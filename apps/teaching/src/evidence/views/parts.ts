@@ -2,7 +2,7 @@ import { button, el } from '@/quiz/dom';
 import { ITEM } from '../constants';
 import type { CompareRow, Quadrants } from '../patterns';
 import type { ItemStat, Summary } from '../stats';
-import { TAG_KIND_LABEL, type Flag, type InsightQuestion, type MixUp, type TagKind, type TagRow } from '../types';
+import { TAG_KIND_LABEL, type Flag, type MixUp, type TagKind, type TagRow } from '../types';
 import './insight.css';
 
 /** Small pieces the quiz insight and the markbook Patterns view share. */
@@ -33,7 +33,6 @@ export function summaryCards(s: Summary | null, attempts: number, of: number, al
   const row = el('div', 'ev-cards');
   row.append(
     card('Attempts', of ? `${attempts}/${of}` : String(attempts)),
-    card('Mean', pct(s?.mean)),
     card('Median', pct(s?.median)),
     card('Std dev', s ? String(Math.round(s.sd * 100)) : '–', 'Spread, in percentage points.'),
     card('Middle half', s ? `${Math.round(s.q1 * 100)}–${Math.round(s.q3 * 100)}%` : '–'),
@@ -43,50 +42,10 @@ export function summaryCards(s: Summary | null, attempts: number, of: number, al
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}): SVGElementTagNameMap[K] {
+export function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}): SVGElementTagNameMap[K] {
   const node = document.createElementNS(SVG, tag);
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
   return node;
-}
-
-/**
- * One dot per student on a 0–100% line, equal scores stacked; the middle half shaded and the median marked.
- * The 0/50/100% labels are HTML under the drawing, so they stay readable when the drawing shrinks on a phone.
- */
-export function dotPlot(shares: number[], s: Summary | null): HTMLElement {
-  const x = (share: number): number => 20 + share * 600;
-  const stacks = new Map<number, number>();
-  const bins = shares.map((share) => Math.round(share * 50));
-  const counts = new Map<number, number>();
-  for (const b of bins) counts.set(b, (counts.get(b) ?? 0) + 1);
-  const step = Math.min(9, 30 / Math.max(1, ...counts.values()));
-  const r = Math.min(4.5, step / 2);
-  const dots: Array<[number, number]> = [];
-  for (const share of [...shares].sort((a, b) => a - b)) {
-    const bin = Math.round(share * 50);
-    const k = stacks.get(bin) ?? 0;
-    stacks.set(bin, k + 1);
-    dots.push([x(bin / 50), 36 - r - k * step]);
-  }
-  const root = svg('svg', { viewBox: '0 0 640 46', class: 'ev-dots', role: 'img' });
-  const title = svg('title');
-  title.textContent = `Scores of ${shares.length} ${shares.length === 1 ? 'student' : 'students'}${s ? `, median ${pct(s.median)}` : ''}`;
-  root.append(title, svg('line', { x1: 20, y1: 40, x2: 620, y2: 40, class: 'ev-dots__axis' }));
-  if (s) {
-    root.append(svg('rect', { x: x(s.q1), y: 22, width: Math.max(2, x(s.q3) - x(s.q1)), height: 18, rx: 3, class: 'ev-dots__band' }));
-    root.append(svg('line', { x1: x(s.median), y1: 16, x2: x(s.median), y2: 44, class: 'ev-dots__median' }));
-  }
-  for (const [cx, cy] of dots) root.append(svg('circle', { cx, cy, r, class: 'ev-dots__dot' }));
-  const ticks = el('div', 'ev-dots__ticks');
-  ticks.setAttribute('aria-hidden', 'true');
-  for (const [t, text] of [[0, '0%'], [0.5, '50%'], [1, '100%']] as const) {
-    const tick = el('span', 'ev-dots__tick', text);
-    tick.style.left = `${(x(t) / 640) * 100}%`;
-    ticks.append(tick);
-  }
-  const wrap = el('figure', 'ev-dotplot');
-  wrap.append(root, ticks);
-  return wrap;
 }
 
 export function tagSwitch(kinds: TagKind[], current: TagKind, onPick: (kind: TagKind) => void): HTMLElement {
@@ -220,42 +179,12 @@ export function quadrantGrid(q: Quadrants, who: (ids: string[]) => string): HTML
   return grid;
 }
 
-/** Facility and discrimination per question, with a quality note. */
-export function questionTable(questions: InsightQuestion[], stats: ItemStat[], showDiscrimination: boolean): HTMLElement {
-  const table = el('table', 'ev-questions');
-  const head = el('tr');
-  // Discrimination only gets a column when it is shown.
-  for (const [h, hidden] of [['Question', false], ['Right', false], ...(showDiscrimination ? [['Discrimination', false] as const] : []), ['Note', true]] as const) {
-    const th = el('th');
-    th.scope = 'col';
-    if (hidden) th.append(el('span', 'ev-visually-hidden', h));
-    else th.textContent = h;
-    head.append(th);
-  }
-  table.append(head);
-  questions.forEach((q, i) => {
-    const s = stats[i];
-    const tr = el('tr');
-    const note =
-      !s || s.facility === null
-        ? ''
-        : s.facility >= ITEM.tooEasy
-          ? 'Too easy'
-          : s.facility <= ITEM.tooHard
-            ? 'Too hard'
-            : showDiscrimination && s.discrimination !== null && s.discrimination < 0
-              ? 'Check question'
-              : '';
-    const prompt = el('td', 'ev-questions__prompt', q.prompt || 'Question');
-    prompt.title = q.prompt;
-    const noteCell = el('td');
-    if (note) noteCell.append(el('span', `ev-badge ev-badge--${note === 'Check question' ? 'weak' : 'thin'}`, note));
-    tr.append(prompt, el('td', undefined, pct(s?.facility)));
-    if (showDiscrimination) tr.append(el('td', undefined, s?.discrimination !== null && s?.discrimination !== undefined ? s.discrimination.toFixed(2) : ''));
-    tr.append(noteCell);
-    table.append(tr);
-  });
-  return table;
+/** The one-word quality note for a question, from how many got it right and whether the strong students did better. */
+export function itemNote(s: ItemStat | undefined, showDiscrimination: boolean): 'Too easy' | 'Too hard' | 'Check question' | '' {
+  if (!s || s.facility === null) return '';
+  if (s.facility >= ITEM.tooEasy) return 'Too easy';
+  if (s.facility <= ITEM.tooHard) return 'Too hard';
+  return showDiscrimination && s.discrimination !== null && s.discrimination < 0 ? 'Check question' : '';
 }
 
 export function comparePanel(rows: CompareRow[], label: (tag: string) => string, title: string): HTMLElement {

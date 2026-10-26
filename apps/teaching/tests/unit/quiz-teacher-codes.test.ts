@@ -70,6 +70,8 @@ async function openAttempt() {
   });
   document.body.append(handle.root);
   // Wait for the insight context, then open the attempt.
+  await vi.waitFor(() => expect(handle.root.querySelector('.ev-tab')).toBeTruthy());
+  [...handle.root.querySelectorAll<HTMLButtonElement>('.ev-tab')].find((t) => t.textContent?.startsWith('Students'))!.click();
   await vi.waitFor(() => expect(handle.root.querySelector('.qz-attempt')).toBeTruthy());
   await new Promise((r) => setTimeout(r, 0));
   handle.root.querySelector<HTMLButtonElement>('button.qz-attempt')!.click();

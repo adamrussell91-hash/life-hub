@@ -5,7 +5,8 @@ vi.mock('@/blocks/literary-elements', () => ({ loadLiteraryElements: loaders.ele
 vi.mock('@/skills/api', () => ({ loadSkills: loaders.skills }));
 vi.mock('@/blocks/feedback-codes', () => ({ loadFeedbackCodes: loaders.codes }));
 
-import { dotPlot, flagCards, mixUpList, questionTable, summaryCards, tagRows, tagSwitch } from '@/evidence/views/parts';
+import { flagCards, mixUpList, summaryCards, tagRows, tagSwitch } from '@/evidence/views/parts';
+import { attemptStrips, newResultsUi, questionRows, scoreHistogram, scoreRing } from '@/evidence/views/results';
 import { summary } from '@/evidence/stats';
 import type { Flag, TagRow } from '@/evidence/types';
 
@@ -17,17 +18,6 @@ describe('view parts', () => {
     expect(node.textContent).toContain('2/3');
     expect(node.textContent).toContain('60%');
     expect(node.querySelector('[title="Needs 5 attempts."]')?.textContent).toContain('–');
-  });
-  it('dot plot draws one dot per score and stacks equal scores', () => {
-    const svg = dotPlot([0.5, 0.5, 0.9], summary([0.5, 0.5, 0.9])).querySelector('svg')!;
-    const dots = [...svg.querySelectorAll('circle')];
-    expect(dots).toHaveLength(3);
-    expect(new Set(dots.map((d) => d.getAttribute('cy'))).size).toBe(2);
-  });
-  it('dot plot labels its scale in HTML under the drawing', () => {
-    const plot = dotPlot([0.2], summary([0.2]));
-    expect(plot.querySelector('svg text')).toBeNull();
-    expect([...plot.querySelectorAll('.ev-dots__tick')].map((t) => t.textContent)).toEqual(['0%', '50%', '100%']);
   });
   it('tag rows give long names a tooltip so they can be cut short', () => {
     const row: TagRow = { tag: 'tech:Personification', mean: 0.3, full: 0.2, half: 0.2, confidence: null, questions: 2, band: 'weak', groups: { weak: [], developing: [], secure: [] } };
@@ -60,16 +50,6 @@ describe('view parts', () => {
     expect(now.getAttribute('aria-pressed')).toBe('true');
     host.remove();
   });
-  it('question table drops the discrimination column when it is not shown', () => {
-    const qs = [{ id: 'q1', prompt: 'Find it', marks: 1, kind: 'spot_technique', outcomes: [] }] as Parameters<typeof questionTable>[0];
-    const hidden = questionTable(qs, [{ facility: 0.5, discrimination: 0.3 }], false);
-    expect(hidden.querySelectorAll('th')).toHaveLength(3);
-    expect(hidden.textContent).not.toContain('Discrimination');
-    expect(hidden.querySelector('tr:last-child')!.querySelectorAll('td')).toHaveLength(3);
-    const shown = questionTable(qs, [{ facility: 0.5, discrimination: 0.3 }], true);
-    expect([...shown.querySelectorAll('th')].map((t) => t.textContent)).toEqual(['Question', 'Right', 'Discrimination', 'Note']);
-    expect(shown.textContent).toContain('0.30');
-  });
   it('tag rows name bands', () => {
     const row: TagRow = { tag: 'tech:jux', mean: 0.3, full: 0.2, half: 0.2, confidence: 2.4, questions: 3, band: 'weak', groups: { weak: [], developing: [], secure: [] } };
     const node = tagRows([row, { ...row, tag: 'tech:motif', band: 'thin', questions: 1 }], label);
@@ -97,24 +77,48 @@ describe('view parts', () => {
     expect(node.textContent).toContain('jux named as contrast · 3');
     expect(node.textContent).not.toContain('not found');
   });
-  it('question table flags too easy and check question', () => {
-    const node = questionTable(
-      [{ id: 'q1', prompt: 'Find the simile', marks: 1, kind: 'spot_technique', outcomes: [] }, { id: 'q2', prompt: 'Name it', marks: 1, kind: 'quote_technique', outcomes: [] }],
-      [{ facility: 0.97, discrimination: 0.05 }, { facility: 0.45, discrimination: -0.1 }],
-      true
-    );
+  it('question rows show the share right, flag too easy and check question, and open to the detail', () => {
+    const qs = [{ id: 'q1', prompt: 'Find the simile', marks: 1, kind: 'spot_technique', outcomes: [] }, { id: 'q2', prompt: 'Name it', marks: 1, kind: 'quote_technique', outcomes: [] }];
+    const ui = newResultsUi();
+    const node = questionRows(qs, [{ facility: 0.97, discrimination: 0.05 }, { facility: 0.45, discrimination: -0.1 }], true, ui, (id) => {
+      const d = document.createElement('p');
+      d.textContent = `detail ${id}`;
+      return d;
+    });
+    expect([...node.querySelectorAll('.ev-qrow__pct')].map((n) => n.textContent)).toEqual(['97%', '45%']);
     expect(node.textContent).toContain('Too easy');
     expect(node.textContent).toContain('Check question');
+    expect(node.textContent).not.toContain('detail q2');
+    node.querySelectorAll<HTMLButtonElement>('.ev-qrow__head')[1]!.click();
+    expect(node.textContent).toContain('detail q2');
+    expect(node.textContent).toContain('Discrimination -0.10');
+    expect(ui.openQuestions.has('q2')).toBe(true);
   });
-  it('dot plot keeps tall stacks inside the viewBox', () => {
-    const shares = Array(20).fill(0.5);
-    const svg = dotPlot(shares, summary(shares)).querySelector('svg')!;
-    const [, , , h] = svg.getAttribute('viewBox')!.split(' ').map(Number);
-    for (const c of svg.querySelectorAll('circle')) {
-      const cy = Number(c.getAttribute('cy'));
-      expect(cy).toBeGreaterThanOrEqual(0);
-      expect(cy).toBeLessThanOrEqual(h!);
-    }
+  it('question rows list the hardest first on request', () => {
+    const qs = [{ id: 'q1', prompt: 'Easy', marks: 1, kind: 'x', outcomes: [] }, { id: 'q2', prompt: 'Hard', marks: 1, kind: 'x', outcomes: [] }];
+    const node = questionRows(qs, [{ facility: 0.9, discrimination: null }, { facility: 0.2, discrimination: null }], false, newResultsUi());
+    node.querySelector<HTMLButtonElement>('.ev-switch__pill')!.click();
+    expect([...node.querySelectorAll('.ev-qrow__prompt')].map((n) => n.textContent)).toEqual(['Hard', 'Easy']);
+    expect([...node.querySelectorAll('.ev-qrow__n')].map((n) => n.textContent)).toEqual(['2', '1']);
+  });
+  it('score ring shows the average and the histogram bins every score', () => {
+    expect(scoreRing(0.69).textContent).toContain('69%');
+    expect(scoreRing(null).textContent).toContain('–');
+    const shares = [0.1, 0.15, 0.55, 1];
+    const fig = scoreHistogram(shares, summary(shares));
+    expect([...fig.querySelectorAll('rect.ev-hist__bar')]).toHaveLength(3);
+    expect([...fig.querySelectorAll('.ev-hist__n')].map((n) => n.textContent)).toEqual(['2', '1', '1']);
+    expect([...fig.querySelectorAll('.ev-dots__tick')].map((t) => t.textContent)).toEqual(['0%', '50%', '100%']);
+  });
+  it('attempt strips give one square per question', () => {
+    const p = {
+      questions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }],
+      attempts: [{ attempt_id: 'a1', rows: [{ id: 'q1', awarded: 2, max: 2 }, { id: 'q2', awarded: 1, max: 2 }, { id: 'q3', awarded: 0, max: 2 }, { id: 'q4', awarded: null, max: 2 }] }]
+    } as unknown as Parameters<typeof attemptStrips>[0];
+    const { head, strip } = attemptStrips(p);
+    expect(head.children).toHaveLength(4);
+    expect([...strip('a1')!.children].map((c) => (c as HTMLElement).dataset.state)).toEqual(['full', 'part', 'none', 'wait']);
+    expect(strip('missing')).toBeNull();
   });
   it('dismiss and follow-up buttons name their flag', () => {
     const flag: Flag = { id: 'sure_wrong:tech:jux', type: 'sure_wrong', tag: 'tech:jux', students: [] };
