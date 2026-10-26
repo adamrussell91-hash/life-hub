@@ -1,4 +1,4 @@
-import type { LimitBox, SprintPhaseKey, UnderstandStep } from './schema';
+import type { LimitBox, UnderstandStep } from './schema';
 
 /**
  * Plain-language help for every step a student meets. Each step says what to
@@ -120,24 +120,64 @@ export const SKETCH_GUIDE: Record<'inspiration' | 'rapid' | 'pick' | 'develop', 
   }
 };
 
-/** What each later phase is, in three plain steps. */
-export const PHASE_GUIDE: Partial<Record<SprintPhaseKey, { icon: string; steps: string[]; done: string }>> = {
-  decide: {
+export const LATER_GUIDE = {
+  read: {
+    icon: '👀',
+    doThis: 'Open every set of ideas and read them. Place a dot on any part that stands out.',
+    why: 'Reading all the ideas, not just the first few, is how you find the best one.',
+    example: ['A dot goes on one part, like a clever feature, even if you won’t pick that idea overall.'],
+    stuck: ['Open one set at a time and read slowly.', 'Ask: would this actually fix the problem we chose?']
+  },
+  reasons: {
     icon: '⚖️',
-    steps: ['Open every set of ideas and read them.', 'Place your dots on the parts that stand out.', 'Choose the best idea for each criterion and say why.'],
-    done: 'Done when every dot is placed and every criterion has a reason.'
+    doThis: 'For each criterion, say which idea does it best and why.',
+    why: 'A reason turns a gut feeling into an argument your group can discuss.',
+    example: ['Speed: Idea B does this best because students collect lunch without queuing.'],
+    stuck: ['Use the sentence starter.', 'One idea can win more than one criterion.']
   },
-  prototype: {
+  part: {
+    icon: '📌',
+    doThis: 'Read your part: what it is, what it must show and which criterion it serves.',
+    why: 'Your part is one piece of your group’s prototype, so it has to fit with the others.',
+    example: ['Part: the order screen. It must show the pickup time. It serves: speed.'],
+    stuck: ['No part yet? Your group gives parts out in Decide. Ask them.']
+  },
+  build: {
     icon: '🧪',
-    steps: ['Find your part in the list.', 'Build it so it meets the criteria.', 'Tick off each criterion and add your work.'],
-    done: 'Done when your part is added and your group’s pitch file is set.'
+    doThis: 'Write or build your part, then upload a picture, PDF or link if it helps.',
+    why: 'Making it real shows you what works and what you missed.',
+    example: ['A short description plus a sketch of the screen is enough to show your idea.'],
+    stuck: ['Start with the “must show” line and answer it first.', 'A rough sketch is fine. You can improve it later.']
   },
-  test: {
-    icon: '🎤',
-    steps: ['Watch each group’s pitch.', 'Write feedback that helps them improve.', 'Read the feedback your group received.'],
-    done: 'Done when you have sent feedback to every group.'
+  share: {
+    icon: '🤝',
+    doThis: 'See how your group’s parts are coming together and set the pitch file.',
+    why: 'Your pitch shows the whole prototype, not only your part.',
+    example: ['The assembler puts all the parts together and uploads one finished file.'],
+    stuck: ['Part missing? Message that groupmate.', 'Not the assembler? Your job is your own part.']
+  },
+  check: {
+    icon: '✅',
+    doThis: 'Rate your part against each criterion and tick the requirements it meets.',
+    why: 'Checking yourself first finds gaps before the pitch.',
+    example: ['If you chose “Not yet” for a criterion, fix it now or note what you’d change.'],
+    stuck: ['Be honest. The rating is for you and your group.', 'Point to the line in your part that proves each tick.']
+  },
+  feedback: {
+    icon: '📥',
+    doThis: 'Read what other students said about your group’s idea.',
+    why: 'Feedback shows what an audience really understood.',
+    example: ['Look for patterns: did several people say the same thing?'],
+    stuck: ['No feedback yet? Your teacher releases it after the pitches.']
+  },
+  reflect: {
+    icon: '🪞',
+    doThis: 'Answer each prompt, quote one piece of feedback and pick the criterion you’d change next.',
+    why: 'Reflection is where testing turns into a better idea.',
+    example: ['Quote: “It wasn’t clear how students pay.” Change: speed, by adding a pay-ahead step.'],
+    stuck: ['Start with what the feedback showed, then what you’d do differently.', 'Choose the change that matters most, not the easiest.']
   }
-};
+} satisfies Record<string, Guide>;
 
 export type LimitCell = { icon: string; title: string; ask: string; example: string };
 
