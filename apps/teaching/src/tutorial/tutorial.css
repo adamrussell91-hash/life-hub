@@ -1,16 +1,11 @@
 /* apps/teaching/src/tutorial/tutorial.css */
 .tut, .tut__body { display: grid; gap: var(--space-4); }
 .tut__hero:empty { display: none; }
-.tut__goal { margin: 0; font-weight: var(--weight-semibold); color: var(--ink); }
+.tut__page { display: grid; gap: var(--space-4); min-width: 0; }
 .tut__note { color: var(--muted); }
-.tut-wait { display: grid; gap: var(--space-3); place-items: center; text-align: center; padding: var(--space-6, 3rem) var(--space-4); border: 1px dashed var(--line); border-radius: var(--radius-md); }
-.tut-wait__title { margin: 0; font-size: var(--text-lg); }
-.tut-shown { margin: 0; padding: var(--space-3) var(--space-4); border-left: 4px solid var(--marine); background: color-mix(in srgb, var(--marine) 6%, var(--paper)); text-align: left; max-width: 34rem; width: 100%; }
-.tut-shown__label { margin: 0 0 var(--space-1); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.tut-shown__text { margin: 0; font-size: var(--text-lg); }
 .tut-claim { display: grid; gap: var(--space-2); max-width: 20rem; }
 .tut-claim__err { margin: 0; color: var(--danger); }
-.tut__finish { justify-self: start; min-height: 44px; }
+.tut__next { justify-self: start; min-height: 44px; }
 
 /* Teacher board: a card per group, then the live board for the group being sat with. */
 .tut-board { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); min-width: 0; }
