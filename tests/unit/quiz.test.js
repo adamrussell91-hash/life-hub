@@ -557,6 +557,11 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
   assert.match((await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id].attempt_id, /~1$/, 'cleared goes are skipped');
 
   assert.equal(await classQuizScores(store, 'lesson1', 'class1', [bob.id]), null, 'an ordinary lesson is not a quiz');
+
+  assert.equal((await classQuizScores(store, 'quiz1', 'class1', [bob.id, tom.id])).started, undefined, 'nobody is partway');
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'start' });
+  assert.deepEqual((await classQuizScores(store, 'quiz1', 'class1', [bob.id, tom.id])).started, [tom.id], 'Tom opened it and never handed in');
 });
 
 test('markbook: a student’s cleared record and first attempt are read in one round trip', async () => {
