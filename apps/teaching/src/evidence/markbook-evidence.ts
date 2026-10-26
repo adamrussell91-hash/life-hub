@@ -7,7 +7,7 @@ import type { Evidence } from './types';
 export type Source = { source: string; title: string };
 
 /**
- * Every piece of evidence the markbook holds: quiz items (first attempts,
+ * Every piece of evidence the markbook holds: quiz items (latest attempts,
  * shown quizzes only) and assessment criteria. Old outcome codes become
  * catalogue ids when `labels` are given.
  */
