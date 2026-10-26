@@ -31,6 +31,8 @@
 // `/introduction-paths`'s output. See tests/integration/network-ecology-world.test.js's
 // dedicated privacy test for the end-to-end proof.
 
+import { isDeletedRecord } from './record-liveness.mjs';
+
 import { loadAllPeopleWithRelationships } from './people-collection.mjs';
 import { groupCurrentOrganisationMembers } from './people-cohorts.mjs';
 import {
@@ -68,13 +70,20 @@ function isLinkActiveAsOf(link, cutoffMs) {
 }
 
 function isVisiblePerson(person) {
-  return person?.lifecycle_status !== 'archived';
+  return Boolean(person) && !isDeletedRecord(person) && person.lifecycle_status !== 'archived';
 }
 
 // Exported for direct unit testing of the privacy gap this module closes,
 // independent of any store.
 export function filterVisiblePeople(peopleWithRelationships) {
-  return (peopleWithRelationships ?? []).filter((entry) => isVisiblePerson(entry.person));
+  return (peopleWithRelationships ?? [])
+    .filter((entry) => isVisiblePerson(entry.person))
+    .map((entry) => ({
+      ...entry,
+      relationships: (entry.relationships ?? []).filter(({ endpoint }) =>
+        !isDeletedRecord(endpoint) && endpoint?.lifecycle_status !== 'archived'
+      )
+    }));
 }
 
 async function loadVisiblePeople(deps) {
