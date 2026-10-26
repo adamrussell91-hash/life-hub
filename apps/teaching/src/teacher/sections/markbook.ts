@@ -14,6 +14,7 @@ import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
+import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { newDetailState, renderPatterns } from '@/markbook/patterns-view';
@@ -44,12 +45,13 @@ type Options = {
   narrow?: () => boolean;
   /** Test seam for today's date, YYYY-MM-DD. */
   today?: () => string;
-  /** The view the markbook opens on. Defaults to Next steps. */
+  /** The view the markbook opens on. Defaults to the syllabus Grid. */
   view?: Mode;
 };
 
-type Mode = 'next' | 'grid' | 'detail' | 'history';
-const MODES: Array<[Mode, string]> = [['next', 'Next steps'], ['grid', 'Grid'], ['detail', 'Detail'], ['history', 'History']];
+/** `grid` is the syllabus Grid; `marks` is the table of quizzes and tasks. */
+type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks';
+const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -109,9 +111,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let view: MarkbookView | null = null;
   /** The last view the server confirmed, with no local changes on it. */
   let confirmed: MarkbookView | null = null;
-  let mode: Mode = options.view ?? 'next';
+  let mode: Mode = options.view ?? 'grid';
   /** Sort orders and open rows, kept across redraws. */
   const nextState = newNextState();
+  const gridState = newSyllabusGridState();
   const detailState = newDetailState();
   const historyState = newHistoryState();
   /** Names for tags and codes, for Next steps, Detail and the student panel; loaded once, after the markbook. */
@@ -511,9 +514,25 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode !== 'grid') {
+    if (mode !== 'marks') {
       const context = ctx;
       if (!context) body.replaceChildren(el('p', 'mb__status', ctxError ?? 'Loading…'));
+      else if (mode === 'grid')
+        body.replaceChildren(
+          renderSyllabusGrid(
+            current,
+            students,
+            context,
+            gridState,
+            {
+              openStudent: actions.openStudent,
+              followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
+              planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
+              repaint: paint
+            },
+            narrow()
+          )
+        );
       else if (mode === 'next')
         body.replaceChildren(
           renderNextSteps(current, students, context, nextState, {
@@ -662,7 +681,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     (loaded) => {
       if (disposed) return;
       ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
-      if (mode !== 'grid') paint();
+      if (mode !== 'marks') paint();
       void syncGroups();
       const waiting = pendingStudent;
       pendingStudent = null;
@@ -676,7 +695,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       ctxError = 'Couldn’t load the tag names, so Next steps, Detail and student panels can’t open. Reload to try again.';
       pendingStudent = null;
       status.textContent = ctxError;
-      if (mode !== 'grid') paint();
+      if (mode !== 'marks') paint();
     }
   );
   return () => {
