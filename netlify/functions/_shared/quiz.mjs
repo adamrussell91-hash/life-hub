@@ -385,7 +385,10 @@ async function deviceAttempts(store, k, device, from) {
     if (!next) break;
     starts.push(next);
   }
-  return Promise.all(starts.map((start) => loadAttempt(store, k, device, start)));
+  // A deleted go keeps its start as a marker, so its number is never reused.
+  const goes = await Promise.all(starts.filter((s) => !s.deleted).map((start) => loadAttempt(store, k, device, start)));
+  goes.next = starts.reduce((top, s) => Math.max(top, s.n + 1), from);
+  return goes;
 }
 
 /**
@@ -495,7 +498,7 @@ export async function quizAction(store, lessonId, body) {
     if (closed) reject(409, 'closed', 'This quiz has closed.');
     if (attempts.length >= settings.attempts) reject(409, 'no_attempts', settings.attempts === 1 ? 'You’ve already done this quiz.' : 'You’ve used all your attempts.');
     const start = {
-      n: attempts.reduce((top, a) => Math.max(top, a.n + 1), from),
+      n: attempts.next,
       version: record.version,
       started_at: new Date(now).toISOString(),
       deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null,
@@ -649,7 +652,7 @@ async function studentLabel(store, start, rosters) {
 async function clearOwner(store, k, lessonId, device) {
   const from = await clearedFrom(store, k, device);
   const goes = await deviceAttempts(store, k, device, from);
-  const next = goes.reduce((top, a) => Math.max(top, a.n + 1), from);
+  const next = goes.next;
   await store.setJSON(k.cleared(device), { from: next, at: new Date().toISOString() });
   const prefixes = ['attempts', 'hints', 'checked', 'results'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
   const doomed = (await Promise.all(prefixes.map((prefix) => listBlobKeys(store, prefix)))).flat();
@@ -667,7 +670,7 @@ export async function quizTeacherAction(store, lessonId, body) {
   }
   if (action.startsWith('live_')) return liveTeacher(store, lessonId, body, action);
   if (action === 'classes') return { classes: await classesForLesson(store, lessonId) };
-  if (!['results', 'attempt', 'mark', 'release', 'reset', 'clear_all', 'insight', 'close', 'reopen', 'dismiss_flag'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['results', 'attempt', 'mark', 'release', 'reset', 'delete_attempt', 'clear_all', 'insight', 'close', 'reopen', 'dismiss_flag'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
 
   let loaded;
   try {
@@ -704,6 +707,19 @@ export async function quizTeacherAction(store, lessonId, body) {
     const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
     if (!match) reject(400, 'bad_request', 'Unknown attempt.');
     await clearOwner(store, k, lessonId, match[1]);
+    await markInsightChanged(store, lessonId);
+  }
+
+  // One handed-in go, gone for good: it no longer counts anywhere and the student gets that go back.
+  if (action === 'delete_attempt') {
+    const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
+    if (!match) reject(400, 'bad_request', 'Unknown attempt.');
+    const [device, n] = [match[1], Number(match[2])];
+    const start = await read(store, k.attempt(device, n));
+    if (!start || start.deleted || !(await read(store, k.result(device, n)))) reject(404, 'not_found', 'That attempt is gone.');
+    await store.setJSON(k.attempt(device, n), { n, deleted: true, deleted_at: new Date().toISOString(), ...(start.class_id ? { class_id: start.class_id } : {}), ...(start.student_id ? { student_id: start.student_id } : {}) });
+    const doomed = (await Promise.all([listBlobKeys(store, k.hints(device, n)), listBlobKeys(store, k.checked(device, n))])).flat();
+    await mapBounded([k.result(device, n), k.marks(device, n), ...doomed], 8, (key) => store.delete(key));
     await markInsightChanged(store, lessonId);
   }
 
