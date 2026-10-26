@@ -27,6 +27,7 @@ import { FOLLOW_UP } from '@/evidence/constants';
 import { tagLabel } from '@/evidence/tags';
 import type { InsightPayload } from '@/evidence/types';
 import { renderQuizInsight } from '@/evidence/views/quiz-insight';
+import { attemptStrips, band, newResultsUi } from '@/evidence/views/results';
 import { codeChips } from '@/evidence/code-chips';
 import { navigate } from '@/app/router';
 import './quiz.css';
@@ -109,6 +110,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let editing: string | null = null;
   let results: Results | null = null;
   let openAttempt: string | null = null;
+  const resultsUi = newResultsUi();
   let live: LiveQuiz | null = null;
   let disposed = false;
   let timer: number | undefined;
@@ -611,6 +613,24 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     }
     const r = results;
     const total = r.attempts.length;
+    const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
+    const release =
+      r.feedback === 'released'
+        ? button(r.released ? 'Hide results from students' : 'Release results to students', r.released ? 'ghost' : 'primary', async function () {
+            this.disabled = true;
+            try {
+              results = await post<Results>({ action: 'release', released: !r.released });
+            } catch (error) {
+              showError(error);
+            }
+            paint();
+          })
+        : null;
+    if (insight && ctx) {
+      wrap.append(...insightSection(insight, ctx, release, studentsView(r, names, attemptStrips(insight)), r));
+      return wrap;
+    }
+    // No class insight to build on: plain counts, the questions and the attempts.
     const avg = total ? r.attempts.reduce((sum, a) => sum + (a.max ? a.score / a.max : 0), 0) / total : 0;
     const waiting = r.attempts.reduce((sum, a) => sum + a.pending, 0);
     const top = el('div', 'qz-results__top');
@@ -619,65 +639,80 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       stat(total ? `${Math.round(avg * 100)}%` : '–', 'average'),
       stat(String(waiting), waiting === 1 ? 'answer to mark' : 'answers to mark')
     );
-    if (r.feedback === 'released') {
-      top.append(
-        button(r.released ? 'Hide results from students' : 'Release results to students', r.released ? 'ghost' : 'primary', async function () {
-          this.disabled = true;
-          try {
-            results = await post<Results>({ action: 'release', released: !r.released });
-          } catch (error) {
-            showError(error);
-          }
-          paint();
-        })
-      );
-    }
+    if (release) top.append(release);
     wrap.append(top);
-    if (insight && ctx) wrap.append(...insightSection(insight, ctx));
+    if (total) {
+      wrap.append(el('h4', 'qz-h', 'Answers by question'));
+      const qs = el('ol', 'qz-qstats');
+      for (const q of r.questions) qs.append(questionStat(q));
+      wrap.append(qs);
+    }
+    wrap.append(studentsView(r, names, null));
+    return wrap;
+  }
+
+  /** Every hand-in, lowest or latest first, with a square per question when the class insight has the marks. */
+  function studentsView(r: Extract<Results, { published: true }>, names: Map<string, string>, strips: ReturnType<typeof attemptStrips> | null): HTMLElement {
+    const wrap = el('div', 'qz-students');
+    const total = r.attempts.length;
     if (!total) {
       wrap.append(el('p', 'qz-note block-secondary', 'No one has finished the quiz yet. This updates by itself.'));
       return wrap;
     }
-
-    wrap.append(el('h4', 'qz-h', 'Answers by question'));
-    const qs = el('ol', 'qz-qstats');
-    for (const q of r.questions) qs.append(questionStat(q));
-    wrap.append(qs);
-
-    wrap.append(el('h4', 'qz-h', 'Attempts'));
-    const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
-    const list = el('ul', 'qz-attempts');
     const sets = r.sets ?? [];
-    if (sets.length) {
-      const head = el('li', 'qz-attempts__head');
-      head.append(el('span', 'qz-attempt__who'), el('span', 'qz-attempt__score'));
-      for (const set of sets) head.append(el('span', 'qz-attempt__set', set.name));
-      list.append(head);
-    }
-    for (const a of r.attempts) {
-      const li = el('li');
-      const b = el('button', 'qz-attempt');
-      b.type = 'button';
-      b.append(
-        el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.go > 0 ? ` · go ${a.go + 1}` : ''}`),
-        el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
-        ...sets.map((set) => {
-          const p = a.practice?.[set.id];
-          const cell = el('span', 'qz-attempt__set', p ? `${formatMarks(p.score)}/${formatMarks(p.max)}` : '');
-          cell.dataset.set = set.id;
-          return cell;
-        }),
-        el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
-      );
-      if (a.pending) b.dataset.pending = 'true';
-      b.addEventListener('click', () => {
-        openAttempt = a.id;
-        paint();
-      });
-      li.append(b);
-      list.append(li);
-    }
-    wrap.append(list);
+    const list = el('ul', 'qz-attempts');
+    if (sets.length) list.style.setProperty('--qz-attempt-cols', `minmax(0, 1fr) auto 3rem repeat(${sets.length}, 4.5em)`);
+    const draw = (): void => {
+      const rows = [...r.attempts];
+      if (resultsUi.lowestFirst) rows.sort((a, b) => (a.max ? a.score / a.max : 0) - (b.max ? b.score / b.max : 0));
+      list.replaceChildren();
+      if (sets.length || strips) {
+        const head = el('li', 'qz-attempts__head');
+        head.append(el('span', 'qz-attempt__who'), strips ? strips.head.cloneNode(true) : el('span'), el('span', 'qz-attempt__score'));
+        for (const set of sets) head.append(el('span', 'qz-attempt__set', set.name));
+        list.append(head);
+      }
+      for (const a of rows) {
+        const li = el('li');
+        const b = el('button', 'qz-attempt');
+        b.type = 'button';
+        const share = a.max ? a.score / a.max : 0;
+        const score = el('span', 'qz-attempt__score', `${Math.round(share * 100)}%`);
+        score.title = `${formatMarks(a.score)} / ${formatMarks(a.max)} marks`;
+        score.dataset.band = band(share);
+        b.append(
+          el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.go > 0 ? ` · go ${a.go + 1}` : ''}`),
+          strips?.strip(a.id) ?? el('span'),
+          score,
+          ...sets.map((set) => {
+            const p = a.practice?.[set.id];
+            const cell = el('span', 'qz-attempt__set', p ? `${formatMarks(p.score)}/${formatMarks(p.max)}` : '');
+            cell.dataset.set = set.id;
+            return cell;
+          }),
+          el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
+        );
+        if (a.pending) b.dataset.pending = 'true';
+        b.addEventListener('click', () => {
+          openAttempt = a.id;
+          paint();
+        });
+        li.append(b);
+        list.append(li);
+      }
+    };
+    const tools = el('div', 'qz-students__tools');
+    const sort = el('button', 'ev-switch__pill', resultsUi.lowestFirst ? 'Lowest first' : 'Latest first');
+    sort.type = 'button';
+    sort.setAttribute('aria-pressed', String(resultsUi.lowestFirst));
+    sort.addEventListener('click', () => {
+      resultsUi.lowestFirst = !resultsUi.lowestFirst;
+      sort.textContent = resultsUi.lowestFirst ? 'Lowest first' : 'Latest first';
+      sort.setAttribute('aria-pressed', String(resultsUi.lowestFirst));
+      draw();
+    });
+    tools.append(el('span', 'qz-note block-secondary', strips ? 'Each square is a question: dark full marks, light part marks, red none.' : 'Tap a student to see their answers.'), sort);
+    draw();
     const foot = el('div', 'qz-results__foot');
     foot.append(
       button('Clear all attempts', 'ghost', async function () {
@@ -691,12 +726,12 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         paint();
       })
     );
-    wrap.append(foot);
+    wrap.append(tools, list, foot);
     return wrap;
   }
 
-  function insightSection(p: InsightPayload, context: InsightContext): HTMLElement[] {
-    const out: HTMLElement[] = [];
+  function insightSection(p: InsightPayload, context: InsightContext, release: HTMLElement | null, students: HTMLElement, r: Extract<Results, { published: true }>): HTMLElement[] {
+    const extras: HTMLElement[] = [];
     if ((classes?.length ?? 0) > 0) {
       // "Every hand-in" shows attempts whatever class or student they were saved under, so none can hide.
       const pick = select([...(classes ?? []).map((c) => ({ value: c.id, label: c.title })), { value: '', label: 'Every hand-in (any class)' }], insightClass ?? '');
@@ -711,7 +746,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         }
         paint();
       });
-      out.push(labelled('Class', pick, 'Insights use each student’s latest attempt.'));
+      pick.title = 'Insights use each student’s latest attempt.';
+      extras.push(labelled('Class', pick));
     }
     const act = (run: () => Promise<InsightReply>) => async () => {
       insightGen++;
@@ -724,9 +760,16 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       }
       paint();
     };
-    out.push(
+    return [
       renderQuizInsight(p, {
         ctx: context,
+        ui: resultsUi,
+        extras: release ? [...extras, release] : extras,
+        students,
+        questionDetail: (id) => {
+          const q = r.questions.find((x) => x.id === id);
+          return q ? questionDetail(q) : null;
+        },
         compare: compareInsight,
         followUps: followInsights,
         onClose: act(() => insightApi.close(lessonId, insightClass)),
@@ -765,23 +808,18 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         },
         openLesson: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
       })
-    );
-    return out;
+    ];
   }
 
-  function questionStat(q: QuestionStats): HTMLElement {
-    const li = el('li', 'qz-qstat');
-    const pct = q.total ? Math.round((q.full / q.total) * 100) : 0;
-    const head = el('div', 'qz-qstat__head');
-    head.append(el('span', 'qz-qstat__prompt', questionLabel(q.question)), el('span', 'qz-qstat__pct', `${pct}% full marks`));
-    li.append(head);
-    li.append(meter(pct));
+  /** The notes and option bars under one question: who was sure, who used the hint, what was picked. */
+  function questionDetail(q: QuestionStats): HTMLElement | null {
+    const box = el('div', 'qz-qdetail');
     const notes: string[] = [];
     if (q.pending) notes.push(`${q.pending} to mark`);
     if (q.hinted) notes.push(`${q.hinted} used the hint`);
     const sureWrong = q.confidence['3'][0] - q.confidence['3'][1];
     if (sureWrong > 0) notes.push(`${sureWrong} ${sureWrong === 1 ? 'was' : 'were'} sure but didn’t get full marks`);
-    if (notes.length) li.append(el('p', 'qz-note block-secondary', notes.join(' · ')));
+    if (notes.length) box.append(el('p', 'qz-note block-secondary', notes.join(' · ')));
     if ('options' in q.question && q.key.answer.type === 'choice') {
       const right = new Set(q.key.answer.ids);
       const picksTotal = Object.values(q.picks).reduce((a, b) => a + b, 0);
@@ -793,8 +831,19 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         row.append(el('span', 'qz-bars__label', o.text), meter(picksTotal ? Math.round((n / picksTotal) * 100) : 0), el('span', 'qz-bars__n', String(n)));
         bars.append(row);
       }
-      li.append(bars);
+      box.append(bars);
     }
+    return box.childElementCount ? box : null;
+  }
+
+  function questionStat(q: QuestionStats): HTMLElement {
+    const li = el('li', 'qz-qstat');
+    const pct = q.total ? Math.round((q.full / q.total) * 100) : 0;
+    const head = el('div', 'qz-qstat__head');
+    head.append(el('span', 'qz-qstat__prompt', questionLabel(q.question)), el('span', 'qz-qstat__pct', `${pct}% full marks`));
+    li.append(head, meter(pct));
+    const more = questionDetail(q);
+    if (more) li.append(more);
     return li;
   }
 
