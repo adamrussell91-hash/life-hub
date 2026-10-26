@@ -6,7 +6,10 @@ import { CATALOGUE_IDS } from '../decision-book/catalogue.mjs';
 import { FEEDBACK_ID } from '../decision-book/record-slots.mjs';
 import { GEAR_SHIFTER_MODEL, REVIEW_TOOL as GEAR_REVIEW_TOOL } from '../get-things-done/model.mjs';
 import { CATALOGUE as GEAR_CATALOGUE } from '../get-things-done/catalogue.mjs';
-import { EXPERIMENT_REVIEW_ID as GEAR_EXPERIMENT_REVIEW } from '../get-things-done/commit-slots.mjs';
+import { COMMIT_ID as GEAR_COMMIT, EXPERIMENT_REVIEW_ID as GEAR_EXPERIMENT_REVIEW } from '../get-things-done/commit-slots.mjs';
+import { RULES_BOOK_MODEL } from '../rules-book/model.mjs';
+import { CATALOGUE as RULES_CATALOGUE } from '../rules-book/catalogue.mjs';
+import { COMMIT_ID as RULES_COMMIT, REVIEW_ID as RULES_REVIEW } from '../rules-book/commit-slots.mjs';
 
 /** Tool families. A tool's `step` is one of these. `contradiction` is TRIZ only. */
 export const BOOK_STEPS = Object.freeze([
@@ -66,8 +69,15 @@ const PLANS = Object.freeze({
   // with two it has no default, so the coach chooses.
   gear_shifter: Object.freeze([
     entry('explore', ['explore'], false, () => GEAR_CATALOGUE.map((e) => e.id).filter((id) => TOOLS[id])),
-    entry('commit', ['commit'], false, null, 'implement'),
+    entry('commit', ['commit'], false, () => [GEAR_COMMIT].filter((id) => TOOLS[id]), 'implement'),
     entry('review', ['review'], true, () => [GEAR_EXPERIMENT_REVIEW, GEAR_REVIEW_TOOL].filter((id) => TOOLS[id]), 'improve')
+  ]),
+  // Rules Book: the coach selects the rule, so Explore names the catalogue's tools; Act has the
+  // one experiment tool and Review the one review.
+  rules_book: Object.freeze([
+    entry('explore', ['explore'], false, () => RULES_CATALOGUE.map((e) => e.id).filter((id) => TOOLS[id])),
+    entry('commit', ['commit'], false, () => [RULES_COMMIT].filter((id) => TOOLS[id]), 'implement'),
+    entry('review', ['review'], true, () => [RULES_REVIEW].filter((id) => TOOLS[id]), 'improve')
   ])
 });
 
@@ -104,7 +114,7 @@ export function nextStepAfter(modelId, stepId) {
   return i >= 0 && i < plan.length - 1 ? plan[i + 1].step : null;
 }
 
-const BOOK_MODELS = Object.freeze({ [DECISION_MODEL.id]: DECISION_MODEL, [GEAR_SHIFTER_MODEL.id]: GEAR_SHIFTER_MODEL });
+const BOOK_MODELS = Object.freeze({ [DECISION_MODEL.id]: DECISION_MODEL, [GEAR_SHIFTER_MODEL.id]: GEAR_SHIFTER_MODEL, [RULES_BOOK_MODEL.id]: RULES_BOOK_MODEL });
 const modelDef = (modelId) => MODELS[modelId] ?? BOOK_MODELS[modelId] ?? null;
 
 export function stepName(modelId, stepId) {

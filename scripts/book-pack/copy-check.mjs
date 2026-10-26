@@ -4,7 +4,8 @@
 // It compares against a private pack's fact anchors and page text, so it runs locally, never
 // in CI (tests/unit/get-things-done-copy.test.js skips where the pack is absent).
 //
-//   node scripts/book-pack/copy-check.mjs <pack-dir>   check Gear Shifter's shipped strings
+//   node scripts/book-pack/copy-check.mjs <pack-dir>                   check Gear Shifter's shipped strings
+//   node scripts/book-pack/copy-check.mjs <pack-dir> --book rules-book  check the Rules Book's
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,11 +58,11 @@ export function readPackTexts(dir) {
 /** The app's own copy: every quoted string in Gear Shifter's Tasks views (section and route lines, step text, cards) and the Quick start chart. */
 const APP_DIR = new URL('../../apps/tasks/src/views/get-things-done/', import.meta.url);
 const QUICK_CHART = fileURLToPath(new URL('../../packages/get-things-done/render/quick.ts', import.meta.url));
-function appStrings() {
-  const dir = fileURLToPath(APP_DIR);
+function appStrings(appDir = APP_DIR, extra = [QUICK_CHART]) {
+  const dir = fileURLToPath(appDir);
   if (!existsSync(dir)) return [];
   const out = [];
-  const files = [...readdirSync(dir).filter((name) => name.endsWith('.ts')).map((name) => join(dir, name)), ...(existsSync(QUICK_CHART) ? [QUICK_CHART] : [])];
+  const files = [...readdirSync(dir).filter((name) => name.endsWith('.ts')).map((name) => join(dir, name)), ...extra.filter((path) => existsSync(path))];
   for (const path of files) {
     const file = path.split('/').at(-1);
     const source = readFileSync(path, 'utf8');
@@ -98,6 +99,46 @@ export async function gearShifterStrings() {
   return out;
 }
 
+/** The Rules Book's shipped strings, each with where it came from: rules, the Act and Review tools, the coach's knowledge and rubric, the catalogue, the glyph titles and the app's own copy. */
+export async function rulesBookStrings() {
+  const { RULE_TOOLS } = await import('../../packages/rules-book/tools/index.mjs');
+  const { rbCommit } = await import('../../packages/rules-book/tools/commit.mjs');
+  const { rbReview } = await import('../../packages/rules-book/tools/review.mjs');
+  const knowledge = await import('../../netlify/functions/_shared/problem-solver/knowledge/rules-book.mjs');
+  const { RULES_RUBRIC } = await import('../../netlify/functions/_shared/problem-solver/rules-book-prompts.mjs');
+  const { CATALOGUE, SECTIONS } = await import('../../packages/rules-book/catalogue.mjs');
+  const { GROUPS } = await import('../../packages/rules-book/route.mjs');
+  const glyphs = fileURLToPath(new URL('../../packages/rules-book/glyphs/', import.meta.url));
+  const out = [];
+  for (const [id, tool] of Object.entries({ ...RULE_TOOLS, rb_commit: rbCommit, rb_review: rbReview })) for (const text of shippedStrings(tool)) out.push([id, text]);
+  for (const key of ['STANCE', 'MODEL_CHECKS', 'GROUP_GUIDE', 'SITUATION_GUIDE', 'RULES_TRAPS', 'SECTION_LINE']) out.push([`knowledge ${key}`, knowledge[key]]);
+  out.push(['rubric RULES_RUBRIC', RULES_RUBRIC]);
+  for (const entry of [...CATALOGUE, ...SECTIONS, ...GROUPS]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
+  for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
+      const title = /<title>([^<]*)<\/title>/.exec(readFileSync(join(glyphs, folder.name, file), 'utf8'))?.[1];
+      if (title) out.push([`glyph ${folder.name}/${file}`, title]);
+    }
+  }
+  out.push(...appStrings(new URL('../../apps/tasks/src/views/rules-book/', import.meta.url), []));
+  return out;
+}
+
+/** Copied runs in the Rules Book's shipped strings: [where, run] pairs, empty when clean. */
+export async function checkRulesBook(dir) {
+  const shingles = shinglesOf(readPackTexts(dir));
+  // The four part titles are headings: they are shown as the book's own names for its parts, in the
+  // catalogue and on the part emblems, and nowhere inside running text.
+  const titles = new Set(JSON.parse(readFileSync(join(dir, 'book.json'), 'utf8')).sections.map((part) => wordsOf(part.title).join(' ')));
+  const found = [];
+  for (const [where, text] of await rulesBookStrings()) {
+    if (titles.has(wordsOf(text).join(' '))) continue;
+    const run = copiedRun(text, shingles);
+    if (run) found.push([where, run]);
+  }
+  return found;
+}
+
 /** Copied runs in Gear Shifter's shipped strings: [where, run] pairs, empty when clean. */
 export async function checkGearShifter(dir) {
   const shingles = shinglesOf(readPackTexts(dir));
@@ -110,12 +151,13 @@ export async function checkGearShifter(dir) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const dir = process.argv[2] && resolve(process.argv[2]);
+  const dir = process.argv[2] && !process.argv[2].startsWith('--') && resolve(process.argv[2]);
   if (!dir || !existsSync(join(dir, 'entries'))) {
     console.error('Usage: node scripts/book-pack/copy-check.mjs <pack-dir>');
     process.exit(2);
   }
-  const found = await checkGearShifter(dir);
+  const book = process.argv.includes('--book') ? process.argv[process.argv.indexOf('--book') + 1] : 'get-things-done';
+  const found = book === 'rules-book' ? await checkRulesBook(dir) : await checkGearShifter(dir);
   for (const [where, run] of found) console.log(`COPIED ${where}: "${run}…"`);
   console.log(found.length ? `${found.length} copied runs` : 'No copied runs.');
   process.exit(found.length ? 1 : 0);
