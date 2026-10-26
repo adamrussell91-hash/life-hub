@@ -1940,3 +1940,8 @@
     display: none;
   }
 }
+
+.qz-save { font-size: 0.8rem; color: var(--text-muted, #666); margin-left: auto; }
+.qz-save[data-state='failed'] { color: var(--danger, #b3261e); font-weight: 600; }
+.qz-receipt { border: 2px solid var(--success, #2e7d32); border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+.qz-receipt__title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--success, #2e7d32); }
