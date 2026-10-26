@@ -14,6 +14,9 @@ import { GEAR_SHIFTER_MODEL } from '../get-things-done/model.mjs';
 import { parseRoute } from '../get-things-done/route.mjs';
 import { RECORD_ID } from '../decision-book/record-slots.mjs';
 import { COMMIT_ID } from '../get-things-done/commit-slots.mjs';
+import { RULES_BOOK_MODEL } from '../rules-book/model.mjs';
+import { parseGroups } from '../rules-book/route.mjs';
+import { COMMIT_ID as RULES_COMMIT_ID } from '../rules-book/commit-slots.mjs';
 
 export const BOOK_KINDS = Object.freeze({
   decision: Object.freeze({
@@ -31,6 +34,14 @@ export const BOOK_KINDS = Object.freeze({
     parsePlace: parseRoute,
     record: Object.freeze({ tool: COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The check-back date set in the experiment.', basisRule: 'The experiment rests on what a technique showed' }),
     reason: 'Gear Shifter works from The Get Things Done Book.'
+  }),
+  rules: Object.freeze({
+    model: RULES_BOOK_MODEL,
+    frameKeys: Object.freeze(['situation', 'group', 'known']),
+    placeKey: 'group',
+    parsePlace: parseGroups,
+    record: Object.freeze({ tool: RULES_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The check time set in the experiment.', basisRule: 'The experiment rests on what a rule showed' }),
+    reason: 'The Rules Book works from The Rules Book.'
   })
 });
 
