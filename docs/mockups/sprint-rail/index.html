@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint glyph rail</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Mockup only. The rail copies Problem Solver and Decision Maker: flat geometric marks on a
+   dotted line, the current one breathing, later ones faded, a darker line drawn to where you are. */
+:root {
+  --paper: #faf8ef; --ink: #171813; --line: #c9cabd; --muted: #6b6c60; --soft: #efeee4;
+  --red: #d7262e; --blue: #2c55a4; --yellow: #f6be2c; --green: #60ba2c; --navy: #17375e;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--ink); background: #f3efe6;
+}
+@media (prefers-color-scheme: dark) { :root { --paper: #182131; --ink: #f2f1ea; --line: #3a4559; --muted: #a2a9b8; --soft: #1d2738; background: #131a26; } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 20px 60px; }
+main { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
+h1 { font-size: 24px; margin: 0; }
+h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+p.lede { margin: 6px 0 0; color: var(--muted); max-width: 640px; line-height: 1.5; }
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 24px; padding: 22px clamp(16px, 3vw, 28px); }
+.cap { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
+/* ── the rail ── */
+.rail { position: relative; margin: 6px 0 4px; }
+.rail ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: relative; }
+.rail ol::before, .rail ol::after { content: ""; position: absolute; left: 10%; top: 21px; }
+.rail ol::before { right: 10%; border-top: 3px dotted var(--line); }
+.rail ol::after { width: calc(80% * var(--p, 0)); border-top: 3px dotted var(--ink); transition: width 900ms var(--ease); }
+.stn { all: unset; box-sizing: border-box; display: grid; justify-items: center; gap: 6px; position: relative; z-index: 1; text-align: center; cursor: pointer; padding: 0 2px; }
+.stn:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; border-radius: 12px; }
+.stn__mark { width: 44px; height: 44px; display: grid; place-items: center; background: var(--paper); border-radius: 50%; position: relative; }
+.stn__mark svg { width: 100%; height: 100%; }
+.stn b { font-size: 14px; font-weight: 700; }
+.stn small { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.stn .where { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+.stn[data-where="class"] .where { background: #dfe8f7; color: var(--blue); }
+.stn[data-where="home"] .where { background: #fbe9d3; color: #8a4a12; }
+.stn[data-state="later"] { cursor: default; }
+.stn[data-state="later"] .stn__mark { opacity: .32; }
+.stn[data-state="later"] b { color: var(--muted); font-weight: 500; }
+.stn[data-state="now"] .stn__mark { animation: breathe 2.4s var(--ease) infinite; }
+.stn[data-state="now"] b { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; text-decoration-color: var(--yellow); }
+.stn[data-state="in"] .stn__mark::after { content: "✓"; position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--paper); }
+.stn[data-state="late"] .stn__mark::after { content: "!"; position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--paper); }
+@keyframes breathe { 50% { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .stn[data-state="now"] .stn__mark { animation: none; } .rail ol::after { transition: none; } }
+
+/* ── phone frame ── */
+.frames { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .frames { grid-template-columns: minmax(0, 1fr); } }
+.phone { width: 390px; max-width: 100%; border: 1px solid var(--line); border-radius: 28px; padding: 16px 10px; background: var(--paper); }
+.phone .rail ol::before, .phone .rail ol::after { top: 17px; }
+.phone .stn__mark { width: 36px; height: 36px; }
+.phone .stn b { font-size: 11.5px; }
+.phone .stn small, .phone .stn .where { display: none; }
+.phone .stn[data-state="now"] small { display: block; font-size: 10px; }
+
+/* the countdown banner sits under the rail */
+.count { margin-top: 18px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-radius: 16px; background: var(--navy); color: #fff; }
+.count b { font-size: 15px; }
+.count span { font-size: 13px; opacity: .85; }
+
+/* before */
+.old { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.old div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; background: rgba(255,255,255,.5); }
+.old div b { display: block; font-size: 14px; }
+.old .now { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(23,55,94,.12); background: #fff; }
+.old .done { background: #dcefe1; border-color: transparent; }
+.old .later { color: var(--muted); }
+
+/* the five marks, key */
+.key { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.key div { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 12.5px; color: var(--muted); }
+.key svg { width: 56px; height: 56px; }
+.key b { color: var(--ink); font-size: 13px; }
+@media (max-width: 600px) { .key { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sprint phase rail</h1>
+    <p class="lede">The five phases as marks on a dotted line, the way Problem Solver and Decision Maker show their steps. A darker line is drawn to where the student is. Click a state below to see it.</p>
+  </header>
+
+  <section class="card">
+    <h2>Now (the current five buttons)</h2>
+    <div class="old" aria-hidden="true">
+      <div class="done"><b>Understand</b>Class · in</div><div class="now"><b>Sketch</b>Home · now</div><div class="later"><b>Decide</b>Class</div><div class="later"><b>Prototype</b>Home</div><div class="later"><b>Test</b>Class</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>New: desktop</h2>
+    <div class="state-pick" role="group" aria-label="Show state" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <nav class="rail" aria-label="Sprint phases"><ol id="rail-desk"></ol></nav>
+    <div class="count"><b id="cd-title">Sketch closes</b><span id="cd-sub">1 day left · Thursday 29 October, 3:00 pm</span></div>
+    <p class="cap" id="cap">Understand is handed in (green tick). Sketch is where you are: the mark breathes and the name is underlined. Later phases are faded and can’t be opened yet. Each phase says Class or Home, and when it closes.</p>
+  </section>
+
+  <section class="card">
+    <h2>New: phone (390px)</h2>
+    <div class="frames">
+      <div>
+        <p class="lede" style="margin:0 0 12px">Labels stay, the Class/Home tags and dates fold away, and only the current phase shows its note. Marks are still 36px, so they are easy to tap.</p>
+        <div class="key" aria-label="The five marks">
+          <div><svg viewBox="0 0 100 100" id="k0"></svg><b>Understand</b>look closely</div>
+          <div><svg viewBox="0 0 100 100" id="k1"></svg><b>Sketch</b>quick lines</div>
+          <div><svg viewBox="0 0 100 100" id="k2"></svg><b>Decide</b>two become one</div>
+          <div><svg viewBox="0 0 100 100" id="k3"></svg><b>Prototype</b>blocks fit</div>
+          <div><svg viewBox="0 0 100 100" id="k4"></svg><b>Test</b>hit the target</div>
+        </div>
+      </div>
+      <div class="phone"><nav class="rail" aria-label="Sprint phases (phone)"><ol id="rail-phone"></ol></nav></div>
+    </div>
+  </section>
+</main>
+<script>
+const MARKS = [
+  // Understand: a lens. Blue disc, a paper ring, a red dot at the centre (search + focus).
+  '<circle cx="50" cy="50" r="46" fill="var(--blue)"/><circle cx="50" cy="50" r="24" fill="var(--paper)"/><circle cx="50" cy="50" r="11" fill="var(--red)"/>',
+  // Sketch: yellow disc with a loose pencil line crossing it.
+  '<circle cx="50" cy="50" r="46" fill="var(--yellow)"/><path d="M22 66C34 40 44 70 56 44S72 38 80 30" fill="none" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>',
+  // Decide: two circles, one chosen (the Decision Maker idea of overlap).
+  '<circle cx="50" cy="50" r="46" fill="var(--paper)"/><circle cx="34" cy="50" r="28" fill="var(--red)"/><circle cx="66" cy="50" r="28" fill="var(--blue)" style="mix-blend-mode:multiply"/>',
+  // Prototype: three blocks building up inside a yellow disc.
+  '<circle cx="50" cy="50" r="46" fill="var(--yellow)"/><rect x="24" y="52" width="24" height="24" fill="var(--blue)"/><rect x="52" y="52" width="24" height="24" fill="var(--red)"/><rect x="38" y="26" width="24" height="24" fill="var(--ink)"/>',
+  // Test: a target.
+  '<circle cx="50" cy="50" r="46" fill="var(--red)"/><circle cx="50" cy="50" r="31" fill="var(--paper)"/><circle cx="50" cy="50" r="18" fill="var(--blue)"/><circle cx="50" cy="50" r="6" fill="var(--yellow)"/>'
+];
+const PHASES = [['Understand', 'class'], ['Sketch', 'home'], ['Decide', 'class'], ['Prototype', 'home'], ['Test', 'class']];
+const STATES = {
+  'Day 1: Understand': { s: ['now', 'later', 'later', 'later', 'later'], p: 0, due: ['Understand closes', '6 h left · Wednesday 28 October, 3:00 pm'], cap: 'Day one. Understand is the current phase; everything else is faded. No line has been drawn yet.', notes: ['Closes Wed 3pm', 'Opens next', '', '', ''] },
+  'Mid sprint: Sketch': { s: ['in', 'now', 'later', 'later', 'later'], p: 0.25, due: ['Sketch closes', '1 day left · Thursday 29 October, 3:00 pm'], cap: 'Understand is handed in (green tick). Sketch is where you are: the mark breathes and the name is underlined. Later phases are faded and can’t be opened yet.', notes: ['Handed in', 'Closes Thu 3pm', '', '', ''] },
+  'Behind: Prototype': { s: ['in', 'in', 'in', 'late', 'later'], p: 0.75, due: ['Prototype closed', 'Closed · Monday 2 November, 3:00 pm'], cap: 'A phase that closed without a hand-in shows a red “!”. It stays tappable so a student can go back and see what they have.', notes: ['Handed in', 'Handed in', 'Handed in', 'Closed', ''] },
+  'All done': { s: ['in', 'in', 'in', 'in', 'in'], p: 1, due: ['Sprint complete', 'Pitch day was Tuesday 3 November'], cap: 'Everything handed in. The line is drawn all the way across.', notes: ['Handed in', 'Handed in', 'Handed in', 'Handed in', 'Handed in'] }
+};
+function mark(i) { return `<svg viewBox="0 0 100 100" aria-hidden="true">${MARKS[i]}</svg>`; }
+function paint(id, st, withNotes) {
+  const ol = document.getElementById(id);
+  ol.style.setProperty('--p', st.p);
+  ol.innerHTML = PHASES.map(([name, where], i) => `<li style="list-style:none"><button class="stn" data-state="${st.s[i]}" data-where="${where}" ${st.s[i] === 'now' ? 'aria-current="step"' : ''} ${st.s[i] === 'later' ? 'disabled aria-disabled="true"' : ''}><span class="stn__mark">${mark(i)}</span><b>${name}</b><span class="where">${where === 'class' ? 'Class' : 'Home'}</span><small>${st.notes[i] || '&nbsp;'}</small></button></li>`).join('');
+}
+const pick = document.querySelector('.state-pick');
+let cur = 'Mid sprint: Sketch';
+function show(name) {
+  cur = name; const st = STATES[name];
+  paint('rail-desk', st); paint('rail-phone', st);
+  document.getElementById('cd-title').textContent = st.due[0]; document.getElementById('cd-sub').textContent = st.due[1];
+  document.getElementById('cap').textContent = st.cap;
+  pick.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === name)));
+}
+for (const name of Object.keys(STATES)) { const b = document.createElement('button'); b.textContent = name; b.style.cssText = 'font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer'; b.addEventListener('click', () => show(name)); pick.append(b); }
+document.head.insertAdjacentHTML('beforeend', '<style>.state-pick button[aria-pressed="true"]{background:var(--ink)!important;color:var(--paper)!important}</style>');
+MARKS.forEach((m, i) => { document.getElementById('k' + i).innerHTML = m; });
+show(cur);
+</script>
+</body>
+</html>

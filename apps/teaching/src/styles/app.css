@@ -857,7 +857,7 @@ a:hover {
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
-  max-height: calc(100dvh - 8rem);
+  max-height: calc(100dvh - 4rem);
   padding: var(--space-3);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -884,7 +884,7 @@ a:hover {
 .ai-panel.ai-panel > .chat-pending-confirms:not([hidden]) {
   flex: 0 1 auto;
   min-height: 0;
-  max-height: min(45%, 22rem);
+  max-height: min(30%, 12rem);
 }
 
 .agent-protocol-pills[hidden] {
@@ -1043,8 +1043,8 @@ a:hover {
 }
 
 .ai-panel__thread {
-  flex: 1;
-  min-height: 8rem;
+  flex: 1 1 16rem;
+  min-height: 16rem;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -1129,7 +1129,7 @@ a:hover {
   display: grid;
   gap: 0.25rem;
   /* A long batch scrolls in place so Accept and Reject stay in view. */
-  max-height: 9rem;
+  max-height: 5rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -1177,7 +1177,7 @@ a:hover {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  min-height: 4rem;
+  min-height: 2.75rem;
   font: inherit;
   font-family: var(--font-ui);
   font-size: var(--text-base);
@@ -9277,7 +9277,7 @@ input.scope-timeline__note-title:focus-visible {
 /* The chat keeps its full height whatever the trays above the thread are
  * doing; folding them gives the room to the thread, not back to the page. */
 .lesson-builder__chat > .ai-panel {
-  height: calc(100dvh - 8rem);
+  height: calc(100dvh - 4rem);
 }
 
 .lesson-builder__chat-fab {
