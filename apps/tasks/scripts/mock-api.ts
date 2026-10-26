@@ -149,7 +149,8 @@ export function createMockApi({ seed }: MockApiOptions) {
   const coachServices: Record<string, ReturnType<typeof createProblemSolverService>> = {
     '/api/problem-solver': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach }),
     '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] }),
-    '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift', 'start'] })
+    '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift', 'start'] }),
+    '/api/rules-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['rules'] })
   };
 
   async function handle(method: string, urlPath: string, body?: unknown) {
