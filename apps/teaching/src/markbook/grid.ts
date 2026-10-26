@@ -61,7 +61,16 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
   const sid = student.id;
   if (column.kind === 'quiz') {
     const score = column.scores[sid];
-    if (!score) return el('span', 'mb-cell mb-cell--quiz mb-cell--blank', '');
+    if (!score) {
+      // A tutorial's exit check is for the students in its groups; everyone else isn't missing it.
+      if (column.groups && !column.groups[sid]) return el('span', 'mb-cell mb-cell--quiz mb-cell--blank mb-cell--na', '');
+      if (column.started?.includes(sid)) {
+        const open = el('span', 'mb-cell mb-cell--quiz mb-cell--blank mb-cell--started', 'Started');
+        open.title = 'Opened this quiz but hasn’t handed it in';
+        return open;
+      }
+      return el('span', 'mb-cell mb-cell--quiz mb-cell--blank', '');
+    }
     const toMark = score.pending > 0 ? `, ${score.pending} to mark` : '';
     const group = column.groups?.[sid];
     const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}${toMark}${group ? ` · ${group}` : ''}`);
