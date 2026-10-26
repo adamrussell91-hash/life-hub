@@ -70,7 +70,9 @@ const keys = (lesson) => ({
   check: (device, n, id) => `quiz/${lesson}/checked/${device}/${n}/${id}`,
   result: (device, n) => `quiz/${lesson}/results/${device}/${n}`,
   marks: (device, n) => `quiz/${lesson}/marks/${device}~${n}`,
+  draft: (device, n) => `quiz/${lesson}/drafts/${device}/${n}`,
   cleared: (device) => `quiz/${lesson}/cleared/${device}`,
+  swept: `quiz/${lesson}/swept`,
   release: `quiz/${lesson}/release`,
   live: `quiz/${lesson}/live/active`,
   player: (session, device) => `quiz/${lesson}/live/${session}/players/${device}`,
@@ -421,7 +423,7 @@ export async function quizAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
   if (action.startsWith('live_')) return liveStudent(store, lessonId, body, action);
-  if (!['status', 'claim', 'start', 'hint', 'check', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'claim', 'start', 'hint', 'check', 'save', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const loaded = await loadQuiz(store, lessonId);
   const { draft, settings, k } = loaded;
   let { record } = loaded;
@@ -535,37 +537,20 @@ export async function quizAction(store, lessonId, body) {
     reply = { mark, key: lastAttempt(current) ? shownKey(entry.key) : null };
   }
 
+  if (action === 'save') {
+    needCurrent();
+    const kept = await read(store, k.draft(device, current.n));
+    const saved = mergeDrafts(kept, cleanDraft(attemptRecord, body.responses, body.confidence), body);
+    const at = new Date(now).toISOString();
+    await store.setJSON(k.draft(device, current.n), { ...saved, at });
+    return { saved: true, at, count: Object.keys(saved.responses).length };
+  }
+
   if (action === 'submit') {
     needCurrent();
-    const responses = {};
-    const confidence = {};
-    const marks = {};
-    const given = body.responses && typeof body.responses === 'object' ? body.responses : {};
-    for (const id of attemptRecord.order) {
-      const entry = attemptRecord.questions[id];
-      const instant = current.answers[id];
-      if (instant) {
-        responses[id] = instant.response;
-        marks[id] = instant.mark;
-        if (instant.confidence) confidence[id] = instant.confidence;
-        continue;
-      }
-      const response = cleanResponse(entry.key.kind, Object.hasOwn(given, id) ? given[id] : null);
-      if (response && hasAnswer(response)) responses[id] = response;
-      marks[id] = markResponse(entry.key, response);
-      const c = confidenceOf(body.confidence?.[id]);
-      if (c) confidence[id] = c;
-    }
-    const result = {
-      responses,
-      confidence,
-      marks,
-      hints: current.hints,
-      submitted_at: new Date(now).toISOString(),
-      overtime: pastDeadline || closed
-    };
-    await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
-    await markInsightChanged(store, lessonId);
+    const draft = await read(store, k.draft(device, current.n));
+    const merged = mergeDrafts(draft, cleanDraft(attemptRecord, body.responses, body.confidence), body);
+    await handIn(store, k, lessonId, device, current, attemptRecord, merged, now, pastDeadline || closed);
     attempts = await deviceAttempts(store, k, device, from);
     current = null;
   }
@@ -604,6 +589,7 @@ export async function quizAction(store, lessonId, body) {
   );
 
   const open = current && !current.result ? current : null;
+  const kept = open ? await read(store, k.draft(device, open.n)) : null;
   return {
     ...shared,
     ...(reply ?? {}),
@@ -618,6 +604,7 @@ export async function quizAction(store, lessonId, body) {
           settings: { ...publicSettings(attemptRecord.settings), version: attemptRecord.version },
           questions: publicQuestions(attemptRecord),
           practice: Object.keys(attemptRecord.practice ?? {}),
+          ...(kept ? { saved: { responses: kept.responses ?? {}, confidence: kept.confidence ?? {}, at: kept.at } } : {}),
           hints: Object.fromEntries(Object.keys(open.hints).filter((id) => entryFor(attemptRecord, id)).map((id) => [id, attemptRecord.questions[id].key.hint ?? ''])),
           answers: Object.fromEntries(
             Object.entries(open.answers)
@@ -628,6 +615,103 @@ export async function quizAction(store, lessonId, body) {
       : null,
     results
   };
+}
+
+/** Answers sent with a save or hand-in, cleaned to the question kinds the attempt's key knows. */
+function cleanDraft(record, responses, confidence) {
+  const given = responses && typeof responses === 'object' && !Array.isArray(responses) ? responses : {};
+  const sure = confidence && typeof confidence === 'object' && !Array.isArray(confidence) ? confidence : {};
+  const out = { responses: {}, confidence: {} };
+  for (const id of record.order) {
+    const entry = record.questions[id];
+    const response = cleanResponse(entry.key.kind, Object.hasOwn(given, id) ? given[id] : null);
+    if (response && hasAnswer(response)) out.responses[id] = response;
+    const c = confidenceOf(Object.hasOwn(sure, id) ? sure[id] : null);
+    if (c) out.confidence[id] = c;
+  }
+  return out;
+}
+
+/**
+ * What the student sent last wins; what the server kept fills any gaps. A
+ * question named in the request with no answer left is cleared, so un-ticking
+ * sticks, while questions the request leaves out are never lost.
+ */
+function mergeDrafts(kept, sent, body = null) {
+  const merged = { responses: { ...(kept?.responses ?? {}), ...sent.responses }, confidence: { ...(kept?.confidence ?? {}), ...sent.confidence } };
+  const named = body?.responses && typeof body.responses === 'object' && !Array.isArray(body.responses) ? Object.keys(body.responses) : [];
+  for (const id of named) if (!Object.hasOwn(sent.responses, id)) delete merged.responses[id];
+  return merged;
+}
+
+/**
+ * Marks an open attempt and writes its hand-in. Answers checked one by one
+ * come from the server; the rest from the draft the student sent or saved.
+ */
+async function handIn(store, k, lessonId, device, current, record, draft, now, overtime, auto = false) {
+  const responses = {};
+  const confidence = {};
+  const marks = {};
+  for (const id of record.order) {
+    const entry = record.questions[id];
+    const instant = current.answers[id];
+    if (instant) {
+      responses[id] = instant.response;
+      marks[id] = instant.mark;
+      if (instant.confidence) confidence[id] = instant.confidence;
+      continue;
+    }
+    const response = draft.responses[id] ?? null;
+    if (response && hasAnswer(response)) responses[id] = response;
+    marks[id] = markResponse(entry.key, response);
+    if (draft.confidence[id]) confidence[id] = draft.confidence[id];
+  }
+  const result = {
+    responses,
+    confidence,
+    marks,
+    hints: current.hints,
+    submitted_at: new Date(now).toISOString(),
+    overtime: !!overtime,
+    ...(auto ? { auto: true } : {})
+  };
+  await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
+  await markInsightChanged(store, lessonId);
+}
+
+/** The sweep runs at most once a minute per quiz, however often insight is read. */
+const SWEEP_EVERY_MS = 60_000;
+async function sweepStale(store, k, lessonId, record, closed, now) {
+  const last = Date.parse((await read(store, k.swept))?.at ?? '');
+  if (Number.isFinite(last) && now - last < SWEEP_EVERY_MS) return;
+  await store.setJSON(k.swept, { at: new Date(now).toISOString() });
+  await handInStale(store, k, lessonId, record, closed, now).catch((error) => console.warn('quiz sweep failed', error));
+}
+
+/**
+ * Hands in open attempts nobody pressed Hand it in on, once their timer has
+ * run out or the quiz has closed, using what was saved as the student went.
+ * An attempt with nothing saved or checked stays open: there is nothing to mark.
+ */
+async function handInStale(store, k, lessonId, record, closed, now = Date.now()) {
+  const owners = new Set();
+  for (const key of await listBlobKeys(store, `quiz/${lessonId}/attempts/`)) owners.add(key.split('/')[3]);
+  let changed = false;
+  await mapBounded([...owners], 8, async (device) => {
+    const from = await clearedFrom(store, k, device);
+    const attempts = await deviceAttempts(store, k, device, from);
+    const current = attempts.find((a) => !a.result);
+    if (!current) return;
+    const deadline = Date.parse(current.deadline ?? '');
+    const expired = Number.isFinite(deadline) && now > deadline + GRACE_MS;
+    if (!closed && !expired) return;
+    const rec = narrow(await recordFor(store, lessonId, current.version, record), current.student_id);
+    const draft = await read(store, k.draft(device, current.n));
+    if (!draft && !Object.keys(current.answers).length) return;
+    await handIn(store, k, lessonId, device, current, rec, mergeDrafts(draft, { responses: {}, confidence: {} }), now, true, true);
+    changed = true;
+  });
+  return changed;
 }
 
 function confidenceOf(value) {
@@ -963,7 +1047,8 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     family ? unitFamily(store, draft, lessonId) : { siblings: [], followUps: [] }
   ]);
   const fallback = lessonOutcomes(draft);
-  const stamp = stampRow?.at ?? null;
+  await sweepStale(store, k, lessonId, record, state.closed, now);
+  const stamp = (await read(store, k.stamp))?.at ?? stampRow?.at ?? null;
   // A class with no list stays anonymous, so its insight covers every latest attempt.
   const listed = cls && roster?.students.length ? roster : null;
   let body;

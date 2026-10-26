@@ -782,3 +782,50 @@ test('teacher-only quiz settings never reach students', async () => {
   for (const key of secret) assert.equal(Object.hasOwn(status.settings, key), false, `${key} is not in the student status`);
   assert.equal(JSON.stringify(status).includes('bob_brown'), false);
 });
+
+test('autosave: saved answers fill a hand-in that arrives empty, and answers sent with it win', async () => {
+  const store = baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] });
+  await publishQuiz(store);
+  const me = { token: token(21) };
+  await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  const saved = await quizAction(store, 'quiz1', { ...me, action: 'save', responses: { qa: { selected: ['b'] }, qb: { text: 'Juliet' } } });
+  assert.equal(saved.saved, true);
+  assert.equal(saved.count, 2);
+  await quizAction(store, 'quiz1', { ...me, action: 'save', responses: { qb: { text: 'Romeo' } } });
+  const done = await quizAction(store, 'quiz1', { ...me, action: 'submit', responses: {} });
+  assert.equal(done.results.length, 1);
+  assert.equal(done.current, null);
+  const row = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
+  assert.equal(row.responses.qb.text, 'Romeo', 'the last save is what was handed in');
+  assert.ok(row.responses.qa, 'an answer saved earlier is kept');
+  await assert.rejects(quizAction(store, 'quiz1', { ...me, action: 'save', responses: {} }), /Start the quiz first/);
+});
+
+test('autosave: an attempt past its timer is handed in from what was saved, once the teacher looks', async () => {
+  const store = withClass(baseStore({ quizSettings: { timer_minutes: 5 }, quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'save', responses: { qb: { text: 'Romeo' } } });
+  const insight = () => quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal((await insight()).attempts.length, 0, 'still inside its time');
+  const key = [...store.data.keys()].find((k) => k.startsWith('quiz/quiz1/attempts/'));
+  store.data.set(key, { ...store.data.get(key), deadline: new Date(Date.now() - 5 * 60_000).toISOString() });
+  store.data.delete('quiz/quiz1/swept');
+  const after = await insight();
+  assert.equal(after.attempts.length, 1);
+  const result = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
+  assert.equal(result.auto, true);
+  assert.equal(result.overtime, true);
+  assert.equal(result.responses.qb.text, 'Romeo');
+});
+
+test('autosave: an attempt with nothing saved is left open, not handed in blank', async () => {
+  const store = withClass(baseStore({ quizSettings: { timer_minutes: 5 } }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  const key = [...store.data.keys()].find((k) => k.startsWith('quiz/quiz1/attempts/'));
+  store.data.set(key, { ...store.data.get(key), deadline: new Date(Date.now() - 5 * 60_000).toISOString() });
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts.length, 0);
+});
