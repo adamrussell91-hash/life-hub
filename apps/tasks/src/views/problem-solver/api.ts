@@ -15,7 +15,7 @@ export function createSessionApi(base: string) {
   const api = {
     list: () => apiGet<{ sessions: PsSummary[] }>(`${base}?list=1`).then((r) => r.sessions),
     get: (id: string) => apiGet<{ session: PsSession }>(`${base}?id=${encodeURIComponent(id)}`).then((r) => r.session),
-    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'start'; startModel?: string }) =>
+    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'start'; startModel?: string }) =>
       apiPost<{ session: PsSession }>(base, { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
     act: (session: PsSession, action: PsAction, text?: string) =>
       apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
@@ -39,6 +39,8 @@ export const problemSolverApi = createSessionApi('/api/problem-solver');
 export const decisionBookApi = createSessionApi('/api/decision-book');
 /** Gear Shifter's sessions: the same handler over its own store. */
 export const gearShifterApi = createSessionApi('/api/get-things-done');
+/** The Rules Book's sessions: the same handler over its own store. */
+export const rulesBookApi = createSessionApi('/api/rules-book');
 
 export function isBusy(session: PsSession): boolean {
   return session.runner.status === 'queued' || session.runner.status === 'running';
