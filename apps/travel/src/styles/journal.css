@@ -826,50 +826,179 @@
   background: var(--paper);
 }
 
-.journal-capture__context {
+.journal-capture__stamp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
   color: var(--muted);
 }
 
-.journal-capture__modes {
+.journal-capture__stamp-time::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.journal-capture__stamp-retry {
+  min-height: 2.75rem;
+  padding-inline: var(--space-2);
+}
+
+/* Three big, thumb-sized capture buttons. */
+.journal-capture__actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
 }
 
-.journal-capture__mode {
-  min-height: 3rem;
-}
-
-/* Only the chosen capture type reads as selected. */
-.journal-capture__mode:not(.is-active) {
-  background: var(--paper);
+.journal-capture__action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 6.5rem;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper) 90%, var(--ink) 10%);
   color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.journal-capture__mode.is-active {
-  box-shadow: inset 0 0 0 2px var(--wave);
+.journal-capture__action:active {
+  transform: scale(0.97);
 }
 
-.journal-capture__mode-action {
-  min-height: 3rem;
-  width: 100%;
-  margin-top: var(--space-2);
+.journal-capture__action:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
 }
 
-.journal-capture__field {
-  display: grid;
-  gap: var(--space-1);
+.journal-capture__icon {
+  width: 2rem;
+  height: 2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.journal-capture__action.is-recording {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.journal-capture__recording {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-3);
   font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.journal-capture__recording-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .journal-capture__recording-dot {
+    animation: journal-capture-pulse 1.2s ease-in-out infinite;
+  }
+
+  .journal-capture__action {
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+}
+
+@keyframes journal-capture-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.journal-capture__notice {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.journal-capture__tray {
+  margin-top: var(--space-3);
+}
+
+/* Fixed-size thumbnails: never let a camera photo set its own height. */
+.journal-capture__thumbs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.journal-capture__thumb {
+  position: relative;
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.journal-capture__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.journal-capture__thumb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-bottom-left-radius: var(--radius-sm, 6px);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.journal-capture__sound {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.journal-capture__sound-player {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.journal-capture__remove {
+  min-height: 2.75rem;
 }
 
 .journal-capture__text {
   width: 100%;
-  min-height: 6rem;
+  min-height: 3.25rem;
+  margin-top: var(--space-3);
 }
 
 .journal-capture__draft-status {
@@ -889,17 +1018,6 @@
 
 .journal-capture__discard {
   margin: var(--space-2) 0;
-}
-
-.journal-capture__voice-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.journal-capture__voice-playback {
-  width: 100%;
-  margin-top: var(--space-2);
 }
 
 html.vv-keyboard-open .sheet.addform.journal-capture-sheet {
