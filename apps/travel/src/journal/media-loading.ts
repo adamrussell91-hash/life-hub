@@ -81,9 +81,12 @@ export function buildJournalImageSrcset(tripId: string, media: JournalMedia): st
 
 export function reserveMediaAspect(img: HTMLImageElement, media: JournalMedia): void {
   if (media.width && media.height && media.width > 0 && media.height > 0) {
+    // Width/height attributes give the browser the intrinsic ratio before the
+    // file arrives. CSS must pair them with height: auto, or the height
+    // attribute pins the img at the camera's pixel height (thousands of px).
+    // No inline aspect-ratio: it would override each layout's crop ratio.
     img.width = media.width;
     img.height = media.height;
-    img.style.aspectRatio = `${media.width} / ${media.height}`;
   }
 }
 
