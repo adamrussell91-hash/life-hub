@@ -697,8 +697,9 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
 
   function insightSection(p: InsightPayload, context: InsightContext): HTMLElement[] {
     const out: HTMLElement[] = [];
-    if ((classes?.length ?? 0) > 1) {
-      const pick = select((classes ?? []).map((c) => ({ value: c.id, label: c.title })), insightClass ?? '');
+    if ((classes?.length ?? 0) > 0) {
+      // "Every hand-in" shows attempts whatever class or student they were saved under, so none can hide.
+      const pick = select([...(classes ?? []).map((c) => ({ value: c.id, label: c.title })), { value: '', label: 'Every hand-in (any class)' }], insightClass ?? '');
       pick.addEventListener('change', async () => {
         const previous = insightClass;
         insightClass = pick.value || null;
