@@ -45,7 +45,7 @@ function lesson(mode?: 'quiz' | 'direct_instruction', blocks: Block[] = [createB
 function quizBlock(id: string, question: Record<string, unknown>): Block {
   const block = createBlock('quiz_question', id);
   if (block.block_type !== 'quiz_question') throw new Error('expected quiz_question');
-  return { ...block, content: { question: { id, marks: 1, ...question } as never } };
+  return { ...block, content: { question: { id, marks: 1, outcomes: ['EA12-1'], skills: ['reading.inference'], ...question } as never } };
 }
 
 const goodMc = quizBlock('q1', {
@@ -115,6 +115,14 @@ describe('quizProposalIssues', () => {
     expect(quizProposalIssues(insertQuiz([goodMc, goodTf]), lesson('quiz'))).toEqual([]);
   });
 
+  it('asks for outcomes and a skill on every question', () => {
+    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, outcomes: undefined, skills: undefined });
+    const issues = quizProposalIssues(insertQuiz([goodMc, bare]), lesson('quiz'));
+    expect(issues).toHaveLength(2);
+    expect(issues[0]).toMatch(/^Question 2 \(q_bare\): add outcomes/);
+    expect(issues[1]).toMatch(/^Question 2 \(q_bare\): add skills/);
+  });
+
   it('names the question and the fix when an answer is missing', () => {
     const issues = quizProposalIssues(insertQuiz([goodMc, badMc]), lesson('quiz'));
     expect(issues).toHaveLength(1);
@@ -132,7 +140,7 @@ describe('quizProposalIssues', () => {
     // Live test 21 Oct: Ann left prompt out of a fill_gap question and the check said "Write the question."
     const gap = createBlock('quiz_question', 'q_gap');
     if (gap.block_type !== 'quiz_question') throw new Error('expected quiz_question');
-    const noPrompt = { ...gap, content: { question: { id: 'q_gap', kind: 'fill_gap', marks: 2, passage: '[[Maiwar]] is the river.' } as never } } as Block;
+    const noPrompt = { ...gap, content: { question: { id: 'q_gap', kind: 'fill_gap', marks: 2, passage: '[[Maiwar]] is the river.', outcomes: ['EA12-1'], skills: ['reading.inference'] } as never } } as Block;
     expect(quizProposalIssues(insertQuiz([noPrompt]), lesson('quiz'))).toEqual([]);
     expect(validateMutatingProposal(insertQuiz([noPrompt]), emptySearchPack(''))).toEqual({ ok: true });
     expect(checkQuestion({ id: 'q_tf', kind: 'true_false', marks: 1, answer: true })).toEqual({ ok: false, message: 'Write the question.' });
@@ -204,6 +212,11 @@ describe('questions that give their answer away', () => {
   it('teaches Ann the item-writing rules', () => {
     expect(BLOCK_BUILD_RECIPES).toMatch(/## Writing questions that test something/);
     expect(BLOCK_BUILD_RECIPES).toMatch(/never teaches the answer/);
+  });
+
+  it('tells Ann to tag each question from the lists', () => {
+    expect(BLOCK_BUILD_RECIPES).toMatch(/### Tag every question/);
+    expect(BLOCK_BUILD_RECIPES).toMatch(/list_question_tags/);
   });
 });
 

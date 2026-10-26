@@ -80,7 +80,7 @@ const question = {
   id: 'q1', type: 'block', block_type: 'quiz_question', variant: 'medium', visibility: 'student_teacher',
   content: {
     question: {
-      id: 'q1', kind: 'multiple_choice', marks: 1,
+      id: 'q1', kind: 'multiple_choice', marks: 1, outcomes: ['O-1'], skills: ['reading.inference'],
       prompt: 'Whose assassination in 1914 triggered the July Crisis?',
       options: [{ id: 'a', text: 'Archduke Franz Ferdinand' }, { id: 'b', text: 'Kaiser Wilhelm II' }],
       correct: ['a']
@@ -359,4 +359,18 @@ test('read_lesson gives each dot point its syllabus wording, outcomes and closel
   ]);
   const later = await run('read_lesson', { id: 'lesson_0', offset: 5 });
   assert.equal(later.syllabus, undefined, 'the syllabus comes with the first page only');
+});
+
+test('list_question_tags gives the subject\'s outcomes and the skills a question can carry', async () => {
+  const store = memoryStore({
+    'units/unit_1': { id: 'unit_1', title: 'Invented unit', subject_id: 'subject_1', lesson_ids: [] },
+    'subjects/subject_1': { id: 'subject_1', outcome_ids: ['out_a', 'out_gone'] },
+    'outcomes/out_a': { id: 'out_a', code: 'O-A', description: 'Invented outcome A' }
+  });
+  const skills = async () => ({ strands: [{ id: 'reading', sub_strands: [{ id: 'inference', name: 'Inferring the implied' }] }] });
+  const run = createLessonToolRunner({ store, lesson, skills });
+  assert.deepEqual(await run('list_question_tags'), {
+    outcomes: [{ id: 'out_a', code: 'O-A', description: 'Invented outcome A' }],
+    skills: [{ id: 'reading.inference', name: 'Inferring the implied' }]
+  });
 });
