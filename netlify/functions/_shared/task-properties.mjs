@@ -51,7 +51,8 @@ export const DEFAULT_TASK_PROPERTY_CONFIG = {
     { id: 'suggested_by_agent', label: 'suggested by agent' },
     { id: 'problem_solver', label: 'problem solver' },
     { id: 'decision_maker', label: 'decision maker' },
-    { id: 'gear_shifter', label: 'gear shifter' }
+    { id: 'gear_shifter', label: 'gear shifter' },
+    { id: 'rules_book', label: 'rules book' }
   ],
   tags: []
 };
