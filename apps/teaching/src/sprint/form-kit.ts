@@ -192,3 +192,24 @@ export function coach(guide: Guide): HTMLElement {
   box.append(line, help);
   return box;
 }
+
+/**
+ * Give an existing form the same numbered step cards as Understand: each step
+ * claims the direct children of `root` its selector matches, and they move into
+ * a card (number, icon, heading, coach) placed where the first one was.
+ */
+export function stepify(root: HTMLElement, steps: Array<{ pick: string; title: string; guide: Guide }>): void {
+  steps.forEach((st, i) => {
+    const kids = [...root.children].filter((c) => c.matches(st.pick));
+    if (!kids.length) return;
+    const card = el('section', 'su-step su-step--alone');
+    const head = el('div', 'su-step__head');
+    const icon = el('span', 'su-step__icon', st.guide.icon);
+    icon.setAttribute('aria-hidden', 'true');
+    head.append(el('span', 'su-step__num', String(i + 1)), el('h3', '', st.title), icon);
+    const body = el('div', 'su-step__body');
+    card.append(head, coach(st.guide), body);
+    root.insertBefore(card, kids[0]!);
+    body.append(...kids);
+  });
+}

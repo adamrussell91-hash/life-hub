@@ -346,8 +346,3 @@ body.spractice-open { overflow: hidden; }
 .su-rail__dot.is-group.is-now { background: var(--pastel-peach-ink, #9a4a1c); border-color: var(--pastel-peach-ink, #9a4a1c); }
 .su-nav { position: sticky; bottom: 0; padding: 10px 0; background: linear-gradient(to top, var(--bg, #f7f4ee) 70%, transparent); }
 
-/* Later phases: three plain steps and what done looks like. */
-.phase-how-card { padding: 12px 16px; border-radius: 14px; background: var(--pastel-lilac, #efe8fa); color: var(--pastel-lilac-ink, #4a3478); margin-bottom: 14px; }
-.phase-how-card__head { font-weight: 700; margin-bottom: 4px; }
-.phase-how { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
-.phase-how-card__done { margin: 8px 0 0; font-weight: 600; font-size: 13px; }

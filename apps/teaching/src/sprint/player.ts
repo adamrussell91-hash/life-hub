@@ -5,7 +5,6 @@ import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { phaseDue } from './rules';
 import { phaseIntention, phaseMove, toolFrames } from './defaults';
-import { PHASE_GUIDE } from './guidance';
 import { sprintParts } from './model';
 import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
@@ -255,14 +254,6 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       });
       fill.classList.add('sprint-practice-fill');
       work.append(fill);
-    }
-    const pg = PHASE_GUIDE[key];
-    if (pg) {
-      const how = el('ol', 'phase-how');
-      for (const t of pg.steps) how.append(el('li', '', t));
-      const card = el('div', 'phase-how-card');
-      card.append(el('div', 'phase-how-card__head', `${pg.icon} How this works`), how, el('p', 'phase-how-card__done', pg.done));
-      work.append(card);
     }
     work.append(form.el);
     layout.append(work, guidesPanel(key));
