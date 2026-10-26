@@ -36,6 +36,9 @@ import { dmRecord } from '../../decision-book/tools/record.mjs';
 import { GEAR_TOOLS } from '../../get-things-done/tools/index.mjs';
 import { gtCommit } from '../../get-things-done/tools/commit.mjs';
 import { gtReview } from '../../get-things-done/tools/review.mjs';
+import { RULE_TOOLS } from '../../rules-book/tools/index.mjs';
+import { rbCommit } from '../../rules-book/tools/commit.mjs';
+import { rbReview } from '../../rules-book/tools/review.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -79,7 +82,11 @@ export const TOOLS = {
   ...GEAR_TOOLS,
   // Gear Shifter's Commit and Review tools (steps commit and review, neither a toolkit step).
   gt_commit: gtCommit,
-  gt_review: gtReview
+  gt_review: gtReview,
+  // The Rules Book's rules (step explore), then its Act and Review tools.
+  ...RULE_TOOLS,
+  rb_commit: rbCommit,
+  rb_review: rbReview
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));

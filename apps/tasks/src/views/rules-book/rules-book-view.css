@@ -1,0 +1,147 @@
+/* apps/tasks/src/views/rules-book/rules-book-view.css
+   The Rules Book's pages. The layout is Problem Solver's (problem-solver-view.css), as Decision
+   Maker's and Gear Shifter's are; this file swaps its palette for the book's (red becomes
+   orange, yellow becomes indigo, blue becomes ink) and adds the pieces the Rules Book has of
+   its own: the track's dashed line, the groups row, the four-part shelves, the two checks and
+   the canvas strip. Flat surfaces: a hairline border, no shadow, square corners as on the cover. */
+.rb-page {
+  --ps-red: var(--rb-orange);
+  --ps-yellow: var(--rb-indigo);
+  --ps-blue: var(--rb-ink);
+  --ps-on-yellow: var(--rb-paper);
+  --ps-ink: var(--rb-ink);
+  --ps-paper: var(--rb-paper);
+  --ps-ghost: var(--rb-ghost);
+  --ps-ease: var(--rb-ease);
+  --ps-spring: var(--rb-spring);
+  --ps-other: #a9aa9f;
+  --navy: var(--rb-ink);
+}
+.rb-page :is(.ps-prob__link, .ps-bench, .ps-build, .ps-skills__item, .ps-start) { box-shadow: none; border: 1px solid var(--rb-line); }
+
+/* ── Emblems ── */
+.rb-page .rb-emblem { flex: none; width: 1.75rem; height: 1.75rem; }
+
+/* ── Landing: hero ── */
+.rb-hero__lede { display: flex; align-items: center; gap: var(--space-4); }
+.rb-hero__lede .rb-emblem--book { width: 4.5rem; height: 4.5rem; }
+.rb-hero__art { display: grid; place-items: center; min-width: 0; }
+.rb-hero__art .rb-emblem { width: min(100%, 15rem); height: auto; aspect-ratio: 1; }
+.rb-start::before { display: none; }
+.rb-start__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.rb-start .ps-start__input { border: 0; border-radius: 2px; background: var(--rb-soft); }
+.rb-start__picked { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); color: var(--rb-ink); }
+.rb-start__picked[hidden] { display: none; }
+.rb-start__clear { margin-left: auto; min-height: 44px; padding: 0 var(--space-3); border: 1px solid var(--rb-line); border-radius: 999px; background: transparent; color: var(--rb-muted); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.rb-start__clear:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+
+/* ── Landing: your work ── */
+.rb-prob__medal .rb-emblem { width: 100%; height: 100%; }
+
+/* ── Landing: how a session builds ── */
+.rb-build .ps-build__art svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* ── Landing and session: the two checks ── */
+.rb-check { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--space-3); }
+.rb-check__item { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: var(--space-4); border: 1px solid var(--rb-line); border-radius: var(--radius-md); background: var(--rb-paper); }
+.rb-check__mark { width: 3rem; height: 3rem; }
+.rb-check__mark svg { display: block; width: 100%; height: 100%; }
+.rb-check__title { margin: 0 0 2px; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--rb-ink); }
+.rb-check__line { margin: 0; font-size: var(--text-sm); color: var(--rb-muted); }
+.rb-checks { border: 1px solid var(--rb-line); border-radius: var(--radius-lg); background: var(--ps-card); }
+.rb-checks__head { min-height: 44px; display: flex; align-items: center; padding: 0 var(--space-4); font-weight: var(--weight-semibold); cursor: pointer; }
+.rb-checks__head:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+.rb-checks .rb-check { padding: 0 var(--space-3) var(--space-3); }
+
+/* ── Landing: the four parts ── */
+.rb-sections { display: grid; gap: var(--space-4); }
+.rb-sect { border: 1px solid var(--rb-line); border-radius: var(--radius-lg); background: transparent; }
+.rb-sect[open] { background: var(--ps-card); }
+.rb-sect__head { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-5); align-items: center; min-height: 44px; padding: var(--space-5); cursor: pointer; list-style: none; }
+.rb-sect__head::-webkit-details-marker { display: none; }
+.rb-sect__head:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+.rb-sect__mark { display: grid; justify-items: center; gap: 6px; }
+.rb-sect__mark .rb-emblem { width: 5rem; height: 5rem; }
+.rb-sect__stn { font: 500 11px / 1.2 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.04em; text-transform: uppercase; color: var(--rb-indigo-label); }
+.rb-sect__text { display: grid; gap: 2px; min-width: 0; }
+.rb-sect__title { font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--rb-ink); }
+.rb-sect__line { color: var(--rb-muted); font-size: var(--text-sm); }
+.rb-shelf { grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr)); gap: var(--space-2); padding: 0 var(--space-5) var(--space-5) calc(6rem + var(--space-10)); }
+.rb-shelf__tool { grid-template-columns: 2.75rem minmax(0, 1fr); gap: 2px var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--rb-soft); box-shadow: none; }
+.rb-shelf__tool:hover { background: var(--rb-indigo-tint); }
+.rb-shelf__tool .rb-emblem { grid-row: span 3; width: 2.75rem; height: 2.75rem; }
+.rb-shelf__tool .ps-shelf__name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--rb-ink); }
+.rb-shelf__tag { font: 500 11px / 1.2 var(--font-mono, ui-monospace, monospace); font-style: normal; color: var(--rb-indigo-label); }
+.rb-shelf__start { justify-self: start; min-height: 44px; margin-top: var(--space-1); padding: 0 var(--space-3); border: 1.5px solid var(--rb-ink); border-radius: 999px; background: transparent; color: var(--rb-ink); font: inherit; font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; }
+.rb-shelf__start:hover { background: var(--rb-ink); color: var(--rb-paper); }
+.rb-shelf__start:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+
+/* ── Session: track ── */
+.rb-track__line { min-width: 24rem; max-width: 40rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rb-track__line::before { left: 12.5%; right: 12.5%; height: 0; border-top: 3px dashed var(--rb-line); background: none; }
+.rb-track__line::after { left: 12.5%; width: calc(75% * var(--ps-track-p, 0)); height: 0; border-top: 3px dashed var(--rb-ink); background: none; }
+.rb-track__mark { border-radius: 50%; background: var(--rb-paper); box-shadow: 0 0 0 5px var(--rb-paper); }
+.rb-track__stn[data-state='future'] .rb-track__mark { opacity: 0.3; }
+.rb-track__note { min-height: 1em; color: var(--rb-muted); font-size: 11px; }
+
+/* ── Session: the groups above the canvas ── */
+.rb-groups { display: grid; gap: var(--space-3); }
+.rb-groups[hidden] { display: none; }
+.rb-groups__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.rb-groups__item { display: grid; justify-items: center; gap: 6px; min-width: 0; text-align: center; }
+.rb-groups__em { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--ps-card); }
+.rb-groups__em .rb-emblem { width: 48px; height: 48px; }
+.rb-groups__item[data-lit='false'] .rb-groups__em .rb-emblem { opacity: 0.4; filter: grayscale(1); }
+.rb-groups__item[data-lit='true'] .rb-groups__em::after { content: ''; position: absolute; inset: -4px; border: 3px solid var(--rb-ink); border-radius: 50%; }
+.rb-groups__label { color: var(--rb-muted); font-size: 11.5px; line-height: 1.25; }
+.rb-groups__item[data-lit='true'] .rb-groups__label { color: var(--rb-ink); font-weight: var(--weight-semibold); }
+.rb-groups__text { margin: 0; color: var(--rb-muted); font-size: var(--text-sm); }
+.rb-groups__text b { color: var(--rb-ink); }
+
+/* ── Session: canvas ── */
+.rb-canvas__title { flex-wrap: wrap; }
+.rb-canvas__title .rb-emblem { width: 1.75rem; height: 1.75rem; }
+.rb-canvas__count { color: var(--rb-muted); font: 500 11px / 1.4 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.04em; }
+.rb-canvas__back { margin-left: auto; }
+.rb-canvas__empty { display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-8) var(--space-4); text-align: center; color: var(--rb-muted); }
+.rb-canvas__empty .rb-emblem { width: 4rem; height: 4rem; }
+.rb-canvas__empty p { max-width: 28rem; margin: 0; }
+.rb-canvas__strip { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+.rb-canvas__run { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-3); border: 1px solid var(--rb-line); border-radius: 999px; background: transparent; color: var(--rb-ink); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.rb-canvas__run[aria-pressed='true'] { border-color: var(--rb-ink); background: var(--rb-ink); color: var(--rb-paper); }
+.rb-canvas__run.is-switched .rb-canvas__run-name { text-decoration: line-through; }
+.rb-canvas__run:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+
+/* ── Session: the shelf ── */
+.rb-session-shelf { border: 1px solid var(--rb-line); border-radius: var(--radius-lg); }
+.rb-session-shelf[hidden] { display: none; }
+.rb-session-shelf__head { min-height: 44px; display: flex; align-items: center; padding: 0 var(--space-4); font-weight: var(--weight-semibold); cursor: pointer; }
+.rb-session-shelf__head:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+.rb-session-shelf__line { margin: 0; padding: 0 var(--space-4); color: var(--rb-muted); font-size: var(--text-sm); }
+.rb-session-shelf__body { display: grid; gap: var(--space-4); padding: var(--space-4); }
+.rb-session-shelf__group[data-lit='true'] .rb-session-shelf__title { color: var(--rb-indigo-label); }
+.rb-session-shelf__title { margin: 0 0 var(--space-2); font-size: 11px; font-weight: var(--weight-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-muted); }
+.rb-session-shelf__list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rb-session-shelf__pick { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 6px; border: 1px solid var(--rb-line); border-radius: 999px; background: var(--rb-soft); color: var(--rb-ink); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.rb-session-shelf__pick .rb-emblem { width: 1.75rem; height: 1.75rem; }
+.rb-session-shelf__pick:hover { background: var(--rb-indigo-tint); }
+.rb-session-shelf__pick:focus-visible { outline: 2px solid var(--rb-ink); outline-offset: 2px; }
+
+/* ── Session: the coach ── */
+.rb-coach-host { display: grid; gap: var(--space-4); align-content: start; }
+.rb-avatar { display: inline-grid; place-items: center; }
+.rb-avatar .rb-emblem { width: 100%; height: 100%; }
+
+@media (max-width: 720px) {
+  .rb-track__line { min-width: 0; }
+  .rb-track__note { display: none; }
+  .rb-sect__head { grid-template-columns: 4rem minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4); }
+  .rb-sect__mark .rb-emblem { width: 3.5rem; height: 3.5rem; }
+  .rb-shelf { padding: 0 var(--space-4) var(--space-4); }
+  .rb-groups__em { width: 44px; height: 44px; }
+  .rb-groups__em .rb-emblem { width: 40px; height: 40px; }
+  .rb-groups__label { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-sect__mark .rb-emblem, .rb-shelf__tool .rb-emblem { transition: none; }
+}
