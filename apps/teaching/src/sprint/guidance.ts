@@ -135,6 +135,20 @@ export const LATER_GUIDE = {
     example: ['Speed: Idea B does this best because students collect lunch without queuing.'],
     stuck: ['Use the sentence starter.', 'One idea can win more than one criterion.']
   },
+  result: {
+    icon: '📊',
+    doThis: 'See which idea your group picked, how the votes fell and which parts stood out.',
+    why: 'The pattern shows what your group valued and which parts are worth borrowing.',
+    example: ['A dark square means many people chose that idea for that criterion.'],
+    stuck: ['Your teacher confirms the idea. It shows here once they have.']
+  },
+  parts: {
+    icon: '🧩',
+    doThis: 'List the parts the prototype needs, then give each part to someone by their initials.',
+    why: 'Splitting the work means everyone has something to build and nothing is missed.',
+    example: ['Part: order screen. It must show the pickup time. It serves: speed. Owner: AB.'],
+    stuck: ['Think about what the audience sees first, next and last.', 'Check “Worth borrowing” for strong parts from the other ideas.']
+  },
   part: {
     icon: '📌',
     doThis: 'Read your part: what it is, what it must show and which criterion it serves.',
@@ -171,7 +185,7 @@ export const LATER_GUIDE = {
     stuck: ['No feedback yet? Your teacher releases it after the pitches.']
   },
   reflect: {
-    icon: '🪞',
+    icon: '🔄',
     doThis: 'Answer each prompt, quote one piece of feedback and pick the criterion you’d change next.',
     why: 'Reflection is where testing turns into a better idea.',
     example: ['Quote: “It wasn’t clear how students pay.” Change: speed, by adding a pay-ahead step.'],
