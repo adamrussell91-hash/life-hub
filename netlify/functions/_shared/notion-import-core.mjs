@@ -3473,6 +3473,14 @@ var SectionLinkSchema = z11.object({
   mode: z11.literal("linked"),
   source_composition_id: z11.string().min(1)
 });
+var GroupSetSchema = z11.object({
+  group_id: z11.string().min(1).max(64),
+  class_id: z11.string().min(1).max(64),
+  name: z11.string().min(1).max(120),
+  tags: z11.array(z11.string().min(1).max(120)).min(1).max(8),
+  students: z11.array(z11.string().min(1).max(64)).max(60),
+  target: z11.number().int().min(1).max(10)
+});
 var SectionBlockObjectSchema = z11.object({
   id: z11.string().min(1),
   type: z11.literal("block"),
@@ -3495,7 +3503,9 @@ var SectionBlockObjectSchema = z11.object({
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
     tutorial_exit: z11.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
-    sprint_phase: SprintPhaseKeySchema.optional()
+    sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
+    group_set: GroupSetSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps

@@ -17,8 +17,9 @@ import { assembleWorldGraph } from './network-ecology-world.mjs';
 export const WORLD_SNAPSHOT_KEY = 'network-ecology/world-snapshot';
 export const WORLD_BUILD_LOCK_KEY = 'network-ecology/world-build-lock';
 // Bump when the `/world` response shape changes so a deploy never serves a
-// snapshot built by older code.
-export const WORLD_SNAPSHOT_VERSION = 1;
+// snapshot built by older code. Version 2 also invalidates maps containing
+// removed identities or their relationship endpoints.
+export const WORLD_SNAPSHOT_VERSION = 2;
 // A snapshot older than this is still served, but triggers a rebuild.
 export const WORLD_SNAPSHOT_FRESH_MS = 2 * 60_000;
 // Don't start another background build while one started this recently.

@@ -207,7 +207,8 @@ export function filterBlocksForStudent(blocks, { keepQuizQuestions = false } = {
 
 function withoutQuizQuestions(blocks) {
   return blocks
-    .filter(block => block?.block_type !== 'quiz_question')
+    // A group set's name, tags and students are the teacher's; publish lifts it, everywhere else drops it.
+    .filter(block => block?.block_type !== 'quiz_question' && !(block?.block_type === 'section' && block.content?.group_set))
     .map(block => {
       const c = block.content;
       if (Array.isArray(c?.blocks)) return { ...block, content: { ...c, blocks: withoutQuizQuestions(c.blocks) } };

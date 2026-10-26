@@ -61,3 +61,39 @@ It passed on a focused rerun alongside both mobile date/action cases (3/3).
 Mandatory `npm run pre-pr-check`: exit 0; root tests report 7,204 passed,
 zero failed, 12 skipped; static guards, affected Tasks/Teaching test selection
 and Professional typecheck passed.
+
+## iPhone date overflow follow-up — 25 October 2026
+
+The 24 October layout change did not fix the reported iPhone rendering. The
+follow-up screenshot shows the native date field still painting beyond the
+other inputs even after Address and Date stack. The earlier Chromium-only
+geometry checks were insufficient evidence for this Safari complaint.
+
+The visible date is now painted by a normal, clipped `.food-date` field.
+A transparent, absolutely positioned `input[type=date]` fills that field,
+retaining its label, focus, native picker and date value without contributing
+native control paint or intrinsic width to the layout. The displayed value
+uses the shared `dd/mm/yy` formatter and follows input/change events.
+
+Checked R2/R3/R4, L1, P1/P3: WebKit phone emulation at 390 and 320 and desktop
+at 1440 verifies the visible field bounds, both-edge hit targets, native date
+input, focus, displayed date changes, draft reopening and saved date. Visual
+review against the reported screenshot: date now shares the Address right
+edge on phones; intended difference is left-aligned `dd/mm/yy` display. Test
+screenshots use synthetic journal data, never personal production content.
+WebKit runs with temporary user-space libraries; this is browser-engine
+coverage with iPhone emulation, not a physical iPhone test.
+
+Verification: full Chromium Food Journal suite passed 31/31. WebKit date
+regressions passed 3/3 after checking both `input` and native-picker `change`
+commits; WebKit long-form/R4 checks passed at 390 and 320. Its broader photo
+capture case timed out before the second thumbnail; the same failure and
+"Choose a photo under 4 MB" status reproduce with the pre-fix `view.js`.
+That existing photo path is outside this date-field change.
+
+Final native-picker change-event checks passed 3/3 in Chromium as well.
+`npm run pre-pr-check` passed: 7,247 root tests passed, 12 skipped, zero
+failed; static guards, affected Tasks/Teaching test selection and Professional
+typecheck passed. Run the WebKit cases with
+`PLAYWRIGHT_BROWSER=webkit node --test --test-name-pattern='date control|phone (390|320)' tests/browser/food-journal.spec.mjs`
+after installing Playwright WebKit and its host libraries.

@@ -2589,6 +2589,14 @@ var SectionLinkSchema = z10.object({
   mode: z10.literal("linked"),
   source_composition_id: z10.string().min(1)
 });
+var GroupSetSchema = z10.object({
+  group_id: z10.string().min(1).max(64),
+  class_id: z10.string().min(1).max(64),
+  name: z10.string().min(1).max(120),
+  tags: z10.array(z10.string().min(1).max(120)).min(1).max(8),
+  students: z10.array(z10.string().min(1).max(64)).max(60),
+  target: z10.number().int().min(1).max(10)
+});
 var SectionBlockObjectSchema = z10.object({
   id: z10.string().min(1),
   type: z10.literal("block"),
@@ -2611,7 +2619,9 @@ var SectionBlockObjectSchema = z10.object({
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
     tutorial_exit: z10.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
-    sprint_phase: SprintPhaseKeySchema.optional()
+    sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
+    group_set: GroupSetSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -5549,6 +5559,12 @@ A question is good when the students who learnt the lesson get it right and the 
 5. Every fact in a question comes from a lesson or note you opened in this job. Never test a detail you only half know: a poet's influences, a date, a publication, a quote. If the lessons do not say it, do not ask it. Lesson content beats your general knowledge when they differ.
 6. Use the lessons' own examples, texts and wording for recall, and fresh but similar material (another line from the same poem, a new everyday example) for application, so students apply the idea and do not just recognise a sentence.
 
+### Tag every question
+The markbook and the insight views track what each question tests, so every quiz_question carries its own tags in question.outcomes and question.skills. Call list_question_tags once for the lists.
+- outcomes: the one or two outcome ids (the id field, e.g. "EA12-2") the question actually tests. Choose from what the question asks a student to do, not from the lesson's dot points: a quiz that mixes ideas has different outcomes on different questions. Never copy the same outcomes onto every question.
+- skills: exactly one skill id from the list (e.g. "reading.inference"), the skill the student uses to answer. Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference; weighing readings or context belongs to the matching skill in the list. A recall-only question still gets the nearest skill. If a question tests nothing on either list, rewrite it or cut it.
+- Tag after you finish each question, from its final wording, and re-check the tags if you change the question.
+
 ### Every kind
 - One idea per question. The stem asks a clear question that a student who knows the content could answer with the options covered.
 - The stem never teaches the answer. Cut any preamble that states the point being tested. Never put a word in the stem that only the right answer matches (a stem saying "Japanese forms" with one Japanese name among the options), or a grammatical cue (a/an, singular/plural) that fits only the key.
@@ -5611,6 +5627,7 @@ A question is good when the students who learnt the lesson get it right and the 
 - Cover test: hide the options. Could a student who learnt the lesson answer? If not, the stem is unclear.
 - Test-wise test: read only the options. Can you spot the key by length, tone, absolutes, a stem echo or common sense? If so, rewrite.
 - Lesson test: point to the lesson and dot point it checks. If you cannot, cut it.
+- Tag test: its outcomes and skill match what a student does to answer it, and not simply the quiz's overall topic.
 - Then check the quiz as a whole: every key idea covered in proportion to how it was taught, a spread from recall to application, kinds varied, and no question giving away another's answer.`;
 
 // apps/teaching/src/ai/block-recipes.ts
@@ -5657,6 +5674,9 @@ A group tab follows gradual release, I do \u2192 We do \u2192 You do: a heading 
 - with_teacher: content { talking_points: [string] } (up to 8).
 No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2\u20133 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
+
+## Group sets
+A quiz may hold group sets: top-level sections with group_set { group_id, class_id, name, tags, students, target }. Only that group's students get a set's questions, mixed in with the quiz. To fill one, use propose_replace_section on it, keeping its id, title and group_set exactly; put target quiz_question blocks inside, written on the lesson's own content and tagged so results land on the set's tags. Never add a group set yourself and never move quiz questions into or out of one.
 
 ## Limits: say so before you build
 Never agree to something these limits rule out. When a request hits one, say so plainly in your first sentence, then offer the nearest thing you can do. Do not quietly truncate, merge, or drop content to fit.
@@ -7020,6 +7040,16 @@ function questionGiveaways(question) {
   }
   return issues;
 }
+function questionTagIssues(label, question) {
+  const issues = [];
+  if (!question.outcomes?.length) {
+    issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
+  }
+  if (!question.skills?.length) {
+    issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
+  }
+  return issues;
+}
 function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true } = {}) {
   const questions = [];
   visitBlocks(proposalBlocks(proposal), (block) => {
@@ -7061,6 +7091,7 @@ function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true
       return;
     }
     for (const giveaway of questionGiveaways(question)) issues.push(`${label}: ${giveaway}`);
+    issues.push(...questionTagIssues(label, checked.question));
     const url = checked.question.image?.url;
     if (url && !images.has(url)) {
       issues.push(`${label}: its image must be one already in the lesson. Use one of the lesson's images or a different question kind.`);

@@ -237,3 +237,24 @@ span.mb-cell { display: inline-block; cursor: default; }
   .mb-who__chips { grid-column: 1 / -1; padding-top: 0; }
   .mb-who__name { min-height: 44px; }
 }
+
+.mb-cell__practice { display: block; font: var(--text-2xs) / 1.2 var(--font-ui); color: var(--muted); }
+
+.mb-saved-list { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.mb-saved { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); font: var(--text-sm) / 1.4 var(--font-ui); color: var(--ink); }
+.mb-saved__name { margin: 0; font: var(--weight-semibold) var(--text-sm) / 1.3 var(--font-ui); }
+.mb-saved__add { justify-self: start; }
+
+.mb-hist { display: grid; gap: var(--space-3); }
+.mb-hist__bar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.mb-hist__group { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); color: var(--ink); font: var(--text-sm) / 1.4 var(--font-ui); }
+.mb-hist__head { display: grid; gap: 2px; width: 100%; padding: var(--space-3); border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.mb-hist__head:focus-visible, .mb-hist__who:focus-visible { outline: 2px solid var(--marine); outline-offset: 2px; }
+.mb-hist__name { font-weight: var(--weight-semibold); }
+.mb-hist__meta { font: var(--text-xs) / 1.3 var(--font-ui); color: var(--muted); }
+.mb-hist__members { display: grid; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); }
+.mb-hist__member { display: grid; grid-template-columns: minmax(120px, 200px) 1fr; gap: var(--space-2) var(--space-4); }
+.mb-hist__who { justify-self: start; padding: 0; border: 0; background: none; font: var(--weight-semibold) var(--text-sm) / 1.3 var(--font-ui); color: var(--marine); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.mb-hist__lines { display: grid; gap: var(--space-1); margin: 0; padding-left: 1.1em; }
+.mb-hist__line--left { font-weight: var(--weight-semibold); }
+@media (max-width: 600px) { .mb-hist__member { grid-template-columns: 1fr; } }
