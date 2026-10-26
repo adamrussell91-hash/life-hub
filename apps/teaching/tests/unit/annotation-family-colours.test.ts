@@ -64,6 +64,29 @@ describe('annotation technique family colours', () => {
     el.remove();
   });
 
+  it('turns on by itself when only the techniques layer is showing, and the reader can turn it off', async () => {
+    const fixture = structuredClone(threadFocusFixture);
+    const layer = fixture.content.layers.find((l) => l.id === 'layer_imagery')!;
+    layer.kind = 'family';
+    fixture.content.annotations = [
+      tagged('ann_simile', 'line_1', 13, 'like old beggars', 'simile'),
+      tagged('ann_allit', 'line_2', 0, 'Knock-kneed', 'alliteration')
+    ];
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+    await loadLiteraryElements();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const simile = () => el.querySelector<HTMLElement>('[data-annotation-id="ann_simile"]')!;
+    const toggle = () => el.querySelector<HTMLButtonElement>('.block-annotation__family-toggle')!;
+    expect(toggle().getAttribute('aria-pressed')).toBe('true');
+    expect(simile().className).toContain('block-annotation__anchor--fam-comparative');
+
+    toggle().click();
+    expect(toggle().getAttribute('aria-pressed')).toBe('false');
+    expect(simile().className).not.toContain('--fam-');
+    el.remove();
+  });
+
   it('stays hidden when no note carries a technique', () => {
     const el = renderAnnotationBlock(structuredClone(threadFocusFixture), 'student');
     expect(el.querySelector<HTMLElement>('.block-annotation__family-key')!.hidden).toBe(true);
