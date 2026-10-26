@@ -5,7 +5,7 @@ import { outcomeLabels } from '@/markbook/parse';
 import { loadSkills } from '@/skills/api';
 import { loadAlignment } from '@/alignment/api';
 import type { Alignment } from '@/alignment/schema';
-import { lessonOutcomeMap } from './syllabus';
+import { lessonOutcomeMap, lessonPointMap, outcomePointMap } from './syllabus';
 import type { TagContext } from './tags';
 
 /**
@@ -13,9 +13,15 @@ import type { TagContext } from './tags';
  * missing; views fall back to raw ids. `lessonOutcomes` holds the outcome
  * tags each lesson's dot points reach, for quiz items tagged with none.
  */
-export type InsightContext = TagContext & { codes: FeedbackCode[]; lessonOutcomes?: ReadonlyMap<string, string[]> };
+export type InsightContext = TagContext & {
+  codes: FeedbackCode[];
+  lessonOutcomes?: ReadonlyMap<string, string[]>;
+  /** Each lesson's dot point tags, and the dot points each outcome tag reaches. */
+  lessonPoints?: ReadonlyMap<string, string[]>;
+  outcomePoints?: ReadonlyMap<string, string[]>;
+};
 
-let cached: Promise<Omit<InsightContext, 'outcomes' | 'lessonOutcomes'> & { alignment: Alignment | null }> | null = null;
+let cached: Promise<Omit<InsightContext, 'outcomes' | 'lessonOutcomes' | 'lessonPoints' | 'outcomePoints' | 'alignment'> & { alignment: Alignment | null }> | null = null;
 
 export async function loadInsightContext(): Promise<InsightContext> {
   let failed = false;
@@ -39,7 +45,14 @@ export async function loadInsightContext(): Promise<InsightContext> {
   const { alignment, ...rest } = await mine;
   const curriculum = peekCurriculum();
   const outcomes = outcomeLabels(curriculum?.outcomes ?? []);
-  return { ...rest, outcomes, lessonOutcomes: lessonOutcomeMap(curriculum?.lessons ?? [], alignment, outcomes) };
+  return {
+    ...rest,
+    alignment,
+    outcomes,
+    lessonOutcomes: lessonOutcomeMap(curriculum?.lessons ?? [], alignment, outcomes),
+    lessonPoints: lessonPointMap(curriculum?.lessons ?? [], alignment),
+    outcomePoints: outcomePointMap(alignment, outcomes)
+  };
 }
 
 export function codeLabel(id: string, codes: readonly FeedbackCode[]): string {

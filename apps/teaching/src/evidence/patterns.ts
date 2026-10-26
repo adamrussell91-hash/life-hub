@@ -7,7 +7,7 @@ import type { Band, Evidence, Flag, MixUp, StudentBand, TagKind, TagRow, Why } f
 const avg = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
 const scored = (list: Evidence[]): Evidence[] => list.filter((x) => x.share !== null);
 const questionOf = (item: string): string => item.split('#')[0] as string;
-const tagsOf = (x: Evidence, kind: TagKind): string[] => x.tags.filter((t) => t.startsWith(`${kind}:`));
+const tagsOf = (x: Evidence, kind: string): string[] => x.tags.filter((t) => t.startsWith(`${kind}:`));
 
 function groupBy<T>(xs: T[], key: (x: T) => string[]): Map<string, T[]> {
   const out = new Map<string, T[]>();
@@ -29,7 +29,8 @@ export function kindsPresent(evidence: Evidence[]): TagKind[] {
   return (['tech', 'fam', 'out', 'skill'] as TagKind[]).filter((kind) => evidence.some((x) => tagsOf(x, kind).length));
 }
 
-export function byTag(evidence: Evidence[], kind: TagKind): TagRow[] {
+/** `kind` is a tag prefix: tech, fam, out, skill, or dp for syllabus dot points. */
+export function byTag(evidence: Evidence[], kind: string): TagRow[] {
   const rows: TagRow[] = [];
   for (const [tag, list] of groupBy(scored(evidence), (x) => tagsOf(x, kind))) {
     const shares = list.map((x) => x.share as number);
