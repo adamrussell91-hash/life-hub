@@ -18,9 +18,10 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-prototype');
   root.append(el('h2', '', myPart ? `Your part: ${myPart.text}` : 'Your part'));
   const brief = el('div', 'sprint-brief-part');
-  brief.append(el('p', '', s.chosen ? `Group idea: ${s.chosen.title}` : ''), el('p', '', myPart?.shows ? `It must show: ${myPart.shows}` : 'Your group gives out parts in Decide.'));
+  const line = (k: string, v: string) => { const p = el('p', 'sprint-brief-part__line'); p.append(el('b', '', k), v); return p; };
+  brief.append(line('Group idea', s.chosen?.title ?? 'Not chosen yet'), line('It must show', myPart?.shows || 'Your group gives out parts in Decide.'));
   const serves = ctx.sprint.criteria.find((c) => c.id === myPart?.criterion);
-  if (serves) brief.append(el('p', '', `It serves: ${serves.text}`));
+  if (serves) brief.append(line('It serves', serves.text));
   root.append(brief);
   const bar = submitBar(ctx, 'prototype', () => state, () => prototypeProblems(state, ctx.sprint.criteria, ctx.sprint.requirements));
   root.append(frameField({ label: 'Write your part here, or upload it below', value: state.text, max: 4000, rows: 8, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.text = v; bar.changed(); } }));
@@ -86,10 +87,10 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   if (value) self.append(value);
   root.append(self);
   stepify(root, [
-    { pick: '.sprint-brief-part', title: 'Your part', guide: LATER_GUIDE.part },
+    { pick: '.sprint-brief-part', title: 'What your part must do', guide: LATER_GUIDE.part },
     { pick: '.sprint-field, .sprint-files', title: 'Build it', guide: LATER_GUIDE.build },
     { pick: '.sp-parts, .sprint-pitch', title: 'Bring the parts together', guide: LATER_GUIDE.share },
-    { pick: '.sprint-self', title: 'Check your part', guide: LATER_GUIDE.check }
+    { pick: '.sprint-self', title: 'Rate your part', guide: LATER_GUIDE.check }
   ]);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
