@@ -833,6 +833,19 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           showError(error);
           this.disabled = false;
         }
+      }),
+      button('Delete this attempt', 'ghost', async function () {
+        const who = a.student ? whoLabel(a, new Map()) : 'this student';
+        if (!window.confirm(`Delete this attempt by ${who}? It stops counting in the markbook and insights, and they get that go back. Their other attempts stay. This can’t be undone.`)) return;
+        this.disabled = true;
+        try {
+          results = await post<Results>({ action: 'delete_attempt', attempt_id: a.id });
+          openAttempt = null;
+          paint();
+        } catch (error) {
+          showError(error);
+          this.disabled = false;
+        }
       })
     );
     wrap.append(bar);
