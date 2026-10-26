@@ -39,8 +39,8 @@ describe('sprint player', () => {
     mountSprintPlayer(host, { lesson, classId: 'class1', client: c, renderHero: () => {} });
     await flush();
     expect(host.querySelector('.sprint-group')?.textContent).toContain('Kestrel');
-    expect([...host.querySelectorAll('.sprint-step')].map((s) => s.textContent)).toHaveLength(5);
-    expect(host.querySelector('.sprint-step--now')?.textContent).toContain('Understand');
+    expect([...host.querySelectorAll('.srail__stn')].map((s) => s.textContent)).toHaveLength(5);
+    expect(host.querySelector('.srail__stn[data-state="now"]')?.textContent).toContain('Understand');
     expect(host.querySelector<HTMLElement>('.sprint-intent')?.hidden).toBe(true);
     expect(c.open).toHaveBeenCalledWith('understand');
   });

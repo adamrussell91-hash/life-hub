@@ -6,6 +6,7 @@ import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { phaseDue } from './rules';
 import { phaseIntention, phaseMove, toolFrames } from './defaults';
 import { sprintParts } from './model';
+import { buildRail } from './rail';
 import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
 import { fillPhaseSample } from './practice-sample';
@@ -115,21 +116,11 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const group = el('div', 'sprint-group', `Group ${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     intent.hidden = !intent.textContent;
-    const steps = el('nav', 'sprint-steps');
-    steps.setAttribute('aria-label', 'Sprint phases');
-    for (const p of s.phases ?? []) {
-      const b = el('button', `sprint-step${p.key === key ? ' sprint-step--now' : p.state === 'in' ? ' sprint-step--done' : !p.open ? ' sprint-step--later' : ''}`);
-      b.type = 'button';
-      b.disabled = !p.open;
-      const where = sprint.phases.find((x) => x.key === p.key)?.where === 'class' ? 'Class' : 'Home';
-      b.append(el('b', '', PHASE_LABELS[p.key]), el('span', '', `${where}${p.state === 'in' ? ' · in' : p.key === key ? ' · now' : ''}`));
-      b.addEventListener('click', () => { chosen = p.key; paint(); });
-      steps.append(b);
-    }
+    const steps = buildRail(s.phases ?? [], key, (k) => sprint.phases.find((x) => x.key === k)?.where, (k) => { chosen = k; paint(); }, (p) => (p.due_date ? `Closes ${new Date(`${p.due_date}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })}` : ''));
     const brief = el('details', 'sprint-brief');
     brief.append(el('summary', '', 'The challenge'));
     for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
-    top.append(cd, group, steps, intent, brief);
+    top.append(steps, cd, group, intent, brief);
   }
 
   function guidesPanel(key: SprintPhaseKey): HTMLElement {
