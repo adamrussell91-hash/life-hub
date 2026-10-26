@@ -2439,7 +2439,9 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
     // Other blocks carry the same optional attachment beneath their content.
     const question = block.block_type === 'question_set' && block.content.questions.length === 1
       ? wrapper.querySelector('.block-question-set__question') : null;
-    const response = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines');
+    let response: Element | null = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines') ?? null;
+    // Formats nest the response inside their own wrapper; insert before that wrapper, not the nested node.
+    while (question && response && response.parentElement !== question) response = response.parentElement;
     for (const attachment of attachments) {
       if (response) question!.insertBefore(attachment, response);
       else if (question) question.append(attachment);

@@ -69,6 +69,9 @@ function lines(count = PRINT_LINES): HTMLElement {
 }
 
 /** Write it down: the finished answer, a Copy button and the handover. */
+const noSpace = (...questions: QuestionSet['content']['questions']): boolean =>
+  questions.length > 0 && questions.every((q) => q.kind === 'short_answer' && q.response_space === 'none');
+
 function writeDown(mode: Mode, state: State, persist: () => void, id: string, frame: string, instruction: string): HTMLElement {
   const wrap = el('div', 'block-question-set__write');
   wrap.append(el('p', 'block-question-set__answer-label block-eyebrow', 'Write it down'), el('p', 'block-secondary', instruction));
@@ -148,7 +151,8 @@ export function renderHumanExperienceTable(block: QuestionSet, mode: Mode, ctx: 
   }
   table.append(body);
   scroll.append(table);
-  wrap.append(scroll, writeDown(mode, state, persist, 'answer', TABLE_FRAME, 'Pick your strongest row and write it as a full sentence.'));
+  wrap.append(scroll);
+  if (!noSpace(...block.content.questions)) wrap.append(writeDown(mode, state, persist, 'answer', TABLE_FRAME, 'Pick your strongest row and write it as a full sentence.'));
   return wrap;
 }
 
@@ -170,7 +174,8 @@ export function renderAnchorBridge(block: QuestionSet, mode: Mode, ctx: Ctx = {}
       else label.append(box(state, persist, `${question.id}.${part.id}`, `${part.label}: ${part.hint}`, part.hint));
       boxes.append(label);
     }
-    li.append(boxes, writeDown(mode, state, persist, `${question.id}.answer`, ANCHOR_FRAME, 'Bring the three parts together in your own words.'));
+    li.append(boxes);
+    if (!noSpace(question)) li.append(writeDown(mode, state, persist, `${question.id}.answer`, ANCHOR_FRAME, 'Bring the three parts together in your own words.'));
     list.append(li);
   }
   wrap.append(list);
@@ -202,13 +207,14 @@ export function renderQuestionLevels(block: QuestionSet, mode: Mode, ctx: Ctx = 
       n += 1;
       const li = el('li', 'block-question-set__question');
       li.dataset.questionId = question.id;
-      li.append(el('p', 'block-question-set__prompt block-body', question.prompt), answer(mode, state, persist, question.id, `Question ${n} answer`));
+      li.append(el('p', 'block-question-set__prompt block-body', question.prompt));
+      if (!noSpace(question)) li.append(answer(mode, state, persist, question.id, `Question ${n} answer`));
       list.append(li);
     }
     band.append(head, list);
     wrap.append(band);
   }
-  wrap.append(writeDown(mode, state, persist, 'answer', LEVELS_FRAME, 'Take your best Judge or Inventor answer and write it up as a paragraph.'));
+  if (!noSpace(...block.content.questions)) wrap.append(writeDown(mode, state, persist, 'answer', LEVELS_FRAME, 'Take your best Judge or Inventor answer and write it up as a paragraph.'));
   return wrap;
 }
 
@@ -238,6 +244,7 @@ export function renderBecauseButSo(block: QuestionSet, mode: Mode, ctx: Ctx = {}
     li.append(parts);
     list.append(li);
   }
-  wrap.append(list, writeDown(mode, state, persist, 'answer', BBS_FRAME, 'Join your best three into one sentence, or pick the strongest and improve it.'));
+  wrap.append(list);
+  if (!noSpace(...block.content.questions)) wrap.append(writeDown(mode, state, persist, 'answer', BBS_FRAME, 'Join your best three into one sentence, or pick the strongest and improve it.'));
   return wrap;
 }
