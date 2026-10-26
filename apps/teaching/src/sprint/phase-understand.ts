@@ -1,16 +1,11 @@
 import { button, el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { briefText } from './model';
-import { draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { coach, draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
 import { LIMIT_BOXES, UNDERSTAND_ALONE, defaultUnderstand, type LimitBox, type PhasePayload, type UnderstandStep } from './schema';
 import type { SprintStatus, UnderstandGroup } from './api';
 
-const LIMIT_LABELS: Record<LimitBox, string> = {
-  can_known: 'Known · we can control',
-  cant_known: 'Known · we can’t control',
-  can_unknown: 'Unknown · we can control',
-  cant_unknown: 'Unknown · we can’t control'
-};
 const STEP_TITLES: Record<UnderstandStep, string> = {
   spot: 'Spot: what stands out in the brief?',
   audience: 'Audience: who is this for?',
@@ -57,7 +52,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   root.append(el('h2', '', 'Understand the problem'));
   if (ctx.sprint.phases[0]!.instruction) root.append(el('p', '', ctx.sprint.phases[0]!.instruction));
   const bar = submitBar(ctx, 'understand', () => state, () => understandProblems(state, steps, (status.notes ?? []).length));
-  const changed = () => bar.changed();
+  const changed = () => { bar.changed(); if (slides) paintRail(); };
   const err = el('p', 'sprint-submit__err');
   err.setAttribute('role', 'alert');
   /** A shared-space write: shows the new state, or says why it didn't work. */
@@ -67,8 +62,9 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     const box = el('section', `su-step su-step--${alone(k) ? 'alone' : 'group'}`);
     box.dataset.step = k;
     const head = el('div', 'su-step__head');
-    head.append(el('span', 'su-step__num', String(n)), el('h3', '', STEP_TITLES[k]));
-    box.append(head);
+    head.append(el('span', 'su-step__num', String(n)), el('h3', '', STEP_TITLES[k]), el('span', 'su-step__icon', UNDERSTAND_GUIDE[k].icon));
+    head.lastElementChild!.setAttribute('aria-hidden', 'true');
+    box.append(head, coach(UNDERSTAND_GUIDE[k]));
     return box;
   };
 
@@ -77,7 +73,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   function spot(box: HTMLElement): void {
     const text = briefText(ctx.blocks);
     if (!text) { box.append(el('p', 'sprint-note', 'Your teacher hasn’t written the brief yet.')); return; }
-    box.append(el('p', 'sprint-note', 'Tap the words that matter most. Tap again to undo.'));
+    box.append(el('p', 'sprint-note', 'Tap a word to mark it. Tap again to undo.'));
     const words = el('div', 'su-words');
     const picked = el('p', 'sprint-note');
     const paintPicked = () => { picked.textContent = state.spot.length ? `You picked: ${state.spot.join(', ')}` : 'No words picked yet.'; };
@@ -115,8 +111,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   }
 
   function dig(box: HTMLElement): void {
-    box.append(el('p', 'sprint-note', 'Start with the problem on the surface. Then ask why it’s a problem. Stop when you hit the real one.'));
-    const list = el('div', 'su-dig');
+        const list = el('div', 'su-dig');
     const paint = () => {
       list.replaceChildren();
       state.dig.forEach((v, i) => {
@@ -133,24 +128,49 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     if (steps.vote) box.append(el('p', 'sprint-note', 'It goes up to your group’s space without your name.'));
   }
 
+  /** The 2 × 2 sorter: columns say whether we can control it, rows whether we know it. */
+  function matrix(fill: (b: LimitBox, cell: HTMLElement) => void): HTMLElement {
+    const wrap = el('div', 'su-matrix');
+    wrap.append(
+      el('span', 'su-axis su-axis--corner', ''),
+      el('span', 'su-axis su-axis--col', '✅ We can control it'),
+      el('span', 'su-axis su-axis--col', '🚫 We can’t control it')
+    );
+    const rows: ReadonlyArray<readonly [LimitBox, LimitBox]> = [['can_known', 'cant_known'], ['can_unknown', 'cant_unknown']];
+    rows.forEach((pair, r) => {
+      wrap.append(el('span', 'su-axis su-axis--row', r === 0 ? '📘 We know it' : '❔ We don’t know yet'));
+      for (const b of pair) {
+        const meta = LIMIT_CELLS[b];
+        const cell = el('div', `su-box su-box--${b}${b.endsWith('unknown') ? ' su-box--unknown' : ''}`);
+        const head = el('div', 'su-box__head');
+        head.append(el('span', 'su-box__icon', meta.icon), el('h4', '', meta.title));
+        head.firstElementChild!.setAttribute('aria-hidden', 'true');
+        cell.append(head, el('p', 'su-box__ask', meta.ask));
+        fill(b, cell);
+        wrap.append(cell);
+      }
+    });
+    return wrap;
+  }
+
   function limits(box: HTMLElement): void {
-    box.append(el('p', 'sprint-note', `Add a short card to each box.${steps.ask ? ' The unknowns become questions for the expert.' : ''}`));
-    const grid = el('div', 'su-grid');
-    for (const b of LIMIT_BOXES) {
-      const cell = el('div', `su-box${b.endsWith('unknown') ? ' su-box--unknown' : ''}`);
-      cell.append(el('h4', '', LIMIT_LABELS[b]));
+    if (steps.ask) box.append(el('p', 'sprint-note', 'The unknowns become questions for the expert.'));
+    box.append(matrix((b, cell) => {
       const cards = el('ul', 'su-cards');
       const paint = () => {
-        cards.replaceChildren(...state.limits[b].map((t, i) => {
+        const items = state.limits[b].map((t, i) => {
           const li = el('li', 'su-card');
           li.append(el('span', '', t));
           if (!off) {
-            const x = button('Remove', 'ghost', () => { state.limits[b].splice(i, 1); paint(); changed(); });
+            const x = button('✕', 'ghost', () => { state.limits[b].splice(i, 1); paint(); changed(); });
             x.setAttribute('aria-label', `Remove "${t}"`);
+            x.classList.add('su-card__x');
             li.append(x);
           }
           return li;
-        }));
+        });
+        if (!items.length) items.push(el('li', 'su-card su-card--ghost', LIMIT_CELLS[b].example));
+        cards.replaceChildren(...items);
       };
       paint();
       cell.append(cards);
@@ -158,8 +178,8 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
         const add = el('form', 'su-add');
         const input = el('input', 'qz-input');
         input.maxLength = 120;
-        input.placeholder = 'Add a card';
-        input.setAttribute('aria-label', `Add a card: ${LIMIT_LABELS[b]}`);
+        input.placeholder = 'Type a card, press Enter';
+        input.setAttribute('aria-label', `Add a card: ${LIMIT_CELLS[b].title}`);
         const go = el('button', 'btn btn--secondary', 'Add');
         go.type = 'submit';
         add.addEventListener('submit', (e) => {
@@ -174,9 +194,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
         add.append(input, go);
         cell.append(add);
       }
-      grid.append(cell);
-    }
-    box.append(grid);
+    }));
   }
 
   // ---------------------------------------------------------------- the group's shared space
@@ -190,7 +208,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
 
   function vote(box: HTMLElement): void {
     const notes = status.notes ?? [];
-    box.append(el('p', 'sprint-note', 'Everyone’s problem statements, without names. Star the one your group should take on.'));
+    box.append(el('p', 'sprint-note', 'Everyone’s statements, without names.'));
     if (!notes.length) { box.append(el('p', 'sprint-note', 'Statements show here as your group writes them.')); return; }
     if (state.star && !notes.some((n) => n.id === state.star)) state.star = '';
     for (const n of notes) {
@@ -205,7 +223,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
 
   function merge(box: HTMLElement): void {
     const g = group();
-    box.append(el('p', 'sprint-note', 'What everyone wrote, with repeats stacked. Agree one version together. Tap a line to use it.'));
+    box.append(el('p', 'sprint-note', 'Repeats are stacked, like “×3”.'));
     const field = (label: string, key: 'who' | 'why', options: UnderstandGroup['who']) => {
       const chips = el('div', 'su-chips');
       const input = el('input', 'qz-input');
@@ -234,18 +252,12 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
 
   function gridShared(box: HTMLElement): void {
     const g = group();
-    box.append(el('p', 'sprint-note', 'Everyone’s cards in one grid, with repeats stacked.'));
-    const grid = el('div', 'su-grid');
-    for (const b of LIMIT_BOXES) {
-      const cell = el('div', `su-box${b.endsWith('unknown') ? ' su-box--unknown' : ''}`);
-      cell.append(el('h4', '', LIMIT_LABELS[b]));
+    box.append(matrix((b, cell) => {
       const ul = el('ul', 'su-cards');
       for (const c of g.limits[b]) ul.append(el('li', 'su-card', counted(c.text, c.count)));
-      if (!g.limits[b].length) ul.append(el('li', 'sprint-note', 'Nothing yet.'));
+      if (!g.limits[b].length) ul.append(el('li', 'su-card su-card--ghost', 'Nothing here yet'));
       cell.append(ul);
-      grid.append(cell);
-    }
-    box.append(grid);
+    }));
   }
 
   function ask(box: HTMLElement): void {
@@ -319,6 +331,8 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   let at = 0;
   const nav = el('div', 'su-nav');
   const where = el('span', 'su-nav__where');
+  const rail = el('ol', 'su-rail');
+  rail.setAttribute('aria-label', 'Steps');
   const back = button('Back', 'secondary', () => { at = Math.max(0, at - 1); show(); });
   const next = button('Next', 'primary', () => { at = Math.min(order.length - 1, at + 1); show(); });
   function show(): void {
@@ -327,6 +341,37 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     next.disabled = at === order.length - 1;
     const k = order[at];
     where.textContent = k ? `Step ${at + 1} of ${order.length} · ${alone(k) ? 'On your own' : 'Your group’s space'}` : '';
+    paintRail();
+  }
+  /** Has this step got something in it? Alone steps read the draft, shared ones the group's space. */
+  function stepDone(k: UnderstandStep): boolean {
+    const g = group();
+    switch (k) {
+      case 'spot': return state.spot.length > 0;
+      case 'audience': return !!state.audience.who.trim() && !!state.audience.why.trim();
+      case 'dig': return state.dig.filter((d) => d.trim()).length >= 2;
+      case 'say': return !!state.say.trim();
+      case 'limits': return LIMIT_BOXES.every((b) => state.limits[b].length > 0);
+      case 'vote': return !!state.star;
+      case 'merge': return !!g.audience;
+      case 'grid': return false;
+      case 'ask': return g.questions.some((q) => q.picked);
+      case 'expert': return g.sent.some((q) => q.answer);
+    }
+  }
+  function paintRail(): void {
+    rail.replaceChildren(...order.map((k, i) => {
+      const li = el('li', '');
+      const done = stepDone(k);
+      const b = el('button', `su-rail__dot${i === at ? ' is-now' : ''}${done ? ' is-done' : ''}${alone(k) ? '' : ' is-group'}`, done && i !== at ? '✓' : String(i + 1));
+      b.type = 'button';
+      b.title = STEP_TITLES[k];
+      b.setAttribute('aria-label', `Step ${i + 1}: ${STEP_TITLES[k]}${done ? ' (has something in it)' : ''}`);
+      if (i === at) b.setAttribute('aria-current', 'step');
+      b.addEventListener('click', () => { at = i; show(); });
+      li.append(b);
+      return li;
+    }));
   }
   let lastAlone = true;
   for (const k of order) {
@@ -336,12 +381,12 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   }
   if (!order.length) flow.append(el('p', 'sprint-note', 'Your teacher hasn’t set the steps for this phase yet.'));
   root.append(flow);
-  if (slides) { nav.append(back, where, next); root.append(nav); }
+  if (slides) { root.append(rail); nav.append(back, where, next); root.append(nav); }
   show();
   root.append(err, bar.el);
   return {
     el: root,
-    update(next: SprintStatus) { status = next; paintShared(); },
+    update(next: SprintStatus) { status = next; paintShared(); if (slides) paintRail(); },
     dispose: bar.dispose
   };
 }

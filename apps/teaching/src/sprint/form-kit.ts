@@ -2,6 +2,7 @@ import { button, el } from '@/quiz/dom';
 import { libraryValue } from '@/toolkit/library';
 import type { Block } from '@/schemas/block';
 import type { PhaseRow, SprintClient, SprintStatus } from './api';
+import type { Guide } from './guidance';
 import type { PhasePayload, PublicSprint, SprintPhaseKey } from './schema';
 
 /** What every phase form is given. */
@@ -164,4 +165,51 @@ export function briefCard(s: SprintStatus): HTMLElement | null {
   if (b?.audience?.who) card.append(el('p', '', `Audience: ${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`));
   for (const a of b?.answers ?? []) card.append(el('p', 'sprint-note', `Expert: ${a.question} ${a.answer}`));
   return card;
+}
+
+/**
+ * The coach under a step's heading: what to do in one line, then three
+ * folded helpers (why, an example, ways out when stuck), so a student sees
+ * one line unless they ask for more.
+ */
+export function coach(guide: Guide): HTMLElement {
+  const box = el('div', 'coach');
+  const line = el('p', 'coach__do');
+  line.append(el('span', 'coach__tag', 'Do this'), ` ${guide.doThis}`);
+  const help = el('div', 'coach__help');
+  const fold = (cls: string, label: string, fill: (into: HTMLElement) => void, open = false) => {
+    const d = el('details', `coach__fold coach__fold--${cls}`);
+    d.open = open;
+    d.append(el('summary', '', label));
+    const inner = el('div', 'coach__body');
+    fill(inner);
+    d.append(inner);
+    help.append(d);
+  };
+  fold('why', '💡 Why this step', (b) => b.append(el('p', '', guide.why)));
+  fold('example', '👀 See an example', (b) => { for (const l of guide.example) b.append(el('p', '', l)); });
+  fold('stuck', '🆘 I’m stuck', (b) => { const ul = el('ul'); for (const l of guide.stuck) ul.append(el('li', '', l)); b.append(ul); });
+  box.append(line, help);
+  return box;
+}
+
+/**
+ * Give an existing form the same numbered step cards as Understand: each step
+ * claims the direct children of `root` its selector matches, and they move into
+ * a card (number, icon, heading, coach) placed where the first one was.
+ */
+export function stepify(root: HTMLElement, steps: Array<{ pick: string; title: string; guide: Guide }>): void {
+  steps.forEach((st, i) => {
+    const kids = [...root.children].filter((c) => c.matches(st.pick));
+    if (!kids.length) return;
+    const card = el('section', 'su-step su-step--alone');
+    const head = el('div', 'su-step__head');
+    const icon = el('span', 'su-step__icon', st.guide.icon);
+    icon.setAttribute('aria-hidden', 'true');
+    head.append(el('span', 'su-step__num', String(i + 1)), el('h3', '', st.title), icon);
+    const body = el('div', 'su-step__body');
+    card.append(head, coach(st.guide), body);
+    root.insertBefore(card, kids[0]!);
+    body.append(...kids);
+  });
 }
