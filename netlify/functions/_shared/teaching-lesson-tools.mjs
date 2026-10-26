@@ -1,6 +1,7 @@
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
-import { draftLessonKey, getJSON, listJSON, outcomeKey, SCHEDULED_LESSON_PREFIX, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, getJSON, listJSON, outcomeKey, SCHEDULED_LESSON_PREFIX, subjectKey, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadAlignment } from './syllabus-alignment.mjs';
+import { loadSkills } from './skills-continuum.mjs';
 import { childBlocks, editableFields } from '../../../packages/alchemy/patches.js';
 
 /** One read_lesson call returns this much text; pass offset to continue. */
@@ -26,6 +27,11 @@ export const LESSON_TOOLS = [
       id: { type: 'string', description: 'A lesson id from list_lessons.' },
       offset: { type: 'integer', minimum: 0 }
     } }
+  },
+  {
+    name: 'list_question_tags',
+    description: 'List the outcomes (id, code and wording) and skills (id and name) a quiz question can be tagged with, for this lesson\'s subject. Call it before writing quiz questions: every question gets its own outcomes and skill from these lists. Read-only.',
+    input_schema: { type: 'object', additionalProperties: false, properties: {} }
   }
 ];
 
@@ -84,7 +90,7 @@ export function dotPointSyllabus(doc, ref) {
 }
 
 /** Runs list_lessons and read_lesson against the content store, loading the timetable and syllabus once per job. */
-export function createLessonToolRunner({ store, lesson, alignment = () => loadAlignment(store) }) {
+export function createLessonToolRunner({ store, lesson, alignment = () => loadAlignment(store), skills = () => loadSkills(store) }) {
   let scheduled = null;
   let syllabus = null;
   const syllabusFor = async row => {
@@ -153,6 +159,16 @@ export function createLessonToolRunner({ store, lesson, alignment = () => loadAl
           text: text.slice(offset, end),
           ...(end < text.length ? { more_from: end } : {})
         };
+      }
+      case 'list_question_tags': {
+        const unit = await liveUnit(lesson.unit_id);
+        const subject = unit?.subject_id ? await getJSON(store, subjectKey(unit.subject_id)).catch(() => null) : null;
+        const outcomes = (await Promise.all((subject?.outcome_ids ?? []).map(id => getJSON(store, outcomeKey(id)).catch(() => null))))
+          .filter(o => o && !isDeletedRecord(o))
+          .map(o => ({ id: o.id, code: o.code, description: o.description ?? o.title }));
+        const continuum = await Promise.resolve().then(skills).catch(() => null);
+        const skillList = (continuum?.strands ?? []).flatMap(strand => strand.sub_strands.map(sub => ({ id: `${strand.id}.${sub.id}`, name: sub.name })));
+        return { outcomes, skills: skillList };
       }
       default:
         return { error: 'Unknown tool.' };
