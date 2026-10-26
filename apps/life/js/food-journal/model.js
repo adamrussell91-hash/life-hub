@@ -301,6 +301,116 @@ export function knownTags(journal) {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([key]) => key);
 }
+// Tags say what kind of food a dish is. These are offered first; anything
+// typed is still allowed, and tags used before rise to the front.
+export const FOOD_TAGS = [
+  "Burger",
+  "Sandwich",
+  "Toastie",
+  "Wrap",
+  "Pizza",
+  "Pasta",
+  "Noodles",
+  "Ramen",
+  "Dumplings",
+  "Bao",
+  "Curry",
+  "Rice bowl",
+  "Fried rice",
+  "Salad",
+  "Soup",
+  "Steak",
+  "Chicken",
+  "Schnitzel",
+  "Taco",
+  "Burrito",
+  "Kebab",
+  "Chips",
+  "Pie",
+  "Eggs",
+  "Pancakes",
+  "Cake",
+  "Ice cream",
+  "Pastry",
+  "Coffee",
+  "Smoothie",
+];
+const TAG_CUISINE = {
+  burger: "American",
+  pizza: "Italian",
+  pasta: "Italian",
+  ramen: "Japanese",
+  dumplings: "Chinese",
+  bao: "Chinese",
+  "fried rice": "Chinese",
+  curry: "Indian",
+  taco: "Mexican",
+  burrito: "Mexican",
+  schnitzel: "German",
+  kebab: "Turkish",
+};
+// The cuisine the first tag that has one suggests, or "".
+export function cuisineFor(tags = []) {
+  for (const t of tags) {
+    const c = TAG_CUISINE[tagKey(t)];
+    if (c) return c;
+  }
+  return "";
+}
+const capital = (key) => key.charAt(0).toUpperCase() + key.slice(1);
+// Food tags to offer as buttons: the person's own most used food tags
+// first, then the rest of the list, then their other tags when searched.
+// Tags already on the dish are left out; the field shows those itself.
+export function foodTagOptions(known = [], picked = [], query = "") {
+  const q = tagKey(query);
+  const taken = new Set(picked.map(tagKey));
+  const food = new Map(FOOD_TAGS.map((t) => [tagKey(t), t]));
+  const seen = new Set();
+  const out = [];
+  const add = (key, label) => {
+    if (!key || seen.has(key) || taken.has(key)) return;
+    if (q && !key.includes(q)) return;
+    seen.add(key);
+    out.push(label);
+  };
+  for (const key of known) if (food.has(key)) add(key, food.get(key));
+  for (const [key, label] of food) add(key, label);
+  if (q) for (const key of known) add(key, capital(key));
+  return out;
+}
+// The meal a time of day suggests, in Sydney.
+export function mealAt(instant = new Date()) {
+  const [h, m] = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  })
+    .format(instant)
+    .split(":")
+    .map(Number);
+  const minutes = h * 60 + m;
+  if (minutes < 10 * 60 + 30) return "Breakfast";
+  if (minutes < 15 * 60) return "Lunch";
+  if (minutes < 17 * 60 + 30) return "Snack";
+  return "Dinner";
+}
+// Venues logged before whose name contains what is typed, latest first.
+export function pastVenues(journal, typed, limit = 5) {
+  const q = String(typed || "").trim().toLowerCase();
+  if (!q) return [];
+  const seen = new Set(),
+    out = [];
+  for (const visit of liveVisits(journal)) {
+    const name = String(visit.venue?.name || "").trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key) || !key.includes(q) || key === q) continue;
+    seen.add(key);
+    out.push(visit.venue);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 // Day One reviews carry the score in the text as "4/5" or "4\\.5/5". Dates
 // such as 21/5/26 are not scores.
 export function dayOneRating(text) {
