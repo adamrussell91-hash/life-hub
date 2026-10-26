@@ -28,4 +28,14 @@ describe('block recipe limits', () => {
     expect(BLOCK_BUILD_RECIPES).toMatch(/Draw on a whiteboard/);
     expect(BLOCK_BUILD_RECIPES).toMatch(/voice tracks/);
   });
+  it('teaches the question_set formats, including 4 Levels, with a valid shape', () => {
+    for (const phrase of ['question_levels', 'because_but_so', 'reasoning_chart', 'beginner|detective|judge|inventor']) {
+      expect(BLOCK_BUILD_RECIPES).toContain(phrase);
+    }
+    const block = createBlock('question_set', 'levels_set') as { content: Record<string, unknown> };
+    const levels = ['beginner', 'detective', 'judge', 'inventor'] as const;
+    block.content.format = 'question_levels';
+    block.content.questions = levels.map((level) => ({ id: `q_${level}`, prompt: `A ${level} question`, kind: 'short_answer', level }));
+    expect(BlockSchema.safeParse(block).success).toBe(true);
+  });
 });
