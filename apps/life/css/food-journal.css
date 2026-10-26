@@ -579,6 +579,293 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
   line-height: 1;
 }
 
+/* Add and edit visit in three steps (27 Oct 2026): where and when, the food,
+   then a check. The step bar sits under the title; the Close / Back, Next
+   and Save bar keeps its place at the top of the page. */
+.food-steps {
+  order: -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.food-steps__step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.food-steps__num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--line);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
+}
+.food-steps__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.food-steps__step.is-done .food-steps__num {
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+}
+.food-steps__step[aria-current="step"] {
+  border-color: var(--navy);
+  color: var(--navy);
+  font-weight: var(--weight-semibold);
+}
+.food-steps__step[aria-current="step"] .food-steps__num {
+  background: var(--navy);
+  color: var(--on-dark);
+}
+.food-step {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.food-step[hidden],
+.food-suggest[hidden],
+.food-badge[hidden],
+.food-tags__more[hidden],
+.food-portion[hidden] {
+  display: none;
+}
+.food-snap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.food-snap__pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 7.5rem;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--warm-white);
+  color: var(--navy);
+  cursor: pointer;
+  text-align: left;
+}
+.food-snap__pick--dish {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--on-dark);
+}
+.food-snap__pick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.food-snap__pick:focus-within {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+.food-snap__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.food-snap__hint {
+  font-size: var(--text-xs);
+  opacity: 0.85;
+}
+.food-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.food-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.food-choices--meals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.food-choice,
+.food-tags__option {
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  white-space: normal;
+}
+.food-choice.is-active {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--on-dark);
+}
+.food-suggest {
+  display: grid;
+  gap: var(--space-1);
+}
+.food-suggest .food-meta {
+  margin: 0;
+}
+.food-suggest__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.food-find {
+  flex: none;
+  min-height: 44px;
+}
+.food-venue input {
+  font-weight: var(--weight-medium);
+}
+.food-tags__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.food-tags__new {
+  grid-column: 1 / -1;
+  border-style: dashed;
+  color: var(--navy);
+}
+.food-tags__more {
+  justify-self: start;
+  min-height: 44px;
+}
+.food-rate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.food-badge {
+  justify-self: start;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.food-dish-more > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--navy);
+}
+.food-dish-more > .food-pair {
+  padding-top: var(--space-2);
+}
+.food-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+.food-summary__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--warm-white);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.food-summary__text {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+.food-summary__title {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.food-summary__ingredients {
+  font-size: var(--text-xs);
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.food-summary__edit {
+  flex: none;
+  color: var(--navy);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.food-summary .food-meta {
+  margin: 0;
+}
+.food-brisket-after {
+  align-items: center;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.food-count-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.food-count {
+  display: grid;
+  gap: var(--space-1);
+}
+.food-count__name {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.food-again-chip {
+  background: var(--success-surface);
+  color: var(--success);
+}
+@media (max-width: 720px) {
+  .food-steps__step {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    text-align: center;
+    font-size: var(--text-xs);
+  }
+  .food-steps__label {
+    max-width: 100%;
+  }
+  .food-snap__pick {
+    min-height: 8.5rem;
+  }
+}
+
 /* ── Editorial journal (magazine, timeline, entry, fix-up) ─────────────────
    Bodoni Moda is the same deliberate exception Aesthetics uses (css/aesthetics.css):
    Adam approved the editorial voice from the Food Journal redesign mockups,

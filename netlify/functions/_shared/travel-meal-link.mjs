@@ -15,7 +15,7 @@ export function parseTravelSourceId(sourceId) {
   return m ? { tripId: m[1], momentId: m[2] } : null;
 }
 
-const DISH_FIELDS = ["title", "title_en", "meal_type", "rating", "cuisine", "tags", "notes", "notes_en", "ingredients", "ingredients_original"];
+const DISH_FIELDS = ["title", "title_en", "meal_type", "rating", "cuisine", "tags", "notes", "notes_en", "ingredients", "ingredients_original", "order_again"];
 
 // Dish ids are unique across the whole journal, tombstones included.
 // An id already taken, even by an earlier dish in the same save, starts a new dish.

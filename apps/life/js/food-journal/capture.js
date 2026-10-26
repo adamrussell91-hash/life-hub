@@ -121,6 +121,36 @@ export function mergeCapture(visit, draft, photos = []) {
 
 const sameName = (a, b) =>
   String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// The menu's words for a dish typed by name, so ingredients come across
+// even when the dish was not ticked from the list. Null when the menu has
+// no dish of that name or it lists no ingredients.
+export function menuIngredientsFor(visit, title) {
+  if (!String(title || "").trim()) return null;
+  const item = (visit.menu_items || []).find(
+    (i) =>
+      i.kind !== "extra" &&
+      (sameName(i.name, title) || (i.name_en && sameName(i.name_en, title))),
+  );
+  const ingredients = String(item?.description_en || item?.description || "");
+  if (!ingredients.trim()) return null;
+  return item.description_en && item.description
+    ? { ingredients, ingredients_original: String(item.description) }
+    : { ingredients };
+}
+// Whether a dish's ingredients are still the menu's own words.
+export function ingredientsFromMenu(visit, dish) {
+  const own = String(dish.ingredients || "")
+    .split("\n")
+    .filter((l) => !l.startsWith("+ "))
+    .join("\n")
+    .trim();
+  if (!own) return false;
+  return (visit.menu_items || []).some((i) =>
+    [i.description, i.description_en]
+      .map((t) => String(t || "").trim())
+      .includes(own),
+  );
+}
 // Extras (add bacon, a side of hash brown) ride on a dish as "+ name" lines.
 const isExtra = (item) => item.kind === "extra";
 const extraLine = (item) => `+ ${item.name}`;
