@@ -8,39 +8,15 @@
  */
 import { isSafeId } from './class-examples.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
-import { listBlobKeys } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
-import { deleteKey, draftLessonKey, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, unitKey } from './teaching-blobs.mjs';
 import { markbookAction } from './markbook.mjs';
 import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
 import { profileItems, storedAlignment } from './profile-items.mjs';
+import { listDone, recordDone, removeDone } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
-const doneKey = (classId, studentId, lessonId) => `profile/${classId}/${studentId}/done/${lessonId}`;
-const donePrefix = (classId, studentId) => `profile/${classId}/${studentId}/done/`;
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
-
-export async function recordDone(store, classId, studentId, lessonId, via) {
-  if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
-  await store.setJSON(doneKey(classId, studentId, lessonId), { at: new Date().toISOString(), via }, { onlyIfNew: true });
-}
-
-export async function listDone(store, classId, studentId) {
-  const prefix = donePrefix(classId, studentId);
-  const out = {};
-  await Promise.all(
-    (await listBlobKeys(store, prefix)).map(async (key) => {
-      const held = await read(store, key);
-      if (held) out[key.slice(prefix.length)] = held;
-    })
-  );
-  return out;
-}
-
-export async function removeDone(store, classId, studentId, lessonId) {
-  if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
-  await deleteKey(store, doneKey(classId, studentId, lessonId));
-}
 
 /** The class's current unit, lessons in unit order with their route role. */
 async function unitLessons(store, cls) {
@@ -92,7 +68,7 @@ export function mapRows(lessons, view, done, studentId) {
 async function profileFor(store, roster, student) {
   const classId = roster.cls.id;
   const { lessons } = await unitLessons(store, roster.cls);
-  const view = await markbookAction(store, classId, { action: 'load' });
+  const view = await markbookAction(store, classId, { action: 'load', skip_done: true });
   const done = await listDone(store, classId, student.id);
   const rows = mapRows(lessons, view, done, student.id);
   const next = rows.find((r) => r.role === 'core' && !r.done)?.id ?? null;

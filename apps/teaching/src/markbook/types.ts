@@ -34,7 +34,13 @@ export type QuizColumn = {
   sets?: QuizSet[];
 };
 
-export type MarkbookView = { markbook: Markbook; students: RosterStudent[]; quizzes: QuizColumn[] };
+export type MarkbookView = {
+  markbook: Markbook;
+  students: RosterStudent[];
+  quizzes: QuizColumn[];
+  /** Lessons each student marked done, by student id then lesson id. */
+  done?: Record<string, Record<string, { at: string; via: string }>>;
+};
 export type AnyColumn = Column | QuizColumn;
 export type OutcomeLabel = { id: string; code: string; title: string; group: string };
 
