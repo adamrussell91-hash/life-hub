@@ -327,7 +327,8 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
     const go = button(label, 'primary', function () {
       void run(async () => {
         let next = s;
-        if (text.trim() !== saved || !remaining || !own) next = await client!.save({ kind: 'answer', part_id: latest.id, text: (drafts.answers[latest.id] ?? text).trim() });
+        const now = (drafts.answers[latest.id] ?? text).trim();
+        if (now !== saved || !remaining || !own) next = await client!.save({ kind: 'answer', part_id: latest.id, text: now });
         return remaining && own ? client!.nextPart() : next;
       }, this);
     });

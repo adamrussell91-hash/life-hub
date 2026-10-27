@@ -130,6 +130,7 @@ import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedb
 import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
+import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/_shared/case-study.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -1248,11 +1249,16 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     // A design sprint keeps its groups and rules server-side, as the real publish does.
     const sprint = parsed.data.pedagogical_mode === 'design_sprint' && parsed.data.sprint ? prepareSprintPublish(parsed.data, studentBlocks) : null;
     if (sprint) await storeSprintConfig(functionBlobStore(), id, sprint.config);
+    // A case study keeps its documents, outcome and transfer case server-side, as the real publish does.
+    const caseStudy = parsed.data.pedagogical_mode === 'case_study' ? prepareCasePublish(parsed.data) : null;
+    if (caseStudy?.problems.length) return errorResponse(400, 'validation_error', caseStudy.problems[0]);
+    if (caseStudy) await storeCaseConfig(functionBlobStore(), id, caseStudy.config);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
       ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
-      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {})
+      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
+      ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {})
     });
 
     try {

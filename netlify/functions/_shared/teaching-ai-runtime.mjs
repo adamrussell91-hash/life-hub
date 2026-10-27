@@ -6188,7 +6188,7 @@ var Id2 = z14.string().regex(/^[a-z0-9_-]{1,40}$/);
 var CaseDocSchema = z14.object({
   id: Id2,
   kind: z14.enum(CASE_DOC_KINDS),
-  title: z14.string().min(1).max(120),
+  title: z14.string().max(120),
   /** "Water Authority internal memo, 3 March". Shown under the title. */
   source: z14.string().max(160).default(""),
   /** Plain text; blank lines separate paragraphs. */
@@ -6196,35 +6196,35 @@ var CaseDocSchema = z14.object({
 });
 var CasePartSchema = z14.object({
   id: Id2,
-  title: z14.string().min(1).max(80),
+  title: z14.string().max(80),
   docs: z14.array(CaseDocSchema).min(1).max(8),
   /** Layered release only: a short question the student answers before the next part opens. */
   question: z14.string().max(300).optional()
 });
 var CaseOptionSchema = z14.object({
   id: Id2,
-  label: z14.string().min(1).max(120),
+  label: z14.string().max(120),
   detail: z14.string().max(300).optional()
 });
 var CaseDecisionSchema = z14.object({
   /** The question in the case's voice: "You are the head of the water authority. The dam is at 30%. What do you do?" */
-  prompt: z14.string().min(1).max(500),
+  prompt: z14.string().max(500),
   /** 2 to 4 options for a guided decision; empty means free text (extension). */
   options: z14.array(CaseOptionSchema).max(4).default([])
 });
 var CaseOutcomeSchema = z14.object({
   /** What actually happened. */
-  text: z14.string().min(1).max(4e3),
+  text: z14.string().max(4e3),
   /** Publish is blocked without it. */
-  source: z14.string().min(1).max(200),
+  source: z14.string().max(200),
   /** Own pace only: hold the Outcome until this date (YYYY-MM-DD) so the class sees it together. */
   hold_until: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
 });
 var CaseTransferSchema = z14.object({
-  title: z14.string().min(1).max(120),
+  title: z14.string().max(120),
   docs: z14.array(CaseDocSchema).min(1).max(4),
   /** Includes "Which rule helped?" in its wording when the teacher wants it. */
-  question: z14.string().min(1).max(500)
+  question: z14.string().max(500)
 });
 var CaseHelpSchema = z14.object({
   do: z14.string().max(300).optional(),
@@ -6249,10 +6249,10 @@ var CaseSettingsSchema = z14.object({
   decision: CaseDecisionSchema.optional(),
   outcome: CaseOutcomeSchema.optional(),
   /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
-  objections: z14.array(z14.string().min(1).max(300)).max(3).default([]),
+  objections: z14.array(z14.string().max(300)).max(3).default([]),
   transfer: CaseTransferSchema.optional(),
   /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
-  class_id: z14.string().min(1).max(64).optional(),
+  class_id: z14.string().max(64).optional(),
   help: CaseHelpMap.optional()
 });
 var PublicCaseSchema = z14.object({
