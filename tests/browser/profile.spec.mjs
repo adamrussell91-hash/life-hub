@@ -6,13 +6,18 @@ import path from 'node:path';
 import { createPublishedProfileHandler } from '../../netlify/functions/published-profile.mjs';
 
 const data = new Map([
-  ['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', current_unit_id: 'unit1', students: [{ name: 'Bob Brown' }, { name: 'Tom Tills' }, { name: 'Cara Chen' }] }],
-  ['units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1', 'l2', 'l3', 'l4'] }],
-  ['lessons/l1', { id: 'l1', title: 'Ghost poem' }],
-  ['lessons/l2', { id: 'l2', title: 'Tutorial', route_role: 'support' }],
-  ['lessons/l3', { id: 'l3', title: 'Stretch task', route_role: 'extension' }],
-  ['lessons/l4', { id: 'l4', title: 'Close reading' }]
+  ['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', current_unit_id: 'unit1', subject_id: 'subj1', students: [{ name: 'Bob Brown' }, { name: 'Tom Tills' }, { name: 'Cara Chen' }] }],
+  ['subjects/subj1', { id: 'subj1', network_lines: [{ id: 'ln1', mode: 'train', name: 'Argument', short: 'ARG', colour: 'wave' }, { id: 'ln2', mode: 'metro', name: 'Voice', short: 'VOI', colour: 'green' }] }],
+  ['units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1', 'l2', 'l3', 'l4', 'l5'] }],
+  ['lessons/l1', { id: 'l1', title: 'Ghost poem', line_stops: [{ line_id: 'ln1', level: 'introduced' }, { line_id: 'ln2', level: 'introduced' }] }],
+  ['lessons/l2', { id: 'l2', title: 'Tutorial', route_role: 'support', line_stops: [{ line_id: 'ln1' }] }],
+  ['lessons/l3', { id: 'l3', title: 'Stretch task', route_role: 'extension', line_stops: [{ line_id: 'ln2' }] }],
+  ['lessons/l4', { id: 'l4', title: 'Close reading', line_stops: [{ line_id: 'ln1', level: 'reinforced' }] }],
+  ['lessons/l5', { id: 'l5', title: 'Poem task', pedagogical_mode: 'assessment' }],
+  ['scheduled_lessons/s1', { id: 's1', class_id: 'class1', lesson_id: 'l1', date: '2026-10-05' }],
+  ['scheduled_lessons/s4', { id: 's4', class_id: 'class1', lesson_id: 'l4', date: '2026-10-12' }]
 ]);
+for (const id of ['l1', 'l2', 'l3', 'l4', 'l5']) data.set(`published/lessons/${id}`, { id });
 const store = {
   async get(key) { return structuredClone(data.get(key) ?? null); },
   async getWithMetadata(key) { return data.has(key) ? { data: structuredClone(data.get(key)), etag: 'e' } : null; },
@@ -69,13 +74,20 @@ try {
   await claim(bob, 'bb');
 
   // 2. The map starts grey, with Next up and no numbers.
-  assert.equal(await bob.locator('.pm-row.is-done').count(), 0, 'everything starts grey');
-  assert.ok((await bob.locator('[data-lesson="l1"]').textContent()).includes('Next up'));
+  const doneStations = (p) => p.locator('.cm-station.cm-p-done');
+  assert.equal(await doneStations(bob).count(), 0, 'everything starts grey');
+  assert.ok((await bob.locator('.cm-row[data-row="l1"]').textContent()).includes('Next up'));
   assert.equal(await bob.locator('.pm-bar').count(), 4);
   const visible = await bob.locator('.pm-profile').innerText();
   assert.doesNotMatch(visible, /\d+\s*%|\d+ of \d+|\d+ lessons?|\bscore\b|\bred\b|\bamber\b/i, 'no counts, scores or percentages');
-  assert.equal(await bob.locator('[data-lesson="l3"]').evaluate((e) => e.classList.contains('is-faded')), true, 'unassigned extension is faded');
-  assert.ok((await bob.locator('[data-lesson="l3"] a').getAttribute('href')).endsWith('/s/classes/class1/lessons/l3'), 'faded lesson still opens');
+  assert.equal(await bob.locator('.cm-row[data-row="l3"]').evaluate((e) => e.classList.contains('cm-faded')), true, 'unassigned extension is faded');
+  assert.equal(await bob.locator('.cm-row[data-row="l5"] rect[rx="2"]').count(), 1, 'the assessment is the square');
+  // A faded lesson still opens.
+  await bob.route('**/s/classes/class1/lessons/l3', (route) => route.fulfill({ contentType: 'text/html', body: '<p>opened</p>' }));
+  await bob.locator('.cm-row[data-row="l3"]').click();
+  await bob.waitForURL('**/s/classes/class1/lessons/l3');
+  await bob.goBack();
+  await bob.locator('.pm-map').waitFor();
   await shot(bob, 'phone-grey');
   await noSideScroll(bob);
   console.log('Claimed, map starts grey, faded lesson still a link');
@@ -89,8 +101,8 @@ try {
   await bob.getByText('Marked done').waitFor();
   await bob.goto(`${origin}/profile-check`);
   await bob.locator('.pm-map').waitFor();
-  assert.equal(await bob.locator('[data-lesson="l1"]').evaluate((e) => e.classList.contains('is-done')), true, 'the lesson filled');
-  assert.equal(await bob.locator('[data-lesson="l4"]').evaluate((e) => e.classList.contains('is-next')), true, 'Next up moved on');
+  assert.equal(await bob.locator('.cm-row[data-row="l1"] .cm-station').evaluate((e) => e.classList.contains('cm-p-done')), true, 'the lesson filled');
+  assert.ok((await bob.locator('.cm-row[data-row="l4"]').textContent()).includes('Next up'), 'Next up moved on');
   await shot(bob, 'phone-done');
   await noSideScroll(bob);
   console.log('Done fills the map and moves Next up');
@@ -98,7 +110,7 @@ try {
   // 4. Another student's device never sees Bob's progress.
   await tom.goto(`${origin}/profile-check`);
   await claim(tom, 'tt');
-  assert.equal(await tom.locator('.pm-row.is-done').count(), 0, 'Tom sees none of Bob’s progress');
+  assert.equal(await doneStations(tom).count(), 0, 'Tom sees none of Bob’s progress');
   await shot(tom, 'desktop-grey');
 
   // 5. A new device types its initials in the Done block on a lesson not assigned to her; it still fills.
@@ -111,8 +123,8 @@ try {
   await cara.getByText('Marked done').waitFor();
   await cara.goto(`${origin}/profile-check`);
   await cara.locator('.pm-map').waitFor();
-  const support = cara.locator('[data-lesson="l2"]');
-  assert.equal(await support.evaluate((e) => e.classList.contains('is-done') && e.classList.contains('is-faded')), true, 'an unassigned lesson fills when done');
+  const support = cara.locator('.cm-row[data-row="l2"]');
+  assert.equal(await support.evaluate((e) => e.classList.contains('cm-faded') && e.querySelector('.cm-station').classList.contains('cm-p-done')), true, 'an unassigned lesson fills when done');
   await shot(cara, 'phone-typed');
   await noSideScroll(cara);
   console.log('PASS: unclaimed step, grey map, Done on a known device, typed initials, isolation between students, faded lessons, no numbers, 390px.');

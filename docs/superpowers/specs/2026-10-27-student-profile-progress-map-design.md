@@ -74,3 +74,10 @@ Each bar is measured against the unit's declared items, not only what has been m
 - **Skills:** `skill:` tags on the class markbook's assessment criteria plus those on the unit's published quiz keys.
 - The alignment is read from the stored copy (`syllabus_alignment/{id}`) only. A public student request never reads the private source file. If the teacher has never opened the alignment, the two dot-point bars stay empty.
 - The unit is the class's `current_unit_id` (first `active_unit_ids` entry when unset). The class markbook is class-wide, not per unit, so its skills are all counted.
+
+## Added after review (27 October 2026)
+
+- **Assessment lessons are the square.** A lesson whose type is Assessment is drawn as the map's square (no gradebook link needed). It fills only when the teacher marks it complete in the Progress view; a student tick or hand-in leaves it waiting.
+- **Teacher Progress view** (a new Markbook view): one row per student, one column per lesson of the class's current unit. A tick is complete, a half circle is partial (a quiz started but not handed in, a handed-in assessment waiting to be marked, or a teacher's partial mark), a grey box is a support, extension or option lesson not set for that student, and a red dot means not complete a week (`LATE_AFTER_DAYS`) after the lesson's set date for the class. Pressing a cell cycles not done, complete, partial, cleared. Red appears only here, never on the student's page.
+- **Student map layout.** The student page draws the teacher's unit coverage map (same route, lanes, week bands and a branch per syllabus line), grey until done. Quizzes are diamonds, assessments squares, the next core lesson has a gold ring and "Next up", unassigned side lessons are faded and dashed but still open. It shows no scores, percentages or counts. Dot-point (Understanding / Responding) branches are not drawn: they need the syllabus wording, which a public endpoint does not send.
+- The student payload lists published lessons only.

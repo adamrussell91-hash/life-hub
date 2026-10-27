@@ -1,16 +1,11 @@
 /* Student progress map. Grey until done. Words always sit beside colour. Tokens only. */
 .pm-profile {
-  --pm-grey: #c9ced6;
-  --pm-grey-ink: var(--muted);
   --pm-core: var(--wave);
-  --pm-support: var(--high-sea);
-  --pm-extension: var(--pastel-lilac-ink);
-  --pm-gold: #c9a227;
   display: grid;
   gap: var(--space-6);
   width: 100%;
   min-width: 0;
-  max-width: 44rem;
+  max-width: 60rem;
   margin: 0 auto;
 }
 
@@ -86,6 +81,7 @@
 .pm-map {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .pm-map__title {
@@ -94,131 +90,8 @@
   color: var(--navy);
 }
 
-.pm-route {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-}
-
-.pm-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-2) 0 var(--space-2) var(--space-1);
+.pm-map__host {
   min-width: 0;
-}
-
-/* The route behind the nodes: grey until the lesson is done. */
-.pm-row::before {
-  content: '';
-  position: absolute;
-  left: 15px;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--pm-grey);
-}
-
-.pm-row.is-done::before {
-  background: var(--pm-core);
-}
-
-.pm-row.is-support,
-.pm-row.is-extension,
-.pm-row.is-optional {
-  margin-left: var(--space-6);
-}
-
-.pm-row.is-support::before,
-.pm-row.is-extension::before,
-.pm-row.is-optional::before {
-  display: none;
-}
-
-.pm-node {
-  position: relative;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  margin-top: 2px;
-  border-radius: 50%;
-  background: var(--pm-grey);
-  border: 3px solid var(--pm-grey);
-  box-sizing: border-box;
-}
-
-.pm-node--quiz {
-  border-radius: 4px;
-  transform: rotate(45deg) scale(0.8);
-}
-
-.pm-row.is-done .pm-node {
-  background: var(--pm-core);
-  border-color: var(--pm-core);
-}
-
-.pm-row.is-done.is-support .pm-node {
-  background: var(--pm-support);
-  border-color: var(--pm-support);
-}
-
-.pm-row.is-done.is-extension .pm-node,
-.pm-row.is-done.is-optional .pm-node {
-  background: var(--pm-extension);
-  border-color: var(--pm-extension);
-}
-
-/* Assigned support and extension lessons are in colour, with a ring until done. */
-.pm-row.is-support:not(.is-done):not(.is-faded) .pm-node {
-  border-color: var(--pm-support);
-}
-
-.pm-row.is-extension:not(.is-done):not(.is-faded) .pm-node,
-.pm-row.is-optional:not(.is-done):not(.is-faded) .pm-node {
-  border-color: var(--pm-extension);
-}
-
-.pm-row.is-next .pm-node {
-  border-color: var(--pm-gold);
-  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.35);
-}
-
-/* Not assigned: faded and dashed, but still a link. */
-.pm-row.is-faded {
-  opacity: 0.45;
-}
-
-.pm-row.is-faded .pm-node {
-  background: transparent;
-  border-style: dashed;
-}
-
-.pm-row__text {
-  display: grid;
-  min-width: 0;
-}
-
-.pm-row__link {
-  display: inline-block;
-  min-height: 44px;
-  padding-block: 10px;
-  box-sizing: border-box;
-  color: var(--navy);
-  font-weight: var(--weight-bold);
-  overflow-wrap: anywhere;
-}
-
-.pm-row__note {
-  margin-top: -10px;
-  font-size: var(--text-sm);
-  color: var(--muted);
-}
-
-.pm-row.is-next .pm-row__note {
-  color: var(--high-sea-ink);
-  font-weight: var(--weight-bold);
 }
 
 /* ── Initials ──────────────────────────────────────────────────────── */

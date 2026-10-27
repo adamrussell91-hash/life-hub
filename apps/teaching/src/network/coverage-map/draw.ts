@@ -8,11 +8,21 @@ import './coverage-map.css';
  * item with a coverage bar above it, and an optional student layer.
  */
 
+/** A student's own progress, drawn instead of coverage: grey until a lesson is done, then in colour. Never scores. */
+export type ProgressLayer = {
+  done: ReadonlySet<string>;
+  /** The first core lesson not yet done. */
+  next: string | null;
+  /** Side lessons not assigned to this student: faded, still pressable. */
+  faded: ReadonlySet<string>;
+};
+
 export type DrawState = {
   collapsed: ReadonlySet<string>;
   selected: string | null;
   focus: string | null;
   student: StudentRoute | null;
+  progress?: ProgressLayer | null;
   /** Width of the lesson-name column; it gives way so the branches fit. */
   nameW: number;
 };
@@ -78,6 +88,8 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
   const height = HEAD_H + rows.length * ROW_H + 8;
   const Y = (i: number) => HEAD_H + i * ROW_H + ROW_H / 2;
   const st = state.student;
+  const pr = state.progress ?? null;
+  const lit = (id: string) => pr?.done.has(id) ?? false;
   const nameChars = Math.floor(state.nameW / 6.6);
   const out: string[] = [];
   const push = (s: string) => out.push(s);
@@ -131,7 +143,10 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       push(`<rect x="${lane.x - 10}" y="30" width="20" height="74" fill="transparent"/>`);
       push(`<text class="cm-item${state.focus === item.id ? ' cm-item--on' : ''}" transform="translate(${lane.x + 3},92) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text></g>`);
     }
-    if (!st) {
+    if (pr) {
+      const any = rows.some((r) => lane.items.some((it) => r.teaches.has(it.id)) && lit(r.id));
+      push(`<circle class="cm-node ${any ? 'cm-p-lit' : 'cm-p-grey'}" cx="${lane.x}" cy="116" r="6"${any ? ` style="fill:${colour};stroke:${colour}"` : ''}/>`);
+    } else if (!st) {
       let core = 0;
       let optional = 0;
       let thin = false;
@@ -180,13 +195,15 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
     const firstY = pts.length ? Y(pts[0]!.i) : height - 8;
-    push(`<line class="cm-sprout${dim ? ' cm-dim' : ''}" x1="${lane.x}" y1="136" x2="${lane.x}" y2="${firstY}" style="stroke:${colour}"/>`);
+    const sproutLit = pr !== null && pts.length > 0 && lit(pts[0]!.row.id);
+    push(`<line class="cm-sprout${dim ? ' cm-dim' : ''}${pr ? (sproutLit ? ' cm-p-lit' : ' cm-p-grey') : ''}" x1="${lane.x}" y1="136" x2="${lane.x}" y2="${firstY}"${pr && !sproutLit ? '' : ` style="stroke:${colour}"`}/>`);
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k]!;
       const b = pts[k + 1]!;
-      const w = st ? 1.5 : lane.collapsed ? 2.5 : [0, 1.5, 2.5, 4][b.depth];
+      const w = st || pr ? 1.5 : lane.collapsed ? 2.5 : [0, 1.5, 2.5, 4][b.depth];
+      const segLit = pr !== null && lit(b.row.id);
       const ahead = st !== null && b.i > st.now;
-      push(`<line class="cm-branch${dim ? ' cm-dim' : ''}${ahead ? ' cm-ahead' : ''}${st ? ' cm-branch--quiet' : ''}" x1="${lane.x}" y1="${Y(a.i)}" x2="${lane.x}" y2="${Y(b.i)}" style="stroke:${colour};stroke-width:${w}"/>`);
+      push(`<line class="cm-branch${dim ? ' cm-dim' : ''}${ahead ? ' cm-ahead' : ''}${st ? ' cm-branch--quiet' : ''}${pr ? (segLit ? ' cm-p-lit' : ' cm-p-grey') : ''}" x1="${lane.x}" y1="${Y(a.i)}" x2="${lane.x}" y2="${Y(b.i)}" style="${pr && !segLit ? '' : `stroke:${colour};`}stroke-width:${w}"/>`);
     }
     for (const p of pts) {
       const x = lane.x;
@@ -194,7 +211,10 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       const side = isSideRow(p.row);
       const ring = p.row.lane === 'support' ? ' cm-node--support' : side ? ' cm-node--side' : '';
       push(`<g class="cm-hit${dim ? ' cm-dim' : ''}" data-row="${esc(p.row.id)}">`);
-      if (!st) {
+      if (pr) {
+        const on = lit(p.row.id);
+        push(`<circle class="cm-node ${on ? 'cm-p-lit' : 'cm-p-grey cm-node--hollow'}${ring}" cx="${x}" cy="${y}" r="${on ? 5 : 3.5}"${on ? ` style="fill:${colour};stroke:${colour}"` : ''}/>`);
+      } else if (!st) {
         const r = lane.collapsed ? Math.min(8, 3.5 + p.hits.length * 1.3) : [0, 4, 5.5, 7][p.depth]!;
         if (state.selected === p.row.id) push(`<circle class="cm-pick" cx="${x}" cy="${y}" r="${r + 4}"/>`);
         const hollow = !lane.collapsed && p.depth === 1;
@@ -218,7 +238,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
   for (let k = 0; k + 1 < coreIdx.length; k++) {
     const a = coreIdx[k]!;
     const b = coreIdx[k + 1]!;
-    push(`<line class="cm-route${fadeAfter(b) ? ' cm-ahead' : ''}" x1="${X_CORE}" y1="${Y(a)}" x2="${X_CORE}" y2="${Y(b)}"/>`);
+    push(`<line class="cm-route${fadeAfter(b) ? ' cm-ahead' : ''}${pr ? (lit(rows[b]!.id) ? ' cm-p-lit' : ' cm-p-grey') : ''}" x1="${X_CORE}" y1="${Y(a)}" x2="${X_CORE}" y2="${Y(b)}"/>`);
   }
   for (let i = 0; i < rows.length; ) {
     const row = rows[i]!;
@@ -235,9 +255,9 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const yb = after !== undefined ? Y(after) : Y(j) + ROW_H / 2;
     const xa = before !== undefined ? X_CORE : x;
     const xb = after !== undefined ? X_CORE : x;
-    const took = st ? rows.slice(i, j + 1).some((r) => st.took.has(r.id)) : false;
+    const took = st ? rows.slice(i, j + 1).some((r) => st.took.has(r.id)) : pr ? rows.slice(i, j + 1).some((r) => lit(r.id)) : false;
     const skipped = st ? !took && i <= st.now : false;
-    const cls = `cm-detour cm-detour--${row.lane === 'support' ? 'support' : 'side'}${took ? ' cm-detour--took' : ''}${skipped ? ' cm-skip' : ''}${st && i > st.now ? ' cm-ahead' : ''}`;
+    const cls = `cm-detour cm-detour--${row.lane === 'support' ? 'support' : 'side'}${took ? ' cm-detour--took' : ''}${skipped ? ' cm-skip' : ''}${st && i > st.now ? ' cm-ahead' : ''}${pr ? (took ? ' cm-p-lit' : ' cm-p-grey') : ''}${pr && rows.slice(i, j + 1).every((r) => pr.faded.has(r.id)) ? ' cm-p-faded' : ''}`;
     push(`<path class="${cls}" d="M${xa} ${ya} C${xa} ${ya + 8},${x} ${Y(i) - 10},${x} ${Y(i)} L${x} ${Y(j)} C${x} ${Y(j) + 10},${xb} ${yb - 8},${xb} ${yb}"/>`);
     i = j + 1;
   }
@@ -248,21 +268,22 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const y = Y(i);
     const side = isSideRow(row);
     const took = st?.took.has(row.id) ?? false;
-    const faded = st !== null && (i > st.now || (side && !took));
+    const faded = (st !== null && (i > st.now || (side && !took))) || (pr !== null && pr.faded.has(row.id));
     const here = st !== null && i === st.now;
-    const cls = `cm-station${row.lane === 'support' ? ' cm-station--support' : side ? ' cm-station--side' : ''}${state.selected === row.id ? ' cm-station--on' : ''}${st && took && side ? ' cm-station--took' : ''}${here ? ' cm-station--here' : ''}`;
-    push(`<g class="cm-hit cm-row${faded ? ' cm-faded' : ''}" data-row="${esc(row.id)}" role="button" tabindex="0" aria-label="${esc(row.title)}">`);
+    const cls = `cm-station${row.lane === 'support' ? ' cm-station--support' : side ? ' cm-station--side' : ''}${state.selected === row.id ? ' cm-station--on' : ''}${st && took && side ? ' cm-station--took' : ''}${here ? ' cm-station--here' : ''}${pr ? `${lit(row.id) ? ' cm-p-done' : ''}${pr.next === row.id ? ' cm-p-next' : ''}` : ''}`;
+    push(`<g class="cm-hit cm-row${faded ? ' cm-faded' : ''}" data-row="${esc(row.id)}" role="button" tabindex="0" aria-label="${esc(row.title)}${pr ? (lit(row.id) ? ', done' : pr.next === row.id ? ', next up' : '') : ''}">`);
     push(`<rect x="34" y="${HEAD_H + i * ROW_H}" width="${start - 40}" height="${ROW_H}" fill="transparent"/>`);
     if (row.kind === 'check') push(`<rect class="${cls}" x="${x - 5}" y="${y - 5}" width="10" height="10" transform="rotate(45 ${x} ${y})"/>`);
     else if (row.kind === 'goal') push(`<rect class="${cls}" x="${x - 6}" y="${y - 6}" width="12" height="12" rx="2"/>`);
     else push(`<circle class="${cls}" cx="${x}" cy="${y}" r="${side ? 4.5 : 5}"/>`);
-    const tag = rowTag(row);
+    const tag = pr && pr.next === row.id ? 'Next up' : rowTag(row);
     let tx = NAME_X;
     if (tag) {
       const tw = tag.length * 6 + 10;
-      push(`<rect class="cm-tag cm-tag--${tagClass(row)}" x="${tx}" y="${y - 8}" width="${tw}" height="16" rx="4"/><text class="cm-tag-text" x="${tx + tw / 2}" y="${y + 4}" text-anchor="middle">${tag}</text>`);
+      push(`<rect class="cm-tag cm-tag--${pr && pr.next === row.id ? 'next' : tagClass(row)}" x="${tx}" y="${y - 8}" width="${tw}" height="16" rx="4"/><text class="cm-tag-text" x="${tx + tw / 2}" y="${y + 4}" text-anchor="middle">${tag}</text>`);
       tx += tw + 5;
     }
+    if (pr && lit(row.id)) push(`<text class="cm-done-mark" x="${start - 8}" y="${y + 4}" text-anchor="end">✓<title>Done</title></text>`);
     const score = st?.scores.get(row.id);
     // A quiz score sits at the end of the name column; the name gives it room.
     const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / 6.3) - (score && score.max > 0 ? 5 : 0));

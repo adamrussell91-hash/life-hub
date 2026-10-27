@@ -9,15 +9,26 @@ import { apiPost } from '@/api/client';
 import { button, deviceToken, el, errorText } from '@/quiz/dom';
 import { ensureNoIndex } from '@/student/feedback-view';
 import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor } from '@/student/shell';
+import { buildCoverageMap, type CoverageMapInput } from '@/network/coverage-map/model';
+import { mountProgressMap } from '@/network/coverage-map/progress';
+import { scheduleFromRows, type ScheduleRow } from '@/network/schedule';
 import './profile.css';
 
 type Role = 'core' | 'support' | 'extension' | 'optional';
 type Fill = { mastered: number; building: number };
-export type ProfileLesson = { id: string; title: string; role: Role; kind: 'lesson' | 'quiz'; done: boolean; assigned: boolean };
+export type ProfileLesson = { id: string; title: string; role: Role; kind: 'lesson' | 'quiz' | 'assessment'; done: boolean; assigned: boolean };
+/** What the server sends to draw the map; see netlify/functions/_shared/profile-map.mjs. */
+export type ProfileUnit = {
+  content: unknown;
+  lines: unknown[];
+  lessons: unknown[];
+  schedule: ScheduleRow[];
+  pre: string[];
+};
 export type ProfilePayload = {
   need: 'initials' | null;
   initials?: string;
-  map?: { lessons: ProfileLesson[]; next: string | null };
+  map?: { lessons: ProfileLesson[]; next: string | null; unit: ProfileUnit | null };
   fills?: Record<'understanding' | 'responding' | 'concepts' | 'skills', Fill>;
 };
 
@@ -35,8 +46,6 @@ const BARS = [
   { key: 'concepts', label: 'Concepts' },
   { key: 'skills', label: 'Skills' }
 ] as const;
-
-const LANE: Record<Exclude<Role, 'core'>, string> = { support: 'Support', extension: 'Extension', optional: 'Option' };
 
 /** Words for a bar, so the colour is never the only signal. */
 function barWords(fill: Fill): string {
@@ -71,35 +80,32 @@ function renderBars(fills: NonNullable<ProfilePayload['fills']>): HTMLElement {
   return section;
 }
 
-function renderRoute(map: NonNullable<ProfilePayload['map']>, classId: string): HTMLElement {
+/** The unit map: the teacher's coverage map as the student's own, grey until done. */
+function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HTMLElement {
   const section = el('section', 'pm-map');
   section.append(el('h2', 'pm-map__title', 'Your unit'));
-  if (!map.lessons.length) {
+  const unit = map.unit;
+  if (!unit || !map.lessons.length) {
     section.append(el('p', 'pm-empty', 'Your teacher hasn’t set up a unit for this class yet.'));
     return section;
   }
-  const list = el('ol', 'pm-route');
-  for (const lesson of map.lessons) {
-    const row = el('li', 'pm-row');
-    row.dataset.lesson = lesson.id;
-    row.classList.add(lesson.role === 'core' ? 'is-core' : `is-${lesson.role}`);
-    if (lesson.done) row.classList.add('is-done');
-    if (lesson.id === map.next) row.classList.add('is-next');
-    if (!lesson.assigned) row.classList.add('is-faded');
-    const node = el('span', `pm-node pm-node--${lesson.kind}`);
-    node.setAttribute('aria-hidden', 'true');
-    const text = el('div', 'pm-row__text');
-    text.append(studentAnchor(`/s/classes/${classId}/lessons/${lesson.id}`, 'pm-row__link', lesson.title));
-    const notes: string[] = [];
-    if (lesson.role !== 'core') notes.push(LANE[lesson.role]);
-    if (lesson.kind === 'quiz') notes.push('Quiz');
-    if (lesson.done) notes.push('Done');
-    if (lesson.id === map.next) notes.push('Next up');
-    if (notes.length) text.append(el('span', 'pm-row__note', notes.join(' · ')));
-    row.append(node, text);
-    list.append(row);
-  }
-  section.append(list);
+  const schedule = scheduleFromRows(unit.schedule, new Set(unit.pre));
+  const built = buildCoverageMap({
+    content: unit.content as CoverageMapInput['content'],
+    lines: unit.lines as CoverageMapInput['lines'],
+    lessons: unit.lessons as CoverageMapInput['lessons'],
+    ...(schedule ? { bands: schedule.bands, dates: schedule.dates } : {})
+  });
+  const host = el('div', 'pm-map__host');
+  section.append(host);
+  mountProgressMap(host, {
+    map: built,
+    classId,
+    label: 'Your unit map',
+    done: new Set(map.lessons.filter((l) => l.done).map((l) => l.id)),
+    faded: new Set(map.lessons.filter((l) => !l.assigned).map((l) => l.id)),
+    next: map.next
+  });
   return section;
 }
 
@@ -129,7 +135,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   root.append(el('h1', 'pm-title', 'My progress'));
   if (payload.initials) root.append(el('p', 'pm-who', `Signed in as ${payload.initials} on this device.`));
-  root.append(renderBars(payload.fills), renderRoute(payload.map, options.classId));
+  root.append(renderBars(payload.fills), renderMap(payload.map, options.classId));
   return root;
 }
 

@@ -9,8 +9,10 @@ Spec: `docs/superpowers/specs/2026-10-27-student-profile-progress-map-design.md`
 1. Add **Learning → Done** at the bottom of each lesson students should be able to finish. The button text is the only setting.
 2. A student whose device already holds a class claim taps once ("I've finished this (Done as AR)"). A new device shows an initials box; Done claims the initials (same messages as quizzes for unknown or taken initials) and then records the lesson.
 3. A submitted quiz counts as done without a tick. There is no student undo.
-4. **My progress** shows the class's current unit: lessons in order, support / extension / option lessons indented, quiz diamonds, a gold ring and "Next up" on the first core lesson not yet done. Support, extension and option lessons the student isn't assigned (the gradebook's `took` tick) are faded and dashed but still open, and fill when done.
-5. Four bars sit above the map. Pale = building, strong = mastered. Students never see scores, percentages, counts, bands or any comparison.
+4. **My progress** draws the unit's coverage map as the student's own: route, support / extension lanes, week bands and a branch per syllabus line, grey until lessons are done. Quizzes are diamonds, Assessment lessons squares, and the first core lesson not yet done has a gold ring and "Next up". Support, extension and option lessons the student isn't assigned (the gradebook's `took` tick) are faded and dashed but still open, and fill when done. Only published lessons appear.
+5. An **Assessment** lesson fills only when the teacher marks it complete (Markbook → **Progress**).
+6. **Markbook → Progress** (teacher): a student by lesson table. ✓ complete, ◐ partial or waiting to be marked, grey box not for that student, red dot not complete a week after its set date. Press a cell to cycle complete, partial, cleared.
+7. Four bars sit above the map. Pale = building, strong = mastered. Students never see scores, percentages, counts, bands or any comparison.
 
 ## Mastery rules
 
@@ -25,9 +27,9 @@ All thresholds live in `apps/teaching/src/evidence/constants.ts` (`BANDS`, `MAST
 ## Implementation
 
 - Student endpoint: `POST /api/published/profile/:class` (`published-profile.mjs`, in `PUBLIC_STUDENT_API_ROUTES`). Actions `status`, `claim`, `done`. The student is whoever the device's class claim says; a student id in the request is ignored.
-- Teacher endpoint: `POST /api/classes/:id/profile` (`class-profile.mjs`, operator session). Actions `list`, `remove`. The markbook `load` also returns `done` for the gradebook.
+- Teacher endpoint: `POST /api/classes/:id/profile` (`class-profile.mjs`, operator session). Actions `list`, `mark` (complete, partial, clear), `remove`. The markbook `load` also returns `done` for the gradebook.
 - Storage: `profile/{class}/{student}/done/{lesson}` `{ at, via }`, create-only; `profile/{class}/{student}/fills/{unit}`.
-- Code: `_shared/profile.mjs`, `profile-done.mjs`, `profile-items.mjs`; `apps/teaching/src/student/profile-view.ts`, `blocks/done.ts`, `evidence/mastery.ts`.
+- Code: `_shared/profile.mjs`, `profile-done.mjs`, `profile-items.mjs`, `profile-map.mjs`; `apps/teaching/src/student/profile-view.ts`, `network/coverage-map/progress.ts`, `markbook/progress.ts`, `blocks/done.ts`, `evidence/mastery.ts`.
 
 ## Verification
 

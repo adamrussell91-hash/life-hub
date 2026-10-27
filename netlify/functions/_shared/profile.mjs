@@ -9,7 +9,8 @@
 import { isSafeId } from './class-examples.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
-import { draftLessonKey, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
+import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
 import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
 import { profileItems, storedAlignment } from './profile-items.mjs';
@@ -25,8 +26,9 @@ async function unitLessons(store, cls) {
   const lessons = [];
   for (const id of unit?.lesson_ids ?? []) {
     if (!isSafeId(id)) continue;
-    const lesson = await read(store, draftLessonKey(id));
-    if (lesson && lesson.title && !lesson.deleted_at) lessons.push(lesson);
+    const [lesson, published] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
+    // Students only ever see lessons that are published.
+    if (lesson && published && lesson.title && !lesson.deleted_at) lessons.push(lesson);
   }
   return { unit, lessons };
 }
@@ -83,7 +85,7 @@ async function profileFor(store, roster, student) {
   const mine = markbookEvidence(view, []).evidence.filter((e) => e.student === student.id);
   const evidence = withPointTags(mine, lessonPointMap(lessons, alignment), new Map());
   const items = await profileItems(store, roster, lessons, view, alignment);
-  return { need: null, initials: student.initials, map: { lessons: rows, next }, fills: await highWaterFills(store, classId, student.id, unit?.id, fillsFor(items, evidence)) };
+  return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) }, fills: await highWaterFills(store, classId, student.id, unit?.id, fillsFor(items, evidence)) };
 }
 
 /** Teacher: every student's done records; marking one complete, partial or clearing it. */
