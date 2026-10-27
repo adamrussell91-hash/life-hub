@@ -1,7 +1,7 @@
 // Generated from apps/teaching/src/ai/job-runner.ts; regenerate with scripts/generate-teaching-ai-runtime.mjs.
 
 // apps/teaching/src/ai/proposals.ts
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 
 // apps/teaching/src/schemas/block.ts
 import { z as z10 } from "zod";
@@ -5136,71 +5136,174 @@ function countBlocksInTree(blocks) {
   return count;
 }
 
+// apps/teaching/src/case-study/schema.ts
+import { z as z12 } from "zod";
+var CASE_OUTCOMES = ["transfer", "framework", "decision", "causal"];
+var CASE_DOC_KINDS = ["memo", "data", "news", "transcript", "update"];
+var Id2 = z12.string().regex(/^[a-z0-9_-]{1,40}$/);
+var CaseDocSchema = z12.object({
+  id: Id2,
+  kind: z12.enum(CASE_DOC_KINDS),
+  title: z12.string().max(120),
+  /** "Water Authority internal memo, 3 March". Shown under the title. */
+  source: z12.string().max(160).default(""),
+  /** Plain text; blank lines separate paragraphs. */
+  text: z12.string().max(6e3)
+});
+var CasePartSchema = z12.object({
+  id: Id2,
+  title: z12.string().max(80),
+  docs: z12.array(CaseDocSchema).min(1).max(8),
+  /** Layered release only: a short question the student answers before the next part opens. */
+  question: z12.string().max(300).optional()
+});
+var CaseOptionSchema = z12.object({
+  id: Id2,
+  label: z12.string().max(120),
+  detail: z12.string().max(300).optional()
+});
+var CaseDecisionSchema = z12.object({
+  /** The question in the case's voice: "You are the head of the water authority. The dam is at 30%. What do you do?" */
+  prompt: z12.string().max(500),
+  /** 2 to 4 options for a guided decision; empty means free text (extension). */
+  options: z12.array(CaseOptionSchema).max(4).default([])
+});
+var CaseOutcomeSchema = z12.object({
+  /** What actually happened. */
+  text: z12.string().max(4e3),
+  /** Publish is blocked without it. */
+  source: z12.string().max(200),
+  /** Own pace only: hold the Outcome until this date (YYYY-MM-DD) so the class sees it together. */
+  hold_until: z12.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+});
+var CaseTransferSchema = z12.object({
+  title: z12.string().max(120),
+  docs: z12.array(CaseDocSchema).min(1).max(4),
+  /** Includes "Which rule helped?" in its wording when the teacher wants it. */
+  question: z12.string().max(500)
+});
+var CaseHelpSchema = z12.object({
+  do: z12.string().max(300).optional(),
+  why: z12.string().max(400).optional(),
+  example: z12.string().max(600).optional(),
+  stuck: z12.string().max(400).optional()
+});
+var CaseHelpMap = z12.record(z12.string(), CaseHelpSchema);
+var CASE_PACES = ["teacher", "own"];
+var CASE_SUPPORTS = ["guided", "standard", "open"];
+var CaseSettingsSchema = z12.object({
+  /** Required: "On a case they haven't seen, students will be able to…". */
+  purpose: z12.string().max(400).default(""),
+  outcomes: z12.array(z12.enum(CASE_OUTCOMES)).max(4).default([]),
+  /** Phase 1 builds Flow A only. */
+  flow: z12.literal("A").default("A"),
+  pace: z12.enum(CASE_PACES).default("teacher"),
+  support: z12.enum(CASE_SUPPORTS).default("standard"),
+  /** 'whole': every document at once (M2). 'layered': parts open in turn, each with a question (M1). */
+  release: z12.enum(["whole", "layered"]).default("whole"),
+  parts: z12.array(CasePartSchema).max(4).default([]),
+  decision: CaseDecisionSchema.optional(),
+  outcome: CaseOutcomeSchema.optional(),
+  /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
+  objections: z12.array(z12.string().max(300)).max(3).default([]),
+  transfer: CaseTransferSchema.optional(),
+  /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
+  class_id: z12.string().max(64).optional(),
+  help: CaseHelpMap.optional()
+});
+var PublicCaseSchema = z12.object({
+  purpose: z12.string().max(400),
+  pace: z12.enum(CASE_PACES),
+  support: z12.enum(CASE_SUPPORTS),
+  release: z12.enum(["whole", "layered"]),
+  decision: CaseDecisionSchema,
+  /** Part titles only, so the rail can say "Part 2 to come". */
+  part_titles: z12.array(z12.string().max(80)).max(4),
+  has_objections: z12.boolean(),
+  help: CaseHelpMap.optional()
+});
+
 // apps/teaching/src/ai/proposals.ts
-var AiScopeSchema = z12.enum(["block", "section", "lesson"]).default("lesson");
-var AiChatRequestSchema = z12.object({
-  lesson_id: z12.string().min(1),
-  agent: z12.enum(["ann", "clementine", "hammond", "clare"]),
+var AiScopeSchema = z13.enum(["block", "section", "lesson"]).default("lesson");
+var AiChatRequestSchema = z13.object({
+  lesson_id: z13.string().min(1),
+  agent: z13.enum(["ann", "clementine", "hammond", "clare"]),
   scope: AiScopeSchema,
-  selected_block_id: z12.string().min(1).optional(),
+  selected_block_id: z13.string().min(1).optional(),
   lesson_snapshot_at: IsoDateSchema.optional(),
-  message: z12.string().min(1).max(8e3),
-  protocol_id: z12.string().min(1).max(64).regex(/^[a-z0-9-]+$/).optional(),
-  action: z12.string().min(1).max(80).optional(),
-  history: z12.array(
-    z12.object({
-      role: z12.enum(["user", "assistant"]),
-      content: z12.string().max(16e3)
+  message: z13.string().min(1).max(8e3),
+  protocol_id: z13.string().min(1).max(64).regex(/^[a-z0-9-]+$/).optional(),
+  action: z13.string().min(1).max(80).optional(),
+  history: z13.array(
+    z13.object({
+      role: z13.enum(["user", "assistant"]),
+      content: z13.string().max(16e3)
     })
   ).max(20).optional()
 });
-var ProposeReplaceBlockSchema = z12.object({
-  block_id: z12.string().min(1),
+var ProposeReplaceBlockSchema = z13.object({
+  block_id: z13.string().min(1),
   block: BlockSchema
 });
-var ProposeReplaceSectionSchema = z12.object({
-  section_id: z12.string().min(1),
+var ProposeReplaceSectionSchema = z13.object({
+  section_id: z13.string().min(1),
   section: BlockSchema
 });
-var ProposalSetModeSchema = z12.literal("quiz");
-var ProposeReplaceLessonSchema = z12.object({
-  title: z12.string().min(1).optional(),
+var ProposalSetModeSchema = z13.literal("quiz");
+var ProposeReplaceLessonSchema = z13.object({
+  title: z13.string().min(1).optional(),
   cover: CoverSchema.optional(),
-  blocks: z12.array(BlockSchema),
+  blocks: z13.array(BlockSchema),
   set_mode: ProposalSetModeSchema.optional()
 });
-var ProposeInsertBlocksSchema = z12.object({
-  anchor_block_id: z12.string().min(1).optional(),
-  position: z12.enum(["above", "below"]),
-  blocks: z12.array(BlockSchema).min(1).max(48),
+var ProposeInsertBlocksSchema = z13.object({
+  anchor_block_id: z13.string().min(1).optional(),
+  position: z13.enum(["above", "below"]),
+  blocks: z13.array(BlockSchema).min(1).max(48),
   set_mode: ProposalSetModeSchema.optional()
 });
-var ProposeReplaceBlocksSchema = z12.object({
-  blocks: z12.array(BlockSchema).min(1).max(30)
+var ProposeReplaceBlocksSchema = z13.object({
+  blocks: z13.array(BlockSchema).min(1).max(30)
 });
-var ProposeDeleteBlocksSchema = z12.object({
-  ids: z12.array(z12.string().min(1)).min(1)
+var ProposeDeleteBlocksSchema = z13.object({
+  ids: z13.array(z13.string().min(1)).min(1)
 });
-var DropParentSchema = z12.discriminatedUnion("kind", [
-  z12.object({ kind: z12.literal("root") }),
-  z12.object({ kind: z12.literal("section"), id: z12.string().min(1) }),
-  z12.object({
-    kind: z12.literal("column"),
-    id: z12.string().min(1),
-    columnIndex: z12.number().int()
+var DropParentSchema = z13.discriminatedUnion("kind", [
+  z13.object({ kind: z13.literal("root") }),
+  z13.object({ kind: z13.literal("section"), id: z13.string().min(1) }),
+  z13.object({
+    kind: z13.literal("column"),
+    id: z13.string().min(1),
+    columnIndex: z13.number().int()
   }),
-  z12.object({
-    kind: z12.literal("tab"),
-    id: z12.string().min(1),
-    tabIndex: z12.number().int()
+  z13.object({
+    kind: z13.literal("tab"),
+    id: z13.string().min(1),
+    tabIndex: z13.number().int()
   })
 ]);
-var ProposeReorderBlocksSchema = z12.object({
+var ProposeReorderBlocksSchema = z13.object({
   parent: DropParentSchema,
-  ordered_ids: z12.array(z12.string().min(1)).min(1)
+  ordered_ids: z13.array(z13.string().min(1)).min(1)
 });
-var ReviewOnlySchema = z12.object({
-  summary: z12.string().min(1).max(4e3)
+var ProposeUpdateCaseSchema = z13.object({
+  case: CaseSettingsSchema.omit({ class_id: true, flow: true }).partial().refine((patch) => Object.keys(patch).length > 0, "Send at least one setting")
+});
+function caseIdIssue(patch) {
+  const seen = /* @__PURE__ */ new Set();
+  const ids = [
+    ...(patch.parts ?? []).flatMap((part) => [part.id, ...part.docs.map((doc) => doc.id)]),
+    ...(patch.transfer?.docs ?? []).map((doc) => doc.id),
+    ...(patch.decision?.options ?? []).map((option) => option.id)
+  ];
+  for (const id of ids) {
+    if (seen.has(id)) return `The id "${id}" is used twice. Give every part, document and option its own id (p1, d1, o1\u2026).`;
+    seen.add(id);
+  }
+  return null;
+}
+var ReviewOnlySchema = z13.object({
+  summary: z13.string().min(1).max(4e3)
 });
 var MESSAGE_PROPERTY = {
   type: "string",
@@ -5318,6 +5421,18 @@ var AI_TOOLS = [
     }
   },
   {
+    name: "propose_update_case",
+    description: "Propose changes to a case study lesson's settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string], transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.",
+    input_schema: {
+      type: "object",
+      properties: {
+        message: MESSAGE_PROPERTY,
+        case: { type: "object", description: "The settings to change, as described." }
+      },
+      required: ["case"]
+    }
+  },
+  {
     name: "review_only",
     description: "Provide structured feedback without mutating lesson content.",
     input_schema: {
@@ -5393,6 +5508,13 @@ function parseToolProposal(name, input) {
       parent: parsed.data.parent,
       ordered_ids: parsed.data.ordered_ids
     };
+  }
+  if (name === "propose_update_case") {
+    const parsed = ProposeUpdateCaseSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    const issue = caseIdIssue(parsed.data.case);
+    if (issue) return { error: issue };
+    return { kind: "update_case", case: parsed.data.case };
   }
   if (name === "review_only") {
     const parsed = ReviewOnlySchema.safeParse(input);
@@ -5706,13 +5828,15 @@ No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
 
 ## Case studies
-A case study lesson (type case_study) is built in its own editor tabs: Kit, Brief, The case, Decide, Outcome, Rules. Its settings are in the lesson JSON under case. You cannot change them: no proposal writes to case. What you can do is read it, advise, and write ready-to-paste text in your message for the teacher to put in the right tab. Name the tab each piece goes in. Blocks you propose (propose_insert_blocks) become the Decide stage's own content, shown above the decision; use them only for a short lens or scaffold on that stage, and never use set_mode in a case study.
+A case study lesson (type case_study) is built in its own editor tabs: Kit, Brief, The case, Decide, Outcome, Rules. Its settings are in the lesson JSON under case, and you write them with propose_update_case: send only the keys you change, and each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts, decision, outcome, objections, transfer, help. Give every part, document and option its own id (p1, p2; d1, d2\u2026; o1, o2\u2026) and never reuse one, including in the transfer case (d1 is taken if part one uses it: use d9, d10 or t1). document kind is memo, data, news, transcript or update; text is plain with blank lines between paragraphs. Never change the class or flow, and never use set_mode. Blocks you propose (propose_insert_blocks) become the Decide stage's own content, shown above the decision; use them only for a short lens or scaffold on that stage.
+Writing a whole case is a big build: first reply with a short plan (the purpose line, the decision and options, the documents and what each shows, the outcome and where its source comes from, the transfer case and what it shares and where it differs), then build with one propose_update_case once the teacher says go. For one tab, send only those keys. In your message, say which tab each part landed in and what to check.
+The facts come from the teacher or from research you can source. When you research, put "Sources:" in your message and use a real, documented case; when you cannot document what happened, tell the teacher the case needs one and do not send an outcome. Never invent the outcome text or its source. An invented example case, if the teacher asks for one, goes in with the source set to "Invented for this lesson" and your message says so.
 How to coach a build, in this order, one tab at a time:
 - Kit: the purpose line must finish "On a case they haven't seen, students will be able to\u2026" and name something students do on a new case, such as spot the pattern, weigh a decision or explain a cause. If the purpose is "learn about X", ask what they will do with X on a case they have not met. If the purpose could be met by a worked example, say so: a case study earns its place only when the aim is transfer, applying a framework to evidence, deciding under ambiguity or tracing a cause.
 - Brief: the decision prompt names a role and a real choice: "You are the head of the water authority. The dam is at 30%. What do you do?" Both options must be defensible. If one option is plainly right, it is a worked problem, so suggest a harder case.
 - The case: a real, bounded situation split into documents (memo, data, news, transcript, update), each with a source line. Keep each document short and plain. Layered release suits a decision focus: part 1, one short question, then part 2 that adds or changes information. Whole release suits causal tracing. Never invent real events, quotes, figures or sources: when the teacher has not supplied the facts, say you have none, give the shape of the document to write, and mark any invented example clearly as an example.
 - Decide: 2 to 4 options for guided support, each with a short label and a one-line detail; free text for open support. The confidence slider and the locked decision come with the mode.
-- Outcome: what actually happened, with a real source. Publish is blocked without the source. Never write or guess an outcome or its source for the teacher. If they do not know what happened, say the case needs one that is documented. Own pace: write 1 to 3 strongest objections to the most popular option, each a sentence a student could answer; hold-until date is optional.
+- Outcome: what actually happened, with a real source. Publish is blocked without the source. Write the outcome only from facts the teacher gave you or that you sourced. If nobody knows what happened, say the case needs one that is documented. Own pace: write 1 to 3 strongest objections to the most popular option, each a sentence a student could answer; hold-until date is optional.
 - Rules: the unseen transfer case shares the studied case's underlying structure and differs on the surface (a different setting, people and numbers). Check it: name the shared structure, name the two or three differences, and confirm a student who learned the rule from the first case could use it here. Ask the question so it includes "which rule helped?".
 Pace and support: teacher pace for core lessons taught live; own pace for support, extension or optional route lessons done at home. Support lessons use guided (an anchor case close to what students know, sentence frames, 2 to 3 options); extension uses open (free-text position, a harder transfer case).
 When asked to review a built case, check these in order: purpose finishes the sentence; the decision has a real choice; every document has a source; the outcome has a source and is documented; the objections are the strongest ones, not weak ones; the transfer case has the same structure and a different surface. Report what is missing as a short list, then offer the text to fix the first item.
@@ -5778,7 +5902,7 @@ function buildAiStaticPrompt(input) {
     "",
     "## Output rules",
     "- Use tools to propose schema-valid block changes. Do not claim the lesson was already updated.",
-    "- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.",
+    "- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / propose_update_case (case study settings only) / review_only.",
     "- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.",
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
@@ -5799,7 +5923,7 @@ function lessonForAgent(lesson) {
 function lessonTypeLine(mode) {
   if (mode === "quiz") return "quiz";
   if (mode === "tutorial") return "tutorial (quiz_question only inside a group\u2019s exit check section; follow the tutorial recipe)";
-  if (mode === "case_study") return "case_study (no quiz_question; its settings are in lesson.case, which you read and advise on but cannot edit; follow the case study recipe)";
+  if (mode === "case_study") return "case_study (no quiz_question; its settings are in lesson.case, which you change with propose_update_case; follow the case study recipe)";
   return `${mode ?? "lesson"} (not a quiz)`;
 }
 function buildAiLessonContext(input) {
@@ -6061,7 +6185,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 import { z as z16 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
-import { z as z13 } from "zod";
+import { z as z14 } from "zod";
 var PEDAGOGICAL_MODES = [
   "lab",
   "workshop",
@@ -6077,7 +6201,7 @@ var PEDAGOGICAL_MODES = [
   "assessment",
   "quiz"
 ];
-var PedagogicalModeSchema = z13.enum(PEDAGOGICAL_MODES);
+var PedagogicalModeSchema = z14.enum(PEDAGOGICAL_MODES);
 
 // apps/teaching/src/tutorial/model.ts
 function groupSection(block) {
@@ -6193,93 +6317,6 @@ function sprintIssues(lesson) {
   }
   return out;
 }
-
-// apps/teaching/src/case-study/schema.ts
-import { z as z14 } from "zod";
-var CASE_OUTCOMES = ["transfer", "framework", "decision", "causal"];
-var CASE_DOC_KINDS = ["memo", "data", "news", "transcript", "update"];
-var Id2 = z14.string().regex(/^[a-z0-9_-]{1,40}$/);
-var CaseDocSchema = z14.object({
-  id: Id2,
-  kind: z14.enum(CASE_DOC_KINDS),
-  title: z14.string().max(120),
-  /** "Water Authority internal memo, 3 March". Shown under the title. */
-  source: z14.string().max(160).default(""),
-  /** Plain text; blank lines separate paragraphs. */
-  text: z14.string().max(6e3)
-});
-var CasePartSchema = z14.object({
-  id: Id2,
-  title: z14.string().max(80),
-  docs: z14.array(CaseDocSchema).min(1).max(8),
-  /** Layered release only: a short question the student answers before the next part opens. */
-  question: z14.string().max(300).optional()
-});
-var CaseOptionSchema = z14.object({
-  id: Id2,
-  label: z14.string().max(120),
-  detail: z14.string().max(300).optional()
-});
-var CaseDecisionSchema = z14.object({
-  /** The question in the case's voice: "You are the head of the water authority. The dam is at 30%. What do you do?" */
-  prompt: z14.string().max(500),
-  /** 2 to 4 options for a guided decision; empty means free text (extension). */
-  options: z14.array(CaseOptionSchema).max(4).default([])
-});
-var CaseOutcomeSchema = z14.object({
-  /** What actually happened. */
-  text: z14.string().max(4e3),
-  /** Publish is blocked without it. */
-  source: z14.string().max(200),
-  /** Own pace only: hold the Outcome until this date (YYYY-MM-DD) so the class sees it together. */
-  hold_until: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
-});
-var CaseTransferSchema = z14.object({
-  title: z14.string().max(120),
-  docs: z14.array(CaseDocSchema).min(1).max(4),
-  /** Includes "Which rule helped?" in its wording when the teacher wants it. */
-  question: z14.string().max(500)
-});
-var CaseHelpSchema = z14.object({
-  do: z14.string().max(300).optional(),
-  why: z14.string().max(400).optional(),
-  example: z14.string().max(600).optional(),
-  stuck: z14.string().max(400).optional()
-});
-var CaseHelpMap = z14.record(z14.string(), CaseHelpSchema);
-var CASE_PACES = ["teacher", "own"];
-var CASE_SUPPORTS = ["guided", "standard", "open"];
-var CaseSettingsSchema = z14.object({
-  /** Required: "On a case they haven't seen, students will be able to…". */
-  purpose: z14.string().max(400).default(""),
-  outcomes: z14.array(z14.enum(CASE_OUTCOMES)).max(4).default([]),
-  /** Phase 1 builds Flow A only. */
-  flow: z14.literal("A").default("A"),
-  pace: z14.enum(CASE_PACES).default("teacher"),
-  support: z14.enum(CASE_SUPPORTS).default("standard"),
-  /** 'whole': every document at once (M2). 'layered': parts open in turn, each with a question (M1). */
-  release: z14.enum(["whole", "layered"]).default("whole"),
-  parts: z14.array(CasePartSchema).max(4).default([]),
-  decision: CaseDecisionSchema.optional(),
-  outcome: CaseOutcomeSchema.optional(),
-  /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
-  objections: z14.array(z14.string().max(300)).max(3).default([]),
-  transfer: CaseTransferSchema.optional(),
-  /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
-  class_id: z14.string().max(64).optional(),
-  help: CaseHelpMap.optional()
-});
-var PublicCaseSchema = z14.object({
-  purpose: z14.string().max(400),
-  pace: z14.enum(CASE_PACES),
-  support: z14.enum(CASE_SUPPORTS),
-  release: z14.enum(["whole", "layered"]),
-  decision: CaseDecisionSchema,
-  /** Part titles only, so the rail can say "Part 2 to come". */
-  part_titles: z14.array(z14.string().max(80)).max(4),
-  has_objections: z14.boolean(),
-  help: CaseHelpMap.optional()
-});
 
 // apps/teaching/src/case-study/model.ts
 var filled = (s2) => !!s2 && s2.trim().length > 0;
