@@ -1185,7 +1185,9 @@ var GalleryItemSchema = z10.object({
   id: z10.string().min(1),
   url: z10.string(),
   alt_text: z10.string(),
-  caption: z10.string().optional()
+  caption: z10.string().optional(),
+  /** A lesson in the same unit: the image opens it. Unresolved ids show as a plain image. */
+  lesson_id: z10.string().min(1).optional()
 });
 var GalleryBlockSchema = z10.object({
   id: z10.string().min(1),

@@ -2069,7 +2069,9 @@ var GalleryItemSchema = z11.object({
   id: z11.string().min(1),
   url: z11.string(),
   alt_text: z11.string(),
-  caption: z11.string().optional()
+  caption: z11.string().optional(),
+  /** A lesson in the same unit: the image opens it. Unresolved ids show as a plain image. */
+  lesson_id: z11.string().min(1).optional()
 });
 var GalleryBlockSchema = z11.object({
   id: z11.string().min(1),
