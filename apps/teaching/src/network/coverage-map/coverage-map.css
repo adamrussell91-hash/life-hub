@@ -174,3 +174,30 @@
   .cm__note { display: none; }
   .cm__scroll { overflow: visible; }
 }
+
+/* ── The student's progress map: grey until a lesson is done, then in colour ── */
+
+.cm--progress {
+  --pm-grey: #c9ced6;
+  --pm-gold: #c9a227;
+}
+
+.cm--progress .cm-p-grey { stroke: var(--pm-grey); }
+.cm--progress .cm-node.cm-p-grey { fill: var(--paper, #fbf8f2); }
+.cm--progress .cm-branch.cm-p-lit { opacity: 0.85; }
+.cm--progress .cm-route.cm-p-lit { stroke: var(--wave, #376fb7); }
+
+.cm--progress .cm-station { stroke: var(--pm-grey); }
+.cm--progress .cm-station--support { stroke: var(--cm-support); }
+.cm--progress .cm-station--side { stroke: var(--cm-side); }
+.cm--progress .cm-station.cm-p-done { fill: var(--wave, #376fb7); stroke: var(--wave, #376fb7); }
+.cm--progress .cm-station--support.cm-p-done { fill: var(--cm-support); stroke: var(--cm-support); }
+.cm--progress .cm-station--side.cm-p-done { fill: var(--cm-side); stroke: var(--cm-side); }
+.cm--progress .cm-station.cm-p-next { stroke: var(--pm-gold); stroke-width: 4; }
+.cm--progress .cm-faded .cm-station { stroke-dasharray: 2 2; fill: none; }
+.cm--progress .cm-detour.cm-p-grey { stroke: var(--pm-grey); }
+.cm--progress .cm-detour.cm-p-faded { opacity: 0.38; }
+
+.cm-tag--next { fill: var(--pm-gold, #c9a227); }
+.cm-tag--next + .cm-tag-text { fill: var(--depth, #0a1536); font-weight: 700; }
+.cm-done-mark { font-size: 12px; font-weight: 700; fill: var(--success, #2f7a4f); }

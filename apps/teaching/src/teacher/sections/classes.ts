@@ -24,6 +24,7 @@ import {
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { mountClassStudents } from '@/teacher/sections/class-students';
 import { mountMarkbook } from '@/teacher/sections/markbook';
+import { unitProgressLessons } from '@/markbook/progress';
 import { outcomeLabels } from '@/markbook/parse';
 import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
@@ -369,7 +370,10 @@ export function renderClassPage(
 
   const markbookHost = document.createElement('div');
   markbookHost.className = 'class-page__markbook-host';
-  disposers.push(mountMarkbook(markbookHost, pageClass, { outcomes: outcomeLabels(curriculum.outcomes ?? []) }));
+  disposers.push(mountMarkbook(markbookHost, pageClass, {
+    outcomes: outcomeLabels(curriculum.outcomes ?? []),
+    progressLessons: unitProgressLessons(unitsById.get(currentActiveUnitId), curriculum.lessons, classScheduled)
+  }));
 
   const sequence = renderUnitSequence(sequenceHost, {
     units: activeUnits,

@@ -1632,6 +1632,25 @@ a:hover {
   box-shadow: var(--elev-1);
 }
 
+.student-class__progress {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--hub-glass-fill);
+  border: 1px solid var(--line);
+  color: var(--navy);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.student-class__progress:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
 .student-class__layout {
   display: grid;
   gap: var(--space-8);

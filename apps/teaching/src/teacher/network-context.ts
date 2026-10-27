@@ -18,6 +18,7 @@ import { markbookEvidence } from '@/evidence/markbook-evidence';
 import type { ClassEvidence } from '@/network/coverage-map/mount';
 import type { Alignment } from '@/alignment/schema';
 import { focusAreaFor } from '@/alignment/coverage';
+import { scheduleFromRows } from '@/network/schedule';
 import type { SkillsContinuum } from '@/skills/schema';
 import { conceptLineIds, skillLineIds, unitConceptKeys, unitLines, unitSkillStrands } from '@/network/unit-concepts';
 
@@ -76,13 +77,6 @@ export async function lessonBlockChoices(lessonId: string): Promise<Array<{ id: 
   return (lesson.blocks ?? []).map((block) => ({ id: block.id, label: blockLabel(block) }));
 }
 
-function isoWeek(ymd: string): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  const day = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - day);
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * Each lesson's first date (and start time) for the class with the most
  * scheduled lessons in this unit, and its week band, numbered from the unit's
@@ -97,17 +91,8 @@ export function unitSchedule(curriculum: CurriculumResponse, unit: Unit): { date
   const byClass = new Map<string, typeof rows>();
   for (const row of rows) byClass.set(row.class_id, [...(byClass.get(row.class_id) ?? []), row]);
   const best = [...byClass.values()].sort((a, b) => b.length - a.length)[0]!;
-  const when = (row: (typeof rows)[number]) => `${row.date}T${row.start_time ?? '00:00'}`;
-  const dates = new Map<string, string>();
-  for (const row of [...best].sort((a, b) => when(a).localeCompare(when(b)))) {
-    if (!dates.has(row.lesson_id)) dates.set(row.lesson_id, when(row));
-  }
   const pre = new Set(curriculum.lessons.filter((l) => l.pre_unit && unit.lesson_ids.includes(l.id)).map((l) => l.id));
-  const weeks = [...new Set([...dates].filter(([id]) => !pre.has(id)).map(([, d]) => isoWeek(d.slice(0, 10))))].sort();
-  const bands = new Map<string, string>();
-  for (const [lessonId, d] of dates) bands.set(lessonId, pre.has(lessonId) ? 'Pre' : `Wk ${weeks.indexOf(isoWeek(d.slice(0, 10))) + 1}`);
-  for (const id of pre) if (!bands.has(id)) bands.set(id, 'Pre');
-  return { dates, bands };
+  return scheduleFromRows(best, pre);
 }
 
 function unitLessons(curriculum: CurriculumResponse, unit: Unit) {
@@ -257,7 +242,8 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       ...(l.route_role ? { role: l.route_role } : {}),
       ...(l.skip_rule ? { skip: l.skip_rule } : {}),
       ...(l.branch_from ? { branchFrom: l.branch_from } : {}),
-      ...(l.pedagogical_mode === 'quiz' ? { quiz: true } : {})
+      ...(l.pedagogical_mode === 'quiz' ? { quiz: true } : {}),
+      ...(l.pedagogical_mode === 'assessment' ? { assessment: true } : {})
     })),
     unitTitle: unit.title,
     classes: unitClasses(curriculum, unit),

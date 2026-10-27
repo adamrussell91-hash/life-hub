@@ -42,6 +42,7 @@ export const NEW_BLOCK_TYPES = [
   'table',
   'peer_feedback',
   'question_drop',
+  'done',
   'brainstorm',
   'hinge_question',
   'continuum_line',
@@ -114,6 +115,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   table: 'Table',
   peer_feedback: 'Peer feedback',
   question_drop: 'Question drop',
+  done: 'Done',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   continuum_line: 'Continuum line',
@@ -246,7 +248,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -298,6 +300,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   'brainstorm',
   'hinge_question',
   'question_drop',
+  'done',
   'quiz_question',
   ...TOOLKIT_GROUP_TYPES,
   'teacher_note',
@@ -323,7 +326,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -641,6 +644,8 @@ export function createBlock(type: NewBlockType, id: string): Block {
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
         target_quiz_id: '', prompt: '', kinds: [], marks_min: 1, marks_max: 3, per_student: 1, accepting: true
       } };
+    case 'done':
+      return { ...shared, block_type: 'done', variant: 'small', content: { label: 'I’ve finished this' } };
     case 'quiz_question':
       return { ...shared, block_type: 'quiz_question', variant: 'medium', content: {
         question: blankQuestion('multiple_choice', id)

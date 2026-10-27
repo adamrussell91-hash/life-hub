@@ -45,6 +45,7 @@ export const BlockTypeSchema = z.enum([
   'table',
   'peer_feedback',
   'question_drop',
+  'done',
   'brainstorm',
   'hinge_question',
   'continuum_line',
@@ -810,6 +811,16 @@ export const QuestionDropBlockSchema = z.object({
     marks_max: z.number().int().min(1).max(20).default(3),
     per_student: z.number().int().min(1).max(5).default(1),
     accepting: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/** Done: the student marks a lesson finished. One tap on a known device, initials on a new one. */
+export const DoneBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('done'), variant: z.string().default('small'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    label: z.string().max(120).default('I’ve finished this')
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1691,6 +1702,7 @@ const leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,

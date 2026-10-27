@@ -66,3 +66,10 @@ await build({
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   banner: {js:'// Generated from apps/teaching/src/sprint/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/evidence/server-entry.ts'],
+  outfile: 'netlify/functions/_shared/profile-evidence.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  alias: { '@': './apps/teaching/src' },
+  banner: {js:'// Generated from apps/teaching/src/evidence/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
