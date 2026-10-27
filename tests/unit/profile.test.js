@@ -122,3 +122,16 @@ test('the teacher can list and remove a student\'s done records', async () => {
   await teacherProfileAction(s, 'class1', { action: 'remove', student_id: bob.id, lesson_id: 'l1' });
   assert.deepEqual((await teacherProfileAction(s, 'class1', { action: 'list' })).done[bob.id] ?? {}, {});
 });
+
+test('the public endpoint answers JSON: need=initials for an unclaimed device, 404 for an unknown class', async () => {
+  const { createPublishedProfileHandler } = await import('../../netlify/functions/published-profile.mjs');
+  const s = await fixture();
+  const handler = createPublishedProfileHandler({ env: {}, getContentStore: async () => s });
+  const call = (id, body) => handler(new Request(`https://example.com/api/published/profile/${id}`, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }));
+  const ok = await call('class1', { class_token: token(9) });
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).data.need, 'initials');
+  assert.equal((await call('nope', { class_token: token(9) })).status, 404);
+  const bad = await handler(new Request('https://example.com/api/published/profile/class1', { method: 'POST', body: 'nope' }));
+  assert.equal(bad.status, 400);
+});
