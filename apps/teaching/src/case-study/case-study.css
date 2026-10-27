@@ -1,0 +1,121 @@
+/* Case Study: student player. Rail and coach styles come from sprint.css. */
+.cs [hidden], .cs-pop[hidden] { display: none !important; }
+.cs { display: grid; gap: 16px; }
+.cs__rail { margin-bottom: 6px; }
+.cs__study { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr); gap: 24px; align-items: start; }
+.cs__case, .cs__work { min-width: 0; }
+.cs__work { position: sticky; top: 16px; }
+.cs__docs { display: flex; flex-direction: column; gap: 16px; }
+.cs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.cs-head h2 { margin: 0; font-size: 21px; font-weight: 700; color: var(--navy); letter-spacing: -.01em; }
+.cs-err { margin: 0 0 8px; color: var(--danger, #a33); font-size: 13px; }
+.cs-err:empty { display: none; }
+.cs-note { color: var(--muted); }
+.cs-hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.cs-resume { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--pastel-sage-ink); background: var(--pastel-sage); padding: 3px 10px; border-radius: 999px; width: fit-content; }
+
+/* The case: documents */
+.cs-doc { padding: 18px 20px; font-size: 17px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1, 0 1px 2px rgba(20,35,70,.06)); }
+.cs-doc h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; line-height: 1.35; }
+.cs-doc p { margin: 0 0 10px; }
+.cs-doc__body ::selection { background: var(--pastel-blue); }
+.cs-doc__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.cs-doc__from { font-size: 13px; color: var(--muted); }
+.cs-doc__cited { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--wave, #376fb7); }
+.cs-doc__unused { margin-left: auto; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 6px; background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.cs-doc__source { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; margin: 4px 0 0; }
+.cs-doc--outcome { border: 1.5px solid var(--navy); }
+.cs-chip { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 6px; background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.cs-chip--data { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.cs-chip--news { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.cs-chip--transcript { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.cs-chip--update { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.cs-chip--outcome { background: var(--navy); color: #fff; }
+.cs-para { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.cs-para__cite { user-select: none; font: inherit; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper, #fbf8f2); color: var(--navy); cursor: pointer; opacity: 0; }
+.cs-para:hover .cs-para__cite, .cs-para__cite:focus-visible { opacity: 1; }
+@media (hover: none) { .cs-para__cite { opacity: 1; } }
+.cs-part-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -6px; }
+.cs-locked { border: 2px dashed rgba(23,55,94,.18); border-radius: var(--radius-md); padding: 18px 20px; display: flex; gap: 14px; align-items: center; color: var(--muted); }
+.cs-locked svg { flex: 0 0 auto; width: 22px; height: 22px; }
+.cs-locked b { display: block; color: var(--ink); font-weight: 600; }
+.cs-locked span { font-size: 13px; }
+
+/* Your work */
+.cs-panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1, 0 1px 2px rgba(20,35,70,.06)); padding: 20px; }
+.cs-panel h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; line-height: 1.35; }
+.cs-panel p { margin: 0 0 10px; }
+.cs-panel__top { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.cs-panel__eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.cs-help { margin-left: auto; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; border: 1px solid var(--line); background: var(--paper, #fbf8f2); color: var(--navy); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; display: grid; place-items: center; }
+.cs-help:hover { background: var(--pastel-blue); }
+.cs-help[aria-expanded="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.cs-panel .coach { margin: 4px 0 14px; }
+.cs-ask { font-size: 21px; font-weight: 700; color: var(--navy); line-height: 1.3; letter-spacing: -.01em; margin: 0 0 10px; }
+.cs-input { width: 100%; margin-bottom: 8px; }
+.cs-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.cs-saved { padding: 10px 12px; border-radius: 12px; background: var(--paper, #fbf8f2); border: 1px solid var(--line); white-space: pre-wrap; }
+.cs-confirm { font-size: 14px; font-weight: 600; flex-basis: 100%; }
+.cs-wait { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--marine, #142b51) 7%, var(--paper, #fbf8f2)); font-size: 13px; margin-top: 12px; }
+.cs-wait--plain { display: block; }
+.cs-wait__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--wave, #376fb7); animation: cs-pulse 1.4s ease infinite; flex: 0 0 auto; }
+@keyframes cs-pulse { 50% { opacity: .25; } }
+.cs-opts { display: grid; gap: 8px; margin: 0 0 12px; }
+.cs-opt { font: inherit; color: inherit; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; text-align: left; border: 1px solid var(--line); background: var(--paper, #fbf8f2); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.cs-opt:disabled { cursor: default; }
+.cs-opt__k { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--navy); display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--navy); }
+.cs-opt[aria-pressed="true"] { border-color: var(--navy); background: var(--pastel-blue); }
+.cs-opt[aria-pressed="true"] .cs-opt__k { background: var(--navy); color: #fff; }
+.cs-opt b { display: block; font-weight: 600; }
+.cs-opt__d { display: block; color: var(--muted); font-size: 13px; }
+.cs-conf { margin: 4px 0 12px; }
+.cs-conf__top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+.cs-conf input { width: 100%; accent-color: var(--navy); }
+.cs-conf__ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.cs-blocks { display: grid; gap: 12px; margin-bottom: 16px; }
+
+/* Evidence */
+.cs-evidence { display: grid; gap: 6px; margin: 4px 0 12px; }
+.cs-ev { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; background: var(--pastel-blue); border-radius: 6px; padding: 7px 10px; font-size: 13px; line-height: 1.4; color: var(--pastel-blue-ink); }
+.cs-ev small { display: block; font-size: 12px; opacity: .8; margin-top: 2px; }
+.cs-ev button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0 2px; cursor: pointer; }
+.cs-pop { position: absolute; z-index: 60; background: var(--ink, #13233a); color: #fff; border: 0; border-radius: 12px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px -6px rgba(0,0,0,.35); }
+
+/* Locked decision, outcome, objection, rules */
+.cs-decision { border-radius: 12px; background: var(--paper, #fbf8f2); border: 1px solid var(--line); padding: 14px; display: grid; gap: 8px; margin-bottom: 10px; }
+.cs-decision__top { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.cs-decision__top svg { width: 14px; height: 14px; }
+.cs-decision__choice { font-weight: 700; font-size: 17px; }
+.cs-decision__conf { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.cs-decision .cs-decision__because { margin: 0; font-size: 14px; }
+.cs-bar { height: 6px; border-radius: 999px; background: var(--shore, #eae7da); overflow: hidden; }
+.cs-bar span { display: block; height: 100%; background: var(--navy); border-radius: inherit; }
+.cs-objection { border-left: 3px solid var(--high-sea, #f68620); background: var(--paper, #fbf8f2); border-radius: 0 6px 6px 0; padding: 10px 12px; margin: 14px 0 10px; }
+.cs-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+.cs-compare div { border-radius: 12px; padding: 10px 12px; background: var(--paper, #fbf8f2); border: 1px solid var(--line); font-size: 13px; }
+.cs-compare b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.cs-compare .cs-compare__changed { background: var(--pastel-peach); border-color: transparent; color: var(--pastel-peach-ink); }
+.cs-spread { margin: 14px 0; }
+.cs-spread__row { margin: 8px 0; font-size: 13px; }
+.cs-spread__head { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.cs-spread__row[data-mine="true"] { font-weight: 700; }
+.cs-frame { display: grid; gap: 8px; }
+.cs-frame label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.cs-transfer { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* Phone: one column, a switch fixed at the bottom */
+.cs-switch { display: none; }
+@media (max-width: 900px) {
+  .cs { padding-bottom: 80px; }
+  .cs__study { grid-template-columns: 1fr; }
+  .cs__study[data-pane="case"] .cs__work { display: none; }
+  .cs__study[data-pane="work"] .cs__case { display: none; }
+  .cs__work { position: static; }
+  .cs-head { display: none; }
+  .cs-doc { padding: 16px; }
+  .cs-switch { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); background: var(--paper, #fbf8f2); border-top: 1px solid var(--line); }
+  .cs-seg { display: inline-flex; width: 100%; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper, #fbf8f2); }
+  .cs-seg__btn { flex: 1; position: relative; font: inherit; font-weight: 600; min-height: 44px; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+  .cs-seg__btn[aria-pressed="true"] { background: var(--ink); color: var(--paper, #fbf8f2); }
+  .cs-seg__new { position: absolute; top: 9px; right: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea, #f68620); }
+}
