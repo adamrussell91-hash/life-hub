@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { partsProblems, voteProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { briefCard, draftOf, frameField, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { briefCard, draftOf, frameField, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { IDEA_PARTS, type IdeaPart, type Part, type PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
 
@@ -20,7 +20,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const dots = s.dots ?? 0;
   const sets = s.gallery ?? [];
   const root = el('div', 'sprint-decide');
-  const brief = briefCard(s);
+  const brief = briefCard(s, false);
   if (brief) root.append(brief);
   const voting = !s.votes_closed;
   const dottable = sets.flatMap((x) => x.ideas).reduce((n, i) => n + IDEA_PARTS.filter((k) => i[k]?.trim()).length, 0);
@@ -87,6 +87,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     { pick: '.sd-counter, .sd-legend, .sprint-sets', title: 'Read the ideas and place your dots', guide: LATER_GUIDE.read },
     { pick: '.sprint-reasons', title: 'Say which idea does each criterion best', guide: LATER_GUIDE.reasons }
   ]);
+  slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }

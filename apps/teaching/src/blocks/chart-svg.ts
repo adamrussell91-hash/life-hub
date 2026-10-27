@@ -24,6 +24,7 @@ export type ChartContent = {
 
 const VIEW_W = 400;
 const VIEW_H = 240;
+const X_LABEL_ROOM = 20;
 const PAD = { top: 16, right: 20, bottom: 44, left: 44 };
 
 function seriesFill(
@@ -267,5 +268,17 @@ export function buildChartSvg(content: ChartContent): string {
       break;
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${VIEW_H}" overflow="visible" role="img">${body}</svg>`;
+  const xLabel = content.chart_type !== 'pie' ? content.x_label?.trim() : undefined;
+  const yLabel = content.chart_type !== 'pie' ? content.y_label?.trim() : undefined;
+  const viewH = VIEW_H + (xLabel ? X_LABEL_ROOM : 0);
+  const bounds = plotBounds();
+  if (xLabel) {
+    body += `<text class="block-chart__axis-label" x="${((bounds.x0 + bounds.x1) / 2).toFixed(2)}" y="${viewH - 4}" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">${escapeXml(xLabel)}</text>`;
+  }
+  if (yLabel) {
+    const cy = ((bounds.y0 + bounds.y1) / 2).toFixed(2);
+    body += `<text class="block-chart__axis-label" transform="translate(12 ${cy}) rotate(-90)" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">${escapeXml(yLabel)}</text>`;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${viewH}" overflow="visible" role="img">${body}</svg>`;
 }

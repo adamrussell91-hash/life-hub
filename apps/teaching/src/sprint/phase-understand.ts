@@ -2,7 +2,7 @@ import { button, el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { briefText } from './model';
 import { coach, draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
-import { LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
+import { LIMITS_SCENARIO, LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
 import { LIMIT_BOXES, UNDERSTAND_ALONE, defaultUnderstand, type LimitBox, type PhasePayload, type UnderstandStep } from './schema';
 import type { SprintStatus, UnderstandGroup } from './api';
 
@@ -131,7 +131,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   /** The 2 × 2 sorter: columns say whether we can control it, rows whether we know it. */
   function matrix(fill: (b: LimitBox, cell: HTMLElement) => void): HTMLElement {
     const wrap = el('div', 'su-matrix');
-    wrap.append(
+        wrap.append(
       el('span', 'su-axis su-axis--corner', ''),
       el('span', 'su-axis su-axis--col', '✅ We can control it'),
       el('span', 'su-axis su-axis--col', '🚫 We can’t control it')
@@ -145,7 +145,19 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
         const head = el('div', 'su-box__head');
         head.append(el('span', 'su-box__icon', meta.icon), el('h4', '', meta.title));
         head.firstElementChild!.setAttribute('aria-hidden', 'true');
-        cell.append(head, el('p', 'su-box__ask', meta.ask));
+        const more = el('div', 'su-box__more');
+        more.hidden = true;
+        more.append(el('p', '', meta.more.what), el('p', '', meta.more.tell), el('strong', '', 'Examples (made-up canteen problem)'));
+        const ul = el('ul');
+        for (const x of meta.more.examples) ul.append(el('li', '', x));
+        more.append(ul);
+        const info = el('button', 'su-box__info', 'ⓘ');
+        info.type = 'button';
+        info.setAttribute('aria-label', `What does “${meta.title}” mean?`);
+        info.setAttribute('aria-expanded', 'false');
+        info.addEventListener('click', () => { more.hidden = !more.hidden; info.setAttribute('aria-expanded', String(!more.hidden)); });
+        head.append(info);
+        cell.append(head, el('p', 'su-box__ask', meta.ask), more);
         fill(b, cell);
         wrap.append(cell);
       }
@@ -155,6 +167,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
 
   function limits(box: HTMLElement): void {
     if (steps.ask) box.append(el('p', 'sprint-note', 'The unknowns become questions for the expert.'));
+    box.append(el('p', 'sprint-note', LIMITS_SCENARIO));
     box.append(matrix((b, cell) => {
       const cards = el('ul', 'su-cards');
       const paint = () => {
@@ -169,7 +182,11 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
           }
           return li;
         });
-        if (!items.length) items.push(el('li', 'su-card su-card--ghost', LIMIT_CELLS[b].example));
+        if (!items.length) {
+          const ghost = el('li', 'su-card su-card--ghost');
+          ghost.append(el('span', 'su-card__eg', 'Example'), ` ${LIMIT_CELLS[b].example}`);
+          items.push(ghost);
+        }
         cards.replaceChildren(...items);
       };
       paint();
@@ -200,6 +217,8 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   // ---------------------------------------------------------------- the group's shared space
 
   const shared: Partial<Record<UnderstandStep, HTMLElement>> = {};
+  // Set once the slide buttons exist; keeps Next's label right as the group's space changes.
+  let paintNext: () => void = () => {};
   // The agreed audience being edited: polling never overwrites it mid-edit.
   let mergeDraft: { who: string; why: string } | null = null;
   let questionDraft = '';
@@ -221,33 +240,54 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     }
   }
 
+  let savedFlash = false;
   function merge(box: HTMLElement): void {
     const g = group();
-    box.append(el('p', 'sprint-note', 'Repeats are stacked, like “×3”.'));
-    const field = (label: string, key: 'who' | 'why', options: UnderstandGroup['who']) => {
+    const draft = { who: mergeDraft?.who ?? g.audience?.who ?? '', why: mergeDraft?.why ?? g.audience?.why ?? '' };
+    // What the group has agreed so far, in one place, so a save visibly changes something.
+    const agreed = el('div', `su-agreed${g.audience ? ' is-set' : ''}`);
+    agreed.setAttribute('role', 'status');
+    if (g.audience) {
+      agreed.append(el('span', 'su-agreed__tag', savedFlash ? '✓ Saved for your group' : 'Your group’s audience'), el('strong', '', g.audience.who), el('span', '', `Why it matters: ${g.audience.why || 'not written yet'}`));
+    } else {
+      agreed.append(el('span', 'su-agreed__tag', 'Not chosen yet'), el('span', '', 'Choose below, then press Save. Whatever is saved here is what your group designs for in Sketch.'));
+    }
+    box.append(
+      el('p', 'sprint-note', 'In Audience, each of you wrote who the problem is for. Your group now needs one answer, so you all design for the same people. Anyone in the group can save, and the last save is the one that counts.'),
+      agreed
+    );
+    const field = (label: string, hint: string, key: 'who' | 'why', options: UnderstandGroup['who']) => {
       const chips = el('div', 'su-chips');
       const input = el('input', 'qz-input');
       input.maxLength = key === 'who' ? 200 : 300;
       input.disabled = off;
-      input.value = mergeDraft?.[key] ?? g.audience?.[key] ?? '';
+      input.value = draft[key];
       input.setAttribute('aria-label', label);
-      input.addEventListener('input', () => { mergeDraft = { who: mergeDraft?.who ?? g.audience?.who ?? '', why: mergeDraft?.why ?? g.audience?.why ?? '', [key]: input.value }; });
+      const mark = () => chips.querySelectorAll<HTMLButtonElement>('.sprint-chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.text === input.value)));
+      input.addEventListener('input', () => { mergeDraft = { who: mergeDraft?.who ?? draft.who, why: mergeDraft?.why ?? draft.why, [key]: input.value }; savedFlash = false; mark(); });
       for (const o of options) {
         const c = button(counted(o.text, o.count), 'ghost', () => { input.value = o.text; input.dispatchEvent(new Event('input')); });
         c.className = 'sprint-chip';
+        c.dataset.text = o.text;
         c.disabled = off;
         chips.append(c);
       }
-      box.append(el('span', 'sprint-field__label', label), chips, input);
+      mark();
+      box.append(el('span', 'sprint-field__label', label), el('p', 'sprint-note', hint));
+      if (options.length) box.append(chips);
+      box.append(input);
     };
-    field('Our audience', 'who', g.who);
-    field('Why it matters to them', 'why', g.why);
-    const save = button(g.audience ? 'Update' : 'Save for the group', 'primary', () => {
-      const d = mergeDraft ?? { who: g.audience?.who ?? '', why: g.audience?.why ?? '' };
-      void write(ctx.client.audience(d.who, d.why)).then(() => { mergeDraft = null; paintShared(); });
+    field('Who is it for?', 'Tap an answer from your group to use it, or type your own. “×3” means three people wrote it.', 'who', g.who);
+    field('Why does it matter to them?', 'Same again: tap one or write your own.', 'why', g.why);
+    const save = button(g.audience ? 'Update the group’s audience' : 'Save for the group', 'primary', () => {
+      const d = mergeDraft ?? draft;
+      if (!d.who.trim()) { err.textContent = 'Write who it is for first.'; return; }
+      save.disabled = true;
+      save.textContent = 'Saving…';
+      void write(ctx.client.audience(d.who, d.why)).then(() => { mergeDraft = null; savedFlash = true; paintShared(); window.setTimeout(() => { savedFlash = false; paintShared(); }, 4000); });
     });
     save.disabled = off;
-    box.append(save, el('p', 'sprint-note', g.audience ? `Saved for the group: ${g.audience.who}` : 'Anyone in the group can save it. The last saved version goes to Sketch.'));
+    box.append(save);
   }
 
   function gridShared(box: HTMLElement): void {
@@ -323,6 +363,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
       inner.replaceChildren();
       BUILD[k](inner);
     }
+    paintNext();
   }
   paintShared();
 
@@ -334,11 +375,27 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   const rail = el('ol', 'su-rail');
   rail.setAttribute('aria-label', 'Steps');
   const back = button('Back', 'secondary', () => { at = Math.max(0, at - 1); show(); });
-  const next = button('Next', 'primary', () => { at = Math.min(order.length - 1, at + 1); show(); });
+  const go = () => { at = Math.min(order.length - 1, at + 1); show(); };
+  /** On Ask, Next sends the starred questions to the teacher first, so they can't be skipped. */
+  const sendFirst = () => order[at] === 'ask' && ctx.editable && group().questions.some((q) => q.picked && !q.sent);
+  const next = button('Next', 'primary', () => {
+    if (!sendFirst()) { go(); return; }
+    next.disabled = true;
+    ctx.client.askSend().then((s) => { err.textContent = ''; status = s; paintShared(); go(); }).catch((e: unknown) => { err.textContent = e instanceof Error ? e.message : 'That didn’t work. Try again.'; paintNext(); });
+  });
+  paintNext = () => {
+    if (!slides) return;
+    const asking = order[at] === 'ask' && ctx.editable;
+    const g = group();
+    const unsent = g.questions.some((q) => q.picked && !q.sent);
+    next.textContent = asking && unsent ? 'Send to teacher, then next' : 'Next';
+    next.disabled = at === order.length - 1 || (asking && !unsent && !g.sent.length);
+    next.title = next.disabled && asking && !g.sent.length ? 'Star at least one question to send' : '';
+  };
   function show(): void {
     order.forEach((k, i) => { boxes.get(k)!.hidden = slides && i !== at; });
     back.disabled = at === 0;
-    next.disabled = at === order.length - 1;
+    paintNext();
     const k = order[at];
     where.textContent = k ? `Step ${at + 1} of ${order.length} · ${alone(k) ? 'On your own' : 'Your group’s space'}` : '';
     paintRail();

@@ -470,6 +470,7 @@ async function studentView(store, lessonId, config, who, group) {
     brief: {
       problem: state.question?.text ?? null,
       audience: shared.audience,
+      limits: shared.limits,
       answers: shared.sent.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer }))
     }
   };

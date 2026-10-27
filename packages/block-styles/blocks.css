@@ -527,6 +527,9 @@
   max-width: 100%;
 }
 
+.block-chart--small { max-width: 18rem; }
+.block-chart--medium { max-width: 32rem; }
+
 .block-quote {
   margin: 0;
 }
@@ -1303,6 +1306,7 @@
 .block-question-set__band-head .block-secondary { margin: 0; }
 .block-question-set--levels .block-question-set__question .block-question-set__box,
 .block-question-set--levels .block-question-set__question .block-question-set__response-lines { margin-left: 2rem; width: calc(100% - 2rem); }
+.block-question-set--levels .block-question-set__prompt { max-width: none; }
 .block-question-set__bbs { display: flex; flex-direction: column; gap: var(--space-3); margin: var(--space-2) 0 0 2rem; }
 .block-question-set__bbs-part { display: flex; flex-direction: column; gap: var(--space-1); }
 .block-question-set__bbs-lead { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--navy); }

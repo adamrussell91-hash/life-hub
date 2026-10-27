@@ -2,6 +2,7 @@ import type { Block } from '@/schemas/block';
 import { moveSentence } from '@/toolkit/content';
 import { libraryTool } from '@/toolkit/library';
 import { createBlock } from '@/blocks/create-block';
+import { isGuidesSection } from './model';
 import { SPRINT_PHASES, PHASE_LABELS, defaultUnderstand, type SprintPhaseKey, type SprintSettings } from './schema';
 
 /**
@@ -80,6 +81,13 @@ export function withPhaseSections(blocks: Block[], newId: () => string): Block[]
   const have = new Set(blocks.map((b) => (b.block_type === 'section' ? b.content.sprint_phase : undefined)));
   const missing = SPRINT_PHASES.filter((key) => !have.has(key));
   return missing.length ? [...blocks, ...missing.map((key) => phaseSection(key, newId))] : blocks;
+}
+
+/** The Guides section (resources for every phase), added if the lesson has none. Unchanged blocks come back as the same array. */
+export function withGuidesSection(blocks: Block[], newId: () => string): Block[] {
+  if (blocks.some(isGuidesSection)) return blocks;
+  const base = createBlock('section', newId());
+  return [...blocks, { ...base, content: { title: 'Guides', blocks: [], sprint_guides: true } } as Block];
 }
 
 type Move = { skill: string; tools: string[]; value: string };

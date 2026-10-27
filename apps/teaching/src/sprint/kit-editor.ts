@@ -158,7 +158,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     if (key === 'understand') {
       const und = card('Understand steps', 'How students work out the problem: alone first, then together. Untick a step to leave it out.', 'understand');
       const u = cur.understand ?? defaultUnderstand();
-      und.append(selectOf([['slides', 'One step at a time (slides)'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }, true), 'Understand layout'));
+      und.append(selectOf([['slides', 'One step at a time (slides), in every phase'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }, true), 'Step layout for every phase'));
       for (const [title, keys] of [['Alone, on their own computer', UNDERSTAND_ALONE], ['Together, in the group’s space', UNDERSTAND_GROUP]] as const) {
         und.append(el('p', 'kit-label', title));
         for (const k of keys) {
@@ -237,7 +237,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );
 
-    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes and the class’s pitch feedback.', 'criteria');
+    const crit = card('Criteria', 'How good: the qualities ideas are judged on, at Starting · Showing · Strong. Students back the strongest idea with a quoted line, vote with these in Decide, and the class rates the pitch with them.', 'criteria');
     cur.criteria.forEach((c, i) => {
       const row = el('div', 'kit-row kit-criterion');
       row.append(
@@ -252,7 +252,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
 
-    const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.', 'requirements');
+    const req = card('Requirements', 'Must have: things every idea or part must include, yes or no. Students tick each one on their strongest idea and say where it is.', 'requirements');
     cur.requirements.forEach((r, i) => {
       const row = el('div', 'kit-row kit-requirement');
       row.append(text(r.text, 160, (v) => put((d) => { d.requirements[i]!.text = v; }), 'Requirement'));

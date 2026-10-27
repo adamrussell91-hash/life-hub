@@ -23,7 +23,7 @@ export type UnderstandGroup = {
   sent: Array<{ id: string; text: string; answer: string | null }>;
 };
 /** What the group carries from Understand into the later phases. */
-export type GroupBrief = { problem: string | null; audience: { who: string; why: string } | null; answers: Array<{ question: string; answer: string }> };
+export type GroupBrief = { problem: string | null; audience: { who: string; why: string } | null; limits?: Partial<Record<LimitBox, Stacked[]>>; answers: Array<{ question: string; answer: string }> };
 export type SprintStatus = {
   identity: { need: 'class' | 'initials' | null; initials: string | null };
   anonymous?: boolean;
