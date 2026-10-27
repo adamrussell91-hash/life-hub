@@ -5813,7 +5813,6 @@ a.home-class-tile:hover {
   position: relative;
   margin: 0;
   padding-left: 2rem;
-  max-width: var(--measure);
 }
 
 .block-question-set__prompt::before {
