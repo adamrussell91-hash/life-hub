@@ -937,6 +937,7 @@ var BlockTypeSchema = z10.enum([
   "table",
   "peer_feedback",
   "question_drop",
+  "done",
   "brainstorm",
   "hinge_question",
   "continuum_line",
@@ -1608,6 +1609,18 @@ var QuestionDropBlockSchema = z10.object({
     marks_max: z10.number().int().min(1).max(20).default(3),
     per_student: z10.number().int().min(1).max(5).default(1),
     accepting: z10.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DoneBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("done"),
+  variant: z10.string().default("small"),
+  visibility: VisibilitySchema,
+  content: z10.object({
+    label: z10.string().max(120).default("I\u2019ve finished this")
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2364,6 +2377,7 @@ var leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
@@ -2668,6 +2682,7 @@ export {
   DiagramSourceSchema,
   DiscernConfirmBlockSchema,
   DividerBlockSchema,
+  DoneBlockSchema,
   DotPointRefSchema,
   EmbedBlockSchema,
   EmbedProviderSchema,

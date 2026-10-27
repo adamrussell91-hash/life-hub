@@ -1,0 +1,129 @@
+/* Student progress map. Grey until done. Words always sit beside colour. Tokens only. */
+.pm-profile {
+  --pm-core: var(--wave);
+  display: grid;
+  gap: var(--space-6);
+  width: 100%;
+  min-width: 0;
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+.pm-profile > * {
+  min-width: 0;
+}
+
+.pm-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--navy);
+}
+
+.pm-who,
+.pm-key,
+.pm-empty,
+.pm-claim__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* ── Bars ──────────────────────────────────────────────────────────── */
+
+.pm-bars {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.pm-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+}
+
+.pm-bar__label {
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.pm-bar__words {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pm-bar__track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--shore);
+  overflow: hidden;
+}
+
+.pm-bar__building,
+.pm-bar__mastered {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 7px;
+}
+
+.pm-bar__building {
+  background: var(--pastel-blue);
+}
+
+.pm-bar__mastered {
+  background: var(--pm-core);
+}
+
+/* ── Map ───────────────────────────────────────────────────────────── */
+
+.pm-map {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pm-map__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--navy);
+}
+
+.pm-map__host {
+  min-width: 0;
+}
+
+/* ── Initials ──────────────────────────────────────────────────────── */
+
+.pm-claim {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.pm-claim__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--navy);
+}
+
+.pm-claim__input {
+  min-height: 44px;
+  width: min(100%, 14rem);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.pm-claim .btn {
+  min-height: 44px;
+}
+
+.pm-claim__message {
+  margin: 0;
+  color: var(--danger);
+}
+
+.pm-claim__message[hidden] {
+  display: none;
+}

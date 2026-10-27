@@ -92,6 +92,15 @@ describe('router match', () => {
     });
   });
 
+  it('matches the student progress page before the bare class page', () => {
+    expect(match('/s/classes/class_2026_12engadv1/profile')).toEqual({
+      name: 'student-profile',
+      params: { classId: 'class_2026_12engadv1' },
+      requiresAuth: false,
+      path: '/s/classes/class_2026_12engadv1/profile'
+    });
+  });
+
   it('matches public student class-scoped lesson view', () => {
     expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008')).toEqual({
       name: 'student-class-lesson',

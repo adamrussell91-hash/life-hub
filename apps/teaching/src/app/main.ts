@@ -58,6 +58,7 @@ import {
   mountStudentFeedbackView,
   type StudentFeedbackViewHandle
 } from '@/student/feedback-view';
+import { mountStudentProfileView, type StudentProfileViewHandle } from '@/student/profile-view';
 import {
   applyCreatedEntity,
   applyCreatedMedia,
@@ -111,6 +112,9 @@ let studentClassViewHandle: StudentClassViewHandle | null = null;
 
 // The student feedback view mounted for the current public route, if any.
 let studentFeedbackViewHandle: StudentFeedbackViewHandle | null = null;
+
+// The student progress view mounted for the current public route, if any.
+let studentProfileViewHandle: StudentProfileViewHandle | null = null;
 
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
@@ -172,6 +176,12 @@ function teardownStudentFeedbackView(): void {
   if (!studentFeedbackViewHandle) return;
   studentFeedbackViewHandle.dispose();
   studentFeedbackViewHandle = null;
+}
+
+function teardownStudentProfileView(): void {
+  if (!studentProfileViewHandle) return;
+  studentProfileViewHandle.dispose();
+  studentProfileViewHandle = null;
 }
 
 function teardownFeedbackSection(): void {
@@ -740,6 +750,15 @@ function renderStudentFeedbackRoute(feedbackToken: string, token: number): void 
   });
 }
 
+function renderStudentProfileRoute(classId: string, token: number): void {
+  teardownStudentProfileView();
+  studentProfileViewHandle = mountStudentProfileView({
+    root: appRoot,
+    classId,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderTeacherScopeSequencesRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -1044,6 +1063,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-feedback':
       renderStudentFeedbackRoute(match.params.token, token);
       break;
+    case 'student-profile':
+      renderStudentProfileRoute(match.params.classId, token);
+      break;
     case 'not-found':
       renderNotFoundRoute(token);
       break;
@@ -1082,6 +1104,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownStudentUnitView();
   teardownStudentClassView();
   teardownStudentFeedbackView();
+  teardownStudentProfileView();
 
   if (isClassSiteHost() && !isClassSiteStudentRoute(match.name)) {
     renderClassSiteDeadEnd(appRoot);

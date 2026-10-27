@@ -1016,6 +1016,7 @@ var BlockTypeSchema = z10.enum([
   "table",
   "peer_feedback",
   "question_drop",
+  "done",
   "brainstorm",
   "hinge_question",
   "continuum_line",
@@ -1684,6 +1685,18 @@ var QuestionDropBlockSchema = z10.object({
     marks_max: z10.number().int().min(1).max(20).default(3),
     per_student: z10.number().int().min(1).max(5).default(1),
     accepting: z10.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DoneBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("done"),
+  variant: z10.string().default("small"),
+  visibility: VisibilitySchema,
+  content: z10.object({
+    label: z10.string().max(120).default("I\u2019ve finished this")
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2439,6 +2452,7 @@ var leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
@@ -4239,6 +4253,7 @@ var NEW_BLOCK_TYPES = [
   "table",
   "peer_feedback",
   "question_drop",
+  "done",
   "brainstorm",
   "hinge_question",
   "continuum_line",
@@ -4308,6 +4323,7 @@ var NEW_BLOCK_LABEL = {
   table: "Table",
   peer_feedback: "Peer feedback",
   question_drop: "Question drop",
+  done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
   continuum_line: "Continuum line",
@@ -4415,7 +4431,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "note_cue", "faded_example", "with_teacher", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "note_cue", "faded_example", "with_teacher", "annotation"]
   },
   {
     label: "Visualisation",
@@ -4464,6 +4480,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   "brainstorm",
   "hinge_question",
   "question_drop",
+  "done",
   "quiz_question",
   ...TOOLKIT_GROUP_TYPES,
   "teacher_note",
@@ -4484,7 +4501,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "with_teacher", "faded_example", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "with_teacher", "faded_example", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -4793,6 +4810,8 @@ function createBlock(type, id) {
         per_student: 1,
         accepting: true
       } };
+    case "done":
+      return { ...shared, block_type: "done", variant: "small", content: { label: "I\u2019ve finished this" } };
     case "quiz_question":
       return { ...shared, block_type: "quiz_question", variant: "medium", content: {
         question: blankQuestion("multiple_choice", id)
@@ -6423,6 +6442,7 @@ var KIND_LABEL = {
   html_app: "HTML app",
   question_set: "Question set",
   question_drop: "Question drop",
+  done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
   continuum_line: "Continuum line",

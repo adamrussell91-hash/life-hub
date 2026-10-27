@@ -1900,6 +1900,7 @@ var BlockTypeSchema = z11.enum([
   "table",
   "peer_feedback",
   "question_drop",
+  "done",
   "brainstorm",
   "hinge_question",
   "continuum_line",
@@ -2568,6 +2569,18 @@ var QuestionDropBlockSchema = z11.object({
     marks_max: z11.number().int().min(1).max(20).default(3),
     per_student: z11.number().int().min(1).max(5).default(1),
     accepting: z11.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DoneBlockSchema = z11.object({
+  id: z11.string().min(1),
+  type: z11.literal("block"),
+  block_type: z11.literal("done"),
+  variant: z11.string().default("small"),
+  visibility: VisibilitySchema,
+  content: z11.object({
+    label: z11.string().max(120).default("I\u2019ve finished this")
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3323,6 +3336,7 @@ var leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
@@ -3998,6 +4012,7 @@ var KIND_LABEL = {
   html_app: "HTML app",
   question_set: "Question set",
   question_drop: "Question drop",
+  done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
   continuum_line: "Continuum line",

@@ -126,6 +126,9 @@ describe('mountStudentClassView', () => {
     expect(publishedOpen).not.toBeNull();
     expect(publishedOpen?.textContent).toContain('Intro');
 
+    expect(root.querySelector('a.student-class__progress')?.getAttribute('href')).toBe(
+      `https://class.adam-russell.com/s/classes/${CLASS_ID}/profile`
+    );
     expect(root.querySelector('.student-continue')).toBeTruthy();
     expect(root.querySelector('[data-homepage-region="announcements"]')).toBeTruthy();
     expect(root.querySelector('[data-homepage-region="resources"]')).toBeNull();
