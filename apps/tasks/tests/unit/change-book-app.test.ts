@@ -136,6 +136,131 @@ describe('Rhizome', () => {
   });
 });
 
+const AT = (n: number) => `2026-10-${String(n).padStart(2, '0')}T09:00:00.000Z`;
+const node = (id: string, slot: string, text: string, tag?: string) => ({ id, slot, text, title: text, ...(tag ? { tag } : {}), state: 'accepted', skills: [], turnId: null });
+const typeIn = (input: HTMLInputElement, value: string) => {
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+describe('Multitasking: the split star', () => {
+  const tool = TOOLS.ch_multitasking as never;
+  const snap = (time: number[], value: number[], at: string) => ({ at, time: { a: time[0], b: time[1], c: time[2], d: time[3] }, value: { a: value[0], b: value[1], c: value[2], d: value[3] } });
+
+  it('draws the TIME and VALUE halves, labelled inputs per mode, and sends one snapshot on Save', () => {
+    const view = createChangeChartForTool(tool) as unknown as { el: HTMLElement; update(run: unknown): void; onScore(cb: (s: Record<string, unknown>) => void): void };
+    const sent: Record<string, unknown>[] = [];
+    view.onScore((s) => sent.push(s));
+    view.update({ id: 'r', tool: 'ch_multitasking', status: 'active', nodes: [node('n1', 'subject', 'Last Tuesday')], edges: [] });
+    const star = view.el.querySelector('.ch-tv__star')!;
+    expect([...star.querySelectorAll('.ch-tv__half')].map((t) => t.textContent)).toEqual(['TIME', 'VALUE']);
+    expect(star.querySelector('.ch-tv__divider')).not.toBeNull();
+    expect(star.getAttribute('role')).toBe('img');
+    expect(star.querySelector('title')!.textContent).toMatch(/not scored yet/);
+    const rows = [...view.el.querySelectorAll<HTMLElement>('.ch-tv__row')];
+    expect(rows.map((r) => r.dataset.mode)).toEqual(['a', 'b', 'c', 'd']);
+    for (const input of view.el.querySelectorAll('.ch-tv__input')) expect(input.getAttribute('aria-label')).toMatch(/^(Time for|Value of) [A-D], /);
+    const save = view.el.querySelector<HTMLButtonElement>('.ch-tv__save')!;
+    save.click();
+    expect(sent).toHaveLength(0);
+    expect(view.el.querySelector('.ch-tv__status')!.textContent).toMatch(/0 to 100/);
+    const values = [['40', '3'], ['50', '2'], ['10', '9'], ['30', '5']];
+    rows.forEach((row, i) => {
+      const [time, value] = row.querySelectorAll<HTMLInputElement>('.ch-tv__input');
+      typeIn(time, values[i][0]);
+      typeIn(value, values[i][1]);
+    });
+    expect(view.el.querySelector('.ch-tv__readout')!.textContent).toBe('Adds up to 130% — switching overlaps the other three, so this can pass 100');
+    save.click();
+    expect(sent).toEqual([{ time: { a: 40, b: 50, c: 10, d: 30 }, value: { a: 3, b: 2, c: 9, d: 5 } }]);
+  });
+
+  it('shows gap chips, the latest polygons, the previous save faintly and a text alternative', () => {
+    const view = createChangeChartForTool(tool)!;
+    const scores = { snapshots: [snap([30, 45, 20, 35], [8, 3, 9, 6], AT(1)), snap([30, 40, 10, 20], [8, 2, 9, 6], AT(8))] };
+    view.update({ id: 'r', tool: 'ch_multitasking', status: 'active', nodes: [node('n1', 'subject', 'Last Tuesday'), node('n2', 'note:1', 'Inbox all morning', 'b')], edges: [], scores } as never);
+    const chip = (mode: string) => view.el.querySelector(`.ch-tv__row[data-mode="${mode}"] .ch-tv__chip`)?.textContent ?? null;
+    expect(chip('b')).toBe('Takes a lot, worth little');
+    expect(chip('c')).toBe('Worth a lot, gets little');
+    expect(chip('a')).toBeNull();
+    expect(view.el.querySelector('.ch-tv__readout')!.textContent).toBe('Adds up to 100% of the day');
+    expect(view.el.querySelector('.ch-tv__poly--time:not(.ch-tv__poly--ghost)')!.getAttribute('points')).not.toBe('');
+    expect(view.el.querySelector('.ch-tv__poly--value.ch-tv__poly--ghost')!.getAttribute('points')).not.toBe('');
+    expect(view.el.querySelector('.ch-tv__star title')!.textContent).toMatch(/B, In the cloud: email, messages, chat: time 40% of the day, value 2 of 10.*previous save is drawn faintly/);
+    expect(view.el.querySelector('.ch-tv__row[data-mode="b"] .ch-tv__notes [data-node="n2"]')).not.toBeNull();
+    expect((view.el.querySelector('.ch-tv__row[data-mode="b"] .ch-tv__input') as HTMLInputElement).value).toBe('40');
+  });
+});
+
+describe('(Un)Happiness: the table of forces', () => {
+  const tool = TOOLS.ch_unhappiness as never;
+  const BOOK = ['thoughts', 'luck', 'politics', 'faith', 'fitness_industry', 'social_limits', 'actions', 'friends_family', 'economy', 'science'];
+  type View = { el: HTMLElement; update(run: unknown): void; onScore(cb: (s: Record<string, unknown>) => void): void };
+  const tap = (group: Element, n: number) => {
+    const input = group.querySelectorAll<HTMLInputElement>('.ch-at__dot-input')[n - 1];
+    input.checked = true;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  it('draws the circles, the table in the book’s order and five 1–5 dots a cell, then sends one snapshot', () => {
+    const view = createChangeChartForTool(tool) as unknown as View;
+    const sent: Record<string, unknown>[] = [];
+    view.onScore((s) => sent.push(s));
+    view.update({ id: 'r', tool: 'ch_unhappiness', status: 'active', nodes: [], edges: [] });
+    expect([...view.el.querySelectorAll('.ch-at__ask')].map((a) => a.textContent)).toEqual(['How happy are you now?', 'In three years, how happy do you expect to be?']);
+    expect([...view.el.querySelectorAll('.ch-at__arrow-caption')].map((a) => a.textContent)).toEqual(['What has got you to this point?', 'What will get you to that point?']);
+    const rows = [...view.el.querySelectorAll<HTMLElement>('.ch-at__row')];
+    expect(rows.map((r) => r.dataset.force)).toEqual(BOOK);
+    expect(rows[0].querySelectorAll('.ch-at__dots--now .ch-at__dot-input')).toHaveLength(5);
+    expect(rows[0].querySelector('.ch-at__dots--now')!.getAttribute('aria-label')).toBe('Your thoughts: Influence on how happy you are now');
+    // Feeling word: lonely changes every label.
+    const lonely = [...view.el.querySelectorAll<HTMLInputElement>('.ch-at__choice-input')].find((i) => i.value === 'lonely')!;
+    lonely.checked = true;
+    lonely.dispatchEvent(new Event('change'));
+    expect(view.el.querySelector('.ch-at__ask')!.textContent).toBe('How lonely are you now?');
+    view.el.querySelector<HTMLButtonElement>('.ch-at__save')!.click();
+    expect(sent).toHaveLength(0);
+    expect(view.el.querySelector('.ch-at__status')!.textContent).toMatch(/1 to 5/);
+    const [nowPick, laterPick] = view.el.querySelectorAll('.ch-at__rate .ch-at__dots');
+    tap(nowPick, 2);
+    tap(laterPick, 4);
+    rows.forEach((row, i) => {
+      tap(row.querySelector('.ch-at__dots--now')!, 1 + (i % 5));
+      tap(row.querySelector('.ch-at__dots--later')!, 3);
+    });
+    view.el.querySelector<HTMLButtonElement>('.ch-at__save')!.click();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ feeling: 'lonely', now: 2, later: 4 });
+    expect(Object.keys(sent[0].influenceNow as object)).toEqual(BOOK);
+    expect((sent[0].influenceNow as Record<string, number>).politics).toBe(3);
+  });
+
+  it('shows the ratings, the up and down marks, the summary, own forces and the arrow answers', () => {
+    const view = createChangeChartForTool(tool) as unknown as View;
+    const ids = [...BOOK, 'own_1'];
+    const influenceNow = Object.fromEntries(ids.map((id) => [id, id === 'thoughts' || id === 'actions' ? 5 : 2]));
+    const influenceLater = { ...influenceNow, thoughts: 3, luck: 4 };
+    const scores = { snapshots: [{ at: AT(1), feeling: 'calm', now: 2, later: 4, influenceNow, influenceLater }] };
+    const nodes = [node('f1', 'force:1', 'My commute'), node('g1', 'got_here', 'A steady job'), node('g2', 'get_there', 'Moving nearer family'), node('t1', 'note:1', 'It is my own doing', 'own_1')];
+    view.update({ id: 'r', tool: 'ch_unhappiness', status: 'active', nodes, edges: [], scores });
+    expect([...view.el.querySelectorAll('.ch-at__number')].map((n) => n.textContent)).toEqual(['2', '4']);
+    expect(view.el.querySelector('.ch-at__ask')!.textContent).toBe('How calm are you now?');
+    expect((view.el.querySelector('.ch-at__own-word') as HTMLInputElement).value).toBe('calm');
+    const row = (id: string) => view.el.querySelector<HTMLElement>(`.ch-at__row[data-force="${id}"]`)!;
+    expect(row('thoughts').dataset.drift).toBe('down');
+    expect(row('thoughts').querySelector('.ch-at__drift')!.textContent).toBe('↓');
+    expect(row('luck').querySelector('.ch-at__drift')!.getAttribute('aria-label')).toBe('more influence in three years');
+    expect(row('politics').dataset.drift).toBe('same');
+    expect(row('own_1').querySelector('[data-node="f1"]')).not.toBeNull();
+    expect(row('own_1').querySelector('[data-node="t1"]')).not.toBeNull();
+    expect(view.el.querySelector('.ch-at__arrow--got [data-node="g1"]')).not.toBeNull();
+    expect(view.el.querySelector('.ch-at__arrow--get [data-node="g2"]')).not.toBeNull();
+    // now: 10 of 28 points -> 4 of 10; later: 8 of 28 -> 3 of 10 (rounded)
+    expect(view.el.querySelector('.ch-at__summary')!.textContent).toMatch(/^Your own thoughts and actions take 4 of every 10 points of influence now, and 3 of 10 in three years/);
+    expect(row('luck').querySelector<HTMLInputElement>('.ch-at__dots--later .ch-at__dot-input:checked')!.value).toBe('4');
+  });
+});
+
 describe('decor', () => {
   it('the track moves Name it, Apply a model, Act, Review', async () => {
     expect(trackStations(fresh()).stations.map((s) => [s.name, s.state, s.note])).toEqual([['Name it', 'now', 'Question 1 of 3'], ['Apply a model', 'future', ''], ['Act', 'future', ''], ['Review', 'future', '']]);

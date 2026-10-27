@@ -3,15 +3,13 @@
 // pack's own-words coaching or ours. No quotation from the book. The (Un)Happiness Model carries
 // the Dictatorship Model (folded in): its outside pressures are scored as forces.
 //
-// Two models run on the shared scales family for now. The pack proposed new families for them
-// (time_value_profile for Multitasking, attribution_table for (Un)Happiness); both are deferred.
-// - Multitasking: four descriptive spokes, the time each mode takes and what it is worth, each 0
-//   to 10. The time is a rough share with no enforced total: whether switching overlaps the other
-//   modes is the one fact the pack leaves unsure.
-// - (Un)Happiness: the forces scored for their influence now and in three years. The book scores
-//   them 1 to 5; the shared scales run 1 to 10, so the coaching reads them as influence, never
-//   control, and asks for the overall happiness rating (now and in three years) in words.
-import { curveTool, listTool, pathTool, scalesTool } from '../../decision-book/families/index.mjs';
+// Two models have Change Book families of their own (../families):
+// - Multitasking (time_value): a split star, four modes' share of the working day (0 to 100,
+//   no sum rule: switching overlaps the other modes) above, their value (1 to 10) below.
+// - (Un)Happiness (attribution): the table of forces, each force's influence now and in three
+//   years (1 to 5), the feeling now and in three years (1 to 5), and the two arrows between.
+import { curveTool, listTool, pathTool } from '../../decision-book/families/index.mjs';
+import { attributionTool, timeValueTool } from '../families/index.mjs';
 import { EVIDENCE_STEP, step } from './shared.mjs';
 
 export const chDecision = pathTool({
@@ -46,39 +44,32 @@ export const chDecision = pathTool({
   }
 });
 
-export const chMultitasking = scalesTool({
+export const chMultitasking = timeValueTool({
   id: 'ch_multitasking',
   name: 'The Multitasking Model',
   when: 'A busy digital day produces less useful work than you expected, and you want to see where your attention went.',
   failureModes: [
     'Treating fast replies as proof of useful output.',
-    'Counting the same time twice when you switch between modes.',
-    'Reading the time scores as exact percentages: they are rough shares.'
+    'Forcing the four times to add up to 100: switching runs through the other modes, so they overlap.',
+    'Reading the shares as exact measurements: they are your best estimate of one ordinary day.'
   ],
   steps: [
-    step('observe', 'Observe a workday', 'Where did your attention actually go yesterday: talking in person, messages and email, focused work, and switching between them?'),
-    step('time', 'Score the time', 'Give each mode a rough score for the time it took, 0 to 10. They need not add up to anything.'),
-    step('value', 'Score the value', 'Now score what each mode was worth to you, 0 to 10.'),
-    step('compare', 'Compare time and value', 'Which modes took time out of step with what they were worth?'),
-    step('protect', 'Protect useful attention', 'Which interruption could you remove for one work block?'),
+    step('observe', 'Observe a workday', 'Where did your attention actually go on one ordinary workday: with people face to face, in email and messages, alone on focused work, and switching between them?'),
+    step('time', 'Set the time', 'On the top half of the star, give each mode its rough share of the working day, 0 to 100. Each one stands alone, so the four can overlap.'),
+    step('value', 'Set the value', 'On the bottom half, rate what each mode was worth to you, 1 to 10.'),
+    step('compare', 'Compare time and value', 'Where do the two halves fall out of step? Look at any mode the chart flags.'),
+    step('protect', 'Protect useful attention', 'Which interruption could you remove for one work block, and which valued mode could get more of the day?'),
     EVIDENCE_STEP
   ],
-  exercise: 'Track one ordinary workday, then protect a single block for the work you value most.',
+  exercise: 'Track one ordinary workday, then protect a single block for the work you value most, and score the star again afterwards.',
   pairsWell: ['eisenhower', 'ch_sustainability'],
   chart: {
     subject: 'The workday you are looking at',
-    mode: 'axes',
-    layout: 'radar',
-    min: 0,
-    scales: [
-      { id: 'offline', label: 'Offline communication' },
-      { id: 'cloud', label: 'Cloud communication' },
-      { id: 'focus', label: 'Focused work' },
-      { id: 'switching', label: 'Switching between modes' }
-    ],
-    series: [
-      { id: 'time', label: 'Time it took' },
-      { id: 'value', label: 'What it was worth' }
+    modes: [
+      { id: 'a', label: 'With people, face to face', short: 'People' },
+      { id: 'b', label: 'In the cloud: email, messages, chat', short: 'Cloud' },
+      { id: 'c', label: 'Alone, focused', short: 'Focused' },
+      { id: 'd', label: 'Switching among A, B and C, and inside C', short: 'Switching' }
     ],
     reflection: 'What the gap between time and value shows about your attention'
   }
@@ -113,44 +104,41 @@ export const chSustainability = listTool({
   }
 });
 
-export const chUnhappiness = scalesTool({
+export const chUnhappiness = attributionTool({
   id: 'ch_unhappiness',
   name: 'The (Un)Happiness Model',
   when: 'You feel responsible for every hard circumstance in your life, and you want to see which forces are really at work.',
   failureModes: [
     'Using positivity as a demand to deny hardship.',
     'Confusing influence with personal control.',
-    'Taking outside pressures, such as fear, the promise of growth, headlines or beauty ideals, for your own wishes.'
+    'Taking outside pressures, such as fear, the promise of growth, headlines or beauty ideals, for your own wishes.',
+    'Reading a low score for your own thoughts and actions as giving up: it can be an honest account of what is outside you.'
   ],
   steps: [
-    step('present', 'Describe the present', 'What is your situation, before you judge your attitude? How happy are you now, 1 to 5, and what do you expect in three years?'),
-    step('forces', 'Separate the forces', 'Score how much each force shapes your happiness now. Which belong to your own actions, and which lie elsewhere?'),
+    step('present', 'Rate the feeling', 'How happy are you now, 1 to 5, and how happy do you expect to be in three years? Swap happy for rich, lonely or your own word if that fits better.'),
+    step('forces', 'Weigh the forces now', 'Rate how much each force shapes that feeling today, 1 to 5. Add up to three forces of your own if the list misses one.'),
     step('pressures', 'Name the pressures', 'Which outside pressures push on you: fear, the promise of growth, breaking news, beauty and fitness ideals? Count them under the force they belong to.'),
-    step('future', 'Compare expectations', 'Score the forces again for three years from now. Which do you expect to matter more, and which less?'),
+    step('future', 'Weigh them for three years on', 'Rate each force again for three years from now, 1 to 5. Which do you expect to matter more, and which less?'),
+    step('arrows', 'Follow the arrows', 'What has brought you to where you are now? And what will carry you to where you expect to be?'),
+    step('compare', 'Compare the columns', 'Where do the two columns differ, and why? How much of the feeling do you put down to your own thoughts and actions?'),
     EVIDENCE_STEP
   ],
   exercise: 'Choose one action within your control, and name one circumstance outside it.',
   pairsWell: ['force_field', 'ch_change'],
   chart: {
-    mode: 'axes',
-    layout: 'bars',
-    scales: [
-      { id: 'thoughts', label: 'Your thoughts' },
-      { id: 'actions', label: 'Your actions' },
-      { id: 'friends_family', label: 'Friends and family' },
+    forces: [
+      { id: 'thoughts', label: 'Your thoughts', self: true },
       { id: 'luck', label: 'Luck' },
-      { id: 'social_limits', label: 'Social restraints' },
-      { id: 'fitness_industry', label: 'Health and fitness industry' },
-      { id: 'economy', label: 'Capitalism' },
       { id: 'politics', label: 'Politics' },
-      { id: 'science', label: 'Science' },
-      { id: 'faith', label: 'God or a higher power' }
+      { id: 'faith', label: 'God or a higher power' },
+      { id: 'fitness_industry', label: 'Health and fitness industry' },
+      { id: 'social_limits', label: 'Social restraints' },
+      { id: 'actions', label: 'Your actions', self: true },
+      { id: 'friends_family', label: 'Friends and family' },
+      { id: 'economy', label: 'Capitalism' },
+      { id: 'science', label: 'Science' }
     ],
-    series: [
-      { id: 'now', label: 'Influence now' },
-      { id: 'later', label: 'In three years' }
-    ],
-    reflection: 'What the forces show about what you can change, and what you carry'
+    reflection: 'What comparing the two columns shows about what you can change, and what you carry'
   }
 });
 

@@ -70,10 +70,112 @@
 .ch-rhizome__reflection { margin: 0; padding: 12px 14px; border: 1.5px solid var(--ch-line); border-top: 3px solid var(--ch-teal); border-radius: 14px; background: var(--ch-paper); color: var(--ch-ink); font: 400 14px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
 .ch-rhizome__reflection[hidden] { display: none; }
 
-/* Scales (Multitasking, (Un)Happiness): the newest overlay draws in teal, the older ones stay ink outlines. */
-.ch-scope .dm-scales__poly[data-style='solid'] { stroke: var(--ch-teal); stroke-width: 2; }
-.ch-scope .dm-scales__legend-item[data-style='solid']::before,
-.ch-scope .dm-scales__bar[data-style='solid'] { background: var(--ch-teal); }
+/* ------------------------------------------------------------------ Multitasking (render/time-value.ts)
+   The split star: TIME above a dashed divider in teal, VALUE below it in copper (large shapes only),
+   the previous save faint and dashed behind. Under it, one row per mode: letter and label, the two
+   inputs, the gap chips and the notes. Phone: the star shrinks with the column and each row stacks. */
+.ch-tv__star-wrap { width: min(100%, 440px); justify-self: center; margin: 4px auto 0; }
+.ch-tv__star { display: block; width: 100%; height: auto; overflow: visible; }
+.ch-tv__divider { stroke: var(--ch-line); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.ch-tv__half { fill: var(--ch-muted); font: 700 11px / 1 var(--font-ui, sans-serif); letter-spacing: 0.12em; }
+.ch-tv__ring { fill: none; stroke: var(--ch-line); stroke-width: 0.6; stroke-dasharray: 2 3; }
+.ch-tv__spoke { stroke: var(--ch-ink); stroke-width: 1; }
+.ch-tv__badge circle { stroke-width: 1.4; }
+.ch-tv__badge--time circle { fill: var(--ch-teal-tint); stroke: var(--ch-teal); }
+.ch-tv__badge--value circle { fill: var(--ch-copper-tint); stroke: var(--ch-copper); }
+.ch-tv__badge text { fill: var(--ch-ink); font: 700 11px / 1 var(--font-ui, sans-serif); text-anchor: middle; }
+.ch-tv__poly { stroke-width: 2; stroke-linejoin: round; transition: opacity 320ms var(--ch-ease); }
+.ch-tv__poly--time { fill: var(--ch-teal-tint); fill-opacity: 0.85; stroke: var(--ch-teal); }
+.ch-tv__poly--value { fill: var(--ch-copper-tint); fill-opacity: 0.85; stroke: var(--ch-copper); }
+.ch-tv__poly--ghost { fill: none; stroke-width: 1.2; stroke-dasharray: 4 3; opacity: 0.45; }
+.ch-tv__legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin: 0; font: 500 11px / 1.4 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-tv__key::before { content: ''; display: inline-block; width: 16px; height: 8px; margin-right: 6px; vertical-align: middle; border: 2px solid var(--ch-ink); border-radius: 3px; }
+.ch-tv__key--time::before { background: var(--ch-teal-tint); border-color: var(--ch-teal); }
+.ch-tv__key--value::before { background: var(--ch-copper-tint); border-color: var(--ch-copper); }
+.ch-tv__key--ghost::before { border-style: dashed; opacity: 0.6; }
+.ch-tv__form { display: grid; gap: 6px; min-width: 0; }
+.ch-tv__head, .ch-tv__row { display: grid; grid-template-columns: minmax(0, 1fr) 92px 92px; align-items: center; gap: 4px 10px; }
+.ch-tv__head { padding: 0 12px; font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ch-muted); }
+.ch-tv__head-time, .ch-tv__head-value { text-align: center; }
+.ch-tv__row { padding: 8px 12px; border: 1.5px solid var(--ch-line); border-radius: 12px; background: var(--ch-paper); }
+.ch-tv__row[data-flag='costly'] { border-color: var(--ch-copper); }
+.ch-tv__row[data-flag='starved'] { border-color: var(--ch-teal); }
+.ch-tv__mode { display: flex; align-items: center; gap: 8px; min-width: 0; font: 600 13px / 1.3 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-tv__mode-label { overflow-wrap: anywhere; }
+.ch-tv__letter { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--ch-ink); font: 700 12px / 1 var(--font-ui, sans-serif); }
+.ch-tv__field { display: grid; justify-items: center; gap: 2px; }
+.ch-tv__field-label { display: none; font: 600 11px / 1.3 var(--font-ui, sans-serif); color: var(--ch-muted); }
+.ch-tv__input { width: 100%; min-height: 36px; border: 1.5px solid var(--ch-line); border-radius: 999px; padding: 0 10px; background: var(--ch-paper); color: var(--ch-ink); font: 500 14px / 1 var(--font-ui, sans-serif); text-align: center; }
+.ch-tv__field--time .ch-tv__input:focus-visible { outline: 2px solid var(--ch-teal); outline-offset: 1px; }
+.ch-tv__field--value .ch-tv__input:focus-visible { outline: 2px solid var(--ch-copper-label); outline-offset: 1px; }
+.ch-tv__flags, .ch-tv__notes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-tv__flags:empty, .ch-tv__notes:empty { display: none; }
+.ch-tv__chip { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 999px; font: 700 11px / 1.2 var(--font-ui, sans-serif); }
+.ch-tv__chip--costly { background: var(--ch-copper-tint); color: var(--ch-copper-label); border: 1.5px solid var(--ch-copper); }
+.ch-tv__chip--starved { background: var(--ch-teal-tint); color: var(--ch-teal-label); border: 1.5px solid var(--ch-teal); }
+.ch-tv__foot, .ch-at__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.ch-tv__save, .ch-at__save { min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--ch-ink); color: var(--ch-paper); font: 600 13px / 1 var(--font-ui, sans-serif); cursor: pointer; }
+.ch-tv__save:focus-visible, .ch-at__save:focus-visible { outline: 2px solid var(--ch-teal); outline-offset: 2px; }
+.ch-tv__readout, .ch-at__summary { margin: 0; flex: 1 1 220px; font: 500 13px / 1.45 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-tv__status, .ch-at__status { margin: 0; font: 600 12px / 1.4 var(--font-ui, sans-serif); color: var(--ch-copper-label); }
+.ch-tv__status:empty, .ch-at__status:empty { display: none; }
+
+/* ------------------------------------------------------------------ (Un)Happiness (render/attribution.ts)
+   The worksheet's shape: the feeling word, then the two circles (now, in three years) each with
+   five dots and its arrow's answer under it; then the table, now | force | in three years, five
+   dots a side, an up or down mark where a force moves. Every dot is a 32px target. Phone: each
+   force's name sits above its two dot rows. */
+.ch-at__top { display: grid; gap: 12px; container-type: inline-size; }
+.ch-at__feeling { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ch-at__feeling-legend { float: left; margin-right: 6px; padding: 0; font: 700 11px / 32px var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ch-muted); }
+.ch-at__choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-at__choice { position: relative; display: inline-flex; }
+.ch-at__choice-input, .ch-at__dot-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.ch-at__choice-mark { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border: 1.5px solid var(--ch-line); border-radius: 999px; background: var(--ch-paper); font: 600 13px / 1 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-at__choice-input:checked + .ch-at__choice-mark { background: var(--ch-teal); border-color: var(--ch-teal); color: var(--ch-paper); }
+.ch-at__choice-input:focus-visible + .ch-at__choice-mark, .ch-at__dot-input:focus-visible + .ch-at__dot-mark { outline: 2px solid var(--ch-teal); outline-offset: 2px; }
+.ch-at__own-word { min-height: 32px; width: 150px; border: 1.5px solid var(--ch-line); border-radius: 999px; padding: 0 12px; background: var(--ch-paper); color: var(--ch-ink); font: 500 14px / 1 var(--font-ui, sans-serif); }
+.ch-at__own-word[hidden] { display: none; }
+.ch-at__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* Side by side, each card needs room for the circle and five 32px dots; narrower, they stack. */
+@container (max-width: 620px) { .ch-at__pair { grid-template-columns: minmax(0, 1fr); } }
+.ch-at__side { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 12px; padding: 12px; border: 1.5px solid var(--ch-line); border-radius: 14px; background: var(--ch-paper); min-width: 0; }
+.ch-at__circle { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--ch-teal); background: var(--ch-teal-tint); }
+.ch-at__circle--later { border-color: var(--ch-copper); background: var(--ch-copper-tint); }
+.ch-at__circle-n { position: absolute; top: -8px; left: -6px; font: 700 14px / 1 var(--font-ui, sans-serif); color: var(--ch-ink); background: var(--ch-paper); border-radius: 50%; }
+.ch-at__number { font: 800 26px / 1 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-at__rate { display: grid; gap: 6px; min-width: 0; }
+.ch-at__ask { font: 600 13px / 1.3 var(--font-ui, sans-serif); color: var(--ch-ink); }
+.ch-at__arrow { grid-column: 1 / -1; display: grid; gap: 6px; padding: 8px 10px 8px 30px; position: relative; border-top: 1.5px dashed var(--ch-line); min-width: 0; }
+.ch-at__arrow::before { content: '↻'; position: absolute; left: 6px; top: 6px; font: 700 16px / 1 var(--font-ui, sans-serif); color: var(--ch-teal); }
+.ch-at__arrow--get::before { content: '↷'; color: var(--ch-copper-label); }
+.ch-at__arrow-caption { font: 600 12px / 1.3 var(--font-ui, sans-serif); font-style: italic; color: var(--ch-muted); }
+.ch-at__dots { display: flex; gap: 0; min-width: 0; }
+.ch-at__dots-tag { display: none; width: 28px; font: 700 13px / 1 var(--font-ui, sans-serif); color: var(--ch-muted); }
+.ch-at__dot { position: relative; display: grid; place-items: center; width: 32px; height: 32px; flex: none; }
+.ch-at__dot-mark { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ch-line); background: var(--ch-paper); color: transparent; font: 700 11px / 1 var(--font-ui, sans-serif); transition: background-color 160ms var(--ch-ease), border-color 160ms var(--ch-ease); }
+.ch-at__dot:hover .ch-at__dot-mark { border-color: var(--ch-ink); }
+.ch-at__dot-input:checked + .ch-at__dot-mark { background: var(--ch-ink); border-color: var(--ch-ink); color: var(--ch-paper); }
+.ch-at__dots--later .ch-at__dot-input:checked + .ch-at__dot-mark, .ch-at__side--later .ch-at__dot-input:checked + .ch-at__dot-mark { background: var(--ch-copper-label); border-color: var(--ch-copper-label); }
+.ch-at__dots--now .ch-at__dot-input:checked + .ch-at__dot-mark, .ch-at__side--now .ch-at__dot-input:checked + .ch-at__dot-mark { background: var(--ch-teal); border-color: var(--ch-teal); }
+.ch-at__table { display: grid; gap: 0; border: 1.5px solid var(--ch-ink); border-radius: 4px; background: var(--ch-paper); min-width: 0; }
+.ch-at__head, .ch-at__row { display: grid; grid-template-columns: 172px minmax(0, 1fr) 172px; align-items: center; gap: 4px 10px; padding: 4px 8px; }
+.ch-at__head { border-bottom: 1.5px solid var(--ch-ink); font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ch-muted); }
+.ch-at__col--force { text-align: center; }
+.ch-at__col--later { text-align: right; }
+.ch-at__row + .ch-at__row { border-top: 1px solid var(--ch-line); }
+.ch-at__row[data-own] { background: var(--ch-soft); }
+.ch-at__dots--now { justify-content: flex-start; }
+.ch-at__dots--later { justify-content: flex-end; }
+.ch-at__force { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; min-width: 0; text-align: center; }
+.ch-at__force-label { font: 600 13px / 1.3 var(--font-ui, sans-serif); color: var(--ch-ink); overflow-wrap: anywhere; }
+.ch-at__force-label[hidden], .ch-at__own:empty { display: none; }
+.ch-at__drift { font: 800 14px / 1 var(--font-ui, sans-serif); }
+.ch-at__drift:empty { display: none; }
+.ch-at__row[data-drift='up'] .ch-at__drift { color: var(--ch-teal-label); }
+.ch-at__row[data-drift='down'] .ch-at__drift { color: var(--ch-copper-label); }
+.ch-at__notes { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.ch-at__notes:empty { display: none; }
 
 /* ------------------------------------------------------------------ the step (render/commit.ts)
    The result as the headline, the next action beside who it affects, the review date and a copper
@@ -102,7 +204,22 @@
 .ch-review__station--keep .ch-review__n { background: var(--ch-ink); }
 .ch-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ch-muted); padding-left: 36px; min-height: 28px; display: flex; align-items: center; }
 
+@media (max-width: 640px) {
+  .ch-at__pair { grid-template-columns: 1fr; }
+  .ch-at__head { display: flex; justify-content: space-between; }
+  .ch-at__col--force { display: none; }
+  .ch-at__row { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 8px; }
+  .ch-at__force { order: -1; justify-content: flex-start; text-align: left; }
+  .ch-at__notes { justify-content: flex-start; }
+  .ch-at__dots--now, .ch-at__dots--later { justify-content: flex-start; align-items: center; }
+  .ch-at__dots-tag { display: inline-block; }
+}
+
 @media (max-width: 480px) {
+  .ch-tv__head { display: none; }
+  .ch-tv__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ch-tv__mode { grid-column: 1 / -1; }
+  .ch-tv__field-label { display: block; }
   .ch-commit__row, .ch-review__row { grid-template-columns: 1fr; }
   .ch-review__station + .ch-review__station::before { left: 8px; right: 8px; top: -7px; bottom: auto; border-left: 0; border-top: 3px solid var(--ch-teal); }
   .ch-review__row { gap: 14px; }

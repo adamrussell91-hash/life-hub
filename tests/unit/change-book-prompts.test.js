@@ -65,9 +65,12 @@ test('every model has a note: steps, slots, minimum, watch-fors, the exercise an
 test('the notes carry the variant, the scales caveats, the merges and the dated examples', () => {
   assert.match(techniqueNote('ch_rhizome'), /Variant of Problem Solver's concept map/);
   assert.match(techniqueNote('ch_rhizome'), /keeps "you" in the middle/);
-  assert.match(techniqueNote('ch_multitasking'), /no total to reach/);
-  assert.match(techniqueNote('ch_multitasking'), /Time it took and What it was worth/);
-  assert.match(techniqueNote('ch_unhappiness'), /influence, never control/);
+  assert.match(techniqueNote('ch_multitasking'), /never ask for a total of 100/);
+  assert.match(techniqueNote('ch_multitasking'), /0 to 100/);
+  assert.match(techniqueNote('ch_multitasking'), /Takes a lot|takes a lot and is worth little/);
+  assert.match(techniqueNote('ch_unhappiness'), /1 to 5 everywhere/);
+  assert.match(techniqueNote('ch_unhappiness'), /rich, lonely or a word of their own/);
+  assert.match(techniqueNote('ch_unhappiness'), /Influence, never control/);
   assert.match(techniqueNote('ch_unhappiness'), /The Dictatorship Model/);
   assert.match(techniqueNote('ch_innovation'), /The Back-of-the-Napkin Model/);
   assert.match(techniqueNote('ch_othering'), /The Prejudice Model/);
