@@ -170,9 +170,35 @@ function fillsFor(items, evidence) {
   }
   return out;
 }
+
+// apps/teaching/src/evidence/syllabus.ts
+var pointTag = (area, id) => `dp:${area}:${id}`;
+function lessonPointMap(lessons, alignment) {
+  const map = /* @__PURE__ */ new Map();
+  if (!alignment) return map;
+  for (const lesson of lessons) {
+    const tags = /* @__PURE__ */ new Set();
+    for (const ref of lesson.dot_points ?? []) {
+      const [area, id] = ref.split(":");
+      if (area && id && alignment.focus_areas.find((a) => a.id === area)?.points.some((p) => p.id === id)) tags.add(pointTag(area, id));
+    }
+    if (tags.size) map.set(lesson.id, [...tags]);
+  }
+  return map;
+}
+function withPointTags(evidence, byLesson, byOutcome) {
+  if (!byLesson.size && !byOutcome.size) return evidence;
+  return evidence.map((e) => {
+    const extra = e.source.startsWith("quiz:") ? byLesson.get(e.source.slice(5)) ?? [] : e.tags.flatMap((t) => t.startsWith("out:") ? byOutcome.get(t) ?? [] : []);
+    return extra.length ? { ...e, tags: [.../* @__PURE__ */ new Set([...e.tags, ...extra])] } : e;
+  });
+}
 export {
   MASTERY_GROUPS,
   fillsFor,
+  lessonPointMap,
   levelFor,
-  markbookEvidence
+  markbookEvidence,
+  pointTag,
+  withPointTags
 };

@@ -12,8 +12,8 @@ import { listBlobKeys } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
 import { deleteKey, draftLessonKey, unitKey } from './teaching-blobs.mjs';
 import { markbookAction } from './markbook.mjs';
-import { fillsFor, markbookEvidence } from './profile-evidence.mjs';
-import { profileItems } from './profile-items.mjs';
+import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
+import { profileItems, storedAlignment } from './profile-items.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const doneKey = (classId, studentId, lessonId) => `profile/${classId}/${studentId}/done/${lessonId}`;
@@ -96,8 +96,10 @@ async function profileFor(store, roster, student) {
   const done = await listDone(store, classId, student.id);
   const rows = mapRows(lessons, view, done, student.id);
   const next = rows.find((r) => r.role === 'core' && !r.done)?.id ?? null;
-  const evidence = markbookEvidence(view, []).evidence.filter((e) => e.student === student.id);
-  const items = await profileItems(store, roster, lessons, view);
+  const alignment = await storedAlignment(store);
+  const mine = markbookEvidence(view, []).evidence.filter((e) => e.student === student.id);
+  const evidence = withPointTags(mine, lessonPointMap(lessons, alignment), new Map());
+  const items = await profileItems(store, roster, lessons, view, alignment);
   return { need: null, initials: student.initials, map: { lessons: rows, next }, fills: fillsFor(items, evidence) };
 }
 
