@@ -18,7 +18,7 @@ import { unitNetworkInput } from './render';
 import { loadAlignment } from '@/alignment/coverage-panel';
 import { focusAreaFor } from '@/alignment/coverage';
 import { toggleLineStop } from '@/alignment/auto-lines';
-import { MAX_UNIT_CONCEPTS, unitLines } from '@/network/unit-concepts';
+import { MAX_UNIT_CONCEPTS, MAX_UNIT_SKILLS, unitLines } from '@/network/unit-concepts';
 
 /** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
 export type UnitNetworkEditorContext = UnitNetworkContext & {
@@ -77,7 +77,7 @@ export function createCurriculumLinesEditor(
   });
   const v2 = (): CurriculumLinesV2Content => current.content as CurriculumLinesV2Content;
   /** The subject's lines this map shows: its own concepts among the metro lines. */
-  const mapLines = (): NetworkLine[] => unitLines(lines, isCurriculumLinesV2(current.content) ? v2().concept_lines : undefined);
+  const mapLines = (): NetworkLine[] => unitLines(lines, isCurriculumLinesV2(current.content) ? v2().concept_lines : undefined, isCurriculumLinesV2(current.content) ? v2().skill_lines : undefined);
   /** The unit's lessons in this map's station order, shown or not. */
   const mapLessons = (): NetLesson[] =>
     placeByDate(orderStations(lessons, isCurriculumLinesV2(current.content) ? v2().station_order : undefined), dates);
@@ -223,30 +223,35 @@ export function createCurriculumLinesEditor(
     return s;
   }
 
-  /* The unit's few concepts: the year network shows every one, this map only these. */
-  function conceptsSection(): HTMLElement | null {
-    const metro = lines.filter((l) => l.mode === 'metro');
-    if (!metro.length || !isCurriculumLinesV2(current.content)) return null;
-    const s = section('Concepts on this map', `Pick the ${MAX_UNIT_CONCEPTS - 1} or ${MAX_UNIT_CONCEPTS} textual concepts this unit is built on. This map and its lessons show only those; the year network shows every concept.`);
-    const chosen = v2().concept_lines ?? [];
+  /* The unit's few concepts and skills: the year network shows every one, this map only these. */
+  function pickSection(mode: 'metro' | 'light_rail'): HTMLElement | null {
+    const pool = lines.filter((l) => l.mode === mode);
+    if (!pool.length || !isCurriculumLinesV2(current.content)) return null;
+    const skills = mode === 'light_rail';
+    const max = skills ? MAX_UNIT_SKILLS : MAX_UNIT_CONCEPTS;
+    const key = skills ? 'skill_lines' : 'concept_lines';
+    const noun = skills ? 'skills' : 'textual concepts';
+    const title = skills ? 'Skills on this map' : 'Concepts on this map';
+    const s = section(title, `Pick the ${max - 1} or ${max} ${noun} this unit is built on. This map and its lessons show only those; the year network shows every one.`);
+    const chosen = v2()[key] ?? [];
     const chips = el('div', 'cl-editor__chips');
     chips.setAttribute('role', 'group');
-    chips.setAttribute('aria-label', 'Concepts on this map');
-    for (const line of metro) {
+    chips.setAttribute('aria-label', title);
+    for (const line of pool) {
       const on = chosen.includes(line.id);
-      const chip = el('button', `cl-editor__chip cl-editor__chip--metro cl-editor__pick${on ? ' cl-editor__pick--on' : ''}`, line.name || 'Untitled line');
+      const chip = el('button', `cl-editor__chip cl-editor__chip--${mode} cl-editor__pick${on ? ' cl-editor__pick--on' : ''}`, line.name || 'Untitled line');
       chip.type = 'button';
       chip.style.setProperty('--net-colour', lineColour(line.colour));
       chip.setAttribute('aria-pressed', String(on));
-      chip.disabled = !on && chosen.length >= MAX_UNIT_CONCEPTS;
+      chip.disabled = !on && chosen.length >= max;
       chip.addEventListener('click', () => {
         const next = on ? chosen.filter((id) => id !== line.id) : [...chosen, line.id];
-        commit({ concept_lines: next.length ? next : undefined });
+        commit({ [key]: next.length ? next : undefined });
       });
       chips.append(chip);
     }
     s.append(chips);
-    if (!chosen.length) s.append(el('p', 'cl-editor__hint', 'None picked: the map shows every concept line.'));
+    if (!chosen.length) s.append(el('p', 'cl-editor__hint', `None picked: the map shows every ${skills ? 'skill' : 'concept'} line.`));
     return s;
   }
 
@@ -474,9 +479,9 @@ export function createCurriculumLinesEditor(
 
   const conceptsHost = el('div', 'cl-editor__stack');
   const paintConcepts = () => {
-    const s = conceptsSection();
-    conceptsHost.hidden = !s;
-    conceptsHost.replaceChildren(...(s ? [s] : []));
+    const parts = [pickSection('metro'), pickSection('light_rail')].filter((n): n is HTMLElement => Boolean(n));
+    conceptsHost.hidden = !parts.length;
+    conceptsHost.replaceChildren(...parts);
   };
   const stopsHost = el('div', 'cl-editor__stack');
   const paintStops = () => stopsHost.replaceChildren(stopsSection(), railSection(), gatesSection());
