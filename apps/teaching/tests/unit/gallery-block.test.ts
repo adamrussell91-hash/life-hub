@@ -320,3 +320,58 @@ describe('renderGalleryBlock', () => {
     el.remove();
   });
 });
+
+describe('gallery lesson links', () => {
+  const unitLessons = [
+    { id: 'les_a', title: 'The Remedy of Butterflies', href: '/lessons/les_a' },
+    { id: 'les_b', title: 'Second poem', href: '/lessons/les_b' }
+  ];
+
+  function linkedGallery(): Extract<Block, { block_type: 'gallery' }> {
+    const block = sampleGallery('grid', 2);
+    block.content.items[0] = { ...block.content.items[0]!, lesson_id: 'les_a' };
+    return block;
+  }
+
+  it('keeps lesson_id through the schema', () => {
+    const parsed = BlockSchema.parse(linkedGallery()) as Extract<Block, { block_type: 'gallery' }>;
+    expect(parsed.content.items[0]!.lesson_id).toBe('les_a');
+  });
+
+  it('a linked image and its caption open the lesson; the corner button enlarges', async () => {
+    openViewer.mockClear();
+    const el = renderGalleryBlock(linkedGallery(), 'student', { unitLessons });
+    const first = el.querySelectorAll('.block-gallery__item')[0]!;
+    expect(first.querySelector<HTMLAnchorElement>('.block-gallery__link')?.getAttribute('href')).toBe('/lessons/les_a');
+    expect(first.querySelector<HTMLAnchorElement>('.block-gallery__caption-link')?.getAttribute('href')).toBe('/lessons/les_a');
+    expect(first.querySelector('.block-gallery__open')).toBeNull();
+    first.querySelector<HTMLButtonElement>('.block-gallery__enlarge')!.click();
+    await vi.waitFor(() => expect(openViewer).toHaveBeenCalled());
+    expect(openViewer.mock.calls.at(-1)?.[1]).toMatchObject({ index: 0 });
+    (await openViewer.mock.results.at(-1)?.value).close();
+    // The unlinked image keeps the plain enlarge button.
+    expect(el.querySelectorAll('.block-gallery__item')[1]!.querySelector('.block-gallery__open')).not.toBeNull();
+  });
+
+  it('a lesson the viewer cannot open renders as a plain image', () => {
+    const el = renderGalleryBlock(linkedGallery(), 'student', { unitLessons: unitLessons.slice(1) });
+    expect(el.querySelector('.block-gallery__link')).toBeNull();
+    expect(el.querySelectorAll('.block-gallery__open')).toHaveLength(2);
+  });
+
+  it('the editor picks a lesson per image from the unit', () => {
+    const changes: Block[] = [];
+    const el = createGalleryEditor(sampleGallery('grid', 2), (next) => changes.push(next), undefined, { unitLessons });
+    const pickers = el.querySelectorAll('.block-editor__gallery-lesson');
+    expect(pickers).toHaveLength(2);
+    pickKitOption(pickers[1]!, 'les_b');
+    const last = changes.at(-1) as Extract<Block, { block_type: 'gallery' }>;
+    expect(last.content.items[1]!.lesson_id).toBe('les_b');
+    expect(last.content.items[0]!.lesson_id).toBeUndefined();
+  });
+
+  it('the editor shows no picker without unit lessons', () => {
+    const el = createGalleryEditor(sampleGallery('grid', 2), () => {});
+    expect(el.querySelector('.block-editor__gallery-lesson')).toBeNull();
+  });
+});

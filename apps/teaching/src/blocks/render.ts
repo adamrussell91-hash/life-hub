@@ -1244,7 +1244,11 @@ export function renderTabsBlock(
 
 let activeLightboxClose: (() => void) | null = null;
 
-type GalleryEntry = { url: string; alt_text: string; caption?: string };
+type GalleryEntry = { url: string; alt_text: string; caption?: string; lesson_id?: string };
+type GalleryLesson = { title: string; href: string };
+
+const ENLARGE_SVG =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
 
 function galleryMediaItems(entries: GalleryEntry[]) {
   return entries
@@ -1279,34 +1283,51 @@ function openGalleryLightbox(entries: GalleryEntry[], index: number): void {
   });
 }
 
+function galleryImage(entry: GalleryEntry): HTMLImageElement {
+  const img = document.createElement('img');
+  img.src = entry.url;
+  img.alt = entry.alt_text;
+  img.loading = 'lazy';
+  return img;
+}
+
 function galleryFigure(
   entry: GalleryEntry,
   interactive: boolean,
   entries: GalleryEntry[] = [entry],
-  index = 0
+  index = 0,
+  lesson?: GalleryLesson
 ): HTMLElement {
   const figure = document.createElement('figure');
   figure.className = 'block-gallery__item';
 
   if (isHttpUrl(entry.url)) {
-    if (interactive) {
+    if (interactive && lesson) {
+      // The picture opens its lesson; the corner button keeps the big view.
+      figure.classList.add('block-gallery__item--linked');
+      const link = document.createElement('a');
+      link.className = 'block-gallery__link';
+      link.href = lesson.href;
+      link.setAttribute('aria-label', `Open lesson: ${lesson.title}`);
+      link.append(galleryImage(entry));
+      const enlarge = document.createElement('button');
+      enlarge.type = 'button';
+      enlarge.className = 'block-gallery__enlarge';
+      enlarge.setAttribute('aria-label', `Enlarge: ${entry.alt_text || 'image'}`);
+      enlarge.title = 'Enlarge';
+      enlarge.innerHTML = ENLARGE_SVG;
+      enlarge.addEventListener('click', () => openGalleryLightbox(entries, index));
+      figure.append(link, enlarge);
+    } else if (interactive) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'block-gallery__open';
       button.setAttribute('aria-label', `Enlarge: ${entry.alt_text || 'image'}`);
-      const img = document.createElement('img');
-      img.src = entry.url;
-      img.alt = entry.alt_text;
-      img.loading = 'lazy';
-      button.append(img);
+      button.append(galleryImage(entry));
       button.addEventListener('click', () => openGalleryLightbox(entries, index));
       figure.append(button);
     } else {
-      const img = document.createElement('img');
-      img.src = entry.url;
-      img.alt = entry.alt_text;
-      img.loading = 'lazy';
-      figure.append(img);
+      figure.append(galleryImage(entry));
     }
   } else {
     const unavailable = document.createElement('p');
@@ -1318,7 +1339,15 @@ function galleryFigure(
   if (entry.caption) {
     const cap = document.createElement('figcaption');
     cap.className = 'block-gallery__caption block-secondary';
-    cap.textContent = entry.caption;
+    if (interactive && lesson) {
+      const link = document.createElement('a');
+      link.className = 'block-gallery__caption-link';
+      link.href = lesson.href;
+      link.textContent = entry.caption;
+      cap.append(link);
+    } else {
+      cap.textContent = entry.caption;
+    }
     figure.append(cap);
   }
   return figure;
@@ -1326,9 +1355,13 @@ function galleryFigure(
 
 export function renderGalleryBlock(
   block: Extract<Block, { block_type: 'gallery' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   const root = document.createElement('div');
+  const lessons = new Map((ctx.unitLessons ?? []).map((l) => [l.id, { title: l.title, href: l.href }]));
+  const lessonFor = (entry: GalleryEntry): GalleryLesson | undefined =>
+    entry.lesson_id ? lessons.get(entry.lesson_id) : undefined;
 
   if (mode === 'print') {
     root.className = `block-gallery block-gallery--print block-gallery--${block.variant}`;
@@ -1372,7 +1405,7 @@ export function renderGalleryBlock(
     function show(i: number): void {
       const len = block.content.items.length;
       index = ((i % len) + len) % len;
-      viewport.replaceChildren(galleryFigure(block.content.items[index]!, true, block.content.items, index));
+      viewport.replaceChildren(galleryFigure(block.content.items[index]!, true, block.content.items, index, lessonFor(block.content.items[index]!)));
       status.textContent = `${index + 1} / ${len}`;
       [...dots.children].forEach((dot, di) => {
         (dot as HTMLButtonElement).setAttribute('aria-selected', di === index ? 'true' : 'false');
@@ -1411,7 +1444,7 @@ export function renderGalleryBlock(
     const list = document.createElement('div');
     list.className = 'block-gallery__list';
     block.content.items.forEach((entry, index) => {
-      list.append(galleryFigure(entry, true, block.content.items, index));
+      list.append(galleryFigure(entry, true, block.content.items, index, lessonFor(entry)));
     });
     root.append(list);
   }
@@ -2307,7 +2340,7 @@ function renderBlockContent(
     case 'image':
       return renderImageBlock(block, mode);
     case 'gallery':
-      return renderGalleryBlock(block, mode);
+      return renderGalleryBlock(block, mode, ctx);
     case 'video':
       return renderVideoBlock(block, mode);
     case 'embed':
