@@ -145,3 +145,27 @@ test('bars only ever fill: a lower result later keeps the highest fractions reac
   assert.deepEqual((await highWaterFills(s, 'class1', 'st1', 'unit2', f(0.25, 0))).understanding, { mastered: 0.25, building: 0 }, 'another unit starts fresh');
   assert.deepEqual((await highWaterFills(s, 'class1', 'st2', 'unit1', f(0, 0))).understanding, { mastered: 0, building: 0 }, 'another student starts fresh');
 });
+
+test('an assessment counts only when the teacher marks it complete; a partial mark is not done', async () => {
+  const lessons = [{ id: 'a1', title: 'Essay', pedagogical_mode: 'assessment' }, { id: 'l1', title: 'Poem' }];
+  const view = { quizzes: [], markbook: {} };
+  const kinds = (done) => mapRows(lessons, view, done, 'st1').map((r) => [r.kind, r.done]);
+  assert.deepEqual(kinds({ a1: { via: 'tick' }, l1: { via: 'tick' } }), [['assessment', false], ['lesson', true]], 'a student tick does not fill the square');
+  assert.deepEqual(kinds({ a1: { via: 'teacher' }, l1: { via: 'teacher', partial: true } }), [['assessment', true], ['lesson', false]]);
+});
+
+test('the teacher marks complete, partial and clear; a student tick replaces a partial mark', async () => {
+  const s = await fixture();
+  const roster = await loadRoster(s, 'class1');
+  const bob = roster.students.find((x) => x.initials === 'BB');
+  const mark = (state) => teacherProfileAction(s, 'class1', { action: 'mark', student_id: bob.id, lesson_id: 'l1', state });
+  assert.equal((await mark('partial')).done[bob.id].l1.partial, true);
+  await profileAction(s, 'class1', { action: 'done', class_token: token(1), lesson_id: 'l1' });
+  const after = (await teacherProfileAction(s, 'class1', { action: 'list' })).done[bob.id].l1;
+  assert.equal(after.via, 'tick');
+  assert.equal(after.partial, undefined);
+  assert.equal((await mark('complete')).done[bob.id].l1.via, 'teacher');
+  assert.deepEqual((await mark('clear')).done[bob.id], {});
+  await assert.rejects(mark('bogus'), { code: 'bad_request' });
+  await assert.rejects(teacherProfileAction(s, 'class1', { action: 'mark', student_id: 'nobody', lesson_id: 'l1', state: 'complete' }), { code: 'bad_request' });
+});

@@ -13,7 +13,7 @@ import { draftLessonKey, unitKey } from './teaching-blobs.mjs';
 import { markbookAction } from './markbook.mjs';
 import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
 import { profileItems, storedAlignment } from './profile-items.mjs';
-import { highWaterFills, listDone, recordDone, removeDone } from './profile-done.mjs';
+import { highWaterFills, listDone, markDone, recordDone, removeDone } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
@@ -47,19 +47,26 @@ export async function profileAction(store, classId, body) {
   return profileFor(store, roster, student);
 }
 
-/** Lessons as the map draws them. A submitted quiz counts as done without a tick; `done` is not changed. */
+/**
+ * Lessons as the map draws them. A submitted quiz counts as done without a tick. A teacher's
+ * partial mark is not done. An assessment counts only when the teacher has marked it complete,
+ * not when it is handed in or ticked.
+ */
 export function mapRows(lessons, view, done, studentId) {
   const submitted = new Set(view.quizzes.filter((q) => q.scores?.[studentId]?.submitted_at).map((q) => q.lesson_id));
   const quizLessons = new Set(view.quizzes.map((q) => q.lesson_id));
   const took = new Set(view.markbook.took?.[studentId] ?? []);
   return lessons.map((l) => {
     const role = ROLES.has(l.route_role) ? l.route_role : 'core';
+    const assessment = l.pedagogical_mode === 'assessment';
+    const record = done[l.id];
+    const counted = assessment ? record?.via === 'teacher' && !record.partial : Boolean(record) && !record.partial;
     return {
       id: l.id,
       title: l.title,
       role,
-      kind: quizLessons.has(l.id) ? 'quiz' : 'lesson',
-      done: Boolean(done[l.id]) || submitted.has(l.id),
+      kind: assessment ? 'assessment' : quizLessons.has(l.id) ? 'quiz' : 'lesson',
+      done: counted || (!assessment && submitted.has(l.id)),
       assigned: role === 'core' || took.has(l.id)
     };
   });
@@ -79,15 +86,20 @@ async function profileFor(store, roster, student) {
   return { need: null, initials: student.initials, map: { lessons: rows, next }, fills: await highWaterFills(store, classId, student.id, unit?.id, fillsFor(items, evidence)) };
 }
 
-/** Teacher: every student's done records, and removing one. */
+/** Teacher: every student's done records; marking one complete, partial or clearing it. */
 export async function teacherProfileAction(store, classId, body) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
-  if (!['list', 'remove'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
-  if (action === 'remove') {
-    if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id)) reject(400, 'bad_request', 'Unknown student.');
-    await removeDone(store, classId, body.student_id, body.lesson_id);
+  if (!['list', 'remove', 'mark'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (action !== 'list') {
+    if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id) || !roster.students.some((s) => s.id === body.student_id)) {
+      reject(400, 'bad_request', 'Unknown student.');
+    }
+    const state = action === 'remove' ? 'clear' : body.state;
+    if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
+    if (state === 'clear') await removeDone(store, classId, body.student_id, body.lesson_id);
+    else await markDone(store, classId, body.student_id, body.lesson_id, state);
   }
   const done = {};
   for (const s of roster.students) done[s.id] = await listDone(store, classId, s.id);
