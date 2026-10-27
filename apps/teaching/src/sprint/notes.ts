@@ -22,8 +22,8 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
     setup: 'Slides suit younger classes: one step at a time. Answer the group’s questions from its board on the progress map. If you switch off Vote, you choose each group’s problem yourself.'
   },
   criteria: {
-    what: 'One list used three times: students link each idea to a criterion, vote with the criteria in Decide, and the class judges the finished prototype with them in Test’s pitch feedback.',
-    students: 'They see each criterion on their idea cards, on the vote, and in pitch feedback, judged Starting · Showing · Strong.',
+    what: 'How good. The qualities you judge ideas by, used three times: students back their strongest idea with a quoted line, vote with the criteria in Decide, and the class rates the finished prototype with them in Test’s pitch feedback.',
+    students: 'They tick the criteria their strongest idea meets and quote the line that shows it, then see the same list on the vote and in pitch feedback, judged Starting · Showing · Strong.',
     setup: 'Keep to 3 or 4. Write each one as something students can do, such as “Uses a quote from the poems as evidence”.'
   },
   reflection: {
@@ -32,8 +32,8 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
     setup: 'Ask what the feedback showed their idea does well, and what they would change next and why.'
   },
   requirements: {
-    what: 'Must-haves, yes or no. Up to 6.',
-    students: 'At each phase you tag (U S D P T), students tick the requirement and say where it is in their work.',
+    what: 'Must have. Things every idea or part has to include, yes or no, not a quality to rate. Up to 6.',
+    students: 'At each phase you tag (U S D P T), students tick the requirement and say where it is in their work. In Sketch that is their strongest idea only.',
     setup: 'Tag each one at two or more phases, so students keep coming back to it. Make every one something a student can point to.'
   },
   idea_guide: {

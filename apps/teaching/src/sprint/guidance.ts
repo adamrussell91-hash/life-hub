@@ -47,9 +47,9 @@ export const UNDERSTAND_GUIDE: Record<UnderstandStep, Guide> = {
   },
   limits: {
     icon: '🧭',
-    doThis: 'Sort what you know and don’t know into the four boxes. One short card each.',
+    doThis: 'Add short cards to the four boxes: one card for each thing about the problem. For each card, ask “Do we know this yet?” and “Could our group change it?” and put it in the box that matches. Tap the ⓘ on a box to see what it means.',
     why: 'Knowing what you can change, and what you still need to find out, tells you where to start.',
-    example: ['We know and can control: the menu.', 'We know but can’t control: lunch is 20 minutes.', 'We don’t know, can control: how many tills fit?', 'We don’t know, can’t control: the school’s budget.'],
+    example: ['Problem (made up): Year 7s skip lunch because the canteen queue is too long.', 'Tools we have: the menu. We know it and can change it.', 'Facts to work around: lunch is 20 minutes. We know it but can’t change it.', 'Things to find out: how many tills fit? We don’t know yet, but we could find out.', 'Questions for the expert: what is the budget? We don’t know, and only someone else does.'],
     stuck: ['Ask two questions about each idea: “Do we know this yet?” and “Could our group change it?”', 'Not sure? Put it in an unknown box. Unknowns are useful: they become questions.']
   },
   vote: {
@@ -61,10 +61,10 @@ export const UNDERSTAND_GUIDE: Record<UnderstandStep, Guide> = {
   },
   merge: {
     icon: '🤝',
-    doThis: 'Agree one audience for the whole group. Tap a line to use it, or write your own.',
-    why: 'Everyone designs for the same people, so your parts fit together.',
-    example: ['Tap the most common answer, then change a few words so it fits everyone.'],
-    stuck: ['Choose the most specific audience, not the biggest.', 'Talk it through with your group before you save.']
+    doThis: 'Choose the one audience your whole group will design for, then press Save. The box at the top shows what is chosen.',
+    why: 'If everyone designs for different people, your parts won’t fit together. One audience keeps the group’s ideas pointed the same way.',
+    example: ['Three people wrote “Year 7 students” and one wrote “hungry kids”.', 'Tap “Year 7 students ×3”, add “with only 20 minutes for lunch” so it is specific, then Save.'],
+    stuck: ['Start with the answer most of you wrote.', 'Choose the most specific audience, not the biggest.', 'Talk it through with your group before you save. You can change it later.']
   },
   grid: {
     icon: '🧩',
@@ -193,12 +193,71 @@ export const LATER_GUIDE = {
   }
 } satisfies Record<string, Guide>;
 
-export type LimitCell = { icon: string; title: string; ask: string; example: string };
-
-/** Each limits box: a friendly name, a one-line definition and a placeholder example. */
-export const LIMIT_CELLS: Record<LimitBox, LimitCell> = {
-  can_known: { icon: '🔧', title: 'Tools we have', ask: 'We know it, and our group could change it.', example: 'e.g. the menu' },
-  cant_known: { icon: '🧱', title: 'Facts to work around', ask: 'We know it, but we can’t change it.', example: 'e.g. lunch is only 20 minutes' },
-  can_unknown: { icon: '🔦', title: 'Things to find out', ask: 'We don’t know yet, but we could find out or decide.', example: 'e.g. how many tills fit?' },
-  cant_unknown: { icon: '🙋', title: 'Questions for the expert', ask: 'We don’t know, and someone else decides or knows.', example: 'e.g. what is the budget?' }
+export type LimitCell = {
+  icon: string;
+  title: string;
+  /** One line under the title: what belongs here. */
+  ask: string;
+  /** The example card shown in an empty box, about the invented canteen problem. */
+  example: string;
+  /** The ⓘ explanation: what the box means, how to tell, and examples. */
+  more: { what: string; tell: string; examples: string[] };
 };
+
+/** The invented problem every Limits example is about, shown above the boxes. */
+export const LIMITS_SCENARIO = 'Examples below are about a made-up problem: “Year 7s skip lunch because the canteen queue is too long.” They are not your answers.';
+
+/** Each limits box: a friendly name, a one-line definition, a placeholder example and a fuller explanation. */
+export const LIMIT_CELLS: Record<LimitBox, LimitCell> = {
+  can_known: {
+    icon: '🔧', title: 'Tools we have', ask: 'Things you already know about that your group can use or change.', example: 'The menu: we could change what is sold.',
+    more: {
+      what: 'These are your building blocks. A “tool” is anything that is part of the problem, that you already know is there, and that you are allowed to use or change in your design. It could be a thing, a skill, a space, a rule your group decides or a bit of time you control.',
+      tell: 'Ask: “Do we already know this?” (yes) and “Could our group change it or use it in our solution?” (yes). If both are yes, it goes here.',
+      examples: ['The menu: we can change what is sold.', 'The layout of the serving area.', 'Someone in our group can build a simple app.']
+    }
+  },
+  cant_known: {
+    icon: '🧱', title: 'Facts to work around', ask: 'Things you know are true but your group can’t change.', example: 'Lunch is only 20 minutes.',
+    more: {
+      what: 'These are fixed facts. They are not things to argue with. They are the edges of the problem, and a good design works inside them. Writing them down stops you designing something that can never happen.',
+      tell: 'Ask: “Do we already know this?” (yes) and “Could our group change it?” (no, someone else decides or it is just how things are). If so, it goes here.',
+      examples: ['Lunch is only 20 minutes.', 'There is one canteen door.', 'Year 7s can’t leave school grounds.']
+    }
+  },
+  can_unknown: {
+    icon: '🔦', title: 'Things to find out', ask: 'Things you don’t know yet, but your group could find out or decide.', example: 'How many tills could fit?',
+    more: {
+      what: 'These are gaps in what you know that you can fill yourselves, by looking, counting, asking classmates, trying something or making a decision as a group. They are your to-do list for research.',
+      tell: 'Ask: “Do we know this yet?” (no) and “Could we work it out ourselves?” (yes). If so, it goes here.',
+      examples: ['How long does a student wait in the queue?', 'How many tills could fit?', 'What do Year 7s buy most?']
+    }
+  },
+  cant_unknown: {
+    icon: '🙋', title: 'Questions for the expert', ask: 'Things you don’t know, and only someone else can answer or decide.', example: 'What is the budget?',
+    more: {
+      what: 'These are gaps that your group can’t fill. They depend on someone with the facts or the power to decide, like the person who sets the budget, a rule-maker or a specialist. Each one can become a question for the expert later, in the Ask step.',
+      tell: 'Ask: “Do we know this yet?” (no) and “Could we work it out ourselves?” (no, we need someone else). If so, it goes here.',
+      examples: ['What is the budget?', 'Is the school allowed to change canteen hours?', 'How many staff are rostered at lunch?']
+    }
+  }
+};
+
+/** Sketch's idea-card checks: what criteria and requirements are, and how they differ. */
+export const SKETCH_CHECKS = {
+  intro: 'Your teacher set two lists. They look alike but do different jobs: criteria say how good an idea is, requirements say what it must include.',
+  criteria: {
+    tag: 'How good',
+    doThis: 'Tick each criterion this idea meets, then paste the line from your idea that proves it.',
+    what: 'Criteria are the qualities your class will judge ideas by, such as “easy to use” or “fits the audience”. An idea can meet one well and another only a little. Your group votes with these in Decide, and the class judges the finished prototype with them.',
+    how: 'You tick one only if you can point to words in your idea that show it. If you can’t find the words, either add them to your idea or leave it unticked.',
+    example: 'Example (canteen): “Fast to use” → “Students pick lunch on a phone and collect it from a shelf.”'
+  },
+  requirements: {
+    tag: 'Must have',
+    doThis: 'Tick each requirement your idea includes, then say where it appears.',
+    what: 'Requirements are must-haves from the brief. They are yes or no: the idea either has it or it doesn’t. An idea that is missing one is not finished.',
+    how: 'If you can’t tick one, change your idea so it has it before you hand in.',
+    example: 'Example (canteen): “Works within a 20-minute lunch” → “Order is ready when students arrive, so no queue.”'
+  }
+} as const;

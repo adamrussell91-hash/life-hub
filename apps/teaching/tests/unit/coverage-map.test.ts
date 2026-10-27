@@ -29,6 +29,28 @@ const LESSONS: MapLesson[] = [
 const build = (lessons = LESSONS, content = v2()) => buildCoverageMap({ content, lines: LINES, lessons, points: POINTS });
 
 describe('Coverage map: model', () => {
+  it('hangs a dated side lesson off the core lesson dated before it, even when "after" links walk the core route out of date order', () => {
+    // Talk is listed on the map; the rest are not, so they follow by date. Talk is linked on to Case study, which is linked on to Review.
+    const lessons: MapLesson[] = [
+      { id: 'p', title: 'Before' }, { id: 't', title: 'Talk', after: ['cs'] }, { id: 'h', title: 'Seminar' },
+      { id: 'd', title: 'Design' }, { id: 'x', title: 'Dreaming', role: 'extension' },
+      { id: 'rv', title: 'Review', after: [] }, { id: 'cs', title: 'Case study', after: ['rv'] }
+    ];
+    const dates = new Map([['p', '2026-10-19T00:00'], ['d', '2026-10-26T00:00'], ['t', '2026-10-26T11:50'], ['x', '2026-10-27T00:00'], ['cs', '2026-10-29T00:00'], ['h', '2026-10-29T13:24']]);
+    const map = buildCoverageMap({ content: v2({ station_order: ['p', 't', 'h'] }), lines: LINES, lessons, points: POINTS, dates });
+    expect(map.rows.map((r) => r.id).slice(0, 5)).toEqual(['p', 'd', 't', 'x', 'cs']);
+  });
+
+  it('hangs a dated side lesson off the core lesson dated before it, even when "after" links reorder the core route', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Talk', after: ['b'] }, { id: 'x', title: 'Dreaming', role: 'extension' },
+      { id: 'c', title: 'Review', after: [] }, { id: 'b', title: 'Case study', after: ['c'] }
+    ];
+    const dates = new Map([['a', '2026-10-26T11:50'], ['x', '2026-10-27T00:00'], ['b', '2026-10-29T00:00']]);
+    const map = buildCoverageMap({ content: v2(), lines: LINES, lessons, points: POINTS, dates });
+    expect(map.rows.map((r) => r.id).slice(0, 4)).toEqual(['a', 'x', 'b', 'c']);
+  });
+
   it('puts lessons on lanes from their role and marks quizzes and the task', () => {
     const map = build();
     expect(map.rows.map((r) => [r.id, r.lane, r.kind])).toEqual([

@@ -71,7 +71,7 @@ What you cannot do:
 - Fill anthology or outcomes blocks; they show the unit's tags and the page's outcomes automatically. You can only place them.
 - Use collection in a lesson.
 
-Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. If you are unsure where a note lands, say so and ask the teacher to check its placement before publishing.`;
+Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. Choose the stanza or line each note anchors to from the text itself and build it.`;
 
 /**
  * Gives a new block's random inner ids (options, cards, nodes...) stable names,

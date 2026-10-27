@@ -105,6 +105,13 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     return f;
   }
 
+  // Built once, so a poll doesn't fold it or reload what's inside it.
+  const wholeGuides = parts.guides && (parts.guides.content.blocks as Block[]).length ? el('details', 'sprint-guides sprint-guides--whole') : null;
+  if (wholeGuides) {
+    wholeGuides.append(el('summary', '', 'Guides for the whole sprint'));
+    for (const b of parts.guides!.content.blocks as Block[]) wholeGuides.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+  }
+
   function paintTop(s: SprintStatus, key: SprintPhaseKey): void {
     top.replaceChildren();
     const row = s.phases?.find((p) => p.key === key);
@@ -113,7 +120,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const left = el('div');
     left.append(el('div', 'sprint-countdown__title', `${PHASE_LABELS[key]} closes`), el('div', 'sprint-countdown__sub', test ? `Pitch day: ${formatDueDay(test.due_date)}` : ''));
     cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, now()) : ''));
-    const group = el('div', 'sprint-group', `Group ${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
+    const group = el('div', 'sprint-group', `${/^group\b/i.test(s.group?.name ?? '') ? '' : 'Group '}${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     intent.hidden = !intent.textContent;
     const steps = buildRail(s.phases ?? [], key, (k) => sprint.phases.find((x) => x.key === k)?.where, (k) => { chosen = k; paint(); }, (p) => (p.due_date ? `Closes ${new Date(`${p.due_date}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })}` : ''));
@@ -121,12 +128,35 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     brief.append(el('summary', '', 'The challenge'));
     for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
     top.append(steps, cd, group, intent, brief);
+    if (wholeGuides) top.append(wholeGuides);
+  }
+
+  /** What this phase must include and the optional push: always in view, above the work. */
+  function asksBlock(key: SprintPhaseKey): HTMLElement {
+    const wrap = el('div', 'sprint-asks');
+    const reqs = sprint.requirements.filter((r) => r.phases.includes(key));
+    if (reqs.length) {
+      const box = el('section', 'sprint-ask sprint-ask--must');
+      box.append(el('div', 'sprint-ask__kind', 'Must include'));
+      const ul = el('ul');
+      for (const r of reqs) ul.append(el('li', '', r.text));
+      box.append(ul);
+      wrap.append(box);
+    }
+    const stretch = sprint.phases.find((p) => p.key === key)?.stretch;
+    if (stretch) {
+      const box = el('section', 'sprint-ask sprint-ask--stretch');
+      box.append(el('div', 'sprint-ask__kind', '★ Stretch (optional)'), el('p', '', stretch));
+      wrap.append(box);
+    }
+    wrap.hidden = !wrap.children.length;
+    return wrap;
   }
 
   function guidesPanel(key: SprintPhaseKey): HTMLElement {
     const panel = el('details', 'sprint-guides');
     panel.open = typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 900px)').matches;
-    panel.append(el('summary', '', 'Guides'));
+    panel.append(el('summary', '', 'Guides for this step'));
     const sec = parts.phases.get(key);
     for (const b of (sec?.content.blocks as Block[] | undefined) ?? []) panel.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
     if (key === 'sketch' || key === 'decide') {
@@ -142,21 +172,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       if (g.pair) model.append(el('p', '', `Developing: ${g.pair.developing}`), el('p', '', `Strong: ${g.pair.strong}`), el('p', 'sprint-guide__note', g.pair.note));
       panel.append(check, model);
     }
-    const reqs = sprint.requirements.filter((r) => r.phases.includes(key));
-    if (reqs.length) {
-      const box = el('div', 'sprint-guide');
-      box.append(el('div', 'sprint-guide__kind', 'Requirements'));
-      const ul = el('ul');
-      for (const r of reqs) ul.append(el('li', '', r.text));
-      box.append(ul);
-      panel.append(box);
-    }
-    const stretch = sprint.phases.find((p) => p.key === key)?.stretch;
-    if (stretch) {
-      const box = el('div', 'sprint-guide');
-      box.append(el('div', 'sprint-guide__kind', 'Stretch'), el('p', '', stretch));
-      panel.append(box);
-    }
+    panel.hidden = panel.children.length < 2;
     return panel;
   }
 
@@ -246,7 +262,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       fill.classList.add('sprint-practice-fill');
       work.append(fill);
     }
-    work.append(form.el);
+    work.append(asksBlock(key), form.el);
     layout.append(work, guidesPanel(key));
     body.replaceChildren(layout);
   }

@@ -78,8 +78,8 @@ import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-t
 import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
 import { sprintTeacherApi } from '@/sprint/api';
 import { openPracticeRun } from '@/sprint/practice';
-import { seedSprint, withPhaseSections } from '@/sprint/defaults';
-import { phaseOfSection } from '@/sprint/model';
+import { seedSprint, withGuidesSection, withPhaseSections } from '@/sprint/defaults';
+import { isGuidesSection, phaseOfSection } from '@/sprint/model';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -1256,6 +1256,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   function tutorialInsertTarget(): { parent: DropParent; index: number } | null {
     // On a sprint phase tab, new blocks land in that phase's section.
     const st = sprintTabs?.current();
+    if (sprintTabs && st === 'guides') {
+      if (!lesson.blocks.some(isGuidesSection)) {
+        emitLesson({ ...lesson, blocks: withGuidesSection(lesson.blocks, options.idFactory) });
+        canvas.update(lesson.blocks, media);
+      }
+      const section = lesson.blocks.find(isGuidesSection);
+      if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+    }
     if (sprintTabs && st && st !== 'kit' && st !== 'brief' && st !== 'all') {
       let section = lesson.blocks.find((b) => phaseOfSection(b) === st);
       if (!section) {
@@ -1341,8 +1349,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   function showSprintPanel(): void {
     const tab = sprintTabs?.current();
     if (!sprintKit) return;
-    sprintKit.root.hidden = !tab || tab === 'brief' || tab === 'all';
-    if (tab && tab !== 'brief' && tab !== 'all') sprintKit.show(tab);
+    sprintKit.root.hidden = !tab || tab === 'brief' || tab === 'guides' || tab === 'all';
+    if (tab && tab !== 'brief' && tab !== 'guides' && tab !== 'all') sprintKit.show(tab);
   }
   function showSprintTab(_tab: SprintTab): void {
     showSprintPanel();
@@ -1568,7 +1576,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       // A publish issue on another tutorial tab: open that tab first.
       const target = blockId ? rootOf(blockId) : undefined;
       if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
-      if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(phaseOfSection(target) ?? 'brief');
+      if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(isGuidesSection(target) ? 'guides' : phaseOfSection(target) ?? 'brief');
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {

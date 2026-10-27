@@ -143,6 +143,7 @@ test('publish splits answers off, drops quiz questions from ordinary lessons, an
   const ordinary = prepareQuizPublish({ pedagogical_mode: 'lesson', blocks: [] }, [qBlock('qa', mc), image]);
   assert.equal(ordinary.quiz, null);
   assert.deepEqual(ordinary.blocks.map(b => b.id), ['img1']);
+  assert.equal(ordinary.dropped, 1, 'publish counts the quiz questions an ordinary lesson drops so it can refuse');
 
   const broken = prepareQuizPublish({ pedagogical_mode: 'quiz', blocks: [] }, [qBlock('qa', { ...mc, correct: [] })]);
   assert.deepEqual(broken.problems, ['Tick the right answer.']);
