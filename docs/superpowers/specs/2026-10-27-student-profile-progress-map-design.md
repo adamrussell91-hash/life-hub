@@ -64,3 +64,13 @@ A pure function turns one student's evidence into `none | building | mastered` f
 ## Out of scope
 
 Feedback shelf, portfolio, strand-dot branches (map option B, can be added later without changing the data), a student "undo", cross-class profiles.
+
+## Item universe (decided in build, 27 October 2026; Adam to confirm)
+
+Each bar is measured against the unit's declared items, not only what has been marked, so a bar never shrinks when new work lands. A group with no declared items stays empty.
+
+- **Understanding / Responding:** dot points on the unit's lessons (`lesson.dot_points`, tag `dp:{area}:{id}`), split by the point id's first letter (U or R). Evidence reaches a point through its lesson (`withPointTags`), so only quiz results count towards these two bars. Assessment criteria carry outcomes, not dot points, and mapping them needs the outcome catalogue, which the public endpoint does not load.
+- **Concepts:** catalogue techniques named in the answer keys of the unit's published quizzes (`tech:{id}`). Techniques that exist only as typed option text (`tech:~name`) and family (`fam:`) tags are left out: resolving them needs the literary elements table, which is browser-side data.
+- **Skills:** `skill:` tags on the class markbook's assessment criteria plus those on the unit's published quiz keys.
+- The alignment is read from the stored copy (`syllabus_alignment/{id}`) only. A public student request never reads the private source file. If the teacher has never opened the alignment, the two dot-point bars stay empty.
+- The unit is the class's `current_unit_id` (first `active_unit_ids` entry when unset). The class markbook is class-wide, not per unit, so its skills are all counted.
