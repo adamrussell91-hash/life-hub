@@ -226,3 +226,21 @@ test('set_focus pins and dismisses tags per student', async () => {
   assert.equal(bob.id in cleared.markbook.focus, false);
   await assert.rejects(call(store, { action: 'set_focus', student_id: 'nobody', pinned: [] }), /class list/);
 });
+
+test('load: carries each student’s done records, and the profile counts a submitted quiz as done', async () => {
+  const { store, bob, tom } = await setup();
+  await store.setJSON(`profile/class1/${bob.id}/done/lesson2`, { at: '2026-10-20T00:00:00.000Z', via: 'tick' });
+  const loaded = await call(store, { action: 'load' });
+  assert.deepEqual(Object.keys(loaded.done[bob.id]), ['lesson2']);
+  assert.deepEqual(loaded.done[tom.id], {});
+  assert.equal((await call(store, { action: 'load', skip_done: true })).done, undefined);
+
+  const device = { token: 'a'.repeat(48), class_id: 'class1', class_token: 'b'.repeat(48) };
+  await quizAction(store, 'quiz1', { ...device, action: 'claim', initials: 'BB' });
+  await quizAction(store, 'quiz1', { ...device, action: 'start' });
+  await quizAction(store, 'quiz1', { ...device, action: 'submit', responses: { qs: { text: 'Romeo' } } });
+  const { profileAction } = await import('../../netlify/functions/_shared/profile.mjs');
+  await store.setJSON('classes/class1', { id: 'class1', type: 'class', title: '12 English', current_unit_id: 'unit1', active_unit_ids: ['unit1'], students: [{ name: 'Bob Brown' }, { name: 'Tom Tills' }] });
+  const out = await profileAction(store, 'class1', { class_token: device.class_token });
+  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.kind, l.done]), [['quiz1', 'quiz', true], ['lesson2', 'lesson', true]]);
+});
