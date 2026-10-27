@@ -3,7 +3,7 @@ import { isJournalMediaKey } from './travel-journal-r2.mjs';
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
 import { ATLAS_PREF_KEY, validateAtlasPreference } from './travel-atlas.mjs';
 
-const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual']);
+const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual', 'device']);
 const LIFECYCLES = new Set(['live', 'deleted', 'archived']);
 const TRANSITION_MODES = new Set(['flight', 'train', 'car', 'ferry', 'other']);
 const TRIP_ID_RE = /^trp_[a-z0-9_]{4,64}$/i;

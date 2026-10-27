@@ -343,6 +343,23 @@ async function journalMenu(page, name) {
     .click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
+// Add / edit visit is three steps: where and when, the food, check and save.
+async function goStep(page, n) {
+  await page.locator(".food-steps__step").nth(n).click();
+}
+// Save from the check step. A save then offers to count new dishes in
+// Brisket; "skip" answers Not now, "keep" leaves the offer open.
+async function saveVisit(page, { brisket = "skip" } = {}) {
+  const save = page.getByRole("button", { name: "Save visit", exact: true });
+  if (!(await save.isVisible())) await goStep(page, 2);
+  await save.click();
+  await page.locator(".food-sheet--page").waitFor({ state: "detached" });
+  const offer = page.getByRole("dialog", { name: /in Brisket\?$/ });
+  if (brisket === "skip" && (await offer.count())) {
+    await offer.getByRole("button", { name: "Not now", exact: true }).click();
+    await offer.waitFor({ state: "detached" });
+  }
+}
 async function openFirstEntry(page) {
   await page.locator(".food-visit .fj-stretch").first().click();
   await page.locator(".fj-entry").waitFor();
@@ -367,9 +384,12 @@ async function phoneGate(page) {
             ),
           ) || innerHeight),
       ),
+      // Steps hide the buttons they don't need; every shown one is tappable.
       buttons: [
         ...sheet.querySelectorAll('[data-part="form-actions"] .btn'),
-      ].map((n) => n.getBoundingClientRect().height),
+      ]
+        .filter((n) => n.getClientRects().length)
+        .map((n) => n.getBoundingClientRect().height),
       fonts: [...sheet.querySelectorAll("input,select,textarea")].map((n) =>
         parseFloat(getComputedStyle(n).fontSize),
       ),
@@ -458,9 +478,9 @@ for (const width of [1440, 390, 320])
     await page.getByRole("button", { name: "Resume", exact: true }).click();
     assert.equal(await page.getByLabel("Date", { exact: true }).inputValue(), "2026-10-27");
     assert.equal(await page.locator(".food-date__value").innerText(), "27/10/26");
+    await goStep(page, 1);
     await page.getByLabel("Dish title", { exact: true }).fill("Test dish");
-    await page.getByRole("button", { name: "Save visit", exact: true }).click();
-    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    await saveVisit(page);
     assert.equal(read().visits.at(-1).date, "2026-10-27");
     assert.deepEqual(errors, []);
     await page.close();
@@ -487,10 +507,6 @@ for (const width of [390, 320])
     );
     assert.ok(dateLayout.right <= dateLayout.fieldRight + 1, JSON.stringify(dateLayout));
     assert.ok(dateLayout.top >= dateLayout.addressBottom, JSON.stringify(dateLayout));
-    await page.getByLabel("Visit title", { exact: true }).fill("Dinner");
-    await page
-      .getByLabel("Dish title", { exact: true })
-      .fill("<script>Lasagne</script>");
     await page
       .getByLabel("Visit notes", { exact: true })
       .fill("Long notes. ".repeat(400));
@@ -508,9 +524,16 @@ for (const width of [390, 320])
     await phoneGate(page);
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await phoneGate(page);
-    await page.getByRole("button", { name: "Save visit", exact: true }).click();
+    await goStep(page, 1);
+    await page
+      .getByLabel("Dish title", { exact: true })
+      .fill("<script>Lasagne</script>");
+    await phoneGate(page);
+    await goStep(page, 2);
+    await page.getByLabel("Visit title", { exact: true }).fill("Dinner");
+    await phoneGate(page);
     try {
-      await page.locator(".food-sheet").waitFor({ state: "detached" });
+      await saveVisit(page);
     } catch (err) {
       console.log(
         "Save error:",
@@ -691,7 +714,9 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
   await gyoza.check();
   // A photo added inside a dish stays on that dish and never adds a dish.
+  await goStep(page, 0);
   await page.getByLabel("Date", { exact: true }).fill("2026-10-01");
+  await goStep(page, 1);
   await page
     .getByLabel("Add photos to this dish")
     .nth(1)
@@ -702,7 +727,7 @@ test("capture, private upload, menu text, backup and restore work through the re
     await page.getByLabel("Date", { exact: true }).inputValue(),
     "2026-10-01",
   );
-  const tags = page.getByLabel("Tags", { exact: true }).first();
+  const tags = page.getByLabel("What kind of food?", { exact: true }).first();
   await tags.fill("Spicy");
   await tags.press("Enter");
   await page.getByRole("button", { name: "Remove tag Spicy", exact: true }).waitFor();
@@ -711,8 +736,7 @@ test("capture, private upload, menu text, backup and restore work through the re
     await page.getByLabel("Menu text", { exact: true }).inputValue(),
     /Soba noodles/,
   );
-  await page.getByRole("button", { name: "Save visit", exact: true }).click();
-  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  await saveVisit(page);
   assert.equal(read().visits.length, 2);
   assert.deepEqual(
     read().visits[1].dishes.map((d) => [d.title, d.photos.length]),
@@ -827,8 +851,7 @@ for (const width of [1440, 390])
     // Editing ingredients keeps the notes translation.
     await ingredients.fill("Egg, potato, onion");
     await page.getByLabel("Dish notes", { exact: true }).first().waitFor();
-    await page.getByRole("button", { name: "Save visit", exact: true }).click();
-    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    await saveVisit(page);
     const saved = read().visits[0].dishes[0];
     assert.equal(saved.ingredients, "Egg, potato, onion");
     assert.equal(saved.notes_en, "Very good");
@@ -840,6 +863,7 @@ test("a conflicted visit draft survives reload and requires review before replac
   const { page, read, otherDevice } = await pageFor(390);
   await openFirstEntry(page);
   await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await goStep(page, 2);
   await page.getByLabel("Visit title", { exact: true }).fill("My revision");
   otherDevice();
   await page.getByRole("button", { name: "Save visit", exact: true }).click();
@@ -850,6 +874,7 @@ test("a conflicted visit draft survives reload and requires review before replac
     )
     .waitFor();
   assert.equal(read().visits[0].title, "Other device revision");
+  await goStep(page, 0);
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.locator("#refresh-button").click();
   await page
@@ -866,14 +891,14 @@ test("a conflicted visit draft survives reload and requires review before replac
   await page
     .getByLabel("Replace the saved visit with this reviewed draft.")
     .check();
-  await page.getByRole("button", { name: "Save visit", exact: true }).click();
-  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  await saveVisit(page);
   assert.equal(read().visits[0].title, "My revision");
   await page.close();
 });
 test("the shared dish list adds, moves, requires hold for deletion and restores with Undo", async () => {
   const { page } = await pageFor(390);
   await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  await goStep(page, 1);
   await page.getByLabel("Dish title", { exact: true }).fill("Main");
   await page.getByRole("button", { name: "Add dish", exact: true }).click();
   await page.getByLabel("Dish title", { exact: true }).nth(1).fill("Salad");
@@ -1043,8 +1068,7 @@ test("magazine, entry, auto-written headline and Day One fix-up work through the
       (n) => n.value === "Chilli wontons",
     ),
   );
-  await page.getByRole("button", { name: "Save visit", exact: true }).click();
-  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  await saveVisit(page);
   const fixed = read().visits.find((v) => v.source_id === "dayone:fixup-food");
   assert.equal(fixed.reviewed, true);
   assert.deepEqual(
@@ -1150,8 +1174,7 @@ test("Find venue searches the typed venue and offers it when the map does not kn
   assert.deepEqual(asked, ["Hidden Den"]);
   await page.getByRole("button", { name: "Use Hidden Den", exact: true }).click();
   assert.equal(await page.getByLabel("Address", { exact: true }).inputValue(), "4 Quay Street, Harbourside");
-  await page.getByRole("button", { name: "Save visit", exact: true }).click();
-  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  await saveVisit(page);
   const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
   assert.equal(venue.name, "Hidden Den");
   assert.equal(venue.address, "4 Quay Street, Harbourside");
@@ -1422,8 +1445,7 @@ for (const width of [1440, 390]) {
       .getByLabel("Ingredients", { exact: true })
       .first()
       .fill("Pasta, beef, bechamel, spinach");
-    await page.getByRole("button", { name: "Save visit", exact: true }).click();
-    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    await saveVisit(page);
     const saved = read().visits[0].dishes;
     assert.equal(saved[0].brisket.needs_recount, true);
     assert.equal(saved[1].brisket, undefined);
@@ -1431,6 +1453,131 @@ for (const width of [1440, 390]) {
     await page.close();
   });
 }
+for (const width of [1440, 390])
+  test(`quick entry ${width}: typed venue, food tags, menu ingredients, then Brisket straight after saving`, async () => {
+    const { page, read, errors } = await pageFor(width, {
+      seed(j) {
+        j.visits[0].venue = { name: "Bar Italia", address: "169 Norton Street, Leichhardt" };
+      },
+    });
+    const sent = await mockChat(page);
+    await page.getByRole("button", { name: "Add visit", exact: true }).click();
+    const steps = page.locator(".food-steps__step");
+    assert.equal(await steps.count(), 3);
+    assert.equal(await steps.nth(0).getAttribute("aria-current"), "step");
+    // The venue is typed; places logged before match as you type.
+    await page.getByLabel("Venue", { exact: true }).fill("ital");
+    await page.getByRole("button", { name: "Use Bar Italia", exact: true }).click();
+    assert.equal(await page.getByLabel("Venue", { exact: true }).inputValue(), "Bar Italia");
+    assert.equal(
+      await page.getByLabel("Address", { exact: true }).inputValue(),
+      "169 Norton Street, Leichhardt",
+    );
+    await page.getByRole("group", { name: "Which meal" }).getByRole("button", { name: "Lunch", exact: true }).click();
+    await page.getByLabel("Visit notes", { exact: true }).fill("Window seat, quick service.");
+    if (width <= 720) await phoneGate(page);
+    await page.getByRole("button", { name: "Next: the food", exact: true }).click();
+    assert.equal(await steps.nth(1).getAttribute("aria-current"), "step");
+    await page.getByLabel("Dish title", { exact: true }).fill("Smash burger");
+    // Tags are foods: tap one, and the cuisine follows.
+    await page.getByRole("button", { name: "Add tag Burger", exact: true }).click();
+    await page.getByRole("button", { name: "Remove tag Burger", exact: true }).waitFor();
+    const find = page.getByLabel("What kind of food?", { exact: true });
+    await find.fill("chi");
+    await page.getByRole("button", { name: "Add tag Chips", exact: true }).click();
+    await page.locator(".fj-rate__star").nth(3).click();
+    await page.getByRole("button", { name: "Would order again", exact: true }).click();
+    await page.getByLabel("Ingredients", { exact: true }).fill("Beef, cheese, pickles");
+    await page.getByLabel("Dish notes", { exact: true }).fill("Needed more pickles.");
+    if (width <= 720) await phoneGate(page);
+    await page.getByRole("button", { name: "Check and save", exact: true }).click();
+    const summary = page.locator(".food-summary");
+    assert.match(await summary.innerText(), /Bar Italia/);
+    assert.match(await summary.innerText(), /Smash burger/);
+    assert.match(await summary.innerText(), /Burger · Chips/);
+    assert.match(await summary.innerText(), /Would order again/);
+    assert.equal(
+      await page.getByLabel("Count in Brisket after saving").isChecked(),
+      true,
+    );
+    if (width <= 720) await phoneGate(page);
+    await saveVisit(page, { brisket: "keep" });
+    const saved = read().visits.at(-1);
+    assert.equal(saved.venue.name, "Bar Italia");
+    assert.equal(saved.notes, "Window seat, quick service.");
+    const dish = saved.dishes[0];
+    assert.deepEqual(dish.tags, ["Burger", "Chips"]);
+    assert.equal(dish.cuisine, "American");
+    assert.equal(dish.meal_type, "Lunch");
+    assert.equal(dish.rating, 4);
+    assert.equal(dish.order_again, true);
+    assert.equal(dish.notes, "Needed more pickles.");
+    // Straight after saving, Brisket asks how much was eaten.
+    const offer = page.getByRole("dialog", { name: "Count it in Brisket?" });
+    await offer.waitFor();
+    if (width <= 720) await phoneGate(page);
+    await offer.getByRole("button", { name: "½", exact: true }).click();
+    await offer.getByRole("button", { name: "Send to Brisket", exact: true }).click();
+    await page.locator("#nutrition-dashboard #chat-view").waitFor();
+    await expectSent(sent, 1);
+    assert.match(sent[0].message, /^Count this Food Journal dish/);
+    assert.match(sent[0].message, new RegExp(`food_dish_id: ${dish.id}`));
+    assert.match(sent[0].message, /I had: ½/);
+    assert.match(sent[0].message, /meal: lunch/);
+    assert.match(sent[0].message, /Ingredients:\nBeef, cheese, pickles/);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+test("quick entry: a dish typed by name brings the menu's ingredients, and Not now skips Brisket", async () => {
+  const { page, read, errors } = await pageFor(390);
+  const sent = await mockChat(page);
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  await page.getByLabel("Menu photo", { exact: true }).setInputFiles({
+    name: "menu.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(JPEG, "base64"),
+  });
+  await page.getByText("Tick what you had.", { exact: true }).waitFor();
+  // Reading a menu moves on to the food, where its list is ticked.
+  assert.equal(
+    await page.locator(".food-steps__step").nth(1).getAttribute("aria-current"),
+    "step",
+  );
+  const title = page.getByLabel("Dish title", { exact: true }).first();
+  await title.fill("pork GYOZA");
+  await title.blur();
+  const ingredients = page.getByLabel("Ingredients", { exact: true }).first();
+  assert.equal(await ingredients.inputValue(), "Pan fried");
+  await page.locator(".food-badge").first().waitFor();
+  await ingredients.fill("Pan fried, chilli oil");
+  assert.equal(await page.locator(".food-badge").first().isVisible(), false);
+  await saveVisit(page, { brisket: "keep" });
+  const offer = page.getByRole("dialog", { name: "Count it in Brisket?" });
+  await offer.getByRole("button", { name: "Not now", exact: true }).click();
+  await offer.waitFor({ state: "detached" });
+  assert.equal(sent.length, 0);
+  assert.equal(read().visits.at(-1).dishes[0].ingredients, "Pan fried, chilli oil");
+  assert.equal(read().visits.at(-1).dishes[0].brisket, undefined);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("quick entry: turning off Count in Brisket saves without asking", async () => {
+  const { page, read, errors } = await pageFor(390);
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  await goStep(page, 1);
+  await page.getByLabel("Dish title", { exact: true }).fill("Toastie");
+  await goStep(page, 2);
+  await page.getByLabel("Count in Brisket after saving").uncheck();
+  await page.getByRole("button", { name: "Save visit", exact: true }).click();
+  await page.locator(".food-sheet--page").waitFor({ state: "detached" });
+  assert.equal(await page.locator(".food-sheet").count(), 0);
+  assert.equal(read().visits.at(-1).dishes[0].title, "Toastie");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("brisket: Keep old numbers clears a re-count without a hand-off", async () => {
   const { page, read, errors } = await pageFor(390, {
     seed: (j) => countedDish(j, { brisket: brisketLink({ needs_recount: true }) }),

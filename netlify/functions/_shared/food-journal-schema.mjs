@@ -144,6 +144,8 @@ export function validateFoodJournal(j) {
       optionalText(d.ingredients, "Ingredients", 2000);
       optionalText(d.ingredients_original, "Ingredients", 2000);
       brisketLink(d.brisket);
+      if (d.order_again != null && typeof d.order_again !== "boolean")
+        bad("Order again must be yes or no.");
       if (
         ![
           "Breakfast",
