@@ -2638,6 +2638,8 @@ var SectionBlockObjectSchema = z10.object({
     tutorial_exit: z10.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
     sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Design Sprint: this top-level section holds resources that stay with students on every phase. */
+    sprint_guides: z10.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
@@ -5861,7 +5863,7 @@ What you cannot do:
 - Fill anthology or outcomes blocks; they show the unit's tags and the page's outcomes automatically. You can only place them.
 - Use collection in a lesson.
 
-Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. If you are unsure where a note lands, say so and ask the teacher to check its placement before publishing.`;
+Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. Choose the stanza or line each note anchors to from the text itself and build it.`;
 function withStableIds(block, prefix) {
   const renamed = /* @__PURE__ */ new Map();
   const collect = (value2, top) => {
@@ -5906,7 +5908,9 @@ function buildAiStaticPrompt(input) {
     "- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.",
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
-    '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply with a short plan (no proposal and no web or notes research yet; do read the lessons it builds on with list_lessons and read_lesson, so the plan is grounded in what was taught) headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you; the lessons you read, named, with the key ideas and dot points the questions will test; their notes; web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Ask the teacher to confirm or change it, then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
+    `- Finish the job. Work to the teacher's goal, not the literal request. When something is unclear or missing (an outcome's wording, which lesson, which kind of question, how many, where it goes), find it with your tools (list_lessons, read_lesson, list_question_tags, notes, web_search), or choose the best-supported option, build on it and say which you chose in one line. Ask a question only when two readings would produce genuinely different builds and nothing you can read settles it. Never hand a gap back as a to-do ("check the wording", "delete the examples if you want", "tell me which code you meant"), never list nearest options instead of picking one, and never present a tool you have as a limit (web research is available when the lesson and notes do not cover it).`,
+    "- Do the whole task. If the build needs a closing task, a missing outcome or skill tag, a better question kind or a fix to something you notice in the same blocks, include it. Check your own proposal against the quiz-writing rules before you send it and fix what fails; the teacher should not be the one finding weak items. Your note says what you built, what you assumed and what you sourced, briefly, with no checklist for the teacher.",
+    '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply with a short plan (no proposal and no web or notes research yet; do read the lessons it builds on with list_lessons and read_lesson, so the plan is grounded in what was taught) headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you; the lessons you read, named, with the key ideas and dot points the questions will test; their notes; web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Settle every open detail yourself in the plan and state it as your choice; ask only the confirm-or-change question. Then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
     "",
     BLOCK_BUILD_RECIPES,
     "",

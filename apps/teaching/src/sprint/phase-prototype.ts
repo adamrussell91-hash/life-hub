@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { prototypeProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, stepify } from './form-kit';
+import { briefCard, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
 import { LEVEL_LABELS, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
@@ -17,6 +17,8 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   const myPart = (s.parts ?? []).find((p) => p.mine);
   const root = el('div', 'sprint-prototype');
   root.append(el('h2', '', myPart ? `Your part: ${myPart.text}` : 'Your part'));
+  const groupBrief = briefCard(s, false);
+  if (groupBrief) root.append(groupBrief);
   const brief = el('div', 'sprint-brief-part');
   const line = (k: string, v: string) => { const p = el('p', 'sprint-brief-part__line'); p.append(el('b', '', k), v); return p; };
   brief.append(line('Group idea', s.chosen?.title ?? 'Not chosen yet'), line('It must show', myPart?.shows || 'Your group gives out parts in Decide.'));
@@ -92,6 +94,7 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
     { pick: '.sp-parts, .sprint-pitch', title: 'Bring the parts together', guide: LATER_GUIDE.share },
     { pick: '.sprint-self', title: 'Rate your part', guide: LATER_GUIDE.check }
   ]);
+  slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }

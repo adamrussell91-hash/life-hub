@@ -63,3 +63,13 @@ describe('sprint checks', () => {
     expect(reflectionProblems({ reflection: [], quote: '', change_criterion: '', value_answer: '' })).toHaveLength(4);
   });
 });
+
+describe('sketchProblems: only the strongest idea is checked against criteria', () => {
+  const card = (id: string, extra = {}) => ({ id, seed: id, title: id, idea: 'A full idea sentence here.', answers: 'It solves the problem well.', evidence: 'Because it worked before.', criteria: {}, requirements: {}, value_answer: 'Yes, it does fit the audience.', ...extra });
+  it('asks for a line only on the strongest', () => {
+    const cards = [card('a'), card('b')];
+    const out = sketchProblems({ cards, strongest: 'a', strongest_why: 'It is clearest and fits the audience.' } as never, { ideas: 2, requirements: [] });
+    expect(out.some((m) => m.startsWith('Idea 1') && /criterion/.test(m))).toBe(true);
+    expect(out.some((m) => m.startsWith('Idea 2') && /criterion/.test(m))).toBe(false);
+  });
+});
