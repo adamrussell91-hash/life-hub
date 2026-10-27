@@ -21,6 +21,7 @@ import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from '
 import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
 import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
 import { prepareTutorialPublish, storeTutorialTabs } from './_shared/tutorial.mjs';
+import { prepareCasePublish, storeCaseConfig } from './_shared/case-study.mjs';
 import { prepareSprintPublish, sprintPublishProblems, storeSprintConfig } from './_shared/sprint.mjs';
 import { SprintSettingsSchema } from './_shared/sprint-schema.mjs';
 
@@ -212,6 +213,28 @@ export function createLessonPublishHandler(deps = {}) {
         ...(draft.feedback_off === true ? { feedback_off: true } : {}),
         pedagogical_mode: 'design_sprint',
         sprint: sprint.snapshot.sprint
+      });
+      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
+    }
+
+    // A case study: the body and a public case summary are public; documents, outcome, objections and transfer are stored apart (case-study.mjs).
+    if (draft.pedagogical_mode === 'case_study') {
+      const study = prepareCasePublish(draft);
+      if (study.problems.length > 0) return withCors(errorResponse(400, 'validation_error', study.problems[0], false), request, env);
+      await storeCaseConfig(store, id, study.config);
+      await setJSON(store, publishedLessonKey(id), {
+        lesson_id: id,
+        title,
+        unit_id,
+        blocks: sanitizeBlocksDeep(publishBlocks),
+        published_at: publishedAt,
+        schema_version: 1,
+        ...(draft.cover ? { cover: draft.cover } : {}),
+        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+        pedagogical_mode: 'case_study',
+        case: study.snapshot
       });
       await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
       return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
