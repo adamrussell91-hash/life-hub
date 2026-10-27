@@ -126,6 +126,7 @@ export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) 
   const questions = {};
   const order = [];
   const problems = [];
+  let dropped = 0;
   // Group sets leave the public blocks; outside a quiz they are dropped whole.
   const lifted = isQuiz ? liftGroupSets(studentBlocks) : { blocks: mapTree(studentBlocks, (b) => (isGroupSet(b) ? null : b)), sets: [], problems: [] };
   problems.push(...lifted.problems);
@@ -141,7 +142,10 @@ export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) 
   };
   const blocks = mapTree(lifted.blocks, (block) => {
     if (block.block_type !== 'quiz_question') return block;
-    if (!isQuiz) return null;
+    if (!isQuiz) {
+      dropped += 1;
+      return null;
+    }
     const question = split(block, null);
     if (!question) return null;
     order.push(block.id);
@@ -157,7 +161,7 @@ export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) 
     const { group_id, class_id, name, tags, students } = s.config;
     sets[s.id] = { group_id, class_id, name, tags: [...(tags ?? [])], students: [...(students ?? [])], questions: ids };
   }
-  if (!isQuiz) return { blocks, quiz: null, problems };
+  if (!isQuiz) return { blocks, quiz: null, problems, dropped };
   const parsed = QuizSettingsSchema.safeParse(draft.quiz ?? {});
   const settings = parsed.success ? parsed.data : {};
   const version = `${Date.now().toString(36)}${randomBytes(4).toString('hex')}`;
@@ -165,6 +169,7 @@ export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) 
   return {
     blocks,
     problems,
+    dropped,
     quiz: {
       version,
       record: { version, order, questions, settings, created_at: new Date().toISOString(), ...(Object.keys(sets).length ? { sets } : {}) },
