@@ -22,7 +22,7 @@ export function unitNetworkInput(block: CurriculumLinesBlock, ctx: RenderContext
     lines = converted.lines;
     lessons = withStops(lessons, converted.lessonStops);
   }
-  return buildUnitNetwork(content, unitLines(lines, content.concept_lines), lessons, network?.bands, network?.dates);
+  return buildUnitNetwork(content, unitLines(lines, content.concept_lines, content.skill_lines), lessons, network?.bands, network?.dates);
 }
 
 export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
@@ -52,7 +52,7 @@ export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderM
   // Teachers see what the lines cover in the syllabus, under the map.
   if (mode === 'teacher' && ctx.network) {
     mountCoveragePanel(root, {
-      lines: unitLines(ctx.network.lines, isCurriculumLinesV2(block.content) ? block.content.concept_lines : undefined),
+      lines: unitLines(ctx.network.lines, isCurriculumLinesV2(block.content) ? block.content.concept_lines : undefined, isCurriculumLinesV2(block.content) ? block.content.skill_lines : undefined),
       lessons: ctx.network.lessons.map((l) => ({ id: l.id, title: l.title, line_stops: l.line_stops ?? [], dot_points: l.dot_points ?? [] })),
       unitTitle: ctx.network.unitTitle,
       ...(isCurriculumLinesV2(block.content) && block.content.focus_area ? { focusArea: block.content.focus_area } : {})
@@ -78,7 +78,7 @@ function mountTeacherMap(root: HTMLElement, block: CurriculumLinesBlock, network
   }
   const base: CoverageMapInput = {
     content,
-    lines: unitLines(lines, content.concept_lines),
+    lines: unitLines(lines, content.concept_lines, content.skill_lines),
     lessons,
     ...(network.bands ? { bands: network.bands } : {}),
     ...(network.dates ? { dates: network.dates } : {})

@@ -770,6 +770,8 @@ export const CurriculumLinesV2ContentSchema = z.object({
   focus_area: z.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
   /** The metro lines (textual concepts) this unit shows; unset shows every one. The year network always shows them all. */
   concept_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
+  /** The light rail lines (skills strands) this unit shows; unset shows every one. The year network always shows them all. */
+  skill_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
 });
 export const CurriculumLinesBlockSchema = z.object({

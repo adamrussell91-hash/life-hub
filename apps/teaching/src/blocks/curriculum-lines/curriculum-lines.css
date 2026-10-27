@@ -237,7 +237,8 @@
   font-weight: 600;
 }
 
-.cl-editor__pick--on.cl-editor__chip--metro::before {
+.cl-editor__pick--on.cl-editor__chip--metro::before,
+.cl-editor__pick--on.cl-editor__chip--light_rail::before {
   background: var(--net-colour);
 }
 
