@@ -105,7 +105,17 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
   // Side lessons sit under the core lesson they branch off, in that lesson's week.
-  const hung = hangSides(order, (id) => roleOf(id) !== undefined, (id) => byId.get(id)?.branchFrom ?? railAfter.get(id));
+  // With no pick and no rail stop, a dated side lesson hangs off the core lesson dated just before it:
+  // explicit "after" links can walk the core route out of date order, and the date is what the teacher set.
+  const datedCore = order.filter((id) => roleOf(id) === undefined && dates?.has(id)).map((id) => ({ id, when: dates!.get(id)! }));
+  const dateAnchor = (id: string): string | undefined => {
+    const when = dates?.get(id);
+    if (when === undefined) return undefined;
+    let best: { id: string; when: string } | undefined;
+    for (const c of datedCore) if (c.when < when && (!best || c.when >= best.when)) best = c;
+    return best?.id;
+  };
+  const hung = hangSides(order, (id) => roleOf(id) !== undefined, (id) => byId.get(id)?.branchFrom ?? railAfter.get(id) ?? dateAnchor(id));
   const shown = withAutoDepths(hung.order.map((id) => byId.get(id)!).filter(Boolean));
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
