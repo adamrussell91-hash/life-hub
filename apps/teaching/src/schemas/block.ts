@@ -233,7 +233,9 @@ export const GalleryItemSchema = z.object({
   id: z.string().min(1),
   url: z.string(),
   alt_text: z.string(),
-  caption: z.string().optional()
+  caption: z.string().optional(),
+  /** A lesson in the same unit: the image opens it. Unresolved ids show as a plain image. */
+  lesson_id: z.string().min(1).optional()
 });
 
 export const GalleryBlockSchema = z.object({
