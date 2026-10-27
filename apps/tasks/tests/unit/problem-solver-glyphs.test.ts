@@ -27,9 +27,9 @@ describe('tool emblems', () => {
   it('every toolkit tool has an emblem in book colours with no ids', async () => {
     const { toolEmblem } = await import('../../../../packages/problem-solver/glyphs');
     const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
-    // Decision Maker's models (dm_) and Gear Shifter's techniques (gt_) carry their own emblems
-    // in packages/decision-book/glyphs and packages/get-things-done/glyphs.
-    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !String(key).startsWith('dm_') && !String(key).startsWith('gt_') && !String(key).startsWith('rb_'))) {
+    // Decision Maker's models (dm_), Gear Shifter's techniques (gt_), the Rules Book's rules (rb_)
+    // and the Change Book's models (ch_) carry their own emblems in their own packages.
+    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !/^(dm|gt|rb|ch)_/.test(String(key)))) {
       const emblem = toolEmblem(id);
       expect(emblem.className).toBe('ps-emblem');
       expect(emblem.getAttribute('aria-hidden')).toBe('true');
