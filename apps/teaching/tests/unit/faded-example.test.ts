@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { renderFadedExample, FADED_EVENT, type FadedExampleBlock } from '@/blocks/faded-example';
+import { renderFadedExample, groupFadedRuns, FADED_EVENT, type FadedExampleBlock } from '@/blocks/faded-example';
 import { LECTURE_ANSWERED } from '@/lecture/answered';
 import { isGate, takesSidePath } from '@/lecture/scenes';
 
@@ -91,5 +91,49 @@ describe('faded example check', () => {
     expect(isGate({ ...block, content: { ...block.content, blanks: [] } })).toBe(false);
     expect(isGate({ ...block, content: { ...block.content, gate: false } })).toBe(false);
     expect(takesSidePath(block)).toBe(true);
+  });
+});
+
+describe('faded sequence', () => {
+  const mk = (id: string, blanks: number[]): FadedExampleBlock =>
+    ({ ...block, id, content: { ...block.content, blanks } }) as FadedExampleBlock;
+  const mount = (blocks: FadedExampleBlock[]) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    for (const b of blocks) {
+      const wrap = document.createElement('div');
+      wrap.className = 'block';
+      wrap.dataset.blockType = 'faded_example';
+      wrap.dataset.blockId = b.id;
+      wrap.append(renderFadedExample(b, 'student'));
+      host.append(wrap);
+    }
+    groupFadedRuns(host);
+    return host;
+  };
+
+  it('joins consecutive steps under one rail with one step open', () => {
+    const host = mount([mk('a', []), mk('b', [1]), mk('c', [0, 1])]);
+    expect(host.querySelectorAll('.block-faded-rail')).toHaveLength(1);
+    expect(host.querySelector('.block-faded__num')?.textContent).toBe('Step 1 of 3 · ');
+    expect(host.querySelectorAll('.block-faded-step--shut')).toHaveLength(2);
+    (host.querySelector('.block-faded__next') as HTMLButtonElement).click();
+    expect(host.querySelectorAll('.block-faded-step--shut')[0]?.getAttribute('data-block-id')).toBe('a');
+  });
+
+  it('moves to the next step after a rating, and is safe to group twice', () => {
+    const host = mount([mk('b', [1]), mk('c', [1])]);
+    groupFadedRuns(host);
+    expect(host.querySelectorAll('.block-faded-rail')).toHaveLength(1);
+    (host.querySelector('textarea') as HTMLTextAreaElement).value = 'x';
+    (host.querySelector('.block-faded__check') as HTMLButtonElement).click();
+    (host.querySelector('.block-faded__rate--right') as HTMLButtonElement).click();
+    expect(host.querySelector('[data-block-id="c"]')?.classList.contains('block-faded-step--shut')).toBe(false);
+    expect(host.querySelector('[data-block-id="b"]')?.classList.contains('block-faded-step--shut')).toBe(true);
+  });
+
+  it('leaves a lone step without a rail', () => {
+    const host = mount([mk('a', [1])]);
+    expect(host.querySelector('.block-faded-rail')).toBeNull();
   });
 });
