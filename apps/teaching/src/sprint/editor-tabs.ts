@@ -2,14 +2,15 @@ import type { Block } from '@/schemas/block';
 import { el } from '@/quiz/dom';
 import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
 import { PHASE_LABELS, SPRINT_PHASES, type SprintPhaseKey } from './schema';
-import { phaseOfSection } from './model';
+import { isGuidesSection, phaseOfSection } from './model';
 
-export type SprintTab = 'kit' | 'brief' | SprintPhaseKey | 'all';
+export type SprintTab = 'kit' | 'brief' | 'guides' | SprintPhaseKey | 'all';
 
 /** A top-level block shows on the canvas when it belongs to the chosen tab. Kit shows no blocks. */
 export function inSprintTab(block: Block, tab: SprintTab): boolean {
   if (tab === 'all') return true;
   if (tab === 'kit') return false;
+  if (isGuidesSection(block)) return tab === 'guides';
   const key = phaseOfSection(block);
   return tab === 'brief' ? key === null : key === tab;
 }
@@ -20,7 +21,7 @@ export function createSprintTabs(options: { onTab: (tab: SprintTab) => void }) {
   const root = el('div', 'hub-pills sprint-edit-tabs');
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', 'Sprint part');
-  const items: Array<[SprintTab, string]> = [['kit', 'Kit'], ['brief', 'Challenge'], ...SPRINT_PHASES.map((k): [SprintTab, string] => [k, PHASE_LABELS[k]]), ['all', 'All']];
+  const items: Array<[SprintTab, string]> = [['kit', 'Kit'], ['brief', 'Challenge'], ['guides', 'Guides'], ...SPRINT_PHASES.map((k): [SprintTab, string] => [k, PHASE_LABELS[k]]), ['all', 'All']];
   function paint(): void {
     root.replaceChildren(...items.map(([id, label]) => {
       const pill = el('button', 'hub-pills__btn', label);

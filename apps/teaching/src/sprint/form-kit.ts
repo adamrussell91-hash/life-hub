@@ -2,8 +2,8 @@ import { button, el } from '@/quiz/dom';
 import { libraryValue } from '@/toolkit/library';
 import type { Block } from '@/schemas/block';
 import type { PhaseRow, SprintClient, SprintStatus } from './api';
-import type { Guide } from './guidance';
-import type { PhasePayload, PublicSprint, SprintPhaseKey } from './schema';
+import { LIMIT_CELLS, type Guide } from './guidance';
+import { LIMIT_BOXES, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 
 /** What every phase form is given. */
 export type FormContext = {
@@ -153,18 +153,89 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   };
 }
 
-/** The group brief from Understand, shown at the top of the later phases: the problem, the audience, the expert's answers. */
-export function briefCard(s: SprintStatus): HTMLElement | null {
+/**
+ * The group brief from Understand, kept in view through the later phases: the
+ * problem, the audience, the limits grid and the expert's answers. It folds
+ * away; `open` says whether it starts unfolded.
+ */
+export function briefCard(s: SprintStatus, open = true): HTMLElement | null {
   const b = s.brief;
   const problem = b?.problem ?? s.question?.text ?? null;
-  if (!problem && !b?.audience && !b?.answers.length) return null;
+  const lim = b?.limits ?? {};
+  const hasLimits = LIMIT_BOXES.some((k) => (lim[k] ?? []).length);
+  if (!problem && !b?.audience && !b?.answers.length && !hasLimits) return null;
   const card = el('details', 'su-brief');
-  card.open = true;
-  card.append(el('summary', '', 'Our group brief'));
-  if (problem) card.append(el('p', '', `Problem: ${problem}`));
-  if (b?.audience?.who) card.append(el('p', '', `Audience: ${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`));
-  for (const a of b?.answers ?? []) card.append(el('p', 'sprint-note', `Expert: ${a.question} ${a.answer}`));
+  card.open = open;
+  card.append(el('summary', '', 'Our group brief (from Understand)'));
+  const row = (label: string, text: string) => { const p = el('p', 'su-brief__row'); p.append(el('b', '', label), ` ${text}`); return p; };
+  if (problem) card.append(row('Problem', problem));
+  if (b?.audience?.who) card.append(row('Audience', `${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`));
+  if (hasLimits) {
+    card.append(el('p', 'su-brief__sub', 'Our limits'));
+    const grid = el('div', 'su-brief__grid');
+    for (const k of LIMIT_BOXES) {
+      const list = lim[k] ?? [];
+      if (!list.length) continue;
+      const cell = el('div', `su-brief__cell su-brief__cell--${k}`);
+      cell.append(el('b', '', `${LIMIT_CELLS[k].icon} ${LIMIT_CELLS[k].title}`));
+      const ul = el('ul');
+      for (const c of list) ul.append(el('li', '', c.count > 1 ? `${c.text} ×${c.count}` : c.text));
+      cell.append(ul);
+      grid.append(cell);
+    }
+    card.append(grid);
+  }
+  if (b?.answers.length) {
+    card.append(el('p', 'su-brief__sub', 'What the expert said'));
+    for (const a of b.answers) { const d = el('div', 'su-brief__qa'); d.append(el('b', '', a.question), el('span', '', a.answer)); card.append(d); }
+  }
   return card;
+}
+
+/**
+ * Show a phase's step cards one at a time, like Understand's slides: a numbered
+ * rail and Back / Next. Does nothing when the Kit sets steps down the page, or
+ * there is only one step. Call after the cards are in `root`.
+ */
+export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined): void {
+  const cards = [...root.children].filter((c): c is HTMLElement => c.classList.contains('su-step'));
+  if (layout === 'vertical' || cards.length < 2) return;
+  let at = 0;
+  const seen = new Set([0]);
+  const rail = el('ol', 'su-rail');
+  rail.setAttribute('aria-label', 'Steps');
+  const where = el('span', 'su-nav__where');
+  const back = button('Back', 'secondary', () => go(at - 1));
+  const next = button('Next', 'primary', () => go(at + 1));
+  const nav = el('div', 'su-nav');
+  nav.append(back, where, next);
+  function go(i: number): void {
+    at = Math.max(0, Math.min(cards.length - 1, i));
+    seen.add(at);
+    paint();
+  }
+  function paint(): void {
+    cards.forEach((c, i) => { c.hidden = i !== at; });
+    back.disabled = at === 0;
+    next.disabled = at === cards.length - 1;
+    where.textContent = `Step ${at + 1} of ${cards.length}`;
+    rail.replaceChildren(...cards.map((c, i) => {
+      const li = el('li', '');
+      const title = c.querySelector('h3')?.textContent ?? `Step ${i + 1}`;
+      const done = seen.has(i) && i !== at;
+      const b = el('button', `su-rail__dot${i === at ? ' is-now' : ''}${done ? ' is-done' : ''}`, done ? '✓' : String(i + 1));
+      b.type = 'button';
+      b.title = title;
+      b.setAttribute('aria-label', `Step ${i + 1}: ${title}`);
+      if (i === at) b.setAttribute('aria-current', 'step');
+      b.addEventListener('click', () => go(i));
+      li.append(b);
+      return li;
+    }));
+  }
+  root.insertBefore(rail, cards[0]!);
+  cards[cards.length - 1]!.after(nav);
+  paint();
 }
 
 /**

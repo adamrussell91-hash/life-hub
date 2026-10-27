@@ -34,3 +34,21 @@ describe('sprint model', () => {
     expect(pub.criteria).toEqual([{ id: 'c1', text: 'A' }]);
   });
 });
+
+describe('guides section', () => {
+  it('keeps the Guides section out of the brief and finds it', async () => {
+    const { withGuidesSection } = await import('@/sprint/defaults');
+    const { sprintParts, briefText } = await import('@/sprint/model');
+    const { inSprintTab } = await import('@/sprint/editor-tabs');
+    let n = 0;
+    const blocks = withGuidesSection(newSprintBlocks(() => `s${n++}`), () => `g${n++}`);
+    expect(withGuidesSection(blocks, () => 'x')).toBe(blocks);
+    const guides = blocks.find((b) => b.block_type === 'section' && b.content.sprint_guides)!;
+    const parts = sprintParts(blocks);
+    expect(parts.guides?.id).toBe(guides.id);
+    expect(parts.brief).toHaveLength(0);
+    expect(briefText(blocks)).toBe('');
+    expect(inSprintTab(guides, 'guides')).toBe(true);
+    expect(inSprintTab(guides, 'brief')).toBe(false);
+  });
+});

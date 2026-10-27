@@ -81,10 +81,30 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     const phase = el('select', 'qz-input');
     for (const k of SPRINT_PHASES) { const op = el('option', '', PHASE_LABELS[k]); op.value = k; phase.append(op); }
     const date = el('input', 'qz-input'); date.type = 'date';
-    const time = el('input', 'qz-input'); time.type = 'time'; time.value = '15:00';
+    const time = el('input', 'qz-input'); time.type = 'time';
+    const msg = el('p', 'sprint-submit__err');
+    // Start from the phase's current deadline (after any class extension), so a nudge is one tap.
+    const current = () => {
+      const base = o.getLesson().sprint?.phases.find((x) => x.key === phase.value);
+      const over = (summary!.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class?.[phase.value];
+      date.value = over?.due_date ?? base?.due_date ?? '';
+      time.value = over?.due_time ?? (base?.due_time || '15:00');
+    };
+    const shift = (minutes: number) => {
+      if (!date.value) current();
+      const t = new Date(`${date.value}T${time.value || '15:00'}:00Z`);
+      t.setUTCMinutes(t.getUTCMinutes() + minutes);
+      date.value = t.toISOString().slice(0, 10);
+      time.value = t.toISOString().slice(11, 16);
+      msg.textContent = '';
+    };
+    phase.addEventListener('change', current);
+    current();
+    const quick = el('div', 'smap-quick');
+    for (const [label, mins] of [['+30 min', 30], ['+1 h', 60], ['+1 day', 1440]] as const) quick.append(button(label, 'secondary', () => shift(mins)));
     for (const [c, l] of [[scope, 'Extend for'], [who, 'Who'], [phase, 'Phase'], [date, 'New due date'], [time, 'New due time']] as const) c.setAttribute('aria-label', l);
-    box.append(el('strong', '', 'Extend a deadline'), scope, who, phase, date, time, button('Extend', 'primary', () => {
-      if (!date.value) return;
+    box.append(el('strong', '', 'Extend a deadline'), scope, who, phase, date, time, quick, msg, button('Extend', 'primary', () => {
+      if (!date.value) { msg.textContent = 'Pick a new due date first.'; return; }
       confirmHost.replaceChildren();
       void run(o.api.extend({ scope: scope.value as 'class' | 'group' | 'student', ...(scope.value === 'class' ? {} : { id: who.value }), phase: phase.value as SprintPhaseKey, due_date: date.value, due_time: time.value || '15:00' }));
     }), button('Cancel', 'secondary', () => confirmHost.replaceChildren()));
@@ -122,13 +142,14 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       const spans = phaseSpans(sprint.phases.map((p) => ({ ...p, ...(ext[p.key] ?? {}) })), sprint.lock_hours, s.ended);
       gantt.replaceChildren(renderPhaseGantt(spans, { now: now(), note: earlyNotes(spans, s.groups.map((g) => g.open), now()) }));
     }
+    const classExt = (s.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class ?? {};
     grid.replaceChildren();
     const header = el('div', 'smap-row smap-row--head');
     header.append(el('div'));
     for (const key of SPRINT_PHASES) {
       const p = sprint?.phases.find((x) => x.key === key);
       const h = el('div', 'smap-ph');
-      h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(p.due_date, p.due_time, now()) : ''));
+      h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(classExt[key]?.due_date ?? p.due_date, classExt[key]?.due_time ?? p.due_time, now()) : ''));
       if (p?.where === 'class' && s.class_parts[key] === 'open' && s.groups.some((g) => g.open.includes(key))) {
         const end = button('End class part', 'secondary', () => confirmEnd(key));
         // The lock length is dropped on a phone; the confirm still says it.

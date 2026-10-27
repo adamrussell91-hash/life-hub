@@ -2,7 +2,8 @@ import { button, el } from '@/quiz/dom';
 import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
 import { SKETCH_GUIDE } from './guidance';
-import { briefCard, coach, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { SKETCH_CHECKS } from './guidance';
+import { briefCard, coach, slidify, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
@@ -33,7 +34,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-sketch');
   root.append(el('h2', '', 'Sketch your ideas'));
   if (ctx.sprint.phases[1]!.instruction) root.append(el('p', '', ctx.sprint.phases[1]!.instruction));
-  const brief = briefCard(ctx.status);
+  const brief = briefCard(ctx.status, true);
   if (brief) root.append(brief);
   const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements }));
   const change = () => bar.changed();
@@ -167,6 +168,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
         paintRapid();
         paintTabs();
         paintCard();
+        paintStrongCheck();
         strongest.hidden = state.cards.length < 2;
       });
       pickList.append(b);
@@ -213,16 +215,37 @@ export function mountSketch(ctx: FormContext): PhaseForm {
       }
     });
     pane.append(el('label', 'sprint-field__label', c.file ? 'Picture or PDF added' : 'Add a picture or PDF (optional)'), upload);
-    const check = el('div', 'sprint-card-check');
-    check.append(el('h3', '', 'Criteria this idea meets'));
-    for (const cr of ctx.sprint.criteria) check.append(tickRow(cr.text, c.criteria, cr.id, 'The line that shows it', ctx.editable, change));
-    if (reqs.length) {
-      check.append(el('h3', '', 'Requirements'));
-      for (const r of reqs) check.append(tickRow(r.text, c.requirements, r.id, 'Where is it?', ctx.editable, change));
+  };
+
+  /** Criteria and requirements are checked for the one idea chosen as strongest, so the other ideas stay quick. */
+  const strongCheck = el('div', 'sprint-card-check sk-strong-check');
+  const paintStrongCheck = () => {
+    strongCheck.replaceChildren();
+    const c = state.cards.length === 1 ? state.cards[0] : state.cards.find((x) => x.id === state.strongest);
+    if (!c) {
+      if (state.cards.length > 1) strongCheck.append(el('p', 'sprint-note', 'Pick your strongest idea above. You check that one against the criteria and requirements. The others don’t need it.'));
+      return;
     }
+    const check = strongCheck;
+    check.append(el('h3', '', `Check your strongest idea${c.title ? `: ${c.title}` : ''}`), el('p', 'sprint-note', SKETCH_CHECKS.intro));
+    const section = (kind: 'criteria' | 'requirements', title: string, items: ReadonlyArray<{ id: string; text: string }>, into: Record<string, string>, placeholder: string) => {
+      const box = el('section', `sk-check sk-check--${kind}`);
+      const tally = el('span', 'sk-check__tally');
+      const count = () => { tally.textContent = `${items.filter((x) => into[x.id]).length} of ${items.length}`; };
+      const head = el('div', 'sk-check__head');
+      head.append(el('h4', '', title), el('span', 'sk-check__tag', SKETCH_CHECKS[kind].tag), tally);
+      const more = el('details', 'sk-check__more');
+      more.append(el('summary', '', 'What does this mean?'));
+      more.append(el('p', '', SKETCH_CHECKS[kind].what), el('p', '', SKETCH_CHECKS[kind].how), el('p', 'sprint-note', SKETCH_CHECKS[kind].example));
+      box.append(head, el('p', 'sk-check__do', SKETCH_CHECKS[kind].doThis), more);
+      for (const x of items) box.append(tickRow(x.text, into, x.id, placeholder, ctx.editable, () => { count(); change(); }));
+      count();
+      check.append(box);
+    };
+    if (ctx.sprint.criteria.length) section('criteria', 'Criteria: how well does it work?', ctx.sprint.criteria, c.criteria, 'Copy the words from your idea that show it');
+    if (reqs.length) section('requirements', 'Requirements: does it have what it must?', reqs, c.requirements, 'Where in your idea is it?');
     const value = valueCheckField(ctx, c.value_answer, (v) => { c.value_answer = v; change(); });
     if (value) check.append(value);
-    pane.append(check);
   };
 
   const paintTabs = () => {
@@ -252,13 +275,15 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   };
   refreshPick();
   pick.addEventListener('focus', refreshPick);
-  pick.addEventListener('change', () => { state.strongest = pick.value; bar.changed(); });
+  pick.addEventListener('change', () => { state.strongest = pick.value; paintStrongCheck(); bar.changed(); });
   strongest.append(el('h3', '', 'Your strongest idea'), pick, frameField({ label: 'Why is it the strongest?', value: state.strongest_why, max: 300, rows: 2, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.strongest_why = v; bar.changed(); } }));
 
   paintPick();
   paintTabs();
   paintCard();
-  dev.append(strongest);
+  paintStrongCheck();
+  dev.append(strongest, strongCheck);
+  slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: () => { window.clearInterval(tick); bar.dispose(); } };
 }

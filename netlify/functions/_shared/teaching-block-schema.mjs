@@ -2563,6 +2563,8 @@ var SectionBlockObjectSchema = z10.object({
     tutorial_exit: z10.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
     sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Design Sprint: this top-level section holds resources that stay with students on every phase. */
+    sprint_guides: z10.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),

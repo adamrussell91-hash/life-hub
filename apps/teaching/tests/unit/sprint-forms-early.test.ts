@@ -115,6 +115,12 @@ describe('sketch form', () => {
     expect(stars()[1]!.disabled).toBe(true);
     expect(f.el.querySelector<HTMLInputElement>('.sprint-card-pane input')!.value).toBe('Objects');
     expect(f.el.textContent).toContain('It solves our problem for the audience because…');
+    // Criteria and requirements are checked for the strongest idea only.
+    expect(f.el.textContent).not.toContain('Two sources');
+    const pick = f.el.querySelector<HTMLSelectElement>('.sprint-strongest select')!;
+    pick.dispatchEvent(new Event('focus'));
+    pick.value = [...pick.options].find((o) => o.value)!.value;
+    pick.dispatchEvent(new Event('change'));
     expect(f.el.textContent).toContain('Two sources');
     expect(f.el.textContent).toContain('Is there another way to look at this?');
     expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(false);

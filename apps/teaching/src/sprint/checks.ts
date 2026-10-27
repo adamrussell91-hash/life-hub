@@ -38,13 +38,17 @@ export function sketchProblems(
     const n = p.rapid.filter((r) => r.trim()).length;
     if (n < opts.ideas) out.push(`Rapid ideas: write at least ${opts.ideas}. You have ${n} so far.`);
   }
+  // Only the idea chosen as strongest is checked against the criteria and requirements.
+  const strongestId = p.cards.length === 1 ? p.cards[0]!.id : p.strongest;
   p.cards.forEach((c, i) => {
     const name = `Idea ${i + 1}`;
     if (!c.title.trim()) out.push(`${name}: give it a title.`);
     for (const field of [c.idea, c.answers, c.evidence]) if (!fullSentence(field)) { out.push(`${name}: ${MORE}`); break; }
-    if (!Object.values(c.criteria).some((w) => w.trim())) out.push(`${name}: link it to at least one criterion and quote the line that shows it.`);
-    for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name}: say where it meets "${r.text}".`);
-    if (!fullSentence(c.value_answer)) out.push(`${name}: answer the check question in a full sentence.`);
+    if (c.id === strongestId) {
+      if (!Object.values(c.criteria).some((w) => w.trim())) out.push(`${name} (your strongest): link it to at least one criterion and quote the line that shows it.`);
+      for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name} (your strongest): say where it meets "${r.text}".`);
+      if (!fullSentence(c.value_answer)) out.push(`${name} (your strongest): answer the check question in a full sentence.`);
+    }
   });
   if (p.cards.length < opts.ideas) out.push(p.rapid ? `Pick: star your best ${opts.ideas} ideas. You have ${p.cards.length} starred.` : `Write ${opts.ideas} ideas. You have ${p.cards.length} so far.`);
   const titles = new Set(p.cards.map((c) => c.title.trim().toLowerCase()));
