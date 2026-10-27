@@ -16,7 +16,9 @@
  * Each statement in the round has a phase: collect → revealed → replace.
  * Placing is open only while collecting, moving only during re-place.
  * Teacher led: students answer the statement the teacher is on. Student
- * paced: they answer any statement still collecting.
+ * paced: they answer any statement still collecting. Self-run: no code, no
+ * teacher steps. One standing round (session "self") that students join on
+ * their own; each student places, sees the class line, then may move.
  *
  * What leaves the server is the safety: while a statement collects, the
  * teacher gets symbols only (the projector drifts them) and students get a
@@ -89,7 +91,7 @@ function settings(block) {
   const scale = c.scale ?? {};
   const stops = (Array.isArray(scale.stops) ? scale.stops : []).filter((s) => typeof s === 'string').slice(0, 3);
   return {
-    pace: c.pace === 'student' ? 'student' : 'teacher',
+    pace: c.pace === 'student' || c.pace === 'self' ? c.pace : 'teacher',
     replace: c.replace !== false,
     scale: { left: String(scale.left ?? ''), right: String(scale.right ?? ''), stops },
     statements: (Array.isArray(c.statements) ? c.statements : [])
@@ -127,6 +129,11 @@ function cleanText(raw, what) {
   return text;
 }
 
+const SELF_SESSION = 'self';
+
+/** Self-run has no teacher-set phases: a statement is collecting until this student places, then it shows the class and allows a move. */
+const selfPhase = (own) => (own ? 'replace' : 'collect');
+
 const phaseOf = (activity, sid) => {
   const p = activity.phases?.[sid]?.phase;
   return PHASES.includes(p) ? p : 'collect';
@@ -161,6 +168,7 @@ function teacherStatement(statement, activity, entries, groups) {
 
 async function teacherAction(store, k, activity, setup, body, opts) {
   const action = body.action ?? 'status';
+  const selfRun = setup.pace === 'self';
   const allowed = ['status', 'go', 'reveal', 'collect', 'replace', 'show_moves', 'group'];
   if (!allowed.includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const statement = action === 'status' ? null : setup.statements.find((s) => s.id === body.statement);
@@ -190,7 +198,7 @@ async function teacherAction(store, k, activity, setup, body, opts) {
 
   const joined = await claimedIds(store, k.claim);
   if (action === 'group') {
-    if (phaseOf(activity, statement.id) === 'collect') reject(409, 'not_revealed', 'Reveal the line first.');
+    if (!selfRun && phaseOf(activity, statement.id) === 'collect') reject(409, 'not_revealed', 'Reveal the line first.');
     const entries = (await entriesFor(store, k, joined, statement.id)).filter((e) => !e.place.flagged);
     if (entries.length < 2) reject(400, 'too_few', 'Sorting needs at least two reasons.');
     const apiKey = opts.env?.ANTHROPIC_API_KEY;
@@ -215,8 +223,9 @@ async function teacherAction(store, k, activity, setup, body, opts) {
   const statements = await Promise.all(
     setup.statements.map(async (s) => {
       const entries = await entriesFor(store, k, joined, s.id);
-      const groups = phaseOf(activity, s.id) === 'collect' ? null : (await read(store, k.groups(s.id)))?.groups ?? null;
-      return teacherStatement(s, activity, entries, groups);
+      const view = selfRun ? { ...activity, phases: { ...activity.phases, [s.id]: { phase: 'replace', moves_shown: true } } } : activity;
+      const groups = phaseOf(view, s.id) === 'collect' ? null : (await read(store, k.groups(s.id)))?.groups ?? null;
+      return teacherStatement(s, view, entries, groups);
     })
   );
   return {
@@ -247,7 +256,7 @@ async function studentAction(store, k, activity, setup, body) {
   let id;
   if (action === 'join') {
     if (!activity.open) reject(409, 'closed', 'This activity has closed.');
-    if (String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    if (setup.pace !== 'self' && String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     id = await claimSymbol(store, k, tokenHash);
     if (!id) reject(409, 'full', 'This activity is full. Ask your teacher.');
   } else {
@@ -262,14 +271,15 @@ async function studentAction(store, k, activity, setup, body) {
     if (at < 0) reject(400, 'bad_request', 'Unknown statement.');
     const statement = setup.statements[at];
     const phase = phaseOf(activity, statement.id);
+    const ownPlace = setup.pace === 'self' ? await read(store, k.place(statement.id, id)) : null;
     if (action === 'place') {
-      if (phase !== 'collect') reject(409, 'revealed', 'Your teacher has revealed this one.');
+      if (setup.pace === 'self' ? ownPlace : phase !== 'collect') reject(409, 'revealed', setup.pace === 'self' ? 'You’ve already placed this one.' : 'Your teacher has revealed this one.');
       if (setup.pace === 'teacher' && at !== current) reject(409, 'moved_on', 'Your teacher has moved to another statement.');
       const pos = cleanPos(body.pos, statement, setup.scale.stops);
       const reason = cleanText(body.reason, 'your reason');
       await store.setJSON(k.place(statement.id, id), { pos, reason, flagged: flagText(reason), at: new Date().toISOString() });
     } else {
-      if (phase !== 'replace') reject(409, 'not_replacing', 'Moving isn’t open for this one.');
+      if ((setup.pace === 'self' ? selfPhase(ownPlace) : phase) !== 'replace') reject(409, 'not_replacing', 'Moving isn’t open for this one.');
       if (!(await read(store, k.place(statement.id, id)))) reject(409, 'not_placed', 'You didn’t place a symbol on this one.');
       const pos = cleanPos(body.pos, statement, setup.scale.stops);
       const why = cleanText(body.why, 'why you moved');
@@ -280,9 +290,9 @@ async function studentAction(store, k, activity, setup, body) {
   const joined = await claimedIds(store, k.claim);
   const statements = await Promise.all(
     setup.statements.map(async (s) => {
-      const phase = phaseOf(activity, s.id);
       const entries = await entriesFor(store, k, joined, s.id);
       const own = entries.find((e) => e.symbol === id);
+      const phase = setup.pace === 'self' ? selfPhase(own) : phaseOf(activity, s.id);
       return {
         id: s.id,
         phase,
@@ -294,6 +304,11 @@ async function studentAction(store, k, activity, setup, body) {
     })
   );
   return { ...shared, joined: true, symbol: id, current, statements };
+}
+
+/** The standing self-run round: same session every time, so a race to create it, or a re-open, never splits the class. */
+function selfRound() {
+  return { session: SELF_SESSION, code: '', open: true, started_at: new Date().toISOString(), expires: roundExpiry(), current: 0, phases: {} };
 }
 
 function freshRound() {
@@ -317,7 +332,7 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'start') {
-    activity = freshRound();
+    activity = setup.pace === 'self' ? selfRound() : freshRound();
     await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
@@ -328,6 +343,10 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   if (teacher && body.action === 'resume') {
     activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(), session }), { open: true });
     if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
+  }
+  if (setup.pace === 'self' && (!activity || activity.expires < Date.now())) {
+    activity = selfRound();
+    await saveRound(store, base, activity);
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
 
