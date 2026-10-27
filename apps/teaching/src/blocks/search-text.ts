@@ -89,6 +89,9 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'question_drop':
       push(parts, c.prompt);
       break;
+    case 'done':
+      push(parts, c.label);
+      break;
     case 'brainstorm':
       push(parts, c.question);
       break;

@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Study mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Mockup only. Values are the hub design-kit tokens (packages/design-kit/tokens.css).
+   The rail copies the sprint, Problem Solver and Decision Maker: flat marks on a dotted line. */
+:root {
+  --paper: #fbf8f2; --cotton: #f5f1e9; --marine: #142b51; --navy: #17375e; --navy-2: #244f7c; --wave: #376fb7;
+  --ink: #13233a; --muted: #6b7788; --line: rgba(23,55,94,.10); --shore: #eae7da;
+  --pastel-blue: #dceafa; --pastel-blue-ink: #294c71; --pastel-sage: #dfe9e1; --pastel-sage-ink: #3c5949;
+  --pastel-peach: #f2dfd0; --pastel-peach-ink: #7a5038; --pastel-gold: #f1e2b6; --pastel-gold-ink: #6c581f;
+  --pastel-lilac: #e8e0f1; --pastel-lilac-ink: #5d4e70;
+  --success: #2f7a4f; --high-sea: #f68620; --high-sea-ink: #a85a0c;
+  --on-dark: rgba(255,255,255,.92); --on-dark-muted: rgba(255,255,255,.66);
+  --text-2xs: .6875rem; --text-xs: .75rem; --text-sm: .8125rem; --text-base: .9375rem; --text-md: 1.0625rem; --text-lg: 1.3125rem; --text-xl: 2rem; --text-2xl: 2.625rem;
+  --radius-xs: .375rem; --radius-sm: .875rem; --radius-md: 1.25rem; --radius-lg: 1.5rem; --radius-full: 999px;
+  --elev-1: 0 1px 2px rgba(20,35,70,.06); --elev-2: 0 4px 14px rgba(20,35,70,.08);
+  --ease: cubic-bezier(.2,.8,.2,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, ui-sans-serif, sans-serif; color: var(--ink); background: var(--cotton); font-size: var(--text-base); line-height: 1.55; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 20px 16px 96px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.chrome { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 18px; padding: 10px 12px; border: 1px dashed rgba(23,55,94,.25); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.chrome__label { font-size: var(--text-2xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.board { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.board[hidden] { display: none; }
+.chrome__reset { margin-left: auto; }
+
+/* hub segmented control */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-full); overflow: hidden; background: var(--paper); }
+.seg button { border: 0; background: transparent; padding: 6px 14px; min-height: 34px; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.pill-btn { border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-full); padding: 6px 12px; min-height: 34px; font-size: var(--text-sm); font-weight: 600; }
+.pill-btn:disabled { opacity: .4; cursor: default; }
+
+/* ---------- hero: the lesson banner, as on every student lesson ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 17rem; gap: 16px; margin-bottom: 28px; }
+.banner { position: relative; height: 12.25rem; border-radius: var(--radius-lg); overflow: hidden; background: radial-gradient(120% 140% at 85% 0%, #2a5a92 0%, var(--marine) 55%, #0a1536 100%); }
+.banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,21,54,.7), rgba(10,21,54,0) 60%); }
+.banner__copy { position: absolute; left: 1.625rem; right: 1.625rem; bottom: 1.15rem; z-index: 1; }
+.banner__eyebrow { font-size: var(--text-sm); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--on-dark-muted); margin: 0 0 4px; }
+.banner h1 { margin: 0; color: #fff; font-size: var(--text-2xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.meta { border-radius: var(--radius-md); padding: 16px 20px; color: var(--on-dark); background: linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 100%); box-shadow: var(--elev-2); display: grid; align-content: start; gap: 6px; }
+.meta p { margin: 0; }
+.meta__class { font-weight: 600; }
+.meta__sub { font-size: var(--text-sm); color: var(--on-dark-muted); }
+.meta__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.meta__chip { font-size: var(--text-xs); font-weight: 600; padding: 2px 9px; border-radius: var(--radius-full); background: rgba(255,255,255,.14); color: var(--on-dark); }
+
+/* ---------- the rail ---------- */
+.rail { margin: 0 0 22px; }
+.rail ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: relative; }
+.rail ol::before, .rail ol::after { content: ""; position: absolute; left: 10%; top: 21px; }
+.rail ol::before { right: 10%; border-top: 3px dotted rgba(23,55,94,.18); }
+.rail ol::after { width: calc(80% * var(--p, 0)); border-top: 3px dotted var(--ink); transition: width 900ms var(--ease); }
+.stn { display: grid; justify-items: center; gap: 4px; text-align: center; position: relative; z-index: 1; }
+.stn button { border: 0; background: none; padding: 0; display: grid; justify-items: center; gap: 4px; }
+.stn button:disabled { cursor: default; }
+.stn__mark { width: 44px; height: 44px; border-radius: 50%; background: var(--cotton); position: relative; display: grid; place-items: center; }
+.stn__mark svg { width: 100%; height: 100%; }
+.stn__name { font-weight: 600; font-size: var(--text-base); }
+.stn__sub { font-size: var(--text-xs); color: var(--muted); }
+.stn[data-state="later"] .stn__mark { opacity: .32; }
+.stn[data-state="later"] .stn__name { color: var(--muted); font-weight: 500; }
+.stn[data-state="now"] .stn__name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.stn[data-state="now"] .stn__mark { animation: breathe 2.4s var(--ease) infinite; }
+.stn[data-state="in"] .stn__mark::after { content: "✓"; position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--success); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--cotton); }
+@keyframes breathe { 50% { transform: scale(1.07); } }
+@media (prefers-reduced-motion: reduce) { .stn[data-state="now"] .stn__mark { animation: none; } .rail ol::after { transition: none; } }
+
+/* ---------- the two-column case layout ---------- */
+.study { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr); gap: 24px; align-items: start; }
+.col-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.col-head h2 { margin: 0; font-size: var(--text-lg); font-weight: 700; color: var(--navy); letter-spacing: -.01em; }
+.col-head span { font-size: var(--text-sm); color: var(--muted); }
+.case { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.work { position: sticky; top: 16px; min-width: 0; }
+
+/* blocks, as in .lesson-blocks */
+.block { padding: 18px 20px; font-size: var(--text-md); background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1); position: relative; }
+.block h3 { margin: 0 0 8px; font-size: var(--text-md); font-weight: 700; line-height: 1.35; }
+.block p { margin: 0 0 10px; }
+.block p:last-child { margin-bottom: 0; }
+.block ::selection { background: var(--pastel-blue); }
+.doc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.doc-chip { font-size: var(--text-xs); font-weight: 600; padding: 2px 9px; border-radius: var(--radius-xs); }
+.doc-chip--memo { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.doc-chip--data { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.doc-chip--news { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.doc-chip--talk { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.doc-chip--update { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.doc-chip--outcome { background: var(--navy); color: #fff; }
+.doc-from { font-size: var(--text-sm); color: var(--muted); }
+.doc-cited { margin-left: auto; font-size: var(--text-xs); font-weight: 600; color: var(--wave); }
+.doc-unused { margin-left: auto; font-size: var(--text-xs); font-weight: 600; padding: 2px 9px; border-radius: var(--radius-xs); background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.block table { width: 100%; border-collapse: collapse; font-size: var(--text-base); }
+.block th, .block td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.block th:first-child, .block td:first-child { text-align: left; }
+.block th { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.block .low { color: var(--high-sea-ink); font-weight: 700; }
+.speaker { display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 8px; }
+.speaker:first-of-type { margin-top: 0; }
+.part-label { font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -6px; }
+.block--outcome { border: 1.5px solid var(--navy); animation: rise .5s var(--ease) both; }
+.source { font-size: var(--text-sm); color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.in { animation: rise .4s var(--ease) both; }
+
+/* not-yet-open part: the lecture's hidden beat */
+.locked { border: 2px dashed rgba(23,55,94,.18); border-radius: var(--radius-md); padding: 18px 20px; display: flex; gap: 14px; align-items: center; color: var(--muted); }
+.locked svg { flex: 0 0 auto; width: 22px; height: 22px; color: var(--muted); }
+.locked b { display: block; color: var(--ink); font-weight: 600; }
+.locked span { font-size: var(--text-sm); }
+.closed { border: 2px dashed rgba(23,55,94,.18); border-radius: var(--radius-md); padding: 40px 20px; text-align: center; color: var(--muted); }
+.closed b { display: block; color: var(--ink); font-size: var(--text-md); margin-bottom: 4px; }
+
+/* ---------- the work panel ---------- */
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1); padding: 20px; }
+.panel__eyebrow { font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.panel h3 { margin: 0 0 10px; font-size: var(--text-md); font-weight: 700; line-height: 1.35; }
+.panel p { margin: 0 0 10px; }
+.hint { color: var(--muted); font-size: var(--text-sm); }
+.ask { font-size: var(--text-lg); font-weight: 700; color: var(--navy); line-height: 1.3; letter-spacing: -.01em; margin: 0 0 10px; }
+textarea { width: 100%; min-height: 88px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; resize: vertical; background: var(--paper); font-size: var(--text-base); }
+textarea:focus, input:focus { outline: 2px solid var(--wave); outline-offset: 1px; }
+.btn { min-height: 44px; padding: 10px 18px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: var(--text-base); }
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn:disabled { opacity: .4; cursor: default; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.opts { display: grid; gap: 8px; margin: 0 0 12px; }
+.opt { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-sm); padding: 10px 12px; }
+.opt__k { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--navy); display: grid; place-items: center; font-weight: 700; font-size: var(--text-sm); color: var(--navy); }
+.opt[aria-pressed="true"] { border-color: var(--navy); background: var(--pastel-blue); }
+.opt[aria-pressed="true"] .opt__k { background: var(--navy); color: #fff; }
+.opt b { display: block; font-size: var(--text-base); font-weight: 600; }
+.opt .d { color: var(--muted); font-size: var(--text-sm); }
+.conf { margin: 4px 0 12px; }
+.conf__top { display: flex; justify-content: space-between; font-size: var(--text-sm); font-weight: 600; }
+.conf input { width: 100%; accent-color: var(--navy); }
+.conf__ends { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--muted); }
+.wait { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--marine) 7%, var(--paper)); color: var(--ink); font-size: var(--text-sm); margin-top: 12px; }
+.wait__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--wave); animation: pulse 1.4s ease infinite; flex: 0 0 auto; }
+@keyframes pulse { 50% { opacity: .25; } }
+
+/* evidence, cited from the case */
+.cite-pop { position: absolute; z-index: 30; background: var(--ink); color: #fff; border: 0; border-radius: var(--radius-sm); padding: 8px 12px; font-size: var(--text-sm); font-weight: 600; box-shadow: 0 8px 20px -6px rgba(0,0,0,.35); }
+.cite-pop[hidden] { display: none; }
+.evidence { display: grid; gap: 6px; margin: 4px 0 12px; }
+.evidence:empty::before { content: "Select a line in the case, then tap Use as evidence."; color: var(--muted); font-size: var(--text-sm); }
+.ev { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; background: var(--pastel-blue); border-radius: var(--radius-xs); padding: 7px 10px; font-size: var(--text-sm); line-height: 1.4; color: var(--pastel-blue-ink); animation: rise .3s var(--ease) both; }
+.ev small { display: block; font-size: var(--text-xs); opacity: .8; margin-top: 2px; }
+.ev button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0 2px; }
+
+/* locked decision */
+.decision { border-radius: var(--radius-sm); background: var(--paper); border: 1px solid var(--line); padding: 14px; display: grid; gap: 8px; }
+.decision__top { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); font-weight: 600; color: var(--muted); }
+.decision__top svg { width: 14px; height: 14px; }
+.decision__choice { font-weight: 700; font-size: var(--text-md); }
+.bar { height: 6px; border-radius: var(--radius-full); background: var(--shore); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--navy); border-radius: inherit; }
+.decision__conf { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--muted); }
+.objection { border-left: 3px solid var(--high-sea); background: var(--paper); border-radius: 0 var(--radius-xs) var(--radius-xs) 0; padding: 10px 12px; margin: 0 0 10px; }
+
+/* outcome comparison */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+.compare div { border-radius: var(--radius-sm); padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); font-size: var(--text-sm); }
+.compare b { display: block; font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.compare .changed { background: var(--pastel-peach); border-color: transparent; color: var(--pastel-peach-ink); }
+.spread svg { width: 100%; height: auto; display: block; }
+.spread__cap { font-size: var(--text-xs); color: var(--muted); margin: 4px 0 14px; }
+
+/* class rules */
+.rule { display: grid; gap: 10px; }
+.rule__text { font-size: var(--text-md); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: var(--text-xs); font-weight: 600; padding: 3px 9px; border-radius: var(--radius-xs); }
+.chip--held { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.chip--cond { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.chip--broke { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.chip--new { animation: rise .35s var(--ease) both; outline: 1.5px solid currentColor; }
+.judge { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.judge__label { font-size: var(--text-sm); color: var(--muted); }
+.frame { display: grid; gap: 8px; }
+.frame label { display: grid; gap: 4px; font-size: var(--text-sm); font-weight: 600; }
+.frame input { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 12px; background: var(--paper); font-size: var(--text-base); font-weight: 400; }
+
+
+/* step help: a small ? on every step that opens the sprint's coach (do this, why, example, stuck) */
+.panel__top { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.panel__top .panel__eyebrow { margin: 0; }
+.help { margin-left: auto; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--navy); font-weight: 700; font-size: var(--text-sm); display: grid; place-items: center; }
+.help:hover { background: var(--pastel-blue); }
+.help[aria-expanded="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.coach { display: grid; gap: 8px; margin: 4px 0 14px; animation: rise .25s var(--ease) both; }
+.coach__do { margin: 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--pastel-blue); color: var(--pastel-blue-ink); font-size: var(--text-base); line-height: 1.45; }
+.coach__tag { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: var(--radius-full); background: var(--navy); color: #fff; font-size: var(--text-2xs); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.coach__help { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: flex-start; }
+.coach__fold { border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; font-size: var(--text-sm); }
+.coach__fold[open] { flex: 1 1 100%; }
+.coach__fold > summary { cursor: pointer; padding: 6px 12px; font-weight: 600; list-style: none; }
+.coach__fold > summary::-webkit-details-marker { display: none; }
+.coach__fold--stuck > summary { color: var(--pastel-peach-ink); }
+.coach__body { padding: 0 12px 10px; }
+.coach__body p { margin: 0 0 4px; }
+.coach__body ul { margin: 0; padding-left: 18px; }
+
+/* phone: one column, switch between the case and your work */
+.switch { display: none; }
+@media (max-width: 760px) {
+  .wrap { padding: 12px 16px 96px; }
+  .hero { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+  .banner { height: 9.5rem; }
+  .banner__copy { left: 1.1rem; right: 1.1rem; bottom: .9rem; }
+  .banner h1 { font-size: var(--text-xl); }
+  .meta { padding: 12px 16px; }
+  .rail ol::before, .rail ol::after { top: 17px; }
+  .stn__mark { width: 36px; height: 36px; }
+  .stn__name { font-size: var(--text-sm); }
+  .stn__sub { display: none; }
+  .study { grid-template-columns: 1fr; }
+  .study[data-pane="case"] .work { display: none; }
+  .study[data-pane="work"] .case { display: none; }
+  .work { position: static; }
+  .col-head { display: none; }
+  .block { padding: 16px; }
+  .switch { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
+  .switch .seg { width: 100%; }
+  .switch .seg button { flex: 1; min-height: 44px; font-size: var(--text-base); position: relative; }
+  .switch .new { position: absolute; top: 9px; right: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="chrome" aria-label="Mockup controls">
+    <span class="chrome__label">Mockup</span>
+    <span class="seg" role="group" aria-label="Pace">
+      <button data-pace="teacher" aria-pressed="false">Teacher pace</button>
+      <button data-pace="own" aria-pressed="true">Own pace</button>
+    </span>
+    <span class="board" id="board" hidden>
+      <span class="chrome__label">Teacher</span>
+      <button class="pill-btn" data-board="release">Open part 2</button>
+      <button class="pill-btn" data-board="work">Move to Work</button>
+      <button class="pill-btn" data-board="reveal">Show the outcome</button>
+    </span>
+    <button class="pill-btn chrome__reset" id="reset">Start again</button>
+  </div>
+
+  <header class="hero">
+    <div class="banner"><div class="banner__copy"><p class="banner__eyebrow">Case study</p><h1>The dam at 31%</h1></div></div>
+    <aside class="meta" id="meta"></aside>
+  </header>
+
+  <nav class="rail" aria-label="Case study steps"><ol id="rail"></ol></nav>
+
+  <div class="study" id="study" data-pane="work">
+    <section class="case" aria-label="The case"><div class="col-head"><h2>The case</h2><span id="casecount"></span></div><div class="case" id="case"></div></section>
+    <section class="work" aria-label="Your work"><div class="col-head"><h2>Your work</h2></div><div id="work"></div></section>
+  </div>
+</div>
+
+<div class="switch" id="switch"><span class="seg" role="group" aria-label="Show">
+  <button data-pane="case" aria-pressed="false">The case</button>
+  <button data-pane="work" aria-pressed="true">Your work</button>
+</span></div>
+<button class="cite-pop" id="cite" hidden>+ Use as evidence</button>
+
+<script>
+/* All names, places and figures are invented for the mockup. */
+const STEPS = [
+  { id: 'brief', label: 'Brief' },
+  { id: 'file', label: 'The case' },
+  { id: 'work', label: 'Decide' },
+  { id: 'outcome', label: 'Outcome' },
+  { id: 'rules', label: 'Rules' }
+];
+const MARKS = {
+  brief: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#dceafa"/><circle cx="22" cy="22" r="11" fill="#376fb7"/><circle cx="22" cy="22" r="4.5" fill="#fff"/></svg>',
+  file: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#f1e2b6"/><rect x="13" y="11" width="14" height="19" rx="2" fill="#c9a94a"/><rect x="17" y="15" width="14" height="19" rx="2" fill="#6c581f"/></svg>',
+  work: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#dfe9e1"/><rect x="12" y="20" width="20" height="13" rx="3" fill="#3c5949"/><path d="M16 20v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#3c5949" stroke-width="3"/></svg>',
+  outcome: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#f2dfd0"/><circle cx="22" cy="22" r="11" fill="none" stroke="#7a5038" stroke-width="3"/><path d="M22 11a11 11 0 0 1 0 22z" fill="#7a5038"/></svg>',
+  rules: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#e8e0f1"/><rect x="12" y="14" width="20" height="4" rx="2" fill="#5d4e70"/><rect x="12" y="21" width="15" height="4" rx="2" fill="#5d4e70"/><rect x="12" y="28" width="18" height="4" rx="2" fill="#5d4e70"/></svg>'
+};
+const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const OPTIONS = [
+  { k: 'A', t: 'Level 3 restrictions now', d: 'Outdoor watering banned, farm licences cut by a quarter.' },
+  { k: 'B', t: 'Truck water in and wait for spring rain', d: 'No restrictions yet. Review in eight weeks.' },
+  { k: 'C', t: 'Fast-track the recycled water plant', d: 'Borrow to build it in 14 months instead of 3 years.' }
+];
+const OBJECTIONS = {
+  A: 'Families lose their gardens this week, yet the three biggest users are farms on licence. Why should a household go first?',
+  B: 'If spring rain fails, you have used eight weeks of water you can never get back. What would make waiting the right call?',
+  C: 'The plant arrives in 14 months at best. What keeps the town in water until then?'
+};
+const DOCS = {
+  memo: { chip: 'memo', type: 'Memo', from: 'Operations, 3 October', title: 'Storage update', body: `
+    <p>Hollin Creek is at 31% of capacity. At current use we have roughly 11 months of supply before we reach the dead storage level.</p>
+    <p>Inflows over winter were the lowest in 40 years. The spring outlook gives a 45% chance of above-average rain, which is close to a coin toss.</p>
+    <p>Households use about 30% of our water. Licensed farms use about 55%. The three largest licences alone use 22%.</p>` },
+  table: { chip: 'data', type: 'Data', from: 'Authority records', title: 'Storage at the start of October', body: `
+    <table><thead><tr><th>Year</th><th>October</th><th>Spring rain</th><th>March</th></tr></thead>
+    <tbody><tr><td>Three years ago</td><td>78%</td><td>Above average</td><td>84%</td></tr>
+    <tr><td>Two years ago</td><td>61%</td><td>Average</td><td>55%</td></tr>
+    <tr><td>Last year</td><td>44%</td><td>Below average</td><td>33%</td></tr>
+    <tr><td>This year</td><td class="low">31%</td><td>?</td><td>?</td></tr></tbody></table>` },
+  clip: { chip: 'news', type: 'News', from: 'The Valley Herald, 5 October', title: '"Don\'t make the town pay first," farmers warn', body: `
+    <p>Growers in the lower valley say any cut to licences before Christmas would mean ploughing in crops already planted. "We employ four hundred people in this valley," said one grower.</p>
+    <p>Councillors are split. Two want restrictions now. Three say the Authority should "trust the season" as it did two years ago, when late rain refilled the dam.</p>` },
+  transcript: { chip: 'talk', type: 'Transcript', from: 'Council meeting, 20 October', title: 'Extract', body: `
+    <span class="speaker">Engineer</span><p>Trucking can cover about 6% of daily use. It buys weeks, not months.</p>
+    <span class="speaker">Mayor</span><p>And the recycled plant?</p>
+    <span class="speaker">Engineer</span><p>Fourteen months if we borrow now. It would need the dam to last until then.</p>
+    <span class="speaker">Councillor</span><p>Restrictions take six weeks to show up in the numbers. People don't change overnight.</p>` },
+  update: { chip: 'update', type: 'Update', from: 'Weather bureau, 24 October', title: 'Seasonal outlook, revised', body: `
+    <p>The chance of above-average spring rain has fallen from 45% to 30%. Ocean temperatures suggest a dry summer is now more likely than not.</p>` }
+};
+const PART1 = ['memo', 'table', 'clip'];
+const PART2 = ['transcript', 'update'];
+const RULES = [
+  { id: 'r1', text: 'When a risk builds slowly, people treat each year as normal, as long as nothing breaks in the year they are looking at.', marks: [['Riverbend levee', 'held'], ['Harbour ferry', 'held']] },
+  { id: 'r2', text: 'When the people who pay for a decision are not the people who make it, the decision waits, as long as waiting costs nothing that year.', marks: [['Riverbend levee', 'held'], ['Harbour ferry', 'cond']] },
+  { id: 'r3', text: 'When a fix takes longer to build than the problem takes to arrive, start the fix and a stopgap together.', marks: [['Harbour ferry', 'held']] }
+];
+const MARK_LABEL = { held: 'Held', cond: 'Needs a condition', broke: 'Broke' };
+
+let S;
+function fresh(pace) {
+  return { pace, tab: 'brief', open: new Set(['brief']), done: new Set(), first: null, part1: '', part2: false, fresh2: false,
+    ev: [], cited: new Set(), seal: null, objection: '', revealed: false, missed: '', marks: {}, proposed: false, pane: 'work',
+    draft: { firstChoice: null, firstWhy: '', p1: '', choice: null, conf: 60, reason: '', obj: '', rule: ['', '', ''] } };
+}
+S = fresh('own');
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const opt = (k) => OPTIONS.find((o) => o.k === k);
+
+/* ---------------- header and rail ---------------- */
+function renderMeta() {
+  $('#meta').innerHTML = S.pace === 'own'
+    ? `<p class="meta__class">Year 10 Geography</p><p class="meta__sub">Branches from Lesson 6 · Managing scarce resources</p><div class="meta__chips"><span class="meta__chip">Optional</span><span class="meta__chip">Your own pace</span></div>`
+    : `<p class="meta__class">Year 10 Geography</p><p class="meta__sub">Tuesday 28 October</p><div class="meta__chips"><span class="meta__chip">In class</span><span class="meta__chip">Your teacher moves you on</span></div>`;
+}
+function stepSub(id) {
+  if (id === 'brief') return S.first ? 'First take in' : 'Your first take';
+  if (id === 'file') return S.part2 ? '5 documents' : S.open.has('file') ? 'Part 2 to come' : '2 parts';
+  if (id === 'work') return S.seal ? `Locked ${S.seal.time}` : 'Lock it in';
+  if (id === 'outcome') return S.revealed || S.tab === 'outcome' ? 'What happened' : S.seal ? (S.pace === 'own' ? 'After one objection' : 'Teacher shows it') : 'After you decide';
+  return 'Class rules';
+}
+function renderRail() {
+  const here = STEPS.findIndex((s) => s.id === S.tab);
+  const furthest = Math.max(...[...S.open].map((id) => STEPS.findIndex((s) => s.id === id)));
+  $('#rail').style.setProperty('--p', String(furthest / (STEPS.length - 1)));
+  $('#rail').innerHTML = STEPS.map((s, i) => {
+    const state = i === here ? 'now' : S.done.has(s.id) ? 'in' : S.open.has(s.id) ? 'open' : 'later';
+    return `<li class="stn" data-state="${state}"><button data-tab="${s.id}" ${S.open.has(s.id) ? '' : 'disabled'} ${i === here ? 'aria-current="step"' : ''}>
+      <span class="stn__mark">${MARKS[s.id]}</span><span class="stn__name">${s.label}</span><span class="stn__sub">${stepSub(s.id)}</span></button></li>`;
+  }).join('');
+}
+
+/* ---------------- the case column ---------------- */
+function docBlock(id) {
+  const d = DOCS[id];
+  const unused = S.tab === 'outcome' && S.revealedSeen && !S.cited.has(id);
+  const tag = unused ? '<span class="doc-unused">Not used</span>' : S.cited.has(id) ? '<span class="doc-cited">Cited</span>' : '';
+  return `<article class="block${PART2.includes(id) && S.fresh2 ? ' in' : ''}" data-doc="${id}">
+    <div class="doc-head"><span class="doc-chip doc-chip--${d.chip}">${d.type}</span><span class="doc-from">${d.from}</span>${tag}</div>
+    <h3>${d.title}</h3>${d.body}</article>`;
+}
+function renderCase() {
+  const c = $('#case');
+  $('#casecount').textContent = S.tab === 'brief' ? '' : S.tab === 'rules' ? '' : S.part2 ? '5 documents' : '3 of 5 documents';
+  $('.case .col-head h2').textContent = S.tab === 'rules' ? 'Class rules' : 'The case';
+  if (S.tab === 'brief') {
+    c.innerHTML = `<div class="closed"><b>The case opens after your first take</b>5 documents, in 2 parts</div>`;
+    return;
+  }
+  if (S.tab === 'rules') { c.innerHTML = renderRules(); return; }
+  let html = '';
+  if (S.tab === 'outcome' && S.revealedSeen) {
+    html += `<article class="block block--outcome"><div class="doc-head"><span class="doc-chip doc-chip--outcome">What happened</span></div>
+      <h3>The Authority waited</h3>
+      <p>The Authority chose to truck water in and review in eight weeks. Spring rain failed. By the time Level 3 restrictions began in mid-December, the dam was at 19%.</p>
+      <p>Because restrictions take about six weeks to bite, use did not fall until February. The dam bottomed out at 12% in April. The recycled water plant was approved in January and opened 15 months later.</p>
+      <p>The review that followed said the warning was in the October numbers: three falling years in a row, and a lag on any response.</p>
+      <p class="source">Source: the Authority's own review, two years later</p></article>
+      <p class="part-label">The case you worked from</p>`;
+  }
+  html += `<p class="part-label">Part 1</p>` + PART1.map(docBlock).join('');
+  html += `<p class="part-label">Part 2</p>`;
+  html += S.part2 ? PART2.map(docBlock).join('')
+    : `<div class="locked">${LOCK}<div><b>Part 2 · 2 documents</b><span>${S.pace === 'own' ? 'Opens when you answer the part 1 question.' : 'Your teacher opens this part.'}</span></div></div>`;
+  c.innerHTML = html;
+  S.fresh2 = false;
+}
+
+
+/* Help for every step. Examples use an invented topic (a town library) so they never give away the dam. */
+const GUIDES = {
+  brief: { doThis: 'Pick the option you would choose right now, and say why in one line.',
+    why: 'Writing down your first instinct lets you see later how much the case changed your mind.',
+    example: ['Question: the town library is losing money. What do you do?', 'First take: B, cut opening hours. Because it saves money fastest.'],
+    stuck: ['There is no wrong answer yet. Go with what you know.', 'Imagine you had to decide in the next minute.', 'Your “why” can be short: “because it’s the cheapest”.'] },
+  part1: { doThis: 'Read the three documents, then name the biggest risk and back it with a line from the case.',
+    why: 'Deciding well starts with seeing what could go wrong. A quote shows your answer comes from the case, not a guess.',
+    example: ['The biggest risk is that visitors keep falling, because the report says “visits are down 12% for the third year”.'],
+    stuck: ['Look for numbers that are getting worse.', 'Look for what people in the case are worried about.', 'Select a sentence that worried you, tap Use as evidence, then say why.'] },
+  part2: { doThis: 'Read the two new documents and ask: does this change the risk I named?',
+    why: 'Real decisions get new information part way through. Good decision-makers update; they don’t start again.',
+    example: ['New document: a council grant is offered.', 'It changes the risk: money matters less, but visits still fall.'],
+    stuck: ['Compare each new fact with your part 1 answer.', 'Does anything make an option easier or harder?', 'Collect a quote you might use when you decide.'] },
+  decide: { doThis: 'Choose one option, say how sure you are, and give your reason with at least one quote from the case.',
+    why: 'Locking in a decision before you see the outcome is how you find out whether your thinking holds.',
+    example: ['Choice: A, open a café inside. About 60% sure.', 'Because the survey says “people would stay longer if there were somewhere to sit”.'],
+    stuck: ['Rule out the option you like least first.', 'How sure? 50% means a coin toss; 90% means you’d bet on it.', 'Start your reason with “Because the case shows…”.'] },
+  locked: { doThis: 'Answer the strongest objection to your choice. Your decision stays as it is.',
+    why: 'Every good decision has a cost. Saying what it is, and why you’d still choose it, makes your reasoning stronger.',
+    example: ['Objection: a café costs money the library doesn’t have.', 'Answer: the grant covers the start-up cost, and the café earns it back.'],
+    stuck: ['Start with “That’s true, but…”.', 'Say what you would do about the cost.', 'Use a quote from the case if you can.'] },
+  outcome: { doThis: 'Compare your decision with what actually happened, then name one thing in the case you didn’t use.',
+    why: 'The point isn’t whether you were right. It’s seeing which clues you used and which you missed.',
+    example: ['I chose the café; the library actually cut hours.', 'I didn’t use the staff survey, which said volunteers were leaving.'],
+    stuck: ['Look at the documents marked “Not used”.', 'Ask: what did the people who chose differently see?', 'Was your confidence about right, too high, or too low?'] },
+  rules: { doThis: 'Write a rule someone could use in a different situation, then mark each class rule against this case.',
+    why: 'A rule that works across cases is the thing you take with you. Testing old rules shows where they hold and where they break.',
+    example: ['When visitor numbers fall three years running, waiting for them to recover tends to cost more, as long as the cause hasn’t changed.'],
+    stuck: ['Take out the names: no dam, no water. What’s left?', '“Held” means the rule worked here. “Needs a condition” means it worked only partly.', 'Read the rule, then ask: did that happen in the dam case?'] }
+};
+function helpTop(eyebrow, key) {
+  const open = S.help === key;
+  return `<div class="panel__top"><p class="panel__eyebrow">${eyebrow}</p><button class="help" data-help="${key}" aria-expanded="${open}" aria-label="Help with this step" title="Help with this step">?</button></div>${open ? coach(GUIDES[key]) : ''}`;
+}
+function coach(g) {
+  return `<div class="coach"><p class="coach__do"><span class="coach__tag">Do this</span> ${g.doThis}</p><div class="coach__help">
+    <details class="coach__fold"><summary>💡 Why this step</summary><div class="coach__body"><p>${g.why}</p></div></details>
+    <details class="coach__fold"><summary>👀 See an example</summary><div class="coach__body">${g.example.map((l) => `<p>${l}</p>`).join('')}</div></details>
+    <details class="coach__fold coach__fold--stuck"><summary>🆘 I’m stuck</summary><div class="coach__body"><ul>${g.stuck.map((l) => `<li>${l}</li>`).join('')}</ul></div></details></div></div>`;
+}
+
+/* ---------------- the work column ---------------- */
+const evidenceList = () => `<div class="evidence">${S.ev.map((e, i) => `<div class="ev"><div>“${esc(e.text)}”<small>${esc(e.from)}</small></div><button aria-label="Remove" data-unev="${i}">×</button></div>`).join('')}</div>`;
+const options = (sel, attr) => `<div class="opts">${OPTIONS.map((o) => `<button class="opt" ${attr}="${o.k}" aria-pressed="${sel === o.k}"><span class="opt__k">${o.k}</span><span><b>${o.t}</b><span class="d">${o.d}</span></span></button>`).join('')}</div>`;
+function decisionCard() {
+  const s = S.seal;
+  return `<div class="decision"><div class="decision__top">${LOCK}Locked at ${s.time}</div>
+    <div class="decision__choice">${s.choice} · ${esc(opt(s.choice).t)}</div>
+    <div class="bar"><span style="width:${s.conf}%"></span></div><div class="decision__conf"><span>How sure</span><span>${s.conf}%</span></div></div>`;
+}
+function renderWork() {
+  const w = $('#work'); const d = S.draft; const t = S.tab;
+  if (t === 'brief') {
+    if (S.first) {
+      w.innerHTML = `<div class="panel">${helpTop('Your first take', 'brief')}<h3>${S.first.choice} · ${esc(opt(S.first.choice).t)}</h3><p>${esc(S.first.why)}</p>
+        <p class="hint">Kept for later. You'll see it again beside the outcome.</p><div class="row"><button class="btn btn--primary" data-go="file">Open the case</button></div></div>`;
+      return;
+    }
+    w.innerHTML = `<div class="panel">${helpTop('Brief', 'brief')}
+      <p class="ask">You run the Marlow Valley Water Authority. It's October and the dam is at 31%. What do you do?</p>
+      <p class="hint">Your first take, before you read the case. Go with what you know.</p>
+      ${options(d.firstChoice, 'data-first')}
+      <textarea id="firstwhy" placeholder="One line: why?">${esc(d.firstWhy)}</textarea>
+      <div class="row"><button class="btn btn--primary" id="firstgo" ${d.firstChoice ? '' : 'disabled'}>Save my first take</button></div></div>`;
+    return;
+  }
+  if (t === 'file') {
+    if (!S.part2) {
+      const sent = !!S.part1;
+      w.innerHTML = `<div class="panel">${helpTop('Part 1', 'part1')}<h3>What is the biggest risk in these three documents?</h3>
+        <p class="hint">Back it with a line from the case.</p>${evidenceList()}
+        <textarea id="p1" placeholder="The biggest risk is…" ${sent ? 'disabled' : ''}>${esc(S.part1 || d.p1)}</textarea>
+        ${sent && S.pace === 'teacher' ? `<div class="wait"><span class="wait__dot"></span>Sent. Part 2 opens when your teacher is ready.</div>`
+          : `<div class="row"><button class="btn btn--primary" id="p1go">${S.pace === 'own' ? 'Answer and open part 2' : 'Send'}</button></div>`}</div>`;
+      return;
+    }
+    const canGo = S.pace === 'own' || S.open.has('work');
+    w.innerHTML = `<div class="panel">${helpTop('Part 2 is open', 'part2')}<h3>What changed?</h3>
+      <p>Two new documents. Read them against your part 1 answer.</p><p class="hint">Keep collecting evidence. It comes with you when you decide.</p>${evidenceList()}
+      ${canGo ? '<div class="row"><button class="btn btn--primary" data-go="work">Decide</button></div>' : '<div class="wait"><span class="wait__dot"></span>Your teacher moves the class on to Decide.</div>'}</div>`;
+    return;
+  }
+  if (t === 'work') {
+    if (S.seal) {
+      let after;
+      if (S.pace === 'own') {
+        after = S.objection
+          ? `<div class="row"><button class="btn btn--primary" data-go="outcome">See the outcome</button></div>`
+          : `<p class="panel__eyebrow" style="margin-top:16px">Before the outcome: the strongest objection</p>
+             <div class="objection">${esc(OBJECTIONS[S.seal.choice])}</div>
+             <textarea id="obj" placeholder="Answer it. Your decision stays locked; your answer defends it.">${esc(d.obj)}</textarea>
+             <div class="row"><button class="btn btn--primary" id="objgo">Send</button></div>`;
+      } else {
+        after = S.revealed ? `<div class="row"><button class="btn btn--primary" data-go="outcome">See the outcome</button></div>`
+          : `<div class="wait"><span class="wait__dot"></span>Your teacher shows the outcome to everyone at once.</div>`;
+      }
+      w.innerHTML = `<div class="panel">${helpTop('Decided', 'locked')}<h3>Your decision is locked</h3>${decisionCard()}
+        <p class="hint" style="margin-top:10px">You can't change it now. You'll see it beside what actually happened.</p>${after}</div>`;
+      return;
+    }
+    w.innerHTML = `<div class="panel">${helpTop('Decide', 'decide')}<h3>What do you do?</h3>
+      <p class="hint">Once you lock it in, it can't change.</p>
+      ${options(d.choice, 'data-choice')}
+      <div class="conf"><div class="conf__top"><span>How sure are you?</span><span id="confv">${d.conf}%</span></div>
+        <input type="range" min="0" max="100" step="5" value="${d.conf}" id="conf" aria-label="How sure are you">
+        <div class="conf__ends"><span>A guess</span><span>Certain</span></div></div>
+      <textarea id="reason" placeholder="Because…">${esc(d.reason)}</textarea>
+      ${evidenceList()}
+      <div class="row"><button class="btn btn--primary" id="sealgo" ${d.choice && d.reason.trim() ? '' : 'disabled'}>Lock in my decision</button></div></div>`;
+    return;
+  }
+  if (t === 'outcome') {
+    const s = S.seal; const changed = S.first && S.first.choice !== s.choice;
+    w.innerHTML = `<div class="panel">${helpTop('Outcome', 'outcome')}<h3>Your decision beside what happened</h3>
+      <div class="compare"><div class="${changed ? 'changed' : ''}"><b>First take</b>${S.first.choice} · ${esc(opt(S.first.choice).t)}</div>
+      <div><b>Locked in</b>${s.choice} · ${s.conf}% sure</div></div>
+      ${decisionCard()}
+      <p class="panel__eyebrow" style="margin-top:16px">Where the class landed</p>${spread()}
+      <p class="panel__eyebrow">What did the case tell you that you didn't use?</p>
+      <p class="hint">The documents you didn't cite are marked on the ${matchMedia('(max-width: 760px)').matches ? 'case' : 'left'}.</p>
+      <textarea id="missed" placeholder="The document I skipped showed…">${esc(S.missed)}</textarea>
+      <div class="row"><button class="btn btn--primary" id="missedgo">On to the rules</button></div></div>`;
+    return;
+  }
+  if (t === 'rules') {
+    const r = d.rule;
+    w.innerHTML = `<div class="panel">${helpTop('Your rule of thumb', 'rules')}<h3>What would you tell the next person making this call?</h3>
+      <div class="frame">
+        <label>When…<input id="r0" value="${esc(r[0])}" placeholder="the dam has fallen three years running"></label>
+        <label>…this tends to follow<input id="r1" value="${esc(r[1])}" placeholder="waiting for rain costs more water than it saves"></label>
+        <label>…as long as<input id="r2" value="${esc(r[2])}" placeholder="any response takes weeks to work"></label></div>
+      ${S.proposed ? '<div class="wait">Sent. Your teacher adds it to the class rules.</div>' : '<div class="row"><button class="btn btn--primary" id="rulego">Send to the class rules</button></div>'}
+      <p class="hint" style="margin-top:14px">Then check each class rule against this case.</p></div>`;
+  }
+}
+
+function spread() {
+  const pts = [['A',80],['A',65],['A',90],['A',55],['A',70],['A',40],['B',85],['B',75],['B',60],['B',95],['B',50],['B',70],['B',45],['B',80],['C',60],['C',35],['C',70],['C',50],['C',55],['A',75],['B',65],['C',80],['A',60]];
+  const col = { A: 0, B: 1, C: 2 }; const jit = (i) => ((i * 37) % 23) - 11;
+  const counts = { A: 0, B: 0, C: 0 }; pts.forEach(([k]) => counts[k]++); counts[S.seal.choice]++;
+  const dots = pts.map(([k, c], i) => `<circle cx="${60 + col[k] * 100 + jit(i)}" cy="${110 - c}" r="5" fill="#a7abb9"/>`).join('')
+    + `<circle cx="${60 + col[S.seal.choice] * 100}" cy="${110 - S.seal.conf}" r="7" fill="#17375e" stroke="#fff" stroke-width="2"/>`;
+  return `<div class="spread"><svg viewBox="0 0 320 132" role="img" aria-label="Class decisions by option and how sure">
+    <line x1="10" y1="10" x2="310" y2="10" stroke="rgba(23,55,94,.08)"/><line x1="10" y1="60" x2="310" y2="60" stroke="rgba(23,55,94,.08)"/><line x1="10" y1="110" x2="310" y2="110" stroke="rgba(23,55,94,.18)"/>
+    <text x="10" y="8" font-size="9" fill="#6b7788" font-family="Inter">certain</text><text x="10" y="106" font-size="9" fill="#6b7788" font-family="Inter">a guess</text>
+    ${dots}${['A','B','C'].map((k) => `<text x="${60 + col[k] * 100}" y="126" font-size="11" font-weight="600" text-anchor="middle" fill="#13233a" font-family="Inter">${k} · ${counts[k]}</text>`).join('')}
+  </svg><div class="spread__cap">The navy dot is you. ${S.pace === 'own' ? '24 of 26 have decided so far.' : 'Everyone in the class.'} No names.</div></div>`;
+}
+function renderRules() {
+  return RULES.map((r) => `<article class="block rule"><div class="rule__text">${r.text}</div>
+    <div class="chips">${r.marks.map(([c, k]) => `<span class="chip chip--${k}">${c} · ${MARK_LABEL[k]}</span>`).join('')}
+    ${S.marks[r.id] ? `<span class="chip chip--${S.marks[r.id]} chip--new">The dam · ${MARK_LABEL[S.marks[r.id]]}</span>` : ''}</div>
+    ${S.marks[r.id] ? '' : `<div class="judge"><span class="judge__label">In the dam case:</span>${Object.entries(MARK_LABEL).map(([k, l]) => `<button class="pill-btn" data-mark="${r.id}:${k}">${l}</button>`).join('')}</div>`}
+  </article>`).join('');
+}
+
+/* ---------------- wiring ---------------- */
+function renderSwitch() {
+  $('#study').dataset.pane = S.pane;
+  document.querySelectorAll('#switch button').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.pane === S.pane));
+    b.querySelector('.new')?.remove();
+  });
+  const fresh = (S.tab === 'file' && S.part2 && S.pane === 'work') || (S.tab === 'outcome' && S.pane === 'work');
+  if (fresh) $('#switch [data-pane="case"]').insertAdjacentHTML('beforeend', '<span class="new"></span>');
+  $('#switch [data-pane="case"]').firstChild.textContent = S.tab === 'rules' ? 'Class rules' : 'The case';
+}
+function renderChrome() {
+  document.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pace === S.pace)));
+  $('#board').hidden = S.pace !== 'teacher';
+  $('[data-board="release"]').disabled = S.part2 || !S.open.has('file');
+  $('[data-board="work"]').disabled = S.open.has('work') || !S.part2;
+  $('[data-board="reveal"]').disabled = S.revealed || !S.seal;
+}
+function render() { renderChrome(); renderMeta(); renderRail(); renderCase(); renderWork(); renderSwitch(); }
+const isPhone = () => matchMedia('(max-width: 760px)').matches;
+function go(tab) {
+  S.done.add(S.tab); S.open.add(tab); S.tab = tab;
+  if (tab === 'outcome') S.revealedSeen = true;
+  S.pane = tab === 'file' || tab === 'rules' ? 'case' : 'work';
+  render(); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showPart2() {
+  if (S.tab !== 'file') return;
+  const first = document.querySelector('[data-doc="transcript"]');
+  if (first) setTimeout(() => first.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+}
+function keepDraft() {
+  if ($('#reason')) S.draft.reason = $('#reason').value;
+  if ($('#firstwhy')) S.draft.firstWhy = $('#firstwhy').value;
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.help) { keepDraft(); S.help = S.help === b.dataset.help ? null : b.dataset.help; renderWork(); return; }
+  if (b.dataset.pace) { S = fresh(b.dataset.pace); render(); return; }
+  if (b.id === 'reset') { S = fresh(S.pace); render(); return; }
+  if (b.dataset.tab) { S.tab = b.dataset.tab; S.pane = 'work'; render(); return; }
+  if (b.dataset.go) { go(b.dataset.go); return; }
+  if (b.closest('#switch')) { S.pane = b.dataset.pane; renderSwitch(); window.scrollTo({ top: 0 }); return; }
+  if (b.dataset.first) { keepDraft(); S.draft.firstChoice = b.dataset.first; renderWork(); return; }
+  if (b.id === 'firstgo') { keepDraft(); S.first = { choice: S.draft.firstChoice, why: S.draft.firstWhy.trim() || 'Gut feeling.' }; S.open.add('file'); render(); return; }
+  if (b.id === 'p1go') {
+    S.part1 = $('#p1').value.trim() || '(answer)';
+    if (S.pace === 'own') { S.part2 = true; S.fresh2 = true; S.pane = 'case'; }
+    render(); showPart2(); return;
+  }
+  if (b.dataset.choice) { keepDraft(); S.draft.choice = b.dataset.choice; renderWork(); return; }
+  if (b.id === 'sealgo') {
+    keepDraft();
+    S.seal = { choice: S.draft.choice, conf: S.draft.conf, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
+    S.done.add('work'); render(); return;
+  }
+  if (b.id === 'objgo') { S.objection = $('#obj').value.trim() || '(answer)'; S.open.add('outcome'); render(); return; }
+  if (b.id === 'missedgo') { S.missed = $('#missed').value; go('rules'); return; }
+  if (b.id === 'rulego') { S.draft.rule = [0, 1, 2].map((i) => $('#r' + i).value); S.proposed = true; renderWork(); return; }
+  if (b.dataset.mark) { const [id, k] = b.dataset.mark.split(':'); S.marks[id] = k; renderCase(); return; }
+  if (b.dataset.unev) { keepDraft(); S.ev.splice(Number(b.dataset.unev), 1); renderWork(); return; }
+  if (b.dataset.board === 'release') { S.part2 = true; S.fresh2 = true; if (S.tab === 'file') S.pane = 'case'; render(); showPart2(); return; }
+  if (b.dataset.board === 'work') { S.open.add('work'); render(); return; }
+  if (b.dataset.board === 'reveal') { S.revealed = true; S.open.add('outcome'); render(); return; }
+});
+document.addEventListener('input', (e) => {
+  const id = e.target.id;
+  if (id === 'conf') { S.draft.conf = Number(e.target.value); $('#confv').textContent = S.draft.conf + '%'; }
+  if (id === 'reason') { S.draft.reason = e.target.value; $('#sealgo').disabled = !(S.draft.choice && S.draft.reason.trim()); }
+  if (id === 'obj') S.draft.obj = e.target.value;
+  if (id === 'p1') S.draft.p1 = e.target.value;
+  if (id === 'missed') S.missed = e.target.value;
+});
+
+/* select a line in the case to cite it */
+const cite = $('#cite'); let pending = null;
+function checkSelection() {
+  const sel = getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { cite.hidden = true; pending = null; return; }
+  const range = sel.getRangeAt(0); const start = range.startContainer;
+  const doc = (start.nodeType === 1 ? start : start.parentElement)?.closest('[data-doc]');
+  const text = sel.toString().trim().replace(/\s+/g, ' ');
+  if (!doc || text.length < 4 || !['file', 'work'].includes(S.tab)) { cite.hidden = true; pending = null; return; }
+  pending = { text: text.length > 160 ? text.slice(0, 157) + '…' : text, id: doc.dataset.doc };
+  const r = range.getBoundingClientRect();
+  cite.hidden = false;
+  cite.style.top = `${r.bottom + window.scrollY + 8}px`;
+  cite.style.left = `${Math.max(12, Math.min(window.innerWidth - 180, r.left + window.scrollX))}px`;
+}
+document.addEventListener('mouseup', () => setTimeout(checkSelection, 0));
+document.addEventListener('touchend', () => setTimeout(checkSelection, 250));
+document.addEventListener('selectionchange', () => { if (isPhone()) setTimeout(checkSelection, 300); });
+cite.addEventListener('mousedown', (e) => e.preventDefault());
+cite.addEventListener('click', (e) => {
+  e.stopPropagation(); if (!pending) return;
+  keepDraft();
+  S.ev.push({ text: pending.text, from: `${DOCS[pending.id].type} · ${DOCS[pending.id].from}` });
+  S.cited.add(pending.id);
+  getSelection().removeAllRanges(); cite.hidden = true; pending = null;
+  if (isPhone()) S.pane = 'work';
+  renderCase(); renderWork(); renderSwitch();
+});
+
+render();
+</script>
+</body>
+</html>

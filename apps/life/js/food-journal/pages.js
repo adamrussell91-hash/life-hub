@@ -804,7 +804,8 @@ export function paintVenueCheck(ctx, host, index) {
       ctx.button(`Keep ${venue.name}`, (e) => ctx.pickVenue(visit, null, e.currentTarget), "ghost"),
     );
   actions.append(
-    ctx.button("Edit visit", (e) => ctx.editVisit(visit, e.currentTarget), "ghost"),
+    // Check venues edits the venue, so it opens on Where and when.
+    ctx.button("Edit visit", (e) => ctx.editVisit(visit, e.currentTarget, { step: 0 }), "ghost"),
     ctx.button("Skip for now", () => ctx.skipVenue(), "ghost"),
   );
   card.append(picks, own, actions);

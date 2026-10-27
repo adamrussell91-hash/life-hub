@@ -16,7 +16,9 @@
  * Each statement in the round has a phase: collect → revealed → replace.
  * Placing is open only while collecting, moving only during re-place.
  * Teacher led: students answer the statement the teacher is on. Student
- * paced: they answer any statement still collecting.
+ * paced: they answer any statement still collecting. Self-run: student paced
+ * with no code and no round to start. One standing round (session "self")
+ * that students join on their own; the teacher reveals later, as usual.
  *
  * What leaves the server is the safety: while a statement collects, the
  * teacher gets symbols only (the projector drifts them) and students get a
@@ -89,7 +91,7 @@ function settings(block) {
   const scale = c.scale ?? {};
   const stops = (Array.isArray(scale.stops) ? scale.stops : []).filter((s) => typeof s === 'string').slice(0, 3);
   return {
-    pace: c.pace === 'student' ? 'student' : 'teacher',
+    pace: c.pace === 'student' || c.pace === 'self' ? c.pace : 'teacher',
     replace: c.replace !== false,
     scale: { left: String(scale.left ?? ''), right: String(scale.right ?? ''), stops },
     statements: (Array.isArray(c.statements) ? c.statements : [])
@@ -126,6 +128,8 @@ function cleanText(raw, what) {
   if (text.length > MAX_REASON) reject(400, 'bad_text', `Keep it to ${MAX_REASON} characters or fewer.`);
   return text;
 }
+
+const SELF_SESSION = 'self';
 
 const phaseOf = (activity, sid) => {
   const p = activity.phases?.[sid]?.phase;
@@ -247,7 +251,7 @@ async function studentAction(store, k, activity, setup, body) {
   let id;
   if (action === 'join') {
     if (!activity.open) reject(409, 'closed', 'This activity has closed.');
-    if (String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    if (setup.pace !== 'self' && String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     id = await claimSymbol(store, k, tokenHash);
     if (!id) reject(409, 'full', 'This activity is full. Ask your teacher.');
   } else {
@@ -296,6 +300,11 @@ async function studentAction(store, k, activity, setup, body) {
   return { ...shared, joined: true, symbol: id, current, statements };
 }
 
+/** The standing self-run round: same session every time, so a race to create it, or a re-open, never splits the class. */
+function selfRound() {
+  return { session: SELF_SESSION, code: '', open: true, started_at: new Date().toISOString(), expires: roundExpiry(), current: 0, phases: {} };
+}
+
 function freshRound() {
   return {
     session: randomBytes(16).toString('hex'),
@@ -317,7 +326,7 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'start') {
-    activity = freshRound();
+    activity = setup.pace === 'self' ? selfRound() : freshRound();
     await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
@@ -328,6 +337,10 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   if (teacher && body.action === 'resume') {
     activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(), session }), { open: true });
     if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
+  }
+  if (setup.pace === 'self' && (!activity || activity.expires < Date.now())) {
+    activity = selfRound();
+    await saveRound(store, base, activity);
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
 

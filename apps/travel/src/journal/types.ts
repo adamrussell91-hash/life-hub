@@ -8,7 +8,8 @@ export type JournalDeletedMeta = {
   deleted_with?: string;
 };
 
-export type JournalLocationSource = 'exif' | 'inferred' | 'manual';
+/** 'device' is the phone's own location service at the moment of capture. */
+export type JournalLocationSource = 'exif' | 'inferred' | 'manual' | 'device';
 
 export type JournalTransitionMode = 'flight' | 'train' | 'car' | 'ferry' | 'other';
 

@@ -55,6 +55,12 @@ await build({
   banner: {js:'// Generated from apps/teaching/src/tutorial/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
 await build({
+  entryPoints: ['apps/teaching/src/case-study/schema.ts'],
+  outfile: 'netlify/functions/_shared/case-study-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/case-study/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
   entryPoints: ['apps/teaching/src/sprint/schema.ts'],
   outfile: 'netlify/functions/_shared/sprint-schema.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
@@ -65,4 +71,11 @@ await build({
   outfile: 'netlify/functions/_shared/sprint-rules.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   banner: {js:'// Generated from apps/teaching/src/sprint/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/evidence/server-entry.ts'],
+  outfile: 'netlify/functions/_shared/profile-evidence.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  alias: { '@': './apps/teaching/src' },
+  banner: {js:'// Generated from apps/teaching/src/evidence/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });

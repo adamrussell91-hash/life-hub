@@ -12,6 +12,7 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { unitKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
+import { listDone } from './profile-done.mjs';
 import { read, reject } from './question-drop.mjs';
 import { MARKBOOK_LIMITS, MarkbookSchema, checkColumn, checkMark, pruneMarks } from './markbook-schema.mjs';
 
@@ -140,7 +141,9 @@ export async function markbookAction(store, classId, body) {
     return {
       markbook: book,
       students: roster.students.map(({ id, name, initials }) => ({ id, name, initials })),
-      quizzes: await quizColumns(store, roster, book)
+      quizzes: await quizColumns(store, roster, book),
+      // Which lessons each student has marked done, for the gradebook. The student profile skips it.
+      ...(body.skip_done ? {} : { done: Object.fromEntries(await Promise.all(roster.students.map(async (s) => [s.id, await listDone(store, classId, s.id)]))) })
     };
   }
 

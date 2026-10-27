@@ -45,6 +45,7 @@ export const BlockTypeSchema = z.enum([
   'table',
   'peer_feedback',
   'question_drop',
+  'done',
   'brainstorm',
   'hinge_question',
   'continuum_line',
@@ -232,7 +233,9 @@ export const GalleryItemSchema = z.object({
   id: z.string().min(1),
   url: z.string(),
   alt_text: z.string(),
-  caption: z.string().optional()
+  caption: z.string().optional(),
+  /** A lesson in the same unit: the image opens it. Unresolved ids show as a plain image. */
+  lesson_id: z.string().min(1).optional()
 });
 
 export const GalleryBlockSchema = z.object({
@@ -578,7 +581,7 @@ export const ContinuumLineBlockSchema = z.object({
       stops: z.array(z.string().max(40)).max(3).default([])
     }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
     statements: z.array(ContinuumStatementSchema).max(10).default([]),
-    pace: z.enum(['teacher', 'student']).default('teacher'),
+    pace: z.enum(['teacher', 'student', 'self']).default('teacher'),
     replace: z.boolean().default(true)
   }), ...blockLayout, ...blockTimestamps
 });
@@ -769,6 +772,8 @@ export const CurriculumLinesV2ContentSchema = z.object({
   focus_area: z.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
   /** The metro lines (textual concepts) this unit shows; unset shows every one. The year network always shows them all. */
   concept_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
+  /** The light rail lines (skills strands) this unit shows; unset shows every one. The year network always shows them all. */
+  skill_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
 });
 export const CurriculumLinesBlockSchema = z.object({
@@ -808,6 +813,16 @@ export const QuestionDropBlockSchema = z.object({
     marks_max: z.number().int().min(1).max(20).default(3),
     per_student: z.number().int().min(1).max(5).default(1),
     accepting: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/** Done: the student marks a lesson finished. One tap on a known device, initials on a new one. */
+export const DoneBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('done'), variant: z.string().default('small'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    label: z.string().max(120).default('I’ve finished this')
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1689,6 +1704,7 @@ const leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,

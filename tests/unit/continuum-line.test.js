@@ -177,3 +177,39 @@ test('routes: student route is public, teacher route needs the operator session'
   assert.equal((await pub(preq('{}', 'https://evil.example'))).status, 403);
   assert.equal((await pub(preq(JSON.stringify({ action: 'reveal', statement: 's1' })))).status, 400, 'students cannot reveal');
 });
+
+test('self-run: no code or start needed; students place and move on, nothing shows until the teacher reveals', async () => {
+  const store = storeFixture({ pace: 'self' });
+  const [a, b] = tokens(2).map(token => ({ token, session: 'self' }));
+  const idle = await learn(store, {});
+  assert.equal(idle.phase, 'live', 'the round opens itself');
+  assert.equal(idle.session, 'self');
+  assert.equal(idle.pace, 'self');
+  await learn(store, { ...a, action: 'join' });
+  await learn(store, { ...b, action: 'join', code: 'wrong' });
+  const first = await place(store, a, 's1', 0.2);
+  assert.equal(first.statements[0].phase, 'collect');
+  assert.equal(first.statements[0].class, null, 'no class line before the reveal');
+  const second = await place(store, a, 's2', 1, 'He needs it.');
+  assert.equal(second.statements[1].mine.pos, 1, 'any statement, in any order');
+  await place(store, b, 's1', 0.8, 'Could be nerves.');
+  const t = await teach(store, {});
+  assert.equal(t.statements[0].placed, 2);
+  assert.doesNotMatch(JSON.stringify(t), /nerves|sweat/, 'reasons stay hidden until the reveal');
+  await teach(store, { action: 'reveal', statement: 's1' });
+  const after = await learn(store, a);
+  assert.deepEqual(after.statements[0].class, [0.2, 0.8]);
+  assert.equal(after.statements[1].class, null, 'revealed per statement');
+});
+
+test('self-run: reopening keeps the same session so nothing is lost', async () => {
+  const store = storeFixture({ pace: 'self' });
+  const a = { token: tokens(1)[0], session: 'self' };
+  await learn(store, { ...a, action: 'join' });
+  await place(store, a, 's1', 0.4);
+  await teach(store, { action: 'end' });
+  await teach(store, { action: 'start' });
+  const back = await learn(store, a);
+  assert.equal(back.open, true);
+  assert.equal(back.statements[0].mine.pos, 0.4);
+});

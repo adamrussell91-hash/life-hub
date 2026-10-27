@@ -21,6 +21,8 @@ export type MapLesson = NetLesson & {
   branchFrom?: string;
   /** A quiz lesson: a checkpoint on the route. */
   quiz?: boolean;
+  /** An assessment lesson: the unit's assessment task, drawn as the square. */
+  assessment?: boolean;
 };
 
 export type MapRow = {
@@ -177,7 +179,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     const lane = roleOf(lesson.id) ?? 'core';
     const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
     const bandOf = hung.anchor.get(lesson.id) ?? lesson.id;
-    const isGoal = content.terminus.lesson_id === lesson.id;
+    const isGoal = content.terminus.lesson_id === lesson.id || lesson.assessment === true;
     return {
       id: lesson.id,
       title: lesson.title || 'Untitled lesson',

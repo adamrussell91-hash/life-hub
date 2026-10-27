@@ -10,6 +10,8 @@ import { mountTutorialPlayer } from '@/tutorial/player';
 import { tutorialClient } from '@/tutorial/api';
 import { mountSprintPlayer } from '@/sprint/player';
 import { sprintClient } from '@/sprint/api';
+import { mountCasePlayer } from '@/case-study/player';
+import { caseClient } from '@/case-study/api';
 import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
 import { isSidePath } from '@/lecture/scenes';
@@ -83,7 +85,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -112,7 +114,7 @@ export function renderPublishedLessonHero(
   return publishedOutcomes;
 }
 
-/** Returns the player's handle when the lesson plays as a lecture, a tutorial or a design sprint. */
+/** Returns the player's handle when the lesson plays as a lecture, a tutorial, a design sprint or a case study. */
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
@@ -128,6 +130,20 @@ function renderPublishedLesson(
       lesson,
       classId,
       client: classId ? sprintClient(lesson.lesson_id, classId) : null,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
+  if (lesson.pedagogical_mode === 'case_study' && lesson.case) {
+    // Only the brief, the decision and part titles are in the snapshot; documents come from the server by stage.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountCasePlayer(playerHost, {
+      lesson,
+      classId,
+      client: classId ? caseClient(lesson.lesson_id, classId) : null,
       renderHero: (hostEl) => {
         renderPublishedLessonHero(hostEl, lesson, extras?.cls);
       }
@@ -176,6 +192,7 @@ function renderPublishedLesson(
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
+        classId: extras?.cls?.id ?? extras?.quizClassId,
         pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
         openNoteId
@@ -354,7 +371,7 @@ export function mountStudentLessonView(
         const fromLink = new URLSearchParams(window.location.search).get('class') ?? undefined;
         const choices = fromLink || lesson.pedagogical_mode === 'quiz' ? [] : lesson.classes ?? [];
         if (choices.length < 2) {
-          // The one link is enough: a lecture, tutorial or sprint finds its single class itself.
+          // The one link is enough: a lecture, tutorial, sprint or case study finds its single class itself.
           show(content, lesson, { quizClassId: fromLink ?? choices[0]?.id });
           mountExamples(content);
           return;

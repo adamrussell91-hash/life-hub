@@ -236,6 +236,7 @@ describe('createBlock learning activities', () => {
       'brainstorm',
       'hinge_question',
       'question_drop',
+      'done',
       'quiz_question',
       'question_set',
       'flashcards',

@@ -2,6 +2,7 @@ import { cloneBlockWithNewIds } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
+import { CaseSettingsSchema } from '@/case-study/schema';
 import type { AiProposal } from '@/ai/proposals';
 import { applyInsertBlocks, replaceBlockInTree } from '@/ai/block-tree';
 import {
@@ -148,6 +149,12 @@ export function applyProposalToLesson(
     return result.ok
       ? { ok: true, lesson: withMode(withBlocks(lesson, result.blocks), proposal) }
       : { ok: false, message: 'Anchor block not found', lesson };
+  }
+
+  if (proposal.kind === 'update_case') {
+    if (lesson.pedagogical_mode !== 'case_study') return { ok: false, message: 'This lesson is not a case study.', lesson };
+    const base = lesson.case ?? CaseSettingsSchema.parse({});
+    return { ok: true, lesson: { ...lesson, case: { ...base, ...proposal.case } } };
   }
 
   if (proposal.kind === 'delete_blocks') {

@@ -1,0 +1,36 @@
+/* Done block: one button, or initials then a button. Tokens only. */
+.dn-done {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  min-width: 0;
+}
+
+.dn-done[hidden] {
+  display: none;
+}
+
+.dn-done .btn {
+  min-height: 44px;
+}
+
+.dn-done__initials {
+  min-height: 44px;
+  width: min(100%, 14rem);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.dn-done__finished {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dn-done__message {
+  margin: 0;
+  color: var(--color-danger, currentColor);
+}
+
+.dn-done__message[hidden] {
+  display: none;
+}

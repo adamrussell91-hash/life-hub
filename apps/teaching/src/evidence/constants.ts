@@ -11,6 +11,9 @@ export const BANDS = {
   groupMin: 2
 } as const;
 
+/** Mastery on the student profile: top-end results on this many separate checkpoints (quizzes or assessed pieces). */
+export const MASTERY = { checkpoints: 2 } as const;
+
 /** Pre-tests usually ask two questions per technique, so two items are enough for a focus area or a secure tag. */
 export const FOCUS = { below: 0.6, minItems: 2, max: 3, secureMinItems: 2 } as const;
 

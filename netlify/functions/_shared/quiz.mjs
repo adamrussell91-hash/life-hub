@@ -228,6 +228,27 @@ async function loadQuiz(store, lessonId) {
   return { draft, snapshot, record, settings: resolveQuizSettings(record.settings), k };
 }
 
+/**
+ * The tags a published quiz's answer keys declare: skills and catalogue techniques.
+ * The student profile measures its bars against these, not only what has been marked.
+ * An unpublished quiz declares none.
+ */
+export async function quizDeclaredTags(store, lessonId) {
+  let record;
+  try {
+    ({ record } = await loadQuiz(store, lessonId));
+  } catch (error) {
+    if (error instanceof QuizError) return [];
+    throw error;
+  }
+  const tags = new Set();
+  for (const { key } of Object.values(record.questions ?? {})) {
+    for (const skill of key.skills ?? []) tags.add(`skill:${skill}`);
+    for (const technique of Object.values(key.techniques ?? {})) tags.add(`tech:${technique}`);
+  }
+  return [...tags];
+}
+
 const versionCache = new Map();
 async function recordFor(store, lessonId, version, fallback) {
   if (version === fallback.version) return fallback;

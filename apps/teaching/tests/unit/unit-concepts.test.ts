@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { conceptLineIds, unitConceptKeys, unitLines } from '@/network/unit-concepts';
-import { settleConceptLines } from '@/teacher/network-context';
+import { conceptLineIds, skillLineIds, unitConceptKeys, unitLines, unitSkillStrands } from '@/network/unit-concepts';
+import { settleConceptLines, settleSkillLines } from '@/teacher/network-context';
 import { unitNetworkInput } from '@/blocks/curriculum-lines/render';
+import type { SkillsContinuum } from '@/skills/schema';
 import type { Alignment } from '@/alignment/schema';
 import type { Block, CurriculumLinesBlock, NetworkLine } from '@/schemas/block';
 
@@ -109,5 +110,50 @@ describe('Unit map: the unit’s concepts only', () => {
   it('draws only the picked metro lines; the rest of the subject’s lines stay', () => {
     const input = unitNetworkInput(mapBlock({ concept_lines: ['reef', 'sand'] }), { network: { lines: LINES, lessons: [] } });
     expect(input.lines.map((l) => l.id)).toEqual(['und', 'reef', 'sand', 'read']);
+  });
+});
+
+/* Skills: the same idea for the light rail lines. */
+const sub = (points: Array<[string, 'shared' | 'related']>) => ({ id: 'x', name: 'X', points: points.map(([point, link]) => ({ area: 'harbours', point, link })) });
+const SKILLS = {
+  strands: [
+    { strand: 'reading', sub_strands: [sub([['U1', 'shared'], ['U2', 'shared']])] },
+    { strand: 'arguing', sub_strands: [sub([['U1', 'shared']]), sub([['U1', 'shared'], ['U3', 'shared']])] },
+    { strand: 'speaking', sub_strands: [sub([['U2', 'shared']])] },
+    { strand: 'language', sub_strands: [sub([['U3', 'shared']])] },
+    { strand: 'valuing', sub_strands: [sub([['U1', 'related']])] }
+  ]
+} as unknown as SkillsContinuum;
+const RAILS: NetworkLine[] = [
+  { id: 'rd', mode: 'light_rail', name: 'Reading', colour: 'wave', alignment: { kind: 'strand', strand: 'reading' } },
+  { id: 'ar', mode: 'light_rail', name: 'Arguing', colour: 'navy', alignment: { kind: 'strand', strand: 'arguing' } },
+  { id: 'sp', mode: 'light_rail', name: 'Speaking', colour: 'amber', alignment: { kind: 'strand', strand: 'speaking' } }
+];
+
+describe('unitSkillStrands', () => {
+  it('ranks strands by the focus area’s dot points they name as core, a fourth only at two or more', () => {
+    expect(unitSkillStrands(DOC, SKILLS, 'harbours')).toEqual(['reading', 'arguing', 'speaking']);
+  });
+  it('is empty for an unknown focus area', () => {
+    expect(unitSkillStrands(DOC, SKILLS, 'nowhere')).toEqual([]);
+  });
+});
+
+describe('skillLineIds and unitLines', () => {
+  it('finds each strand’s light rail line', () => {
+    expect(skillLineIds(RAILS, ['arguing', 'language', 'reading'])).toEqual(['ar', 'rd']);
+  });
+  it('keeps trains, picked concepts and picked skills only', () => {
+    const all = [...LINES.filter((l) => l.mode !== 'light_rail'), ...RAILS];
+    expect(unitLines(all, ['reef'], ['sp']).map((l) => l.id)).toEqual(['und', 'reef', 'sp']);
+    expect(unitLines(all, ['reef'], undefined).map((l) => l.id)).toEqual(['und', 'reef', 'rd', 'ar', 'sp']);
+  });
+});
+
+describe('settleSkillLines', () => {
+  it('gives an unpicked unit map its focus area’s skill lines, and leaves picked ones alone', () => {
+    const out = settleSkillLines([mapBlock()] as Block[], RAILS, DOC, SKILLS, 'Harbours of the world');
+    expect(out?.[0]!.content).toMatchObject({ skill_lines: ['rd', 'ar', 'sp'] });
+    expect(settleSkillLines([mapBlock({ skill_lines: ['rd'] })] as Block[], RAILS, DOC, SKILLS, 'Harbours')).toBeNull();
   });
 });

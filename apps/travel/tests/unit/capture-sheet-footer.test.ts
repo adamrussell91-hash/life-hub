@@ -42,8 +42,8 @@ describe('capture sheet docked actions (R4)', () => {
     );
   });
 
-  it('uses 48px mode buttons and keyboard inset on capture sheet', () => {
-    expect(journalCss).toMatch(/\.journal-capture__mode\s*\{[^}]*min-height:\s*3rem/);
+  it('uses big capture buttons and keyboard inset on capture sheet', () => {
+    expect(journalCss).toMatch(/\.journal-capture__action\s*\{[^}]*min-height:\s*6\.5rem/);
     expect(journalCss).toMatch(/vv-keyboard-open[\s\S]*journal-capture-sheet/);
   });
 });

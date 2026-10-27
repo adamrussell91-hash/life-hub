@@ -181,6 +181,7 @@ const KERNEL_PROPOSAL_TO_TOOL = {
   insert_blocks: 'propose_insert_blocks',
   delete_blocks: 'propose_delete_blocks',
   reorder_blocks: 'propose_reorder_blocks',
+  update_case: 'propose_update_case',
   review_only: 'review_only'
 } as const;
 
