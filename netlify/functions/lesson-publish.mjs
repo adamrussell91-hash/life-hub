@@ -252,6 +252,20 @@ export function createLessonPublishHandler(deps = {}) {
         env
       );
     }
+    // Quiz questions only reach students inside a Quiz lesson; never let them vanish without a word.
+    if (quizPublish.dropped > 0) {
+      const n = quizPublish.dropped;
+      return withCors(
+        errorResponse(
+          400,
+          'validation_error',
+          `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because it isn’t a Quiz. Use a Question set block for answers inside a lesson, or switch the lesson to Quiz.`,
+          false
+        ),
+        request,
+        env
+      );
+    }
     publishBlocks = quizPublish.blocks;
     if (quizPublish.quiz) await storeQuizKey(store, id, quizPublish.quiz);
 
