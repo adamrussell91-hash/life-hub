@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { CATALOGUE, SECTIONS, entriesInSection, entry } from '../../packages/change-book/catalogue.mjs';
+import { CATALOGUE, FAMILIES, SECTIONS, entriesInSection, entry } from '../../packages/change-book/catalogue.mjs';
 import { ANY_GROUP, GROUPS, GROUP_IDS, groupSections, parseGroups } from '../../packages/change-book/route.mjs';
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 
@@ -48,13 +48,14 @@ test('seeAlso holds kept entries; pairsWell holds kept entries or real tools', (
   assert.deepEqual(entry('ch_future').seeAlso, ['ch_sustainability']);
 });
 
-test('Rhizome reuses Problem Solver’s concept map; every other entry has a shared family (no new families)', () => {
+test('Rhizome reuses Problem Solver’s concept map; Multitasking and (Un)Happiness have the Change Book’s own families; the rest are shared', () => {
   assert.deepEqual(CATALOGUE.filter((e) => e.reuse).map((e) => [e.id, e.reuse]), [['ch_rhizome', 'concept_map']]);
   assert.ok(TOOLS.concept_map);
-  const families = new Set(['path', 'list', 'quadrant', 'curve', 'scales', 'plot', 'tension']);
+  const families = new Set(FAMILIES);
   for (const e of CATALOGUE.filter((x) => !x.reuse)) assert.ok(families.has(e.family), `${e.id}: ${e.family}`);
-  assert.equal(entry('ch_multitasking').family, 'scales');
-  assert.equal(entry('ch_unhappiness').family, 'scales');
+  assert.equal(entry('ch_multitasking').family, 'time_value');
+  assert.equal(entry('ch_unhappiness').family, 'attribution');
+  assert.deepEqual(CATALOGUE.filter((e) => ['time_value', 'attribution'].includes(e.family)).map((e) => e.id), ['ch_multitasking', 'ch_unhappiness']);
   for (const id of ['ch_braess', 'ch_innovation', 'ch_swarm_intelligence', 'ch_anti_change']) assert.equal(entry(id).family, 'list', id);
 });
 
