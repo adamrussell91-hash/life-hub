@@ -369,7 +369,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     }
     const moved = sv.mine.new_pos != null;
     const title = moved ? 'Moved' : sv.phase === 'replace' ? 'Kept where it was' : 'Revealed';
-    const sub = moved ? (s.pace === 'self' ? 'Your move is saved.' : 'Your teacher will show the moves.') : sv.phase === 'replace' ? 'You can still move if the discussion changes your mind.' : 'The grey dots are the class. Yours is your symbol.';
+    const sub = moved ? 'Your teacher will show the moves.' : sv.phase === 'replace' ? 'You can still move if the discussion changes your mind.' : 'The grey dots are the class. Yours is your symbol.';
     const panel = waitPanel(title, sub);
     panel.append(line({ symbol, pos: moved ? sv.mine.new_pos! : sv.mine.pos, snap: st.snap, ghost: moved ? sv.mine.pos : undefined, dots: sv.class ?? [] }));
     const row = nav();
