@@ -10,7 +10,7 @@ import { createFragrancePhoto, fragrancePhotoUrl } from './fragrance-photos.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
-import { dressForWeather, SLOTS, slotLabel, styleAround } from './outfit-model.js';
+import { dressForWeather, readGarmentPhoto, SLOTS, slotLabel, styleAround } from './outfit-model.js';
 import {
   combosFor,
   dominantColour,
@@ -124,6 +124,7 @@ export function createAesthetics(doc, {
     vibe: 0,
     snap: null,
     snapSlot: 'top',
+    slotPicked: false,
     styled: null,
     date: null,
     events: [],
@@ -742,6 +743,7 @@ export function createAesthetics(doc, {
   }
   function pickSlot(slot) {
     state.snapSlot = slot;
+    state.slotPicked = true;
     if (state.snap) snapColour(state.snap.colour, { slot });
     else renderSlots();
   }
@@ -756,9 +758,13 @@ export function createAesthetics(doc, {
     $('#aes-snap-swatch').hidden = false;
     $('#aes-snap-swatch').style.background = GARMENT_COLOURS[colour];
     const piece = `${colour} ${garment ?? slotLabel(slot)}`;
+    const read = {
+      shape: `Looks like ${slot === 'bottom' ? 'pants' : slot === 'shoes' ? 'shoes' : `a ${slotLabel(slot)}`} from the shape. `,
+      unsure: 'Could not tell the piece from this photo, so check “It\'s a” above. '
+    }[state.snap.read] ?? '';
     host.replaceChildren(
       el('div', { class: 'aes-display aes-snapres__name', text: label ? `${label}. Good choice.` : `That reads as ${colour}.` }),
-      el('p', { class: 'aes-meta', text: `Styled around ${piece}. Wrong piece? Change “It's a” above. Tap an outfit to lay it out.` }),
+      el('p', { class: 'aes-meta', text: `${read}Styled around ${piece}. Wrong piece? Change “It's a” above. Tap an outfit to lay it out.` }),
       el('div', { class: 'aes-matches aes-matches--stack' }, options.map(o => {
         const on = state.styled && outfitKey(state.styled.look) === outfitKey(o.look);
         return el('button', { type: 'button', class: 'aes-match', 'aria-pressed': String(Boolean(on)), onclick: () => { state.styled = o; renderVibe(); renderSnap(); } },
@@ -770,11 +776,11 @@ export function createAesthetics(doc, {
       })));
   }
   /** `opts.slot` / `opts.garment` say which piece it is; a photo keeps whatever slot is chosen. */
-  function snapColour(colour, { label = null, slot = state.snap?.slot ?? state.snapSlot, garment } = {}) {
+  function snapColour(colour, { label = null, slot = state.snap?.slot ?? state.snapSlot, garment, read = null } = {}) {
     state.snapSlot = slot;
     // No garment given: keep the one already named if it is still the same piece.
     const keepGarment = garment !== undefined ? garment : state.snap?.slot === slot ? state.snap.garment : null;
-    state.snap = { colour, label, slot, garment: keepGarment };
+    state.snap = { colour, label, slot, garment: keepGarment, read };
     state.styled = styleAround({ colour, slot, garment: keepGarment })[0] ?? null;
     renderVibe();
     renderSnap();
@@ -788,13 +794,22 @@ export function createAesthetics(doc, {
       tile.style.background = '';
       tile.style.backgroundImage = `url(${url})`;
       $('#aes-snap-plus').textContent = '';
+      // Keep the photo's proportions: the silhouette says top or pants.
+      const scale = 80 / Math.max(img.naturalWidth || 80, img.naturalHeight || 80);
+      const w = Math.max(8, Math.round((img.naturalWidth || 80) * scale));
+      const h = Math.max(8, Math.round((img.naturalHeight || 80) * scale));
       const cv = doc.createElement('canvas');
-      cv.width = 60; cv.height = 60;
+      cv.width = w; cv.height = h;
       const ctx = cv.getContext('2d');
-      ctx.drawImage(img, 0, 0, 60, 60);
-      // The centre of the frame is where the garment usually is.
-      const rgb = dominantColour(ctx.getImageData(15, 15, 30, 30).data);
-      if (rgb) snapColour(nearestGarmentColour(rgb), { garment: null });
+      ctx.drawImage(img, 0, 0, w, h);
+      const shot = readGarmentPhoto(ctx.getImageData(0, 0, w, h).data, w, h);
+      // No clean silhouette: the centre of the frame is where the garment usually is.
+      const rgb = dominantColour(shot.pixels ?? ctx.getImageData(Math.round(w / 4), Math.round(h / 4), Math.round(w / 2), Math.round(h / 2)).data);
+      if (!rgb) return;
+      // A tap on Top or Layer outranks the shape, which only knows "upper body".
+      const chosen = state.slotPicked ? state.snapSlot : 'top';
+      const slot = !shot.slot ? chosen : shot.slot === 'top' && (chosen === 'top' || chosen === 'outer') ? chosen : shot.slot;
+      snapColour(nearestGarmentColour(rgb), { slot, garment: null, read: shot.slot ? 'shape' : 'unsure' });
     };
     img.onerror = () => { $('#aes-snapres').replaceChildren(el('p', { class: 'aes-meta', text: 'That photo would not open. Try a JPEG or PNG.' })); };
     img.src = url;
