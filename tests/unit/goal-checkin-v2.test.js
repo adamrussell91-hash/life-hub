@@ -12,7 +12,7 @@ const env = {
   SITE_ORIGIN: 'https://life-hub.adam-russell.com'
 };
 const session = createSessionToken(
-  { now: Date.parse('2026-09-27T00:00:00Z'), randomBytes: () => Buffer.alloc(16, 4) },
+  { now: Date.now(), randomBytes: () => Buffer.alloc(16, 4) },
   SECRET
 ).token;
 
