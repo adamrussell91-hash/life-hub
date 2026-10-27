@@ -152,7 +152,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       dot.className = 'cl-dot';
       dot.setAttribute('aria-current', String(i === viewing));
       dot.setAttribute('aria-label', `Statement ${i + 1}`);
-      if (s.pace !== 'teacher' && info) dot.append(el('small', '', info.phase === 'collect' || s.pace === 'self' ? ` ${info.placed}` : ' ✓'));
+      if (s.pace !== 'teacher' && info) dot.append(el('small', '', info.phase === 'collect' ? ` ${info.placed}` : ' ✓'));
       dots.append(dot);
     });
     const count = el('span', 'cl-nav__count block-secondary', `Statement ${viewing + 1} of ${statements.length}${statements[viewing]?.snap ? ' · snapped' : ''}`);
@@ -163,7 +163,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
     counter.replaceChildren();
     if (st.phase === 'collect') {
       counter.append(String(st.placed), el('span', '', ` of ${s.joined} placed`));
-      status.textContent = s.pace === 'self' ? 'Self-run: students place, see the class and move on their own. Reasons show here as they come in.' : s.pace === 'student' ? 'Students move through at their own pace.' : 'A reason is required. Nothing shows until you reveal.';
+      status.textContent = s.pace === 'self' ? 'Self-run: students place on their own. Nothing shows until you reveal.' : s.pace === 'student' ? 'Students move through at their own pace.' : 'A reason is required. Nothing shows until you reveal.';
     } else if (st.phase === 'revealed') {
       counter.append(String(st.placed), el('span', '', ' placed'));
       status.textContent = 'Click a symbol to read its reason.';
