@@ -181,7 +181,7 @@ export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: C
   const roundBox = el('div', 'cl-editor__group');
   roundBox.append(
     chips('Pace', [{ value: 'teacher', label: 'Teacher led: I click through' }, { value: 'student', label: 'Student paced: they move on' }, { value: 'self', label: 'Self-run: no code, no teacher steps' }], current.content.pace, (pace) => set({ pace })),
-    el('p', 'pf-field__hint block-secondary', 'Self-run: students open the lesson, place each statement with a reason, see where the class put theirs, may move and say why, then go on. Nothing for you to start or reveal; reasons appear on the block as they come in.'),
+    el('p', 'pf-field__hint block-secondary', 'Self-run: students open the lesson, place each statement with a reason and go on. No code and nothing to start. Nothing shows until you press Reveal on the block, the same as Student paced.'),
     toggle('Offer a re-place round after each reveal: students move their symbol and say why', current.content.replace, (on) => set({ replace: on }))
   );
 

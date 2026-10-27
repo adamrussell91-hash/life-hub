@@ -178,7 +178,7 @@ test('routes: student route is public, teacher route needs the operator session'
   assert.equal((await pub(preq(JSON.stringify({ action: 'reveal', statement: 's1' })))).status, 400, 'students cannot reveal');
 });
 
-test('self-run: no code, no teacher steps; place, see the class, then move', async () => {
+test('self-run: no code or start needed; students place and move on, nothing shows until the teacher reveals', async () => {
   const store = storeFixture({ pace: 'self' });
   const [a, b] = tokens(2).map(token => ({ token, session: 'self' }));
   const idle = await learn(store, {});
@@ -187,21 +187,19 @@ test('self-run: no code, no teacher steps; place, see the class, then move', asy
   assert.equal(idle.pace, 'self');
   await learn(store, { ...a, action: 'join' });
   await learn(store, { ...b, action: 'join', code: 'wrong' });
-  const mine = await place(store, a, 's1', 0.2);
-  assert.equal(mine.statements[0].phase, 'replace', 'placing shows the class and opens a move');
-  assert.deepEqual(mine.statements[0].class, [0.2]);
-  assert.equal(mine.statements[1].phase, 'collect');
-  assert.equal(mine.statements[1].class, null);
-  await assert.rejects(place(store, a, 's1', 0.3), /already placed/);
-  await assert.rejects(learn(store, { ...b, action: 'move', statement: 's1', pos: 0.5, why: 'x' }), /isn’t open|didn’t place/);
+  const first = await place(store, a, 's1', 0.2);
+  assert.equal(first.statements[0].phase, 'collect');
+  assert.equal(first.statements[0].class, null, 'no class line before the reveal');
+  const second = await place(store, a, 's2', 1, 'He needs it.');
+  assert.equal(second.statements[1].mine.pos, 1, 'any statement, in any order');
   await place(store, b, 's1', 0.8, 'Could be nerves.');
-  const moved = await learn(store, { ...a, action: 'move', statement: 's1', pos: 0.7, why: 'Nerves too.' });
-  assert.equal(moved.statements[0].mine.new_pos, 0.7);
-  assert.deepEqual(moved.statements[0].class, [0.2, 0.8]);
   const t = await teach(store, {});
-  assert.equal(t.statements[0].phase, 'replace');
-  assert.equal(t.statements[0].entries.length, 2);
-  assert.equal(t.statements[0].entries.find(e => e.new_pos === 0.7).why, 'Nerves too.', 'the teacher sees reasons and moves without revealing');
+  assert.equal(t.statements[0].placed, 2);
+  assert.doesNotMatch(JSON.stringify(t), /nerves|sweat/, 'reasons stay hidden until the reveal');
+  await teach(store, { action: 'reveal', statement: 's1' });
+  const after = await learn(store, a);
+  assert.deepEqual(after.statements[0].class, [0.2, 0.8]);
+  assert.equal(after.statements[1].class, null, 'revealed per statement');
 });
 
 test('self-run: reopening keeps the same session so nothing is lost', async () => {
