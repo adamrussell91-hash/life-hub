@@ -27,6 +27,20 @@ function scoreWaiting(run, def) {
     }
     return run;
   }
+  if (def.family === 'time_value') {
+    // The Change Book's split star: shares of the day that overlap (no total), values 1 to 10.
+    const modes = def.chart.modes.map((mode) => mode.id);
+    const time = Object.fromEntries(modes.map((id, i) => [id, [30, 40, 20, 35][i % 4]]));
+    const value = Object.fromEntries(modes.map((id, i) => [id, [8, 3, 9, 2][i % 4]]));
+    return applyScores(run, { time, value }, AT);
+  }
+  if (def.family === 'attribution') {
+    // The Change Book's table of forces: every force on the table (the person's own too), 1 to 5.
+    const own = run.nodes.filter((n) => parseSlot(n.slot).name === 'force').map((n) => `own_${parseSlot(n.slot).index ?? 1}`);
+    const ids = [...def.chart.forces.map((f) => f.id), ...own];
+    const col = (shift) => Object.fromEntries(ids.map((id, i) => [id, 1 + ((i + shift) % 5)]));
+    return applyScores(run, { feeling: 'happy', now: 3, later: 4, influenceNow: col(0), influenceLater: col(1) }, AT);
+  }
   for (const [k, s] of (def.chart.series ?? [{ id: 'now' }]).entries()) {
     const ids = def.chart.scales.map((scale) => scale.id);
     const values = Object.fromEntries(ids.map((id, i) => [id, def.chart.mode === 'shares' ? (i === 0 ? 100 - 15 * (ids.length - 1) : 15) : 2 + ((i * 3 + k * 2) % 8)]));

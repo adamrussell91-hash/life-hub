@@ -4,9 +4,8 @@
 // number lives here. `seeAlso` holds the book's own cross-references and `pairsWell` our own
 // suggestions. `reuse` names the Problem Solver tool a variant is built on; `merged` lists the
 // cut-down entries folded into a parent. Every id starts with `ch_`.
-// The pack proposed two new chart families, time_value_profile (Multitasking) and
-// attribution_table ((Un)Happiness). Both are deferred: the two models run on the shared scales
-// family for now.
+// Two models have Change Book families of their own (families/): time_value (Multitasking) and
+// attribution ((Un)Happiness).
 
 /** The five source sections, in the book's order. `route` is the group id a session stores. */
 export const SECTIONS = Object.freeze([
@@ -17,8 +16,8 @@ export const SECTIONS = Object.freeze([
   Object.freeze({ key: 'appendix', title: 'Appendix', route: null })
 ]);
 
-/** Chart families: the shared Decision Book families. */
-export const FAMILIES = Object.freeze(['path', 'list', 'quadrant', 'curve', 'scales', 'plot', 'tension']);
+/** Chart families: the shared Decision Book families, then the Change Book's own two. */
+export const FAMILIES = Object.freeze(['path', 'list', 'quadrant', 'curve', 'scales', 'plot', 'tension', 'time_value', 'attribution']);
 
 const m = (section, id, title, family, tier, { seeAlso = [], pairsWell = [], reuse = null, merged = [] } = {}) =>
   Object.freeze({ id, section, title, family: reuse ? null : family, tier, seeAlso: Object.freeze(seeAlso), pairsWell: Object.freeze(pairsWell), reuse, merged: Object.freeze(merged) });
@@ -32,9 +31,9 @@ export const CATALOGUE = Object.freeze([
   m('explaining_my_world', 'ch_counterculture', 'The Counterculture Model', 'path', 'lens', { pairsWell: ['ch_objectivity'] }),
   m('explaining_my_world', 'ch_othering', 'The Othering Model', 'quadrant', 'worksheet', { pairsWell: ['perspective_shift', 'dm_cognitive_bias'], merged: ['ch_prejudice'] }),
   m('changing_my_world', 'ch_decision', 'The Decision Model', 'path', 'worksheet', { pairsWell: ['dm_choice_overload', 'dm_stop_rule', 'dm_unconscious'] }),
-  m('changing_my_world', 'ch_multitasking', 'The Multitasking Model', 'scales', 'worksheet', { pairsWell: ['eisenhower', 'ch_sustainability'] }),
+  m('changing_my_world', 'ch_multitasking', 'The Multitasking Model', 'time_value', 'worksheet', { pairsWell: ['eisenhower', 'ch_sustainability'] }),
   m('changing_my_world', 'ch_sustainability', 'The Sustainability Model', 'list', 'lens', { pairsWell: ['ch_future'] }),
-  m('changing_my_world', 'ch_unhappiness', 'The (Un)Happiness Model', 'scales', 'worksheet', { pairsWell: ['force_field', 'ch_change'], merged: ['ch_dictatorship'] }),
+  m('changing_my_world', 'ch_unhappiness', 'The (Un)Happiness Model', 'attribution', 'worksheet', { pairsWell: ['force_field', 'ch_change'], merged: ['ch_dictatorship'] }),
   m('changing_my_world', 'ch_change', 'The Change Model', 'curve', 'lens', { pairsWell: ['force_field', 'ch_anti_change'] }),
   m('changing_my_world', 'ch_objectivity', 'The Objectivity Model', 'list', 'lens', { pairsWell: ['perspective_shift', 'ch_science'] }),
   m('changing_our_world', 'ch_transparency', 'The Transparency Model', 'list', 'worksheet', { pairsWell: ['ch_objectivity'] }),
