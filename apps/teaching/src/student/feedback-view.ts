@@ -21,7 +21,7 @@ type PublishedFeedback = {
   audio_url?: string;
 };
 
-function ensureNoIndex(): () => void {
+export function ensureNoIndex(): () => void {
   let robots = document.querySelector('meta[name="robots"]');
   const created = !robots;
   if (!robots) {

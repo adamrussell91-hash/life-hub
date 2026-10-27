@@ -374,6 +374,10 @@
     "Write a quiz question",
     "question_drop.prompt filler"
   ],
+  "every-block/every_done/student": [],
+  "every-block/every_done/teacher": [
+    "I’ve finished this"
+  ],
   "every-block/every_brainstorm/student": [
     "Brainstorm",
     "Loading…",
@@ -508,6 +512,7 @@
     "Effect",
     "Technique",
     "Where",
+    "Worked example",
     "faded_example.parts.0.answer filler",
     "faded_example.parts.1.answer filler",
     "faded_example.parts.2.answer filler",
@@ -517,6 +522,7 @@
     "Effect",
     "Technique",
     "Where",
+    "Worked example",
     "faded_example.parts.0.answer filler",
     "faded_example.parts.1.answer filler",
     "faded_example.parts.2.answer filler",

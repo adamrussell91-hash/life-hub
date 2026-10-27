@@ -36,8 +36,8 @@ export function freeze(value) {
 /** The fields every model config carries, checked once. */
 export function checkCommon(config) {
   const { id } = config;
-  // Decision Maker's models start dm_, Gear Shifter's techniques gt_, the Rules Book's rb_; all use these factories.
-  check(typeof id === 'string' && /^(dm|gt|rb)_/.test(id), id, 'ids start with dm_ or gt_ (or rb_ for the Rules Book)');
+  // Decision Maker's models start dm_, Gear Shifter's techniques gt_, the Rules Book's rb_, the Change Book's ch_; all use these factories.
+  check(typeof id === 'string' && /^(dm|gt|rb|ch)_/.test(id), id, 'ids start with dm_ or gt_ (or rb_ for the Rules Book, ch_ for the Change Book)');
   check(typeof config.name === 'string' && config.name, id, 'needs a name');
   check(typeof config.when === 'string' && config.when, id, 'needs a "use it when" line');
   check(Array.isArray(config.steps) && config.steps.length > 0, id, 'needs coaching steps');
@@ -53,8 +53,11 @@ export function checkCommon(config) {
  */
 export function framing(config) {
   const subject = config.chart.subject ?? null;
-  // Gear Shifter's techniques are about moving work, not deciding: their default says so; the Rules Book's about reading a situation.
-  const fallback = config.id.startsWith('gt_') ? 'What this shows about getting it moving' : config.id.startsWith('rb_') ? 'What this shows about the situation' : 'What this shows about the decision';
+  // Gear Shifter's techniques are about moving work, not deciding: their default says so; the Rules Book's about reading a situation, the Change Book's about a change.
+  const fallback = config.id.startsWith('gt_') ? 'What this shows about getting it moving'
+    : config.id.startsWith('rb_') ? 'What this shows about the situation'
+      : config.id.startsWith('ch_') ? 'What this shows about the change'
+        : 'What this shows about the decision';
   const reflection = config.chart.reflection === false ? null : (config.chart.reflection ?? fallback);
   return { subject, reflection };
 }

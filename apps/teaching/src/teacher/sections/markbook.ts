@@ -14,6 +14,7 @@ import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
+import { httpProgressApi, renderProgress, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
 import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
@@ -47,11 +48,15 @@ type Options = {
   today?: () => string;
   /** The view the markbook opens on. Defaults to the syllabus Grid. */
   view?: Mode;
+  /** The class's unit lessons in order, for the Progress view. */
+  progressLessons?: ProgressLesson[];
+  /** Test seam. Defaults to POST /api/classes/:id/profile. */
+  progressApi?: ProgressApi;
 };
 
 /** `grid` is the syllabus Grid; `marks` is the table of quizzes and tasks. */
-type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks';
-const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks']];
+type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks' | 'progress';
+const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks'], ['progress', 'Progress']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -105,6 +110,8 @@ function withServerCopy(view: MarkbookView, markbook: Markbook, queued: readonly
 
 export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = {}): () => void {
   const api = options.api ?? httpMarkbookApi;
+  const progressApi = options.progressApi ?? httpProgressApi;
+  let progressError = '';
   const today = options.today ?? (() => todayInSydney());
   const media = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 600px)') : null;
   const narrow = options.narrow ?? (() => !!media?.matches);
@@ -514,6 +521,13 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
+    if (mode === 'progress') {
+      body.replaceChildren(
+        renderProgress({ view: current, students, lessons: options.progressLessons ?? [], today: today(), error: progressError, onMark: (studentId, lessonId, state) => void markProgress(studentId, lessonId, state) })
+      );
+      restoreFocus(key);
+      return;
+    }
     if (mode !== 'marks') {
       const context = ctx;
       if (!context) body.replaceChildren(el('p', 'mb__status', ctxError ?? 'Loading…'));
@@ -645,6 +659,19 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       mistakeText: (why) => mixUpText({ tag, key: '', why, count: 1, students: [] }, label, (id) => codeLabel(id, context.codes)),
       onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
     });
+  }
+
+  /** The Progress view's marks go to the profile endpoint; its reply is every student's records. */
+  async function markProgress(studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear'): Promise<void> {
+    try {
+      const done = await progressApi.mark(cls.id, studentId, lessonId, state);
+      progressError = '';
+      if (confirmed) confirmed = { ...confirmed, done };
+      if (view) view = { ...view, done };
+    } catch (error) {
+      progressError = error instanceof ApiClientError && error.code !== 'network_error' ? error.message : 'Couldn’t save that mark. Try again.';
+    }
+    if (!disposed) paint();
   }
 
   /** Fetches a fresh view; changes still queued are laid over it. Says whether the server answered. */

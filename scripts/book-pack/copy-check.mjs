@@ -6,6 +6,7 @@
 //
 //   node scripts/book-pack/copy-check.mjs <pack-dir>                   check Gear Shifter's shipped strings
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book rules-book  check the Rules Book's
+//   node scripts/book-pack/copy-check.mjs <pack-dir> --book change-book check the Change Book's
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -139,6 +140,48 @@ export async function checkRulesBook(dir) {
   return found;
 }
 
+/** The Change Book's shipped strings, each with where it came from: models, the Act and Review tools, the coach's knowledge and rubric, the catalogue, the glyph titles and the app's own copy. */
+export async function changeBookStrings() {
+  const { CHANGE_TOOLS } = await import('../../packages/change-book/tools/index.mjs');
+  const { chCommit } = await import('../../packages/change-book/tools/commit.mjs');
+  const { chReview } = await import('../../packages/change-book/tools/review.mjs');
+  const knowledge = await import('../../netlify/functions/_shared/problem-solver/knowledge/change-book.mjs');
+  const { CHANGE_RUBRIC } = await import('../../netlify/functions/_shared/problem-solver/change-book-prompts.mjs');
+  const { CATALOGUE, SECTIONS } = await import('../../packages/change-book/catalogue.mjs');
+  const { GROUPS } = await import('../../packages/change-book/route.mjs');
+  const glyphs = fileURLToPath(new URL('../../packages/change-book/glyphs/', import.meta.url));
+  const out = [];
+  for (const [id, tool] of Object.entries({ ...CHANGE_TOOLS, ch_commit: chCommit, ch_review: chReview })) for (const text of shippedStrings(tool)) out.push([id, text]);
+  for (const key of ['STANCE', 'CHANGE_CHECKS', 'GROUP_GUIDE', 'LENS_GUIDE', 'CHANGE_TRAPS', 'SECTION_LINE']) out.push([`knowledge ${key}`, knowledge[key]]);
+  for (const entry of knowledge.LENSES) out.push([`knowledge lens ${entry.id}`, entry.name]);
+  for (const entry of CATALOGUE) { const note = knowledge.techniqueNote(entry.id); if (note) out.push([`knowledge note ${entry.id}`, note]); }
+  out.push(['rubric CHANGE_RUBRIC', CHANGE_RUBRIC]);
+  for (const entry of [...CATALOGUE, ...SECTIONS, ...GROUPS]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
+  for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
+      const title = /<title>([^<]*)<\/title>/.exec(readFileSync(join(glyphs, folder.name, file), 'utf8'))?.[1];
+      if (title) out.push([`glyph ${folder.name}/${file}`, title]);
+    }
+  }
+  out.push(...appStrings(new URL('../../apps/tasks/src/views/change-book/', import.meta.url), []));
+  return out;
+}
+
+/** Copied runs in the Change Book's shipped strings: [where, run] pairs, empty when clean. */
+export async function checkChangeBook(dir) {
+  const shingles = shinglesOf(readPackTexts(dir));
+  // The five part titles are headings: they are shown as the book's own names for its parts, in the
+  // catalogue and on the part emblems, and nowhere inside running text.
+  const titles = new Set(JSON.parse(readFileSync(join(dir, 'book.json'), 'utf8')).sections.map((part) => wordsOf(part.title).join(' ')));
+  const found = [];
+  for (const [where, text] of await changeBookStrings()) {
+    if (titles.has(wordsOf(text).join(' '))) continue;
+    const run = copiedRun(text, shingles);
+    if (run) found.push([where, run]);
+  }
+  return found;
+}
+
 /** Copied runs in Gear Shifter's shipped strings: [where, run] pairs, empty when clean. */
 export async function checkGearShifter(dir) {
   const shingles = shinglesOf(readPackTexts(dir));
@@ -157,7 +200,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exit(2);
   }
   const book = process.argv.includes('--book') ? process.argv[process.argv.indexOf('--book') + 1] : 'get-things-done';
-  const found = book === 'rules-book' ? await checkRulesBook(dir) : await checkGearShifter(dir);
+  const found = book === 'rules-book' ? await checkRulesBook(dir) : book === 'change-book' ? await checkChangeBook(dir) : await checkGearShifter(dir);
   for (const [where, run] of found) console.log(`COPIED ${where}: "${run}…"`);
   console.log(found.length ? `${found.length} copied runs` : 'No copied runs.');
   process.exit(found.length ? 1 : 0);

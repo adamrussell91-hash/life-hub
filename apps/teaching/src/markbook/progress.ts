@@ -1,0 +1,174 @@
+import { apiPost } from '@/api/client';
+import { el } from '@/quiz/dom';
+import type { ScheduledLesson, Unit } from '@/schemas';
+import type { MarkbookView } from './types';
+
+/**
+ * The teacher's Progress view: one row per student, one column per lesson of the unit.
+ * A tick is complete, a half circle is partial, a grey box is not for that student, and a
+ * red dot means it is still not complete a week after its set date. Pure rules first, then the table.
+ */
+
+/** A lesson is late this many days after its set date. */
+export const LATE_AFTER_DAYS = 7;
+
+export type ProgressLesson = {
+  id: string;
+  title: string;
+  role: 'core' | 'support' | 'extension' | 'optional';
+  /** An assessment fills only when the teacher marks it. */
+  assessment: boolean;
+  /** The lesson's set date for this class, YYYY-MM-DD. */
+  date?: string;
+};
+
+/** The unit's lessons in order, with each lesson's earliest set date for the class. */
+export function unitProgressLessons(
+  unit: Pick<Unit, 'lesson_ids'> | undefined,
+  lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string }>,
+  scheduled: readonly Pick<ScheduledLesson, 'lesson_id' | 'date'>[]
+): ProgressLesson[] {
+  const byId = new Map(lessons.map((l) => [l.id, l] as const));
+  const out: ProgressLesson[] = [];
+  for (const id of unit?.lesson_ids ?? []) {
+    const lesson = byId.get(id);
+    if (!lesson || lesson.status === 'trashed') continue;
+    const dates = scheduled.filter((r) => r.lesson_id === id && r.date).map((r) => r.date.slice(0, 10)).sort();
+    out.push({
+      id,
+      title: lesson.title,
+      role: lesson.route_role ?? 'core',
+      assessment: lesson.pedagogical_mode === 'assessment',
+      ...(dates[0] ? { date: dates[0] } : {})
+    });
+  }
+  return out;
+}
+
+export type DoneRecord = { at: string; via: string; partial?: boolean };
+export type CellState = 'complete' | 'partial' | 'na' | 'open';
+export type Cell = { state: CellState; late: boolean };
+
+const addDays = (day: string, n: number): string => {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+export type CellInput = {
+  lesson: ProgressLesson;
+  record: DoneRecord | undefined;
+  quizSubmitted: boolean;
+  quizStarted: boolean;
+  /** The teacher ticked this side lesson as taken for the student. */
+  took: boolean;
+  today: string;
+};
+
+export function cellFor(input: CellInput): Cell {
+  const { lesson, record, quizSubmitted, quizStarted, took, today } = input;
+  const teacherDone = record?.via === 'teacher' && !record.partial;
+  const studentDone = Boolean(record && !record.partial && record.via !== 'teacher') || quizSubmitted;
+  let state: CellState;
+  if (lesson.assessment) {
+    // Handed in or ticked, but not yet marked by the teacher, is partial.
+    state = teacherDone ? 'complete' : studentDone || record?.partial ? 'partial' : 'open';
+  } else if (teacherDone || studentDone) state = 'complete';
+  else if (record?.partial || quizStarted) state = 'partial';
+  else state = 'open';
+  if (state === 'open' && lesson.role !== 'core' && !took) return { state: 'na', late: false };
+  const late = state !== 'complete' && Boolean(lesson.date) && addDays(lesson.date!.slice(0, 10), LATE_AFTER_DAYS) < today;
+  return { state, late };
+}
+
+export type ProgressApi = {
+  mark: (classId: string, studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear') => Promise<Record<string, Record<string, DoneRecord>>>;
+};
+
+export const httpProgressApi: ProgressApi = {
+  mark: async (classId, studentId, lessonId, state) =>
+    (await apiPost<{ done: Record<string, Record<string, DoneRecord>> }>(`/api/classes/${encodeURIComponent(classId)}/profile`, { action: 'mark', student_id: studentId, lesson_id: lessonId, state })).done
+};
+
+/** What a press does: open becomes complete, complete becomes partial, partial is cleared. */
+const NEXT: Record<CellState, 'complete' | 'partial' | 'clear'> = { open: 'complete', na: 'complete', complete: 'partial', partial: 'clear' };
+
+const SYMBOL: Record<CellState, string> = { complete: '✓', partial: '◐', na: '', open: '' };
+const WORD: Record<CellState, string> = { complete: 'complete', partial: 'partial', na: 'not for this student', open: 'not done' };
+
+export type ProgressOptions = {
+  view: MarkbookView;
+  students: ReadonlyArray<{ id: string; name: string; initials: string }>;
+  lessons: readonly ProgressLesson[];
+  today: string;
+  /** Called when a cell is pressed; the table redraws when it settles. */
+  onMark: (studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear') => void;
+  /** Set while a save is failing, shown above the table. */
+  error?: string;
+};
+
+export function renderProgress(options: ProgressOptions): HTMLElement {
+  const { view, students, lessons, today } = options;
+  const root = el('div', 'mb-progress');
+  if (!lessons.length) {
+    root.append(el('p', 'mb__empty', 'This class has no unit lessons yet.'));
+    return root;
+  }
+  if (options.error) {
+    const alert = el('p', 'mb__error', options.error);
+    alert.setAttribute('role', 'alert');
+    root.append(alert);
+  }
+  const key = el('p', 'mb-progress__key', '✓ complete · ◐ partial or waiting to be marked · grey box not for that student · red dot not complete a week after its set date. Press a cell to change it.');
+  root.append(key);
+  const wrap = el('div', 'mb-progress__scroll');
+  const table = el('table', 'mb-progress__table');
+  const head = el('tr');
+  head.append(el('th', 'mb-progress__corner', 'Student'));
+  for (const l of lessons) {
+    const th = el('th', `mb-progress__lesson mb-progress__lesson--${l.role}`);
+    th.scope = 'col';
+    th.append(el('span', 'mb-progress__title', l.title));
+    const tag = l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
+    if (tag) th.append(el('span', 'mb-progress__tag', tag));
+    head.append(th);
+  }
+  const thead = el('thead');
+  thead.append(head);
+  table.append(thead);
+  const body = el('tbody');
+  for (const s of students) {
+    const tr = el('tr');
+    const name = el('th', 'mb-progress__student', `${s.initials} · ${s.name}`);
+    name.scope = 'row';
+    tr.append(name);
+    for (const l of lessons) {
+      const quiz = view.quizzes.find((q) => q.lesson_id === l.id);
+      const cell = cellFor({
+        lesson: l,
+        record: view.done?.[s.id]?.[l.id],
+        quizSubmitted: Boolean(quiz?.scores?.[s.id]?.submitted_at),
+        quizStarted: Boolean(quiz?.started?.includes(s.id)),
+        took: (view.markbook.took?.[s.id] ?? []).includes(l.id),
+        today
+      });
+      const td = el('td', 'mb-progress__cell');
+      const b = el('button', `mb-progress__btn mb-progress__btn--${cell.state}`, SYMBOL[cell.state]);
+      b.type = 'button';
+      b.dataset.student = s.id;
+      b.dataset.lesson = l.id;
+      b.dataset.state = cell.state;
+      if (cell.late) b.dataset.late = 'true';
+      b.setAttribute('aria-label', `${s.name}, ${l.title}: ${WORD[cell.state]}${cell.late ? ', overdue' : ''}`);
+      b.addEventListener('click', () => options.onMark(s.id, l.id, NEXT[cell.state]));
+      if (cell.late) b.append(el('span', 'mb-progress__late'));
+      td.append(b);
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(body);
+  wrap.append(table);
+  root.append(wrap);
+  return root;
+}

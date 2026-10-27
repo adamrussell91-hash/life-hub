@@ -3,6 +3,7 @@ import { BlockSchema } from '@/schemas/block';
 import { CoverSchema } from '@/schemas/cover';
 import { IsoDateSchema } from '@/schemas/common';
 import { countBlocksInTree } from '@/teacher/lesson-canvas/drop';
+import { CaseSettingsSchema } from '@/case-study/schema';
 
 export const AiScopeSchema = z.enum(['block', 'section', 'lesson']).default('lesson');
 export type AiScope = z.infer<typeof AiScopeSchema>;
@@ -86,6 +87,29 @@ export const ProposeReorderBlocksSchema = z.object({
   ordered_ids: z.array(z.string().min(1)).min(1)
 });
 
+/**
+ * A case study's settings, written key by key: each key sent replaces that key whole
+ * (parts, options and objections go as complete arrays). The class and flow are the teacher's.
+ */
+export const ProposeUpdateCaseSchema = z.object({
+  case: CaseSettingsSchema.omit({ class_id: true, flow: true }).partial().refine((patch) => Object.keys(patch).length > 0, 'Send at least one setting')
+});
+
+/** Every id in a case (parts, documents, options) is unique, so the player and board can tell them apart. */
+export function caseIdIssue(patch: z.infer<typeof ProposeUpdateCaseSchema>['case']): string | null {
+  const seen = new Set<string>();
+  const ids = [
+    ...(patch.parts ?? []).flatMap((part) => [part.id, ...part.docs.map((doc) => doc.id)]),
+    ...(patch.transfer?.docs ?? []).map((doc) => doc.id),
+    ...(patch.decision?.options ?? []).map((option) => option.id)
+  ];
+  for (const id of ids) {
+    if (seen.has(id)) return `The id "${id}" is used twice. Give every part, document and option its own id (p1, d1, o1…).`;
+    seen.add(id);
+  }
+  return null;
+}
+
 export const ReviewOnlySchema = z.object({
   summary: z.string().min(1).max(4000)
 });
@@ -114,6 +138,7 @@ export type AiProposal =
       parent: z.infer<typeof DropParentSchema>;
       ordered_ids: string[];
     }
+  | { kind: 'update_case'; case: z.infer<typeof ProposeUpdateCaseSchema>['case'] }
   | { kind: 'review_only'; summary: string };
 
 /**
@@ -242,6 +267,19 @@ export const AI_TOOLS = [
     }
   },
   {
+    name: 'propose_update_case',
+    description:
+      'Propose changes to a case study lesson\'s settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string], transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: MESSAGE_PROPERTY,
+        case: { type: 'object', description: 'The settings to change, as described.' }
+      },
+      required: ['case']
+    }
+  },
+  {
     name: 'review_only',
     description: 'Provide structured feedback without mutating lesson content.',
     input_schema: {
@@ -318,6 +356,13 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
       parent: parsed.data.parent,
       ordered_ids: parsed.data.ordered_ids
     };
+  }
+  if (name === 'propose_update_case') {
+    const parsed = ProposeUpdateCaseSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    const issue = caseIdIssue(parsed.data.case);
+    if (issue) return { error: issue };
+    return { kind: 'update_case', case: parsed.data.case };
   }
   if (name === 'review_only') {
     const parsed = ReviewOnlySchema.safeParse(input);

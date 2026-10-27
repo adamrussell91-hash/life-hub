@@ -69,6 +69,8 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     })
   );
 
+  page.append(studentAnchor(`/s/classes/${cls.id}/profile`, 'student-class__progress', 'My progress'));
+
   const layout = document.createElement('div');
   layout.className = 'student-class__layout';
 

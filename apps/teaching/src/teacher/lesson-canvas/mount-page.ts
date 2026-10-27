@@ -80,6 +80,10 @@ import { sprintTeacherApi } from '@/sprint/api';
 import { openPracticeRun } from '@/sprint/practice';
 import { seedSprint, withGuidesSection, withPhaseSections } from '@/sprint/defaults';
 import { isGuidesSection, phaseOfSection } from '@/sprint/model';
+import { mountCaseEditor, type CaseEditorHandle } from '@/case-study/editor';
+import { mountCaseBoard, type CaseBoardHandle } from '@/case-study/board';
+import { caseTeacherApi } from '@/case-study/api';
+import { seedCase } from '@/case-study/model';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -1107,6 +1111,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncLecturePanel();
     syncTutorialPanel();
     syncSprintPanel();
+    syncCasePanel();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1358,8 +1363,48 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     canvas.update(lesson.blocks, media);
   }
 
+  // A lesson set to Case Study gets the Kit and station tabs, and the board once published.
+  const caseHost = document.createElement('div');
+  caseHost.className = 'lesson-page__case';
+  let caseEditor: CaseEditorHandle | null = null;
+  let caseBoard: CaseBoardHandle | null = null;
+  /** The lesson canvas holds ordinary blocks, which are Decide-stage content: it shows on Decide and All only. */
+  function showCaseCanvas(): void {
+    const tab = caseEditor?.tabs.current();
+    canvasHost.hidden = !!caseEditor && tab !== 'decide' && tab !== 'all';
+  }
+  function syncCasePanel(): void {
+    const isCase = resolvePedagogicalMode(lesson.pedagogical_mode) === 'case_study';
+    if (isCase && !lesson.case) emitLesson({ ...lesson, case: seedCase({ route_role: lesson.route_role ?? options.flowRole }) });
+    if (isCase && !caseEditor) {
+      caseEditor = mountCaseEditor({
+        getLesson: () => lesson,
+        emitLesson,
+        classes: options.flowClasses ?? [],
+        onTab: () => {
+          showCaseCanvas();
+          canvas.clearSelection();
+        }
+      });
+      caseHost.append(caseEditor.root);
+    } else if (!isCase && caseEditor) {
+      caseBoard?.dispose();
+      caseBoard = null;
+      caseEditor.dispose();
+      caseEditor = null;
+      caseHost.replaceChildren();
+    }
+    if (isCase && caseEditor && !caseBoard && lesson.published_at) {
+      caseBoard = mountCaseBoard({ api: caseTeacherApi(lesson.id), getLesson: () => lesson });
+      caseHost.prepend(caseBoard.root);
+      void caseBoard.refresh();
+    }
+    showCaseCanvas();
+    caseHost.hidden = !isCase;
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1451,6 +1496,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncLecturePanel();
   syncTutorialPanel();
   syncSprintPanel();
+  syncCasePanel();
   if (tutorialTabs || sprintTabs) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
@@ -1552,6 +1598,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       syncLecturePanel();
       syncTutorialPanel();
     syncSprintPanel();
+      syncCasePanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1571,6 +1618,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     markPublished(at: string) {
       lesson = { ...lesson, published_at: at };
       syncSprintPanel();
+      syncCasePanel();
     },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
       // A publish issue on another tutorial tab: open that tab first.
@@ -1586,6 +1634,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       tutorialBoard = null;
       sprintMap?.dispose();
       sprintMap = null;
+      caseBoard?.dispose();
+      caseBoard = null;
+      caseEditor?.dispose();
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

@@ -10,7 +10,7 @@ type Group = { id: string; name: string; answer_ids: string[] };
 type StatementState = { id: string; phase: Phase; placed: number; moved: number; moves_shown: boolean; entries: Entry[]; groups: Group[] | null };
 type TeacherState =
   | { phase: 'idle' }
-  | { phase: 'live'; session: string; code: string; open: boolean; pace: 'teacher' | 'student'; replace: boolean; current: number; joined: number; statements: StatementState[] };
+  | { phase: 'live'; session: string; code: string; open: boolean; pace: 'teacher' | 'student' | 'self'; replace: boolean; current: number; joined: number; statements: StatementState[] };
 type Live = Extract<TeacherState, { phase: 'live' }>;
 type Panel = 'none' | 'all' | 'groups' | 'moved';
 
@@ -114,17 +114,19 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
     if (sig === paintedRound) return;
     paintedRound = sig;
     const code = el('div', 'pf-code');
-    if (s.open) code.append(el('span', 'pf-code__label', 'Code'), el('span', 'pf-code__value', formatCode(s.code)));
+    if (s.pace === 'self') code.append(el('span', 'pf-code__label', s.open ? 'Self-run: students open the lesson and go. No code.' : 'Self-run closed'));
+    else if (s.open) code.append(el('span', 'pf-code__label', 'Code'), el('span', 'pf-code__value', formatCode(s.code)));
     else code.append(el('span', 'pf-code__label', 'Placing closed'));
     const right = el('div', 'cl-round__actions');
-    if (s.open) right.append(button('Show code on board', 'ghost', () => showCodeOverlay(s.code)));
+    if (s.open && s.pace !== 'self') right.append(button('Show code on board', 'ghost', () => showCodeOverlay(s.code)));
     right.append(
       s.open
         ? button('Close the activity', 'ghost', function () {
             void send('end', {}, this);
           })
-        : button('Start a new round', 'ghost', function () {
-            if (confirm('Start a new round? Every line clears and students join again.')) void send('start', {}, this);
+        : button(s.pace === 'self' ? 'Reopen' : 'Start a new round', 'ghost', function () {
+            if (s.pace === 'self') void send('start', {}, this);
+            else if (confirm('Start a new round? Every line clears and students join again.')) void send('start', {}, this);
           })
     );
     round.replaceChildren(code, right, past);
@@ -150,7 +152,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       dot.className = 'cl-dot';
       dot.setAttribute('aria-current', String(i === viewing));
       dot.setAttribute('aria-label', `Statement ${i + 1}`);
-      if (s.pace === 'student' && info) dot.append(el('small', '', info.phase === 'collect' ? ` ${info.placed}` : ' ✓'));
+      if (s.pace !== 'teacher' && info) dot.append(el('small', '', info.phase === 'collect' ? ` ${info.placed}` : ' ✓'));
       dots.append(dot);
     });
     const count = el('span', 'cl-nav__count block-secondary', `Statement ${viewing + 1} of ${statements.length}${statements[viewing]?.snap ? ' · snapped' : ''}`);
@@ -161,7 +163,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
     counter.replaceChildren();
     if (st.phase === 'collect') {
       counter.append(String(st.placed), el('span', '', ` of ${s.joined} placed`));
-      status.textContent = s.pace === 'student' ? 'Students move through at their own pace.' : 'A reason is required. Nothing shows until you reveal.';
+      status.textContent = s.pace === 'self' ? 'Self-run: students place on their own. Nothing shows until you reveal.' : s.pace === 'student' ? 'Students move through at their own pace.' : 'A reason is required. Nothing shows until you reveal.';
     } else if (st.phase === 'revealed') {
       counter.append(String(st.placed), el('span', '', ' placed'));
       status.textContent = 'Click a symbol to read its reason.';

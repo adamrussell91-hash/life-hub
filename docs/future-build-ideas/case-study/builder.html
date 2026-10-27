@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Study builder mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Mockup only. Hub design-kit tokens; layout follows the sprint builder (pills over the lesson canvas, Kit = settings). */
+:root {
+  --paper: #fbf8f2; --cotton: #f5f1e9; --marine: #142b51; --navy: #17375e; --navy-2: #244f7c; --wave: #376fb7;
+  --ink: #13233a; --muted: #6b7788; --line: rgba(23,55,94,.10); --line-2: rgba(23,55,94,.18); --shore: #eae7da;
+  --pastel-blue: #dceafa; --pastel-blue-ink: #294c71; --pastel-sage: #dfe9e1; --pastel-sage-ink: #3c5949;
+  --pastel-peach: #f2dfd0; --pastel-peach-ink: #7a5038; --pastel-gold: #f1e2b6; --pastel-gold-ink: #6c581f;
+  --pastel-lilac: #e8e0f1; --pastel-lilac-ink: #5d4e70;
+  --success: #2f7a4f; --high-sea: #f68620; --high-sea-ink: #a85a0c;
+  --on-dark-muted: rgba(255,255,255,.66);
+  --text-2xs: .6875rem; --text-xs: .75rem; --text-sm: .8125rem; --text-base: .9375rem; --text-md: 1.0625rem; --text-lg: 1.3125rem; --text-xl: 2rem; --text-2xl: 2.625rem;
+  --radius-xs: .375rem; --radius-sm: .875rem; --radius-md: 1.25rem; --radius-lg: 1.5rem; --radius-full: 999px;
+  --elev-1: 0 1px 2px rgba(20,35,70,.06); --elev-2: 0 4px 14px rgba(20,35,70,.08);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, ui-sans-serif, sans-serif; color: var(--ink); background: var(--cotton); font-size: var(--text-base); line-height: 1.5; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.wrap { max-width: 76rem; margin: 0 auto; padding: 20px 16px 80px; }
+[hidden] { display: none !important; }
+
+/* hero: the editor's banner with the editable title */
+.banner { position: relative; height: 10rem; border-radius: var(--radius-lg); overflow: hidden; background: radial-gradient(120% 140% at 85% 0%, #2a5a92 0%, var(--marine) 55%, #0a1536 100%); margin-bottom: 14px; }
+.banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,21,54,.7), rgba(10,21,54,0) 60%); }
+.banner__copy { position: absolute; left: 1.625rem; right: 1.625rem; bottom: 1.1rem; z-index: 1; }
+.banner__eyebrow { font-size: var(--text-sm); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--on-dark-muted); margin: 0 0 4px; }
+.banner input[type="text"] { width: 100%; border: 0; border-radius: 0; border-bottom: 1px dashed rgba(255,255,255,.36); background: transparent; color: #fff; font-size: var(--text-xl); font-weight: 700; letter-spacing: -.015em; padding: 0 0 2px; }
+.banner input:focus { outline: 2px solid var(--wave); outline-offset: 3px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 16px; }
+.mode-chip { font-size: var(--text-xs); font-weight: 600; padding: 4px 10px; border-radius: var(--radius-full); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.role-chip { font-size: var(--text-xs); font-weight: 600; padding: 4px 10px; border-radius: var(--radius-full); background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.toolbar__spacer { flex: 1; }
+
+/* hub pills */
+.pills { display: inline-flex; flex-wrap: nowrap; gap: 2px; padding: 3px; background: var(--shore); border-radius: var(--radius-full); overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.pills::-webkit-scrollbar { display: none; }
+.pills button { flex: 0 0 auto; border: 0; background: transparent; padding: 6px 14px; min-height: 36px; border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.pills button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: var(--elev-1); }
+.pills .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--high-sea); }
+.pill-row { margin-bottom: 16px; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-full); overflow: hidden; background: var(--paper); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; min-height: 36px; font-size: var(--text-sm); font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.btn { min-height: 40px; padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: var(--text-sm); }
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn--ghost { border-color: transparent; background: transparent; color: var(--wave); padding-left: 6px; padding-right: 6px; }
+.btn:disabled { opacity: .4; cursor: default; }
+
+/* layout */
+.edit { display: grid; grid-template-columns: minmax(0, 1fr) 18.5rem; gap: 24px; align-items: start; }
+.canvas { display: grid; gap: 14px; min-width: 0; }
+.side { position: sticky; top: 16px; display: grid; gap: 14px; }
+
+/* cards */
+.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1); padding: 18px 20px; }
+.card h2 { margin: 0 0 4px; font-size: var(--text-md); font-weight: 700; }
+.card > .lead { margin: 0 0 14px; color: var(--muted); font-size: var(--text-sm); }
+.stage-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 2px -4px; }
+.stage-head h2 { margin: 0; font-size: var(--text-lg); font-weight: 700; color: var(--navy); letter-spacing: -.01em; }
+.stage-head span { color: var(--muted); font-size: var(--text-sm); }
+.part-label { font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 2px -6px; display: flex; gap: 8px; align-items: center; }
+.part-label::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
+
+/* fields */
+.field { display: grid; gap: 5px; margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field > span { font-size: var(--text-sm); font-weight: 600; }
+.field small { color: var(--muted); font-size: var(--text-xs); }
+input[type="text"], textarea, select { width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 12px; background: var(--paper); font-size: var(--text-base); }
+textarea { min-height: 76px; resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--wave); outline-offset: 1px; }
+.need { border-color: rgba(246,134,32,.55); background: #fffaf3; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid3 { grid-template-columns: repeat(3, 1fr); }
+
+/* block cards in the canvas (editor look) */
+.blk { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-1); padding: 14px 18px 16px; }
+.blk__bar { display: flex; align-items: center; gap: 8px; margin: -2px 0 10px; }
+.grip { width: 12px; height: 18px; background: radial-gradient(circle, var(--shallow, #a7abb9) 1.3px, transparent 1.6px) 0 0 / 6px 6px; opacity: .8; cursor: grab; flex: 0 0 auto; }
+.blk__type { font-size: var(--text-xs); font-weight: 600; color: var(--muted); }
+.blk__tools { margin-left: auto; display: flex; gap: 4px; }
+.blk__bar select.doc-chip { width: auto; flex: 0 0 auto; padding: 3px 8px; border-radius: var(--radius-xs); font-size: var(--text-xs); font-weight: 600; cursor: pointer; }
+.blk__tools { flex: 0 0 auto; }
+.blk__tools button { white-space: nowrap; }
+.blk__tools button { border: 0; background: none; color: var(--muted); font-size: var(--text-sm); padding: 2px 6px; border-radius: var(--radius-xs); }
+.blk__tools button:hover { background: var(--cotton); }
+.doc-chip { font-size: var(--text-xs); font-weight: 600; padding: 2px 9px; border-radius: var(--radius-xs); border: 0; }
+.doc-chip--memo { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.doc-chip--data { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.doc-chip--news { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.doc-chip--talk { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.doc-chip--update { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.doc-chip--image { background: var(--shore); color: var(--ink); }
+.blk__title { width: 100%; border: 0; background: transparent; font-size: var(--text-md); font-weight: 700; padding: 2px 0; margin-bottom: 6px; }
+.blk__title:focus { outline: 0; border-bottom: 1px dashed var(--line-2); }
+.blk__body { border: 0; background: transparent; padding: 0; min-height: 0; font-size: var(--text-base); line-height: 1.55; resize: none; }
+.blk__body:focus { outline: 0; }
+.blk__from { border: 0; background: transparent; padding: 0; font-size: var(--text-sm); color: var(--muted); flex: 1; min-width: 0; }
+.blk__from:focus { outline: 0; border-bottom: 1px dashed var(--line-2); }
+.mini-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.mini-table td, .mini-table th { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+.mini-table th { background: var(--paper); font-size: var(--text-xs); color: var(--muted); }
+.gate { border: 2px dashed var(--line-2); border-radius: var(--radius-md); padding: 14px 18px; background: rgba(255,255,255,.5); }
+.gate__label { font-size: var(--text-xs); font-weight: 700; color: var(--muted); margin-bottom: 6px; display: flex; gap: 6px; align-items: center; }
+.gate__label svg { width: 13px; height: 13px; }
+
+/* add row */
+.add-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border: 1px dashed var(--line-2); border-radius: var(--radius-md); }
+.add-row__label { font-size: var(--text-sm); color: var(--muted); margin-right: 4px; }
+.add-row .doc-chip { cursor: pointer; padding: 5px 11px; font-size: var(--text-sm); }
+
+/* options in the decision block */
+.optrow { display: grid; grid-template-columns: 28px 1fr 1.4fr 28px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.optrow__k { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--navy); display: grid; place-items: center; font-weight: 700; font-size: var(--text-sm); color: var(--navy); }
+.optrow button { border: 0; background: none; color: var(--muted); font-size: 18px; }
+
+/* flow spine (Kit) */
+.spine { display: grid; gap: 0; }
+.spine__stage { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.spine__stage:first-child { border-top: 0; padding-top: 2px; }
+.spine__mark { width: 40px; height: 40px; }
+.spine__name { font-weight: 700; margin: 2px 0 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.spine__name small { font-weight: 500; color: var(--muted); font-size: var(--text-xs); }
+.mods { display: flex; flex-wrap: wrap; gap: 6px; }
+.mod { border: 1px solid var(--line-2); background: #fff; border-radius: var(--radius-full); padding: 5px 12px; font-size: var(--text-sm); font-weight: 600; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.mod[aria-pressed="true"] { background: var(--pastel-blue); border-color: transparent; color: var(--pastel-blue-ink); }
+.mod--fixed { background: var(--navy) !important; color: #fff !important; border-color: transparent; cursor: default; }
+.mod svg { width: 12px; height: 12px; }
+.mod__or { font-size: var(--text-xs); color: var(--muted); align-self: center; }
+
+.chips-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.flow-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.flow { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-sm); padding: 10px 12px; }
+.flow b { display: block; font-size: var(--text-sm); }
+.flow span { font-size: var(--text-xs); color: var(--muted); }
+.flow[aria-pressed="true"] { border-color: var(--navy); background: var(--pastel-blue); }
+.flow__sug { font-size: var(--text-2xs); font-weight: 700; color: var(--success); text-transform: uppercase; letter-spacing: .06em; }
+
+/* checklist side card */
+.check h3 { margin: 0 0 2px; font-size: var(--text-md); }
+.check__sub { color: var(--muted); font-size: var(--text-sm); margin: 0 0 12px; }
+.check ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.check li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: var(--text-sm); align-items: start; }
+.check li button { border: 0; background: none; padding: 0; text-align: left; color: var(--ink); }
+.check li button:hover { text-decoration: underline; }
+.tick { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+.tick--ok { background: var(--success); color: #fff; }
+.tick--todo { border: 2px solid var(--high-sea); }
+.check .btn { width: 100%; margin-top: 14px; }
+.preview { display: grid; gap: 8px; }
+.preview p { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+
+/* Ann */
+.ann { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--marine) 6%, var(--paper)); font-size: var(--text-sm); margin-top: 12px; }
+.ann b { font-weight: 600; }
+.ann .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.toggle { display: flex; gap: 10px; align-items: center; font-size: var(--text-sm); font-weight: 600; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--navy); }
+.note { font-size: var(--text-sm); color: var(--muted); margin: 0; }
+.rule-li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: var(--text-base); }
+.rule-li input { width: 18px; height: 18px; accent-color: var(--navy); margin-top: 2px; }
+.rule-li small { display: block; color: var(--muted); font-size: var(--text-xs); margin-top: 2px; }
+
+@media (max-width: 860px) {
+  .edit { grid-template-columns: 1fr; }
+  .side { position: static; order: -1; }
+  .check ul[data-collapsed="true"] { display: none; }
+  .preview-card { display: none; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 12px 16px 64px; }
+  .banner { height: 8rem; }
+  .banner__copy { left: 1.1rem; right: 1.1rem; }
+  .banner input[type="text"] { font-size: 1.5rem; }
+  .grid2, .flow-pick { grid-template-columns: 1fr; }
+  .optrow { grid-template-columns: 26px 1fr 24px; }
+  .optrow input:nth-of-type(2) { grid-column: 2 / 3; }
+  .card, .blk { padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner"><div class="banner__copy"><p class="banner__eyebrow">Lesson</p><input type="text" value="The dam at 31%" aria-label="Lesson title"></div></div>
+
+  <div class="toolbar">
+    <span class="mode-chip">Case study · Flow A</span>
+    <span class="role-chip">Optional on the unit route</span>
+    <span class="toolbar__spacer"></span>
+    <a class="btn" href="mockup.html" style="text-decoration:none;display:inline-flex;align-items:center">Try it as a student</a>
+  </div>
+
+  <div class="pill-row"><div class="pills" id="pills" role="group" aria-label="Case study part"></div></div>
+
+  <div class="edit">
+    <main class="canvas" id="canvas"></main>
+    <aside class="side">
+      <div class="card check" id="check"></div>
+      <div class="card preview-card"><div class="preview">
+        <p><b style="color:var(--ink)">Students see</b></p>
+        <p id="preview-line"></p>
+      </div></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* All names, places and figures are invented for the mockup. */
+const MARKS = {
+  brief: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#dceafa"/><circle cx="22" cy="22" r="11" fill="#376fb7"/><circle cx="22" cy="22" r="4.5" fill="#fff"/></svg>',
+  case: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#f1e2b6"/><rect x="13" y="11" width="14" height="19" rx="2" fill="#c9a94a"/><rect x="17" y="15" width="14" height="19" rx="2" fill="#6c581f"/></svg>',
+  decide: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#dfe9e1"/><rect x="12" y="20" width="20" height="13" rx="3" fill="#3c5949"/><path d="M16 20v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#3c5949" stroke-width="3"/></svg>',
+  outcome: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#f2dfd0"/><circle cx="22" cy="22" r="11" fill="none" stroke="#7a5038" stroke-width="3"/><path d="M22 11a11 11 0 0 1 0 22z" fill="#7a5038"/></svg>',
+  rules: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#e8e0f1"/><rect x="12" y="14" width="20" height="4" rx="2" fill="#5d4e70"/><rect x="12" y="21" width="15" height="4" rx="2" fill="#5d4e70"/><rect x="12" y="28" width="18" height="4" rx="2" fill="#5d4e70"/></svg>'
+};
+const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const TABS = [['kit', 'Kit'], ['brief', 'Brief'], ['case', 'The case'], ['decide', 'Decide'], ['outcome', 'Outcome'], ['rules', 'Rules'], ['all', 'All']];
+const DOC_TYPES = { memo: 'Memo', data: 'Data', news: 'News', talk: 'Transcript', image: 'Image', update: 'Update' };
+
+const S = {
+  tab: 'kit',
+  purpose: '',
+  leans: { ambiguity: true, causal: true, framework: false, transfer: false },
+  flow: 'A', pace: 'own', support: 'standard', hold: '',
+  mods: { meet: 'layered', trace: true, counter: false, test: 'objection' },
+  prompt: 'You run the Marlow Valley Water Authority. It\'s October and the dam is at 31%. What do you do?',
+  options: [
+    ['Level 3 restrictions now', 'Outdoor watering banned, farm licences cut by a quarter.'],
+    ['Truck water in and wait for spring rain', 'No restrictions yet. Review in eight weeks.'],
+    ['Fast-track the recycled water plant', 'Borrow to build it in 14 months instead of 3 years.']
+  ],
+  docs: [
+    { id: 'd1', part: 1, type: 'memo', from: 'Operations, 3 October', title: 'Storage update', body: 'Hollin Creek is at 31% of capacity. At current use we have roughly 11 months of supply before we reach the dead storage level.\n\nInflows over winter were the lowest in 40 years…' },
+    { id: 'd2', part: 1, type: 'data', from: 'Authority records', title: 'Storage at the start of October', table: true },
+    { id: 'd3', part: 1, type: 'news', from: 'The Valley Herald, 5 October', title: '"Don\'t make the town pay first," farmers warn', body: 'Growers in the lower valley say any cut to licences before Christmas would mean ploughing in crops already planted…' },
+    { id: 'd4', part: 2, type: 'talk', from: 'Council meeting, 20 October', title: 'Extract', body: 'Engineer: Trucking can cover about 6% of daily use. It buys weeks, not months.\nCouncillor: Restrictions take six weeks to show up in the numbers.' },
+    { id: 'd5', part: 2, type: 'update', from: 'Weather bureau, 24 October', title: 'Seasonal outlook, revised', body: 'The chance of above-average spring rain has fallen from 45% to 30%.' }
+  ],
+  gate: 'What is the biggest risk in these three documents?',
+  happened: 'The Authority chose to truck water in and review in eight weeks. Spring rain failed. By the time Level 3 restrictions began in mid-December, the dam was at 19%…',
+  source: '',
+  objections: ['Families lose their gardens this week, yet the three biggest users are farms on licence. Why should a household go first?', 'If spring rain fails, you have used eight weeks of water you can never get back. What would make waiting the right call?', ''],
+  annAsk: false,
+  frame: ['When…', '…this tends to follow', '…as long as'],
+  rules: { r1: true, r2: true, r3: false },
+  transfer: { body: '', question: 'What would you do, and which class rule helped you decide?', shares: '', differs: '', timer: '15', column: true }
+};
+let docSeq = 6;
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- checks: kind nudges that say what to add ---------- */
+function checks() {
+  const out = [];
+  const add = (ok, text, tab, field) => out.push({ ok, text, tab, field });
+  add(S.purpose.trim().split(/\s+/).length >= 4, S.purpose.trim() ? 'Purpose set' : 'Say what students will do on a case they haven’t seen', 'kit', 'purpose');
+  add(S.options.filter((o) => o[0].trim()).length >= 2, 'At least two options', 'brief');
+  add(S.docs.some((d) => d.part === 1), 'Part 1 has documents', 'case');
+  add(S.mods.meet !== 'layered' || S.docs.some((d) => d.part === 2), S.mods.meet === 'layered' ? 'Part 2 has documents' : 'Whole case', 'case');
+  add(!!S.happened.trim(), 'Write what happened', 'outcome', 'happened');
+  add(!!S.source.trim(), S.source.trim() ? 'Outcome has a source' : 'Add where the outcome comes from', 'outcome', 'source');
+  if (S.mods.test === 'objection') {
+    const missing = S.options.map((o, i) => (S.objections[i] || '').trim() ? null : 'ABC'[i]).filter(Boolean);
+    add(!missing.length, missing.length ? `Write an objection for option ${missing.join(', ')}` : 'An objection for every option', 'outcome', 'obj');
+  }
+  add(S.transfer.body.trim().split(/\s+/).length >= 6, S.transfer.body.trim() ? 'Unseen case written' : 'Add the unseen case for the transfer check', 'rules', 'tbody');
+  return out;
+}
+function renderCheck() {
+  const list = checks(); const todo = list.filter((c) => !c.ok);
+  const phone = matchMedia('(max-width: 860px)').matches;
+  $('#check').innerHTML = `<h3>${todo.length ? `${todo.length} thing${todo.length > 1 ? 's' : ''} to add` : 'Ready to publish'}</h3>
+    <p class="check__sub">${todo.length ? 'Publish opens when these are done.' : 'Everything a case study needs is here.'}</p>
+    ${phone ? `<button class="btn" id="checktoggle" style="margin:0 0 10px">${S.checkOpen ? 'Hide the list' : 'Show the list'}</button>` : ''}
+    <ul data-collapsed="${phone && !S.checkOpen}">${list.map((c) => `<li><span class="tick ${c.ok ? 'tick--ok' : 'tick--todo'}">${c.ok ? '✓' : ''}</span>
+      ${c.ok ? `<span>${esc(c.text)}</span>` : `<button data-jump="${c.tab}" data-field="${c.field || ''}">${esc(c.text)}</button>`}</li>`).join('')}</ul>
+    <button class="btn btn--primary" ${todo.length ? 'disabled' : ''}>Publish</button>`;
+  const stages = ['Brief', 'The case', 'Decide', 'Outcome', 'Rules'];
+  $('#preview-line').textContent = `${stages.join(' · ')}. ${S.pace === 'own' ? 'At their own pace: part 2 opens when they answer, the outcome after their objection.' : 'You open part 2 and show the outcome from the board.'}`;
+  // orange dot on pills with something to add
+  document.querySelectorAll('#pills button').forEach((b) => {
+    b.querySelector('.dot')?.remove();
+    if (todo.some((c) => c.tab === b.dataset.tab)) b.insertAdjacentHTML('beforeend', '<span class="dot" aria-label="something to add"></span>');
+  });
+}
+
+/* ---------- pills ---------- */
+function renderPills() {
+  $('#pills').innerHTML = TABS.map(([id, label]) => `<button data-tab="${id}" aria-pressed="${S.tab === id}">${label}</button>`).join('');
+}
+
+/* ---------- Kit ---------- */
+const mod = (key, val, label, fixed) => fixed
+  ? `<span class="mod mod--fixed">${LOCK}${label}</span>`
+  : `<button class="mod" data-mod="${key}:${val}" aria-pressed="${S.mods[key] === val || S.mods[key] === true && val === 'on'}">${label}</button>`;
+function kit() {
+  const L = S.leans;
+  return `
+  <section class="card"><h2>Purpose</h2><p class="lead">Start from the end: the transfer check at the end of the lesson is written against this.</p>
+    <label class="field"><span>On a case they haven’t seen, students will be able to…</span>
+      <textarea id="purpose" class="${S.purpose.trim() ? '' : 'need'}" placeholder="…spot when waiting on a slow-building risk costs more than acting early, and say what would change that.">${esc(S.purpose)}</textarea></label>
+    <div class="field"><span>This lesson leans on</span><div class="chips-pick">
+      ${[['ambiguity', 'Deciding with incomplete information'], ['causal', 'Why it happened'], ['framework', 'Using a framework'], ['transfer', 'Spotting the pattern elsewhere']].map(([k, l]) => `<button class="mod" data-lean="${k}" aria-pressed="${L[k]}">${l}</button>`).join('')}
+    </div></div>
+    <div class="flow-pick">
+      ${[['A', 'Deep case', 'One case, decided and traced'], ['B', 'Compared set', 'Two or three cases side by side'], ['C', 'Deep + echo', 'A deep case, then a short echo']].map(([k, n, d]) => `<button class="flow" data-flow="${k}" aria-pressed="${S.flow === k}">${suggested() === k ? '<span class="flow__sug">Suggested</span>' : ''}<b>Flow ${k} · ${n}</b><span>${d}</span></button>`).join('')}
+    </div>
+  </section>
+
+  <section class="card"><h2>The flow</h2><p class="lead">Five stages, always in this order. Pick what happens in each; the starter blocks appear on that stage’s tab. Locked ones are in every case study.</p>
+    <div class="spine">
+      <div class="spine__stage"><span class="spine__mark">${MARKS.brief}</span><div><div class="spine__name">Brief <small>Frame</small></div>
+        <div class="mods">${mod('', '', 'Pose the decision · first take', true)}</div></div></div>
+      <div class="spine__stage"><span class="spine__mark">${MARKS.case}</span><div><div class="spine__name">The case <small>Meet</small></div>
+        <div class="mods">${mod('meet', 'layered', 'In parts, a question between')}<span class="mod__or">or</span>${mod('meet', 'whole', 'All at once')}</div></div></div>
+      <div class="spine__stage"><span class="spine__mark">${MARKS.decide}</span><div><div class="spine__name">Decide <small>Work</small></div>
+        <div class="mods">${mod('trace', 'on', 'Trace the cause')}${mod('counter', 'on', 'What if…? (counterfactual)')}${mod('', '', 'Lock in the decision', true)}</div></div></div>
+      <div class="spine__stage"><span class="spine__mark">${MARKS.outcome}</span><div><div class="spine__name">Outcome <small>Test</small></div>
+        <div class="mods">${mod('', '', 'What happened', true)}${mod('test', 'objection', 'Strongest objection')}${mod('test', 'premortem', 'Pre-mortem')}${mod('test', 'none', 'Neither')}</div></div></div>
+      <div class="spine__stage"><span class="spine__mark">${MARKS.rules}</span><div><div class="spine__name">Rules <small>Extract</small></div>
+        <div class="mods">${mod('', '', 'Rule of thumb', true)}${mod('', '', 'Mark the class rules', true)}${mod('', '', 'Transfer check', true)}</div></div></div>
+    </div>
+  </section>
+
+  <section class="card"><h2>Running it</h2><p class="lead">Optional lessons start at the student’s own pace. Change it if you’ll run this in class.</p>
+    <div class="field"><span>Pace</span><div><span class="seg">${[['teacher', 'You move the class on'], ['own', 'Their own pace']].map(([k, l]) => `<button data-pace="${k}" aria-pressed="${S.pace === k}">${l}</button>`).join('')}</span></div></div>
+    ${S.pace === 'own' ? `<label class="field"><span>Hold the outcome until</span><input type="text" id="hold" value="${esc(S.hold)}" placeholder="No hold: it opens once they’ve answered the objection"><small>Pick a date to let the class see the outcome together.</small></label>` : '<p class="note" style="margin-bottom:14px">You open part 2, move the class to Decide, and show the outcome from your board.</p>'}
+    <div class="field"><span>Support level</span><div><span class="seg">${[['guided', 'Guided (7–8)'], ['standard', 'Standard (9–10)'], ['open', 'Open (11–12)']].map(([k, l]) => `<button data-support="${k}" aria-pressed="${S.support === k}">${l}</button>`).join('')}</span></div>
+      <small>Guided adds sentence frames and two options; Open swaps the options for a free-text decision.</small></div>
+  </section>`;
+}
+function suggested() {
+  const L = S.leans;
+  if (L.transfer && !L.causal) return 'B';
+  if (L.transfer && L.causal) return 'C';
+  return 'A';
+}
+
+/* ---------- stage tabs ---------- */
+function stageHead(mark, name, sub) { return `<div class="stage-head">${''}<h2>${name}</h2><span>${sub}</span></div>`; }
+function blkBar(label, extra = '') { return `<div class="blk__bar"><span class="grip" aria-hidden="true"></span>${label}<span class="blk__tools">${extra}<button aria-label="More">⋯</button></span></div>`; }
+function brief() {
+  return `${stageHead('brief', 'Brief', 'Students take a first position before they read anything')}
+  <article class="blk">${blkBar('<span class="blk__type">Decision · first take</span>')}
+    <label class="field"><span>The question, in the case’s voice</span><textarea id="prompt">${esc(S.prompt)}</textarea><small>Give them a role and a real choice.</small></label>
+    <div class="field"><span>Options</span>
+      ${S.options.map((o, i) => `<div class="optrow"><span class="optrow__k">${'ABCD'[i]}</span><input type="text" data-opt="${i}:0" value="${esc(o[0])}" placeholder="Option"><input type="text" data-opt="${i}:1" value="${esc(o[1])}" placeholder="What it means, in one line"><button data-delopt="${i}" aria-label="Remove option">×</button></div>`).join('')}
+      ${S.options.length < 4 ? '<div><button class="btn btn--ghost" id="addopt">+ Add an option</button></div>' : ''}
+      <small>Every option should be one a sensible person could defend.</small></div>
+    <p class="note">The same options come back, locked, in Decide.</p>
+  </article>`;
+}
+function docEditor(d) {
+  const chip = `<select class="doc-chip doc-chip--${d.type}" data-doctype="${d.id}" aria-label="Document type">${Object.entries(DOC_TYPES).map(([k, l]) => `<option value="${k}" ${k === d.type ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const body = d.table
+    ? `<table class="mini-table"><tr><th>Year</th><th>October</th><th>Spring rain</th><th>March</th></tr><tr><td>Three years ago</td><td>78%</td><td>Above average</td><td>84%</td></tr><tr><td>Last year</td><td>44%</td><td>Below average</td><td>33%</td></tr><tr><td>This year</td><td>31%</td><td>?</td><td>?</td></tr></table>`
+    : d.type === 'image' ? `<div class="add-row" style="justify-content:center;padding:24px"><button class="btn">Upload an image</button></div>`
+    : `<textarea class="blk__body" rows="3" data-docbody="${d.id}" placeholder="Paste or write the document">${esc(d.body)}</textarea>`;
+  return `<article class="blk">${blkBar(`${chip}<input class="blk__from" data-docfrom="${d.id}" value="${esc(d.from)}" placeholder="Where it’s from">`, `<button data-movedoc="${d.id}">${d.part === 1 ? 'Move to part 2' : 'Move to part 1'}</button>`)}
+    <input class="blk__title" value="${esc(d.title)}" placeholder="Title" data-doctitle="${d.id}">${body}</article>`;
+}
+function addRow(part) {
+  return `<div class="add-row"><span class="add-row__label">Add to part ${part}:</span>${Object.entries(DOC_TYPES).map(([k, l]) => `<button class="doc-chip doc-chip--${k}" data-adddoc="${part}:${k}">+ ${l}</button>`).join('')}</div>`;
+}
+function caseTab() {
+  const layered = S.mods.meet === 'layered';
+  const p1 = S.docs.filter((d) => d.part === 1 || !layered), p2 = S.docs.filter((d) => d.part === 2);
+  return `${stageHead('case', 'The case', layered ? 'Two parts, with a question that opens part 2' : 'Every document at once')}
+  <section class="card" style="padding:14px 18px"><div class="toggle" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><span>Got the case as one long text or a PDF?</span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" id="annsplit">Ann splits it into documents</button><button class="btn">Upload a PDF</button></span></div>
+    ${S.annSplit ? `<div class="ann"><span><b>Ann reads the text and splits it into documents</b>, each with a type, title and source. You check them before they’re added.</span><span>About A$0.02 with Haiku. Nothing is changed until you add them.</span><div class="row"><button class="btn btn--primary">Paste the text</button><button class="btn" id="annsplitno">Not now</button></div></div>` : ''}
+  </section>
+  ${layered ? '<p class="part-label">Part 1</p>' : ''}
+  ${p1.map(docEditor).join('')}
+  ${addRow(1)}
+  ${layered ? `<div class="gate"><div class="gate__label">${LOCK}Opens part 2 · ${S.pace === 'own' ? 'when the student answers' : 'when you open it from the board'}</div>
+      <input type="text" id="gate" value="${esc(S.gate)}" aria-label="Question between the parts"></div>
+    <p class="part-label">Part 2</p>${p2.map(docEditor).join('')}${addRow(2)}` : ''}`;
+}
+function decideTab() {
+  return `${stageHead('decide', 'Decide', 'The thinking, then the decision they lock in')}
+  ${S.mods.trace ? `<article class="blk">${blkBar('<span class="blk__type">Trace the cause</span>')}
+    <p style="margin:0 0 8px">Students build the chain from October to the outcome they predict, one link at a time, and rate each link <b>strong</b>, <b>weak</b> or <b>assumed</b>.</p>
+    <div class="grid2"><label class="field"><span>Start of the chain</span><input type="text" value="The dam is at 31% in October"></label><label class="field"><span>Worked first link (Guided only)</span><input type="text" placeholder="Optional: show one link done"></label></div>
+    <label class="toggle"><input type="checkbox" checked> Ask “what evidence would change my mind?” on each link</label></article>` : ''}
+  ${S.mods.counter ? `<article class="blk">${blkBar('<span class="blk__type">Question set · What if…? format</span>')}
+    <p style="margin:0">If ___ had been different, then ___, because ___.</p></article>` : ''}
+  <article class="blk">${blkBar('<span class="blk__type">Decision · locked</span>')}
+    <p style="margin:0 0 10px">Uses the options from the Brief. Students pick one, say how sure they are, and give a reason with at least one quote from the case. Then it locks.</p>
+    <div class="grid2"><label class="toggle"><input type="checkbox" checked> Ask how sure they are</label><label class="toggle"><input type="checkbox" checked> Need a quote from the case</label></div></article>
+  <div class="add-row"><span class="add-row__label">Add a block before the decision:</span><button class="btn btn--ghost">+ Block</button></div>`;
+}
+function outcomeTab() {
+  const obj = S.mods.test === 'objection';
+  return `${stageHead('outcome', 'Outcome', 'What actually happened, set against their decision')}
+  <article class="blk">${blkBar('<span class="doc-chip" style="background:var(--navy);color:#fff">What happened</span>')}
+    <label class="field"><span>What happened</span><textarea id="happened" rows="4" class="${S.happened.trim() ? '' : 'need'}">${esc(S.happened)}</textarea></label>
+    <label class="field"><span>Source</span><input type="text" id="source" class="${S.source.trim() ? '' : 'need'}" value="${esc(S.source)}" placeholder="Where this comes from, e.g. the Authority’s own review"><small>A real, checkable outcome is what makes the reveal worth it.</small></label>
+  </article>
+  ${obj ? `<article class="blk" id="obj">${blkBar('<span class="blk__type">Strongest objection</span>')}
+    <p class="note" style="margin-bottom:12px">${S.pace === 'own' ? 'Students answer the one for the option they chose, before the outcome opens.' : 'In class, use these to start the discussion from your board.'}</p>
+    ${S.options.map((o, i) => `<label class="field"><span>${'ABC'[i]} · ${esc(o[0])}</span><textarea data-objection="${i}" class="${(S.objections[i] || '').trim() ? '' : 'need'}" rows="2" placeholder="The strongest case against this choice">${esc(S.objections[i])}</textarea></label>`).join('')}
+    <button class="btn" id="annobj">Ask Ann to draft the missing one</button>
+    ${S.annAsk ? `<div class="ann"><span><b>Ann drafts an objection for option C</b> from the case documents. You edit it before it’s used.</span><span>About A$0.01 with Haiku.</span><div class="row"><button class="btn btn--primary" id="annobjgo">Draft it</button><button class="btn" id="annobjno">Not now</button></div></div>` : ''}
+  </article>` : S.mods.test === 'premortem' ? `<article class="blk">${blkBar('<span class="blk__type">Question set · Pre-mortem format</span>')}<p style="margin:0">It’s two years later and your decision went badly. The main reason was ___. You could have seen it in ___.</p></article>` : ''}
+  ${S.pace === 'teacher' ? `<article class="blk">${blkBar('<span class="blk__type">With teacher · talking points</span>')}<textarea class="blk__body" rows="2" placeholder="What to draw out in the discussion. Students don’t see this."></textarea></article>` : ''}`;
+}
+function rulesTab() {
+  const t = S.transfer;
+  return `${stageHead('rules', 'Rules', 'Name the pattern, test the class rules, then try it on a case they haven’t seen')}
+  <article class="blk">${blkBar('<span class="blk__type">Rule of thumb</span>')}
+    <p class="note" style="margin-bottom:10px">The frame students fill in. Their rules come to you to add to the class rules.</p>
+    <div class="grid2 grid3">${S.frame.map((f, i) => `<input type="text" value="${esc(f)}" aria-label="Frame part ${i + 1}">`).join('')}</div></article>
+  <article class="blk">${blkBar('<span class="blk__type">Mark the class rules</span>')}
+    <p class="note">From Year 10 Geography · Unit 2. Tick the rules students should test against this case.</p>
+    ${[['r1', 'When a risk builds slowly, people treat each year as normal, as long as nothing breaks in the year they are looking at.', 'Tested by Riverbend levee, Harbour ferry'], ['r2', 'When the people who pay for a decision are not the people who make it, the decision waits, as long as waiting costs nothing that year.', 'Tested by Riverbend levee, Harbour ferry'], ['r3', 'When a fix takes longer to build than the problem takes to arrive, start the fix and a stopgap together.', 'Tested by Harbour ferry']].map(([id, text, sub]) => `<label class="rule-li"><input type="checkbox" data-rule="${id}" ${S.rules[id] ? 'checked' : ''}><span>${text}<small>${sub}</small></span></label>`).join('')}
+  </article>
+  <article class="blk" id="tbodyblk">${blkBar('<span class="blk__type">Transfer check · the unseen case</span>')}
+    <label class="field"><span>The unseen case</span><textarea id="tbody" rows="4" class="${t.body.trim() ? '' : 'need'}" placeholder="A short case with the same structure and a different surface: a different place, field or time.">${esc(t.body)}</textarea></label>
+    <div class="grid2"><label class="field"><span>What it shares with the dam</span><input type="text" id="tshares" value="${esc(t.shares)}" placeholder="A slow risk, and a fix that arrives late"></label>
+      <label class="field"><span>How it looks different</span><input type="text" id="tdiffers" value="${esc(t.differs)}" placeholder="A hospital, not a dam; beds, not water"></label></div>
+    <label class="field"><span>The question</span><input type="text" value="${esc(t.question)}"></label>
+    <div class="grid2"><label class="field"><span>Timer</span><select><option>No timer</option><option ${t.timer === '10' ? 'selected' : ''}>10 minutes</option><option ${t.timer === '15' ? 'selected' : ''}>15 minutes</option></select></label>
+      <label class="field"><span>Markbook</span><select><option>New column: Transfer · The dam</option><option>No mark</option></select></label></div>
+    <p class="note">Students answer alone, and it locks once sent. You mark it Starting · Showing · Strong.</p>
+    <div class="ann" style="margin-top:12px"><span><b>Ann can check the unseen case</b>: does it share the dam’s structure, and is the surface different enough that students have to spot it? About A$0.01.</span><div class="row"><button class="btn" ${t.body.trim() ? '' : 'disabled'}>Check it</button><button class="btn">Draft one for me</button></div></div>
+  </article>`;
+}
+
+function renderCanvas() {
+  const c = $('#canvas');
+  const parts = { kit, brief, case: caseTab, decide: decideTab, outcome: outcomeTab, rules: rulesTab };
+  c.innerHTML = S.tab === 'all' ? ['brief', 'case', 'decide', 'outcome', 'rules'].map((k) => parts[k]()).join('') : parts[S.tab]();
+}
+function render() { renderPills(); renderCanvas(); renderCheck(); }
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tab) { S.tab = b.dataset.tab; render(); return; }
+  if (b.dataset.jump) {
+    S.tab = b.dataset.jump; render();
+    const f = b.dataset.field && document.getElementById(b.dataset.field);
+    if (f) { f.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => (f.querySelector?.('textarea') || f).focus?.(), 300); }
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  if (b.id === 'checktoggle') { S.checkOpen = !S.checkOpen; renderCheck(); return; }
+  if (b.dataset.lean) { S.leans[b.dataset.lean] = !S.leans[b.dataset.lean]; renderCanvas(); return; }
+  if (b.dataset.flow) { S.flow = b.dataset.flow; $('.mode-chip').textContent = `Case study · Flow ${S.flow}`; renderCanvas(); return; }
+  if (b.dataset.mod) {
+    const [k, v] = b.dataset.mod.split(':');
+    if (v === 'on') S.mods[k] = !S.mods[k]; else S.mods[k] = v;
+    renderCanvas(); renderCheck(); return;
+  }
+  if (b.dataset.pace) { S.pace = b.dataset.pace; render(); return; }
+  if (b.dataset.support) { S.support = b.dataset.support; renderCanvas(); return; }
+  if (b.id === 'addopt') { S.options.push(['', '']); S.objections.push(''); renderCanvas(); renderCheck(); return; }
+  if (b.dataset.delopt) { S.options.splice(+b.dataset.delopt, 1); S.objections.splice(+b.dataset.delopt, 1); renderCanvas(); renderCheck(); return; }
+  if (b.dataset.adddoc) { const [p, t] = b.dataset.adddoc.split(':'); S.docs.push({ id: 'd' + docSeq++, part: +p, type: t, from: '', title: '', body: '' }); renderCanvas(); renderCheck(); return; }
+  if (b.dataset.movedoc) { const d = S.docs.find((x) => x.id === b.dataset.movedoc); d.part = d.part === 1 ? 2 : 1; renderCanvas(); renderCheck(); return; }
+  if (b.id === 'annsplit') { S.annSplit = true; renderCanvas(); return; }
+  if (b.id === 'annsplitno') { S.annSplit = false; renderCanvas(); return; }
+  if (b.id === 'annobj') { S.annAsk = true; renderCanvas(); return; }
+  if (b.id === 'annobjno') { S.annAsk = false; renderCanvas(); return; }
+  if (b.id === 'annobjgo') { S.objections[2] = 'The plant arrives in 14 months at best. What keeps the town in water until then?'; S.annAsk = false; renderCanvas(); renderCheck(); return; }
+});
+document.addEventListener('input', (e) => {
+  const t = e.target; const d = t.dataset;
+  if (t.id === 'purpose') S.purpose = t.value;
+  else if (t.id === 'happened') S.happened = t.value;
+  else if (t.id === 'source') S.source = t.value;
+  else if (t.id === 'tbody') S.transfer.body = t.value;
+  else if (t.id === 'tshares') S.transfer.shares = t.value;
+  else if (t.id === 'tdiffers') S.transfer.differs = t.value;
+  else if (t.id === 'hold') S.hold = t.value;
+  else if (t.id === 'prompt') S.prompt = t.value;
+  else if (t.id === 'gate') S.gate = t.value;
+  else if (d.objection) S.objections[+d.objection] = t.value;
+  else if (d.opt) { const [i, j] = d.opt.split(':'); S.options[+i][+j] = t.value; }
+  else if (d.docbody) S.docs.find((x) => x.id === d.docbody).body = t.value;
+  else if (d.doctitle) S.docs.find((x) => x.id === d.doctitle).title = t.value;
+  else if (d.docfrom) S.docs.find((x) => x.id === d.docfrom).from = t.value;
+  else return;
+  if (t.classList.contains('need') && t.value.trim()) t.classList.remove('need');
+  renderCheck();
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.doctype) { const d = S.docs.find((x) => x.id === t.dataset.doctype); d.type = t.value; d.table = false; renderCanvas(); }
+  if (t.dataset.rule) S.rules[t.dataset.rule] = t.checked;
+});
+addEventListener('resize', renderCheck);
+render();
+</script>
+</body>
+</html>

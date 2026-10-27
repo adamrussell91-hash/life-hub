@@ -17,6 +17,9 @@ import { COMMIT_ID } from '../get-things-done/commit-slots.mjs';
 import { RULES_BOOK_MODEL } from '../rules-book/model.mjs';
 import { parseGroups } from '../rules-book/route.mjs';
 import { COMMIT_ID as RULES_COMMIT_ID } from '../rules-book/commit-slots.mjs';
+import { CHANGE_BOOK_MODEL } from '../change-book/model.mjs';
+import { parseGroups as parseChangeGroups } from '../change-book/route.mjs';
+import { COMMIT_ID as CHANGE_COMMIT_ID } from '../change-book/commit-slots.mjs';
 
 export const BOOK_KINDS = Object.freeze({
   decision: Object.freeze({
@@ -42,6 +45,14 @@ export const BOOK_KINDS = Object.freeze({
     parsePlace: parseGroups,
     record: Object.freeze({ tool: RULES_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The check time set in the experiment.', basisRule: 'The experiment rests on what a rule showed' }),
     reason: 'The Rules Book works from The Rules Book.'
+  }),
+  change: Object.freeze({
+    model: CHANGE_BOOK_MODEL,
+    frameKeys: Object.freeze(['change', 'group', 'stay']),
+    placeKey: 'group',
+    parsePlace: parseChangeGroups,
+    record: Object.freeze({ tool: CHANGE_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The review date set for the step.', basisRule: 'The step rests on what a model showed' }),
+    reason: 'Change Book works from The Change Book.'
   })
 });
 

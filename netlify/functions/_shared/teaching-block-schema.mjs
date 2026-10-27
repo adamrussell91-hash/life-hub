@@ -937,6 +937,7 @@ var BlockTypeSchema = z10.enum([
   "table",
   "peer_feedback",
   "question_drop",
+  "done",
   "brainstorm",
   "hinge_question",
   "continuum_line",
@@ -1105,7 +1106,9 @@ var GalleryItemSchema = z10.object({
   id: z10.string().min(1),
   url: z10.string(),
   alt_text: z10.string(),
-  caption: z10.string().optional()
+  caption: z10.string().optional(),
+  /** A lesson in the same unit: the image opens it. Unresolved ids show as a plain image. */
+  lesson_id: z10.string().min(1).optional()
 });
 var GalleryBlockSchema = z10.object({
   id: z10.string().min(1),
@@ -1415,7 +1418,7 @@ var ContinuumLineBlockSchema = z10.object({
       stops: z10.array(z10.string().max(40)).max(3).default([])
     }).default({ left: "Implied", right: "Not implied", stops: [] }),
     statements: z10.array(ContinuumStatementSchema).max(10).default([]),
-    pace: z10.enum(["teacher", "student"]).default("teacher"),
+    pace: z10.enum(["teacher", "student", "self"]).default("teacher"),
     replace: z10.boolean().default(true)
   }),
   ...blockLayout,
@@ -1577,6 +1580,8 @@ var CurriculumLinesV2ContentSchema = z10.object({
   focus_area: z10.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
   /** The metro lines (textual concepts) this unit shows; unset shows every one. The year network always shows them all. */
   concept_lines: z10.array(z10.string().min(1).max(64)).max(4).optional(),
+  /** The light rail lines (skills strands) this unit shows; unset shows every one. The year network always shows them all. */
+  skill_lines: z10.array(z10.string().min(1).max(64)).max(4).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
 });
 var CurriculumLinesBlockSchema = z10.object({
@@ -1606,6 +1611,18 @@ var QuestionDropBlockSchema = z10.object({
     marks_max: z10.number().int().min(1).max(20).default(3),
     per_student: z10.number().int().min(1).max(5).default(1),
     accepting: z10.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DoneBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("done"),
+  variant: z10.string().default("small"),
+  visibility: VisibilitySchema,
+  content: z10.object({
+    label: z10.string().max(120).default("I\u2019ve finished this")
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2362,6 +2379,7 @@ var leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
@@ -2668,6 +2686,7 @@ export {
   DiagramSourceSchema,
   DiscernConfirmBlockSchema,
   DividerBlockSchema,
+  DoneBlockSchema,
   DotPointRefSchema,
   EmbedBlockSchema,
   EmbedProviderSchema,

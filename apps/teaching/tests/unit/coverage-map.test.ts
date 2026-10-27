@@ -150,6 +150,12 @@ describe('Coverage map: model', () => {
     const rows = build(LESSONS, v2({ terminus: { label: 'Essay', lesson_id: 'f' } })).rows;
     expect(rows.at(-1)).toMatchObject({ id: 'f', kind: 'goal' });
   });
+
+  it('draws an assessment lesson as the goal, with no placeholder row after it', () => {
+    const rows = build([...LESSONS.slice(0, -1), { ...LESSONS.at(-1)!, assessment: true }], v2()).rows;
+    expect(rows.at(-1)).toMatchObject({ id: 'f', kind: 'goal' });
+    expect(rows.some((r) => r.id === '__terminus')).toBe(false);
+  });
 });
 
 const ev = (source: string, share: number, tags: string[] = [], n = 0): Evidence => ({

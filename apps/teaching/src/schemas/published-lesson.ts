@@ -7,6 +7,7 @@ import { PublishableLessonSchema, type Lesson } from './lesson';
 import { attachedOutcomeIds } from '../curriculum/outcome-ids';
 import { QuizSettingsSchema } from '../quiz/core';
 import { PublicSprintSchema } from '../sprint/schema';
+import { PublicCaseSchema } from '../case-study/schema';
 
 export const PublishedLessonSchema = z.object({
   lesson_id: z.string().min(1),
@@ -19,9 +20,10 @@ export const PublishedLessonSchema = z.object({
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
   feedback_off: z.boolean().optional(),
   /** Quiz lessons: the settings students may see, with the published version. */
-  pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint']).optional(),
+  pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint', 'case_study']).optional(),
   sprint: PublicSprintSchema.optional(),
-  /** Lectures, tutorials and sprints: the classes a plain lesson link can mean. */
+  case: PublicCaseSchema.optional(),
+  /** Lectures, tutorials, sprints and case studies: the classes a plain lesson link can mean. */
   classes: z.array(z.object({ id: z.string(), title: z.string() })).optional(),
   quiz: QuizSettingsSchema.extend({
     version: z.string(),

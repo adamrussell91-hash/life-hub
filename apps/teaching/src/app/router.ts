@@ -22,6 +22,7 @@ export type RouteName =
   | 'student-unit'
   | 'student-class'
   | 'student-class-lesson'
+  | 'student-profile'
   | 'student-feedback'
   | 'sign-in'
   | 'not-found';
@@ -48,6 +49,7 @@ export type RouteParams = {
   'student-unit': { unitId: string };
   'student-class': { classId: string };
   'student-class-lesson': { classId: string; lessonId: string };
+  'student-profile': { classId: string };
   'student-feedback': { token: string };
   'sign-in': Record<string, never>;
   'not-found': Record<string, never>;
@@ -138,6 +140,16 @@ export function match(pathname: string): RouteMatch | null {
     return {
       name: 'student-class-lesson',
       params: { classId: studentClassLesson[1], lessonId: studentClassLesson[2] },
+      requiresAuth: false,
+      path
+    };
+  }
+
+  const studentProfile = path.match(/^\/s\/classes\/([^/]+)\/profile$/);
+  if (studentProfile) {
+    return {
+      name: 'student-profile',
+      params: { classId: studentProfile[1] },
       requiresAuth: false,
       path
     };

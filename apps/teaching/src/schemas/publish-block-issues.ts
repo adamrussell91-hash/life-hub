@@ -22,6 +22,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   html_app: 'HTML app',
   question_set: 'Question set',
   question_drop: 'Question drop',
+  done: 'Done',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   continuum_line: 'Continuum line',

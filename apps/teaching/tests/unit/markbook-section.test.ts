@@ -499,13 +499,47 @@ describe('markbook section', () => {
     host.remove();
   });
 
+  it('Progress marks a lesson complete through the profile endpoint and redraws from its reply', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const mark = vi.fn(async () => ({ s1: { l1: { at: 'x', via: 'teacher' } }, s2: {} }));
+    mountMarkbook(host, cls, {
+      api: fakeApi(view()),
+      progressApi: { mark },
+      progressLessons: [{ id: 'l1', title: 'Poem', role: 'core', assessment: false, date: '2026-10-01' }],
+      narrow: () => false,
+      today: () => '2026-11-03',
+      view: 'progress'
+    });
+    const cell = (id: string) => host.querySelector<HTMLButtonElement>(`.mb-progress__btn[data-student="${id}"]`)!;
+    await vi.waitFor(() => expect(cell('s1')).not.toBeNull());
+    expect(cell('s1').dataset.state).toBe('open');
+    expect(cell('s1').dataset.late).toBe('true');
+    cell('s1').click();
+    await vi.waitFor(() => expect(cell('s1').dataset.state).toBe('complete'));
+    expect(mark).toHaveBeenCalledWith('class1', 's1', 'l1', 'complete');
+    expect(cell('s1').dataset.late).toBeUndefined();
+    host.remove();
+  });
+
+  it('Progress shows a failed save instead of pretending', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const mark = vi.fn(async () => { throw new ApiClientError({ code: 'bad_request', message: 'That change can’t be saved.' } as never); });
+    mountMarkbook(host, cls, { api: fakeApi(view()), progressApi: { mark }, progressLessons: [{ id: 'l1', title: 'Poem', role: 'core', assessment: false }], narrow: () => false, today: () => '2026-11-03', view: 'progress' });
+    await vi.waitFor(() => expect(host.querySelector('.mb-progress__btn')).not.toBeNull());
+    host.querySelector<HTMLButtonElement>('.mb-progress__btn')!.click();
+    await vi.waitFor(() => expect(host.querySelector('.mb-progress [role="alert"]')?.textContent).toContain('can’t be saved'));
+    host.remove();
+  });
+
   it('opens on the syllabus Grid when no view is asked for, and Next steps is one press away', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     mountMarkbook(host, cls, { api: fakeApi(view({ quizzes: [outcomeQuiz()] })), narrow: () => false, today: () => '2026-11-03' });
     await vi.waitFor(() => expect(host.querySelector('.mbg')).not.toBeNull());
     expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('true');
-    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks']);
+    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks', 'Progress']);
     host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="next"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-next')).not.toBeNull());
     host.remove();

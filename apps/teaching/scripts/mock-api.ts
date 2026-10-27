@@ -107,6 +107,8 @@ import { createLectureHandler } from '../../../netlify/functions/lecture.mjs';
 import { createPublishedLectureHandler } from '../../../netlify/functions/published-lecture.mjs';
 import { createPublishedTutorialHandler } from '../../../netlify/functions/published-tutorial.mjs';
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
+import { createPublishedCaseHandler } from '../../../netlify/functions/published-case.mjs';
+import { createCaseHandler } from '../../../netlify/functions/case.mjs';
 import { createPublishedSprintHandler } from '../../../netlify/functions/published-sprint.mjs';
 import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
 import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-practice.mjs';
@@ -128,6 +130,7 @@ import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedb
 import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
+import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/_shared/case-study.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -1246,11 +1249,16 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     // A design sprint keeps its groups and rules server-side, as the real publish does.
     const sprint = parsed.data.pedagogical_mode === 'design_sprint' && parsed.data.sprint ? prepareSprintPublish(parsed.data, studentBlocks) : null;
     if (sprint) await storeSprintConfig(functionBlobStore(), id, sprint.config);
+    // A case study keeps its documents, outcome and transfer case server-side, as the real publish does.
+    const caseStudy = parsed.data.pedagogical_mode === 'case_study' ? prepareCasePublish(parsed.data) : null;
+    if (caseStudy?.problems.length) return errorResponse(400, 'validation_error', caseStudy.problems[0]);
+    if (caseStudy) await storeCaseConfig(functionBlobStore(), id, caseStudy.config);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
       ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
-      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {})
+      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
+      ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {})
     });
 
     try {
@@ -3697,6 +3705,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createTutorialHandler(deps)
       : path.startsWith('/api/published/tutorial/')
         ? createPublishedTutorialHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/case$/.test(path)
+        ? createCaseHandler(deps)
+      : path.startsWith('/api/published/case/')
+        ? createPublishedCaseHandler(deps)
       : /^\/api\/lessons\/[^/]+\/sprint$/.test(path)
         ? createSprintHandler(deps)
       : /^\/api\/lessons\/[^/]+\/sprint-practice$/.test(path)
@@ -3828,6 +3840,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
+      /^\/api\/published\/case\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint-practice$/.test(path) ||
       /^\/api\/published\/sprint\/[^/]+$/.test(path) ||
