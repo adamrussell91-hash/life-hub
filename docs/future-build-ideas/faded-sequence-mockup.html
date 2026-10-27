@@ -1,0 +1,66 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Faded sequence mockup</title>
+<style>
+:root{--paper:#fbf9f4;--ink:#23211d;--muted:#6c675d;--line:#e2ddd0;--marine:#1f4e6b;--success:#2f6b45;--r:12px}
+*{box-sizing:border-box}body{margin:0;background:#efebe2;font:16px/1.5 system-ui,sans-serif;color:var(--ink);padding:24px 16px}
+.page{max-width:760px;margin:0 auto}h2.lbl{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:28px 0 8px}
+.seq{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seq__head{padding:14px 18px 0}.seq__title{margin:0;font-size:18px}.seq__sub{margin:2px 0 12px;color:var(--muted);font-size:14px}
+.rail{display:flex;gap:6px;padding:0 18px 14px;border-bottom:1px solid var(--line)}
+.rail button{flex:1;display:flex;align-items:center;gap:8px;border:0;background:none;padding:8px 6px;border-top:3px solid var(--line);text-align:left;font:inherit;font-size:13px;color:var(--muted);cursor:pointer}
+.rail button b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink);font-size:12px;flex:none}
+.rail button.on{border-top-color:var(--marine);color:var(--ink)}.rail button.on b{background:var(--marine);color:#fff}
+.rail button.done{border-top-color:var(--success)}.rail button.done b{background:var(--success);color:#fff}
+.step{padding:16px 18px 18px}.step[hidden]{display:none}
+.mode{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;background:#e7eef3;color:var(--marine);margin-bottom:8px}
+.ask{margin:0 0 10px;font-weight:600}
+.extract{margin:0 0 14px;padding:10px 16px;border-left:4px solid var(--marine);font:italic 18px/1.5 Georgia,serif}
+.rows{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start}
+.chip{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--marine);padding-top:8px}
+.shown{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:0}
+.shown--tick{border-left:4px solid var(--success)}
+textarea{width:100%;font:inherit;border:1px dashed var(--marine);border-radius:8px;padding:8px 12px;background:#fff;min-height:44px}
+.go{margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font:inherit;border:1px solid var(--marine);background:var(--marine);color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer}.btn.sec{background:#fff;color:var(--marine)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.cmp div{font-size:14px;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid var(--line)}.cmp .m{border-color:var(--success)}
+.cmp small{display:block;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted)}
+@media(max-width:560px){.row{grid-template-columns:1fr;gap:2px}.chip{padding-top:0}.rail button span{display:none}.rail button.on span{display:inline}.cmp{grid-template-columns:1fr}}
+.old{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px;font-size:14px;color:var(--muted)}
+</style></head><body><div class="page">
+<h2 class="lbl">Proposed: three consecutive faded_example blocks, grouped</h2>
+<div class="seq" id="seq">
+ <div class="seq__head"><p class="seq__title">Quote analysis</p><p class="seq__sub">Three quotes, one skill. Each step hands you a little more to do.</p></div>
+ <div class="rail" id="rail"></div>
+ <div id="steps"></div>
+</div>
+<h2 class="lbl">What changes for Adam</h2>
+<div class="old">Nothing in the lesson data. The three blocks stay three blocks. The app notices consecutive ones and draws them as this one card. A single faded block on its own gets the same tidy rows, minus the rail.</div>
+</div>
+<script>
+const steps=[
+ {tag:'Watch it done',mode:'Worked example',ask:'What does the poet do here, and why does it matter?',q:'The river kept its own counsel, and the town learned to listen.',rows:[['Technique','Personification: the river “keeps counsel”.'],['Where','“kept its own counsel”'],['Effect','The river feels wise and private, so the town’s listening reads as respect.']],blank:[]},
+ {tag:'Name the effect',mode:'You write the effect',ask:'Same skill, new quote. The technique and location are given.',q:'Every window held a lamp, small and stubborn against the dusk.',rows:[['Technique','Personification: the lamps are “stubborn”.'],['Where','“small and stubborn”'],['Effect','']],blank:[2],model:'The lamps feel brave, so the street reads as a community holding off the dark.'},
+ {tag:'Your turn',mode:'You write all three',ask:'Now you lead. Pick one technique and show how it shapes meaning.',q:'We carried the old songs like water, careful not to spill.',rows:[['Technique',''],['Where',''],['Effect','']],blank:[0,1,2],model:'Simile: “like water”. The songs feel precious and easy to lose, so carrying them reads as a duty.'}
+];
+let cur=0;const done=new Set();
+const rail=document.getElementById('rail'),host=document.getElementById('steps');
+function draw(){
+ rail.innerHTML='';host.innerHTML='';
+ steps.forEach((s,i)=>{
+  const b=document.createElement('button');b.className=(i===cur?'on ':'')+(done.has(i)?'done':'');
+  b.innerHTML=`<b>${done.has(i)?'✓':i+1}</b><span>${s.tag}</span>`;b.onclick=()=>{cur=i;draw()};rail.append(b);
+  const d=document.createElement('div');d.className='step';d.hidden=i!==cur;
+  let h=`<span class="mode">Step ${i+1} of 3 · ${s.mode}</span><p class="ask">${s.ask}</p><blockquote class="extract">${s.q}</blockquote><div class="rows">`;
+  s.rows.forEach((r,j)=>{h+=`<div class="row"><span class="chip">${r[0]}</span>`+(s.blank.includes(j)?`<textarea placeholder="Your ${r[0].toLowerCase()}" aria-label="Your ${r[0].toLowerCase()}"></textarea>`:`<p class="shown${s.blank.length?'':' shown--tick'}">${r[1]}</p>`)+`</div>`});
+  h+='</div>';
+  if(s.blank.length){h+=`<div class="go"><button class="btn" data-c>Check</button><span class="hint">Model stays hidden until you check.</span></div><div data-r></div>`}
+  else{h+=`<div class="go"><button class="btn sec" data-n>On to step ${i+2}</button></div>`}
+  d.innerHTML=h;host.append(d);
+  const c=d.querySelector('[data-c]');if(c)c.onclick=()=>{d.querySelector('[data-r]').innerHTML=`<div class="cmp"><div><small>Yours</small>${[...d.querySelectorAll('textarea')].map(t=>t.value||'…').join(' / ')}</div><div class="m"><small>Model</small>${s.model}</div></div><div class="go"><button class="btn sec" data-y>Got it</button><button class="btn sec" data-y>Not quite</button></div>`;d.querySelectorAll('[data-y]').forEach(y=>y.onclick=()=>{done.add(i);cur=Math.min(i+1,2);draw()})};
+  const n=d.querySelector('[data-n]');if(n)n.onclick=()=>{done.add(i);cur=i+1;draw()};
+ });
+}
+draw();
+</script></body></html>
