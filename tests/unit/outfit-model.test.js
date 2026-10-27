@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { LOOKS, SNAP_SAMPLES } from '../../apps/life/js/app/aesthetics/dress-looks.js';
-import { dressForWeather, pairingFor, SLOTS, styleAround } from '../../apps/life/js/app/aesthetics/outfit-model.js';
+import { dressForWeather, pairingFor, readGarmentPhoto, SLOTS, styleAround } from '../../apps/life/js/app/aesthetics/outfit-model.js';
 import {
   classifyForecast,
   classifyWeather,
@@ -160,4 +160,34 @@ test('"Wear this today" makes Today’s scent follow the outfit', async () => {
   assert.match(doc.querySelector('#aes-ribbon-notes').textContent, /Dressed expensive/);
   const saved = JSON.parse(doc.defaultView.localStorage.getItem('life-aesthetics-outfit'));
   assert.equal(saved['2026-01-15'].vibe, 'expensive');
+});
+
+/** A flat-lay frame: `inside(x, y)` paints olive cloth on a white background. */
+function frame(width, height, inside, noise = false) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const rgb = inside(x, y) ? [108, 109, 59] : noise ? [(x * 97 + y * 31) % 256, (x * 13 + y * 177) % 256, (x * y) % 256] : [246, 246, 244];
+      data.set([...rgb, 255], i);
+    }
+  }
+  return data;
+}
+const pantsShape = (x, y) => y >= 4 && y < 76 && ((y < 30 && x >= 12 && x < 48) || (x >= 12 && x < 28) || (x >= 32 && x < 48));
+const teeShape = (x, y) => (y >= 10 && y < 70 && x >= 22 && x < 58) || (y >= 10 && y < 30 && x >= 6 && x < 74);
+const shoesFromAbove = (x, y) => y >= 8 && y < 52 && ((x >= 6 && x < 20) || (x >= 24 && x < 38));
+
+test('a photo of pants reads as pants, a tee as a top', () => {
+  const pants = readGarmentPhoto(frame(60, 80, pantsShape), 60, 80);
+  assert.equal(pants.slot, 'bottom');
+  assert.ok(pants.pixels.length > 0);
+  for (let i = 0; i < pants.pixels.length; i += 4) assert.deepEqual([...pants.pixels.subarray(i, i + 3)], [108, 109, 59], 'only cloth, never the gap between the legs');
+  assert.equal(readGarmentPhoto(frame(80, 80, teeShape), 80, 80).slot, 'top');
+  assert.equal(readGarmentPhoto(frame(44, 60, shoesFromAbove), 44, 60).slot, 'top', 'two shoes side by side are not legs: no waist');
+  assert.equal(readGarmentPhoto(frame(80, 30, (x, y) => y >= 8 && y < 24 && x >= 4 && x < 76), 80, 30).slot, 'shoes');
+});
+
+test('a busy background is not guessed at', () => {
+  assert.deepEqual(readGarmentPhoto(frame(60, 80, pantsShape, true), 60, 80), { slot: null, pixels: null });
 });
