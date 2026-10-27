@@ -52,12 +52,12 @@ export function createPublishedLessonHandler(deps = {}) {
     }
 
     // A plain lesson link names no class. Lectures, tutorials and sprints need one, so the page gets the choices.
-    const needsClass = ['lecture', 'tutorial', 'design_sprint'].includes(snapshot.pedagogical_mode);
+    const needsClass = ['lecture', 'tutorial', 'design_sprint', 'case_study'].includes(snapshot.pedagogical_mode);
     let classes;
     if (needsClass) {
       classes = await classesForLesson(store, id);
       // A tutorial belongs to the one class it was planned for, scheduled or not.
-      const own = draft.pedagogical_mode === 'tutorial' ? draft.tutorial?.class_id : null;
+      const own = draft.pedagogical_mode === 'tutorial' ? draft.tutorial?.class_id : draft.pedagogical_mode === 'case_study' ? draft.case?.class_id : null;
       if (own) {
         const roster = await loadRoster(store, own);
         classes = roster ? [{ id: roster.cls.id, title: roster.cls.display_name || roster.cls.title || roster.cls.code || 'Class' }] : classes;
