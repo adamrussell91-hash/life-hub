@@ -122,6 +122,81 @@ export function styleAround({ colour, slot = 'top', garment = null, limit = 3 } 
 
 const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
 
+// ---------------- Reading a photo ----------------
+const BG_SPREAD = 28;
+const FG_DISTANCE = 48;
+
+/**
+ * Which piece a photo shows, from its silhouette against a plain background
+ * (flat lay, hanger, product shot). Pants stand tall with background showing
+ * between the legs; a pair of shoes is wide and low; anything else is a top.
+ *
+ * `data` is RGBA for a `width` × `height` frame drawn at the photo's own
+ * proportions (ImageData.data). Returns { slot, pixels }: `pixels` is RGBA of the garment alone
+ * so the colour is read off the cloth, not the gap between the legs. Both are
+ * null when the background is too busy to separate the piece (a worn photo).
+ */
+export function readGarmentPhoto(data, width, height) {
+  const none = { slot: null, pixels: null };
+  if (!data || width < 8 || height < 8) return none;
+  const at = (x, y) => (y * width + x) * 4;
+  const border = [];
+  for (let x = 0; x < width; x++) border.push(at(x, 0), at(x, height - 1));
+  for (let y = 1; y < height - 1; y++) border.push(at(0, y), at(width - 1, y));
+  const bg = [0, 1, 2].map(c => border.reduce((s, i) => s + data[i + c], 0) / border.length);
+  const dist = i => Math.hypot(data[i] - bg[0], data[i + 1] - bg[1], data[i + 2] - bg[2]);
+  if (border.reduce((s, i) => s + dist(i), 0) / border.length > BG_SPREAD) return none;
+
+  const fg = new Uint8Array(width * height);
+  let count = 0;
+  let [x0, y0, x1, y1] = [width, height, -1, -1];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (dist(at(x, y)) <= FG_DISTANCE) continue;
+      fg[y * width + x] = 1;
+      count += 1;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+  }
+  if (count < width * height * 0.04) return none;
+  const pixels = new Uint8ClampedArray(count * 4);
+  for (let p = 0, k = 0; p < fg.length; p++) {
+    if (!fg[p]) continue;
+    pixels.set(data.subarray(p * 4, p * 4 + 4), k);
+    k += 4;
+  }
+
+  const bw = x1 - x0 + 1;
+  const bh = y1 - y0 + 1;
+  const aspect = bh / bw;
+  // Lower legs: a background gap at the centre with cloth either side.
+  const mid = Math.round((x0 + x1) / 2);
+  const band = Math.max(1, Math.round(bw * 0.04));
+  let gap = 0;
+  let rows = 0;
+  for (let y = y0 + Math.round(bh * 0.6); y <= y1; y++) {
+    let left = false;
+    let right = false;
+    for (let x = x0; x < mid - band; x++) if (fg[y * width + x]) { left = true; break; }
+    for (let x = x1; x > mid + band; x--) if (fg[y * width + x]) { right = true; break; }
+    if (!left || !right) continue;
+    rows += 1;
+    let open = true;
+    for (let x = mid - band; x <= mid + band; x++) if (fg[y * width + x]) { open = false; break; }
+    if (open) gap += 1;
+  }
+  // ...joined at the waist, which a pair of shoes shot from above is not.
+  let waist = 0;
+  const waistRows = Math.max(1, Math.round(bh * 0.15));
+  for (let y = y0; y < y0 + waistRows; y++) if (fg[y * width + mid]) waist += 1;
+  const legs = rows > 0 && gap / rows > 0.6 && waist / waistRows > 0.6;
+  let slot = 'top';
+  if ((legs && aspect > 1.1) || aspect >= 1.7) slot = 'bottom';
+  else if (aspect < 0.55) slot = 'shoes';
+  return { slot, pixels };
+}
+
 // ---------------- Weather × garments ----------------
 const HOT = new Set(['humid-heat', 'dry-heat', 'warm-humid']);
 const COLD = new Set(['cool', 'cold', 'wet-cool']);
