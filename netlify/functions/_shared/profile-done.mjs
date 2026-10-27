@@ -13,7 +13,17 @@ const donePrefix = (classId, studentId) => `profile/${classId}/${studentId}/done
 
 export async function recordDone(store, classId, studentId, lessonId, via) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
-  await store.setJSON(doneKey(classId, studentId, lessonId), { at: new Date().toISOString(), via }, { onlyIfNew: true });
+  const key = doneKey(classId, studentId, lessonId);
+  const record = { at: new Date().toISOString(), via };
+  const written = await store.setJSON(key, record, { onlyIfNew: true });
+  // A teacher's "partial" mark yields to the student's own tick; anything else is left as it was.
+  if (written?.modified === false && (await read(store, key))?.partial) await store.setJSON(key, record);
+}
+
+/** Teacher: mark a lesson complete or partial for a student, replacing whatever was there. */
+export async function markDone(store, classId, studentId, lessonId, state) {
+  if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
+  await store.setJSON(doneKey(classId, studentId, lessonId), { at: new Date().toISOString(), via: 'teacher', ...(state === 'partial' ? { partial: true } : {}) });
 }
 
 export async function listDone(store, classId, studentId) {
