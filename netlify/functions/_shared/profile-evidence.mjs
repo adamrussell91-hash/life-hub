@@ -134,7 +134,7 @@ var MASTERY_GROUPS = ["understanding", "responding", "concepts", "skills"];
 function levelFor(group, tag, evidence) {
   const bySource = /* @__PURE__ */ new Map();
   for (const e of evidence) {
-    if (!e.tags.includes(tag)) continue;
+    if (e.share === null || !e.tags.includes(tag)) continue;
     bySource.set(e.source, [...bySource.get(e.source) ?? [], e.share]);
   }
   let top = 0;

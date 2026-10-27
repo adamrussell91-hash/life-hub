@@ -36,6 +36,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   hinge_question: 'A quick check at the turning point of a lesson. Each wrong answer names a misconception, so you know whether to move on.',
   continuum_line: 'Students place a statement on a line and defend it. Hidden until you reveal.',
   curriculum_lines: 'Map the unit as a transit map: strands of learning, lesson stations and the assessment.',
+  done: 'Students tap to mark the lesson finished.',
   question_drop: 'Students write a question for a quiz lesson in this unit. You approve each one.',
   quiz_question: 'One question in a quiz lesson: choice, gaps, matching, ordering and more.',
   question_set: 'Add multiple-choice or short-answer questions.',

@@ -378,6 +378,7 @@ describe('blockRegistry', () => {
       'diagram',
       'discern_confirm',
       'divider',
+      'done',
       'embed',
       'equation',
       'faded_example',

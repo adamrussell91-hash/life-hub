@@ -3,6 +3,7 @@ import { appendWithQuizDecks } from '@/blocks/quiz-deck';
 import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
+import { renderDone } from '@/blocks/done';
 import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderHingeQuestion } from '@/blocks/hinge-question';
 import { renderContinuumLine } from '@/blocks/continuum-line';
@@ -86,6 +87,8 @@ export type RenderContext = {
   /** In the lecture player: `live` for students, `preview` for the teacher's Play as student. */
   lecture?: 'live' | 'preview';
   lessonId?: string;
+  /** The class a student is viewing the lesson in, for blocks that record against the class (Done). */
+  classId?: string;
   attachedOutcomes?: PublicOutcome[];
   anthology?: AnthologyData;
   openNoteId?: string;
@@ -2337,6 +2340,8 @@ function renderBlockContent(
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_drop':
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
+    case 'done':
+      return wrapBlock(renderDone(block, mode, ctx), block, mode);
     case 'brainstorm':
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
     case 'hinge_question':
