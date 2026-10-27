@@ -10,6 +10,7 @@ describe('class site', () => {
     expect(isClassSiteStudentRoute('student-unit')).toBe(true);
     expect(isClassSiteStudentRoute('student-class')).toBe(true);
     expect(isClassSiteStudentRoute('student-class-lesson')).toBe(true);
+    expect(isClassSiteStudentRoute('student-profile')).toBe(true);
     expect(isClassSiteStudentRoute('sign-in')).toBe(false);
     expect(isClassSiteStudentRoute('teacher-home')).toBe(false);
     expect(isClassSiteStudentRoute('not-found')).toBe(false);

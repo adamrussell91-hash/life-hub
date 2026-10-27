@@ -32,3 +32,29 @@ export async function removeDone(store, classId, studentId, lessonId) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
   await deleteKey(store, doneKey(classId, studentId, lessonId));
 }
+
+const fillsKey = (classId, studentId, unitId) => `profile/${classId}/${studentId}/fills/${unitId}`;
+const GROUPS = ['understanding', 'responding', 'concepts', 'skills'];
+
+/**
+ * Bars only ever fill: keep the highest fractions this student has reached in this unit, so a
+ * corrected mark or a re-marked quiz can never take colour away. Fractions only, no evidence.
+ */
+export async function highWaterFills(store, classId, studentId, unitId, fills) {
+  if (!isSafeId(unitId)) return fills;
+  const key = fillsKey(classId, studentId, unitId);
+  const held = (await read(store, key)) ?? {};
+  const out = {};
+  let changed = false;
+  for (const group of GROUPS) {
+    const now = fills[group] ?? { mastered: 0, building: 0 };
+    const was = held[group] ?? { mastered: 0, building: 0 };
+    const mastered = Math.max(now.mastered, was.mastered ?? 0);
+    // Pale covers building and mastered together, so it can't be shorter than strong.
+    const building = Math.max(now.building, was.building ?? 0, 0);
+    out[group] = { mastered, building };
+    if (mastered !== (was.mastered ?? 0) || building !== (was.building ?? 0)) changed = true;
+  }
+  if (changed) await store.setJSON(key, out);
+  return out;
+}
