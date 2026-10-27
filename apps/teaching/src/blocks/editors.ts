@@ -1760,9 +1760,11 @@ export function createQuestionSetEditor(
 export function createGalleryEditor(
   block: Extract<Block, { block_type: 'gallery' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'gallery' }>>,
-  getLatest: () => Extract<Block, { block_type: 'gallery' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'gallery' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
-  type GalleryItem = { id: string; url: string; alt_text: string; caption?: string };
+  type GalleryItem = { id: string; url: string; alt_text: string; caption?: string; lesson_id?: string };
+  const unitLessons = context.unitLessons ?? [];
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
@@ -1779,7 +1781,8 @@ export function createGalleryEditor(
           id: entry.id,
           url: entry.url,
           alt_text: entry.alt_text,
-          ...(entry.caption ? { caption: entry.caption } : {})
+          ...(entry.caption ? { caption: entry.caption } : {}),
+          ...(entry.lesson_id ? { lesson_id: entry.lesson_id } : {})
         }))
       }
     });
@@ -1819,12 +1822,31 @@ export function createGalleryEditor(
           fieldPair(
             editorField('block-editor__gallery-alt', entry.alt_text, 'Alt text (required to publish)', `Gallery image ${n} alt text`, (value) => ctx.update({ ...ctx.current, alt_text: value })),
             editorField('block-editor__gallery-caption', entry.caption ?? '', 'Caption (optional)', `Gallery image ${n} caption`, (value) => ctx.update({ ...ctx.current, caption: value || undefined }))
-          )
+          ),
+          ...galleryLessonPicker(entry, n, (lesson_id) => ctx.update({ ...ctx.current, lesson_id }))
         );
       }
     });
     list.el.classList.add('block-editor__gallery-items');
     listHost.replaceChildren(list.el);
+  }
+
+  // Unit pages only: they know the unit's lessons. A saved link to a lesson that left the unit stays until changed.
+  function galleryLessonPicker(entry: GalleryItem, n: number, set: (lessonId: string | undefined) => void): HTMLElement[] {
+    if (!unitLessons.length && !entry.lesson_id) return [];
+    const options = [{ value: '', label: 'No lesson' }, ...unitLessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
+    if (entry.lesson_id && !unitLessons.some((l) => l.id === entry.lesson_id)) {
+      options.push({ value: entry.lesson_id, label: 'A lesson outside this unit' });
+    }
+    const picker = createChoice({
+      key: 'Opens lesson',
+      value: entry.lesson_id ?? '',
+      options,
+      className: 'block-editor__gallery-lesson',
+      ariaLabel: `Gallery image ${n} opens lesson`,
+      onChange: (value) => set(value || undefined)
+    });
+    return [picker.el];
   }
 
   const layoutSelect = createChoice({
@@ -1958,6 +1980,24 @@ export function createTimelineEditor(
     }
   });
   list.el.classList.add('block-editor__timeline-items');
+
+  // Unit pages only: they know the unit's lessons. A saved link to a lesson that left the unit stays until changed.
+  function galleryLessonPicker(entry: GalleryItem, n: number, set: (lessonId: string | undefined) => void): HTMLElement[] {
+    if (!unitLessons.length && !entry.lesson_id) return [];
+    const options = [{ value: '', label: 'No lesson' }, ...unitLessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
+    if (entry.lesson_id && !unitLessons.some((l) => l.id === entry.lesson_id)) {
+      options.push({ value: entry.lesson_id, label: 'A lesson outside this unit' });
+    }
+    const picker = createChoice({
+      key: 'Opens lesson',
+      value: entry.lesson_id ?? '',
+      options,
+      className: 'block-editor__gallery-lesson',
+      ariaLabel: `Gallery image ${n} opens lesson`,
+      onChange: (value) => set(value || undefined)
+    });
+    return [picker.el];
+  }
 
   const layoutSelect = createChoice({
     key: 'Layout',
@@ -3062,7 +3102,7 @@ function createBlockEditorFields(
     case 'accordion':
       return createAccordionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'accordion' }>);
     case 'gallery':
-      return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
+      return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>, context);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'peer_feedback': {

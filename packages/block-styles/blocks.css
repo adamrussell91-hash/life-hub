@@ -1585,6 +1585,59 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
 .block-gallery__caption {
   margin-top: var(--space-1);
 }
+.block-gallery__item--linked {
+  position: relative;
+}
+
+.block-gallery__link {
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+.block-gallery__link img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s ease;
+}
+
+.block-gallery__link:hover img {
+  opacity: 0.88;
+}
+
+.block-gallery__enlarge {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--paper, #fff) 88%, transparent);
+  color: var(--ink, currentColor);
+  cursor: zoom-in;
+  opacity: 0.85;
+}
+
+.block-gallery__enlarge:hover,
+.block-gallery__enlarge:focus-visible {
+  opacity: 1;
+}
+
+.block-gallery__caption-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 0.2em;
+}
+
+.block-gallery__caption-link:hover {
+  text-decoration-color: currentColor;
+}
 
 .block-gallery__viewport {
   outline: none;
