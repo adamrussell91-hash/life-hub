@@ -578,7 +578,7 @@ export const ContinuumLineBlockSchema = z.object({
       stops: z.array(z.string().max(40)).max(3).default([])
     }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
     statements: z.array(ContinuumStatementSchema).max(10).default([]),
-    pace: z.enum(['teacher', 'student']).default('teacher'),
+    pace: z.enum(['teacher', 'student', 'self']).default('teacher'),
     replace: z.boolean().default(true)
   }), ...blockLayout, ...blockTimestamps
 });

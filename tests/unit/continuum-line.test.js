@@ -177,3 +177,41 @@ test('routes: student route is public, teacher route needs the operator session'
   assert.equal((await pub(preq('{}', 'https://evil.example'))).status, 403);
   assert.equal((await pub(preq(JSON.stringify({ action: 'reveal', statement: 's1' })))).status, 400, 'students cannot reveal');
 });
+
+test('self-run: no code, no teacher steps; place, see the class, then move', async () => {
+  const store = storeFixture({ pace: 'self' });
+  const [a, b] = tokens(2).map(token => ({ token, session: 'self' }));
+  const idle = await learn(store, {});
+  assert.equal(idle.phase, 'live', 'the round opens itself');
+  assert.equal(idle.session, 'self');
+  assert.equal(idle.pace, 'self');
+  await learn(store, { ...a, action: 'join' });
+  await learn(store, { ...b, action: 'join', code: 'wrong' });
+  const mine = await place(store, a, 's1', 0.2);
+  assert.equal(mine.statements[0].phase, 'replace', 'placing shows the class and opens a move');
+  assert.deepEqual(mine.statements[0].class, [0.2]);
+  assert.equal(mine.statements[1].phase, 'collect');
+  assert.equal(mine.statements[1].class, null);
+  await assert.rejects(place(store, a, 's1', 0.3), /already placed/);
+  await assert.rejects(learn(store, { ...b, action: 'move', statement: 's1', pos: 0.5, why: 'x' }), /isn’t open|didn’t place/);
+  await place(store, b, 's1', 0.8, 'Could be nerves.');
+  const moved = await learn(store, { ...a, action: 'move', statement: 's1', pos: 0.7, why: 'Nerves too.' });
+  assert.equal(moved.statements[0].mine.new_pos, 0.7);
+  assert.deepEqual(moved.statements[0].class, [0.2, 0.8]);
+  const t = await teach(store, {});
+  assert.equal(t.statements[0].phase, 'replace');
+  assert.equal(t.statements[0].entries.length, 2);
+  assert.equal(t.statements[0].entries.find(e => e.new_pos === 0.7).why, 'Nerves too.', 'the teacher sees reasons and moves without revealing');
+});
+
+test('self-run: reopening keeps the same session so nothing is lost', async () => {
+  const store = storeFixture({ pace: 'self' });
+  const a = { token: tokens(1)[0], session: 'self' };
+  await learn(store, { ...a, action: 'join' });
+  await place(store, a, 's1', 0.4);
+  await teach(store, { action: 'end' });
+  await teach(store, { action: 'start' });
+  const back = await learn(store, a);
+  assert.equal(back.open, true);
+  assert.equal(back.statements[0].mine.pos, 0.4);
+});
