@@ -51,8 +51,9 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
-import { settleConceptLines, unitNetworkContext } from '@/teacher/network-context';
+import { settleConceptLines, settleSkillLines, unitNetworkContext } from '@/teacher/network-context';
 import { loadAlignment } from '@/alignment/api';
+import { loadSkills } from '@/skills/api';
 import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 
@@ -1038,17 +1039,25 @@ function mountUnitPlanEditor(
 
   void refreshAnthology();
 
-  // A unit map with no concepts picked takes its focus area's few from the syllabus, once.
+  // A unit map with no concepts or skills picked takes its focus area's few from the syllabus, once.
   if (network.usesAlignment && blocks.some((b) => b.block_type === 'curriculum_lines')) {
     void loadAlignment()
       .then((doc) => {
         if (destroyed) return;
-        const settled = settleConceptLines(blocks, network.lines, doc, options.unit.title);
-        if (!settled) return;
-        blocks = settled;
-        revision += 1;
-        canvas.update(blocks);
-        scheduleSave();
+        const concepts = settleConceptLines(blocks, network.lines, doc, options.unit.title);
+        if (concepts) blocks = concepts;
+        // Skills need the continuum too; without it the map keeps every skill line.
+        return loadSkills()
+          .then((skills) => settleSkillLines(blocks, network.lines, doc, skills, options.unit.title))
+          .catch(() => null)
+          .then((withSkills) => {
+            if (destroyed) return;
+            if (withSkills) blocks = withSkills;
+            if (!concepts && !withSkills) return;
+            revision += 1;
+            canvas.update(blocks);
+            scheduleSave();
+          });
       })
       .catch(() => { /* No alignment: the map keeps every line. */ });
   }
