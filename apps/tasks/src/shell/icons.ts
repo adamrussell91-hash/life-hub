@@ -50,6 +50,8 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   'gear-shifter': ['M4 9a8.5 8.5 0 0 1 14.6-3.6', 'M19 2.8v3.6h-3.6', 'M20 15a8.5 8.5 0 0 1-14.6 3.6', 'M5 21.2v-3.6h3.6', 'M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6', 'M12 7v1.3', 'M12 15.7V17', 'M7 12h1.3', 'M15.7 12H17'],
   // An open book with a rule line across it.
   'rules-book': ['M4 5.5h6.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 0-1.5-1.5H4z', 'M20 5.5h-6.5A1.5 1.5 0 0 0 12 7v12a1.5 1.5 0 0 1 1.5-1.5H20z', 'M6.5 9.5h3', 'M14.5 9.5h3'],
+  // A straight path reaching a diamond hinge, then branching two ways.
+  'change-book': ['M3 12h6', 'M12 9l3 3l-3 3l-3-3z', 'M15 12c2.5 0 3.5-5 6-5', 'M15 12c2.5 0 3.5 5 6 5'],
   'term-dates': ['M4 6h16', 'M4 10h12', 'M4 14h16', 'M4 18h8'],
   line: ['M8 3v18', 'M8 7h0', 'M8 7a1.5 1.5 0 1 0 0.01 0', 'M8 15a1.5 1.5 0 1 0 0.01 0', 'M12 7h7', 'M12 15h5']
 };

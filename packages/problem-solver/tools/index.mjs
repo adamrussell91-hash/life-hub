@@ -39,6 +39,9 @@ import { gtReview } from '../../get-things-done/tools/review.mjs';
 import { RULE_TOOLS } from '../../rules-book/tools/index.mjs';
 import { rbCommit } from '../../rules-book/tools/commit.mjs';
 import { rbReview } from '../../rules-book/tools/review.mjs';
+import { CHANGE_TOOLS } from '../../change-book/tools/index.mjs';
+import { chCommit } from '../../change-book/tools/commit.mjs';
+import { chReview } from '../../change-book/tools/review.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -86,7 +89,11 @@ export const TOOLS = {
   // The Rules Book's rules (step explore), then its Act and Review tools.
   ...RULE_TOOLS,
   rb_commit: rbCommit,
-  rb_review: rbReview
+  rb_review: rbReview,
+  // The Change Book's models (step explore), then its Act and Review tools.
+  ...CHANGE_TOOLS,
+  ch_commit: chCommit,
+  ch_review: chReview
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));

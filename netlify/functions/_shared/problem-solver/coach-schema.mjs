@@ -54,9 +54,9 @@ function suggestionOf(raw) {
     if (!CATALOGUE_IDS.includes(raw.tool) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown model in suggestion: ${raw.tool}` };
     return { value: { kind: 'next_tool', tool: raw.tool, reason } };
   }
-  // next_technique is Gear Shifter's and the Rules Book's name for next_tool, limited to their own (gt_, rb_) tools.
+  // next_technique is Gear Shifter's, the Rules Book's and the Change Book's name for next_tool, limited to their own (gt_, rb_, ch_) tools.
   if (raw.kind === 'next_technique') {
-    if (!/^(gt|rb)_/.test(String(raw.tool)) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown technique in suggestion: ${raw.tool}` };
+    if (!/^(gt|rb|ch)_/.test(String(raw.tool)) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown technique in suggestion: ${raw.tool}` };
     return { value: { kind: 'next_tool', tool: raw.tool, reason } };
   }
   if (raw.kind === 'next_tool' || raw.kind === 'switch_tool') {
