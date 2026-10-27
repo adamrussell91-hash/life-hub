@@ -374,6 +374,10 @@
     "Write a quiz question",
     "question_drop.prompt filler"
   ],
+  "every-block/every_done/student": [],
+  "every-block/every_done/teacher": [
+    "I’ve finished this"
+  ],
   "every-block/every_brainstorm/student": [
     "Brainstorm",
     "Loading…",
