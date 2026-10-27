@@ -70,6 +70,7 @@ export function lessonForAgent(lesson: Lesson): Lesson {
 function lessonTypeLine(mode: Lesson['pedagogical_mode']): string {
   if (mode === 'quiz') return 'quiz';
   if (mode === 'tutorial') return 'tutorial (quiz_question only inside a group’s exit check section; follow the tutorial recipe)';
+  if (mode === 'case_study') return 'case_study (no quiz_question; its settings are in lesson.case, which you read and advise on but cannot edit; follow the case study recipe)';
   return `${mode ?? 'lesson'} (not a quiz)`;
 }
 

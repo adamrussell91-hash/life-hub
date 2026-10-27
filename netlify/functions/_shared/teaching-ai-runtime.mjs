@@ -5705,6 +5705,19 @@ A group tab follows gradual release, I do \u2192 We do \u2192 You do: a heading 
 No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2\u20133 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
 
+## Case studies
+A case study lesson (type case_study) is built in its own editor tabs: Kit, Brief, The case, Decide, Outcome, Rules. Its settings are in the lesson JSON under case. You cannot change them: no proposal writes to case. What you can do is read it, advise, and write ready-to-paste text in your message for the teacher to put in the right tab. Name the tab each piece goes in. Blocks you propose (propose_insert_blocks) become the Decide stage's own content, shown above the decision; use them only for a short lens or scaffold on that stage, and never use set_mode in a case study.
+How to coach a build, in this order, one tab at a time:
+- Kit: the purpose line must finish "On a case they haven't seen, students will be able to\u2026" and name something students do on a new case, such as spot the pattern, weigh a decision or explain a cause. If the purpose is "learn about X", ask what they will do with X on a case they have not met. If the purpose could be met by a worked example, say so: a case study earns its place only when the aim is transfer, applying a framework to evidence, deciding under ambiguity or tracing a cause.
+- Brief: the decision prompt names a role and a real choice: "You are the head of the water authority. The dam is at 30%. What do you do?" Both options must be defensible. If one option is plainly right, it is a worked problem, so suggest a harder case.
+- The case: a real, bounded situation split into documents (memo, data, news, transcript, update), each with a source line. Keep each document short and plain. Layered release suits a decision focus: part 1, one short question, then part 2 that adds or changes information. Whole release suits causal tracing. Never invent real events, quotes, figures or sources: when the teacher has not supplied the facts, say you have none, give the shape of the document to write, and mark any invented example clearly as an example.
+- Decide: 2 to 4 options for guided support, each with a short label and a one-line detail; free text for open support. The confidence slider and the locked decision come with the mode.
+- Outcome: what actually happened, with a real source. Publish is blocked without the source. Never write or guess an outcome or its source for the teacher. If they do not know what happened, say the case needs one that is documented. Own pace: write 1 to 3 strongest objections to the most popular option, each a sentence a student could answer; hold-until date is optional.
+- Rules: the unseen transfer case shares the studied case's underlying structure and differs on the surface (a different setting, people and numbers). Check it: name the shared structure, name the two or three differences, and confirm a student who learned the rule from the first case could use it here. Ask the question so it includes "which rule helped?".
+Pace and support: teacher pace for core lessons taught live; own pace for support, extension or optional route lessons done at home. Support lessons use guided (an anchor case close to what students know, sentence frames, 2 to 3 options); extension uses open (free-text position, a harder transfer case).
+When asked to review a built case, check these in order: purpose finishes the sentence; the decision has a real choice; every document has a source; the outcome has a source and is documented; the objections are the strongest ones, not weak ones; the transfer case has the same structure and a different surface. Report what is missing as a short list, then offer the text to fix the first item.
+All student-facing text says what students can do ("Today you will weigh two options"), never what they cannot do or get wrong. Never use meta openers such as "This case asks you to".
+
 ## Group sets
 A quiz may hold group sets: top-level sections with group_set { group_id, class_id, name, tags, students, target }. Only that group's students get a set's questions, mixed in with the quiz. To fill one, use propose_replace_section on it, keeping its id, title and group_set exactly; put target quiz_question blocks inside, written on the lesson's own content and tagged so results land on the set's tags. Never add a group set yourself and never move quiz questions into or out of one.
 
@@ -5786,6 +5799,7 @@ function lessonForAgent(lesson) {
 function lessonTypeLine(mode) {
   if (mode === "quiz") return "quiz";
   if (mode === "tutorial") return "tutorial (quiz_question only inside a group\u2019s exit check section; follow the tutorial recipe)";
+  if (mode === "case_study") return "case_study (no quiz_question; its settings are in lesson.case, which you read and advise on but cannot edit; follow the case study recipe)";
   return `${mode ?? "lesson"} (not a quiz)`;
 }
 function buildAiLessonContext(input) {
