@@ -62,6 +62,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   let poll = 0;
   let selTimer = 0;
   let disposed = false;
+  let loadFailed = false;
   let pending: { doc_id: string; quote: string } | null = null;
   const drafts: Drafts = { answers: {} };
   /** The Decide blocks are built once so a repaint keeps whatever a student did in them. */
@@ -753,7 +754,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
 
   function gateMessage(s: CaseStatus | null): HTMLElement | null {
     if (!client) return note('Open this case from your class page.');
-    if (!s) return note('Loading…');
+    if (!s) return note(loadFailed ? 'This case couldn’t be loaded. Check your connection and it will try again.' : 'Loading…');
     if (s.identity.need === 'initials') return claimForm();
     if (s.not_for_you) return note('This case is set for other classes. Ask your teacher where to find yours.');
     if (s.anonymous || s.identity.need === 'class') return note(s.identity.need === 'class' ? 'Open this case from your class page.' : 'Your teacher hasn’t added a class list yet.');
@@ -797,9 +798,15 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   async function refresh(): Promise<void> {
     if (!client || disposed) return;
     try {
-      apply(await client.status());
+      const next = await client.status();
+      loadFailed = false;
+      apply(next);
     } catch {
-      /* The next poll tries again. */
+      // The next poll tries again. Until a first status arrives, say so rather than leaving "Loading…" up forever.
+      if (!status && !loadFailed) {
+        loadFailed = true;
+        paint();
+      }
     }
   }
 
