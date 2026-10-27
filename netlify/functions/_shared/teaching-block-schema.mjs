@@ -1415,7 +1415,7 @@ var ContinuumLineBlockSchema = z10.object({
       stops: z10.array(z10.string().max(40)).max(3).default([])
     }).default({ left: "Implied", right: "Not implied", stops: [] }),
     statements: z10.array(ContinuumStatementSchema).max(10).default([]),
-    pace: z10.enum(["teacher", "student"]).default("teacher"),
+    pace: z10.enum(["teacher", "student", "self"]).default("teacher"),
     replace: z10.boolean().default(true)
   }),
   ...blockLayout,
