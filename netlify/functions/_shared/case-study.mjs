@@ -341,7 +341,8 @@ export async function caseAction(store, lessonId, body) {
 const TEACHER_ACTIONS = ['board', 'open', 'release_part', 'reveal'];
 
 async function board(store, lessonId, draft, config, state) {
-  const classId = draft?.case?.class_id ?? config.class_id;
+  // A case with no class set reaches students through any class link: read the class from their own work.
+  const classId = draft?.case?.class_id ?? config.class_id ?? (await allWork(store, lessonId)).find((w) => w.class_id)?.class_id;
   const roster = classId ? await loadRoster(store, classId) : null;
   const k = keys(lessonId);
   const students = await Promise.all(list(roster?.students).map(async (s) => {

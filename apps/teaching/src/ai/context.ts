@@ -41,7 +41,7 @@ export function buildAiStaticPrompt(input: Pick<AiContextInput, 'agentName' | 'p
     '',
     '## Output rules',
     '- Use tools to propose schema-valid block changes. Do not claim the lesson was already updated.',
-    '- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.',
+    '- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / propose_update_case (case study settings only) / review_only.',
     '- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.',
     '- Keep proposals minimal and schema-valid.',
     '- Write your explanation for the teacher in the proposal tool\'s message field; that is the text shown with the proposal.',
@@ -70,6 +70,7 @@ export function lessonForAgent(lesson: Lesson): Lesson {
 function lessonTypeLine(mode: Lesson['pedagogical_mode']): string {
   if (mode === 'quiz') return 'quiz';
   if (mode === 'tutorial') return 'tutorial (quiz_question only inside a group’s exit check section; follow the tutorial recipe)';
+  if (mode === 'case_study') return 'case_study (no quiz_question; its settings are in lesson.case, which you change with propose_update_case; follow the case study recipe)';
   return `${mode ?? 'lesson'} (not a quiz)`;
 }
 
