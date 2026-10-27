@@ -125,4 +125,16 @@ describe('case study player', () => {
     expect(out.cl.save).toHaveBeenCalledWith({ kind: 'reflection', text: 'The memo showed it' });
     out.player.dispose();
   });
+
+  it('says so when the first load fails instead of leaving "Loading…" up', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const cl = client(status());
+    cl.status = vi.fn(async () => { throw new Error('404'); });
+    const player = mountCasePlayer(host, { lesson: lessonOf(publicCase()), classId: 'c1', client: cl, renderHero: () => {} });
+    await flush();
+    expect(host.textContent).toContain('couldn’t be loaded');
+    expect(host.textContent).not.toContain('Loading…');
+    player.dispose();
+  });
 });
