@@ -2073,7 +2073,7 @@ export function renderChartBlock(
   mode: RenderMode
 ): HTMLElement {
   const root = document.createElement('figure');
-  root.className = 'block-chart';
+  root.className = `block-chart block-chart--${block.variant}`;
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
