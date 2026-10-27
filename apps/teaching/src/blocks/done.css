@@ -17,6 +17,7 @@
 .dn-done__initials {
   min-height: 44px;
   width: min(100%, 14rem);
+  font-size: 16px;
   text-transform: uppercase;
 }
 

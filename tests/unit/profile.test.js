@@ -135,3 +135,13 @@ test('the public endpoint answers JSON: need=initials for an unclaimed device, 4
   const bad = await handler(new Request('https://example.com/api/published/profile/class1', { method: 'POST', body: 'nope' }));
   assert.equal(bad.status, 400);
 });
+
+test('bars only ever fill: a lower result later keeps the highest fractions reached', async () => {
+  const { highWaterFills } = await import('../../netlify/functions/_shared/profile-done.mjs');
+  const s = storeFixture();
+  const f = (m, b) => ({ understanding: { mastered: m, building: b }, responding: { mastered: 0, building: 0 }, concepts: { mastered: 0, building: 0 }, skills: { mastered: 0, building: 0 } });
+  assert.deepEqual((await highWaterFills(s, 'class1', 'st1', 'unit1', f(0.5, 0.25))).understanding, { mastered: 0.5, building: 0.25 });
+  assert.deepEqual((await highWaterFills(s, 'class1', 'st1', 'unit1', f(0.25, 0))).understanding, { mastered: 0.5, building: 0.25 });
+  assert.deepEqual((await highWaterFills(s, 'class1', 'st1', 'unit2', f(0.25, 0))).understanding, { mastered: 0.25, building: 0 }, 'another unit starts fresh');
+  assert.deepEqual((await highWaterFills(s, 'class1', 'st2', 'unit1', f(0, 0))).understanding, { mastered: 0, building: 0 }, 'another student starts fresh');
+});

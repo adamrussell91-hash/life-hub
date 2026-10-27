@@ -13,7 +13,7 @@ import { draftLessonKey, unitKey } from './teaching-blobs.mjs';
 import { markbookAction } from './markbook.mjs';
 import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
 import { profileItems, storedAlignment } from './profile-items.mjs';
-import { listDone, recordDone, removeDone } from './profile-done.mjs';
+import { highWaterFills, listDone, recordDone, removeDone } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
@@ -67,7 +67,7 @@ export function mapRows(lessons, view, done, studentId) {
 
 async function profileFor(store, roster, student) {
   const classId = roster.cls.id;
-  const { lessons } = await unitLessons(store, roster.cls);
+  const { unit, lessons } = await unitLessons(store, roster.cls);
   const view = await markbookAction(store, classId, { action: 'load', skip_done: true });
   const done = await listDone(store, classId, student.id);
   const rows = mapRows(lessons, view, done, student.id);
@@ -76,7 +76,7 @@ async function profileFor(store, roster, student) {
   const mine = markbookEvidence(view, []).evidence.filter((e) => e.student === student.id);
   const evidence = withPointTags(mine, lessonPointMap(lessons, alignment), new Map());
   const items = await profileItems(store, roster, lessons, view, alignment);
-  return { need: null, initials: student.initials, map: { lessons: rows, next }, fills: fillsFor(items, evidence) };
+  return { need: null, initials: student.initials, map: { lessons: rows, next }, fills: await highWaterFills(store, classId, student.id, unit?.id, fillsFor(items, evidence)) };
 }
 
 /** Teacher: every student's done records, and removing one. */
