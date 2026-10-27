@@ -1,7 +1,7 @@
 // tests/unit/change-book-techniques.test.js
 // The Change Book's tools: registration and integrity, the shelves they may and may not appear
 // on, the Rhizome variant on Problem Solver's concept map, Multitasking and (Un)Happiness on the
-// shared scales, the merges folded in, the dated-forecast rule, and a driver that works every
+// Change Book's own families (time_value and attribution), the merges folded in, the dated-forecast rule, and a driver that works every
 // plain model through the real machine.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -109,28 +109,32 @@ test('Rhizome: Problem Solver’s concept map in the Explore step, sideways link
   assert.equal(isComplete(original), true, 'Problem Solver’s concept map still completes with no reflection');
 });
 
-// ---------------------------------------------------------------- the two scales models
+// ---------------------------------------------------------------- the Change Book's own families
 
-test('Multitasking: four descriptive spokes, time and value, 0 to 10, with no enforced total', () => {
+test('Multitasking: four modes on a split star, time 0 to 100 with no sum rule, value 1 to 10', () => {
   const def = T.ch_multitasking;
-  assert.deepEqual(def.chart.scales.map((s) => s.label), ['Offline communication', 'Cloud communication', 'Focused work', 'Switching between modes']);
-  assert.deepEqual(def.chart.series.map((s) => s.id), ['time', 'value']);
-  assert.equal(def.chart.mode, 'axes', 'axes, never shares: nothing has to add up to 100');
-  assert.equal(def.chart.layout, 'radar');
+  assert.equal(def.family, 'time_value');
+  assert.deepEqual(def.chart.modes.map((m) => m.id), ['a', 'b', 'c', 'd']);
+  assert.deepEqual([...def.nodeTags.note], ['a', 'b', 'c', 'd']);
+  assert.equal(def.slots.subject, 'The workday you are looking at');
   let run = fill(newRun('ch_multitasking', 'm'), ['subject']);
-  assert.equal(def.validateScores(run, { series: 'time', values: { offline: 2, cloud: 9, focus: 3, switching: 7 } }), null, 'any total is accepted');
-  assert.equal(def.validateScores(run, { series: 'time', values: { offline: 0, cloud: 0, focus: 0, switching: 0 } }), null);
-  run = applyScores(run, { series: 'time', values: { offline: 2, cloud: 9, focus: 3, switching: 7 } }, '2026-10-27T10:00:00.000Z');
-  assert.match(def.awaiting(run), /what it was worth/);
+  assert.match(def.awaiting(run), /overlap allowed/);
+  assert.equal(def.validateScores(run, { time: { a: 50, b: 60, c: 40, d: 30 }, value: { a: 5, b: 5, c: 5, d: 5 } }), null, 'a total over 100 is accepted');
+  run = applyScores(run, { time: { a: 10, b: 20, c: 30, d: 5 }, value: { a: 1, b: 2, c: 10, d: 4 } }, '2026-10-27T10:00:00.000Z');
+  assert.equal(def.awaiting(run), null);
+  assert.ok(def.steps.some((s) => s.id === 'time' && /overlap/.test(s.prompt)));
+  assert.ok(def.failureModes.some((line) => /add up to 100/.test(line)));
 });
 
-test('(Un)Happiness: the forces scored now and in three years; the Dictatorship pressures folded into its steps', () => {
+test('(Un)Happiness: ten forces, 1 to 5 everywhere, the arrows, own forces; the Dictatorship pressures folded into its steps', () => {
   const def = T.ch_unhappiness;
-  assert.deepEqual(def.chart.series.map((s) => s.label), ['Influence now', 'In three years']);
-  assert.equal(def.chart.scales.length, 10);
-  assert.ok(def.chart.scales.some((s) => s.label === 'Your actions') && def.chart.scales.some((s) => s.label === 'Luck'));
+  assert.equal(def.family, 'attribution');
+  assert.equal(def.chart.forces.length, 10);
+  assert.deepEqual(def.chart.forces.filter((f) => f.self).map((f) => f.label), ['Your thoughts', 'Your actions']);
+  assert.deepEqual(Object.keys(def.slots), ['force', 'got_here', 'get_there', 'note', 'reflection']);
   assert.ok(def.steps.some((s) => s.id === 'pressures' && /headlines|breaking news/.test(s.prompt)));
   assert.match(def.steps.find((s) => s.id === 'present').prompt, /1 to 5/);
+  assert.match(def.steps.find((s) => s.id === 'present').prompt, /rich, lonely/);
   assert.ok(def.failureModes.some((line) => /influence with personal control/.test(line)));
 });
 

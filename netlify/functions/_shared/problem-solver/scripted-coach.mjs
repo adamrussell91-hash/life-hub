@@ -536,6 +536,13 @@ function changeTurn(session, last, run) {
   if (/^(act|commit)\b/i.test(last.trim()) && session.phase === 'explore') {
     return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'The model has done its work.' }, message: 'Then let us turn it into one small step you can undo. Move on to Act when you are ready.' };
   }
+  // A chart the person scores themselves (Multitasking's star, (Un)Happiness's table): until it is
+  // saved, a plain reply is not placed; a reply that names an open slot ("force: my commute") is.
+  if (TOOLS[run.tool].awaiting?.(run) && last.trim() && !/^[a-z_]+:/i.test(last.trim())) {
+    const hints = nextSlots(run).map((s) => parseSlot(s)?.name).filter(Boolean);
+    const extra = hints.includes('force') ? ' To add a force of your own to the table first, start your reply with "force:".' : hints.includes('note') ? ' To add a note on one part, start your reply with "note:".' : '';
+    return { ...base, verdict: 'clarify', message: `Score it on the chart with its controls and press Save; I will pick up from there.${extra}` };
+  }
   if (run.tool !== CHANGE_COMMIT) return null;
   const { slot, text } = placement(run, last);
   const name = parseSlot(slot)?.name;

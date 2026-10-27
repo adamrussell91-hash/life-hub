@@ -1,18 +1,19 @@
 // tests/unit/change-book-scripted.test.js
 // The Change Book's scripted coach and session shape: framing in three answers (the change, where
 // it sits, what should stay) with the group kept to known ids, selecting a model, another angle
-// within the book, the reversible step in order with its basis and review date, Review, and one
-// walk from the frame to an update offer.
+// within the book, the reversible step in order with its basis and review date, Review, one
+// walk from the frame to an update offer, and the two self-scored charts waiting for their Save.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 import { validateCoachTurn } from '../../netlify/functions/_shared/problem-solver/coach-schema.mjs';
 import {
-  acceptSuggestion, applyCoachTurn, createSession, linkCaseFile, moveOn, say, setReviewTask, startReview
+  acceptSuggestion, activeRun, applyCoachTurn, createSession, linkCaseFile, moveOn, say, score, setReviewTask, startReview
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 import { actionOffer } from '../../packages/change-book/record.mjs';
 import { COMMIT_ID, REVIEW_ID } from '../../packages/change-book/commit-slots.mjs';
 import { toolsForPlanStep } from '../../packages/problem-solver/steps.mjs';
+import { isComplete } from '../../packages/problem-solver/machine.mjs';
 
 let n = 0;
 const deps = { now: () => '2026-10-27T10:00:00.000Z', newId: () => `id${(n += 1)}` };
@@ -155,4 +156,43 @@ test('Review waits for the review date, then opens the review; a walk to the end
 test('only change sessions have a record offer', async () => {
   const s = await committed();
   assert.equal(actionOffer({ ...s, kind: 'rules' }), null);
+});
+
+/** A change session started from a shelf model, framed and with the model open. */
+async function opened(model) {
+  let s = await step(createSession({ text: 'My days are full of messages and I get little done.', kind: 'change', startModel: model }, deps));
+  s = await step(s, 'It is about my own habits and how I spend my attention.');
+  s = await step(s, 'The Friday catch-up with the team, which keeps us close.');
+  return step(acceptSuggestion(s, deps));
+}
+
+test('Multitasking in the dev mock: the workday, then the coach waits for the star to be saved, then it completes', async () => {
+  let s = await opened('ch_multitasking');
+  assert.equal(activeRun(s).tool, 'ch_multitasking');
+  s = await step(s, 'Last Tuesday at the office, mostly email and calls.');
+  assert.deepEqual(activeRun(s).nodes.map((node) => node.slot), ['subject']);
+  s = await step(s, 'I think it was about half email.');
+  assert.match(s.turns.at(-1).text, /Score it on the chart/);
+  assert.equal(activeRun(s).nodes.length, 1, 'a plain reply is not placed while the chart waits');
+  s = score(s, { runId: activeRun(s).id, time: { a: 30, b: 50, c: 15, d: 30 }, value: { a: 8, b: 3, c: 9, d: 2 } }, deps);
+  s = await step(s, 'Email takes half my day and gives back the least of anything.');
+  assert.deepEqual(activeRun(s).nodes.map((node) => node.slot), ['subject', 'note:1']);
+  s = await step(s, 'reflection: Focused work is worth the most and gets the least of my day.');
+  assert.equal(isComplete(s.steps.explore.runs.at(-1)), true);
+});
+
+test('(Un)Happiness in the dev mock: own forces by hint, the table saved, then the two arrows and the reflection', async () => {
+  let s = await opened('ch_unhappiness');
+  s = await step(s, 'I would say three now and four later.');
+  assert.match(s.turns.at(-1).text, /force:/);
+  s = await step(s, 'force: The long commute into the city every day');
+  assert.deepEqual(activeRun(s).nodes.map((node) => node.slot), ['force:1']);
+  const ids = ['thoughts', 'luck', 'politics', 'faith', 'fitness_industry', 'social_limits', 'actions', 'friends_family', 'economy', 'science', 'own_1'];
+  const col = (n) => Object.fromEntries(ids.map((id) => [id, n]));
+  s = score(s, { runId: activeRun(s).id, feeling: 'happy', now: 3, later: 4, influenceNow: col(3), influenceLater: col(2) }, deps);
+  s = await step(s, 'A steady job, good friends and a lot of luck with housing.');
+  s = await step(s, 'Moving closer to family and cutting the commute right down.');
+  assert.deepEqual(activeRun(s).nodes.map((node) => node.slot), ['force:1', 'got_here', 'get_there']);
+  s = await step(s, 'reflection: I put more of it down to myself now than I expect to later.');
+  assert.equal(isComplete(s.steps.explore.runs.at(-1)), true);
 });
