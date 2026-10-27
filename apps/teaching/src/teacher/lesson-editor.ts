@@ -276,6 +276,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.tutorial) lesson.tutorial = next.tutorial;
       // A design sprint's Kit is edited on the page; the next save carries it.
       if (next.sprint) lesson.sprint = next.sprint;
+      // A case study's settings are edited on the page too.
+      if (next.case) lesson.case = next.case;
     }
 
     function bumpDraftClock(): void {
