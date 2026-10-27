@@ -5,6 +5,8 @@ import { mapRows, profileAction, teacherProfileAction } from '../../netlify/func
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
+  // A lesson is published unless it says otherwise.
+  for (const [k, v] of entries) if (k.startsWith('lessons/') && !v.unpublished) data.set(`published/${k}`, { id: v.id });
   return {
     data,
     async get(key) { return structuredClone(data.get(key) ?? null); },
@@ -168,4 +170,31 @@ test('the teacher marks complete, partial and clear; a student tick replaces a p
   assert.deepEqual((await mark('clear')).done[bob.id], {});
   await assert.rejects(mark('bogus'), { code: 'bad_request' });
   await assert.rejects(teacherProfileAction(s, 'class1', { action: 'mark', student_id: 'nobody', lesson_id: 'l1', state: 'complete' }), { code: 'bad_request' });
+});
+
+test('the progress map carries only published lessons and nothing a student should not see', async () => {
+  const s = storeFixture([
+    ['classes/class1', { ...cls([{ name: 'Bob Brown' }]), subject_id: 'subj1' }],
+    ['subjects/subj1', { id: 'subj1', network_lines: [{ id: 'ln1', mode: 'train', name: 'Argument', colour: 'wave', alignment: { kind: 'strand', strand: 'arguing' }, secret: 'x' }] }],
+    ['units/unit1', {
+      id: 'unit1', title: 'Poetry', lesson_ids: ['l1', 'l2', 'l3', 'l4'],
+      blocks: [{ id: 'b1', type: 'block', block_type: 'curriculum_lines', visibility: 'student_teacher', content: { version: 2, rail_stops: [{ id: 'r1', line_id: 'ln1', kind: 'support', lesson_id: 'l2', skip_rule: 'TEACHER ONLY RULE', label: 'secret label' }], gates: [], nudges: {}, terminus: { label: 'Poem task', lesson_id: 'l4' } } }]
+    }],
+    lesson('l1', 'Ghost poem', { line_stops: [{ line_id: 'ln1', level: 'introduced' }], plan_notes: 'PRIVATE' }),
+    lesson('l2', 'Tutorial', { route_role: 'support', skip_rule: 'TEACHER ONLY RULE' }),
+    lesson('l3', 'Unpublished surprise', { unpublished: true }),
+    lesson('l4', 'Poem task', { pedagogical_mode: 'assessment' }),
+    ['scheduled_lessons/s1', { id: 's1', class_id: 'class1', lesson_id: 'l1', date: '2026-10-05', start_time: '09:00' }],
+    ['scheduled_lessons/s2', { id: 's2', class_id: 'other', lesson_id: 'l1', date: '2026-10-06' }]
+  ]);
+  await claimInitials(s, await loadRoster(s, 'class1'), token(1), 'BB');
+  const out = await profileAction(s, 'class1', { class_token: token(1) });
+  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.kind]), [['l1', 'lesson'], ['l2', 'lesson'], ['l4', 'assessment']]);
+  const unit = out.map.unit;
+  assert.deepEqual(unit.lessons.map((l) => l.id), ['l1', 'l2', 'l4']);
+  assert.deepEqual(unit.lines, [{ id: 'ln1', mode: 'train', name: 'Argument', colour: 'wave' }]);
+  assert.deepEqual(unit.schedule, [{ lesson_id: 'l1', date: '2026-10-05', start_time: '09:00' }], 'only this class’s dates');
+  assert.equal(unit.lessons[2].assessment, true);
+  const text = JSON.stringify(out);
+  for (const leak of ['TEACHER ONLY RULE', 'secret label', 'PRIVATE', 'Unpublished surprise', 'secret']) assert.ok(!text.includes(leak), leak);
 });
