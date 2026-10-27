@@ -170,7 +170,8 @@ describe('publish flow', () => {
     );
     expect(annotation).toBeTruthy();
     expect(annotation.content.layers.map((layer: { id: string }) => layer.id)).toEqual([
-      'layer_structure'
+      'layer_structure',
+      'layer_voice'
     ]);
   });
 
