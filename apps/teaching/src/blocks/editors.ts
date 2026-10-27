@@ -2526,8 +2526,13 @@ export function createChartEditor(
   const emitChange = () => {
     const next = content();
     preview.innerHTML = buildChartSvg(next);
-    onChange({ ...getLatest(), content: next });
+    onChange({ ...getLatest(), variant: sizeSelect.getValue(), content: next });
   };
+
+  const sizeSelect = createMediaSizeSelect(
+    (['small', 'medium', 'large'] as const).find((v) => v === block.variant) ?? 'large',
+    () => emitChange()
+  );
 
   const chartTypeSelect = createChoice({
     key: 'Type',
@@ -2615,7 +2620,7 @@ export function createChartEditor(
 
   const settings = document.createElement('div');
   settings.className = 'block-editor__inline-settings';
-  settings.append(chartTypeSelect.el);
+  settings.append(chartTypeSelect.el, sizeSelect.el);
 
   preview.innerHTML = buildChartSvg(content());
   fields.append(settings, title, fieldPair(xLabel, yLabel), seriesList.el, preview);

@@ -5133,6 +5133,9 @@ a.home-class-tile:hover {
   max-width: 100%;
 }
 
+.block-chart--small { max-width: 18rem; }
+.block-chart--medium { max-width: 32rem; }
+
 .block-quote {
   margin: 0;
 }
