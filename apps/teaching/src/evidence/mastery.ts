@@ -20,7 +20,8 @@ export const MASTERY_GROUPS: MasteryGroup[] = ['understanding', 'responding', 'c
 export function levelFor(group: MasteryGroup, tag: string, evidence: readonly Evidence[]): MasteryLevel {
   const bySource = new Map<string, number[]>();
   for (const e of evidence) {
-    if (!e.tags.includes(tag)) continue;
+    // A null share is an answer still waiting to be marked; it says nothing yet.
+    if (e.share === null || !e.tags.includes(tag)) continue;
     bySource.set(e.source, [...(bySource.get(e.source) ?? []), e.share]);
   }
   let top = 0;

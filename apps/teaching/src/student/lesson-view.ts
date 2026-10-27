@@ -176,6 +176,7 @@ function renderPublishedLesson(
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
+        classId: extras?.cls?.id ?? extras?.quizClassId,
         pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
         openNoteId

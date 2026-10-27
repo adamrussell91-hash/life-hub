@@ -4,6 +4,7 @@ import { createFadedExampleEditor } from '@/blocks/faded-example';
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
+import { createDoneEditor } from '@/blocks/done';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
@@ -3070,6 +3071,8 @@ function createBlockEditorFields(
     }
     case 'question_drop':
       return createQuestionDropEditor(block, onChange, context.lessonId);
+    case 'done':
+      return createDoneEditor(block, onChange);
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
     case 'hinge_question':
