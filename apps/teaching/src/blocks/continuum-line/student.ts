@@ -7,7 +7,7 @@ type Mine = { pos: number; reason: string; new_pos?: number; why?: string };
 type StatementView = { id: string; phase: Phase; placed: number; mine: Mine | null; class: number[] | null };
 type StudentState =
   | { phase: 'idle' }
-  | { phase: 'live'; session: string; open: boolean; pace: 'teacher' | 'student'; joined?: boolean; symbol?: string; current?: number; statements?: StatementView[] };
+  | { phase: 'live'; session: string; open: boolean; pace: 'teacher' | 'student' | 'self'; joined?: boolean; symbol?: string; current?: number; statements?: StatementView[] };
 type Live = Extract<StudentState, { phase: 'live' }>;
 /** What a device keeps: the round it joined and its secret token. */
 type Device = { session: string; token: string };
@@ -327,7 +327,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     const wrap = el('div', 'cl-step');
     const head = el('div', 'cl-step__head');
     head.append(el('span', 'block-secondary', `Statement ${index + 1} of ${statements.length}`));
-    if (s.pace === 'student') {
+    if (s.pace !== 'teacher') {
       const bar = el('div', 'cl-progress');
       statements.forEach((x, i) => {
         const done = !!s.statements?.find((y) => y.id === x.id)?.mine;
@@ -340,7 +340,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     const symbol = s.symbol ?? '0-0';
     const nav = () => {
       const row = el('div', 'pf-actions block-actions');
-      if (s.pace !== 'student') return row;
+      if (s.pace === 'teacher') return row;
       if (index > 0) row.append(button('‹ Back', 'ghost', () => ((at = index - 1), (view = ''), paint())));
       if (index < statements.length - 1) row.append(button('Next statement ›', sv.mine ? 'primary' : 'ghost', () => ((at = index + 1), (view = ''), paint())));
       return row;
@@ -369,7 +369,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     }
     const moved = sv.mine.new_pos != null;
     const title = moved ? 'Moved' : sv.phase === 'replace' ? 'Kept where it was' : 'Revealed';
-    const sub = moved ? 'Your teacher will show the moves.' : sv.phase === 'replace' ? 'You can still move if the discussion changes your mind.' : 'The grey dots are the class. Yours is your symbol.';
+    const sub = moved ? (s.pace === 'self' ? 'Your move is saved.' : 'Your teacher will show the moves.') : sv.phase === 'replace' ? 'You can still move if the discussion changes your mind.' : 'The grey dots are the class. Yours is your symbol.';
     const panel = waitPanel(title, sub);
     panel.append(line({ symbol, pos: moved ? sv.mine.new_pos! : sv.mine.pos, snap: st.snap, ghost: moved ? sv.mine.pos : undefined, dots: sv.class ?? [] }));
     const row = nav();
@@ -377,6 +377,27 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     panel.append(row);
     wrap.append(panel);
     return wrap;
+  }
+
+  /** Self-run has no code: the first visit joins on its own, with a fresh device token. */
+  let joining = false;
+  async function autoJoin(s: Live): Promise<void> {
+    if (joining) return;
+    joining = true;
+    try {
+      const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+      const candidate = { session: s.session, token: secret };
+      if (!writeJSON(`${storage}:device`, candidate)) {
+        showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
+        return;
+      }
+      device = candidate;
+      // paint() runs inside send(), which is still busy: step out of it before joining.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (!(await send('join', { code: '' })) && device) forget();
+    } finally {
+      joining = false;
+    }
   }
 
   function paint(): void {
@@ -393,6 +414,12 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     const s = state;
     const joined = !!device && !!s.joined;
     paintCorner(joined ? s.symbol : undefined);
+    if (!joined && s.open && s.pace === 'self') {
+      void autoJoin(s);
+      if (view !== 'joining') body.replaceChildren(waitPanel('Getting you started…', 'One moment.'));
+      view = 'joining';
+      return;
+    }
     if (!joined) {
       const key = s.open ? 'join' : 'closed';
       if (key !== view) {
