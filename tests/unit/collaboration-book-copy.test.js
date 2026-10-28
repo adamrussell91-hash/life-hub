@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { checkCollaborationBook, collaborationBookStrings } from '../../scripts/book-pack/copy-check.mjs';
 
 const PACK = process.env.CB_BOOK_PACK ?? fileURLToPath(new URL('../../../life-hub-data/book-packs/collaboration-book', import.meta.url));
-const present = existsSync(`${PACK}/entries`);
+const present = existsSync(`${PACK}/entries`) && existsSync(`${PACK}/book.json`);
 
 test('the shipped strings include every part: models, the Agree and Review tools, the coach, the catalogue and the glyph titles', async () => {
   const where = new Set((await collaborationBookStrings()).map(([w]) => w.split(' ')[0]));

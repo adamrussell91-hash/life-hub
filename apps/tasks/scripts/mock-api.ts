@@ -153,7 +153,8 @@ export function createMockApi({ seed }: MockApiOptions) {
     '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift', 'start'] }),
     '/api/rules-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['rules'] }),
     '/api/change-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['change'] }),
-    '/api/collaboration-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['collab'] })
+    '/api/collaboration-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['collab'] }),
+    '/api/communication-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['talk'] })
   };
   // The Question Book: an in-memory notebook over invented questions (the book's own live only in the private data repo).
   const questionBook = createQuestionBookMock();

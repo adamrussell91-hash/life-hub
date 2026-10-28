@@ -28,9 +28,9 @@ describe('tool emblems', () => {
     const { toolEmblem } = await import('../../../../packages/problem-solver/glyphs');
     const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
     // Decision Maker's models (dm_), Gear Shifter's techniques (gt_), the Rules Book's rules (rb_),
-    // the Change Book's models (ch_) and the Collaboration Book's models (cb_) carry their own
-    // emblems in their own packages.
-    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !/^(dm|gt|rb|ch|cb)_/.test(String(key)))) {
+    // the Change Book's models (ch_), the Collaboration Book's models (cb_) and the Communication
+    // Book's models (cm_) carry their own emblems in their own packages.
+    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !/^(dm|gt|rb|ch|cb|cm)_/.test(String(key)))) {
       const emblem = toolEmblem(id);
       expect(emblem.className).toBe('ps-emblem');
       expect(emblem.getAttribute('aria-hidden')).toBe('true');

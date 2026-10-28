@@ -36,8 +36,8 @@ export function freeze(value) {
 /** The fields every model config carries, checked once. */
 export function checkCommon(config) {
   const { id } = config;
-  // Decision Maker's models start dm_, Gear Shifter's techniques gt_, the Rules Book's rb_, the Change Book's ch_, the Collaboration Book's cb_; all use these factories.
-  check(typeof id === 'string' && /^(dm|gt|rb|ch|cb)_/.test(id), id, 'ids start with dm_ or gt_ (or rb_ for the Rules Book, ch_ for the Change Book, cb_ for the Collaboration Book)');
+  // Decision Maker's models start dm_, Gear Shifter's techniques gt_, the Rules Book's rb_, the Change Book's ch_, the Collaboration Book's cb_, the Communication Book's cm_; all use these factories.
+  check(typeof id === 'string' && /^(dm|gt|rb|ch|cb|cm)_/.test(id), id, 'ids start with dm_ or gt_ (or rb_ for the Rules Book, ch_ for the Change Book, cb_ for the Collaboration Book, cm_ for the Communication Book)');
   check(typeof config.name === 'string' && config.name, id, 'needs a name');
   check(typeof config.when === 'string' && config.when, id, 'needs a "use it when" line');
   check(Array.isArray(config.steps) && config.steps.length > 0, id, 'needs coaching steps');
@@ -53,11 +53,12 @@ export function checkCommon(config) {
  */
 export function framing(config) {
   const subject = config.chart.subject ?? null;
-  // Gear Shifter's techniques are about moving work, not deciding: their default says so; the Rules Book's about reading a situation, the Change Book's about a change, the Collaboration Book's about a team.
+  // Gear Shifter's techniques are about moving work, not deciding: their default says so; the Rules Book's about reading a situation, the Change Book's about a change, the Collaboration Book's about a team, the Communication Book's about a conversation.
   const fallback = config.id.startsWith('gt_') ? 'What this shows about getting it moving'
     : config.id.startsWith('rb_') ? 'What this shows about the situation'
       : config.id.startsWith('ch_') ? 'What this shows about the change'
         : config.id.startsWith('cb_') ? 'What this shows about how the team works'
+          : config.id.startsWith('cm_') ? 'What this shows about the conversation'
         : 'What this shows about the decision';
   const reflection = config.chart.reflection === false ? null : (config.chart.reflection ?? fallback);
   return { subject, reflection };
