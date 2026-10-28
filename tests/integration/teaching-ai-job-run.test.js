@@ -187,7 +187,7 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
       usage: { input_tokens: 2000, output_tokens: 800, server_tool_use: { web_search_requests: 2 } },
       content: [
         { type: 'thinking', thinking: '' },
-        { type: 'tool_use', id: 't1', name: 'propose_insert_blocks', input: { position: 'below', anchor_block_id: 'b_head', blocks: [question], set_mode: 'quiz', message: 'One question, ready to check.' } }
+        { type: 'tool_use', id: 't1', name: 'propose_insert_blocks', input: { position: 'below', anchor_block_id: 'b_head', blocks: [question], message: 'One question, ready to check.' } }
       ]
     };
   };
@@ -197,7 +197,7 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
   assert.equal(job.response, 'One question, ready to check.');
   assert.deepEqual(job.checks, []);
   assert.equal(store.map.get(AI_USAGE_LOG_KEY).entries[0].failed_checks, 0);
-  assert.equal(job.proposal.set_mode, 'quiz');
+  assert.equal(job.proposal.set_mode, undefined, 'questions run in the lesson as it is');
   assert.equal(job.proposal.blocks[0].block_type, 'quiz_question');
   assert.ok(job.cost_usd > 0.02, 'two searches are counted');
   assert.equal(store.map.get(aiJobsInboxKey()).jobs[0].status, 'done');
@@ -373,4 +373,17 @@ test('list_question_tags gives the subject\'s outcomes and the skills a question
     outcomes: [{ id: 'out_a', code: 'O-A', description: 'Invented outcome A' }],
     skills: [{ id: 'reading.inference', name: 'Inferring the implied' }]
   });
+});
+
+test('list_question_tags also finds outcomes filed under the subject but not in its list, and the lesson\'s own', async () => {
+  const store = memoryStore({
+    'units/unit_1': { id: 'unit_1', title: 'Invented unit', subject_id: 'subject_1', lesson_ids: [] },
+    'subjects/subject_1': { id: 'subject_1', outcome_ids: [] },
+    'outcomes/out_b': { id: 'out_b', subject_id: 'subject_1', code: 'O-B', description: 'Invented outcome B' },
+    'outcomes/out_c': { id: 'out_c', subject_id: 'subject_2', code: 'O-C', description: 'Invented outcome C' },
+    'outcomes/out_d': { id: 'out_d', subject_id: 'subject_2', code: 'O-D', description: 'Invented outcome D' }
+  });
+  const run = createLessonToolRunner({ store, lesson: { ...lesson, outcome_ids: ['out_d'] }, skills: async () => ({ strands: [] }) });
+  const tags = await run('list_question_tags');
+  assert.deepEqual(tags.outcomes.map(o => o.id), ['out_b', 'out_d']);
 });

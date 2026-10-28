@@ -2,6 +2,7 @@ import type { AiProposal } from '@/ai/proposals';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { lessonImages } from '@/quiz/images';
 import { checkQuestion, QuizQuestionSchema } from '@/quiz/core';
+import { pedagogicalModeLabel, quizRunsIn } from '@/curriculum/pedagogical-mode';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 
@@ -118,13 +119,20 @@ export function questionGiveaways(question: Record<string, unknown>): string[] {
   return issues;
 }
 
+/** Which tag lists list_question_tags found; a list that came back empty can't be required. */
+export type TagLists = { outcomes: boolean; skills: boolean };
+
 /** Every question names what it tests, so the markbook and insights track the right thing. */
-export function questionTagIssues(label: string, question: { outcomes?: string[]; skills?: string[] }): string[] {
+export function questionTagIssues(
+  label: string,
+  question: { outcomes?: string[]; skills?: string[] },
+  lists: TagLists = { outcomes: true, skills: true }
+): string[] {
   const issues: string[] = [];
-  if (!question.outcomes?.length) {
+  if (lists.outcomes && !question.outcomes?.length) {
     issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
   }
-  if (!question.skills?.length) {
+  if (lists.skills && !question.skills?.length) {
     issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
   }
   return issues;
@@ -133,15 +141,15 @@ export function questionTagIssues(label: string, question: { outcomes?: string[]
 /**
  * Problems with the quiz questions in a proposal, in words the agent can fix:
  * each question must pass the quiz engine's own check, images must already be
- * in the lesson, quiz questions need a Quiz lesson (or set_mode: quiz) or, in
- * a tutorial, a group's exit-check section, and none may give its answer away
- * (questionGiveaways).
+ * in the lesson, quiz questions need a lesson type that runs them (not a
+ * lecture, design sprint or case study) or, in a tutorial, a group's
+ * exit-check section, and none may give its answer away (questionGiveaways).
  * The block schema only checks a question's id and kind, so this is the real gate.
  */
 export function quizProposalIssues(
   proposal: AiProposal,
   lesson: Lesson,
-  { questions: checkQuestions = true }: { questions?: boolean } = {}
+  { questions: checkQuestions = true, tagLists }: { questions?: boolean; tagLists?: TagLists } = {}
 ): string[] {
   const questions: Extract<Block, { block_type: 'quiz_question' }>[] = [];
   visitBlocks(proposalBlocks(proposal), (block) => {
@@ -170,12 +178,14 @@ export function quizProposalIssues(
         'In a tutorial, quiz questions only go in a group’s exit check section (tutorial_exit: true). Replace that group’s exit check section (propose_replace_blocks or propose_replace_section), keeping its id, title, tutorial_group and tutorial_exit.'
       );
     }
-  } else if (lesson.pedagogical_mode !== 'quiz' && setMode !== 'quiz') {
+  } else if (!quizRunsIn(lesson.pedagogical_mode) && setMode !== 'quiz') {
+    const type = pedagogicalModeLabel(lesson.pedagogical_mode);
     issues.push(
-      proposal.kind === 'insert_blocks' || proposal.kind === 'replace_lesson'
-        ? 'This lesson is not a quiz, and quiz_question blocks only work in a Quiz lesson. Add set_mode: "quiz" so Accept switches the lesson type, and say so in your message. If the teacher wants questions without a quiz, use question_set instead.'
-        : 'This lesson is not a quiz, and quiz_question blocks only work in a Quiz lesson. Use propose_insert_blocks with set_mode: "quiz", or use question_set instead.'
+      `This lesson is a ${type}, which can't run quiz_question blocks. Use question_set instead, or, only if the teacher asked for a quiz, propose_insert_blocks with set_mode: "quiz".`
     );
+  } else if (setMode === 'quiz' && lesson.pedagogical_mode !== 'quiz' && quizRunsIn(lesson.pedagogical_mode) && lesson.blocks.length > 0) {
+    // Quiz questions run in this lesson as it is; switching would turn a seminar or workshop into a Quiz.
+    issues.push('Leave set_mode out: quiz questions run in this lesson as it is, and set_mode would turn the whole lesson into a Quiz.');
   }
 
   const images = new Set(lessonImages(lesson.blocks).map((image) => image.url));
@@ -189,7 +199,7 @@ export function quizProposalIssues(
       return;
     }
     for (const giveaway of questionGiveaways(question as Record<string, unknown>)) issues.push(`${label}: ${giveaway}`);
-    issues.push(...questionTagIssues(label, checked.question));
+    issues.push(...questionTagIssues(label, checked.question, tagLists));
     const url = checked.question.image?.url;
     if (url && !images.has(url)) {
       issues.push(`${label}: its image must be one already in the lesson. Use one of the lesson's images or a different question kind.`);
