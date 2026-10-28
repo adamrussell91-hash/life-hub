@@ -99,6 +99,14 @@ function stripToolkitTeacherFields(block: Block): Block {
   return { ...block, content } as Block;
 }
 
+/** WalkThru notes and jots are teacher-only wherever they sit; students never get the field. */
+function stripWalkthruField(block: Block): Block {
+  const content = block.content as Record<string, unknown> | undefined;
+  if (!content || !Object.prototype.hasOwnProperty.call(content, 'walkthru')) return block;
+  const { walkthru: _walkthru, ...rest } = content;
+  return { ...block, content: rest } as Block;
+}
+
 function filterBlocksForStudentInner(
   blocks: Block[],
   teacherOnlyIds: Set<string>
@@ -110,6 +118,7 @@ function filterBlocksForStudentInner(
         block.visibility === 'student_teacher' && (block.block_type as string) !== 'teacher_note'
     )
     .map((block) => studentTechniqueScan(block))
+    .map(stripWalkthruField)
     .map((block) => {
       if (TEACHER_FIELD_BLOCK_TYPES.has(block.block_type)) {
         return stripToolkitTeacherFields(block);

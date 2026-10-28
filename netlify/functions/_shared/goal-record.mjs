@@ -1,5 +1,6 @@
 // netlify/functions/_shared/goal-record.mjs
 import { normalizeTags } from './tasks-collection.mjs';
+import { normalizeWalkthru } from '../../../packages/walkthrus/goal.mjs';
 
 /**
  * Goal v2 shape (spec: docs/superpowers/specs/2026-09-26-goals-redesign-design.md).
@@ -167,7 +168,7 @@ export function ensureGoalSphere(record, areasById) {
 export const GOAL_INPUT_KEYS = Object.freeze([
   'title', 'description', 'parent_area_id', 'parent_someday_id', 'sphere', 'status', 'structure',
   'frame', 'lead_measure', 'week_log', 'rest_weeks', 'if_then', 'next_start', 'due_date',
-  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal'
+  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal', 'walkthru'
 ]);
 
 function normalizeCurrentSource(value) {
@@ -183,7 +184,8 @@ function normalizeSignal(value, sphere) {
 
 export function normalizeGoalRecord(record) {
   const sphere = SPHERES.has(record.sphere) ? record.sphere : 'life';
-  const { _sphere_derived, ...rest } = record;
+  const { _sphere_derived, walkthru: _walkthru, ...rest } = record;
+  const walkthru = sphere === 'professional' ? normalizeWalkthru(record.walkthru) : null;
   return {
     ...rest,
     description: typeof record.description === 'string' ? record.description : '',
@@ -203,6 +205,7 @@ export function normalizeGoalRecord(record) {
     term_history: normalizeTermHistory(record.term_history),
     life_area: normalizeLifeArea(record.life_area, sphere),
     current_source: normalizeCurrentSource(record.current_source),
-    signal: normalizeSignal(record.signal, sphere)
+    signal: normalizeSignal(record.signal, sphere),
+    ...(walkthru ? { walkthru } : {})
   };
 }

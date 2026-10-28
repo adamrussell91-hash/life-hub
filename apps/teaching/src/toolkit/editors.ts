@@ -5,6 +5,7 @@ import {
   type HubMenuItem
 } from '../../design-kit/js/hub-list.js';
 import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
+import { walkthruEditorFields } from '@/blocks/walkthru-note/note';
 import type { Block } from '@/schemas/block';
 import type { ConceptGameKind, PairLevel, Quadrant, StressVerdict, TkTeacherNote } from '@/schemas/toolkit';
 import { ALL_CLASSES_KEY, classLabel } from '@/toolkit/class-context';
@@ -1682,8 +1683,9 @@ export function createTeacherNoteBlockEditor(
   const fields = el('div', 'block-editor__fields tk-ed__fields');
   let title = block.content.title;
   let html = block.content.html;
+  let walkthru = block.content.walkthru;
   const emit = () => {
-    onChange({ ...getLatest(), visibility: 'teacher_only', content: { title, html } });
+    onChange({ ...getLatest(), visibility: 'teacher_only', content: { title, html, ...(walkthru ? { walkthru } : {}) } });
   };
   const tiptap = mountRichTextTiptap({
     html,
@@ -1701,7 +1703,11 @@ export function createTeacherNoteBlockEditor(
       emit();
     }),
     el('span', 'tk-ed__label', 'Note'),
-    tiptap.host
+    tiptap.host,
+    walkthruEditorFields(walkthru, (next) => {
+      walkthru = next;
+      emit();
+    })
   );
   root.append(fields);
   root.addEventListener('remove', () => tiptap.destroy(), { once: true });

@@ -8,6 +8,12 @@ import {
   isValidPersonId,
   isValidThreadId
 } from '@/domain/ids';
+import { isTechniqueId } from '../../../../packages/walkthrus/catalogue.mjs';
+
+/** Only a technique in the catalogue is a valid `#/learning/<id>` target. */
+function isValidWalkthruTechniqueId(id: string): boolean {
+  return isTechniqueId(id);
+}
 
 export type RailViewId =
   | 'home'
@@ -20,6 +26,7 @@ export type RailViewId =
   | 'events'
   | 'applications'
   | 'career'
+  | 'learning'
   | 'network-ecology';
 
 export type Route =
@@ -53,6 +60,8 @@ export type Route =
   | { name: 'career-application'; id: string }
   | { name: 'career-future'; id: string }
   | { name: 'career-card'; id: string }
+  | { name: 'learning'; technique: string | null }
+  | { name: 'learning-goal' }
   | { name: 'network-ecology' }
   | { name: 'not-found'; path: string };
 
@@ -197,6 +206,16 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
 
+  if (segments[0] === 'learning') {
+    if (segments.length === 1) return { name: 'learning', technique: null };
+    if (segments.length === 2 && segments[1] === 'goal') return { name: 'learning-goal' };
+    if (segments.length === 2) {
+      const id = safeDecode(segments[1]!);
+      if (id && isValidWalkthruTechniqueId(id)) return { name: 'learning', technique: id };
+    }
+    return { name: 'not-found', path };
+  }
+
   return { name: 'not-found', path };
 }
 
@@ -246,6 +265,7 @@ export function railHighlightFor(route: Route): RailViewId | null {
     return 'career';
   }
   if (route.name === 'network-ecology') return 'network-ecology';
+  if (route.name === 'learning' || route.name === 'learning-goal') return 'learning';
   return null;
 }
 

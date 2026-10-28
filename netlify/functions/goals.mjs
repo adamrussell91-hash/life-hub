@@ -2,6 +2,7 @@ import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
 import { GOAL_INPUT_KEYS, normalizeGoalRecord, ensureGoalSphere } from './_shared/goal-record.mjs';
 import { cascadeGoalDelete } from './_shared/goal-delete.mjs';
 import { listJSON } from './_shared/tasks-blobs.mjs';
+import { checkOneActive } from '../../packages/walkthrus/goal.mjs';
 
 export const config = { path: '/api/goals' };
 
@@ -11,6 +12,14 @@ function pickGoalInput(body) {
     if (Object.prototype.hasOwnProperty.call(body, key)) out[key] = body[key];
   }
   return out;
+}
+
+/** Only one WalkThru technique is worked on at a time. */
+async function oneActiveGate(candidate, store) {
+  if (!candidate?.walkthru) return null;
+  const goals = (await listJSON(store, 'goals/')).filter(g => g && typeof g === 'object' && typeof g.id === 'string').map(normalizeGoalRecord);
+  const error = checkOneActive(goals, candidate);
+  return error ? { error } : null;
 }
 
 async function areasById(store) {
@@ -34,7 +43,15 @@ export function createGoalsHandler(deps = {}) {
     async onRead(record, store) {
       return ensureGoalSphere(record, await areasById(store));
     },
+    async beforeCreate(record, store) {
+      return oneActiveGate(record, store);
+    },
     async beforePatch(existing, patch, store) {
+      const touches = Object.prototype.hasOwnProperty.call(patch, 'walkthru') || Object.prototype.hasOwnProperty.call(patch, 'status') || Object.prototype.hasOwnProperty.call(patch, 'sphere');
+      if (touches) {
+        const gate = await oneActiveGate(normalizeGoalRecord({ ...existing, ...patch }), store);
+        if (gate) return gate;
+      }
       // Write through a derived sphere on the next write (§2.3).
       if (Object.prototype.hasOwnProperty.call(patch, 'sphere')) return patch;
       const ensured = ensureGoalSphere(existing, await areasById(store));

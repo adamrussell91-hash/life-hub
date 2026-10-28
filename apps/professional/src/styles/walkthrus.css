@@ -1,0 +1,120 @@
+/* Learning: the WalkThrus board and the technique goal. Tokens from the design kit. */
+.wt-view { position: relative; display: grid; grid-template-rows: auto 1fr; gap: var(--space-2, 0.5rem); min-height: min(78vh, 760px); height: calc(100vh - 9rem); }
+.wt-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.wt-toolbar__status { margin: 0 0 0 0.25rem; font-size: var(--text-sm); color: var(--muted); min-width: 0; flex: 1 1 14rem; }
+.wt-stage { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: #fff; touch-action: none; outline-offset: 2px; }
+.wt-svg { width: 100%; height: 100%; display: block; user-select: none; -webkit-user-select: none; cursor: grab; }
+.wt-svg:active { cursor: grabbing; }
+.wt-svg[data-draw='from'], .wt-svg[data-draw='to'] { cursor: crosshair; }
+
+.wt-hex { stroke: #111; stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; transition: opacity 180ms; }
+.wt-tile { cursor: pointer; transition: opacity 220ms; outline: none; }
+.wt-tile:hover .wt-hex, .wt-tile:focus-visible .wt-hex { stroke-width: 2.6; }
+.wt-tile.is-selected .wt-hex { stroke-width: 3.2; }
+.wt-tile.is-draw-from .wt-hex { stroke: var(--wave); stroke-width: 3.2; }
+.has-selection .wt-tile:not(.is-selected):not(.is-neighbour) { opacity: 0.22; }
+.has-selection .wt-arrow { opacity: 0.35; }
+.wt-tab { fill: #111; }
+.wt-tab__text { fill: #fff; font-weight: 700; font-family: var(--font-ui); letter-spacing: 0.02em; }
+.wt-icon { color: #111; }
+.wt-title { fill: #111; font-weight: 800; font-family: var(--font-ui); letter-spacing: 0.01em; }
+.wt-badge { fill: #111; }
+.wt-dot { fill: #ffd400; stroke: #ffd400; stroke-width: 0.8; }
+.wt-dot.is-hollow { fill: none; }
+.wt-cluster-label text { fill: #111; font-weight: 800; font-size: 28px; font-family: var(--font-ui); letter-spacing: 0.04em; }
+.wt-boxslot rect { fill: none; stroke-width: 2; stroke-dasharray: 10 8; opacity: 0.8; }
+.wt-boxslot text { fill: var(--muted); font-size: 34px; font-weight: 600; font-family: var(--font-ui); }
+
+/* Zoom decides how much text shows. */
+.wt-svg[data-level='clusters'] .wt-title, .wt-svg[data-level='clusters'] .wt-tab__text, .wt-svg[data-level='clusters'] .wt-tab { display: none; }
+.wt-svg[data-level='tabs'] .wt-title { display: none; }
+
+.wt-arrow__line { fill: none; stroke: #111; stroke-width: 1.6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.wt-arrow.is-free .wt-arrow__line { stroke-dasharray: 5 4; stroke-width: 1.2; }
+.wt-knot path, .wt-knot line { vector-effect: non-scaling-stroke; }
+.wt-arrow__hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.wt-arrow__head { fill: #111; }
+.wt-arrow.is-book .wt-arrow__line { stroke: #9aa1ab; }
+.wt-arrow.is-book .wt-arrow__head { fill: #9aa1ab; }
+.wt-arrow.is-book .wt-knot path { stroke: #9aa1ab; }
+.wt-arrow__leader { stroke: #9aa1ab; stroke-width: 0.8; stroke-dasharray: 2 2; }
+.wt-knot path, .wt-knot line { fill: none; stroke: #111; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wt-knot__hit { fill: transparent; cursor: pointer; }
+.wt-chiplabel { fill: #fff; stroke: #111; stroke-width: 0.8; }
+.wt-chiplabel__text { fill: #111; font-size: 12px; font-weight: 500; font-family: var(--font-ui); }
+@keyframes wt-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+.wt-strip__card rect { fill: #fff; stroke: #111; stroke-width: 1.4; }
+.wt-strip__n { font-size: 13px; font-weight: 800; fill: #111; font-family: var(--font-ui); }
+.wt-strip__label { font-size: 9px; font-weight: 600; fill: #111; font-family: var(--font-ui); }
+.wt-strip__connector { fill: none; stroke: #111; stroke-width: 1.4; }
+.wt-strip__close { cursor: pointer; }
+.wt-strip__close circle { fill: #fff; stroke: #111; stroke-width: 1.4; }
+.wt-strip__close path { fill: none; stroke: #111; stroke-width: 1.8; stroke-linecap: round; }
+
+.wt-tip { position: fixed; z-index: 30; max-width: 18rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--depth); color: var(--on-dark); font-size: var(--text-sm); box-shadow: 0 8px 24px rgba(10, 21, 54, 0.25); pointer-events: none; }
+.wt-tip__code { margin: 0; font-size: var(--text-2xs); letter-spacing: 0.06em; color: var(--on-dark-muted); }
+.wt-tip__name { margin: 0.1rem 0 0; font-weight: 700; }
+.wt-tip__steps { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: var(--text-xs); }
+.wt-pop { position: fixed; z-index: 30; display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 10px 30px rgba(10, 21, 54, 0.2); width: min(20rem, calc(100% - 2rem)); left: 50%; top: 4.5rem; transform: translateX(-50%); }
+.wt-pop[style*='top'] { transform: none; }
+.wt-pop__title { margin: 0; font-weight: 700; font-size: var(--text-sm); }
+.wt-pop__types, .wt-pop__row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wt-pop__input { width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.wt-pop__err { margin: 0; color: var(--danger); font-size: var(--text-xs); min-height: 0; }
+
+.wt-panel { position: absolute; z-index: 20; top: 3rem; right: 0.5rem; bottom: 0.5rem; width: min(380px, calc(100% - 1rem)); overflow: auto; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 12px 32px rgba(10, 21, 54, 0.18); }
+.wt-panel__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.wt-panel__code { margin: 0; font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.wt-panel__title { margin: 0.15rem 0 0; font-size: var(--text-xl, 1.25rem); text-transform: uppercase; letter-spacing: 0.01em; }
+.wt-panel__close { border: 0; background: transparent; color: var(--wave); font: inherit; cursor: pointer; padding: 0.25rem; min-height: 2.75rem; }
+.wt-panel__body { display: grid; gap: 0.9rem; margin-top: 0.75rem; }
+.wt-panel__h, .wt-goal__h { margin: 0 0 0.35rem; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.wt-panel__reps, .wt-panel__evidence, .wt-panel__note { margin: 0; font-size: var(--text-sm); }
+.wt-panel__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.wt-panel__also { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wt-panel__also .wt-panel__h { flex-basis: 100%; }
+.wt-chip { border: 1px solid #111; border-radius: 999px; background: #fff; padding: 0.35rem 0.7rem; font: inherit; font-size: var(--text-sm); cursor: pointer; min-height: 2.75rem; }
+
+.wt-chain { display: grid; gap: 0.25rem; }
+.wt-chain__row { display: flex; gap: 0.3rem; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.wt-chain__hex { display: grid; place-items: center; width: 4.1rem; height: 3.3rem; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); background: var(--shore); color: var(--muted); text-align: center; }
+.wt-chain__hex.is-done { background: #ffe97a; color: #111; }
+.wt-chain__hex.is-current { background: #111; color: #fff; }
+.wt-chain__letter { font-weight: 800; font-size: 1.05rem; line-height: 1; }
+.wt-chain__name { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.wt-chain__btn { display: grid; place-items: center; width: 100%; height: 100%; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.wt-chain__loop { font-size: var(--text-xs); color: var(--muted); }
+
+.wt-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
+.wt-steps__label { margin: 0; font-weight: 700; font-size: var(--text-sm); }
+.wt-steps__text { margin: 0.1rem 0 0; font-size: var(--text-sm); }
+.wt-steps__mine { margin: 0.25rem 0 0; padding-left: 0.6rem; border-left: 3px solid #ffd400; font-size: var(--text-sm); font-style: italic; }
+.wt-steps__footer { margin: 0.5rem 0 0; font-size: var(--text-xs); color: var(--muted); }
+
+.wt-goal { display: grid; gap: 1.25rem; max-width: 52rem; }
+.wt-goal__head { display: grid; gap: 0.35rem; justify-items: start; }
+.wt-goal__title { margin: 0; font-size: 1.5rem; text-transform: uppercase; }
+.wt-goal__piece, .wt-goal__hint { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.wt-goal__field { display: grid; gap: 0.25rem; font-size: var(--text-sm); max-width: 24rem; }
+.wt-goal__field select, .wt-goal__snapform input, .wt-goal__adapt { padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; }
+.wt-goal__snaps { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.wt-goal__h3 { margin: 0 0 0.35rem; font-size: var(--text-sm); }
+.wt-goal__snapform { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wt-goal__snapform input { flex: 1 1 8rem; min-width: 0; }
+.wt-goal__step { display: grid; gap: 0.3rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--line); }
+.wt-goal__adapt { width: 100%; resize: vertical; }
+.wt-goal__row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.wt-goal__replist { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: var(--text-sm); }
+.wt-goal__status { margin: 0; min-height: 1.25rem; font-size: var(--text-sm); color: var(--muted); }
+
+/* Phone: the panel becomes a bottom sheet, the toolbar wraps, the board gets the room. */
+@media (max-width: 719px) {
+  .wt-view { height: calc(100vh - 8rem); }
+  .wt-panel { top: auto; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; width: auto; max-height: 62%; }
+  .wt-toolbar .btn { min-height: 2.75rem; }
+  .wt-chain__hex { width: 3.4rem; height: 2.9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wt-tile, .wt-hex { transition: none; }
+}
