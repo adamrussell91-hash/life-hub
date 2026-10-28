@@ -6,6 +6,15 @@ type CaseLesson = { case?: CaseSettings | undefined };
 /** The top-level section that holds the Brief's blocks. */
 export const isCaseBriefSection = (b: Block): boolean => b.block_type === 'section' && b.content.case_brief === true;
 
+/** The top-level section that holds the Outcome's blocks. */
+export const isCaseOutcomeSection = (b: Block): boolean => b.block_type === 'section' && b.content.case_outcome === true;
+
+/** The part a top-level section holds blocks for, if it is a case part section. */
+export const casePartOf = (b: Block): string | undefined => (b.block_type === 'section' && typeof b.content.case_part === 'string' ? b.content.case_part : undefined);
+
+/** The section holding one part's blocks. */
+export const findCasePartSection = (blocks: Block[], partId: string): Block | undefined => blocks.find((b) => casePartOf(b) === partId);
+
 const filled = (s: string | undefined): boolean => !!s && s.trim().length > 0;
 
 /** Every id already used by a document, part or option, so new ones stay unique within the lesson. */
