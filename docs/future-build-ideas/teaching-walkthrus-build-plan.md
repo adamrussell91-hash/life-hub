@@ -247,7 +247,16 @@ Each slice has one builder end to end and is its own PR through `npm run pre-pr-
 - Score anything.
 
 **Verify**
-- UI failure register: **R2** and **R3** (390px, no horizontal scroll), **C9** (no settle then snap: the first frame is the final layout), **V7** (a repaint keeps the camera), **I3** (an empty board has a clear first-run state).
+- UI failure register ([CURSOR-UI-FAILURES.md](../CURSOR-UI-FAILURES.md)), each with its board check:
+  - **R2**, **R3**: at 390px, `scrollWidth === innerWidth`; the board pans inside its own box.
+  - **R6**, **R7**, **V12**, **V13**: the phone bottom sheet sits above the tab bar, is visible on open, lives inside its backdrop, and swipe-back closes the sheet, not the page.
+  - **C1**: no tile title, tab, cluster label or arrow label is clipped or overlapped at any zoom (the Slice 1 tests cover geometry; this checks the rendered text).
+  - **C4**: pinch zoom works in Safari macOS, Chrome and on iPhone, with zoom buttons as well.
+  - **C9**: the first frame is the final layout. Pop-in animates from the final positions, never a settle then snap.
+  - **V7**: a repaint after a save keeps the camera, the opened tile and the open panel.
+  - **I2**, **I10**: every hex is a `<button>` reachable by Tab and Enter; arrow types and labels are chosen in an in-app picker, never `window.prompt`.
+  - **I3**: an empty board (no goals, no arrows) shows a clear first-run state.
+  - **M1**: no idle loops. The robber, pieces and arrows move only when something changes.
 - The stress test walk of `#/learning` at desktop and 390px.
 - Adam looks at it beside the mockup.
 
