@@ -9,6 +9,8 @@ The supplied WalkThrus scans have been transcribed by section and traced into la
 - [Download the complete SVG collection](https://chatgpt.com/library?file_id=libfile_2644196a0fd88191a7bb75254f79780f&account_id=personal)
 - [Read the sectioned text extraction](https://chatgpt.com/library?file_id=libfile_0c96191f479c819198df44aed4ed33a4&account_id=personal)
 
+**Working copy:** the unzipped SVGs live in Adam's Google Drive folder `WalkThrus_SVG_Assets` (subfolders `00_Contents`, `01_Why`, `02_What`, `03_How`, `99_Page_context`). GitHub struggled with the number of files, and the traces copy the book's artwork, so they stay out of this public repository. Read them from Drive, or later from private `life-hub-data`.
+
 These links open the owner's ChatGPT files. They are not public GitHub downloads. The archive itself is stored with the source work, rather than checked into this repository.
 
 ## What is included
@@ -33,4 +35,5 @@ Keep this as reference material until a specific use is chosen. No runtime integ
 
 ## History
 
+- **2026-10-28:** Recorded the Google Drive location of the unzipped SVG collection.
 - **2026-10-28:** Recorded the sectioned text extraction and labelled SVG collection, with download links, coverage and quality limitations.
