@@ -94,13 +94,27 @@ function spell(family: MorphologyFamily, selection: Selection): string {
   return `${selection.front}${selection.prefix}${family.base}${selection.ending}`;
 }
 
-/** The matrix itself: build row, chips, result, counter and found words. */
+/** Words this browser has found in a family, newest first. */
+export function readFoundMorphology(family: MorphologyFamily, storage: Storage | null = browserStorage()): string[] {
+  return readFound(family, storage);
+}
+
+/**
+ * The matrix itself: build row, chips, result, counter and found words.
+ * `start` builds that word on open, so the student begins from the word they tapped.
+ */
 export function createMorphemicMatrix(
   family: MorphologyFamily,
-  storage: Storage | null = browserStorage()
+  storage: Storage | null = browserStorage(),
+  options: { start?: string } = {}
 ): HTMLElement {
   const total = family.words.length;
-  const selection: Selection = { front: '', prefix: '', ending: '' };
+  const startWord = family.words.find((entry) => entry.word === options.start?.trim().toLowerCase());
+  const selection: Selection = {
+    front: startWord?.front ?? '',
+    prefix: startWord?.prefix ?? '',
+    ending: startWord?.ending ?? ''
+  };
   let found = readFound(family, storage);
   let isNew = false;
   let armed = false;
