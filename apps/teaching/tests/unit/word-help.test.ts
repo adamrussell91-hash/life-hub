@@ -214,7 +214,8 @@ describe('teacher text tools', () => {
     const tools = createRichTextTools({ ...ctx, scan: async () => [entry('ephemeral')] });
     document.body.append(tools.status, tools.strip);
     expect(tools.buttons.map((b) => b.textContent)).toEqual(['Dictionary scan', 'Fry explainer', 'Technique scan']);
-    expect(tools.strip.hidden).toBe(true);
+    expect(tools.strip.hidden).toBe(false);
+    expect(tools.strip.textContent).toContain('+ Add word');
 
     tools.buttons[0].click();
     await vi.waitFor(() => expect(ctx.onChange).toHaveBeenCalled());
@@ -224,7 +225,7 @@ describe('teacher text tools', () => {
 
     tools.strip.querySelector<HTMLButtonElement>('.word-help-strip__clear')!.click();
     expect(ctx.getLatest().settings.word_help).toBeUndefined();
-    expect(tools.strip.hidden).toBe(true);
+    expect(tools.strip.textContent).toContain('Words under this block');
   });
 
   it('a failed scan shows the server message and leaves settings alone', async () => {
