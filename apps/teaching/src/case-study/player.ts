@@ -1,7 +1,7 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
-import { isCaseBriefSection } from './model';
+import { casePartOf, isCaseBriefSection } from './model';
 import { button, el } from '@/quiz/dom';
 import { coach } from '@/sprint/form-kit';
 import { buildCaseRail, type CaseRailItem, type CaseRailState } from './rail';
@@ -51,7 +51,13 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   // The Brief section's blocks sit in the Brief; every other block is Decide content.
   const briefSection = pageBlocks.find(isCaseBriefSection);
   const briefBlocks = briefSection?.block_type === 'section' ? (briefSection.content.blocks as Block[]) : [];
-  const blocks = pageBlocks.filter((b) => !isCaseBriefSection(b));
+  const blocks = pageBlocks.filter((b) => !isCaseBriefSection(b) && casePartOf(b) === undefined);
+  // Each part's blocks (hinges, a reasoning step) sit in the work panel while that part is open.
+  const partBlocks = new Map<string, Block[]>();
+  for (const b of pageBlocks) {
+    const id = casePartOf(b);
+    if (id && b.block_type === 'section') partBlocks.set(id, b.content.blocks as Block[]);
+  }
   let status: CaseStatus | null = null;
   let chosen: number | null = null;
   let helpOpen = false;
@@ -73,6 +79,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   /** The Brief and Decide blocks are built once so a repaint keeps whatever a student did in them (a recording keeps playing). */
   let blocksEl: HTMLElement | null = null;
   let briefEl: HTMLElement | null = null;
+  const partEls = new Map<string, HTMLElement>();
   const blockList = (list: Block[]) => {
     const wrap = el('div', 'cs-blocks');
     for (const b of list) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks }));
@@ -324,6 +331,11 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
       if (p.question) box.append(el('p', 'cs-hint', p.question), el('p', 'cs-saved', s.work.answers?.[p.id] ?? ''));
     }
     const remaining = s.parts.length < s.parts_total;
+    const tasks = partBlocks.get(latest.id);
+    if (tasks?.length) {
+      if (!partEls.has(latest.id)) partEls.set(latest.id, blockList(tasks));
+      box.append(partEls.get(latest.id)!);
+    }
     if (!latest.question) {
       box.append(el('h3', '', 'Read the documents'), note('Collect evidence as you read. It comes with you when you decide.', 'cs-hint'), evidencePad(s, true));
       const next = pacing(s, 1);

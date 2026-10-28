@@ -1913,6 +1913,8 @@ const SectionBlockObjectSchema = z.object({
     sprint_guides: z.boolean().optional(),
     /** Case Study: this top-level section holds the Brief's blocks, shown to students above the first-take question. */
     case_brief: z.boolean().optional(),
+    /** Case Study: this top-level section holds one case part's blocks (by part id), shown in the work panel while that part is open. */
+    case_part: z.string().max(40).optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
