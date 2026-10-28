@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { assertValidTimeZone } from './wall-time.mjs';
 import { validateBlocks } from './communication-schema.mjs';
+import { normalizeSheet, SHEETS_MAX } from '../../../packages/walkthrus/coaching.mjs';
 
 // Meeting records for Professional Hub (`professional-hub-content`).
 // Relationships live only as Universal Links — never store Person, Task,
@@ -164,6 +165,20 @@ export function validateGuideRuns(value) {
   });
 }
 
+/** Coaching sheets (WalkThrus): one technique, feedback against each of its five steps, keep or move on. */
+export function validateCoachingSheets(value) {
+  const fail = (why) => validationError('invalid_coaching_sheets', `coaching_sheets: ${why}`);
+  if (!Array.isArray(value) || value.length > SHEETS_MAX) throw fail(`an array of at most ${SHEETS_MAX}.`);
+  const seen = new Set();
+  return value.map((raw) => {
+    const sheet = normalizeSheet(raw);
+    if (!sheet) throw fail('each sheet needs an id, a known technique and timestamps.');
+    if (seen.has(sheet.id)) throw fail('sheet ids must be unique.');
+    seen.add(sheet.id);
+    return sheet;
+  });
+}
+
 function assertTimeOrder(start, end) {
   if (Date.parse(end) < Date.parse(start)) {
     throw validationError('invalid_time_range', 'scheduled_end cannot precede scheduled_start.');
@@ -187,7 +202,8 @@ const STORED_KEYS = new Set([
   'purpose',
   'blocks',
   'decisions',
-  'guide_runs'
+  'guide_runs',
+  'coaching_sheets'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -255,7 +271,8 @@ export function parseMeetingRecord(raw) {
     purpose: typeof raw.purpose === 'string' ? raw.purpose : null,
     blocks: Array.isArray(raw.blocks) ? raw.blocks : [],
     decisions: Array.isArray(raw.decisions) ? raw.decisions : [],
-    guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : []
+    guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : [],
+    coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : []
   };
 }
 
@@ -306,7 +323,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -334,6 +351,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.blocks !== undefined) patch.blocks = validateBlocks(input.blocks);
   if (input.decisions !== undefined) patch.decisions = validateDecisions(input.decisions);
   if (input.guide_runs !== undefined) patch.guide_runs = validateGuideRuns(input.guide_runs);
+  if (input.coaching_sheets !== undefined) patch.coaching_sheets = validateCoachingSheets(input.coaching_sheets);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -404,7 +422,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     purpose: record.purpose ?? null,
     blocks: record.blocks ?? [],
     decisions: record.decisions ?? [],
-    guide_runs: record.guide_runs ?? []
+    guide_runs: record.guide_runs ?? [],
+    coaching_sheets: record.coaching_sheets ?? []
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

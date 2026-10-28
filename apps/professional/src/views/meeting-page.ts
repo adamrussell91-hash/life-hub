@@ -37,6 +37,8 @@ import { buildClareContext } from '@/lib/clare-context';
 import { GUIDES, guideById } from '@/guides/registry';
 import { openGuidePanel } from '@/guides/guide-panel';
 import { renderGuideCard } from '@/guides/guide-card';
+import { openCoachingPanel, renderCoachingCard, type CoachingSheet } from '@/guides/coaching-sheet';
+import { saveSheet } from '../../../../packages/walkthrus/coaching.mjs';
 import { guideDigest, historyFor, noteLine, placeRuns, type PlacedRun } from '@/guides/runs';
 import type { GuideRun } from '@/guides/types';
 
@@ -588,6 +590,15 @@ export async function renderMeetingPage(
     await paintGuides();
   }
 
+  async function storeCoachingSheet(sheet: CoachingSheet): Promise<void> {
+    record = (await updateMeeting(id, { coaching_sheets: saveSheet(record.coaching_sheets ?? [], sheet) as CoachingSheet[] })).meeting;
+    await paintGuides();
+  }
+
+  function openCoaching(edit?: CoachingSheet): void {
+    openCoachingPanel(document, { about: aboutCandidates(), onSave: storeCoachingSheet, edit });
+  }
+
   function openGuides(edit?: GuideRun): void {
     const guide = edit ? guideById(edit.guide) : null;
     openGuidePanel(document, {
@@ -608,8 +619,13 @@ export async function renderMeetingPage(
     run.type = 'button';
     run.dataset.part = 'run-guide';
     run.addEventListener('click', () => openGuides());
-    head.append(el('h3', undefined, 'Guides'), run);
+    const coach = el('button', 'btn btn--secondary', '◇ Coaching sheet') as HTMLButtonElement;
+    coach.type = 'button';
+    coach.dataset.part = 'coaching-sheet';
+    coach.addEventListener('click', () => openCoaching());
+    head.append(el('h3', undefined, 'Guides'), run, coach);
     guidesHost.replaceChildren(head);
+    for (const sheet of record.coaching_sheets ?? []) guidesHost.append(renderCoachingCard(document, sheet, () => openCoaching(sheet)));
     if (!runs.length) {
       guidesHost.append(el('p', 'muted', 'Structured reads you run with someone in the room land here.'));
       return;

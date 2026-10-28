@@ -72,3 +72,35 @@ export async function loadWalkthruReps(): Promise<WalkthruRep[]> {
   const r = await apiGet<{ reps: WalkthruRep[] }>('/api/walkthru-reps');
   return r.reps ?? [];
 }
+
+/** A pattern the monitor found: where it came from, the technique it points to and the chain of reasons. */
+export interface WalkthruSuggestion {
+  key: string;
+  kind: 'one_off' | 'repeated';
+  problem_type: string;
+  problem_label: string;
+  series: { key: string; code: string; name: string } | null;
+  technique_id: string | null;
+  alternatives: string[];
+  class_ids: string[];
+  class_titles: string[];
+  count: number;
+  scope: 'class' | 'classes';
+  /** evidence → problem type → series → technique */
+  chain: Array<{ step: 'evidence' | 'problem' | 'series' | 'technique'; text: string }>;
+  /** One-offs suggest a note on the next lesson; repeated patterns suggest a goal. */
+  action: 'note' | 'goal';
+  /** Why it came back, when it did: "Dismissed 4 Nov. Since then, 3 more quizzes show the same problem." */
+  note: string;
+}
+
+export type DismissKind = 'not_now' | 'not_this' | 'accepted';
+
+export async function loadSuggestions(): Promise<WalkthruSuggestion[]> {
+  const r = await apiGet<{ suggestions: WalkthruSuggestion[] }>('/api/walkthru-suggestions');
+  return (r.suggestions ?? []).filter((s) => s && typeof s.key === 'string' && s.technique_id);
+}
+
+export function dismissSuggestion(key: string, kind: DismissKind): Promise<{ ok: true }> {
+  return apiPost<{ ok: true }>('/api/walkthru-suggestions', { action: 'dismiss', key, kind });
+}

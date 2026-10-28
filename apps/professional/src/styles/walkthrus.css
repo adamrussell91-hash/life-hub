@@ -115,6 +115,20 @@
   .wt-toolbar .btn { min-height: 2.75rem; }
   .wt-chain__hex { width: 3.4rem; height: 2.9rem; }
 }
+/* The robber: sits on the tile a suggestion points to. Moves only when answered, never idles. */
+.wt-robber { cursor: pointer; outline: none; transition: transform 0.4s ease, opacity 0.4s ease; }
+.wt-robber__body { fill: #1a2748; }
+.wt-robber__head { fill: #f2d3b0; }
+.wt-robber__cap { fill: #1a2748; }
+.wt-robber__mask { fill: #1a2748; }
+.wt-robber__hit { fill: #fff; fill-opacity: 0.9; stroke: #1a2748; stroke-width: 0.8; }
+.wt-robber:hover .wt-robber__hit, .wt-robber:focus-visible .wt-robber__hit { stroke-width: 1.6; }
+.wt-robber.is-lifting { transform: translateY(-26px); opacity: 0; }
+.wt-chainlist { margin: 0.35rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.15rem; font-size: var(--text-xs); }
+.wt-chainlist li + li::before { content: '↓ '; color: var(--muted); }
+.wt-chainlist__technique { font-weight: 700; }
+.wt-pop__note { margin: 0.35rem 0 0; font-size: var(--text-xs); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
+  .wt-robber { transition: none; }
   .wt-tile, .wt-hex { transition: none; }
 }
