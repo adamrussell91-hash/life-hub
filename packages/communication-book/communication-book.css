@@ -1,0 +1,89 @@
+/* packages/communication-book/communication-book.css
+   The Communication Book's tokens, scoped to .cmb-scope the way the Collaboration Book scopes
+   .cb-scope (the shorter cm- prefix is already Teaching's coverage map). The pack's screen
+   palette, sampled from the cover: black ink for said speech and text, warm grey for what is
+   heard, implied or withheld, gold for the one move that lands, on warm near-white paper. The
+   pack's grey and gold reach only 3:1 on paper, so they draw marks, rules and fills; text on or in
+   those shades takes the darker label shades, which hold 4.5:1. Motion matches the other tools. */
+.cmb-scope {
+  --cmb-paper: #fffefb;
+  --cmb-ink: #000000;
+  --cmb-grey: #96938f;
+  --cmb-gold: #aa914e;
+  --cmb-grey-label: #5c5955;
+  --cmb-gold-label: #75632b;
+  --cmb-grey-tint: #ecebe8;
+  --cmb-gold-tint: #f3ecda;
+  --cmb-soft: #f6f4ef;
+  --cmb-line: #c9c6c0;
+  --cmb-muted: #5c5955;
+  --cmb-ghost: rgba(0, 0, 0, 0.12);
+  --cmb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cmb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens, so
+     remapping them here draws every shared chart in the Communication Book's palette. Red, which
+     Decision Maker also sets text in, becomes the gold label shade; green, which carries Decision
+     Maker's "go" and takes paper text, becomes the grey label shade; ink stays the cover's black. */
+  --dm-paper: var(--cmb-paper);
+  --dm-ink: var(--cmb-ink);
+  --dm-red: var(--cmb-gold-label);
+  --dm-green: var(--cmb-grey-label);
+  --dm-red-label: var(--cmb-gold-label);
+  --dm-soft: var(--cmb-soft);
+  --dm-line: var(--cmb-line);
+  --dm-green-tint: var(--cmb-grey-tint);
+  --dm-red-tint: var(--cmb-gold-tint);
+  --dm-ghost: var(--cmb-ghost);
+  --dm-ease: var(--cmb-ease);
+  --dm-spring: var(--cmb-spring);
+  --dm-muted: var(--cmb-muted);
+  --dm-contested: var(--cmb-gold-label);
+  --dm-band: var(--cmb-grey-label);
+}
+
+/* The pack's emblems draw their bars in currentColor: the book's ink on paper. */
+.cmb-emblem { display: inline-flex; line-height: 0; color: var(--cmb-ink, #000000); }
+.cmb-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.cmb-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--cmb-ink); background: var(--cmb-paper); }
+.cmb-scope .dm-details__card--red { border-top-color: var(--cmb-gold); }
+.cmb-scope .dm-details__card--green { border-top-color: var(--cmb-grey); }
+.cmb-scope .dm-details__card--tint { border-top-color: var(--cmb-line); }
+/* Decision Maker sets ink on its brighter label red; on the darker gold label, paper reads. */
+.cmb-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.cmb-scope .dm-qk__answer[data-answer='no'] { color: var(--cmb-paper); }
+
+/* ------------------------------------------------------------------ the next conversation (render/commit.ts)
+   What would show it went better as the headline, the next conversation beside who takes it, the
+   date to come back and a gold band for what would change course. Phone: one column. */
+.cmb-commit__part { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px 14px 12px 52px; border-radius: 0; background: var(--cmb-paper); border: 1.5px solid var(--cmb-line); min-width: 0; }
+.cmb-commit__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cmb-muted); }
+.cmb-commit__mark { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; }
+.cmb-commit__result { border: 2px solid var(--cmb-ink); }
+.cmb-commit__result .dm-entry__pill { font-size: 18px; font-weight: 700; padding: 10px 18px; }
+.cmb-commit__rests { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmb-commit__rests .cmb-commit__title { flex-basis: 100%; }
+.cmb-commit__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.cmb-commit__action { background: var(--cmb-grey-tint); border-color: var(--cmb-ink); }
+.cmb-commit__back { background: var(--cmb-soft); border-color: var(--cmb-ink); }
+.cmb-commit__turn { background: var(--cmb-gold-tint); border: 2px solid var(--cmb-gold); }
+.cmb-commit__turn .cmb-commit__title { color: var(--cmb-gold-label); }
+.cmb-scope .dm-chart--commit .dm-chart__frame { display: grid; gap: 10px; }
+
+/* ------------------------------------------------------------------ the review (render/review.ts) */
+.cmb-review__row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+.cmb-review__station { position: relative; display: grid; align-content: start; gap: 8px; padding: 12px; border-radius: 0; border: 1.5px solid var(--cmb-line); background: var(--cmb-paper); min-width: 0; }
+.cmb-review__station + .cmb-review__station::before { content: ''; position: absolute; left: -7px; top: 8px; bottom: 8px; border-left: 3px solid var(--cmb-grey); }
+.cmb-review__n { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; display: grid; place-items: center; font: 800 14px / 1 var(--font-ui, sans-serif); color: var(--cmb-paper); background: var(--cmb-grey-label); }
+.cmb-review__station--landed .cmb-review__n { background: var(--cmb-gold-label); }
+.cmb-review__station--keep .cmb-review__n { background: var(--cmb-ink); }
+.cmb-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cmb-muted); padding-left: 36px; min-height: 28px; display: flex; align-items: center; }
+
+@media (max-width: 480px) {
+  .cmb-commit__row, .cmb-review__row { grid-template-columns: 1fr; }
+  .cmb-review__station + .cmb-review__station::before { left: 8px; right: 8px; top: -7px; bottom: auto; border-left: 0; border-top: 3px solid var(--cmb-grey); }
+  .cmb-review__row { gap: 14px; }
+}
