@@ -790,6 +790,8 @@ export function renderTableBlock(
   return wrapBlock(table, block, mode);
 }
 
+const ANSWER_ROWS: Record<string, number> = { short: 2, medium: 4, long: 7, extended: 10 };
+
 export function renderQuestionSetBlock(
   block: Extract<Block, { block_type: 'question_set' }>,
   mode: RenderMode,
@@ -810,6 +812,14 @@ export function renderQuestionSetBlock(
     wrap.append(title);
   }
 
+  // Answers stay on this device for the student only; teacher previews keep nothing.
+  // A stepped lens owns the writing when one is attached, so the set stays as it was.
+  const typing = mode === 'student' && attachedSteppedLenses(block).length === 0;
+  const answersKey = typing && ctx.lessonId ? `${storageKey(ctx.lessonId, block.id)}.answers` : undefined;
+  const savedAnswers = answersKey ? loadActivityState<Record<string, string>>(answersKey) : null;
+  const answers: Record<string, string> = savedAnswers && typeof savedAnswers === 'object' ? { ...savedAnswers } : {};
+  const saveAnswers = (): void => { if (answersKey) saveActivityState(answersKey, answers); };
+
   const list = document.createElement('ol');
   list.className = 'block-question-set__list';
 
@@ -826,9 +836,26 @@ export function renderQuestionSetBlock(
     if (question.kind === 'multiple_choice' && question.options?.length) {
       const options = document.createElement('ul');
       options.className = 'block-question-set__options';
+      if (typing) options.classList.add('block-question-set__options--pick');
       for (const option of question.options) {
         const optionItem = document.createElement('li');
-        optionItem.textContent = option;
+        if (typing) {
+          const label = document.createElement('label');
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = `${block.id}.${question.id}`;
+          radio.value = option;
+          radio.checked = answers[question.id] === option;
+          radio.addEventListener('change', () => {
+            answers[question.id] = option;
+            saveAnswers();
+            emitAnswered(wrap, block.id, 'done');
+          });
+          label.append(radio, document.createTextNode(option));
+          optionItem.append(label);
+        } else {
+          optionItem.textContent = option;
+        }
         options.append(optionItem);
       }
       li.append(options);
@@ -852,10 +879,28 @@ export function renderQuestionSetBlock(
       const label = document.createElement('p');
       label.className = 'block-question-set__answer-label block-eyebrow';
       label.textContent = 'Your response';
-      const box = document.createElement('div');
-      box.className = 'block-question-set__answer';
-      box.textContent = 'Type your response here…';
-      li.append(label, box);
+      if (typing) {
+        const area = document.createElement('textarea');
+        area.className = 'block-question-set__answer';
+        area.rows = ANSWER_ROWS[question.response_space ?? 'medium'] ?? 4;
+        area.maxLength = 4000;
+        area.placeholder = 'Type your response here…';
+        area.setAttribute('aria-label', `Your response: ${question.prompt}`);
+        area.value = answers[question.id] ?? '';
+        area.addEventListener('input', () => {
+          answers[question.id] = area.value;
+          saveAnswers();
+        });
+        area.addEventListener('change', () => {
+          if (area.value.trim()) emitAnswered(wrap, block.id, 'done');
+        });
+        li.append(label, area);
+      } else {
+        const box = document.createElement('div');
+        box.className = 'block-question-set__answer';
+        box.textContent = 'Type your response here…';
+        li.append(label, box);
+      }
     }
 
     list.append(li);
