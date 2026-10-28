@@ -25,7 +25,7 @@ import type { Lesson } from '@/schemas/lesson';
 
 const NOW = '2026-10-21T00:00:00.000Z';
 
-function lesson(mode?: 'quiz' | 'direct_instruction', blocks: Block[] = [createBlock('heading', 'b_head')]): Lesson {
+function lesson(mode?: 'quiz' | 'direct_instruction' | 'seminar' | 'lecture', blocks: Block[] = [createBlock('heading', 'b_head')]): Lesson {
   return {
     id: 'lesson_ww1',
     type: 'lesson',
@@ -129,11 +129,23 @@ describe('quizProposalIssues', () => {
     expect(issues[0]).toMatch(/^Question 2 \(q3\): Tick the right answer\./);
   });
 
-  it('asks for set_mode in a lesson that is not a quiz, and accepts it once set', () => {
-    const issues = quizProposalIssues(insertQuiz([goodMc]), lesson('direct_instruction'));
-    expect(issues.join(' ')).toMatch(/set_mode: "quiz"/);
+  it('adds quiz questions to a seminar as it is, and refuses set_mode there', () => {
+    // Live 29 Oct: the seminar check forced set_mode, so Accept would have turned the seminar into a Quiz.
+    expect(quizProposalIssues(insertQuiz([goodMc]), lesson('seminar'))).toEqual([]);
+    expect(quizProposalIssues(insertQuiz([goodMc], 'quiz'), lesson('seminar'))[0]).toMatch(/Leave set_mode out/);
+    expect(quizProposalIssues(insertQuiz([goodMc], 'quiz'), lesson('direct_instruction', []))).toEqual([]);
+  });
+
+  it('sends quiz questions in a lecture to question_set', () => {
+    const issues = quizProposalIssues(insertQuiz([goodMc]), lesson('lecture'));
+    expect(issues.join(' ')).toMatch(/Lecture, which can't run quiz_question/);
     expect(issues.join(' ')).toMatch(/question_set/);
-    expect(quizProposalIssues(insertQuiz([goodMc], 'quiz'), lesson('direct_instruction'))).toEqual([]);
+  });
+
+  it('stops asking for outcomes when list_question_tags found none', () => {
+    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, outcomes: undefined });
+    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'), { tagLists: { outcomes: false, skills: true } })).toEqual([]);
+    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'))[0]).toMatch(/add outcomes/);
   });
 
   it('accepts a fill-the-gap question written without a prompt key, and still asks other kinds for one', () => {
@@ -377,6 +389,36 @@ describe('runLessonAiJob', () => {
     expect(requests[0]!.system[1]!.cache_control).toEqual({ type: 'ephemeral' });
   });
 
+  it('lets a link through once the agent has seen it in a search or tool result, and tracks empty tag lists', async () => {
+    // Live 29 Oct: a reading's PDF link and missing outcomes failed every round, so Ann could never pass.
+    const pdf = 'https://press.example.edu/downloads/ch07.pdf';
+    const reading = createBlock('rich_text', 'b_read');
+    if (reading.block_type !== 'rich_text') throw new Error('expected rich_text');
+    const linked = { ...reading, content: { ...reading.content, html: `<p><a href="${pdf}">Read the extract</a></p>` } } as Block;
+    const untagged = quizBlock('q_un', { kind: 'true_false', prompt: 'The road in the poem is a place of danger.', answer: true, outcomes: undefined });
+    const propose = (id: string) => toolUse(id, 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [linked, untagged] });
+    const { complete } = scripted([
+      { stop_reason: 'tool_use', usage, content: [propose('t1')] },
+      { stop_reason: 'tool_use', usage, content: [toolUse('t2', 'list_question_tags', {}), toolUse('t3', 'search_notes', { query: 'Bode' })] },
+      { stop_reason: 'tool_use', usage, content: [propose('t4')] }
+    ]);
+    const result = await runLessonAiJob({
+      job: job('Add the reading and a question'),
+      lesson: lesson('seminar'),
+      agentName: "Ann O'Tation",
+      protocol: 'Be Ann.',
+      complete,
+      tools: [{ name: 'list_question_tags', input_schema: { type: 'object' } }, { name: 'search_notes', input_schema: { type: 'object' } }],
+      runTool: async (name) => (name === 'list_question_tags'
+        ? { outcomes: [], skills: [{ id: 'reading.inference', name: 'Inferring' }] }
+        : { hits: [`Bode's essay, free at ${pdf}.`] })
+    });
+    expect(result.checks?.[0]).toMatch(/Links and media must be ones already in the lesson.*ch07\.pdf/s);
+    expect(result.checks?.[0]).toMatch(/add outcomes/);
+    expect(result.status).toBe('done');
+    expect(result.proposal).toMatchObject({ kind: 'insert_blocks' });
+  });
+
   it('hands a failed quiz check back to the agent, which fixes it in the same job', async () => {
     const { complete, requests } = scripted([
       { stop_reason: 'tool_use', usage, content: [toolUse('t1', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [goodMc, badMc] })] },
@@ -384,8 +426,8 @@ describe('runLessonAiJob', () => {
         stop_reason: 'tool_use',
         usage,
         content: [
-          { type: 'text', text: 'Accepting this also turns the lesson into a Quiz.' },
-          toolUse('t2', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [goodMc, goodTf], set_mode: 'quiz' })
+          { type: 'text', text: 'Two questions on WWI.' },
+          toolUse('t2', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [goodMc, goodTf] })
         ]
       }
     ]);
@@ -397,11 +439,10 @@ describe('runLessonAiJob', () => {
       complete
     });
     expect(result.status).toBe('done');
-    expect(result.proposal).toMatchObject({ set_mode: 'quiz' });
+    expect(result.proposal).toMatchObject({ kind: 'insert_blocks', blocks: [{ id: 'q1' }, { id: 'q2' }] });
     const feedback = JSON.stringify(requests[1]!.messages.at(-1)!.content);
     expect(feedback).toContain('Not shown to the teacher');
     expect(feedback).toContain('Tick the right answer');
-    expect(feedback).toContain('set_mode');
     expect(feedback).toContain('is_error');
   });
 
