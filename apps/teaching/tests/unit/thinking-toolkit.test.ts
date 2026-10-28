@@ -178,11 +178,11 @@ describe('Thinking Toolkit blocks', () => {
     expect(parsed.visibility).toBe('teacher_only');
   });
 
-  it('sits in its own picker group above Learning, with Teacher note in Basic', () => {
+  it('sits in its own picker group above Learning, without the retired skill, tool and value cards, with Teacher note in Basic', () => {
     const labels = BLOCK_GROUPS.map((group) => group.label);
     expect(labels.indexOf('Thinking Toolkit')).toBeLessThan(labels.indexOf('Learning'));
     expect(BLOCK_GROUPS.find((group) => group.label === 'Thinking Toolkit')?.types).toEqual([
-      'thinking_intentions', 'toolkit_skill', 'toolkit_tool', 'toolkit_value', 'thinking_move',
+      'thinking_intentions', 'thinking_move',
       'question_quadrant', 'concept_features', 'continuum_line', 'thinking_reflection'
     ]);
     expect(BLOCK_GROUPS.find((group) => group.label === 'Basic')?.types).toContain('teacher_note');

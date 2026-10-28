@@ -12,7 +12,9 @@ import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderNoteCue } from '@/blocks/note-cue';
 import { renderWithTeacher } from '@/blocks/with-teacher';
 import { renderFadedExample } from '@/blocks/faded-example';
-import { attachedSteppedLenses } from '@/blocks/lenses/registry';
+import { attachedSleeves, attachedSteppedLenses } from '@/blocks/lenses/registry';
+import { NO_SLEEVE_TARGET, SLEEVE_CONVERT_EVENT, sleeveForCard, sleeveTarget } from '@/blocks/lenses/sleeve-convert';
+import { renderSleeves } from '@/blocks/lenses/sleeve-view';
 import { renderAnchorBridge, renderBecauseButSo, renderHumanExperienceTable, renderQuestionLevels } from '@/blocks/formats/question-set-formats';
 import { renderReasoningChartFormat } from '@/blocks/formats/reasoning-chart';
 import { renderSteppedLenses } from '@/blocks/lenses/stepped-view';
@@ -2507,9 +2509,53 @@ function renderBlockContent(
   }
 }
 
+/** A one-question set's typed answer: the box sleeve starters drop into. */
+function sleeveAnswerBox(wrapper: HTMLElement, block: Block): HTMLTextAreaElement | null {
+  if (block.block_type !== 'question_set' || block.content.questions.length !== 1) return null;
+  return wrapper.querySelector<HTMLTextAreaElement>('textarea.block-question-set__answer');
+}
+
+/** Teacher only: an old toolkit card offers to become a sleeve on the block below it. */
+function turnIntoSleeveButton(block: Block, ctx: RenderContext): HTMLElement | null {
+  const lens = sleeveForCard(block);
+  if (!lens) return null;
+  const row = document.createElement('div');
+  row.className = 'sleeve-convert';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn--ghost sleeve-convert__button';
+  button.textContent = 'Turn into a sleeve';
+  const status = document.createElement('p');
+  status.className = 'sleeve-convert__status';
+  status.setAttribute('role', 'status');
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (ctx.pageBlocks && !sleeveTarget(ctx.pageBlocks, block.id)) {
+      status.textContent = NO_SLEEVE_TARGET;
+      return;
+    }
+    status.textContent = '';
+    row.dispatchEvent(new CustomEvent(SLEEVE_CONVERT_EVENT, { bubbles: true, detail: { blockId: block.id } }));
+  });
+  row.append(button, status);
+  return row;
+}
+
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const wrapper = renderBlockContent(block, mode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
+  // Sleeves sit on top of the block, above its prompt, and tint its answer box.
+  const sleeves = attachedSleeves(block);
+  if (sleeves.length) {
+    wrapper.classList.add('has-sleeve', `has-sleeve--${sleeves[0]!.lens.toolkitKind}`);
+    wrapper.prepend(renderSleeves(sleeves, {
+      mode, blockId: block.id, lessonId: ctx.lessonId, answerBox: sleeveAnswerBox(wrapper, block)
+    }));
+  }
+  if (mode === 'teacher') {
+    const convert = turnIntoSleeveButton(block, ctx);
+    if (convert) wrapper.append(convert);
+  }
   const attachments: HTMLElement[] = [];
   const lenses = attachedSteppedLenses(block);
   if (lenses.length) {

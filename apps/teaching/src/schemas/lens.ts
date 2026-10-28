@@ -52,7 +52,21 @@ export const ReasoningConfigSchema = z.object({
   examples: z.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 
+/**
+ * A Thinking Toolkit sleeve (id `sleeve:<library id>`): the start level, the
+ * student's level switch, and optional overrides of Do it and the three checks
+ * at that level. Blank overrides fall back to the sleeve's own text.
+ */
+export const SleeveLevelSchema = z.enum(['support', 'extend']);
+export const SleeveConfigSchema = z.object({
+  level: SleeveLevelSchema.default('support'),
+  student_level: z.boolean().default(true),
+  do: z.string().max(600).optional(),
+  checks: z.array(z.string().max(300)).max(3).optional()
+});
+
 export type LensAttachment = z.infer<typeof LensAttachmentSchema>;
 export type ReasoningConfig = z.infer<typeof ReasoningConfigSchema>;
 export type WindowsMirrorsConfig = z.infer<typeof WindowsMirrorsConfigSchema>;
 export type SteppedLensConfig = z.infer<typeof SteppedLensConfigSchema>;
+export type SleeveConfig = z.infer<typeof SleeveConfigSchema>;

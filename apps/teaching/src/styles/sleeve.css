@@ -1,0 +1,271 @@
+/*
+ * Thinking Toolkit sleeves: a toolkit item laid over the block students are
+ * already answering. Orange for values, navy for tools, the navy and orange
+ * stripe for skills. The host keeps its own colours: only its left edge and
+ * its answer box take the tint.
+ */
+.has-sleeve {
+  --sleeve-orange: var(--high-sea, #f68620);
+  --sleeve-navy: #13233a;
+  --sleeve-stripe: repeating-linear-gradient(180deg, var(--sleeve-navy) 0 6px, var(--sleeve-orange) 6px 12px);
+  --sleeve-orange-wash: #fff3e6;
+  --sleeve-orange-soft: #fde3c8;
+  --sleeve-navy-wash: #eef1f6;
+  --sleeve-navy-soft: #d6dde8;
+  --sleeve-skill-wash: #f7f7f5;
+  position: relative;
+  padding-left: calc(var(--space-3) + 6px);
+  min-width: 0;
+}
+/* The lesson page zeroes block padding, so the edge needs room there too. */
+.lesson-page__block .block.has-sleeve { padding-left: calc(var(--space-3) + 6px); }
+.has-sleeve::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  border-radius: 3px;
+  background: var(--sleeve-orange);
+}
+.has-sleeve--tool::before { background: var(--sleeve-navy); }
+.has-sleeve--skill::before { background: var(--sleeve-stripe); }
+
+/* The answer area only: callouts and hinge questions keep their own backgrounds. */
+.has-sleeve--value :is(textarea.block-question-set__answer, div.block-question-set__answer, .block-question-set__response-lines) {
+  background: var(--sleeve-orange-wash);
+  border-color: var(--sleeve-orange-soft);
+}
+.has-sleeve--tool :is(textarea.block-question-set__answer, div.block-question-set__answer, .block-question-set__response-lines) {
+  background: var(--sleeve-navy-wash);
+  border-color: var(--sleeve-navy-soft);
+}
+.has-sleeve--skill :is(textarea.block-question-set__answer, div.block-question-set__answer, .block-question-set__response-lines) {
+  background: var(--sleeve-skill-wash);
+}
+
+.sleeves {
+  container: sleeve / inline-size;
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-ui);
+  color: var(--ink);
+  min-width: 0;
+}
+.sleeve {
+  border: 1px solid var(--sleeve-orange-soft);
+  border-radius: 12px;
+  background: var(--sleeve-orange-wash);
+  overflow: hidden;
+  min-width: 0;
+}
+.sleeve--tool { background: var(--sleeve-navy-wash); border-color: var(--sleeve-navy-soft); }
+.sleeve--skill { background: var(--sleeve-skill-wash); border-color: var(--line); }
+
+.sleeve__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sleeve--print .sleeve__bar { cursor: default; }
+.sleeve__bar:focus-visible,
+.sleeve__level-option:focus-visible,
+.sleeve__peek:focus-visible,
+.sleeve__starter:focus-visible,
+.sleeve__checks input:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+.sleeve__chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--sleeve-orange);
+  color: var(--sleeve-navy);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+.sleeve--tool .sleeve__chip { background: var(--sleeve-navy); color: #fff; }
+.sleeve--skill .sleeve__chip {
+  position: relative;
+  padding-left: 16px;
+  background: #fff;
+  border: 1px solid var(--sleeve-navy);
+}
+.sleeve--skill .sleeve__chip::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--sleeve-stripe);
+}
+.sleeve__goal {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.sleeve__progress {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--success, #2f7a4f);
+  white-space: nowrap;
+}
+.sleeve__progress:empty { display: none; }
+.sleeve__toggle { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
+
+.sleeve__body { padding: 0 var(--space-3) var(--space-3); }
+.sleeve__body[hidden] { display: none; }
+
+.sleeve__level {
+  display: inline-flex;
+  margin: 0 0 var(--space-2);
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: #fff;
+}
+.sleeve__level-option {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+.sleeve__level-option[aria-pressed='true'] { background: var(--sleeve-navy); color: #fff; }
+
+.sleeve__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.sleeve__step {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgba(19, 35, 58, 0.08);
+  border-radius: 10px;
+  background: #fff;
+}
+.sleeve__step-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.sleeve__step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sleeve-navy);
+  color: #fff;
+  font-size: 11px;
+}
+.sleeve__text { margin: 0; font-size: var(--text-sm); }
+.sleeve__peek {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sleeve-navy);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sleeve__example { display: grid; gap: 6px; margin-top: var(--space-2); font-size: var(--text-sm); }
+.sleeve__example[hidden] { display: none; }
+.sleeve__example p { margin: 0; padding: 6px 8px; border-radius: 8px; }
+.sleeve__weaker { background: #f3f3f3; color: var(--muted); }
+.sleeve__stronger { background: var(--sleeve-orange-soft); }
+.sleeve--tool .sleeve__stronger { background: var(--sleeve-navy-soft); }
+.sleeve--skill .sleeve__stronger { background: #ececea; }
+.sleeve__example-label {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.sleeve__starters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.sleeve__starter {
+  padding: 2px 8px;
+  border: 1px dashed #c9bfae;
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+button.sleeve__starter { cursor: pointer; }
+.sleeve__checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sleeve__checks label { display: flex; gap: var(--space-2); align-items: flex-start; font-size: var(--text-sm); cursor: pointer; }
+.sleeve__checks input { flex: none; width: 16px; height: 16px; margin-top: 3px; accent-color: var(--success, #2f7a4f); }
+
+/* Teacher only: the library notes, folded under the steps. */
+.sleeve__teacher { margin-top: var(--space-3); font-size: var(--text-sm); }
+.sleeve__teacher summary { cursor: pointer; font-weight: var(--weight-semibold); color: var(--navy); }
+.sleeve__teacher p, .sleeve__teacher ul { margin: var(--space-2) 0 0; }
+.sleeve__teacher-head { font-weight: var(--weight-semibold); }
+
+/* Print: the closed strip with the three checks as tick boxes. */
+.sleeve--print .sleeve__checks { padding: 0 var(--space-3) var(--space-3); }
+.sleeve--print .sleeve__checks li { display: flex; gap: var(--space-2); align-items: flex-start; font-size: var(--text-sm); }
+.sleeve__box { flex: none; width: 14px; height: 14px; margin-top: 3px; border: 1.5px solid var(--sleeve-navy); border-radius: 2px; }
+
+/* Narrow blocks: the steps stack and the goal wraps under the chip. */
+@container sleeve (max-width: 560px) {
+  .sleeve__steps { grid-template-columns: 1fr; }
+  .sleeve__bar { flex-wrap: wrap; }
+  .sleeve__goal { flex-basis: 100%; order: 3; font-size: var(--text-sm); }
+}
+
+.sleeve-convert { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.sleeve-convert__status { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.sleeve-convert__status:empty { display: none; }
+
+@media print {
+  .sleeve { break-inside: avoid; background: none; }
+}
+
+/* Teacher setup: a colour swatch stands in for a lens symbol. */
+.sleeve-swatch {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--high-sea, #f68620);
+}
+.sleeve-swatch--tool { background: #13233a; }
+.sleeve-swatch--skill { background: repeating-linear-gradient(180deg, #13233a 0 4px, var(--high-sea, #f68620) 4px 8px); }
+.kaplan-lens-subgroup {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}

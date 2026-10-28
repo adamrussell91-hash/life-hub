@@ -164,6 +164,13 @@ var ReasoningConfigSchema = z5.object({
   supports: z5.record(StepTextSchema.nullable()).optional(),
   examples: z5.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SleeveLevelSchema = z5.enum(["support", "extend"]);
+var SleeveConfigSchema = z5.object({
+  level: SleeveLevelSchema.default("support"),
+  student_level: z5.boolean().default(true),
+  do: z5.string().max(600).optional(),
+  checks: z5.array(z5.string().max(300)).max(3).optional()
+});
 
 // apps/teaching/src/tutorial/schema.ts
 import { z as z6 } from "zod";
@@ -4420,11 +4427,10 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Thinking Toolkit",
+    // Skills, tools and values are sleeves now (Add lens… on a question), so
+    // their old cards leave the menu. Existing cards still render and edit.
     types: [
       "thinking_intentions",
-      "toolkit_skill",
-      "toolkit_tool",
-      "toolkit_value",
       "thinking_move",
       "question_quadrant",
       "concept_features",
@@ -4470,6 +4476,7 @@ var BLOCK_GROUPS = [
 ];
 var PAGE_ONLY_TYPES = /* @__PURE__ */ new Set(["collection", "anthology"]);
 var UNIT_ONLY_TYPES = /* @__PURE__ */ new Set(["curriculum_lines"]);
+var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value"]);
 var TOOLKIT_GROUP_TYPES = [
   "thinking_intentions",
   "toolkit_skill",
@@ -5803,6 +5810,7 @@ Every proposed block must include all required metadata fields: id, type, block_
   - anchor_bridge: each question prompt names the text or moment to anchor on; students fill Anchor, Human experience and Bridge boxes.
   - human_experience_table: questions[0].prompt is the instruction; content.table { rows: 3 to 5, example: true }.
   - The same lenses attach to any other block as lenses [{ id: "question_levels" | "because_but_so", config: { focus, level: support|core|extend, student_level: true, mode: notes|discussion } }] when the teacher wants the thinking steps without a question list. Use the format when they want questions written; use the lens when they want a scaffold on an existing block.
+- Thinking Toolkit sleeves: to help students answer an existing question or activity well (clarity, precision, a distinction, justifying), attach a sleeve to that block instead of adding a card: lenses [{ id: "sleeve:value:clarity", config: { level: "support", student_level: true } }]. The id is "sleeve:" plus the toolkit item id (value:*, tool:* or skill:*); level is support|extend. A sleeve sets no task: it shows See it, Do it and Check it above the block's own prompt, so the block keeps its question. At most two sleeves per block. Never insert toolkit_skill, toolkit_tool or toolkit_value blocks; those old cards are retired.
 - Visuals: chart uses { chart_type, title, series }; equation { latex }; diagram { source, image_url, image_alt }; timeline { events }; card_stack { title?, cards:[{ id, eyebrow, title, description, tint, image_url?, image_alt? }] }. tint must be navy, wave, marine, depth, high-sea, lilac, sage, or peach. source=image requires a search-pack image_url and image_alt \u2014 a caption alone is not enough to publish. If no pack image, omit diagram or use source=svg with real SVG markup.
 - mind_map content is { title?, nodes, edges }; nodes: 1\u201324. Each node needs a valid unique id and meaningful label; parent_id and edges must reference valid node ids. \u201C10 point\u201D means exactly 10 meaningful topic nodes with valid ids/connections.
 - concept_map uses labelled concepts in nodes and valid directed relationships in edges; every from/to value must reference an existing node id and relationship labels must be meaningful.
@@ -5895,7 +5903,7 @@ function withStableIds(block, prefix) {
   );
 }
 function buildBlockSchemaExamples() {
-  const examples = NEW_BLOCK_TYPES.filter((type) => type !== "collection").map(
+  const examples = NEW_BLOCK_TYPES.filter((type) => type !== "collection" && !RETIRED_BLOCK_TYPES.has(type)).map(
     (type) => withStableIds(createBlock(type, `${type}_example`), type)
   );
   return JSON.stringify(
@@ -7150,6 +7158,13 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/ai/validate-proposal.ts
+function retiredInsertIssue(blocks) {
+  let found = null;
+  visitBlocks(blocks, (block) => {
+    if (!found && RETIRED_BLOCK_TYPES.has(block.block_type)) found = block.block_type;
+  });
+  return found ? `${found} is retired: attach a sleeve lens (sleeve:<item id>) to a question instead.` : null;
+}
 function publishIssueForProposal(proposal) {
   switch (proposal.kind) {
     case "replace_block":
@@ -7159,6 +7174,7 @@ function publishIssueForProposal(proposal) {
     case "replace_lesson":
       return publishBlockIssues(proposal.blocks);
     case "insert_blocks":
+      return retiredInsertIssue(proposal.blocks) ?? publishBlockIssues(proposal.blocks);
     case "replace_blocks":
       return publishBlockIssues(proposal.blocks);
     default:

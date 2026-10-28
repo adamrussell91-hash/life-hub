@@ -2,6 +2,19 @@ import type { AiProposal } from '@/ai/proposals';
 import type { SearchPack } from '@/ai/search-pack';
 import { validateProposalAgainstSearchPack } from '@/ai/search-pack-validation';
 import { publishBlockIssues } from '@/schemas/lesson';
+import type { Block } from '@/schemas/block';
+import { RETIRED_BLOCK_TYPES } from '@/blocks/create-block';
+import { visitBlocks } from '@/blocks/walk-blocks';
+
+/** Toolkit cards are sleeves now: Ann attaches them to a block instead of inserting a card. */
+function retiredInsertIssue(blocks: Block[]): string | null {
+  let found: string | null = null;
+  visitBlocks(blocks, (block) => {
+    if (!found && RETIRED_BLOCK_TYPES.has(block.block_type)) found = block.block_type;
+  });
+  return found ? `${found} is retired: attach a sleeve lens (sleeve:<item id>) to a question instead.` : null;
+}
+
 
 export function publishIssueForProposal(proposal: AiProposal): string | null {
   switch (proposal.kind) {
@@ -12,6 +25,7 @@ export function publishIssueForProposal(proposal: AiProposal): string | null {
     case 'replace_lesson':
       return publishBlockIssues(proposal.blocks);
     case 'insert_blocks':
+      return retiredInsertIssue(proposal.blocks) ?? publishBlockIssues(proposal.blocks);
     case 'replace_blocks':
       return publishBlockIssues(proposal.blocks);
     default:
