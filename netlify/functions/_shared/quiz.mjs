@@ -118,17 +118,30 @@ export function mapTree(blocks, fn) {
 }
 
 /**
- * Splits every quiz question in the student blocks. Quiz questions outside a
- * quiz lesson are dropped, so an answer can never ship by accident. Returns
- * the blocks to publish and, for a quiz lesson, the key record to store.
+ * Lesson types that play through their own player, which has no place for
+ * quiz questions. Every other type runs its quiz questions and group sets
+ * inline, like a quiz does.
+ */
+const PLAYER_MODES = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial']);
+
+/** True when quiz questions in a lesson of this type reach students. */
+export function quizRunsIn(mode) {
+  return !PLAYER_MODES.has(mode);
+}
+
+/**
+ * Splits every quiz question in the student blocks. Quiz questions in a lesson
+ * type whose player can't show them are dropped, so an answer can never ship
+ * by accident. Returns the blocks to publish and, when there are questions
+ * (or the lesson is a quiz), the key record to store.
  */
 export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) {
-  const isQuiz = draft?.pedagogical_mode === 'quiz';
+  const isQuiz = quizRunsIn(draft?.pedagogical_mode);
   const questions = {};
   const order = [];
   const problems = [];
   let dropped = 0;
-  // Group sets leave the public blocks; outside a quiz they are dropped whole.
+  // Group sets leave the public blocks; in a lesson type that can't run them they are dropped whole.
   const lifted = isQuiz ? liftGroupSets(studentBlocks) : { blocks: mapTree(studentBlocks, (b) => (isGroupSet(b) ? null : b)), sets: [], problems: [] };
   problems.push(...lifted.problems);
   const split = (block, setId) => {
@@ -163,6 +176,8 @@ export function prepareQuizPublish(draft, studentBlocks, random = cryptoRandom) 
     sets[s.id] = { group_id, class_id, name, tags: [...(tags ?? [])], students: [...(students ?? [])], questions: ids };
   }
   if (!isQuiz) return { blocks, quiz: null, problems, dropped };
+  // An ordinary lesson with no questions has no quiz to store.
+  if (draft?.pedagogical_mode !== 'quiz' && order.length === 0 && Object.keys(sets).length === 0) return { blocks, quiz: null, problems, dropped };
   const parsed = QuizSettingsSchema.safeParse(draft.quiz ?? {});
   const settings = parsed.success ? parsed.data : {};
   const version = `${Date.now().toString(36)}${randomBytes(4).toString('hex')}`;
@@ -217,11 +232,16 @@ export async function setStudentExitQuestions(store, lessonId, classId, studentI
 /** Lesson modes whose quiz questions run on this engine: a quiz, and a tutorial's exit check. */
 const QUIZ_MODES = new Set(['quiz', 'tutorial']);
 
+/** A quiz, a tutorial's exit check, or quiz questions inside any lesson that runs them. */
+function runsQuiz(mode) {
+  return QUIZ_MODES.has(mode) || quizRunsIn(mode);
+}
+
 async function loadQuiz(store, lessonId) {
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Quiz not found.');
   const k = keys(lessonId);
   const [draft, snapshot, current] = await Promise.all([read(store, draftLessonKey(lessonId)), read(store, publishedLessonKey(lessonId)), read(store, k.current)]);
-  if (!draft || isDeletedRecord(draft) || !snapshot || !QUIZ_MODES.has(draft.pedagogical_mode) || !current?.version) {
+  if (!draft || isDeletedRecord(draft) || !snapshot || !runsQuiz(draft.pedagogical_mode) || !current?.version) {
     reject(404, 'not_published', 'Publish this quiz first.');
   }
   const record = await read(store, k.version(current.version));
