@@ -339,6 +339,9 @@ span.mb-cell { display: inline-block; cursor: default; }
 
 .mb-progress__corner,
 .mb-progress__student { position: sticky; left: 0; z-index: 1; background: var(--paper); text-align: left; white-space: nowrap; padding: var(--space-1) var(--space-3); border-right: 1px solid var(--line); }
+.mb-progress__units > * { border-bottom: 0; }
+.mb-progress__unit { max-width: 0; padding: var(--space-2) var(--space-2) 0; text-align: left; border-left: 1px solid var(--line); }
+.mb-progress__unitname { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--weight-semibold) var(--text-xs) / 1.2 var(--font-ui); color: var(--muted); }
 .mb-progress__corner { vertical-align: bottom; padding-bottom: var(--space-2); font: var(--weight-semibold) var(--text-xs) / 1.2 var(--font-ui); color: var(--muted); }
 .mb-progress__student { font-weight: var(--weight-regular, 400); }
 .mb-progress__student .mb-student__initials { color: var(--muted); font-size: var(--text-xs); }
