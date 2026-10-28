@@ -20,6 +20,14 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M16 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
     'M10.4 10.4 13.6 15.6'
   ],
+  // A larger and a smaller figure side by side: one person supporting another.
+  mentoring: [
+    'M8 10.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+    'M3 20c0-3.3 2.2-5.5 5-5.5s5 2.2 5 5.5',
+    'M17 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+    'M14.5 20c0-2.2 1.1-3.8 2.5-3.8s2.5 1.6 2.5 3.8',
+    'M12.5 12.5 14.8 11'
+  ],
   communications: ['M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z'],
   meetings: [
     'M7 4v2',
