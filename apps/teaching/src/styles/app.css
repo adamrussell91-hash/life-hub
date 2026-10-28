@@ -9797,6 +9797,11 @@ body.is-lesson-builder-full-page .hub-utilities {
   display: grid;
   gap: var(--space-2);
   width: 17.5rem;
+  /* The rail is sticky, so page scroll never reaches a long family's last cards: the flyout scrolls itself.
+     --palette-top is the rail's live distance from the top of the screen (mount-palette.ts). */
+  max-height: calc(100dvh - var(--palette-top, var(--space-3)) - var(--space-3));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-3);
   background: var(--hub-glass-fill);
   border: 1px solid rgba(255, 255, 255, 0.9);
