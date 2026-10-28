@@ -5375,7 +5375,7 @@ var AI_TOOLS = [
         set_mode: {
           type: "string",
           enum: ["quiz"],
-          description: "Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz."
+          description: "Only for an empty lesson the teacher wants as a quiz: accepting turns the whole lesson into a Quiz. Leave it out when adding quiz_question blocks to a lesson that already has content; they run there as it is."
         }
       },
       required: ["blocks"]
@@ -5394,7 +5394,7 @@ var AI_TOOLS = [
         set_mode: {
           type: "string",
           enum: ["quiz"],
-          description: "Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz."
+          description: "Only for an empty lesson the teacher wants as a quiz: accepting turns the whole lesson into a Quiz. Leave it out when adding quiz_question blocks to a lesson that already has content; they run there as it is."
         }
       },
       required: ["position", "blocks"]
@@ -5830,7 +5830,7 @@ Mix kinds to suit the content: recall questions first, then structure (matching,
 
 ${QUIZ_WRITING_GUIDE}
 
-quiz_question only works in a lesson whose type is quiz, or inside a tutorial's exit check section (see Tutorials). In any other lesson it is dropped when the lesson is published, so students never see it. Whenever a lesson tells students to write or answer something (levels, tasks, "you will write three short answers"), put those questions in a question_set block, never in quiz_question blocks. In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
+quiz_question runs in any lesson type except a lecture, design sprint or case study, and in a tutorial only inside a group's exit check section (see Tutorials). Add questions to a lesson as it is and leave set_mode out: set_mode: "quiz" turns the whole lesson into a Quiz, so use it only on an empty lesson the teacher wants as a quiz. Whenever a lesson tells students to write or answer something at length (levels, tasks, "you will write three short answers"), put those questions in a question_set block, never in quiz_question blocks. When the teacher wants questions without auto-marking ("just questions", "a few checks for understanding"), use question_set. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
 
 ## Tutorials
 A tutorial lesson (type tutorial) has Common blocks at the top level, and per group a section with tutorial_group (the group's tab) and a section with tutorial_group and tutorial_exit: true (the exit check). To fill a group's tab and exit check together, use one propose_replace_blocks holding both sections (or propose_replace_section for one), each keeping its id, title, tutorial_group and tutorial_exit. A teacher note at the top of a tab is the teacher's plan for that group: follow it and keep it. Never use set_mode in a tutorial: it stays a tutorial.
@@ -6218,6 +6218,35 @@ var PEDAGOGICAL_MODES = [
   "quiz"
 ];
 var PedagogicalModeSchema = z14.enum(PEDAGOGICAL_MODES);
+var DEFAULT_PEDAGOGICAL_MODE = "lesson";
+var PEDAGOGICAL_MODE_LABELS = {
+  lab: "Lab",
+  workshop: "Workshop",
+  lesson: "Lesson",
+  lecture: "Lecture",
+  tutorial: "Tutorial",
+  seminar: "Seminar",
+  project: "Project",
+  case_study: "Case Study",
+  game: "Game",
+  station_rotation: "Station Rotation",
+  design_sprint: "Design Sprint",
+  assessment: "Assessment",
+  quiz: "Quiz"
+};
+function isPedagogicalMode(value2) {
+  return typeof value2 === "string" && PEDAGOGICAL_MODES.includes(value2);
+}
+function resolvePedagogicalMode(value2) {
+  return isPedagogicalMode(value2) ? value2 : DEFAULT_PEDAGOGICAL_MODE;
+}
+var PLAYER_MODES = /* @__PURE__ */ new Set(["lecture", "design_sprint", "case_study", "tutorial"]);
+function quizRunsIn(value2) {
+  return !PLAYER_MODES.has(resolvePedagogicalMode(value2));
+}
+function pedagogicalModeLabel(value2) {
+  return PEDAGOGICAL_MODE_LABELS[resolvePedagogicalMode(value2)];
+}
 
 // apps/teaching/src/tutorial/model.ts
 function groupSection(block) {
@@ -7255,17 +7284,17 @@ function questionGiveaways(question) {
   }
   return issues;
 }
-function questionTagIssues(label, question) {
+function questionTagIssues(label, question, lists = { outcomes: true, skills: true }) {
   const issues = [];
-  if (!question.outcomes?.length) {
+  if (lists.outcomes && !question.outcomes?.length) {
     issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
   }
-  if (!question.skills?.length) {
+  if (lists.skills && !question.skills?.length) {
     issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
   }
   return issues;
 }
-function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true } = {}) {
+function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true, tagLists } = {}) {
   const questions = [];
   visitBlocks(proposalBlocks(proposal), (block) => {
     if (block.block_type === "quiz_question") questions.push(block);
@@ -7290,10 +7319,13 @@ function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true
         "In a tutorial, quiz questions only go in a group\u2019s exit check section (tutorial_exit: true). Replace that group\u2019s exit check section (propose_replace_blocks or propose_replace_section), keeping its id, title, tutorial_group and tutorial_exit."
       );
     }
-  } else if (lesson.pedagogical_mode !== "quiz" && setMode !== "quiz") {
+  } else if (!quizRunsIn(lesson.pedagogical_mode) && setMode !== "quiz") {
+    const type = pedagogicalModeLabel(lesson.pedagogical_mode);
     issues.push(
-      proposal.kind === "insert_blocks" || proposal.kind === "replace_lesson" ? 'This lesson is not a quiz, and quiz_question blocks only work in a Quiz lesson. Add set_mode: "quiz" so Accept switches the lesson type, and say so in your message. If the teacher wants questions without a quiz, use question_set instead.' : 'This lesson is not a quiz, and quiz_question blocks only work in a Quiz lesson. Use propose_insert_blocks with set_mode: "quiz", or use question_set instead.'
+      `This lesson is a ${type}, which can't run quiz_question blocks. Use question_set instead, or, only if the teacher asked for a quiz, propose_insert_blocks with set_mode: "quiz".`
     );
+  } else if (setMode === "quiz" && lesson.pedagogical_mode !== "quiz" && quizRunsIn(lesson.pedagogical_mode) && lesson.blocks.length > 0) {
+    issues.push("Leave set_mode out: quiz questions run in this lesson as it is, and set_mode would turn the whole lesson into a Quiz.");
   }
   const images = new Set(lessonImages(lesson.blocks).map((image) => image.url));
   if (!checkQuestions) return issues;
@@ -7306,7 +7338,7 @@ function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true
       return;
     }
     for (const giveaway of questionGiveaways(question)) issues.push(`${label}: ${giveaway}`);
-    issues.push(...questionTagIssues(label, checked.question));
+    issues.push(...questionTagIssues(label, checked.question, tagLists));
     const url = checked.question.image?.url;
     if (url && !images.has(url)) {
       issues.push(`${label}: its image must be one already in the lesson. Use one of the lesson's images or a different question kind.`);
@@ -7403,20 +7435,39 @@ ${current}`;
   else messages.push({ role: "user", content: current });
   return messages;
 }
-function safeValidate(proposal) {
+var HTTPS_URL = /https:\/\/[^\s"'<>\\]+/g;
+function linksIn(value2) {
+  const text2 = typeof value2 === "string" ? value2 : JSON.stringify(value2 ?? "");
+  return [...text2.matchAll(HTTPS_URL)].map((match) => {
+    let url = match[0].replace(/[.,;:!?]+$/, "");
+    if (/[)\]]$/.test(url) && !/[(\[]/.test(url)) url = url.replace(/[)\]]+$/, "");
+    return url;
+  });
+}
+function packOf(sightings) {
+  const pack = emptySearchPack("");
+  if (!sightings) return pack;
+  return {
+    ...pack,
+    available: true,
+    sources: [...sightings.urls].map((url) => ({ title: "", url, snippet: "", domain: "", education_score: 0 }))
+  };
+}
+function safeValidate(proposal, pack) {
   try {
-    return validateMutatingProposal(proposal, emptySearchPack(""));
+    return validateMutatingProposal(proposal, pack);
   } catch (error) {
     if (typeof DOMParser === "undefined" && error instanceof ReferenceError) return { ok: true };
     throw error;
   }
 }
-function checkProposalCall(name, input, lesson) {
+var MEDIA_PREFIX = "Media not in search pack: ";
+function checkProposalCall(name, input, lesson, sightings) {
   const parsed = parseToolProposal(name, input);
   if ("error" in parsed) return `${name}: ${truncate2(parsed.error)}`;
-  const checked = safeValidate(parsed);
-  const quiz = quizProposalIssues(parsed, lesson);
-  const publish = checked.ok || quiz.length > 0 && /^Quiz question \d+:/.test(checked.error) ? [] : [checked.error];
+  const checked = safeValidate(parsed, packOf(sightings));
+  const quiz = quizProposalIssues(parsed, lesson, { tagLists: sightings?.tagLists });
+  const publish = checked.ok || quiz.length > 0 && /^Quiz question \d+:/.test(checked.error) ? [] : [checked.error.startsWith(MEDIA_PREFIX) ? `Links and media must be ones already in the lesson or that came up in your searches or tool results. Remove these links and name the source in words instead: ${checked.error.slice(MEDIA_PREFIX.length)}` : checked.error];
   const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson)];
   return problems.length ? truncate2(problems.join("\n")) : parsed;
 }
@@ -7480,6 +7531,12 @@ async function runLessonAiJob(input) {
   let lastText = "";
   let turns = 0;
   const checks = [];
+  const sightings = {
+    urls: /* @__PURE__ */ new Set([...linksIn(lesson.blocks), ...linksIn(job.message), ...linksIn(job.history ?? [])])
+  };
+  const sight = (value2) => {
+    for (const url of linksIn(value2)) sightings.urls.add(url);
+  };
   const fail = (error) => ({ status: "error", error, turns, usage, cost_usd: totalCost(usage), checks });
   while (turns < MAX_TURNS) {
     if (input.signal?.aborted) return fail("The agent ran out of time. Try a smaller request.");
@@ -7510,6 +7567,7 @@ async function runLessonAiJob(input) {
       cost_usd: estimateCostUsd(servedBy, reply.usage)
     });
     const content = Array.isArray(reply.content) ? reply.content : [];
+    for (const block of content) if (block.type.endsWith("tool_result")) sight(block);
     const text2 = textOf(content);
     if (text2) lastText = text2;
     if (reply.stop_reason === "refusal") return fail("The model declined this request.");
@@ -7542,7 +7600,7 @@ ${note3}`;
           results.push({ type: "tool_result", tool_use_id: call.id, content: "Only one proposal is shown per answer. This one was skipped.", is_error: true });
           continue;
         }
-        const parsedCall = checkProposalCall(call.name, call.input, lesson);
+        const parsedCall = checkProposalCall(call.name, call.input, lesson, sightings);
         const checked = typeof parsedCall !== "string" && isBigBuild(parsedCall) && !planConfirmed(job) ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.` : parsedCall;
         if (typeof checked === "string") {
           failedProposals += 1;
@@ -7572,6 +7630,11 @@ If the request cannot fit the limits, say so plainly instead.`,
           value2 = { error: error instanceof Error ? error.message : "That tool failed." };
         }
         const isError = Boolean(value2 && typeof value2 === "object" && "error" in value2);
+        if (!isError) sight(value2);
+        if (call.name === "list_question_tags" && !isError) {
+          const lists = value2;
+          sightings.tagLists = { outcomes: Boolean(lists.outcomes?.length), skills: Boolean(lists.skills?.length) };
+        }
         results.push({
           type: "tool_result",
           tool_use_id: call.id,
@@ -7618,6 +7681,7 @@ export {
   checkProposalCall,
   estimateCostUsd,
   isBigBuild,
+  linksIn,
   pickLane,
   planConfirmed,
   runLessonAiJob,

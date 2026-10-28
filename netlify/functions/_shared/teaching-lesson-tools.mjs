@@ -1,5 +1,5 @@
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
-import { draftLessonKey, getJSON, listJSON, outcomeKey, SCHEDULED_LESSON_PREFIX, subjectKey, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, getJSON, listJSON, OUTCOME_PREFIX, outcomeKey, SCHEDULED_LESSON_PREFIX, subjectKey, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadAlignment } from './syllabus-alignment.mjs';
 import { loadSkills } from './skills-continuum.mjs';
 import { childBlocks, editableFields } from '../../../packages/alchemy/patches.js';
@@ -163,8 +163,18 @@ export function createLessonToolRunner({ store, lesson, alignment = () => loadAl
       case 'list_question_tags': {
         const unit = await liveUnit(lesson.unit_id);
         const subject = unit?.subject_id ? await getJSON(store, subjectKey(unit.subject_id)).catch(() => null) : null;
-        const outcomes = (await Promise.all((subject?.outcome_ids ?? []).map(id => getJSON(store, outcomeKey(id)).catch(() => null))))
-          .filter(o => o && !isDeletedRecord(o))
+        // The picker's catalog: the subject's ordered outcome_ids, then any other
+        // outcome filed under the subject, then the lesson's own outcomes.
+        const live = withoutDeleted(await listJSON(store, OUTCOME_PREFIX).catch(() => [])).filter(o => o.status !== 'trashed');
+        const byId = new Map(live.map(o => [o.id, o]));
+        const ids = [
+          ...(subject?.outcome_ids ?? []),
+          ...live.filter(o => subject && o.subject_id === subject.id).map(o => o.id).sort(),
+          ...(lesson.outcome_ids ?? [])
+        ];
+        const outcomes = [...new Set(ids)]
+          .map(id => byId.get(id))
+          .filter(Boolean)
           .map(o => ({ id: o.id, code: o.code, description: o.description ?? o.title }));
         const continuum = await Promise.resolve().then(skills).catch(() => null);
         const skillList = (continuum?.strands ?? []).flatMap(strand => strand.sub_strands.map(sub => ({ id: `${strand.id}.${sub.id}`, name: sub.name })));
