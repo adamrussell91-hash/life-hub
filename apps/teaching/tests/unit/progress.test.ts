@@ -31,6 +31,10 @@ describe('cellFor', () => {
     expect(cellFor({ ...base, lesson: a, quizSubmitted: true }).state).toBe('partial');
     expect(cellFor({ ...base, lesson: a, record: { at: 'x', via: 'teacher' } }).state).toBe('complete');
   });
+  it('a fully marked quiz is complete, even on an assessment', () => {
+    const a = { ...core, assessment: true };
+    expect(cellFor({ ...base, lesson: a, quizSubmitted: true, quizMarked: true, today: '2027-01-01' })).toEqual({ state: 'complete', late: false });
+  });
 });
 
 describe('renderProgress', () => {
@@ -54,6 +58,21 @@ describe('renderProgress', () => {
     expect(onMark).toHaveBeenNthCalledWith(1, 's2', 'l1', 'complete');
     expect(onMark).toHaveBeenNthCalledWith(2, 's1', 'l1', 'partial');
   });
+  it('counts a marked quiz on an assessment lesson, with the score in the cell, and bands lessons by unit', () => {
+    const marked = {
+      ...view,
+      done: {},
+      quizzes: [{ lesson_id: 'l2', scores: { s1: { submitted_at: '2026-10-03', score: 15, max: 20, pending: 0 }, s2: { submitted_at: '2026-10-03', score: 4, max: 20, pending: 2 } } }]
+    } as never;
+    const lessons = [{ ...core, unit: 'Poetry' }, { ...core, id: 'l2', title: 'Test', assessment: true, unit: 'Novel' }];
+    const root = renderProgress({ view: marked, students, lessons, today: '2026-10-20', onMark: vi.fn() });
+    const cell = (s: string) => root.querySelector<HTMLButtonElement>(`[data-student="${s}"][data-lesson="l2"]`)!;
+    expect(cell('s1').dataset.state).toBe('complete');
+    expect(cell('s1').title).toContain('quiz 15/20');
+    expect(cell('s2').dataset.state).toBe('partial');
+    expect(cell('s2').title).toContain('2 to mark');
+    expect([...root.querySelectorAll('.mb-progress__unit')].map((n) => n.textContent)).toEqual(['Poetry', 'Novel']);
+  });
   it('says so when there are no lessons', () => {
     expect(renderProgress({ view, students, lessons: [], today: '2026-10-20', onMark: vi.fn() }).textContent).toContain('no unit lessons');
   });
@@ -63,7 +82,7 @@ import { unitProgressLessons } from '@/markbook/progress';
 describe('unitProgressLessons', () => {
   it('lists the unit in order with roles, assessments and the earliest set date, skipping trashed lessons', () => {
     const out = unitProgressLessons(
-      { lesson_ids: ['a', 'b', 'c', 'gone'] } as never,
+      [{ lesson_ids: ['a', 'b', 'c', 'gone'] }] as never,
       [
         { id: 'a', title: 'A' },
         { id: 'b', title: 'B', route_role: 'support' },
@@ -77,5 +96,13 @@ describe('unitProgressLessons', () => {
       { id: 'b', title: 'B', role: 'support', assessment: false },
       { id: 'c', title: 'C', role: 'core', assessment: true }
     ]);
+  });  it('runs across every active unit in order, each lesson once, tagged with its unit', () => {
+    const out = unitProgressLessons(
+      [{ title: 'Poetry', lesson_ids: ['a', 'b'] }, { title: 'Novel', lesson_ids: ['b', 'q'] }] as never,
+      [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'q', title: 'Quiz', pedagogical_mode: 'quiz' }],
+      []
+    );
+    expect(out.map((l) => [l.id, l.unit])).toEqual([['a', 'Poetry'], ['b', 'Poetry'], ['q', 'Novel']]);
   });
+
 });
