@@ -36,7 +36,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   if (ctx.sprint.phases[1]!.instruction) root.append(el('p', '', ctx.sprint.phases[1]!.instruction));
   const brief = briefCard(ctx.status, true);
   if (brief) root.append(brief);
-  const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements }));
+  const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements, valueCheck: !!ctx.valueCheck }));
   const change = () => bar.changed();
   const step = (n: number, key: keyof typeof SKETCH_GUIDE, title: string, note: string) => {
     const box = el('section', 'su-step su-step--alone');

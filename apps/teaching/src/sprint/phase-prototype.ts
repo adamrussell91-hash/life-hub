@@ -25,7 +25,7 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   const serves = ctx.sprint.criteria.find((c) => c.id === myPart?.criterion);
   if (serves) brief.append(line('It serves', serves.text));
   root.append(brief);
-  const bar = submitBar(ctx, 'prototype', () => state, () => prototypeProblems(state, ctx.sprint.criteria, ctx.sprint.requirements));
+  const bar = submitBar(ctx, 'prototype', () => state, () => prototypeProblems(state, ctx.sprint.criteria, ctx.sprint.requirements, !!ctx.valueCheck));
   root.append(frameField({ label: 'Write your part here, or upload it below', value: state.text, max: 4000, rows: 8, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.text = v; bar.changed(); } }));
 
   const files = el('div', 'sprint-files');

@@ -29,7 +29,7 @@ export function understandProblems(p: PhasePayload['understand'], steps: Record<
 
 export function sketchProblems(
   p: Pick<PhasePayload['sketch'], 'cards' | 'strongest' | 'strongest_why'> & Partial<Pick<PhasePayload['sketch'], 'inspiration' | 'rapid'>>,
-  opts: { ideas: number; requirements: readonly SprintRequirement[] }
+  opts: { ideas: number; requirements: readonly SprintRequirement[]; /** False when the phase has no check question on screen, so none is required. */ valueCheck?: boolean }
 ): string[] {
   const out: string[] = [];
   const reqs = opts.requirements.filter((r) => r.phases.includes('sketch'));
@@ -47,7 +47,7 @@ export function sketchProblems(
     if (c.id === strongestId) {
       if (!Object.values(c.criteria).some((w) => w.trim())) out.push(`${name} (your strongest): link it to at least one criterion and quote the line that shows it.`);
       for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name} (your strongest): say where it meets "${r.text}".`);
-      if (!fullSentence(c.value_answer)) out.push(`${name} (your strongest): answer the check question in a full sentence.`);
+      if (opts.valueCheck !== false && !fullSentence(c.value_answer)) out.push(`${name} (your strongest): answer the check question in a full sentence.`);
     }
   });
   if (p.cards.length < opts.ideas) out.push(p.rapid ? `Pick: star your best ${opts.ideas} ideas. You have ${p.cards.length} starred.` : `Write ${opts.ideas} ideas. You have ${p.cards.length} so far.`);
@@ -79,13 +79,14 @@ export function partsProblems(parts: readonly Part[]): string[] {
 export function prototypeProblems(
   p: PhasePayload['prototype'],
   criteria: readonly Pick<SprintCriterion, 'id' | 'text'>[],
-  requirements: readonly SprintRequirement[]
+  requirements: readonly SprintRequirement[],
+  valueCheck = true
 ): string[] {
   const out: string[] = [];
   if (!p.text.trim() && !p.files.length && !p.link) out.push('Add your part: write it, upload a file or add a link.');
   for (const r of requirements.filter((x) => x.phases.includes('prototype'))) if (!p.requirements[r.id]?.trim()) out.push(`Say where your part meets "${r.text}".`);
   for (const c of criteria) if (!p.self[c.id] || !fullSentence(p.self_why[c.id])) out.push(`${crit(c)}: pick Starting, Showing or Strong and say why.`);
-  if (!fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');
+  if (valueCheck && !fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');
   return out;
 }
 
@@ -98,11 +99,11 @@ export function feedbackProblems(f: FeedbackEntry, criteria: readonly Pick<Sprin
   return out;
 }
 
-export function reflectionProblems(p: PhasePayload['test']): string[] {
+export function reflectionProblems(p: PhasePayload['test'], valueCheck = true): string[] {
   const out: string[] = [];
   if (p.reflection.length < 2 || p.reflection.some((r) => !fullSentence(r))) out.push('Answer both reflection questions in full sentences.');
   if (!p.quote.trim()) out.push('Quote one piece of feedback your group received.');
   if (!p.change_criterion) out.push('Pick the criterion your change is about.');
-  if (!fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');
+  if (valueCheck && !fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');
   return out;
 }
