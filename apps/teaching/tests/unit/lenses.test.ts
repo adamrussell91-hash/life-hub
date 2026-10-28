@@ -4,6 +4,7 @@ import { createBlockEditor } from '@/blocks/editors';
 import { withKaplanQualifier } from '@/blocks/kaplan';
 import { withLens } from '@/blocks/lenses/attachments';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { SLEEVE_LENSES } from '@/blocks/lenses/registry';
 import { storageKey } from '@/blocks/learning-activity';
 import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
@@ -77,7 +78,7 @@ describe('Add lens picker', () => {
     const items = [...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent);
     expect(items).toEqual(['Add lens…']);
     click(editor, 'Add lens…');
-    expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Literature', 'Questioning', 'Writing', 'Thinking', 'Frameworks', 'Judgement']);
+    expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Literature', 'Questioning', 'Writing', 'Thinking', 'Frameworks', 'Judgement', 'Thinking toolkit']);
     click(editor, 'DiscernInitial answer → against → for → step back');
     expect(editor.querySelector<HTMLElement>('.discern-setup')!.hidden).toBe(false);
   });
@@ -86,9 +87,11 @@ describe('Add lens picker', () => {
     for (const lens of ['patterns', 'multiple_perspectives', 'ethics'] as const) block = withKaplanQualifier(block, { ...qualifier, lens });
     for (const id of ['windows_mirrors', 'question_levels', 'because_but_so', 'reasoning', 'fw_rosenshine', 'fw_willingham', 'fw_marge', 'fw_wiliam', 'fw_berger']) block = withLens(block, id, { focus: '' });
     block = { ...block, discern: { mode: 'own', who: '', focus: '', source: '', initial: { type: 'write', preset: 'agree', options: [] } } };
+    // Two sleeves is the most a block holds.
+    for (const sleeve of SLEEVE_LENSES.slice(0, 2)) block = sleeve.write(block, sleeve.create());
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     expect(editor.querySelector<HTMLElement>('.kaplan-author__options')!.hidden).toBe(true);
-    expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(13);
+    expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(15);
   });
 });
 
