@@ -23,6 +23,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const brief = briefCard(s, false);
   if (brief) root.append(brief);
   const voting = !s.votes_closed;
+  root.append(purpose(voting));
   const dottable = sets.flatMap((x) => x.ideas).reduce((n, i) => n + IDEA_PARTS.filter((k) => i[k]?.trim()).length, 0);
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting && dots && state.dots.length < Math.min(dots, dottable) ? [`Place all ${dots} stand-out dots. You have placed ${state.dots.length}.`] : []),
@@ -34,8 +35,10 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const dotCounter = el('p', 'sd-counter');
   const paintCounter = () => { dotCounter.textContent = `Stand-out dots: ${state.dots.length} of ${dots} placed.`; };
   paintCounter();
+  let repaintReview = () => {};
   const dotChanged = () => {
     paintCounter();
+    repaintReview();
     root.querySelectorAll<HTMLButtonElement>('.sd-dot').forEach((b) => {
       const on = b.getAttribute('aria-pressed') === 'true';
       b.disabled = !ctx.editable || (!on && state.dots.length >= dots);
@@ -47,26 +50,65 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   for (const set of sets) for (const i of set.ideas) label.set(i.id, `Idea ${LETTERS[letter++] ?? letter}`);
 
   if (voting) {
-    root.append(el('h2', '', 'Pick the idea that does each one best'));
-    if (dots) root.append(dotCounter, el('p', 'sprint-note sd-legend', `● marks a part that stands out. You have ${dots}. Under each idea, tap the criteria it does best.`));
+    if (dots) {
+      const legend = el('div', 'sd-legend');
+      legend.append(
+        el('p', '', `Two things to do as you read each idea:`),
+        el('p', 'sd-legend__row', `● Stands out: tap the ● beside a part you think is clever. You have ${dots} to place. Your group can borrow a part even from an idea it doesn’t pick.`),
+        el('p', 'sd-legend__row', 'Does it best: under each idea, tap the criteria that idea does best.')
+      );
+      root.append(dotCounter, legend);
+    } else root.append(el('p', 'sprint-note sd-legend', 'Read each idea. Under it, tap the criteria it does best.'));
+    // Every set is on show: nothing hides behind a fold, so reading them all is how you vote.
+    for (const set of sets) if (!state.opened.includes(set.id)) state.opened.push(set.id);
     const gallery = el('div', 'sprint-sets');
     sets.forEach((set, n) => {
-      const d = el('details', 'sprint-set');
-      d.append(el('summary', '', `Set ${n + 1} · ${set.ideas.length} ${set.ideas.length === 1 ? 'idea' : 'ideas'}`));
+      const d = el('section', 'sprint-set');
+      if (sets.length > 1) d.append(el('h4', 'sprint-set__title', `Set ${n + 1} · ${set.ideas.length} ${set.ideas.length === 1 ? 'idea' : 'ideas'}`));
       const grid = el('div', 'sprint-gallery');
-      d.addEventListener('toggle', () => {
-        if (!d.open) return;
-        if (!state.opened.includes(set.id)) { state.opened.push(set.id); bar.changed(); }
-        if (!grid.childElementCount) for (const i of set.ideas) grid.append(ideaCard(i, label.get(i.id)!, ctx, state, root, dotChanged));
-      });
+      for (const i of set.ideas) grid.append(ideaCard(i, label.get(i.id)!, ctx, state, root, dotChanged));
       d.append(grid);
       gallery.append(d);
     });
     root.append(gallery);
     const reasons = el('div', 'sprint-reasons');
+    const review = el('div', 'sd-review');
+    const paintReview = () => {
+      review.replaceChildren(el('p', 'sprint-note', 'The ideas again, so you can look back as you write. ● is a part you marked as standing out.'));
+      for (const set of sets) for (const i of set.ideas) {
+        const box = el('article', 'sd-review__idea');
+        box.append(el('strong', '', `${label.get(i.id)} · ${i.title}`));
+        const best = ctx.sprint.criteria.filter((c) => state.votes[c.id] === i.id).map((c) => c.text);
+        if (best.length) box.append(el('p', 'sd-review__best', `You picked it for: ${best.join(', ')}`));
+        for (const part of IDEA_PARTS) {
+          const text = i[part]?.trim();
+          if (!text) continue;
+          const marked = state.dots.some((d) => d.idea === i.id && d.part === part);
+          const line = el('p', 'sd-review__part');
+          line.append(el('b', '', `${marked ? '● ' : ''}${PART_LABEL[part]}: `), text);
+          box.append(line);
+        }
+        review.append(box);
+      }
+    };
+    paintReview();
+    reasons.append(review);
+    const picks: Array<() => void> = [];
     for (const c of ctx.sprint.criteria) {
-      reasons.append(frameField({ label: `${c.text}: it does this best because…`, value: state.reasons[c.id] ?? '', max: 300, rows: 2, frames: ctx.frames.slice(-1), support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reasons[c.id] = v; bar.changed(); } }));
+      const block = el('div', 'sd-reason');
+      const pick = el('p', 'sd-reason__pick');
+      const paintPick = () => {
+        const id = state.votes[c.id];
+        const idea = sets.flatMap((x) => x.ideas).find((x) => x.id === id);
+        pick.textContent = idea ? `You picked ${label.get(idea.id)} · ${idea.title} for “${c.text}”.` : `Go back a step and tap “${c.text}” under the idea that does it best.`;
+        pick.classList.toggle('is-empty', !idea);
+      };
+      paintPick();
+      picks.push(paintPick);
+      block.append(pick, frameField({ label: `${c.text}: it does this best because…`, value: state.reasons[c.id] ?? '', max: 300, rows: 2, frames: ctx.frames.slice(-1), support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reasons[c.id] = v; bar.changed(); } }));
+      reasons.append(block);
     }
+    repaintReview = () => { paintReview(); picks.forEach((f) => f()); };
     root.append(reasons);
   } else {
     root.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Your teacher is choosing'));
@@ -84,8 +126,8 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
   ]);
   if (voting) stepify(root, [
-    { pick: '.sd-counter, .sd-legend, .sprint-sets', title: 'Read the ideas and place your dots', guide: LATER_GUIDE.read },
-    { pick: '.sprint-reasons', title: 'Say which idea does each criterion best', guide: LATER_GUIDE.reasons }
+    { pick: '.sd-counter, .sd-legend, .sprint-sets', title: 'Read the ideas, mark what stands out, pick the best', guide: LATER_GUIDE.read },
+    { pick: '.sprint-reasons', title: 'Explain each pick', guide: LATER_GUIDE.reasons }
   ]);
   slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
@@ -93,6 +135,16 @@ export function mountDecide(ctx: FormContext): PhaseForm {
 }
 
 const PART_LABEL: Record<IdeaPart, string> = { idea: 'The idea', answers: 'How it solves the problem', evidence: 'The evidence' };
+
+/** The point of Decide, said once at the top. */
+function purpose(voting: boolean): HTMLElement {
+  const box = el('section', 'sd-purpose');
+  box.append(el('div', 'sd-purpose__kind', 'What this step is for'));
+  box.append(el('p', '', voting
+    ? 'Here you pick and choose the best bits of the best ideas, to answer the challenge for the audience your group chose. Keep your tools and limits in mind: they are in your group brief above.'
+    : 'Your group’s idea is chosen. Now you plan the prototype: list its parts, borrow the best bits of the other ideas and give every part to someone.'));
+  return box;
+}
 
 function ideaCard(i: GalleryIdea, name: string, ctx: FormContext, state: PhasePayload['decide'], root: HTMLElement, changed: () => void): HTMLElement {
   const card = el('article', 'sprint-idea');
@@ -105,7 +157,8 @@ function ideaCard(i: GalleryIdea, name: string, ctx: FormContext, state: PhasePa
     row.append(el('p', part === 'idea' ? '' : 'sprint-note', text));
     if (dots) {
       const at = () => state.dots.findIndex((d) => d.idea === i.id && d.part === part);
-      const dot = el('button', 'sd-dot', '●');
+      const dot = el('button', 'sd-dot');
+      dot.append(el('span', 'sd-dot__mark', '●'), el('span', 'sd-dot__text', ' Stands out'));
       dot.type = 'button';
       dot.setAttribute('aria-label', `Stand-out dot: ${PART_LABEL[part]}, ${name}`);
       dot.setAttribute('aria-pressed', String(at() >= 0));
@@ -135,6 +188,7 @@ function ideaCard(i: GalleryIdea, name: string, ctx: FormContext, state: PhasePa
     const open = button('Open the picture or PDF', 'ghost', async () => window.open(await ctx.client.fileUrl(i.file!), '_blank', 'noopener'));
     card.append(open);
   }
+  card.append(el('p', 'sprint-note sd-best', 'This idea does best at:'));
   const chips = el('div', 'sprint-votes');
   for (const c of ctx.sprint.criteria) {
     const chip = el('button', 'sprint-chip sprint-vote', c.text);

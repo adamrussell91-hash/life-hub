@@ -124,8 +124,8 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     intent.hidden = !intent.textContent;
     const steps = buildRail(s.phases ?? [], key, (k) => sprint.phases.find((x) => x.key === k)?.where, (k) => { chosen = k; paint(); }, (p) => (p.due_date ? `Closes ${new Date(`${p.due_date}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })}` : ''));
-    const brief = el('details', 'sprint-brief');
-    brief.append(el('summary', '', 'The challenge'));
+    const brief = el('section', 'sprint-brief');
+    brief.append(el('div', 'sprint-brief__kind', 'The challenge'));
     for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
     top.append(steps, cd, group, intent, brief);
     if (wholeGuides) top.append(wholeGuides);
