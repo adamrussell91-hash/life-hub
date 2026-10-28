@@ -79,3 +79,14 @@ metaphorical analysis uses a page and lens, conceptual transfer applies one
 rule to two shapes, and analogical chains uses diagonal interlocking links.
 Peer feedback uses exchanged speech cards. Question drop uses a question card
 entering a tray. Quiz question uses a single answer sheet with a selected row.
+
+## Complete palette coverage
+
+Classroom tools uses a stopwatch and die. Countdown uses a calendar and clock.
+Done uses a completed clipboard. Saved compositions use overlapping layout cards.
+These SVGs share the revised vectors' 256px canvas, 10px rounded charcoal stroke
+and transparent background. Compositions use a drawing rather than title initials.
+
+Professional serves the canonical Teaching block assets through its public asset
+symlink. Tasks retains its existing PNG set for its narrower block palette.
+The icon coverage test checks every offered block against each hub's public files.
