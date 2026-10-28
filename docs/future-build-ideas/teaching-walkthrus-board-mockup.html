@@ -6,147 +6,147 @@
 <title>WalkThrus board mockup</title>
 <style>
   :root {
-    --table: #4a3323; --table-2: #3a271a; --frame: #8a5a2e; --frame-dark: #5e3b1c;
-    --sea: #2f6e9e; --sea-2: #3a7fb1; --sand: #e8d29a;
-    --parch: #f6ead0; --parch-2: #ecdcb6; --ink: #2b1d12; --muted: #7a6650; --line: #d6c39b;
-    --red: #b8322a; --red-dark: #7d1f19;
+    --bg: #ffffff; --paper: #ffffff; --ink: #1a1a1a; --tab: #2f2f2f; --muted: #6b6b6b; --line: #e3e3e3;
+    --yellow: #ffd400; --blue: #2da8e0; --green: #9dc33b; --pink: #e6258f;
   }
-  /* the board is a physical object on a table, so it keeps the same colours in dark mode */
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --table: #2c1f15; --table-2: #22170f; } }
-  :root[data-theme="dark"] { --table: #2c1f15; --table-2: #22170f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #161616; --paper: #1f1f1f; --ink: #f2f2f2; --muted: #a8a8a8; --line: #333; }
+  }
+  :root[data-theme="dark"] { --bg: #161616; --paper: #1f1f1f; --ink: #f2f2f2; --muted: #a8a8a8; --line: #333; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
-  body { background: var(--table); color: var(--ink); font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--table-2); color: var(--parch); flex-wrap: wrap; border-bottom: 3px solid var(--frame-dark); }
-  header h1 { font-size: 19px; margin: 0; letter-spacing: .02em; font-family: "Palatino Linotype", Palatino, Georgia, serif; }
-  header .sub { color: #c9b48f; font-size: 12.5px; }
-  .tools { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  button { font: inherit; font-size: 13px; font-weight: 600; border: 1.5px solid var(--frame-dark); background: var(--parch); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; transition: background .2s, transform .15s, box-shadow .2s; box-shadow: 0 2px 0 var(--frame-dark); }
-  button:hover { background: #fff6e2; }
-  button:active { transform: translateY(2px); box-shadow: none; }
-  button.on { background: var(--red); color: #fff; border-color: var(--red-dark); box-shadow: 0 2px 0 var(--red-dark); }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 "Helvetica Neue", Arial, system-ui, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: stretch; background: var(--yellow); flex-wrap: wrap; }
+  .brand { background: #111; color: #fff; padding: 10px 26px 10px 16px; font-weight: 900; font-size: 20px; letter-spacing: .02em; clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%); display: flex; align-items: center; }
+  .brand span { font-weight: 300; letter-spacing: .35em; font-size: 15px; margin-left: 14px; }
+  .title { display: flex; align-items: center; padding: 0 16px; font-weight: 800; color: #111; font-size: 15px; }
+  .tools { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 12px; }
+  button { font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; border: 2px solid #111; background: #fff; color: #111; border-radius: 0; padding: 6px 11px; cursor: pointer; transition: background .15s, transform .1s; }
+  button:hover { background: #fff7c2; }
+  button:active { transform: translateY(1px); }
+  button.on { background: #111; color: #fff; }
   main { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-  svg#board { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab;
-    background: radial-gradient(ellipse at 50% 40%, #5a3f2b 0%, var(--table) 60%, var(--table-2) 100%); }
+  svg#board { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; background: var(--bg); }
   svg#board.dragging { cursor: grabbing; }
   svg#board.drawing { cursor: crosshair; }
 
   .hex { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform .25s cubic-bezier(.2,.8,.2,1), filter .25s, opacity .3s; }
-  .hex:hover { transform: scale(1.05); filter: drop-shadow(0 5px 6px rgba(0,0,0,.35)); }
-  .hex.pick { filter: drop-shadow(0 0 7px #fff); }
-  .hex.dim { opacity: .4; }
-  .tile-edge { fill: none; stroke: #f3e3b5; stroke-width: 2.6; }
-  .token { fill: var(--parch); stroke: #6b4a2b; stroke-width: 1.4; }
-  .tok-num { font-size: 12.5px; font-weight: 800; text-anchor: middle; fill: var(--ink); font-family: "Palatino Linotype", Palatino, Georgia, serif; }
-  .tok-num.hot { fill: var(--red); }
-  .tok-code { font-size: 5.2px; font-weight: 800; text-anchor: middle; fill: var(--muted); letter-spacing: .06em; }
-  .pip { fill: var(--ink); }
-  .pip.hot { fill: var(--red); }
-  .name { font-size: 7.6px; font-weight: 800; text-anchor: middle; fill: var(--ink); paint-order: stroke; stroke: rgba(246,234,208,.95); stroke-width: 3px; stroke-linejoin: round; }
+  .hex:hover { transform: scale(1.05); filter: drop-shadow(0 6px 8px rgba(0,0,0,.18)); }
+  .hex.pick { filter: drop-shadow(0 0 0 #000) drop-shadow(0 0 5px #111); }
+  .hex.dim { opacity: .3; }
+  .face { stroke: none; }
+  .tabbar { fill: var(--tab); }
+  .tabtext { font-size: 8.2px; font-weight: 800; fill: #fff; text-anchor: middle; letter-spacing: .03em; }
+  .htitle { font-size: 8.6px; font-weight: 900; fill: #111; text-anchor: middle; letter-spacing: .01em; }
+  .glyph { fill: none; stroke: #111; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .badge { fill: #111; }
+  .dot { fill: #111; }
+  .cl-label { font-size: 13px; font-weight: 900; letter-spacing: .08em; fill: var(--ink); }
+  .cl-bar { fill: var(--yellow); }
   .pop { animation: pop .5s cubic-bezier(.2,.9,.3,1.3) both; }
   @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
 
-  .road { fill: none; stroke-linecap: round; pointer-events: stroke; }
-  .road.casing { stroke: var(--red-dark); stroke-width: 9; }
-  .road.edge { stroke: var(--red); stroke-width: 6; }
-  .road.thin { stroke: var(--red); stroke-width: 3; stroke-dasharray: 7 5; }
-  .road.casing.thin { stroke: rgba(0,0,0,.25); stroke-width: 5; stroke-dasharray: none; }
-  .road.new { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .7s ease-out forwards; }
-  .road.thin.new { animation: draw .9s ease-out forwards; }
+  .arrow { fill: none; stroke: var(--ink); stroke-width: 1.8; pointer-events: stroke; }
+  .arrow.new { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .8s ease-out forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
-  .chev { fill: var(--parch); transform-box: fill-box; transform-origin: center; }
-  .roadg { cursor: help; }
-  .building { pointer-events: none; filter: drop-shadow(0 2px 1.5px rgba(0,0,0,.45)); }
-  .building .place { animation: drop .6s cubic-bezier(.2,.9,.3,1.4) both; transform-box: fill-box; transform-origin: bottom center; }
-  @keyframes drop { from { transform: translateY(-30px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
-  .robber { cursor: pointer; transition: transform .6s cubic-bezier(.5,0,.2,1), opacity .4s; filter: drop-shadow(0 3px 2px rgba(0,0,0,.45)); }
+  .knot circle { fill: var(--bg); stroke: var(--ink); stroke-width: 1.8; }
+  .knot path { fill: var(--ink); }
+  .arrow-label { font-size: 8px; font-weight: 800; letter-spacing: .06em; fill: var(--ink); }
+  .arrowg { cursor: help; }
+  .robber { cursor: pointer; transition: transform .6s cubic-bezier(.5,0,.2,1), opacity .4s; }
   .robber.gone { opacity: 0; transform: translateY(-40px); }
-  .harbour { cursor: pointer; }
-  .harbour text { font-size: 8.5px; font-weight: 800; fill: var(--ink); text-anchor: middle; }
-  .facedown .back { fill: #c9a96a; stroke: #f3e3b5; stroke-width: 2.6; }
-  .facedown .q { font-size: 16px; font-weight: 700; fill: rgba(80,50,20,.45); text-anchor: middle; font-family: Palatino, Georgia, serif; }
-  .table-label { font-size: 13px; font-weight: 700; letter-spacing: .06em; fill: #e7d3ad; text-anchor: middle; font-family: Palatino, Georgia, serif; }
-  .table-sub { font-size: 10px; fill: #c4ab84; text-anchor: middle; }
+  .chip rect { fill: var(--bg); stroke: var(--ink); stroke-width: 1.8; }
+  .chip text { font-size: 9px; font-weight: 900; letter-spacing: .06em; fill: var(--ink); text-anchor: middle; }
+  .chip { cursor: pointer; }
+  .boxed .face { fill: var(--bg); stroke: var(--blue); stroke-width: 2; stroke-dasharray: 5 4; }
+  .boxed .q { font-size: 18px; font-weight: 900; fill: var(--blue); text-anchor: middle; }
 
-  /* side panel: parchment */
-  #panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(380px, 100%); background: var(--parch); border-left: 4px solid var(--frame); transform: translateX(105%); transition: transform .45s cubic-bezier(.2,.8,.2,1); overflow-y: auto; padding: 18px 18px 28px; box-shadow: -10px 0 30px rgba(0,0,0,.35); }
+  /* five-step strip, opened with the magnifier */
+  .strip { animation: stripIn .45s cubic-bezier(.2,.8,.2,1) both; transform-box: fill-box; transform-origin: bottom center; }
+  @keyframes stripIn { from { opacity: 0; transform: translateY(16px) scale(.92); } to { opacity: 1; transform: none; } }
+  .panel-sq { stroke: none; }
+  .stepnum { font-size: 7px; font-weight: 900; fill: #fff; }
+  .steplab { fill: #3a3a3a; }
+  .ph { fill: #d9d9d9; }
+  .mag { cursor: pointer; }
+
+  /* side panel */
+  #panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(380px, 100%); background: var(--paper); border-left: 3px solid #111; transform: translateX(105%); transition: transform .45s cubic-bezier(.2,.8,.2,1); overflow-y: auto; padding: 0 0 28px; }
   #panel.open { transform: none; }
-  #panel .close { position: absolute; top: 12px; right: 12px; border-radius: 50%; width: 32px; height: 32px; padding: 0; }
-  .p-head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; padding-right: 36px; }
-  .p-icon { width: 58px; height: 66px; flex: none; }
-  .p-code { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--muted); }
-  .p-name { font-size: 21px; font-weight: 700; line-height: 1.15; font-family: "Palatino Linotype", Palatino, Georgia, serif; }
+  #panel .close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 0; }
+  .p-head { background: var(--c); padding: 16px 52px 16px 18px; position: relative; color: #111; }
+  .p-code { display: inline-block; background: #2f2f2f; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 9px; letter-spacing: .04em; }
+  .p-name { font-size: 22px; font-weight: 900; line-height: 1.05; margin-top: 8px; text-transform: uppercase; }
+  .p-ser { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .p-body { padding: 0 18px; }
   .p-sec { margin-top: 18px; }
-  .p-sec h3 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
-  .adapt { display: flex; gap: 4px; }
-  .adapt span { flex: 1; text-align: center; padding: 7px 0 6px; border-radius: 8px; background: var(--parch-2); font-weight: 800; font-size: 13px; color: var(--muted); border: 1px solid var(--line); }
-  .adapt span small { display: block; font-size: 9.5px; font-weight: 600; }
-  .adapt span.done { background: color-mix(in srgb, var(--c) 35%, var(--parch)); color: var(--ink); border-color: transparent; }
-  .adapt span.now { background: var(--c); color: #fff; border-color: transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); }
+  .p-sec h3 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 900; }
   .steps { display: grid; gap: 8px; }
   .step { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
-  .step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--parch-2); border: 1.5px solid #6b4a2b; font-weight: 800; display: grid; place-items: center; font-size: 12px; font-family: Palatino, Georgia, serif; }
-  .step .book { height: 9px; border-radius: 4px; background: var(--line); margin: 3px 0 5px; }
+  .step .n { width: 26px; height: 22px; background: #2f2f2f; color: #fff; font-weight: 900; display: grid; place-items: center; font-size: 12px; }
+  .step .book { height: 9px; background: var(--line); margin: 3px 0 5px; }
   .step .book.short { width: 70%; }
-  .step .mine { font-size: 12.5px; padding: 6px 8px; border-left: 3px solid var(--red); background: #fffaf0; border-radius: 0 6px 6px 0; }
+  .step .mine { font-size: 12.5px; padding: 6px 8px; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 14%, var(--paper)); }
   .note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .reps { display: flex; gap: 4px; flex-wrap: wrap; }
-  .reps span { font-size: 11.5px; padding: 3px 8px; border-radius: 999px; background: #fffaf0; border: 1px solid var(--line); }
+  .reps span { font-size: 11.5px; padding: 3px 8px; border: 1.5px solid var(--ink); font-weight: 700; }
   .ev { display: grid; gap: 6px; }
-  .ev .row { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 8px; font-size: 12.5px; }
-  .ev .bar { height: 12px; border-radius: 6px; background: #fffaf0; overflow: hidden; border: 1px solid var(--line); }
+  .ev .row { display: grid; grid-template-columns: 60px 1fr 40px; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; }
+  .ev .bar { height: 12px; background: var(--line); overflow: hidden; }
   .ev .bar i { display: block; height: 100%; background: var(--c); width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
   .p-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
-  .chain { font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-  .chain b { padding: 3px 8px; background: #fffaf0; border-radius: 6px; border: 1px solid var(--line); font-weight: 600; }
+  .chain { font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-weight: 700; }
+  .chain b { padding: 3px 8px; border: 1.5px solid var(--ink); }
+  .adapt-svg { width: 100%; height: auto; display: block; }
+  .adapt-svg text { font-family: inherit; }
 
-  #suggest { position: absolute; left: 16px; top: 16px; width: min(330px, calc(100% - 32px)); background: var(--parch); border: 2px solid var(--frame); border-radius: 12px; padding: 12px 14px; box-shadow: 0 10px 26px rgba(0,0,0,.4); transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s; }
+  #suggest { position: absolute; left: 16px; top: 16px; width: min(290px, calc(100% - 32px)); font-size: 12.5px; background: var(--paper); border: 2.5px solid #111; padding: 0 0 12px; box-shadow: 6px 6px 0 var(--yellow); transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s; }
   #suggest.gone { transform: translateY(-20px); opacity: 0; pointer-events: none; }
-  #suggest .t { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 800; display: flex; gap: 6px; align-items: center; }
-  #suggest p { margin: 6px 0 10px; font-size: 13px; }
-  #hand { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 8px; max-width: calc(100% - 32px); overflow-x: auto; padding: 8px 4px 2px; transition: opacity .3s; }
-  .card { flex: none; width: 96px; height: 120px; border-radius: 9px; background: var(--parch); border: 3px solid #fff; outline: 1.5px solid var(--frame-dark); padding: 8px 7px; cursor: pointer; transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; box-shadow: 0 6px 12px rgba(0,0,0,.35); display: flex; flex-direction: column; margin-bottom: -56px; }
-  .card:hover { transform: translateY(-50px) rotate(-1.5deg); box-shadow: 0 14px 22px rgba(0,0,0,.45); }
-  .card .k { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
-  .card .v { font-weight: 700; font-size: 13px; margin-top: 3px; line-height: 1.15; font-family: Palatino, Georgia, serif; }
-  .card .art { margin-top: auto; height: 34px; border-radius: 5px; background: repeating-linear-gradient(45deg, #e6d3a8 0 6px, #efe0bd 6px 12px); display: grid; place-items: center; font-size: 10px; color: var(--muted); }
-  .card .u { font-size: 10px; color: var(--muted); margin-top: 4px; }
-  #legend { position: absolute; right: 16px; top: 16px; background: var(--parch); border: 2px solid var(--frame); border-radius: 12px; padding: 10px 12px; font-size: 12px; display: grid; gap: 5px; transition: opacity .3s, transform .3s; box-shadow: 0 10px 26px rgba(0,0,0,.35); }
-  #legend .lh { font-weight: 800; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
-  #legend .terr { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
-  #legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; border: 1px solid rgba(0,0,0,.2); }
+  #suggest .t { background: #111; color: #fff; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 900; padding: 6px 12px; }
+  #suggest p { margin: 8px 12px; font-size: 12.5px; }
+  #suggest button { font-size: 11px; padding: 5px 9px; }
+  #suggest .acts { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 14px; }
+  #hand { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 8px; max-width: calc(100% - 32px); overflow-x: auto; padding: 8px 4px 2px; transition: opacity .3s, transform .3s; }
+  .card { flex: none; width: 98px; background: var(--paper); border: 2px solid #111; cursor: pointer; transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; box-shadow: 4px 4px 0 var(--pink); }
+  .card:hover { transform: translateY(-6px); box-shadow: 6px 8px 0 var(--pink); }
+  .card .k { background: #111; color: #fff; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; font-weight: 900; padding: 4px 7px; }
+  .card .v { font-weight: 900; font-size: 11.5px; padding: 5px 7px 0; text-transform: uppercase; line-height: 1.05; }
+  .card .u { font-size: 9.5px; color: var(--muted); padding: 2px 7px 6px; }
+  #legend { position: absolute; right: 16px; top: 16px; background: var(--paper); border: 2.5px solid #111; padding: 10px 12px; font-size: 12px; display: grid; gap: 6px; transition: opacity .3s, transform .3s; box-shadow: 6px 6px 0 var(--yellow); }
+  #legend .lh { font-weight: 900; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
+  #legend .sw { display: inline-block; width: 14px; height: 12px; vertical-align: -2px; margin-right: 6px; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
   #legend svg { vertical-align: middle; margin-right: 6px; }
-  #legend.hide, #hand.hide { opacity: 0; transform: translateY(10px); pointer-events: none; }
-  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--parch); font-size: 12px; padding: 6px 9px; border-radius: 8px; max-width: 240px; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; z-index: 5; }
+  #legend.hide, #hand.hide { opacity: 0; pointer-events: none; }
+  .tip { position: absolute; pointer-events: none; background: #111; color: #fff; font-size: 12px; padding: 6px 9px; max-width: 240px; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; z-index: 5; }
   .tip.show { opacity: 1; transform: none; }
-  .zoom { position: absolute; left: 16px; bottom: 80px; display: grid; gap: 6px; }
-  .zoom button { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 18px; }
+  .zoom { position: absolute; left: 16px; bottom: 96px; display: grid; gap: 6px; }
+  .zoom button { width: 36px; height: 36px; padding: 0; font-size: 18px; }
   @media (max-width: 700px) {
     #legend { display: none; }
-    #panel { top: auto; height: 72%; width: 100%; border-left: 0; border-top: 4px solid var(--frame); border-radius: 18px 18px 0 0; transform: translateY(105%); }
+    .title { display: none; }
+    #panel { top: auto; height: 72%; width: 100%; border-left: 0; border-top: 3px solid #111; transform: translateY(105%); }
     #panel.open { transform: none; }
-    header .sub { display: none; }
     main:has(#panel.open) #suggest { opacity: 0; pointer-events: none; }
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>Professional learning · WalkThrus</h1>
-  <span class="sub">Mockup. Placeholder art until the custom icons arrive. Book wording loads privately.</span>
+  <div class="brand">WALKTHRUs<span>BOARD</span></div>
+  <div class="title">Professional learning</div>
   <div class="tools">
-    <button id="drawBtn" title="Click one hex, then another">Build a road</button>
-    <button id="seriesBtn">Show by series</button>
+    <button id="drawBtn" title="Click one hex, then another">Draw arrow</button>
+    <button id="seriesBtn">Series</button>
     <button id="keyBtn">Key</button>
-    <button id="resetBtn">Reset view</button>
+    <button id="resetBtn">Reset</button>
   </div>
 </header>
 <main>
   <svg id="board" aria-label="WalkThrus board"></svg>
   <div id="suggest">
-    <div class="t"><svg width="12" height="16" viewBox="0 0 12 16"><circle cx="6" cy="4" r="3.4" fill="#6d6d6d"/><path d="M1.5 15c0-5 2-7.5 4.5-7.5S10.5 10 10.5 15z" fill="#6d6d6d"/></svg> The robber has moved</div>
-    <p><b>Recall gap</b> on 3 quizzes in 3 weeks, Year 9 and Year 10. It is blocking <b>Weekly and monthly review</b>.</p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <div class="t">Pattern spotted</div>
+    <p><b>Recall gap</b> on 3 quizzes in 3 weeks, Year 9 and Year 10. The robber is on <b>Weekly and monthly review</b>.</p>
+    <div class="acts">
       <button class="on" id="placeGoal">Make it a goal</button>
       <button id="showRobber">Show me</button>
       <button id="dismiss">Dismiss</button>
@@ -160,24 +160,25 @@
 </main>
 
 <script>
-// each series is a terrain, like Catan's resources
+// colour shows the set (book volume); the black tab shows the series
+const SETS = { 1: { name: 'Set 1', hex: '#ffd400' }, 2: { name: 'Set 2', hex: '#2da8e0' }, 3: { name: 'Set 3', hex: '#9dc33b' } };
 const SERIES = {
-  QF: { code: 'Q&F', name: 'Questioning and feedback', terrain: 'Fields', hex: '#e2b13c' },
-  PR: { code: 'P&R', name: 'Practice and retrieval', terrain: 'Hills', hex: '#c4623a' },
-  CP: { code: 'CP',  name: 'Curriculum planning', terrain: 'Mountains', hex: '#8d949a' },
-  EM: { code: 'E&M', name: 'Explaining and modelling', terrain: 'Forest', hex: '#3f7d36' },
-  BR: { code: 'B&R', name: 'Behaviour and relationships', terrain: 'Pasture', hex: '#93c457' },
-  MB: { code: 'MB',  name: 'Mode B teaching', terrain: 'Fishery', hex: '#4fa3b4' },
+  QF: { code: 'Q&F', name: 'Questioning & feedback' },
+  PR: { code: 'P&R', name: 'Practice & retrieval' },
+  EM: { code: 'E&M', name: 'Explaining & modelling' },
+  CP: { code: 'CP',  name: 'Curriculum planning' },
+  BR: { code: 'B&R', name: 'Behaviour & relationships' },
+  MB: { code: 'MB',  name: 'Mode B teaching' },
 };
 const T = {
-  BR: [['Rehearse routines',44],['Positive relationships',36],['Establish your expectations',38],['Signal, pause, insist',40],['Positive framing',42],['Choices and consequences',46]],
-  CP: [['Sequence concepts in small steps',52],['Designing a knowledge rich curriculum',50],['Coherent mapping',54],['Blend knowledge and experience',56],['Pitch it up',58],['Plan for reading',60],['Tiered questions and problems',62],['Deliver core; signpost hinterland',64]],
-  EM: [['Live modelling',78],['Worked examples and backward fading',68],['Dual coding',70],['Deliberate vocabulary development',72],['Big picture, small picture',74],['Abstract models with concrete examples',76],['Scaffolding',80],['Metacognitive talk',82],['Set the standards',84],['Head on misconceptions',86]],
   QF: [['Check for understanding',96],['Cold calling',90],['Show-me boards',94],['Think, pair, share',92],['Say it again better',98],['Probing questions',100],['Process questions',102],['Whole class feedback',108],['Feedback that moves forward',104],['Feedback as actions',106]],
   PR: [['Quizzing',112],['Weekly and monthly review',122],['Elaborative interrogation',114],['Using a knowledge organiser',116],['Rehearsal and performance',118],['Peer supported retrieval',120],['Concrete examples',124],['Guided practice',126],['Independent practice',128],['Building fluency',130]],
+  EM: [['Live modelling',78],['Worked examples and backward fading',68],['Dual coding',70],['Deliberate vocabulary development',72],['Big picture, small picture',74],['Abstract models with concrete examples',76],['Scaffolding',80],['Metacognitive talk',82],['Set the standards',84],['Head on misconceptions',86]],
+  CP: [['Sequence concepts in small steps',52],['Designing a knowledge rich curriculum',50],['Coherent mapping',54],['Blend knowledge and experience',56],['Pitch it up',58],['Plan for reading',60],['Tiered questions and problems',62],['Deliver core; signpost hinterland',64]],
+  BR: [['Rehearse routines',44],['Positive relationships',36],['Establish your expectations',38],['Signal, pause, insist',40],['Positive framing',42],['Choices and consequences',46]],
   MB: [['Collaborative learning',134],['Oracy: debating',142],['Homework as guided study',136],['Enquiry projects',138],['Open response tasks',140],['Oracy: talk for writing',144],['Oracy: instructional inputs',146],['Independent learning: pre reading',148]],
 };
-// invented demo state. b: 0 none, 1 trying, 2 practising, 3 embedded. pips: lesson uses this term (0-5)
+// invented demo state. b: 0 none, 1 trying, 2 practising, 3 embedded. pips: lesson uses this term
 const STATE = {
   'Cold calling': { b: 3, pips: 5 }, 'Check for understanding': { b: 2, pips: 4, goal: true, stage: 3, notes: true },
   'Show-me boards': { b: 2, pips: 3 }, 'Think, pair, share': { b: 3, pips: 4 },
@@ -188,215 +189,202 @@ const STATE = {
   'Dual coding': { b: 1, pips: 2 }, 'Oracy: debating': { b: 1, pips: 1 }, 'Probing questions': { b: 0, pips: 2 },
   'Collaborative learning': { b: 2, pips: 3 },
 };
-const ROADS = [['Think, pair, share','Cold calling'],['Cold calling','Check for understanding'],['Show-me boards','Check for understanding'],['Check for understanding','Say it again better'],['Quizzing','Weekly and monthly review'],['Live modelling','Worked examples and backward fading'],['Check for understanding','Whole class feedback']];
-const SECTOR = ['QF', 'PR', 'CP', 'EM', 'BR', 'MB'];
+const ARROWS = [['Think, pair, share','Cold calling'],['Cold calling','Check for understanding'],['Show-me boards','Check for understanding'],['Check for understanding','Say it again better'],['Quizzing','Weekly and monthly review'],['Live modelling','Worked examples and backward fading'],['Check for understanding','Quizzing', 'then retrieve'],['Rehearse routines','Think, pair, share', 'routine first']];
+
+// flat-topped hexes on one shared grid, so clusters can snap anywhere
+const S = 50, R3 = Math.sqrt(3), H = S * R3 / 2;
+// tiles are drawn a little smaller than their grid cell, so clusters keep the book's white gaps
+const SF = S - 3, HF = SF * R3 / 2;
 const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
-const S = 46, R3 = Math.sqrt(3);
-const toPx = (q, r) => [S * R3 * (q + r / 2), S * 1.5 * r];
-const corners = (cx, cy, s = S) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 180 * (60 * i - 30); return [cx + s * Math.cos(a), cy + s * Math.sin(a)]; });
+const toPx = (q, r) => [S * 1.5 * q, S * R3 * (r + q / 2)];
+const toAx = (x, y) => { const q = Math.round(x / (1.5 * S)); return [q, Math.round(y / (R3 * S) - q / 2)]; };
+const corners = (cx, cy, s = S) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 3 * i; return [cx + s * Math.cos(a), cy + s * Math.sin(a)]; });
 const pts = c => c.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
 const NS = 'http://www.w3.org/2000/svg';
 const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
 const isNeighbour = (a, b) => DIRS.some(([dq, dr]) => a.q === b.q + dq && a.r === b.r + dr);
+function spiral(cq, cr, n) {
+  const out = [[cq, cr]];
+  for (let k = 1; out.length < n; k++) {
+    let q = cq + DIRS[4][0] * k, r = cr + DIRS[4][1] * k;
+    for (let d = 0; d < 6 && out.length < n; d++) for (let s = 0; s < k && out.length < n; s++) { out.push([q, r]); q += DIRS[d][0]; r += DIRS[d][1]; }
+  }
+  return out;
+}
 
 const board = document.getElementById('board');
 const defs = el('defs', {}, board);
-defs.innerHTML = `
-  <marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b8322a"/></marker>
-  <pattern id="t-QF" width="14" height="16" patternUnits="userSpaceOnUse"><rect width="14" height="16" fill="#e2b13c"/><path d="M4 15 V6 M4 7 l-2.2-2.4 M4 7 l2.2-2.4 M4 10 l-2-2 M4 10 l2-2 M11 9 V1 M11 3 l-2-2 M11 3 l2-2" stroke="#b8861d" stroke-width="1.1" fill="none"/></pattern>
-  <pattern id="t-PR" width="18" height="10" patternUnits="userSpaceOnUse"><rect width="18" height="10" fill="#c4623a"/><path d="M0 0.5 H18 M0 5.5 H18 M5 0.5 V5.5 M14 5.5 V10.5" stroke="#9c4626" stroke-width="1"/></pattern>
-  <pattern id="t-CP" width="26" height="20" patternUnits="userSpaceOnUse"><rect width="26" height="20" fill="#8d949a"/><path d="M1 17 L8 6 L15 17 Z" fill="#6f777d"/><path d="M8 6 L5.6 9.8 L10.4 9.8 Z" fill="#eef0f1"/><path d="M13 19 L19 10 L25 19 Z" fill="#7b8389"/></pattern>
-  <pattern id="t-EM" width="16" height="18" patternUnits="userSpaceOnUse"><rect width="16" height="18" fill="#3f7d36"/><path d="M4 2 L8 10 H0 Z M4 6 L8.5 14 H-.5 Z" fill="#2a5e25"/><path d="M12 9 L15.5 16 H8.5 Z" fill="#2f6a2a"/><rect x="3.4" y="14" width="1.2" height="3" fill="#5a3b1e"/></pattern>
-  <pattern id="t-BR" width="18" height="14" patternUnits="userSpaceOnUse"><rect width="18" height="14" fill="#93c457"/><path d="M2 6 l1.5-3 l1.5 3 M10 12 l1.5-3 l1.5 3" stroke="#6fa13b" stroke-width="1.1" fill="none"/><ellipse cx="14" cy="4" rx="2.6" ry="1.8" fill="#f7f4ea"/><circle cx="16.3" cy="3.6" r="1" fill="#3a3a3a"/></pattern>
-  <pattern id="t-MB" width="20" height="12" patternUnits="userSpaceOnUse"><rect width="20" height="12" fill="#4fa3b4"/><path d="M0 4 q5 -3 10 0 t10 0 M0 10 q5 -3 10 0 t10 0" stroke="#7cc1cd" stroke-width="1.2" fill="none"/></pattern>
-  <pattern id="t-desert" width="14" height="14" patternUnits="userSpaceOnUse"><rect width="14" height="14" fill="#e3c98b"/><circle cx="3" cy="4" r=".9" fill="#c9a964"/><circle cx="10" cy="10" r=".9" fill="#c9a964"/><path d="M8 4 q2-2 4 0" stroke="#c9a964" fill="none"/></pattern>
-  <pattern id="sea" width="44" height="22" patternUnits="userSpaceOnUse"><rect width="44" height="22" fill="#2f6e9e"/><path d="M0 11 q5.5 -5 11 0 t11 0 t11 0 t11 0" fill="none" stroke="#3f84b8" stroke-width="1.6"/></pattern>
-  <pattern id="wood" width="120" height="12" patternUnits="userSpaceOnUse"><rect width="120" height="12" fill="#8a5a2e"/><path d="M0 4 q30 -2 60 0 t60 0 M0 9 q40 2 80 0 t40 0" stroke="#74491f" stroke-width="1.2" fill="none"/></pattern>`;
-const gFrame = el('g', {}, board), gShore = el('g', {}, board), gTiles = el('g', {}, board), gRoads = el('g', {}, board), gTop = el('g', {}, board);
+defs.innerHTML = `<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`;
+const gLabels = el('g', {}, board), gArrows = el('g', {}, board), gTiles = el('g', {}, board), gTop = el('g', {}, board), gStrip = el('g', {}, board);
+gArrows.style.color = 'var(--ink)';
 
-// one island: a radius-4 hex board split into six wedges, one per series; desert in the middle
-const tiles = {}; const cells = {};
-let order = 0;
-SECTOR.forEach(sk => cells[sk] = []);
-for (let k = 1; k <= 4; k++) {
-  let q = DIRS[4][0] * k, r = DIRS[4][1] * k;
-  for (let d = 0; d < 6; d++) for (let s = 0; s < k; s++) { cells[SECTOR[d]].push([q, r]); q += DIRS[d][0]; r += DIRS[d][1]; }
-}
-for (const sk of SECTOR) {
-  // inner cells first so the techniques you use most sit near the middle
-  const cs = cells[sk].slice().sort((a, b) => (Math.abs(a[0]) + Math.abs(a[1]) + Math.abs(a[0] + a[1])) - (Math.abs(b[0]) + Math.abs(b[1]) + Math.abs(b[0] + b[1])));
-  T[sk].forEach(([name, page], i) => { const [q, r] = cs[i]; const [x, y] = toPx(q, r); tiles[name] = { name, page, sk, q, r, x, y, st: STATE[name] || { b: 0, pips: 0 }, i: order++ }; });
+// clusters laid out like the book's cluster sheets: white space between them for arrows
+const CL = { QF: [0, -150], PR: [470, -150], EM: [-470, -150], CP: [-470, 300], BR: [0, 300], MB: [470, 300] };
+const tiles = {}; let order = 0;
+for (const sk of Object.keys(CL)) {
+  const [cq, cr] = toAx(...CL[sk]);
+  const cells = spiral(cq, cr, T[sk].length);
+  T[sk].forEach(([name, page], i) => { const [q, r] = cells[i]; const [x, y] = toPx(q, r); tiles[name] = { name, page, sk, set: 1, q, r, x, y, st: STATE[name] || { b: 0, pips: 0 }, i: order++ }; });
+  const ys = cells.map(c => toPx(...c)[1]), xs = cells.map(c => toPx(...c)[0]);
+  const lx = Math.min(...xs) - S, ly = Math.min(...ys) - H - 22;
+  el('rect', { class: 'cl-bar', x: lx, y: ly - 11, width: 6, height: 14 }, gLabels);
+  const t = el('text', { class: 'cl-label', x: lx + 12, y: ly }, gLabels); t.textContent = SERIES[sk].name.toUpperCase();
 }
 const all = Object.values(tiles);
 
-// frame: sea inside a wooden flat-topped hexagon
-const FR = 470;
-const frameHex = (R) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 3 * i; return [R * Math.cos(a), R * Math.sin(a)]; });
-el('polygon', { points: pts(frameHex(FR + 26)), fill: 'url(#wood)', stroke: '#5e3b1c', 'stroke-width': 3 }, gFrame);
-el('polygon', { points: pts(frameHex(FR)), fill: 'url(#sea)', stroke: '#5e3b1c', 'stroke-width': 2 }, gFrame);
-// sandy shore under the island
-[...all, { x: 0, y: 0 }].forEach(t => el('polygon', { points: pts(corners(t.x, t.y, S + 9)), fill: '#e8d29a' }, gShore));
-[...all, { x: 0, y: 0 }].forEach(t => el('polygon', { points: pts(corners(t.x, t.y, S + 4)), fill: '#f0dfae' }, gShore));
-
-// desert in the centre
-const desert = el('g', { class: 'hex pop', style: 'animation-delay:80ms' }, gTiles);
-el('polygon', { points: pts(corners(0, 0)), fill: 'url(#t-desert)' }, desert);
-el('polygon', { class: 'tile-edge', points: pts(corners(0, 0)) }, desert);
-const dl = el('text', { class: 'name', x: 0, y: 4, style: 'font-size:8.5px' }, desert); dl.textContent = 'Term 4';
-desert.addEventListener('pointerenter', e => tip(e, '<b>Desert</b><br>Your starting tile. The robber rests here when no student problem is flagged.'));
-desert.addEventListener('pointerleave', () => tip());
-
-function wrap(text, max = 16) {
-  const words = text.split(' '); const lines = []; let cur = '';
+function wrap(text, max = 12) {
+  const words = text.toUpperCase().split(' '); const lines = []; let cur = '';
   for (const w of words) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
   if (cur) lines.push(cur); return lines.slice(0, 3);
 }
-function initials(name) { return name.replace(/[^A-Za-z ]/g, '').split(' ').filter(w => w.length > 2 || /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join(''); }
 
-// your pieces are red wood; settlements sit on the tile's top-right corner like Catan
-function building(b, x, y, place) {
-  if (!b) return null;
-  const outer = el('g', { class: 'building', transform: `translate(${x + S * Math.cos(-Math.PI / 6)},${y + S * Math.sin(-Math.PI / 6)})` });
-  const g = el('g', { class: place ? 'place' : '' }, outer);
-  const R = '#b8322a', D = '#7d1f19';
-  if (b === 1) el('path', { d: 'M-7 7 V-1 L0 -8 L7 -1 V7 Z', fill: 'rgba(255,255,255,.55)', stroke: R, 'stroke-width': 2, 'stroke-dasharray': '3 2' }, g);
-  if (b === 2) { el('path', { d: 'M-7 7 V-1 L0 -8 L7 -1 V7 Z', fill: R, stroke: D, 'stroke-width': 1.5 }, g); el('path', { d: 'M0 -8 L7 -1 V7', fill: 'none', stroke: 'rgba(0,0,0,.25)', 'stroke-width': 3 }, g); }
-  if (b === 3) { el('path', { d: 'M-11 8 V0 L-4 -6 L2 0 V-6 L5 -13 L11 -6 V8 Z', fill: R, stroke: D, 'stroke-width': 1.5 }, g); el('path', { d: 'M5 -13 L11 -6 V8', fill: 'none', stroke: 'rgba(0,0,0,.25)', 'stroke-width': 3 }, g); }
-  return outer;
+// placeholder line icons, one per series, until the custom set arrives
+function glyph(sk, x, y, g) {
+  const p = (d) => el('path', { class: 'glyph', d }, g);
+  const head = (hx, hy, r = 3.2) => el('circle', { class: 'glyph', cx: hx, cy: hy, r }, g);
+  if (sk === 'QF') { head(x - 6, y - 4); p(`M${x - 6} ${y - 1} v9 M${x - 6} ${y + 2} l6 -3`); p(`M${x + 2} ${y - 11} h10 v7 h-6 l-3 3 v-3 h-1 z`); }
+  if (sk === 'PR') { p(`M${x - 8} ${y} a8 8 0 1 1 3 6`); p(`M${x - 9} ${y + 5} l1 -5 l5 1`); p(`M${x - 2} ${y - 3} l2 2 l4 -5`); }
+  if (sk === 'EM') { head(x - 7, y - 4); p(`M${x - 7} ${y - 1} v9 M${x - 7} ${y + 2} l7 -6`); p(`M${x + 2} ${y - 10} h11 v9 h-11 z M${x + 4} ${y - 7} h5 M${x + 4} ${y - 4} h7`); }
+  if (sk === 'CP') { p(`M${x - 11} ${y + 7} h6 v-5 h6 v-5 h6 v-5 h5`); p(`M${x - 9} ${y + 7} v3 M${x + 9} ${y - 9} v-3`); }
+  if (sk === 'BR') { head(x, y - 6); p(`M${x} ${y - 3} v9 M${x} ${y} l-6 -7 M${x} ${y} l6 3`); p(`M${x - 11} ${y + 7} h22`); }
+  if (sk === 'MB') { head(x - 8, y - 2, 2.8); head(x, y - 6, 2.8); head(x + 8, y - 2, 2.8); p(`M${x - 8} ${y + 1} v6 M${x} ${y - 3} v6 M${x + 8} ${y + 1} v6 M${x - 8} ${y + 3} l8 -3 l8 3`); }
 }
+
+// progress piece in the bottom badge: dashed house, house, city
+function piece(b, x, y, g, place) {
+  const pg = el('g', { class: place ? 'pop' : '' }, g);
+  el('rect', { class: 'badge', x: x - 7.5, y: y - 7.5, width: 15, height: 15 }, pg);
+  if (!b) { el('circle', { cx: x, cy: y, r: 1.6, fill: '#fff' }, pg); return pg; }
+  const w = { fill: b === 1 ? 'none' : '#fff', stroke: '#fff', 'stroke-width': 1.1 };
+  if (b === 1) w['stroke-dasharray'] = '1.6 1.2';
+  if (b < 3) el('path', { d: `M${x - 4} ${y + 4} v-4 l4 -4 l4 4 v4 z`, ...w }, pg);
+  else { el('path', { d: `M${x - 5} ${y + 4.5} v-4 l3 -3 l3 3 v-3 l2.5 -3 l2.5 3 v7 z`, ...w }, pg); }
+  return pg;
+}
+
+function tabPoints(x, y, t = 13) { const dd = t * (SF / 2) / HF; return pts([[x - SF / 2, y - HF], [x + SF / 2, y - HF], [x + SF / 2 + dd, y - HF + t], [x - SF / 2 - dd, y - HF + t]]); }
 
 function drawTile(t, delay) {
   const s = SERIES[t.sk];
-  const g = el('g', { class: 'hex pop', 'data-name': t.name, style: `animation-delay:${delay}ms` }, gTiles);
-  el('polygon', { points: pts(corners(t.x, t.y)), fill: `url(#t-${t.sk})` }, g);
-  el('polygon', { class: 'tile-edge', points: pts(corners(t.x, t.y)) }, g);
-  // number token: page number, series code, and pips for how often you use it
-  const ty = t.y - 9, hot = t.st.pips >= 4;
-  el('circle', { class: 'token', cx: t.x, cy: ty, r: 15.5 }, g);
-  const c = el('text', { class: 'tok-code', x: t.x, y: ty - 7 }, g); c.textContent = s.code;
-  const n = el('text', { class: 'tok-num' + (hot ? ' hot' : ''), x: t.x, y: ty + 4.5 }, g); n.textContent = t.page;
-  for (let p = 0; p < t.st.pips; p++) el('circle', { class: 'pip' + (hot ? ' hot' : ''), cx: t.x - (t.st.pips - 1) * 2.3 + p * 4.6, cy: ty + 10, r: 1.4 }, g);
+  const g = el('g', { class: 'hex pop', style: `animation-delay:${delay}ms` }, gTiles);
+  el('polygon', { class: 'face', points: pts(corners(t.x, t.y, SF)), fill: SETS[t.set].hex }, g);
+  el('polygon', { class: 'tabbar', points: tabPoints(t.x, t.y) }, g);
+  const tt = el('text', { class: 'tabtext', x: t.x, y: t.y - HF + 9.6 }, g); tt.textContent = `${s.code} | ${t.page}`;
   const lines = wrap(t.name);
-  lines.forEach((ln, i) => { const tx = el('text', { class: 'name', x: t.x, y: t.y + 17 + i * 8.6 - (lines.length === 3 ? 2 : 0) }, g); tx.textContent = ln; });
+  lines.forEach((ln, i) => { const tx = el('text', { class: 'htitle', x: t.x, y: t.y - 17 + i * 9.4 + (lines.length === 1 ? 5 : 0) }, g); tx.textContent = ln; });
+  glyph(t.sk, t.x, t.y + 18, g);
+  t.pieceEl = piece(t.st.b, t.x - 2, t.y + HF - 9, g);
+  for (let p = 0; p < t.st.pips; p++) el('circle', { class: 'dot', cx: t.x + 9 + p * 4, cy: t.y + HF - 9, r: 1.3 }, g);
   if (t.st.goal) goalRing(t, g);
   t.g = g;
-  g.addEventListener('pointerenter', e => tip(e, `<b>${t.name}</b><br>${s.terrain} · ${s.name}<br>Used in ${t.st.pips} lesson${t.st.pips === 1 ? '' : 's'} this term`));
+  g.addEventListener('pointerenter', e => tip(e, `<b>${t.name}</b><br>${s.name} · ${SETS[t.set].name}<br>Used in ${t.st.pips} lesson${t.st.pips === 1 ? '' : 's'} this term`));
   g.addEventListener('pointerleave', () => tip());
-  g.addEventListener('click', () => { if (moved) return; drawing ? pickForArrow(t) : openPanel(t); });
+  g.addEventListener('click', () => { if (moved) return; drawing ? pickForArrow(t) : openTile(t); });
 }
 function goalRing(t, g) {
-  const ring = el('polygon', { points: pts(corners(t.x, t.y, S - 3)), fill: 'none', stroke: '#fff7df', 'stroke-width': 3, 'stroke-dasharray': '7 5' }, g);
-  el('animate', { attributeName: 'stroke-dashoffset', from: 0, to: 24, dur: '1.2s', repeatCount: 'indefinite' }, ring);
+  const ring = el('polygon', { points: pts(corners(t.x, t.y, S + 3)), fill: 'none', stroke: '#111', 'stroke-width': 3, 'stroke-dasharray': '8 5' }, g);
+  el('animate', { attributeName: 'stroke-dashoffset', from: 0, to: 26, dur: '1.3s', repeatCount: 'indefinite' }, ring);
 }
-all.slice().sort((a, b) => a.i - b.i).forEach((t, i) => drawTile(t, 140 + i * 16));
-// buildings sit above every tile so neighbours never cover them
-const gBuild = el('g', {}, board);
-board.insertBefore(gBuild, gTop);
-all.forEach(t => { const b = building(t.st.b, t.x, t.y); if (b) { gBuild.appendChild(b); t.bEl = b; } });
+all.slice().sort((a, b) => a.i - b.i).forEach((t, i) => drawTile(t, 100 + i * 16));
 
-// roads: red wood on the shared edge between neighbours; a dashed sea route for distant tiles
-function addRoad(a, b, animate) {
-  const A = tiles[a], B = tiles[b]; const dx = B.x - A.x, dy = B.y - A.y; const d = Math.hypot(dx, dy);
-  const ux = dx / d, uy = dy / d;
-  const g = el('g', { class: 'roadg' }, gRoads);
-  const line = (dAttr, cls, extra = {}) => { const p = el('path', { d: dAttr, class: cls, ...extra }, g); if (animate) { const len = p.getTotalLength(); p.style.setProperty('--len', len); p.classList.add('new'); } return p; };
+// arrows: a knot with a chevron on a shared edge; a thin black line through the white space otherwise
+function addArrow(a, b, label, animate) {
+  const A = tiles[a], B = tiles[b]; const dx = B.x - A.x, dy = B.y - A.y; const d = Math.hypot(dx, dy); const ux = dx / d, uy = dy / d;
+  const g = el('g', { class: 'arrowg' }, isNeighbour(A, B) ? gTop : gArrows);
   if (isNeighbour(A, B)) {
-    const [c1, c2] = corners(A.x, A.y).map(c => [c, Math.hypot(c[0] - B.x, c[1] - B.y)]).sort((p, q) => p[1] - q[1]).slice(0, 2).map(p => p[0]);
-    const k = .16; const sx = c1[0] + (c2[0] - c1[0]) * k, sy = c1[1] + (c2[1] - c1[1]) * k, ex = c2[0] - (c2[0] - c1[0]) * k, ey = c2[1] - (c2[1] - c1[1]) * k;
-    line(`M${sx} ${sy} L${ex} ${ey}`, 'road casing'); line(`M${sx} ${sy} L${ex} ${ey}`, 'road edge');
-    const mx = (c1[0] + c2[0]) / 2, my = (c1[1] + c2[1]) / 2;
-    el('path', { d: `M${mx + ux * 4.5} ${my + uy * 4.5} L${mx - ux * 2.5 - uy * 3.5} ${my - uy * 2.5 + ux * 3.5} L${mx - ux * 2.5 + uy * 3.5} ${my - uy * 2.5 - ux * 3.5} Z`, class: 'chev' + (animate ? ' pop' : ''), style: animate ? 'animation-delay:.5s' : '' }, g);
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    const k = el('g', { class: 'knot' + (animate ? ' pop' : '') }, g);
+    el('circle', { cx: mx, cy: my, r: 6 }, k);
+    el('path', { d: `M${mx + ux * 3.5} ${my + uy * 3.5} L${mx - ux * 2 - uy * 3} ${my - uy * 2 + ux * 3} L${mx - ux * 2 + uy * 3} ${my - uy * 2 - ux * 3} Z` }, k);
   } else {
-    const off = 40; const x1 = A.x + ux * off, y1 = A.y + uy * off, x2 = B.x - ux * off, y2 = B.y - uy * off;
-    const bend = Math.min(60, d * .22); const mx = (x1 + x2) / 2 - uy * bend, my = (y1 + y2) / 2 + ux * bend;
-    const dd = `M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}`;
-    line(dd, 'road casing thin'); line(dd, 'road thin', { 'marker-end': 'url(#ah)' });
+    // leave from the hex edge, bow out into white space, arrive at the far hex edge
+    const off = S + 4; const x1 = A.x + ux * off, y1 = A.y + uy * off, x2 = B.x - ux * (off + 2), y2 = B.y - uy * (off + 2);
+    const bend = Math.min(110, d * .3); const cx = (x1 + x2) / 2 - uy * bend, cy = (y1 + y2) / 2 + ux * bend;
+    el('circle', { cx: x1, cy: y1, r: 3, fill: 'var(--bg)', stroke: 'var(--ink)', 'stroke-width': 1.8 }, g);
+    const p = el('path', { class: 'arrow' + (animate ? ' new' : ''), d: `M${x1} ${y1} Q${cx} ${cy} ${x2} ${y2}`, 'marker-end': 'url(#ah)' }, g);
+    if (animate) p.style.setProperty('--len', p.getTotalLength());
+    if (label) { const lx = .25 * x1 + .5 * cx + .25 * x2, ly = .25 * y1 + .5 * cy + .25 * y2; const tx = el('text', { class: 'arrow-label', x: lx, y: ly - 5, 'text-anchor': 'middle' }, g); tx.textContent = label.toUpperCase(); }
   }
   g.addEventListener('pointerenter', e => tip(e, `${a} → ${b}`)); g.addEventListener('pointerleave', () => tip());
 }
-setTimeout(() => ROADS.forEach(([a, b], i) => setTimeout(() => addRoad(a, b, true), i * 140)), 1300);
+setTimeout(() => ARROWS.forEach(([a, b, l], i) => setTimeout(() => addArrow(a, b, l, true), i * 130)), 1100);
 
-// robber: grey pawn on the tile that would fix the student problem
+// robber: a black pawn on the tile that would fix the student problem
 const robT = tiles['Weekly and monthly review'];
 const robber = el('g', { class: 'robber' }, gTop);
-const rx = robT.x - 29, ry = robT.y - 13;
-el('ellipse', { cx: rx, cy: ry + 22, rx: 10, ry: 3.5, fill: 'rgba(0,0,0,.3)' }, robber);
-el('path', { d: `M${rx - 9} ${ry + 22} c0-4 2-6 4-7 c-2-3 -3-8 -1-12 h12 c2 4 1 9 -1 12 c2 1 4 3 4 7 z`, fill: '#6d6d6d', stroke: '#4a4a4a', 'stroke-width': 1 }, robber);
-el('circle', { cx: rx, cy: ry - 2, r: 6, fill: '#6d6d6d', stroke: '#4a4a4a', 'stroke-width': 1 }, robber);
-el('path', { d: `M${rx - 3} ${ry - 5} a3 3 0 0 1 3 -3`, stroke: 'rgba(255,255,255,.35)', 'stroke-width': 1.5, fill: 'none' }, robber);
+const rx = robT.x - 30, ry = robT.y + 6;
+el('path', { d: `M${rx - 8} ${ry + 18} c0-4 2-6 4-7 c-2-3 -3-8 -1-12 h10 c2 4 1 9 -1 12 c2 1 4 3 4 7 z`, fill: '#111', stroke: '#fff', 'stroke-width': 1.5 }, robber);
+el('circle', { cx: rx, cy: ry - 4, r: 5.5, fill: '#111', stroke: '#fff', 'stroke-width': 1.5 }, robber);
 robber.addEventListener('pointerenter', e => tip(e, '<b>Student problem: recall</b><br>3 quizzes in 3 weeks · Year 9, Year 10<br>This technique would fix it'));
 robber.addEventListener('pointerleave', () => tip());
-robber.addEventListener('click', () => openPanel(robT));
+robber.addEventListener('click', () => openTile(robT));
 
-// harbours: little docks where the board trades with Teaching
-const HARB = [
-  { near: 'Feedback as actions', label: 'Markbook', ratio: 'evidence in', info: 'Quiz tags, Patterns and Next steps come in here' },
-  { near: 'Independent learning: pre reading', label: 'Lessons', ratio: '14 notes', info: '14 lessons used a WalkThru note this term' },
-  { near: 'Deliver core; signpost hinterland', label: 'Unit plans', ratio: '3 plans', info: '3 unit plans have WalkThru fields filled' },
+// links out to Teaching, drawn as outlined chips with a line to the tile
+const LINKS = [
+  { near: 'Feedback as actions', dx: 0, dy: 1, label: 'MARKBOOK', info: 'Quiz tags, Patterns and Next steps come in here' },
+  { near: 'Oracy: instructional inputs', dx: 0, dy: 1, label: 'LESSONS · 14', info: '14 lessons used a WalkThru note this term' },
+  { near: 'Plan for reading', dx: 0, dy: 1, label: 'UNIT PLANS · 3', info: '3 unit plans have WalkThru fields filled' },
 ];
-HARB.forEach(h => {
+LINKS.forEach(h => {
   const t = tiles[h.near]; if (!t) return;
-  const d = Math.hypot(t.x, t.y), ox = t.x / d, oy = t.y / d;
-  const hx = t.x + ox * 78, hy = t.y + oy * 78;
-  const g = el('g', { class: 'harbour' }, gShore);
-  // two wooden piers to the tile's outer corners
-  const outer = corners(t.x, t.y).map(c => [c, Math.hypot(c[0] - hx, c[1] - hy)]).sort((a, b) => a[1] - b[1]).slice(0, 2).map(p => p[0]);
-  outer.forEach(c => el('line', { x1: c[0], y1: c[1], x2: hx + (c[0] - hx) * .35, y2: hy + (c[1] - hy) * .35, stroke: '#8a5a2e', 'stroke-width': 5, 'stroke-linecap': 'round' }, g));
-  el('circle', { cx: hx, cy: hy, r: 22, fill: '#f6ead0', stroke: '#5e3b1c', 'stroke-width': 2 }, g);
-  const a = el('text', { x: hx, y: hy - 3 }, g); a.textContent = '⚓ ' + h.label;
-  const b = el('text', { x: hx, y: hy + 8, style: 'font-size:7px;font-weight:600;fill:#7a6650' }, g); b.textContent = h.ratio;
+  const hx = t.x, hy = t.y + H + 34;
+  const g = el('g', { class: 'chip' }, gArrows);
+  el('line', { x1: t.x, y1: t.y + H, x2: hx, y2: hy - 10, stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-dasharray': '2 3' }, g);
+  const w = h.label.length * 6.2 + 16;
+  el('rect', { x: hx - w / 2, y: hy - 10, width: w, height: 20 }, g);
+  const tx = el('text', { x: hx, y: hy + 3.5 }, g); tx.textContent = h.label;
   g.addEventListener('pointerenter', e => tip(e, `<b>${h.label}</b><br>${h.info}`)); g.addEventListener('pointerleave', () => tip());
 });
 
-// expansion tiles waiting face-down on the table
-const SET2 = ['Make everyone think', 'No opt out', 'Normalise error and uncertainty', 'Randomised questioning', 'Hands up for asking questions'];
-const EX = [FR + 190, -40];
-const exCells = [[0, 0], [1, 0], [0, 1], [1, -1], [-1, 1]];
+// set 2 still in the box: dashed blue outlines, revealed in blue
+const SET2 = [['Make everyone think', 'P&R'], ['No opt out', 'Q&F'], ['Normalise error and uncertainty', 'Q&F'], ['Randomised questioning', 'Q&F'], ['Hands up for asking questions', 'Q&F']];
+const [eq, er] = toAx(900, 60);
+const exCells = spiral(eq, er, 5);
 const gEx = el('g', {}, gTiles);
-const tl = el('text', { class: 'table-label', x: EX[0] + 30, y: EX[1] - 120 }, gEx); tl.textContent = 'Expansion · Set 2';
-const ts = el('text', { class: 'table-sub', x: EX[0] + 30, y: EX[1] - 104 }, gEx); ts.textContent = 'still in the box · click to open';
-const exTiles = exCells.map(([q, r], i) => {
-  const [px, py] = toPx(q, r); const x = EX[0] + px, y = EX[1] + py;
-  const g = el('g', { class: 'hex facedown pop', style: `animation-delay:${1000 + i * 60}ms` }, gEx);
-  el('polygon', { class: 'back', points: pts(corners(x, y)) }, g);
-  el('circle', { cx: x, cy: y, r: 17, fill: 'none', stroke: 'rgba(80,50,20,.3)', 'stroke-width': 1.5 }, g);
-  const q2 = el('text', { class: 'q', x, y: y + 6 }, g); q2.textContent = '?';
+const exPx = exCells.map(c => toPx(...c));
+const exLX = Math.min(...exPx.map(p => p[0])) - S, exLY = Math.min(...exPx.map(p => p[1])) - H - 22;
+el('rect', { x: exLX, y: exLY - 11, width: 6, height: 14, fill: 'var(--blue)' }, gLabels);
+const exLabel = el('text', { class: 'cl-label', x: exLX + 12, y: exLY }, gLabels); exLabel.textContent = 'SET 2 · STILL IN THE BOX';
+const exTiles = exPx.map(([x, y], i) => {
+  const g = el('g', { class: 'hex boxed pop', style: `animation-delay:${900 + i * 60}ms` }, gEx);
+  el('polygon', { class: 'face', points: pts(corners(x, y, S - 2)) }, g);
+  const q = el('text', { class: 'q', x, y: y + 6 }, g); q.textContent = '?';
   g.addEventListener('pointerenter', e => tip(e, 'A new set of techniques. Click to open the box.'));
   g.addEventListener('pointerleave', () => tip());
-  g.addEventListener('click', () => { if (!moved) openExpansion(); });
+  g.addEventListener('click', () => { if (!moved) openSet2(); });
   return { g, x, y };
 });
 let opened = false;
-function openExpansion() {
-  if (opened) return; opened = true; ts.textContent = 'opened · tiles ready to place on the board';
+function openSet2() {
+  if (opened) return; opened = true; exLabel.textContent = 'SET 2 · NEW TECHNIQUES';
   exTiles.forEach((f, i) => setTimeout(() => {
-    const g = f.g; g.innerHTML = ''; g.classList.remove('facedown', 'pop'); void g.getBBox(); g.classList.add('pop');
-    el('polygon', { points: pts(corners(f.x, f.y)), fill: 'url(#t-QF)' }, g);
-    el('polygon', { class: 'tile-edge', points: pts(corners(f.x, f.y)), style: 'stroke:#9fd0f0' }, g);
-    el('circle', { class: 'token', cx: f.x, cy: f.y - 9, r: 15.5 }, g);
-    const c = el('text', { class: 'tok-code', x: f.x, y: f.y - 16 }, g); c.textContent = 'SET 2';
-    const n = el('text', { class: 'tok-num', x: f.x, y: f.y - 4.5, style: 'font-size:10px' }, g); n.textContent = initials(SET2[i]);
-    wrap(SET2[i]).forEach((ln, j) => { const tx = el('text', { class: 'name', x: f.x, y: f.y + 17 + j * 8.6 }, g); tx.textContent = ln; });
-  }, i * 170));
+    const g = f.g; g.innerHTML = ''; g.classList.remove('boxed', 'pop'); void g.getBBox(); g.classList.add('pop');
+    el('polygon', { class: 'face', points: pts(corners(f.x, f.y, SF)), fill: SETS[2].hex }, g);
+    el('polygon', { class: 'tabbar', points: tabPoints(f.x, f.y) }, g);
+    const tt = el('text', { class: 'tabtext', x: f.x, y: f.y - HF + 9.6 }, g); tt.textContent = `${SET2[i][1]} | SET 2`;
+    wrap(SET2[i][0]).forEach((ln, j) => { const tx = el('text', { class: 'htitle', x: f.x, y: f.y - 14 + j * 9.4 }, g); tx.textContent = ln; });
+    piece(0, f.x, f.y + HF - 9, g);
+  }, i * 160));
 }
 
-// framework chapters as development cards in your hand
+// framework chapters as cards along the bottom
 const CARDS = [['Rosenshine', 'Review schedule', 'In 2 unit plans'], ['Willingham', 'What will they think about?', 'In 1 unit plan'], ['MARGE', 'Motivate to evaluate', 'Not played yet'], ['Wiliam', 'Five strategies', 'In 3 unit plans'], ['Berger', 'Drafts and critique', 'In 1 unit plan']];
 const hand = document.getElementById('hand');
-CARDS.forEach(([k, v, u]) => { const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<div class="k">Framework</div><div class="v">${k}</div><div class="u">${v}</div><div class="art">art</div><div class="u">${u}</div>`; c.title = 'Play onto a unit plan as a lens'; hand.appendChild(c); });
+CARDS.forEach(([k, v, u]) => { const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<div class="k">Framework</div><div class="v">${k}</div><div class="u">${u}</div>`; c.title = 'Play onto a unit plan as a lens'; hand.appendChild(c); });
 
 // key
-const pieceSvg = b => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', 26); s.setAttribute('height', 24); s.setAttribute('viewBox', '-13 -15 26 24'); const g = building(b, 0, 0); g.setAttribute('transform', ''); s.appendChild(g); return s.outerHTML; };
+const pieceSvg = b => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', 18); s.setAttribute('height', 18); s.setAttribute('viewBox', '-9 -9 18 18'); piece(b, 0, 0, s); return s.outerHTML; };
 document.getElementById('legend').innerHTML = `
-  <div class="lh">Terrain = series</div>
-  <div class="terr">${Object.values(SERIES).map(s => `<div><span class="sw" style="background:${s.hex}"></span>${s.terrain}: ${s.code}</div>`).join('')}</div>
-  <div class="lh">Your pieces</div>
+  <div class="lh">Colour = set</div>
+  <div><span class="sw" style="background:var(--yellow)"></span>Set 1 · <span class="sw" style="background:var(--blue)"></span>Set 2 · <span class="sw" style="background:var(--green)"></span>Set 3</div>
+  <div class="lh">Black tab = series and page</div>
+  <div class="lh">Your progress</div>
   <div>${pieceSvg(1)}Trying it (Attempt)</div>
   <div>${pieceSvg(2)}Practising (Develop to Practise)</div>
-  <div>${pieceSvg(3)}Embedded (passed Test on student evidence)</div>
-  <div><svg width="26" height="10"><line x1="2" y1="5" x2="24" y2="5" stroke="#7d1f19" stroke-width="7" stroke-linecap="round"/><line x1="2" y1="5" x2="24" y2="5" stroke="#b8322a" stroke-width="4.5" stroke-linecap="round"/></svg>Road: one technique leads to another</div>
-  <div><svg width="26" height="18" viewBox="-10 -12 20 22"><circle cx="0" cy="-5" r="5" fill="#6d6d6d"/><path d="M-7 9c0-6 3-9 7-9s7 3 7 9z" fill="#6d6d6d"/></svg>Robber: a student problem this would fix</div>
-  <div><svg width="26" height="18" viewBox="-13 -11 26 22"><circle r="10.5" fill="#f6ead0" stroke="#6b4a2b"/><text y="3.5" text-anchor="middle" font-size="9" font-weight="800" fill="#b8322a">96</text></svg>Token: page, dots for lesson use</div>`;
+  <div>${pieceSvg(3)}Embedded (passed Test on evidence)</div>
+  <div><svg width="18" height="10"><circle cx="3" cy="5" r="1.6"/><circle cx="9" cy="5" r="1.6"/><circle cx="15" cy="5" r="1.6"/></svg>Lessons it was used in</div>
+  <div><svg width="18" height="18" viewBox="-9 -11 18 22"><circle cx="0" cy="-5" r="4.5"/><path d="M-6 9c0-6 3-9 6-9s6 3 6 9z"/></svg>Robber: a student problem this would fix</div>
+  <div><svg width="18" height="14" viewBox="-9 -7 18 14"><circle r="6" fill="#fff" stroke="#111" stroke-width="1.6"/><path d="M3 0 L-2 -3 L-2 3 Z"/></svg>One technique leads to the next</div>`;
 const keyBtn = document.getElementById('keyBtn'); keyBtn.onclick = () => { keyBtn.classList.toggle('on'); document.getElementById('legend').classList.toggle('hide'); };
 
 // tooltip
@@ -408,12 +396,12 @@ function tip(e, html) {
 }
 
 // view box, pan, zoom (animated)
-const HOME = [-FR - 60, -FR + 10, 2 * FR + 360, 2 * FR - 20];
+const bx = [...all.map(t => t.x), ...exPx.map(p => p[0])], by = [...all.map(t => t.y), ...exPx.map(p => p[1])];
+const HOME = [Math.min(...bx) - S - 20, Math.min(...by) - H - 50, Math.max(...bx) - Math.min(...bx) + 2 * S + 40, Math.max(...by) - Math.min(...by) + 2 * H + 130];
 let vb = HOME.slice(), anim;
 const setVB = v => { vb = v; board.setAttribute('viewBox', v.map(n => n.toFixed(1)).join(' ')); };
 setVB(HOME);
-// phones start on the active goal's corner of the island
-if (innerWidth <= 700) { const f = tiles['Check for understanding']; setVB([f.x - 200, f.y - 300, 400, 660]); }
+if (innerWidth <= 700) { const f = tiles['Check for understanding']; setVB([f.x - 200, f.y - 300, 400, 700]); }
 function animateVB(to, ms = 650) {
   cancelAnimationFrame(anim); const from = vb.slice(), t0 = performance.now();
   const ease = x => 1 - Math.pow(1 - x, 3);
@@ -422,7 +410,7 @@ function animateVB(to, ms = 650) {
 }
 function zoomBy(f, cx, cy) {
   cx ??= vb[0] + vb[2] / 2; cy ??= vb[1] + vb[3] / 2;
-  const w = Math.max(250, Math.min(HOME[2] * 1.6, vb[2] * f)), h = w * vb[3] / vb[2];
+  const w = Math.max(250, Math.min(HOME[2] * 1.5, vb[2] * f)), h = w * vb[3] / vb[2];
   animateVB([cx - (cx - vb[0]) * w / vb[2], cy - (cy - vb[1]) * h / vb[3], w, h], 300);
 }
 const toSvg = (cx, cy) => { const r = board.getBoundingClientRect(); const s = Math.max(vb[2] / r.width, vb[3] / r.height); const ox = (r.width * s - vb[2]) / 2, oy = (r.height * s - vb[3]) / 2; return [vb[0] - ox + (cx - r.left) * s, vb[1] - oy + (cy - r.top) * s]; };
@@ -438,44 +426,63 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => { drag = null; board.classList.remove('dragging'); setTimeout(() => moved = false, 0); });
 document.getElementById('zin').onclick = () => zoomBy(.75);
 document.getElementById('zout').onclick = () => zoomBy(1.33);
-document.getElementById('resetBtn').onclick = () => { closePanel(); animateVB(HOME); };
+document.getElementById('resetBtn').onclick = () => { closeTile(); animateVB(HOME); };
 
-// build-a-road mode
+// draw-arrow mode
 let drawing = false, first = null;
 const drawBtn = document.getElementById('drawBtn');
-drawBtn.onclick = () => { drawing = !drawing; drawBtn.classList.toggle('on', drawing); board.classList.toggle('drawing', drawing); if (first) first.g.classList.remove('pick'); first = null; drawBtn.textContent = drawing ? 'Pick where it starts' : 'Build a road'; };
+drawBtn.onclick = () => { drawing = !drawing; drawBtn.classList.toggle('on', drawing); board.classList.toggle('drawing', drawing); if (first) first.g.classList.remove('pick'); first = null; drawBtn.textContent = drawing ? 'Pick the start' : 'Draw arrow'; };
 function pickForArrow(t) {
-  if (!first) { first = t; t.g.classList.add('pick'); drawBtn.textContent = 'Now pick where it leads'; return; }
-  if (first !== t) addRoad(first.name, t.name, true);
-  first.g.classList.remove('pick'); first = null; drawBtn.textContent = 'Pick where it starts';
+  if (!first) { first = t; t.g.classList.add('pick'); drawBtn.textContent = 'Pick where it leads'; return; }
+  if (first !== t) addArrow(first.name, t.name, '', true);
+  first.g.classList.remove('pick'); first = null; drawBtn.textContent = 'Pick the start';
 }
 
-// series filter
+// series spotlight
 let seriesOn = false; const seriesBtn = document.getElementById('seriesBtn');
 seriesBtn.onclick = () => {
   seriesOn = !seriesOn; seriesBtn.classList.toggle('on', seriesOn);
   const ks = Object.keys(SERIES); let i = 0;
-  if (!seriesOn) { all.forEach(t => t.g.classList.remove('dim')); seriesBtn.textContent = 'Show by series'; clearInterval(seriesBtn.t); return; }
-  const show = () => { const sk = ks[i++ % ks.length]; seriesBtn.textContent = SERIES[sk].terrain + ' · ' + SERIES[sk].code; all.forEach(t => t.g.classList.toggle('dim', t.sk !== sk)); };
+  if (!seriesOn) { all.forEach(t => t.g.classList.remove('dim')); seriesBtn.textContent = 'Series'; clearInterval(seriesBtn.t); return; }
+  const show = () => { const sk = ks[i++ % ks.length]; seriesBtn.textContent = SERIES[sk].code; all.forEach(t => t.g.classList.toggle('dim', t.sk !== sk)); };
   show(); seriesBtn.t = setInterval(show, 1600);
 };
 
-// detail panel
+// open a tile: the five-step strip rises above it (the book's magnifier move) and the panel slides in
 const panel = document.getElementById('panel');
-const STAGES = [['A', 'Attempt'], ['D', 'Develop'], ['A', 'Adapt'], ['P', 'Practise'], ['T', 'Test']];
-function openPanel(t) {
+const STAGES = ['ATTEMPT', 'DEVELOP', 'ADAPT', 'PRACTISE', 'TEST'];
+function adaptChain(stage, colour) {
+  // five flat-topped hexes in a row with a REPEAT loop over the top
+  const s = 26, h = s * R3 / 2, gap = s * 1.5 + 1;
+  let out = `<svg class="adapt-svg" viewBox="-6 -40 ${gap * 4 + s * 2 + 12} ${h * 2 + 62}">`;
+  out += `<path d="M${s + gap * 4} ${-h + 2} V-26 H${s} V${-h - 4}" fill="none" stroke="#111" stroke-width="1.5" marker-end="url(#ahs)"/>`;
+  out += `<defs><marker id="ahs" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#111"/></marker></defs>`;
+  out += `<text x="${s + gap * 2}" y="-30" text-anchor="middle" font-size="8" font-weight="900" letter-spacing=".08em" fill="#111">REPEAT · ITERATE, DEVELOP, IMPROVE</text>`;
+  STAGES.forEach((w, i) => {
+    const cx = s + gap * i, cy = i % 2 ? h * .55 : 0;
+    const cs = corners(cx, cy, s).map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+    const fill = i < stage ? colour : i === stage ? '#111' : '#fff';
+    const tcol = i === stage ? '#fff' : '#111';
+    out += `<polygon points="${cs}" fill="${fill}" stroke="#111" stroke-width="${i === stage ? 3 : 2}"/>`;
+    out += `<text x="${cx}" y="${cy + 3}" text-anchor="middle" font-size="7" font-weight="900" fill="${tcol}">${w}</text>`;
+  });
+  return out + '</svg>';
+}
+let openT = null;
+function openTile(t) {
+  closeStrip();
+  openT = t;
   const s = SERIES[t.sk]; const st = t.st; const robHere = t === robT;
   const stage = st.goal ? st.stage : st.b === 3 ? 5 : st.b === 2 ? 2 : st.b === 1 ? 0 : -1;
-  panel.style.setProperty('--c', s.hex);
+  const colour = SETS[t.set].hex;
+  panel.style.setProperty('--c', colour);
   panel.innerHTML = `
-    <button class="close" aria-label="Close">✕</button>
-    <div class="p-head">
-      <svg class="p-icon" viewBox="-50 -50 100 100"><polygon points="${pts(corners(0, 0, 46))}" fill="url(#t-${t.sk})" stroke="#f3e3b5" stroke-width="3"/><circle cx="0" cy="0" r="20" fill="#f6ead0" stroke="#6b4a2b" stroke-width="1.5"/><text x="0" y="6" text-anchor="middle" font-size="17" font-weight="800" fill="#2b1d12" font-family="Palatino, Georgia, serif">${t.page}</text></svg>
-      <div><div class="p-code">${s.code} | ${t.page} · ${s.terrain.toUpperCase()}</div><div class="p-name">${t.name}</div></div>
-    </div>
-    ${robHere ? `<div class="p-sec"><h3>Why the robber is here</h3><div class="chain"><b>3 quizzes</b>→<b>Recall</b>→<b>Practice and retrieval</b>→<b>This technique</b></div><div class="note">Year 9 and Year 10, last 3 weeks. Evidence comes from quiz tags and markbook Patterns.</div></div>` : ''}
-    <div class="p-sec"><h3>ADAPT stage</h3><div class="adapt">${STAGES.map(([l, w], i) => `<span class="${i < stage ? 'done' : i === stage ? 'now' : ''}">${l}<small>${w}</small></span>`).join('')}</div>
-      ${stage < 0 ? '<div class="note">No goal yet. Start one to place your first piece.</div>' : ''}</div>
+    <div class="p-head"><button class="close" aria-label="Close">✕</button>
+      <span class="p-code">${s.code} | ${t.page}</span>
+      <div class="p-name">${t.name}</div><div class="p-ser">${s.name} · ${SETS[t.set].name}</div></div>
+    <div class="p-body">
+    ${robHere ? `<div class="p-sec"><h3>Why the robber is here</h3><div class="chain"><b>3 quizzes</b>→<b>Recall</b>→<b>Practice &amp; retrieval</b>→<b>This technique</b></div><div class="note">Year 9 and Year 10, last 3 weeks. From quiz tags and markbook Patterns.</div></div>` : ''}
+    <div class="p-sec"><h3>ADAPT</h3>${adaptChain(stage, colour)}${stage < 0 ? '<div class="note">No goal yet. Start one to place your first piece.</div>' : ''}</div>
     <div class="p-sec"><h3>The five steps</h3><div class="steps">${[1, 2, 3, 4, 5].map(n => `<div class="step"><div class="n">${n}</div><div><div class="book"></div><div class="book short"></div>${st.notes && n <= 3 ? `<div class="mine">${['Year 10: name the question type out loud first.', 'Wait a full 10 seconds on why-questions.', 'Start with a quiet student, not a volunteer.'][n - 1]}</div>` : ''}</div></div>`).join('')}</div>
       <div class="note">Grey lines: the book's wording, loaded privately from life-hub-data. Your adapted notes sit under each step.</div></div>
     ${st.pips ? `<div class="p-sec"><h3>Lesson reps</h3><div class="reps">${['Y10 · 14 Oct', 'Y9 · 16 Oct', 'Y10 · 21 Oct', 'Y9 · 23 Oct', 'Y10 · 27 Oct'].slice(0, st.pips).map(r => `<span>${r}</span>`).join('')}</div></div>` : ''}
@@ -483,20 +490,50 @@ function openPanel(t) {
       <div class="row"><span>Before</span><div class="bar"><i data-w="58"></i></div><span>58%</span></div>
       <div class="row"><span>Now</span><div class="bar"><i data-w="71"></i></div><span>71%</span></div></div>
       <div class="note">First-attempt scores on the questions this technique targets.</div></div>` : ''}
-    <div class="p-actions">${st.goal ? '<button class="on">Keep going</button><button>Move on</button>' : '<button class="on" id="startGoal">Start a goal</button><button>Open in a lesson</button>'}</div>`;
+    <div class="p-actions">${st.goal ? '<button class="on">Keep going</button><button>Move on</button>' : '<button class="on" id="startGoal">Start a goal</button><button>Open in a lesson</button>'}</div>
+    </div>`;
   panel.classList.add('open'); hand.classList.add('hide');
-  panel.querySelector('.close').onclick = closePanel;
-  const sg = panel.querySelector('#startGoal'); if (sg) sg.onclick = () => { if (t === robT && !robberGone) placeGoal(); else { makeGoal(t); openPanel(t); } };
+  panel.querySelector('.close').onclick = closeTile;
+  const sg = panel.querySelector('#startGoal'); if (sg) sg.onclick = () => { if (t === robT && !robberGone) placeGoal(); else { makeGoal(t); openTile(t); } };
   requestAnimationFrame(() => panel.querySelectorAll('.bar i').forEach(b => b.style.width = b.dataset.w + '%'));
-  const narrow = innerWidth <= 700; const w = narrow ? 360 : 560, h = w * vb[3] / vb[2];
-  animateVB([t.x - w * (narrow ? .5 : .38), t.y - h * (narrow ? .14 : .5), w, h]);
+  drawStrip(t);
+  const narrow = innerWidth <= 700; const w = narrow ? 420 : 760, h = w * vb[3] / vb[2];
+  // desktop: keep the strip in the space left of the panel
+  animateVB([t.x - w * (narrow ? .5 : .24), t.y - 150 - h * (narrow ? .12 : .32), w, h]);
   all.forEach(o => o.g.classList.toggle('dim', o !== t && !isNeighbour(o, t)));
 }
-function closePanel() { panel.classList.remove('open'); hand.classList.remove('hide'); all.forEach(o => o.g.classList.remove('dim')); }
+function drawStrip(t) {
+  const colour = SETS[t.set].hex;
+  const P = 62, G = 7, W = P * 5 + G * 4, top = t.y - H - 40 - P - 22;
+  const g = el('g', { class: 'strip' }, gStrip);
+  // connector from the strip down to the tile
+  el('path', { d: `M${t.x} ${top + P + 22} V${t.y - H - 4}`, stroke: '#111', 'stroke-width': 2.5, fill: 'none' }, g);
+  el('rect', { x: t.x - W / 2 - 8, y: top - 8, width: W + 16, height: P + 34, fill: 'var(--bg)', stroke: '#111', 'stroke-width': 2.5 }, g);
+  for (let i = 0; i < 5; i++) {
+    const x = t.x - W / 2 + i * (P + G);
+    el('rect', { class: 'panel-sq', x, y: top, width: P, height: P, fill: colour }, g);
+    // placeholder figure until the custom step art arrives
+    el('circle', { class: 'glyph', cx: x + P * .38, cy: top + P * .3, r: 4.5 }, g);
+    el('path', { class: 'glyph', d: `M${x + P * .38} ${top + P * .3 + 4.5} v16 M${x + P * .38} ${top + P * .3 + 9} l${8 + i * 2} ${-4 + i * 2}` }, g);
+    el('rect', { class: 'steplab', x, y: top + P - 11, width: 30, height: 11 }, g);
+    const n = el('text', { class: 'stepnum', x: x + 4, y: top + P - 3 }, g); n.textContent = `STEP ${i + 1}`;
+    el('rect', { class: 'ph', x, y: top + P + 5, width: P, height: 4 }, g);
+    el('rect', { class: 'ph', x, y: top + P + 12, width: P * .6, height: 4 }, g);
+  }
+  // magnifier to close, like the book's minus glass
+  const m = el('g', { class: 'mag' }, g);
+  const mx = t.x + W / 2 + 26, my = top + P / 2;
+  el('circle', { cx: mx, cy: my, r: 11, fill: 'var(--bg)', stroke: '#111', 'stroke-width': 3 }, m);
+  el('path', { d: `M${mx - 5} ${my} h10 M${mx + 8} ${my + 8} l9 9`, stroke: '#111', 'stroke-width': 3, 'stroke-linecap': 'round' }, m);
+  m.addEventListener('click', e => { e.stopPropagation(); closeTile(); });
+}
+function closeStrip() { gStrip.innerHTML = ''; }
+function closeTile() { closeStrip(); openT = null; panel.classList.remove('open'); hand.classList.remove('hide'); all.forEach(o => o.g.classList.remove('dim')); }
 function makeGoal(t) {
-  if (t.bEl) t.bEl.remove();
-  const b = building(1, t.x, t.y, true); gBuild.appendChild(b); t.bEl = b;
-  Object.assign(t.st, { b: Math.max(1, t.st.b), goal: true, stage: 0, fresh: true });
+  t.pieceEl.remove();
+  t.st.b = Math.max(1, t.st.b);
+  t.pieceEl = piece(t.st.b, t.x - 2, t.y + HF - 9, t.g, true);
+  Object.assign(t.st, { goal: true, stage: 0, fresh: true });
   goalRing(t, t.g);
 }
 
@@ -505,10 +542,10 @@ let robberGone = false; const sug = document.getElementById('suggest');
 function placeGoal() {
   robberGone = true; robber.classList.add('gone'); sug.classList.add('gone');
   setTimeout(() => makeGoal(robT), 450);
-  setTimeout(() => openPanel(robT), 900);
+  setTimeout(() => openTile(robT), 900);
 }
 document.getElementById('placeGoal').onclick = placeGoal;
-document.getElementById('showRobber').onclick = () => openPanel(robT);
+document.getElementById('showRobber').onclick = () => openTile(robT);
 document.getElementById('dismiss').onclick = () => { sug.classList.add('gone'); robber.classList.add('gone'); robberGone = true; };
 </script>
 </body>

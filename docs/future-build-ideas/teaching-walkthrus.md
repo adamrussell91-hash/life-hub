@@ -150,6 +150,7 @@ Clickable mockup: [teaching-walkthrus-board-mockup.html](teaching-walkthrus-boar
 
 ## History
 
-- 28 Oct 2026: Restyled the mockup as a Catan board (terrains, tokens, red wooden pieces, expansion box on the table). Next: blend in the clean WalkThrus look (flat yellow, blue and green, black code tabs, line art).
+- 28 Oct 2026: Restyled the mockup as a Catan board (terrains, tokens, red wooden pieces, expansion box on the table).
+- 28 Oct 2026: Restyled the mockup in the WalkThrus cluster look: white page, flat-topped hexes in series clusters with white gaps, black series and page tab, bold caps titles, line icons, progress piece in a black badge. Colour now shows the set (yellow set 1, blue set 2, green set 3). Arrows are a knot with a chevron on shared edges and thin black lines through the white space otherwise. Opening a tile raises its five-step strip on a connector, with a magnifier to close. The panel shows ADAPT as a chain of five hexes with a repeat loop.
 - 28 Oct 2026: Added the board mockup and the Catan mapping (no points).
 - 28 Oct 2026: Created from a read of the book against Adam's four uses, and Adam's follow-up decisions (three layers, ADAPT as goal life cycle, pattern monitor, specific icons, hexagon board, expansions, parked coaching templates).
