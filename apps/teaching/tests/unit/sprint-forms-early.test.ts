@@ -129,3 +129,21 @@ describe('sketch form', () => {
     expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(true);
   });
 });
+
+describe('submit feedback', () => {
+  it('shows a clear Submitted banner and changes the button once it is in', async () => {
+    const { submitBar } = await import('@/sprint/form-kit');
+    const client = { save: vi.fn(), submit: vi.fn().mockResolvedValue({}) };
+    const c = ctx({ client: client as never, onStatus: vi.fn() });
+    const bar = submitBar(c, 'sketch', () => ({}) as never, () => []);
+    document.body.append(bar.el);
+    const banner = bar.el.querySelector<HTMLElement>('.sprint-submit__done')!;
+    expect(banner.hidden).toBe(true);
+    bar.el.querySelector<HTMLButtonElement>('.btn--primary, button')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(banner.hidden).toBe(false);
+    expect(banner.textContent).toContain('Submitted');
+    expect(bar.el.textContent).toContain('Update my submission');
+    bar.dispose();
+  });
+});
