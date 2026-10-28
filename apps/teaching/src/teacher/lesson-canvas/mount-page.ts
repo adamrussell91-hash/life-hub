@@ -179,6 +179,10 @@ export type MountLessonPageOptions = {
   /** Set when the subject is in the syllabus alignment: tag the dot points this lesson teaches. */
   dotPoints?: { unitTitle?: string; focusArea?: string };
   onToggleFullPage?: () => void;
+  /** Saves pending edits before a page tool starts Ann, who reads the saved draft. */
+  flushDraft?: () => Promise<void>;
+  /** A page tool started an Ann job: open the chat on it. */
+  onAnnStarted?: () => void;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
    * editor passes false and carries those items in its single header menu,
@@ -1501,20 +1505,22 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       return group ? activeMembers(group) : [];
     },
     onError: (error) => console.error(error),
-    startAnn: (sectionId, config) => {
-      void (async () => {
-        const context = await loadInsightContext();
-        const view = await httpMarkbookApi.load(config.class_id);
-        const { evidence } = classEvidence(view, context);
-        const label = (t: string) => tagLabel(t, context);
-        const inGroup = new Set(config.students);
-        const mistakes = config.tags.flatMap((tag) =>
-          mixUps(evidence.filter((e) => inGroup.has(e.student) && e.tags.includes(tag)), tag.slice(0, tag.indexOf(':')) as TagKind)
-            .slice(0, 3)
-            .map((m) => `- ${mixUpText(m, label, (id) => codeLabel(id, context.codes))} (${m.count} ${m.count === 1 ? 'student' : 'students'})`)
-        );
-        await startAnn(lesson.id, groupSetBrief({ sectionId, config, label, lessonTitle: lesson.title, mistakes }));
-      })().catch((error) => console.error(error));
+    startAnn: async (sectionId, config) => {
+      // Ann reads the saved draft, so a set added a moment ago must be saved first.
+      await options.flushDraft?.();
+      const context = await loadInsightContext();
+      const view = await httpMarkbookApi.load(config.class_id);
+      const { evidence } = classEvidence(view, context);
+      const label = (t: string) => tagLabel(t, context);
+      const inGroup = new Set(config.students);
+      const mistakes = config.tags.flatMap((tag) =>
+        mixUps(evidence.filter((e) => inGroup.has(e.student) && e.tags.includes(tag)), tag.slice(0, tag.indexOf(':')) as TagKind)
+          .slice(0, 3)
+          .map((m) => `- ${mixUpText(m, label, (id) => codeLabel(id, context.codes))} (${m.count} ${m.count === 1 ? 'student' : 'students'})`)
+      );
+      await startAnn(lesson.id, groupSetBrief({ sectionId, config, label, lessonTitle: lesson.title, mistakes }));
+      // The job runs on the server; the chat shows it and carries Ann's draft to accept.
+      options.onAnnStarted?.();
     }
   });
   const canvas = mountBlockCanvas(canvasHost, {

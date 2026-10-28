@@ -31,6 +31,8 @@ export interface AiPanelHandle {
   setShelved(shelved: boolean): void;
   setExpanded(expanded: boolean): void;
   isWorking(): boolean;
+  /** Picks up a job started outside the chat (a page tool) and shows it like a chat turn. */
+  followOpenJob(): Promise<void>;
   dispose(): void;
 }
 
@@ -991,6 +993,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     },
     isWorking() {
       return busy;
+    },
+    followOpenJob() {
+      return busy ? Promise.resolve() : resumeOpenJob();
     },
     dispose() {
       abort?.abort();
