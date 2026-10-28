@@ -1,11 +1,13 @@
 /**
  * The Question Book: a private notebook of reflection questions, for the operator only.
+ * Answers are deeply personal, so they live in the encrypted R2 cognitive store (the one
+ * Problem Solver uses) under their own prefix, question-book/v1/{owner}/…:
  *
- *   question-book/v1/index                       { chapters: { [chapterId]: { answered, updatedAt } } }
- *   question-book/v1/chapters/{chapter}          { answers: { [questionId]: { value, updatedAt } }, updatedAt }
- *   question-book/v1/history/{chapter}/{question} { versions: [{ value, updatedAt }] }  newest first, last 20
- *   question-book/v1/notes/{chapter}             { notes: [{ id, at, observation, question, answered }] }  newest first
- *   question-book/v1/own                         { own: [{ id, question, answer, updatedAt, history }], updatedAt }
+ *   counts                       { chapters: { [chapterId]: { answered, updatedAt } } }
+ *   chapter_{chapter}            { answers: { [questionId]: { value, updatedAt } }, updatedAt }
+ *   history_{chapter}_{question} { versions: [{ value, updatedAt }] }  newest first, last 20
+ *   notes_{chapter}              { notes: [{ id, at, observation, question, answered }] }  newest first
+ *   own                          { own: [{ id, question, answer, updatedAt, history }], updatedAt }
  *
  * The question texts never enter public code: they are read from the private data repository
  * (data/tasks/question-book/questions.json in life-hub-data) and cached in memory for ten
@@ -17,15 +19,36 @@ import { readPrivateJsonFile } from './private-data-file.mjs';
 import { reject } from './question-drop.mjs';
 import { AnthropicClientError, DEFAULT_MODEL, completeMessage } from './anthropic-client.mjs';
 
-const STRONG = { type: 'json', consistency: 'strong' };
-const PREFIX = 'question-book/v1';
+export const QUESTION_BOOK_PREFIX = 'question-book/v1';
 export const KEYS = Object.freeze({
-  index: `${PREFIX}/index`,
-  chapter: (id) => `${PREFIX}/chapters/${id}`,
-  history: (chapterId, questionId) => `${PREFIX}/history/${chapterId}/${questionId}`,
-  notes: (id) => `${PREFIX}/notes/${id}`,
-  own: `${PREFIX}/own`
+  index: 'counts',
+  chapter: (id) => `chapter_${id}`,
+  history: (chapterId, questionId) => `history_${chapterId}_${questionId}`,
+  notes: (id) => `notes_${id}`,
+  own: 'own'
 });
+
+/** The encrypted R2 store under the Question Book's own prefix; null when R2 isn't bound. */
+export async function defaultGetQuestionBookStore(env) {
+  const { defaultGetCognitiveStore } = await import('./cognitive-store.mjs');
+  return defaultGetCognitiveStore(env, { prefix: QUESTION_BOOK_PREFIX, indexRow: (value) => ({ id: value.id, updatedAt: value.updatedAt ?? null }) });
+}
+
+/**
+ * One owner's documents in a cognitive store, read and written whole with an etag. Each
+ * document carries its own id (the store's index row needs one).
+ */
+export function ownerDocs(store, owner) {
+  return {
+    async read(id) {
+      const row = await store.read(owner, id);
+      return { data: row?.value ?? null, etag: row?.etag ?? null };
+    },
+    async write(id, value, etag) {
+      return (await store.write(owner, id, { ...value, id }, etag ?? null)) !== null;
+    }
+  };
+}
 
 export const CACHE_MS = 10 * 60 * 1000;
 /** Edits within this gap overwrite in place; a later edit keeps the earlier answer as a version. */
@@ -83,20 +106,16 @@ export function createQuestionSource({ env = process.env, fetchImpl = fetch, now
 const chartsFor = (source, chapterId) => Object.fromEntries(CHARTS.filter((c) => c.chapter === chapterId).map((c) => [c.id, source.charts[c.id]]));
 const chartOf = (source, question) => (question.response.type === 'chart' ? source.charts[question.response.chart] ?? null : null);
 
-/* ------------------------------------------------------------------ the store */
+/* ------------------------------------------------------------------ the store (one owner's documents) */
 
-async function readDoc(store, key) {
-  const row = await store.getWithMetadata(key, STRONG);
-  return { data: row?.data ?? null, etag: row?.etag ?? null };
-}
+const readDoc = (docs, id) => docs.read(id);
 
 /** Read, change and write one document, retrying twice if another tab wrote in between. */
-async function mutate(store, key, change) {
+async function mutate(docs, id, change) {
   for (let i = 0; i < 3; i += 1) {
-    const { data, etag } = await readDoc(store, key);
+    const { data, etag } = await docs.read(id);
     const next = change(data ? structuredClone(data) : null);
-    const written = await store.setJSON(key, next, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
-    if (written?.modified !== false) return next;
+    if (await docs.write(id, next, etag)) return next;
   }
   return reject(409, 'changed', 'This changed in another tab. Reload to see it.');
 }
@@ -115,8 +134,8 @@ const ownAnswered = (own) => own.filter((entry) => entry.answer).length;
 /* ------------------------------------------------------------------ reads */
 
 /** Every group and chapter, with how many questions each has and how many are answered. */
-export async function listChapters(store, loadSource) {
-  const [source, { data: index }, { data: ownDoc }] = await Promise.all([loadSource(), readDoc(store, KEYS.index), readDoc(store, KEYS.own)]);
+export async function listChapters(docs, loadSource) {
+  const [source, { data: index }, { data: ownDoc }] = await Promise.all([loadSource(), readDoc(docs, KEYS.index), readDoc(docs, KEYS.own)]);
   const own = ownDoc?.own ?? [];
   const chapters = CHAPTERS.map((ch) => {
     const row = index?.chapters?.[ch.id];
@@ -128,33 +147,33 @@ export async function listChapters(store, loadSource) {
 }
 
 /** One chapter: its questions, charts, saved answers and past Notice results. */
-export async function readChapter(store, loadSource, chapterId) {
+export async function readChapter(docs, loadSource, chapterId) {
   const ch = requireChapter(chapterId);
-  const { data: notesDoc } = await readDoc(store, KEYS.notes(ch.id));
+  const { data: notesDoc } = await readDoc(docs, KEYS.notes(ch.id));
   const base = { chapter: publicChapter(ch), questions: [], charts: {}, answers: {}, notes: notesDoc?.notes ?? [] };
   if (ch.kind === 'rules') return { ...base, rules: RULES.map((r) => ({ ...r })) };
   if (ch.kind === 'own') {
-    const { data: ownDoc } = await readDoc(store, KEYS.own);
+    const { data: ownDoc } = await readDoc(docs, KEYS.own);
     return { ...base, own: ownDoc?.own ?? [] };
   }
-  const [source, { data: doc }] = await Promise.all([loadSource(), readDoc(store, KEYS.chapter(ch.id))]);
+  const [source, { data: doc }] = await Promise.all([loadSource(), readDoc(docs, KEYS.chapter(ch.id))]);
   return { ...base, questions: source.byChapter.get(ch.id) ?? [], charts: chartsFor(source, ch.id), answers: doc?.answers ?? {} };
 }
 
 /** One question's earlier versions, newest first. */
-export async function readHistory(store, loadSource, chapterId, questionId) {
+export async function readHistory(docs, loadSource, chapterId, questionId) {
   const ch = requireChapter(chapterId, ['questions']);
   const source = await loadSource();
   const question = source.byId.get(questionId);
   if (!question || question.chapter !== ch.id) reject(404, 'not_found', 'That question isn’t in this chapter.');
-  const { data } = await readDoc(store, KEYS.history(ch.id, question.id));
+  const { data } = await readDoc(docs, KEYS.history(ch.id, question.id));
   return { question: question.id, versions: data?.versions ?? [] };
 }
 
 /* ------------------------------------------------------------------ writes */
 
 /** Save (or with value null, clear) one answer, keeping the earlier one as a version. */
-export async function saveAnswer(store, loadSource, body, { now = Date.now } = {}) {
+export async function saveAnswer(docs, loadSource, body, { now = Date.now } = {}) {
   const ch = requireChapter(body?.chapter, ['questions']);
   const source = await loadSource();
   const question = typeof body.question === 'string' ? source.byId.get(body.question) : null;
@@ -163,7 +182,7 @@ export async function saveAnswer(store, loadSource, body, { now = Date.now } = {
   const value = normalizeAnswer(question, body.value, chartOf(source, question));
   const updatedAt = iso(now);
   let previous = null;
-  const doc = await mutate(store, KEYS.chapter(ch.id), (current) => {
+  const doc = await mutate(docs, KEYS.chapter(ch.id), (current) => {
     const next = current ?? { answers: {} };
     previous = next.answers[question.id] ?? null;
     if (value === null) delete next.answers[question.id];
@@ -174,11 +193,11 @@ export async function saveAnswer(store, loadSource, body, { now = Date.now } = {
   const changed = previous && JSON.stringify(previous.value) !== JSON.stringify(value);
   const stale = previous && (value === null || now() - Date.parse(previous.updatedAt) >= VERSION_GAP_MS);
   if (changed && stale) {
-    await mutate(store, KEYS.history(ch.id, question.id), (current) => ({ versions: [previous, ...(current?.versions ?? [])].slice(0, MAX_VERSIONS) }));
+    await mutate(docs, KEYS.history(ch.id, question.id), (current) => ({ versions: [previous, ...(current?.versions ?? [])].slice(0, MAX_VERSIONS) }));
   }
   const questions = source.byChapter.get(ch.id) ?? [];
   const answered = questions.filter((q) => doc.answers[q.id] && isAnswered(q, doc.answers[q.id].value)).length;
-  await mutate(store, KEYS.index, (current) => {
+  await mutate(docs, KEYS.index, (current) => {
     const next = current ?? { chapters: {} };
     next.chapters[ch.id] = { answered, updatedAt };
     return next;
@@ -195,7 +214,7 @@ const ownText = (value, max, what) => {
 };
 
 /** Replace your own questions and answers; an entry edited later keeps its earlier wording. */
-export async function saveOwn(store, body, { now = Date.now } = {}) {
+export async function saveOwn(docs, body, { now = Date.now } = {}) {
   requireChapter(body?.chapter, ['own']);
   if (!Array.isArray(body.own)) reject(400, 'bad_request', 'Send your questions as a list.');
   if (body.own.length > MAX_OWN) reject(400, 'bad_answer', `Keep it to ${MAX_OWN} questions.`);
@@ -210,7 +229,7 @@ export async function saveOwn(store, body, { now = Date.now } = {}) {
     if (question || answer) incoming.push({ id: entry.id, question, answer });
   }
   const updatedAt = iso(now);
-  const doc = await mutate(store, KEYS.own, (current) => {
+  const doc = await mutate(docs, KEYS.own, (current) => {
     const before = new Map((current?.own ?? []).map((entry) => [entry.id, entry]));
     const own = incoming.map((entry) => {
       const old = before.get(entry.id);
@@ -262,14 +281,14 @@ function parseNotice(text) {
 }
 
 /** One Sonnet call over a chapter's answers; the result is saved to the chapter's notes. */
-export async function notice(store, loadSource, body, { env = process.env, now = Date.now, complete = completeMessage, modelFetch, newId = () => crypto.randomUUID() } = {}) {
+export async function notice(docs, loadSource, body, { env = process.env, now = Date.now, complete = completeMessage, modelFetch, newId = () => crypto.randomUUID() } = {}) {
   const ch = requireChapter(body?.chapter, ['questions', 'own']);
   let items;
   if (ch.kind === 'own') {
-    const { data } = await readDoc(store, KEYS.own);
+    const { data } = await readDoc(docs, KEYS.own);
     items = (data?.own ?? []).filter((entry) => entry.question && entry.answer).map((entry) => ({ prompt: entry.question, answer: entry.answer }));
   } else {
-    const [source, { data: doc }] = await Promise.all([loadSource(), readDoc(store, KEYS.chapter(ch.id))]);
+    const [source, { data: doc }] = await Promise.all([loadSource(), readDoc(docs, KEYS.chapter(ch.id))]);
     items = (source.byChapter.get(ch.id) ?? [])
       .filter((q) => doc?.answers?.[q.id] && isAnswered(q, doc.answers[q.id].value))
       .map((q) => ({ prompt: q.prompt, answer: describeAnswer(q, doc.answers[q.id].value, chartOf(source, q)) }))
@@ -293,6 +312,6 @@ export async function notice(store, loadSource, body, { env = process.env, now =
     throw e;
   }
   const note = { id: newId(), at: iso(now), ...parseNotice(text), answered: items.length };
-  const doc = await mutate(store, KEYS.notes(ch.id), (current) => ({ notes: [note, ...(current?.notes ?? [])].slice(0, MAX_NOTES) }));
+  const doc = await mutate(docs, KEYS.notes(ch.id), (current) => ({ notes: [note, ...(current?.notes ?? [])].slice(0, MAX_NOTES) }));
   return { note, notes: doc.notes, cost: NOTICE_COST };
 }

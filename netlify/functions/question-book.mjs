@@ -1,5 +1,6 @@
 // netlify/functions/question-book.mjs
-// The Question Book's API, operator only. Answers save as you go and keep earlier versions;
+// The Question Book's API, operator only. Answers save as you go and keep earlier versions, in
+// the encrypted R2 cognitive store under question-book/v1 (never the Teaching content store);
 // the one model call (Notice a pattern) runs only when asked.
 //
 //   GET  /api/question-book                              groups and chapters with counts
@@ -8,19 +9,32 @@
 //   PUT  /api/question-book  { chapter, question, value }        save (value null clears)
 //   PUT  /api/question-book  { chapter: 'qb_your_questions', own } save your own questions
 //   POST /api/question-book/notice  { chapter }          one short observation and a follow-up question
-import { createOperatorHandler } from './_shared/operator-gate.mjs';
+import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { QuizError } from './_shared/question-drop.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { AnswerError } from '../../packages/question-book/answers.mjs';
 import { OWN_CHAPTER } from '../../packages/question-book/catalogue.mjs';
-import { createQuestionSource, listChapters, notice, readChapter, readHistory, saveAnswer, saveOwn } from './_shared/question-book.mjs';
+import { createQuestionSource, defaultGetQuestionBookStore, listChapters, ownerDocs, notice, readChapter, readHistory, saveAnswer, saveOwn } from './_shared/question-book.mjs';
 
 export const config = { path: ['/api/question-book', '/api/question-book/notice'], timeout: 26 };
 
+/** The cognitive store's owner, as Problem Solver picks it. */
+export function owner(env) {
+  return env.COGNITIVE_OWNER_ID || 'operator';
+}
+
 export function createQuestionBookHandler(deps = {}) {
   let loadSource = deps.loadSource ?? null;
-  return createOperatorHandler(async (request, context) => {
-    const { env, store } = context;
+  return createSessionOriginHandler(async (request, context) => {
+    const { env } = context;
+    let cognitive = null;
+    try {
+      cognitive = deps.getStore ? await deps.getStore(env) : await defaultGetQuestionBookStore(env);
+    } catch {
+      cognitive = null;
+    }
+    if (!cognitive) return withCors(errorResponse(503, 'store_unbound', 'Question Book storage is not configured.', true), request, env);
+    const store = ownerDocs(cognitive, owner(env));
     loadSource ??= createQuestionSource({ env, fetchImpl: deps.fetchImpl ?? fetch, now: deps.now ?? Date.now });
     const now = deps.now ?? Date.now;
     const ok = (data) => withCors(okResponse(200, data, { 'cache-control': 'no-store' }), request, env);

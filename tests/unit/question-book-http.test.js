@@ -1,13 +1,14 @@
 // tests/unit/question-book-http.test.js
 // The Question Book's API over a memory store and a fake private-repo fetch serving an INVENTED
 // questions file (the book's questions live only in the private data repo): the chapter list
-// with counts, one chapter, saving and clearing answers with earlier versions kept, your own
+// with counts (stored in a memory cognitive store), one chapter, saving and clearing answers with earlier versions kept, your own
 // questions, the ten-minute cache, the operator gate, and Notice a pattern with a fake model.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuestionBookHandler } from '../../netlify/functions/question-book.mjs';
-import { KEYS, NOTICE_COST, NOTICE_MAX_TOKENS, NOTICE_SYSTEM, VERSION_GAP_MS } from '../../netlify/functions/_shared/question-book.mjs';
+import { KEYS, QUESTION_BOOK_PREFIX, NOTICE_COST, NOTICE_MAX_TOKENS, NOTICE_SYSTEM, VERSION_GAP_MS } from '../../netlify/functions/_shared/question-book.mjs';
 import { PRIVATE_QUESTIONS_PATH } from '../../packages/question-book/catalogue.mjs';
+import { createMemoryCognitiveStore } from '../../netlify/functions/_shared/cognitive-store.mjs';
 
 const invented = {
   version: 1,
@@ -24,31 +25,18 @@ const invented = {
   charts: {}
 };
 
-function memoryStore() {
-  const data = new Map();
-  const etags = new Map();
-  let n = 0;
-  return {
-    data,
-    async getWithMetadata(key) { return data.has(key) ? { data: structuredClone(data.get(key)), etag: etags.get(key) } : null; },
-    async setJSON(key, value, options) {
-      if (options?.onlyIfNew && data.has(key)) return { modified: false };
-      if (options?.onlyIfMatch && etags.get(key) !== options.onlyIfMatch) return { modified: false };
-      data.set(key, structuredClone(value)); etags.set(key, `e${++n}`); return { modified: true };
-    }
-  };
-}
-
 const env = { GITHUB_TOKEN: 'test-token', LIFE_HUB_PASSPHRASE_HASH: 'configured', SESSION_SECRET: 's'.repeat(32), ANTHROPIC_API_KEY: 'test-key' };
 
-function setup({ file = invented, model, signedIn = true } = {}) {
-  const store = memoryStore();
+function setup({ file = invented, model, signedIn = true, unbound = false } = {}) {
+  const store = createMemoryCognitiveStore();
+  const has = async (id) => (await store.read('operator', id)) !== null;
   const fetches = [];
   const modelCalls = [];
   let clock = Date.parse('2026-10-28T09:00:00Z');
   const handler = createQuestionBookHandler({
     env,
-    getContentStore: async () => store,
+    getStore: async () => (unbound ? null : store),
+    getContentStore: async () => { throw new Error('the Teaching content store is never used'); },
     verifySessionToken: () => ({ valid: signedIn }),
     fetchImpl: async (url, init) => { fetches.push({ url, init }); return new Response(JSON.stringify(file), { status: 200 }); },
     now: () => clock,
@@ -59,12 +47,23 @@ function setup({ file = invented, model, signedIn = true } = {}) {
     const response = await handler(new Request(`https://example.test${path}`, { method, ...(body ? { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } } : {}) }));
     return { status: response.status, json: await response.json() };
   };
-  return { store, fetches, modelCalls, call, tick: (ms) => { clock += ms; } };
+  return { store, has, fetches, modelCalls, call, tick: (ms) => { clock += ms; } };
 }
 
 test('the endpoint is operator only', async () => {
   const { call } = setup({ signedIn: false });
   assert.equal((await call('GET', '/api/question-book')).status, 401);
+});
+
+test('answers live in the encrypted cognitive store, under the owner; unbound storage is a 503', async () => {
+  const { call, store } = setup();
+  await call('PUT', '/api/question-book', { chapter: 'qb_love', question: 'qb_question_901', value: { main: 'teal' } });
+  const row = await store.read('operator', KEYS.chapter('qb_love'));
+  assert.deepEqual(row.value.answers.qb_question_901.value, { main: 'teal' });
+  assert.equal(QUESTION_BOOK_PREFIX, 'question-book/v1');
+  const unbound = await setup({ unbound: true }).call('GET', '/api/question-book');
+  assert.equal(unbound.status, 503);
+  assert.equal(unbound.json.error.code, 'store_unbound');
 });
 
 test('the list has every group and chapter with totals from the private file', async () => {
@@ -124,14 +123,14 @@ test('saving an answer cleans it, counts it and shows it on the chapter and the 
 });
 
 test('bad answers are a 400 and save nothing; questions from another chapter are a 404', async () => {
-  const { call, store } = setup();
+  const { call, has } = setup();
   const shares = await call('PUT', '/api/question-book', { chapter: 'qb_love', question: 'qb_question_905', value: { main: [50, 30, 10] } });
   assert.equal(shares.status, 400);
   assert.equal(shares.json.error.code, 'shares_total');
   assert.equal((await call('PUT', '/api/question-book', { chapter: 'qb_love', question: 'qb_question_902', value: { parts: { 0: 'never' } } })).status, 400);
   assert.equal((await call('PUT', '/api/question-book', { chapter: 'qb_love', question: 'qb_question_906', value: { main: 'x' } })).status, 404);
   assert.equal((await call('PUT', '/api/question-book', { chapter: 'qb_love', question: 'qb_question_901' })).status, 400);
-  assert.equal(store.data.has(KEYS.chapter('qb_love')), false);
+  assert.equal(await has(KEYS.chapter('qb_love')), false);
 });
 
 test('quick edits overwrite in place; a later edit or a clear keeps the earlier answer as a version', async () => {
@@ -218,11 +217,11 @@ test('the Notice prompt asks for one warm observation and one question, no score
 });
 
 test('a reply that isn’t the JSON asked for is a 502 and saves no note', async () => {
-  const { call, store } = setup({ model: () => 'Sorry, no.' });
+  const { call, has } = setup({ model: () => 'Sorry, no.' });
   for (const [question, value] of [['qb_question_901', { main: 'a' }], ['qb_question_903', { main: ['b'] }], ['qb_question_904', { main: 3 }]]) {
     await call('PUT', '/api/question-book', { chapter: 'qb_love', question, value });
   }
   const failed = await call('POST', '/api/question-book?action=notice', { chapter: 'qb_love' });
   assert.equal(failed.status, 502);
-  assert.equal(store.data.has(KEYS.notes('qb_love')), false);
+  assert.equal(await has(KEYS.notes('qb_love')), false);
 });
