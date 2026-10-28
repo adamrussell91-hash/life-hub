@@ -106,7 +106,7 @@ function renderNotFound(canvas: HTMLElement, hash: string): void {
 
 /** Grove owns a WebGL context; release it when another view takes the canvas. */
 let groveUnmount: (() => void) | null = null;
-/** Problem Solver, Decision Maker, Gear Shifter, Rules Book, Change Book and Collaboration Book poll the coach and listen for task changes; stop them when another view takes the canvas. */
+/** Problem Solver, Decision Maker, Gear Shifter, Rules Book, Change Book and Collaboration Book poll the coach and listen for task changes (the Question Book flushes its unsaved answers); stop them when another view takes the canvas. */
 let problemSolverUnmount: (() => void) | null = null;
 
 async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<void> {
@@ -200,6 +200,11 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       const collaborationBook = await import('@/views/collaboration-book/view');
       problemSolverUnmount = collaborationBook.unmountCollaborationBookView;
       return collaborationBook.renderCollaborationBookView(canvas);
+    }
+    case 'question-book': {
+      const questionBook = await import('@/views/question-book/view');
+      problemSolverUnmount = questionBook.unmountQuestionBookView;
+      return questionBook.renderQuestionBookView(canvas);
     }
     case 'city': {
       const { renderCityView } = await import('@/views/city/view');
