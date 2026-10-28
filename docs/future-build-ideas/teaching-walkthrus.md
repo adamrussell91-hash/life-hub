@@ -80,6 +80,10 @@ Every suggestion carries the technique's icon. Hovering shows the chain: evidenc
 
 ## Use 2: professional learning board (Professional hub)
 
+Clickable mockup: [teaching-walkthrus-board-mockup.html](teaching-walkthrus-board-mockup.html). It uses invented demo data and placeholder icons. The grey lines in the step panel stand in for the book's wording.
+
+**Catan mapping (no points, ever).** Hex tiles are techniques, with the series as resource colour. Buildings show ADAPT progress: an outline house for trying, a house for practising, a city once Test passes on student evidence. Roads are the arrows Adam draws: a road on the shared edge between neighbouring hexes, a curved arrow over the sea for distant ones. Dots under each name show how often the technique appears in lessons. The robber is the pattern monitor, sitting on the tile that would fix a student problem. Harbours are where the board trades with Teaching (Markbook, Lessons, Unit plans). Framework chapters are cards in hand, played onto unit plans as lenses. Later volumes are fogged islands across the sea, revealed by sailing to them. Nothing scores: the board grows only when students improve.
+
 - A hexagon board. Each technique is a hex in its series colour, labelled with its custom icon and a `series | page` code.
 - Hexes cluster by relationship; the focus technique is large, related ones touch it.
 - Adam can draw arrows between and around hexes (sequence, "leads to", "supports").
@@ -146,4 +150,5 @@ Every suggestion carries the technique's icon. Hovering shows the chain: evidenc
 
 ## History
 
+- 28 Oct 2026: Added the board mockup and the Catan mapping (no points).
 - 28 Oct 2026: Created from a read of the book against Adam's four uses, and Adam's follow-up decisions (three layers, ADAPT as goal life cycle, pattern monitor, specific icons, hexagon board, expansions, parked coaching templates).

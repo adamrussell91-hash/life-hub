@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WalkThrus board mockup</title>
+<style>
+  :root {
+    --bg: #f3efe6; --sea: #dce8ec; --sea-line: #c6d9df; --ink: #1d2327; --muted: #5f6b72;
+    --panel: #fffdf8; --line: #ddd6c8; --accent: #1d2327;
+    --br: #d9786a; --cp: #6f8fb8; --em: #e2b04a; --qf: #3fa59a; --pr: #8f78c4; --mb: #8aa357;
+    --fog: #b9c3c8; --set2: #4a9fd8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161a1d; --sea: #1c2a30; --sea-line: #24363d; --ink: #eef1f2; --muted: #9aa6ad;
+      --panel: #1f2428; --line: #333b40; --accent: #eef1f2; --fog: #3a454b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161a1d; --sea: #1c2a30; --sea-line: #24363d; --ink: #eef1f2; --muted: #9aa6ad;
+    --panel: #1f2428; --line: #333b40; --accent: #eef1f2; --fog: #3a454b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .01em; }
+  header .sub { color: var(--muted); font-size: 12.5px; }
+  .tools { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; transition: background .2s, border-color .2s, transform .15s; }
+  button:hover { border-color: var(--ink); }
+  button:active { transform: scale(.97); }
+  button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  main { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  svg#board { width: 100%; height: 100%; display: block; background: var(--sea); touch-action: none; cursor: grab; }
+  svg#board.dragging { cursor: grabbing; }
+  svg#board.drawing { cursor: crosshair; }
+
+  .hex { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform .25s cubic-bezier(.2,.8,.2,1), filter .25s; }
+  .hex:hover { transform: scale(1.06); filter: drop-shadow(0 4px 6px rgba(0,0,0,.18)); }
+  .hex.pick { filter: drop-shadow(0 0 0 #000) drop-shadow(0 0 6px var(--ink)); }
+  .hex.dim { opacity: .35; }
+  .hex .tile { stroke: rgba(0,0,0,.18); stroke-width: 1.2; }
+  .hex .code { font-size: 7.5px; font-weight: 700; letter-spacing: .06em; fill: #fff; }
+  .hex .name { font-size: 8.2px; font-weight: 700; fill: #1d2327; text-anchor: middle; }
+  .hex .glyph { fill: rgba(255,255,255,.85); }
+  .hex .glyph-text { font-size: 9px; font-weight: 800; fill: #1d2327; text-anchor: middle; }
+  .hex .codebar { fill: #1d2327; }
+  .pip { fill: #1d2327; }
+  .pop { animation: pop .5s cubic-bezier(.2,.9,.3,1.3) both; }
+  @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+
+  .road { fill: none; stroke: #1d2327; stroke-width: 6; stroke-linecap: round; pointer-events: stroke; }
+  .road.casing { stroke: #fffdf8; stroke-width: 8.5; }
+  .road.thin { stroke-width: 2.5; }
+  .road.casing.thin { stroke-width: 6; }
+  .chev { fill: #fffdf8; transform-box: fill-box; transform-origin: center; }
+  .roadg { cursor: help; }
+  .road.new { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .7s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .building { pointer-events: none; }
+  .building .place { animation: drop .6s cubic-bezier(.2,.9,.3,1.4) both; transform-box: fill-box; transform-origin: bottom center; }
+  @keyframes drop { from { transform: translateY(-30px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  .robber { cursor: pointer; transition: transform .6s cubic-bezier(.5,0,.2,1), opacity .4s; }
+  .robber.gone { opacity: 0; transform: translateY(-40px); }
+  .harbour { cursor: pointer; }
+  .harbour text { font-size: 9px; font-weight: 700; fill: var(--ink); }
+  .fog .tile { fill: var(--fog); stroke: rgba(0,0,0,.08); transition: fill .6s; }
+  .fog .q { font-size: 18px; font-weight: 700; fill: rgba(0,0,0,.25); text-anchor: middle; }
+  .sea-route { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 3 6; opacity: .45; }
+  .island-label { font-size: 12px; font-weight: 700; letter-spacing: .08em; fill: var(--muted); text-anchor: middle; text-transform: uppercase; }
+
+  /* side panel */
+  #panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(380px, 100%); background: var(--panel); border-left: 1px solid var(--line); transform: translateX(105%); transition: transform .45s cubic-bezier(.2,.8,.2,1); overflow-y: auto; padding: 18px 18px 28px; box-shadow: -8px 0 24px rgba(0,0,0,.08); }
+  #panel.open { transform: none; }
+  #panel .close { position: absolute; top: 12px; right: 12px; border-radius: 50%; width: 32px; height: 32px; padding: 0; }
+  .p-head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; padding-right: 36px; }
+  .p-icon { width: 54px; height: 62px; flex: none; }
+  .p-code { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+  .p-name { font-size: 19px; font-weight: 750; line-height: 1.15; }
+  .p-sec { margin-top: 18px; }
+  .p-sec h3 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .adapt { display: flex; gap: 4px; }
+  .adapt span { flex: 1; text-align: center; padding: 7px 0 6px; border-radius: 8px; background: var(--bg); font-weight: 700; font-size: 13px; color: var(--muted); border: 1px solid var(--line); transition: all .3s; }
+  .adapt span small { display: block; font-size: 9.5px; font-weight: 600; letter-spacing: .02em; }
+  .adapt span.done { background: color-mix(in srgb, var(--c) 30%, var(--panel)); color: var(--ink); border-color: transparent; }
+  .adapt span.now { background: var(--c); color: #fff; border-color: transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); }
+  .steps { display: grid; gap: 8px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
+  .step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--c); color: #fff; font-weight: 800; display: grid; place-items: center; font-size: 12px; }
+  .step .book { height: 9px; border-radius: 4px; background: var(--line); margin: 3px 0 5px; }
+  .step .book.short { width: 70%; }
+  .step .mine { font-size: 12.5px; padding: 6px 8px; border-left: 3px solid var(--c); background: var(--bg); border-radius: 0 6px 6px 0; }
+  .note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .reps { display: flex; gap: 4px; flex-wrap: wrap; }
+  .reps span { font-size: 11.5px; padding: 3px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+  .ev { display: grid; gap: 6px; }
+  .ev .row { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 8px; font-size: 12.5px; }
+  .ev .bar { height: 12px; border-radius: 6px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
+  .ev .bar i { display: block; height: 100%; background: var(--c); width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .p-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .chain { font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .chain b { padding: 3px 8px; background: var(--bg); border-radius: 6px; border: 1px solid var(--line); font-weight: 600; }
+
+  /* suggestion + cards */
+  #suggest { position: absolute; left: 16px; top: 16px; width: min(330px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.1); transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s; }
+  #suggest.gone { transform: translateY(-20px); opacity: 0; pointer-events: none; }
+  #suggest .t { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; display: flex; gap: 6px; align-items: center; }
+  #suggest p { margin: 6px 0 10px; font-size: 13px; }
+  #hand { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 8px; max-width: calc(100% - 32px); overflow-x: auto; padding: 4px 4px 2px; }
+  .card { flex: none; width: 104px; height: 66px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); padding: 8px; cursor: pointer; transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; box-shadow: 0 3px 8px rgba(0,0,0,.08); }
+  .card:hover { transform: translateY(-6px) rotate(-1.5deg); box-shadow: 0 10px 18px rgba(0,0,0,.14); }
+  .card .k { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .card .v { font-weight: 750; font-size: 13px; margin-top: 2px; }
+  .card .u { font-size: 10.5px; color: var(--muted); }
+  #legend { position: absolute; right: 16px; top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 12px; display: grid; gap: 5px; transition: opacity .3s, transform .3s; }
+  #legend.hide, #hand.hide { opacity: 0; transform: translateY(10px); pointer-events: none; }
+  #hand { transition: opacity .3s; }
+  #legend svg { vertical-align: middle; margin-right: 6px; }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 6px 9px; border-radius: 8px; max-width: 240px; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; z-index: 5; }
+  .tip.show { opacity: 1; transform: none; }
+  .zoom { position: absolute; left: 16px; bottom: 92px; display: grid; gap: 6px; }
+  .zoom button { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 18px; }
+  @media (max-width: 700px) {
+    #legend { display: none; }
+    #panel { top: auto; height: 72%; width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(105%); }
+    #panel.open { transform: none; }
+    .zoom { bottom: 96px; }
+    main:has(#panel.open) #suggest { opacity: 0; pointer-events: none; }
+    header .sub { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Professional learning · WalkThrus</h1>
+  <span class="sub">Mockup. Placeholder icons until the custom set arrives. Book wording loads privately.</span>
+  <div class="tools">
+    <button id="drawBtn" title="Click one hex, then another">Draw arrow</button>
+    <button id="seriesBtn">Show by series</button>
+    <button id="keyBtn" class="on">Key</button>
+    <button id="resetBtn">Reset view</button>
+  </div>
+</header>
+<main>
+  <svg id="board" aria-label="WalkThrus board"></svg>
+  <div id="suggest">
+    <div class="t"><svg width="12" height="16" viewBox="0 0 12 16"><circle cx="6" cy="4" r="3.4" fill="currentColor"/><path d="M1.5 15c0-5 2-7.5 4.5-7.5S10.5 10 10.5 15z" fill="currentColor"/></svg> New pattern spotted</div>
+    <p><b>Recall gap</b> on 3 quizzes in 3 weeks, Year 9 and Year 10. The robber is sitting on <b>Weekly and monthly review</b>.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="on" id="placeGoal">Make it a goal</button>
+      <button id="showRobber">Show me</button>
+      <button id="dismiss">Dismiss</button>
+    </div>
+  </div>
+  <div id="legend"></div>
+  <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+  <div id="hand"></div>
+  <aside id="panel" aria-live="polite"></aside>
+  <div class="tip" id="tip"></div>
+</main>
+
+<script>
+const SERIES = {
+  BR: { code: 'B&R', name: 'Behaviour and relationships', c: 'var(--br)', hex: '#d9786a' },
+  CP: { code: 'CP',  name: 'Curriculum planning', c: 'var(--cp)', hex: '#6f8fb8' },
+  EM: { code: 'E&M', name: 'Explaining and modelling', c: 'var(--em)', hex: '#e2b04a' },
+  QF: { code: 'Q&F', name: 'Questioning and feedback', c: 'var(--qf)', hex: '#3fa59a' },
+  PR: { code: 'P&R', name: 'Practice and retrieval', c: 'var(--pr)', hex: '#8f78c4' },
+  MB: { code: 'MB',  name: 'Mode B teaching', c: 'var(--mb)', hex: '#8aa357' },
+};
+const T = {
+  BR: [['Positive relationships',36],['Establish your expectations',38],['Signal, pause, insist',40],['Positive framing',42],['Rehearse routines',44],['Choices and consequences',46]],
+  CP: [['Designing a knowledge rich curriculum',50],['Sequence concepts in small steps',52],['Coherent mapping',54],['Blend knowledge and experience',56],['Pitch it up',58],['Plan for reading',60],['Tiered questions and problems',62],['Deliver core; signpost hinterland',64]],
+  EM: [['Worked examples and backward fading',68],['Dual coding',70],['Deliberate vocabulary development',72],['Big picture, small picture',74],['Abstract models with concrete examples',76],['Live modelling',78],['Scaffolding',80],['Metacognitive talk',82],['Set the standards',84],['Head on misconceptions',86]],
+  QF: [['Check for understanding',96],['Cold calling',90],['Think, pair, share',92],['Show-me boards',94],['Say it again better',98],['Probing questions',100],['Process questions',102],['Feedback that moves forward',104],['Feedback as actions',106],['Whole class feedback',108]],
+  PR: [['Weekly and monthly review',122],['Quizzing',112],['Elaborative interrogation',114],['Using a knowledge organiser',116],['Rehearsal and performance',118],['Peer supported retrieval',120],['Concrete examples',124],['Guided practice',126],['Independent practice',128],['Building fluency',130]],
+  MB: [['Collaborative learning',134],['Homework as guided study',136],['Enquiry projects',138],['Open response tasks',140],['Oracy: debating',142],['Oracy: talk for writing',144],['Oracy: instructional inputs',146],['Independent learning: pre reading',148]],
+};
+// invented demo state: building 0 none, 1 trying, 2 practising, 3 embedded; pips = lesson uses (0-5)
+const STATE = {
+  'Cold calling': { b: 3, pips: 5 }, 'Check for understanding': { b: 2, pips: 4, goal: true, stage: 3, notes: true },
+  'Show-me boards': { b: 2, pips: 3 }, 'Think, pair, share': { b: 3, pips: 4 },
+  'Quizzing': { b: 3, pips: 5 }, 'Worked examples and backward fading': { b: 1, pips: 1 },
+  'Say it again better': { b: 1, pips: 2 }, 'Live modelling': { b: 3, pips: 3 },
+  'Sequence concepts in small steps': { b: 2, pips: 2 }, 'Rehearse routines': { b: 3, pips: 2 },
+  'Weekly and monthly review': { b: 0, pips: 1 }, 'Whole class feedback': { b: 2, pips: 2 },
+  'Dual coding': { b: 1, pips: 2 }, 'Oracy: debating': { b: 1, pips: 1 }, 'Probing questions': { b: 0, pips: 2 },
+};
+const ROADS = [['Think, pair, share','Cold calling'],['Cold calling','Check for understanding'],['Show-me boards','Check for understanding'],['Check for understanding','Say it again better'],['Quizzing','Weekly and monthly review'],['Live modelling','Worked examples and backward fading'],['Check for understanding','Whole class feedback']];
+// six series clusters in a ring around an inner sea
+const RING = { QF:[5,0], PR:[5,-5], CP:[0,-5], EM:[-5,0], BR:[-5,5], MB:[0,5] };
+const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const S = 46, R3 = Math.sqrt(3);
+const toPx = (q, r) => [S * R3 * (q + r / 2), S * 1.5 * r];
+const corners = (cx, cy, s = S) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 180 * (60 * i - 30); return [cx + s * Math.cos(a), cy + s * Math.sin(a)]; });
+const pts = c => c.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+function spiral(cq, cr, n, taken) {
+  const out = []; const key = (q, r) => q + ',' + r;
+  const tryAdd = (q, r) => { if (out.length < n && !taken.has(key(q, r))) { taken.add(key(q, r)); out.push([q, r]); } };
+  tryAdd(cq, cr);
+  for (let k = 1; out.length < n && k < 5; k++) {
+    let q = cq + DIRS[4][0] * k, r = cr + DIRS[4][1] * k;
+    for (let d = 0; d < 6; d++) for (let s = 0; s < k; s++) { tryAdd(q, r); q += DIRS[d][0]; r += DIRS[d][1]; }
+  }
+  return out;
+}
+
+const board = document.getElementById('board');
+const gSea = el('g', {}, board), gIsl = el('g', {}, board), gTiles = el('g', {}, board), gRoads = el('g', {}, board), gTop = el('g', {}, board);
+const tiles = {}; const taken = new Set();
+let idx = 0;
+for (const sk of Object.keys(RING)) {
+  const [cq, cr] = RING[sk];
+  const cells = spiral(cq, cr, T[sk].length, taken);
+  T[sk].forEach(([name, page], i) => {
+    const [q, r] = cells[i]; const [x, y] = toPx(q, r);
+    tiles[name] = { name, page, sk, q, r, x, y, st: STATE[name] || { b: 0, pips: 0 }, i: idx++ };
+  });
+}
+
+// island shore: slightly larger hex behind each tile
+for (const t of Object.values(tiles)) el('polygon', { points: pts(corners(t.x, t.y, S + 7)), fill: 'var(--bg)', opacity: .9 }, gIsl);
+
+function wrap(text, max = 13) {
+  const words = text.split(' '); const lines = []; let cur = '';
+  for (const w of words) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  if (cur) lines.push(cur); return lines.slice(0, 4);
+}
+function initials(name) { return name.replace(/[^A-Za-z ]/g, '').split(' ').filter(w => w.length > 2 || /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join(''); }
+
+function building(b, x, y, place) {
+  if (!b) return null;
+  const outer = el('g', { class: 'building', transform: `translate(${x + 17},${y - 34})` });
+  const g = el('g', { class: place ? 'place' : '' }, outer);
+  if (b === 1) el('path', { d: 'M0 14 V6 L7 0 L14 6 V14 Z', fill: 'none', stroke: '#1d2327', 'stroke-width': 1.8, 'stroke-dasharray': '2.5 2' }, g);
+  if (b === 2) el('path', { d: 'M0 14 V6 L7 0 L14 6 V14 Z', fill: '#fff', stroke: '#1d2327', 'stroke-width': 1.8 }, g);
+  if (b === 3) { el('path', { d: 'M-4 16 V8 L3 2 L10 8 V16 Z', fill: '#fff', stroke: '#1d2327', 'stroke-width': 1.8 }, g); el('path', { d: 'M10 16 V-2 L15 -7 L20 -2 V16 Z', fill: '#1d2327' }, g); }
+  return outer;
+}
+
+function drawTile(t, delay) {
+  const s = SERIES[t.sk];
+  const g = el('g', { class: 'hex pop', 'data-name': t.name, style: `animation-delay:${delay}ms` }, gTiles);
+  el('polygon', { class: 'tile', points: pts(corners(t.x, t.y)), fill: s.hex }, g);
+  // code bar across the top
+  el('rect', { class: 'codebar', x: t.x - 22, y: t.y - 33, width: 44, height: 11, rx: 3 }, g);
+  const code = el('text', { class: 'code', x: t.x, y: t.y - 25, 'text-anchor': 'middle' }, g); code.textContent = `${s.code} | ${t.page}`;
+  // placeholder glyph (custom icon goes here)
+  el('circle', { class: 'glyph', cx: t.x, cy: t.y - 9, r: 8 }, g);
+  const gi = el('text', { class: 'glyph-text', x: t.x, y: t.y - 6 }, g); gi.textContent = initials(t.name);
+  const lines = wrap(t.name);
+  lines.forEach((ln, i) => { const tx = el('text', { class: 'name', x: t.x, y: t.y + 9 + i * 9 - (lines.length > 3 ? 4 : 0) }, g); tx.textContent = ln; });
+  // pips: how often in lessons
+  for (let p = 0; p < t.st.pips; p++) el('circle', { class: 'pip', cx: t.x - (t.st.pips - 1) * 3.5 + p * 7, cy: t.y + 34, r: 2.1 }, g);
+  const b = building(t.st.b, t.x, t.y); if (b) g.appendChild(b);
+  if (t.st.goal) { const ring = el('polygon', { points: pts(corners(t.x, t.y, S + 3)), fill: 'none', stroke: '#1d2327', 'stroke-width': 2.5, 'stroke-dasharray': '6 4' }, g); el('animate', { attributeName: 'stroke-dashoffset', from: 0, to: 20, dur: '1.2s', repeatCount: 'indefinite' }, ring); }
+  t.g = g;
+  g.addEventListener('pointerenter', e => tip(e, `<b>${t.name}</b><br>${s.name} · used in ${t.st.pips} lesson${t.st.pips === 1 ? '' : 's'} this term`));
+  g.addEventListener('pointerleave', () => tip());
+  g.addEventListener('click', () => { if (moved) return; drawing ? pickForArrow(t) : openPanel(t); });
+}
+Object.values(tiles).sort((a, b) => a.i - b.i).forEach((t, i) => drawTile(t, 120 + i * 18));
+
+// roads (arrows between techniques)
+el('defs', {}, board).innerHTML = `<marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`;
+// neighbours get a Catan road on their shared edge; distant hexes get a curved arrow over the sea
+function addRoad(a, b, animate) {
+  const A = tiles[a], B = tiles[b]; const dx = B.x - A.x, dy = B.y - A.y; const d = Math.hypot(dx, dy);
+  const ux = dx / d, uy = dy / d;
+  const g = el('g', { class: 'roadg' }, gRoads);
+  const line = (dAttr, cls, extra = {}) => { const p = el('path', { d: dAttr, class: cls, ...extra }, g); if (animate) { const len = p.getTotalLength(); p.style.setProperty('--len', len); p.classList.add('new'); } return p; };
+  if (isNeighbour(A, B)) {
+    const [c1, c2] = corners(A.x, A.y).map(c => [c, Math.hypot(c[0] - B.x, c[1] - B.y)]).sort((p, q) => p[1] - q[1]).slice(0, 2).map(p => p[0]);
+    const sx = c1[0] + (c2[0] - c1[0]) * .12, sy = c1[1] + (c2[1] - c1[1]) * .12, ex = c2[0] - (c2[0] - c1[0]) * .12, ey = c2[1] - (c2[1] - c1[1]) * .12;
+    line(`M${sx} ${sy} L${ex} ${ey}`, 'road casing');
+    line(`M${sx} ${sy} L${ex} ${ey}`, 'road edge');
+    const mx = (c1[0] + c2[0]) / 2, my = (c1[1] + c2[1]) / 2;
+    el('path', { d: `M${mx + ux * 6} ${my + uy * 6} L${mx - ux * 3 - uy * 5} ${my - uy * 3 + ux * 5} L${mx - ux * 3 + uy * 5} ${my - uy * 3 - ux * 5} Z`, class: 'chev' + (animate ? ' pop' : ''), style: animate ? 'animation-delay:.5s' : '' }, g);
+  } else {
+    const off = 42; const x1 = A.x + ux * off, y1 = A.y + uy * off, x2 = B.x - ux * off, y2 = B.y - uy * off;
+    const bend = Math.min(60, d * .22); const mx = (x1 + x2) / 2 - uy * bend, my = (y1 + y2) / 2 + ux * bend;
+    const dd = `M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}`;
+    line(dd, 'road casing thin'); line(dd, 'road thin', { 'marker-end': 'url(#ah)', style: 'color:var(--ink)' });
+  }
+  g.addEventListener('pointerenter', e => tip(e, `${a} → ${b}`)); g.addEventListener('pointerleave', () => tip());
+}
+setTimeout(() => ROADS.forEach(([a, b], i) => setTimeout(() => addRoad(a, b, true), i * 140)), 1300);
+
+// robber on the tile that would fix the student problem
+const robT = tiles['Weekly and monthly review'];
+const robber = el('g', { class: 'robber', transform: '' }, gTop);
+el('ellipse', { cx: robT.x - 22, cy: robT.y + 26, rx: 11, ry: 3.5, fill: 'rgba(0,0,0,.25)' }, robber);
+el('path', { d: `M${robT.x - 31} ${robT.y + 26} c0-14 4-20 9-20 s9 6 9 20 z`, fill: '#2a2f33' }, robber);
+el('circle', { cx: robT.x - 22, cy: robT.y + 1, r: 6.5, fill: '#2a2f33' }, robber);
+robber.addEventListener('pointerenter', e => tip(e, '<b>Student problem: recall</b><br>3 quizzes in 3 weeks · Year 9, Year 10<br>Practice and retrieval would fix it'));
+robber.addEventListener('pointerleave', () => tip());
+robber.addEventListener('click', () => openPanel(robT));
+
+// harbours: where the board trades with Teaching
+const HARB = [
+  { near: 'Whole class feedback', dx: 1, label: 'Markbook', info: 'Evidence comes in here: quiz tags, Patterns, Next steps' },
+  { near: 'Oracy: instructional inputs', dx: -1, label: 'Lessons', info: '14 lessons used a WalkThru note this term' },
+  { near: 'Deliver core; signpost hinterland', dx: 0, label: 'Unit plans', info: '3 unit plans have WalkThru fields filled' },
+];
+HARB.forEach(h => {
+  const t = tiles[h.near]; if (!t) return;
+  const hx = t.x + h.dx * 70, hy = t.y + (h.dx === 0 ? -72 : 40);
+  const g = el('g', { class: 'harbour' }, gIsl);
+  el('line', { x1: t.x, y1: t.y, x2: hx, y2: hy, stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-dasharray': '2 3', opacity: .5 }, g);
+  el('rect', { x: hx - 30, y: hy - 11, width: 60, height: 22, rx: 11, fill: 'var(--panel)', stroke: 'var(--ink)', 'stroke-width': 1.2 }, g);
+  const tx = el('text', { x: hx, y: hy + 3.5, 'text-anchor': 'middle' }, g); tx.textContent = '⚓ ' + h.label;
+  g.addEventListener('pointerenter', e => tip(e, `<b>${h.label}</b><br>${h.info}`)); g.addEventListener('pointerleave', () => tip());
+});
+
+// the next set: a fogged island across the sea
+const SET2 = ['Make everyone think', 'No opt out', 'Normalise error and uncertainty', 'Randomised questioning', 'Hands up for asking questions'];
+const s2cells = spiral(14, -3, 5, taken);
+const gFog = el('g', {}, gTiles);
+const s2px = s2cells.map(([q, r]) => toPx(q, r));
+const route = el('path', { class: 'sea-route', d: `M${tiles['Check for understanding'].x + 40} ${tiles['Check for understanding'].y - 10} C ${s2px[0][0] - 200} ${s2px[0][1] + 120}, ${s2px[0][0] - 120} ${s2px[0][1] - 40}, ${s2px[0][0] - 52} ${s2px[0][1]}` }, gIsl);
+const isl = el('text', { class: 'island-label', x: s2px[0][0], y: s2px[0][1] - 110 }, gIsl); isl.textContent = 'Set 2 · unexplored';
+const fogTiles = s2px.map(([x, y], i) => {
+  const g = el('g', { class: 'hex fog pop', style: `animation-delay:${1100 + i * 60}ms` }, gFog);
+  el('polygon', { class: 'tile', points: pts(corners(x, y)) }, g);
+  const q = el('text', { class: 'q', x, y: y + 6 }, g); q.textContent = '?';
+  g.addEventListener('pointerenter', e => tip(e, 'A new set. Build a road here to reveal it.'));
+  g.addEventListener('pointerleave', () => tip());
+  g.addEventListener('click', () => { if (!moved) revealSet2(); });
+  return { g, x, y };
+});
+let revealed = false;
+function revealSet2() {
+  if (revealed) return; revealed = true; isl.textContent = 'Set 2 · revealed';
+  route.style.transition = 'opacity .6s'; route.style.strokeDasharray = 'none'; route.style.opacity = .7;
+  fogTiles.forEach((f, i) => setTimeout(() => {
+    const g = f.g; g.innerHTML = ''; g.classList.remove('fog'); g.classList.remove('pop'); void g.offsetWidth; g.classList.add('pop');
+    el('polygon', { class: 'tile', points: pts(corners(f.x, f.y)), fill: '#4a9fd8' }, g);
+    el('rect', { class: 'codebar', x: f.x - 24, y: f.y - 37, width: 48, height: 12, rx: 3 }, g);
+    const c = el('text', { class: 'code', x: f.x, y: f.y - 28.5, 'text-anchor': 'middle' }, g); c.textContent = 'SET 2';
+    el('circle', { class: 'glyph', cx: f.x, cy: f.y - 12, r: 9 }, g);
+    const gi = el('text', { class: 'glyph-text', x: f.x, y: f.y - 9 }, g); gi.textContent = initials(SET2[i]);
+    wrap(SET2[i]).forEach((ln, j) => { const tx = el('text', { class: 'name', x: f.x, y: f.y + 6 + j * 9.5 }, g); tx.textContent = ln; });
+  }, i * 160));
+}
+
+// framework cards in hand
+const CARDS = [['Rosenshine', 'Review schedule', 'In 2 unit plans'], ['Willingham', 'What will they think about?', 'In 1 unit plan'], ['MARGE', 'Motivate to evaluate', 'Not played yet'], ['Wiliam', 'Five strategies', 'In 3 unit plans'], ['Berger', 'Drafts and critique', 'In 1 unit plan']];
+const hand = document.getElementById('hand');
+CARDS.forEach(([k, v, u]) => { const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<div class="k">Framework · ${k}</div><div class="v">${v}</div><div class="u">${u}</div>`; c.title = 'Play onto a unit plan as a lens'; hand.appendChild(c); });
+
+// legend
+const house = (b) => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', 26); s.setAttribute('height', 24); s.setAttribute('viewBox', '-6 -9 28 27'); const g = building(b, -17, 34); s.appendChild(g); return s.outerHTML; };
+document.getElementById('legend').innerHTML = `
+  <div>${house(1)}Trying it (Attempt)</div>
+  <div>${house(2)}Practising (Develop, Adapt, Practise)</div>
+  <div>${house(3)}Embedded (passed Test on student evidence)</div>
+  <div><svg width="26" height="10"><circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/></svg>How often it is in your lessons</div>
+  <div><svg width="26" height="18" viewBox="0 0 20 22"><circle cx="10" cy="6" r="5" fill="#2a2f33"/><path d="M3 21c0-10 3-13 7-13s7 3 7 13z" fill="#2a2f33"/></svg>A student problem this would fix</div>
+  <div><svg width="26" height="14"><polygon points="13,1 24,7 13,13 2,7" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/></svg>Active goal</div>`;
+
+const keyBtn = document.getElementById('keyBtn'); keyBtn.onclick = () => { keyBtn.classList.toggle('on'); document.getElementById('legend').classList.toggle('hide'); };
+
+// tooltip
+const tipEl = document.getElementById('tip');
+function tip(e, html) {
+  if (!e) { tipEl.classList.remove('show'); return; }
+  tipEl.innerHTML = html; const r = document.querySelector('main').getBoundingClientRect();
+  tipEl.style.left = Math.min(e.clientX - r.left + 12, r.width - 250) + 'px'; tipEl.style.top = (e.clientY - r.top + 14) + 'px'; tipEl.classList.add('show');
+}
+
+// view box, pan, zoom (animated)
+const all = Object.values(tiles);
+const minX = Math.min(...all.map(t => t.x), ...s2px.map(p => p[0])) - 110, maxX = Math.max(...all.map(t => t.x), ...s2px.map(p => p[0])) + 110;
+const minY = Math.min(...all.map(t => t.y), ...s2px.map(p => p[1])) - 140, maxY = Math.max(...all.map(t => t.y)) + 140;
+const HOME = [minX, minY, maxX - minX, maxY - minY];
+let vb = HOME.slice(), anim;
+const setVB = v => { vb = v; board.setAttribute('viewBox', v.map(n => n.toFixed(1)).join(' ')); };
+setVB(HOME);
+// phones start on the active goal's cluster rather than the whole island
+if (innerWidth <= 700) { const f = tiles['Check for understanding']; setVB([f.x - 210, f.y - 330, 420, 700]); }
+// sea texture
+const sea = el('pattern', { id: 'waves', width: 60, height: 30, patternUnits: 'userSpaceOnUse' }, board.querySelector('defs'));
+el('path', { d: 'M0 15 q15 -8 30 0 t30 0', fill: 'none', stroke: 'var(--sea-line)', 'stroke-width': 1.5 }, sea);
+el('rect', { x: minX - 2000, y: minY - 2000, width: 6000, height: 6000, fill: 'url(#waves)' }, gSea);
+
+function animateVB(to, ms = 650) {
+  cancelAnimationFrame(anim); const from = vb.slice(), t0 = performance.now();
+  const ease = x => 1 - Math.pow(1 - x, 3);
+  const step = now => { const k = Math.min(1, (now - t0) / ms), e = ease(k); setVB(from.map((f, i) => f + (to[i] - f) * e)); if (k < 1) anim = requestAnimationFrame(step); };
+  anim = requestAnimationFrame(step);
+}
+function zoomBy(f, cx, cy) {
+  cx ??= vb[0] + vb[2] / 2; cy ??= vb[1] + vb[3] / 2;
+  const w = Math.max(250, Math.min(HOME[2] * 1.6, vb[2] * f)), h = w * vb[3] / vb[2];
+  animateVB([cx - (cx - vb[0]) * w / vb[2], cy - (cy - vb[1]) * h / vb[3], w, h], 300);
+}
+const toSvg = (cx, cy) => { const r = board.getBoundingClientRect(); const s = Math.max(vb[2] / r.width, vb[3] / r.height); const ox = (r.width * s - vb[2]) / 2, oy = (r.height * s - vb[3]) / 2; return [vb[0] - ox + (cx - r.left) * s, vb[1] - oy + (cy - r.top) * s]; };
+board.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = toSvg(e.clientX, e.clientY); zoomBy(e.deltaY > 0 ? 1.15 : 0.87, x, y); }, { passive: false });
+let drag = null, moved = false;
+board.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, vb: vb.slice() }; moved = false; });
+window.addEventListener('pointermove', e => {
+  if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!moved && Math.hypot(dx, dy) < 5) return; moved = true; board.classList.add('dragging'); tip();
+  const r = board.getBoundingClientRect(); const s = Math.max(drag.vb[2] / r.width, drag.vb[3] / r.height);
+  setVB([drag.vb[0] - dx * s, drag.vb[1] - dy * s, drag.vb[2], drag.vb[3]]);
+});
+window.addEventListener('pointerup', () => { drag = null; board.classList.remove('dragging'); setTimeout(() => moved = false, 0); });
+document.getElementById('zin').onclick = () => zoomBy(.75);
+document.getElementById('zout').onclick = () => zoomBy(1.33);
+document.getElementById('resetBtn').onclick = () => { closePanel(); animateVB(HOME); };
+
+// draw arrow mode
+let drawing = false, first = null;
+const drawBtn = document.getElementById('drawBtn');
+drawBtn.onclick = () => { drawing = !drawing; drawBtn.classList.toggle('on', drawing); board.classList.toggle('drawing', drawing); if (first) first.g.classList.remove('pick'); first = null; drawBtn.textContent = drawing ? 'Pick the first hex' : 'Draw arrow'; };
+function pickForArrow(t) {
+  if (!first) { first = t; t.g.classList.add('pick'); drawBtn.textContent = 'Now pick where it leads'; return; }
+  if (first !== t) addRoad(first.name, t.name, true);
+  first.g.classList.remove('pick'); first = null; drawBtn.textContent = 'Pick the first hex';
+}
+
+// series filter
+let seriesOn = false; const seriesBtn = document.getElementById('seriesBtn');
+seriesBtn.onclick = () => {
+  seriesOn = !seriesOn; seriesBtn.classList.toggle('on', seriesOn);
+  const order = Object.keys(SERIES); let i = 0;
+  if (!seriesOn) { all.forEach(t => t.g.classList.remove('dim')); seriesBtn.textContent = 'Show by series'; clearInterval(seriesBtn.t); return; }
+  const show = () => { const sk = order[i++ % order.length]; seriesBtn.textContent = SERIES[sk].name; all.forEach(t => t.g.classList.toggle('dim', t.sk !== sk)); };
+  show(); seriesBtn.t = setInterval(show, 1600);
+};
+
+// detail panel
+const panel = document.getElementById('panel');
+const STAGES = [['A', 'Attempt'], ['D', 'Develop'], ['A', 'Adapt'], ['P', 'Practise'], ['T', 'Test']];
+function openPanel(t) {
+  const s = SERIES[t.sk]; const st = t.st; const robHere = t === robT;
+  const stage = st.goal ? st.stage : st.b === 3 ? 5 : st.b === 2 ? 2 : st.b === 1 ? 0 : -1;
+  panel.style.setProperty('--c', s.hex);
+  panel.innerHTML = `
+    <button class="close" aria-label="Close">✕</button>
+    <div class="p-head">
+      <svg class="p-icon" viewBox="-50 -50 100 100"><polygon points="${pts(corners(0, 0, 46))}" fill="${s.hex}"/><circle cx="0" cy="-4" r="20" fill="rgba(255,255,255,.85)"/><text x="0" y="3" text-anchor="middle" font-size="18" font-weight="800" fill="#1d2327">${initials(t.name)}</text></svg>
+      <div><div class="p-code">${s.code} | ${t.page} · ${s.name.toUpperCase()}</div><div class="p-name">${t.name}</div></div>
+    </div>
+    ${robHere ? `<div class="p-sec"><h3>Why this is flagged</h3><div class="chain"><b>3 quizzes</b>→<b>Recall</b>→<b>Practice and retrieval</b>→<b>This technique</b></div><div class="note">Year 9 and Year 10, last 3 weeks. Evidence comes from quiz tags and markbook Patterns.</div></div>` : ''}
+    <div class="p-sec"><h3>ADAPT stage</h3><div class="adapt">${STAGES.map(([l, w], i) => `<span class="${i < stage ? 'done' : i === stage ? 'now' : ''}">${l}<small>${w}</small></span>`).join('')}</div>
+      ${stage < 0 ? '<div class="note">No goal yet. Start one to begin Attempt.</div>' : ''}</div>
+    <div class="p-sec"><h3>The five steps</h3><div class="steps">${[1, 2, 3, 4, 5].map(n => `<div class="step"><div class="n">${n}</div><div><div class="book"></div><div class="book short"></div>${st.notes && n <= 3 ? `<div class="mine">${['Year 10: name the question type out loud first.', 'Wait a full 10 seconds on why-questions.', 'Start with a quiet student, not a volunteer.'][n - 1]}</div>` : ''}</div></div>`).join('')}</div>
+      <div class="note">Grey lines: the book's wording, loaded privately from life-hub-data. Your adapted notes sit under each step.</div></div>
+    ${st.pips ? `<div class="p-sec"><h3>Lesson reps</h3><div class="reps">${['Y10 · 14 Oct', 'Y9 · 16 Oct', 'Y10 · 21 Oct', 'Y9 · 23 Oct', 'Y10 · 27 Oct'].slice(0, st.pips).map(r => `<span>${r}</span>`).join('')}</div></div>` : ''}
+    ${st.b >= 2 && !st.fresh ? `<div class="p-sec"><h3>Student evidence</h3><div class="ev">
+      <div class="row"><span>Before</span><div class="bar"><i data-w="58"></i></div><span>58%</span></div>
+      <div class="row"><span>Now</span><div class="bar"><i data-w="71"></i></div><span>71%</span></div></div>
+      <div class="note">First-attempt scores on the questions this technique targets.</div></div>` : ''}
+    <div class="p-actions">${st.goal ? '<button class="on">Keep going</button><button>Move on</button>' : '<button class="on" id="startGoal">Start a goal</button><button>Open in a lesson</button>'}</div>`;
+  panel.classList.add('open'); hand.classList.add('hide');
+  panel.querySelector('.close').onclick = closePanel;
+  const sg = panel.querySelector('#startGoal'); if (sg) sg.onclick = () => { if (t === robT) placeGoal(); else { setBuilding(t, 1); Object.assign(t.st, { goal: true, stage: 0, fresh: true }); openPanel(t); } };
+  requestAnimationFrame(() => panel.querySelectorAll('.bar i').forEach(b => b.style.width = b.dataset.w + '%'));
+  // zoom towards the tile, leaving room for the panel
+  const narrow = innerWidth <= 700; const w = narrow ? 360 : 560, h = w * vb[3] / vb[2];
+  animateVB([t.x - w * (narrow ? .5 : .38), t.y - h * (narrow ? .14 : .5), w, h]);
+  all.forEach(o => o.g.classList.toggle('dim', o !== t && !isNeighbour(o, t)));
+}
+const isNeighbour = (a, b) => DIRS.some(([dq, dr]) => a.q === b.q + dq && a.r === b.r + dr);
+function closePanel() { panel.classList.remove('open'); hand.classList.remove('hide'); all.forEach(o => o.g.classList.remove('dim')); }
+
+function setBuilding(t, b) {
+  t.st.b = b; const old = t.g.querySelector('.building'); if (old) old.remove();
+  const g = building(b, t.x, t.y, true); if (g) t.g.appendChild(g);
+}
+
+// suggestion actions
+let robberGone = false; const sug = document.getElementById('suggest');
+function placeGoal() {
+  robberGone = true; robber.classList.add('gone'); sug.classList.add('gone');
+  setTimeout(() => { setBuilding(robT, 1); Object.assign(robT.st, { goal: true, stage: 0, fresh: true }); const ring = el('polygon', { points: pts(corners(robT.x, robT.y, S + 3)), fill: 'none', stroke: '#1d2327', 'stroke-width': 2.5, 'stroke-dasharray': '6 4', class: 'pop' }, robT.g); el('animate', { attributeName: 'stroke-dashoffset', from: 0, to: 20, dur: '1.2s', repeatCount: 'indefinite' }, ring); }, 450);
+  setTimeout(() => openPanel(robT), 900);
+}
+document.getElementById('placeGoal').onclick = placeGoal;
+document.getElementById('showRobber').onclick = () => openPanel(robT);
+document.getElementById('dismiss').onclick = () => { sug.classList.add('gone'); robber.classList.add('gone'); robberGone = true; };
+</script>
+</body>
+</html>
