@@ -5878,6 +5878,29 @@ a.home-class-tile:hover {
   box-shadow: 0 0 0 3px rgba(55, 111, 183, 0.08);
 }
 
+textarea.block-question-set__answer {
+  display: block;
+  width: calc(100% - 2rem);
+  min-height: 0;
+  color: var(--ink);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+textarea.block-question-set__answer:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.block-question-set__options--pick { list-style: none; padding-left: 0; display: grid; gap: var(--space-1); }
+.block-question-set__options--pick label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: #fff;
+  cursor: pointer;
+}
+.block-question-set__options--pick input { margin-top: 3px; accent-color: var(--wave); flex: none; }
+.block-question-set__options--pick label:has(input:checked) { border-color: var(--wave); box-shadow: 0 0 0 3px rgba(55, 111, 183, 0.08); }
+
 /* Question set formats: Human experience table and Anchor & bridge. */
 .block-editor__format { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .block-editor__format-hint { flex: 1 1 16rem; margin: 0; font-size: var(--text-sm); }
