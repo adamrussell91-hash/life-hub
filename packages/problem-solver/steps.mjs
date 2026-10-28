@@ -16,6 +16,9 @@ import { COMMIT_ID as CHANGE_COMMIT, REVIEW_ID as CHANGE_REVIEW } from '../chang
 import { COLLABORATION_BOOK_MODEL } from '../collaboration-book/model.mjs';
 import { CATALOGUE as COLLAB_CATALOGUE } from '../collaboration-book/catalogue.mjs';
 import { COMMIT_ID as COLLAB_COMMIT, REVIEW_ID as COLLAB_REVIEW } from '../collaboration-book/commit-slots.mjs';
+import { COMMUNICATION_BOOK_MODEL } from '../communication-book/model.mjs';
+import { CATALOGUE as COMM_CATALOGUE } from '../communication-book/catalogue.mjs';
+import { COMMIT_ID as COMM_COMMIT, REVIEW_ID as COMM_REVIEW } from '../communication-book/commit-slots.mjs';
 
 /** Tool families. A tool's `step` is one of these. `contradiction` is TRIZ only. */
 export const BOOK_STEPS = Object.freeze([
@@ -98,6 +101,13 @@ const PLANS = Object.freeze({
     entry('explore', ['explore'], false, () => COLLAB_CATALOGUE.map((e) => e.id).filter((id) => TOOLS[id])),
     entry('commit', ['commit'], false, () => [COLLAB_COMMIT].filter((id) => TOOLS[id]), 'implement'),
     entry('review', ['review'], true, () => [COLLAB_REVIEW].filter((id) => TOOLS[id]), 'improve')
+  ]),
+  // Communication Book: as the Collaboration Book, the coach selects the model, so Explore names
+  // the catalogue's tools; Commit has the one next conversation and Review the one review.
+  communication_book: Object.freeze([
+    entry('explore', ['explore'], false, () => COMM_CATALOGUE.map((e) => e.id).filter((id) => TOOLS[id])),
+    entry('commit', ['commit'], false, () => [COMM_COMMIT].filter((id) => TOOLS[id]), 'implement'),
+    entry('review', ['review'], true, () => [COMM_REVIEW].filter((id) => TOOLS[id]), 'improve')
   ])
 });
 
@@ -134,7 +144,7 @@ export function nextStepAfter(modelId, stepId) {
   return i >= 0 && i < plan.length - 1 ? plan[i + 1].step : null;
 }
 
-const BOOK_MODELS = Object.freeze({ [DECISION_MODEL.id]: DECISION_MODEL, [GEAR_SHIFTER_MODEL.id]: GEAR_SHIFTER_MODEL, [RULES_BOOK_MODEL.id]: RULES_BOOK_MODEL, [CHANGE_BOOK_MODEL.id]: CHANGE_BOOK_MODEL, [COLLABORATION_BOOK_MODEL.id]: COLLABORATION_BOOK_MODEL });
+const BOOK_MODELS = Object.freeze({ [DECISION_MODEL.id]: DECISION_MODEL, [GEAR_SHIFTER_MODEL.id]: GEAR_SHIFTER_MODEL, [RULES_BOOK_MODEL.id]: RULES_BOOK_MODEL, [CHANGE_BOOK_MODEL.id]: CHANGE_BOOK_MODEL, [COLLABORATION_BOOK_MODEL.id]: COLLABORATION_BOOK_MODEL, [COMMUNICATION_BOOK_MODEL.id]: COMMUNICATION_BOOK_MODEL });
 const modelDef = (modelId) => MODELS[modelId] ?? BOOK_MODELS[modelId] ?? null;
 
 export function stepName(modelId, stepId) {
