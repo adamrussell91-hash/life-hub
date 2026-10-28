@@ -2509,12 +2509,6 @@ function renderBlockContent(
   }
 }
 
-/** A one-question set's typed answer: the box sleeve starters drop into. */
-function sleeveAnswerBox(wrapper: HTMLElement, block: Block): HTMLTextAreaElement | null {
-  if (block.block_type !== 'question_set' || block.content.questions.length !== 1) return null;
-  return wrapper.querySelector<HTMLTextAreaElement>('textarea.block-question-set__answer');
-}
-
 /** Teacher only: an old toolkit card offers to become a sleeve on the block below it. */
 function turnIntoSleeveButton(block: Block, ctx: RenderContext): HTMLElement | null {
   const lens = sleeveForCard(block);
@@ -2548,9 +2542,7 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   const sleeves = attachedSleeves(block);
   if (sleeves.length) {
     wrapper.classList.add('has-sleeve', `has-sleeve--${sleeves[0]!.lens.toolkitKind}`);
-    wrapper.prepend(renderSleeves(sleeves, {
-      mode, blockId: block.id, lessonId: ctx.lessonId, answerBox: sleeveAnswerBox(wrapper, block)
-    }));
+    wrapper.prepend(renderSleeves(sleeves, { mode, blockId: block.id, lessonId: ctx.lessonId }));
   }
   if (mode === 'teacher') {
     const convert = turnIntoSleeveButton(block, ctx);
