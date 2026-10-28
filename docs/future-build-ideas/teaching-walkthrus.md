@@ -4,6 +4,8 @@ Teaching WalkThrus is a book of 50 classroom techniques. Each technique is set o
 
 It is a concept doc, not a build brief. Nothing builds from it until Adam names a slice.
 
+Build plan: [teaching-walkthrus-build-plan.md](teaching-walkthrus-build-plan.md).
+
 ## Privacy and copyright (read first)
 
 - **The book's wording never enters this repo.** Step text, technique write-ups and framework summaries live only in private `life-hub-data`, read with an authenticated request. Code, tests, fixtures, screenshots and this doc hold technique IDs, names, series and page numbers only.
@@ -174,14 +176,18 @@ Adam approved the cluster version of the mockup ("that is cool"). It replaces th
 ## Open questions
 
 - **The game layer.** How far does the island-trading board game idea go: tiles, resources, building on a technique, trading between sets, expansion boards? Next round of thinking.
-- Should the hex board be a free canvas (Adam places hexes) or an auto-layout (clusters arrange themselves from relationships), or auto-layout with pinning?
-- Are arrows typed (sequence, supports, contrasts) or free lines with a label?
-- Where do the six problem-type tags come from: existing evidence tags mapped across, or a new tag set?
-- Does a dismissed suggested goal ever come back, and on what rule?
-- How is a lesson rep logged with the least friction: a one-tap rating on the teacher note after the lesson?
+
+Answered 28 Oct 2026 (details in the build plan, §0):
+
+- Board layout: **auto-layout, as in the mockup** (Adam).
+- Arrows: **typed and free** (Adam). Types are leads to, pairs with and free, each with an optional label.
+- Problem-type tags: suggested, derived from signals the evidence already holds plus an optional problem type on each feedback code. No new tagging.
+- Dismissed goals: suggested, they come back only on new evidence (double the count at dismissal, at least 3 new pieces), never on time alone. "Not this" mutes for the term.
+- Lesson reps: suggested, one tap on the teacher note after the lesson ends (Ran it, Partly, Didn't get to it). No push by default; unlogged lessons lapse after 7 days.
 
 ## History
 
+- 28 Oct 2026: Adam answered the layout and arrow questions; suggestions recorded for tags, dismissal and reps. Build plan written.
 - 28 Oct 2026: Adam approved the cluster look. Rewrote Use 2 as the build design (look, kept Catan mechanics, arrows, expanding a tile) and added the final-version rule that arrows and their labels never cross text.
 - 28 Oct 2026: Restyled the mockup in the WalkThrus cluster look: white page, flat-topped hexes in series clusters with white gaps, black series and page tab, bold caps titles, line icons, progress piece in a black badge. Colour now shows the set (yellow set 1, blue set 2, green set 3). Arrows are a knot with a chevron on shared edges and thin black lines through the white space otherwise. Opening a tile raises its five-step strip on a connector, with a magnifier to close. The panel shows ADAPT as a chain of five hexes with a repeat loop.
 - 28 Oct 2026: Restyled the mockup as a Catan board (terrains, tokens, red wooden pieces, expansion box on the table).
