@@ -83,20 +83,16 @@ function renderCard(card: PaletteCard): HTMLButtonElement {
     el.dataset.compositionId = card.id;
   }
 
-  const icon = document.createElement(card.kind === 'block' ? 'img' : 'span');
+  const icon = document.createElement('img');
   icon.className = 'lesson-palette__card-icon';
-  if (card.kind === 'block' && icon instanceof HTMLImageElement) {
-    icon.src = card.iconSrc;
-    icon.alt = '';
-    icon.onerror = () => {
-      const fallback = document.createElement('span');
-      fallback.className = 'lesson-palette__card-icon';
-      fallback.textContent = card.title.slice(0, 1);
-      icon.replaceWith(fallback);
-    };
-  } else {
-    icon.textContent = card.title.slice(0, 1);
-  }
+  icon.src = card.kind === 'block'
+    ? card.iconSrc
+    : withAppBase('/assets/blocks/composition.svg');
+  icon.alt = '';
+  icon.onerror = () => {
+    icon.onerror = null;
+    icon.src = withAppBase('/assets/blocks/composition.svg');
+  };
 
   const title = document.createElement('span');
   title.className = 'lesson-palette__card-title';
