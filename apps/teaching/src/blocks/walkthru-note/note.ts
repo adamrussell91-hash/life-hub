@@ -83,8 +83,11 @@ export function reconcilePlans(lessonId: string, pageBlocks: Block[] | undefined
 function stepsList(master: WalkthruTechniqueText, goal: GoalLite | null, jots: Record<string, string>): HTMLElement {
   const list = el('ol', 'tk-wt__steps');
   for (const step of master.steps) {
+    // One line per step to glance at in class; the book's full text opens on tap.
     const item = el('li', 'tk-wt__step');
-    item.append(el('p', 'tk-wt__label', `${step.n}. ${step.label}`), el('p', 'tk-wt__text block-body', step.text));
+    const more = el('details', 'tk-wt__more');
+    more.append(el('summary', 'tk-wt__label', `${step.n}. ${step.label}`), el('p', 'tk-wt__text block-body', step.text));
+    item.append(more);
     const adapted = goal?.walkthru?.adapted?.[String(step.n)];
     if (adapted) item.append(el('p', 'tk-wt__adapted', adapted));
     const jot = jots[String(step.n)];

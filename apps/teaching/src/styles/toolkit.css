@@ -2673,8 +2673,11 @@ button.tk-qdot {
 .tk-wt__code { margin: 0; font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .tk-wt__name { margin: 0; font-weight: 800; text-transform: uppercase; }
 .tk-wt__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
-.tk-wt__label { margin: 0; font-weight: 700; font-size: var(--text-sm); }
-.tk-wt__text { margin: 0.1rem 0 0; }
+.tk-wt__label { margin: 0; font-weight: 700; font-size: var(--text-sm); cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 0.4rem; min-height: 1.75rem; }
+.tk-wt__label::-webkit-details-marker { display: none; }
+.tk-wt__label::after { content: '+'; margin-left: auto; padding-left: 0.5rem; color: var(--muted); }
+.tk-wt__more[open] > .tk-wt__label::after { content: '–'; }
+.tk-wt__more .tk-wt__text { margin: 0.1rem 0 0.4rem; font-size: var(--text-sm); line-height: 1.45; }
 .tk-wt__adapted { margin: 0.25rem 0 0; padding-left: 0.6rem; border-left: 3px solid #ffd400; font-style: italic; font-size: var(--text-sm); }
 .tk-wt__jot { margin: 0.25rem 0 0; padding: 0.35rem 0.5rem; border-radius: 6px; background: var(--cotton); font-size: var(--text-sm); white-space: pre-wrap; }
 .tk-wt__reps { display: grid; gap: 0.4rem; }
@@ -2690,9 +2693,11 @@ button.tk-qdot {
 .tk-wt-plan { margin: 0 0 0.75rem; }
 .tk-wt-plan__head { cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; display: flex; align-items: center; }
 .tk-wt-plan .tk-wt-badges { display: grid; gap: 0.4rem; }
-.tk-wt-badge { border: 1px dashed var(--line); border-radius: 10px; padding: 0.25rem 0.6rem; background: var(--cotton); }
-.tk-wt-badge__summary { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; }
-.tk-wt-badge__glyph { display: inline-grid; width: 1.6rem; height: 1.6rem; color: #111; }
+/* WalkThrus book look: yellow card, the icon on a small yellow hexagon. */
+.tk-wt-badge { border: 1px solid #f2c200; border-radius: 10px; padding: 0.25rem 0.6rem; background: #fff7cc; color: #111; }
+.tk-wt-badge__summary { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: var(--text-sm); font-weight: 700; min-height: 2.75rem; }
+.tk-wt-badge__glyph { display: inline-grid; place-items: center; flex: none; width: 2.1rem; height: 1.85rem; padding: 0.2rem 0.4rem; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); background: #ffd400; color: #111; }
 .tk-wt-badge__glyph svg { width: 100%; height: 100%; mix-blend-mode: multiply; }
 .tk-wt-badge__body { padding: 0.25rem 0 0.5rem; }
+.tk-wt-badge__body .tk-wt__steps { gap: 0.15rem; }
 @media print { .tk-wt, .tk-wt-badges, .tk-wt-plan { display: none; } }
