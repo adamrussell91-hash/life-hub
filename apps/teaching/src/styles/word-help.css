@@ -411,6 +411,57 @@
   min-height: 2.75rem;
 }
 
+/* Pinned words show in the lesson's word tray strip (word-tray.css). */
+.word-help-strip__chip {
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.word-help-strip__chip[aria-pressed='false'] {
+  color: var(--muted);
+  background: color-mix(in oklab, var(--paper) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.word-help-strip__chip[aria-pressed='true'] {
+  color: var(--navy);
+  background: var(--pastel-blue);
+  box-shadow: inset 0 0 0 1.5px var(--wave);
+}
+
+.word-help-strip__add {
+  padding: 0 var(--space-2);
+  border: 1px dashed color-mix(in oklab, var(--wave) 45%, transparent);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--wave);
+  font: var(--weight-semibold) var(--text-xs) / 1.8 var(--font-ui);
+  cursor: pointer;
+}
+
+.word-help-strip__add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+
+.word-help-strip__add-form .input {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.word-help-strip__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  font-size: var(--text-xs);
+  color: var(--orca);
+  cursor: pointer;
+}
+
 /* ---- Fry review dialog ------------------------------------------------- */
 
 .text-tools-review {

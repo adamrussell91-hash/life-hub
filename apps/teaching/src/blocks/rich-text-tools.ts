@@ -2,7 +2,9 @@
  * Teacher-side text tools in the rich text editor toolbar.
  *
  *   Dictionary scan  Saves word cards on `settings.word_help`. Students see the
- *                    words lit on the published block without waiting.
+ *                    words lit on the published block without waiting. In a
+ *                    lesson, words the teacher pins (or types in with Add
+ *                    word) sit in the word tray's strip under the text.
  *   Fry explainer    Rewrites the block as a Fry explainer. Teacher only. The
  *                    rewrite waits in a preview until the teacher replaces the
  *                    text, and the replace can be undone.
@@ -16,7 +18,7 @@ import type { Block } from '@/schemas/block';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import {
   DICTIONARY_ICON,
-  openWordCard,
+  readCopyStep,
   readWordHelp,
   wordsPresentIn,
   type WordHelpEntry
@@ -104,49 +106,144 @@ export function createRichTextTools(options: {
     tiptap.host.classList.toggle('word-help-scanning', on);
   }
 
-  function saveWords(words: WordHelpEntry[] | null): void {
+  function saveWords(words: WordHelpEntry[], copyStep = readCopyStep(options.getLatest())): void {
     const latest = options.getLatest();
     const settings = { ...(latest.settings ?? {}) } as Record<string, unknown>;
-    if (words) settings.word_help = { words, scanned_at: new Date().toISOString() };
-    else delete settings.word_help;
+    if (words.length) {
+      const previous = settings.word_help as { scanned_at?: unknown } | undefined;
+      settings.word_help = {
+        words,
+        scanned_at: typeof previous?.scanned_at === 'string' ? previous.scanned_at : new Date().toISOString(),
+        ...(copyStep ? {} : { copy_step: false })
+      };
+    } else delete settings.word_help;
     options.onChange({ ...latest, settings });
     paintStrip();
   }
 
-  function paintStrip(): void {
+  /** A fresh scan keeps the teacher's pins and typed-in words. */
+  function mergeScan(scanned: WordHelpEntry[]): WordHelpEntry[] {
     const saved = readWordHelp(options.getLatest());
-    const words = wordsPresentIn(plainText(tiptap.getHtml()), saved);
+    const pinned = new Set(saved.filter((entry) => entry.pinned).map((entry) => entry.word.toLowerCase()));
+    const added = saved.filter((entry) => entry.added);
+    const addedKeys = new Set(added.map((entry) => entry.word.toLowerCase()));
+    return [
+      ...scanned
+        .filter((entry) => !addedKeys.has(entry.word.toLowerCase()))
+        .map((entry) => (pinned.has(entry.word.toLowerCase()) ? { ...entry, pinned: true } : entry)),
+      ...added
+    ];
+  }
+
+  function chipButton(label: string, className: string): HTMLButtonElement {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = className;
+    chip.textContent = label;
+    return chip;
+  }
+
+  function openAddForm(): void {
+    const form = document.createElement('form');
+    form.className = 'word-help-strip__add-form';
+    const term = document.createElement('input');
+    term.className = 'input';
+    term.placeholder = 'Word';
+    term.setAttribute('aria-label', 'Word');
+    const meaning = document.createElement('input');
+    meaning.className = 'input';
+    meaning.placeholder = 'Meaning';
+    meaning.setAttribute('aria-label', 'Meaning');
+    const add = chipButton('Add', 'btn btn--primary');
+    add.type = 'submit';
+    const cancel = chipButton('Cancel', 'btn btn--ghost');
+    cancel.addEventListener('click', () => paintStrip());
+    form.append(term, meaning, add, cancel);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const word = term.value.trim();
+      const definition = meaning.value.trim();
+      if (!word || !definition) {
+        (word ? meaning : term).focus();
+        return;
+      }
+      const saved = readWordHelp(options.getLatest()).filter((entry) => entry.word.toLowerCase() !== word.toLowerCase());
+      saveWords([
+        ...saved,
+        { word, kind: 'uncommon', part_of_speech: '', pronunciation: '', definition, etymology: '', example: '', added: true, pinned: true }
+      ]);
+    });
+    wordStrip.querySelector('.word-help-strip__add')?.replaceWith(form);
+    term.focus();
+  }
+
+  function paintStrip(): void {
+    const latest = options.getLatest();
+    const saved = readWordHelp(latest);
+    const scanned = saved.filter((entry) => !entry.added);
+    const words = wordsPresentIn(plainText(tiptap.getHtml()), scanned);
+    const added = saved.filter((entry) => entry.added);
     wordStrip.replaceChildren();
-    wordStrip.hidden = saved.length === 0;
-    strip.hidden = wordStrip.hidden && techniqueStrip.hidden;
-    if (saved.length === 0) return;
+    wordStrip.hidden = false;
+    strip.hidden = false;
 
     const label = document.createElement('p');
     label.className = 'word-help-strip__label';
     label.textContent =
-      words.length === saved.length
-        ? `${words.length} ${words.length === 1 ? 'word' : 'words'} lit for students`
-        : `${words.length} of ${saved.length} words still in the text. Scan again to refresh.`;
+      scanned.length === 0
+        ? 'Words under this block'
+        : words.length === scanned.length
+          ? `${words.length} ${words.length === 1 ? 'word' : 'words'} lit for students. Tap one to show it under the text.`
+          : `${words.length} of ${scanned.length} words still in the text. Scan again to refresh.`;
     const chips = document.createElement('div');
     chips.className = 'word-help-strip__chips';
+    const toggle = (target: WordHelpEntry) => {
+      saveWords(
+        readWordHelp(options.getLatest()).map((entry) =>
+          entry.word === target.word && !entry.added ? { ...entry, pinned: !entry.pinned } : entry
+        )
+      );
+    };
     for (const entry of words) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'word-help-term word-help-strip__chip';
-      chip.textContent = entry.word;
-      chip.setAttribute('aria-haspopup', 'dialog');
-      chip.addEventListener('click', () => openWordCard(chip, entry));
+      const chip = chipButton(entry.word, 'word-help-term word-help-strip__chip');
+      chip.setAttribute('aria-pressed', String(Boolean(entry.pinned)));
+      chip.title = entry.pinned ? 'Shown under the text. Tap to hide.' : 'Tap to show under the text.';
+      chip.addEventListener('click', () => toggle(entry));
       chips.append(chip);
     }
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'btn btn--ghost word-help-strip__clear';
-    clear.textContent = 'Clear';
-    clear.addEventListener('click', () => {
-      saveWords(null);
-      say('Dictionary words cleared. Students can still run their own scan.');
-    });
-    wordStrip.append(label, chips, clear);
+    for (const entry of added) {
+      const chip = chipButton(`${entry.word} ×`, 'word-help-term word-help-strip__chip');
+      chip.setAttribute('aria-pressed', 'true');
+      chip.setAttribute('aria-label', `Remove ${entry.word}`);
+      chip.title = entry.definition;
+      chip.addEventListener('click', () =>
+        saveWords(readWordHelp(options.getLatest()).filter((candidate) => candidate !== entry && candidate.word !== entry.word))
+      );
+      chips.append(chip);
+    }
+    const addButton = chipButton('+ Add word', 'word-help-strip__add');
+    addButton.addEventListener('click', openAddForm);
+    chips.append(addButton);
+    wordStrip.append(label, chips);
+
+    if (saved.some((entry) => entry.pinned)) {
+      const copy = document.createElement('label');
+      copy.className = 'word-help-strip__copy';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = readCopyStep(latest);
+      box.addEventListener('change', () => saveWords(readWordHelp(options.getLatest()), box.checked));
+      copy.append(box, 'Copy it down step');
+      wordStrip.append(copy);
+    }
+    if (scanned.length) {
+      const clear = chipButton('Clear', 'btn btn--ghost word-help-strip__clear');
+      clear.addEventListener('click', () => {
+        saveWords(added);
+        say('Dictionary words cleared. Students can still run their own scan.');
+      });
+      wordStrip.append(clear);
+    }
   }
 
   function saveTechniques(next: ReturnType<typeof createTechniqueScan> | null): void {
@@ -210,7 +307,13 @@ export function createRichTextTools(options: {
     say('Scanning for challenging words…');
     try {
       const words = await scan(tiptap.getHtml());
-      saveWords(words);
+      const latest = options.getLatest();
+      // A new scan is a new date even when the old pins carry over.
+      const settings = { ...(latest.settings ?? {}) } as Record<string, unknown>;
+      delete settings.word_help;
+      const merged = mergeScan(words);
+      options.onChange({ ...latest, settings });
+      saveWords(merged, readCopyStep(latest));
       say(words.length ? '' : 'No challenging words found in this block.');
     } catch (error) {
       say(error instanceof Error && error.message ? error.message : 'The scan did not finish. Try again.', 'error');
