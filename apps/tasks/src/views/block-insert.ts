@@ -1,3 +1,4 @@
+import { withAppBase } from '@teaching/app/base-path';
 import { BLOCK_GROUPS, type InsertMenuValue } from '@teaching/blocks/create-block';
 import {
   familiesFromGroups,
@@ -49,8 +50,8 @@ function renderCard(card: PaletteBlockCard): HTMLButtonElement {
   icon.src = card.iconSrc;
   icon.alt = '';
   icon.onerror = () => {
-    const fallback = el('span', 'lesson-palette__card-icon', card.title.slice(0, 1));
-    icon.replaceWith(fallback);
+    icon.onerror = null;
+    icon.src = withAppBase('/assets/blocks/section.png');
   };
 
   const title = el('span', 'lesson-palette__card-title', card.title);
