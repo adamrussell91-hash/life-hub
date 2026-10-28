@@ -1,3 +1,4 @@
+import { GLYPH_SVGS } from '../../../../packages/walkthrus/glyphs';
 import { CATALOGUE, SERIES, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import { SETS } from '../../../../packages/walkthrus/sets.mjs';
 import { checkOneActive, isLiveWalkthruGoal, normalizeWalkthru, pieceFor } from '../../../../packages/walkthrus/goal.mjs';
@@ -49,7 +50,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 
 const entries = CATALOGUE as unknown as BoardEntry[];
 const seriesList = SERIES as unknown as BoardSeries[];
-const glyphs = createGlyphSet({ svgs: {}, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wt-glyph' });
+const glyphs = createGlyphSet({ svgs: GLYPH_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wt-glyph' });
 
 /** Caps title wrapped to a few short lines, with an ellipsis if it still doesn't fit. */
 export function wrapTitle(name: string, maxChars: number, maxLines: number): string[] {
