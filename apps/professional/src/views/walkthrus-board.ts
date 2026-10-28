@@ -546,7 +546,9 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       if (live) { make.disabled = true; make.title = 'You’re already working on a technique. Finish, park or drop it first.'; }
       row.append(make);
     } else {
-      row.append(button('Open the technique', () => { hidePop(); select(entry.id); }, 'btn btn--primary btn--small'));
+      const next = sug.next_lesson;
+      if (next) row.append(button(`Add to the next lesson (${next.date})`, () => { window.location.assign(next.url); }, 'btn btn--primary btn--small'));
+      row.append(button('Open the technique', () => { hidePop(); select(entry.id); }, next ? 'btn btn--secondary btn--small' : 'btn btn--primary btn--small'));
     }
     row.append(
       button('Not now', () => { hidePop(); void answerSuggestion(sug, 'not_now', 'Parked until there’s more evidence.'); }, 'btn btn--secondary btn--small'),
@@ -555,7 +557,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     );
     const lead = sug.action === 'goal'
       ? `Try ${entry.name}?`
-      : `${sug.problem_label} showed up once. Add ${entry.name} to ${sug.class_titles[0] ?? 'the class'}’s next lesson as a WalkThru note?`;
+      : `${sug.problem_label} showed up once. Add ${entry.name} to ${sug.class_titles[0] ?? 'the class'}’s next lesson as a WalkThru note?${sug.next_lesson ? '' : ' No upcoming lesson is timetabled for it yet.'}`;
     pop.replaceChildren(el('p', 'wt-pop__title', lead), chainList(sug), ...(sug.note ? [el('p', 'wt-pop__note', sug.note)] : []), row);
     pop.hidden = false;
     void positionHubFloating(at, pop, { placement: 'bottom', strategy: 'fixed', offset: 8 });

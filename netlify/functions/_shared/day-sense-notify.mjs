@@ -6,6 +6,7 @@
  *   dexy   — a usual dose (learned from Adam's logs) is 30–60 min overdue with no log
  *   review — the train-home pass: school day, around leave time, review not done
  *   bookmark — a task's work block (30 min+) ends within 10 min: leave a way back in (max 2/day)
+ *   walkthru — a lesson with a WalkThru note ended within 10 min and its rep isn't logged (max 2/day)
  *   checkin — around 7 am, no morning check-in yet: "How are you starting today?"
  *
  * Cap: 4 a day. Each key once a day. An ignored notification changes nothing.
@@ -15,6 +16,7 @@ import { parseEventDocument } from '../../../apps/life/js/core/records.js';
 import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import { medicationDay, usualDoseTimes, clock } from '../../../packages/design-kit/js/calendar/medication-model.js';
 import { getJSON, listJSON } from './tasks-blobs.mjs';
+import { techniqueById } from '../../../packages/walkthrus/catalogue.mjs';
 import { PUSH_DAILY_CAP, readPushLog, readSubscriptions, sendToAll, writePushLog } from './push.mjs';
 
 export const DAY_REVIEW_PREFIX = 'meta/day_review/';
@@ -26,6 +28,8 @@ const REVIEW_WINDOW_H = 1;
 const BOOKMARK_LEAD_H = 10 / 60;
 const BOOKMARK_MIN_BLOCK_H = 0.5;
 const BOOKMARK_DAILY_CAP = 2;
+const REP_PROMPT_WINDOW_MS = 10 * 60 * 1000;
+const REP_PROMPT_DAILY_CAP = 2;
 const BLOCKS_REFRESH_MS = 60 * 60 * 1000;
 
 const hourOf = (hhmm) => {
@@ -59,7 +63,7 @@ export function isSchoolDay(date, terms) {
  * Pure: which notifications are due now.
  * @returns {Array<{ key: string, title: string, body: string, url: string }>}
  */
-export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, checkinDone = true, log, blocks = [], sprintNudges = [] }) {
+export function decideNotifications({ today, nowHour, nowMs = Date.now(), med, schoolDay, leave, reviewDone, checkinDone = true, log, blocks = [], sprintNudges = [], walkthruReps = [] }) {
   const out = [];
   const sentCount = Object.keys(log?.sent ?? {}).length;
   const unsent = (key) => !log?.sent?.[key];
@@ -103,7 +107,33 @@ export function decideNotifications({ today, nowHour, med, schoolDay, leave, rev
       url: `/#/calendar/day?bookmark=${encodeURIComponent(bookmark.task_id)}`
     });
   }
+  const rep = repPromptCandidate(walkthruReps, nowMs, log);
+  if (rep) {
+    const technique = techniqueById(rep.technique_id);
+    out.push({
+      key: repPromptKey(rep),
+      title: 'Log your WalkThru',
+      body: `Did you run ${technique?.name ?? 'the technique'} in that lesson? One tap: ran it, partly, or didn’t get to it.`,
+      url: `/teaching/lessons/${encodeURIComponent(rep.lesson_id)}`
+    });
+  }
   return out.slice(0, Math.max(0, PUSH_DAILY_CAP - sentCount));
+}
+
+const repPromptKey = (rep) => `walkthru-${rep.technique_id}-${rep.lesson_id}-${rep.class_id ?? 'any'}`;
+
+/**
+ * Pure: a planned WalkThru rep whose lesson ended in the last 10 minutes, not yet asked about,
+ * while today's two prompts are not spent. A logged rep is no longer `planned`, so it never asks.
+ * @param {Array<{ technique_id: string, lesson_id: string, class_id?: string | null, state: string, lesson_end?: string | null }>} reps
+ */
+export function repPromptCandidate(reps, nowMs, log) {
+  const sent = Object.keys(log?.sent ?? {});
+  if (sent.filter((key) => key.startsWith('walkthru-')).length >= REP_PROMPT_DAILY_CAP) return null;
+  return (reps ?? [])
+    .filter((rep) => rep?.state === 'planned' && rep.lesson_end && !log?.sent?.[repPromptKey(rep)]
+      && nowMs - Date.parse(rep.lesson_end) >= 0 && nowMs - Date.parse(rep.lesson_end) <= REP_PROMPT_WINDOW_MS)
+    .sort((a, b) => Date.parse(a.lesson_end) - Date.parse(b.lesson_end))[0] ?? null;
 }
 
 /**
@@ -155,7 +185,7 @@ async function loadDoseLogs(client, decodeBlob, today) {
  * The scheduled run. `deps` make it testable without Netlify or GitHub.
  * @returns {Promise<{ sent: string[], skipped?: string }>}
  */
-export async function runDaySenseNotify({ store, now = new Date(), loadProfile, loadTerms, openRepo, send = sendToAll, env = process.env }) {
+export async function runDaySenseNotify({ store, now = new Date(), loadProfile, loadTerms, openRepo, loadPlannedReps, send = sendToAll, env = process.env }) {
   const subs = await readSubscriptions(store);
   if (!subs.length) return { sent: [], skipped: 'no_devices' };
   const today = getSydneyDateKey(now);
@@ -252,9 +282,13 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   } catch {
     sprintNudges = [];
   }
+  // WalkThru reps live in the teaching store; a missing loader or a failed read just means no prompt.
+  const walkthruReps = typeof loadPlannedReps === 'function' ? await loadPlannedReps(now).catch(() => []) : [];
   const due = decideNotifications({
     today,
     nowHour,
+    nowMs: now.getTime(),
+    walkthruReps,
     med,
     schoolDay: isSchoolDay(today, terms),
     leave: leaveHour(profile),

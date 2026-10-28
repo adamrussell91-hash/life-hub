@@ -274,7 +274,7 @@ function entryFor(record, id) {
   return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
 }
 
-const INSIGHT_SCHEMA = 3;
+const INSIGHT_SCHEMA = 4;
 
 /** Closed by the teacher's Close now, or by the Closes date. */
 async function closedState(store, k, settings, now = Date.now()) {
@@ -1007,7 +1007,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
         const entry = rec.questions[r.id];
         const outcomes = entry.key.outcomes ?? fallback;
         const items = answerEvidence({ question: entry.question, key: entry.key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback });
-        return { id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, codes: r.codes, outcomes, items, ...(r.set ? { set: r.set } : {}) };
+        return { id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, codes: r.codes, outcomes, items, ...(hasAnswer(r.response) ? {} : { unanswered: true }), ...(r.set ? { set: r.set } : {}) };
       })
     });
   }
@@ -1115,6 +1115,8 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     built_at: body.built_at,
     saved: !!body.saved,
     confidence: !!settings.confidence,
+    // A timer was set: items left blank at the end of the paper show working under time.
+    timed: !!settings.timer_minutes,
     students,
     questions: record.order.map((id) => {
       const { question, key } = record.questions[id];
@@ -1167,6 +1169,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     title: insight.title,
     unit_id: insight.unit_id,
     confidence: insight.confidence,
+    timed: insight.timed,
     closed: insight.closed,
     first_at: firstAt,
     ...(started.length ? { started } : {}),
