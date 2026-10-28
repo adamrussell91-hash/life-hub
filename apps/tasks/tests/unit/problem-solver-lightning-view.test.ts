@@ -100,7 +100,7 @@ describe('Lightning run page', () => {
     expect(page.querySelector('.ps-composer__now')!.textContent).toBe('');
     expect(page.querySelector('.ps-ltn-page__done')!.hasAttribute('hidden')).toBe(true);
     expect(page.querySelector('.ps-ltn-page__sent')!.hasAttribute('hidden')).toBe(true);
-  });
+  }, 30000); // first test pays the cold import of the whole page; under a full parallel run that passes 5s
 
   it('lights the questions the current round reached and marks the one holding the current box', async () => {
     const path = [
