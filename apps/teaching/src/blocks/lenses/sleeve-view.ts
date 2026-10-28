@@ -8,8 +8,6 @@ type ViewOptions = {
   mode: 'student' | 'teacher' | 'print';
   blockId: string;
   lessonId?: string;
-  /** The host's answer box; starters insert here. Without one they are plain text. */
-  answerBox?: HTMLTextAreaElement | null;
 };
 type SleeveState = { level?: SleeveLevel; ticks: Partial<Record<SleeveLevel, boolean[]>> };
 
@@ -37,20 +35,6 @@ function initialState(key?: string): SleeveState {
     if (Array.isArray(row)) state.ticks[level] = row.slice(0, 3).map((tick) => tick === true);
   }
   return state;
-}
-
-/** Puts a starter at the cursor and lets the host's own input listener save it. */
-export function insertStarter(box: HTMLTextAreaElement, starter: string): void {
-  const start = box.selectionStart ?? box.value.length;
-  const end = box.selectionEnd ?? start;
-  const before = box.value.slice(0, start);
-  const words = starter.replace(/…$/, '').trimEnd();
-  const text = `${before && !/\s$/.test(before) ? ' ' : ''}${words} `;
-  box.value = `${before}${text}${box.value.slice(end)}`;
-  const caret = start + text.length;
-  box.focus();
-  box.setSelectionRange(caret, caret);
-  box.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function chip(label: string): HTMLElement {
@@ -204,20 +188,14 @@ export function renderSleeves(attached: AttachedSleeve[], options: ViewOptions):
 
       const move = step(2, 'Do it');
       move.append(el('p', 'sleeve__text', text.do));
+      // Students write in their book: the page keeps nothing they type.
+      move.append(el('p', 'sleeve__book', 'Write it in your book. Start with:'));
       const starters = el('div', 'sleeve__starters');
-      const box = options.mode === 'student' ? options.answerBox : null;
-      for (const starter of text.starters) {
-        if (box) {
-          const tap = button(starter, 'sleeve__starter', () => insertStarter(box, starter));
-          tap.setAttribute('aria-label', `Add “${starter}” to your answer`);
-          starters.append(tap);
-        } else {
-          starters.append(el('span', 'sleeve__starter sleeve__starter--text', starter));
-        }
-      }
+      for (const starter of text.starters) starters.append(el('span', 'sleeve__starter', starter));
       move.append(starters);
 
       const check = step(3, 'Check it');
+      check.append(el('p', 'sleeve__book', 'Tick what your book shows.'));
       const list = el('ul', 'sleeve__checks');
       const row = ticks();
       text.checks.forEach((line, i) => {
