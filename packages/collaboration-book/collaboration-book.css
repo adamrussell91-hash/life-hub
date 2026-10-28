@@ -1,0 +1,91 @@
+/* packages/collaboration-book/collaboration-book.css
+   The Collaboration Book's tokens, scoped to .cb-scope the way the Change Book scopes .ch-scope.
+   The pack's screen palette, adapted from the American cover: purple for the main ribbons and
+   structure, cyan for relationships and exchange, gold for the one point of attention, deep
+   aubergine ink for text on warm paper. Every colour holds 4.5:1 on paper; small gold and cyan
+   text take the darker label shades. Motion matches the other tools. */
+.cb-scope {
+  --cb-paper: #fffdf6;
+  --cb-ink: #241b36;
+  --cb-purple: #613fad;
+  --cb-cyan: #007d97;
+  --cb-gold: #a06400;
+  --cb-cyan-label: #007080;
+  --cb-gold-label: #8c5400;
+  --cb-purple-tint: #ede6fa;
+  --cb-cyan-tint: #d6eef2;
+  --cb-gold-tint: #fbe7a7;
+  --cb-soft: #f4f0f8;
+  --cb-line: #c8bfd8;
+  --cb-muted: #5a5170;
+  --cb-ghost: rgba(36, 27, 54, 0.12);
+  --cb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens, so
+     remapping them here draws every shared chart in the Collaboration Book's palette. Red becomes
+     gold (the label shade under text); green, which carries Decision Maker's "go", becomes cyan,
+     which takes paper text; ink becomes the book's purple-black. */
+  --dm-paper: var(--cb-paper);
+  --dm-ink: var(--cb-ink);
+  --dm-red: var(--cb-gold);
+  --dm-green: var(--cb-cyan);
+  --dm-red-label: var(--cb-gold-label);
+  --dm-soft: var(--cb-soft);
+  --dm-line: var(--cb-line);
+  --dm-green-tint: var(--cb-cyan-tint);
+  --dm-red-tint: var(--cb-gold-tint);
+  --dm-ghost: var(--cb-ghost);
+  --dm-ease: var(--cb-ease);
+  --dm-spring: var(--cb-spring);
+  --dm-muted: var(--cb-muted);
+  --dm-contested: var(--cb-gold-label);
+  --dm-band: var(--cb-purple);
+}
+
+/* The pack's emblems draw their main ribbons in currentColor: the book's purple on paper. */
+.cb-emblem { display: inline-flex; line-height: 0; color: var(--cb-purple, #613fad); }
+.cb-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.cb-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--cb-purple); background: var(--cb-paper); }
+.cb-scope .dm-details__card--red { border-top-color: var(--cb-gold); }
+.cb-scope .dm-details__card--green { border-top-color: var(--cb-cyan); }
+.cb-scope .dm-details__card--tint { border-top-color: var(--cb-line); }
+/* Decision Maker sets ink on its brighter label red; on the darker gold label, paper reads. */
+.cb-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.cb-scope .dm-qk__answer[data-answer='no'] { color: var(--cb-paper); }
+
+/* ------------------------------------------------------------------ the experiment (render/commit.ts)
+   The result as the headline, the next action beside its owner, the date to come back and a gold
+   band for what would change course. Phone: one column. */
+.cb-commit__part { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px 14px 12px 52px; border-radius: 4px; background: var(--cb-paper); border: 1.5px solid var(--cb-line); min-width: 0; }
+.cb-commit__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cb-muted); }
+.cb-commit__mark { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; }
+.cb-commit__result { border: 2px solid var(--cb-ink); }
+.cb-commit__result .dm-entry__pill { font-size: 18px; font-weight: 700; padding: 10px 18px; }
+.cb-commit__rests { display: flex; flex-wrap: wrap; gap: 6px; }
+.cb-commit__rests .cb-commit__title { flex-basis: 100%; }
+.cb-commit__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.cb-commit__action { background: var(--cb-cyan-tint); border-color: var(--cb-cyan); }
+.cb-commit__action .cb-commit__title { color: var(--cb-cyan-label); }
+.cb-commit__back { background: var(--cb-soft); border-color: var(--cb-ink); }
+.cb-commit__turn { background: var(--cb-gold-tint); border: 2px solid var(--cb-gold); }
+.cb-commit__turn .cb-commit__title { color: var(--cb-gold-label); }
+.cb-scope .dm-chart--commit .dm-chart__frame { display: grid; gap: 10px; }
+
+/* ------------------------------------------------------------------ the review (render/review.ts) */
+.cb-review__row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+.cb-review__station { position: relative; display: grid; align-content: start; gap: 8px; padding: 12px; border-radius: 4px; border: 1.5px solid var(--cb-line); background: var(--cb-paper); min-width: 0; }
+.cb-review__station + .cb-review__station::before { content: ''; position: absolute; left: -7px; top: 8px; bottom: 8px; border-left: 3px solid var(--cb-cyan); }
+.cb-review__n { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; display: grid; place-items: center; font: 800 14px / 1 var(--font-ui, sans-serif); color: var(--cb-paper); background: var(--cb-cyan); }
+.cb-review__station--conditions .cb-review__n { background: var(--cb-gold-label); }
+.cb-review__station--keep .cb-review__n { background: var(--cb-ink); }
+.cb-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cb-muted); padding-left: 36px; min-height: 28px; display: flex; align-items: center; }
+
+@media (max-width: 480px) {
+  .cb-commit__row, .cb-review__row { grid-template-columns: 1fr; }
+  .cb-review__station + .cb-review__station::before { left: 8px; right: 8px; top: -7px; bottom: auto; border-left: 0; border-top: 3px solid var(--cb-cyan); }
+  .cb-review__row { gap: 14px; }
+}

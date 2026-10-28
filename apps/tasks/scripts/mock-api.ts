@@ -151,7 +151,8 @@ export function createMockApi({ seed }: MockApiOptions) {
     '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] }),
     '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift', 'start'] }),
     '/api/rules-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['rules'] }),
-    '/api/change-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['change'] })
+    '/api/change-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['change'] }),
+    '/api/collaboration-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['collab'] })
   };
 
   async function handle(method: string, urlPath: string, body?: unknown) {

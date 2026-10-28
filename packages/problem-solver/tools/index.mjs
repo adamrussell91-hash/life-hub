@@ -42,6 +42,9 @@ import { rbReview } from '../../rules-book/tools/review.mjs';
 import { CHANGE_TOOLS } from '../../change-book/tools/index.mjs';
 import { chCommit } from '../../change-book/tools/commit.mjs';
 import { chReview } from '../../change-book/tools/review.mjs';
+import { COLLAB_TOOLS } from '../../collaboration-book/tools/index.mjs';
+import { cbCommit } from '../../collaboration-book/tools/commit.mjs';
+import { cbReview } from '../../collaboration-book/tools/review.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -93,7 +96,11 @@ export const TOOLS = {
   // The Change Book's models (step explore), then its Act and Review tools.
   ...CHANGE_TOOLS,
   ch_commit: chCommit,
-  ch_review: chReview
+  ch_review: chReview,
+  // The Collaboration Book's models (step explore), then its Agree and Review tools.
+  ...COLLAB_TOOLS,
+  cb_commit: cbCommit,
+  cb_review: cbReview
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
