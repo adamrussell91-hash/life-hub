@@ -1,8 +1,8 @@
 import { AI_TOOLS, parseToolProposal, type AiProposal } from '@/ai/proposals';
 import { buildAiLessonContext, buildAiStaticPrompt } from '@/ai/context';
-import { emptySearchPack } from '@/ai/search-pack';
+import { emptySearchPack, type SearchPack } from '@/ai/search-pack';
 import { validateMutatingProposal } from '@/ai/validate-proposal';
-import { quizProposalIssues } from '@/ai/quiz-proposal';
+import { quizProposalIssues, type TagLists } from '@/ai/quiz-proposal';
 import { findBlockById } from '@/blocks/find-block';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { AiJob } from '@/ai/jobs';
@@ -241,28 +241,64 @@ function openingMessages(job: AiJob): ModelMessage[] {
 }
 
 /**
+ * What the agent has seen in this job: links it may put in a proposal (ones
+ * already in the lesson, the teacher's words, or its searches and tool
+ * results), and which tag lists list_question_tags found.
+ */
+export type JobSightings = { urls: Set<string>; tagLists?: TagLists };
+
+const HTTPS_URL = /https:\/\/[^\s"'<>\\]+/g;
+
+/** Every https link in some text or value, trailing punctuation (and an unpaired bracket) trimmed. */
+export function linksIn(value: unknown): string[] {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return [...text.matchAll(HTTPS_URL)].map((match) => {
+    let url = match[0].replace(/[.,;:!?]+$/, '');
+    if (/[)\]]$/.test(url) && !/[(\[]/.test(url)) url = url.replace(/[)\]]+$/, '');
+    return url;
+  });
+}
+
+/** The links the agent has seen, as a search pack the media check accepts. */
+function packOf(sightings: JobSightings | undefined): SearchPack {
+  const pack = emptySearchPack('');
+  if (!sightings) return pack;
+  return {
+    ...pack,
+    available: true,
+    sources: [...sightings.urls].map((url) => ({ title: '', url, snippet: '', domain: '', education_score: 0 }))
+  };
+}
+
+/**
  * The SVG diagram check needs DOMParser, which Node lacks. There the proposal
  * keeps its schema check and the diagram is re-checked when the lesson publishes.
  */
-function safeValidate(proposal: AiProposal): { ok: true } | { ok: false; error: string } {
+function safeValidate(proposal: AiProposal, pack: SearchPack): { ok: true } | { ok: false; error: string } {
   try {
-    return validateMutatingProposal(proposal, emptySearchPack(''));
+    return validateMutatingProposal(proposal, pack);
   } catch (error) {
     if (typeof DOMParser === 'undefined' && error instanceof ReferenceError) return { ok: true };
     throw error;
   }
 }
 
+const MEDIA_PREFIX = 'Media not in search pack: ';
+
 /** Parse and check one proposal tool call; a string is the problem to hand back. */
-export function checkProposalCall(name: string, input: unknown, lesson: Lesson): AiProposal | string {
+export function checkProposalCall(name: string, input: unknown, lesson: Lesson, sightings?: JobSightings): AiProposal | string {
   const parsed = parseToolProposal(name, input);
   if ('error' in parsed) return `${name}: ${truncate(parsed.error)}`;
   // Report every problem in one round. For a quiz question the quiz pass says
   // exactly which field is wrong, so its words replace the publish check's
   // generic ones; any other publish problem is kept.
-  const checked = safeValidate(parsed);
-  const quiz = quizProposalIssues(parsed, lesson);
-  const publish = checked.ok || (quiz.length > 0 && /^Quiz question \d+:/.test(checked.error)) ? [] : [checked.error];
+  const checked = safeValidate(parsed, packOf(sightings));
+  const quiz = quizProposalIssues(parsed, lesson, { tagLists: sightings?.tagLists });
+  const publish = checked.ok || (quiz.length > 0 && /^Quiz question \d+:/.test(checked.error))
+    ? []
+    : [checked.error.startsWith(MEDIA_PREFIX)
+      ? `Links and media must be ones already in the lesson or that came up in your searches or tool results. Remove these links and name the source in words instead: ${checked.error.slice(MEDIA_PREFIX.length)}`
+      : checked.error];
   const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson)];
   return problems.length ? truncate(problems.join('\n')) : parsed;
 }
@@ -347,6 +383,12 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
   let lastText = '';
   let turns = 0;
   const checks: string[] = [];
+  const sightings: JobSightings = {
+    urls: new Set([...linksIn(lesson.blocks), ...linksIn(job.message), ...linksIn(job.history ?? [])])
+  };
+  const sight = (value: unknown) => {
+    for (const url of linksIn(value)) sightings.urls.add(url);
+  };
 
   const fail = (error: string): RunLessonJobResult => ({ status: 'error', error, turns, usage, cost_usd: totalCost(usage), checks });
 
@@ -380,6 +422,7 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
     });
 
     const content = Array.isArray(reply.content) ? reply.content : [];
+    for (const block of content) if (block.type.endsWith('tool_result')) sight(block);
     const text = textOf(content);
     if (text) lastText = text;
 
@@ -418,7 +461,7 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
           results.push({ type: 'tool_result', tool_use_id: call.id, content: 'Only one proposal is shown per answer. This one was skipped.', is_error: true });
           continue;
         }
-        const parsedCall = checkProposalCall(call.name, call.input, lesson);
+        const parsedCall = checkProposalCall(call.name, call.input, lesson, sightings);
         const checked =
           typeof parsedCall !== 'string' && isBigBuild(parsedCall) && !planConfirmed(job)
             ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.`
@@ -449,6 +492,11 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
           value = { error: error instanceof Error ? error.message : 'That tool failed.' };
         }
         const isError = Boolean(value && typeof value === 'object' && 'error' in value);
+        if (!isError) sight(value);
+        if (call.name === 'list_question_tags' && !isError) {
+          const lists = value as { outcomes?: unknown[]; skills?: unknown[] };
+          sightings.tagLists = { outcomes: Boolean(lists.outcomes?.length), skills: Boolean(lists.skills?.length) };
+        }
         results.push({
           type: 'tool_result',
           tool_use_id: call.id,

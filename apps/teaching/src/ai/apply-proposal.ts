@@ -54,7 +54,7 @@ function withBlocks(lesson: Lesson, blocks: Block[]): Lesson {
   return { ...lesson, blocks };
 }
 
-/** Quiz questions only work in a Quiz lesson, so a proposal can switch the lesson type with them. */
+/** A proposal can switch an empty lesson to a Quiz along with its questions. */
 function withMode(lesson: Lesson, proposal: { set_mode?: 'quiz' }): Lesson {
   // A tutorial keeps its type: its exit checks hold the quiz questions.
   if (lesson.pedagogical_mode === 'tutorial') return lesson;

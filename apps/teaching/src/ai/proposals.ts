@@ -206,7 +206,7 @@ export const AI_TOOLS = [
         set_mode: {
           type: 'string',
           enum: ['quiz'],
-          description: 'Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz.'
+          description: 'Only for an empty lesson the teacher wants as a quiz: accepting turns the whole lesson into a Quiz. Leave it out when adding quiz_question blocks to a lesson that already has content; they run there as it is.'
         }
       },
       required: ['blocks']
@@ -226,7 +226,7 @@ export const AI_TOOLS = [
         set_mode: {
           type: 'string',
           enum: ['quiz'],
-          description: 'Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz.'
+          description: 'Only for an empty lesson the teacher wants as a quiz: accepting turns the whole lesson into a Quiz. Leave it out when adding quiz_question blocks to a lesson that already has content; they run there as it is.'
         }
       },
       required: ['position', 'blocks']
