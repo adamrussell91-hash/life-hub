@@ -110,19 +110,38 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   let busy = false;
   const saved = ctx.row.state === 'in' ? 'In. You can change it until the deadline.' : ctx.row.state === 'draft' ? 'Saved as a draft.' : '';
   note.textContent = ctx.row.frozen ? 'Your class work is in.' : saved;
+  // A clear, lasting sign that it went in, not just a line of small print.
+  const done = el('div', 'sprint-submit__done');
+  done.setAttribute('role', 'status');
+  let submitted = ctx.row.state === 'in' || ctx.row.frozen;
+  const paintDone = (when?: Date) => {
+    done.hidden = !submitted;
+    if (!submitted) return;
+    const at = when ? ` at ${when.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : '';
+    done.replaceChildren(el('span', 'sprint-submit__tick', '✓'), el('div', ''));
+    done.lastElementChild!.append(el('strong', '', `Submitted${at}`), el('span', '', ctx.row.frozen ? ' Your class work is in.' : ' You can still change it until the deadline. Changes save by themselves.'));
+  };
+  const goLabel = () => (submitted ? 'Update my submission' : 'Check and submit');
   const send = async (kind: 'save' | 'submit') => {
     if (busy || !ctx.editable) return;
     busy = true;
     // An autosave keeps a submit's message in view; a new submit clears it.
-    if (kind === 'submit') err.textContent = '';
+    if (kind === 'submit') { err.textContent = ''; go.textContent = 'Submitting…'; go.disabled = true; }
     try {
       const next = kind === 'save' ? await ctx.client.save(phase, payload()) : await ctx.client.submit(phase, payload());
-      note.textContent = kind === 'submit' ? 'In. You can change it until the deadline.' : 'Saved as a draft.';
-      if (kind === 'submit') ctx.onStatus(next);
+      note.textContent = kind === 'submit' ? '' : submitted ? 'Changes saved.' : 'Saved as a draft.';
+      if (kind === 'submit') {
+        submitted = true;
+        paintDone(new Date());
+        done.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        ctx.onStatus(next);
+      }
     } catch (e) {
       err.textContent = e instanceof Error ? e.message : 'That didn’t save. Try again.';
     } finally {
       busy = false;
+      go.textContent = goLabel();
+      go.disabled = !ctx.editable;
     }
   };
   const check = () => {
@@ -134,7 +153,9 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     if (check().length === 0) void send('submit');
   });
   go.disabled = !ctx.editable;
-  bar.append(el('h3', '', 'Check before you submit'), list, go, note, err);
+  go.textContent = goLabel();
+  paintDone();
+  bar.append(done, el('h3', '', 'Check before you submit'), list, go, note, err);
   return {
     el: bar,
     changed() {
