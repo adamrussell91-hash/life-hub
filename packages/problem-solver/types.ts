@@ -64,11 +64,11 @@ export type PsSession = {
   id: string;
   title: string;
   revision: number;
-  kind: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'start';
+  kind: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'start';
   status: 'active' | 'finished' | 'archived';
   /** 'frame', a plan step id from steps.mjs, or 'finished'. */
   phase: string;
-  frame: { goal?: string; whatIsTrue?: string; whatCanBeDone?: string; decision?: string; compass?: string; known?: string; need?: string; route?: string; situation?: string; group?: string; change?: string; stay?: string };
+  frame: { goal?: string; whatIsTrue?: string; whatCanBeDone?: string; decision?: string; compass?: string; known?: string; need?: string; route?: string; situation?: string; group?: string; change?: string; stay?: string; outcome?: string };
   model: { id: PsModelId; reason: string } | null;
   links: { kind: 'task' | 'project' | 'goal'; id: string }[];
   steps: Record<string, PsStepState>;
@@ -107,7 +107,7 @@ export type PsSession = {
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'start'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'start'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
 
 export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'quick_answer' | 'quick_again' | 'quick_check' | 'start_answer' | 'start_again' | 'start_check' | 'escalate';
 

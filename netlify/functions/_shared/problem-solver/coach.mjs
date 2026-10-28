@@ -8,6 +8,7 @@ import { buildDecisionPrompt } from './decision-prompts.mjs';
 import { buildGearPrompt } from './get-things-done-prompts.mjs';
 import { buildRulesPrompt } from './rules-book-prompts.mjs';
 import { buildChangePrompt } from './change-book-prompts.mjs';
+import { buildCollabPrompt } from './collaboration-book-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
 import { buildStartPrompt, checkStartTurn } from './start-prompts.mjs';
@@ -185,6 +186,7 @@ const PROMPTS = {
   shift: { build: buildGearPrompt, read: parse },
   rules: { build: buildRulesPrompt, read: parse },
   change: { build: buildChangePrompt, read: parse },
+  collab: { build: buildCollabPrompt, read: parse },
   full: { build: buildCoachPrompt, read: parse }
 };
 
