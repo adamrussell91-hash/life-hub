@@ -69,6 +69,7 @@ export type HubViewId =
   | 'change-book'
   | 'collaboration-book'
   | 'communication-book'
+  | 'question-book'
   | 'city'
   | 'grove';
 
@@ -132,6 +133,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'change-book', label: 'Change Book', href: '#/change-book' },
       { id: 'collaboration-book', label: 'Collaboration Book', href: '#/collaboration-book' },
       { id: 'communication-book', label: 'Communication Book', href: '#/communication-book' },
+      { id: 'question-book', label: 'Question Book', href: '#/question-book' },
       { id: 'line', label: 'Personal line', href: '#/line' },
       { id: 'search', label: 'Search', href: '#/search' },
       { id: 'properties', label: 'Properties', href: '#/properties' },
