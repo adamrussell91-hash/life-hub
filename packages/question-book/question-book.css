@@ -1,0 +1,56 @@
+/* packages/question-book/question-book.css
+   The Question Book's tokens, scoped to .qb-scope the way the Rules Book scopes .rb-scope. The
+   pack's screen palette: ivory paper, ink, the lifted cover blue for structure and the red for
+   the answer and the focus, the cover yellow as a shape only (1.6:1 on paper), and the warm soft
+   and line tints. The red falls under 4.5:1 on paper, so small red text takes the pack's red
+   label shade; the blue label is our own darker step of the cover blue for text on its tint.
+   Motion matches the other tools. */
+.qb-scope {
+  --qb-paper: #f4eedd;
+  --qb-ink: #181916;
+  --qb-blue: #3d66cf;
+  --qb-red: #d73c2c;
+  --qb-yellow: #e9b92f;
+  --qb-blue-label: #2f52ad;
+  --qb-red-label: #9e2a20;
+  --qb-blue-tint: #dce5fa;
+  --qb-red-tint: #f3d8cf;
+  --qb-soft: #eee5d1;
+  --qb-line: #655f52;
+  --qb-muted: #655f52;
+  --qb-ghost: rgba(24, 25, 22, 0.12);
+  --qb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --qb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens, so
+     remapping them here draws the five chapter charts in the Question Book's palette. Red stays
+     red (the label shade under text); green, Decision Maker's "go", becomes the blue. */
+  --dm-paper: var(--qb-paper);
+  --dm-ink: var(--qb-ink);
+  --dm-red: var(--qb-red);
+  --dm-green: var(--qb-blue);
+  --dm-red-label: var(--qb-red-label);
+  --dm-soft: var(--qb-soft);
+  --dm-line: var(--qb-line);
+  --dm-green-tint: var(--qb-blue-tint);
+  --dm-red-tint: var(--qb-red-tint);
+  --dm-ghost: var(--qb-ghost);
+  --dm-ease: var(--qb-ease);
+  --dm-spring: var(--qb-spring);
+  --dm-muted: var(--qb-muted);
+  --dm-contested: var(--qb-red-label);
+  --dm-band: var(--qb-blue-label);
+}
+
+.qb-emblem { display: inline-flex; line-height: 0; }
+.qb-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.qb-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--qb-ink); background: var(--qb-paper); }
+.qb-scope .dm-details__card--red { border-top-color: var(--qb-red); }
+.qb-scope .dm-details__card--green { border-top-color: var(--qb-blue); }
+.qb-scope .dm-details__card--tint { border-top-color: var(--qb-line); }
+/* Decision Maker sets ink on its brighter label red; on the darker red label, paper reads. */
+.qb-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.qb-scope .dm-qk__answer[data-answer='no'] { color: var(--qb-paper); }
