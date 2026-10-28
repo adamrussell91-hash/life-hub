@@ -7434,3 +7434,185 @@ button.org-chart__unit-label:focus-visible {
     bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Mentoring & coaching (views/mentoring.ts): one card per relationship. */
+.mentoring-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.mentoring-summary {
+  margin: 0;
+}
+
+.mentoring-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mentoring-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.mentoring-section__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.mentoring-section__count {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.mentoring-section__hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.mentoring-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-4);
+}
+
+.mentor-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--glass);
+  box-shadow: var(--elev-3);
+}
+
+.mentor-card--due {
+  border-color: var(--pastel-gold-ink);
+}
+
+.mentor-card__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.mentor-card__avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.mentor-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.mentor-card__name {
+  font-size: var(--text-md, 1.0625rem);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.mentor-card__name:hover {
+  text-decoration: underline;
+}
+
+.mentor-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.mentor-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.mentor-chip--mentee { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.mentor-chip--coachee { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.mentor-chip--mentor { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.mentor-chip--warmth-warm { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.mentor-chip--warmth-cold { color: var(--muted); }
+
+.mentor-card__role {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.mentor-card__nudge {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.mentor-card__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.mentor-card__fact {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.mentor-card__fact dt {
+  color: var(--muted);
+}
+
+.mentor-card__fact dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.mentor-card__link {
+  color: var(--navy);
+}
+
+.mentor-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.mentoring-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 36rem;
+}
