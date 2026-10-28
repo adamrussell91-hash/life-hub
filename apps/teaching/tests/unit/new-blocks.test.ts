@@ -169,6 +169,36 @@ describe('new block renderers', () => {
     expect(el.textContent).toContain('Explain');
     expect(el.querySelectorAll('.block-question-set__options li')).toHaveLength(2);
   });
+
+  it('renderQuestionSetBlock lets students pick and type, and keeps answers on the device', () => {
+    localStorage.clear();
+    const block = {
+      ...baseBlock,
+      block_type: 'question_set' as const,
+      content: {
+        questions: [
+          { id: 'q1', prompt: 'Explain', kind: 'short_answer' as const, response_space: 'long' as const },
+          { id: 'q2', prompt: 'Pick', kind: 'multiple_choice' as const, options: ['One', 'Two'] }
+        ]
+      }
+    };
+    const first = renderQuestionSetBlock(block, 'student', { lessonId: 'lesson_qs' });
+    const area = first.querySelector('textarea.block-question-set__answer') as HTMLTextAreaElement;
+    expect(area.getAttribute('rows')).toBe('7');
+    area.value = 'Because of line (4)';
+    area.dispatchEvent(new Event('input'));
+    const radios = first.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+    expect(radios).toHaveLength(2);
+    radios[1]!.checked = true;
+    radios[1]!.dispatchEvent(new Event('change'));
+
+    const again = renderQuestionSetBlock(block, 'student', { lessonId: 'lesson_qs' });
+    expect((again.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Because of line (4)');
+    expect(again.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1]!.checked).toBe(true);
+
+    const teacher = renderQuestionSetBlock(block, 'teacher', { lessonId: 'lesson_qs' });
+    expect(teacher.querySelector('textarea, input')).toBeNull();
+  });
 });
 
 describe('createQuoteEditor', () => {
