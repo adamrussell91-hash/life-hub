@@ -45,6 +45,7 @@ import { renderTiesToConfirmView } from '@/views/ties-to-confirm';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
+import { renderMentoringView } from '@/views/mentoring';
 import { renderCommunicationNewView, renderCommunicationsView } from '@/views/communications';
 import { renderCommPage } from '@/views/comm-page';
 import { renderThreadPage } from '@/views/thread-page';
@@ -202,6 +203,13 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'relationships') {
       renderPageHeader(shell, viewChrome('relationships'));
       renderRelationshipsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'mentoring') {
+      renderPageHeader(shell, viewChrome('mentoring'));
+      await renderMentoringView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'communications') {

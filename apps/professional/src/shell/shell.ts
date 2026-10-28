@@ -34,6 +34,7 @@ const REST: NavItem[] = [
   { id: 'people', label: 'People', href: '#/people' },
   { id: 'organisations', label: 'Organisations', href: '#/organisations' },
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
+  { id: 'mentoring', label: 'Mentoring', href: '#/mentoring' },
   { id: 'communications', label: 'Comms', href: '#/communications' },
   { id: 'meetings', label: 'Meetings', href: '#/meetings' },
   { id: 'events', label: 'Events', href: '#/events' },

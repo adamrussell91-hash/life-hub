@@ -21,6 +21,7 @@ export type RailViewId =
   | 'people'
   | 'organisations'
   | 'relationships'
+  | 'mentoring'
   | 'communications'
   | 'meetings'
   | 'events'
@@ -40,6 +41,7 @@ export type Route =
   | { name: 'organisations-compare' }
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
+  | { name: 'mentoring' }
   | { name: 'communications' }
   | { name: 'meetings' }
   | { name: 'events' }
@@ -103,6 +105,7 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
+  if (segments.length === 1 && segments[0] === 'mentoring') return { name: 'mentoring' };
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
   if (segments.length === 1 && segments[0] === 'meetings') return { name: 'meetings' };
   if (segments.length === 1 && segments[0] === 'events') return { name: 'events' };
@@ -252,6 +255,7 @@ export function railHighlightFor(route: Route): RailViewId | null {
   if (route.name === 'people' || route.name === 'people-ties' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
+  if (route.name === 'mentoring') return 'mentoring';
   if (
     route.name === 'applications' ||
     route.name === 'application' ||
