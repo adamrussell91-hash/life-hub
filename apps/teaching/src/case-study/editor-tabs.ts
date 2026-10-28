@@ -1,15 +1,26 @@
 import type { Block } from '@/schemas/block';
+import { createBlock } from '@/blocks/create-block';
 import { el } from '@/quiz/dom';
 import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
 import type { CaseStation } from './schema';
+import { isCaseBriefSection } from './model';
 
 export type CaseTab = 'kit' | CaseStation | 'all';
 
 const ITEMS: Array<[CaseTab, string]> = [['kit', 'Kit'], ['brief', 'Brief'], ['case', 'The case'], ['decide', 'Decide'], ['outcome', 'Outcome'], ['rules', 'Rules'], ['all', 'All']];
 
-/** Ordinary lesson blocks are Decide-stage content: they show on Decide and All only. */
-export function inCaseTab(_block: Block, tab: CaseTab): boolean {
-  return tab === 'all' || tab === 'decide';
+/** The Brief section's blocks show on Brief; every other block is Decide-stage content. All shows both. */
+export function inCaseTab(block: Block, tab: CaseTab): boolean {
+  if (tab === 'all') return true;
+  if (tab === 'brief') return isCaseBriefSection(block);
+  return tab === 'decide' && !isCaseBriefSection(block);
+}
+
+/** The Brief section, added if the lesson has none. Unchanged blocks come back as the same array. */
+export function withCaseBriefSection(blocks: Block[], newId: () => string): Block[] {
+  if (blocks.some(isCaseBriefSection)) return blocks;
+  const base = createBlock('section', newId());
+  return [{ ...base, content: { title: 'Brief', blocks: [], case_brief: true } } as Block, ...blocks];
 }
 
 /** Kit, one per station, All. `marks` puts a dot on tabs that still have something to add. */

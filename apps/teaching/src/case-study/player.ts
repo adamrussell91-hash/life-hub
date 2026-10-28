@@ -1,6 +1,7 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
+import { isCaseBriefSection } from './model';
 import { button, el } from '@/quiz/dom';
 import { coach } from '@/sprint/form-kit';
 import { buildCaseRail, type CaseRailItem, type CaseRailState } from './rail';
@@ -46,7 +47,11 @@ const dayOf = (day: string) => new Date(`${day}T12:00`).toLocaleDateString('en-A
 export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): { dispose(): void } {
   const { lesson, client } = options;
   const cs = lesson.case as PublicCase;
-  const blocks = lesson.blocks as Block[];
+  const pageBlocks = lesson.blocks as Block[];
+  // The Brief section's blocks sit in the Brief; every other block is Decide content.
+  const briefSection = pageBlocks.find(isCaseBriefSection);
+  const briefBlocks = briefSection?.block_type === 'section' ? (briefSection.content.blocks as Block[]) : [];
+  const blocks = pageBlocks.filter((b) => !isCaseBriefSection(b));
   let status: CaseStatus | null = null;
   let chosen: number | null = null;
   let helpOpen = false;
@@ -65,8 +70,14 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   let loadFailed = false;
   let pending: { doc_id: string; quote: string } | null = null;
   const drafts: Drafts = { answers: {} };
-  /** The Decide blocks are built once so a repaint keeps whatever a student did in them. */
+  /** The Brief and Decide blocks are built once so a repaint keeps whatever a student did in them (a recording keeps playing). */
   let blocksEl: HTMLElement | null = null;
+  let briefEl: HTMLElement | null = null;
+  const blockList = (list: Block[]) => {
+    const wrap = el('div', 'cs-blocks');
+    for (const b of list) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks }));
+    return wrap;
+  };
 
   const shell = el('div', 'cs');
   const hero = el('div', 'cs__hero');
@@ -277,6 +288,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
 
   function briefPanel(s: CaseStatus): HTMLElement {
     const box = panel('brief', 'Brief');
+    if (briefBlocks.length) box.append(briefEl ??= blockList(briefBlocks));
     box.append(el('p', 'cs-ask', cs.decision.prompt));
     const take = s.work.first_take;
     if (take) {
@@ -383,12 +395,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
       return box;
     }
     if (blocks.length) {
-      blocksEl ??= (() => {
-        const wrap = el('div', 'cs-blocks');
-        for (const b of blocks) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
-        return wrap;
-      })();
-      box.append(blocksEl);
+      box.append(blocksEl ??= blockList(blocks));
     }
     box.append(el('h3', '', cs.decision.prompt), note('Once you lock it in, it can’t change.', 'cs-hint'));
     const free = cs.decision.options.length === 0;
