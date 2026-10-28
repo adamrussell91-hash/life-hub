@@ -127,6 +127,13 @@ const tasks: Task[] = [
   })
 ];
 
+/** The kanban is the secondary view now — the hive is where Projects lands. */
+function openBoard(canvas: HTMLElement): void {
+  [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="View"] button')]
+    .find((button) => button.textContent === 'Board')
+    ?.click();
+}
+
 describe('projects view rebuild', () => {
   beforeEach(() => {
     // Fixtures use created_at: '2026-08-01' with no other activity, and the
@@ -216,6 +223,7 @@ describe('projects view rebuild', () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderProjectsView(canvas);
+    openBoard(canvas);
     const listsBefore = vi.mocked(tasksApi.listProjects).mock.calls.length;
 
     const form = canvas.querySelector('form.quick-add') as HTMLFormElement;
@@ -273,6 +281,7 @@ describe('projects view rebuild', () => {
   it('groups the board by status and opens a project page from a card', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const lanes = [...canvas.querySelectorAll('.lane__title')].map((node) => node.textContent);
     expect(lanes).toContain('On the go');
@@ -293,6 +302,7 @@ describe('projects view rebuild', () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const completed = [...canvas.querySelectorAll<HTMLButtonElement>('.projects-chart__slice')].find((btn) =>
       btn.textContent?.includes('Completed')
@@ -376,6 +386,7 @@ describe('projects view rebuild', () => {
   it('takes Add next action to the project page instead of doing nothing', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
     const hint = canvas.querySelector<HTMLButtonElement>(
       '[data-project-id="proj_idle"] .proj-health'
     );
@@ -389,6 +400,7 @@ describe('projects view rebuild', () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const cards = [...canvas.querySelectorAll<HTMLElement>('.pcard')];
     expect(cards.length).toBeGreaterThan(0);
@@ -455,6 +467,7 @@ describe('projects view rebuild', () => {
   it('filters the board when a chart slice is selected', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const planning = [...canvas.querySelectorAll<HTMLButtonElement>('.projects-chart__slice')].find((btn) =>
       btn.textContent?.includes('Planning')
@@ -468,10 +481,21 @@ describe('projects view rebuild', () => {
     });
   });
 
-  it('puts the forecast first, kanban next, and status mix beside the timeline', async () => {
+  it('puts the forecast first, the hive next, and status mix beside the timeline', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
 
+    const hive = canvas.querySelector('.projects-hive');
+    expect(hive).not.toBeNull();
+    expect(canvas.querySelector('.projects-board')).toBeNull();
+    expect(
+      canvas.querySelector('#project-forecast')!.compareDocumentPosition(hive!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      hive!.compareDocumentPosition(canvas.querySelector('.projects-pulse')!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    openBoard(canvas);
     const forecast = canvas.querySelector('#project-forecast');
     const board = canvas.querySelector('.projects-board');
     const pulse = canvas.querySelector('.projects-pulse');
@@ -506,6 +530,7 @@ describe('projects view rebuild', () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const card = (id: string) => canvas.querySelector<HTMLElement>(`.pcard[data-project-id="${id}"]`);
     expect(card('proj_plan')?.querySelector('.halt-badge')?.getAttribute('aria-label')).toBe('NSW HALT');
@@ -593,5 +618,55 @@ describe('projects view rebuild', () => {
     );
     bury?.click();
     expect(canvas.querySelector('.stall-confirm .page-header__supporting')?.textContent).toMatch(/Park it/);
+  });
+
+  it('lands on the hive: one hexagon per live project, HALT badge only on NSW HALT ones', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      ...Object.values(fixtures).filter((item) => item.id !== 'proj_plan'),
+      { ...fixtures.plan, job: 'halt_board' }
+    ]);
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    const tile = (id: string) => canvas.querySelector<SVGGElement>(`.hive-tile[data-project-id="${id}"]`);
+    const ids = [...canvas.querySelectorAll<SVGGElement>('.hive-tile')].map((node) => node.dataset.projectId).sort();
+    expect(ids).toEqual(['proj_go', 'proj_idle', 'proj_plan', 'proj_stall']);
+    expect(tile('proj_plan')?.querySelector('.hive-halt')).not.toBeNull();
+    expect(tile('proj_go')?.querySelector('.hive-halt')).toBeNull();
+    expect(tile('proj_plan')?.getAttribute('aria-label')).toMatch(/NSW HALT/);
+    expect(tile('proj_stall')?.classList.contains('hive-tile--stalled')).toBe(true);
+    const clusters = [...canvas.querySelectorAll('.hive-label__title')].map((node) => node.textContent);
+    expect(clusters).toEqual(['On the go', 'Planning', 'Not started', 'Stalled']);
+  });
+
+  it('opens a summary with the next action when a hexagon is tapped', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    canvas.querySelector<SVGGElement>('.hive-tile[data-project-id="proj_plan"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const panel = canvas.querySelector('.projects-hive__panel')!;
+    expect(panel.querySelector('.projects-hive__panel-title')?.textContent).toBe('MindWorks prep');
+    expect(panel.querySelector('.projects-hive__next-text')?.textContent).toBe('Draft slides');
+    expect(canvas.querySelector('.hive-tile[data-project-id="proj_plan"]')?.getAttribute('aria-pressed')).toBe('true');
+    panel.querySelector<HTMLButtonElement>('.btn--primary')?.click();
+    expect(location.hash).toBe('#/project/proj_plan');
+  });
+
+  it('regroups the hive in place, keeping each hexagon so it can slide', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    const before = canvas.querySelector('.hive-tile[data-project-id="proj_go"]');
+    const pill = [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="Group by (more)"] button')].find(
+      (button) => button.textContent === 'Deadline'
+    );
+    pill?.click();
+    const after = canvas.querySelector<SVGGElement>('.hive-tile[data-project-id="proj_go"]');
+    expect(after).toBe(before);
+    expect(after?.dataset.group).toBe('no_date');
+    expect([...canvas.querySelectorAll('.hive-label__title')].map((node) => node.textContent)).toEqual(['No date']);
   });
 });

@@ -8716,6 +8716,290 @@ button.column-bar--row.is-active {
   background: #a0218b;
 }
 
+/* Projects hive: the Projects landing view (projects-hive.ts). WalkThru-style
+   hexagons, one cluster per group; the kanban board is the Board toggle. */
+.projects-view-toggle {
+  flex-shrink: 0;
+}
+
+.projects-hive {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.projects-hive__stage {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.projects-hive__svg {
+  display: block;
+  max-width: none;
+  overflow: visible;
+}
+
+.hive-label__title {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hive-label__count {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hive-label__swatch {
+  stroke: var(--ink);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.hive-tile {
+  cursor: pointer;
+  outline: none;
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms;
+}
+
+.hive-tile__hex {
+  stroke: var(--ink);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.hive-tile:hover .hive-tile__hex,
+.hive-tile:focus-visible .hive-tile__hex {
+  stroke-width: 2.6;
+}
+
+.hive-tile.is-selected .hive-tile__hex {
+  stroke-width: 3.4;
+}
+
+.hive-tile--parked {
+  opacity: 0.55;
+}
+
+.hive-tile__hatch {
+  fill: url(#hive-hatch);
+  pointer-events: none;
+}
+
+.hive-hatch__line {
+  fill: rgba(19, 35, 58, 0.14);
+}
+
+.hive-tile__tab,
+.hive-tile__badge {
+  fill: var(--ink);
+}
+
+.hive-tile__tab-text,
+.hive-tile__count {
+  fill: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hive-tile__title {
+  fill: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+/* Same blue and magenta as .halt-badge above. */
+.hive-halt__halt {
+  fill: #27418f;
+}
+
+.hive-halt__nsw {
+  fill: #a0218b;
+}
+
+.hive-halt__text {
+  fill: #fff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.hive-pip {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1;
+}
+
+.hive-pip.is-done {
+  fill: #fff;
+}
+
+/* Health on the dark badge: shape differs too (dot, triangle, square, dash). */
+.hive-health--on_track { fill: #3dd68c; }
+.hive-health--slipping { fill: #ffb224; }
+.hive-health--stalled { fill: #ff6369; }
+.hive-health--parked { fill: #b4b4b4; }
+
+.hive-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.hive-dot--on_track { border-radius: 50%; background: var(--success); }
+.hive-dot--slipping { width: 11px; background: var(--pastel-gold-ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hive-dot--stalled { background: var(--danger); }
+.hive-dot--parked { height: 3px; border-radius: 2px; background: var(--muted); }
+
+.projects-hive__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 12px);
+  background: #fff;
+  position: sticky;
+  top: var(--space-4);
+}
+
+.projects-hive__panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.projects-hive__panel-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.projects-hive__panel-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  line-height: var(--leading-snug);
+}
+
+.projects-hive__close {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.projects-hive__status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.projects-hive__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.projects-hive__scope,
+.projects-hive__next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.projects-hive__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.projects-hive__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--navy);
+}
+
+.projects-hive__next {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.projects-hive__next-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.projects-hive__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.projects-hive__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.projects-hive__summary-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.projects-hive__summary-row span:not(.hive-dot) {
+  flex: 1;
+}
+
+.projects-hive__hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  line-height: var(--leading-snug);
+}
+
+@media (max-width: 900px) {
+  .projects-hive {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a phone the summary sits above the hive only while a hexagon is open. */
+  .projects-hive__panel {
+    order: -1;
+    position: static;
+  }
+
+  .projects-hive:not(.has-selection) .projects-hive__panel {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hive-tile {
+    transition: none;
+  }
+}
+
 .pcard--compact .pcard__title {
   font-size: var(--text-sm);
 }
