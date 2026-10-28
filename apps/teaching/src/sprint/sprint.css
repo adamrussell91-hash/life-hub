@@ -47,6 +47,7 @@
 .sprint-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 16px; }
 .sprint-tab[aria-selected="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
 .sprint-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 6px 0; font-size: 14px; }
+.sprint-row--where { grid-template-columns: 1fr; }
 .sprint-row input[type="text"], .sprint-row .qz-input { width: 100%; margin-top: 4px; }
 .sprint-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .sprint-idea { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; display: grid; gap: 8px; }
@@ -420,3 +421,6 @@ body.spractice-open { overflow: hidden; }
 .sk-check__more { font-size: 13px; margin-bottom: 6px; }
 .sk-check__more summary { cursor: pointer; color: var(--muted); }
 .sk-check__more p { margin: 6px 0 0; }
+.sprint-submit__done { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; background: var(--pastel-sage); color: var(--pastel-sage-ink); border: 1.5px solid var(--pastel-sage-ink); }
+.sprint-submit__done[hidden] { display: none; }
+.sprint-submit__tick { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--pastel-sage-ink); color: #fff; font-size: 18px; }
