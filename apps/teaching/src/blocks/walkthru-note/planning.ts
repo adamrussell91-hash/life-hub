@@ -1,3 +1,4 @@
+import { GLYPH_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { renderStepsInto } from './note';
@@ -20,7 +21,7 @@ export const PLANNING_FIELDS: ReadonlyArray<{ label: string; technique: string; 
   { label: 'Enquiry projects', technique: 'w1-enquiry-projects' }
 ];
 
-const glyphs = createGlyphSet({ svgs: {}, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
+const glyphs = createGlyphSet({ svgs: GLYPH_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
 
 /** A teacher-only row of planning prompts for the unit page. Returns null if the catalogue lacks them all. */
 export function renderPlanningPrompts(): HTMLElement | null {
