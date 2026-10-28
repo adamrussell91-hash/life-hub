@@ -5,7 +5,7 @@ import type { AssessmentMark, Column, Markbook } from './schema';
 
 export type RosterStudent = { id: string; name: string; initials: string; removed?: true };
 
-export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[]; set?: string };
+export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[]; set?: string; /** Left blank by the student. */ unanswered?: true };
 export type PracticeScore = { score: number; max: number; pending: number };
 export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[]; practice?: Record<string, PracticeScore> };
 /** A quiz's group set, as the markbook sees it. */
@@ -23,6 +23,8 @@ export type QuizColumn = {
   hidden: boolean;
   /** The quiz asked students how sure they were. */
   confidence: boolean;
+  /** The quiz had a timer. */
+  timed?: boolean;
   closed?: boolean;
   questions: QuizQuestionMeta[];
   scores: Record<string, QuizScore>;

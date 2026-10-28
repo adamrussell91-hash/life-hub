@@ -38,3 +38,44 @@ describe('unit planning prompts', () => {
     for (const field of PLANNING_FIELDS) expect(techniqueById(field.technique)).toBeTruthy();
   });
 });
+
+import { withWalkthruNote } from '@/blocks/walkthru-note/add-note';
+import { renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
+import { markbookEvidence } from '@/evidence/markbook-evidence';
+
+describe('unit-level framework lenses', () => {
+  it('offers one button per framework and adds the chosen lens', () => {
+    const added: string[] = [];
+    const host = renderFrameworkLenses((id) => { added.push(id); return true; })!;
+    const buttons = [...host.querySelectorAll('button')];
+    expect(buttons).toHaveLength(5);
+    expect(buttons.every((b) => /framework chapter/.test(b.title))).toBe(true);
+    buttons[2]!.click();
+    expect(added).toEqual(['fw_marge']);
+    expect(host.textContent).toContain('added at the end of the plan');
+  });
+});
+
+describe('WalkThru note on a lesson', () => {
+  const lesson = { id: 'l1', blocks: [] as never[] };
+  it('adds one teacher-only note carrying the id and no text, once', () => {
+    const next = withWalkthruNote(lesson, 'w1-cold-calling', 'block_1');
+    expect(next.blocks).toHaveLength(1);
+    const note = next.blocks[0] as { block_type: string; visibility: string; content: { walkthru: unknown } };
+    expect(note.block_type).toBe('teacher_note');
+    expect(note.visibility).toBe('teacher_only');
+    expect(note.content.walkthru).toEqual({ set: 1, id: 'w1-cold-calling', jots: {} });
+    expect(withWalkthruNote(next, 'w1-cold-calling', 'block_2')).toBe(next);
+    expect(withWalkthruNote(lesson, 'not-a-technique', 'block_3')).toBe(lesson);
+  });
+});
+
+describe('timing evidence', () => {
+  it('counts blank items at the end of a timed quiz and ignores untimed ones', () => {
+    const row = (id: string, unanswered?: true) => ({ id, awarded: 0, max: 1, confidence: null, outcomes: [], items: [], ...(unanswered ? { unanswered } : {}) });
+    const quiz = (timed: boolean) => ({ kind: 'quiz', id: 'quiz:q', lesson_id: 'q', title: 'Q', date: '2026-10-01', hidden: false, confidence: false, timed, questions: [], scores: { s1: { attempt_id: 'a', submitted_at: '2026-10-01T00:00:00.000Z', score: 0, max: 3, pending: 0, rows: [row('1'), row('2', true), row('3', true)] } } });
+    const view = (timed: boolean) => ({ markbook: { columns: [], marks: {}, groups: [], history: [], hidden_quizzes: [] }, students: [], quizzes: [quiz(timed)] }) as never;
+    expect(markbookEvidence(view(true)).timing).toEqual({ 'quiz:q': { s1: 2 } });
+    expect(markbookEvidence(view(false)).timing).toEqual({});
+  });
+});

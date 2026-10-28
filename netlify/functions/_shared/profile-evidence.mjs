@@ -15,14 +15,21 @@ var findOutcome = (token, labels) => labels.find((l) => l.code.toLowerCase() ===
 var outcomeIdOf = (token, labels) => findOutcome(token, labels)?.id ?? token;
 
 // apps/teaching/src/evidence/markbook-evidence.ts
+var trailingBlanks = (rows) => {
+  let n = 0;
+  for (let i = rows.length - 1; i >= 0 && rows[i].unanswered; i--) n += 1;
+  return n;
+};
 function markbookEvidence(view, labels = []) {
   const norm = (tag) => tag.startsWith("out:") ? `out:${outcomeIdOf(tag.slice(4), labels)}` : tag;
   const evidence = [];
   const sources = [];
+  const timing = {};
   for (const quiz of view.quizzes) {
     if (quiz.hidden) continue;
     const source = `quiz:${quiz.lesson_id}`;
     sources.push({ source, title: quiz.title });
+    if (quiz.timed) timing[source] = Object.fromEntries(Object.entries(quiz.scores).map(([student, score]) => [student, trailingBlanks(score.rows)]));
     for (const [student, score] of Object.entries(quiz.scores)) {
       const date = score.submitted_at ? sydneyDay(score.submitted_at) : quiz.date;
       for (const row of score.rows) for (const item of row.items ?? []) evidence.push({ ...item, tags: item.tags.map(norm), student, source, date, confidence: row.confidence });
@@ -44,7 +51,7 @@ function markbookEvidence(view, labels = []) {
       }
     }
   }
-  return { evidence, sources };
+  return { evidence, sources, timing };
 }
 
 // apps/teaching/src/skills/schema.ts
@@ -263,6 +270,7 @@ var NEED = {
   /** Students whose answers are marked with a code of a problem type. */
   codeMinStudents: 2
 };
+var TIME = { tailMin: 2, students: 2 };
 var scored2 = (list) => list.filter((x) => x.share !== null);
 var avg2 = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 function needsFor(items, codes) {
@@ -297,13 +305,15 @@ function needsFor(items, codes) {
   for (const [type, students] of byType) if (students.size >= NEED.codeMinStudents && !out.some((o) => o.type === type)) out.push({ type, students: students.size });
   return out;
 }
-function signalsFor(evidence, sources, codes) {
+function signalsFor(evidence, sources, codes, timing = {}) {
   const signals = [];
   for (const { source, title } of sources) {
     const mine = evidence.filter((x) => x.source === source);
     if (!mine.length) continue;
     const date = mine.map((x) => x.date).sort()[0];
     for (const need of needsFor(mine, codes)) signals.push({ source, title, date, type: need.type, students: need.students });
+    const unfinished = Object.values(timing[source] ?? {}).filter((blank) => blank >= TIME.tailMin).length;
+    if (unfinished >= TIME.students) signals.push({ source, title, date, type: "time", students: unfinished });
   }
   return signals.sort((a, b) => a.date.localeCompare(b.date) || a.source.localeCompare(b.source) || a.type.localeCompare(b.type));
 }

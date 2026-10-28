@@ -55,7 +55,7 @@ test('the same problem in two classes is a pattern; a lone recent signal is a on
   assert.equal(lone[0].key, 'recall:c1:one');
   // settings are numbers, not constants
   assert.equal(countPatterns({ c1: [sig('q1', '2026-10-12'), sig('q2', '2026-10-13')] }, '2026-10-14', { ...DEFAULT_MONITOR, quizzes: 2 })[0].kind, 'repeated');
-  assert.deepEqual(cleanSettings({ quizzes: 1, weeks: 99, classes: 3 }), { ...DEFAULT_MONITOR, classes: 3 });
+  assert.deepEqual(cleanSettings({ quizzes: 1, weeks: 99, classes: 3 }), { ...DEFAULT_MONITOR, rep_push: true, classes: 3 });
 });
 
 test('signalsFor makes one signal per source and type', () => {
@@ -147,4 +147,59 @@ test('the suggestions endpoint is teacher only', async () => {
   const handler = createWalkthruSuggestionsHandler({ env: gateEnv, getContentStore: async () => store() });
   const res = await handler(new Request('https://x.test/api/walkthru-suggestions'));
   assert.equal(res.status, 401);
+});
+
+test('working under time: students ending a timed quiz with blank items make a signal, and only then', () => {
+  const evidence = students.map((student) => item({ student, share: 1, source: 'quiz:t' }));
+  const timing = { 'quiz:t': { s1: 3, s2: 2, s3: 0, s4: 1 } };
+  const signals = signalsFor(evidence, [{ source: 'quiz:t', title: 'T' }], [], timing);
+  assert.deepEqual(signals.filter((s) => s.type === 'time').map((s) => s.students), [2]);
+  assert.equal(signalsFor(evidence, [{ source: 'quiz:t', title: 'T' }], [], { 'quiz:t': { s1: 3, s2: 1 } }).filter((s) => s.type === 'time').length, 0);
+  assert.equal(signalsFor(evidence, [{ source: 'quiz:t', title: 'T' }], []).filter((s) => s.type === 'time').length, 0);
+});
+
+test('a one-off suggestion points at the class’s next timetabled lesson', async () => {
+  const s = store();
+  const built = '2026-10-14T00:00:00.000Z';
+  await s.setJSON(SIGNALS_KEY, { built_at: built, classes: { c1: { title: '8T2', signals: [sig('q1', '2026-10-12')] } } });
+  const row = (id, date, over = {}) => ({ id, type: 'scheduled_lesson', class_id: 'c1', lesson_id: `l-${id}`, date, start_time: '09:00', delivery_status: 'planned', ...over });
+  await s.setJSON('scheduled_lessons/a', row('a', '2026-10-13'));
+  await s.setJSON('scheduled_lessons/b', row('b', '2026-10-16', { start_time: '10:00' }));
+  await s.setJSON('scheduled_lessons/c', row('c', '2026-10-15', { delivery_status: 'skipped' }));
+  await s.setJSON('scheduled_lessons/d', row('d', '2026-10-20', { class_id: 'c2' }));
+  const { suggestions } = await loadSuggestions(s, '2026-10-14T01:00:00.000Z');
+  assert.equal(suggestions[0].action, 'note');
+  assert.equal(suggestions[0].next_lesson.lesson_id, 'l-b');
+  assert.equal(suggestions[0].next_lesson.url, '/teaching/lessons/l-b?walkthru=w1-quizzing');
+  await s.delete('scheduled_lessons/b');
+  assert.equal((await loadSuggestions(s, '2026-10-14T01:00:00.000Z')).suggestions[0].next_lesson, undefined);
+});
+
+test('the lesson push asks once, within ten minutes of the lesson ending, and never for a logged rep', async () => {
+  const { repPromptCandidate, decideNotifications } = await import('../../netlify/functions/_shared/day-sense-notify.mjs');
+  const rep = { technique_id: 'w1-cold-calling', lesson_id: 'l1', class_id: 'c1', state: 'planned', lesson_end: '2026-10-29T04:00:00.000Z' };
+  const at = (min) => Date.parse('2026-10-29T04:00:00.000Z') + min * 60000;
+  assert.equal(repPromptCandidate([rep], at(-1), { sent: {} }), null, 'not before the lesson ends');
+  assert.equal(repPromptCandidate([rep], at(5), { sent: {} }).lesson_id, 'l1');
+  assert.equal(repPromptCandidate([rep], at(11), { sent: {} }), null, 'not after ten minutes');
+  assert.equal(repPromptCandidate([{ ...rep, state: 'ran' }], at(5), { sent: {} }), null, 'a logged rep never asks');
+  assert.equal(repPromptCandidate([rep], at(5), { sent: { 'walkthru-w1-cold-calling-l1-c1': 'x' } }), null, 'once per lesson');
+  const two = { sent: { 'walkthru-a': 1, 'walkthru-b': 1 } };
+  assert.equal(repPromptCandidate([rep], at(5), two), null, 'two a day');
+  const out = decideNotifications({ today: '2026-10-29', nowHour: 15, nowMs: at(5), schoolDay: false, leave: 99, reviewDone: true, log: { sent: {} }, walkthruReps: [rep] });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].url, '/teaching/lessons/l1');
+  assert.match(out[0].body, /Cold calling/);
+});
+
+test('the lesson push is on by default and can be switched off', async () => {
+  const { loadPlannedRepsForPush } = await import('../../netlify/functions/_shared/walkthru-reps.mjs');
+  const { saveSettings } = await import('../../netlify/functions/_shared/walkthru-monitor.mjs');
+  const s = store();
+  const now = Date.parse('2026-10-29T04:05:00.000Z');
+  await s.setJSON('walkthru_reps/w1-cold-calling/l1~c1', { technique_id: 'w1-cold-calling', lesson_id: 'l1', class_id: 'c1', state: 'planned', lesson_end: '2026-10-29T04:00:00.000Z', at: '2026-10-28T00:00:00.000Z', note: '' });
+  assert.equal((await loadPlannedRepsForPush(s, now)).length, 1);
+  await saveSettings(s, { rep_push: false });
+  assert.equal((await loadPlannedRepsForPush(s, now)).length, 0);
+  await assert.rejects(saveSettings(s, { rep_push: 'yes' }), { status: 400 });
 });
