@@ -37,29 +37,32 @@ export type RunwayOverlay = { crunchWeeks: string[]; proposedRest: Record<string
 let selectedTermStart: string | null = null;
 let runwayMode: 'term' | 'year' = 'term';
 let zoomHandle: YearZoomHandle | null = null;
+let renderToken = 0;
 
 /** Term Runway (spec: docs/superpowers/specs/2026-09-26-goals-redesign-design.md). */
 export async function renderGoalsView(canvas: HTMLElement, today = sydneyToday()): Promise<void> {
   showViewLoading(canvas, 'Loading goals…', '.runway');
+  const token = ++renderToken;
   try {
-    const [goals, projects, tasks, prefs, readsResult, direction, profile] = await Promise.all([
+    // goal-reads can take many seconds (calendar fetch + one model call per stale goal),
+    // so it must not hold up the first paint. It is applied once it arrives.
+    const readsPromise = tasksApi.getGoalReads().catch(() => ({ reads: [] as GoalReadEnvelope[] }));
+    const [goals, projects, tasks, prefs, direction, profile] = await Promise.all([
       tasksApi.listGoals(),
       tasksApi.listProjects(),
       tasksApi.listTasks(),
       tasksApi.getHubPrefs(),
-      tasksApi.getGoalReads().catch(() => ({ reads: [] as GoalReadEnvelope[] })),
       tasksApi.getPlanningDirection().catch(() => DEFAULT_PLANNING_DIRECTION),
       tasksApi.getPlanningProfile().catch(() => null)
     ]);
+    const data = { goals, projects, tasks, terms: flattenTerms(prefs), today };
+    const extra = { direction, profile };
+    paintGoals(canvas, data, undefined, [], extra);
+    const readsResult = await readsPromise;
+    if (token !== renderToken || !readsResult.reads.length) return;
     const envelopes = readsResult.reads;
     const overlay = overlayFromReads(envelopes.flatMap((e) => (e.read ? [e.read] : [])));
-    paintGoals(
-      canvas,
-      { goals, projects, tasks, terms: flattenTerms(prefs), today },
-      overlay,
-      envelopes,
-      { direction, profile }
-    );
+    paintGoals(canvas, data, overlay, envelopes, extra);
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load goals.')));
   }
@@ -382,8 +385,16 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
   cancel.addEventListener('click', () => form.remove());
   form.append(tabs, dreamPick, title, chips, submit, cancel);
 
+  let saving = false;
+  const setSaving = (on: boolean): void => {
+    saving = on;
+    submit.disabled = on;
+    submit.textContent = on ? 'Adding…' : 'Create';
+  };
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (saving) return;
     const text = title.value.trim();
     if (!text) return;
     const selectedTerm: GoalTerm | null =
@@ -406,6 +417,7 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
 
     let status: Goal['status'] = 'active';
     const create = (): void => {
+      setSaving(true);
       void tasksApi
         .createGoal({
           title: text,
@@ -425,7 +437,10 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
           }
           reload();
         })
-        .catch((err) => window.alert(errorMessage(err)));
+        .catch((err) => {
+          setSaving(false);
+          window.alert(errorMessage(err));
+        });
     };
 
     if (selectedTerm && termTiedActive.length >= LANE_CAP) {
@@ -439,7 +454,14 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
           window.alert('No matching goal to park.');
           return;
         }
-        void tasksApi.updateGoal(target.id, { status: 'parked' }).then(create);
+        setSaving(true);
+        void tasksApi
+          .updateGoal(target.id, { status: 'parked' })
+          .then(create)
+          .catch((err) => {
+            setSaving(false);
+            window.alert(errorMessage(err));
+          });
         return;
       }
       status = 'parked';
