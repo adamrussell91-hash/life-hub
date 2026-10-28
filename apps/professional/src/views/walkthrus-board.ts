@@ -15,8 +15,8 @@ import {
 } from '../../design-kit/js/board-camera.js';
 import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import {
-  createWalkthruGoal, loadBoardArrows, loadWalkthruGoals, loadWalkthruReps, loadWalkthruText, makeArrowId, saveBoardArrows,
-  type WalkthruGoal, type WalkthruRep, type WalkthruText
+  createWalkthruGoal, dismissSuggestion, loadBoardArrows, loadSuggestions, loadWalkthruGoals, loadWalkthruReps, loadWalkthruText, makeArrowId, saveBoardArrows,
+  type DismissKind, type WalkthruGoal, type WalkthruRep, type WalkthruSuggestion, type WalkthruText
 } from '@/api/walkthrus';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderPanel, type PanelModel } from '@/views/walkthrus-panel';
@@ -76,19 +76,34 @@ function pieceIcon(kind: 'dashed_house' | 'house' | 'city', x: number, y: number
   return g;
 }
 
-interface BoardData { arrows: BoardArrow[]; goals: WalkthruGoal[]; reps: WalkthruRep[]; notices: string[] }
+/** The robber: a masked figure in a flat cap. Sits on the tile a suggestion points to. */
+function robberIcon(x: number, y: number, size: number): SVGElement {
+  const g = svg('g', { transform: `translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / 20).toFixed(3)})`, class: 'wt-robber__figure' });
+  g.append(
+    svg('circle', { class: 'wt-robber__hit', cx: 10, cy: 10, r: 11 }),
+    svg('path', { class: 'wt-robber__body', d: 'M4 20c0-5 2.5-8 6-8s6 3 6 8Z' }),
+    svg('circle', { class: 'wt-robber__head', cx: 10, cy: 7.5, r: 4 }),
+    svg('path', { class: 'wt-robber__cap', d: 'M5.8 6.2c.6-3 2.4-4.4 4.2-4.4s3.6 1.4 4.2 4.4Z' }),
+    svg('rect', { class: 'wt-robber__mask', x: 6.2, y: 6.6, width: 7.6, height: 2.2, rx: 1 })
+  );
+  return g;
+}
+
+interface BoardData { arrows: BoardArrow[]; goals: WalkthruGoal[]; reps: WalkthruRep[]; suggestions: WalkthruSuggestion[]; notices: string[] }
 
 async function loadData(): Promise<BoardData> {
-  const [arrows, goals, reps] = await Promise.allSettled([loadBoardArrows(), loadWalkthruGoals(), loadWalkthruReps()]);
+  const [arrows, goals, reps, suggestions] = await Promise.allSettled([loadBoardArrows(), loadWalkthruGoals(), loadWalkthruReps(), loadSuggestions()]);
   if (arrows.status === 'rejected' && goals.status === 'rejected' && reps.status === 'rejected') throw arrows.reason;
   const notices: string[] = [];
   if (arrows.status === 'rejected') notices.push('Your arrows didn’t load.');
   if (goals.status === 'rejected') notices.push('Your goal didn’t load.');
   if (reps.status === 'rejected') notices.push('Lesson reps didn’t load.');
+  if (suggestions.status === 'rejected') notices.push('Suggestions didn’t load.');
   return {
     arrows: arrows.status === 'fulfilled' ? arrows.value : [],
     goals: goals.status === 'fulfilled' ? goals.value : [],
     reps: reps.status === 'fulfilled' ? reps.value : [],
+    suggestions: suggestions.status === 'fulfilled' ? suggestions.value : [],
     notices
   };
 }
@@ -117,6 +132,9 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     arrows: data.arrows,
     goals: data.goals,
     reps: data.reps,
+    suggestions: data.suggestions,
+    /** The suggestion being lifted into a goal: it animates once, then goes. */
+    lifting: null as string | null,
     text: null as WalkthruText | null,
     textError: null as string | null,
     draw: 'off' as 'off' | 'from' | 'to',
@@ -368,6 +386,21 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       tileLayer.append(node);
     }
     children.push(tileLayer);
+    // One robber per tile a suggestion points to; the first (repeated before one-off) wins the tile.
+    const robberLayer = svg('g', { class: 'wt-robbers' });
+    const seenTiles = new Set<string>();
+    for (const sug of state.suggestions) {
+      const tile = sug.technique_id ? layout.tiles.find((t) => t.id === sug.technique_id) : null;
+      if (!tile || seenTiles.has(tile.id)) continue;
+      seenTiles.add(tile.id);
+      const robber = svg('g', {
+        class: `wt-robber${state.lifting === sug.key ? ' is-lifting' : ''}`, 'data-suggestion': sug.key, role: 'button', tabindex: 0,
+        'aria-label': `Suggestion: ${sug.problem_label} points to ${tile.name}. Press Enter for the reasons.`
+      });
+      robber.append(robberIcon(tile.x + tile.box.w * 0.34, tile.y - tile.box.h * 0.36, layout.drawn * 0.5));
+      robberLayer.append(robber);
+    }
+    children.push(robberLayer);
     if (selectedTile) {
       const strip = stripNode(selectedTile);
       if (strip) children.push(strip);
@@ -442,6 +475,89 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     }
     paint();
     paintPanel();
+  }
+
+  // ── suggestions ──
+  const suggestionByKey = (key: string): WalkthruSuggestion | null => state.suggestions.find((x) => x.key === key) ?? null;
+
+  function chainList(sug: WalkthruSuggestion): HTMLElement {
+    const list = el('ol', 'wt-chainlist');
+    for (const link of sug.chain) if (link.text) list.append(el('li', `wt-chainlist__${link.step}`, link.text));
+    return list;
+  }
+
+  function showRobberTip(sug: WalkthruSuggestion, anchor: Element): void {
+    tip.replaceChildren(el('p', 'wt-tip__code', sug.kind === 'repeated' ? 'Suggestion' : 'Worth a look'), chainList(sug));
+    tip.hidden = false;
+    void positionHubFloating(anchor, tip, { placement: 'top', strategy: 'fixed', offset: 8 });
+  }
+
+  function removeSuggestion(key: string): void {
+    state.suggestions = state.suggestions.filter((x) => x.key !== key);
+    state.lifting = null;
+    paint();
+  }
+
+  async function answerSuggestion(sug: WalkthruSuggestion, kind: DismissKind, said: string): Promise<void> {
+    try {
+      await dismissSuggestion(sug.key, kind);
+      status.textContent = said;
+      removeSuggestion(sug.key);
+    } catch (err) {
+      status.textContent = `That didn’t save. ${errorMessage(err)}`;
+    }
+  }
+
+  /** "Make it a goal": the robber lifts, a dashed house goes on the tile. */
+  async function makeGoal(sug: WalkthruSuggestion): Promise<void> {
+    const entry = sug.technique_id ? techniqueById(sug.technique_id) : null;
+    if (!entry) return;
+    const candidate = { id: '', sphere: 'professional', status: 'active', walkthru: { technique_id: entry.id } };
+    const refused = checkOneActive(state.goals, candidate);
+    if (refused) { status.textContent = refused.message; return; }
+    try {
+      const goal = await createWalkthruGoal({
+        title: `Get better at ${entry.name}`,
+        walkthru: { technique_id: entry.id, stage: 'attempt', problem_type: sug.problem_type, origin: { kind: 'pattern', suggestion_id: sug.key } }
+      });
+      state.goals = [...state.goals, goal];
+      await dismissSuggestion(sug.key, 'accepted').catch(() => undefined);
+      hidePop();
+      state.lifting = sug.key;
+      paint();
+      status.textContent = `Started working on ${entry.name}.`;
+      const done = (): void => removeSuggestion(sug.key);
+      if (prefersReducedMotion()) done(); else window.setTimeout(done, 420);
+    } catch (err) {
+      status.textContent = errorMessage(err);
+    }
+  }
+
+  function openSuggestion(key: string, at: Element): void {
+    const sug = suggestionByKey(key);
+    const entry = sug?.technique_id ? techniqueById(sug.technique_id) : null;
+    if (!sug || !entry) return;
+    hideTip();
+    const live = liveGoal();
+    const row = el('div', 'wt-pop__row');
+    if (sug.action === 'goal') {
+      const make = button('Make it a goal', () => void makeGoal(sug), 'btn btn--primary btn--small');
+      if (live) { make.disabled = true; make.title = 'You’re already working on a technique. Finish, park or drop it first.'; }
+      row.append(make);
+    } else {
+      row.append(button('Open the technique', () => { hidePop(); select(entry.id); }, 'btn btn--primary btn--small'));
+    }
+    row.append(
+      button('Not now', () => { hidePop(); void answerSuggestion(sug, 'not_now', 'Parked until there’s more evidence.'); }, 'btn btn--secondary btn--small'),
+      button('Not this', () => { hidePop(); void answerSuggestion(sug, 'not_this', 'Muted for these classes until the end of term.'); }, 'btn btn--secondary btn--small'),
+      button('Close', hidePop, 'btn btn--secondary btn--small')
+    );
+    const lead = sug.action === 'goal'
+      ? `Try ${entry.name}?`
+      : `${sug.problem_label} showed up once. Add ${entry.name} to ${sug.class_titles[0] ?? 'the class'}’s next lesson as a WalkThru note?`;
+    pop.replaceChildren(el('p', 'wt-pop__title', lead), chainList(sug), ...(sug.note ? [el('p', 'wt-pop__note', sug.note)] : []), row);
+    pop.hidden = false;
+    void positionHubFloating(at, pop, { placement: 'bottom', strategy: 'fixed', offset: 8 });
   }
 
   // ── tooltip ──
@@ -637,6 +753,8 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (dragged) { dragged = false; return; }
     const target = e.target as Element;
     if (target.closest('[data-close]')) { select(null); return; }
+    const robber = target.closest('[data-suggestion]');
+    if (robber && state.draw === 'off') { openSuggestion((robber as SVGElement).dataset.suggestion!, robber); return; }
     const tile = target.closest('[data-tile]');
     if (tile) { tileClicked((tile as SVGElement).dataset.tile!); return; }
     const arrow = target.closest('[data-arrow]');
@@ -646,10 +764,15 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   board.addEventListener('keydown', (e) => {
     const tile = (e.target as Element).closest('[data-tile]') as SVGElement | null;
     const close = (e.target as Element).closest('[data-close]');
+    const robber = (e.target as Element).closest('[data-suggestion]') as SVGElement | null;
+    if ((e.key === 'Enter' || e.key === ' ') && robber && state.draw === 'off') { e.preventDefault(); openSuggestion(robber.dataset.suggestion!, robber); return; }
     if ((e.key === 'Enter' || e.key === ' ') && (tile || close)) { e.preventDefault(); if (close) select(null); else tileClicked(tile!.dataset.tile!); }
   });
   board.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse') return;
+    const robberNode = (e.target as Element).closest('[data-suggestion]');
+    const hovered = robberNode ? suggestionByKey((robberNode as SVGElement).dataset.suggestion!) : null;
+    if (robberNode && hovered && state.draw === 'off' && pop.hidden) { window.clearTimeout(tipTimer); tipTimer = window.setTimeout(() => showRobberTip(hovered, robberNode), 140); return; }
     const tile = (e.target as Element).closest('[data-tile]') as SVGElement | null;
     if (!tile || state.draw !== 'off' || !pop.hidden) return;
     const t = layout.tiles.find((x) => x.id === tile.dataset.tile);
@@ -657,8 +780,11 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     window.clearTimeout(tipTimer);
     tipTimer = window.setTimeout(() => showTip(t, tile), 140);
   });
-  board.addEventListener('pointerout', (e) => { if ((e.target as Element).closest('[data-tile]')) hideTip(); });
+  board.addEventListener('pointerout', (e) => { if ((e.target as Element).closest('[data-tile], [data-suggestion]')) hideTip(); });
   board.addEventListener('focusin', (e) => {
+    const robberNode = (e.target as Element).closest('[data-suggestion]') as SVGElement | null;
+    const sug = robberNode ? suggestionByKey(robberNode.dataset.suggestion!) : null;
+    if (robberNode && sug) { if (robberNode.matches(':focus-visible') && state.draw === 'off') showRobberTip(sug, robberNode); else hideTip(); return; }
     const tile = (e.target as Element).closest('[data-tile]') as SVGElement | null;
     const t = tile ? layout.tiles.find((x) => x.id === tile.dataset.tile) : null;
     // Keyboard focus shows the tip; a tap doesn't.
