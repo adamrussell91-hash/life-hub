@@ -1,6 +1,6 @@
 # Teaching WalkThrus build plan
 
-**Status:** Draft plan. Not a build brief. Nothing builds until Adam names a slice.
+**Status:** Slices 0 to 4 built in one PR (29 October 2026). Slices 5 to 7 are still a plan. Nothing else builds until Adam names a slice.
 **Written:** 28 October 2026
 **Governs from:** [teaching-walkthrus.md](teaching-walkthrus.md) (the concept doc) and the approved board mockup [teaching-walkthrus-board-mockup.html](teaching-walkthrus-board-mockup.html). Where this plan and the concept doc disagree, the concept doc wins until Adam says otherwise.
 **Inputs:** the concept doc, the mockup and a sweep of `main` for code to reuse (§2).
@@ -339,5 +339,7 @@ The game layer (resources, trading between sets, expansion boards), set 2 and se
 | K2 | Build Slice 2 to the brief above once Slices 0 and 1 are merged |
 
 ## 6. History
+
+- **2026-10-29:** Adam took the suggested answers to D3 to D6 and said the goal lives on a new Professional page (`#/learning/goal`), with the board at `#/learning`. Cursor is retired, so Claude Code built Slice 2 as well. Slices 0 to 4 shipped as one PR. Deviations from this plan: the board camera is a new shared `design-kit/js/board-camera.js` (the miniworld camera is untouched, so moving it onto the shared one is still open); the board is drawn at tile size 64 with cluster labels sized to read at full zoom out; `keep` and `move_on` write the same `term_history` outcomes as the term picker but through the goal page, using a calendar-month guess for the term label; Test evidence is a class mean and student count Adam enters (derived `need:` tags arrive with Slice 5); the robber is not drawn (Slice 5); markbook feedback has no block to carry the Whole class feedback icon, so it is not in the auto-attach list; the catalogue holds the 52 techniques and page numbers in the approved mockup, not 50, with empty `see_also` until the book’s cross-references are entered.
 
 - **2026-10-28:** Draft written from the concept doc, the approved mockup, Adam's answers (auto-layout; typed and free arrows) and a sweep of `main` for reusable code. Suggested answers recorded for problem-type tags, dismissal, lesson reps and where the goal lives.

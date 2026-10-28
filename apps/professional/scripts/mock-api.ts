@@ -1,3 +1,7 @@
+import { CATALOGUE } from '../../../packages/walkthrus/catalogue.mjs';
+import { normalizeArrows } from '../../../packages/walkthrus/arrows.mjs';
+import { checkOneActive } from '../../../packages/walkthrus/goal.mjs';
+import { normalizeGoalRecord } from '../../../netlify/functions/_shared/goal-record.mjs';
 import { isDeletedRecord, withoutDeleted } from '../../../netlify/functions/_shared/record-liveness.mjs';
 /**
  * In-memory mock of umbrella endpoints Professional needs for local Vite
@@ -213,6 +217,9 @@ function timelineLabel(
   return `${link.inverse_label} ${endpoint.display_label}`.trim();
 }
 
+let walkthruArrows: Array<Record<string, unknown>> = [];
+let walkthruGoals: Array<Record<string, any>> = [];
+
 export function createMockApi() {
   const people = new Map<string, PersonRecord>(
     (seedData.people as PersonRecord[]).map((p) => [p.id, { ...p }])
@@ -412,6 +419,37 @@ export function createMockApi() {
         ok: false,
         error: { code: 'unauthenticated', message: 'Please sign in to continue.' }
       });
+    }
+
+    // Learning (WalkThrus): invented filler text only. The real wording lives in the private data repo.
+    if (path === '/api/walkthrus-text' && method === 'GET') {
+      const techniques = CATALOGUE.filter((e: { kind: string }) => e.kind === 'technique').map((e: { id: string }) => ({
+        id: e.id,
+        steps: [1, 2, 3, 4, 5].map((n) => ({ n, label: `Step ${n}`, text: `Lorem ipsum dolor sit amet ${n}.` })),
+        footer: 'Lorem ipsum footer.'
+      }));
+      return json(200, { ok: true, data: { text: { sets: [{ set: 1, techniques, frameworks: [] }] } } });
+    }
+    if (path === '/api/walkthrus-board') {
+      if (method === 'GET') return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
+      walkthruArrows = normalizeArrows((body as { arrows?: unknown })?.arrows);
+      return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
+    }
+    if (path === '/api/walkthru-reps' && method === 'GET') return json(200, { ok: true, data: { reps: [] } });
+    if (path === '/api/goals') {
+      if (method === 'GET') return json(200, { ok: true, data: { goals: walkthruGoals } });
+      if (method === 'POST') {
+        const record = normalizeGoalRecord({ id: `goal_${walkthruGoals.length + 1}`, ...(body as object) });
+        const refused = checkOneActive(walkthruGoals, record);
+        if (refused) return json(409, { ok: false, error: { code: refused.code, message: refused.message } });
+        walkthruGoals = [...walkthruGoals, record];
+        return json(201, { ok: true, data: record });
+      }
+      if (method === 'PATCH') {
+        const id = url.searchParams.get('id');
+        walkthruGoals = walkthruGoals.map((g) => (g.id === id ? normalizeGoalRecord({ ...g, ...(body as object) }) : g));
+        return json(200, { ok: true, data: walkthruGoals.find((g) => g.id === id) });
+      }
     }
 
     if (path === '/api/entities/search' && method === 'GET') {

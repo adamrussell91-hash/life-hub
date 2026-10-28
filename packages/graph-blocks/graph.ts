@@ -216,7 +216,7 @@ export function boundsOf(rects: Array<{ x: number; y: number; w: number; h: numb
 
 /* ── Geometry ── */
 
-type Pt = { x: number; y: number };
+export type Pt = { x: number; y: number };
 const fmt = (v: number) => v.toFixed(1);
 
 export function rectExit(n: Rect, tx: number, ty: number, pad = 0): Pt {
@@ -237,7 +237,7 @@ function cubicAt(p: Pt[], t: number): Pt {
   };
 }
 
-function quadAt(p: Pt[], t: number): Pt {
+export function quadAt(p: Pt[], t: number): Pt {
   const u = 1 - t;
   return { x: u * u * p[0]!.x + 2 * u * t * p[1]!.x + t * t * p[2]!.x, y: u * u * p[0]!.y + 2 * u * t * p[1]!.y + t * t * p[2]!.y };
 }
@@ -283,7 +283,7 @@ const CHIP_TS_FINE = Array.from({ length: 17 }, (_, i) => 0.1 + i * 0.05).filter
  * Labels try positions along their curve until one clears the boxes and earlier labels. Boxes are
  * hard obstacles: a label may overlap another label as a last resort, never a box.
  */
-function placeChips(chips: Chip[], obstacles: Rect[]): void {
+export function placeChips(chips: Chip[], obstacles: Rect[]): void {
   const placed: Rect[] = [];
   const hit = (a: Rect, b: Rect) => Math.abs(a.x - b.x) * 2 < a.w + b.w + 6 && Math.abs(a.y - b.y) * 2 < a.h + b.h + 4;
   const clear = (r: Rect, others: Rect[]) => !others.some((o) => hit(r, o));

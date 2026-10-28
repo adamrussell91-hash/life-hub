@@ -52,7 +52,8 @@ export function createTasksCollectionHandler({
   pickPatch = null,
   onRead = null,
   onDelete = null,
-  beforePatch = null
+  beforePatch = null,
+  beforeCreate = null
 }, deps = {}) {
   const shape = record => (normalize ? normalize(record) : record);
   return createOperatorHandler(async (request, context) => {
@@ -97,6 +98,10 @@ export function createTasksCollectionHandler({
           );
         }
         const record = shape(built.record);
+        const refused = beforeCreate ? await beforeCreate(record, store) : null;
+        if (refused?.error) {
+          return withCors(errorResponse(refused.error.status ?? 400, refused.error.code, refused.error.message, false), request, env);
+        }
         await setJSON(store, recordKey(prefix, record.id), record);
         const ids = await readIndex(store, indexKey);
         await writeIndex(store, indexKey, [...ids, record.id]);
@@ -127,6 +132,9 @@ export function createTasksCollectionHandler({
         let patch = pickPatch ? pickPatch(parsed.value) : parsed.value;
         if (beforePatch) {
           patch = await beforePatch(existing, patch, store);
+          if (patch?.error) {
+            return withCors(errorResponse(patch.error.status ?? 400, patch.error.code, patch.error.message, false), request, env);
+          }
         }
         const next = shape(mergeRecord(existing, patch));
         await setJSON(store, recordKey(prefix, id), next);
