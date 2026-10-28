@@ -29,7 +29,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
     got.append(ul);
   }
   root.append(got);
-  const bar = submitBar(ctx, 'test', () => state, () => reflectionProblems(state));
+  const bar = submitBar(ctx, 'test', () => state, () => reflectionProblems(state, !!ctx.valueCheck));
   prompts.forEach((p, i) => root.append(frameField({ label: p, value: state.reflection[i] ?? '', max: 1000, rows: 4, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reflection[i] = v; bar.changed(); } })));
   root.append(frameField({ label: 'Quote one piece of feedback your group received', value: state.quote, max: 300, rows: 2, support: 'open', disabled: !ctx.editable, onInput: (v) => { state.quote = v; bar.changed(); } }));
   const crit = el('select', 'qz-input');
