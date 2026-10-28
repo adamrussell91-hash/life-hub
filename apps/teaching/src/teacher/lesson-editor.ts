@@ -673,6 +673,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         if (titleEl) titleEl.textContent = 'Lesson';
       },
       onPrint: () => openPrintLesson(lesson),
+      flushDraft: () => saveController?.flush() ?? Promise.resolve(),
+      onAnnStarted: () => {
+        setChatShelved(false);
+        void aiPanel?.followOpenJob();
+      },
       onSelect: (blockId) => {
         selectedBlockId = blockId;
         syncAiSelection();

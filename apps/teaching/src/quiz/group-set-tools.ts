@@ -43,7 +43,8 @@ export type GroupSetToolsOptions = {
   names: () => ReadonlyMap<string, string>;
   /** The group's active members now (loads the markbook). */
   refreshMembers: (config: GroupSet) => Promise<string[] | void>;
-  startAnn: (sectionId: string, config: GroupSet) => void;
+  /** Resolves once Ann's job is running; rejects with a message for the strip. */
+  startAnn: (sectionId: string, config: GroupSet) => Promise<void>;
   onError?: (error: unknown) => void;
 };
 
@@ -80,15 +81,24 @@ export function createGroupSetTools(o: GroupSetToolsOptions) {
       confirm.hidden = true;
       const ann = button('Ann drafts', 'secondary', () => {
         confirm.hidden = false;
-        const go = button(`Ann writes ${config.target} (${ANN_SET_COST})`, 'primary', () => {
-          confirm.hidden = true;
-          o.startAnn(block.id, config);
+        const note = el('p', 'qz-note', `Ann writes ${config.target} questions on this lesson for ${config.name}, ${ANN_SET_COST}. You review them before publishing.`);
+        const go = button(`Ann writes ${config.target} (${ANN_SET_COST})`, 'primary', async () => {
+          go.disabled = true;
+          note.textContent = 'Starting Ann…';
+          try {
+            await o.startAnn(block.id, config);
+            confirm.replaceChildren(el('p', 'qz-note', 'Ann is writing them in the chat. Accept her draft there to fill this set.'));
+          } catch (error) {
+            go.disabled = false;
+            note.textContent = `Ann didn’t start: ${error instanceof Error && error.message ? error.message : 'try again.'}`;
+            o.onError?.(error);
+          }
         });
         go.classList.add('qz-gs-strip__go');
         const cancel = button('Not now', 'ghost', () => {
           confirm.hidden = true;
         });
-        confirm.replaceChildren(el('p', 'qz-note', `Ann writes ${config.target} questions on this lesson for ${config.name}, ${ANN_SET_COST}. You review them before publishing.`), go, cancel);
+        confirm.replaceChildren(note, go, cancel);
       });
       ann.classList.add('qz-gs-strip__ann');
       tools.append(refresh, write, ann);
