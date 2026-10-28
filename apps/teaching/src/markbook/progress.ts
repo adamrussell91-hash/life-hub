@@ -96,6 +96,10 @@ const NEXT: Record<CellState, 'complete' | 'partial' | 'clear'> = { open: 'compl
 const SYMBOL: Record<CellState, string> = { complete: '✓', partial: '◐', na: '', open: '' };
 const WORD: Record<CellState, string> = { complete: 'complete', partial: 'partial', na: 'not for this student', open: 'not done' };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** 2026-10-12 → 12 Oct. */
+const shortDate = (day: string): string => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1] ?? ''}`;
+
 export type ProgressOptions = {
   view: MarkbookView;
   students: ReadonlyArray<{ id: string; name: string; initials: string }>;
@@ -119,7 +123,21 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
     alert.setAttribute('role', 'alert');
     root.append(alert);
   }
-  const key = el('p', 'mb-progress__key', '✓ complete · ◐ partial or waiting to be marked · grey box not for that student · red dot not complete a week after its set date. Press a cell to change it.');
+  const key = el('ul', 'mb-progress__key');
+  const swatch = (cls: string, symbol: string, words: string) => {
+    const li = el('li', 'mb-progress__keyitem');
+    const box = el('span', `mb-progress__swatch ${cls}`, symbol);
+    box.setAttribute('aria-hidden', 'true');
+    li.append(box, words);
+    return li;
+  };
+  key.append(
+    swatch('mb-progress__btn--complete', '✓', 'Complete'),
+    swatch('mb-progress__btn--partial', '◐', 'Partial or waiting to be marked'),
+    swatch('mb-progress__btn--na', '', 'Not for this student'),
+    swatch('mb-progress__btn--late', '', 'Overdue a week after its date'),
+    el('li', 'mb-progress__keyhint', 'Press a cell to change it.')
+  );
   root.append(key);
   const wrap = el('div', 'mb-progress__scroll');
   const table = el('table', 'mb-progress__table');
@@ -128,9 +146,13 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
   for (const l of lessons) {
     const th = el('th', `mb-progress__lesson mb-progress__lesson--${l.role}`);
     th.scope = 'col';
-    th.append(el('span', 'mb-progress__title', l.title));
+    th.title = l.title;
+    const label = el('div', 'mb-progress__label');
+    label.append(el('span', 'mb-progress__title', l.title));
     const tag = l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
-    if (tag) th.append(el('span', 'mb-progress__tag', tag));
+    const meta = [l.date ? shortDate(l.date) : '', tag].filter(Boolean).join(' · ');
+    if (meta) label.append(el('span', 'mb-progress__meta', meta));
+    th.append(label);
     head.append(th);
   }
   const thead = el('thead');
@@ -139,8 +161,11 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
   const body = el('tbody');
   for (const s of students) {
     const tr = el('tr');
-    const name = el('th', 'mb-progress__student', `${s.initials} · ${s.name}`);
+    const name = el('th', 'mb-progress__student');
     name.scope = 'row';
+    const who = el('span', 'mb-student');
+    who.append(el('span', 'mb-student__initials', s.initials), el('span', 'mb-student__name', s.name));
+    name.append(who);
     tr.append(name);
     for (const l of lessons) {
       const quiz = view.quizzes.find((q) => q.lesson_id === l.id);
@@ -158,10 +183,12 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
       b.dataset.student = s.id;
       b.dataset.lesson = l.id;
       b.dataset.state = cell.state;
-      if (cell.late) b.dataset.late = 'true';
+      if (cell.late) {
+        b.dataset.late = 'true';
+        b.classList.add('mb-progress__btn--late');
+      }
       b.setAttribute('aria-label', `${s.name}, ${l.title}: ${WORD[cell.state]}${cell.late ? ', overdue' : ''}`);
       b.addEventListener('click', () => options.onMark(s.id, l.id, NEXT[cell.state]));
-      if (cell.late) b.append(el('span', 'mb-progress__late'));
       td.append(b);
       tr.append(td);
     }
