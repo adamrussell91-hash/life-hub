@@ -2667,3 +2667,29 @@ button.tk-qdot {
     font-size: var(--text-xs);
   }
 }
+
+/* WalkThru note: steps, your notes, rep strip (teacher view only) */
+.tk-wt { display: grid; gap: 0.6rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.tk-wt__code { margin: 0; font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tk-wt__name { margin: 0; font-weight: 800; text-transform: uppercase; }
+.tk-wt__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
+.tk-wt__label { margin: 0; font-weight: 700; font-size: var(--text-sm); }
+.tk-wt__text { margin: 0.1rem 0 0; }
+.tk-wt__adapted { margin: 0.25rem 0 0; padding-left: 0.6rem; border-left: 3px solid #ffd400; font-style: italic; font-size: var(--text-sm); }
+.tk-wt__jot { margin: 0.25rem 0 0; padding: 0.35rem 0.5rem; border-radius: 6px; background: var(--cotton); font-size: var(--text-sm); white-space: pre-wrap; }
+.tk-wt__reps { display: grid; gap: 0.4rem; }
+.tk-wt__reps-title { margin: 0; font-weight: 700; font-size: var(--text-sm); }
+.tk-wt__rep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.tk-wt__slot { font-size: var(--text-sm); font-weight: 600; }
+.tk-wt__taps { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.tk-wt__taps .btn { min-height: 2.75rem; }
+.tk-wt__taps .btn.is-on { background: var(--depth); color: #fff; }
+.tk-wt-ed__jots { display: grid; gap: 0.4rem; margin-top: 0.5rem; }
+.tk-ed__jot { width: 100%; resize: vertical; }
+.tk-wt-badges { margin-top: 0.5rem; }
+.tk-wt-badge { border: 1px dashed var(--line); border-radius: 10px; padding: 0.25rem 0.6rem; background: var(--cotton); }
+.tk-wt-badge__summary { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; }
+.tk-wt-badge__glyph { display: inline-grid; width: 1.6rem; height: 1.6rem; color: #111; }
+.tk-wt-badge__glyph svg { width: 100%; height: 100%; }
+.tk-wt-badge__body { padding: 0.25rem 0 0.5rem; }
+@media print { .tk-wt, .tk-wt-badges { display: none; } }

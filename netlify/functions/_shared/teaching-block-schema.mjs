@@ -895,9 +895,15 @@ var AnalogyTypesContentSchema = z9.object({
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
+var TeacherNoteWalkthruSchema = z9.object({
+  set: z9.number().int().min(1).max(20).default(1),
+  id: z9.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
+  jots: z9.record(z9.string().regex(/^[1-5]$/), z9.string().max(2e3)).default({})
+});
 var TeacherNoteBlockContentSchema = z9.object({
   title: z9.string().default("Teacher note"),
-  html: z9.string().default("")
+  html: z9.string().default(""),
+  walkthru: TeacherNoteWalkthruSchema.optional()
 });
 var TOOLKIT_NOTE_BLOCK_TYPES = [
   "toolkit_skill",

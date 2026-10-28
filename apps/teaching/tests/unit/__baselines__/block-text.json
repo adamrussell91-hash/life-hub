@@ -396,6 +396,8 @@
     "hinge_question.prompt filler"
   ],
   "every-block/every_hinge_question/teacher": [
+    "CF",
+    "Check for understanding",
     "Hinge question",
     "Loading…",
     "hinge_question.prompt filler"
@@ -427,6 +429,8 @@
     "1 mark",
     "Multiple choice",
     "Not ready: Tick the right answer.",
+    "QU",
+    "Quizzing",
     "quiz_question.question.prompt filler",
     "○ quiz_question.question.options.0.text filler",
     "○ quiz_question.question.options.1.text filler",
@@ -439,6 +443,8 @@
     "question_set.questions.0.prompt filler"
   ],
   "every-block/every_question_set/teacher": [
+    "QU",
+    "Quizzing",
     "Type your response here…",
     "Your response",
     "question_set.questions.0.prompt filler"
@@ -521,8 +527,10 @@
   "every-block/every_faded_example/teacher": [
     "Effect",
     "Technique",
+    "WE",
     "Where",
     "Worked example",
+    "Worked examples and backward fading",
     "faded_example.parts.0.answer filler",
     "faded_example.parts.1.answer filler",
     "faded_example.parts.2.answer filler",

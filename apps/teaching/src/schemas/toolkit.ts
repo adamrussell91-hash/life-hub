@@ -308,14 +308,26 @@ export const AnalogyTypesContentSchema = z.object({
   teacher_jots: TkJotsSchema.optional()
 });
 
+/**
+ * A WalkThru technique on a teacher note: the technique's id and your own jots, step by step.
+ * The book's wording is fetched from the private endpoint when the note renders and never stored here.
+ */
+export const TeacherNoteWalkthruSchema = z.object({
+  set: z.number().int().min(1).max(20).default(1),
+  id: z.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
+  jots: z.record(z.string().regex(/^[1-5]$/), z.string().max(2000)).default({})
+});
+
 export const TeacherNoteBlockContentSchema = z.object({
   title: z.string().default('Teacher note'),
-  html: z.string().default('')
+  html: z.string().default(''),
+  walkthru: TeacherNoteWalkthruSchema.optional()
 });
 
 export type TkStep = z.infer<typeof TkStepSchema>;
 export type TkReveal = z.infer<typeof TkRevealSchema>;
 export type TkTeacherNote = z.infer<typeof TkTeacherNoteSchema>;
+export type TeacherNoteWalkthru = z.infer<typeof TeacherNoteWalkthruSchema>;
 export type ToolFrame = z.infer<typeof ToolFrameSchema>;
 export type PairLevel = z.infer<typeof PairLevelSchema>;
 export type StressVerdict = z.infer<typeof StressVerdictSchema>;

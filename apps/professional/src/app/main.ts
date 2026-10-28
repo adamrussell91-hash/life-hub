@@ -19,6 +19,7 @@ import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../../design-kit/calendar-zoom-bar.css';
 import '../styles/hub.css';
+import '../styles/walkthrus.css';
 import '../styles/walk-in.css';
 import '../styles/quick-log.css';
 import '../styles/tasks-engine.css';
@@ -60,6 +61,8 @@ import { renderCareerView, selectCareerFutureInPlace } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import { renderOrganisationsCompare } from '@/views/organisations-compare';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
+import { renderLearningBoard } from '@/views/walkthrus-board';
+import { renderLearningGoal } from '@/views/walkthrus-goal';
 import { renderQuickLog } from '@/views/quick-log';
 import { personRoute } from '@/app/router';
 import { setClassroomExtras } from '@teaching/blocks/classroom-extras';
@@ -331,6 +334,19 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'log') {
       renderPageHeader(shell, { eyebrow: 'Calendar', title: 'Log a comm' });
       await renderQuickLog(shell.canvas);
+      return;
+    }
+    if (route.name === 'learning') {
+      renderPageHeader(shell, viewChrome('learning'));
+      await renderLearningBoard(shell.canvas, {
+        technique: route.technique,
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'learning-goal') {
+      renderPageHeader(shell, { eyebrow: 'Learning', title: 'Your technique' });
+      await renderLearningGoal(shell.canvas, { isCurrent: () => generation === routeGeneration });
       return;
     }
     if (route.name === 'network-ecology') {
