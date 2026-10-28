@@ -83,7 +83,8 @@ import { isGuidesSection, phaseOfSection } from '@/sprint/model';
 import { mountCaseEditor, type CaseEditorHandle } from '@/case-study/editor';
 import { mountCaseBoard, type CaseBoardHandle } from '@/case-study/board';
 import { caseTeacherApi } from '@/case-study/api';
-import { seedCase } from '@/case-study/model';
+import { isCaseBriefSection, seedCase } from '@/case-study/model';
+import { inCaseTab, withCaseBriefSection } from '@/case-study/editor-tabs';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -1259,6 +1260,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }
   /** On a group's tab, new blocks go at the end of that group's tab section, so they stay in view. */
   function tutorialInsertTarget(): { parent: DropParent; index: number } | null {
+    // On a case study's Brief tab, new blocks land in the Brief section.
+    if (caseEditor?.tabs.current() === 'brief') {
+      if (!lesson.blocks.some(isCaseBriefSection)) {
+        emitLesson({ ...lesson, blocks: withCaseBriefSection(lesson.blocks, options.idFactory) });
+        canvas.update(lesson.blocks, media);
+      }
+      const section = lesson.blocks.find(isCaseBriefSection);
+      if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+    }
     // On a sprint phase tab, new blocks land in that phase's section.
     const st = sprintTabs?.current();
     if (sprintTabs && st === 'guides') {
@@ -1368,14 +1378,19 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   caseHost.className = 'lesson-page__case';
   let caseEditor: CaseEditorHandle | null = null;
   let caseBoard: CaseBoardHandle | null = null;
-  /** The lesson canvas holds ordinary blocks, which are Decide-stage content: it shows on Decide and All only. */
+  /** The canvas shows on Brief (the Brief section's blocks), Decide (every other block) and All. */
   function showCaseCanvas(): void {
     const tab = caseEditor?.tabs.current();
-    canvasHost.hidden = !!caseEditor && tab !== 'decide' && tab !== 'all';
+    canvasHost.hidden = !!caseEditor && tab !== 'brief' && tab !== 'decide' && tab !== 'all';
   }
   function syncCasePanel(): void {
     const isCase = resolvePedagogicalMode(lesson.pedagogical_mode) === 'case_study';
     if (isCase && !lesson.case) emitLesson({ ...lesson, case: seedCase({ route_role: lesson.route_role ?? options.flowRole }) });
+    // The Brief tab needs a section to hold its blocks; emitLesson only records the lesson, so redraw the canvas.
+    if (isCase && !lesson.blocks.some(isCaseBriefSection)) {
+      emitLesson({ ...lesson, blocks: withCaseBriefSection(lesson.blocks, options.idFactory) });
+      canvas.update(lesson.blocks, media);
+    }
     if (isCase && !caseEditor) {
       caseEditor = mountCaseEditor({
         getLesson: () => lesson,
@@ -1384,6 +1399,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         onTab: () => {
           showCaseCanvas();
           canvas.clearSelection();
+          canvas.update(lesson.blocks, media);
         }
       });
       caseHost.append(caseEditor.root);
@@ -1462,6 +1478,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       // Tabs hide page-level rows only; what's inside a section is left alone.
       if (tutorialTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inTab(block, tutorialTabs.current());
       if (sprintTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inSprintTab(block, sprintTabs.current());
+      if (caseEditor && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inCaseTab(block, caseEditor.tabs.current());
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
@@ -1497,7 +1514,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncTutorialPanel();
   syncSprintPanel();
   syncCasePanel();
-  if (tutorialTabs || sprintTabs) canvas.update(lesson.blocks, media);
+  if (tutorialTabs || sprintTabs || caseEditor) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
   const syllabus = mountLessonSyllabus(document.createElement('div'));
@@ -1625,6 +1642,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       const target = blockId ? rootOf(blockId) : undefined;
       if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
       if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(isGuidesSection(target) ? 'guides' : phaseOfSection(target) ?? 'brief');
+      if (caseEditor && target && !inCaseTab(target, caseEditor.tabs.current())) caseEditor.tabs.set(isCaseBriefSection(target) ? 'brief' : 'decide');
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {

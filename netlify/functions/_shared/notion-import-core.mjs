@@ -3524,6 +3524,8 @@ var SectionBlockObjectSchema = z11.object({
     sprint_phase: SprintPhaseKeySchema.optional(),
     /** Design Sprint: this top-level section holds resources that stay with students on every phase. */
     sprint_guides: z11.boolean().optional(),
+    /** Case Study: this top-level section holds the Brief's blocks, shown to students above the first-take question. */
+    case_brief: z11.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
