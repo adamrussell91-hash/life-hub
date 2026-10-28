@@ -86,7 +86,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:pdf': 'Embed a PDF document for inline viewing.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {
