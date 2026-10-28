@@ -73,3 +73,12 @@ describe('sketchProblems: only the strongest idea is checked against criteria', 
     expect(out.some((m) => m.startsWith('Idea 2') && /criterion/.test(m))).toBe(false);
   });
 });
+
+describe('check question only when it is on screen', () => {
+  it('does not require an answer when the phase has no check question', () => {
+    const c = { id: 'a', seed: 'a', title: 'a', idea: 'A full idea sentence here.', answers: 'It solves the problem well.', evidence: 'Because it worked before.', criteria: { c1: 'line' }, requirements: {}, value_answer: '' };
+    const p = { cards: [c], strongest: 'a', strongest_why: '' } as never;
+    expect(sketchProblems(p, { ideas: 1, requirements: [] }).some((m) => /check question/.test(m))).toBe(true);
+    expect(sketchProblems(p, { ideas: 1, requirements: [], valueCheck: false }).some((m) => /check question/.test(m))).toBe(false);
+  });
+});

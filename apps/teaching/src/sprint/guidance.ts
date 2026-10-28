@@ -255,9 +255,9 @@ export const SKETCH_CHECKS = {
   },
   requirements: {
     tag: 'Must have',
-    doThis: 'Tick each requirement your idea includes, then say where it appears.',
+    doThis: 'For each requirement, say where your idea includes it. You need all of them.',
     what: 'Requirements are must-haves from the brief. They are yes or no: the idea either has it or it doesn’t. An idea that is missing one is not finished.',
-    how: 'If you can’t tick one, change your idea so it has it before you hand in.',
+    how: 'If you can’t say where one is, change your idea so it has it before you hand in.',
     example: 'Example (canteen): “Works within a 20-minute lunch” → “Order is ready when students arrive, so no queue.”'
   }
 } as const;
