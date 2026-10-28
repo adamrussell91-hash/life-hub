@@ -181,7 +181,7 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
   function briefPanel(c: CaseSettings): HTMLElement {
     const box = card('Decision · first take', 'Students take a first position before they read anything. Give them a role and a real choice.');
     box.append(labelled('The question, in the case’s voice', area(c.decision?.prompt ?? '', 500, 'Decision question', (v) => put((d) => { d.decision = { options: [], ...d.decision, prompt: v }; }), 3)));
-    box.append(note('Students name a first take with a reason, then read the case, then lock in a decision. Ordinary lesson blocks go on the Decide tab.'));
+    box.append(note('Students name a first take with a reason, then read the case, then lock in a decision. Blocks you add on this tab (a recording, a sample, a reading) sit above the question. Blocks on the Decide tab show when they decide.'));
     return box;
   }
 
