@@ -334,9 +334,14 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   )
 })).filter((group) => group.types.length > 0);
 
+/** Lessons put words in the word tray under a text block, so Definition leaves their menu. Old blocks still render. */
+const LESSON_EXCLUDED = new Set(['definition']);
+
 export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
-  types: group.types.filter((t) => !UNIT_ONLY_TYPES.has(t) && (group.label !== 'Layout' || !PAGE_ONLY_TYPES.has(t)))
+  types: group.types.filter(
+    (t) => !UNIT_ONLY_TYPES.has(t) && !LESSON_EXCLUDED.has(t) && (group.label !== 'Layout' || !PAGE_ONLY_TYPES.has(t))
+  )
 }));
 
 /** Block types allowed inside a columns cell */

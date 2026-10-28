@@ -4529,9 +4529,12 @@ var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
     )
   )
 })).filter((group) => group.types.length > 0);
+var LESSON_EXCLUDED = /* @__PURE__ */ new Set(["definition"]);
 var LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
-  types: group.types.filter((t) => !UNIT_ONLY_TYPES.has(t) && (group.label !== "Layout" || !PAGE_ONLY_TYPES.has(t)))
+  types: group.types.filter(
+    (t) => !UNIT_ONLY_TYPES.has(t) && !LESSON_EXCLUDED.has(t) && (group.label !== "Layout" || !PAGE_ONLY_TYPES.has(t))
+  )
 }));
 var COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
   (t) => t !== "columns" && t !== "section" && t !== "timeline" && t !== "card_stack" && t !== "tabs" && !PAGE_ONLY_TYPES.has(t)

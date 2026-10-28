@@ -194,7 +194,14 @@ export function mountLessonPalette(
     flyout.append(footer);
   }
 
+  /** The rail only sticks once the page scrolls, so the flyout's room depends on where the rail sits now. */
+  function fitFlyout(): void {
+    flyout?.style.setProperty('--palette-top', `${Math.max(0, host.getBoundingClientRect().top)}px`);
+  }
+
   function closeFlyout(): void {
+    window.removeEventListener('scroll', fitFlyout);
+    window.removeEventListener('resize', fitFlyout);
     flyout?.remove();
     flyout = null;
     openId = null;
@@ -252,6 +259,9 @@ export function mountLessonPalette(
     }
 
     host.append(flyout);
+    fitFlyout();
+    window.addEventListener('scroll', fitFlyout, { passive: true });
+    window.addEventListener('resize', fitFlyout);
     syncOpenFamily();
   }
 

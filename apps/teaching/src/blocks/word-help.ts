@@ -20,9 +20,14 @@ export type WordHelpEntry = {
   definition: string;
   etymology: string;
   example: string;
+  /** Shown as a pill in the word strip under the text (lessons only). */
+  pinned?: boolean;
+  /** Typed in by the teacher rather than found by a scan. Always pinned. */
+  added?: boolean;
 };
 
-export type WordHelpData = { words: WordHelpEntry[]; scanned_at: string };
+/** `copy_step: false` hides the Copy it down step in the word tray. */
+export type WordHelpData = { words: WordHelpEntry[]; scanned_at: string; copy_step?: boolean };
 
 export const WORD_HELP_KIND_LABEL: Record<WordHelpKind, string> = {
   technical: 'Technical',
@@ -58,7 +63,8 @@ export function normaliseWordHelp(value: unknown): WordHelpEntry[] {
       pronunciation: text(entry.pronunciation),
       definition,
       etymology: text(entry.etymology),
-      example: text(entry.example)
+      example: text(entry.example),
+      ...(entry.added === true ? { added: true, pinned: true } : entry.pinned === true ? { pinned: true } : {})
     });
   }
   return out;
@@ -69,6 +75,15 @@ export function readWordHelp(block: { settings?: Record<string, unknown> }): Wor
   const saved = block.settings?.word_help as { words?: unknown } | undefined;
   return normaliseWordHelp(saved?.words);
 }
+
+/** Whether the word tray offers its Copy it down step. On unless the teacher turned it off. */
+export function readCopyStep(block: { settings?: Record<string, unknown> }): boolean {
+  const saved = block.settings?.word_help as { copy_step?: unknown } | undefined;
+  return saved?.copy_step !== false;
+}
+
+/** What opens when a lit word is tapped: the floating card, or a lesson's word tray. */
+export type OpenWord = (anchor: HTMLElement, entry: WordHelpEntry) => void;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -91,7 +106,7 @@ export function wordsPresentIn(plain: string, words: WordHelpEntry[]): WordHelpE
  * card. Links, code and earlier wraps are left alone. Returns the number of
  * words wrapped at least once.
  */
-export function applyWordHelp(root: HTMLElement, words: WordHelpEntry[]): number {
+export function applyWordHelp(root: HTMLElement, words: WordHelpEntry[], openWord: OpenWord = openWordCard): number {
   removeWordHelp(root);
   if (words.length === 0) return 0;
   const byKey = new Map(words.map((entry) => [matchKey(entry.word), entry]));
@@ -120,7 +135,7 @@ export function applyWordHelp(root: HTMLElement, words: WordHelpEntry[]): number
       if (!entry) continue;
       if (!order.has(key)) order.set(key, order.size);
       fragment.append(value.slice(last, match.index));
-      fragment.append(createTerm(doc, match[0], entry, order.get(key)!));
+      fragment.append(createTerm(doc, match[0], entry, order.get(key)!, openWord));
       last = match.index + match[0].length;
     }
     if (last === 0) continue;
@@ -139,20 +154,26 @@ export function removeWordHelp(root: HTMLElement): void {
   root.classList.remove('word-help-on');
 }
 
-function createTerm(doc: Document, label: string, entry: WordHelpEntry, index: number): HTMLButtonElement {
+function createTerm(
+  doc: Document,
+  label: string,
+  entry: WordHelpEntry,
+  index: number,
+  openWord: OpenWord
+): HTMLButtonElement {
   const term = doc.createElement('button');
   term.type = 'button';
   term.className = 'word-help-term';
   term.textContent = label;
   term.style.setProperty('--word-help-i', String(Math.min(index, 20)));
   term.setAttribute('aria-haspopup', 'dialog');
-  term.setAttribute('aria-label', `${label}: open dictionary card`);
+  term.setAttribute('aria-label', `${label}: show meaning`);
   // The teacher canvas selects a block on click; a word tap is not that.
   term.addEventListener('pointerdown', (event) => event.stopPropagation());
   term.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    openWordCard(term, entry);
+    openWord(term, entry);
   });
   return term;
 }

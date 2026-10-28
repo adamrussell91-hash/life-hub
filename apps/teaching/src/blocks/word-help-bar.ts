@@ -10,6 +10,7 @@ import {
   DICTIONARY_ICON,
   removeWordHelp,
   setScanning,
+  type OpenWord,
   type WordHelpEntry
 } from '@/blocks/word-help';
 import { scanWordsAsStudent } from '@/blocks/text-tools-client';
@@ -20,6 +21,8 @@ export function createStudentWordHelpBar(options: {
   blockId: string;
   preScanned: WordHelpEntry[];
   scan?: typeof scanWordsAsStudent;
+  /** Lessons pass the word tray's opener; elsewhere a tap opens the floating card. */
+  openWord?: OpenWord;
 }): HTMLElement {
   const scan = options.scan ?? scanWordsAsStudent;
   const bar = document.createElement('div');
@@ -48,7 +51,7 @@ export function createStudentWordHelpBar(options: {
   function show(on: boolean): void {
     shown = on;
     if (on && words) {
-      const found = applyWordHelp(options.body, words);
+      const found = applyWordHelp(options.body, words, options.openWord);
       status.textContent = found ? '' : 'No tricky words in this block.';
     } else {
       removeWordHelp(options.body);
