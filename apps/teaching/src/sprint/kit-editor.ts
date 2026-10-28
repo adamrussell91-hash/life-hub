@@ -252,7 +252,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
 
-    const req = card('Requirements', 'Must have: things every idea or part must include, yes or no. Students tick each one on their strongest idea and say where it is.', 'requirements');
+    const req = card('Requirements', 'Must have: things every idea or part must include, yes or no. Students say where each one is in their strongest idea; none can be skipped.', 'requirements');
     cur.requirements.forEach((r, i) => {
       const row = el('div', 'kit-row kit-requirement');
       row.append(text(r.text, 160, (v) => put((d) => { d.requirements[i]!.text = v; }), 'Requirement'));

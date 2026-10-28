@@ -231,14 +231,15 @@ export function mountSketch(ctx: FormContext): PhaseForm {
     const section = (kind: 'criteria' | 'requirements', title: string, items: ReadonlyArray<{ id: string; text: string }>, into: Record<string, string>, placeholder: string) => {
       const box = el('section', `sk-check sk-check--${kind}`);
       const tally = el('span', 'sk-check__tally');
-      const count = () => { tally.textContent = `${items.filter((x) => into[x.id]).length} of ${items.length}`; };
+      const count = () => { tally.textContent = kind === 'criteria' ? `${items.filter((x) => into[x.id]).length} ticked` : `${items.filter((x) => into[x.id]?.trim()).length} of ${items.length} done`; };
       const head = el('div', 'sk-check__head');
       head.append(el('h4', '', title), el('span', 'sk-check__tag', SKETCH_CHECKS[kind].tag), tally);
       const more = el('details', 'sk-check__more');
       more.append(el('summary', '', 'What does this mean?'));
       more.append(el('p', '', SKETCH_CHECKS[kind].what), el('p', '', SKETCH_CHECKS[kind].how), el('p', 'sprint-note', SKETCH_CHECKS[kind].example));
       box.append(head, el('p', 'sk-check__do', SKETCH_CHECKS[kind].doThis), more);
-      for (const x of items) box.append(tickRow(x.text, into, x.id, placeholder, ctx.editable, () => { count(); change(); }));
+      // Criteria are optional ticks. Requirements are all needed, so each is just a "where is it?" box.
+      for (const x of items) box.append(kind === 'criteria' ? tickRow(x.text, into, x.id, placeholder, ctx.editable, () => { count(); change(); }) : whereRow(x.text, into, x.id, placeholder, ctx.editable, () => { count(); change(); }));
       count();
       check.append(box);
     };
@@ -286,6 +287,22 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: () => { window.clearInterval(tick); bar.dispose(); } };
+}
+
+/** A requirement: no tick, because every one is needed. Just the box saying where it is. */
+function whereRow(label: string, into: Record<string, string>, id: string, placeholder: string, editable: boolean, change: () => void): HTMLElement {
+  const row = el('label', 'sprint-row sprint-row--where');
+  const input = el('input', 'qz-input');
+  input.type = 'text';
+  input.maxLength = 200;
+  input.placeholder = placeholder;
+  input.value = into[id] ?? '';
+  input.disabled = !editable;
+  input.addEventListener('input', () => { if (input.value.trim()) into[id] = input.value; else delete into[id]; change(); });
+  const text = el('span', '', label);
+  text.append(input);
+  row.append(text);
+  return row;
 }
 
 /** A tick with a "where" box; unticking clears it. */

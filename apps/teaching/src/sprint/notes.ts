@@ -33,7 +33,7 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
   },
   requirements: {
     what: 'Must have. Things every idea or part has to include, yes or no, not a quality to rate. Up to 6.',
-    students: 'At each phase you tag (U S D P T), students tick the requirement and say where it is in their work. In Sketch that is their strongest idea only.',
+    students: 'At each phase you tag (U S D P T), students say where it is in their work, and every one needs an answer. In Sketch that is their strongest idea only.',
     setup: 'Tag each one at two or more phases, so students keep coming back to it. Make every one something a student can point to.'
   },
   idea_guide: {
