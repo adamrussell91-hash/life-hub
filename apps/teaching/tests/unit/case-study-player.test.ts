@@ -11,7 +11,7 @@ const publicCase = (over: Partial<PublicCase> = {}): PublicCase => ({
   part_titles: ['Part one'], has_objections: true,
   ...over
 });
-const lessonOf = (c: PublicCase) => ({ lesson_id: 'cs1', title: 'The dam', unit_id: 'u1', blocks: [], published_at: 'x', schema_version: 1, pedagogical_mode: 'case_study', case: c }) as unknown as PublishedLesson;
+const lessonOf = (c: PublicCase, blocks: unknown[] = []) => ({ lesson_id: 'cs1', title: 'The dam', unit_id: 'u1', blocks, published_at: 'x', schema_version: 1, pedagogical_mode: 'case_study', case: c }) as unknown as PublishedLesson;
 const doc = { id: 'd1', kind: 'memo', title: 'Storage update', source: 'Operations, 3 October', text: 'The dam is low.\n\nUse is rising.' } as const;
 const status = (over: Partial<CaseStatus> = {}): CaseStatus => ({
   identity: { need: null, initials: 'AB' }, open_to: 0, done: [],
@@ -24,11 +24,11 @@ const client = (s: CaseStatus): CaseClient => ({
   nextPart: vi.fn(async () => s), advance: vi.fn(async () => s), lock: vi.fn(async () => s)
 });
 const flush = () => new Promise((r) => setTimeout(r, 0));
-const mount = async (c: PublicCase, s: CaseStatus) => {
+const mount = async (c: PublicCase, s: CaseStatus, blocks: unknown[] = []) => {
   const host = document.createElement('div');
   document.body.append(host);
   const cl = client(s);
-  const player = mountCasePlayer(host, { lesson: lessonOf(c), classId: 'c1', client: cl, renderHero: () => {} });
+  const player = mountCasePlayer(host, { lesson: lessonOf(c, blocks), classId: 'c1', client: cl, renderHero: () => {} });
   await flush();
   return { host, cl, player };
 };
@@ -43,6 +43,24 @@ describe('case study player', () => {
     const { host, player } = await mount(publicCase(), status({ identity: { need: 'initials', initials: null } }));
     expect(host.querySelector('input[aria-label="Your initials"]')).not.toBeNull();
     player.dispose();
+  });
+
+  it('shows the Brief section\'s blocks above the first take and keeps them off Decide', async () => {
+    const text = (id: string, body: string) => ({ id, type: 'block', block_type: 'rich_text', variant: 'medium', content: { html: `<p>${body}</p>` } });
+    const blocks = [
+      { id: 'brief', block_type: 'section', content: { title: 'Brief', blocks: [text('t1', 'Listen to the viva first.')], case_brief: true } },
+      text('t2', 'Decide-stage reading.')
+    ];
+    const brief = await mount(publicCase(), status({ open_to: 0 }), blocks);
+    const panel = brief.host.querySelector('.cs__panelhost')!;
+    expect(panel.textContent).toContain('Listen to the viva first.');
+    expect(panel.textContent).not.toContain('Decide-stage reading.');
+    expect(panel.textContent!.indexOf('Listen to the viva')).toBeLessThan(panel.textContent!.indexOf('The dam is at 31%'));
+    brief.player.dispose();
+    const decide = await mount(publicCase(), withCase(), blocks);
+    expect(decide.host.querySelector('.cs__panelhost')!.textContent).toContain('Decide-stage reading.');
+    expect(decide.host.querySelector('.cs__panelhost')!.textContent).not.toContain('Listen to the viva first.');
+    decide.player.dispose();
   });
 
   it('draws five stations with done, now and later states', async () => {

@@ -1,7 +1,10 @@
-import type { LessonRouteRole } from '@/schemas/block';
+import type { Block, LessonRouteRole } from '@/schemas/block';
 import type { CaseDoc, CaseDocKind, CaseOption, CasePart, CaseSettings } from './schema';
 
 type CaseLesson = { case?: CaseSettings | undefined };
+
+/** The top-level section that holds the Brief's blocks. */
+export const isCaseBriefSection = (b: Block): boolean => b.block_type === 'section' && b.content.case_brief === true;
 
 const filled = (s: string | undefined): boolean => !!s && s.trim().length > 0;
 
