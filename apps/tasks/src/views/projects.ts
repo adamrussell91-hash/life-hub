@@ -20,6 +20,7 @@ import {
   type ProjectLifecycle,
   type ProjectPulseCard,
   type ProjectsGroupBy,
+  type PulseGroup,
   type RoadmapZoom
 } from '@/domain/projects-pulse';
 import { tasksApi } from '@/services/client-api';
@@ -27,6 +28,7 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { deleteProjectNow, showCompleteConfirm } from '@/views/card-actions';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
+import { createProjectsHive, type ProjectsHive } from '@/views/projects-hive';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
@@ -68,6 +70,8 @@ let groupBy: ProjectsGroupBy = 'status';
 let roadmapZoom: RoadmapZoom = 'month';
 let lifecycleFilter: ProjectLifecycle | 'all' = 'all';
 let jobFilter: ProjectJob | 'all' = 'all';
+/** Projects lands on the hive; the kanban board is the secondary view. */
+let projectsView: 'hive' | 'board' = 'hive';
 let tensionDismissed = false;
 
 const CLOCK_ICON =
@@ -503,18 +507,27 @@ function renderQuickAddProject(goals: Goal[], onCreated: (project: Project) => v
   return plus.root;
 }
 
-function renderBoard(
-  ctx: PulseContext,
-  confirmHost: HTMLElement,
-  actions: ProjectBoardActions
-): HTMLElement {
+/** The filtered, grouped projects both the hive and the board show. */
+function visibleGroups(ctx: PulseContext): PulseGroup[] {
   const visible = cardsForBoard(ctx).filter((card) => {
     if (!matchesProjectQuery(card.project, projectQuery)) return false;
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) return false;
     if (jobFilter !== 'all' && projectJob(card.project) !== jobFilter) return false;
     return true;
   });
-  const groups = groupPulseCards(visible, groupBy, ctx.goals, ctx.now);
+  return groupPulseCards(visible, groupBy, ctx.goals, ctx.now);
+}
+
+function emptyBoardMessage(): string {
+  return lifecycleFilter === 'completed' ? 'No completed projects yet.' : 'No projects match.';
+}
+
+function renderBoard(
+  ctx: PulseContext,
+  confirmHost: HTMLElement,
+  actions: ProjectBoardActions
+): HTMLElement {
+  const groups = visibleGroups(ctx);
   const grid = el('div', 'projects-board');
   grid.id = 'projects-board';
   grid.style.gridTemplateColumns = groups.length
@@ -522,11 +535,7 @@ function renderBoard(
     : 'minmax(0, 1fr)';
   if (!groups.length) {
     grid.append(
-      el(
-        'p',
-        'empty-state',
-        lifecycleFilter === 'completed' ? 'No completed projects yet.' : 'No projects match.'
-      )
+      el('p', 'empty-state', emptyBoardMessage())
     );
     return grid;
   }
@@ -735,12 +744,13 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   const mergeTargets = projects.filter((project) => project.status !== 'stalled');
 
   const reload = () => void renderProjectsView(canvas);
+  const hive: ProjectsHive = createProjectsHive();
 
   function selectLifecycle(id: ProjectLifecycle | 'all'): void {
     lifecycleFilter = id;
     paint();
     requestAnimationFrame(() => {
-      canvas.querySelector('#projects-board')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      canvas.querySelector(projectsView === 'hive' ? '#projects-hive' : '#projects-board')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
 
@@ -770,7 +780,8 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     ctx.stallIds.delete(projectId);
     ctx.stallCandidates = ctx.stallCandidates.filter((item) => item.project.id !== projectId);
     removeProjectNodes(canvas, projectId);
-    refreshPulse();
+    if (projectsView === 'hive') paint();
+    else refreshPulse();
   }
 
   function acceptProject(created: Project): void {
@@ -876,7 +887,21 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
         }
       })
     );
-    toolbar.append(filters.root, groupByRow, renderQuickAddProject(ctx.goals, acceptProject));
+    const viewPills = createHubPills<'hive' | 'board'>({
+      label: 'View',
+      role: 'tablist',
+      items: [
+        { id: 'hive', label: 'Hive' },
+        { id: 'board', label: 'Board' }
+      ],
+      value: projectsView,
+      onSelect: (id) => {
+        projectsView = id;
+        paint();
+      }
+    });
+    viewPills.classList.add('projects-view-toggle');
+    toolbar.append(viewPills, filters.root, groupByRow, renderQuickAddProject(ctx.goals, acceptProject));
     canvas.append(toolbar);
     // Forecast goes first: "is anything about to slip" is the thing to
     // check before browsing the board itself.
@@ -886,7 +911,12 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     // with an actual per-status breakdown, which made this card pure
     // duplicate chrome on this page specifically (still used as-is on
     // Goals, which has no equivalent chart).
-    canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
+    if (projectsView === 'hive') {
+      hive.update({ groups: visibleGroups(ctx), tasks: ctx.tasks, now: ctx.now, emptyMessage: emptyBoardMessage() });
+      canvas.append(hive.el);
+    } else {
+      canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
+    }
 
     // One bento: mix + timeline as a paired top row; Due for review spans
     // the full width underneath with the same tile gap (not a floating island).
@@ -1058,5 +1088,6 @@ export function resetProjectsViewStateForTests(): void {
   roadmapZoom = 'month';
   lifecycleFilter = 'all';
   jobFilter = 'all';
+  projectsView = 'hive';
   tensionDismissed = false;
 }
