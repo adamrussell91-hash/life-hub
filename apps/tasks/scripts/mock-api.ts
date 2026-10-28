@@ -18,6 +18,7 @@ import { lineSummary, newLineSlug, sanitizeLineSnapshot } from '../../../netlify
 import { createProblemSolverService } from '../../../netlify/functions/_shared/problem-solver/service.mjs';
 import { createMemoryProblemStore } from '../../../netlify/functions/_shared/problem-solver/store.mjs';
 import { scriptedCoach } from '../../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
+import { createQuestionBookMock } from './question-book-mock';
 
 export function createMemoryKv(): KvAdapter & { map: Map<string, unknown> } {
   const map = new Map<string, unknown>();
@@ -155,6 +156,8 @@ export function createMockApi({ seed }: MockApiOptions) {
     '/api/collaboration-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['collab'] }),
     '/api/communication-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['talk'] })
   };
+  // The Question Book: an in-memory notebook over invented questions (the book's own live only in the private data repo).
+  const questionBook = createQuestionBookMock();
 
   async function handle(method: string, urlPath: string, body?: unknown) {
     await ensure();
@@ -457,6 +460,9 @@ export function createMockApi({ seed }: MockApiOptions) {
         return json(200, { ok: true, data: { slug, deleted: true } });
       }
     }
+
+    const questionBookReply = questionBook.handle(method, url, body);
+    if (questionBookReply) return json(questionBookReply.status, questionBookReply.body);
 
     const problemSolver = coachServices[path];
     if (problemSolver) {

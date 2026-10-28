@@ -90,6 +90,8 @@ export interface WalkthruSuggestion {
   chain: Array<{ step: 'evidence' | 'problem' | 'series' | 'technique'; text: string }>;
   /** One-offs suggest a note on the next lesson; repeated patterns suggest a goal. */
   action: 'note' | 'goal';
+  /** One-offs: the class's next lesson, where the WalkThru note goes. */
+  next_lesson?: { lesson_id: string; date: string; url: string };
   /** Why it came back, when it did: "Dismissed 4 Nov. Since then, 3 more quizzes show the same problem." */
   note: string;
 }

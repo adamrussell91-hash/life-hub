@@ -9,6 +9,7 @@
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book change-book check the Change Book's
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book collaboration-book  the Collaboration Book's
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book communication-book  the Communication Book's
+//   node scripts/book-pack/copy-check.mjs <pack-dir> --book question-book       the Question Book's
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -281,6 +282,38 @@ export async function checkGearShifter(dir) {
   return found;
 }
 
+/** The Question Book's shipped strings, each with where it came from: the catalogue (chapters, charts, groups, the rules card), the Notice prompt, the glyph titles and the app's own copy. The questions themselves never ship: they live in the private data repo. */
+export async function questionBookStrings() {
+  const { CHAPTERS, CHARTS, GROUPS, RULES } = await import('../../packages/question-book/catalogue.mjs');
+  const { NOTICE_SYSTEM } = await import('../../netlify/functions/_shared/question-book.mjs');
+  const glyphs = fileURLToPath(new URL('../../packages/question-book/glyphs/', import.meta.url));
+  const out = [];
+  for (const entry of [...CHAPTERS, ...CHARTS, ...GROUPS, ...RULES]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
+  out.push(['prompt NOTICE_SYSTEM', NOTICE_SYSTEM]);
+  for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
+      const title = /<title>([^<]*)<\/title>/.exec(readFileSync(join(glyphs, folder.name, file), 'utf8'))?.[1];
+      if (title) out.push([`glyph ${folder.name}/${file}`, title]);
+    }
+  }
+  out.push(...appStrings(new URL('../../apps/tasks/src/views/question-book/', import.meta.url), []));
+  return out;
+}
+
+/** Copied runs in the Question Book's shipped strings: [where, run] pairs, empty when clean. */
+export async function checkQuestionBook(dir) {
+  const shingles = shinglesOf(readPackTexts(dir));
+  // The five group titles are headings, shown as the book's own names for its groups.
+  const titles = new Set(JSON.parse(readFileSync(join(dir, 'book.json'), 'utf8')).sections.map((part) => wordsOf(part.title).join(' ')));
+  const found = [];
+  for (const [where, text] of await questionBookStrings()) {
+    if (titles.has(wordsOf(text).join(' '))) continue;
+    const run = copiedRun(text, shingles);
+    if (run) found.push([where, run]);
+  }
+  return found;
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dir = process.argv[2] && !process.argv[2].startsWith('--') && resolve(process.argv[2]);
   if (!dir || !existsSync(join(dir, 'entries'))) {
@@ -288,7 +321,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exit(2);
   }
   const book = process.argv.includes('--book') ? process.argv[process.argv.indexOf('--book') + 1] : 'get-things-done';
-  const found = book === 'rules-book' ? await checkRulesBook(dir) : book === 'change-book' ? await checkChangeBook(dir) : book === 'collaboration-book' ? await checkCollaborationBook(dir) : book === 'communication-book' ? await checkCommunicationBook(dir) : await checkGearShifter(dir);
+  const found = book === 'rules-book' ? await checkRulesBook(dir) : book === 'change-book' ? await checkChangeBook(dir) : book === 'collaboration-book' ? await checkCollaborationBook(dir) : book === 'communication-book' ? await checkCommunicationBook(dir) : book === 'question-book' ? await checkQuestionBook(dir) : await checkGearShifter(dir);
   for (const [where, run] of found) console.log(`COPIED ${where}: "${run}…"`);
   console.log(found.length ? `${found.length} copied runs` : 'No copied runs.');
   process.exit(found.length ? 1 : 0);

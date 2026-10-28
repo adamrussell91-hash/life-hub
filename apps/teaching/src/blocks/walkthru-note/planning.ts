@@ -2,6 +2,7 @@ import { GLYPH_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { renderStepsInto } from './note';
+import { FRAMEWORK_LENSES } from '@/blocks/lenses/framework-lenses';
 
 /**
  * Unit planning prompts that come from the book. Each carries the technique's icon; opening one
@@ -56,5 +57,36 @@ export function renderPlanningPrompts(): HTMLElement | null {
     list.append(details);
   }
   wrap.append(head, list);
+  return wrap;
+}
+
+/**
+ * Framework lenses for the whole unit: one button each adds a plan block carrying the lens. The hover
+ * names the source as a framework chapter, not a WalkThru. `add` returns false if the lens is gone.
+ */
+export function renderFrameworkLenses(add: (lensId: string) => boolean): HTMLElement | null {
+  if (!FRAMEWORK_LENSES.length) return null;
+  const wrap = document.createElement('details');
+  wrap.className = 'tk-wt-plan';
+  const head = document.createElement('summary');
+  head.className = 'tk-wt-plan__head';
+  head.textContent = 'Framework lenses for this unit';
+  const list = document.createElement('div');
+  list.className = 'tk-wt-badges';
+  const status = document.createElement('p');
+  status.className = 'muted';
+  status.setAttribute('role', 'status');
+  for (const lens of FRAMEWORK_LENSES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn--secondary';
+    b.textContent = `Add ${lens.label} to the plan`;
+    b.title = lens.path;
+    b.addEventListener('click', () => {
+      status.textContent = add(lens.id) ? `${lens.label} added at the end of the plan.` : 'That lens isn’t available.';
+    });
+    list.append(b);
+  }
+  wrap.append(head, list, status);
   return wrap;
 }

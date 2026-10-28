@@ -2648,6 +2648,10 @@ var SectionBlockObjectSchema = z10.object({
     sprint_guides: z10.boolean().optional(),
     /** Case Study: this top-level section holds the Brief's blocks, shown to students above the first-take question. */
     case_brief: z10.boolean().optional(),
+    /** Case Study: this top-level section holds one case part's blocks (by part id), shown in the work panel while that part is open. */
+    case_part: z10.string().max(40).optional(),
+    /** Case Study: this top-level section holds the Outcome's blocks, shown to students once the outcome is out. */
+    case_outcome: z10.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
