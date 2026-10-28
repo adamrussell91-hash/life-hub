@@ -16,7 +16,7 @@ A **sleeve** is a toolkit item laid over a question or activity students are alr
 - **Closed:** one strip above the host prompt, made of the chip, the goal line, progress ("2/3 checked") and Show how. The host block gets a coloured left edge, and its answer box gets a tint: orange for values, navy for tools, the navy and orange stripe for skills.
 - **Open:** three explicit-instruction steps that look the same on every item.
   1. **See it.** One sentence on what good looks like. Show example reveals a weaker version next to a stronger one.
-  2. **Do it.** One move, plus tap-to-insert sentence starters.
+  2. **Do it.** One move, then “Write it in your book” with sentence starters to copy.
   3. **Check it.** Three ticks students check against their own work.
 - **Levels:** Support and Extend. The steps are the same; the wording asks more at Extend.
 - **Stacking:** up to two sleeves on one block. Only one is open at a time.
@@ -43,10 +43,10 @@ The stepped walk (`stepped-view.ts`) stays as it is for Kaplan, Windows & Mirror
 
 ### 1. Sleeve lens and view
 - Add the type, factory, registry list, view, host tint and CSS.
-- Starters insert at the cursor in the host's answer box. That box is the response textarea of a `short_answer` or a one-question `question_set`. A block with no answer box shows the starters as plain text, with no tap.
+- Starters are text to copy into their book (changed 29 Oct; see decision 2).
 - Ticks and the student's level save through `saveActivityState`, keyed `lesson.block.sleeve.<id>`.
 - Print: a closed strip plus the three checks as tick boxes.
-- Unit tests for read/write/remove, the two-sleeve limit, one-open-at-a-time, and starter insertion into each host type.
+- Unit tests for read/write/remove, the two-sleeve limit, one-open-at-a-time, and the book instructions.
 
 ### 2. Content for all 37 items
 - Written into the data files by Claude during the build. Nothing is generated at runtime, so there is no AI cost.
@@ -83,7 +83,7 @@ The stepped walk (`stepped-view.ts`) stays as it is for Kaplan, Windows & Mirror
   - Distinction on a question set
   - Justify on a short answer with lines
   - two stacked sleeves
-  - starter insertion
+  - the book instructions
   - ticks surviving a reload
   - print preview
   - Turn into a sleeve on an old Clarity block
@@ -92,7 +92,7 @@ The stepped walk (`stepped-view.ts`) stays as it is for Kaplan, Windows & Mirror
 ## Decisions made in the mockup (Adam can overturn any)
 
 1. **Two levels, Support and Extend.** Students see *More help* and *Stretch*, matching the lens labels. Stepped lenses have three levels, but a sleeve's job is quick, so Core is dropped.
-2. **No Write it down step.** Students write in the host block's answer box. The sleeve only scaffolds and checks.
+2. **Students write in their book** (Adam, 29 Oct). Do it says “Write it in your book. Start with:” and the starters are text to copy; Check it says “Tick what your book shows.” Nothing is typed into the host's answer box; a question can hide its own box with response space None.
 3. **The row of all nine values and In discussion leave the student view.** They move to the teacher fold.
 4. **Old toolkit blocks are not migrated automatically.** The teacher converts them one at a time, because only the teacher knows which question each belongs to.
 

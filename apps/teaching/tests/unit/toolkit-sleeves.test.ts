@@ -5,7 +5,6 @@ import { withLens } from '@/blocks/lenses/attachments';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { attachedSleeves, canAddSleeve, SLEEVE_LENSES, sleeveById } from '@/blocks/lenses/registry';
 import { attachCardSleeve, sleeveTarget } from '@/blocks/lenses/sleeve-convert';
-import { insertStarter } from '@/blocks/lenses/sleeve-view';
 import { storageKey } from '@/blocks/learning-activity';
 import { renderBlock } from '@/blocks/render';
 import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
@@ -131,33 +130,15 @@ describe('sleeve view', () => {
     expect(locked.querySelector('.sleeve__level')).toBeNull();
   });
 
-  it('inserts a starter at the cursor in a one-question short answer and saves it', () => {
+  it('sends writing to the book: starters are text to copy, never typed into the answer box', () => {
     const view = renderBlock(sleeved(), 'student', { lessonId: 'lesson' });
     document.body.append(view);
-    const box = view.querySelector<HTMLTextAreaElement>('textarea.block-question-set__answer')!;
-    box.value = 'Katniss volunteers.';
-    box.setSelectionRange(box.value.length, box.value.length);
-    view.querySelector<HTMLButtonElement>('.sleeve__bar')!.click();
-    const starter = view.querySelector<HTMLButtonElement>('button.sleeve__starter')!;
-    starter.click();
-    expect(box.value).toBe(`Katniss volunteers. ${starter.textContent} `);
-    const saved = JSON.parse(localStorage.getItem(`${storageKey('lesson', 'qset')}.answers`) ?? '{}') as Record<string, string>;
-    expect(Object.values(saved)).toEqual([box.value]);
-  });
-
-  it('inserts mid-text at the caret', () => {
-    const box = document.createElement('textarea');
-    box.value = 'Start end';
-    box.setSelectionRange(5, 5);
-    insertStarter(box, 'For example,');
-    expect(box.value).toBe('Start For example,  end');
-  });
-
-  it('shows starters as plain text when the host has no answer box', () => {
-    const view = renderBlock(sleeved(createBlock('callout', 'c')), 'student');
     view.querySelector<HTMLButtonElement>('.sleeve__bar')!.click();
     expect(view.querySelector('button.sleeve__starter')).toBeNull();
     expect(view.querySelectorAll('span.sleeve__starter').length).toBeGreaterThan(1);
+    expect([...view.querySelectorAll('.sleeve__book')].map((p) => p.textContent)).toEqual([
+      'Write it in your book. Start with:', 'Tick what your book shows.'
+    ]);
   });
 
   it('keeps ticks and the chosen level across a reload', () => {
