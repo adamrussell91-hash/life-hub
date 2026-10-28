@@ -63,6 +63,25 @@ describe('case study player', () => {
     decide.player.dispose();
   });
 
+  it('shows the open part\'s blocks in the work panel and keeps them off Decide', async () => {
+    const text = (id: string, body: string) => ({ id, type: 'block', block_type: 'rich_text', variant: 'medium', content: { html: `<p>${body}</p>` } });
+    const blocks = [
+      { id: 'sp1', block_type: 'section', content: { title: 'Part 1', blocks: [text('t1', 'Hinge: what is that line doing?')], case_part: 'p1' } },
+      { id: 'sp2', block_type: 'section', content: { title: 'Part 2', blocks: [text('t3', 'Later part task.')], case_part: 'p2' } },
+      text('t2', 'Decide-stage reading.')
+    ];
+    const work = await mount(publicCase(), withCase({ open_to: 1 }), blocks);
+    const panel = work.host.querySelector('.cs__panelhost')!;
+    expect(panel.textContent).toContain('Hinge: what is that line doing?');
+    expect(panel.textContent).not.toContain('Later part task.');
+    expect(panel.textContent).not.toContain('Decide-stage reading.');
+    work.player.dispose();
+    const decide = await mount(publicCase(), withCase(), blocks);
+    expect(decide.host.querySelector('.cs__panelhost')!.textContent).toContain('Decide-stage reading.');
+    expect(decide.host.querySelector('.cs__panelhost')!.textContent).not.toContain('Hinge:');
+    decide.player.dispose();
+  });
+
   it('draws five stations with done, now and later states', async () => {
     const { host, player } = await mount(publicCase(), withCase({ open_to: 1 }));
     const states = [...host.querySelectorAll<HTMLElement>('.srail__stn')].map((b) => b.dataset.state);

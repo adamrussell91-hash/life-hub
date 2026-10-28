@@ -12,11 +12,15 @@ export type CaseEditorOptions = {
   classes?: Array<{ id: string; name: string }>;
   /** Called after the tab changes, so the page can show or hide the lesson canvas. */
   onTab?: (tab: CaseTab) => void;
+  /** Called when the teacher picks a part to add blocks to, so the page can make its section and show it. */
+  onPartBlocks?: (partId: string, title: string) => void;
 };
 
 export type CaseEditorHandle = {
   root: HTMLElement;
   tabs: ReturnType<typeof createCaseTabs>;
+  /** The part new blocks go into on The case tab: the one last picked, else the first. */
+  activePart(): { id: string; title: string } | undefined;
   repaint(): void;
   dispose(): void;
 };
@@ -31,6 +35,8 @@ const PACE_LABELS: Array<[CaseSettings['pace'], string]> = [['teacher', 'You mov
 const SUPPORT_LABELS: Array<[CaseSettings['support'], string]> = [['guided', 'Guided (7 to 8)'], ['standard', 'Standard (9 to 10)'], ['open', 'Open (11 to 12)']];
 const RELEASE_LABELS: Array<[CaseSettings['release'], string]> = [['whole', 'All at once'], ['layered', 'In parts, a question between']];
 
+const partSectionTitle = (pi: number, title: string): string => `Part ${pi + 1}${title.trim() ? `: ${title.trim()}` : ''}`;
+
 /** Teacher editor for a Case Study lesson. All state lives in `lesson.case`; every change emits the whole lesson for autosave. */
 export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
   const root = el('section', 'cse');
@@ -42,6 +48,7 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
   root.append(bar, el('div', 'cse__body'));
   root.lastElementChild!.append(panels, checklist);
   let marked = '';
+  let pickedPart: string | undefined;
 
   const current = (): CaseSettings => o.getLesson().case ?? seedCase(o.getLesson());
   const put = (change: (draft: CaseSettings) => void, repaint = false): void => {
@@ -202,6 +209,18 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
       box.append(head);
       part.docs.forEach((doc, di) => box.append(docEditor(doc, di, part.docs.length, (change, structural) => put((d) => change(d.parts[pi]!.docs), structural))));
       if (part.docs.length < 8) box.append(addDocRow((kind) => put((d) => { d.parts[pi]!.docs.push(newDoc(d, kind)); }, true)));
+      const picked = (pickedPart ?? c.parts[0]?.id) === part.id;
+      box.classList.toggle('is-picked', picked);
+      const blocksRow = el('div', 'cse-part__blocks');
+      blocksRow.append(
+        button(picked ? 'Adding blocks here' : 'Add blocks to this part', picked ? 'primary' : 'secondary', () => {
+          pickedPart = part.id;
+          paint();
+          o.onPartBlocks?.(part.id, partSectionTitle(pi, part.title));
+        }),
+        note('Hinge questions, a reasoning step, a challenge: students see them in the work panel while this part is open. New blocks from the left rail go into the part marked here.')
+      );
+      box.append(blocksRow);
       if (layered && pi < c.parts.length - 1) {
         box.append(labelled('Question before the next part opens', area(part.question ?? '', 300, 'Part question', (v) => put((d) => { d.parts[pi]!.question = v; }), 2), 'Students answer it before they see the next part.'));
       }
@@ -314,5 +333,12 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
   }
 
   paint();
-  return { root, tabs, repaint: paint, dispose() { root.remove(); } };
+  function activePart(): { id: string; title: string } | undefined {
+    const parts = current().parts;
+    const pi = Math.max(0, parts.findIndex((p) => p.id === pickedPart));
+    const part = parts[pi];
+    return part ? { id: part.id, title: partSectionTitle(pi, part.title) } : undefined;
+  }
+
+  return { root, tabs, activePart, repaint: paint, dispose() { root.remove(); } };
 }

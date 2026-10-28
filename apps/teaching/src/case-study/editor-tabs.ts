@@ -3,17 +3,18 @@ import { createBlock } from '@/blocks/create-block';
 import { el } from '@/quiz/dom';
 import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
 import type { CaseStation } from './schema';
-import { isCaseBriefSection } from './model';
+import { casePartOf, isCaseBriefSection } from './model';
 
 export type CaseTab = 'kit' | CaseStation | 'all';
 
 const ITEMS: Array<[CaseTab, string]> = [['kit', 'Kit'], ['brief', 'Brief'], ['case', 'The case'], ['decide', 'Decide'], ['outcome', 'Outcome'], ['rules', 'Rules'], ['all', 'All']];
 
-/** The Brief section's blocks show on Brief; every other block is Decide-stage content. All shows both. */
+/** The Brief section's blocks show on Brief, part sections on The case; every other block is Decide-stage content. All shows everything. */
 export function inCaseTab(block: Block, tab: CaseTab): boolean {
   if (tab === 'all') return true;
   if (tab === 'brief') return isCaseBriefSection(block);
-  return tab === 'decide' && !isCaseBriefSection(block);
+  if (tab === 'case') return casePartOf(block) !== undefined;
+  return tab === 'decide' && !isCaseBriefSection(block) && casePartOf(block) === undefined;
 }
 
 /** The Brief section, added if the lesson has none. Unchanged blocks come back as the same array. */
@@ -21,6 +22,13 @@ export function withCaseBriefSection(blocks: Block[], newId: () => string): Bloc
   if (blocks.some(isCaseBriefSection)) return blocks;
   const base = createBlock('section', newId());
   return [{ ...base, content: { title: 'Brief', blocks: [], case_brief: true } } as Block, ...blocks];
+}
+
+/** A section for one part's blocks, added at the end if the lesson has none. Unchanged blocks come back as the same array. */
+export function withCasePartSection(blocks: Block[], partId: string, title: string, newId: () => string): Block[] {
+  if (blocks.some((b) => casePartOf(b) === partId)) return blocks;
+  const base = createBlock('section', newId());
+  return [...blocks, { ...base, content: { title, blocks: [], case_part: partId } } as Block];
 }
 
 /** Kit, one per station, All. `marks` puts a dot on tabs that still have something to add. */
