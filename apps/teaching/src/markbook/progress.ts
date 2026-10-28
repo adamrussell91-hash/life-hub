@@ -4,7 +4,7 @@ import type { ScheduledLesson, Unit } from '@/schemas';
 import type { MarkbookView } from './types';
 
 /**
- * The teacher's Progress view: one row per student, one column per lesson of the unit.
+ * The teacher's Progress view: one row per student, one column per lesson of the class's active units.
  * A tick is complete, a half circle is partial, a grey box is not for that student, and a
  * red dot means it is still not complete a week after its set date. Pure rules first, then the table.
  */
@@ -20,26 +20,32 @@ export type ProgressLesson = {
   assessment: boolean;
   /** The lesson's set date for this class, YYYY-MM-DD. */
   date?: string;
+  /** The unit it belongs to, for the band above the columns. */
+  unit?: string;
 };
 
-/** The unit's lessons in order, with each lesson's earliest set date for the class. */
+/** The units' lessons in order, each once, with each lesson's earliest set date for the class. */
 export function unitProgressLessons(
-  unit: Pick<Unit, 'lesson_ids'> | undefined,
+  units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & { title?: string }>,
   lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string }>,
   scheduled: readonly Pick<ScheduledLesson, 'lesson_id' | 'date'>[]
 ): ProgressLesson[] {
   const byId = new Map(lessons.map((l) => [l.id, l] as const));
   const out: ProgressLesson[] = [];
-  for (const id of unit?.lesson_ids ?? []) {
+  const seen = new Set<string>();
+  for (const unit of units)
+  for (const id of unit.lesson_ids ?? []) {
     const lesson = byId.get(id);
-    if (!lesson || lesson.status === 'trashed') continue;
+    if (!lesson || lesson.status === 'trashed' || seen.has(id)) continue;
+    seen.add(id);
     const dates = scheduled.filter((r) => r.lesson_id === id && r.date).map((r) => r.date.slice(0, 10)).sort();
     out.push({
       id,
       title: lesson.title,
       role: lesson.route_role ?? 'core',
       assessment: lesson.pedagogical_mode === 'assessment',
-      ...(dates[0] ? { date: dates[0] } : {})
+      ...(dates[0] ? { date: dates[0] } : {}),
+      ...(unit.title ? { unit: unit.title } : {})
     });
   }
   return out;
@@ -59,6 +65,8 @@ export type CellInput = {
   lesson: ProgressLesson;
   record: DoneRecord | undefined;
   quizSubmitted: boolean;
+  /** Handed in with nothing left to mark. */
+  quizMarked?: boolean;
   quizStarted: boolean;
   /** The teacher ticked this side lesson as taken for the student. */
   took: boolean;
@@ -67,11 +75,11 @@ export type CellInput = {
 
 export function cellFor(input: CellInput): Cell {
   const { lesson, record, quizSubmitted, quizStarted, took, today } = input;
-  const teacherDone = record?.via === 'teacher' && !record.partial;
+  const teacherDone = (record?.via === 'teacher' && !record.partial) || Boolean(input.quizMarked);
   const studentDone = Boolean(record && !record.partial && record.via !== 'teacher') || quizSubmitted;
   let state: CellState;
   if (lesson.assessment) {
-    // Handed in or ticked, but not yet marked by the teacher, is partial.
+    // Handed in or ticked, but not yet marked, is partial. A fully marked quiz is complete.
     state = teacherDone ? 'complete' : studentDone || record?.partial ? 'partial' : 'open';
   } else if (teacherDone || studentDone) state = 'complete';
   else if (record?.partial || quizStarted) state = 'partial';
@@ -141,6 +149,24 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
   root.append(key);
   const wrap = el('div', 'mb-progress__scroll');
   const table = el('table', 'mb-progress__table');
+  const thead = el('thead');
+  const units = lessons.map((l) => l.unit ?? '');
+  if (new Set(units).size > 1) {
+    const band = el('tr', 'mb-progress__units');
+    band.append(el('td', 'mb-progress__corner'));
+    for (let i = 0; i < units.length; ) {
+      let n = 1;
+      while (units[i + n] === units[i]) n++;
+      const th = el('th', 'mb-progress__unit');
+      th.scope = 'colgroup';
+      th.colSpan = n;
+      th.title = units[i]!;
+      th.append(el('span', 'mb-progress__unitname', units[i]!));
+      band.append(th);
+      i += n;
+    }
+    thead.append(band);
+  }
   const head = el('tr');
   head.append(el('th', 'mb-progress__corner', 'Student'));
   for (const l of lessons) {
@@ -155,7 +181,6 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
     th.append(label);
     head.append(th);
   }
-  const thead = el('thead');
   thead.append(head);
   table.append(thead);
   const body = el('tbody');
@@ -169,10 +194,12 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
     tr.append(name);
     for (const l of lessons) {
       const quiz = view.quizzes.find((q) => q.lesson_id === l.id);
+      const score = quiz?.scores?.[s.id];
       const cell = cellFor({
         lesson: l,
         record: view.done?.[s.id]?.[l.id],
-        quizSubmitted: Boolean(quiz?.scores?.[s.id]?.submitted_at),
+        quizSubmitted: Boolean(score?.submitted_at),
+        quizMarked: Boolean(score?.submitted_at) && score!.pending === 0,
         quizStarted: Boolean(quiz?.started?.includes(s.id)),
         took: (view.markbook.took?.[s.id] ?? []).includes(l.id),
         today
@@ -187,7 +214,10 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
         b.dataset.late = 'true';
         b.classList.add('mb-progress__btn--late');
       }
-      b.setAttribute('aria-label', `${s.name}, ${l.title}: ${WORD[cell.state]}${cell.late ? ', overdue' : ''}`);
+      const quizWords = score?.submitted_at ? (score.pending ? `, quiz handed in, ${score.pending} to mark` : `, quiz ${score.score}/${score.max}`) : '';
+      const words = `${s.name}, ${l.title}: ${WORD[cell.state]}${quizWords}${cell.late ? ', overdue' : ''}`;
+      b.setAttribute('aria-label', words);
+      b.title = words;
       b.addEventListener('click', () => options.onMark(s.id, l.id, NEXT[cell.state]));
       td.append(b);
       tr.append(td);
