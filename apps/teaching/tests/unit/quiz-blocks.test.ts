@@ -25,7 +25,7 @@ describe('quiz lessons and blocks', () => {
     expect(HOMEPAGE_BLOCK_GROUPS.flatMap((g) => g.types)).not.toContain('question_drop');
   });
 
-  it('blocks publishing a drop with no target, an unfinished question, or a quiz question outside a quiz', () => {
+  it('blocks publishing a drop with no target, an unfinished question, or a quiz question in a lecture', () => {
     const drop = createBlock('question_drop', 'd1');
     const question = createBlock('quiz_question', 'q1');
     const messages = listPublishBlockIssues([drop, question]).map((i) => i.message);
@@ -36,9 +36,11 @@ describe('quiz lessons and blocks', () => {
       id: 'l1', title: 'Monday', slug: 'monday', status: 'active', created_at: now, updated_at: now, schema_version: 1,
       type: 'lesson', unit_id: 'u1', sequence: 1, blocks: [question]
     } as unknown as Lesson;
-    const result = PublishableLessonSchema.safeParse(lesson);
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain('Quiz questions only work in a lesson set to Quiz');
+    const seminar = PublishableLessonSchema.safeParse({ ...lesson, pedagogical_mode: 'seminar' });
+    expect(JSON.stringify(seminar.error?.issues ?? [])).not.toContain('Quiz questions don’t run');
+    const lecture = PublishableLessonSchema.safeParse({ ...lesson, pedagogical_mode: 'lecture' });
+    expect(lecture.success).toBe(false);
+    expect(JSON.stringify(lecture.error?.issues)).toContain('Quiz questions don’t run in a Lecture');
   });
 
   it('prints a quiz question without its answer and shows the teacher the answer', () => {
