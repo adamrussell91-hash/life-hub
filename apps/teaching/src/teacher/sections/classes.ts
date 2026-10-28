@@ -372,7 +372,7 @@ export function renderClassPage(
   markbookHost.className = 'class-page__markbook-host';
   disposers.push(mountMarkbook(markbookHost, pageClass, {
     outcomes: outcomeLabels(curriculum.outcomes ?? []),
-    progressLessons: unitProgressLessons(unitsById.get(currentActiveUnitId), curriculum.lessons, classScheduled)
+    progressLessons: unitProgressLessons(activeUnits, curriculum.lessons, classScheduled)
   }));
 
   const sequence = renderUnitSequence(sequenceHost, {
