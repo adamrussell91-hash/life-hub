@@ -1,4 +1,6 @@
-import { renderPlanningPrompts } from '@/blocks/walkthru-note/planning';
+import { renderPlanningPrompts, renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
+import { steppedLens } from '@/blocks/lenses/registry';
+import { createBlock } from '@/blocks/create-block';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
@@ -617,6 +619,8 @@ export function renderUnitPage(
   planSection.append(planHeading);
   const planningPrompts = renderPlanningPrompts();
   if (planningPrompts) planSection.append(planningPrompts);
+  const frameworks = renderFrameworkLenses((id) => planEditor.addFrameworkLens(id));
+  if (frameworks) planSection.append(frameworks);
   planSection.append(planHost);
 
   const tagsHost = document.createElement('div');
@@ -844,7 +848,7 @@ function mountUnitPlanEditor(
     onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
     attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
   }
-): { dispose: () => void; updateOutcomes: (next: ReturnType<typeof publicOutcomesForPage>) => void } {
+): { dispose: () => void; updateOutcomes: (next: ReturnType<typeof publicOutcomesForPage>) => void; addFrameworkLens: (lensId: string) => boolean } {
   let blocks = structuredClone(initialBlocks);
   let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
@@ -1105,6 +1109,18 @@ function mountUnitPlanEditor(
     updateOutcomes(next) {
       attachedOutcomes = next;
       canvas.update(blocks);
+    },
+    /** A framework lens on the whole unit: a new plan block that carries the lens, at the end of the plan. */
+    addFrameworkLens(lensId) {
+      const lens = steppedLens(lensId);
+      if (!lens) return false;
+      const block = createBlock('rich_text', nextId());
+      const withIt = lens.write(block, { ...lens.create(block), focus: options.unit.title });
+      blocks = [...blocks, withIt];
+      revision += 1;
+      canvas.update(blocks);
+      scheduleSave();
+      return true;
     },
     dispose: () => {
       assistant?.dispose();

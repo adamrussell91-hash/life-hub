@@ -19,6 +19,7 @@ import {
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createFromInsertMenu } from '@/blocks/create-block';
+import { withWalkthruNote } from '@/blocks/walkthru-note/add-note';
 import { findBlockById } from '@/blocks/find-block';
 import { openPrintLesson } from '@/print/open-print';
 import { downloadPortableExport } from '@/teacher/export-api';
@@ -705,6 +706,25 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       onToggleFullPage: toggleFullPage,
       showPageMenu: false
     });
+
+    // The pattern monitor sends Adam here with ?walkthru=<technique>: make sure the lesson has its note.
+    const wanted = new URLSearchParams(window.location.search).get('walkthru');
+    if (wanted) {
+      const withNote = withWalkthruNote(lesson, wanted, nextId());
+      if (withNote !== lesson) {
+        assignLesson(withNote);
+        nextId = nextBlockIdFactory(`block_${lesson.id}`, lesson.blocks);
+        page.update(lesson);
+        markDirty();
+      }
+      try {
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete('walkthru');
+        window.history.replaceState(window.history.state, '', clean);
+      } catch {
+        /* the address is a convenience */
+      }
+    }
 
     printLesson = () => openPrintLesson(lesson);
 

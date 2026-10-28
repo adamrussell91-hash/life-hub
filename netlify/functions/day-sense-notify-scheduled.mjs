@@ -7,6 +7,8 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { defaultGetTasksStore, getJSON } from './_shared/tasks-blobs.mjs';
 import { okResponse } from './_shared/http.mjs';
 import { readSchoolTerms } from './almanac.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
+import { loadPlannedRepsForPush } from './_shared/walkthru-reps.mjs';
 import { runDaySenseNotify } from './_shared/day-sense-notify.mjs';
 
 export const config = { schedule: '*/10 * * * *' };
@@ -19,6 +21,7 @@ export default async function daySenseNotifyScheduled() {
       now: new Date(),
       loadProfile: () => getJSON(store, 'meta/planning_profile'),
       loadTerms: () => readSchoolTerms(async () => store),
+      loadPlannedReps: async (now) => loadPlannedRepsForPush(await defaultGetTeachingStore(process.env), now.getTime()),
       openRepo: async () => ({ client: createGitHubClient({ env: process.env, fetchImpl: fetch }), decodeBlob })
     });
     return okResponse(200, result);
