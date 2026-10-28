@@ -20,6 +20,9 @@ import { COMMIT_ID as RULES_COMMIT_ID } from '../rules-book/commit-slots.mjs';
 import { CHANGE_BOOK_MODEL } from '../change-book/model.mjs';
 import { parseGroups as parseChangeGroups } from '../change-book/route.mjs';
 import { COMMIT_ID as CHANGE_COMMIT_ID } from '../change-book/commit-slots.mjs';
+import { COLLABORATION_BOOK_MODEL } from '../collaboration-book/model.mjs';
+import { parseGroups as parseCollabGroups } from '../collaboration-book/route.mjs';
+import { COMMIT_ID as COLLAB_COMMIT_ID } from '../collaboration-book/commit-slots.mjs';
 
 export const BOOK_KINDS = Object.freeze({
   decision: Object.freeze({
@@ -53,6 +56,14 @@ export const BOOK_KINDS = Object.freeze({
     parsePlace: parseChangeGroups,
     record: Object.freeze({ tool: CHANGE_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The review date set for the step.', basisRule: 'The step rests on what a model showed' }),
     reason: 'Change Book works from The Change Book.'
+  }),
+  collab: Object.freeze({
+    model: COLLABORATION_BOOK_MODEL,
+    frameKeys: Object.freeze(['situation', 'group', 'outcome']),
+    placeKey: 'group',
+    parsePlace: parseCollabGroups,
+    record: Object.freeze({ tool: COLLAB_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The date set to come back to the experiment.', basisRule: 'The experiment rests on what a model showed' }),
+    reason: 'Collaboration Book works from The Collaboration Book.'
   })
 });
 

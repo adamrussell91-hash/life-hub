@@ -7,6 +7,7 @@
 //   node scripts/book-pack/copy-check.mjs <pack-dir>                   check Gear Shifter's shipped strings
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book rules-book  check the Rules Book's
 //   node scripts/book-pack/copy-check.mjs <pack-dir> --book change-book check the Change Book's
+//   node scripts/book-pack/copy-check.mjs <pack-dir> --book collaboration-book  the Collaboration Book's
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -182,6 +183,48 @@ export async function checkChangeBook(dir) {
   return found;
 }
 
+/** The Collaboration Book's shipped strings, each with where it came from: models, the Agree and Review tools, the coach's knowledge and rubric, the catalogue, the glyph titles and the app's own copy. */
+export async function collaborationBookStrings() {
+  const { COLLAB_TOOLS } = await import('../../packages/collaboration-book/tools/index.mjs');
+  const { cbCommit } = await import('../../packages/collaboration-book/tools/commit.mjs');
+  const { cbReview } = await import('../../packages/collaboration-book/tools/review.mjs');
+  const knowledge = await import('../../netlify/functions/_shared/problem-solver/knowledge/collaboration-book.mjs');
+  const { COLLAB_RUBRIC } = await import('../../netlify/functions/_shared/problem-solver/collaboration-book-prompts.mjs');
+  const { CATALOGUE, SECTIONS } = await import('../../packages/collaboration-book/catalogue.mjs');
+  const { GROUPS } = await import('../../packages/collaboration-book/route.mjs');
+  const glyphs = fileURLToPath(new URL('../../packages/collaboration-book/glyphs/', import.meta.url));
+  const out = [];
+  for (const [id, tool] of Object.entries({ ...COLLAB_TOOLS, cb_commit: cbCommit, cb_review: cbReview })) for (const text of shippedStrings(tool)) out.push([id, text]);
+  for (const key of ['STANCE', 'COLLAB_CHECKS', 'GROUP_GUIDE', 'LENS_GUIDE', 'COLLAB_TRAPS', 'SECTION_LINE']) out.push([`knowledge ${key}`, knowledge[key]]);
+  for (const entry of knowledge.LENSES) out.push([`knowledge lens ${entry.id}`, entry.name]);
+  for (const entry of CATALOGUE) { const note = knowledge.techniqueNote(entry.id); if (note) out.push([`knowledge note ${entry.id}`, note]); }
+  out.push(['rubric COLLAB_RUBRIC', COLLAB_RUBRIC]);
+  for (const entry of [...CATALOGUE, ...SECTIONS, ...GROUPS]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
+  for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
+      const title = /<title>([^<]*)<\/title>/.exec(readFileSync(join(glyphs, folder.name, file), 'utf8'))?.[1];
+      if (title) out.push([`glyph ${folder.name}/${file}`, title]);
+    }
+  }
+  out.push(...appStrings(new URL('../../apps/tasks/src/views/collaboration-book/', import.meta.url), []));
+  return out;
+}
+
+/** Copied runs in the Collaboration Book's shipped strings: [where, run] pairs, empty when clean. */
+export async function checkCollaborationBook(dir) {
+  const shingles = shinglesOf(readPackTexts(dir));
+  // The three part titles are headings: they are shown as the book's own names for its parts, in
+  // the catalogue and on the part emblems, and nowhere inside running text.
+  const titles = new Set(JSON.parse(readFileSync(join(dir, 'book.json'), 'utf8')).sections.map((part) => wordsOf(part.title).join(' ')));
+  const found = [];
+  for (const [where, text] of await collaborationBookStrings()) {
+    if (titles.has(wordsOf(text).join(' '))) continue;
+    const run = copiedRun(text, shingles);
+    if (run) found.push([where, run]);
+  }
+  return found;
+}
+
 /** Copied runs in Gear Shifter's shipped strings: [where, run] pairs, empty when clean. */
 export async function checkGearShifter(dir) {
   const shingles = shinglesOf(readPackTexts(dir));
@@ -200,7 +243,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exit(2);
   }
   const book = process.argv.includes('--book') ? process.argv[process.argv.indexOf('--book') + 1] : 'get-things-done';
-  const found = book === 'rules-book' ? await checkRulesBook(dir) : book === 'change-book' ? await checkChangeBook(dir) : await checkGearShifter(dir);
+  const found = book === 'rules-book' ? await checkRulesBook(dir) : book === 'change-book' ? await checkChangeBook(dir) : book === 'collaboration-book' ? await checkCollaborationBook(dir) : await checkGearShifter(dir);
   for (const [where, run] of found) console.log(`COPIED ${where}: "${run}…"`);
   console.log(found.length ? `${found.length} copied runs` : 'No copied runs.');
   process.exit(found.length ? 1 : 0);

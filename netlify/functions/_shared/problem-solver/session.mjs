@@ -307,7 +307,7 @@ export function applyCoachTurn(session, turn, deps) {
   const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
   const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
   // A session started from a model (or technique, or rule) on the shelf opens on it once it is framed.
-  // The Change Book calls its entries models, so it takes the default word.
+  // The Change Book and the Collaboration Book call their entries models, so they take the default word.
   const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: `You started from this ${next.kind === 'shift' ? 'technique' : next.kind === 'rules' ? 'rule' : 'model'} on the shelf.` } : null;
   const suggestion = quiet ? null : (shelf ?? turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
