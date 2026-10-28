@@ -26,6 +26,8 @@ import { SITUATIONS, anotherAngle as rulesAngle } from './knowledge/rules-book.m
 import { COMMIT_ID as RULES_COMMIT, REVIEW_ID as RULES_REVIEW } from '../../../../packages/rules-book/commit-slots.mjs';
 import { LENSES, anotherAngle as changeAngle } from './knowledge/change-book.mjs';
 import { COMMIT_ID as CHANGE_COMMIT, REVIEW_ID as CHANGE_REVIEW } from '../../../../packages/change-book/commit-slots.mjs';
+import { LENSES as COLLAB_LENSES, anotherAngle as collabAngle } from './knowledge/collaboration-book.mjs';
+import { COMMIT_ID as COLLAB_COMMIT, REVIEW_ID as COLLAB_REVIEW } from '../../../../packages/collaboration-book/commit-slots.mjs';
 import { validateCoachTurn } from './coach-schema.mjs';
 import { activeRun, currentStep, followOn, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
@@ -77,6 +79,12 @@ const CHANGE_FRAME = [
   ['change', 'Tell me about the change: what is changing, or what do you want to change, in one concrete example? Say what you have seen, as well as what you think it means.'],
   ['group', 'Clear. Where does it sit: making sense of the world, making sense of yourself and others, changing your own life, or changing things together?'],
   ['stay', 'Good. What should stay the same through this change: what is valuable and worth keeping?']
+];
+
+const COLLAB_FRAME = [
+  ['situation', 'Tell me about the team situation: what happened, and who was involved? Say what you saw, as well as what you think it means.'],
+  ['group', 'Clear. Is this mostly about solving a problem together, reaching a goal together, or building trust?'],
+  ['outcome', 'Good. What result would help, for the team as well as for you?']
 ];
 
 /**
@@ -356,6 +364,38 @@ function changeFrameTurn(session, last) {
   });
 }
 
+/** The Collaboration Book group the scripted coach hears in an answer; problems, when nothing else is named. */
+function heardCollabGroup(text) {
+  if (/\b(trust|safe|safety|respect|culture|relationship|honest\w*|candou?r)\b/i.test(text)) return 'trust';
+  if (/\b(goal|goals|aim|target|purpose|deadline|plan|metric|decide|decision)\b/i.test(text)) return 'goals';
+  return 'problems';
+}
+
+/** The scripted Collaboration Book coach's pick: the difficulty the group's first entry leads with, and its first model. */
+function collabDiscern(frame) {
+  const group = String(frame.group ?? 'problems').split('+')[0];
+  const lens = COLLAB_LENSES.find((o) => o.groups[0] === group) ?? COLLAB_LENSES.find((o) => o.groups.includes(group));
+  const tool = lens?.look.find((id) => TOOLS[id]) ?? toolsForPlanStep('collaboration_book', 'explore')[0];
+  return lens && tool ? { lens, tool } : null;
+}
+
+/** Collaboration Book framing: the opening message is the situation; then the group, then the result that would help. */
+function collabFrameTurn(session, last) {
+  const missing = COLLAB_FRAME.filter(([key]) => !session.frame[key]);
+  const [key] = missing[0];
+  const frame = { [key]: key === 'group' ? heardCollabGroup(last) : last };
+  if (missing.length > 1) return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
+  const pick = collabDiscern({ ...session.frame, ...frame });
+  if (!pick) return { ...base, verdict: 'accept', frame, message: 'That places the team situation. Pick a model from the shelf when you are ready.', skillsSeen: ['decision_making'] };
+  return asCoachReply({
+    verdict: 'accept',
+    frame,
+    message: `That places the team situation. It looks like ${pick.lens.name}. I suggest ${TOOLS[pick.tool].name} as a lens: it is one way of seeing, so tell me if it stops fitting. Shall we begin?`,
+    suggestion: { kind: 'next_technique', tool: pick.tool, reason: `A first lens for ${pick.lens.name}, with its limits kept in view.` },
+    skillsSeen: ['decision_making']
+  });
+}
+
 /** Decision framing: the opening message is the decision; then the compass, then what is known. */
 function decisionFrameTurn(session, last) {
   const missing = DECISION_FRAME.filter(([key]) => !session.frame[key]);
@@ -558,6 +598,46 @@ function changeTurn(session, last, run) {
 }
 
 /**
+ * A collaboration session's own turns, or null to fall through to the shared ones: selecting a
+ * model, another angle, Agree, the experiment's basis and date, and Review.
+ */
+function collabTurn(session, last, run) {
+  if (!run && waitingForReview(session)) return { ...base, verdict: 'clarify', message: `Review picks up on ${dueText(session)}. Press Review now if the results are already in.` };
+  if (!run && session.reviewState?.status === 'reviewing' && session.phase === 'review') {
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool: COLLAB_REVIEW, reason: 'See what happened and whether the conditions changed.' }, message: 'The results are in. The review asks what happened, whether the conditions changed and whether to keep the practice; start it when you are ready.' });
+  }
+  if (!run && session.phase === 'explore') {
+    const pick = collabDiscern(session.frame);
+    if (!pick) return null;
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool: pick.tool, reason: `A first lens for ${pick.lens.name}.` }, message: `Pick a model from the shelf, or start with ${TOOLS[pick.tool].name}: it fits ${pick.lens.name}.` });
+  }
+  if (!run) return null;
+  if (/^another angle\b/i.test(last.trim()) && session.phase === 'explore') {
+    if (!followOn(session)) return { ...base, verdict: 'clarify', message: 'Finish this model first: it is short of its minimum. What goes next on the chart?' };
+    const used = (currentStep(session)?.runs ?? []).map((item) => item.tool);
+    const { book, ours } = collabAngle(run.tool, used);
+    const tool = book[0] ?? ours[0];
+    if (!tool) return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'No other angle is listed; agree the experiment.' }, message: 'There is no other angle listed for this one. Shall we agree an experiment?' };
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool, reason: `Another angle on the same situation: ${TOOLS[tool].name}.` }, message: `Another angle would help: ${TOOLS[tool].name} looks at it from a different side. Start it when you are ready.` });
+  }
+  if (/^(agree|act|commit)\b/i.test(last.trim()) && session.phase === 'explore') {
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'The model has done its work.' }, message: 'Then let us agree one small experiment with an owner and a date. Move on to Agree when you are ready.' };
+  }
+  if (run.tool !== COLLAB_COMMIT) return null;
+  const { slot, text } = placement(run, last);
+  const name = parseSlot(slot)?.name;
+  if (name === 'check_back') {
+    const date = /\d{4}-\d{2}-\d{2}/.exec(text)?.[0];
+    if (!isRecordDate(date)) return { ...base, verdict: 'clarify', message: 'Give it a date, written like 2026-11-05. When will you come back to it together?' };
+    return { ...base, verdict: 'accept', node: { slot, text: date }, skillsSeen: ['metacognition'], message: 'Date set; confirm it on the card. Last: what would show it is not working, or that the conditions need changing?' };
+  }
+  if (name === 'rests_on' && wordCount(text) >= 6) {
+    return { ...base, verdict: 'accept', node: { slot, text }, basis: restsOn(session), skillsSeen: ['decision_making'], message: 'That rests on what the model showed. What is the next action, small enough to start this week and easy to stop?' };
+  }
+  return null;
+}
+
+/**
  * Lightning runs: the coach asks the current box, reads a reply starting yes or no (then
  * optional words) as the answer, takes a goal, learn, next or cannot line of three words or
  * more as the note, and treats `escalate` as asking for the full process.
@@ -733,12 +813,12 @@ export async function scriptedCoach(session) {
       const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
-    const how = session.kind === 'decision' ? 'decide' : session.kind === 'shift' ? 'get things done' : session.kind === 'rules' ? 'read situations' : session.kind === 'change' ? 'handle change' : 'tend to work through problems';
+    const how = session.kind === 'decision' ? 'decide' : session.kind === 'shift' ? 'get things done' : session.kind === 'rules' ? 'read situations' : session.kind === 'change' ? 'handle change' : session.kind === 'collab' ? 'work with others' : 'tend to work through problems';
     return { ...base, verdict: 'clarify', message: `Fair enough, that step is behind us now. Before we go on: what did you learn about how you ${how} in that step?` };
   }
   if (session.pendingLearning) {
     if (waitingForReview(session)) {
-      const step = ['decision', 'shift', 'rules', 'change'].includes(session.kind) ? 'Review' : 'Improve';
+      const step = ['decision', 'shift', 'rules', 'change', 'collab'].includes(session.kind) ? 'Review' : 'Improve';
       return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. ${step} picks up at your review on ${dueText(session)}.` };
     }
     const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
@@ -757,6 +837,7 @@ export async function scriptedCoach(session) {
     if (session.kind === 'shift') return shiftFrameTurn(session, last || session.turns[0].text);
     if (session.kind === 'rules') return rulesFrameTurn(session, last || session.turns[0].text);
     if (session.kind === 'change') return changeFrameTurn(session, last || session.turns[0].text);
+    if (session.kind === 'collab') return collabFrameTurn(session, last || session.turns[0].text);
     if (session.turns.length === 1) {
       // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
       const seeds = session.frameSeeds;
@@ -790,6 +871,10 @@ export async function scriptedCoach(session) {
   }
   if (session.kind === 'change') {
     const own = changeTurn(session, last, run);
+    if (own) return own;
+  }
+  if (session.kind === 'collab') {
+    const own = collabTurn(session, last, run);
     if (own) return own;
   }
   if (!run && waitingForReview(session)) {
@@ -850,7 +935,7 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };
   }
   const message = slot === CHOICE_SLOT ? choiceMessage(run)
-    : ['decision', 'shift', 'rules', 'change'].includes(session.kind) ? 'That holds up, and it is on the chart. What goes next: what else belongs here?'
+    : ['decision', 'shift', 'rules', 'change', 'collab'].includes(session.kind) ? 'That holds up, and it is on the chart. What goes next: what else belongs here?'
       : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
   return { ...base, verdict: 'accept', ...fillNode(run, slot, text, tag), skillsSeen: ['analysis'], message };
 }
