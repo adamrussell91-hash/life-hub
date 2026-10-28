@@ -64,3 +64,13 @@ export async function unplanRep(store, body) {
   if (existing?.state === 'planned') await deleteKey(store, key);
   return { removed: existing?.state === 'planned' };
 }
+
+/**
+ * Planned reps whose lesson ended recently, for the push prompt. Empty when the teacher has turned
+ * the prompt off (monitor setting `rep_push`). A rep that has been logged is no longer `planned`.
+ */
+export async function loadPlannedRepsForPush(store, nowMs, windowMs = 30 * 60 * 1000) {
+  const { loadSettings } = await import('./walkthru-monitor.mjs');
+  if (!(await loadSettings(store)).rep_push) return [];
+  return (await listReps(store)).filter((r) => r.state === 'planned' && r.lesson_end && nowMs - Date.parse(r.lesson_end) >= 0 && nowMs - Date.parse(r.lesson_end) <= windowMs);
+}

@@ -74,6 +74,7 @@ export async function quizColumns(store, roster, book) {
       date: sydneyDay(q.first_at),
       hidden: book.hidden_quizzes.includes(q.lesson_id),
       confidence: q.confidence,
+      timed: q.timed,
       closed: q.closed,
       questions: q.questions,
       scores: q.scores,

@@ -11,7 +11,7 @@
 import { countPatterns, DEFAULT_MONITOR, markbookEvidence, signalsFor } from './profile-evidence.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { markbookAction, sydneyDay } from './markbook.mjs';
-import { getJSON, setJSON, CLASS_PREFIX } from './teaching-blobs.mjs';
+import { getJSON, setJSON, listJSON, CLASS_PREFIX, SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { reject } from './question-drop.mjs';
@@ -24,10 +24,11 @@ export const SIGNALS_KEY = 'walkthru_monitor/signals';
 export const QUIET_KEY = 'walkthru_monitor/quiet';
 export const SETTINGS_KEY = 'walkthru_monitor/settings';
 
+/** Lesson-rep push: on by default (Adam asked for it); `rep_push: false` turns it off. */
 const RANGES = { quizzes: [2, 10], weeks: [1, 12], classes: [2, 10], oneOffDays: [3, 60] };
 
 export function cleanSettings(input) {
-  const out = { ...DEFAULT_MONITOR };
+  const out = { ...DEFAULT_MONITOR, rep_push: input?.rep_push !== false };
   for (const [key, [lo, hi]] of Object.entries(RANGES)) {
     const n = Number(input?.[key]);
     if (Number.isInteger(n) && n >= lo && n <= hi) out[key] = n;
@@ -44,6 +45,7 @@ export async function saveSettings(store, input) {
   for (const [key, [lo, hi]] of Object.entries(RANGES)) {
     if (input[key] !== undefined && !(Number.isInteger(Number(input[key])) && Number(input[key]) >= lo && Number(input[key]) <= hi)) reject(400, 'invalid_field', `${key} must be a whole number from ${lo} to ${hi}.`);
   }
+  if (input.rep_push !== undefined && typeof input.rep_push !== 'boolean') reject(400, 'invalid_field', 'rep_push must be true or false.');
   const settings = cleanSettings(input);
   await setJSON(store, SETTINGS_KEY, settings);
   return settings;
@@ -65,8 +67,8 @@ export async function rebuildSignals(store, now = new Date().toISOString()) {
   for (const cls of await liveClasses(store)) {
     try {
       const view = await markbookAction(store, cls.id, { action: 'load', skip_done: true });
-      const { evidence, sources } = markbookEvidence(view, []);
-      classes[cls.id] = { title: cls.title, signals: signalsFor(evidence, sources, codes) };
+      const { evidence, sources, timing } = markbookEvidence(view, []);
+      classes[cls.id] = { title: cls.title, signals: signalsFor(evidence, sources, codes, timing) };
     } catch {
       // One class that won't load must not hide the rest.
     }
@@ -140,6 +142,14 @@ async function patternsNow(store, now) {
   return { patterns: countPatterns(byClass, today, settings), titles, quiet, today, settings };
 }
 
+/** The class's next timetabled lesson on or after today, or null. */
+async function nextLessonFor(store, classId, today) {
+  const rows = await listJSON(store, SCHEDULED_LESSON_PREFIX).catch(() => []);
+  return rows
+    .filter((r) => r && r.class_id === classId && typeof r.lesson_id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && r.date >= today && !['delivered', 'skipped'].includes(r.delivery_status) && !isDeletedRecord(r))
+    .sort((a, b) => a.date.localeCompare(b.date) || String(a.start_time ?? '').localeCompare(String(b.start_time ?? '')))[0] ?? null;
+}
+
 export async function loadSuggestions(store, now = new Date().toISOString()) {
   const { patterns, titles, quiet, today, settings } = await patternsNow(store, now);
   const suggestions = [];
@@ -147,7 +157,13 @@ export async function loadSuggestions(store, now = new Date().toISOString()) {
     if (pattern.class_ids.every((id) => quietState(quiet[muteKey(pattern.type, id)], 0, today).quiet)) continue;
     const state = quietState(quiet[pattern.key], pattern.count, today);
     if (state.quiet) continue;
-    suggestions.push(describe(pattern, titles, state.comeback));
+    const suggestion = describe(pattern, titles, state.comeback);
+    // A one-off points at the class's next lesson, where the WalkThru note goes.
+    if (suggestion.action === 'note' && suggestion.technique_id) {
+      const next = await nextLessonFor(store, pattern.class_ids[0], today);
+      if (next) suggestion.next_lesson = { lesson_id: next.lesson_id, date: next.date, url: `/teaching/lessons/${encodeURIComponent(next.lesson_id)}?walkthru=${encodeURIComponent(suggestion.technique_id)}` };
+    }
+    suggestions.push(suggestion);
   }
   return { suggestions, settings };
 }

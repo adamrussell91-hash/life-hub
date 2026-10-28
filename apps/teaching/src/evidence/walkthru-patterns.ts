@@ -37,8 +37,8 @@ export const NEED = {
   codeMinStudents: 2
 } as const;
 
-/** Unanswered items at the end of a timed quiz are not recorded in quiz results yet, so `time` waits. */
-export const TIME_SIGNAL_RECORDED = false;
+/** Working under time: this many students finishing a timed quiz with blank items at the end of the paper. */
+export const TIME = { tailMin: 2, students: 2 } as const;
 
 /** A feedback code as the monitor needs it: its id and the problem type Adam marked it with. */
 export type CodeType = { id: string; problem_type?: ProblemType | null };
@@ -95,18 +95,19 @@ export function needsFor(items: Evidence[], codes: readonly CodeType[]): Array<{
   }
   for (const [type, students] of byType) if (students.size >= NEED.codeMinStudents && !out.some((o) => o.type === type)) out.push({ type, students: students.size });
 
-  // Working under time waits for quiz results that record unanswered items.
   return out;
 }
 
 /** One signal per source and problem type, oldest first. */
-export function signalsFor(evidence: Evidence[], sources: ReadonlyArray<{ source: string; title: string }>, codes: readonly CodeType[]): Signal[] {
+export function signalsFor(evidence: Evidence[], sources: ReadonlyArray<{ source: string; title: string }>, codes: readonly CodeType[], timing: Readonly<Record<string, Readonly<Record<string, number>>>> = {}): Signal[] {
   const signals: Signal[] = [];
   for (const { source, title } of sources) {
     const mine = evidence.filter((x) => x.source === source);
     if (!mine.length) continue;
     const date = mine.map((x) => x.date).sort()[0] as string;
     for (const need of needsFor(mine, codes)) signals.push({ source, title, date, type: need.type, students: need.students });
+    const unfinished = Object.values(timing[source] ?? {}).filter((blank) => blank >= TIME.tailMin).length;
+    if (unfinished >= TIME.students) signals.push({ source, title, date, type: 'time', students: unfinished });
   }
   return signals.sort((a, b) => a.date.localeCompare(b.date) || a.source.localeCompare(b.source) || a.type.localeCompare(b.type));
 }
