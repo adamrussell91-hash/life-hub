@@ -54,6 +54,8 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   'change-book': ['M3 12h6', 'M12 9l3 3l-3 3l-3-3z', 'M15 12c2.5 0 3.5-5 6-5', 'M15 12c2.5 0 3.5 5 6 5'],
   // After the cover: two diagonal loops crossing around a small ring they share.
   'collaboration-book': ['M5.6 5.6a9 4 45 1 1 12.8 12.8a9 4 45 1 1-12.8-12.8', 'M5.6 18.4a9 4 -45 1 1 12.8-12.8a9 4 -45 1 1-12.8 12.8', 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0'],
+  // After the cover: a square quotation mark with its cut tail, over a line of speech.
+  'communication-book': ['M5 4h6v7l-4 4l1-4H5z', 'M13 4h6v7l-4 4l1-4h-3z', 'M5 19h14'],
   // A question mark inside a square, in outline.
   'question-book': ['M4 4h16v16H4z', 'M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8v.5', 'M12 16.8v.2'],
   'term-dates': ['M4 6h16', 'M4 10h12', 'M4 14h16', 'M4 18h8'],

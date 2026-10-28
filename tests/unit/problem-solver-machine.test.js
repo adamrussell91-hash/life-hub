@@ -7,24 +7,27 @@ import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { RULE_TOOLS } from '../../packages/rules-book/tools/index.mjs';
 import { CHANGE_TOOLS } from '../../packages/change-book/tools/index.mjs';
 import { COLLAB_TOOLS } from '../../packages/collaboration-book/tools/index.mjs';
+import { COMM_TOOLS } from '../../packages/communication-book/tools/index.mjs';
 import { addEdge, applyScores, canEdge, canPropose, checkNode, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
-test('registry lists every tool in order: the toolkit, Decision Maker’s models and record, then Gear Shifter’s techniques, Commit and Review tools, then the Rules Book’s rules, Act and Review tools, then the Change Book’s models, Act and Review tools, then the Collaboration Book’s models, Agree and Review tools', () => {
+test('registry lists every tool in order: the toolkit, Decision Maker’s models and record, then Gear Shifter’s techniques, Commit and Review tools, then the Rules Book’s rules, Act and Review tools, then the Change Book’s models, Act and Review tools, then the Collaboration Book’s models, Agree and Review tools, then the Communication Book’s models, Commit and Review tools', () => {
   const gear = [...Object.keys(GEAR_TOOLS), 'gt_commit', 'gt_review'];
   const rules = [...Object.keys(RULE_TOOLS), 'rb_commit', 'rb_review'];
   const change = [...Object.keys(CHANGE_TOOLS), 'ch_commit', 'ch_review'];
   const collab = [...Object.keys(COLLAB_TOOLS), 'cb_commit', 'cb_review'];
-  const books = rules.length + change.length + collab.length;
-  assert.deepEqual(TOOL_IDS.slice(-collab.length), collab);
-  assert.deepEqual(TOOL_IDS.slice(-change.length - collab.length, -collab.length), change);
-  assert.deepEqual(TOOL_IDS.slice(-books, -change.length - collab.length), rules);
+  const comm = [...Object.keys(COMM_TOOLS), 'cm_commit', 'cm_review'];
+  const books = rules.length + change.length + collab.length + comm.length;
+  assert.deepEqual(TOOL_IDS.slice(-comm.length), comm);
+  assert.deepEqual(TOOL_IDS.slice(-collab.length - comm.length, -comm.length), collab);
+  assert.deepEqual(TOOL_IDS.slice(-change.length - collab.length - comm.length, -collab.length - comm.length), change);
+  assert.deepEqual(TOOL_IDS.slice(-books, -change.length - collab.length - comm.length), rules);
   assert.deepEqual(TOOL_IDS.slice(-books - gear.length, -books), gear);
   const rest = TOOL_IDS.slice(0, -books - gear.length);
   assert.deepEqual(rest.slice(-Object.keys(DECISION_TOOLS).length - 1, -1), Object.keys(DECISION_TOOLS));
   assert.equal(rest.at(-1), 'dm_record');
-  assert.deepEqual(TOOL_IDS.filter((id) => !/^(dm|gt|rb|ch|cb)_/.test(id)), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management']);
+  assert.deepEqual(TOOL_IDS.filter((id) => !/^(dm|gt|rb|ch|cb|cm)_/.test(id)), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management']);
   assert.throws(() => toolDef('nope'), /Unknown tool/);
 });
 

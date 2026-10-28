@@ -50,7 +50,8 @@ export const DEFAULT_TASK_PROPERTY_CONFIG: TaskPropertyConfig = {
     { id: 'gear_shifter', label: 'gear shifter' },
     { id: 'rules_book', label: 'rules book' },
     { id: 'change_book', label: 'change book' },
-    { id: 'collaboration_book', label: 'collaboration book' }
+    { id: 'collaboration_book', label: 'collaboration book' },
+    { id: 'communication_book', label: 'communication book' }
   ],
   tags: []
 };
