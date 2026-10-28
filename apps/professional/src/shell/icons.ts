@@ -49,6 +49,11 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M12 8c3 0 4 3 9 3',
     'M12 8c3 0 4 8 9 8'
   ],
+  // A hexagon with a smaller one beside it: Learning (WalkThrus board)
+  learning: [
+    'M13 4.5 17.5 7v5L13 14.5 8.5 12V7Z',
+    'M7 14.5 10.5 16.5v4L7 22.5 3.5 20.5v-4Z'
+  ],
   // Three connected habitat "nodes" — matches the rail icon drawn in
   // docs/professional-hub/people-experience/mockups/04-network-ecology.html
   // (`circle cx=6 cy=6.5`/`circle cx=18 cy=9`/`circle cx=8 cy=18`, connected

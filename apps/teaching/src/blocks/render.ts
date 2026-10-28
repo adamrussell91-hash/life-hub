@@ -64,6 +64,7 @@ import type { ClassEvidence } from '@/network/coverage-map/mount';
 // Last: the shared block anatomy roles win ties with block stylesheets above.
 import '@/styles/block-anatomy.css';
 import { emitAnswered } from '@/lecture/answered';
+import { renderTechniqueBadge } from '@/blocks/walkthru-note/badge';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 /** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
@@ -2471,6 +2472,10 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   }
   if (block.discern && canHaveDiscern(block)) {
     attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+  }
+  if (mode === 'teacher') {
+    const technique = renderTechniqueBadge(block);
+    if (technique) attachments.push(technique);
   }
   if (attachments.length) {
     // A question keeps its process next to its prompt, before the response space.

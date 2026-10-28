@@ -15,6 +15,7 @@ import {
 import { analogyMove, type AnalogyMoveBlock, type AnalogyMoveType } from '@/toolkit/analogy-moves';
 import { analogyIconSvg } from '@/toolkit/analogy-icons';
 import { classLabel } from '@/toolkit/class-context';
+import { renderWalkthruSection } from '@/blocks/walkthru-note/note';
 import { authoredPoint, mapLayer, mountClassQuestions, mountStudentQuestions, numberMarker } from '@/toolkit/quadrant-live';
 import {
   CONCEPT_CRITERIA,
@@ -1754,7 +1755,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
 
 // ─── Standalone Teacher note ────────────────────────────────────────────────
 
-function renderTeacherNoteBlock(block: TeacherNoteBlock, mode: TkRenderMode): HTMLElement {
+function renderTeacherNoteBlock(block: TeacherNoteBlock, mode: TkRenderMode, ctx: TkRenderContext = {}): HTMLElement {
   const aside = el('aside', 'tk-note tk-note--standalone');
   if (mode !== 'teacher') {
     // Never reaches students (filtered before publish); render nothing if it does.
@@ -1768,6 +1769,8 @@ function renderTeacherNoteBlock(block: TeacherNoteBlock, mode: TkRenderMode): HT
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
   if (!body.textContent?.trim()) body.append(el('p', 'tk-note__hint block-secondary', 'Select the block to write your note.'));
   aside.append(head, body);
+  const walkthru = block.content.walkthru ? renderWalkthruSection(block.content.walkthru, ctx) : null;
+  if (walkthru) aside.append(walkthru);
   return aside;
 }
 
@@ -1803,7 +1806,7 @@ export function renderToolkitContent(block: Block, mode: TkRenderMode, ctx: TkRe
     case 'analogy_chains':
       return renderAnalogyMove(b, mode, ctx);
     case 'teacher_note':
-      return renderTeacherNoteBlock(b, mode);
+      return renderTeacherNoteBlock(b, mode, ctx);
     default:
       return null;
   }

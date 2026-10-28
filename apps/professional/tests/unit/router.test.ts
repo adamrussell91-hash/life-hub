@@ -137,3 +137,18 @@ describe('calendar comms routes', () => {
     expect(railHighlightFor({ name: 'log' })).toBe('calendar');
   });
 });
+
+describe('learning routes', () => {
+  it('parses the board, a technique and the goal page', () => {
+    expect(parseRoute('#/learning')).toEqual({ name: 'learning', technique: null });
+    expect(parseRoute('#/learning/w1-quizzing')).toEqual({ name: 'learning', technique: 'w1-quizzing' });
+    expect(parseRoute('#/learning/goal')).toEqual({ name: 'learning-goal' });
+    expect(parseRoute('#/learning/nope')).toEqual({ name: 'not-found', path: 'learning/nope' });
+    expect(parseRoute('#/learning/..%2Fx')).toEqual({ name: 'not-found', path: 'learning/..%2Fx' });
+    expect(parseRoute('#/learning/a/b')).toEqual({ name: 'not-found', path: 'learning/a/b' });
+  });
+  it('highlights Learning on both pages', () => {
+    expect(railHighlightFor({ name: 'learning', technique: null })).toBe('learning');
+    expect(railHighlightFor({ name: 'learning-goal' })).toBe('learning');
+  });
+});
