@@ -1256,7 +1256,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
-      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
+      ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(parsed.data.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' as const } : {}) } : {}),
       ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
       ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {})
     });

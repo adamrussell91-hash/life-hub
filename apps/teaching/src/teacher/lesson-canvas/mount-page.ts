@@ -43,9 +43,11 @@ import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
   pedagogicalModeLabel,
+  quizRunsIn,
   resolvePedagogicalMode,
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
+import { visitBlocks } from '@/blocks/walk-blocks';
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
 import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -1001,9 +1003,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   root.className = 'lesson-page';
   host.append(root);
 
+  // Set once the quiz panel exists: a quiz question added to any lesson brings the panel up.
+  let afterEmit: () => void = () => {};
   function emitLesson(next: Lesson): void {
     lesson = next;
     options.onChange(next);
+    afterEmit();
   }
 
   const optionsMenu = mountPageOptionsMenu(
@@ -1125,8 +1130,18 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const quizHost = document.createElement('div');
   quizHost.className = 'lesson-page__quiz';
   let quizPanel: QuizPanelHandle | null = null;
+  /** A Quiz always has the panel; any other lesson that runs quiz questions gets it once it holds a question or group set. */
+  function showsQuizPanel(): boolean {
+    if (resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz') return true;
+    if (!quizRunsIn(lesson.pedagogical_mode)) return false;
+    let found = false;
+    visitBlocks(lesson.blocks, (block) => {
+      if (block.block_type === 'quiz_question' || (block.block_type === 'section' && block.content.group_set)) found = true;
+    });
+    return found;
+  }
   function syncQuizPanel(): void {
-    const isQuiz = resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz';
+    const isQuiz = showsQuizPanel();
     if (isQuiz && !quizPanel) {
       quizPanel = mountQuizPanel({
         getLesson: () => lesson,
@@ -1511,7 +1526,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
-      if (resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz') groupSetTools.decorate(row, block);
+      if (showsQuizPanel()) groupSetTools.decorate(row, block);
     },
     blocks: lesson.blocks,
     media,
@@ -1539,6 +1554,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
 
   syncQuizPanel();
+  afterEmit = syncQuizPanel;
   syncLecturePanel();
   syncTutorialPanel();
   syncSprintPanel();

@@ -54,6 +54,31 @@ describe('family data', () => {
   });
 });
 
+describe('every family', () => {
+  it('spells each word from its parts, with unique paths and no word in two families', () => {
+    const seen = new Set<string>();
+    for (const family of MORPHOLOGY_FAMILIES) {
+      const paths = new Set<string>();
+      for (const word of family.words) {
+        expect(family.fronts.map((s) => s.id).concat('')).toContain(word.front);
+        expect(family.prefixes.map((s) => s.id).concat('')).toContain(word.prefix);
+        expect(family.endings.map((s) => s.id).concat('')).toContain(word.ending);
+        expect(`${word.front}${word.prefix}${family.base}${word.ending}`).toBe(word.word);
+        paths.add(`${word.front}|${word.prefix}|${word.ending}`);
+        expect(seen.has(word.word)).toBe(false);
+        seen.add(word.word);
+      }
+      expect(paths.size).toBe(family.words.length);
+    }
+  });
+
+  it('finds the essay words in their families', () => {
+    expect(findMorphology('inscribes')?.id).toBe('scrib');
+    expect(findMorphology('irreversible')?.id).toBe('vers');
+    expect(findMorphology('subversive')?.id).toBe('vers');
+  });
+});
+
 describe('findMorphology', () => {
   it('matches a whole family word ignoring case and nothing else', () => {
     expect(findMorphology('Paradox')?.id).toBe('dox');

@@ -275,14 +275,14 @@ export function createLessonPublishHandler(deps = {}) {
         env
       );
     }
-    // Quiz questions only reach students inside a Quiz lesson; never let them vanish without a word.
+    // A lecture, design sprint or case study plays through its own player, which can't show quiz questions; never let them vanish without a word.
     if (quizPublish.dropped > 0) {
       const n = quizPublish.dropped;
       return withCors(
         errorResponse(
           400,
           'validation_error',
-          `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because it isn’t a Quiz. Use a Question set block for answers inside a lesson, or switch the lesson to Quiz.`,
+          `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a ${draft.pedagogical_mode === 'lecture' ? 'Lecture' : draft.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : 'Case Study'} plays through its own player. Use a Question set block, or change the lesson type.`,
           false
         ),
         request,
@@ -302,7 +302,8 @@ export function createLessonPublishHandler(deps = {}) {
       ...(draft.cover ? { cover: draft.cover } : {}),
       ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
       ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
+      // Any lesson can carry quiz questions; only a Quiz lesson is published as one.
+      ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(draft.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' } : {}) } : {}),
       ...(!quizPublish.quiz && draft.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' } : {})
     };
 
