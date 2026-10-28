@@ -24,7 +24,10 @@ export type ProgressLesson = {
   unit?: string;
 };
 
-/** The units' lessons in order, each once, with each lesson's earliest set date for the class. */
+/**
+ * The units' lessons, each once, with each lesson's earliest set date for the class, in date order.
+ * Undated lessons follow the dated ones in unit order.
+ */
 export function unitProgressLessons(
   units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & { title?: string }>,
   lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string }>,
@@ -48,7 +51,7 @@ export function unitProgressLessons(
       ...(unit.title ? { unit: unit.title } : {})
     });
   }
-  return out;
+  return out.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0));
 }
 
 export type DoneRecord = { at: string; via: string; partial?: boolean };
