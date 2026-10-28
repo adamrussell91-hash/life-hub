@@ -249,7 +249,7 @@ Each slice has one builder end to end and is its own PR through `npm run pre-pr-
 **Verify**
 - UI failure register ([CURSOR-UI-FAILURES.md](../CURSOR-UI-FAILURES.md)), each with its board check:
   - **R2**, **R3**: at 390px, `scrollWidth === innerWidth`; the board pans inside its own box.
-  - **R6**, **R7**, **V12**, **V13**: the phone bottom sheet sits above the tab bar, is visible on open, lives inside its backdrop, and swipe-back closes the sheet, not the page.
+  - **R6**, **R7**, **V12**, **V13**: the phone bottom sheet sits above the tab bar, is visible on open, lives inside its backdrop and swipe-back closes the sheet, not the page.
   - **C1**: no tile title, tab, cluster label or arrow label is clipped or overlapped at any zoom (the Slice 1 tests cover geometry; this checks the rendered text).
   - **C4**: pinch zoom works in Safari macOS, Chrome and on iPhone, with zoom buttons as well.
   - **C9**: the first frame is the final layout. Pop-in animates from the final positions, never a settle then snap.
