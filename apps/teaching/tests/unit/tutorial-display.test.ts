@@ -36,6 +36,13 @@ describe('Focus view of a tutorial', () => {
     expect(displayBlocks({ blocks: blocks() }).map((b) => b.id)).toEqual(['common_1', 'tab_a', 'exit_a', 'common_2']);
   });
 
+  it('takes quiz questions out of any lesson with a quiz, so answers stay off the board', () => {
+    const withQuestion = [createBlock('heading', 'h1'), createBlock('quiz_question', 'q1'), createBlock('heading', 'h2')];
+    const quiz = { version: 'v1', question_count: 1, total_marks: 1 } as unknown as PublishedLesson['quiz'];
+    expect(displayBlocks({ blocks: withQuestion, quiz }).map((b) => b.id)).toEqual(['h1', 'h2']);
+    expect(displayBlocks({ blocks: withQuestion }).map((b) => b.id)).toEqual(['h1', 'q1', 'h2']);
+  });
+
   it('draws no group tab, exit check or board on the display', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 404 })));
     const lesson = { lesson_id: 'lesson_t1', title: 'Cyclical structure', pedagogical_mode: 'tutorial', blocks: blocks() } as unknown as PublishedLesson;

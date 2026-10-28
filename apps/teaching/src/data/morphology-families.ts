@@ -139,5 +139,237 @@ export const MORPHOLOGY_FAMILIES: MorphologyFamily[] = [
         example: 'Her unorthodoxy was tolerated while the results kept coming.'
       }
     ]
+  },
+  {
+    id: 'scrib',
+    base: 'scrib',
+    source: 'Latin scribere',
+    meaning: 'to write',
+    fronts: [],
+    prefixes: [
+      { id: 'in', label: 'in-', cousins: 'in- (into): inject, inhabit. With script- it gives inscription.' },
+      { id: 'de', label: 'de-', cousins: 'de- (down, fully): declare, depict. With script- it gives description.' },
+      { id: 'pre', label: 'pre-', cousins: 'pre- (before): predict, prejudice, prescription.' },
+      { id: 'sub', label: 'sub-', cousins: 'sub- (under): submarine, subtitle, subscription.' },
+      { id: 'pro', label: 'pro-', cousins: 'pro- (forward, in public): proclaim, protest, project.' },
+      { id: 'a', label: 'a-', cousins: 'a- (to, towards; from ad-): ascend, aspire.' }
+    ],
+    endings: [
+      { id: 'e', label: '-e' },
+      { id: 'es', label: '-es' },
+      { id: 'ed', label: '-ed' }
+    ],
+    words: [
+      {
+        word: 'inscribe',
+        front: '',
+        prefix: 'in',
+        ending: 'e',
+        definition: 'To write or carve words into a surface, or to mark something with a lasting meaning.',
+        example: 'The settlers inscribed their own names on the hills.'
+      },
+      {
+        word: 'inscribes',
+        front: '',
+        prefix: 'in',
+        ending: 'es',
+        definition: 'Writes or carves into a surface; marks something with a lasting meaning.',
+        example: 'Each new road inscribes another boundary on the city.'
+      },
+      {
+        word: 'inscribed',
+        front: '',
+        prefix: 'in',
+        ending: 'ed',
+        definition: 'Written or carved into a surface; marked with a lasting meaning.',
+        example: 'Her grandmother’s name is inscribed on the memorial.'
+      },
+      {
+        word: 'describe',
+        front: '',
+        prefix: 'de',
+        ending: 'e',
+        definition: 'To say or write what something is like.',
+        example: 'Describe the road the way the speaker sees it.'
+      },
+      {
+        word: 'describes',
+        front: '',
+        prefix: 'de',
+        ending: 'es',
+        definition: 'Says or writes what something is like.',
+        example: 'The poem describes the highway as a living thing.'
+      },
+      {
+        word: 'described',
+        front: '',
+        prefix: 'de',
+        ending: 'ed',
+        definition: 'Said or written what something was like.',
+        example: 'The critic described the ending as hopeful.'
+      },
+      {
+        word: 'prescribe',
+        front: '',
+        prefix: 'pre',
+        ending: 'e',
+        definition: 'To set down a rule or remedy in writing before it is followed.',
+        example: 'The syllabus prescribes which poems we study.'
+      },
+      {
+        word: 'subscribe',
+        front: '',
+        prefix: 'sub',
+        ending: 'e',
+        definition: 'To sign your name underneath to agree, or to sign up for something regular.',
+        example: 'I don’t subscribe to the idea that talk achieves nothing.'
+      },
+      {
+        word: 'proscribe',
+        front: '',
+        prefix: 'pro',
+        ending: 'e',
+        definition: 'To forbid something officially, once done by posting a written notice in public.',
+        example: 'The old laws proscribed speaking language on the missions.'
+      },
+      {
+        word: 'ascribe',
+        front: '',
+        prefix: 'a',
+        ending: 'e',
+        definition: 'To say that something is caused by, or belongs to, a person or thing.',
+        example: 'Bode ascribes the blame to the system, not the drivers.'
+      }
+    ]
+  },
+  {
+    id: 'vers',
+    base: 'vers',
+    source: 'Latin vertere, versus',
+    meaning: 'to turn, turned',
+    fronts: [{ id: 'ir', label: 'ir-', cousins: 'ir- (not) is in- before r: irregular, irrelevant, irresponsible.' }],
+    prefixes: [
+      { id: 'sub', label: 'sub-', cousins: 'sub- (under): submarine, subtitle, subconscious.' },
+      { id: 're', label: 're-', cousins: 're- (back, again): return, rewrite, reconcile.' },
+      { id: 'di', label: 'di-', cousins: 'di- (apart; from dis-): divide, digress, divert.' },
+      { id: 'ad', label: 'ad-', cousins: 'ad- (towards): advance, adjust, advert.' },
+      { id: 'con', label: 'con-', cousins: 'con- (with, together): connect, community, convert.' }
+    ],
+    endings: [
+      { id: 'e', label: '-e' },
+      { id: 'es', label: '-es' },
+      { id: 'al', label: '-al' },
+      { id: 'ible', label: '-ible' },
+      { id: 'ive', label: '-ive' },
+      { id: 'ion', label: '-ion' },
+      { id: 'ity', label: '-ity' },
+      { id: 'ation', label: '-ation' }
+    ],
+    words: [
+      {
+        word: 'subversive',
+        front: '',
+        prefix: 'sub',
+        ending: 'ive',
+        definition: 'Quietly undermining the powerful or the accepted way of seeing things.',
+        example: 'Calling the invaders childish is a subversive move.'
+      },
+      {
+        word: 'subversion',
+        front: '',
+        prefix: 'sub',
+        ending: 'ion',
+        definition: 'The act of quietly undermining power or accepted ideas.',
+        example: 'The poem’s humour is a form of subversion.'
+      },
+      {
+        word: 'reverse',
+        front: '',
+        prefix: 're',
+        ending: 'e',
+        definition: 'To turn something the other way round, or to undo it.',
+        example: 'The final stanza reverses the reader’s expectations.'
+      },
+      {
+        word: 'reverses',
+        front: '',
+        prefix: 're',
+        ending: 'es',
+        definition: 'Turns something the other way round, or undoes it.',
+        example: 'The poem reverses who is childish and who is adult.'
+      },
+      {
+        word: 'reversal',
+        front: '',
+        prefix: 're',
+        ending: 'al',
+        definition: 'A change to the opposite direction or position.',
+        example: 'The reversal of roles makes the reader uneasy.'
+      },
+      {
+        word: 'reversible',
+        front: '',
+        prefix: 're',
+        ending: 'ible',
+        definition: 'Able to be turned back or undone.',
+        example: 'The decision is reversible if the council votes again.'
+      },
+      {
+        word: 'irreversible',
+        front: 'ir',
+        prefix: 're',
+        ending: 'ible',
+        definition: 'Impossible to turn back or undo.',
+        example: 'Bode calls the loss irreversible, yet she still finds hope.'
+      },
+      {
+        word: 'diverse',
+        front: '',
+        prefix: 'di',
+        ending: 'e',
+        definition: 'Made up of many different kinds.',
+        example: 'The class brought diverse readings of the poem.'
+      },
+      {
+        word: 'diversity',
+        front: '',
+        prefix: 'di',
+        ending: 'ity',
+        definition: 'The range of different kinds within a group.',
+        example: 'The anthology shows the diversity of First Nations writing.'
+      },
+      {
+        word: 'adverse',
+        front: '',
+        prefix: 'ad',
+        ending: 'e',
+        definition: 'Harmful or working against you.',
+        example: 'The road had adverse effects on the community.'
+      },
+      {
+        word: 'adversity',
+        front: '',
+        prefix: 'ad',
+        ending: 'ity',
+        definition: 'Hard times or trouble that you face.',
+        example: 'The speaker keeps talking in the face of adversity.'
+      },
+      {
+        word: 'converse',
+        front: '',
+        prefix: 'con',
+        ending: 'e',
+        definition: 'To talk with someone.',
+        example: 'The poem asks both sides to converse honestly.'
+      },
+      {
+        word: 'conversation',
+        front: '',
+        prefix: 'con',
+        ending: 'ation',
+        definition: 'A talk between two or more people.',
+        example: '“Let’s Talk!” asks whether a conversation can change anything.'
+      }
+    ]
   }
 ];

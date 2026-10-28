@@ -184,9 +184,20 @@ function renderPublishedLesson(
   const blocks = document.createElement('div');
   blocks.className = 'lesson-blocks';
   // A quiz lesson shows its other blocks as an introduction, then the quiz itself.
+  // Any other lesson runs its quiz where its first question sits, or at the end
+  // when it only has group sets.
   const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
+  const inlineQuiz = !isQuiz && !!lesson.quiz;
+  const quizClassId = extras?.cls?.id ?? extras?.quizClassId;
+  let quizPlaced = false;
   for (const block of lesson.blocks) {
-    if (isQuiz && block.block_type === 'quiz_question') continue;
+    if ((isQuiz || inlineQuiz) && block.block_type === 'quiz_question') {
+      if (inlineQuiz && !quizPlaced) {
+        blocks.append(mountStudentQuiz(lesson, { classId: quizClassId }));
+        quizPlaced = true;
+      }
+      continue;
+    }
     // A side path only plays inside a lecture.
     if (isSidePath(block)) continue;
     blocks.append(
@@ -204,8 +215,9 @@ function renderPublishedLesson(
     blocks: lesson.blocks,
     feedbackOff: lesson.feedback_off === true
   });
+  if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId }));
   content.append(blocks);
-  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: extras?.cls?.id ?? extras?.quizClassId }));
+  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: quizClassId }));
   revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {

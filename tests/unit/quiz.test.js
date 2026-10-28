@@ -129,7 +129,7 @@ test('question drop refuses targets that are not a quiz in the same unit, paused
   await assert.rejects(questionDropAction(unpublished, 'lesson1', 'drop1', {}), /isn’t published/);
 });
 
-test('publish splits answers off, drops quiz questions from ordinary lessons, and blocks unfinished ones', () => {
+test('publish splits answers off, runs quiz questions in any lesson, drops them from player lessons, and blocks unfinished ones', () => {
   const draft = { pedagogical_mode: 'quiz', quiz: { attempts: 2, timer_minutes: 10 }, blocks: [qBlock('qa', mc), { id: 'col', block_type: 'columns', content: { columns: [{ width: 6, blocks: [qBlock('qb', sa)] }] } }] };
   const prepared = prepareQuizPublish(draft, draft.blocks);
   const text = JSON.stringify(prepared.blocks);
@@ -140,10 +140,18 @@ test('publish splits answers off, drops quiz questions from ordinary lessons, an
   assert.equal(prepared.quiz.snapshot.timer_minutes, 10);
   assert.equal(prepared.blocks[0].content.question.has_hint, true);
 
-  const ordinary = prepareQuizPublish({ pedagogical_mode: 'lesson', blocks: [] }, [qBlock('qa', mc), image]);
-  assert.equal(ordinary.quiz, null);
-  assert.deepEqual(ordinary.blocks.map(b => b.id), ['img1']);
-  assert.equal(ordinary.dropped, 1, 'publish counts the quiz questions an ordinary lesson drops so it can refuse');
+  const seminar = prepareQuizPublish({ pedagogical_mode: 'seminar', blocks: [] }, [qBlock('qa', mc), image]);
+  assert.deepEqual(seminar.quiz.record.order, ['qa'], 'a seminar runs its quiz questions like a quiz');
+  assert.equal(seminar.dropped, 0);
+  assert.ok(!JSON.stringify(seminar.blocks).includes('correct'), 'answers still never ship');
+
+  const plain = prepareQuizPublish({ pedagogical_mode: 'seminar', blocks: [] }, [image]);
+  assert.equal(plain.quiz, null, 'a lesson with no questions stores no quiz');
+
+  const lecture = prepareQuizPublish({ pedagogical_mode: 'lecture', blocks: [] }, [qBlock('qa', mc), image]);
+  assert.equal(lecture.quiz, null);
+  assert.deepEqual(lecture.blocks.map(b => b.id), ['img1']);
+  assert.equal(lecture.dropped, 1, 'publish counts the quiz questions a lecture drops so it can refuse');
 
   const broken = prepareQuizPublish({ pedagogical_mode: 'quiz', blocks: [] }, [qBlock('qa', { ...mc, correct: [] })]);
   assert.deepEqual(broken.problems, ['Tick the right answer.']);

@@ -4596,7 +4596,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
       path: ["title"]
     });
   }
-  if (lesson.pedagogical_mode !== "quiz" && lesson.pedagogical_mode !== "tutorial") {
+  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study") {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === "quiz_question") stray = true;
@@ -4604,7 +4604,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     if (stray) {
       ctx.addIssue({
         code: z15.ZodIssueCode.custom,
-        message: "Quiz questions only work in a lesson set to Quiz. Change the lesson type or remove them.",
+        message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
     }

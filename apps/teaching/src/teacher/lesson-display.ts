@@ -37,13 +37,19 @@ export interface LessonDisplayViewHandle {
   dispose(): void;
 }
 
+/** A published lesson whose quiz questions run on the quiz engine: a quiz, or any lesson that carries questions. */
+function hasLiveQuiz(lesson: Pick<PublishedLesson, 'pedagogical_mode' | 'quiz'>): boolean {
+  return !!lesson.quiz && lesson.pedagogical_mode !== 'tutorial';
+}
+
 /**
- * What Focus view steps through: a quiz without its questions, a tutorial's
- * Common demo only (never a group's tab or exit check), else every block.
+ * What Focus view steps through: any lesson with a quiz without its questions
+ * (they run as the live quiz step), a tutorial's Common demo only (never a
+ * group's tab or exit check), else every block.
  */
 export function displayBlocks(lesson: Pick<PublishedLesson, 'blocks' | 'pedagogical_mode' | 'quiz'>): PublishedLesson['blocks'] {
-  if (lesson.pedagogical_mode === 'quiz' && !!lesson.quiz) return lesson.blocks.filter((block) => block.block_type !== 'quiz_question');
   if (lesson.pedagogical_mode === 'tutorial') return tutorialCommon(lesson.blocks);
+  if (hasLiveQuiz(lesson)) return lesson.blocks.filter((block) => block.block_type !== 'quiz_question');
   return lesson.blocks;
 }
 
@@ -106,7 +112,7 @@ export function mountLessonDisplayView(
     const outcomes = renderPublishedLessonHero(hero, lesson);
 
     examples = createTeacherClassExamples({ lessonId: lesson.lesson_id });
-    const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
+    const isQuiz = hasLiveQuiz(lesson);
     const shown = displayBlocks(lesson);
     const views: FocusStepView[] = [{ label: 'Start', blocks: [], el: hero }];
     for (const step of focusSteps(shown)) {
