@@ -1,6 +1,6 @@
 // apps/teaching/tests/unit/case-study-player.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { mountCasePlayer } from '@/case-study/player';
+import { mountCasePlayer, paragraphEl } from '@/case-study/player';
 import type { CaseClient, CaseStatus } from '@/case-study/api';
 import type { PublicCase } from '@/case-study/schema';
 import type { PublishedLesson } from '@/schemas/published-lesson';
@@ -63,7 +63,7 @@ describe('case study player', () => {
     decide.player.dispose();
   });
 
-  it('shows the open part\'s blocks in the work panel and keeps them off Decide', async () => {
+  it('shows each open part\'s blocks under its documents in the case and keeps them off Decide', async () => {
     const text = (id: string, body: string) => ({ id, type: 'block', block_type: 'rich_text', variant: 'medium', content: { html: `<p>${body}</p>` } });
     const blocks = [
       { id: 'sp1', block_type: 'section', content: { title: 'Part 1', blocks: [text('t1', 'Hinge: what is that line doing?')], case_part: 'p1' } },
@@ -71,15 +71,28 @@ describe('case study player', () => {
       text('t2', 'Decide-stage reading.')
     ];
     const work = await mount(publicCase(), withCase({ open_to: 1 }), blocks);
-    const panel = work.host.querySelector('.cs__panelhost')!;
-    expect(panel.textContent).toContain('Hinge: what is that line doing?');
-    expect(panel.textContent).not.toContain('Later part task.');
-    expect(panel.textContent).not.toContain('Decide-stage reading.');
+    const col = work.host.querySelector('.cs__case')!;
+    expect(col.textContent).toContain('Hinge: what is that line doing?');
+    expect(col.textContent!.indexOf('The dam is low.')).toBeLessThan(col.textContent!.indexOf('Hinge:'));
+    expect(col.textContent).not.toContain('Later part task.');
+    expect(work.host.querySelector('.cs__panelhost')!.textContent).toContain('Work through the tasks under Part 1');
+    expect(work.host.textContent).not.toContain('Decide-stage reading.');
     work.player.dispose();
     const decide = await mount(publicCase(), withCase(), blocks);
     expect(decide.host.querySelector('.cs__panelhost')!.textContent).toContain('Decide-stage reading.');
-    expect(decide.host.querySelector('.cs__panelhost')!.textContent).not.toContain('Hinge:');
     decide.player.dispose();
+  });
+
+  it('draws a table, a sub-heading and speaker turns from document text', () => {
+    const table = paragraphEl('| Criterion | A | B |\n|---|---|---|\n| Analysis | names the technique | some features |');
+    expect(table.querySelectorAll('thead th')).toHaveLength(3);
+    expect(table.querySelector('tbody th')!.textContent).toBe('Analysis');
+    expect(table.querySelectorAll('tbody td')).toHaveLength(2);
+    expect(paragraphEl('## Criterion 2').tagName).toBe('H4');
+    const turn = paragraphEl('STUDENT: The experience that stands out…');
+    expect(turn.dataset.who).toBe('student');
+    expect(turn.querySelector('.cs-turn__who')!.textContent).toBe('STUDENT');
+    expect(paragraphEl('Just a line.').tagName).toBe('P');
   });
 
   it('draws five stations with done, now and later states', async () => {

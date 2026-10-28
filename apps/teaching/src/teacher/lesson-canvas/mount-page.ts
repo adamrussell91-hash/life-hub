@@ -83,8 +83,8 @@ import { isGuidesSection, phaseOfSection } from '@/sprint/model';
 import { mountCaseEditor, type CaseEditorHandle } from '@/case-study/editor';
 import { mountCaseBoard, type CaseBoardHandle } from '@/case-study/board';
 import { caseTeacherApi } from '@/case-study/api';
-import { casePartOf, findCasePartSection, isCaseBriefSection, seedCase } from '@/case-study/model';
-import { inCaseTab, withCaseBriefSection, withCasePartSection } from '@/case-study/editor-tabs';
+import { casePartOf, findCasePartSection, isCaseBriefSection, isCaseOutcomeSection, seedCase } from '@/case-study/model';
+import { inCaseTab, withCaseBriefSection, withCaseOutcomeSection, withCasePartSection } from '@/case-study/editor-tabs';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -1269,6 +1269,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       const section = lesson.blocks.find(isCaseBriefSection);
       if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
     }
+    // On the Outcome tab, new blocks land in the Outcome section.
+    if (caseEditor?.tabs.current() === 'outcome') {
+      if (!lesson.blocks.some(isCaseOutcomeSection)) {
+        emitLesson({ ...lesson, blocks: withCaseOutcomeSection(lesson.blocks, options.idFactory) });
+        canvas.update(lesson.blocks, media);
+      }
+      const section = lesson.blocks.find(isCaseOutcomeSection);
+      if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+    }
     // On The case tab, new blocks land in the picked part's section.
     if (caseEditor?.tabs.current() === 'case') {
       const part = caseEditor.activePart();
@@ -1390,7 +1399,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   /** The canvas shows on Brief (the Brief section's blocks), Decide (every other block) and All. */
   function showCaseCanvas(): void {
     const tab = caseEditor?.tabs.current();
-    canvasHost.hidden = !!caseEditor && tab !== 'brief' && tab !== 'case' && tab !== 'decide' && tab !== 'all';
+    canvasHost.hidden = !!caseEditor && tab !== 'brief' && tab !== 'case' && tab !== 'decide' && tab !== 'outcome' && tab !== 'all';
   }
   /** A part's blocks live in a top-level section tagged with its id; made the first time the teacher adds to that part. */
   function ensureCasePartSection(partId: string, title: string): void {
@@ -1662,7 +1671,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       const target = blockId ? rootOf(blockId) : undefined;
       if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
       if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(isGuidesSection(target) ? 'guides' : phaseOfSection(target) ?? 'brief');
-      if (caseEditor && target && !inCaseTab(target, caseEditor.tabs.current())) caseEditor.tabs.set(isCaseBriefSection(target) ? 'brief' : casePartOf(target) ? 'case' : 'decide');
+      if (caseEditor && target && !inCaseTab(target, caseEditor.tabs.current())) caseEditor.tabs.set(isCaseBriefSection(target) ? 'brief' : casePartOf(target) ? 'case' : isCaseOutcomeSection(target) ? 'outcome' : 'decide');
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
