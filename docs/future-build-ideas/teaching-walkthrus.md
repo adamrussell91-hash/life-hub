@@ -82,14 +82,46 @@ Every suggestion carries the technique's icon. Hovering shows the chain: evidenc
 
 Clickable mockup: [teaching-walkthrus-board-mockup.html](teaching-walkthrus-board-mockup.html). It uses invented demo data and placeholder icons. The grey lines in the step panel stand in for the book's wording.
 
-**Catan mapping (no points, ever).** The board is styled as a real Catan board: one island in a wooden frame, a sandy shore and a blue sea, on a table. Each series is a terrain: Questioning and feedback is Fields, Practice and retrieval is Hills, Curriculum planning is Mountains, Explaining and modelling is Forest, Behaviour and relationships is Pasture, and Mode B is a Fishery. A desert sits in the middle. Each tile carries a cream number token showing the book page, with dots for how often the technique is used in lessons; busy tiles turn red, like Catan's 6 and 8. Adam's pieces are red wood. Hex tiles are techniques. Buildings show ADAPT progress: an outline house for trying, a house for practising, a city once Test passes on student evidence. Roads are the arrows Adam draws: a road on the shared edge between neighbouring hexes, a curved arrow over the sea for distant ones. Dots under each name show how often the technique appears in lessons. The robber is the pattern monitor, sitting on the tile that would fix a student problem. Harbours are where the board trades with Teaching (Markbook, Lessons, Unit plans). Framework chapters are cards in hand, played onto unit plans as lenses. Later volumes wait face-down on the table beside the board, like an expansion box, and turn over when opened. Nothing scores: the board grows only when students improve.
+### Approved look: WalkThrus clusters with Catan mechanics (28 Oct 2026)
 
-- A hexagon board. Each technique is a hex in its series colour, labelled with its custom icon and a `series | page` code.
-- Hexes cluster by relationship; the focus technique is large, related ones touch it.
-- Adam can draw arrows between and around hexes (sequence, "leads to", "supports").
-- Clicking a hex zooms into its five-step strip and the goal's ADAPT stage, rep log and before/after evidence.
-- Suggested goals from the pattern monitor arrive at the edge of the board, waiting to be placed.
-- Smooth animation throughout: cluster growth, zoom in and out, arrows drawing on.
+Adam approved the cluster version of the mockup ("that is cool"). It replaces the earlier Catan-board styling. This is the design to build from.
+
+**Look**
+
+- White page. Black and yellow header bar: `WALKTHRUs` in a black slab, `BOARD` in spaced light caps, the page name on the yellow band.
+- Each series is its own cluster of hexes, labelled above in bold caps with a short yellow bar, laid out like the book's cluster sheets with white space between clusters.
+- Flat-topped hexes, drawn slightly smaller than their grid cell so neighbours keep a thin white gap.
+- Each hex has: a dark tab across the top with `series | page` (e.g. `Q&F | 96`), the technique name in bold black caps, a line icon (custom set to come), and a small black badge at the bottom holding the progress piece, with lesson-use dots beside it.
+- **Colour means the set, not the series.** Yellow for set 1, blue for set 2, green for set 3. The series reads from the black tab and the cluster.
+- Overlay cards (pattern spotted, key) are white with a heavy black border, a black title strip and a flat yellow offset shadow. Framework cards use a pink offset shadow.
+
+**Catan mechanics kept (no points, ever)**
+
+- **Progress pieces** in the bottom badge: dashed house for trying (Attempt), house for practising (Develop to Practise), city once Test passes on student evidence.
+- **The robber** is a black pawn sitting on the tile that would fix a student problem flagged by the pattern monitor. "Make it a goal" lifts it off and places a dashed house.
+- **Links out** to Teaching (Markbook, Lessons, Unit plans) are outlined chips on a dotted line from the nearest tile, in place of harbours.
+- **Expansions** wait beside the board as dashed blue outlines, "still in the box", and turn over into blue tiles when opened.
+- **Framework cards** sit along the bottom, played onto unit plans as lenses.
+- Nothing scores: the board grows only when students improve.
+
+**Arrows**
+
+- Between touching hexes: a small white circle with a black chevron on the shared edge, pointing the way the technique leads.
+- Between hexes further apart: a thin black line leaving the hex edge from a small open circle, bowing out through white space, ending in a filled arrowhead. It can carry a short caps label ("THEN RETRIEVE", "ROUTINE FIRST").
+- Arrows animate as they draw on. "Draw arrow" mode: pick a start hex, then where it leads.
+
+**Expanding a tile**
+
+- Clicking a hex opens its five-step strip above it (the book's magnifier move): five square panels in the set colour with `STEP 1` to `STEP 5` tabs and the step label under each, joined to the hex by a connector line. A magnifier with a minus closes it.
+- The side panel opens at the same time: set-colour header with the black code tab and the name in caps, then ADAPT as a chain of five flat-topped hexes with a "REPEAT · ITERATE, DEVELOP, IMPROVE" loop over the top (current stage filled black, done stages in the set colour), then the five steps with Adam's notes, lesson reps and before/after student evidence.
+- Other hexes fade except the opened tile's neighbours. On a phone the panel is a bottom sheet and the view starts on the active goal's cluster.
+
+**Final-version rules (Adam, 28 Oct 2026)**
+
+- **Arrows never cross text.** In the mockup a long arrow can run across a tile title or a cluster label (e.g. "ROUTINE FIRST" crossing "BEHAVIOUR & RELATIONSHIPS"). The build must route arrows around tile titles, tabs, cluster labels and other arrows' labels: leave from the nearest clear edge, travel through white space between clusters, and bend around any hex in the way rather than passing over it.
+- **Arrow labels never overlap** a hex, a cluster label or another label; they sit in white space along the arrow and shift along it if crowded.
+- **Chevron knots stay on the shared edge** and never cover a tab or a title.
+- Everything animates smoothly: clusters popping in, zoom in and out, arrows drawing on, the step strip rising, pieces dropping in.
 
 ## Use 3: unit planning and scope and sequence
 
@@ -150,6 +182,7 @@ Clickable mockup: [teaching-walkthrus-board-mockup.html](teaching-walkthrus-boar
 
 ## History
 
+- 28 Oct 2026: Adam approved the cluster look. Rewrote Use 2 as the build design (look, kept Catan mechanics, arrows, expanding a tile) and added the final-version rule that arrows and their labels never cross text.
 - 28 Oct 2026: Restyled the mockup in the WalkThrus cluster look: white page, flat-topped hexes in series clusters with white gaps, black series and page tab, bold caps titles, line icons, progress piece in a black badge. Colour now shows the set (yellow set 1, blue set 2, green set 3). Arrows are a knot with a chevron on shared edges and thin black lines through the white space otherwise. Opening a tile raises its five-step strip on a connector, with a magnifier to close. The panel shows ADAPT as a chain of five hexes with a repeat loop.
 - 28 Oct 2026: Restyled the mockup as a Catan board (terrains, tokens, red wooden pieces, expansion box on the table).
 - 28 Oct 2026: Added the board mockup and the Catan mapping (no points).
