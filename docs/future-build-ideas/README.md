@@ -94,7 +94,11 @@ This split is an **Open question** for the next round, not a decision.
 | Lesson builder on a phone: one thing at a time | Concept | [lesson-builder-mobile.md](lesson-builder-mobile.md) |
 | Focus view: one step of the lesson at a time on the board | Built | [focus-view.md](focus-view.md) |
 
+| WalkThrus text and SVG collection | Collected reference material | [walkthrus.md](walkthrus.md) |
+
 ## History
+
+- **2026-10-28:** Indexed the WalkThrus text extraction and 630 labelled SVG files, with catalogue instructions and source quality notes.
 
 - **2026-10-22:** Indexed focus view (slideshow-style Display mode: step rules, tools dock, lesson map, hinge checkpoint with Ann's auto back-up).
 
