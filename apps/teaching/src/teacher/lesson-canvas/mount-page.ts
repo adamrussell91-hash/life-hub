@@ -21,6 +21,7 @@ import {
 import { findBlockById } from '@/blocks/find-block';
 import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, removeDiscernConfirms } from '@/blocks/discern';
 import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
+import { attachCardSleeve, NO_SLEEVE_TARGET, SLEEVE_CONVERT_EVENT, type SleeveConvertDetail } from '@/blocks/lenses/sleeve-convert';
 import { renderBlock } from '@/blocks/render';
 import { mountLecturePanel, type LecturePanelHandle } from '@/lecture/teacher-panel';
 import { addToScene } from '@/lecture/tree';
@@ -350,6 +351,31 @@ export function mountBlockCanvas(
   root.addEventListener(DISCERN_DETACH_EVENT, event => {
     const hostId = (event as CustomEvent<{ blockId: string }>).detail.blockId;
     if (findDiscernConfirm(blocks, hostId)) emit(removeDiscernConfirms(blocks, hostId));
+  });
+
+  // Turn into a sleeve: the old toolkit card's item goes onto the next block
+  // that can wear it, then the card goes once the teacher confirms.
+  root.addEventListener(SLEEVE_CONVERT_EVENT, event => {
+    event.stopPropagation();
+    if (!canEdit) return;
+    const cardId = (event as CustomEvent<SleeveConvertDetail>).detail.blockId;
+    const result = attachCardSleeve(blocks, cardId);
+    if (!result) {
+      setHint(NO_SLEEVE_TARGET);
+      return;
+    }
+    emit(result.blocks);
+    const where = blockTypeLabel(result.target);
+    if (window.confirm(`${result.lens.label} is now a sleeve on the ${where} block below. Remove the old card?`)) {
+      if (selectedId === cardId) {
+        selectedId = null;
+        options.onSelect?.(null);
+      }
+      emit(deleteBlocksById(blocks, [cardId]));
+      setHint(`${result.lens.label} moved onto the ${where} block as a sleeve.`);
+    } else {
+      setHint(`${result.lens.label} added as a sleeve. The old card stays until you delete it.`);
+    }
   });
 
   function clearDnd(): void {

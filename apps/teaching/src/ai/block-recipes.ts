@@ -1,4 +1,4 @@
-import { createBlock, NEW_BLOCK_TYPES } from '@/blocks/create-block';
+import { createBlock, NEW_BLOCK_TYPES, RETIRED_BLOCK_TYPES } from '@/blocks/create-block';
 import { QUIZ_WRITING_GUIDE } from '@/ai/quiz-writing-guide';
 
 export const BLOCK_BUILD_RECIPES = `## Block build recipes
@@ -14,6 +14,7 @@ Every proposed block must include all required metadata fields: id, type, block_
   - anchor_bridge: each question prompt names the text or moment to anchor on; students fill Anchor, Human experience and Bridge boxes.
   - human_experience_table: questions[0].prompt is the instruction; content.table { rows: 3 to 5, example: true }.
   - The same lenses attach to any other block as lenses [{ id: "question_levels" | "because_but_so", config: { focus, level: support|core|extend, student_level: true, mode: notes|discussion } }] when the teacher wants the thinking steps without a question list. Use the format when they want questions written; use the lens when they want a scaffold on an existing block.
+- Thinking Toolkit sleeves: to help students answer an existing question or activity well (clarity, precision, a distinction, justifying), attach a sleeve to that block instead of adding a card: lenses [{ id: "sleeve:value:clarity", config: { level: "support", student_level: true } }]. The id is "sleeve:" plus the toolkit item id (value:*, tool:* or skill:*); level is support|extend. A sleeve sets no task: it shows See it, Do it and Check it above the block's own prompt, so the block keeps its question. At most two sleeves per block. Never insert toolkit_skill, toolkit_tool or toolkit_value blocks; those old cards are retired.
 - Visuals: chart uses { chart_type, title, series }; equation { latex }; diagram { source, image_url, image_alt }; timeline { events }; card_stack { title?, cards:[{ id, eyebrow, title, description, tint, image_url?, image_alt? }] }. tint must be navy, wave, marine, depth, high-sea, lilac, sage, or peach. source=image requires a search-pack image_url and image_alt — a caption alone is not enough to publish. If no pack image, omit diagram or use source=svg with real SVG markup.
 - mind_map content is { title?, nodes, edges }; nodes: 1–24. Each node needs a valid unique id and meaningful label; parent_id and edges must reference valid node ids. “10 point” means exactly 10 meaningful topic nodes with valid ids/connections.
 - concept_map uses labelled concepts in nodes and valid directed relationships in edges; every from/to value must reference an existing node id and relationship labels must be meaningful.
@@ -117,7 +118,7 @@ function withStableIds<T extends { id: string }>(block: T, prefix: string): T {
  * random id would make every job pay to write that cache again.
  */
 export function buildBlockSchemaExamples(): string {
-  const examples = NEW_BLOCK_TYPES.filter((type) => type !== 'collection').map((type) =>
+  const examples = NEW_BLOCK_TYPES.filter((type) => type !== 'collection' && !RETIRED_BLOCK_TYPES.has(type)).map((type) =>
     withStableIds(createBlock(type, `${type}_example`), type)
   );
 

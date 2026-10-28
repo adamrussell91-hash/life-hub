@@ -1,4 +1,7 @@
 import type { Block } from '@/schemas/block';
+import type { SleeveConfig } from '@/schemas/lens';
+import type { ToolkitKind } from '@/toolkit/library';
+import type { SleeveLevel, SleeveText } from '@/toolkit/sleeves';
 
 /**
  * A lens is an optional thinking process attached to an existing block, never
@@ -66,4 +69,27 @@ export type SteppedLens = {
   walk?: (args: { config: LensConfig; ctx: StepContext; storageKey?: string; preview: boolean; onDone: () => void }) => HTMLElement;
   /** Replaces the default print sheet. */
   print?: (config: LensConfig, ctx: StepContext) => HTMLElement;
+};
+
+/**
+ * A sleeve lays one Thinking Toolkit item over the block students are already
+ * answering. It never walks: it opens in place with See it, Do it and Check it.
+ */
+export type SleeveLens = {
+  kind: 'sleeve';
+  /** Lens id, `sleeve:<library id>`. */
+  id: string;
+  /** Library id, e.g. `value:clarity`. */
+  toolkitId: string;
+  toolkitKind: ToolkitKind;
+  label: string;
+  goal: string;
+  levels: readonly SleeveLevel[];
+  canAttach: (block: Block) => boolean;
+  read: (block: Block) => SleeveConfig | undefined;
+  write: <T extends Block>(block: T, config: SleeveConfig) => T;
+  remove: <T extends Block>(block: T) => T;
+  create: () => SleeveConfig;
+  /** The text at one level, with the teacher's overrides applied at their start level. */
+  content: (level: SleeveLevel, config: SleeveConfig) => SleeveText;
 };
