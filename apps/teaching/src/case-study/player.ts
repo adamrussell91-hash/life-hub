@@ -1,7 +1,7 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
-import { casePartOf, isCaseBriefSection } from './model';
+import { casePartOf, isCaseBriefSection, isCaseOutcomeSection } from './model';
 import { button, el } from '@/quiz/dom';
 import { coach } from '@/sprint/form-kit';
 import { buildCaseRail, type CaseRailItem, type CaseRailState } from './rail';
@@ -40,6 +40,43 @@ type Drafts = {
 
 const isPhone = () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches;
 const paragraphs = (text: string) => text.split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+
+/**
+ * One document paragraph. A paragraph of `| a | b |` rows is a table (the first row is
+ * the header; a `|---|` row is skipped), `## ` starts a heading, and `NAME: ` at the start
+ * of a paragraph is a speaker turn in a transcript. Anything else is plain text.
+ */
+export function paragraphEl(text: string): HTMLElement {
+  const lines = text.split('\n').map((l) => l.trim());
+  if (lines.length > 1 && lines.every((l) => l.startsWith('|'))) {
+    const cells = (l: string) => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const rows = lines.filter((l) => !/^\|[\s:|-]+\|?$/.test(l)).map(cells);
+    const wrap = el('div', 'cs-table');
+    const table = el('table', '');
+    const head = el('tr', '');
+    for (const c of rows[0] ?? []) head.append(el('th', '', c));
+    const thead = el('thead', '');
+    thead.append(head);
+    const tbody = el('tbody', '');
+    for (const r of rows.slice(1)) {
+      const tr = el('tr', '');
+      r.forEach((c, i) => tr.append(el(i === 0 ? 'th' : 'td', '', c)));
+      tbody.append(tr);
+    }
+    table.append(thead, tbody);
+    wrap.append(table);
+    return wrap;
+  }
+  if (text.startsWith('## ')) return el('h4', 'cs-doc__sub', text.slice(3));
+  const turn = /^([A-Z][A-Z ]{1,24}):\s+([\s\S]*)$/.exec(text);
+  if (turn) {
+    const p = el('p', 'cs-turn');
+    p.dataset.who = turn[1]!.toLowerCase();
+    p.append(el('b', 'cs-turn__who', turn[1]!), document.createTextNode(` ${turn[2]}`));
+    return p;
+  }
+  return el('p', '', text);
+}
 const clip = (text: string) => (text.length > QUOTE_MAX ? `${text.slice(0, QUOTE_MAX - 1)}…` : text);
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
 const dayOf = (day: string) => new Date(`${day}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -51,7 +88,9 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   // The Brief section's blocks sit in the Brief; every other block is Decide content.
   const briefSection = pageBlocks.find(isCaseBriefSection);
   const briefBlocks = briefSection?.block_type === 'section' ? (briefSection.content.blocks as Block[]) : [];
-  const blocks = pageBlocks.filter((b) => !isCaseBriefSection(b) && casePartOf(b) === undefined);
+  const blocks = pageBlocks.filter((b) => !isCaseBriefSection(b) && casePartOf(b) === undefined && !isCaseOutcomeSection(b));
+  const outcomeSection = pageBlocks.find(isCaseOutcomeSection);
+  const outcomeBlocks = outcomeSection?.block_type === 'section' ? (outcomeSection.content.blocks as Block[]) : [];
   // Each part's blocks (hinges, a reasoning step) sit in the work panel while that part is open.
   const partBlocks = new Map<string, Block[]>();
   for (const b of pageBlocks) {
@@ -80,6 +119,14 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   let blocksEl: HTMLElement | null = null;
   let briefEl: HTMLElement | null = null;
   const partEls = new Map<string, HTMLElement>();
+  let outcomeEl: HTMLElement | null = null;
+  /** A part's (or the Outcome's) blocks under its documents, built once so a repaint keeps what a student did in them. */
+  const partTasks = (id: string): HTMLElement | null => {
+    const list = partBlocks.get(id);
+    if (!list?.length) return null;
+    if (!partEls.has(id)) partEls.set(id, Object.assign(blockList(list), { className: 'cs-blocks cs-tasks' }));
+    return partEls.get(id)!;
+  };
   const blockList = (list: Block[]) => {
     const wrap = el('div', 'cs-blocks');
     for (const b of list) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks }));
@@ -331,11 +378,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
       if (p.question) box.append(el('p', 'cs-hint', p.question), el('p', 'cs-saved', s.work.answers?.[p.id] ?? ''));
     }
     const remaining = s.parts.length < s.parts_total;
-    const tasks = partBlocks.get(latest.id);
-    if (tasks?.length) {
-      if (!partEls.has(latest.id)) partEls.set(latest.id, blockList(tasks));
-      box.append(partEls.get(latest.id)!);
-    }
+    if (partBlocks.get(latest.id)?.length) box.append(note(`Work through the tasks under Part ${s.parts.length} in the case first.`, 'cs-hint'));
     if (!latest.question) {
       box.append(el('h3', '', 'Read the documents'), note('Collect evidence as you read. It comes with you when you decide.', 'cs-hint'), evidencePad(s, true));
       const next = pacing(s, 1);
@@ -569,7 +612,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
     const body = el('div', 'cs-doc__body');
     for (const text of paragraphs(doc.text)) {
       const row = el('div', 'cs-para');
-      row.append(el('p', '', text));
+      row.append(paragraphEl(text));
       if (cite && client) {
         const c = el('button', 'cs-para__cite', 'Cite');
         c.type = 'button';
@@ -618,12 +661,16 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
         card.append(head);
         for (const text of paragraphs(o.text)) card.append(el('p', '', text));
         card.append(el('p', 'cs-doc__source', `Source: ${o.source}`));
-        out.push(card, el('p', 'cs-part-label', 'The case you worked from'));
+        out.push(card);
+        if (outcomeBlocks.length) out.push(outcomeEl ??= Object.assign(blockList(outcomeBlocks), { className: 'cs-blocks cs-tasks' }));
+        out.push(el('p', 'cs-part-label', 'The case you worked from'));
       }
       const layered = s.parts_total > 1;
       s.parts.forEach((p, i) => {
         if (layered) out.push(el('p', 'cs-part-label', `Part ${i + 1} · ${p.title}`));
         for (const d of p.docs) out.push(docCard(s, d, cite, cited));
+        const tasks = partTasks(p.id);
+        if (tasks) out.push(tasks);
       });
       for (let i = s.parts.length; i < s.parts_total; i++) {
         out.push(el('p', 'cs-part-label', `Part ${i + 1}`));

@@ -119,3 +119,15 @@
   .cs-seg__btn[aria-pressed="true"] { background: var(--ink); color: var(--paper, #fbf8f2); }
   .cs-seg__new { position: absolute; top: 9px; right: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea, #f68620); }
 }
+
+/* Rich document text: tables, sub-headings and transcript turns. */
+.cs-table { overflow-x: auto; margin: 2px 0; }
+.cs-table table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+.cs-table th, .cs-table td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+.cs-table thead th { background: var(--pastel-blue, #dceafa); color: var(--navy, #17375e); font-weight: 700; }
+.cs-table tbody th { background: var(--paper, #fbf8f2); font-weight: 700; white-space: nowrap; }
+.cs-doc__sub { margin: 10px 0 0; font-size: 0.9375rem; color: var(--navy, #17375e); }
+.cs-turn { margin: 0; padding: 8px 12px; border-radius: 0.75rem; background: var(--paper, #fbf8f2); }
+.cs-turn[data-who='examiner'] { background: transparent; color: var(--muted, #6b7788); font-style: italic; }
+.cs-turn__who { display: block; font-style: normal; font-size: 0.6875rem; letter-spacing: 0.06em; color: var(--muted, #6b7788); margin-bottom: 2px; }
+.cs-tasks { border-top: 2px solid var(--line); padding-top: 14px; display: grid; gap: 14px; }
