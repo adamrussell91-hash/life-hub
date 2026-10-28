@@ -128,6 +128,13 @@ var NEXT = {
   /** This share secure, with at most one weak: move on. */
   moveOnShare: 2 / 3
 };
+var FLAGS = {
+  /** Students sure (3) but below full marks on one tag. */
+  sureWrongStudents: 2,
+  /** Share of full-mark answers given at confidence 1. */
+  guessShare: 0.25,
+  guessMin: 2
+};
 
 // apps/teaching/src/evidence/mastery.ts
 var MASTERY_GROUPS = ["understanding", "responding", "concepts", "skills"];
@@ -193,12 +200,162 @@ function withPointTags(evidence, byLesson, byOutcome) {
     return extra.length ? { ...e, tags: [.../* @__PURE__ */ new Set([...e.tags, ...extra])] } : e;
   });
 }
+
+// apps/teaching/src/evidence/patterns.ts
+var avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+var scored = (list) => list.filter((x) => x.share !== null);
+var questionOf = (item) => item.split("#")[0];
+var tagsOf = (x, kind) => x.tags.filter((t) => t.startsWith(`${kind}:`));
+function groupBy(xs, key) {
+  const out = /* @__PURE__ */ new Map();
+  for (const x of xs) for (const k of key(x)) out.set(k, [...out.get(k) ?? [], x]);
+  return out;
+}
+function studentBand(mean) {
+  return mean < BANDS.weak ? "weak" : mean >= BANDS.secure ? "secure" : "developing";
+}
+function byTag(evidence, kind) {
+  const rows = [];
+  for (const [tag, list] of groupBy(scored(evidence), (x) => tagsOf(x, kind))) {
+    const shares = list.map((x) => x.share);
+    const mean = avg(shares);
+    const sure = list.map((x) => x.confidence).filter((c) => c !== null);
+    const confidence = sure.length ? avg(sure) : null;
+    const questions = new Set(list.map((x) => questionOf(x.item))).size;
+    const band = questions < BANDS.minQuestions ? "thin" : mean < BANDS.weak ? "weak" : mean >= BANDS.secure && (confidence === null || confidence >= BANDS.secureConfidence) ? "secure" : "developing";
+    const groups = { weak: [], developing: [], secure: [] };
+    for (const [student, mine] of groupBy(list, (x) => [x.student])) {
+      if (mine.length < BANDS.groupMin) continue;
+      groups[studentBand(avg(mine.map((x) => x.share)))].push(student);
+    }
+    rows.push({ tag, mean, full: shares.filter((s) => s >= 1).length / shares.length, half: shares.filter((s) => s > 0 && s < 1).length / shares.length, confidence, questions, band, groups });
+  }
+  return rows.sort((a, b) => a.mean - b.mean || a.tag.localeCompare(b.tag));
+}
+function confidenceQuadrants(evidence) {
+  const q = { sureRight: 0, sureWrong: 0, unsureRight: 0, unsureWrong: 0, total: 0, sureWrongStudents: [] };
+  for (const x of scored(evidence)) {
+    if (x.confidence !== 3 && x.confidence !== 1) continue;
+    const right = x.share >= 1;
+    q.total += 1;
+    if (x.confidence === 3 && right) q.sureRight += 1;
+    if (x.confidence === 3 && !right) {
+      q.sureWrong += 1;
+      if (!q.sureWrongStudents.includes(x.student)) q.sureWrongStudents.push(x.student);
+    }
+    if (x.confidence === 1 && right) q.unsureRight += 1;
+    if (x.confidence === 1 && !right) q.unsureWrong += 1;
+  }
+  q.sureWrongStudents.sort();
+  return q;
+}
+
+// apps/teaching/src/evidence/walkthru-patterns.ts
+var PROBLEM_TYPES = ["recall", "fluency", "recognising", "dexterity", "sophistication", "time"];
+var DEFAULT_MONITOR = { quizzes: 3, weeks: 3, classes: 2, oneOffDays: 14 };
+var NEED = {
+  /** Retrieval items (`fam:` and `out:` tags) below this mean show weak recall. */
+  recallBelow: BANDS.weak,
+  recallMinItems: 3,
+  /** This share of scored items with part marks shows fluency trouble. */
+  partShare: 0.3,
+  partMinItems: 5,
+  /** Students whose answers are marked with a code of a problem type. */
+  codeMinStudents: 2
+};
+var scored2 = (list) => list.filter((x) => x.share !== null);
+var avg2 = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+function needsFor(items, codes) {
+  const out = [];
+  const list = scored2(items);
+  if (!list.length) return out;
+  const retrieval = list.filter((x) => x.tags.some((t) => t.startsWith("fam:") || t.startsWith("out:")));
+  const sureWrong = confidenceQuadrants(list).sureWrongStudents;
+  const lowRecall = retrieval.length >= NEED.recallMinItems && avg2(retrieval.map((x) => x.share)) < NEED.recallBelow;
+  if (lowRecall || sureWrong.length >= FLAGS.sureWrongStudents) {
+    const students = lowRecall ? new Set(retrieval.filter((x) => x.share < 1).map((x) => x.student)).size : sureWrong.length;
+    out.push({ type: "recall", students });
+  }
+  const part = list.filter((x) => x.share > 0 && x.share < 1);
+  const full = list.filter((x) => x.share >= 1);
+  const guesses = full.filter((x) => x.confidence === 1);
+  const manyPart = list.length >= NEED.partMinItems && part.length / list.length >= NEED.partShare;
+  const guessing = guesses.length >= FLAGS.guessMin && guesses.length / full.length >= FLAGS.guessShare;
+  if (manyPart || guessing) out.push({ type: "fluency", students: new Set((manyPart ? part : guesses).map((x) => x.student)).size });
+  const weakSkill = byTag(list, "skill").filter((r) => r.band === "weak");
+  if (weakSkill.length) out.push({ type: "dexterity", students: Math.max(...weakSkill.map((r) => r.groups.weak.length)) });
+  const typeOf = new Map(codes.filter((c) => c.problem_type).map((c) => [c.id, c.problem_type]));
+  const byType = /* @__PURE__ */ new Map();
+  for (const x of list) {
+    if (x.share >= 1) continue;
+    for (const w of x.why) {
+      const type = w.type === "code" ? typeOf.get(w.id) : void 0;
+      if (!type) continue;
+      byType.set(type, (byType.get(type) ?? /* @__PURE__ */ new Set()).add(x.student));
+    }
+  }
+  for (const [type, students] of byType) if (students.size >= NEED.codeMinStudents && !out.some((o) => o.type === type)) out.push({ type, students: students.size });
+  return out;
+}
+function signalsFor(evidence, sources, codes) {
+  const signals = [];
+  for (const { source, title } of sources) {
+    const mine = evidence.filter((x) => x.source === source);
+    if (!mine.length) continue;
+    const date = mine.map((x) => x.date).sort()[0];
+    for (const need of needsFor(mine, codes)) signals.push({ source, title, date, type: need.type, students: need.students });
+  }
+  return signals.sort((a, b) => a.date.localeCompare(b.date) || a.source.localeCompare(b.source) || a.type.localeCompare(b.type));
+}
+var daysBetween = (from, to) => Math.round((Date.parse(`${to.slice(0, 10)}T00:00:00Z`) - Date.parse(`${from.slice(0, 10)}T00:00:00Z`)) / 864e5);
+function countPatterns(byClass, today, settings = DEFAULT_MONITOR) {
+  const windowDays = settings.weeks * 7;
+  const recent = [];
+  for (const [class_id, list] of Object.entries(byClass)) for (const s of list) if (daysBetween(s.date, today) <= windowDays && daysBetween(s.date, today) >= 0) recent.push({ ...s, class_id });
+  const patterns = [];
+  const covered = /* @__PURE__ */ new Set();
+  const build = (key, kind, type, scope, rows) => {
+    const sources = rows.map((r) => ({ class_id: r.class_id, source: r.source, title: r.title, date: r.date })).sort((a, b) => a.date.localeCompare(b.date) || a.source.localeCompare(b.source));
+    return { key, kind, type, class_ids: [...new Set(rows.map((r) => r.class_id))].sort(), count: new Set(rows.map((r) => `${r.class_id}|${r.source}`)).size, scope, sources, newest: sources[sources.length - 1].date };
+  };
+  for (const type of PROBLEM_TYPES) {
+    const ofType = recent.filter((s) => s.type === type);
+    if (!ofType.length) continue;
+    const classes = [...new Set(ofType.map((s) => s.class_id))].sort();
+    const acrossClasses = classes.length >= settings.classes;
+    for (const class_id of classes) {
+      const rows = ofType.filter((s) => s.class_id === class_id);
+      if (rows.length >= settings.quizzes) {
+        patterns.push(build(`${type}:${class_id}`, "repeated", type, "class", rows));
+        for (const r of rows) covered.add(`${r.class_id}|${r.source}|${r.type}`);
+      }
+    }
+    if (acrossClasses) {
+      patterns.push(build(`${type}:classes`, "repeated", type, "classes", ofType));
+      for (const r of ofType) covered.add(`${r.class_id}|${r.source}|${r.type}`);
+    }
+  }
+  for (const type of PROBLEM_TYPES) {
+    for (const class_id of Object.keys(byClass).sort()) {
+      const rows = recent.filter((s) => s.type === type && s.class_id === class_id && !covered.has(`${s.class_id}|${s.source}|${s.type}`));
+      const newest = rows.sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+      if (!newest || daysBetween(newest.date, today) > settings.oneOffDays) continue;
+      patterns.push(build(`${type}:${class_id}:one`, "one_off", type, "class", [newest]));
+    }
+  }
+  return patterns.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "repeated" ? -1 : 1) || b.count - a.count || a.key.localeCompare(b.key));
+}
 export {
+  DEFAULT_MONITOR,
   MASTERY_GROUPS,
+  PROBLEM_TYPES,
+  countPatterns,
   fillsFor,
   lessonPointMap,
   levelFor,
   markbookEvidence,
+  needsFor,
   pointTag,
+  signalsFor,
   withPointTags
 };

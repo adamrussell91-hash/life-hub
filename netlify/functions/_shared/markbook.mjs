@@ -14,6 +14,7 @@ import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { listDone } from './profile-done.mjs';
 import { read, reject } from './question-drop.mjs';
+import { markWalkthruDirty } from './walkthru-dirty.mjs';
 import { MARKBOOK_LIMITS, MarkbookSchema, checkColumn, checkMark, pruneMarks } from './markbook-schema.mjs';
 
 const bookKey = (classId) => `markbook/${classId}`;
@@ -130,7 +131,16 @@ function leaveMember(book, group, student, day, why) {
 
 const findGroup = (book, id) => book.groups.find((g) => g.id === id) ?? reject(404, 'not_found', 'That group is gone.');
 
+/** Actions that change what the pattern monitor reads (marks, columns, shown quizzes). */
+const EVIDENCE_ACTIONS = new Set(['set_mark', 'save_column', 'delete_column', 'hide_quiz']);
+
 export async function markbookAction(store, classId, body) {
+  const result = await markbookActionInner(store, classId, body);
+  if (EVIDENCE_ACTIONS.has(body?.action)) await markWalkthruDirty(store);
+  return result;
+}
+
+async function markbookActionInner(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');

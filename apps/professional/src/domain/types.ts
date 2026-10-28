@@ -1,4 +1,5 @@
 import type { GuideRun } from '@/guides/types';
+import type { CoachingSheet } from '@/guides/coaching-sheet';
 
 /**
  * Shapes mirroring the server contracts this hub consumes.
@@ -369,6 +370,7 @@ export interface MeetingRecord {
   blocks?: unknown[];
   decisions?: MeetingDecision[];
   guide_runs?: GuideRun[];
+  coaching_sheets?: CoachingSheet[];
 }
 
 export interface MeetingDecision {

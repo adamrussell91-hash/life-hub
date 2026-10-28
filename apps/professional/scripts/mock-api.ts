@@ -219,6 +219,20 @@ function timelineLabel(
 
 let walkthruArrows: Array<Record<string, unknown>> = [];
 let walkthruGoals: Array<Record<string, any>> = [];
+// Invented demo suggestion (no real class or quiz names).
+let walkthruSuggestions: Array<Record<string, any>> = [
+  {
+    key: 'recall:demo-class', kind: 'repeated', problem_type: 'recall', problem_label: 'Recall',
+    series: { key: 'PR', code: 'P&R', name: 'Practice and retrieval' }, technique_id: 'w1-quizzing', alternatives: [],
+    class_ids: ['demo-class'], class_titles: ['Demo class'], count: 3, scope: 'class', action: 'goal', note: '',
+    chain: [
+      { step: 'evidence', text: '3 quizzes in Demo class since 2026-10-05' },
+      { step: 'problem', text: 'Recall' },
+      { step: 'series', text: 'Practice and retrieval (P&R)' },
+      { step: 'technique', text: 'Quizzing' }
+    ]
+  }
+];
 
 export function createMockApi() {
   const people = new Map<string, PersonRecord>(
@@ -434,6 +448,12 @@ export function createMockApi() {
       if (method === 'GET') return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
       walkthruArrows = normalizeArrows((body as { arrows?: unknown })?.arrows);
       return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
+    }
+    if (path === '/api/walkthru-suggestions') {
+      if (method === 'GET') return json(200, { ok: true, data: { suggestions: walkthruSuggestions } });
+      const key = (body as { key?: string })?.key;
+      walkthruSuggestions = walkthruSuggestions.filter((s) => s.key !== key);
+      return json(200, { ok: true, data: { ok: true } });
     }
     if (path === '/api/walkthru-reps' && method === 'GET') return json(200, { ok: true, data: { reps: [] } });
     if (path === '/api/goals') {
@@ -2253,6 +2273,7 @@ export function createMockApi() {
         blocks: [] as unknown[],
         decisions: [] as unknown[],
         guide_runs: [] as unknown[],
+        coaching_sheets: [] as unknown[],
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -2284,7 +2305,7 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();

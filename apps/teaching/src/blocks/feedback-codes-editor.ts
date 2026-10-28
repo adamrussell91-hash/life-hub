@@ -5,8 +5,10 @@ import {
   FEEDBACK_CODES_ENDPOINT,
   CRITERION_LABELS,
   GROUP_LABELS,
+  PROBLEM_TYPE_LABELS,
   codeInk,
   primeFeedbackCodes,
+  type CodeProblemType,
   type Criterion,
   type FeedbackCode,
   type FeedbackCodeGroup
@@ -148,6 +150,16 @@ export function mountFeedbackCodesEditor(): HTMLElement {
     descriptor.classList.add('pa-bank__wide');
     strength.classList.add('pa-bank__wide');
     body.append(descriptor, strength);
+    if (code.group !== 'speaking') {
+      body.append(
+        pills(
+          'Problem it points to (WalkThrus, optional)',
+          (Object.keys(PROBLEM_TYPE_LABELS) as CodeProblemType[]).map((t) => ({ value: t, label: PROBLEM_TYPE_LABELS[t] })),
+          code.problem_type ?? null,
+          (t) => change(index, { problem_type: code.problem_type === t ? undefined : t }, true)
+        )
+      );
+    }
 
     const tools = el('div', 'pa-bank__row-actions pa-bank__wide');
     tools.append(

@@ -11,6 +11,7 @@
  * The seed below is deliberately short. The full department wording lives in
  * the saved library (Blobs), never in this public repo.
  */
+import { isProblemType } from '../../../packages/walkthrus/problem-types.mjs';
 
 export const CODES_KEY = 'feedback_codes/library';
 export const CODE_COLOURS = ['blue', 'sage', 'peach', 'gold', 'lilac'];
@@ -103,6 +104,8 @@ export function cleanFeedbackCodes(input) {
     }
     const strength = text(row?.strength_descriptor, MAX_DESCRIPTOR);
     if (strength) out.strength_descriptor = strength;
+    // Optional: the WalkThrus problem type this code points to, set by the teacher in the editor.
+    if (isProblemType(row?.problem_type)) out.problem_type = row.problem_type;
     if (row?.hidden === true) out.hidden = true;
     return out;
   });
