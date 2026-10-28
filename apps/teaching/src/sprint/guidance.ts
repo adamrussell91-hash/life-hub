@@ -123,17 +123,17 @@ export const SKETCH_GUIDE: Record<'inspiration' | 'rapid' | 'pick' | 'develop', 
 export const LATER_GUIDE = {
   read: {
     icon: '👀',
-    doThis: 'Open every set of ideas and read them. Place a dot on any part that stands out.',
-    why: 'Reading all the ideas, not just the first few, is how you find the best one.',
-    example: ['A dot goes on one part, like a clever feature, even if you won’t pick that idea overall.'],
+    doThis: 'Read every idea. Tap ● Stands out on the parts you would borrow, then tap the criteria each idea does best.',
+    why: 'Reading all the ideas, not just the first few, is how you find the best one. Dots mark good parts, even in ideas you won’t pick.',
+    example: ['Idea B’s evidence is clever, so it gets a ● Stands out. Idea C does “Speed” best, so you tap “Speed” under Idea C.'],
     stuck: ['Open one set at a time and read slowly.', 'Ask: would this actually fix the problem we chose?']
   },
   reasons: {
     icon: '⚖️',
-    doThis: 'For each criterion, say which idea does it best and why.',
+    doThis: 'For each criterion, say why the idea you picked does it best. The ideas are listed above the boxes to look back at.',
     why: 'A reason turns a gut feeling into an argument your group can discuss.',
     example: ['Speed: Idea B does this best because students collect lunch without queuing.'],
-    stuck: ['Use the sentence starter.', 'One idea can win more than one criterion.']
+    stuck: ['Use the sentence starter.', 'One idea can win more than one criterion.', 'Not picked yet? Go back a step and tap the criterion under an idea.']
   },
   result: {
     icon: '📊',
