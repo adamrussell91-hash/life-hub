@@ -1,6 +1,6 @@
 # Teaching WalkThrus build plan
 
-**Status:** Slices 0 to 4 built in one PR (29 October 2026). Slices 5 to 7 are still a plan. Nothing else builds until Adam names a slice.
+**Status:** Slices 0 to 4 built in one PR (29 October 2026). Slices 5 to 7 built in a second PR, with testing run once at the end (see History). Nothing else builds until Adam names a slice.
 **Written:** 28 October 2026
 **Governs from:** [teaching-walkthrus.md](teaching-walkthrus.md) (the concept doc) and the approved board mockup [teaching-walkthrus-board-mockup.html](teaching-walkthrus-board-mockup.html). Where this plan and the concept doc disagree, the concept doc wins until Adam says otherwise.
 **Inputs:** the concept doc, the mockup and a sweep of `main` for code to reuse (§2).
@@ -348,6 +348,8 @@ The game layer (resources, trading between sets, expansion boards), set 2 and se
 | K2 | Build Slice 2 to the brief above once Slices 0 and 1 are merged |
 
 ## 6. History
+
+- **2026-10-29 (later):** Slices 5 to 7 built, tested together at the end. Deviations from this plan: the monitor runs lazily, not inside `markbookAction` and quiz `submit`. Those saves only write a one-key "evidence changed" marker (`_shared/walkthru-dirty.mjs`) and the monitor rebuilds when the board next asks, so marking and student hand-in are never slowed. The `time` problem type stays dormant until quiz results record unanswered items. One-off suggestions open the technique rather than creating a lesson note, so Adam adds the WalkThru note himself. Cross-class patterns count the same problem in 2 or more classes inside the window. Framework lens prompts are original wording for students, not Adam's: he should rewrite them, and check MARGE's steps (Attend, Relate, Generate, Evaluate) against the book. Planning prompts are a teacher-only strip on the unit page, because units have no fixed planning fields yet. The coaching sheet is a new `coaching_sheets` list on meetings, separate from `guide_runs`, whose shape is built for the motivation scales. No Drive artwork was imported: Drive holds only the traced book SVGs, which this plan forbids, and the commissioned icon set (A2) is not there yet, so placeholders remain.
 
 - **2026-10-29:** Adam took the suggested answers to D3 to D6 and said the goal lives on a new Professional page (`#/learning/goal`), with the board at `#/learning`. Cursor is retired, so Claude Code built Slice 2 as well. Slices 0 to 4 shipped as one PR. Deviations from this plan: the board camera is a new shared `design-kit/js/board-camera.js` (the miniworld camera is untouched, so moving it onto the shared one is still open); the board is drawn at tile size 64 with cluster labels sized to read at full zoom out; `keep` and `move_on` write the same `term_history` outcomes as the term picker but through the goal page, using a calendar-month guess for the term label; Test evidence is a class mean and student count Adam enters (derived `need:` tags arrive with Slice 5); the robber is not drawn (Slice 5); markbook feedback has no block to carry the Whole class feedback icon, so it is not in the auto-attach list; the catalogue holds the 52 techniques and page numbers in the approved mockup, not 50, with empty `see_also` until the book’s cross-references are entered.
 

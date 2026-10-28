@@ -31,6 +31,7 @@
  * Students have no accounts. A device keeps a random token and the server
  * keeps a hash of it. Attempts are counted by that hash, or by the student once initials are claimed.
  */
+import { markWalkthruDirty } from './walkthru-dirty.mjs';
 import { randomBytes, randomInt } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
@@ -292,6 +293,8 @@ const INSIGHT_SETTLE_MS = 60_000;
  */
 async function markInsightChanged(store, lessonId) {
   await store.setJSON(keys(lessonId).stamp, { at: new Date().toISOString() });
+  // The WalkThrus pattern monitor reads this evidence; it catches up on the next board load.
+  await markWalkthruDirty(store);
 }
 
 /** Feedback-code ids on one answer: unique, at most 8. */

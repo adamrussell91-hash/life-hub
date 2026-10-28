@@ -10,6 +10,15 @@ import type { CodeColour } from '@/blocks/peer-annotate';
 
 export type FeedbackCodeGroup = 'composition' | 'viva' | 'speaking';
 export type Criterion = 1 | 2 | 3;
+export type CodeProblemType = 'recall' | 'fluency' | 'recognising' | 'dexterity' | 'sophistication' | 'time';
+export const PROBLEM_TYPE_LABELS: Record<CodeProblemType, string> = {
+  recall: 'Recall',
+  fluency: 'Fluency',
+  recognising: 'Recognising what the question asks',
+  dexterity: 'Dexterity with procedures',
+  sophistication: 'Sophistication of responses',
+  time: 'Working under time'
+};
 
 export type FeedbackCode = {
   id: string;
@@ -21,6 +30,8 @@ export type FeedbackCode = {
   descriptor: string;
   key?: string;
   strength_descriptor?: string;
+  /** Optional. The WalkThrus problem type this code points to; codes without one add nothing to the pattern monitor. */
+  problem_type?: CodeProblemType;
   hidden?: boolean;
 };
 

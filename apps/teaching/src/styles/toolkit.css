@@ -2687,9 +2687,12 @@ button.tk-qdot {
 .tk-wt-ed__jots { display: grid; gap: 0.4rem; margin-top: 0.5rem; }
 .tk-ed__jot { width: 100%; resize: vertical; }
 .tk-wt-badges { margin-top: 0.5rem; }
+.tk-wt-plan { margin: 0 0 0.75rem; }
+.tk-wt-plan__head { cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; display: flex; align-items: center; }
+.tk-wt-plan .tk-wt-badges { display: grid; gap: 0.4rem; }
 .tk-wt-badge { border: 1px dashed var(--line); border-radius: 10px; padding: 0.25rem 0.6rem; background: var(--cotton); }
 .tk-wt-badge__summary { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; }
 .tk-wt-badge__glyph { display: inline-grid; width: 1.6rem; height: 1.6rem; color: #111; }
 .tk-wt-badge__glyph svg { width: 100%; height: 100%; }
 .tk-wt-badge__body { padding: 0.25rem 0 0.5rem; }
-@media print { .tk-wt, .tk-wt-badges { display: none; } }
+@media print { .tk-wt, .tk-wt-badges, .tk-wt-plan { display: none; } }

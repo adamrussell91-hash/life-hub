@@ -1,3 +1,4 @@
+import { renderPlanningPrompts } from '@/blocks/walkthru-note/planning';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
@@ -613,7 +614,10 @@ export function renderUnitPage(
       })
     : null;
 
-  planSection.append(planHeading, planHost);
+  planSection.append(planHeading);
+  const planningPrompts = renderPlanningPrompts();
+  if (planningPrompts) planSection.append(planningPrompts);
+  planSection.append(planHost);
 
   const tagsHost = document.createElement('div');
   tagsHost.className = 'unit-page__tags';

@@ -1,5 +1,6 @@
 import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
 import type { GuideRun } from '@/guides/types';
+import type { CoachingSheet } from '@/guides/coaching-sheet';
 import type { MeetingDecision, MeetingRecord } from '@/domain/types';
 
 export interface MeetingLinkInput {
@@ -60,6 +61,7 @@ export function updateMeeting(
     blocks?: unknown[];
     decisions?: MeetingDecision[];
     guide_runs?: GuideRun[];
+    coaching_sheets?: CoachingSheet[];
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ meeting: MeetingRecord }> {
