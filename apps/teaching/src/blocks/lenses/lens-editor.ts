@@ -3,14 +3,29 @@ import { classroomExtras } from '@/blocks/classroom-extras';
 import { canHaveDiscern } from '../discern';
 import { createDiscernAuthor } from '../discern-editor';
 import { discernSymbol } from '../discern-view';
-import { STEPPED_LENSES, attachedSteppedLenses, lensLevel } from './registry';
+import type { SleeveConfig } from '@/schemas/lens';
+import type { ToolkitKind } from '@/toolkit/library';
+import type { SleeveLevel } from '@/toolkit/sleeves';
+import { createEditorFilter } from '../editor-filter';
+import { SLEEVE_LENSES, STEPPED_LENSES, attachedSleeves, attachedSteppedLenses, canAddSleeve, lensLevel } from './registry';
+import { MAX_SLEEVES } from './sleeve-lens';
 import { renderSteppedLenses } from './stepped-view';
-import { LEVEL_LABELS, type LensConfig, type SteppedLens } from './types';
+import { LEVEL_LABELS, type LensConfig, type SleeveLens, type SteppedLens } from './types';
 
 type Options<T extends Block> = { getBlock: () => T; onChange: (block: T) => void };
 
 /** Discern brings its own setup; the picker only needs to show it. */
 const DISCERN_PICK = { label: 'Discern', group: 'Judgement', path: 'Initial answer → against → for → step back' };
+const SLEEVE_GROUP = 'Thinking toolkit';
+const SLEEVE_SUBHEADS: Array<[ToolkitKind, string]> = [['value', 'Values'], ['tool', 'Tools'], ['skill', 'Skills']];
+
+/** A small swatch in the sleeve's colour, standing in for a lens symbol. */
+function sleeveSwatch(kind: ToolkitKind): HTMLElement {
+  const swatch = document.createElement('span');
+  swatch.className = `sleeve-swatch sleeve-swatch--${kind}`;
+  swatch.setAttribute('aria-hidden', 'true');
+  return swatch;
+}
 
 /**
  * One "Add lens…" item in the block options menu, a picker grouped by
@@ -22,7 +37,8 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
   root.className = 'kaplan-author';
   if (!classroomExtras()) return root;
   const available = () => STEPPED_LENSES.filter((lens) => lens.canAttach(options.getBlock()));
-  if (!available().length && !canHaveDiscern(options.getBlock())) return root;
+  const sleevable = () => SLEEVE_LENSES.some((item) => item.canAttach(options.getBlock()));
+  if (!available().length && !sleevable() && !canHaveDiscern(options.getBlock())) return root;
   const bar = document.createElement('div');
   bar.className = 'kaplan-author__bar';
   const attached = document.createElement('div');
@@ -68,6 +84,8 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
   };
   let lens: SteppedLens | null = null;
   let draft: LensConfig | null = null;
+  let sleeve: SleeveLens | null = null;
+  let sleeveDraft: SleeveConfig | null = null;
   let editing = false;
   let currentStep = 0;
 
@@ -78,6 +96,8 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
   function close(): void {
     lens = null;
     draft = null;
+    sleeve = null;
+    sleeveDraft = null;
     panel.hidden = true;
     panel.replaceChildren();
     setupVisibility(false);
@@ -101,13 +121,32 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
   function unusedLenses(): SteppedLens[] {
     return available().filter((item) => !item.read(options.getBlock()));
   }
+  function unusedSleeves(): SleeveLens[] {
+    const block = options.getBlock();
+    return canAddSleeve(block) ? SLEEVE_LENSES.filter((item) => item.canAttach(block) && !item.read(block)) : [];
+  }
+  function saveSleeve(): void {
+    if (!sleeve || !sleeveDraft) return;
+    options.onChange(sleeve.write(options.getBlock(), sleeveDraft));
+    const label = sleeve.label;
+    close();
+    renderBar();
+    status.textContent = `${label} sleeve saved. The original block is unchanged.`;
+  }
+  function removeSleeve(target: SleeveLens): void {
+    options.onChange(target.remove(options.getBlock()));
+    close();
+    renderBar();
+    status.textContent = `${target.label} sleeve removed. The original block is unchanged.`;
+    summary.focus();
+  }
   function discernFree(): boolean {
     return canHaveDiscern(options.getBlock()) && !options.getBlock().discern;
   }
   function renderBar(): void {
     attached.replaceChildren();
     entries.replaceChildren();
-    if (unusedLenses().length || discernFree()) {
+    if (unusedLenses().length || unusedSleeves().length || discernFree()) {
       const entry = button('Add lens…', () => { menu.open = false; status.textContent = ''; choose(); });
       entry.className = 'page-options__item';
       entries.append(entry);
@@ -119,11 +158,18 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
       chip.setAttribute('aria-label', `Edit ${item.lens.label} lens`);
       attached.append(chip);
     }
+    for (const item of attachedSleeves(options.getBlock())) {
+      const chip = button(item.lens.label, () => editSleeve(item.lens, item.config));
+      chip.className = 'kaplan-chip';
+      chip.prepend(sleeveSwatch(item.lens.toolkitKind));
+      chip.setAttribute('aria-label', `Edit ${item.lens.label} sleeve`);
+      attached.append(chip);
+    }
     const discernChip = discern.chip();
     if (discernChip) attached.append(discernChip);
     menu.hidden = !entries.childElementCount;
   }
-  function title(text: string, symbol?: SVGSVGElement): void {
+  function title(text: string, symbol?: Element): void {
     panel.replaceChildren();
     panel.hidden = false;
     setupVisibility(true);
@@ -141,7 +187,7 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     row.append(...buttons);
     panel.append(row);
   }
-  function choice(label: string, path: string, symbol: SVGSVGElement, onClick: () => void): HTMLButtonElement {
+  function choice(label: string, path: string, symbol: Element, onClick: () => void): HTMLButtonElement {
     const pick = button('', onClick);
     pick.className = 'kaplan-lens-choice';
     const text = document.createElement('span');
@@ -186,7 +232,113 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
       list.append(...picks);
       panel.append(heading, list);
     }
+    sleeveChoices();
     actions(button('Cancel', close));
+  }
+  /** Thinking toolkit sleeves, under Values, Tools and Skills, in library order. */
+  function sleeveChoices(): void {
+    const block = options.getBlock();
+    if (!SLEEVE_LENSES.some((item) => item.canAttach(block))) return;
+    const heading = document.createElement('h4');
+    heading.className = 'kaplan-lens-group';
+    heading.textContent = SLEEVE_GROUP;
+    panel.append(heading);
+    if (!canAddSleeve(block)) {
+      const full = document.createElement('p');
+      full.className = 'kaplan-caption';
+      full.textContent = `This block has ${MAX_SLEEVES} sleeves, the most one block can hold. Remove one to add another.`;
+      panel.append(full);
+      return;
+    }
+    const unused = unusedSleeves();
+    for (const [kind, subhead] of SLEEVE_SUBHEADS) {
+      const items = unused.filter((item) => item.toolkitKind === kind);
+      if (!items.length) continue;
+      const sub = document.createElement('h5');
+      sub.className = 'kaplan-lens-subgroup';
+      sub.textContent = subhead;
+      const list = document.createElement('div');
+      list.className = 'kaplan-lens-choices';
+      list.append(...items.map((item) => choice(item.label, item.goal, sleeveSwatch(item.toolkitKind), () => {
+        editing = false;
+        sleeve = item;
+        sleeveDraft = item.create();
+        sleeveSetup();
+      })));
+      panel.append(sub, list);
+    }
+  }
+  function editSleeve(target: SleeveLens, config: SleeveConfig): void {
+    editing = true;
+    sleeve = target;
+    sleeveDraft = structuredClone(config);
+    menu.open = false;
+    status.textContent = '';
+    sleeveSetup();
+  }
+  /** Start level, the student switch, and Do it and the checks at that level. Blank keeps the sleeve's text. */
+  function sleeveSetup(): void {
+    if (!sleeve || !sleeveDraft) return;
+    const target = sleeve;
+    const config = sleeveDraft;
+    title(`${target.label} sleeve`, sleeveSwatch(target.toolkitKind));
+    const caption = document.createElement('p');
+    caption.className = 'kaplan-caption';
+    caption.textContent = `${target.goal} Students see it above the question: See it, Do it, Check it.`;
+    panel.append(caption);
+    const base = target.content(config.level, { ...config, do: undefined, checks: undefined });
+    const levelGroup = document.createElement('div');
+    levelGroup.className = 'kaplan-field';
+    levelGroup.append(document.createTextNode('Start level'));
+    const level = createEditorFilter({
+      key: 'Start level',
+      ariaLabel: 'Start level',
+      value: config.level,
+      defaultValue: 'support',
+      options: target.levels.map((value) => ({ value, label: LEVEL_LABELS[value] })),
+      onChange: (value) => {
+        if (value === config.level) return;
+        // Overrides belong to one level, so a new level starts from its own text.
+        config.level = value as SleeveLevel;
+        delete config.do;
+        delete config.checks;
+        sleeveSetup();
+      }
+    });
+    levelGroup.append(level.el);
+    const toggle = document.createElement('label');
+    toggle.className = 'lens-toggle';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = config.student_level !== false;
+    box.addEventListener('change', () => { config.student_level = box.checked; });
+    toggle.append(box, document.createTextNode(' Students can switch level'));
+    const move = document.createElement('textarea');
+    move.rows = 2;
+    move.maxLength = 600;
+    move.placeholder = base.do;
+    move.value = config.do ?? '';
+    move.addEventListener('input', () => { config.do = move.value; });
+    panel.append(levelGroup, toggle, field('Do it · blank uses the sleeve’s own move', move));
+    base.checks.forEach((check, i) => {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 300;
+      input.placeholder = check;
+      input.value = config.checks?.[i] ?? '';
+      input.addEventListener('input', () => {
+        const checks = [0, 1, 2].map((n) => config.checks?.[n] ?? '');
+        checks[i] = input.value;
+        config.checks = checks;
+      });
+      panel.append(field(`Check ${i + 1} · blank uses the sleeve’s own`, input));
+    });
+    actions(button(editing ? 'Save sleeve' : 'Add sleeve', saveSleeve, true), button('Cancel', close));
+    if (editing) {
+      const removeButton = button('Remove sleeve', () => removeSleeve(target));
+      removeButton.classList.add('kaplan-remove');
+      panel.append(removeButton);
+    }
   }
   function edit(target: SteppedLens, config: LensConfig): void {
     editing = true;

@@ -4,7 +4,11 @@ import { FRAMEWORK_LENSES } from './framework-lenses';
 import { KAPLAN_STEPPED_LENSES } from './kaplan-lenses';
 import { QUESTION_LEVELS_LENS } from './question-levels';
 import { REASONING } from './reasoning';
-import type { LensConfig, LensLevel, SteppedLens } from './types';
+import type { SleeveConfig } from '@/schemas/lens';
+import { TOOLKIT_SKILLS, TOOLKIT_TOOLS, TOOLKIT_VALUES } from '@/toolkit/library';
+import { sleeveContent, type SleeveLevel } from '@/toolkit/sleeves';
+import { MAX_SLEEVES, sleeveLens } from './sleeve-lens';
+import type { LensConfig, LensLevel, SleeveLens, SteppedLens } from './types';
 import { WINDOWS_MIRRORS } from './windows-mirrors';
 
 /**
@@ -34,4 +38,39 @@ export function attachedSteppedLenses(block: Block): AttachedLens[] {
 export function lensLevel(lens: SteppedLens, config: LensConfig, chosen?: LensLevel): LensLevel {
   const wanted = (config.student_level !== false && chosen) || config.level || 'core';
   return lens.levels.includes(wanted) ? wanted : lens.levels.includes('core') ? 'core' : lens.levels[0]!;
+}
+
+/**
+ * Every Thinking Toolkit item that has sleeve text, in library order: values,
+ * then tools, then skills. Sleeves open in place, so they are not stepped lenses.
+ */
+export const SLEEVE_LENSES: readonly SleeveLens[] = [...TOOLKIT_VALUES, ...TOOLKIT_TOOLS, ...TOOLKIT_SKILLS].flatMap((item) => {
+  const text = sleeveContent(item.id);
+  return text ? [sleeveLens(item, text)] : [];
+});
+
+export function sleeveById(id: string): SleeveLens | undefined {
+  return SLEEVE_LENSES.find((lens) => lens.id === id);
+}
+
+export type AttachedSleeve = { lens: SleeveLens; config: SleeveConfig };
+
+/** Sleeves in the order the teacher attached them, never more than two. */
+export function attachedSleeves(block: Block): AttachedSleeve[] {
+  const attached: AttachedSleeve[] = [];
+  for (const item of block.lenses ?? []) {
+    const lens = sleeveById(item.id);
+    const config = lens?.canAttach(block) ? lens.read(block) : undefined;
+    if (lens && config) attached.push({ lens, config });
+  }
+  return attached.slice(0, MAX_SLEEVES);
+}
+
+export function canAddSleeve(block: Block): boolean {
+  return attachedSleeves(block).length < MAX_SLEEVES;
+}
+
+/** The student's choice when they may switch level, otherwise the teacher's start level. */
+export function sleeveLevel(config: SleeveConfig, chosen?: SleeveLevel): SleeveLevel {
+  return (config.student_level !== false && chosen) || config.level;
 }

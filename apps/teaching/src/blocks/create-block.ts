@@ -221,11 +221,10 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Thinking Toolkit',
+    // Skills, tools and values are sleeves now (Add lens… on a question), so
+    // their old cards leave the menu. Existing cards still render and edit.
     types: [
       'thinking_intentions',
-      'toolkit_skill',
-      'toolkit_tool',
-      'toolkit_value',
       'thinking_move',
       'question_quadrant',
       'concept_features',
@@ -273,6 +272,9 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
 const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
 /** Unit plan pages only: it maps the unit's lessons. */
 const UNIT_ONLY_TYPES = new Set(['curriculum_lines']);
+/** The old toolkit cards: kept for saved lessons, never offered for new ones (they are sleeves now). */
+export const RETIRED_BLOCK_TYPES: ReadonlySet<string> = new Set(['toolkit_skill', 'toolkit_tool', 'toolkit_value']);
+
 const TOOLKIT_GROUP_TYPES = [
   'thinking_intentions',
   'toolkit_skill',
