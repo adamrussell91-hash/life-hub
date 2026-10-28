@@ -22,17 +22,18 @@ const ctx = (status: SprintStatus, key: 'decide' | 'prototype' = 'decide'): Form
 });
 
 describe('decide form', () => {
-  it('keeps each set folded until opened, then one vote per criterion moves between ideas', () => {
+  it('shows every set at once, then one vote per criterion moves between ideas', () => {
     const f = mountDecide(ctx(base()));
-    const sets = f.el.querySelectorAll<HTMLDetailsElement>('.sprint-set');
-    expect(sets).toHaveLength(2);
-    expect(f.el.querySelectorAll('.sprint-vote')).toHaveLength(0);
-    sets.forEach((s) => { s.open = true; s.dispatchEvent(new Event('toggle')); });
+    expect(f.el.querySelectorAll('.sprint-set')).toHaveLength(2);
+    expect(f.el.querySelector('.sd-purpose')?.textContent).toContain('best bits of the best ideas');
     const chips = [...f.el.querySelectorAll<HTMLButtonElement>('.sprint-vote')].filter((b) => b.dataset.criterion === 'c1');
     chips[0]!.click();
     chips[2]!.click();
     expect(chips.map((c) => c.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
     expect(f.el.textContent).not.toMatch(/Ann|AB/);
+    // The second step lists the ideas again and says which one was picked for each criterion.
+    expect(f.el.querySelectorAll('.sd-review__idea').length).toBeGreaterThan(0);
+    expect(f.el.querySelector('.sd-reason__pick')?.textContent).toContain('You picked');
   });
 
   it('says votes are saved while the group’s idea is still being chosen', () => {
@@ -56,7 +57,6 @@ describe('decide: stand-out dots and parts', () => {
   it('places up to the Kit’s dots on parts of any idea, with an optional note, and checks they are all placed', () => {
     const c = ctx(base({ dots: 2 }));
     const f = mountDecide(c);
-    f.el.querySelectorAll<HTMLDetailsElement>('.sprint-set').forEach((s) => { s.open = true; s.dispatchEvent(new Event('toggle')); });
     const dots = () => [...f.el.querySelectorAll<HTMLButtonElement>('.sd-dot')];
     expect(dots()).toHaveLength(9);
     expect(f.el.querySelector('.sd-counter')?.textContent).toBe('Stand-out dots: 0 of 2 placed.');
