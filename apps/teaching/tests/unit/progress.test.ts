@@ -96,7 +96,22 @@ describe('unitProgressLessons', () => {
       { id: 'b', title: 'B', role: 'support', assessment: false },
       { id: 'c', title: 'C', role: 'core', assessment: true }
     ]);
-  });  it('runs across every active unit in order, each lesson once, tagged with its unit', () => {
+  });
+
+  it('orders lessons by set date across units, undated lessons last in unit order', () => {
+    const out = unitProgressLessons(
+      [{ title: 'Poetry', lesson_ids: ['p1', 'p2', 'p3'] }, { title: 'Novel', lesson_ids: ['n1', 'n2'] }] as never,
+      ['p1', 'p2', 'p3', 'n1', 'n2'].map((id) => ({ id, title: id })),
+      [
+        { lesson_id: 'p1', date: '2026-10-20' },
+        { lesson_id: 'p2', date: '2026-10-06' },
+        { lesson_id: 'n2', date: '2026-10-13' }
+      ] as never
+    );
+    expect(out.map((l) => l.id)).toEqual(['p2', 'n2', 'p1', 'p3', 'n1']);
+  });
+
+  it('runs across every active unit in order, each lesson once, tagged with its unit', () => {
     const out = unitProgressLessons(
       [{ title: 'Poetry', lesson_ids: ['a', 'b'] }, { title: 'Novel', lesson_ids: ['b', 'q'] }] as never,
       [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'q', title: 'Quiz', pedagogical_mode: 'quiz' }],
