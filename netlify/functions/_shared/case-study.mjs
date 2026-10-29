@@ -48,8 +48,7 @@ export function casePublishProblems(draft) {
   if (!clean(c.outcome?.text)) problems.push('Write what actually happened (the outcome).');
   else if (!clean(c.outcome.source)) problems.push('Add the source for the outcome.');
   const t = c.transfer;
-  if (!clean(t?.title) || !list(t?.docs).length || !clean(t?.question)) problems.push('Add a transfer case with a title, a document and a question.');
-  if (c.pace === 'own' && list(c.objections).filter((o) => clean(o)).length === 0) problems.push('Own pace needs at least one objection for the Outcome.');
+  if (!c.rules_off && (!clean(t?.title) || !list(t?.docs).length || !clean(t?.question))) problems.push('Add a transfer case with a title, a document and a question.');
   return problems;
 }
 
@@ -59,7 +58,7 @@ export function prepareCasePublish(draft) {
   const parsed = problems.length === 0 ? CaseSettingsSchema.safeParse(draft.case) : null;
   if (parsed && !parsed.success) problems.push('The case has a field that is too long or missing. Check each document and option.');
   if (problems.length > 0) return { snapshot: null, config: null, problems };
-  const c = parsed.data;
+  const c = { ...parsed.data, objections: parsed.data.objections.filter((o) => clean(o)) };
   return {
     problems,
     snapshot: {
@@ -69,7 +68,9 @@ export function prepareCasePublish(draft) {
       release: c.release,
       decision: c.decision,
       part_titles: c.parts.map((p) => p.title),
-      has_objections: c.objections.length > 0,
+      has_objections: c.pace === 'own' && c.objections.length > 0,
+      ...(c.reflection ? { reflection: c.reflection } : {}),
+      ...(c.rules_off ? { rules_off: true } : {}),
       ...(c.help ? { help: c.help } : {})
     },
     config: { ...c, version: Date.now().toString(36) }
@@ -83,13 +84,15 @@ export async function storeCaseConfig(store, lessonId, config) {
 // ---------------------------------------------------------------- shared rules
 
 const stagesDone = (work) => list(work.stage_done);
+/** The last station a case runs to: Outcome when the teacher has turned Rules off, else Rules. */
+const lastStation = (config) => (config.rules_off ? 3 : 4);
 
 /** Own pace: stations open = those the student has moved past, plus the next. */
 function openToFor(config, state, work) {
-  if (config.pace === 'teacher') return Math.max(0, Math.min(4, Number(state.open_to) || 0));
+  if (config.pace === 'teacher') return Math.max(0, Math.min(lastStation(config), Number(state.open_to) || 0));
   const done = stagesDone(work);
   let n = 0;
-  while (n < 4 && done.includes(CASE_STATIONS[n])) n += 1;
+  while (n < lastStation(config) && done.includes(CASE_STATIONS[n])) n += 1;
   return n;
 }
 
@@ -112,7 +115,8 @@ function doneStations(config, work, partsOpen) {
   if (partsOpen >= parts.length && (!layered || parts.every((p) => questionAnswered(config, work, p)))) done.push('case');
   if (work.decision) done.push('decide');
   const needsObjection = config.pace === 'own' && list(config.objections).length > 0;
-  if (work.reflection && (!needsObjection || work.objection)) done.push('outcome');
+  const needsReflection = !config.reflection?.off;
+  if ((!needsReflection || work.reflection) && (!needsObjection || work.objection)) done.push('outcome');
   if (work.rule && work.transfer) done.push('rules');
   return done;
 }
@@ -252,7 +256,7 @@ export async function caseAction(store, lessonId, body) {
 
   if (action === 'advance') {
     if (config.pace === 'teacher') reject(409, 'teacher_pace', 'Your teacher moves the class on.');
-    if (openTo >= 4) return view();
+    if (openTo >= lastStation(config)) return view();
     const current = CASE_STATIONS[openTo];
     if (!doneStations(config, work, partsOpen).includes(current)) reject(409, 'not_done', 'Finish this step first.');
     work.stage_done = [...stagesDone(work), current];
@@ -317,11 +321,13 @@ export async function caseAction(store, lessonId, body) {
     work.objection = { index: body.index, answer };
   } else if (body.kind === 'reflection') {
     lockedOnly('Lock your decision first.');
+    if (config.reflection?.off) reject(409, 'not_open', 'Your teacher has turned this question off.');
     const text = clean(body.text);
     if (!text) reject(400, 'empty', 'Write your reflection.');
     work.reflection = text;
   } else {
     // rule and transfer: only once the Outcome has shown, since the transfer case is behind it.
+    if (config.rules_off) reject(409, 'not_open', 'Your teacher has turned the rules step off.');
     if (!outcomeVisible(config, state, work, openTo) || heldUntil(config)) reject(409, 'not_open', 'That isn’t open yet.');
     if (body.kind === 'rule') {
       const rule = { when: clean(body.when), then: clean(body.then), unless: clean(body.unless) };
@@ -368,7 +374,8 @@ async function board(store, lessonId, draft, config, state) {
   const cites = new Map();
   for (const w of await allWork(store, lessonId)) for (const doc of new Set(list(w.evidence).map((e) => e.doc_id))) cites.set(doc, (cites.get(doc) ?? 0) + 1);
   return {
-    open_to: Math.max(0, Math.min(4, Number(state.open_to) || 0)),
+    open_to: Math.max(0, Math.min(lastStation(config), Number(state.open_to) || 0)),
+    last: lastStation(config),
     parts_open: partsOpenFor({ ...config, pace: 'teacher' }, state, {}),
     parts_total: list(config.parts).length,
     outcome_revealed: !!state.outcome_revealed,
@@ -395,7 +402,7 @@ export async function caseTeacherAction(store, lessonId, body) {
     await store.setJSON(k.state, state);
   };
   if (action === 'open') {
-    if (!Number.isInteger(body.station) || body.station < 0 || body.station > 4) reject(400, 'bad_station', 'Pick a station from 0 to 4.');
+    if (!Number.isInteger(body.station) || body.station < 0 || body.station > lastStation(config)) reject(400, 'bad_station', `Pick a station from 0 to ${lastStation(config)}.`);
     if (body.station < state.open_to) reject(409, 'cannot_close', 'A station can’t be closed once it’s open.');
     await write({ open_to: body.station });
   }

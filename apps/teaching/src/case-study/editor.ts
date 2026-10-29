@@ -1,6 +1,6 @@
 import type { Lesson } from '@/schemas/lesson';
 import { button, el, labelled } from '@/quiz/dom';
-import { CASE_DOC_KINDS, CASE_DOC_LABELS, CASE_OUTCOMES, type CaseDoc, type CaseOutcomeKey, type CaseSettings } from './schema';
+import { CASE_DOC_KINDS, CASE_DOC_LABELS, CASE_OUTCOMES, CASE_REFLECTION_DEFAULT, type CaseDoc, type CaseOutcomeKey, type CaseSettings } from './schema';
 import { newDoc, newOption, newPart, publishChecklist, seedCase, type ChecklistItem } from './model';
 import { createCaseTabs, type CaseTab } from './editor-tabs';
 import './editor.css';
@@ -169,7 +169,7 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
 
     const run = card('Running it', 'A support, extension or optional lesson starts with the setting that suits it. Change any of it.');
     run.append(
-      labelled('Pace', seg(PACE_LABELS, c.pace, 'Pace', (v) => put((d) => { d.pace = v; if (v === 'own' && d.objections.length === 0) d.objections = ['']; }, true))),
+      labelled('Pace', seg(PACE_LABELS, c.pace, 'Pace', (v) => put((d) => { d.pace = v; }, true))),
       labelled('Support level', seg(SUPPORT_LABELS, c.support, 'Support level', (v) => put((d) => { d.support = v; }, true)), 'Guided adds sentence frames and 2 to 4 options. Open swaps the options for a free-text decision.'),
       labelled('Release the case', seg(RELEASE_LABELS, c.release, 'Release', (v) => put((d) => { d.release = v; }, true)))
     );
@@ -272,20 +272,33 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
     }
     wrap.append(box);
     if (c.pace === 'own') {
-      const obj = card('Strongest objections', 'Students answer one before the Outcome opens. Write 1 to 3.');
+      const prompt = c.decision?.prompt.trim();
+      const obj = card('Push back on their decision (optional)', 'After a student locks in their answer to the decision, they pick one of these challenges and argue back before the Outcome opens. Write the case against the choice most students will make. Leave it empty to skip this step.');
+      if (prompt) obj.append(note(`The decision: ${prompt}`));
       c.objections.forEach((text0, i) => {
         const row = el('div', 'cse-obj');
-        row.append(area(text0, 300, `Objection ${i + 1}`, (v) => put((d) => { d.objections[i] = v; }), 2), tool('✕', `Remove objection ${i + 1}`, () => put((d) => { d.objections.splice(i, 1); }, true), c.objections.length <= 1));
+        row.append(area(text0, 300, `Challenge ${i + 1}`, (v) => put((d) => { d.objections[i] = v; }), 2), tool('✕', `Remove challenge ${i + 1}`, () => put((d) => { d.objections.splice(i, 1); }, true)));
         obj.append(row);
       });
-      if (c.objections.length < 3) obj.append(button('Add an objection', 'secondary', () => put((d) => { d.objections.push(''); }, true)));
+      if (c.objections.length < 3) obj.append(button(c.objections.length ? 'Add a challenge' : 'Add a challenge to their decision', 'secondary', () => put((d) => { d.objections.push(''); }, true)));
       wrap.append(obj);
     }
+    const r = c.reflection ?? { question: '', off: false };
+    const ask = card('Question after the Outcome', 'Students answer this once they have seen what happened.');
+    ask.append(labelled('Ask students', seg<'on' | 'off'>([['on', 'On'], ['off', 'Off']], r.off ? 'off' : 'on', 'Ask a question after the Outcome', (v) => put((d) => { d.reflection = { question: '', ...d.reflection, off: v === 'off' }; }, true))));
+    if (!r.off) {
+      const q = area(r.question, 300, 'Question after the Outcome', (v) => put((d) => { d.reflection = { off: false, ...d.reflection, question: v }; }), 2);
+      q.placeholder = CASE_REFLECTION_DEFAULT;
+      ask.append(labelled('The question', q, 'Leave it blank to use the wording shown.'));
+    }
+    wrap.append(ask);
     return wrap;
   }
 
   function rulesPanel(c: CaseSettings): HTMLElement {
-    const box = card('Rules · the unseen case', 'A second short case with the same structure and a different surface. Students apply their rule of thumb to it.');
+    const box = card('Rules · the unseen case', 'Optional last step. After the Outcome, students write a rule of thumb (when, then, unless), then try it on a second short case with the same structure and a different surface.');
+    box.append(labelled('Include this step', seg<'on' | 'off'>([['on', 'On'], ['off', 'Off']], c.rules_off ? 'off' : 'on', 'Include the Rules step', (v) => put((d) => { d.rules_off = v === 'off'; }, true)), 'Turn it off and the case ends at the Outcome.'));
+    if (c.rules_off) return box;
     const t = c.transfer ?? { title: '', docs: [], question: '' };
     const set = (change: (tr: NonNullable<CaseSettings['transfer']>) => void, repaint = false) => put((d) => { d.transfer = { title: '', docs: [], question: '', ...d.transfer }; change(d.transfer); }, repaint);
     box.append(labelled('Title', text(t.title, 120, 'Unseen case title', (v) => set((tr) => { tr.title = v; }))));
