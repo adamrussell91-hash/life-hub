@@ -40,8 +40,13 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
   let state = lastState.get(endpoint) ?? null;
   let busy = false;
   let painted = '';
-  const clock = el('p', 'hq-clock block-secondary');
+  // A countdown above the answers when the round has a time limit.
+  const clock = el('div', 'hq-timer');
+  clock.setAttribute('role', 'timer');
   clock.setAttribute('aria-live', 'off');
+  const clockTime = el('span', 'hq-timer__time');
+  const clockText = el('span', 'hq-timer__text block-secondary');
+  clock.append(clockTime, clockText);
   const ticker = window.setInterval(() => {
     if (!root.isConnected) return window.clearInterval(ticker);
     paintClock();
@@ -73,7 +78,10 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
   function paintClock(): void {
     if (!state || state.phase !== 'live' || !state.open) return;
     const left = secondsLeft(state.closes_at);
-    clock.textContent = left === null ? 'You can change your answer until your teacher closes it.' : `${formatSeconds(left)} left. You can change your answer until then.`;
+    clockTime.hidden = left === null;
+    clockTime.textContent = left === null ? '' : formatSeconds(left);
+    clockText.textContent = left === null ? 'You can change your answer until your teacher closes it.' : 'left to answer. You can change your answer until then.';
+    clock.classList.toggle('is-ending', left !== null && left <= 10);
     if (left === 0 && !busy) void send('status');
   }
 
@@ -140,8 +148,9 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
     if (sig === painted) return paintClock();
     painted = sig;
     if (promptEl) promptEl.textContent = s.question?.prompt ?? (block.content.prompt.trim() || 'Choose one answer.');
-    const parts: HTMLElement[] = [choices(s)];
+    const parts: HTMLElement[] = [];
     if (s.open) parts.push(clock);
+    parts.push(choices(s));
     if (!token) parts.push(el('p', 'pf-alert', 'This browser won’t save anything, so you can’t answer here. Try a normal (not private) window.'));
     const v = verdict(s);
     if (v) parts.push(v);

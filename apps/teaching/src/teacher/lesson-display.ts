@@ -126,6 +126,7 @@ export function mountLessonDisplayView(
         row.append(
           renderBlock(block, 'teacher', {
             lessonId: lesson.lesson_id,
+            display: true,
             pageBlocks: lesson.blocks,
             attachedOutcomes: outcomes
           })
