@@ -81,6 +81,7 @@
 .cbd-pill:empty { display: none; }
 .cbd-pill--in { background: #dfe9e1; color: #3c5949; }
 .cbd-rule { margin: 0; font-size: 0.875rem; }
+.cbd-clear { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8125rem; padding: 6px 0; border-top: 1px solid var(--line, rgba(23, 55, 94, 0.1)); }
 @media (max-width: 640px) {
   .cbd-prow { grid-template-columns: 1fr 1fr; }
 }

@@ -144,6 +144,22 @@ export function mountCaseBoard(o: { api: CaseTeacherApi; getLesson?: () => Lesso
     return box;
   }
 
+  function clearing(b: CaseBoard): HTMLElement {
+    const box = el('div', 'cbd-card');
+    const started = b.students.filter((s) => s.started);
+    box.append(el('h3', '', 'Clear a student’s work'), el('p', 'cbd-lead', 'Deletes everything they saved here, so they start again from the Brief.'));
+    if (!started.length) box.append(el('p', 'cbd-lead', 'Nobody has started yet.'));
+    for (const s of started) {
+      const row = el('div', 'cbd-clear');
+      row.append(el('b', '', `${s.initials} · ${s.name}`), button('Clear work', 'ghost', () => {
+        if (!window.confirm(`Clear all of ${s.name}’s work in this case? Their first take, answers, evidence, decision and rule are deleted. This can’t be undone.`)) return;
+        void run(o.api.clearStudent(s.id));
+      }));
+      box.append(row);
+    }
+    return box;
+  }
+
   function paint(): void {
     if (!board) return;
     const b = board;
@@ -153,6 +169,7 @@ export function mountCaseBoard(o: { api: CaseTeacherApi; getLesson?: () => Lesso
       spread(b),
       heat(b),
       rules(b),
+      clearing(b),
       error
     );
     root.querySelectorAll('button').forEach((x) => { if (busy) (x as HTMLButtonElement).disabled = true; });

@@ -338,7 +338,7 @@ export async function caseAction(store, lessonId, body) {
 
 // ---------------------------------------------------------------- teacher
 
-const TEACHER_ACTIONS = ['board', 'open', 'release_part', 'reveal'];
+const TEACHER_ACTIONS = ['board', 'open', 'release_part', 'reveal', 'clear_student'];
 
 async function board(store, lessonId, draft, config, state) {
   // A case with no class set reaches students through any class link: read the class from their own work.
@@ -355,6 +355,7 @@ async function board(store, lessonId, draft, config, state) {
       id: s.id,
       initials: s.initials,
       name: s.name,
+      started: Object.keys(work).length > 0,
       at: Math.max(activity, config.pace === 'own' ? openToFor(config, state, work) : 0),
       locked: d ? { ...(d.option_id ? { option_id: d.option_id } : { text: d.text }), confidence: d.confidence, changed } : null,
       cited: list(work.evidence).length,
@@ -405,6 +406,15 @@ export async function caseTeacherAction(store, lessonId, body) {
   if (action === 'reveal') {
     if (state.open_to < 3) reject(409, 'not_open', 'Open the Outcome station first.');
     await write({ outcome_revealed: true });
+  }
+  // One student's work, gone for good: they start the case again from the Brief.
+  if (action === 'clear_student') {
+    const studentId = String(body.student_id ?? '');
+    if (!isSafeId(studentId)) reject(400, 'bad_request', 'Unknown student.');
+    const found = await listBlobKeys(store, k.workAll);
+    const mine = (await Promise.all(found.map(async (key) => ((await read(store, key))?.student_id === studentId ? key : null)))).filter(Boolean);
+    if (!mine.length) reject(404, 'not_found', 'That student has no work to clear.');
+    await Promise.all(mine.map((key) => store.delete(key)));
   }
   return board(store, lessonId, draft, config, state);
 }
