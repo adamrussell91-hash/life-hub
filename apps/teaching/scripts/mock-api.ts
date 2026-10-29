@@ -122,6 +122,8 @@ import { createPublishedQuadrantHandler } from '../../../netlify/functions/publi
 import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
 import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
 import { createTextToolsHandler } from '../../../netlify/functions/teaching-text-tools.mjs';
+import { createMorphemicHandler } from '../../../netlify/functions/teaching-morphemic.mjs';
+import { createPublishedMorphemicHandler } from '../../../netlify/functions/published-morphemic.mjs';
 import { runTextToolJob } from '../../../netlify/functions/_shared/text-tools.mjs';
 import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
 import { createContinuumHandler } from '../../../netlify/functions/continuum-line.mjs';
@@ -3673,6 +3675,39 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     });
   }
 
+  /** Offline stand-in for the morphemic matrix build: the critic matrix for any critic- word, none otherwise. */
+  async function mockMorphemic(args: { messages: Array<{ content: string }> }): Promise<string> {
+    const word = String(args.messages[0]?.content ?? '').replace(/<\/?word>/g, '');
+    if (!/critic/.test(word)) return JSON.stringify({ head_word: word, has_matrix: false });
+    const w = (entry: string, prefix_1: string, prefix_2: string, suffix: string, definition: string, example: string) => ({ word: entry, prefix_1, prefix_2, suffix, definition, example });
+    return JSON.stringify({
+      head_word: word.split(' ').find((part) => part.includes('critic')) ?? word,
+      has_matrix: true,
+      base: 'critic',
+      source: 'Greek kritikos',
+      meaning: 'able to judge',
+      words: [
+        w('critic', '', '', '', 'A person who judges the good and bad qualities of something.', 'The film critic praised the ending.'),
+        w('critics', '', '', '-s', 'More than one critic.', 'Some critics found the narrator unreliable.'),
+        w('critical', '', '', '-al', 'Judging carefully, often pointing out faults.', 'Ono becomes more critical of his past.'),
+        w('critically', '', '', '-ally', 'In a careful, judging way.', 'Read the propaganda critically.'),
+        w('criticise', '', '', '-ise', 'To point out what is wrong with something.', 'His students begin to criticise him.'),
+        w('criticism', '', '', '-ism', 'A judgement, often pointing out faults.', 'Ono avoids any criticism of his own role.'),
+        w('uncritical', 'un-', '', '-al', 'Accepting something without questioning it.', 'His early followers were uncritical.'),
+        w('uncritically', 'un-', '', '-ally', 'Without questioning.', 'He uncritically repeated the slogans.'),
+        w('hypercritical', '', 'hyper-', '-al', 'Too quick to find fault.', 'She was hypercritical of every draft.'),
+        w('criticalise', '', '', '-alise', 'Invented to show the dictionary check.', 'Never shown.')
+      ]
+    });
+  }
+
+  function mockKickMorphemic(_request: Request, _path: string, key: string): Promise<boolean> {
+    setTimeout(() => {
+      void runTextToolJob({ store: functionBlobStore(), env: { ANTHROPIC_API_KEY: 'mock' }, key, completeMessage: mockMorphemic });
+    }, 3000);
+    return Promise.resolve(true);
+  }
+
   function mockKickTextTool(_request: Request, _path: string, key: string): Promise<boolean> {
     setTimeout(() => {
       void runTextToolJob({ store: functionBlobStore(), env: { ANTHROPIC_API_KEY: 'mock' }, key, completeMessage: mockHingeBackup });
@@ -3693,7 +3728,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
     const path = pathWithQuery.split('?')[0]!;
-    const handler = /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
+    const handler = path.startsWith('/api/morphemic')
+      ? createMorphemicHandler({ ...deps, kickTextToolRun: mockKickMorphemic })
+      : path.startsWith('/api/published/morphemic/')
+        ? createPublishedMorphemicHandler({ ...deps, kickTextToolRun: mockKickMorphemic })
+      : /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
       ? createHingeHandler({ ...deps, kickTextToolRun: mockKickTextTool })
       : path.startsWith('/api/text-tools/')
         ? createTextToolsHandler(deps)
@@ -3852,6 +3891,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
       (method === 'GET' && /^\/api\/text-tools\/[a-f0-9]{64}$/.test(path)) ||
+      path === '/api/morphemic' ||
+      path.startsWith('/api/morphemic/') ||
+      path.startsWith('/api/published/morphemic/') ||
       /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/(continuum|peer-feedback)\/[^/]+$/.test(path) ||
       /^\/api\/published\/(continuum|peer-feedback)\/[^/]+\/[^/]+$/.test(path)

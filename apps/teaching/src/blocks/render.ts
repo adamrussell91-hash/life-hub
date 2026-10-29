@@ -36,6 +36,7 @@ import { buildAnnotationView } from '@/blocks/annotation-view';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { applyWordHelp, readWordHelp, wordsPresentIn, type OpenWord } from '@/blocks/word-help';
 import { createWordTray } from '@/blocks/word-tray';
+import { loadMatrix } from '@/blocks/morphemic-client';
 import { createStudentWordHelpBar } from '@/blocks/word-help-bar';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -199,7 +200,10 @@ export function renderRichTextBlock(
         // A scanned word the text no longer holds drops off the strip; typed-in words always stay.
         pinned: preScanned.filter(
           (entry) => entry.added || (entry.pinned && wordsPresentIn(body.textContent ?? '', [entry]).length > 0)
-        )
+        ),
+        // Students reach the library through the published lesson; the teacher's own view asks directly.
+        loadMatrix: (word) =>
+          loadMatrix(word, mode === 'student' ? { kind: 'student', lessonId: ctx.lessonId!, blockId: block.id } : { kind: 'teacher' })
       })
     : null;
   const openWord: OpenWord | undefined = tray ? (anchor, entry) => tray.open(entry, anchor) : undefined;

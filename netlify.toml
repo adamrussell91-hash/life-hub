@@ -12,7 +12,7 @@
 [functions]
 directory = "netlify/functions"
 node_bundler = "esbuild"
-external_node_modules = ["@netlify/blobs", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"]
+external_node_modules = ["@netlify/blobs", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner", "dictionary-en-au", "nspell"]
 included_files = [
   "config/chadwick-protocol.md",
   "config/hyaluronica-protocol.md",
