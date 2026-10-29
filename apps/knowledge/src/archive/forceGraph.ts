@@ -99,6 +99,12 @@ export type ForceGraphOptions = {
   variant: ForceGraphVariant;
   search: string;
   excerptFor: (pageId: string) => string;
+  /** Show All only: the dock tools to offer (all of them when left out). */
+  tools?: readonly DockTool[];
+  /** Show All only: a fixed theme, instead of the one remembered for the Knowledge Hub. */
+  theme?: ShowAllTheme;
+  /** Show All only: how far past the overview (×) topic names and every note name appear. A small map can name more sooner. */
+  labelZoom?: { topics: number; notes: number };
 };
 
 function curve(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
@@ -276,7 +282,7 @@ export function mountForceGraph(
     overviewView = fitted;
   }
   let zoneLabelBoxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
-  let theme: ShowAllTheme = readShowAllTheme();
+  let theme: ShowAllTheme = options.theme ?? readShowAllTheme();
   let relaxToken = 0;
   let disposed = false;
   let growing = false;
@@ -887,7 +893,8 @@ export function mountForceGraph(
     const halo = dark ? "rgba(3, 5, 10, 0.85)" : "rgba(247, 243, 234, 0.9)";
     // Words stay out of the overview. Topic names appear only once you zoom in (or for the topic
     // you are hovering or have selected), and then only where they do not collide (C1).
-    const zoomedIn = overviewK > 0 && view.k >= overviewK * 1.7;
+    const labelZoom = options.labelZoom ?? { topics: 1.7, notes: 8 };
+    const zoomedIn = (overviewK > 0 ? view.k / overviewK : 1) >= labelZoom.topics;
     const zones = simNodes.filter(
       node =>
         node.kind === "major" &&
@@ -931,7 +938,7 @@ export function mountForceGraph(
       if (!selectable(node) || tool === "grow") continue;
       const pinned = node === hover || pathPicks.includes(node.id) || (Boolean(selected) && node.label === selected);
       const knot = (node.degree ?? 0) >= 7 && zoom >= 3.5;
-      if (pinned || knot || zoom >= 8) wanted.push({ node, pinned });
+      if (pinned || knot || zoom >= labelZoom.notes) wanted.push({ node, pinned });
     }
     wanted.sort((x, y) => Number(y.pinned) - Number(x.pinned) || (y.node.degree ?? 0) - (x.node.degree ?? 0) || x.node.id.localeCompare(y.node.id));
     // Topic names were placed first; note names keep clear of them.
@@ -1258,7 +1265,7 @@ export function mountForceGraph(
     ctx.restore();
   }
 
-  const dock: Dock | null = showAllMode ? createDock(host, chooseTool) : null;
+  const dock: Dock | null = showAllMode ? createDock(host, chooseTool, options.tools) : null;
   // Atlas-style ± / Fit. Wheel and pinch stay the fine control; buttons step like shelf Atlas.
   const zoomMin = 0.04;
   const zoomMax = 24;
@@ -2313,7 +2320,7 @@ export function mountForceGraph(
       clearTool();
       return;
     }
-    if ((event.target as HTMLElement | null)?.closest("input, select, textarea, button")) return;
+    if ((event.target as HTMLElement | null)?.closest("input, select, textarea, button, [contenteditable]")) return;
     if (event.key !== "Enter" || !canOpenSelected()) return;
     const note = resolveEnterKey(selected, simNodes, options.excerptFor);
     if (note) onNoteSelect(note);

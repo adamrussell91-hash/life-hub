@@ -66,10 +66,10 @@ export function layoutShowAll(
   layoutNeural(nodes, links, { spread: shape.spread, fan: 0.6 + shape.lean * 0.67 });
 }
 
-function buildHubs(counts: Map<string, number>): GraphNodeDatum[] {
+function buildHubs(counts: Map<string, number>, colorFor: (label: string) => HubPalette = colorForHub): GraphNodeDatum[] {
   const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return ordered.map(([label, count]) => {
-    const palette = colorForHub(label);
+    const palette = colorFor(label);
     return {
       id: `major:${label}`,
       kind: "major" as const,
@@ -83,20 +83,30 @@ function buildHubs(counts: Map<string, number>): GraphNodeDatum[] {
   });
 }
 
+type HubPalette = { fill: string; soft: string; ink: string };
+
+/** Lets another hub (Teaching's anthology) bring its own hub labels and colours to the same map. */
+export type ShowAllCustomHubs = {
+  labelsFor: (entry: PageManifestEntry) => string[];
+  colorFor?: (label: string) => HubPalette;
+};
+
 export function buildShowAllGraph(
   entries: PageManifestEntry[],
   grouping: ShowAllGrouping = "tags",
+  custom?: ShowAllCustomHubs,
 ): ArchiveGraphModel {
-  const eligible = filterShowAllEntries(entries, grouping);
+  const labelsOf = custom ? custom.labelsFor : (entry: PageManifestEntry) => hubLabelsFor(entry, grouping);
+  const eligible = custom ? entries.filter(entry => custom.labelsFor(entry).length > 0) : filterShowAllEntries(entries, grouping);
   const counts = new Map<string, number>();
-  const labelsByEntry = eligible.map(entry => hubLabelsFor(entry, grouping));
+  const labelsByEntry = eligible.map(labelsOf);
   for (const labels of labelsByEntry) {
     for (const label of new Set(labels)) {
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
   }
 
-  const hubNodes = buildHubs(counts);
+  const hubNodes = buildHubs(counts, custom?.colorFor);
   const hubTies = showAllHubTies(labelsByEntry, new Set(counts.keys()));
   const hubByLabel = new Map(hubNodes.map(node => [node.label, node]));
   const nodes: GraphNodeDatum[] = [...hubNodes];

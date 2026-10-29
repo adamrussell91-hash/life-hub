@@ -8,6 +8,8 @@ export type AnthologyItem = {
   block_id: string;
   annotation_id: string;
   quote: string;
+  /** The note itself, as plain text. */
+  note: string;
   line_number: number;
   layer_name: string;
   technique_id?: string;
@@ -130,6 +132,7 @@ export function collectAnthology(
           block_id: block.id,
           annotation_id: ann.id,
           quote: ann.anchor.quote.exact,
+          note: annotationNotePlain(ann.body?.html ?? ''),
           line_number: lineId ? (numbers.get(lineId) ?? 0) : 0,
           layer_name: layer.name,
           technique_id: ann.technique?.id,

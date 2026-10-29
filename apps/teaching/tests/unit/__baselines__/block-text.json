@@ -750,21 +750,11 @@
     "No items."
   ],
   "every-block/every_anthology/student": [
-    "By technique",
-    "By text",
-    "By theme",
-    "Connections",
-    "Make cards from this view",
-    "Notes from this unit’s lessons will gather here.",
+    "Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.",
     "anthology.title filler"
   ],
   "every-block/every_anthology/teacher": [
-    "By technique",
-    "By text",
-    "By theme",
-    "Connections",
-    "Make cards from this view",
-    "Tick Add to unit anthology on a note in any lesson of this unit.",
+    "Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.",
     "anthology.title filler"
   ],
   "every-block/every_outcomes/student": [
