@@ -247,3 +247,21 @@ describe('retiring the old toolkit cards', () => {
     expect(clarity().read(blocks[1]!)).toBeTruthy();
   });
 });
+
+describe('lens setup inside a composition', () => {
+  it('keeps the columns editor open while a nested block picks a lens', async () => {
+    const { createBlockEditor } = await import('@/blocks/editors');
+    const cols = createBlock('columns', 'cols');
+    if (cols.block_type !== 'columns') throw Error('wrong block');
+    cols.content.columns[0]!.blocks = [createBlock('rich_text', 'rt')];
+    let current: Block = cols;
+    const editor = createBlockEditor(current, (next) => { current = next; }, () => current);
+    document.body.append(editor);
+    [...editor.querySelectorAll('button')].find((b) => b.textContent === 'Add lens…')!.click();
+    const setup = [...editor.querySelectorAll<HTMLElement>('.kaplan-setup')].find((panel) => !panel.hidden)!;
+    expect(setup).toBeTruthy();
+    for (let node: HTMLElement | null = setup; node && node !== editor; node = node.parentElement) {
+      expect(node.hidden, node.className).toBe(false);
+    }
+  });
+});
