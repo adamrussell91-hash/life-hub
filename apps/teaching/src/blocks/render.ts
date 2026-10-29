@@ -91,6 +91,8 @@ export type UnitNetworkContext = {
 export type RenderContext = {
   /** In the lecture player: `live` for students, `preview` for the teacher's Play as student. */
   lecture?: 'live' | 'preview';
+  /** The Display view: the teacher's controls on a screen the class can see. */
+  display?: boolean;
   lessonId?: string;
   /** The class a student is viewing the lesson in, for blocks that record against the class (Done). */
   classId?: string;

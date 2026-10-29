@@ -461,3 +461,35 @@
 .hq-editor__backup > summary {
   cursor: pointer;
 }
+
+/* ── Timers: the student's countdown and the Display view's clock ───── */
+.hq-timer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.hq-timer__time {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hq-timer.is-ending {
+  border-color: var(--warning);
+  background: var(--warning-surface);
+}
+
+.hq-clock--display {
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.hq-clock--display.is-ending {
+  color: var(--warning);
+}
