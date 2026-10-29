@@ -1,7 +1,49 @@
-// Complete Notion source snapshot, retrieved 08/10/26. Preserve source wording and unset fields.
-// All 52 active tracker pages were fetched; only Syzygy and Encre Noire have page bodies.
+// Complete Notion source snapshot, retrieved 08/10/26; Syzygy and Orchard Rain refreshed 29/10/26.
+// Preserve source wording and unset fields.
+// All 53 active tracker pages were fetched; only Syzygy, Encre Noire and Orchard Rain have page bodies.
 // Images and covers are unset on every source record. Dates and URLs remain in source form.
 export const SOURCE_FRAGRANCES = [
+  {
+    "id": "408f794f8476818a836fe2fc3a7c04e1",
+    "properties": {
+      "Added": "2026-10-29T11:18:39.905Z",
+      "Base Notes": [
+        "Musk",
+        "Amber"
+      ],
+      "Brand": "Feily",
+      "Fragrance": "Orchard Rain",
+      "Occasion": [
+        "Casual"
+      ],
+      "Parfumo URL": "https://feily.shop",
+      "Perfumer": "",
+      "Review": "Fresh, fruity and rainy. Inspired by chilled Asian pear after rain: crisp, juicy and clean. Opens with snow pear, nashi pear, peach, mandarin and lychee, a watery fruitiness rather than sugary sweetness. Lily petals, orchid and plum blossom add a soft floral layer before it settles into sheer musk, pale woods, petrichor and amber, with a subtle rain-soaked finish.",
+      "Season": [
+        "Spring",
+        "Summer"
+      ],
+      "Status": "Owned",
+      "Time of Day": [
+        "Day"
+      ],
+      "Top Notes": [
+        "Pear",
+        "Peach",
+        "Mandarin"
+      ],
+      "date:Date Acquired:is_datetime": 0,
+      "date:Date Acquired:start": "2026-10-26",
+      "url": "https://app.notion.com/p/408f794f8476818a836fe2fc3a7c04e1"
+    },
+    "content": "Opening: Snow Pear, Peach, Nashi Pear, Mandarin, Lychee<br>Heart: Lily Petals, Orchid Flower, Plum Blossom<br>Base: Sheer Musk, Pale Wood, Petrichor, Amber",
+    "icon": {
+      "type": "emoji",
+      "emoji": "🧴"
+    },
+    "cover": null,
+    "lastEditedAt": "2026-10-29T11:18:39.905Z"
+  },
   {
     "id": "e1f8e6b5153a43f892d6db25ac624382",
     "properties": {
@@ -652,7 +694,7 @@ export const SOURCE_FRAGRANCES = [
         "Winter"
       ],
       "Size": "100ml",
-      "Status": "Sampling",
+      "Status": "Owned",
       "Time of Day": [
         "Night"
       ],
@@ -661,6 +703,7 @@ export const SOURCE_FRAGRANCES = [
       ],
       "Type": "Parfum",
       "date:Date Acquired:is_datetime": 0,
+      "date:Date Acquired:start": "2026-10-26",
       "url": "https://app.notion.com/p/710963b2010449508c9ae6840c7f74d3"
     },
     "content": "I LOVE the dry down on this",
@@ -669,7 +712,7 @@ export const SOURCE_FRAGRANCES = [
       "emoji": "🧴"
     },
     "cover": null,
-    "lastEditedAt": "2026-07-26T03:29:25.222Z"
+    "lastEditedAt": "2026-10-29T11:18:37.251Z"
   },
   {
     "id": "399f794f8476816283a9de8a7cc6e657",

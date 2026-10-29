@@ -39,6 +39,13 @@ export const FAMILY_LABELS = {
 };
 const MAP_METADATA = [
   {
+    "name": "Orchard Rain",
+    "family": "fresh",
+    "loved": false,
+    "hated": false,
+    "tryAt": null
+  },
+  {
     "name": "Neon",
     "family": "fresh",
     "loved": true,
