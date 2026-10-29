@@ -38,6 +38,12 @@ test('rich text sanitizer strips script and javascript hrefs', () => {
   assert.doesNotMatch(html, /javascript:/i);
 });
 
+test('filterBlocksForStudent keeps With teacher talking points off the student copy', () => {
+  const block = { id: 'w1', type: 'block', block_type: 'with_teacher', variant: 'medium', visibility: 'student_teacher', content: { talking_points: ['Ask about the ending'] } };
+  const [out] = filterBlocksForStudent([{ type: 'block', block_type: 'section', id: 's1', visibility: 'student_teacher', content: { blocks: [block] } }]);
+  assert.deepEqual(out.content.blocks[0].content.talking_points, []);
+});
+
 test('filterBlocksForStudent drops Teacher-style callouts', () => {
   const callout = (id, style) => ({ id, type: 'block', block_type: 'callout', variant: 'medium', visibility: 'student_teacher', content: { style, body: id } });
   const out = filterBlocksForStudent([callout('mine', 'teacher'), callout('theirs', 'important')]);

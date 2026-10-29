@@ -128,6 +128,42 @@ export async function mountHubWhiteboard<B extends WhiteboardBlockLike>(
     return saveChain;
   };
 
+  // Saving is debounced, so closing the tab inside that window would drop the last strokes.
+  const flushOnLeave = () => {
+    if (!host.isConnected) {
+      removeLeaveListeners();
+      return;
+    }
+    const next = pending;
+    if (!next) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    pending = null;
+    void saveWhiteboardDocument(options.getBaseUrl(), block.content.document_id, next, { keepalive: true }).catch(() => {
+      pending = pending ?? next;
+    });
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') flushOnLeave();
+  };
+  const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!host.isConnected) {
+      removeLeaveListeners();
+      return;
+    }
+    if (pending) event.preventDefault();
+  };
+  function removeLeaveListeners() {
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pagehide', flushOnLeave);
+    window.removeEventListener('beforeunload', onBeforeUnload);
+  }
+  if (editable) {
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flushOnLeave);
+    window.addEventListener('beforeunload', onBeforeUnload);
+  }
+
   const queueSave = (next: BoardScene) => {
     pending = next;
     if (saveTimer) clearTimeout(saveTimer);

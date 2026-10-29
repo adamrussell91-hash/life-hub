@@ -39,7 +39,8 @@ export async function loadWhiteboardDocument(
 export async function saveWhiteboardDocument(
   baseUrl: string,
   documentId: string,
-  snapshot: WhiteboardSnapshot
+  snapshot: WhiteboardSnapshot,
+  options: { keepalive?: boolean } = {}
 ): Promise<WhiteboardDocument> {
   const response = await fetch(endpoint(baseUrl, documentId), {
     method: 'PUT',
@@ -48,7 +49,9 @@ export async function saveWhiteboardDocument(
       Accept: 'application/json',
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ snapshot })
+    body: JSON.stringify({ snapshot }),
+    // Lets a save started as the tab closes finish (the browser caps these bodies near 64KB).
+    keepalive: options.keepalive
   });
   return parseResponse<WhiteboardDocument>(response);
 }

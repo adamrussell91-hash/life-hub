@@ -1,7 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { button, el, errorText, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
 import { poller } from '@/blocks/brainstorm/shared';
-import { lineMarks, liveStatements, nearestStop, type ContinuumBlock, type Phase } from './shared';
+import { lineMarks, liveStatements, nearestStop, scaleValueText, type ContinuumBlock, type Phase } from './shared';
 
 type Mine = { pos: number; reason: string; new_pos?: number; why?: string };
 type StatementView = { id: string; phase: Phase; placed: number; mine: Mine | null; class: number[] | null };
@@ -114,7 +114,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'No account and no name. You get a symbol; classmates won’t know which one is yours.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'You join with a symbol of your own. Classmates see the symbol and your name stays private.'));
     const join = button('Join', 'primary', function () {
       void doJoin(this);
     });
@@ -135,7 +135,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
       const candidate = { session: state.session, token: secret };
       if (!writeJSON(`${storage}:device`, candidate)) {
-        showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
+        showError('Open a normal (not private) window to join here.');
         return;
       }
       device = candidate;
@@ -183,13 +183,19 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     box.setAttribute('aria-label', `Your position, from ${block.content.scale.left} to ${block.content.scale.right}`);
     box.setAttribute('aria-valuemin', '0');
     box.setAttribute('aria-valuemax', '100');
+    box.setAttribute('aria-valuetext', 'Choose a place on the line');
     let pos = opts.pos;
+    if (pos != null) {
+      box.setAttribute('aria-valuenow', String(Math.round(pos * 100)));
+      box.setAttribute('aria-valuetext', scaleValueText(block.content.scale, pos));
+    }
     const set = (p: number) => {
       pos = opts.snap ? nearestStop(p, block.content.scale.stops) : Math.round(Math.min(1, Math.max(0, p)) * 1000) / 1000;
       me.hidden = false;
       hint.hidden = true;
       me.style.left = `${pos * 100}%`;
       box.setAttribute('aria-valuenow', String(Math.round(pos * 100)));
+      box.setAttribute('aria-valuetext', scaleValueText(block.content.scale, pos));
       opts.onMove?.(pos);
     };
     const fromPointer = (e: PointerEvent) => {
@@ -215,6 +221,8 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     box.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') step(-1);
       else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') step(1);
+      else if (e.key === 'Home') set(0);
+      else if (e.key === 'End') set(1);
       else return;
       e.preventDefault();
     });
@@ -360,7 +368,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       return wrap;
     }
     if (!sv.mine) {
-      wrap.append(waitPanel('Revealed', 'You didn’t place a symbol on this one. Here’s where the class put theirs.'), line({ symbol, pos: null, snap: st.snap, dots: sv.class ?? [] }), nav());
+      wrap.append(waitPanel('Revealed', 'Here’s where the class put their symbols.'), line({ symbol, pos: null, snap: st.snap, dots: sv.class ?? [] }), nav());
       return wrap;
     }
     if (sv.phase === 'replace' && sv.mine.new_pos == null && !kept.has(sv.id) && s.open) {
@@ -388,7 +396,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
       const candidate = { session: s.session, token: secret };
       if (!writeJSON(`${storage}:device`, candidate)) {
-        showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
+        showError('Open a normal (not private) window to join here.');
         return;
       }
       device = candidate;
@@ -407,7 +415,7 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     }
     if (state.phase === 'idle') {
       paintCorner(undefined);
-      if (view !== 'idle') body.replaceChildren(waitPanel('Your teacher hasn’t started this yet.', 'This page updates by itself.'));
+      if (view !== 'idle') body.replaceChildren(waitPanel('Waiting for your teacher to start.', 'This page updates by itself.'));
       view = 'idle';
       return;
     }

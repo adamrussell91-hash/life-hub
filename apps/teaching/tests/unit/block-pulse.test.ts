@@ -113,12 +113,12 @@ describe('student dots', () => {
     expect(dot.getAttribute('aria-expanded')).toBe('true');
 
     const stuck = host.querySelector<HTMLButtonElement>('.pulse__option[data-option="stuck"]')!;
-    expect(stuck.getAttribute('aria-label')).toBe("I can't get started");
+    expect(stuck.getAttribute('aria-label')).toBe("I need help to get started");
     stuck.click();
     await flush();
     expect(send).toHaveBeenLastCalledWith('lesson_1', { block_id: 'b_q1', option: 'stuck', on: true });
     expect(stuck.getAttribute('aria-pressed')).toBe('true');
-    expect(host.querySelector('.pulse__caption')!.textContent).toBe("Sent: I can't get started");
+    expect(host.querySelector('.pulse__caption')!.textContent).toBe("Sent: I need help to get started");
     expect(host.querySelector('.pulse')!.classList.contains('pulse--used')).toBe(true);
 
     stuck.click();
@@ -147,7 +147,7 @@ describe('student dots', () => {
     confused.click();
     await flush();
     expect(confused.getAttribute('aria-pressed')).toBe('false');
-    expect(host.querySelector('.pulse__caption')!.textContent).toBe("Didn't send. Try again.");
+    expect(host.querySelector('.pulse__caption')!.textContent).toBe("Try sending again.");
   });
 
   it('only one panel is open at a time', () => {

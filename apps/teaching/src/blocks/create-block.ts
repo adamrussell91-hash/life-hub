@@ -251,7 +251,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Visualisation',
-    types: ['chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'curriculum_lines', 'whiteboard']
+    types: ['chart', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'curriculum_lines', 'whiteboard']
   },
   {
     label: 'Layout',
@@ -343,6 +343,11 @@ export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
     (t) => !UNIT_ONLY_TYPES.has(t) && !LESSON_EXCLUDED.has(t) && (group.label !== 'Layout' || !PAGE_ONLY_TYPES.has(t))
   )
 }));
+
+/** Every type a page's menu offers, for the nested pickers inside its layouts. */
+export function pageBlockTypes(groups: ReadonlyArray<{ types: readonly NewBlockType[] }>): ReadonlySet<string> {
+  return new Set(groups.flatMap((group) => group.types));
+}
 
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(

@@ -78,7 +78,7 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
   if (unit.lessons.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'student-unit__empty';
-    empty.textContent = 'No published lessons in this unit yet.';
+    empty.textContent = 'Lessons will appear here as your teacher publishes them.';
     content.append(empty);
     return;
   }

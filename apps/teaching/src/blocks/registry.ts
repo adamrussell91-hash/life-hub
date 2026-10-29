@@ -89,13 +89,13 @@ import {
   type RenderMode
 } from '@/blocks/render';
 import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
-import { renderQuestionDrop, createQuestionDropEditor } from '@/blocks/question-drop';
+import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderDone, createDoneEditor } from '@/blocks/done';
 import { renderBrainstorm, createBrainstormEditor } from '@/blocks/brainstorm';
 import { renderHingeQuestion, createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { renderContinuumLine, createContinuumLineEditor } from '@/blocks/continuum-line';
 import { renderCurriculumLines, createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
-import { renderQuizQuestion, createQuizQuestionEditor } from '@/blocks/quiz-question';
+import { renderQuizQuestion } from '@/blocks/quiz-question';
 import type { Block } from '@/schemas/block';
 import {
   createAnalogyTypesEditor,
@@ -210,8 +210,8 @@ export const blockRegistry: {
   continuum_line: { render: renderContinuumLine, createEditor: createContinuumLineEditor },
   curriculum_lines: { render: renderCurriculumLines, createEditor: (block, onChange) => createCurriculumLinesEditor(block, onChange) },
   done: { render: renderDone, createEditor: (block, onChange) => createDoneEditor(block, onChange) },
-  question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createQuestionDropEditor(block, onChange) },
-  quiz_question: { render: renderQuizQuestion, createEditor: (block, onChange) => createQuizQuestionEditor(block, onChange) },
+  question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },
+  quiz_question: { render: renderQuizQuestion, createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },
   discern_confirm: { render: (block, mode) => renderBlock(block, mode), createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },
   question_set: {
     render: renderQuestionSetBlock,

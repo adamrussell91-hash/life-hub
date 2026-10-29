@@ -49,7 +49,7 @@ const STEPS: Array<{ id: QuestionLevel; title: string; prompt: (focus: string) =
     prompt: (focus) => ({
       support: 'Why does this happen? What caused it?',
       core: `Ask a Detective question about ${focus}, then answer it.`,
-      extend: `Ask a Detective question about ${focus} that your Beginner answer can’t settle, then answer it.`
+      extend: `Ask a Detective question about ${focus} that takes your Beginner answer further, then answer it.`
     }),
     support: {
       support: 'Start with: “This happens because…”',

@@ -102,8 +102,9 @@ export function anthologyConnections(items: AnthologyItem[]): AnthologyConnectio
   return out;
 }
 
-function emptyMessage(): string {
-  return 'Tick Add to unit anthology on a note in any lesson of this unit.';
+function emptyMessage(mode: AnthologyViewMode): string {
+  if (mode === 'teacher') return 'Tick Add to unit anthology on a note in any lesson of this unit.';
+  return 'Notes from this unit’s lessons will gather here.';
 }
 
 function appendItemLink(host: HTMLElement, item: AnthologyItem, mode: AnthologyViewMode): void {
@@ -185,7 +186,7 @@ export function buildAnthologyView(
     if (options.data.texts.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage();
+      empty.textContent = emptyMessage(options.mode);
       body.append(empty);
       return;
     }
@@ -236,7 +237,7 @@ export function buildAnthologyView(
     if (themes.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage();
+      empty.textContent = emptyMessage(options.mode);
       body.append(empty);
       return;
     }
@@ -311,7 +312,7 @@ export function buildAnthologyView(
               const open = bar.getAttribute('aria-expanded') === 'true';
               bar.setAttribute('aria-expanded', open ? 'false' : 'true');
               if (!open) {
-                for (const lineId of row.lineIds) {
+                for (const lineId of [...row.lineIds].reverse()) {
                   const line = poem.stanzas
                     .flatMap((s) => s.lines)
                     .find((l) => l.id === lineId);
@@ -361,7 +362,7 @@ export function buildAnthologyView(
     if (grouped.size === 0) {
       const empty = document.createElement('p');
       empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage();
+      empty.textContent = emptyMessage(options.mode);
       body.append(empty);
       return;
     }

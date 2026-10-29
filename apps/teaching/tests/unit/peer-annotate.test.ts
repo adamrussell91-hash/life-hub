@@ -59,6 +59,21 @@ describe('giving notes', () => {
   }
   const sentence = (view: HTMLElement, i: number) => view.querySelectorAll<HTMLElement>('.pa-sentence')[i]!;
 
+  it('sentences are keyboard buttons: focusable, aria-pressed, Enter and Space pick them', () => {
+    const { view } = mount();
+    const first = sentence(view, 0);
+    expect(first.tabIndex).toBe(0);
+    expect(first.getAttribute('role')).toBe('button');
+    expect(first.getAttribute('aria-pressed')).toBe('false');
+    first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(view.querySelector('.pa-quote')?.textContent).toBe('“The sea is like a hungry dog.”');
+    expect(sentence(view, 0).getAttribute('aria-pressed')).toBe('true');
+    expect(sentence(view, 1).getAttribute('aria-pressed')).toBe('false');
+    sentence(view, 1).dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    expect(view.querySelector('.pa-quote')?.textContent).toContain('dog. This shows danger!');
+    expect(sentence(view, 1).getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('tap a sentence, extend to the next, pick a button that asks, add, send', async () => {
     const { view, onSend } = mount();
     expect(view.textContent).toContain('Piece 1 of 2');

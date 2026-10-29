@@ -17,6 +17,19 @@ export function nearestStop(pos: number, stops: readonly string[]): number {
   return snapPoints(stops).reduce((best, p) => (Math.abs(p - pos) < Math.abs(best - pos) ? p : best), 0);
 }
 
+/** Spoken position for a slider value (0 to 1): the nearest pole or named stop, with "between" wording otherwise. */
+export function scaleValueText(scale: Scale, pos: number): string {
+  const labels = [scale.left, ...scale.stops, scale.right];
+  const points = snapPoints(scale.stops);
+  let best = 0;
+  points.forEach((p, i) => {
+    if (Math.abs(p - pos) < Math.abs(points[best]! - pos)) best = i;
+  });
+  const exact = Math.abs(points[best]! - pos) < 0.02;
+  const percent = Math.round(pos * 100);
+  return exact ? `${labels[best]}, ${percent} out of 100` : `Nearest to ${labels[best]}, ${percent} out of 100`;
+}
+
 /** Tick marks and stop labels under a line. Snapped lines get solid stops. */
 export function lineMarks(scale: Scale, snap: boolean): HTMLElement {
   const marks = el('div', 'cl-marks');

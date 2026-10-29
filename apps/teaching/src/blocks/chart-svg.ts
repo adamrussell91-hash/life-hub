@@ -251,6 +251,12 @@ function buildPieSvg(content: ChartContent): string {
   return parts.join('');
 }
 
+export function chartAriaLabel(content: ChartContent): string {
+  const kind = `${content.chart_type} chart`;
+  const title = content.title?.trim();
+  return title ? `${title}, ${kind}` : kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
 export function buildChartSvg(content: ChartContent): string {
   let body = '';
   switch (content.chart_type) {
@@ -280,5 +286,5 @@ export function buildChartSvg(content: ChartContent): string {
     body += `<text class="block-chart__axis-label" transform="translate(12 ${cy}) rotate(-90)" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">${escapeXml(yLabel)}</text>`;
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${viewH}" overflow="visible" role="img">${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${viewH}" overflow="visible" role="img" aria-label="${escapeXml(chartAriaLabel(content))}">${body}</svg>`;
 }
