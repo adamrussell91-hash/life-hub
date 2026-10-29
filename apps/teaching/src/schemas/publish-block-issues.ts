@@ -19,7 +19,7 @@ export type PublishBlockIssue = {
 const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   rich_text: 'Text',
   html: 'HTML',
-  html_app: 'HTML app',
+  html_app: 'Interactive app',
   question_set: 'Question set',
   question_drop: 'Question drop',
   done: 'Done',
@@ -33,7 +33,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   note_cue: 'Note cue',
   with_teacher: 'With teacher',
   faded_example: 'Faded example',
-  mind_map: 'Mind map',
+  mind_map: 'Map',
   concept_map: 'Concept map'
 };
 

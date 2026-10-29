@@ -565,7 +565,7 @@ export function renderHtmlAppBlock(
   iframe.className = 'block-html-app__frame';
   iframe.setAttribute('sandbox', 'allow-scripts allow-forms');
   iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-  iframe.title = block.content.title?.trim() || 'HTML app';
+  iframe.title = block.content.title?.trim() || 'Interactive app';
   iframe.style.height = `${height}px`;
   iframe.style.width = '100%';
   iframe.style.border = '0';
@@ -932,6 +932,38 @@ export function renderQuestionSetBlock(
       }
     }
 
+    const modelAnswer = question.kind === 'short_answer' ? question.model_answer?.trim() : '';
+    if (modelAnswer && mode !== 'print') {
+      if (mode === 'teacher' && !ctx.display) {
+        const note = document.createElement('p');
+        note.className = 'block-question-set__model-note block-body';
+        note.textContent = `Model answer: ${modelAnswer}`;
+        li.append(note);
+      } else {
+        const revealKey = `${question.id}.model_revealed`;
+        let revealed = answers[revealKey] === '1';
+        const model = document.createElement('div');
+        model.className = 'block-question-set__model block-self-check__answer block-body';
+        model.textContent = modelAnswer;
+        const toggle = disclosureToggle(
+          revealed ? 'Hide the model' : 'Check against the model',
+          'block-question-set__model-btn block-self-check__btn'
+        );
+        toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
+        model.hidden = !revealed;
+        toggle.addEventListener('click', () => {
+          revealed = !revealed;
+          toggle.textContent = revealed ? 'Hide the model' : 'Check against the model';
+          toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
+          model.hidden = !revealed;
+          if (revealed) answers[revealKey] = '1';
+          else delete answers[revealKey];
+          saveAnswers();
+        });
+        li.append(toggle, model);
+      }
+    }
+
     list.append(li);
   }
 
@@ -1240,6 +1272,29 @@ export function renderTabsBlock(
       root.append(section);
     }
 
+    return wrapBlock(root, block, mode);
+  }
+
+  if (block.content.style === 'folds') {
+    root.classList.add('block-tabs--folds');
+    for (const panelData of block.content.tabs) {
+      const fold = document.createElement('details');
+      fold.className = 'block-tabs__fold';
+      const summary = document.createElement('summary');
+      summary.className = 'block-tabs__fold-summary';
+      summary.textContent = panelData.label || 'Panel';
+      const body = document.createElement('div');
+      body.className = 'block-tabs__fold-body';
+      fold.append(summary, body);
+      // Build on first open, then keep it: rebuilding would wipe what a student typed.
+      fold.addEventListener('toggle', () => {
+        if (fold.open && !body.dataset.built) {
+          body.dataset.built = '1';
+          appendWithQuizDecks(body, panelData.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
+        }
+      });
+      root.append(fold);
+    }
     return wrapBlock(root, block, mode);
   }
 

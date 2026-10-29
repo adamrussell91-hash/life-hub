@@ -222,10 +222,11 @@ describe('createGalleryEditor', () => {
     expect(el.querySelector('.hub-list__add')).toBeNull();
   });
 
-  it('delete is off at 2 images for grid', () => {
+  it('delete at 2 images for grid turns the gallery into an image; comparison keeps delete off', () => {
     const block = createBlock('gallery', 'g1');
     if (block.block_type !== 'gallery') throw new Error('expected gallery');
-    let latest = block;
+    block.content.items = block.content.items.slice(0, 2);
+    let latest: Block = block;
     const el = createGalleryEditor(block, (next) => {
       latest = next;
     });
@@ -233,8 +234,15 @@ describe('createGalleryEditor', () => {
     const menus = () => [...el.querySelectorAll('.hub-list__row .hub-list__more')];
 
     holdDelete(menus()[0]!);
-    expect(latest.content.items).toHaveLength(2);
-    expect(menus().every((m) => menuItem(m, 'delete')?.disabled)).toBe(true);
+    expect(latest.block_type).toBe('image');
+
+    const cmp = createBlock('gallery', 'g2');
+    if (cmp.block_type !== 'gallery') throw new Error('expected gallery');
+    cmp.content.layout = 'comparison';
+    cmp.content.items = cmp.content.items.slice(0, 2);
+    const cmpEl = createGalleryEditor(cmp, () => {});
+    const cmpMenus = [...cmpEl.querySelectorAll('.hub-list__row .hub-list__more')];
+    expect(cmpMenus.every((m) => menuItem(m, 'delete')?.disabled)).toBe(true);
   });
 });
 

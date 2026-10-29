@@ -165,6 +165,7 @@ function filterBlocksForStudentInner(
         return {
           ...block,
           content: {
+            ...block.content,
             tabs: block.content.tabs.map((panel) => ({
               ...panel,
               blocks: filterBlocksForStudentInner(

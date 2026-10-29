@@ -92,6 +92,7 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
       return {
         ...block,
         content: {
+          ...block.content,
           tabs: block.content.tabs.map((panel) => ({
             ...panel,
             blocks: sanitizeBlocksDeep(panel.blocks) as TabsBlock['content']['tabs'][number]['blocks']

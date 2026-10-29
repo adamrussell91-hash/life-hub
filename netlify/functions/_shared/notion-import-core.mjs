@@ -2352,7 +2352,9 @@ var QuestionItemSchema = z11.object({
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
   level: z11.enum(["beginner", "detective", "judge", "inventor"]).optional(),
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
-  logic: LogicSchema.optional()
+  logic: LogicSchema.optional(),
+  /** Short answer only: the answer a student can check their own against. */
+  model_answer: z11.string().optional()
 });
 var PeerFeedbackBlockSchema = z11.object({
   id: z11.string().min(1),
@@ -3458,7 +3460,9 @@ var TabsBlockSchema = z11.object({
         label: z11.string(),
         blocks: z11.array(TabChildBlockSchema)
       })
-    ).min(2).max(8)
+    ).min(2).max(8),
+    /** Absent means tabs; folds shows each panel as a fold-out. */
+    style: z11.enum(["tabs", "folds"]).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -4151,7 +4155,7 @@ function isSidePath(block) {
 var KIND_LABEL = {
   rich_text: "Text",
   html: "HTML",
-  html_app: "HTML app",
+  html_app: "Interactive app",
   question_set: "Question set",
   question_drop: "Question drop",
   done: "Done",
@@ -4165,7 +4169,7 @@ var KIND_LABEL = {
   note_cue: "Note cue",
   with_teacher: "With teacher",
   faded_example: "Faded example",
-  mind_map: "Mind map",
+  mind_map: "Map",
   concept_map: "Concept map"
 };
 var CAPTION_MAX = 48;

@@ -181,9 +181,9 @@ describe('teacher word strip', () => {
 });
 
 describe('block menus', () => {
-  it('Definition leaves the lesson menu but stays on the homepage', () => {
+  it('Definition leaves every menu; the word tray does its job', () => {
     expect(LESSON_BLOCK_GROUPS.flatMap((g) => g.types)).not.toContain('definition');
-    expect(HOMEPAGE_BLOCK_GROUPS.flatMap((g) => g.types)).toContain('definition');
+    expect(HOMEPAGE_BLOCK_GROUPS.flatMap((g) => g.types)).not.toContain('definition');
   });
 });
 

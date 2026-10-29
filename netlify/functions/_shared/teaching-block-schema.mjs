@@ -1389,7 +1389,9 @@ var QuestionItemSchema = z10.object({
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
   level: z10.enum(["beginner", "detective", "judge", "inventor"]).optional(),
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
-  logic: LogicSchema.optional()
+  logic: LogicSchema.optional(),
+  /** Short answer only: the answer a student can check their own against. */
+  model_answer: z10.string().optional()
 });
 var PeerFeedbackBlockSchema = z10.object({
   id: z10.string().min(1),
@@ -2499,7 +2501,9 @@ var TabsBlockSchema = z10.object({
         label: z10.string(),
         blocks: z10.array(TabChildBlockSchema)
       })
-    ).min(2).max(8)
+    ).min(2).max(8),
+    /** Absent means tabs; folds shows each panel as a fold-out. */
+    style: z10.enum(["tabs", "folds"]).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
