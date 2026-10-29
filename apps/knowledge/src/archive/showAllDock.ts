@@ -26,7 +26,7 @@ export type Dock = {
   setTop: (px: number) => void;
 };
 
-export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void): Dock {
+export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void, only?: readonly DockTool[]): Dock {
   const root = document.createElement("div");
   root.className = "neural-dock";
   const reveal = el("button", { type: "button", class: "neural-dock__reveal", "data-dock-reveal": "", text: "Tools", "aria-label": "Show map tools", "aria-expanded": "false" });
@@ -52,6 +52,7 @@ export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void):
   row.setAttribute("aria-label", "Map tools");
   const buttons = new Map<DockTool, HTMLButtonElement>();
   for (const tool of DOCK_TOOLS) {
+    if (only && !only.includes(tool.id)) continue;
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = tool.label;

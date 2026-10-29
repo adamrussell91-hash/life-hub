@@ -1,135 +1,139 @@
-import type { AnthologyData, AnthologyItem, AnthologyText } from '@/blocks/anthology-collect';
-import { foldRows } from '@/blocks/annotation-thread';
-import { lessonCollectionHref } from '@/blocks/collection-resolve';
+import type { AnthologyData, AnthologyItem } from '@/blocks/anthology-collect';
 import {
-  FAMILY_PALETTE,
-  loadLiteraryElements,
-  lookupTechnique,
-  type LiteraryElementsTable
-} from '@/blocks/literary-elements';
-import type { AnnotationBlock, AnnotationFamilyKey, AnthologyView, Block } from '@/schemas/block';
+  ANTHOLOGY_GROUPINGS,
+  anthologyMapItems,
+  anthologyNoteId,
+  buildAnthologyGraph,
+  type AnthologyGrouping
+} from '@/blocks/anthology-graph';
+import { lessonCollectionHref } from '@/blocks/collection-resolve';
+import type { AnthologyView, Block } from '@/schemas/block';
+import type { DockTool } from '../../../knowledge/src/archive/showAllDock';
+import type { GraphMount } from '../../../knowledge/src/archive/forceGraphBehavior';
 
 export type AnthologyViewMode = 'teacher' | 'student' | 'print';
 
 export type BuildAnthologyViewOptions = {
   data: AnthologyData;
   mode: AnthologyViewMode;
-  defaultView?: AnthologyView;
   title?: string;
-  textBlocks?: Map<string, AnnotationBlock>;
   onMakeCards?: (request: { items: AnthologyItem[]; view: AnthologyView }) => void;
 };
 
-const VIEW_LABELS: Record<AnthologyView, string> = {
-  text: 'By text',
-  theme: 'By theme',
-  technique: 'By technique',
-  connections: 'Connections'
-};
+/** The Show All tools that suit a unit's notes. Grow, Recall, Sharpen and Recent read a note's history. */
+const ANTHOLOGY_TOOLS: readonly DockTool[] = ['spark', 'path', 'walk', 'bridges'];
 
-const FAMILY_ORDER: AnnotationFamilyKey[] = [
-  'Descriptive',
-  'Repetitive',
-  'Comparative',
-  'Structural',
-  'Intertextual'
-];
-
-function noteHref(lessonId: string, annotationId: string): string {
-  return `${lessonCollectionHref(lessonId)}#note=${encodeURIComponent(annotationId)}`;
+function noteHref(item: AnthologyItem): string {
+  return `${lessonCollectionHref(item.lesson_id)}#note=${encodeURIComponent(item.annotation_id)}`;
 }
 
-function fingerprintWords(fp: AnthologyText['fingerprint']): string {
-  const parts: string[] = [];
-  for (const family of FAMILY_ORDER) {
-    const n = fp[family];
-    if (n && n > 0) parts.push(`${family} ${n}`);
+function emptyMessage(): string {
+  return 'Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.';
+}
+
+function canDraw(): boolean {
+  try {
+    return Boolean(document.createElement('canvas').getContext('2d'));
+  } catch {
+    return false;
   }
-  return parts.join(', ') || 'No techniques tagged';
 }
 
-function allThemes(items: AnthologyItem[]): string[] {
-  const seen = new Map<string, string>();
-  for (const item of items) {
-    for (const t of item.themes) {
-      const key = t.toLowerCase();
-      if (!seen.has(key)) seen.set(key, t);
+function itemMatches(item: AnthologyItem, query: string): boolean {
+  if (!query) return true;
+  const hay = `${item.quote} ${item.note} ${item.lesson_title} ${item.themes.join(' ')} ${item.concepts.join(' ')}`;
+  return hay.toLowerCase().includes(query.toLowerCase());
+}
+
+/** Run `mount` once `host` is on the page, and tear it down again once it leaves. */
+function mountWhileConnected(host: HTMLElement, mount: () => () => void): void {
+  let tries = 0;
+  const start = () => {
+    if (!host.isConnected) {
+      if (tries++ < 600) requestAnimationFrame(start);
+      return;
     }
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
-}
-
-function itemsForTheme(items: AnthologyItem[], theme: string): AnthologyItem[] {
-  const key = theme.toLowerCase();
-  return items.filter((item) => item.themes.some((t) => t.toLowerCase() === key));
-}
-
-export type AnthologyConnection = {
-  kind: 'theme' | 'concept' | 'technique';
-  key: string;
-  label: string;
-  items: AnthologyItem[];
-};
-
-export function anthologyConnections(items: AnthologyItem[]): AnthologyConnection[] {
-  type Bucket = { kind: AnthologyConnection['kind']; label: string; items: AnthologyItem[] };
-  const buckets = new Map<string, Bucket>();
-  const add = (kind: AnthologyConnection['kind'], key: string, label: string, item: AnthologyItem) => {
-    const id = `${kind}:${key.toLowerCase()}`;
-    let bucket = buckets.get(id);
-    if (!bucket) {
-      bucket = { kind, label, items: [] };
-      buckets.set(id, bucket);
-    }
-    bucket.items.push(item);
-  };
-  for (const item of items) {
-    for (const theme of item.themes) add('theme', theme, theme, item);
-    for (const concept of item.concepts) add('concept', concept, concept, item);
-    if (item.technique_id) add('technique', item.technique_id, item.technique_id, item);
-  }
-  const out: AnthologyConnection[] = [];
-  for (const [id, bucket] of buckets) {
-    if (new Set(bucket.items.map((i) => i.block_id)).size < 2) continue;
-    out.push({
-      kind: bucket.kind,
-      key: id.slice(id.indexOf(':') + 1),
-      label: bucket.label,
-      items: bucket.items
+    const stop = mount();
+    const watch = new MutationObserver(() => {
+      if (host.isConnected) return;
+      watch.disconnect();
+      stop();
     });
+    watch.observe(document.body, { childList: true, subtree: true });
+  };
+  requestAnimationFrame(start);
+}
+
+function chip(text: string, kind: 'theme' | 'concept'): HTMLElement {
+  const span = document.createElement('span');
+  span.className = `block-anthology__chip block-anthology__chip--${kind}`;
+  span.textContent = text;
+  return span;
+}
+
+function noteCard(item: AnthologyItem, textTitle: string, mode: AnthologyViewMode): HTMLElement {
+  const card = document.createElement('article');
+  card.className = 'block-anthology__card';
+  const quote = document.createElement('p');
+  quote.className = 'block-anthology__card-quote';
+  quote.textContent = `“${item.quote.replace(/\s+/g, ' ').trim()}”`;
+  const meta = document.createElement('p');
+  meta.className = 'block-anthology__card-meta';
+  meta.textContent = [textTitle, item.line_number > 0 ? `line ${item.line_number}` : '', item.layer_name]
+    .filter(Boolean)
+    .join(' · ');
+  card.append(quote, meta);
+  if (item.note) {
+    const note = document.createElement('p');
+    note.className = 'block-anthology__card-note';
+    note.textContent = item.note;
+    card.append(note);
   }
-  out.sort((a, b) => a.kind.localeCompare(b.kind) || a.label.localeCompare(b.label));
-  return out;
-}
-
-function emptyMessage(mode: AnthologyViewMode): string {
-  if (mode === 'teacher') return 'Tick Add to unit anthology on a note in any lesson of this unit.';
-  return 'Notes from this unit’s lessons will gather here.';
-}
-
-function appendItemLink(host: HTMLElement, item: AnthologyItem, mode: AnthologyViewMode): void {
-  const row = document.createElement('div');
-  row.className = 'block-anthology__item';
-  const link = document.createElement('a');
-  link.className = 'block-anthology__item-link';
-  link.href = noteHref(item.lesson_id, item.annotation_id);
-  const quote = document.createElement('span');
-  quote.className = 'block-anthology__quote';
-  quote.textContent =
-    item.line_number > 0 ? `l.${item.line_number} “${item.quote}”` : `“${item.quote}”`;
-  quote.title = item.quote;
-  const meta = document.createElement('span');
-  meta.className = 'block-anthology__meta';
-  meta.textContent = item.lesson_title;
-  link.append(quote, meta);
-  row.append(link);
+  if (item.themes.length || item.concepts.length) {
+    const chips = document.createElement('div');
+    chips.className = 'block-anthology__chips';
+    for (const theme of item.themes) chips.append(chip(theme, 'theme'));
+    for (const concept of item.concepts) chips.append(chip(concept, 'concept'));
+    card.append(chips);
+  }
+  const foot = document.createElement('div');
+  foot.className = 'block-anthology__card-foot';
+  const open = document.createElement('a');
+  open.className = 'block-anthology__card-open';
+  open.href = noteHref(item);
+  open.textContent = 'Open in the lesson';
+  foot.append(open);
   if (mode === 'teacher' && item.published === false) {
     const tag = document.createElement('span');
     tag.className = 'block-anthology__unpublished';
     tag.textContent = 'Not published';
-    row.append(tag);
+    foot.append(tag);
   }
-  host.append(row);
+  card.append(foot);
+  return card;
+}
+
+/** Paper has no canvas to pan: print lists each theme's notes instead. */
+function printList(items: AnthologyItem[], titles: Map<string, string>): HTMLElement {
+  const body = document.createElement('div');
+  body.className = 'block-anthology__print';
+  const themes = [...new Set(items.flatMap((item) => item.themes))].sort((a, b) => a.localeCompare(b));
+  for (const theme of themes) {
+    const heading = document.createElement('h4');
+    heading.className = 'block-anthology__print-theme block-subtitle';
+    heading.textContent = theme;
+    const list = document.createElement('ul');
+    for (const item of items.filter((row) => row.themes.includes(theme))) {
+      const li = document.createElement('li');
+      const where = [titles.get(item.block_id) ?? item.lesson_title, item.line_number > 0 ? `l.${item.line_number}` : '']
+        .filter(Boolean)
+        .join(' ');
+      li.textContent = `“${item.quote.replace(/\s+/g, ' ').trim()}” (${where})`;
+      list.append(li);
+    }
+    body.append(heading, list);
+  }
+  return body;
 }
 
 export function buildAnthologyView(
@@ -148,340 +152,131 @@ export function buildAnthologyView(
     root.append(title);
   }
 
-  let view: AnthologyView = options.defaultView ?? block.content.default_view ?? 'text';
-  let theme: string | null = null;
-  let table: LiteraryElementsTable | null = null;
+  const titles = new Map(options.data.texts.map((text) => [text.block_id, text.title]));
+  const items = anthologyMapItems(options.data);
+
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'block-anthology__empty block-empty';
+    empty.textContent = emptyMessage();
+    root.append(empty);
+    return root;
+  }
+
+  if (options.mode === 'print') {
+    root.append(printList(items, titles));
+    return root;
+  }
+
+  const byId = new Map(items.map((item) => [anthologyNoteId(item), item]));
+  let grouping: AnthologyGrouping = 'theme';
+  let query = '';
+  let graph: GraphMount | null = null;
+
+  const bar = document.createElement('div');
+  bar.className = 'block-anthology__bar';
 
   const pills = document.createElement('div');
-  pills.className = 'hub-pills block-anthology__views';
+  pills.className = 'hub-pills block-anthology__groupings';
   pills.setAttribute('role', 'toolbar');
-  pills.setAttribute('aria-label', 'Anthology views');
-
-  const body = document.createElement('div');
-  body.className = 'block-anthology__body';
-
-  const makeCardsBtn = document.createElement('button');
-  makeCardsBtn.type = 'button';
-  makeCardsBtn.className = 'btn btn--secondary block-anthology__make-cards';
-  makeCardsBtn.textContent = 'Make cards from this view';
-  makeCardsBtn.hidden = true;
-
+  pills.setAttribute('aria-label', 'Group the map by');
   const paintPills = () => {
     pills.replaceChildren();
-    for (const key of Object.keys(VIEW_LABELS) as AnthologyView[]) {
+    for (const option of ANTHOLOGY_GROUPINGS) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'hub-pills__btn';
-      btn.textContent = VIEW_LABELS[key];
-      btn.setAttribute('aria-pressed', key === view ? 'true' : 'false');
+      btn.textContent = option.label;
+      btn.setAttribute('aria-pressed', option.id === grouping ? 'true' : 'false');
       btn.addEventListener('click', () => {
-        view = key;
-        paint();
+        if (grouping === option.id) return;
+        grouping = option.id;
+        paintPills();
+        graph?.setModel(buildAnthologyGraph(options.data, grouping));
       });
       pills.append(btn);
     }
   };
+  paintPills();
 
-  const paintText = () => {
-    if (options.data.texts.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage(options.mode);
-      body.append(empty);
-      return;
-    }
-    for (const text of options.data.texts) {
-      const card = document.createElement('article');
-      card.className = 'block-anthology__text-card';
-      const title = document.createElement('h4');
-      title.className = 'block-anthology__text-title block-subtitle';
-      const titleLink = document.createElement('a');
-      titleLink.href = lessonCollectionHref(text.lesson_id);
-      titleLink.textContent = text.title;
-      title.append(titleLink);
-      card.append(title);
-      if (text.attribution) {
-        const attr = document.createElement('p');
-        attr.className = 'block-anthology__attribution';
-        attr.textContent = text.attribution;
-        card.append(attr);
-      }
-      const strip = document.createElement('div');
-      strip.className = 'block-anthology__fingerprint';
-      strip.setAttribute('aria-label', fingerprintWords(text.fingerprint));
-      for (const family of FAMILY_ORDER) {
-        const n = text.fingerprint[family] ?? 0;
-        if (n <= 0) continue;
-        const cell = document.createElement('span');
-        cell.className = `block-anthology__fp-cell block-anthology__fp-cell--${FAMILY_PALETTE[family]}`;
-        cell.title = `${family} ${n}`;
-        cell.textContent = String(n);
-        strip.append(cell);
-      }
-      const words = document.createElement('p');
-      words.className = 'block-anthology__fingerprint-words';
-      words.textContent = fingerprintWords(text.fingerprint);
-      card.append(strip, words);
-      if (options.mode === 'teacher' && text.published === false) {
-        const tag = document.createElement('span');
-        tag.className = 'block-anthology__unpublished';
-        tag.textContent = 'Not published';
-        card.append(tag);
-      }
-      body.append(card);
-    }
-  };
-
-  const paintTheme = () => {
-    const themes = allThemes(options.data.items);
-    if (themes.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage(options.mode);
-      body.append(empty);
-      return;
-    }
-    const themePills = document.createElement('div');
-    themePills.className = 'hub-pills block-anthology__theme-pills';
-    const active = theme && themes.includes(theme) ? theme : themes[0]!;
-    for (const name of themes) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'hub-pills__btn';
-      btn.textContent = name;
-      btn.title = name;
-      btn.setAttribute('aria-pressed', name === active ? 'true' : 'false');
-      btn.addEventListener('click', () => {
-        theme = name;
-        paint();
-      });
-      themePills.append(btn);
-    }
-    body.append(themePills);
-
-    const themed = itemsForTheme(options.data.items, active);
-    const byBlock = new Map<string, AnthologyItem[]>();
-    for (const item of themed) {
-      const list = byBlock.get(item.block_id) ?? [];
-      list.push(item);
-      byBlock.set(item.block_id, list);
-    }
-
-    for (const text of options.data.texts) {
-      const group = byBlock.get(text.block_id);
-      if (!group?.length) continue;
-      const section = document.createElement('section');
-      section.className = 'block-anthology__theme-text';
-      const heading = document.createElement('h4');
-      heading.className = 'block-anthology__text-title block-subtitle';
-      heading.textContent = text.title;
-      section.append(heading);
-
-      const poem =
-        options.textBlocks?.get(text.block_id)?.content.text ??
-        (text.text_included ? text.poem : undefined);
-      if (poem && text.text_included) {
-        const fromBlocks = options.textBlocks?.get(text.block_id);
-        const stopLines = new Set(
-          group
-            .map((item) => {
-              if (fromBlocks) {
-                const ann = fromBlocks.content.annotations.find(
-                  (a) => a.id === item.annotation_id
-                );
-                return ann && 'line' in ann.anchor ? ann.anchor.line : undefined;
-              }
-              return text.stop_lines?.[item.annotation_id];
-            })
-            .filter((id): id is string => typeof id === 'string')
-        );
-        const rows = foldRows(poem, stopLines, {
-          context: 0,
-          expanded: new Set()
-        });
-        const foldHost = document.createElement('div');
-        foldHost.className = 'block-anthology__fold';
-        for (const row of rows) {
-          if (row.kind === 'fold') {
-            const bar = document.createElement('button');
-            bar.type = 'button';
-            bar.className = 'block-anthology__fold-bar';
-            bar.textContent = `⋯ ${row.count} lines`;
-            bar.setAttribute('aria-expanded', 'false');
-            bar.addEventListener('click', () => {
-              const open = bar.getAttribute('aria-expanded') === 'true';
-              bar.setAttribute('aria-expanded', open ? 'false' : 'true');
-              if (!open) {
-                for (const lineId of [...row.lineIds].reverse()) {
-                  const line = poem.stanzas
-                    .flatMap((s) => s.lines)
-                    .find((l) => l.id === lineId);
-                  if (!line) continue;
-                  const p = document.createElement('p');
-                  p.className = 'block-anthology__fold-line';
-                  p.dataset.foldId = row.id;
-                  p.textContent = line.text;
-                  bar.after(p);
-                }
-              } else {
-                foldHost.querySelectorAll(`[data-fold-id="${row.id}"]`).forEach((el) => el.remove());
-              }
-            });
-            foldHost.append(bar);
-          } else {
-            const line = poem.stanzas
-              .flatMap((s) => s.lines)
-              .find((l) => l.id === row.lineId);
-            const p = document.createElement('p');
-            p.className = 'block-anthology__fold-line';
-            p.textContent = `${row.number} ${line?.text ?? ''}`;
-            foldHost.append(p);
-          }
-        }
-        section.append(foldHost);
-      } else {
-        const staticBar = document.createElement('p');
-        staticBar.className = 'block-anthology__fold-static';
-        staticBar.textContent = `⋯ ${Math.max(group.length, 1)} lines`;
-        section.append(staticBar);
-      }
-
-      for (const item of group) appendItemLink(section, item, options.mode);
-      body.append(section);
-    }
-  };
-
-  const paintTechnique = () => {
-    const grouped = new Map<string, AnthologyItem[]>();
-    for (const item of options.data.items) {
-      if (!item.technique_id) continue;
-      const list = grouped.get(item.technique_id) ?? [];
-      list.push(item);
-      grouped.set(item.technique_id, list);
-    }
-    if (grouped.size === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty block-empty';
-      empty.textContent = emptyMessage(options.mode);
-      body.append(empty);
-      return;
-    }
-    const entries = [...grouped.entries()].map(([id, items]) => {
-      const tech = table ? lookupTechnique(table, id) : undefined;
-      const family =
-        table && tech
-          ? table.subgroups.find((sg) => sg.id === tech.subgroup)?.family
-          : undefined;
-      return {
-        id,
-        items,
-        name: tech?.name ?? id,
-        family: (family ?? 'Structural') as AnnotationFamilyKey,
-        definition: tech?.definition ?? ''
-      };
-    });
-    entries.sort(
-      (a, b) =>
-        FAMILY_ORDER.indexOf(a.family) - FAMILY_ORDER.indexOf(b.family) ||
-        a.name.localeCompare(b.name)
-    );
-    let lastFamily = '';
-    for (const entry of entries) {
-      if (entry.family !== lastFamily) {
-        lastFamily = entry.family;
-        const fam = document.createElement('h4');
-        fam.className = 'block-anthology__family';
-        fam.textContent = entry.family;
-        body.append(fam);
-      }
-      const section = document.createElement('section');
-      section.className = 'block-anthology__technique';
-      const heading = document.createElement('h5');
-      heading.className = 'block-anthology__technique-name';
-      heading.textContent = entry.name;
-      heading.title = entry.name;
-      section.append(heading);
-      if (entry.definition) {
-        const def = document.createElement('p');
-        def.className = 'block-anthology__technique-def';
-        def.textContent = entry.definition;
-        section.append(def);
-      }
-      for (const item of entry.items) appendItemLink(section, item, options.mode);
-      body.append(section);
-    }
-  };
-
-  const paintConnections = () => {
-    const connections = anthologyConnections(options.data.items);
-    if (connections.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty block-empty';
-      empty.textContent =
-        'Shared themes, concepts or techniques across two or more texts will appear here.';
-      body.append(empty);
-      return;
-    }
-    for (const conn of connections) {
-      const section = document.createElement('section');
-      section.className = 'block-anthology__connection';
-      const heading = document.createElement('h4');
-      heading.className = 'block-anthology__connection-title';
-      let label = conn.label;
-      if (conn.kind === 'technique' && table) {
-        label = lookupTechnique(table, conn.key)?.name ?? conn.label;
-      }
-      heading.textContent = `${conn.kind}: ${label}`;
-      section.append(heading);
-      const texts = [...new Set(conn.items.map((i) => i.lesson_title))];
-      const list = document.createElement('p');
-      list.className = 'block-anthology__connection-texts';
-      list.textContent = texts.join(' · ');
-      section.append(list);
-      for (const item of conn.items) appendItemLink(section, item, options.mode);
-      body.append(section);
-    }
-  };
-
-  const paint = () => {
-    paintPills();
-    body.replaceChildren();
-    if (options.mode === 'print' || view === 'text') paintText();
-    else if (view === 'theme') paintTheme();
-    else if (view === 'technique') paintTechnique();
-    else paintConnections();
-
-    const canMake =
-      options.mode === 'teacher' &&
-      Boolean(options.onMakeCards) &&
-      (view === 'theme' || view === 'technique');
-    makeCardsBtn.hidden = !canMake;
-  };
-
-  makeCardsBtn.addEventListener('click', () => {
-    if (!options.onMakeCards) return;
-    let items = options.data.items;
-    if (view === 'theme') {
-      const themes = allThemes(items);
-      const active = theme && themes.includes(theme) ? theme : themes[0];
-      items = active ? itemsForTheme(items, active) : [];
-    } else if (view === 'technique') {
-      items = items.filter((item) => Boolean(item.technique_id));
-    }
-    options.onMakeCards({ items, view });
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'block-anthology__search';
+  search.placeholder = 'Find a word, quote or idea';
+  search.setAttribute('aria-label', 'Find in the anthology');
+  search.addEventListener('input', () => {
+    query = search.value.trim();
+    graph?.setSearch(query);
   });
 
-  if (options.mode === 'print') {
-    paintText();
-    root.append(body);
-    return root;
+  const count = document.createElement('span');
+  count.className = 'block-anthology__count';
+  const textCount = new Set(items.map((item) => item.block_id)).size;
+  count.textContent = `${items.length} notes · ${textCount} ${textCount === 1 ? 'text' : 'texts'}`;
+
+  bar.append(pills, search, count);
+
+  if (options.mode === 'teacher' && options.onMakeCards) {
+    const make = document.createElement('button');
+    make.type = 'button';
+    make.className = 'btn btn--secondary block-anthology__make-cards';
+    make.textContent = 'Make cards from these notes';
+    make.title = 'Flashcards from the technique-tagged notes on the map, or those matching your search';
+    make.addEventListener('click', () => {
+      options.onMakeCards?.({ items: items.filter((item) => itemMatches(item, query)), view: 'theme' });
+    });
+    bar.append(make);
   }
 
-  root.append(pills, body, makeCardsBtn);
-  paint();
-  void loadLiteraryElements().then((loaded) => {
-    table = loaded;
-    if (view === 'technique' || view === 'connections') paint();
-  });
+  const frame = document.createElement('div');
+  frame.className = 'block-anthology__map graph-wrap';
+  const stage = document.createElement('div');
+  stage.className = 'block-anthology__stage graph-stage';
+  frame.append(stage);
+
+  const cardHost = document.createElement('div');
+  cardHost.className = 'block-anthology__selected';
+  const hint = document.createElement('p');
+  hint.className = 'block-anthology__hint';
+  hint.textContent = 'Click a dot to read its note. Drag to move around; scroll or pinch to zoom.';
+  cardHost.append(hint);
+
+  root.append(bar, frame, cardHost);
+
+  if (canDraw()) {
+    mountWhileConnected(stage, () => {
+      void import('../../../knowledge/src/archive/forceGraph').then(({ mountForceGraph }) => {
+        if (!stage.isConnected) return;
+        graph = mountForceGraph(
+          stage,
+          buildAnthologyGraph(options.data, grouping),
+          {
+            onNoteSelect: (note) => {
+              const item = note ? byId.get(note.pageId) : undefined;
+              cardHost.replaceChildren(
+                item ? noteCard(item, titles.get(item.block_id) ?? item.lesson_title, options.mode) : hint
+              );
+            }
+          },
+          {
+            variant: 'showAll',
+            search: query,
+            excerptFor: (id) => {
+              const item = byId.get(id);
+              return item ? `${item.note} ${item.themes.join(' ')} ${item.concepts.join(' ')}` : '';
+            },
+            tools: ANTHOLOGY_TOOLS,
+            theme: 'light',
+            labelZoom: { topics: 0, notes: 1.6 }
+          }
+        );
+      });
+      return () => {
+        graph?.();
+        graph = null;
+      };
+    });
+  }
+
   return root;
 }
