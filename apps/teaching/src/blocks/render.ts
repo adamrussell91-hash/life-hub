@@ -34,7 +34,7 @@ import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { buildAnnotationView } from '@/blocks/annotation-view';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
-import { applyWordHelp, readCopyStep, readWordHelp, wordsPresentIn, type OpenWord } from '@/blocks/word-help';
+import { applyWordHelp, readWordHelp, wordsPresentIn, type OpenWord } from '@/blocks/word-help';
 import { createWordTray } from '@/blocks/word-tray';
 import { createStudentWordHelpBar } from '@/blocks/word-help-bar';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
@@ -196,12 +196,10 @@ export function renderRichTextBlock(
   // Lessons open words in a tray under the text; other pages keep the floating card.
   const tray = ctx.lessonId
     ? createWordTray({
-        lessonId: ctx.lessonId,
         // A scanned word the text no longer holds drops off the strip; typed-in words always stay.
         pinned: preScanned.filter(
           (entry) => entry.added || (entry.pinned && wordsPresentIn(body.textContent ?? '', [entry]).length > 0)
-        ),
-        copyStep: readCopyStep(block)
+        )
       })
     : null;
   const openWord: OpenWord | undefined = tray ? (anchor, entry) => tray.open(entry, anchor) : undefined;
