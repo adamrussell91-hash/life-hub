@@ -29,6 +29,19 @@ function normaliseTagList(tags, seen) {
   return out;
 }
 
+function notePlain(html) {
+  return String(html ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function lineNumbers(text) {
   const map = new Map();
   let n = 0;
@@ -98,6 +111,7 @@ export function collectAnthology(snapshots, ctx = {}) {
           block_id: block.id,
           annotation_id: ann.id,
           quote: ann.anchor?.quote?.exact ?? '',
+          note: notePlain(ann.body?.html),
           line_number: lineId ? (numbers.get(lineId) ?? 0) : 0,
           layer_name: layer.name,
           technique_id: ann.technique?.id,

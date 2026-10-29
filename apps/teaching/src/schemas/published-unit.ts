@@ -15,6 +15,7 @@ export const PublishedAnthologyItemSchema = z.object({
   block_id: z.string().min(1),
   annotation_id: z.string().min(1),
   quote: z.string(),
+  note: z.string().default(''),
   line_number: z.number().int().min(0),
   layer_name: z.string(),
   technique_id: z.string().optional(),

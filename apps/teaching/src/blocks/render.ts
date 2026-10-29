@@ -2435,7 +2435,6 @@ export function renderAnthologyBlock(
     buildAnthologyView(block, {
       data,
       mode,
-      defaultView: block.content.default_view,
       title: block.content.title,
       onMakeCards: mode === 'teacher' ? ctx.onMakeAnthologyCards : undefined
     }),

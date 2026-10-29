@@ -2926,38 +2926,22 @@ export function createAnthologyEditor(
   title.placeholder = 'Title (optional)';
   title.setAttribute('aria-label', 'Anthology title');
 
-  const view = createEditorFilter({
-    key: 'View',
-    value: block.content.default_view ?? 'text',
-    options: [
-      { value: 'text', label: 'By text' },
-      { value: 'theme', label: 'By theme' },
-      { value: 'technique', label: 'By technique' },
-      { value: 'connections', label: 'Connections' }
-    ],
-    className: 'block-editor__anthology-view',
-    ariaLabel: 'Default view',
-    onChange: () => emitChange()
-  });
-
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
   hint.textContent =
-    'Gathers notes tagged Add to unit anthology from published lessons in this unit.';
+    'Maps the notes tagged Add to unit anthology across this unit’s lessons, grouped by theme, concept or text.';
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
-      content: {
-        title: title.value.trim() || undefined,
-        default_view: view.getValue() as 'text' | 'theme' | 'technique' | 'connections'
-      }
+      ...latest,
+      content: { ...latest.content, title: title.value.trim() || undefined }
     });
   };
 
   title.addEventListener('input', emitChange);
 
-  fields.append(title, view.el, hint);
+  fields.append(title, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
