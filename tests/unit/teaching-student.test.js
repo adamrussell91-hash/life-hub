@@ -38,6 +38,22 @@ test('rich text sanitizer strips script and javascript hrefs', () => {
   assert.doesNotMatch(html, /javascript:/i);
 });
 
+test('filterBlocksForStudent drops Teacher-style callouts', () => {
+  const callout = (id, style) => ({ id, type: 'block', block_type: 'callout', variant: 'medium', visibility: 'student_teacher', content: { style, body: id } });
+  const out = filterBlocksForStudent([callout('mine', 'teacher'), callout('theirs', 'important')]);
+  assert.deepEqual(out.map(b => b.id), ['theirs']);
+});
+
+test('sanitizeRichTextHtml drops disguised script links and handlers', () => {
+  const html = sanitizeRichTextHtml(
+    '<a href="java&#9;script:alert(1)">a</a><a href=" JAVASCRIPT:x">b</a><a href="data:text/html,x">c</a>' +
+      '<svg/onload=alert(1)></svg><img src=x onerror=alert(1)><a href="https://ok.example/p">d</a><a href="/lesson">e</a>'
+  );
+  assert.doesNotMatch(html, /script:|data:|onload|onerror/i);
+  assert.match(html, /href="https:\/\/ok\.example\/p"/);
+  assert.match(html, /href="\/lesson"/);
+});
+
 test('filterBlocksForStudent strips annotation teacher layers (shared fixture)', () => {
   const out = sanitizeBlocksDeep(
     filterBlocksForStudent([

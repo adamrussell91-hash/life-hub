@@ -27,9 +27,14 @@ function escapeAttr(value: string): string {
     .replace(/</g, '&lt;');
 }
 
-function isSafeHref(href: string): boolean {
-  const trimmed = href.trim().toLowerCase();
-  return !trimmed.startsWith('javascript:') && !trimmed.startsWith('data:');
+const SAFE_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
+
+/** Browsers drop control characters and whitespace inside a URL scheme, so check what they would see. */
+export function isSafeHref(href: string): boolean {
+  const cleaned = href.replace(/[\u0000-\u0020\u007f-\u009f]/g, '').toLowerCase();
+  const scheme = /^([a-z][a-z0-9+.-]*):/.exec(cleaned);
+  if (!scheme) return true; // relative link
+  return SAFE_SCHEMES.has(scheme[1]!);
 }
 
 function sanitizeNode(node: Node): string {

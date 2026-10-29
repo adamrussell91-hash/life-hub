@@ -23,10 +23,17 @@ export function toPublicOutcome(outcome) {
   };
 }
 
+/** Students never get this block. Keep in step with apps/teaching/src/blocks/visibility.ts (isTeacherOnlyBlock). */
+export function isTeacherOnlyBlock(block) {
+  if (block?.visibility !== 'student_teacher') return true;
+  if (block.block_type === 'teacher_note') return true;
+  return block.block_type === 'callout' && block.content?.style === 'teacher';
+}
+
 function collectTeacherOnlyIds(blocks, out = new Set()) {
   if (!Array.isArray(blocks)) return out;
   for (const block of blocks) {
-    if (block?.visibility === 'teacher_only' && block.id) out.add(block.id);
+    if (block?.id && isTeacherOnlyBlock(block)) out.add(block.id);
     if (block?.block_type === 'section') {
       collectTeacherOnlyIds(block.content?.blocks, out);
     } else if (block?.block_type === 'columns') {
@@ -129,8 +136,8 @@ function stripWalkthruField(block) {
 function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
   if (!Array.isArray(blocks)) return [];
   return blocks
-    // Teacher note blocks are always teacher-only, whatever visibility a draft carries.
-    .filter(block => block?.visibility === 'student_teacher' && block?.block_type !== 'teacher_note')
+    // Teacher notes and Teacher-style callouts are teacher-only whatever visibility a draft carries.
+    .filter(block => !isTeacherOnlyBlock(block))
     .map(studentTechniqueScan)
     .map(stripWalkthruField)
     .map(block => {
@@ -226,13 +233,38 @@ function withoutQuizQuestions(blocks) {
     });
 }
 
+const SAFE_URL_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
+
+function decodeEntities(value) {
+  return value
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);?/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&(tab|newline|colon);?/gi, (_, name) => ({ tab: '\t', newline: '\n', colon: ':' })[name.toLowerCase()]);
+}
+
+/** Browsers drop control characters and whitespace inside a URL scheme, so check what they would see. Keep in step with apps/teaching/src/blocks/sanitize.ts. */
+export function isSafeUrl(raw) {
+  let cleaned;
+  try {
+    cleaned = decodeEntities(String(raw ?? ''));
+  } catch {
+    return false;
+  }
+  cleaned = cleaned.replace(/[\u0000-\u0020\u007f-\u009f]/g, '').toLowerCase();
+  const scheme = /^([a-z][a-z0-9+.-]*):/.exec(cleaned);
+  return !scheme || SAFE_URL_SCHEMES.has(scheme[1]);
+}
+
 export function sanitizeRichTextHtml(html) {
   if (typeof html !== 'string') return '';
   return html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/href\s*=\s*(["']?)\s*javascript:[^"'>\s]*/gi, 'href=$1');
+    .replace(/<(script|style|iframe|object|embed)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<\/?(script|style|iframe|object|embed|base|meta|link)\b[^>]*>/gi, '')
+    .replace(/([\s/"'])on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '$1')
+    .replace(/\b(href|src|xlink:href|action|formaction)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, (attr, name, value) => {
+      const unquoted = /^["']/.test(value) ? value.slice(1, -1) : value;
+      return isSafeUrl(unquoted) ? attr : '';
+    });
 }
 
 export function sanitizeBlocksDeep(blocks) {

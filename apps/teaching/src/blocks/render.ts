@@ -1,3 +1,4 @@
+import { isTeacherOnlyBlock } from '@/blocks/visibility';
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
 import { appendWithQuizDecks } from '@/blocks/quiz-deck';
 import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
@@ -136,7 +137,7 @@ function wrapBlock(content: HTMLElement, block: Block, mode: RenderMode): HTMLEl
   wrapper.dataset.blockId = block.id;
   wrapper.dataset.blockType = block.block_type;
 
-  if (mode === 'teacher' && block.visibility === 'teacher_only') {
+  if (mode === 'teacher' && isTeacherOnlyBlock(block)) {
     wrapper.classList.add('block--teacher-only');
   }
 
@@ -1251,11 +1252,12 @@ export function renderTabsBlock(
       btn.tabIndex = active ? 0 : -1;
       btn.classList.toggle('block-tabs__tab--active', active);
     });
+    // Build each panel the first time it opens, then keep it: rebuilding would wipe what a student typed.
     panels.forEach((panel, i) => {
       const active = i === selected;
       panel.hidden = !active;
-      panel.replaceChildren();
-      if (active) {
+      if (active && !panel.dataset.built) {
+        panel.dataset.built = '1';
         appendWithQuizDecks(panel, block.content.tabs[i]!.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
       }
     });
@@ -2553,8 +2555,12 @@ function turnIntoSleeveButton(block: Block, ctx: RenderContext): HTMLElement | n
   return row;
 }
 
+/** Practice blocks show their student view on the class display, so answers stay hidden until revealed there. */
+const STUDENT_VIEW_ON_DISPLAY: ReadonlySet<string> = new Set(['flashcards', 'cloze', 'self_check', 'faded_example']);
+
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
-  const wrapper = renderBlockContent(block, mode, ctx);
+  const contentMode = mode === 'teacher' && ctx.display && STUDENT_VIEW_ON_DISPLAY.has(block.block_type) ? 'student' : mode;
+  const wrapper = renderBlockContent(block, contentMode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
   // Sleeves sit on top of the block, above its prompt, and tint its answer box.
   const sleeves = attachedSleeves(block);
