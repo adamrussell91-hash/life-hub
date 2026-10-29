@@ -35,10 +35,16 @@ export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlo
   return root;
 }
 
-export function renderQuizQuestion(block: QuizBlock, mode: RenderMode, _ctx: RenderContext = {}): HTMLElement {
+export function renderQuizQuestion(block: QuizBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const q = block.content.question as QuizQuestion;
   const root = el('section', 'qz-card');
   root.dataset.blockId = block.id;
+  // Answered where it sits: the quiz fills this space and keeps it current.
+  if (mode === 'student' && ctx.quizSlot) {
+    root.classList.add('qz-card--slot');
+    root.append(ctx.quizSlot(block.id));
+    return root;
+  }
   const info = QUIZ_KIND_INFO[q.kind];
   const head = el('div', 'qz-card__head');
   head.append(el('span', 'qz-eyebrow block-eyebrow', info?.label ?? 'Question'), el('span', 'qz-card__marks block-secondary', `${formatMarks(q.marks ?? 1)} ${q.marks === 1 ? 'mark' : 'marks'}`));
