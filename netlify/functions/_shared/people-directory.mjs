@@ -21,6 +21,7 @@ const ROLE_LABELS = {
   recruiter: 'Recruiter',
   referee: 'Referee',
   conference_contact: 'Conference contact',
+  parent: 'Parent / carer',
   introduction: 'Introduction',
   student: 'Student',
   other: 'Other'
@@ -101,6 +102,17 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       if (link.relationship_type === 'professional_relationship') {
         const role = link.role ?? 'other';
         const human = link.metadata?.human_label ?? null;
+        // A parent link is written parent → child; the child's row names the parent instead.
+        if (role === 'parent') {
+          const other = endpoint?.display_label ?? 'someone';
+          const isParent = link.source_ref === personRef;
+          proRoles.push({
+            role: isParent ? 'parent' : 'child',
+            label: isParent ? `Parent of ${other}` : `Child of ${other}`,
+            current: isCurrentLink(link)
+          });
+          continue;
+        }
         proRoles.push({
           role,
           label: human || ROLE_LABELS[role] || role,
@@ -129,7 +141,7 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     const moreRoles = currentOrgLinks.length > 1 ? ` +${currentOrgLinks.length - 1}` : '';
     const roleLine =
       (titled ? `${titled.role.trim()} · ${titled.display_name}${moreRoles}` : null) ??
-      proRoles.find((r) => r.current)?.label ??
+      proRoles.find((r) => r.current && r.role !== 'child')?.label ??
       (primaryOrg
         ? primaryOrg.current
           ? `At ${primaryOrg.display_name}${moreRoles}`
