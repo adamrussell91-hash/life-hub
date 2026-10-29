@@ -101,6 +101,8 @@ export type RenderContext = {
   openNoteId?: string;
   /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
   pageBlocks?: Block[];
+  /** A student lesson whose quiz questions sit inside sections or columns: the answer space for a question, by block id. */
+  quizSlot?: (blockId: string) => HTMLElement;
   /** Lessons a unit plan block may link to, resolved for this viewer (Curriculum lines). */
   unitLessons?: Array<{ id: string; title: string; href: string }>;
   /** Curriculum network for a unit map: the subject's lines, the unit's lessons and their week bands. */

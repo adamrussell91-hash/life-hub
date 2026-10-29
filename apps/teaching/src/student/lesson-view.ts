@@ -3,7 +3,7 @@ import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
-import { mountStudentQuiz } from '@/quiz/student-quiz';
+import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
 import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
@@ -189,9 +189,18 @@ function renderPublishedLesson(
   const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
   const inlineQuiz = !isQuiz && !!lesson.quiz;
   const quizClassId = extras?.cls?.id ?? extras?.quizClassId;
+  // Questions inside sections or columns are answered where they sit; the quiz box at the end keeps the hand-in.
+  const quizSlots = inlineQuiz && hasNestedQuizQuestion(lesson.blocks) ? new Map<string, HTMLElement>() : null;
+  const quizSlot = quizSlots
+    ? (id: string) => {
+        const slot = quizSlots.get(id) ?? document.createElement('div');
+        quizSlots.set(id, slot);
+        return slot;
+      }
+    : undefined;
   let quizPlaced = false;
   for (const block of lesson.blocks) {
-    if ((isQuiz || inlineQuiz) && block.block_type === 'quiz_question') {
+    if ((isQuiz || (inlineQuiz && !quizSlots)) && block.block_type === 'quiz_question') {
       if (inlineQuiz && !quizPlaced) {
         blocks.append(mountStudentQuiz(lesson, { classId: quizClassId }));
         quizPlaced = true;
@@ -206,7 +215,8 @@ function renderPublishedLesson(
         classId: extras?.cls?.id ?? extras?.quizClassId,
         pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
-        openNoteId
+        openNoteId,
+        ...(quizSlot ? { quizSlot } : {})
       })
     );
   }
@@ -215,7 +225,7 @@ function renderPublishedLesson(
     blocks: lesson.blocks,
     feedbackOff: lesson.feedback_off === true
   });
-  if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId }));
+  if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, ...(quizSlots ? { slots: quizSlots } : {}) }));
   content.append(blocks);
   if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: quizClassId }));
   revealBlockFromHash(content);
