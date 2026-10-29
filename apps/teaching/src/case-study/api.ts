@@ -76,6 +76,8 @@ export type CaseBoardStudent = {
   id: string;
   initials: string;
   name: string;
+  /** True once the student has saved anything in this case. */
+  started: boolean;
   /** Highest station index the student has reached. */
   at: number;
   locked: { option_id?: string; text?: string; confidence: number; changed: boolean } | null;
@@ -107,6 +109,8 @@ export type CaseTeacherApi = {
   releasePart(): Promise<CaseBoard>;
   /** Teacher pace: show the Outcome to the whole room. */
   reveal(): Promise<CaseBoard>;
+  /** Delete one student's work so they start the case again. */
+  clearStudent(studentId: string): Promise<CaseBoard>;
 };
 
 export function caseTeacherApi(lessonId: string): CaseTeacherApi {
@@ -116,7 +120,8 @@ export function caseTeacherApi(lessonId: string): CaseTeacherApi {
     board: () => call('board'),
     open: (station) => call('open', { station }),
     releasePart: () => call('release_part'),
-    reveal: () => call('reveal')
+    reveal: () => call('reveal'),
+    clearStudent: (studentId) => call('clear_student', { student_id: studentId })
   };
 }
 

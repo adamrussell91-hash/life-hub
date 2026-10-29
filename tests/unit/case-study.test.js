@@ -211,3 +211,21 @@ test('board lists every student and every doc, flags changed minds', async () =>
   assert.deepEqual(b.spread, { b: 1 });
   assert.equal(b.pace, 'own');
 });
+
+test('clear_student deletes one student’s work and leaves the others', async () => {
+  const store = await setup();
+  await toDecision(store, 1, 'a');
+  await toDecision(store, 2, 'b');
+  let b = await teach(store, 'board');
+  assert.equal(b.students.find((s) => s.initials === 'AB').started, true);
+  assert.equal(b.students.find((s) => s.initials === 'EF').started, false);
+  b = await teach(store, 'clear_student', { student_id: 'st_ann' });
+  const ann = b.students.find((s) => s.initials === 'AB');
+  assert.equal(ann.started, false);
+  assert.equal(ann.at, 0);
+  assert.equal(b.students.find((s) => s.initials === 'CD').started, true);
+  const again = await claim(store, 1);
+  assert.deepEqual(again.work, {});
+  await rejects(teach(store, 'clear_student', { student_id: 'st_ann' }), 'not_found');
+  await rejects(teach(store, 'clear_student', { student_id: '../x' }), 'bad_request');
+});
