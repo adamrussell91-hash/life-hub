@@ -6,10 +6,20 @@ type SectionBlock = Extract<Block, { block_type: 'section' }>;
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 type AnnotationBlock = Extract<Block, { block_type: 'annotation' }>;
 
+/**
+ * Students never get this block: teacher-only visibility, a teacher note, or a
+ * callout in the Teacher style. Keep in step with netlify/functions/_shared/teaching-student.mjs.
+ */
+export function isTeacherOnlyBlock(block: Block): boolean {
+  if (block.visibility === 'teacher_only') return true;
+  if ((block.block_type as string) === 'teacher_note') return true;
+  return block.block_type === 'callout' && block.content.style === 'teacher';
+}
+
 function collectTeacherOnlyIds(blocks: Block[] | undefined, out: Set<string>): void {
   if (!Array.isArray(blocks)) return;
   for (const block of blocks) {
-    if (block.visibility === 'teacher_only') out.add(block.id);
+    if (isTeacherOnlyBlock(block)) out.add(block.id);
     if (block.block_type === 'section') {
       collectTeacherOnlyIds(block.content.blocks as Block[], out);
     } else if (block.block_type === 'columns') {
@@ -112,11 +122,8 @@ function filterBlocksForStudentInner(
   teacherOnlyIds: Set<string>
 ): Block[] {
   return blocks
-    // Teacher note blocks are teacher-only by schema; the type check guards stale drafts too.
-    .filter(
-      (block) =>
-        block.visibility === 'student_teacher' && (block.block_type as string) !== 'teacher_note'
-    )
+    // Teacher notes and Teacher-style callouts are teacher-only whatever visibility a draft carries.
+    .filter((block) => !isTeacherOnlyBlock(block))
     .map((block) => studentTechniqueScan(block))
     .map(stripWalkthruField)
     .map((block) => {

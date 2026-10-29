@@ -34,7 +34,7 @@ export function renderBrainstorm(block: BrainstormBlock, mode: RenderMode, ctx: 
     return root;
   }
   if (mode === 'teacher') {
-    root.append(mountTeacher(block, ctx.lessonId));
+    root.append(mountTeacher(block, ctx.lessonId, ctx.display === true));
   } else {
     const corner = el('div', 'pf-corner');
     corner.hidden = true;

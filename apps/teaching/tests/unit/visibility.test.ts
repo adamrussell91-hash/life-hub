@@ -183,4 +183,12 @@ describe('filterBlocksForStudent', () => {
     const out = sanitizeBlocksDeep(filterBlocksForStudent([section, columns, tabs]));
     assertTeacherNotesGone(out);
   });
+
+  it('drops a Teacher-style callout even when it is marked for students', () => {
+    const teacher = createBlock('callout', 'mine');
+    const shared = createBlock('callout', 'theirs');
+    if (teacher.block_type !== 'callout') throw new Error('expected callout');
+    teacher.content.style = 'teacher';
+    expect(filterBlocksForStudent([teacher, shared]).map((b) => b.id)).toEqual(['theirs']);
+  });
 });

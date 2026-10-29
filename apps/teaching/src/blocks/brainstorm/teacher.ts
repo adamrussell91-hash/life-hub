@@ -35,7 +35,8 @@ const LAYOUTS: Array<{ value: Layout; label: string }> = [
 /** Latest state per endpoint, so a re-rendered block paints at once. */
 const lastState = new Map<string, TeacherState>();
 
-export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElement {
+/** On the class display the board shows, but held and removed ideas never paint. */
+export function mountTeacher(block: BrainstormBlock, lessonId: string, display = false): HTMLElement {
   const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/brainstorm/${encodeURIComponent(block.id)}`;
   const root = el('div', 'bs-run');
   const controls = el('div', 'bs-controls');
@@ -168,6 +169,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
   }
 
   function paintQueue(s: Live): void {
+    if (display) return;
     const waiting = s.answers.filter((a) => a.status === 'pending');
     const removed = s.answers.filter((a) => a.status === 'removed');
     const sig = JSON.stringify([waiting, removed]);

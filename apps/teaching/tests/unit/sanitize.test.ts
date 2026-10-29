@@ -60,6 +60,15 @@ describe('sanitizeRichTextHtml', () => {
     ).toBe('<a>bad</a>');
   });
 
+  it('strips disguised script links and keeps web, mail and relative links', () => {
+    expect(sanitizeRichTextHtml('<a href="java\tscript:alert(1)">a</a>')).toBe('<a>a</a>');
+    expect(sanitizeRichTextHtml('<a href="\u0001 JavaScript:alert(1)">b</a>')).toBe('<a>b</a>');
+    expect(sanitizeRichTextHtml('<a href="vbscript:x">c</a>')).toBe('<a>c</a>');
+    expect(sanitizeRichTextHtml('<a href="https://ok.example/p">d</a>')).toBe('<a href="https://ok.example/p">d</a>');
+    expect(sanitizeRichTextHtml('<a href="mailto:a@b.example">e</a>')).toBe('<a href="mailto:a@b.example">e</a>');
+    expect(sanitizeRichTextHtml('<a href="/lesson#x">f</a>')).toBe('<a href="/lesson#x">f</a>');
+  });
+
   it('keeps a numeric start on ol only', () => {
     expect(sanitizeRichTextHtml('<ol start="3"><li>x</li></ol>')).toBe('<ol start="3"><li>x</li></ol>');
     expect(sanitizeRichTextHtml('<ol start="x1" onclick="a()"><li>x</li></ol>')).toBe('<ol><li>x</li></ol>');

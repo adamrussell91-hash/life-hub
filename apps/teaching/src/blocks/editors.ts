@@ -434,8 +434,15 @@ export function createCalloutEditor(
     ).map((style) => ({ value: style, label: style === 'cultural_warning' ? 'Cultural warning' : style })),
     className: 'block-editor__callout-style',
     ariaLabel: 'Callout style',
-    onChange: () => emitChange()
+    onChange: () => {
+      teacherHint.hidden = styleSelect.getValue() !== 'teacher';
+      emitChange();
+    }
   });
+  const teacherHint = document.createElement('p');
+  teacherHint.className = 'block-editor__hint';
+  teacherHint.textContent = 'Only you see a Teacher callout. Students and the class display skip it.';
+  teacherHint.hidden = resolvedCalloutStyle(block.content) !== 'teacher';
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
@@ -474,7 +481,7 @@ export function createCalloutEditor(
   const targetLabel = document.createElement('label');
   targetLabel.textContent = 'Related activity or question';
   targetLabel.append(targetSelect);
-  fields.append(styleSelect.el, titleInput, bodyInput);
+  fields.append(styleSelect.el, teacherHint, titleInput, bodyInput);
   if (classroomExtras()) fields.append(targetLabel);
   return editorShell(block, onChange, fields, getLatest);
 }
