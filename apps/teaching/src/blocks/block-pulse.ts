@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { isTeacherOnlyBlock } from '@/blocks/visibility';
 
 /**
  * Block pulse: a quiet dot in a block's top-right corner. Students tap it to
@@ -89,7 +90,7 @@ const EXCLUDED_TYPES = new Set<Block['block_type']>([
 
 /** Can this kind of block ever carry a dot? (Ignores the off switches.) */
 export function blockTypeTakesPulse(block: Block): boolean {
-  return !EXCLUDED_TYPES.has(block.block_type) && block.visibility !== 'teacher_only';
+  return !EXCLUDED_TYPES.has(block.block_type) && !isTeacherOnlyBlock(block);
 }
 
 export function blockPulseOff(block: Block): boolean {

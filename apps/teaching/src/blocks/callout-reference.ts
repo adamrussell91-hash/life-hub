@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { isTeacherOnlyBlock } from '@/blocks/visibility';
 
 type Mode = 'teacher' | 'student' | 'print';
 export type CalloutTarget = { block_id: string; question_id?: string };
@@ -35,7 +36,7 @@ export function calloutIdentity(style: string): HTMLElement {
 
 function visibleBlocks(blocks: Block[], mode: Mode): Block[] {
   return blocks.flatMap(block => {
-    if (mode !== 'teacher' && block.visibility === 'teacher_only') return [];
+    if (mode !== 'teacher' && isTeacherOnlyBlock(block)) return [];
     let children: Block[] = [];
     if (block.block_type === 'section') children = block.content.blocks as Block[];
     if (block.block_type === 'columns') children = block.content.columns.flatMap(c => c.blocks) as Block[];

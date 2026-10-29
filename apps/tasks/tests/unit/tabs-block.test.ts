@@ -66,7 +66,8 @@ describe('renderTabsBlock', () => {
     (tabButtons[1] as HTMLButtonElement).click();
     expect(tabButtons[1]!.getAttribute('aria-selected')).toBe('true');
     expect(el.querySelector('[data-block-type="heading"]')).toBeTruthy();
-    expect(el.querySelector('[data-block-type="rich_text"]')).toBeFalsy();
+    // The first panel is hidden, not rebuilt, so anything typed in it survives the switch.
+    expect(el.querySelector('[data-block-type="rich_text"]')!.closest<HTMLElement>('[role="tabpanel"]')!.hidden).toBe(true);
   });
 
   it('renderBlock dispatches tabs', () => {

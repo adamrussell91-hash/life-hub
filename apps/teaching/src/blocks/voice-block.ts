@@ -43,6 +43,11 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
     root.append(el('p', 'pf-note block-secondary', 'Students record from the published lesson.'));
     return root;
   }
+  if (mode === 'teacher' && ctx.display) {
+    // The marking inbox names students, so the class screen shows the task only.
+    root.append(el('p', 'pf-note block-secondary', 'Record your answer on your own device.'));
+    return root;
+  }
   root.append(mode === 'teacher' ? mountVoiceTeacher(block, ctx.lessonId) : mountVoiceStudent(block, ctx.lessonId));
   return root;
 }

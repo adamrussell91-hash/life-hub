@@ -180,7 +180,10 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
     root.append(el('p', 'pf-note block-secondary', 'Students take part from the published lesson.'));
     return root;
   }
-  if (mode === 'teacher') {
+  if (mode === 'teacher' && ctx.display) {
+    // The class screen shows the task; answers and feedback stay on the teacher's own screen.
+    root.append(el('p', 'pf-note block-secondary', 'Write your answer on your own device, then swap and give feedback.'));
+  } else if (mode === 'teacher') {
     root.append(mountTeacher(block, ctx.lessonId));
   } else {
     const corner = el('div', 'pf-corner');

@@ -1008,6 +1008,12 @@ export function cloneBlockWithNewIds(
     const lineMap = new Map<string, string>();
     const layerMap = new Map<string, string>();
     const sublayerMap = new Map<string, string>();
+    // Every anchor (thread stops and voice taps and clips too) points at the copy's stanzas and lines.
+    const remapAnchor = <A extends { stanza: string; line?: string }>(anchor: A): A => ({
+      ...anchor,
+      stanza: stanzaMap.get(anchor.stanza) ?? anchor.stanza,
+      line: anchor.line ? (lineMap.get(anchor.line) ?? anchor.line) : undefined
+    });
     cloned.content = {
       ...cloned.content,
       text: {
@@ -1045,13 +1051,16 @@ export function cloneBlockWithNewIds(
         sublayer_id: ann.sublayer_id
           ? (sublayerMap.get(ann.sublayer_id) ?? ann.sublayer_id)
           : undefined,
-        anchor: {
-          ...ann.anchor,
-          stanza: stanzaMap.get(ann.anchor.stanza) ?? ann.anchor.stanza,
-          line: ann.anchor.line ? (lineMap.get(ann.anchor.line) ?? ann.anchor.line) : undefined
-        },
+        anchor: remapAnchor(ann.anchor),
+        also_anchors: ann.also_anchors?.map(remapAnchor),
         created_at: stamp,
         updated_at: stamp
+      })),
+      voice_tracks: cloned.content.voice_tracks?.map((track) => ({
+        ...track,
+        layer_id: layerMap.get(track.layer_id) ?? track.layer_id,
+        taps: track.taps?.map((tap) => ({ ...tap, anchor: remapAnchor(tap.anchor) })),
+        clips: track.clips.map((clip) => ({ ...clip, anchor: clip.anchor ? remapAnchor(clip.anchor) : undefined }))
       })),
       settings: {
         ...cloned.content.settings,

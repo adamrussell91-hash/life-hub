@@ -43,6 +43,37 @@ describe('AnnotationBlockSchema', () => {
     expect(cloned.content.annotations[0]!.id).not.toBe('ann_word');
     expect(cloned.content.annotations[0]!.layer_id).toBe(cloned.content.layers[1]!.id);
   });
+
+  it('clones thread stops and voice tracks onto the copy\'s lines and layers', () => {
+    const source = structuredClone(dulceAnnotationFixture);
+    const quote = { exact: 'trudge' };
+    const stop = (id: string, line: string) => ({ id, granularity: 'line' as const, stanza: 'stanza_1', line, quote });
+    source.content.annotations[0]!.anchor = stop('s1', 'line_4');
+    source.content.annotations[0]!.also_anchors = [stop('s2', 'line_2')];
+    source.content.layers.push({ id: 'layer_voice', name: 'Reading', kind: 'voice', colour: 'wave' } as (typeof source.content.layers)[number]);
+    source.content.voice_tracks = [{
+      id: 'track_1', layer_id: 'layer_voice', kind: 'reading', title: 'Read aloud', status: 'draft',
+      audio: { url: 'https://example.test/a.webm', duration_s: 3, mime: 'audio/webm' },
+      transcript: { words: [], timing: 'estimated' },
+      taps: [{ t: 1, anchor: stop('t1', 'line_1') }],
+      clips: [{ id: 'clip_1', start_s: 0, end_s: 1, word_range: [0, 0], anchor: stop('c1', 'line_3'), source: 'tap', confidence: 1, approved: true, transcript_text: '' }]
+    }];
+    expect(BlockSchema.safeParse(source).success).toBe(true);
+
+    let n = 0;
+    const cloned = cloneBlockWithNewIds(source, () => `id_${++n}`);
+    if (cloned.block_type !== 'annotation') throw new Error('expected annotation');
+    expect(BlockSchema.safeParse(cloned).success).toBe(true);
+    const lineIds = new Set(cloned.content.text.stanzas.flatMap((s) => s.lines.map((l) => l.id)));
+    const stanzaIds = new Set(cloned.content.text.stanzas.map((s) => s.id));
+    const ann = cloned.content.annotations[0]!;
+    const track = cloned.content.voice_tracks![0]!;
+    for (const anchor of [ann.anchor, ...ann.also_anchors!, track.taps![0]!.anchor, track.clips[0]!.anchor!]) {
+      expect(stanzaIds.has(anchor.stanza)).toBe(true);
+      expect(lineIds.has(anchor.line!)).toBe(true);
+    }
+    expect(cloned.content.layers.map((l) => l.id)).toContain(track.layer_id);
+  });
 });
 
 describe('annotation render + sanitise', () => {
