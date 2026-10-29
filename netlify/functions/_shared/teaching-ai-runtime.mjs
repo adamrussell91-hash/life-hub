@@ -1468,7 +1468,9 @@ var QuestionItemSchema = z10.object({
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
   level: z10.enum(["beginner", "detective", "judge", "inventor"]).optional(),
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
-  logic: LogicSchema.optional()
+  logic: LogicSchema.optional(),
+  /** Short answer only: the answer a student can check their own against. */
+  model_answer: z10.string().optional()
 });
 var PeerFeedbackBlockSchema = z10.object({
   id: z10.string().min(1),
@@ -2574,7 +2576,9 @@ var TabsBlockSchema = z10.object({
         label: z10.string(),
         blocks: z10.array(TabChildBlockSchema)
       })
-    ).min(2).max(8)
+    ).min(2).max(8),
+    /** Absent means tabs; folds shows each panel as a fold-out. */
+    style: z10.enum(["tabs", "folds"]).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -4335,7 +4339,7 @@ var NEW_BLOCK_LABEL = {
   definition: "Definition",
   code: "Code",
   html: "HTML",
-  html_app: "HTML app",
+  html_app: "Interactive app",
   image: "Image",
   gallery: "Gallery",
   video: "Video",
@@ -4361,7 +4365,7 @@ var NEW_BLOCK_LABEL = {
   chart: "Chart",
   equation: "Equation",
   diagram: "Diagram",
-  mind_map: "Mind map",
+  mind_map: "Map",
   concept_map: "Concept map",
   curriculum_lines: "Curriculum lines",
   whiteboard: "Whiteboard",
@@ -4370,7 +4374,7 @@ var NEW_BLOCK_LABEL = {
   spacer: "Spacer",
   timeline: "Timeline",
   card_stack: "Card stack",
-  tabs: "Tabs",
+  tabs: "Panels",
   collection: "Collection",
   anthology: "Anthology",
   outcomes: "Outcomes",
@@ -4405,21 +4409,20 @@ var BLOCK_GROUPS = [
   {
     label: "Basic",
     types: [
+      // Quote is a Callout style, Rich text has its own HTML source view, and the word tray replaced Definition.
       "rich_text",
       "heading",
       "callout",
       "teacher_note",
-      "quote",
       "table",
-      "definition",
       "code",
-      "html",
       "html_app"
     ]
   },
   {
     label: "Media",
-    types: ["image", "gallery", "video", "embed", "audio", "attachment"]
+    // Image grows into a gallery from its own editor.
+    types: ["image", "video", "embed", "audio", "attachment"]
   },
   {
     label: "Teaching",
@@ -4453,20 +4456,20 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "note_cue", "faded_example", "with_teacher", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "question_set", "flashcards", "cloze", "note_cue", "faded_example", "with_teacher", "annotation"]
   },
   {
     label: "Visualisation",
-    types: ["chart", "timeline", "equation", "diagram", "mind_map", "concept_map", "curriculum_lines", "whiteboard"]
+    // One Map entry: its editor switches between a tree (mind map) and a network (concept map).
+    types: ["chart", "timeline", "equation", "diagram", "mind_map", "curriculum_lines", "whiteboard"]
   },
   {
     label: "Layout",
     types: [
+      // Divider switches to a space, and Panels show as tabs or fold-outs.
       "section",
       "columns",
       "divider",
-      "spacer",
-      "accordion",
       "tabs",
       "card_stack",
       "collection",
@@ -4476,7 +4479,7 @@ var BLOCK_GROUPS = [
 ];
 var PAGE_ONLY_TYPES = /* @__PURE__ */ new Set(["collection", "anthology"]);
 var UNIT_ONLY_TYPES = /* @__PURE__ */ new Set(["curriculum_lines"]);
-var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value"]);
+var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value", "definition", "html"]);
 var TOOLKIT_GROUP_TYPES = [
   "thinking_intentions",
   "toolkit_skill",
@@ -6667,7 +6670,7 @@ function validateConceptMap(content) {
 var KIND_LABEL = {
   rich_text: "Text",
   html: "HTML",
-  html_app: "HTML app",
+  html_app: "Interactive app",
   question_set: "Question set",
   question_drop: "Question drop",
   done: "Done",
@@ -6681,7 +6684,7 @@ var KIND_LABEL = {
   note_cue: "Note cue",
   with_teacher: "With teacher",
   faded_example: "Faded example",
-  mind_map: "Mind map",
+  mind_map: "Map",
   concept_map: "Concept map"
 };
 var CAPTION_MAX = 48;

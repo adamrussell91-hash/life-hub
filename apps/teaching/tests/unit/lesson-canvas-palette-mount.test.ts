@@ -101,9 +101,9 @@ describe('mountLessonPalette', () => {
 
     const flyout = host.querySelector('.lesson-palette__flyout');
     expect(flyout).not.toBeNull();
-    const card = host.querySelector('[data-block-type="concept_map"]');
+    const card = host.querySelector('[data-block-type="mind_map"]');
     expect(card).not.toBeNull();
-    expect(card?.textContent).toContain(INSERT_MENU_DESCRIPTION.concept_map);
+    expect(card?.textContent).toContain(INSERT_MENU_DESCRIPTION.mind_map);
   });
 
   it('closes the flyout on a second family click', () => {
@@ -156,13 +156,13 @@ describe('mountLessonPalette', () => {
     });
 
     host.querySelector<HTMLButtonElement>('[data-family="Visualisation"]')!.click();
-    const card = host.querySelector<HTMLElement>('[data-block-type="concept_map"]')!;
+    const card = host.querySelector<HTMLElement>('[data-block-type="mind_map"]')!;
     const dt = dispatchDragStart(card);
 
     expect(host.dataset.dragging).toBe('true');
     expect(onDragStart).toHaveBeenCalled();
     expect(dt.effectAllowed).toBe('copy');
-    expect(JSON.parse(dt.getData(MIME))).toEqual({ kind: 'block', type: 'concept_map' });
+    expect(JSON.parse(dt.getData(MIME))).toEqual({ kind: 'block', type: 'mind_map' });
 
     const flyout = host.querySelector('.lesson-palette__flyout');
     const receded =
