@@ -1,7 +1,6 @@
 /*
  * Word tray under a rich text block in a lesson (src/blocks/word-tray.ts).
- * Kit tokens only. Matrix tiles reuse morphology.css so a word's parts keep
- * one colour from the build row to the book page.
+ * Kit tokens only. The matrix inside keeps its own styles (morphology.css).
  */
 
 .word-tray {
@@ -78,16 +77,6 @@
   transform: rotate(90deg);
 }
 
-.word-tray__tick {
-  display: inline-grid;
-  place-items: center;
-  width: 1rem;
-  height: 1rem;
-  border-radius: var(--radius-full);
-  background: var(--pastel-sage-ink);
-  color: var(--paper);
-  font-size: var(--text-2xs);
-}
 
 /* Panel ------------------------------------------------------------------------ */
 
@@ -188,183 +177,16 @@
   font-weight: var(--weight-semibold);
 }
 
-/* Steps ------------------------------------------------------------------------ */
-
-.word-tray__steps {
-  display: flex;
-  gap: var(--space-1);
-  width: fit-content;
-  max-width: 100%;
+/* The matrix sits under the meaning, split off by a rule. */
+.word-tray__panel > .morph-matrix {
   margin-top: var(--space-2);
-  padding: 3px;
-  border-radius: var(--radius-sm);
-  background: var(--cotton);
-}
-
-.word-tray__step {
-  display: inline-flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 2.5rem;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--orca);
-  font: var(--weight-semibold) var(--text-sm) / 1 var(--font-ui);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.word-tray__step[aria-selected='true'] {
-  background: var(--paper);
-  color: var(--marine);
-  box-shadow: 0 1px 2px rgba(20, 43, 81, 0.12);
-}
-
-.word-tray__step-n {
-  display: inline-grid;
-  place-items: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: var(--radius-full);
-  background: var(--wave);
-  color: var(--paper);
-  font-size: var(--text-2xs);
-}
-
-.word-tray__pane {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.word-tray__pane[hidden] {
-  display: none;
-}
-
-.word-tray__next {
-  justify-self: end;
-}
-
-/* Copy it down: a ruled book page ---------------------------------------------- */
-
-.word-tray__book {
-  --rule: 2rem;
-  padding: 0 var(--space-4) 0 calc(var(--space-4) + 1.5rem);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(var(--space-4) + 0.75rem),
-      color-mix(in oklab, var(--high-sea) 45%, transparent) calc(var(--space-4) + 0.75rem),
-      color-mix(in oklab, var(--high-sea) 45%, transparent) calc(var(--space-4) + 0.75rem + 1px),
-      transparent calc(var(--space-4) + 0.75rem + 1px)
-    ),
-    repeating-linear-gradient(
-      var(--paper) 0 calc(var(--rule) - 1px),
-      color-mix(in oklab, var(--wave) 22%, transparent) calc(var(--rule) - 1px) var(--rule)
-    );
-}
-
-/* One rule per line: blanks shrink rather than wrap, so writing lines stay on the ruling. */
-.word-tray__line {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0 var(--space-2);
-  min-height: var(--rule);
-  margin: 0;
-  font-size: var(--text-base);
-  line-height: var(--rule);
-}
-
-.word-tray__line-label {
-  flex: none;
-  color: var(--orca);
-}
-
-.word-tray__copy-word {
-  font-size: var(--text-md);
-  color: var(--marine);
-}
-
-.word-tray__parts {
-  display: inline-flex;
-  gap: 3px;
-}
-
-.word-tray__parts .morph-matrix__tile {
-  min-width: 0;
-  min-height: 1.5rem;
-  padding: 0 var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.word-tray__blank {
-  flex: 1 1 8rem;
-  min-width: 2rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border-bottom: 1px dashed var(--muted);
-  color: var(--muted);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-}
-
-.word-tray__copy-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.word-tray__check {
-  min-height: 2.75rem;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-  color: var(--marine);
-  font: var(--weight-semibold) var(--text-sm) / 1 var(--font-ui);
-  cursor: pointer;
-}
-
-.word-tray__check.is-done {
-  border-color: var(--pastel-sage-ink);
-  background: var(--pastel-sage);
-  color: var(--pastel-sage-ink);
-}
-
-.word-tray__hint {
-  font-size: var(--text-xs);
-  color: var(--muted);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 480px) {
   .word-tray__panel {
     padding: var(--space-3);
-  }
-
-  .word-tray__steps {
-    width: 100%;
-  }
-
-  .word-tray__step {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: var(--space-1) var(--space-2);
-    white-space: normal;
-    line-height: 1.2;
-  }
-
-  .word-tray__book {
-    padding-right: var(--space-3);
   }
 }
 

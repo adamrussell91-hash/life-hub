@@ -18,7 +18,6 @@ import type { Block } from '@/schemas/block';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import {
   DICTIONARY_ICON,
-  readCopyStep,
   readWordHelp,
   wordsPresentIn,
   type WordHelpEntry
@@ -106,15 +105,14 @@ export function createRichTextTools(options: {
     tiptap.host.classList.toggle('word-help-scanning', on);
   }
 
-  function saveWords(words: WordHelpEntry[], copyStep = readCopyStep(options.getLatest())): void {
+  function saveWords(words: WordHelpEntry[]): void {
     const latest = options.getLatest();
     const settings = { ...(latest.settings ?? {}) } as Record<string, unknown>;
     if (words.length) {
       const previous = settings.word_help as { scanned_at?: unknown } | undefined;
       settings.word_help = {
         words,
-        scanned_at: typeof previous?.scanned_at === 'string' ? previous.scanned_at : new Date().toISOString(),
-        ...(copyStep ? {} : { copy_step: false })
+        scanned_at: typeof previous?.scanned_at === 'string' ? previous.scanned_at : new Date().toISOString()
       };
     } else delete settings.word_help;
     options.onChange({ ...latest, settings });
@@ -226,16 +224,6 @@ export function createRichTextTools(options: {
     chips.append(addButton);
     wordStrip.append(label, chips);
 
-    if (saved.some((entry) => entry.pinned)) {
-      const copy = document.createElement('label');
-      copy.className = 'word-help-strip__copy';
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.checked = readCopyStep(latest);
-      box.addEventListener('change', () => saveWords(readWordHelp(options.getLatest()), box.checked));
-      copy.append(box, 'Copy it down step');
-      wordStrip.append(copy);
-    }
     if (scanned.length) {
       const clear = chipButton('Clear', 'btn btn--ghost word-help-strip__clear');
       clear.addEventListener('click', () => {
@@ -313,7 +301,7 @@ export function createRichTextTools(options: {
       delete settings.word_help;
       const merged = mergeScan(words);
       options.onChange({ ...latest, settings });
-      saveWords(merged, readCopyStep(latest));
+      saveWords(merged);
       say(words.length ? '' : 'No challenging words found in this block.');
     } catch (error) {
       say(error instanceof Error && error.message ? error.message : 'The scan did not finish. Try again.', 'error');

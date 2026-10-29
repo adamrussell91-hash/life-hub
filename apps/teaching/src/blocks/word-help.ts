@@ -26,8 +26,7 @@ export type WordHelpEntry = {
   added?: boolean;
 };
 
-/** `copy_step: false` hides the Copy it down step in the word tray. */
-export type WordHelpData = { words: WordHelpEntry[]; scanned_at: string; copy_step?: boolean };
+export type WordHelpData = { words: WordHelpEntry[]; scanned_at: string };
 
 export const WORD_HELP_KIND_LABEL: Record<WordHelpKind, string> = {
   technical: 'Technical',
@@ -74,12 +73,6 @@ export function normaliseWordHelp(value: unknown): WordHelpEntry[] {
 export function readWordHelp(block: { settings?: Record<string, unknown> }): WordHelpEntry[] {
   const saved = block.settings?.word_help as { words?: unknown } | undefined;
   return normaliseWordHelp(saved?.words);
-}
-
-/** Whether the word tray offers its Copy it down step. On unless the teacher turned it off. */
-export function readCopyStep(block: { settings?: Record<string, unknown> }): boolean {
-  const saved = block.settings?.word_help as { copy_step?: unknown } | undefined;
-  return saved?.copy_step !== false;
 }
 
 /** What opens when a lit word is tapped: the floating card, or a lesson's word tray. */

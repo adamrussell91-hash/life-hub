@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WordHelpEntry } from '@/blocks/word-help';
-import { copiedStorageKey, createWordTray } from '@/blocks/word-tray';
+import { createWordTray } from '@/blocks/word-tray';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import { renderBlock } from '@/blocks/render';
 import { LESSON_BLOCK_GROUPS, HOMEPAGE_BLOCK_GROUPS } from '@/blocks/create-block';
@@ -63,12 +63,7 @@ afterEach(() => {
 
 describe('word tray', () => {
   it('shows pinned words as pills and opens one word at a time under the text', () => {
-    const tray = createWordTray({
-      lessonId: 'l1',
-      pinned: [entry('paradox'), entry('orthodox')],
-      copyStep: true,
-      storage: memoryStorage()
-    });
+    const tray = createWordTray({ pinned: [entry('paradox'), entry('orthodox')], storage: memoryStorage() });
     document.body.append(tray.root);
     const pills = tray.root.querySelectorAll<HTMLButtonElement>('.word-tray__pill');
     expect([...pills].map((p) => p.textContent)).toEqual(['paradox›', 'orthodox›']);
@@ -88,44 +83,20 @@ describe('word tray', () => {
     expect(panel.hidden).toBe(true);
   });
 
-  it('a family word starts in Play with the word, built from the tapped word', () => {
-    const tray = createWordTray({ lessonId: 'l1', pinned: [entry('paradox')], copyStep: true, storage: memoryStorage() });
+  it('a family word shows the matrix built from the tapped word, with no copy-down page', () => {
+    const tray = createWordTray({ pinned: [entry('paradox')], storage: memoryStorage() });
     document.body.append(tray.root);
     tray.open(entry('paradox'));
-    const steps = [...tray.root.querySelectorAll('.word-tray__step')].map((s) => s.textContent);
-    expect(steps).toEqual(['1Play with the word', '2Copy it down']);
     expect(tray.root.querySelector('.morph-matrix__result .morph-matrix__word')?.textContent).toBe('paradox');
     expect(tray.root.querySelector('.morph-matrix__chip[aria-pressed="true"]')?.textContent).toBe('para-');
+    expect(tray.root.textContent).not.toContain('Copy it down');
   });
 
-  it('Copy it down lays out the book page and ticks the pill once copied', () => {
-    const storage = memoryStorage();
-    const tray = createWordTray({ lessonId: 'l1', pinned: [entry('paradox')], copyStep: true, storage });
-    document.body.append(tray.root);
-    tray.open(entry('paradox'));
-    press(tray.root, 'Copy it down →');
-    const book = tray.root.querySelector('.word-tray__book')!;
-    expect(book.textContent).toContain('Means:');
-    expect(book.textContent).toContain('I built:');
-    expect([...book.querySelectorAll('.morph-matrix__tile')].map((t) => t.textContent)).toEqual(['para', 'dox']);
-
-    press(tray.root, "I've copied it into my book");
-    expect(tray.root.querySelector('.word-tray__check')?.textContent).toBe('✓ Copied into my book');
-    expect(tray.root.querySelector('.word-tray__pill .word-tray__tick')).not.toBeNull();
-    expect(JSON.parse(storage.getItem(copiedStorageKey('l1'))!)).toEqual(['paradox']);
-  });
-
-  it('a word with no family gets only Copy it down; with the step off, just the meaning', () => {
-    const tray = createWordTray({ lessonId: 'l1', pinned: [], copyStep: true, storage: memoryStorage() });
-    document.body.append(tray.root);
+  it('a word with no family shows just its meaning', () => {
+    const tray = createWordTray({ pinned: [], storage: memoryStorage() });
     tray.open(entry('ephemeral'));
-    expect(tray.root.querySelector('.word-tray__steps')).toBeNull();
-    expect(tray.root.querySelector('.word-tray__book')?.textContent).not.toContain('I built:');
-
-    const plain = createWordTray({ lessonId: 'l1', pinned: [], copyStep: false, storage: memoryStorage() });
-    plain.open(entry('ephemeral'));
-    expect(plain.root.querySelector('.word-tray__book, .word-tray__steps')).toBeNull();
-    expect(plain.root.querySelector('.word-tray__def')?.textContent).toBe('Meaning of ephemeral.');
+    expect(tray.root.querySelector('.morph-matrix')).toBeNull();
+    expect(tray.root.querySelector('.word-tray__def')?.textContent).toBe('Meaning of ephemeral.');
   });
 
   it('in a lesson a lit word opens the tray, not the floating card; elsewhere the card stays', () => {
@@ -164,7 +135,7 @@ describe('teacher word strip', () => {
     return { tiptap, onChange, getLatest: () => latest };
   }
 
-  it('pins scanned words, adds a typed word, and turns the copy step off', () => {
+  it('pins scanned words and adds a typed word', () => {
     const ctx = setup('<p>The ephemeral glow.</p>', { word_help: { words: [entry('ephemeral')], scanned_at: 'x' } });
     const tools = createRichTextTools(ctx);
     document.body.append(tools.strip);
@@ -179,12 +150,6 @@ describe('teacher word strip', () => {
     meaning.value = 'Something unusual.';
     tools.strip.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(words()[1]).toMatchObject({ word: 'anomaly', definition: 'Something unusual.', added: true, pinned: true });
-
-    const copy = tools.strip.querySelector<HTMLInputElement>('.word-help-strip__copy input')!;
-    expect(copy.checked).toBe(true);
-    copy.checked = false;
-    copy.dispatchEvent(new Event('change'));
-    expect(ctx.getLatest().settings.word_help).toMatchObject({ copy_step: false });
 
     press(tools.strip, 'Clear');
     expect(words().map((w) => w.word)).toEqual(['anomaly']);
