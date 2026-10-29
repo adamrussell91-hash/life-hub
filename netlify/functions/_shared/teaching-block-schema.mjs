@@ -161,6 +161,13 @@ var ReasoningConfigSchema = z5.object({
   supports: z5.record(StepTextSchema.nullable()).optional(),
   examples: z5.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SleeveLevelSchema = z5.enum(["support", "extend"]);
+var SleeveConfigSchema = z5.object({
+  level: SleeveLevelSchema.default("support"),
+  student_level: z5.boolean().default(true),
+  do: z5.string().max(600).optional(),
+  checks: z5.array(z5.string().max(300)).max(3).optional()
+});
 
 // apps/teaching/src/tutorial/schema.ts
 import { z as z6 } from "zod";

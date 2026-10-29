@@ -75,7 +75,6 @@ export function seedCase(lesson: { route_role?: LessonRouteRole | null | undefin
     options.push(newOption({ ...seeded, decision: { prompt: '', options } }));
     seeded.decision = { prompt: '', options };
   }
-  if (base.pace === 'own') seeded.objections = [''];
   return seeded;
 }
 
@@ -95,10 +94,9 @@ export function caseIssues(lesson: CaseLesson): string[] {
   else if (options === 1) out.push('Add a second option, or remove the first for a free-text decision.');
   if (!filled(c.outcome?.text)) out.push('Write what actually happened (Outcome).');
   if (!filled(c.outcome?.source)) out.push('The outcome needs a source.');
-  if (c.pace === 'own' && (c.objections.length < 1 || c.objections.length > 3 || c.objections.some((o) => !filled(o)))) out.push('At their own pace, add 1 to 3 objections.');
   if (c.release === 'layered' && c.parts.slice(0, -1).some((p) => !filled(p.question))) out.push('Layered release needs a question on every part except the last.');
   const t = c.transfer;
-  if (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question)) out.push('Write the unseen case: a title, a document and a question (Rules).');
+  if (!c.rules_off && (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question))) out.push('Write the unseen case: a title, a document and a question (Rules).');
   return out;
 }
 
@@ -117,7 +115,6 @@ export function publishChecklist(c: CaseSettings | undefined): ChecklistItem[] {
   items.push({ label: s.support === 'guided' ? '2 to 4 options' : 'Options set, or a free-text decision', ok: s.support === 'guided' ? options >= 2 && options <= 4 : options !== 1, tab: 'decide' });
   items.push({ label: 'What happened written', ok: filled(s.outcome?.text), tab: 'outcome' });
   items.push({ label: 'Outcome has a source', ok: filled(s.outcome?.source), tab: 'outcome' });
-  if (s.pace === 'own') items.push({ label: '1 to 3 objections', ok: s.objections.length >= 1 && s.objections.length <= 3 && s.objections.every(filled), tab: 'outcome' });
-  items.push({ label: 'Unseen case written', ok: !!s.transfer && filled(s.transfer.title) && docIssues(s.transfer.docs) && filled(s.transfer.question), tab: 'rules' });
+  if (!s.rules_off) items.push({ label: 'Unseen case written', ok: !!s.transfer && filled(s.transfer.title) && docIssues(s.transfer.docs) && filled(s.transfer.question), tab: 'rules' });
   return items;
 }

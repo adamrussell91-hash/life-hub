@@ -269,7 +269,7 @@ export const AI_TOOLS = [
   {
     name: 'propose_update_case',
     description:
-      'Propose changes to a case study lesson\'s settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string], transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.',
+      'Propose changes to a case study lesson\'s settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string] (optional challenges to the decision), reflection { question, off }, rules_off (true ends the case at the Outcome), transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.',
     input_schema: {
       type: 'object',
       properties: {
