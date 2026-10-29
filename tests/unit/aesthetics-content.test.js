@@ -12,7 +12,7 @@ const NO_PHOTO = new Set(['Tea Soirée', 'Orchard Rain']);
 test('recommendations use exact source names, perfumers and recorded note tiers', () => {
   assert.ok(FRAGRANCES.some(f => f.name === 'Asad Zanzibar Limited Edition'));
   assert.equal(FRAGRANCES.find(f => f.name === 'Milk Orchid').perfumer, 'Emma / Perfumerism x Commodity');
-  assert.deepEqual(FRAGRANCES.find(f => f.name === 'Syzygy').notes, ['Bergamot', 'Oud', 'Musk', 'Ambroxan']);
+  assert.deepEqual(FRAGRANCES.find(f => f.name === 'Syzygy').notes, ['Bergamot', 'Raspberry', 'Oud', 'Norlimbanol', 'Musk', 'Ambroxan']);
   assert.deepEqual(FRAGRANCES.find(f => f.name === 'Verge').notes, [], 'no invented pyramid when Notion only records a review');
 });
 

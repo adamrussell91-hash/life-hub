@@ -63,7 +63,7 @@ export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = '
 const HEAT_BANDS = new Set(['humid-heat', 'dry-heat', 'warm-humid']);
 const COLD_BANDS = new Set(['cool', 'cold', 'wet-cool']);
 const SWEET_NOTES = new Set(['Vanilla', 'Tonka Bean', 'Praline', 'Cocoa', 'Honey', 'Coconut']);
-const FRESH_NOTES = new Set(['Bergamot', 'Lemon', 'Citron', 'Grapefruit', 'Mandarin', 'Marine', 'Sea Notes', 'Mint', 'Aldehydes', 'Petitgrain', 'Apple', 'Pear']);
+const FRESH_NOTES = new Set(['Bergamot', 'Lemon', 'Citron', 'Grapefruit', 'Mandarin', 'Marine', 'Sea Notes', 'Mint', 'Aldehydes', 'Petitgrain', 'Apple', 'Pear', 'Snow Pear', 'Nashi Pear', 'Petrichor']);
 const HEAVY_NOTES = new Set(['Oud', 'Leather', 'Labdanum', 'Tobacco', 'Incense', 'Myrrh', 'Benzoin', 'Amber']);
 const BAND_PHRASE = {
   'humid-heat': 'muggy heat',
@@ -455,7 +455,8 @@ const WARMTH = {
   Cashmeran: 0.5, 'Dry Wood': 0.5, 'Bay Laurel': 0.5, 'Cashmere wood': 0.5, Vetiver: 0.3, 'Bourbon vetiver': 0.3, 'Haitian vetiver': 0.3,
   Bergamot: -1, Lemon: -2, Citron: -2, Grapefruit: -2, Mandarin: -1, Petitgrain: -1, Mint: -2, Marine: -2, 'Sea Notes': -2, Salt: -2, Aldehydes: -1, Apple: -1, Pear: -1, Lavender: -1,
   Fennel: -1, 'Violet Leaf': -1, Cypress: -1, Tea: -1, 'Clary Sage': -1, Geranium: -1, Neroli: -1, Ambroxan: -1, 'ISO E Super': -1, 'Black Pepper': -0.5, 'Pink Pepper': -0.5,
-  'Cedar Leaf': -1, 'Water Hyacinth': -1, Olive: -1, 'Tomato Leaf': -2, Juniper: -1, Mate: -1, Ginger: -1, Tarragon: -1, Musk: -0.3
+  'Cedar Leaf': -1, 'Water Hyacinth': -1, Olive: -1, 'Tomato Leaf': -2, Juniper: -1, Mate: -1, Ginger: -1, Tarragon: -1, Musk: -0.3,
+  'Snow Pear': -1, 'Nashi Pear': -1, Lychee: -0.5, Petrichor: -2, 'Sheer Musk': -0.3, Norlimbanol: 0.5
 };
 const SWEETNESS = {
   Vanilla: 2, 'Tonka Bean': 2, Praline: 2, Cocoa: 2, Coconut: 2, 'Sour Cherry': 2, Raspberry: 2, Honey: 1, Pandan: 1, 'Bitter Almond': 1, Peach: 1, Plum: 1, 'Black Currant': 1,
@@ -463,6 +464,7 @@ const SWEETNESS = {
   Vetiver: -2, 'Bourbon vetiver': -2, 'Haitian vetiver': -2, 'Vetiveryl acetate': -2, Cypress: -2, Incense: -2, Oud: -2, Leather: -2, Oakmoss: -2, 'Dry Wood': -2, Cypriol: -2,
   Cedarwood: -1, 'Black Pepper': -1, Patchouli: -1, 'Cashmere wood': -1, 'Guaiac Wood': -1, 'Teak Wood': -1, Salt: -1, Fennel: -1, 'Orris Root': -1, 'Cedar Leaf': -1, Akigalawood: -1,
   Olibanum: -1, Myrrh: -1, Clove: -1, Cumin: -1, 'Tomato Leaf': -1, Elemi: -1, Mate: -1, Olive: -1,
+  'Snow Pear': 1, 'Nashi Pear': 1, Lychee: 1, 'Plum Blossom': 0.5, 'Orchid Flower': 0.5, Petrichor: -1, 'Pale Wood': -0.5, Norlimbanol: -2,
   Tea: -0.5, Ambroxan: -0.5, Iris: -0.5, 'ISO E Super': -0.5, Tobacco: -0.5, Saffron: -0.5, Cardamom: -0.5
 };
 const axis = (notes, table) => {
