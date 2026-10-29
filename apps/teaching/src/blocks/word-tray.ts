@@ -6,10 +6,12 @@
  * a pill or a lit word in the text opens the tray, which pushes the next block
  * down rather than covering the passage. One word is open at a time.
  *
- * The tray holds the word's meaning and, when the word belongs to a known
- * family, the morphemic matrix built from the tapped word.
+ * The tray holds the word's meaning and its morphemic matrix, opened on the
+ * tapped word. A built-in matrix shows at once; any other word asks
+ * `loadMatrix`, and while a new matrix builds the tray says so under the
+ * meaning. A word with no prefix or suffix to build with shows its meaning only.
  */
-import { createMorphemicMatrix, findMorphology } from '@/blocks/morphology';
+import { createMorphemicMatrix, findMorphology, type MorphologyFamily } from '@/blocks/morphology';
 import { WORD_HELP_KIND_LABEL, type WordHelpEntry } from '@/blocks/word-help';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
@@ -32,6 +34,8 @@ const key = (word: string): string => word.trim().toLowerCase();
 export function createWordTray(options: {
   /** Words shown as pills in the strip. */
   pinned: WordHelpEntry[];
+  /** Matrices beyond the built-in ones. Lessons pass the shared library. */
+  loadMatrix?: (word: string) => Promise<MorphologyFamily | null>;
   storage?: Storage | null;
 }): { root: HTMLElement; open: (entry: WordHelpEntry, anchor?: HTMLElement) => void; close: () => void } {
   const storage = options.storage === undefined ? browserStorage() : options.storage;
@@ -122,7 +126,34 @@ export function createWordTray(options: {
       panel.append(origin);
     }
 
-    if (family) panel.append(createMorphemicMatrix(family, storage, { start: entry.word }));
+    if (family) {
+      panel.append(createMorphemicMatrix(family, storage, { start: entry.word }));
+      return;
+    }
+    if (!options.loadMatrix) return;
+    const building = el('div', 'word-tray__building');
+    building.setAttribute('role', 'status');
+    building.hidden = true;
+    const line = el('p', 'word-tray__building-line');
+    line.append(el('span', 'word-tray__spinner'), `Building the morphemic matrix for ${entry.word}…`);
+    const skeleton = el('div', 'word-tray__skeleton');
+    for (const width of [4, 3.25, 4.5, 3.75]) {
+      const bar = el('span', '');
+      bar.style.width = `${width}rem`;
+      skeleton.append(bar);
+    }
+    building.append(line, skeleton);
+    panel.append(building);
+    // A library answer comes back almost at once; only show "building" when it is a real build.
+    const reveal = setTimeout(() => {
+      building.hidden = false;
+    }, 400);
+    const opened = entry;
+    void options.loadMatrix(entry.word).then((matrix) => {
+      clearTimeout(reveal);
+      if (current !== opened) return;
+      building.replaceWith(...(matrix ? [createMorphemicMatrix(matrix, storage, { start: entry.word })] : []));
+    });
   }
 
   panel.addEventListener('keydown', (event) => {

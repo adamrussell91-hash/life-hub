@@ -9,6 +9,7 @@ export type LibraryView =
   | { kind: 'by-unit' }
   | { kind: 'outcomes' }
   | { kind: 'skills' }
+  | { kind: 'morphemic' }
   | { kind: 'folder'; id: string };
 
 export interface UsedInLink {
@@ -114,6 +115,7 @@ export function mediaForView(
       return media.filter((entry) => effectiveFolderId(entry, folders) === view.id);
     case 'outcomes':
     case 'skills':
+    case 'morphemic':
       return [];
   }
 }

@@ -34,7 +34,8 @@ export async function completeMessage({
   system,
   messages,
   signal,
-  thinking = { type: 'disabled' }
+  thinking = { type: 'disabled' },
+  outputConfig = null
 } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
@@ -45,6 +46,7 @@ export async function completeMessage({
     model,
     max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
     thinking,
+    ...(outputConfig ? { output_config: outputConfig } : {}),
     ...(system ? { system } : {}),
     messages,
     stream: false
