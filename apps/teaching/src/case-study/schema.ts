@@ -94,6 +94,14 @@ export const CaseHelpSchema = z.object({
 export type CaseHelp = z.infer<typeof CaseHelpSchema>;
 const CaseHelpMap = z.record(z.string(), CaseHelpSchema) as unknown as z.ZodType<Partial<Record<CaseStation, CaseHelp>>>;
 
+/** The default question under the Outcome, used when the teacher leaves it blank. */
+export const CASE_REFLECTION_DEFAULT = 'What did the case tell you that you didn’t use?';
+export const CaseReflectionSchema = z.object({
+  question: z.string().max(300).default(''),
+  off: z.boolean().default(false)
+});
+export type CaseReflection = z.infer<typeof CaseReflectionSchema>;
+
 export const CASE_PACES = ['teacher', 'own'] as const;
 export const CASE_SUPPORTS = ['guided', 'standard', 'open'] as const;
 export type CasePace = (typeof CASE_PACES)[number];
@@ -112,8 +120,12 @@ export const CaseSettingsSchema = z.object({
   parts: z.array(CasePartSchema).max(4).default([]),
   decision: CaseDecisionSchema.optional(),
   outcome: CaseOutcomeSchema.optional(),
-  /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
+  /** Own pace, optional: up to 3 challenges to the student's locked decision; they answer one before the Outcome opens. */
   objections: z.array(z.string().max(300)).max(3).default([]),
+  /** The question under the Outcome. Blank keeps the default wording; off drops the step. */
+  reflection: CaseReflectionSchema.optional(),
+  /** True drops the Rules station: no rule of thumb and no unseen case, so the case ends at the Outcome. */
+  rules_off: z.boolean().optional(),
   transfer: CaseTransferSchema.optional(),
   /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
   class_id: z.string().max(64).optional(),
@@ -131,6 +143,8 @@ export const PublicCaseSchema = z.object({
   /** Part titles only, so the rail can say "Part 2 to come". */
   part_titles: z.array(z.string().max(80)).max(4),
   has_objections: z.boolean(),
+  reflection: CaseReflectionSchema.optional(),
+  rules_off: z.boolean().optional(),
   help: CaseHelpMap.optional()
 });
 export type PublicCase = z.infer<typeof PublicCaseSchema>;

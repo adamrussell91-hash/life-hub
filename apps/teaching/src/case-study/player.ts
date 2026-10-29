@@ -6,7 +6,7 @@ import { button, el } from '@/quiz/dom';
 import { coach } from '@/sprint/form-kit';
 import { buildCaseRail, type CaseRailItem, type CaseRailState } from './rail';
 import { helpGuide } from './help';
-import { CASE_DOC_LABELS, CASE_STATIONS, CASE_STATION_LABELS, type CaseDoc, type CaseStation, type PublicCase } from './schema';
+import { CASE_DOC_LABELS, CASE_REFLECTION_DEFAULT, CASE_STATIONS, CASE_STATION_LABELS, type CaseDoc, type CaseStation, type PublicCase } from './schema';
 import type { CaseClient, CaseStatus } from './api';
 import '@/sprint/sprint.css';
 import './case-study.css';
@@ -175,6 +175,8 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   // ------------------------------------------------------------ state helpers
 
   const index = (key: CaseStation) => CASE_STATIONS.indexOf(key);
+  /** The stations this case runs: Rules drops off when the teacher turns it off. */
+  const stations = cs.rules_off ? CASE_STATIONS.filter((k) => k !== 'rules') : CASE_STATIONS;
   const locked = () => !!status?.work.decision;
   const stationDone = (s: CaseStatus, i: number) => s.done.includes(CASE_STATIONS[i]!) || (i < 2 && !!s.work.decision);
 
@@ -328,7 +330,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
 
   /** Own pace: the button to the next station once this one is done. Teacher pace: a waiting note. */
   function pacing(s: CaseStatus, i: number): HTMLElement | null {
-    if (i >= CASE_STATIONS.length - 1 || !s.done.includes(CASE_STATIONS[i]!) || i < s.open_to) return null;
+    if (i >= stations.length - 1 || !s.done.includes(CASE_STATIONS[i]!) || i < s.open_to) return null;
     const next = CASE_STATION_LABELS[CASE_STATIONS[i + 1]!];
     if (cs.pace === 'own') {
       const row = el('div', 'cs-row');
@@ -413,7 +415,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   function objectionCard(s: CaseStatus): HTMLElement | null {
     if (!s.objections?.length || s.work.objection) return null;
     const card = el('div', 'cs-objection');
-    card.append(el('p', 'cs-panel__eyebrow', 'Before the outcome: the strongest objection'));
+    card.append(el('p', 'cs-panel__eyebrow', 'Before the outcome: someone disagrees with you'), note('Pick one challenge to your decision and answer it.', 'cs-hint'));
     const pick = el('div', 'cs-opts');
     const chosenAt = drafts.objIndex ?? 0;
     s.objections.forEach((text, i) => {
@@ -526,7 +528,15 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
     if (s.spread) box.append(spreadView(s));
     const objection = objectionCard(s);
     if (objection) box.append(objection);
-    box.append(el('p', 'cs-panel__eyebrow', 'What did the case tell you that you didn’t use?'), note('The documents you didn’t cite are marked in the case.', 'cs-hint'));
+    const next = pacing(s, 3) ?? (cs.rules_off && s.done.includes('outcome') ? note('That’s the end of the case.', 'cs-hint') : null);
+    const ask = cs.reflection;
+    if (ask?.off) {
+      if (next) box.append(next);
+      return box;
+    }
+    const question = ask?.question.trim() || CASE_REFLECTION_DEFAULT;
+    box.append(el('p', 'cs-panel__eyebrow', question));
+    if (question === CASE_REFLECTION_DEFAULT) box.append(note('The documents you didn’t cite are marked in the case.', 'cs-hint'));
     const saved = s.work.reflection ?? '';
     const text = drafts.reflection ?? saved;
     const send = button(saved ? 'Update reflection' : 'Save reflection', 'primary', function () {
@@ -534,11 +544,10 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
     });
     const sync = () => { send.disabled = !(drafts.reflection ?? text).trim(); };
     sync();
-    box.append(area('What the case told you that you did not use', text, 1500, (v) => { drafts.reflection = v; sync(); }, { placeholder: 'The document I skipped showed…' }));
+    box.append(area(question, text, 1500, (v) => { drafts.reflection = v; sync(); }, question === CASE_REFLECTION_DEFAULT ? { placeholder: 'The document I skipped showed…' } : {}));
     const row = el('div', 'cs-row');
     row.append(send);
     box.append(row);
-    const next = pacing(s, 3);
     if (next) box.append(next);
     return box;
   }
@@ -746,7 +755,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   }
 
   function paintRail(s: CaseStatus, idx: number): void {
-    const items: CaseRailItem[] = CASE_STATIONS.map((key, i) => {
+    const items: CaseRailItem[] = stations.map((key, i) => {
       const state: CaseRailState = i === idx ? 'now' : i > s.open_to ? 'later' : stationDone(s, i) ? 'in' : 'open';
       return { key, state, note: stationNote(s, key) };
     });

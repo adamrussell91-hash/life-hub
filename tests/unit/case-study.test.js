@@ -46,7 +46,9 @@ test('publish problems list every missing piece, and a finished case splits clea
   assert.ok(casePublishProblems({ case: SETTINGS({ decision: { prompt: 'Q', options: [{ id: 'a', label: 'A' }] } }) }).length);
   assert.ok(casePublishProblems({ case: SETTINGS({ outcome: { text: 't', source: ' ' } }) }).length);
   assert.ok(casePublishProblems({ case: SETTINGS({ transfer: undefined }) }).length);
-  assert.ok(casePublishProblems({ case: SETTINGS({ objections: [] }) }).length);
+  assert.deepEqual(casePublishProblems({ case: SETTINGS({ objections: [] }) }), []);
+  assert.deepEqual(casePublishProblems({ case: SETTINGS({ rules_off: true, transfer: undefined }) }), []);
+  assert.deepEqual(prepareCasePublish({ case: SETTINGS({ objections: ['Fair?', ' '] }) }).config.objections, ['Fair?']);
   assert.deepEqual(casePublishProblems({ case: SETTINGS({ pace: 'teacher', objections: [] }) }), []);
   const { snapshot, config } = prepareCasePublish(draft);
   const text = JSON.stringify(snapshot);
@@ -148,6 +150,22 @@ test('outcome done needs objection and reflection, then rules open the transfer'
   await save(store, 1, 'rule', { when: 'w', then: 't', unless: 'u' });
   const done = await save(store, 1, 'transfer', { answer: 'ans' });
   assert.deepEqual(done.done, ['brief', 'case', 'decide', 'outcome', 'rules']);
+});
+
+test('with Rules and the reflection off, the case ends at the Outcome once the objection is answered', async () => {
+  const store = await setup({ rules_off: true, reflection: { question: '', off: true }, transfer: undefined });
+  await toDecision(store);
+  await act(store, 1, 'lock', { option_id: 'a', because: 'ev', confidence: 80 });
+  await act(store, 1, 'advance');
+  await rejects(save(store, 1, 'reflection', { text: 'x' }), 'not_open');
+  await save(store, 1, 'objection', { index: 0, answer: 'It still holds' });
+  const s = await act(store, 1, 'advance');
+  assert.equal(s.open_to, 3);
+  assert.equal(s.transfer, null);
+  assert.ok(s.done.includes('outcome'));
+  await rejects(save(store, 1, 'rule', { when: 'w', then: 't', unless: 'u' }), 'not_open');
+  await rejects(teach(store, 'open', { station: 4 }), 'bad_station');
+  assert.equal((await teach(store, 'board')).last, 3);
 });
 
 test('spread is aggregate and early under five; not_used lists uncited docs', async () => {

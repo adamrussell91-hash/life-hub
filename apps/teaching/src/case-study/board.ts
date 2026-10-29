@@ -41,7 +41,8 @@ export function mountCaseBoard(o: { api: CaseTeacherApi; getLesson?: () => Lesso
   function controls(b: CaseBoard): HTMLElement {
     const box = el('div', 'cbd-card cbd-controls');
     const row = el('div', 'cbd-stations');
-    CASE_STATIONS.forEach((key, i) => {
+    const last = b.last ?? CASE_STATIONS.length - 1;
+    CASE_STATIONS.slice(0, last + 1).forEach((key, i) => {
       const state = i <= b.open_to ? (i === b.open_to ? 'now' : 'done') : 'next';
       const chip = el('span', `cbd-station cbd-station--${state}`, CASE_STATION_LABELS[key]);
       if (key === 'outcome' && b.outcome_revealed) chip.classList.add('cbd-station--revealed');
@@ -50,7 +51,7 @@ export function mountCaseBoard(o: { api: CaseTeacherApi; getLesson?: () => Lesso
     box.append(row);
     const actions = el('div', 'cbd-actions');
     const next = b.open_to + 1;
-    const nextKey = CASE_STATIONS[next];
+    const nextKey = next <= last ? CASE_STATIONS[next] : undefined;
     if (nextKey && next !== OUTCOME) {
       actions.append(button(`Open ${CASE_STATION_LABELS[nextKey]}`, 'primary', () => void run(o.api.open(next))));
     }

@@ -88,6 +88,8 @@ export type CaseBoardStudent = {
 export type CaseBoard = {
   /** Teacher pace: stations open to the whole class (0 = Brief only … 4 = all), and parts open (layered). */
   open_to: number;
+  /** The last station this case runs to: 3 when Rules is off, else 4. */
+  last?: number;
   parts_open: number;
   parts_total: number;
   outcome_revealed: boolean;

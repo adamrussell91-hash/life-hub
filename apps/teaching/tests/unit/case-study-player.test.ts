@@ -168,12 +168,23 @@ describe('case study player', () => {
     expect(objection.cl.save).toHaveBeenCalledWith({ kind: 'objection', index: 0, answer: 'Because it is fair' });
     objection.player.dispose();
     const out = await mount(publicCase(), withCase({ open_to: 3, outcome: { text: 'It dried.', source: 'Review' }, work: locked }));
-    const reflection = out.host.querySelector<HTMLTextAreaElement>('textarea[aria-label^="What the case told you"]')!;
+    const reflection = out.host.querySelector<HTMLTextAreaElement>('textarea[aria-label^="What did the case tell you"]')!;
     reflection.value = 'The memo showed it';
     reflection.dispatchEvent(new Event('input'));
     click(out.host, 'Save reflection');
     expect(out.cl.save).toHaveBeenCalledWith({ kind: 'reflection', text: 'The memo showed it' });
     out.player.dispose();
+  });
+
+  it('asks the teacher\'s own question after the Outcome, or none when it is off', async () => {
+    const locked = { first_take: { option_id: 'a', why: 'g' }, decision: { option_id: 'a', because: 'b', confidence: 60, locked_at: '2026-10-27T05:41:00Z' } };
+    const open = withCase({ open_to: 3, outcome: { text: 'It dried.', source: 'Review' }, work: locked });
+    const own = await mount({ ...publicCase(), reflection: { question: 'Which mark would you change?', off: false } }, open);
+    expect(own.host.querySelector('textarea[aria-label="Which mark would you change?"]')).not.toBeNull();
+    own.player.dispose();
+    const off = await mount({ ...publicCase(), reflection: { question: '', off: true } }, open);
+    expect(off.host.textContent).not.toMatch(/Save reflection/);
+    off.player.dispose();
   });
 
   it('says so when the first load fails instead of leaving "Loading…" up', async () => {
