@@ -23,6 +23,7 @@ import {
   type WordHelpEntry
 } from '@/blocks/word-help';
 import { rewriteAsFryExplainer, scanTechniquesAsTeacher, scanWordsAsTeacher } from '@/blocks/text-tools-client';
+import { matrixStatus as defaultMatrixStatus, normaliseMatrixWord, type MatrixStatus } from '@/blocks/morphemic-client';
 import { loadLiteraryElements } from '@/blocks/literary-elements';
 import { approveTechniques, createTechniqueScan, quoteAppearsIn, readTechniqueScan } from '@/blocks/technique-scan';
 import { openTechniqueReview } from '@/blocks/technique-review';
@@ -63,10 +64,13 @@ export function createRichTextTools(options: {
   scan?: typeof scanWordsAsTeacher;
   rewrite?: typeof rewriteAsFryExplainer;
   scanTechniques?: typeof scanTechniquesAsTeacher;
+  /** Where a pinned word's morphemic matrix stands; asking starts its build. */
+  matrixStatus?: (word: string) => Promise<MatrixStatus>;
 }): { buttons: HTMLButtonElement[]; status: HTMLElement; strip: HTMLElement } {
   const scan = options.scan ?? scanWordsAsTeacher;
   const rewrite = options.rewrite ?? rewriteAsFryExplainer;
   const scanTechniques = options.scanTechniques ?? scanTechniquesAsTeacher;
+  const askMatrix = options.matrixStatus ?? defaultMatrixStatus;
   const { tiptap } = options;
 
   const dictionary = toolButton(DICTIONARY_ICON, 'Dictionary scan', 'Highlight challenging words with dictionary cards for students');
@@ -131,6 +135,49 @@ export function createRichTextTools(options: {
         .map((entry) => (pinned.has(entry.word.toLowerCase()) ? { ...entry, pinned: true } : entry)),
       ...added
     ];
+  }
+
+  // Matrix status per word for the strip's dots. Ready and none are final; building is asked again.
+  const matrixStates = new Map<string, MatrixStatus>();
+  const MATRIX_DOT_TITLE: Record<MatrixStatus, string> = {
+    ready: 'Morphemic matrix ready',
+    building: 'Building the morphemic matrix…',
+    none: 'No prefix or suffix to build with'
+  };
+
+  function matrixDot(word: string): HTMLElement {
+    const dot = document.createElement('span');
+    dot.className = 'word-help-strip__dot';
+    dot.setAttribute('aria-hidden', 'true');
+    const key = normaliseMatrixWord(word);
+    const paint = (state: MatrixStatus) => {
+      dot.dataset.state = state;
+      dot.title = MATRIX_DOT_TITLE[state];
+    };
+    if (!key) {
+      paint('none');
+      return dot;
+    }
+    const known = matrixStates.get(key);
+    if (known && known !== 'building') {
+      paint(known);
+      return dot;
+    }
+    paint('building');
+    let tries = 0;
+    const ask = () => {
+      void askMatrix(word).then((state) => {
+        matrixStates.set(key, state);
+        if (!dot.isConnected && tries > 0) return;
+        paint(state);
+        if (state === 'building' && tries < 60) {
+          tries += 1;
+          setTimeout(ask, 3000);
+        }
+      });
+    };
+    ask();
+    return dot;
   }
 
   function chipButton(label: string, className: string): HTMLButtonElement {
@@ -204,6 +251,7 @@ export function createRichTextTools(options: {
     };
     for (const entry of words) {
       const chip = chipButton(entry.word, 'word-help-term word-help-strip__chip');
+      if (entry.pinned) chip.prepend(matrixDot(entry.word));
       chip.setAttribute('aria-pressed', String(Boolean(entry.pinned)));
       chip.title = entry.pinned ? 'Shown under the text. Tap to hide.' : 'Tap to show under the text.';
       chip.addEventListener('click', () => toggle(entry));
@@ -211,6 +259,7 @@ export function createRichTextTools(options: {
     }
     for (const entry of added) {
       const chip = chipButton(`${entry.word} ×`, 'word-help-term word-help-strip__chip');
+      chip.prepend(matrixDot(entry.word));
       chip.setAttribute('aria-pressed', 'true');
       chip.setAttribute('aria-label', `Remove ${entry.word}`);
       chip.title = entry.definition;
@@ -223,6 +272,19 @@ export function createRichTextTools(options: {
     addButton.addEventListener('click', openAddForm);
     chips.append(addButton);
     wordStrip.append(label, chips);
+    if (saved.some((entry) => entry.pinned)) {
+      const legend = document.createElement('p');
+      legend.className = 'word-help-strip__legend';
+      for (const state of ['ready', 'building', 'none'] as const) {
+        const item = document.createElement('span');
+        const dot = document.createElement('span');
+        dot.className = 'word-help-strip__dot';
+        dot.dataset.state = state;
+        item.append(dot, state === 'ready' ? 'Matrix ready' : state === 'building' ? 'Building' : 'No prefix or suffix to build with');
+        legend.append(item);
+      }
+      wordStrip.append(legend);
+    }
 
     if (scanned.length) {
       const clear = chipButton('Clear', 'btn btn--ghost word-help-strip__clear');

@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WordHelpEntry } from '@/blocks/word-help';
 import { createWordTray } from '@/blocks/word-tray';
+import { readMatrix } from '@/blocks/morphemic-client';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import { renderBlock } from '@/blocks/render';
 import { LESSON_BLOCK_GROUPS, HOMEPAGE_BLOCK_GROUPS } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
+
+// No network in unit tests: the library answers "no matrix" unless a test injects its own.
+vi.mock('@/blocks/morphemic-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/blocks/morphemic-client')>()),
+  loadMatrix: async () => null,
+  matrixStatus: async () => 'none'
+}));
+
 
 type RichText = Extract<Block, { block_type: 'rich_text' }>;
 
@@ -175,5 +184,91 @@ describe('block menus', () => {
   it('Definition leaves the lesson menu but stays on the homepage', () => {
     expect(LESSON_BLOCK_GROUPS.flatMap((g) => g.types)).not.toContain('definition');
     expect(HOMEPAGE_BLOCK_GROUPS.flatMap((g) => g.types)).toContain('definition');
+  });
+});
+
+describe('morphemic matrices beyond the built-in ones', () => {
+  const critic = {
+    id: 'critic',
+    base: 'critic',
+    source: 'Greek kritikos',
+    meaning: 'able to judge',
+    fronts: [{ id: 'un', label: 'un-' }],
+    prefixes: [],
+    endings: [{ id: 'al', label: '-al' }, { id: 'ise', label: '-ise' }],
+    words: [
+      { word: 'critic', front: '', prefix: '', ending: '', definition: 'A judge of things.', example: '' },
+      { word: 'critical', front: '', prefix: '', ending: 'al', definition: 'Judging carefully.', example: '' },
+      { word: 'uncritical', front: 'un', prefix: '', ending: 'al', definition: 'Not questioning.', example: '' }
+    ]
+  };
+
+  it('shows building, then the matrix opened on the phrase word, with prefix and suffix labels', async () => {
+    vi.useFakeTimers();
+    let resolve!: (value: typeof critic | null) => void;
+    const tray = createWordTray({
+      pinned: [],
+      storage: memoryStorage(),
+      loadMatrix: () => new Promise((done) => (resolve = done))
+    });
+    document.body.append(tray.root);
+    tray.open(entry('critical attitudes'));
+    vi.advanceTimersByTime(500);
+    expect(tray.root.querySelector<HTMLElement>('.word-tray__building')?.hidden).toBe(false);
+    expect(tray.root.textContent).toContain('Building the morphemic matrix for critical attitudes');
+    vi.useRealTimers();
+
+    resolve(critic);
+    await vi.waitFor(() => expect(tray.root.querySelector('.morph-matrix')).not.toBeNull());
+    expect(tray.root.querySelector('.word-tray__building')).toBeNull();
+    expect(tray.root.querySelector('.morph-matrix__title')?.textContent).toBe('Base: critic, from Greek kritikos');
+    expect(tray.root.querySelector('.morph-matrix__from')?.textContent).toBe('Base of critical');
+    expect([...tray.root.querySelectorAll('.morph-matrix__label')].map((n) => n.textContent)).toEqual(['Prefix', 'Suffix']);
+    expect(tray.root.querySelector('.morph-matrix__result .morph-matrix__word')?.textContent).toBe('critical');
+  });
+
+  it('a word with no matrix leaves just the meaning', async () => {
+    const tray = createWordTray({ pinned: [], storage: memoryStorage(), loadMatrix: async () => null });
+    tray.open(entry('glow'));
+    await vi.waitFor(() => expect(tray.root.querySelector('.word-tray__building')).toBeNull());
+    expect(tray.root.querySelector('.morph-matrix')).toBeNull();
+    expect(tray.root.querySelector('.word-tray__def')?.textContent).toBe('Meaning of glow.');
+  });
+
+  it('readMatrix accepts the server shape and refuses junk', () => {
+    expect(readMatrix(critic)?.words).toHaveLength(3);
+    expect(readMatrix({ base: 'x', words: [] })).toBeNull();
+    expect(readMatrix('nope')).toBeNull();
+  });
+
+  it('built-in matrices label two prefix slots Prefix 1 and Prefix 2', () => {
+    const tray = createWordTray({ pinned: [], storage: memoryStorage() });
+    tray.open(entry('unorthodox'));
+    expect([...tray.root.querySelectorAll('.morph-matrix__label')].map((n) => n.textContent)).toEqual(['Prefix 1', 'Prefix 2', 'Suffix']);
+  });
+
+  it('pinned words in the editor strip show their matrix status', async () => {
+    let latest = richText('<p>The critical glow.</p>', {
+      word_help: { words: [entry('critical', { pinned: true }), entry('glow', { pinned: true }), entry('anomaly', { added: true })], scanned_at: 'x' }
+    });
+    const tiptap = { host: document.createElement('div'), getHtml: () => '<p>The critical glow.</p>', setHtml: vi.fn() };
+    const asked: string[] = [];
+    const tools = createRichTextTools({
+      tiptap,
+      getLatest: () => latest,
+      onChange: (next) => {
+        latest = next;
+      },
+      matrixStatus: async (word) => {
+        asked.push(word);
+        return word === 'critical' ? 'ready' : 'none';
+      }
+    });
+    document.body.append(tools.strip);
+    await vi.waitFor(() =>
+      expect([...tools.strip.querySelectorAll<HTMLElement>('.word-help-strip__chips .word-help-strip__dot')].map((d) => d.dataset.state)).toEqual(['ready', 'none', 'none'])
+    );
+    expect(asked).toEqual(['critical', 'glow', 'anomaly']);
+    expect(tools.strip.querySelector('.word-help-strip__legend')?.textContent).toContain('Matrix ready');
   });
 });

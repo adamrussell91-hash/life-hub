@@ -430,6 +430,40 @@
   box-shadow: inset 0 0 0 1.5px var(--wave);
 }
 
+/* Morphemic matrix status on a pinned word. */
+.word-help-strip__dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: var(--space-1);
+  border-radius: var(--radius-full);
+  vertical-align: 0.05em;
+  background: var(--line);
+}
+
+.word-help-strip__dot[data-state='ready'] {
+  background: var(--pastel-sage-ink);
+}
+
+.word-help-strip__dot[data-state='building'] {
+  background: var(--pastel-gold-ink);
+}
+
+.word-help-strip__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--orca);
+}
+
+.word-help-strip__legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
 .word-help-strip__add {
   padding: 0 var(--space-2);
   border: 1px dashed color-mix(in oklab, var(--wave) 45%, transparent);

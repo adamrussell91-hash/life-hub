@@ -35,7 +35,9 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/html-app-ai$/ },
   { method: 'POST', pattern: /^\/api\/published\/word-help\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/word-help\/[^/]+\/[a-f0-9]{64}$/ },
-  { method: 'POST', pattern: /^\/api\/published\/word-help-run$/ }
+  { method: 'POST', pattern: /^\/api\/published\/word-help-run$/ },
+  { method: 'POST', pattern: /^\/api\/published\/morphemic\/[^/]+$/ },
+  { method: 'GET', pattern: /^\/api\/published\/morphemic\/[^/]+\/[a-f0-9]{64}$/ }
 ];
 
 export function isPublicStudentApi(method, pathname) {

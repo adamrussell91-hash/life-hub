@@ -1,11 +1,12 @@
 /**
- * Morphemic matrix on the dictionary card.
+ * Morphemic matrix on the dictionary card and the lesson word tray.
  *
- * When the word on a dictionary card belongs to a known family, the card
- * offers a "Morphemic matrix" row. Opened, it lets a student build the family
- * from its parts (front, prefix, base, ending), shows each established word's
- * definition as it is built, names the prefix's relatives, and counts words
- * found out of the family total so "find them all" works as a small game.
+ * A matrix is a base plus the prefixes and suffixes that attach to it. A
+ * student builds words from the morphemes (prefix, base, suffix), sees each
+ * established word's definition as it is built, reads the prefix's relatives,
+ * and counts words found out of the total so "find them all" works as a small
+ * game. Built-in matrices live in data/morphology-families.ts; lessons also
+ * load matrices from the shared library (morphemic-client.ts).
  *
  * Progress is a list of found words kept in this browser only. Nothing is sent
  * to the server and nothing is marked.
@@ -22,11 +23,19 @@ export type { MorphologyFamily };
 type SlotName = 'front' | 'prefix' | 'ending';
 type Selection = Record<SlotName, string>;
 
-const GROUPS: Array<{ slot: SlotName; label: string; tone: 'gold' | 'peach' | 'sage'; placeholder: string }> = [
-  { slot: 'front', label: 'Front', tone: 'gold', placeholder: 'front' },
-  { slot: 'prefix', label: 'Prefix', tone: 'peach', placeholder: 'prefix' },
-  { slot: 'ending', label: 'Ending', tone: 'sage', placeholder: 'ending' }
+// `front` is an outer prefix (un- in un + ortho + dox); `ending` is the suffix.
+const GROUPS: Array<{ slot: SlotName; tone: 'gold' | 'peach' | 'sage' }> = [
+  { slot: 'front', tone: 'gold' },
+  { slot: 'prefix', tone: 'peach' },
+  { slot: 'ending', tone: 'sage' }
 ];
+
+/** Prefix, or Prefix 1 and Prefix 2 in word order when a matrix has both; Suffix. */
+function groupLabel(family: MorphologyFamily, slot: SlotName): string {
+  if (slot === 'ending') return 'Suffix';
+  if (family.fronts.length === 0 || family.prefixes.length === 0) return 'Prefix';
+  return slot === 'front' ? 'Prefix 1' : 'Prefix 2';
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -47,14 +56,27 @@ function browserStorage(): Storage | null {
   }
 }
 
-/** The family a word belongs to, or null. Matches the whole word, ignoring case. */
+/**
+ * The built-in matrix a word belongs to, or null. Matches the whole word,
+ * ignoring case; for a phrase, the first of its words that has one.
+ */
 export function findMorphology(
   word: string,
   families: MorphologyFamily[] = MORPHOLOGY_FAMILIES
 ): MorphologyFamily | null {
   const key = word.trim().toLowerCase();
   if (!key) return null;
-  return families.find((family) => family.words.some((entry) => entry.word === key)) ?? null;
+  for (const candidate of [key, ...key.split(/\s+/)]) {
+    const family = families.find((entry) => entry.words.some((item) => item.word === candidate));
+    if (family) return family;
+  }
+  return null;
+}
+
+/** The word in a phrase that the matrix builds, so the matrix opens on it. */
+export function matrixWordIn(family: MorphologyFamily, word: string): string | null {
+  const key = word.trim().toLowerCase();
+  return [key, ...key.split(/\s+/)].find((candidate) => family.words.some((entry) => entry.word === candidate)) ?? null;
 }
 
 export function morphologyStorageKey(family: MorphologyFamily): string {
@@ -104,7 +126,8 @@ export function createMorphemicMatrix(
   options: { start?: string } = {}
 ): HTMLElement {
   const total = family.words.length;
-  const startWord = family.words.find((entry) => entry.word === options.start?.trim().toLowerCase());
+  const startKey = options.start ? matrixWordIn(family, options.start) : null;
+  const startWord = family.words.find((entry) => entry.word === startKey);
   const selection: Selection = {
     front: startWord?.front ?? '',
     prefix: startWord?.prefix ?? '',
@@ -120,10 +143,14 @@ export function createMorphemicMatrix(
 
   const head = el('div', 'morph-matrix__head');
   const heading = el('div', 'morph-matrix__heading');
-  heading.append(
-    el('p', 'morph-matrix__title', `${family.base}, from ${family.source}`),
-    el('p', 'morph-matrix__meaning', `“${family.meaning}”`)
-  );
+  heading.append(el('p', 'morph-matrix__title', family.source ? `Base: ${family.base}, from ${family.source}` : `Base: ${family.base}`));
+  if (family.meaning) heading.append(el('p', 'morph-matrix__meaning', `“${family.meaning}”`));
+  // A phrase opens the matrix of one of its words; say which.
+  if (startKey && options.start && startKey !== options.start.trim().toLowerCase()) {
+    const from = el('p', 'morph-matrix__from', 'Base of ');
+    from.append(el('strong', '', startKey));
+    heading.append(from);
+  }
   const score = el('div', 'morph-matrix__score');
   const count = el('p', 'morph-matrix__count');
   const pips = el('div', 'morph-matrix__pips');
@@ -145,7 +172,7 @@ export function createMorphemicMatrix(
     const items = slotsFor(family, group.slot);
     if (items.length === 0) continue;
     const wrap = el('div', 'morph-matrix__group');
-    wrap.append(el('span', 'morph-matrix__label', group.label));
+    wrap.append(el('span', 'morph-matrix__label', groupLabel(family, group.slot)));
     const row = el('div', 'morph-matrix__row');
     for (const item of items) {
       const button = el('button', `morph-matrix__chip morph-matrix__chip--${group.tone}`, item.label);
@@ -173,12 +200,11 @@ export function createMorphemicMatrix(
       selection[slot]
         ? el('span', `morph-matrix__tile morph-matrix__tile--${tone}`, labelFor(slot, selection[slot]))
         : el('span', 'morph-matrix__tile morph-matrix__tile--empty', placeholder);
-    assembly.append(
-      tile('front', 'gold', 'front'),
-      tile('prefix', 'peach', 'prefix'),
-      el('span', 'morph-matrix__tile morph-matrix__tile--base', family.base),
-      tile('ending', 'sage', 'ending')
-    );
+    // Only the slots this matrix uses, so an empty prefix box never hints at a prefix that does not exist.
+    if (family.fronts.length) assembly.append(tile('front', 'gold', 'prefix'));
+    if (family.prefixes.length) assembly.append(tile('prefix', 'peach', 'prefix'));
+    assembly.append(el('span', 'morph-matrix__tile morph-matrix__tile--base', family.base));
+    if (family.endings.length) assembly.append(tile('ending', 'sage', 'suffix'));
   }
 
   function paintResult(): void {

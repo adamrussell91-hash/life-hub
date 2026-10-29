@@ -28,6 +28,7 @@ import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 import { libraryOutcomeCount, renderOutcomesLibrary } from '@/teacher/sections/outcomes-library';
+import { renderMorphemicLibrary } from '@/teacher/sections/morphemic-library';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
@@ -49,7 +50,7 @@ function readStoredView(): LibraryView {
   try {
     const raw = localStorage.getItem(VIEW_STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as LibraryView) : null;
-    if (parsed && ['all', 'unfiled', 'unused', 'by-unit', 'outcomes', 'skills'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
+    if (parsed && ['all', 'unfiled', 'unused', 'by-unit', 'outcomes', 'skills', 'morphemic'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
     if (parsed?.kind === 'folder' && typeof parsed.id === 'string') return { kind: 'folder', id: parsed.id };
   } catch {
     // Storage blocked: start on All resources.
@@ -501,7 +502,11 @@ export function renderResourcesIndex(
     curriculumHeading.textContent = 'Curriculum';
     const curriculumViews = document.createElement('div');
     curriculumViews.className = 'resources-nav__views';
-    curriculumViews.append(navButton('Outcomes', { kind: 'outcomes' }, libraryOutcomeCount(curriculum)), navButton('Skills continuum', { kind: 'skills' }));
+    curriculumViews.append(
+      navButton('Outcomes', { kind: 'outcomes' }, libraryOutcomeCount(curriculum)),
+      navButton('Skills continuum', { kind: 'skills' }),
+      navButton('Morphemic matrices', { kind: 'morphemic' })
+    );
     nav.append(views, heading, tree, curriculumHeading, curriculumViews);
   }
 
@@ -512,10 +517,14 @@ export function renderResourcesIndex(
     main.replaceChildren();
     const data = curriculumView();
     // Upload, link and folder tools act on files, not outcomes.
-    toolbar.hidden = currentView.kind === 'outcomes' || currentView.kind === 'skills';
+    toolbar.hidden = currentView.kind === 'outcomes' || currentView.kind === 'skills' || currentView.kind === 'morphemic';
     if (toolbar.hidden) urlForm.hidden = true;
     if (currentView.kind === 'skills') {
       renderSkillsLibrary(main);
+      return;
+    }
+    if (currentView.kind === 'morphemic') {
+      renderMorphemicLibrary(main);
       return;
     }
     if (currentView.kind === 'outcomes') {
@@ -815,7 +824,8 @@ const VIEW_TITLES: Record<Exclude<LibraryView['kind'], 'folder'>, string> = {
   unused: 'Not used anywhere',
   'by-unit': 'By class and unit',
   outcomes: 'Outcomes',
-  skills: 'Skills continuum'
+  skills: 'Skills continuum',
+  morphemic: 'Morphemic matrices'
 };
 
 const VIEW_EMPTY: Record<'all' | 'unfiled' | 'unused', string> = {

@@ -82,6 +82,16 @@
   color: var(--muted);
 }
 
+.morph-matrix__from {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--orca);
+}
+
+.morph-matrix__from strong {
+  color: var(--marine);
+}
+
 .morph-matrix__score {
   display: grid;
   gap: var(--space-1);
@@ -333,4 +343,132 @@
     min-width: 2.5rem;
     padding: 0 var(--space-2);
   }
+}
+
+/* Resource Library → Morphemic matrices (src/teacher/sections/morphemic-library.ts) */
+
+.morph-lib__intro {
+  max-width: 64ch;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--orca);
+}
+
+.morph-lib__filters {
+  margin-bottom: var(--space-4);
+}
+
+.morph-lib__list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.morph-lib__card {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.morph-lib__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.morph-lib__title {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--marine);
+}
+
+.morph-lib__source,
+.morph-lib__meaning {
+  font-weight: var(--weight-regular);
+  color: var(--orca);
+}
+
+.morph-lib__badge {
+  padding: var(--space-px) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.morph-lib__badge--new {
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+}
+
+.morph-lib__badge--checked {
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
+}
+
+.morph-lib__built {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.morph-lib__rows {
+  display: grid;
+}
+
+.morph-lib__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: start;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.morph-lib__name {
+  display: grid;
+  gap: var(--space-px);
+  min-width: 0;
+}
+
+.morph-lib__word {
+  font-weight: var(--weight-semibold);
+  color: var(--marine);
+}
+
+.morph-lib__morphemes {
+  font-size: var(--text-xs);
+  color: var(--orca);
+}
+
+.morph-lib__def-input {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+/* Narrow card (phone, or a wide sidebar): meaning goes under the word, full width. */
+@container (max-width: 36rem) {
+  .morph-lib__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .morph-lib__def-input {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.morph-lib__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

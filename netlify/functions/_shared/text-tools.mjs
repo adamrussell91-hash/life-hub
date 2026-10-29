@@ -9,6 +9,9 @@
  *   hinge_backup  Drafts a parallel hinge question when the class comes in
  *               under the bar (see hinge-backup.mjs). Started by the hinge
  *               route from the draft lesson, never by POST /api/text-tools.
+ *   morphemic   Builds the morphemic matrix for one word and saves it in the
+ *               shared library (see morphemic-matrix.mjs). Started by the
+ *               morphemic routes, never by POST /api/text-tools.
  *
  * The live deploy cuts synchronous functions off at about ten seconds, which
  * is shorter than either model call. So a request starts a job record keyed by
@@ -20,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { completeMessage as defaultCompleteMessage } from './anthropic-client.mjs';
 import { buildFryExplainerSystem } from './fry-explainer-prompt.mjs';
 import { HINGE_BACKUP_SYSTEM, parseHingeBackupResult } from './hinge-backup.mjs';
+import { buildMorphemicRequest, parseMorphemicResult, saveMatrixResult } from './morphemic-matrix.mjs';
 import {
   MAX_TECHNIQUE_SCAN_CHARS,
   parseTechniqueResult,
@@ -46,15 +50,17 @@ const DEFAULT_MODELS = {
   dictionary: 'claude-haiku-4-5',
   fry: 'claude-sonnet-5',
   techniques: 'gpt-4o',
-  hinge_backup: 'claude-sonnet-5-5'
+  hinge_backup: 'claude-sonnet-5-5',
+  morphemic: 'claude-sonnet-5-5'
 };
 const MODEL_ENV = {
   dictionary: 'TEXT_TOOLS_DICTIONARY_MODEL',
   fry: 'TEXT_TOOLS_FRY_MODEL',
   techniques: 'TEXT_TOOLS_TECHNIQUES_MODEL',
-  hinge_backup: 'TEXT_TOOLS_HINGE_BACKUP_MODEL'
+  hinge_backup: 'TEXT_TOOLS_HINGE_BACKUP_MODEL',
+  morphemic: 'TEXT_TOOLS_MORPHEMIC_MODEL'
 };
-const MAX_TOKENS = { dictionary: 4096, fry: 4096, hinge_backup: 1500 };
+const MAX_TOKENS = { dictionary: 4096, fry: 4096, hinge_backup: 1500, morphemic: 12_000 };
 const KEY_RE = /^[a-f0-9]{64}$/;
 
 export function isTextTool(tool) {
@@ -309,6 +315,7 @@ export function fryLengthBudget(text) {
 }
 
 export function buildTextToolRequest(tool, text) {
+  if (tool === 'morphemic') return buildMorphemicRequest(text);
   if (tool === 'hinge_backup') {
     return {
       system: HINGE_BACKUP_SYSTEM,
@@ -369,16 +376,26 @@ export async function runTextToolJob({
   } else {
     try {
       const { system, messages } = buildTextToolRequest(job.tool, job.text);
+      const morphemic = job.tool === 'morphemic';
       const raw = await completeMessage({
         apiKey: env.ANTHROPIC_API_KEY,
         model: textToolModel(job.tool, env),
         maxTokens: MAX_TOKENS[job.tool],
         system,
         messages,
-        signal: AbortSignal.timeout(120_000)
+        signal: AbortSignal.timeout(120_000),
+        // Getting the words right matters more than speed: let the model think.
+        ...(morphemic ? { thinking: { type: 'adaptive' }, outputConfig: { effort: 'medium' } } : {})
       });
-      const result =
-        job.tool === 'fry' ? parseFryResult(raw) : job.tool === 'hinge_backup' ? parseHingeBackupResult(raw) : parseDictionaryResult(raw, job.text);
+      let result;
+      if (morphemic) {
+        const parsed = parseMorphemicResult(raw, job.text);
+        const matrix = await saveMatrixResult(store, job.text, parsed, { model: textToolModel(job.tool, env) });
+        result = { matrix, dropped: parsed.dropped };
+      } else {
+        result =
+          job.tool === 'fry' ? parseFryResult(raw) : job.tool === 'hinge_backup' ? parseHingeBackupResult(raw) : parseDictionaryResult(raw, job.text);
+      }
       next = { ...job, status: 'done', result };
     } catch (error) {
       next = {
