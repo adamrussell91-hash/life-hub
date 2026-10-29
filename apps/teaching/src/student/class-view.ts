@@ -234,7 +234,8 @@ function renderHomepageRegion(
       }
       list.append(collectionEl);
     } else {
-      list.append(renderBlock(block, 'student'));
+      // The homepage has no lesson, so answers keep under the class instead.
+      list.append(renderBlock(block, 'student', { saveScope: `class-${cls.id}` }));
     }
   }
   section.append(list);

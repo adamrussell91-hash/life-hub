@@ -424,3 +424,55 @@ describe('blockRegistry', () => {
     }
   });
 });
+
+describe('screen reader alternatives', () => {
+  it('chart has an svg label and a hidden data table', () => {
+    const el = renderBlock(
+      {
+        id: 'c1',
+        block_type: 'chart',
+        variant: 'default',
+        content: {
+          chart_type: 'bar',
+          title: 'Rainfall',
+          series: [{ id: 's1', name: 'Sydney', points: [{ x: 'Jan', y: 5 }] }]
+        }
+      } as unknown as Block,
+      'student'
+    );
+    const svg = el.querySelector('.block-chart__svg svg')!;
+    expect(svg.getAttribute('role')).toBe('img');
+    expect(svg.getAttribute('aria-label')).toBe('Rainfall, bar chart');
+    const cells = [...el.querySelectorAll('.block-chart__sr-table td')].map((c) => c.textContent);
+    expect(cells).toEqual(['Sydney', 'Jan', '5']);
+  });
+
+  it('diagram svg is an image with a label from alt, caption or a fallback', () => {
+    const mk = (content: Record<string, unknown>) =>
+      renderBlock(
+        { id: 'd1', block_type: 'diagram', variant: 'default', content: { source: 'svg', svg_markup: '<svg viewBox="0 0 10 10"><rect width="5" height="5"/></svg>', ...content } } as unknown as Block,
+        'student'
+      ).querySelector('.block-diagram__svg svg')!;
+    expect(mk({ caption: 'The water cycle' }).getAttribute('aria-label')).toBe('The water cycle');
+    expect(mk({ image_alt: 'Cycle arrows', caption: 'X' }).getAttribute('aria-label')).toBe('Cycle arrows');
+    expect(mk({}).getAttribute('role')).toBe('img');
+    expect(mk({}).getAttribute('aria-label')).toBe('Diagram');
+  });
+
+  it('mind map and concept map carry a hidden text list', () => {
+    const nodes = [
+      { id: 'a', label: 'Sea', parent_id: null },
+      { id: 'b', label: 'Waves', parent_id: 'a' }
+    ];
+    const mind = renderBlock(
+      { id: 'm1', block_type: 'mind_map', variant: 'default', content: { title: 'Ocean', nodes, edges: [] } } as unknown as Block,
+      'student'
+    );
+    expect(mind.querySelector('.graph-sr-text ul ul li')?.textContent).toBe('Waves');
+    const concept = renderBlock(
+      { id: 'k1', block_type: 'concept_map', variant: 'default', content: { nodes, edges: [{ id: 'e1', from: 'a', to: 'b', label: 'makes' }] } } as unknown as Block,
+      'student'
+    );
+    expect(concept.querySelector('.graph-sr-text li')?.textContent).toBe('Sea \u2014 makes \u2014 Waves');
+  });
+});

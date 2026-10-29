@@ -60,7 +60,7 @@ export function mountSolo(block: HingeBlock, lessonId: string, preview: boolean)
       // If the question can't be answered here (storage blocked, question changed since publishing),
       // the student can still go on; the lecture counts it as seen.
       if (!root.querySelector('.hq-solo__skip')) {
-        const skip = el('button', 'btn btn--ghost hq-solo__skip', 'Carry on without answering');
+        const skip = el('button', 'btn btn--ghost hq-solo__skip', 'Skip to the next step');
         skip.type = 'button';
         skip.addEventListener('click', () => {
           skip.disabled = true;

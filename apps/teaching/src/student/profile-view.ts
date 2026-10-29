@@ -86,7 +86,7 @@ function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HT
   section.append(el('h2', 'pm-map__title', 'Your unit'));
   const unit = map.unit;
   if (!unit || !map.lessons.length) {
-    section.append(el('p', 'pm-empty', 'Your teacher hasn’t set up a unit for this class yet.'));
+    section.append(el('p', 'pm-empty', 'Your unit will appear here once your teacher sets it up.'));
     return section;
   }
   const schedule = scheduleFromRows(unit.schedule, new Set(unit.pre));

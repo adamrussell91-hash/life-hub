@@ -6,7 +6,7 @@ import { QUESTION_LEVEL_LABELS, QUESTION_LEVEL_STEMS, QUESTION_LEVELS, guessQues
 
 type QuestionSet = Extract<Block, { block_type: 'question_set' }>;
 type Mode = 'student' | 'teacher' | 'print';
-type Ctx = { lessonId?: string };
+type Ctx = { lessonId?: string; saveScope?: string };
 type State = Record<string, string>;
 
 const PRINT_LINES = 4;
@@ -44,7 +44,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 
 /** Answers stay on this device for the student only; teacher previews keep nothing. */
 function formatState(block: QuestionSet, mode: Mode, ctx: Ctx): { state: State; persist: () => void } {
-  const key = mode === 'student' && ctx.lessonId ? `${storageKey(ctx.lessonId, block.id)}.format.${block.content.format}` : undefined;
+  const key = mode === 'student' && (ctx.lessonId ?? ctx.saveScope) ? `${storageKey((ctx.lessonId ?? ctx.saveScope)!, block.id)}.format.${block.content.format}` : undefined;
   const saved = key ? loadActivityState<State>(key) : null;
   const state: State = saved && typeof saved === 'object' ? { ...saved } : {};
   return { state, persist: () => { if (key) saveActivityState(key, state); } };

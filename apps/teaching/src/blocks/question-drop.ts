@@ -251,7 +251,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
       const why = { no_quiz: 'This question box isn’t set up yet.', paused: 'Your teacher has paused this question box.', closed: 'The quiz has closed to new questions.' };
       frame.append(waitPanel(why[s.reason ?? 'paused'] ?? 'Not taking questions right now.', 'Ask your teacher what to do next.'));
     } else if (!token) {
-      frame.append(waitPanel('This browser won’t save anything, so you can’t send a question here.', 'Try a normal (not private) window.'));
+      frame.append(waitPanel('Open a normal (not private) window to send a question here.', 'This page updates by itself.'));
     } else if (remaining > 0) {
       if (s.sent.length && !writing) {
         frame.append(
@@ -279,7 +279,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
       images,
       audience: 'student',
       onChange: (q) => {
-        if (!writeJSON(draftKey, q)) showError('This browser isn’t saving drafts. Keep this page open until you send.');
+        if (!writeJSON(draftKey, q)) showError('Keep this page open until you send, so your draft stays with you.');
       }
     });
     const sendBtn = button('Send question', 'primary', async function () {
@@ -301,7 +301,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
       }
     });
     const actions = el('div', 'qz-actions');
-    actions.append(sendBtn, el('span', 'qz-note block-secondary', remaining > 1 ? `You can send ${remaining}.` : 'You can’t change it after you send it.'));
+    actions.append(sendBtn, el('span', 'qz-note block-secondary', remaining > 1 ? `You can send ${remaining}.` : 'Your question is final once you send it.'));
     wrap.append(builder.root, actions);
     return wrap;
   }

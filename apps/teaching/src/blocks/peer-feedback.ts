@@ -666,7 +666,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     view = key;
     const s = state;
     if (key === 'idle') {
-      body.replaceChildren(waitPanel('Your teacher hasn’t started this yet.', 'This page updates by itself.'));
+      body.replaceChildren(waitPanel('Waiting for your teacher to start.', 'This page updates by itself.'));
     } else if (key === 'join') {
       body.replaceChildren(joinView());
     } else if (key === 'closed') {
@@ -696,7 +696,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'No account and no name. Classmates won’t know which answer is yours.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'You join with a code. Classmates see symbols and your name stays private.'));
 
     const join = button('Join', 'primary', function () {
       void doJoin(this);
@@ -719,7 +719,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
       const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
       const candidate = { session: state.session, token: secret };
       if (!writeJSON(`${storage}:device`, candidate)) {
-        showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
+        showError('Open a normal (not private) window to join here.');
         return;
       }
       device = candidate;
@@ -738,7 +738,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     made.input.maxLength = max;
     made.input.value = readJSON<string>(draftKey(name)) ?? '';
     made.input.addEventListener('input', () => {
-      if (!writeJSON(draftKey(name), made.input.value)) showError('This browser isn’t saving drafts. Keep this page open until you send.');
+      if (!writeJSON(draftKey(name), made.input.value)) showError('Keep this page open until you send, so your draft stays with you.');
     });
     return made;
   }
@@ -747,7 +747,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     const stage = el('div', 'pf-stage');
 
     if (s.phase === 'write' && !s.submitted) {
-      const answer = draftField('Your answer', 'writing', MAX_WRITING, 7, 'You can’t change it after you hand it in.');
+      const answer = draftField('Your answer', 'writing', MAX_WRITING, 7, 'Check it over first. Your answer is final once you hand it in.');
       const hand = button('Hand it in', 'primary', function () {
         if (!answer.input.value.trim()) {
           showError('Write something first.');
@@ -768,7 +768,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
 
     if (s.phase === 'review') {
       if (!s.included) {
-        stage.append(waitPanel('Your answer isn’t in this swap.', 'Your teacher will tell you what to do.'));
+        stage.append(waitPanel('This swap runs on other answers.', 'Your teacher will tell you what to do.'));
         return stage;
       }
       if (s.reviewed) {
@@ -815,7 +815,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     if (s.mode === 'annotate') {
       stage.append(
         waitPanel(
-          s.included ? 'No notes have come back yet.' : 'Your answer wasn’t in this swap.',
+          s.included ? 'Notes will appear here as they come in.' : 'This swap ran on other answers.',
           s.included ? 'This page updates by itself. If nothing arrives, ask your teacher.' : 'Ask your teacher if you’d like someone to read it.'
         )
       );
@@ -824,7 +824,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     } else {
       stage.append(
         waitPanel(
-          s.included ? 'No feedback has come back yet.' : 'Your answer wasn’t in this swap.',
+          s.included ? 'Feedback will appear here as it comes in.' : 'This swap ran on other answers.',
           s.included ? 'This page updates by itself. If nothing arrives, ask your teacher.' : 'Ask your teacher if you’d like someone to read it.'
         )
       );

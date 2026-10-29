@@ -59,7 +59,7 @@ describe('mountStudentUnitView', () => {
 
     await vi.waitFor(() => {
       expect(root.textContent).toContain(
-        'No published lessons in this unit yet.'
+        'Lessons will appear here as your teacher publishes them.'
       );
     });
   });

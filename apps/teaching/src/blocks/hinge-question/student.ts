@@ -119,9 +119,9 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
   function verdict(s: Live): HTMLElement | null {
     if (!s.revealed || !s.correct_id) {
       if (s.open) return null;
-      return waitPanel('Answers are closed.', s.mine ? 'Your teacher will tell you what happens next.' : 'You didn’t answer this one.');
+      return waitPanel('Answers are closed.', 'Your teacher will tell you what happens next.');
     }
-    if (!s.mine) return waitPanel('You didn’t answer this one.', 'The right answer is marked above.');
+    if (!s.mine) return waitPanel('This round has finished.', 'The right answer is marked above.');
     const right = s.mine === s.correct_id;
     const box = el('div', `hq-verdict hq-verdict--${right ? 'right' : 'wrong'}`);
     box.setAttribute('role', 'status');
@@ -139,7 +139,7 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
     }
     if (state.phase === 'idle') {
       if (promptEl) promptEl.textContent = block.content.prompt.trim() || 'Choose one answer.';
-      if (painted !== 'idle') body.replaceChildren(waitPanel('Your teacher hasn’t asked this yet.', 'This page updates by itself.'));
+      if (painted !== 'idle') body.replaceChildren(waitPanel('Waiting for your teacher to ask.', 'This page updates by itself.'));
       painted = 'idle';
       return;
     }
@@ -151,7 +151,7 @@ export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTM
     const parts: HTMLElement[] = [];
     if (s.open) parts.push(clock);
     parts.push(choices(s));
-    if (!token) parts.push(el('p', 'pf-alert', 'This browser won’t save anything, so you can’t answer here. Try a normal (not private) window.'));
+    if (!token) parts.push(el('p', 'pf-alert', 'Open a normal (not private) window to answer here.'));
     const v = verdict(s);
     if (v) parts.push(v);
     body.replaceChildren(...parts);

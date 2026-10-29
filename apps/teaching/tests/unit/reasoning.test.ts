@@ -178,7 +178,7 @@ describe('Reasoning walk', () => {
     const state = { ...emptyWalkState(), step: 3, answers };
     const root = createReasoningWalk({ logic: 'deductive', level: 'core', state, persist: () => {}, preview: false, onDone: () => { done = true; } });
     expect(root.querySelector('.lens-frame')!.textContent).toContain('it must be that ___');
-    expect(root.textContent).toContain('This page won’t keep your answer');
+    expect(root.textContent).toContain('Your answer is saved on this device');
     press(root, 'I’ve written it down');
     expect(state.done).toBe(true);
     expect(done).toBe(true);

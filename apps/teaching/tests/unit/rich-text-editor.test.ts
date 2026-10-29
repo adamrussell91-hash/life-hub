@@ -38,6 +38,11 @@ function mount(html: string): {
 }
 
 function selectAllIn(surface: HTMLElement): void {
+  const tiptap = (surface as unknown as { editor?: { commands: { selectAll: () => boolean } } }).editor;
+  if (tiptap) {
+    tiptap.commands.selectAll();
+    return;
+  }
   const range = document.createRange();
   range.selectNodeContents(surface);
   const selection = window.getSelection();

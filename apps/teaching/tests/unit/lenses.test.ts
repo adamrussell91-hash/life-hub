@@ -37,7 +37,7 @@ describe('Write it down', () => {
     expect(view.querySelector('.lens-frame')!.textContent).toContain('Both ___ and ___');
     expect(view.querySelector<HTMLTextAreaElement>('.lens-answer')!.value).toContain('Both ___ and ___');
     expect(view.querySelectorAll('.lens-checklist li')).toHaveLength(3);
-    expect(view.querySelector('.lens-handover')!.textContent).toContain('won’t keep your answer');
+    expect(view.querySelector('.lens-handover')!.textContent).toContain('saved on this device');
     const answer = view.querySelector<HTMLTextAreaElement>('.lens-answer')!;
     answer.value = 'My finished sentence'; answer.dispatchEvent(new Event('input'));
     click(view, 'I’ve written it down');

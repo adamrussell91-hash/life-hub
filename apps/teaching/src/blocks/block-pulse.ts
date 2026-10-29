@@ -49,7 +49,7 @@ export const PULSE_OPTIONS: ReadonlyArray<{
   },
   {
     id: 'stuck',
-    label: "I can't get started",
+    label: 'I need help to get started',
     weight: 1,
     icon: SVG('<path d="M3 20h5v-5h5v-5h5V5h3"/>')
   },

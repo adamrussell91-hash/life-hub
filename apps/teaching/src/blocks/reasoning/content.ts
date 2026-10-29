@@ -99,7 +99,7 @@ const STEPS: Record<Logic, Draft[]> = {
     {
       id: 'so', column: 2, kind: 'text', title: 'So probably', sure: true,
       question: 'If the pattern keeps going, what happens next?',
-      hint: 'A pattern never makes you certain. Choose how sure you are.',
+      hint: 'A pattern leaves room for doubt. Choose how sure you are.',
       starter: 'So ___ will probably ___.',
       example: 'So Katniss will probably die in the arena.'
     },
@@ -263,7 +263,7 @@ export function reasoningWrite(logic: Logic | 'all_three', level: LensLevel): Wr
           checklist: ['Names specific evidence', 'Moves from probably to must']
         };
   }
-  const base = ['Names specific evidence from the text', SIGNAL[logic], 'Explains, rather than retells'];
+  const base = ['Names specific evidence from the text', SIGNAL[logic], 'Explains and builds on the text'];
   if (level === 'support') {
     return { frame: FRAMES[logic].support, example: EXAMPLES[logic], checklist: ['I used something from the text', SIGNAL[logic]] };
   }

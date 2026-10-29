@@ -778,6 +778,30 @@
   .cl-editor__statement .pf-switch {
     grid-column: 2;
   }
+
+  /* Long end and stop labels wrap in their own lane instead of running into each other. */
+  .cl-end,
+  .cl-stop-label {
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .cl-end {
+    max-width: 38%;
+  }
+
+  .cl-end--right {
+    text-align: right;
+  }
+
+  .cl-stop-label {
+    max-width: 5.5rem;
+    text-align: center;
+  }
+
+  .cl-line {
+    height: 132px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

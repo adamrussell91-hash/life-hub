@@ -22,12 +22,8 @@ export type RichTextTiptapHandle = {
 };
 
 function runWithSelection(editor: Editor, apply: (chain: ReturnType<Editor['chain']>) => unknown): void {
-  const { empty } = editor.state.selection;
+  // With only a caret, mark toggles set the stored mark for what is typed next.
   const chain = editor.chain().focus();
-  // happy-dom / programmatic DOM selections may not map into PM; select all when empty
-  // so toolbar actions still affect the visible prose (matches teacher expectation for
-  // "format this block" when nothing is selected).
-  if (empty) chain.selectAll();
   apply(chain);
   chain.run();
 }

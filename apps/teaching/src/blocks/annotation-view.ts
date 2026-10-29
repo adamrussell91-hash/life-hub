@@ -1205,7 +1205,7 @@ function buildInteractiveView(
     if (untagged) {
       const note = document.createElement('span');
       note.className = 'block-annotation__family-note';
-      note.textContent = 'Notes without a technique keep their layer colour.';
+      note.textContent = 'Untagged notes keep their layer colour.';
       familyKey.append(note);
     }
   }
@@ -1641,7 +1641,7 @@ function buildInteractiveView(
       empty.textContent =
         mode === 'teacher'
           ? 'Select text to add a note'
-          : 'No annotations on this text yet.';
+          : 'Annotations will appear here as they are added.';
       textCol.append(empty);
     }
 

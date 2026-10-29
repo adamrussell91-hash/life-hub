@@ -7,7 +7,7 @@ import { createReasoningWalk, readWalkState, renderReasoningPrint, type WalkStat
 
 type QuestionSet = Extract<Block, { block_type: 'question_set' }>;
 type Mode = 'student' | 'teacher' | 'print';
-type Ctx = { lessonId?: string };
+type Ctx = { lessonId?: string; saveScope?: string };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -38,7 +38,7 @@ export function renderReasoningChartFormat(block: QuestionSet, mode: Mode, ctx: 
     return wrap;
   }
 
-  const base = mode === 'student' && ctx.lessonId ? `${storageKey(ctx.lessonId, block.id)}.format.reasoning_chart` : undefined;
+  const base = mode === 'student' && (ctx.lessonId ?? ctx.saveScope) ? `${storageKey((ctx.lessonId ?? ctx.saveScope)!, block.id)}.format.reasoning_chart` : undefined;
   let level: LensLevel = settings.level;
   if (base && settings.student_level) {
     const saved = loadActivityState<string>(`${base}.level`);
