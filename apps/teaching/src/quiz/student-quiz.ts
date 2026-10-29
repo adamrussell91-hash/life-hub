@@ -1,7 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { PublishedLesson } from '@/schemas/published-lesson';
-import { hasAnswer, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse } from '@/quiz/core';
+import { hasAnswer, QUIZ_KIND_INFO, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse } from '@/quiz/core';
 import { mountQuestionPlayer, seededShuffle } from '@/quiz/player';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import './quiz.css';
@@ -73,7 +73,14 @@ const FEEDBACK_TEXT = {
   released: 'Your teacher will share the marks later.'
 } as const;
 
-export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: string; pickClass?: boolean } = {}): HTMLElement {
+/**
+ * Slots, keyed by question (block) id, put each question's answer space where
+ * the teacher placed it in the lesson. The quiz box itself then keeps the
+ * start, the hand-in and the marks; it is still one go, one hand-in.
+ */
+export type StudentQuizOptions = { classId?: string; pickClass?: boolean; slots?: Map<string, HTMLElement> };
+
+export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOptions = {}): HTMLElement {
   // The page's copy is only a first paint. The server sends the questions and
   // settings for each attempt, so a republish never leaves a student answering
   // against ids the marker no longer knows.
@@ -103,6 +110,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   };
   useClass(classId);
   let autoPick = true;
+  const slots = options.slots?.size ? options.slots : null;
 
   const root = el('section', 'qz-quiz');
   root.setAttribute('aria-label', 'Quiz');
@@ -265,6 +273,11 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   /* ── Views ── */
 
   function paint(): void {
+    paintBody();
+    paintSlots();
+  }
+
+  function paintBody(): void {
     window.clearInterval(tick);
     if (!status) {
       body.replaceChildren(el('p', 'qz-note', 'Loading the quiz…'));
@@ -288,7 +301,9 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       return;
     }
     if (status.current && view !== 'review') view = 'quiz';
-    if (view === 'quiz' && status.current) body.replaceChildren(quizView(status.current));
+    // Answering happens in the slots, so the box here is the hand-in.
+    if (slots && status.current && (view === 'quiz' || view === 'review')) body.replaceChildren(reviewView(status.current));
+    else if (view === 'quiz' && status.current) body.replaceChildren(quizView(status.current));
     else if (view === 'review' && status.current) body.replaceChildren(reviewView(status.current));
     else if (view === 'result') body.replaceChildren(resultView());
     // One way in at a time: while the teacher runs it live, the join box above is the quiz.
@@ -361,6 +376,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     if (settings.question_seconds) fact(`${settings.question_seconds} seconds a question`);
     fact(settings.attempts === 1 ? 'One go' : `${settings.attempts} goes, ${Math.max(0, s.attempts_allowed - s.attempts_used)} left`);
     fact(FEEDBACK_TEXT[settings.feedback ?? 'end']);
+    if (slots) fact('You answer each question where it sits in the lesson, then hand in here.');
     if ((settings.attempts ?? 1) > 1 && settings.feedback !== 'released') fact('Right answers show after your last go.');
     if (settings.closes_at) fact(`Closes ${new Date(settings.closes_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`);
     wrap.append(facts);
@@ -391,17 +407,22 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       wrap.append(
         button(s.results.length ? 'Try again' : 'Start the quiz', 'primary', async function () {
           this.disabled = true;
-          const next = await call('start');
-          if (next?.current) {
-            draft = loadDraft(next.current);
-            questionStarted = Date.now();
-            view = 'quiz';
-          } else if (next) showError('The quiz didn’t open. Try again in a moment.');
-          paint();
+          if ((await startAttempt()) && slots) firstSlot()?.scrollIntoView({ block: 'center' });
         })
       );
     }
     return wrap;
+  }
+
+  async function startAttempt(): Promise<boolean> {
+    const next = await call('start');
+    if (next?.current) {
+      draft = loadDraft(next.current);
+      questionStarted = Date.now();
+      view = 'quiz';
+    } else if (next) showError('The quiz didn’t open. Try again in a moment.');
+    paint();
+    return !!next?.current;
   }
 
   function remainingMs(current: Current): number | null {
@@ -466,46 +487,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     });
     wrap.append(player);
 
-    // Hint: opened once, costs a share of the marks, and stays open.
-    if (q.has_hint && !checked) {
-      const hint = current.hints[id];
-      if (hint) wrap.append(el('p', 'qz-hint', `Hint: ${hint}`));
-      else {
-        const cost = settings.hint_cost ?? 0.5;
-        const label = cost === 0 ? 'Show hint' : cost >= 1 ? 'Show hint (you’ll lose this question’s marks)' : `Show hint (costs ${cost === 0.5 ? 'half' : `${Math.round(cost * 100)}%`} of the marks)`;
-        wrap.append(
-          button(label, 'ghost', async function () {
-            this.disabled = true;
-            leaveQuestion();
-            await call('hint', { question_id: id });
-            paint();
-          })
-        );
-      }
-    }
-
-    if (settings.confidence && !checked) {
-      const row = el('div', 'qz-confidence');
-      row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', 'How sure are you?');
-      row.append(el('span', 'qz-confidence__label', 'How sure are you?'));
-      ([
-        [1, 'Guessing'],
-        [2, 'Fairly sure'],
-        [3, 'Sure']
-      ] as const).forEach(([value, text]) => {
-        const b = el('button', 'qz-chip', text);
-        b.type = 'button';
-        b.setAttribute('aria-pressed', String(d.confidence[id] === value));
-        b.addEventListener('click', () => {
-          d.confidence[id] = value;
-          saveDraft();
-          row.querySelectorAll('.qz-chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-        });
-        row.append(b);
-      });
-      wrap.append(row);
-    }
+    if (q.has_hint && !checked) wrap.append(hintControl(current, id, leaveQuestion));
+    if (settings.confidence && !checked) wrap.append(confidenceControl(d, id));
 
     const nav = el('div', 'qz-actions qz-actions--nav');
     const back = button('Back', 'ghost', () => go(d.index - 1));
@@ -580,6 +563,153 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     return wrap;
   }
 
+  /** Hint: opened once, costs a share of the marks, and stays open. */
+  function hintControl(current: Current, id: string, before: () => void): HTMLElement {
+    const hint = current.hints[id];
+    if (hint) return el('p', 'qz-hint', `Hint: ${hint}`);
+    const cost = settings.hint_cost ?? 0.5;
+    const label = cost === 0 ? 'Show hint' : cost >= 1 ? 'Show hint (you’ll lose this question’s marks)' : `Show hint (costs ${cost === 0.5 ? 'half' : `${Math.round(cost * 100)}%`} of the marks)`;
+    return button(label, 'ghost', async function () {
+      this.disabled = true;
+      before();
+      await call('hint', { question_id: id });
+      paint();
+    });
+  }
+
+  function confidenceControl(d: Draft, id: string): HTMLElement {
+    const row = el('div', 'qz-confidence');
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'How sure are you?');
+    row.append(el('span', 'qz-confidence__label', 'How sure are you?'));
+    ([
+      [1, 'Guessing'],
+      [2, 'Fairly sure'],
+      [3, 'Sure']
+    ] as const).forEach(([value, text]) => {
+      const b = el('button', 'qz-chip', text);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(d.confidence[id] === value));
+      b.addEventListener('click', () => {
+        d.confidence[id] = value;
+        saveDraft();
+        row.querySelectorAll('.qz-chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      });
+      row.append(b);
+    });
+    return row;
+  }
+
+  /* ── Slots: each question answered where it sits in the lesson ── */
+
+  const slotList = () => [...(slots?.entries() ?? [])];
+  const firstSlot = (only?: (id: string) => boolean) => slotList().find(([id]) => !only || only(id))?.[1];
+
+  function paintSlots(): void {
+    for (const [id, slot] of slotList()) {
+      // Repaint only when this question's state changes, so typing elsewhere keeps its place.
+      const sig = slotSignature(id);
+      if (slot.dataset.sig === sig) continue;
+      slot.dataset.sig = sig;
+      slot.replaceChildren(slotView(id));
+    }
+  }
+
+  function slotSignature(id: string): string {
+    const s = status;
+    const current = s?.current;
+    return JSON.stringify([
+      !!s,
+      current?.n ?? null,
+      !!draft,
+      byId.has(id),
+      !!(current?.answers[id] ?? checking[id]),
+      !!current?.hints[id],
+      s?.identity?.need ?? null,
+      !!s?.live,
+      s?.open ?? null,
+      s?.results.length ?? 0,
+      s ? s.attempts_allowed - s.attempts_used : null
+    ]);
+  }
+
+  function slotView(id: string): HTMLElement {
+    const q = byId.get(id);
+    const current = status?.current;
+    if (current && q) {
+      if (!draft) draft = loadDraft(current);
+      return slotTaking(current, id, q);
+    }
+    const box = el('div', 'qz-slot');
+    if (q) {
+      box.append(el('p', 'qz-eyebrow block-eyebrow', `${QUIZ_KIND_INFO[q.kind]?.label ?? 'Question'} · ${formatMarks(q.marks)} ${q.marks === 1 ? 'mark' : 'marks'}`));
+      box.append(el('p', 'qz-card__prompt block-title', q.prompt));
+    }
+    const s = status;
+    const toBox = (label: string) => button(label, 'secondary', () => root.scrollIntoView({ block: 'center' }));
+    if (!s) box.append(el('p', 'qz-note', 'Loading…'));
+    else if (current) box.append(el('p', 'qz-note', 'This question isn’t part of your current go.'));
+    else if (s.live) box.append(el('p', 'qz-note', 'Your teacher is running this quiz live. Join at the end of the lesson.'), toBox('Go to the quiz'));
+    else if (s.identity?.need) box.append(el('p', 'qz-note', 'Start at the end of the lesson, then answer here.'), toBox('Go to the start'));
+    else if (!s.open) box.append(el('p', 'qz-note', 'This quiz has closed.'));
+    else if (s.attempts_allowed - s.attempts_used > 0) {
+      box.append(
+        button(s.results.length ? 'Try again' : 'Start answering', 'primary', async function () {
+          this.disabled = true;
+          if (!(await startAttempt())) this.disabled = false;
+        })
+      );
+    } else box.append(el('p', 'qz-note', 'Handed in. Your marks are at the end of the lesson.'), toBox('See your marks'));
+    return box;
+  }
+
+  function slotTaking(current: Current, id: string, q: PublicQuestion): HTMLElement {
+    const d = draft as Draft;
+    const checked = current.answers[id] ?? checking[id];
+    const wrap = el('div', 'qz-slot qz-slot--taking');
+    if (practice.has(id)) wrap.append(practiceChip());
+    wrap.append(
+      mountQuestionPlayer({
+        question: q,
+        response: checked?.response ?? d.responses[id] ?? null,
+        locked: !!checked,
+        shuffle: !!settings.shuffle_options,
+        seed: `${token ?? ''}:${current.n}`,
+        result: checked ? { mark: checked.mark, key: checked.key } : null,
+        onChange: (response) => {
+          d.responses[id] = response;
+          saveDraft();
+          // The hand-in box counts what's left to answer.
+          paintBody();
+        }
+      })
+    );
+    if (q.has_hint && !checked) wrap.append(hintControl(current, id, saveDraft));
+    if (settings.confidence && !checked) wrap.append(confidenceControl(d, id));
+    const row = el('div', 'qz-actions');
+    if (settings.feedback === 'instant' && !checked) {
+      row.append(
+        button('Check answer', 'primary', async function () {
+          if (!hasAnswer(d.responses[id])) {
+            note.textContent = 'Answer the question first.';
+            note.hidden = false;
+            return;
+          }
+          this.disabled = true;
+          const res = await call('check', { question_id: id, response: d.responses[id], confidence: d.confidence[id] });
+          if (res?.mark) checking = { ...checking, [id]: { mark: res.mark, key: res.key ?? null } };
+          paint();
+        })
+      );
+    }
+    row.append(saveChip());
+    const note = el('p', 'qz-alert');
+    note.setAttribute('role', 'alert');
+    note.hidden = true;
+    wrap.append(note, row);
+    return wrap;
+  }
+
   function leaveQuestion(): void {
     if (!draft) return;
     const id = draft.order[draft.index] as string;
@@ -602,8 +732,9 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     const d = draft ?? loadDraft(current);
     const wrap = el('div', 'qz-review');
     const unanswered = d.order.filter((id) => !hasAnswer(d.responses[id]) && !current.answers[id]);
-    wrap.append(el('h3', 'qz-h', 'Ready to hand in?'), saveChip());
-    wrap.append(el('p', 'qz-note', 'Your answers are saved, but your teacher only sees them after you press Hand it in.'));
+    wrap.append(el('h3', 'qz-h', slots ? 'Hand in your answers' : 'Ready to hand in?'), saveChip());
+    if (slots) wrap.append(el('p', 'qz-note', 'Answer each question where it sits in the lesson. Your teacher only sees your answers after you press Hand it in.'));
+    else wrap.append(el('p', 'qz-note', 'Your answers are saved, but your teacher only sees them after you press Hand it in.'));
     if (unanswered.length) {
       wrap.append(el('p', 'qz-note', `${plural(unanswered.length, 'question')} not answered yet:`));
       const list = el('div', 'qz-actions');
@@ -611,6 +742,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
         const i = d.order.indexOf(id);
         list.append(
           button(`Question ${i + 1}`, 'ghost', () => {
+            if (slots) {
+              slots.get(id)?.scrollIntoView({ block: 'center' });
+              return;
+            }
             view = 'quiz';
             go(i);
           })
@@ -636,11 +771,15 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       paintClock();
     }, 500);
     const actions = el('div', 'qz-actions');
+    if (!slots) {
+      actions.append(
+        button('Back to the questions', 'ghost', () => {
+          view = 'quiz';
+          paint();
+        })
+      );
+    }
     actions.append(
-      button('Back to the questions', 'ghost', () => {
-        view = 'quiz';
-        paint();
-      }),
       button('Hand it in', 'primary', async function () {
         this.disabled = true;
         await submit(false);
@@ -864,6 +1003,12 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     scheduleLive();
   });
   return root;
+}
+
+/** True when a quiz question sits inside a section, columns or tabs rather than on the page itself. */
+export function hasNestedQuizQuestion(blocks: Block[]): boolean {
+  const top = new Set(blocks.filter((b) => b.block_type === 'quiz_question').map((b) => b.id));
+  return collectQuestions(blocks).some((q) => !top.has(q.id));
 }
 
 function collectQuestions(blocks: Block[]): PublicQuestion[] {
