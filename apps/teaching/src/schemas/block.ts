@@ -538,7 +538,13 @@ export const QuestionItemSchema = z.object({
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
   level: z.enum(['beginner', 'detective', 'judge', 'inventor']).optional(),
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
-  logic: LogicSchema.optional()
+  logic: LogicSchema.optional(),
+  /** Short answer only: the answer a student can check their own against. */
+  model_answer: z.string().optional(),
+  /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
+  model_check: z.enum(['reveal', 'confidence']).optional(),
+  /** Success criteria the student ticks off against their answer. */
+  checklist: z.array(z.object({ id: z.string().min(1), label: z.string() })).max(12).optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({
@@ -1823,7 +1829,9 @@ export const TabsBlockSchema = z.object({
         })
       )
       .min(2)
-      .max(8)
+      .max(8),
+    /** Absent means tabs; folds shows each panel as a fold-out. */
+    style: z.enum(['tabs', 'folds']).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

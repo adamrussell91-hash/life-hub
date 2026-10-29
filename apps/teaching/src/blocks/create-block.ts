@@ -104,7 +104,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   definition: 'Definition',
   code: 'Code',
   html: 'HTML',
-  html_app: 'HTML app',
+  html_app: 'Interactive app',
   image: 'Image',
   gallery: 'Gallery',
   video: 'Video',
@@ -130,7 +130,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   chart: 'Chart',
   equation: 'Equation',
   diagram: 'Diagram',
-  mind_map: 'Mind map',
+  mind_map: 'Map',
   concept_map: 'Concept map',
   curriculum_lines: 'Curriculum lines',
   whiteboard: 'Whiteboard',
@@ -139,7 +139,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   spacer: 'Spacer',
   timeline: 'Timeline',
   card_stack: 'Card stack',
-  tabs: 'Tabs',
+  tabs: 'Panels',
   collection: 'Collection',
   anthology: 'Anthology',
   outcomes: 'Outcomes',
@@ -199,21 +199,20 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   {
     label: 'Basic',
     types: [
+      // Quote is a Callout style, Rich text has its own HTML source view, and the word tray replaced Definition.
       'rich_text',
       'heading',
       'callout',
       'teacher_note',
-      'quote',
       'table',
-      'definition',
       'code',
-      'html',
       'html_app'
     ]
   },
   {
     label: 'Media',
-    types: ['image', 'gallery', 'video', 'embed', 'audio', 'attachment']
+    // Image grows into a gallery from its own editor.
+    types: ['image', 'video', 'embed', 'audio', 'attachment']
   },
   {
     label: 'Teaching',
@@ -247,20 +246,20 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
   },
   {
     label: 'Visualisation',
-    types: ['chart', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'curriculum_lines', 'whiteboard']
+    // One Map entry: its editor switches between a tree (mind map) and a network (concept map).
+    types: ['chart', 'timeline', 'equation', 'diagram', 'mind_map', 'curriculum_lines', 'whiteboard']
   },
   {
     label: 'Layout',
     types: [
+      // Divider switches to a space, and Panels show as tabs or fold-outs.
       'section',
       'columns',
       'divider',
-      'spacer',
-      'accordion',
       'tabs',
       'card_stack',
       'collection',
@@ -273,7 +272,7 @@ const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
 /** Unit plan pages only: it maps the unit's lessons. */
 const UNIT_ONLY_TYPES = new Set(['curriculum_lines']);
 /** The old toolkit cards: kept for saved lessons, never offered for new ones (they are sleeves now). */
-export const RETIRED_BLOCK_TYPES: ReadonlySet<string> = new Set(['toolkit_skill', 'toolkit_tool', 'toolkit_value']);
+export const RETIRED_BLOCK_TYPES: ReadonlySet<string> = new Set(['toolkit_skill', 'toolkit_tool', 'toolkit_value', 'definition', 'html']);
 
 const TOOLKIT_GROUP_TYPES = [
   'thinking_intentions',

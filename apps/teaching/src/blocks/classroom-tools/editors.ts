@@ -3,7 +3,9 @@
  * block and the countdown header.
  */
 import type { Block, ClassroomToolId, TimerSegment } from '@/schemas/block';
-import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
+import { editorShell, type BlockChangeHandler, type BlockEditorContext } from '@/blocks/editors';
+import { createEditorFilter } from '@/blocks/editor-filter';
+import { swapBlock } from '@/blocks/swap-block';
 import { ALL_TOOLS, TIMER_PRESETS, TOOL_LABEL, stackTotalMinutes, formatClock } from '@/blocks/classroom-tools/logic';
 import './classroom-tools.css';
 
@@ -117,9 +119,24 @@ export function createTimerStackEditor(initial: TimerSegment[], onStack: (stack:
 export function createDividerEditor(
   block: DividerBlock,
   onChange: BlockChangeHandler<DividerBlock>,
-  getLatest: () => DividerBlock = () => block
+  getLatest: () => DividerBlock = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = el('div', 'block-editor__fields ct-editor');
+  const kind = createEditorFilter({
+    key: 'Kind',
+    value: 'line',
+    options: [
+      { value: 'line', label: 'Line' },
+      { value: 'space', label: 'Space' }
+    ],
+    className: 'block-editor__divider-kind',
+    ariaLabel: 'Line or space',
+    onChange: (picked) => {
+      if (picked !== 'space') return;
+      swapBlock({ ...getLatest(), block_type: 'spacer', content: { size: 'medium' } } as unknown as Block, onChange as unknown as (b: Block) => void, context);
+    }
+  });
   const toggle = el('input');
   toggle.type = 'checkbox';
   toggle.id = `ct-ed-tools-${(editorSeed += 1)}`;
@@ -137,7 +154,7 @@ export function createDividerEditor(
     stack.hidden = !toggle.checked;
     onChange({ ...latest, content: { tools: toggle.checked, timer_stack: latest.content?.timer_stack ?? [] } });
   });
-  fields.append(toggleLabel, hint, stack);
+  fields.append(kind.el, toggleLabel, hint, stack);
   return editorShell(block, onChange, fields, getLatest);
 }
 
