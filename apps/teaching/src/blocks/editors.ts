@@ -65,7 +65,8 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { createEditorFilter, type HubFilterControl } from '@/blocks/editor-filter';
 import { swapBlock } from '@/blocks/swap-block';
 import { classroomExtras } from '@/blocks/classroom-extras';
-import { parseEmbedInput } from '@/blocks/embed-url';
+import { isMapsShareLink, parseEmbedInput } from '@/blocks/embed-url';
+import { apiGet } from '@/api/client';
 import { parseVideoInput } from '@/blocks/video-url';
 import {
   CARD_STACK_MAX_CARDS,
@@ -765,6 +766,7 @@ export function createEmbedEditor(
     className: 'block-editor__embed-provider',
     ariaLabel: 'Embed provider',
     onChange: (value) => {
+      syncProvider();
       const parsed = parseEmbedInput(url.value);
       if (parsed && parsed.provider === value) {
         emitChange(parsed.embed_url);
@@ -776,7 +778,17 @@ export function createEmbedEditor(
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
-  hint.textContent = 'Share settings must allow viewers. Docs and Drive files preview in place.';
+
+  // A map comes from a Google Maps link, so it gets no PDF or Drive buttons and its own help.
+  let sourceRow: HTMLElement | null = null;
+  const syncProvider = () => {
+    const isMap = provider.getValue() === 'google_maps';
+    if (sourceRow) sourceRow.hidden = isMap;
+    url.placeholder = isMap ? 'Paste a Google Maps link' : 'Paste a link';
+    hint.textContent = isMap
+      ? 'In Google Maps, copy the link from the address bar or use Share. The map shows that place.'
+      : 'Share settings must allow viewers. Docs and Drive files preview in place.';
+  };
 
   const emitChange = (embedUrl?: string) => {
     const selected = provider.getValue() as EmbedProvider;
@@ -791,10 +803,40 @@ export function createEmbedEditor(
     });
   };
 
+  // Share links (maps.app.goo.gl) only redirect, so the server follows them to the full map link.
+  let resolving = '';
+  const resolveShareLink = (shortUrl: string) => {
+    resolving = shortUrl;
+    provider.setValue('google_maps');
+    syncProvider();
+    hint.textContent = 'Opening the Share link…';
+    emitChange(undefined);
+    apiGet<{ url: string }>(`/api/embed/resolve?url=${encodeURIComponent(shortUrl)}`)
+      .then((res) => {
+        if (resolving !== shortUrl || url.value.trim() !== shortUrl) return;
+        url.value = res.url;
+        applyUrlDetection();
+      })
+      .catch((err: unknown) => {
+        if (resolving !== shortUrl) return;
+        hint.textContent =
+          err instanceof Error && err.message
+            ? err.message
+            : 'That Share link could not be opened. Paste the link from the address bar instead.';
+      });
+  };
+
   const applyUrlDetection = () => {
+    const value = url.value.trim();
+    if (isMapsShareLink(value)) {
+      if (value !== resolving) resolveShareLink(value);
+      return;
+    }
+    resolving = '';
     const parsed = parseEmbedInput(url.value);
     if (parsed) {
       provider.setValue(parsed.provider);
+      syncProvider();
       emitChange(parsed.embed_url);
       return;
     }
@@ -829,11 +871,14 @@ export function createEmbedEditor(
       url.value = uploadedUrl;
       if (!title.value.trim()) title.value = media.title;
       provider.setValue('pdf');
+      syncProvider();
       emitChange(undefined);
     }
   });
 
-  fields.append(mediaSourceRow(upload.el, driveBtn), url, title, provider.el, hint);
+  sourceRow = mediaSourceRow(upload.el, driveBtn);
+  syncProvider();
+  fields.append(sourceRow, url, title, provider.el, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
