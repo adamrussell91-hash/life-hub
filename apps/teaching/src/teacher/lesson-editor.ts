@@ -580,6 +580,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           compositionCache.set(updated.id, updated);
           setCompositionStatus(`Saved “${updated.title}”.`);
           page?.update(lesson);
+          // Students get a copy of the source frozen at publish, so a source
+          // edit leaves this lesson with changes to publish.
+          markDirty();
         }
       }).then((modal) => {
         if (disposed || isStale() || openSeq !== editSourceOpenSeq) {
