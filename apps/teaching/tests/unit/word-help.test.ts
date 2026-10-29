@@ -14,6 +14,14 @@ import { createRichTextTools, openFryReview } from '@/blocks/rich-text-tools';
 import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 
+// No network in unit tests: the library answers "no matrix" unless a test injects its own.
+vi.mock('@/blocks/morphemic-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/blocks/morphemic-client')>()),
+  loadMatrix: async () => null,
+  matrixStatus: async () => 'none'
+}));
+
+
 const entry = (word: string, extra: Partial<WordHelpEntry> = {}): WordHelpEntry => ({
   word,
   kind: 'uncommon',

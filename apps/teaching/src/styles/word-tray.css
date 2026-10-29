@@ -195,3 +195,71 @@
     transition: none;
   }
 }
+
+/* While a new matrix builds (a few seconds, once per base). */
+.word-tray__building {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.word-tray__building[hidden] {
+  display: none;
+}
+
+.word-tray__building-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--orca);
+}
+
+.word-tray__spinner {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--pastel-blue);
+  border-top-color: var(--wave);
+  border-radius: var(--radius-full);
+  animation: word-tray-spin 1s linear infinite;
+}
+
+.word-tray__skeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.word-tray__skeleton span {
+  height: 2.125rem;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(90deg, var(--cotton) 0%, var(--paper) 50%, var(--cotton) 100%);
+  background-size: 200% 100%;
+  animation: word-tray-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes word-tray-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes word-tray-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-tray__spinner,
+  .word-tray__skeleton span {
+    animation: none;
+  }
+}

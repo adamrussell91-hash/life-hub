@@ -63,6 +63,8 @@ test('the hinge route starts Ann\'s back-up as a job; the page polls it and gets
   const run = createTextToolsRunHandler(deps(store, { completeMessage: async (args) => (calls.push(args), REPLY) }));
   assert.equal((await run(req('POST', '/api/text-tools-run', { key: view.key }), {})).status, 200);
   assert.equal(calls[0].model, 'claude-sonnet-5-5');
+  // Sonnet 5.5 rejects thinking "disabled"; between_tools is its thinking-off setting.
+  assert.deepEqual(calls[0].thinking, { type: 'between_tools' });
   assert.match(calls[0].messages[0].content, /appeal to fear \(0 picked it; teacher's note: naming the technique/);
 
   const poll = createTextToolsHandler(deps(store));
