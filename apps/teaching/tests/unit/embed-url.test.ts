@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEmbedInput, embedFrameSrc } from '@/blocks/embed-url';
+import { parseEmbedInput, embedFrameSrc, isMapsShareLink } from '@/blocks/embed-url';
 
 describe('parseEmbedInput', () => {
   it('detects Google Slides and derives embed url', () => {
@@ -72,6 +72,23 @@ describe('parseEmbedInput', () => {
     expect(parsed?.embed_url).toContain('output=embed');
     expect(parsed?.embed_url).toContain('-33.8688');
     expect(parsed?.embed_url).toContain('151.2093');
+  });
+
+  it('pins a Google Maps place by name when the link has no coordinates', () => {
+    expect(parseEmbedInput('https://www.google.com/maps/place/Opera+House%2C+Sydney/data=!4m2')).toEqual({
+      provider: 'google_maps',
+      embed_url: 'https://maps.google.com/maps?q=Opera%20House%2C%20Sydney&output=embed'
+    });
+    expect(parseEmbedInput('https://maps.google.com/?q=Bondi+Beach')?.embed_url).toBe(
+      'https://maps.google.com/maps?q=Bondi%20Beach&output=embed'
+    );
+  });
+
+  it('spots Share links and never frames one before it is opened', () => {
+    expect(isMapsShareLink('https://maps.app.goo.gl/AbC123')).toBe(true);
+    expect(isMapsShareLink('https://goo.gl/maps/AbC123')).toBe(true);
+    expect(isMapsShareLink('https://www.google.com/maps/place/Sydney')).toBe(false);
+    expect(embedFrameSrc({ url: 'https://maps.app.goo.gl/AbC123', provider: 'google_maps' })).toBeNull();
   });
 
   it('passes through existing maps embed urls', () => {
