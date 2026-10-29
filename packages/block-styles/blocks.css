@@ -610,6 +610,28 @@
   margin-top: var(--space-2);
   white-space: pre-wrap;
 }
+
+.block-tabs--folds {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.block-tabs__fold {
+  padding: var(--space-2) var(--space-3);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.block-tabs__fold-summary {
+  cursor: pointer;
+}
+
+.block-tabs__fold-body {
+  margin-top: var(--space-2);
+  display: grid;
+  gap: var(--space-3);
+}
 .block[data-block-type='timeline'] {
   container-type: inline-size;
 }
@@ -6128,4 +6150,18 @@ button.block-annotation__margin-note.is-collapsed:hover {
   outline-offset: 6px;
   border-radius: var(--radius-sm, 8px);
   transition: outline-color 0.6s ease;
+}
+
+.block-question-set__model-note {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.block-question-set__model-btn {
+  margin-top: var(--space-2);
+}
+
+.block-question-set__model {
+  margin-top: var(--space-2);
 }

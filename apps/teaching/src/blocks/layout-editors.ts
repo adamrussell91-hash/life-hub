@@ -14,6 +14,7 @@ import {
 } from '@/blocks/create-block';
 import { editorShell, type BlockChangeHandler, type BlockEditorContext } from '@/blocks/editors';
 import { createEditorFilter } from '@/blocks/editor-filter';
+import { swapBlock } from '@/blocks/swap-block';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import type { Block } from '@/schemas/block';
 import { createHubTabStrip } from '../../design-kit/js/hub-list.js';
@@ -24,10 +25,26 @@ type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 export function createSpacerEditor(
   block: Extract<Block, { block_type: 'spacer' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'spacer' }>>,
-  getLatest: () => Extract<Block, { block_type: 'spacer' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'spacer' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
+
+  const kind = createEditorFilter({
+    key: 'Kind',
+    value: 'space',
+    options: [
+      { value: 'line', label: 'Line' },
+      { value: 'space', label: 'Space' }
+    ],
+    className: 'block-editor__spacer-kind',
+    ariaLabel: 'Line or space',
+    onChange: (picked) => {
+      if (picked !== 'line') return;
+      swapBlock({ ...getLatest(), block_type: 'divider', content: { tools: true, timer_stack: [] } } as unknown as Block, onChange as unknown as (b: Block) => void, context);
+    }
+  });
 
   const select = createEditorFilter({
     key: 'Size',
@@ -50,7 +67,7 @@ export function createSpacerEditor(
   preview.className = `block-spacer block-spacer--${block.content.size}`;
   preview.setAttribute('aria-hidden', 'true');
 
-  fields.append(select.el, preview);
+  fields.append(kind.el, select.el, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -332,7 +349,7 @@ export function createTabsEditor(
   let seq = 0;
 
   function emitTabs(tabs: Tab[]): void {
-    onChange({ ...getLatest(), content: { tabs } });
+    onChange({ ...getLatest(), content: { ...getLatest().content, tabs } });
   }
 
   function patchTab(tabId: string, blocks: Block[]): void {
@@ -395,6 +412,22 @@ export function createTabsEditor(
       })
   });
 
-  fields.append(strip.el);
+  const styleFilter = createEditorFilter({
+    key: 'Show as',
+    value: block.content.style ?? 'tabs',
+    options: [
+      { value: 'tabs', label: 'Tabs' },
+      { value: 'folds', label: 'Fold-outs' }
+    ],
+    className: 'block-editor__tabs-style',
+    ariaLabel: 'Show panels as',
+    defaultValue: 'tabs',
+    onChange: (value) => {
+      const latest = getLatest();
+      onChange({ ...latest, content: { ...latest.content, style: value === 'folds' ? 'folds' : 'tabs' } });
+    }
+  });
+
+  fields.append(styleFilter.el, strip.el);
   return editorShell(block, onChange, fields, getLatest);
 }

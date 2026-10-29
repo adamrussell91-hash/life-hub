@@ -63,6 +63,7 @@ import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { createEditorFilter, type HubFilterControl } from '@/blocks/editor-filter';
+import { swapBlock } from '@/blocks/swap-block';
 import { classroomExtras } from '@/blocks/classroom-extras';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
@@ -249,6 +250,24 @@ function createChoice(options: {
   return createEditorFilter(options);
 }
 
+const CALLOUT_STYLE_OPTIONS = [
+  'cultural_warning',
+  'information',
+  'important',
+  'warning',
+  'extension',
+  'scaffold',
+  'example',
+  'remember'
+] as const;
+
+/** Callout styles a picker offers. Teacher is kept only on a block that already uses it. */
+function calloutStyleOptions(current: string): Array<{ value: string; label: string }> {
+  const styles: string[] = [...CALLOUT_STYLE_OPTIONS];
+  if (current === 'teacher') styles.push('teacher');
+  return styles.map((style) => ({ value: style, label: style === 'cultural_warning' ? 'Cultural warning' : style }));
+}
+
 export function editorShell<T extends Block>(
   block: T,
   onChange: BlockChangeHandler<T>,
@@ -421,22 +440,24 @@ export function createCalloutEditor(
   const styleSelect = createEditorFilter({
     key: 'Style',
     value: resolvedCalloutStyle(block.content),
-    options: (
-      [
-        'cultural_warning',
-        'information',
-        'important',
-        'warning',
-        'extension',
-        'scaffold',
-        'example',
-        'remember',
-        'teacher'
-      ] as const
-    ).map((style) => ({ value: style, label: style === 'cultural_warning' ? 'Cultural warning' : style })),
+    options: [...calloutStyleOptions(resolvedCalloutStyle(block.content)), { value: 'quote', label: 'Quote' }],
     className: 'block-editor__callout-style',
     ariaLabel: 'Callout style',
-    onChange: () => {
+    onChange: (picked) => {
+      if (picked === 'quote') {
+        const rest = getLatest();
+        const title = titleInput.value.trim();
+        swapBlock(
+          {
+            ...rest,
+            block_type: 'quote',
+            content: { quote: bodyInput.value, ...(title ? { attribution: title } : {}) }
+          } as unknown as Block,
+          onChange as unknown as (b: Block) => void,
+          context
+        );
+        return;
+      }
       teacherHint.hidden = styleSelect.getValue() !== 'teacher';
       emitChange();
     }
@@ -597,6 +618,36 @@ export function createImageEditor(
   alt.addEventListener('input', emitChange);
   caption.addEventListener('input', emitChange);
 
+  // A second image turns this into a gallery. The first slot keeps this image.
+  const addAnother = document.createElement('button');
+  addAnother.type = 'button';
+  addAnother.className = 'btn btn--ghost block-editor__image-add-another';
+  addAnother.textContent = 'Add another image';
+  addAnother.addEventListener('click', () => {
+    const latest = getLatest();
+    const stamp = Date.now().toString(36);
+    swapBlock(
+      {
+        ...latest,
+        block_type: 'gallery',
+        content: {
+          layout: 'grid',
+          items: [
+            {
+              id: `${latest.id}_i${stamp}a`,
+              url: url.value,
+              alt_text: alt.value,
+              ...(caption.value ? { caption: caption.value } : {})
+            },
+            { id: `${latest.id}_i${stamp}b`, url: '', alt_text: '' }
+          ]
+        }
+      } as unknown as Block,
+      onChange as unknown as (b: Block) => void,
+      context
+    );
+  });
+
   fields.append(
     mediaSourceRow(upload.el, libraryBtn, driveBtn),
     driveHint,
@@ -604,7 +655,8 @@ export function createImageEditor(
     url,
     alt,
     caption,
-    sizeSelect.el
+    sizeSelect.el,
+    addAnother
   );
   return editorShell(block, onChange, fields, getLatest);
 }
@@ -926,10 +978,36 @@ export function createHtmlAppEditor(
 export function createQuoteEditor(
   block: Extract<Block, { block_type: 'quote' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'quote' }>>,
-  getLatest: () => Extract<Block, { block_type: 'quote' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'quote' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
+
+  const styleSelect = createEditorFilter({
+    key: 'Style',
+    value: 'quote',
+    options: [{ value: 'quote', label: 'Quote' }, ...calloutStyleOptions('')],
+    className: 'block-editor__callout-style',
+    ariaLabel: 'Callout style',
+    onChange: (picked) => {
+      if (picked === 'quote') return;
+      const latest = getLatest();
+      swapBlock(
+        {
+          ...latest,
+          block_type: 'callout',
+          content: {
+            style: picked,
+            ...(attribution.value.trim() ? { title: attribution.value.trim() } : {}),
+            body: quote.value
+          }
+        } as unknown as Block,
+        onChange as unknown as (b: Block) => void,
+        context
+      );
+    }
+  });
 
   const quote = document.createElement('textarea');
   quote.className = 'block-editor__quote-text';
@@ -975,7 +1053,7 @@ export function createQuoteEditor(
   source.addEventListener('input', emitChange);
   reference.addEventListener('input', emitChange);
 
-  fields.append(quote, attribution, source, reference);
+  fields.append(styleSelect.el, quote, attribution, source, reference);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1552,6 +1630,9 @@ export function createQuestionSetEditor(
     response_space?: ResponseSpace;
     level?: QuestionLevel;
     logic?: LogicSetting;
+    model_answer?: string;
+    model_check?: 'reveal' | 'confidence';
+    checklist?: Array<{ id: string; label: string }>;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1573,7 +1654,10 @@ export function createQuestionSetEditor(
     options: q.options ? [...q.options] : undefined,
     response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
     level: q.level,
-    logic: q.logic
+    logic: q.logic,
+    model_answer: q.model_answer,
+    model_check: q.model_check,
+    checklist: q.checklist ? q.checklist.map((item) => ({ ...item })) : undefined
   }));
 
   const emitChange = () => {
@@ -1593,7 +1677,12 @@ export function createQuestionSetEditor(
             ? { response_space: q.response_space }
             : {}),
           ...(q.level ? { level: q.level } : {}),
-          ...(q.logic ? { logic: q.logic } : {})
+          ...(q.logic ? { logic: q.logic } : {}),
+          ...(q.kind === 'short_answer' && q.model_answer?.trim() ? { model_answer: q.model_answer } : {}),
+          ...(q.kind === 'short_answer' && q.model_answer?.trim() && q.model_check === 'confidence' ? { model_check: 'confidence' as const } : {}),
+          ...(q.checklist?.some((item) => item.label.trim())
+            ? { checklist: q.checklist.filter((item) => item.label.trim()).slice(0, 12) }
+            : {})
         }))
       }
     });
@@ -1658,6 +1747,53 @@ export function createQuestionSetEditor(
       });
       responseSpace.el.hidden = question.kind !== 'short_answer';
 
+      const modelAnswer = editorField(
+        'block-editor__question-model-answer',
+        question.model_answer ?? '',
+        'Model answer (optional)',
+        `Question ${n} model answer`,
+        (value) => ctx.update({ ...ctx.current, model_answer: value }),
+        'textarea',
+        2
+      );
+      modelAnswer.hidden = question.kind !== 'short_answer';
+
+      const modelCheck = createChoice({
+        key: 'Model opens',
+        value: question.model_check ?? 'reveal',
+        options: [
+          { value: 'reveal', label: 'On a tap' },
+          { value: 'confidence', label: 'After a confidence rating' }
+        ],
+        className: 'block-editor__question-model-check',
+        ariaLabel: `Question ${n} how the model answer opens`,
+        onChange: (value) => ctx.update({ ...ctx.current, model_check: value as 'reveal' | 'confidence' })
+      });
+      modelCheck.el.hidden = question.kind !== 'short_answer';
+
+      // One criterion per line; a line keeps its id while its words stay the same.
+      const checklist = editorField(
+        'block-editor__question-checklist',
+        (question.checklist ?? []).map((item) => item.label).join('\n'),
+        'Checklist students tick (optional, one per line)',
+        `Question ${n} checklist`,
+        (value) => {
+          const previous = ctx.current.checklist ?? [];
+          const used = new Set<string>();
+          let next = 0;
+          const items = splitOptions(value).map((label) => {
+            const same = previous.find((item) => item.label === label && !used.has(item.id));
+            let id = same?.id;
+            while (!id || used.has(id) || (!same && previous.some((item) => item.id === id))) id = `${ctx.current.id}_c${(next += 1)}`;
+            used.add(id);
+            return { id, label };
+          });
+          ctx.update({ ...ctx.current, checklist: items.length ? items : undefined });
+        },
+        'textarea',
+        2
+      );
+
       const kind = createChoice({
         key: 'Kind',
         value: question.kind,
@@ -1677,6 +1813,8 @@ export function createQuestionSetEditor(
           });
           options.hidden = nextKind !== 'multiple_choice';
           responseSpace.el.hidden = nextKind !== 'short_answer';
+          modelAnswer.hidden = nextKind !== 'short_answer';
+          modelCheck.el.hidden = nextKind !== 'short_answer';
           if (nextKind === 'short_answer') responseSpace.setValue('medium');
         }
       });
@@ -1695,7 +1833,7 @@ export function createQuestionSetEditor(
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
       settings.append(level.el, kind.el, responseSpace.el, logic.el);
-      return fragmentOf(prompt, settings, options);
+      return fragmentOf(prompt, settings, options, modelAnswer, modelCheck.el, checklist);
     }
   });
   list.el.classList.add('block-editor__questions');
@@ -1815,15 +1953,35 @@ export function createGalleryEditor(
       getKey: (entry) => entry.id,
       itemLabel: (_entry, index) => (comparison ? (index === 0 ? 'Before' : 'After') : `Image ${index + 1}`),
       describe: (_entry, index) => `Image ${index + 1}`,
-      min: 2,
+      min: comparison ? 2 : 1,
       max: comparison ? 2 : 12,
-      minReason: comparison ? 'A comparison shows exactly two images.' : 'A gallery needs at least two images.',
+      minReason: 'A comparison shows exactly two images.',
       maxReason: comparison ? 'A comparison shows exactly two images.' : 'A gallery holds up to twelve images.',
       addLabel: comparison ? false : 'Add image',
       create: emptyItem,
       duplicate: (entry) => ({ ...entry, id: itemId(`${getLatest().id}_i`) }),
       onChange: (next) => {
         items = next;
+        // Removing down to one image turns the gallery back into a single image.
+        if (items.length === 1 && layout !== 'comparison') {
+          const only = items[0]!;
+          const latest = getLatest();
+          const { lesson_id: _lessonId, ...imageItem } = only;
+          swapBlock(
+            {
+              ...latest,
+              block_type: 'image',
+              content: {
+                url: imageItem.url,
+                alt_text: imageItem.alt_text,
+                ...(imageItem.caption ? { caption: imageItem.caption } : {})
+              }
+            } as unknown as Block,
+            onChange as unknown as (b: Block) => void,
+            context
+          );
+          return;
+        }
         emitChange();
       },
       renderItem: (entry, ctx) => {
@@ -2817,14 +2975,48 @@ export function createDiagramEditor(
 
 type GraphBlock = Extract<Block, { block_type: 'mind_map' | 'concept_map' }>;
 
+/**
+ * Tree to Network: a tree keeps its links in parent_id, a network draws only edges,
+ * so each parent link without an edge gets one. Network to Tree needs nothing: the
+ * mind map reads edges as parents when parent_id is missing, and hangs loose ideas
+ * off the first root.
+ */
+function treeLinksAsEdges(content: GraphBlock['content']): GraphBlock['content']['edges'] {
+  const edges = [...content.edges];
+  for (const node of content.nodes) {
+    if (!node.parent_id || edges.length >= 40) continue;
+    if (edges.some((e) => e.from === node.parent_id && e.to === node.id)) continue;
+    edges.push({ id: `${node.parent_id}_${node.id}`, from: node.parent_id, to: node.id });
+  }
+  return edges;
+}
+
 function createGraphBlockEditor<T extends GraphBlock>(
   block: T,
   onChange: BlockChangeHandler<T>,
-  getLatest: () => T
+  getLatest: () => T,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__graph-fields';
   const kind = block.block_type === 'mind_map' ? 'mind' : 'concept';
+  const shape = createChoice({
+    key: 'Shape',
+    value: kind === 'mind' ? 'tree' : 'network',
+    options: [
+      { value: 'tree', label: 'Tree' },
+      { value: 'network', label: 'Network' }
+    ],
+    className: 'block-editor__graph-shape',
+    ariaLabel: 'Tree or network',
+    onChange: (picked) => {
+      const latest = getLatest();
+      const nextType = picked === 'tree' ? 'mind_map' : 'concept_map';
+      if (nextType === latest.block_type) return;
+      const content = nextType === 'concept_map' ? { ...latest.content, edges: treeLinksAsEdges(latest.content) } : latest.content;
+      swapBlock({ ...latest, block_type: nextType, content } as unknown as Block, onChange as unknown as (b: Block) => void, context);
+    }
+  });
   mountGraphEditor(fields, {
     kind,
     content: block.content,
@@ -2839,23 +3031,27 @@ function createGraphBlockEditor<T extends GraphBlock>(
         }
       } as T)
   });
+  // The graph editor takes over its host, so the picker goes in after it mounts.
+  fields.prepend(shape.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createMindMapEditor(
   block: Extract<Block, { block_type: 'mind_map' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'mind_map' }>>,
-  getLatest: () => Extract<Block, { block_type: 'mind_map' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'mind_map' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
-  return createGraphBlockEditor(block, onChange, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest, context);
 }
 
 export function createConceptMapEditor(
   block: Extract<Block, { block_type: 'concept_map' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'concept_map' }>>,
-  getLatest: () => Extract<Block, { block_type: 'concept_map' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'concept_map' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
-  return createGraphBlockEditor(block, onChange, getLatest);
+  return createGraphBlockEditor(block, onChange, getLatest, context);
 }
 
 export function createWhiteboardEditor(
@@ -3079,9 +3275,9 @@ function createBlockEditorFields(
         latest as () => Extract<Block, { block_type: 'html_app' }>
       );
     case 'quote':
-      return createQuoteEditor(block, onChange, latest as () => Extract<Block, { block_type: 'quote' }>);
+      return createQuoteEditor(block, onChange, latest as () => Extract<Block, { block_type: 'quote' }>, context);
     case 'divider':
-      return createDividerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'divider' }>);
+      return createDividerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'divider' }>, context);
     case 'classroom_tools':
       return createClassroomToolsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'classroom_tools' }>);
     case 'countdown':
@@ -3174,13 +3370,13 @@ function createBlockEditorFields(
     case 'diagram':
       return createDiagramEditor(block, onChange, latest as () => Extract<Block, { block_type: 'diagram' }>);
     case 'mind_map':
-      return createMindMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'mind_map' }>);
+      return createMindMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'mind_map' }>, context);
     case 'concept_map':
-      return createConceptMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'concept_map' }>);
+      return createConceptMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'concept_map' }>, context);
     case 'whiteboard':
       return createWhiteboardEditor(block, onChange, latest as () => Extract<Block, { block_type: 'whiteboard' }>);
     case 'spacer':
-      return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
+      return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>, context);
     case 'section':
       return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>, context);
     case 'columns':
