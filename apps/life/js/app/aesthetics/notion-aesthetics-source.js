@@ -8,11 +8,18 @@ export const SOURCE_FRAGRANCES = [
     "properties": {
       "Added": "2026-10-29T11:18:39.905Z",
       "Base Notes": [
-        "Musk",
+        "Sheer Musk",
+        "Pale Wood",
+        "Petrichor",
         "Amber"
       ],
       "Brand": "Feily",
       "Fragrance": "Orchard Rain",
+      "Heart Notes": [
+        "Lily Petals",
+        "Orchid Flower",
+        "Plum Blossom"
+      ],
       "Occasion": [
         "Casual"
       ],
@@ -28,9 +35,11 @@ export const SOURCE_FRAGRANCES = [
         "Day"
       ],
       "Top Notes": [
-        "Pear",
+        "Snow Pear",
         "Peach",
-        "Mandarin"
+        "Nashi Pear",
+        "Mandarin",
+        "Lychee"
       ],
       "date:Date Acquired:is_datetime": 0,
       "date:Date Acquired:start": "2026-10-26",
@@ -42,7 +51,7 @@ export const SOURCE_FRAGRANCES = [
       "emoji": "🧴"
     },
     "cover": null,
-    "lastEditedAt": "2026-10-29T11:18:39.905Z"
+    "lastEditedAt": "2026-10-29T11:27:37.867Z"
   },
   {
     "id": "e1f8e6b5153a43f892d6db25ac624382",
@@ -674,12 +683,15 @@ export const SOURCE_FRAGRANCES = [
     "properties": {
       "Added": "2026-07-10T02:28:24.272Z",
       "Base Notes": [
-        "Oud",
         "Musk",
         "Ambroxan"
       ],
       "Brand": "\\[noun\\] collection",
       "Fragrance": "Syzygy",
+      "Heart Notes": [
+        "Oud",
+        "Norlimbanol"
+      ],
       "Occasion": [
         "Date Night",
         "Formal"
@@ -699,7 +711,8 @@ export const SOURCE_FRAGRANCES = [
         "Night"
       ],
       "Top Notes": [
-        "Bergamot"
+        "Bergamot",
+        "Raspberry"
       ],
       "Type": "Parfum",
       "date:Date Acquired:is_datetime": 0,
@@ -712,7 +725,7 @@ export const SOURCE_FRAGRANCES = [
       "emoji": "🧴"
     },
     "cover": null,
-    "lastEditedAt": "2026-10-29T11:18:37.251Z"
+    "lastEditedAt": "2026-10-29T11:27:40.626Z"
   },
   {
     "id": "399f794f8476816283a9de8a7cc6e657",
