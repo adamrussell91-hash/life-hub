@@ -122,3 +122,43 @@ describe('question model answer', () => {
     expect(kept.content.questions[0]!.model_answer).toBe('The model');
   });
 });
+
+describe('question checklist and confidence (the old Self check modes)', () => {
+  const withExtras = (extra: Record<string, unknown>) =>
+    ({
+      ...base,
+      id: 'qs2',
+      block_type: 'question_set',
+      content: { questions: [{ id: 'q1', prompt: 'Explain.', kind: 'short_answer', ...extra }] }
+    }) as Block;
+
+  it('the schema takes a checklist and a confidence check', () => {
+    expect(BlockSchema.safeParse(withExtras({ model_answer: 'M', model_check: 'confidence', checklist: [{ id: 'c1', label: 'Quote used' }] })).success).toBe(true);
+  });
+
+  it('students tick criteria and it keeps on this device', () => {
+    localStorage.clear();
+    const block = withExtras({ checklist: [{ id: 'c1', label: 'Quote used' }, { id: 'c2', label: 'Explained the effect' }] });
+    const el = renderQuestionSetBlock(block as never, 'student', { saveScope: 'class-x' });
+    const boxes = el.querySelectorAll<HTMLInputElement>('.block-question-set__checklist input[type="checkbox"]');
+    expect(boxes).toHaveLength(2);
+    boxes[1]!.click();
+    const again = renderQuestionSetBlock(block as never, 'student', { saveScope: 'class-x' });
+    expect([...again.querySelectorAll<HTMLInputElement>('.block-question-set__checklist input')].map((b) => b.checked)).toEqual([false, true]);
+  });
+
+  it('confidence shows the model only after a rating', () => {
+    const el = renderQuestionSetBlock(withExtras({ model_answer: 'The model', model_check: 'confidence' }) as never, 'student', {});
+    const model = el.querySelector<HTMLElement>('.block-question-set__model')!;
+    expect(model.hidden).toBe(true);
+    expect(el.querySelector('.block-question-set__model-btn')).toBeNull();
+    el.querySelector<HTMLButtonElement>('.block-self-check__confidence-btn[data-rating="4"]')!.click();
+    expect(model.hidden).toBe(false);
+  });
+
+  it('the teacher sees the criteria as a list', () => {
+    const el = renderQuestionSetBlock(withExtras({ checklist: [{ id: 'c1', label: 'Quote used' }] }) as never, 'teacher', {});
+    expect(el.querySelector('.block-question-set__checklist li')?.textContent).toBe('Quote used');
+    expect(el.querySelector('.block-question-set__checklist input')).toBeNull();
+  });
+});
