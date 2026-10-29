@@ -43,6 +43,27 @@ function driveFileId(url: URL): string | undefined {
   return fromQuery || undefined;
 }
 
+function safeDecode(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * A Google Maps Share link (maps.app.goo.gl). It only redirects to the real map, so the
+ * editor asks the server to follow it before the block can embed anything.
+ */
+export function isMapsShareLink(raw: string): boolean {
+  try {
+    const url = new URL(raw.trim());
+    return url.hostname === 'maps.app.goo.gl' || (url.hostname === 'goo.gl' && url.pathname.startsWith('/maps'));
+  } catch {
+    return false;
+  }
+}
+
 function isGoogleMapsUrl(host: string, pathname: string): boolean {
   if (host === 'maps.google.com') return true;
   if (host === 'goo.gl' && pathname.startsWith('/maps')) return true;
@@ -108,6 +129,14 @@ export function parseEmbedInput(raw: string): ParsedEmbed | null {
         embed_url: `https://maps.google.com/maps?q=${at[1]},${at[2]}&z=15&output=embed`
       };
     }
+    const segment = url.pathname.match(/\/maps\/(?:place|search)\/([^/]+)/)?.[1];
+    const place = segment ? safeDecode(segment.replace(/\+/g, ' ')) : url.searchParams.get('q')?.trim();
+    if (place) {
+      return {
+        provider: 'google_maps',
+        embed_url: `https://maps.google.com/maps?q=${encodeURIComponent(place)}&output=embed`
+      };
+    }
     return {
       provider: 'google_maps',
       embed_url: `https://maps.google.com/maps?q=${encodeURIComponent(url.href)}&output=embed`
@@ -131,6 +160,8 @@ export function embedFrameSrc(content: {
   if (parsed?.embed_url && isHttpUrl(parsed.embed_url)) return parsed.embed_url;
 
   if (provider === 'google_docs' || provider === 'pdf') return null;
+  // An unopened Share link only redirects, and Google blocks that page in a frame.
+  if (isMapsShareLink(content.url)) return null;
 
   if (isHttpUrl(content.url)) return content.url.trim();
   return null;
