@@ -4457,7 +4457,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Visualisation",
-    types: ["chart", "table", "timeline", "equation", "diagram", "mind_map", "concept_map", "curriculum_lines", "whiteboard"]
+    types: ["chart", "timeline", "equation", "diagram", "mind_map", "concept_map", "curriculum_lines", "whiteboard"]
   },
   {
     label: "Layout",

@@ -1,6 +1,6 @@
 import { renderPlanningPrompts, renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
 import { steppedLens } from '@/blocks/lenses/registry';
-import { createBlock } from '@/blocks/create-block';
+import { createBlock, UNIT_PLAN_BLOCK_GROUPS, pageBlockTypes } from '@/blocks/create-block';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
@@ -1023,7 +1023,7 @@ function mountUnitPlanEditor(
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
-    editorContext: { unitLessons, network },
+    editorContext: { unitLessons, network, pageTypes: pageBlockTypes(UNIT_PLAN_BLOCK_GROUPS) },
     idFactory: () => nextId(),
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {

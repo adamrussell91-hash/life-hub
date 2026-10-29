@@ -86,7 +86,7 @@ describe('hinge in a lecture', () => {
     el.querySelectorAll<HTMLButtonElement>('.hq-choice')[0]!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const skip = el.querySelector<HTMLButtonElement>('.hq-solo__skip')!;
-    expect(skip.textContent).toBe('Carry on without answering');
+    expect(skip.textContent).toBe('Skip to the next step');
     skip.click();
     expect(got).toEqual([{ blockId: 'hq2', result: 'done' }]);
     fetchMock.mockRestore();

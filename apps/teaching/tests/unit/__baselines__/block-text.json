@@ -533,41 +533,67 @@
   ],
   "every-block/every_chart/student": [
     "2",
+    "2",
     "3",
+    "3",
+    "5",
     "5",
     "A",
     "A",
+    "A",
     "B",
     "B",
+    "B",
+    "C",
     "C",
     "C",
     "Chart data",
     "Series",
+    "Series",
+    "Series 1",
+    "Series 1",
+    "Series 1",
     "Series 1",
     "Series 1",
     "Series 1",
     "X",
+    "X",
     "Y",
-    "chart.title filler"
+    "Y",
+    "chart.title filler",
+    "chart.title filler, bar chart: data"
   ],
   "every-block/every_chart/teacher": [
     "2",
+    "2",
     "3",
+    "3",
+    "5",
     "5",
     "A",
     "A",
+    "A",
     "B",
     "B",
+    "B",
+    "C",
     "C",
     "C",
     "Chart data",
     "Series",
+    "Series",
+    "Series 1",
+    "Series 1",
+    "Series 1",
     "Series 1",
     "Series 1",
     "Series 1",
     "X",
+    "X",
     "Y",
-    "chart.title filler"
+    "Y",
+    "chart.title filler",
+    "chart.title filler, bar chart: data"
   ],
   "every-block/every_equation/student": [
     "E = mc^2"
@@ -584,31 +610,43 @@
   "every-block/every_mind_map/student": [
     "Centre",
     "Centre",
+    "Centre",
+    "Idea 1",
     "Idea 1",
     "Idea 1",
     "Idea 2",
-    "Idea 2"
+    "Idea 2",
+    "Idea 2",
+    "Mind map, as a list"
   ],
   "every-block/every_mind_map/teacher": [
     "Centre",
     "Centre",
+    "Centre",
+    "Idea 1",
     "Idea 1",
     "Idea 1",
     "Idea 2",
-    "Idea 2"
+    "Idea 2",
+    "Idea 2",
+    "Mind map, as a list"
   ],
   "every-block/every_concept_map/student": [
     "Concept A",
     "Concept A",
+    "Concept A — relates to — Concept B",
     "Concept B",
     "Concept B",
+    "Concept map, as a list",
     "relates to"
   ],
   "every-block/every_concept_map/teacher": [
     "Concept A",
     "Concept A",
+    "Concept A — relates to — Concept B",
     "Concept B",
     "Concept B",
+    "Concept map, as a list",
     "relates to"
   ],
   "every-block/every_curriculum_lines/student": [
@@ -717,7 +755,7 @@
     "By theme",
     "Connections",
     "Make cards from this view",
-    "Tick Add to unit anthology on a note in any lesson of this unit.",
+    "Notes from this unit’s lessons will gather here.",
     "anthology.title filler"
   ],
   "every-block/every_anthology/teacher": [
@@ -738,7 +776,7 @@
     "Outcomes"
   ],
   "every-block/every_annotation/student": [
-    "No annotations on this text yet.",
+    "Annotations will appear here as they are added.",
     "annotation.text.stanzas.0.lines.0.text filler"
   ],
   "every-block/every_annotation/teacher": [

@@ -78,6 +78,6 @@ describe('audio block Record', () => {
     const handle = createAudioRecordButton({ upload: async () => undefined, uploaded: () => false });
     handle.el.querySelector('button')!.click();
     await flush();
-    expect(handle.el.textContent).toContain('No microphone access');
+    expect(handle.el.textContent).toContain('Allow the microphone');
   });
 });

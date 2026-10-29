@@ -136,7 +136,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'No account and no name. Classmates won’t know which answers are yours.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'You join with a code. Classmates see symbols and your name stays private.'));
     const join = button('Join', 'primary', function () {
       void doJoin(this);
     });
@@ -157,7 +157,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
       const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
       const candidate = { session: state.session, token: secret };
       if (!writeJSON(`${storage}:device`, candidate)) {
-        showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
+        showError('Open a normal (not private) window to join here.');
         return;
       }
       device = candidate;
@@ -237,7 +237,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     if (state.phase === 'idle') {
       paintCorner(null);
       board.root.hidden = true;
-      if (view !== 'idle') body.replaceChildren(waitPanel('Your teacher hasn’t started this yet.', 'This page updates by itself.'));
+      if (view !== 'idle') body.replaceChildren(waitPanel('Waiting for your teacher to start.', 'This page updates by itself.'));
       view = 'idle';
       return;
     }

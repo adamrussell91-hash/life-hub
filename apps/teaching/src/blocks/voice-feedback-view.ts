@@ -96,7 +96,7 @@ export function renderVoiceFeedback(state: Returned): HTMLElement {
   }
 
   if (!words.length) {
-    root.append(el('p', 'block-secondary', 'The transcript isn’t available for this recording.'));
+    root.append(el('p', 'block-secondary', 'Play the recording to hear it.'));
     return root;
   }
 

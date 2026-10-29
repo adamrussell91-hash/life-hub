@@ -224,7 +224,7 @@ function writeItDown(raw: LensConfig, ctx: StepContext): WriteItDown {
       checklist: ['I named the part of the text', 'I used one of the verbs', 'I said something about people, not just what happens']
     };
   }
-  const core = ['Names a specific moment', VERB_CHECK[path], 'Explains, rather than retells'];
+  const core = ['Names a specific moment', VERB_CHECK[path], 'Explains and builds on the text'];
   if (ctx.level === 'core') return { frame: FRAMES[path].core, example, checklist: core };
   return {
     challenge: FRAMES[path].extend, example,

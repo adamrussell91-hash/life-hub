@@ -127,6 +127,10 @@ function filterBlocksForStudentInner(
     .map((block) => studentTechniqueScan(block))
     .map(stripWalkthruField)
     .map((block) => {
+      // Talking points are the teacher's, in every kind of lesson, not just tutorials.
+      if (block.block_type === 'with_teacher') {
+        return { ...block, content: { ...block.content, talking_points: [] } };
+      }
       if (TEACHER_FIELD_BLOCK_TYPES.has(block.block_type)) {
         return stripToolkitTeacherFields(block);
       }

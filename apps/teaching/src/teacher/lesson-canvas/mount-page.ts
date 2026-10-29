@@ -11,6 +11,8 @@ import {
   createFromInsertMenu,
   cloneBlockWithNewIds,
   createBlock,
+  LESSON_BLOCK_GROUPS,
+  pageBlockTypes,
   type InsertMenuValue
 } from '@/blocks/create-block';
 import {
@@ -1562,7 +1564,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     blocks: lesson.blocks,
     media,
-    editorContext: { lessonId: lesson.id },
+    editorContext: { lessonId: lesson.id, pageTypes: pageBlockTypes(LESSON_BLOCK_GROUPS) },
     onChange: (blocks) => {
       emitLesson({ ...lesson, blocks });
     },

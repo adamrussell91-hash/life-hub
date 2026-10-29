@@ -60,7 +60,7 @@ describe('Human experience table', () => {
     const pick = view.querySelector<HTMLButtonElement>('.block-question-set__lens-pick')!;
     pick.click();
     expect(pick.getAttribute('aria-pressed')).toBe('true');
-    expect(view.querySelector('.block-question-set__handover')!.textContent).toContain('won’t keep your answer');
+    expect(view.querySelector('.block-question-set__handover')!.textContent).toContain('saved on this device');
     const cell = view.querySelector<HTMLTextAreaElement>('tbody tr:not(.block-question-set__example) textarea')!;
     cell.value = 'Survival'; cell.dispatchEvent(new Event('input'));
     const again = renderBlock(block, 'student', { lessonId: 'lesson' });

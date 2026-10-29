@@ -5134,6 +5134,8 @@ a.home-class-tile:hover {
 }
 
 .block-chart--small { max-width: 18rem; }
+/* A small chart scales its 400-unit drawing down, so its labels draw larger to stay readable. */
+.block-chart--small .block-chart__svg svg text { font-size: 15px; }
 .block-chart--medium { max-width: 32rem; }
 
 .block-quote {
@@ -5141,6 +5143,7 @@ a.home-class-tile:hover {
 }
 
 .block-quote__text {
+  white-space: pre-line;
   margin: 0;
   padding: var(--space-3) 0 var(--space-3) var(--space-4);
   border-left: 3px solid var(--wave);
@@ -5736,6 +5739,10 @@ a.home-class-tile:hover {
   }
 }
 
+.block-table-wrap {
+  overflow-x: auto;
+}
+
 .block-table {
   width: 100%;
   border-collapse: collapse;
@@ -5790,6 +5797,7 @@ a.home-class-tile:hover {
 }
 
 .callout__body {
+  white-space: pre-line;
   margin: 0;
 }
 
@@ -6343,29 +6351,6 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   background: var(--ink);
 }
 
-.block-gallery-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: var(--space-6);
-  background: rgba(10, 20, 30, 0.72);
-}
-
-.block-gallery-lightbox__image {
-  max-width: min(96vw, 56rem);
-  max-height: 85vh;
-  object-fit: contain;
-  border-radius: var(--radius-sm);
-}
-
-.block-gallery-lightbox__close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-}
-
 /* Learning activities */
 /* Flat inside the block card, full width: the flashcard deck is the one inner panel. */
 .block-flashcards,
@@ -6521,6 +6506,7 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
 
 .block-cloze__blank {
   min-width: 3ch;
+  max-width: 100%;
   margin: 0 var(--space-px);
   padding: var(--space-px) var(--space-1);
   color: var(--ink);

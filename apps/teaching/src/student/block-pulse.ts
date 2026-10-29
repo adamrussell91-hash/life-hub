@@ -144,7 +144,7 @@ export function mountStudentBlockPulse(root: HTMLElement, options: MountStudentP
         else chosen.add(option);
         btn.setAttribute('aria-pressed', String(!on));
         paintDot();
-        message = "Didn't send. Try again.";
+        message = 'Try sending again.';
         if (caption) caption.textContent = message;
       }
     }

@@ -32,7 +32,7 @@ export function pastRounds(
       list.replaceChildren(
         ...(past.length
           ? [el('p', 'pf-note block-secondary', 'Bring a round back to see its answers or carry on with it. Students who joined it rejoin with the same code.'), ...past.map(row)]
-          : [el('p', 'pf-note block-secondary', 'No past rounds yet.')])
+          : [el('p', 'pf-note block-secondary', 'Past rounds will appear here.')])
       );
     } catch (error) {
       list.replaceChildren(el('p', 'pf-alert', errorText(error)));
