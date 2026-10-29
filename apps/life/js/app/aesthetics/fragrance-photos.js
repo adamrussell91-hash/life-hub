@@ -60,6 +60,10 @@ export const FRAGRANCE_PHOTOS = {
     "file": "noun-collection-syzygy.webp",
     "source": "https://nouncollection.com/products/syzygy"
   },
+  "Orchard Rain": {
+    "file": "feily-orchard-rain.webp",
+    "source": "https://feily.shop"
+  },
   "Silhouette": {
     "file": "mr-hux-silhouette.webp",
     "source": "https://beta.fragrantica.com/perfume/Mr-Hux/Silhouette-100347.html"
