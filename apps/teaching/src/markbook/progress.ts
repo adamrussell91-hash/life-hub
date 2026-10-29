@@ -31,7 +31,7 @@ export type ProgressLesson = {
 export function unitProgressLessons(
   units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & { title?: string }>,
   lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string }>,
-  scheduled: readonly Pick<ScheduledLesson, 'lesson_id' | 'date'>[]
+  scheduled: readonly (Pick<ScheduledLesson, 'lesson_id' | 'date'> & { delivery_status?: ScheduledLesson['delivery_status'] })[]
 ): ProgressLesson[] {
   const byId = new Map(lessons.map((l) => [l.id, l] as const));
   const out: ProgressLesson[] = [];
@@ -41,7 +41,7 @@ export function unitProgressLessons(
     const lesson = byId.get(id);
     if (!lesson || lesson.status === 'trashed' || seen.has(id)) continue;
     seen.add(id);
-    const dates = scheduled.filter((r) => r.lesson_id === id && r.date).map((r) => r.date.slice(0, 10)).sort();
+    const dates = scheduled.filter((r) => r.lesson_id === id && r.date && r.delivery_status !== 'skipped').map((r) => r.date.slice(0, 10)).sort();
     out.push({
       id,
       title: lesson.title,

@@ -120,4 +120,13 @@ describe('unitProgressLessons', () => {
     expect(out.map((l) => [l.id, l.unit])).toEqual([['a', 'Poetry'], ['b', 'Poetry'], ['q', 'Novel']]);
   });
 
+  it('ignores skipped calendar rows when dating a lesson', () => {
+    const out = unitProgressLessons(
+      [{ lesson_ids: ['a'] }] as never,
+      [{ id: 'a', title: 'A' }],
+      [{ lesson_id: 'a', date: '2026-10-01', delivery_status: 'skipped' }, { lesson_id: 'a', date: '2026-11-03', delivery_status: 'planned' }] as never
+    );
+    expect(out[0]?.date).toBe('2026-11-03');
+  });
+
 });
