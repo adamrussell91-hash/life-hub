@@ -61,6 +61,16 @@ const MODEL_ENV = {
   morphemic: 'TEXT_TOOLS_MORPHEMIC_MODEL'
 };
 const MAX_TOKENS = { dictionary: 4096, fry: 4096, hinge_backup: 1500, morphemic: 12_000 };
+/**
+ * Request options beyond the client's default (thinking disabled), which
+ * Sonnet 5.5 rejects with a 400. The hinge back-up keeps thinking off the
+ * Sonnet 5.5 way; the matrix build thinks, because getting the words right
+ * matters more than speed.
+ */
+const REQUEST_OPTIONS = {
+  hinge_backup: { thinking: { type: 'between_tools' } },
+  morphemic: { thinking: { type: 'adaptive' }, outputConfig: { effort: 'medium' } }
+};
 const KEY_RE = /^[a-f0-9]{64}$/;
 
 export function isTextTool(tool) {
@@ -384,8 +394,7 @@ export async function runTextToolJob({
         system,
         messages,
         signal: AbortSignal.timeout(120_000),
-        // Getting the words right matters more than speed: let the model think.
-        ...(morphemic ? { thinking: { type: 'adaptive' }, outputConfig: { effort: 'medium' } } : {})
+        ...(REQUEST_OPTIONS[job.tool] ?? {})
       });
       let result;
       if (morphemic) {
