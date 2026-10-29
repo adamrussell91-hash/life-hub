@@ -134,7 +134,7 @@ export function proposePeopleChangesSchema() {
               relationship_type: { type: 'string', enum: [...AGENT_LINK_TYPES] },
               role: {
                 type: 'string',
-                description: 'Person↔person: colleague, former_colleague, mentor, mentee, academic_contact, research_collaborator, recruiter, referee, conference_contact, introduction or other. Person→organisation: a job title or role, optional.'
+                description: 'Person↔person: colleague, former_colleague, mentor, mentee, academic_contact, research_collaborator, recruiter, referee, conference_contact, introduction, student, parent or other. Person→organisation: a job title or role, optional.'
               },
               valid_from: { type: 'string', description: 'YYYY-MM-DD, optional.' }
             },
