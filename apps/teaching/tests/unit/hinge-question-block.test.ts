@@ -7,6 +7,10 @@ import { blockRegistry } from '@/blocks/registry';
 import { hingeIssue, nextStep, type HingeBlock } from '@/blocks/hinge-question/shared';
 import { openBoard } from '@/blocks/hinge-question/board';
 import { filterBlocksForStudent } from '@/blocks/visibility';
+import { apiPost } from '@/api/client';
+
+vi.mock('@/api/client', async (real) => ({ ...(await real<typeof import('@/api/client')>()), apiPost: vi.fn() }));
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 const finished = (): HingeBlock => {
   const block = createBlock('hinge_question', 'hq1') as HingeBlock;
@@ -125,5 +129,62 @@ describe('Hinge question block', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(document.querySelector('.hq-board')).toBeNull();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('the Display view hides the right answer and the spread until reveal, and never shows misconceptions', async () => {
+    const block = finished();
+    const options = block.content.options.map((o, i) => ({ ...o, misconception: i ? 'magnets pull the Moon' : '' }));
+    const live = {
+      phase: 'live', session: 's1', round: 'main', open: true, closes_at: new Date(Date.now() + 45_000).toISOString(), revealed: false,
+      prompt: block.content.prompt, options, correct_id: options[0]!.id, move_on: 80, reteach: 50, stale: false,
+      answered: 4, picks: { [options[0]!.id]: 1, [options[1]!.id]: 3 }
+    };
+    vi.mocked(apiPost).mockResolvedValue(live);
+    const shown = renderBlock(block, 'teacher', { lessonId: 'L1', display: true });
+    document.body.append(shown);
+    await flush();
+    expect(shown.textContent).toContain('Magnetism');
+    expect(shown.textContent).toMatch(/0:4\d left/);
+    expect(shown.textContent).not.toMatch(/Right/);
+    expect(shown.querySelector('[data-right="true"]')).toBeNull();
+    expect(shown.querySelector('.hq-bar')).toBeNull();
+    expect(shown.textContent).not.toContain('magnets');
+    expect(shown.textContent).not.toContain('Show on board');
+    expect(shown.querySelector('.hq-step')).toBeNull();
+
+    vi.mocked(apiPost).mockResolvedValue({ ...live, open: false, revealed: true });
+    shown.querySelector<HTMLButtonElement>('.hq-actions button:last-child')!.click();
+    await flush();
+    expect(shown.querySelector('[data-right="true"]')!.textContent).toContain('Gravity');
+    expect(shown.textContent).toContain('75%');
+    expect(shown.textContent).not.toContain('magnets');
+    shown.remove();
+  });
+
+  it('the teacher’s own screen still shows the right answer and misconceptions', async () => {
+    const block = finished();
+    const options = block.content.options.map((o, i) => ({ ...o, misconception: i ? 'magnets pull the Moon' : '' }));
+    vi.mocked(apiPost).mockResolvedValue({
+      phase: 'live', session: 's2', round: 'main', open: true, closes_at: null, revealed: false,
+      prompt: block.content.prompt, options, correct_id: options[0]!.id, move_on: 80, reteach: 50, stale: false,
+      answered: 2, picks: { [options[1]!.id]: 2 }
+    });
+    const shown = renderBlock(block, 'teacher', { lessonId: 'L2' });
+    document.body.append(shown);
+    await flush();
+    expect(shown.querySelector('[data-right="true"]')!.textContent).toContain('Gravity');
+    expect(shown.textContent).toContain('magnets pull the Moon');
+    shown.remove();
+  });
+
+  it('students see a countdown above the answers while a timed round is open', async () => {
+    vi.mocked(apiPost).mockResolvedValue({ phase: 'live', session: 's3', open: true, closes_at: new Date(Date.now() + 30_000).toISOString(), revealed: false, mine: null });
+    const shown = renderBlock(finished(), 'student', { lessonId: 'L3' });
+    document.body.append(shown);
+    await flush();
+    const timer = shown.querySelector('[role="timer"]')!;
+    expect(timer.querySelector('.hq-timer__time')!.textContent).toMatch(/^0:(30|29)$/);
+    expect(timer.compareDocumentPosition(shown.querySelector('.hq-choices')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    shown.remove();
   });
 });

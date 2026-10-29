@@ -45,7 +45,12 @@ export type HingeStateDetail = {
 
 const STALE = 'You’ve changed this question since publishing. Students still see the published one, so publish again before you ask.';
 
-export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTMLElement): HTMLElement {
+/**
+ * On the Display view the class can see the screen, so the panel shows what
+ * the board shows: the answers and a big timer, then the spread and the right
+ * answer only once the teacher reveals. Never the misconceptions or the next step.
+ */
+export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTMLElement, display = false): HTMLElement {
   const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/hinge/${encodeURIComponent(block.id)}`;
   const root = el('div', 'hq-run');
   const alert = el('p', 'pf-alert');
@@ -61,7 +66,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
   let inflight: Promise<void> = Promise.resolve();
   let painted = '';
   let board: ReturnType<typeof openBoard> | null = null;
-  const clock = el('span', 'hq-clock');
+  const clock = el('span', display ? 'hq-clock hq-clock--display' : 'hq-clock');
   const ticker = window.setInterval(() => {
     if (!root.isConnected) return window.clearInterval(ticker);
     paintClock();
@@ -132,9 +137,38 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
   function paintClock(): void {
     if (!state || state.phase !== 'live') return;
     const left = state.open ? secondsLeft(state.closes_at) : null;
-    clock.textContent = state.open ? (left === null ? 'Open' : `Open · ${formatSeconds(left)} left`) : 'Answers closed';
+    if (display) {
+      clock.textContent = state.open ? (left === null ? 'Answers open' : `${formatSeconds(left)} left`) : 'Answers closed';
+      clock.classList.toggle('is-ending', state.open && left !== null && left <= 10);
+    } else {
+      clock.textContent = state.open ? (left === null ? 'Open' : `Open · ${formatSeconds(left)} left`) : 'Answers closed';
+    }
     // The timer ran out between polls: fetch the closed state now.
     if (state.open && left === 0 && !busy) void send('status');
+  }
+
+  /** The Display view's list: letters and answers, with the spread only after reveal. */
+  function displayList(s: Live): HTMLElement {
+    const list = el('ol', 'hq-spread');
+    list.setAttribute('aria-label', s.revealed ? 'How the class answered' : 'The answers');
+    s.options.forEach((o, i) => {
+      const right = s.revealed && o.id === s.correct_id;
+      const li = el('li', 'hq-spread__row');
+      li.dataset.right = String(right);
+      const head = el('div', 'hq-spread__head');
+      head.append(el('span', 'hq-letter', LETTERS[i] ?? '?'), el('span', 'hq-spread__text', o.text));
+      li.append(head);
+      if (s.revealed) {
+        const pct = percent(s.picks[o.id] ?? 0, s.answered);
+        if (right) head.append(el('span', 'pf-chip pf-chip--done', 'Right'));
+        head.append(el('span', 'hq-spread__count', `${pct}%`));
+        const bar = el('span', 'hq-bar');
+        bar.style.setProperty('--hq-pct', `${pct}%`);
+        li.append(bar);
+      }
+      list.append(li);
+    });
+    return list;
   }
 
   function spread(s: Live): HTMLElement {
@@ -229,7 +263,8 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
     }
     const s = state;
     board?.update(boardView(s));
-    const sig = JSON.stringify([s.session, s.round, s.open, s.revealed, s.answered, s.picks, s.options, s.correct_id, s.move_on, s.reteach]);
+    // On the Display view the picks stay off screen until reveal, so they needn't trigger a repaint.
+    const sig = JSON.stringify([s.session, s.round, s.open, s.revealed, s.answered, display && !s.revealed ? null : s.picks, s.options, s.correct_id, s.move_on, s.reteach]);
     if (sig === painted) return paintClock();
     painted = sig;
 
@@ -243,7 +278,9 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
     actions.append(
       button(s.revealed ? 'Hide the answer' : 'Reveal to the class', s.open ? 'ghost' : 'primary', function () {
         act(s.revealed ? 'hide' : 'reveal', this);
-      }),
+      })
+    );
+    if (!display) actions.append(
       button('Show on board', 'ghost', () => {
         if (board) return;
         board = openBoard(boardView(s), () => (board = null));
@@ -267,7 +304,8 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
     if (s.round === 'backup') {
       parts.push(el('p', 'pf-chip hq-round-tag', s.backup?.source === 'ann' ? 'Back-up question · drafted by Ann' : 'Back-up question'));
     }
-    body.replaceChildren(...parts, bar, spread(s), stepCard(s), hint, round, past);
+    if (display) body.replaceChildren(...parts, bar, displayList(s), round, past);
+    else body.replaceChildren(...parts, bar, spread(s), stepCard(s), hint, round, past);
     paintClock();
   }
 
