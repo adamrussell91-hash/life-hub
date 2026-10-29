@@ -535,6 +535,18 @@
   gap: var(--space-3);
 }
 
+/* A question answered where it sits in a lesson. */
+.qz-slot {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  justify-items: start;
+}
+
+.qz-slot--taking {
+  justify-items: stretch;
+}
+
 .qz-card__head {
   display: flex;
   justify-content: space-between;
