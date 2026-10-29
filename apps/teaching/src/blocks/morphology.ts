@@ -94,11 +94,6 @@ function spell(family: MorphologyFamily, selection: Selection): string {
   return `${selection.front}${selection.prefix}${family.base}${selection.ending}`;
 }
 
-/** Words this browser has found in a family, newest first. */
-export function readFoundMorphology(family: MorphologyFamily, storage: Storage | null = browserStorage()): string[] {
-  return readFound(family, storage);
-}
-
 /**
  * The matrix itself: build row, chips, result, counter and found words.
  * `start` builds that word on open, so the student begins from the word they tapped.
