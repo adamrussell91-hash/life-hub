@@ -70,6 +70,7 @@ const ROLE_LABELS = {
   recruiter: 'Recruiter',
   referee: 'Referee',
   conference_contact: 'Conference contact',
+  parent: 'Parent / carer',
   introduction: 'Introduction contact',
   other: 'Contact'
 };

@@ -22,6 +22,7 @@ import '../styles/hub.css';
 import '../styles/walkthrus.css';
 import '../styles/walk-in.css';
 import '../styles/quick-log.css';
+import '../styles/comm-log.css';
 import '../styles/tasks-engine.css';
 import '../styles/block-page.css';
 import '../styles/comm-page.css';
@@ -46,7 +47,8 @@ import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import { renderMentoringView } from '@/views/mentoring';
-import { renderCommunicationNewView, renderCommunicationsView } from '@/views/communications';
+import { renderCommunicationsView } from '@/views/communications';
+import { renderCommLog } from '@/views/comm-log';
 import { renderCommPage } from '@/views/comm-page';
 import { renderThreadPage } from '@/views/thread-page';
 import { renderPdGroupPage } from '@/views/pd-group-page';
@@ -234,8 +236,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'communication-new') {
-      renderPageHeader(shell, { eyebrow: 'Communications', title: 'Compose' });
-      await renderCommunicationNewView(shell.canvas);
+      renderPageHeader(shell, { eyebrow: 'Comms', title: 'Log a conversation' });
+      await renderCommLog(shell.canvas);
       return;
     }
     if (route.name === 'communication') {
