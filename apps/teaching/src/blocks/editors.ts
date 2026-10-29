@@ -1631,6 +1631,8 @@ export function createQuestionSetEditor(
     level?: QuestionLevel;
     logic?: LogicSetting;
     model_answer?: string;
+    model_check?: 'reveal' | 'confidence';
+    checklist?: Array<{ id: string; label: string }>;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1653,7 +1655,9 @@ export function createQuestionSetEditor(
     response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
     level: q.level,
     logic: q.logic,
-    model_answer: q.model_answer
+    model_answer: q.model_answer,
+    model_check: q.model_check,
+    checklist: q.checklist ? q.checklist.map((item) => ({ ...item })) : undefined
   }));
 
   const emitChange = () => {
@@ -1674,7 +1678,11 @@ export function createQuestionSetEditor(
             : {}),
           ...(q.level ? { level: q.level } : {}),
           ...(q.logic ? { logic: q.logic } : {}),
-          ...(q.kind === 'short_answer' && q.model_answer?.trim() ? { model_answer: q.model_answer } : {})
+          ...(q.kind === 'short_answer' && q.model_answer?.trim() ? { model_answer: q.model_answer } : {}),
+          ...(q.kind === 'short_answer' && q.model_answer?.trim() && q.model_check === 'confidence' ? { model_check: 'confidence' as const } : {}),
+          ...(q.checklist?.some((item) => item.label.trim())
+            ? { checklist: q.checklist.filter((item) => item.label.trim()).slice(0, 12) }
+            : {})
         }))
       }
     });
@@ -1750,6 +1758,42 @@ export function createQuestionSetEditor(
       );
       modelAnswer.hidden = question.kind !== 'short_answer';
 
+      const modelCheck = createChoice({
+        key: 'Model opens',
+        value: question.model_check ?? 'reveal',
+        options: [
+          { value: 'reveal', label: 'On a tap' },
+          { value: 'confidence', label: 'After a confidence rating' }
+        ],
+        className: 'block-editor__question-model-check',
+        ariaLabel: `Question ${n} how the model answer opens`,
+        onChange: (value) => ctx.update({ ...ctx.current, model_check: value as 'reveal' | 'confidence' })
+      });
+      modelCheck.el.hidden = question.kind !== 'short_answer';
+
+      // One criterion per line; a line keeps its id while its words stay the same.
+      const checklist = editorField(
+        'block-editor__question-checklist',
+        (question.checklist ?? []).map((item) => item.label).join('\n'),
+        'Checklist students tick (optional, one per line)',
+        `Question ${n} checklist`,
+        (value) => {
+          const previous = ctx.current.checklist ?? [];
+          const used = new Set<string>();
+          let next = 0;
+          const items = splitOptions(value).map((label) => {
+            const same = previous.find((item) => item.label === label && !used.has(item.id));
+            let id = same?.id;
+            while (!id || used.has(id) || (!same && previous.some((item) => item.id === id))) id = `${ctx.current.id}_c${(next += 1)}`;
+            used.add(id);
+            return { id, label };
+          });
+          ctx.update({ ...ctx.current, checklist: items.length ? items : undefined });
+        },
+        'textarea',
+        2
+      );
+
       const kind = createChoice({
         key: 'Kind',
         value: question.kind,
@@ -1770,6 +1814,7 @@ export function createQuestionSetEditor(
           options.hidden = nextKind !== 'multiple_choice';
           responseSpace.el.hidden = nextKind !== 'short_answer';
           modelAnswer.hidden = nextKind !== 'short_answer';
+          modelCheck.el.hidden = nextKind !== 'short_answer';
           if (nextKind === 'short_answer') responseSpace.setValue('medium');
         }
       });
@@ -1788,7 +1833,7 @@ export function createQuestionSetEditor(
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
       settings.append(level.el, kind.el, responseSpace.el, logic.el);
-      return fragmentOf(prompt, settings, options, modelAnswer);
+      return fragmentOf(prompt, settings, options, modelAnswer, modelCheck.el, checklist);
     }
   });
   list.el.classList.add('block-editor__questions');

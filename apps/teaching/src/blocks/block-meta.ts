@@ -39,7 +39,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   done: 'Students tap to mark the lesson finished.',
   question_drop: 'Students write a question for a quiz lesson in this unit. You approve each one.',
   quiz_question: 'One question in a quiz lesson: choice, gaps, matching, ordering and more.',
-  question_set: 'Multiple-choice or short-answer questions, with an optional model answer students check against.',
+  question_set: 'Multiple-choice or short-answer questions. Add a model answer, a confidence rating or a checklist for students to check their own work.',
   flashcards: 'Flip cards for vocabulary or quick recall practice.',
   cloze: 'Fill-in-the-blank sentences for guided retrieval.',
   self_check: 'Let students check their own answer against a model.',

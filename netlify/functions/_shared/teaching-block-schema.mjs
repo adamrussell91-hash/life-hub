@@ -1391,7 +1391,11 @@ var QuestionItemSchema = z10.object({
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
   logic: LogicSchema.optional(),
   /** Short answer only: the answer a student can check their own against. */
-  model_answer: z10.string().optional()
+  model_answer: z10.string().optional(),
+  /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
+  model_check: z10.enum(["reveal", "confidence"]).optional(),
+  /** Success criteria the student ticks off against their answer. */
+  checklist: z10.array(z10.object({ id: z10.string().min(1), label: z10.string() })).max(12).optional()
 });
 var PeerFeedbackBlockSchema = z10.object({
   id: z10.string().min(1),

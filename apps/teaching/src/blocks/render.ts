@@ -934,13 +934,86 @@ export function renderQuestionSetBlock(
       }
     }
 
+    // Checklist: success criteria the student ticks against their answer (the old Self check checklist).
+    const criteria = (question.checklist ?? []).filter((item) => item.label.trim());
+    if (criteria.length) {
+      const box = document.createElement('div');
+      box.className = 'block-question-set__checklist block-self-check__checklist';
+      if ((mode === 'teacher' && !ctx.display) || mode === 'print') {
+        const ul = document.createElement('ul');
+        ul.className = 'block-self-check__preview-list';
+        for (const item of criteria) {
+          const entry = document.createElement('li');
+          entry.textContent = item.label;
+          ul.append(entry);
+        }
+        box.append(ul);
+      } else {
+        const checkedKey = `${question.id}.checked`;
+        const checked = new Set((answers[checkedKey] ?? '').split(',').filter(Boolean));
+        for (const item of criteria) {
+          const label = document.createElement('label');
+          label.className = 'block-self-check__checklist-item block-body';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'block-self-check__checkbox';
+          checkbox.checked = checked.has(item.id);
+          checkbox.addEventListener('click', () => {
+            if (checkbox.checked) checked.add(item.id);
+            else checked.delete(item.id);
+            if (checked.size) answers[checkedKey] = [...checked].join(',');
+            else delete answers[checkedKey];
+            saveAnswers();
+            if (checked.size) emitAnswered(wrap, block.id, 'done');
+          });
+          label.append(checkbox, document.createTextNode(item.label));
+          box.append(label);
+        }
+      }
+      li.append(box);
+    }
+
     const modelAnswer = question.kind === 'short_answer' ? question.model_answer?.trim() : '';
     if (modelAnswer && mode !== 'print') {
+      const confidence = question.model_check === 'confidence';
       if (mode === 'teacher' && !ctx.display) {
         const note = document.createElement('p');
         note.className = 'block-question-set__model-note block-body';
-        note.textContent = `Model answer: ${modelAnswer}`;
+        note.textContent = confidence ? `Model answer, after a confidence rating: ${modelAnswer}` : `Model answer: ${modelAnswer}`;
         li.append(note);
+      } else if (confidence) {
+        // Rate first, then see the model (the old Self check confidence mode).
+        const ratingKey = `${question.id}.confidence`;
+        const saved = Number(answers[ratingKey]);
+        let rating = Number.isInteger(saved) && saved >= 1 && saved <= 5 ? saved : undefined;
+        const model = document.createElement('div');
+        model.className = 'block-question-set__model block-self-check__answer block-body';
+        model.textContent = modelAnswer;
+        model.hidden = rating === undefined;
+        const ask = document.createElement('p');
+        ask.className = 'block-question-set__confidence-ask block-secondary';
+        ask.textContent = 'How sure are you? Rate it, then see the model.';
+        const scale = document.createElement('div');
+        scale.className = 'block-self-check__confidence';
+        scale.setAttribute('role', 'group');
+        scale.setAttribute('aria-label', 'Confidence from 1 to 5');
+        for (let value = 1; value <= 5; value += 1) {
+          const button = activityButton(String(value), 'block-self-check__confidence-btn');
+          button.dataset.rating = String(value);
+          button.setAttribute('aria-pressed', rating === value ? 'true' : 'false');
+          button.addEventListener('click', () => {
+            rating = value;
+            for (const child of scale.children) {
+              child.setAttribute('aria-pressed', (child as HTMLElement).dataset.rating === String(value) ? 'true' : 'false');
+            }
+            model.hidden = false;
+            answers[ratingKey] = String(value);
+            saveAnswers();
+            emitAnswered(wrap, block.id, 'done');
+          });
+          scale.append(button);
+        }
+        li.append(ask, scale, model);
       } else {
         const revealKey = `${question.id}.model_revealed`;
         let revealed = answers[revealKey] === '1';
