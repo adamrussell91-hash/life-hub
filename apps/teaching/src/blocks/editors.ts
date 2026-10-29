@@ -258,12 +258,16 @@ export function editorShell<T extends Block>(
   shell.dataset.blockId = block.id;
   shell.dataset.blockType = block.block_type;
   const visibility = createVisibilitySelect(block, onChange, getLatest);
+  const lenses = createLensEditor({ getBlock: getLatest, onChange });
   shell.addEventListener('kaplan-setup-toggle', (event) => {
+    // A nested block's lens setup bubbles up through columns and sections; only
+    // this block's own setup may hide this block's fields.
+    if (event.target !== lenses) return;
     const open = (event as CustomEvent<{ open: boolean }>).detail.open;
     fields.hidden = open;
     visibility.hidden = open;
   });
-  shell.append(visibility, createLensEditor({ getBlock: getLatest, onChange }), fields);
+  shell.append(visibility, lenses, fields);
   return shell;
 }
 
