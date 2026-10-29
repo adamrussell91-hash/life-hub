@@ -372,7 +372,13 @@ export function renderClassPage(
   markbookHost.className = 'class-page__markbook-host';
   disposers.push(mountMarkbook(markbookHost, pageClass, {
     outcomes: outcomeLabels(curriculum.outcomes ?? []),
-    progressLessons: unitProgressLessons(activeUnits, curriculum.lessons, classScheduled)
+    // Dates by lesson, whatever unit the calendar row was filed under: the lesson page's Date row
+    // files it under the lesson's own unit, which may be trashed or another one.
+    progressLessons: unitProgressLessons(
+      activeUnits,
+      curriculum.lessons,
+      curriculum.scheduled_lessons.filter((entry) => entry.class_id === cls.id)
+    )
   }));
 
   const sequence = renderUnitSequence(sequenceHost, {
