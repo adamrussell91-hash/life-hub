@@ -171,6 +171,19 @@
     "note": "Original photo retains a coloured, lifestyle or product-display background inside the white square canvas."
   },
   {
+    "name": "Orchard Rain",
+    "brand": "Feily",
+    "product": "https://feily.shop",
+    "image": "Photo supplied by Adam, 29 October 2026",
+    "source": "https://feily.shop",
+    "file": "feily-orchard-rain.webp",
+    "width": 512,
+    "height": 512,
+    "bytes": 8180,
+    "status": "ready",
+    "note": "Supplied photo keeps its linen backdrop inside the white square canvas."
+  },
+  {
     "name": "Silhouette",
     "brand": "Mr Hux",
     "image": "https://fimgs.net/mdimg/perfume/o.100347.jpg",
