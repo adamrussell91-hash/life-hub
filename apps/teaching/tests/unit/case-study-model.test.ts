@@ -42,9 +42,9 @@ describe('caseIssues', () => {
     expect(caseIssues({ case: c })).toContain('A guided case needs 2 to 4 options.');
   });
 
-  it('needs 1 to 3 objections at their own pace', () => {
+  it('treats objections as optional at their own pace', () => {
     const c = { ...complete(), pace: 'own' as const };
-    expect(caseIssues({ case: c }).some((m) => /objections/.test(m))).toBe(true);
+    expect(caseIssues({ case: c })).toEqual([]);
     expect(caseIssues({ case: { ...c, objections: ['Why me first?'] } })).toEqual([]);
   });
 
@@ -88,9 +88,9 @@ describe('publishChecklist', () => {
     expect(publishChecklist(seedCase({})).some((i) => !i.ok)).toBe(true);
     expect(publishChecklist(complete()).every((i) => i.ok)).toBe(true);
   });
-  it('adds objections for own pace and a part question for layered', () => {
+  it('adds a part question for layered, and no objection item for own pace', () => {
     const labels = publishChecklist({ ...complete(), pace: 'own', release: 'layered' }).map((i) => i.label);
-    expect(labels).toContain('1 to 3 objections');
+    expect(labels.some((l) => /objection/.test(l))).toBe(false);
     expect(labels).toContain('A question on every part but the last');
   });
 });

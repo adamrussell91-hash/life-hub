@@ -5213,6 +5213,10 @@ var CaseHelpSchema = z12.object({
   stuck: z12.string().max(400).optional()
 });
 var CaseHelpMap = z12.record(z12.string(), CaseHelpSchema);
+var CaseReflectionSchema = z12.object({
+  question: z12.string().max(300).default(""),
+  off: z12.boolean().default(false)
+});
 var CASE_PACES = ["teacher", "own"];
 var CASE_SUPPORTS = ["guided", "standard", "open"];
 var CaseSettingsSchema = z12.object({
@@ -5228,8 +5232,12 @@ var CaseSettingsSchema = z12.object({
   parts: z12.array(CasePartSchema).max(4).default([]),
   decision: CaseDecisionSchema.optional(),
   outcome: CaseOutcomeSchema.optional(),
-  /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
+  /** Own pace, optional: up to 3 challenges to the student's locked decision; they answer one before the Outcome opens. */
   objections: z12.array(z12.string().max(300)).max(3).default([]),
+  /** The question under the Outcome. Blank keeps the default wording; off drops the step. */
+  reflection: CaseReflectionSchema.optional(),
+  /** True drops the Rules station: no rule of thumb and no unseen case, so the case ends at the Outcome. */
+  rules_off: z12.boolean().optional(),
   transfer: CaseTransferSchema.optional(),
   /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
   class_id: z12.string().max(64).optional(),
@@ -5244,6 +5252,8 @@ var PublicCaseSchema = z12.object({
   /** Part titles only, so the rail can say "Part 2 to come". */
   part_titles: z12.array(z12.string().max(80)).max(4),
   has_objections: z12.boolean(),
+  reflection: CaseReflectionSchema.optional(),
+  rules_off: z12.boolean().optional(),
   help: CaseHelpMap.optional()
 });
 
@@ -5446,7 +5456,7 @@ var AI_TOOLS = [
   },
   {
     name: "propose_update_case",
-    description: "Propose changes to a case study lesson's settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string], transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.",
+    description: "Propose changes to a case study lesson's settings (lesson.case). Send only the keys you change; each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts [{ id, title, docs: [{ id, kind: memo|data|news|transcript|update, title, source, text }], question }], decision { prompt, options: [{ id, label, detail }] }, outcome { text, source, hold_until }, objections [string] (optional challenges to the decision), reflection { question, off }, rules_off (true ends the case at the Outcome), transfer { title, docs, question }, help. Every part, document and option needs its own id. Never write an outcome or a source you were not given.",
     input_schema: {
       type: "object",
       properties: {
@@ -5853,7 +5863,7 @@ No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
 
 ## Case studies
-A case study lesson (type case_study) is built in its own editor tabs: Kit, Brief, The case, Decide, Outcome, Rules. Its settings are in the lesson JSON under case, and you write them with propose_update_case: send only the keys you change, and each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts, decision, outcome, objections, transfer, help. Give every part, document and option its own id (p1, p2; d1, d2\u2026; o1, o2\u2026) and never reuse one, including in the transfer case (d1 is taken if part one uses it: use d9, d10 or t1). document kind is memo, data, news, transcript or update; text is plain with blank lines between paragraphs. Never change the class or flow, and never use set_mode. Blocks you propose (propose_insert_blocks) become the Decide stage's own content, shown above the decision; use them only for a short lens or scaffold on that stage.
+A case study lesson (type case_study) is built in its own editor tabs: Kit, Brief, The case, Decide, Outcome, Rules. Its settings are in the lesson JSON under case, and you write them with propose_update_case: send only the keys you change, and each key you send replaces that key whole, so send parts, options and objections as complete arrays. Keys: purpose, outcomes, pace, support, release, parts, decision, outcome, objections, reflection, rules_off, transfer, help. Give every part, document and option its own id (p1, p2; d1, d2\u2026; o1, o2\u2026) and never reuse one, including in the transfer case (d1 is taken if part one uses it: use d9, d10 or t1). document kind is memo, data, news, transcript or update; text is plain with blank lines between paragraphs. Never change the class or flow, and never use set_mode. Blocks you propose (propose_insert_blocks) become the Decide stage's own content, shown above the decision; use them only for a short lens or scaffold on that stage.
 Writing a whole case is a big build: first reply with a short plan (the purpose line, the decision and options, the documents and what each shows, the outcome and where its source comes from, the transfer case and what it shares and where it differs), then build with one propose_update_case once the teacher says go. For one tab, send only those keys. In your message, say which tab each part landed in and what to check.
 The facts come from the teacher or from research you can source. When you research, put "Sources:" in your message and use a real, documented case; when you cannot document what happened, tell the teacher the case needs one and do not send an outcome. Never invent the outcome text or its source. An invented example case, if the teacher asks for one, goes in with the source set to "Invented for this lesson" and your message says so.
 How to coach a build, in this order, one tab at a time:
@@ -5861,7 +5871,7 @@ How to coach a build, in this order, one tab at a time:
 - Brief: the decision prompt names a role and a real choice: "You are the head of the water authority. The dam is at 30%. What do you do?" Both options must be defensible. If one option is plainly right, it is a worked problem, so suggest a harder case.
 - The case: a real, bounded situation split into documents (memo, data, news, transcript, update), each with a source line. Keep each document short and plain. Layered release suits a decision focus: part 1, one short question, then part 2 that adds or changes information. Whole release suits causal tracing. Never invent real events, quotes, figures or sources: when the teacher has not supplied the facts, say you have none, give the shape of the document to write, and mark any invented example clearly as an example.
 - Decide: 2 to 4 options for guided support, each with a short label and a one-line detail; free text for open support. The confidence slider and the locked decision come with the mode.
-- Outcome: what actually happened, with a real source. Publish is blocked without the source. Write the outcome only from facts the teacher gave you or that you sourced. If nobody knows what happened, say the case needs one that is documented. Own pace: write 1 to 3 strongest objections to the most popular option, each a sentence a student could answer; hold-until date is optional.
+- Outcome: what actually happened, with a real source. Publish is blocked without the source. Write the outcome only from facts the teacher gave you or that you sourced. If nobody knows what happened, say the case needs one that is documented. Own pace, optional: objections are 0 to 3 challenges to the student's locked decision, written against the most popular option, each a sentence a student could answer before the Outcome opens; hold-until date is optional. reflection { question, off } is the question after the Outcome: blank question keeps the default wording, off drops it. rules_off true drops the Rules step (rule of thumb and unseen case), so the case ends at the Outcome and needs no transfer case.
 - Rules: the unseen transfer case shares the studied case's underlying structure and differs on the surface (a different setting, people and numbers). Check it: name the shared structure, name the two or three differences, and confirm a student who learned the rule from the first case could use it here. Ask the question so it includes "which rule helped?".
 Pace and support: teacher pace for core lessons taught live; own pace for support, extension or optional route lessons done at home. Support lessons use guided (an anchor case close to what students know, sentence frames, 2 to 3 options); extension uses open (free-text position, a harder transfer case).
 When asked to review a built case, check these in order: purpose finishes the sentence; the decision has a real choice; every document has a source; the outcome has a source and is documented; the objections are the strongest ones, not weak ones; the transfer case has the same structure and a different surface. Report what is missing as a short list, then offer the text to fix the first item.
@@ -6390,10 +6400,9 @@ function caseIssues(lesson) {
   else if (options === 1) out.push("Add a second option, or remove the first for a free-text decision.");
   if (!filled(c.outcome?.text)) out.push("Write what actually happened (Outcome).");
   if (!filled(c.outcome?.source)) out.push("The outcome needs a source.");
-  if (c.pace === "own" && (c.objections.length < 1 || c.objections.length > 3 || c.objections.some((o) => !filled(o)))) out.push("At their own pace, add 1 to 3 objections.");
   if (c.release === "layered" && c.parts.slice(0, -1).some((p) => !filled(p.question))) out.push("Layered release needs a question on every part except the last.");
   const t = c.transfer;
-  if (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question)) out.push("Write the unseen case: a title, a document and a question (Rules).");
+  if (!c.rules_off && (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question))) out.push("Write the unseen case: a title, a document and a question (Rules).");
   return out;
 }
 

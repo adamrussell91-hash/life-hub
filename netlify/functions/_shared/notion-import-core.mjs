@@ -1093,6 +1093,13 @@ var ReasoningConfigSchema = z6.object({
   supports: z6.record(StepTextSchema.nullable()).optional(),
   examples: z6.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SleeveLevelSchema = z6.enum(["support", "extend"]);
+var SleeveConfigSchema = z6.object({
+  level: SleeveLevelSchema.default("support"),
+  student_level: z6.boolean().default(true),
+  do: z6.string().max(600).optional(),
+  checks: z6.array(z6.string().max(300)).max(3).optional()
+});
 
 // apps/teaching/src/tutorial/schema.ts
 import { z as z7 } from "zod";
@@ -3767,6 +3774,10 @@ var CaseHelpSchema = z12.object({
   stuck: z12.string().max(400).optional()
 });
 var CaseHelpMap = z12.record(z12.string(), CaseHelpSchema);
+var CaseReflectionSchema = z12.object({
+  question: z12.string().max(300).default(""),
+  off: z12.boolean().default(false)
+});
 var CASE_PACES = ["teacher", "own"];
 var CASE_SUPPORTS = ["guided", "standard", "open"];
 var CaseSettingsSchema = z12.object({
@@ -3782,8 +3793,12 @@ var CaseSettingsSchema = z12.object({
   parts: z12.array(CasePartSchema).max(4).default([]),
   decision: CaseDecisionSchema.optional(),
   outcome: CaseOutcomeSchema.optional(),
-  /** Own pace: the strongest objections (1 to 3); the student answers one before the Outcome opens. */
+  /** Own pace, optional: up to 3 challenges to the student's locked decision; they answer one before the Outcome opens. */
   objections: z12.array(z12.string().max(300)).max(3).default([]),
+  /** The question under the Outcome. Blank keeps the default wording; off drops the step. */
+  reflection: CaseReflectionSchema.optional(),
+  /** True drops the Rules station: no rule of thumb and no unseen case, so the case ends at the Outcome. */
+  rules_off: z12.boolean().optional(),
   transfer: CaseTransferSchema.optional(),
   /** Set when the lesson is a class-bound case; the one class whose roster the initials claim uses. */
   class_id: z12.string().max(64).optional(),
@@ -3798,6 +3813,8 @@ var PublicCaseSchema = z12.object({
   /** Part titles only, so the rail can say "Part 2 to come". */
   part_titles: z12.array(z12.string().max(80)).max(4),
   has_objections: z12.boolean(),
+  reflection: CaseReflectionSchema.optional(),
+  rules_off: z12.boolean().optional(),
   help: CaseHelpMap.optional()
 });
 
@@ -3817,10 +3834,9 @@ function caseIssues(lesson) {
   else if (options === 1) out.push("Add a second option, or remove the first for a free-text decision.");
   if (!filled(c.outcome?.text)) out.push("Write what actually happened (Outcome).");
   if (!filled(c.outcome?.source)) out.push("The outcome needs a source.");
-  if (c.pace === "own" && (c.objections.length < 1 || c.objections.length > 3 || c.objections.some((o) => !filled(o)))) out.push("At their own pace, add 1 to 3 objections.");
   if (c.release === "layered" && c.parts.slice(0, -1).some((p) => !filled(p.question))) out.push("Layered release needs a question on every part except the last.");
   const t = c.transfer;
-  if (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question)) out.push("Write the unseen case: a title, a document and a question (Rules).");
+  if (!c.rules_off && (!t || !filled(t.title) || !docIssues(t.docs) || !filled(t.question))) out.push("Write the unseen case: a title, a document and a question (Rules).");
   return out;
 }
 
