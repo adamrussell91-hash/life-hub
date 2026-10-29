@@ -6,8 +6,8 @@ import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesth
 import { fragrancePhotoUrl } from '../../apps/life/js/app/aesthetics/fragrance-photos.js';
 import { FRAGRANCES, REFERENCE_FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 
-// No bundled bottle photo yet: the shop could not be fetched when these were added.
-const NO_PHOTO = new Set(['Tea Soirée', 'Orchard Rain']);
+// No bundled bottle photo yet.
+const NO_PHOTO = new Set(['Tea Soirée']);
 
 test('recommendations use exact source names, perfumers and recorded note tiers', () => {
   assert.ok(FRAGRANCES.some(f => f.name === 'Asad Zanzibar Limited Edition'));
@@ -68,7 +68,7 @@ test('Dress exposes all seven summary sections and the complete transcript with 
 test('photos appear in the shelf, full records, selected scent and Today without losing interactions', () => {
   const doc = render();
   assert.equal(doc.querySelectorAll('#aes-shelf img').length, FRAGRANCES.filter(f => f.status === 'Owned' && !NO_PHOTO.has(f.name)).length);
-  assert.equal(doc.querySelectorAll('#aes-library summary img').length, 51);
+  assert.equal(doc.querySelectorAll('#aes-library summary img').length, 52);
   assert.match(doc.querySelector('#aes-mapcard img').src, /criminal-elements-neon\.webp$/);
   assert.equal(doc.querySelectorAll('#aes-today-bottle img').length, 1);
   doc.querySelector('#aes-reroll').click();
