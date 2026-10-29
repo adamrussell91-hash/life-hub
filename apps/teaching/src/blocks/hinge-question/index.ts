@@ -42,6 +42,6 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
     root.append(mountSolo(block, ctx.lessonId, ctx.lecture === 'preview'));
     return root;
   }
-  root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId, prompt) : mountStudent(block, ctx.lessonId, prompt));
+  root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId, prompt, ctx.display === true) : mountStudent(block, ctx.lessonId, prompt));
   return root;
 }
