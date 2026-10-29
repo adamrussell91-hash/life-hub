@@ -26,7 +26,7 @@ import { resolvedCalloutStyle, calloutIdentity, decorateCalloutReferences } from
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
-import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
+import { buildChartSvg, buildChartTableRows, chartAriaLabel } from '@/blocks/chart-svg';
 import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { AnthologyData } from '@/blocks/anthology-collect';
@@ -95,6 +95,8 @@ export type RenderContext = {
   /** The Display view: the teacher's controls on a screen the class can see. */
   display?: boolean;
   lessonId?: string;
+  /** Where answers are kept on this device when there is no lesson (the class homepage). Never sent to the server. */
+  saveScope?: string;
   /** The class a student is viewing the lesson in, for blocks that record against the class (Done). */
   classId?: string;
   attachedOutcomes?: PublicOutcome[];
@@ -485,7 +487,8 @@ export function renderEmbedBlock(
     link.href = safeUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = block.content.title?.trim() || 'Open in new tab';
+    // Some sites refuse to show inside another page, so the way out is always labelled.
+    link.textContent = block.content.title?.trim() ? `Open ${block.content.title.trim()} in a new tab` : 'Open in new tab';
     wrap.append(link);
   } else {
     const host = hostnameFromUrl(safeUrl);
@@ -512,10 +515,7 @@ export function renderEmbedBlock(
 
     const meta = document.createElement('p');
     meta.className = 'block-embed__card-meta';
-    meta.textContent =
-      host && provider !== 'generic'
-        ? embedProviderLabel(provider)
-        : 'This provider blocks in-page embedding, so it opens in a new tab.';
+    meta.textContent = host && provider !== 'generic' ? embedProviderLabel(provider) : 'Opens in a new tab.';
 
     const link = document.createElement('a');
     link.className = 'btn btn--secondary block-embed__open';
@@ -808,7 +808,14 @@ export function renderTableBlock(
   }
   table.append(tbody);
 
-  return wrapBlock(table, block, mode);
+  // Wide tables scroll sideways on a phone; the wrapper takes keyboard focus so they can be scrolled without a mouse.
+  const scroller = document.createElement('div');
+  scroller.className = 'block-table-wrap';
+  scroller.tabIndex = 0;
+  scroller.setAttribute('role', 'region');
+  scroller.setAttribute('aria-label', 'Table');
+  scroller.append(table);
+  return wrapBlock(scroller, block, mode);
 }
 
 const ANSWER_ROWS: Record<string, number> = { short: 2, medium: 4, long: 7, extended: 10 };
@@ -836,7 +843,8 @@ export function renderQuestionSetBlock(
   // Answers stay on this device for the student only; teacher previews keep nothing.
   // A stepped lens owns the writing when one is attached, so the set stays as it was.
   const typing = mode === 'student' && attachedSteppedLenses(block).length === 0;
-  const answersKey = typing && ctx.lessonId ? `${storageKey(ctx.lessonId, block.id)}.answers` : undefined;
+  const scope = ctx.lessonId ?? ctx.saveScope;
+  const answersKey = typing && scope ? `${storageKey(scope, block.id)}.answers` : undefined;
   const savedAnswers = answersKey ? loadActivityState<Record<string, string>>(answersKey) : null;
   const answers: Record<string, string> = savedAnswers && typeof savedAnswers === 'object' ? { ...savedAnswers } : {};
   const saveAnswers = (): void => { if (answersKey) saveActivityState(answersKey, answers); };
@@ -2136,6 +2144,39 @@ export function renderSelfCheckBlock(
   return wrapBlock(root, block, mode);
 }
 
+/** Visually hidden data table so screen readers get the values, not just the title. */
+function buildChartScreenReaderTable(content: Extract<Block, { block_type: 'chart' }>['content']): HTMLElement {
+  const holder = document.createElement('div');
+  holder.className = 'block-chart__sr-table';
+  holder.setAttribute(
+    'style',
+    'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:-1px;padding:0;border:0'
+  );
+  const table = document.createElement('table');
+  const caption = document.createElement('caption');
+  caption.textContent = `${chartAriaLabel(content)}: data`;
+  table.append(caption);
+  const head = document.createElement('tr');
+  for (const label of ['Series', 'X', 'Y']) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = label;
+    head.append(th);
+  }
+  table.append(head);
+  for (const row of buildChartTableRows(content)) {
+    const tr = document.createElement('tr');
+    for (const value of [row.series, row.x, row.y]) {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  holder.append(table);
+  return holder;
+}
+
 export function renderChartBlock(
   block: Extract<Block, { block_type: 'chart' }>,
   mode: RenderMode
@@ -2154,6 +2195,7 @@ export function renderChartBlock(
   wrap.className = 'block-chart__svg';
   wrap.innerHTML = buildChartSvg(block.content);
   root.append(wrap);
+  root.append(buildChartScreenReaderTable(block.content));
 
   const details = document.createElement('details');
   details.className = 'block-chart__data block-disclosure';
@@ -2250,6 +2292,14 @@ export function renderDiagramBlock(
     const wrap = document.createElement('div');
     wrap.className = 'block-diagram__svg';
     wrap.innerHTML = sanitizeSvgMarkup(block.content.svg_markup ?? '');
+    const svgEl = wrap.querySelector('svg');
+    if (svgEl) {
+      svgEl.setAttribute('role', 'img');
+      svgEl.setAttribute(
+        'aria-label',
+        (block.content.image_alt ?? '').trim() || (block.content.caption ?? '').trim() || 'Diagram'
+      );
+    }
     root.append(wrap);
   }
 
@@ -2566,7 +2616,7 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   const sleeves = attachedSleeves(block);
   if (sleeves.length) {
     wrapper.classList.add('has-sleeve', `has-sleeve--${sleeves[0]!.lens.toolkitKind}`);
-    wrapper.prepend(renderSleeves(sleeves, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+    wrapper.prepend(renderSleeves(sleeves, { mode, blockId: block.id, lessonId: ctx.lessonId ?? ctx.saveScope }));
   }
   if (mode === 'teacher') {
     const convert = turnIntoSleeveButton(block, ctx);
@@ -2575,7 +2625,7 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   const attachments: HTMLElement[] = [];
   const lenses = attachedSteppedLenses(block);
   if (lenses.length) {
-    attachments.push(renderSteppedLenses(lenses, block, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+    attachments.push(renderSteppedLenses(lenses, block, { mode, blockId: block.id, lessonId: ctx.lessonId ?? ctx.saveScope }));
   }
   if (block.discern && canHaveDiscern(block)) {
     attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));

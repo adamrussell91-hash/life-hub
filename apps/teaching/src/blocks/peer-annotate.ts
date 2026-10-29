@@ -86,6 +86,12 @@ export function paper(text: string, marks: Mark[], selected: { start: number; en
     const points = [...cuts].sort((a, b) => a - b);
     const sentence = el('span', 'pa-sentence');
     sentence.dataset.index = String(index);
+    sentence.tabIndex = 0;
+    sentence.setAttribute('role', 'button');
+    sentence.setAttribute(
+      'aria-pressed',
+      String(!!selected && s.start >= selected.start && s.end <= selected.end)
+    );
     for (let i = 0; i < points.length - 1; i++) {
       const [a, b] = [points[i]!, points[i + 1]!];
       const run = el('span', 'pa-run', text.slice(a, b));
@@ -168,7 +174,7 @@ export function giveView(opts: GiveOptions): HTMLElement {
   let comment = '';
 
   const save = () => {
-    if (!writeJSON(opts.draftKey(piece), notes)) opts.onError('This browser isn’t saving drafts. Keep this page open until you send.');
+    if (!writeJSON(opts.draftKey(piece), notes)) opts.onError('Keep this page open until you send, so your draft stays with you.');
   };
 
   const head = el('div', 'pa-give__head');
@@ -204,6 +210,17 @@ export function giveView(opts: GiveOptions): HTMLElement {
   }
 
   // Tap: one sentence, or grow the selection to the next/previous sentence.
+  paperHost.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = (event.target as HTMLElement).closest<HTMLElement>('.pa-sentence');
+    if (!target) return;
+    event.preventDefault();
+    target.click();
+    const again = paperHost.querySelector<HTMLElement>(`.pa-sentence[data-index="${target.dataset.index}"]`);
+    // Painting rebuilds the paper; the tray takes focus when a sentence is picked.
+    if (again && !selected) again.focus({ preventScroll: true });
+  });
+
   paperHost.addEventListener('click', (event) => {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && paperHost.contains(sel.anchorNode)) return;
@@ -336,7 +353,7 @@ export function giveView(opts: GiveOptions): HTMLElement {
       if (await opts.onSend(piece, notes, this)) writeJSON(opts.draftKey(piece), null);
     });
     send.disabled = notes.length === 0;
-    sendRow.replaceChildren(el('p', 'pa-hint pa-send-hint', notes.length ? `${notes.length} note${notes.length === 1 ? '' : 's'}. You can’t change them after sending.` : 'Add at least one note.'), send);
+    sendRow.replaceChildren(el('p', 'pa-hint pa-send-hint', notes.length ? `${notes.length} note${notes.length === 1 ? '' : 's'}. Your notes are final once sent.` : 'Add at least one note.'), send);
   }
 
   paint();

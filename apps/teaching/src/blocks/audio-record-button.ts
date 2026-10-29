@@ -95,13 +95,13 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
   async function start(): Promise<void> {
     const mime = pickMime();
     if (!mime || !navigator.mediaDevices?.getUserMedia) {
-      say('This browser cannot record audio. Try Chrome or Safari, or upload a file.');
+      say('Recording works in Chrome or Safari, or you can upload a file.');
       return;
     }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      say('No microphone access. Allow the microphone for this site, then press Record again.');
+      say('Allow the microphone for this site, then press Record again.');
       return;
     }
     if (disposed) {

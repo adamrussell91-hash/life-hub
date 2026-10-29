@@ -271,7 +271,7 @@ export function renderSteppedLenses(
     notes.addEventListener('input', () => { state.notes[step.id] = notes.value; persist(lens, state); });
     label.append(notes);
     workspace.append(label, el('p', 'kaplan-caption', options.mode === 'student'
-      ? 'Thinking notes for this device only. Not submitted or marked.'
+      ? 'Thinking notes stay on this device for your own use.'
       : 'Student preview · notes are not saved.'));
   }
 

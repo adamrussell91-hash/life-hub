@@ -180,7 +180,7 @@ describe('student render', () => {
     const root = body('<p>The cat sat.</p>');
     const bar = createStudentWordHelpBar({ body: root, lessonId: 'l', blockId: 'b', preScanned: [], scan: async () => [] });
     bar.querySelector<HTMLButtonElement>('button')!.click();
-    await vi.waitFor(() => expect(bar.textContent).toContain('No tricky words in this block.'));
+    await vi.waitFor(() => expect(bar.textContent).toContain('Every word in this block is one you can read on your own.'));
   });
 });
 

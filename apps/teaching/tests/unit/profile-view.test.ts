@@ -80,6 +80,6 @@ describe('profile map', () => {
   });
   it('says so when the class has no unit yet', () => {
     const empty = renderProfile({ ...payload, map: { lessons: [], next: null, unit: null } } as never, { classId: 'class1' });
-    expect(empty.textContent).toContain('hasn’t set up a unit');
+    expect(empty.textContent).toContain('will appear here once your teacher sets it up');
   });
 });

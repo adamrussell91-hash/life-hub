@@ -76,6 +76,9 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     return next;
   });
   const columnMove = options.columnMove;
+  // A layout only offers what its page offers (no unit map in a lesson, no live activities on a homepage).
+  const pageTypes = options.context?.pageTypes;
+  const allowedTypes = pageTypes ? options.allowedTypes.filter((t) => pageTypes.has(t)) : options.allowedTypes;
 
   const list = createHubList<Block>({
     items: blocks,
@@ -88,7 +91,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     insertBetween: true,
     read: options.read,
     pick: (anchor, done) =>
-      openBlockPicker(anchor, options.allowedTypes, (value) => done(createFromInsertMenu(value, nextId()))),
+      openBlockPicker(anchor, allowedTypes, (value) => done(createFromInsertMenu(value, nextId()))),
     duplicate: (block) => cloneBlockWithNewIds(block, nextId),
     onChange: (next) => options.onChange(next),
     renderItem: (block, ctx) =>
@@ -117,7 +120,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
       ? (insert, pick) =>
           createEmptyBlocksPrompt({
             ...options.empty!,
-            allowed: options.allowedTypes,
+            allowed: allowedTypes,
             idFactory: nextId,
             insert,
             pick
@@ -138,7 +141,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     try {
       const parsed = JSON.parse(raw) as { kind?: unknown; type?: unknown };
       if (parsed.kind !== 'block' || typeof parsed.type !== 'string') return null;
-      return options.allowedTypes.includes(parsed.type as NewBlockType)
+      return allowedTypes.includes(parsed.type as NewBlockType)
         ? (parsed.type as NewBlockType)
         : null;
     } catch {

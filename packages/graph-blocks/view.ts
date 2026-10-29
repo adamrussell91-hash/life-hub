@@ -1,4 +1,4 @@
-import { drawForRoom, svgMarkup, withParents, type GraphContent, type GraphKind, type Scene } from './graph';
+import { buildTree, drawForRoom, svgMarkup, withParents, type TreeNode, type GraphContent, type GraphKind, type Scene } from './graph';
 
 type PaintState = Parameters<typeof drawForRoom>[3];
 
@@ -87,12 +87,64 @@ export function openFullView(kind: GraphKind, content: GraphContent): void {
 }
 
 /** Read-only picture of a block: the student view, the teacher preview and print all use this. */
+const HIDDEN_STYLE =
+  'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:-1px;padding:0;border:0';
+
+function treeList(node: TreeNode): HTMLUListElement {
+  const ul = document.createElement('ul');
+  const li = document.createElement('li');
+  li.append(document.createTextNode(node.label));
+  if (node.kids.length) {
+    const inner = document.createElement('ul');
+    for (const kid of node.kids) inner.append(...treeList(kid).children);
+    li.append(inner);
+  }
+  ul.append(li);
+  return ul;
+}
+
+/** Visually hidden text version of a map so screen readers can read its content. */
+export function buildGraphTextAlternative(kind: GraphKind, content: GraphContent): HTMLElement {
+  const host = document.createElement('div');
+  host.className = 'graph-sr-text';
+  host.setAttribute('style', HIDDEN_STYLE);
+  const heading = document.createElement('p');
+  heading.textContent = `${content.title?.trim() || kindName(kind)}, as a list`;
+  host.append(heading);
+  if (kind === 'mind') {
+    const root = buildTree(content.nodes);
+    if (root) host.append(treeList(root));
+    return host;
+  }
+  const label = new Map(content.nodes.map((n) => [n.id, n.label]));
+  const ul = document.createElement('ul');
+  const linked = new Set<string>();
+  for (const e of content.edges ?? []) {
+    const a = label.get(e.from);
+    const b = label.get(e.to);
+    if (a === undefined || b === undefined) continue;
+    linked.add(e.from);
+    linked.add(e.to);
+    const li = document.createElement('li');
+    li.textContent = e.label?.trim() ? `${a} \u2014 ${e.label.trim()} \u2014 ${b}` : `${a} \u2014 ${b}`;
+    ul.append(li);
+  }
+  for (const n of content.nodes) {
+    if (linked.has(n.id)) continue;
+    const li = document.createElement('li');
+    li.textContent = n.label;
+    ul.append(li);
+  }
+  host.append(ul);
+  return host;
+}
+
 export function renderGraphView(host: HTMLElement, kind: GraphKind, block: GraphContent): void {
   const content = withParents(kind, block);
   const stage = document.createElement('div');
   stage.className = 'graph-stage graph-stage--read';
   stage.dataset.kind = kind;
-  stage.append(expandButton(() => openFullView(kind, content)));
+  stage.append(expandButton(() => openFullView(kind, content)), buildGraphTextAlternative(kind, content));
   host.replaceChildren(stage);
   const paint = () => paintStage(stage, kind, content);
   paint();

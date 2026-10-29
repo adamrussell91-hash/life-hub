@@ -5,7 +5,7 @@ import { createBlockEditor } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
 import { blockRegistry } from '@/blocks/registry';
 import { publishBlockIssues } from '@/schemas/publish-block-issues';
-import { nearestStop, snapPoints } from '@/blocks/continuum-line/shared';
+import { nearestStop, snapPoints, scaleValueText } from '@/blocks/continuum-line/shared';
 import { mountStage } from '@/blocks/continuum-line/stage';
 
 describe('Continuum line block', () => {
@@ -91,5 +91,14 @@ describe('Continuum line block', () => {
     stage.update({ key: 'b', scale, snap: false, phase: 'collect', movesShown: false, entries: [], picked: null });
     expect(stage.root.querySelectorAll('.cl-sym, .cl-ghost')).toHaveLength(0);
     stage.root.remove();
+  });
+
+  it('slider value text names the nearest pole or stop', () => {
+    const scale = { left: 'Implied', right: 'Not implied', stops: ['Somewhat'] };
+    expect(scaleValueText(scale, 0)).toBe('Implied, 0 out of 100');
+    expect(scaleValueText(scale, 1)).toBe('Not implied, 100 out of 100');
+    expect(scaleValueText(scale, 0.5)).toBe('Somewhat, 50 out of 100');
+    expect(scaleValueText(scale, 0.3)).toBe('Nearest to Somewhat, 30 out of 100');
+    expect(scaleValueText({ left: 'A', right: 'B', stops: [] }, 0.9)).toBe('Nearest to B, 90 out of 100');
   });
 });

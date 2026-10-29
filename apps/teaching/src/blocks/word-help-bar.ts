@@ -52,7 +52,7 @@ export function createStudentWordHelpBar(options: {
     shown = on;
     if (on && words) {
       const found = applyWordHelp(options.body, words, options.openWord);
-      status.textContent = found ? '' : 'No tricky words in this block.';
+      status.textContent = found ? '' : 'Every word in this block is one you can read on your own.';
     } else {
       removeWordHelp(options.body);
       status.textContent = '';

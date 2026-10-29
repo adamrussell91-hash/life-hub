@@ -1,5 +1,5 @@
-/** Nothing students type is kept, so every lens and format ends by handing the answer over. */
-export const HANDOVER_TEXT = 'This page won’t keep your answer. Write it in your book or document now.';
+/** Answers are saved on this device only, so every lens and format ends by pointing students to their book or document. */
+export const HANDOVER_TEXT = 'Your answer is saved on this device. Copy it into your book or document when you finish.';
 
 export function copyAnswerButton(box: HTMLTextAreaElement, status: HTMLElement): HTMLButtonElement {
   const copy = document.createElement('button');

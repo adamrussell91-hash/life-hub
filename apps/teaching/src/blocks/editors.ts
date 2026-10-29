@@ -99,6 +99,8 @@ import {
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
 
 export type BlockEditorContext = {
+  /** Block types this page's own menu offers; sections, columns and tabs offer no others. */
+  pageTypes?: ReadonlySet<string>;
   resolveCollection?: (
     block: Extract<Block, { block_type: 'collection' }>
   ) => { links: CollectionLink[]; emptyMessage?: string };
@@ -1991,24 +1993,6 @@ export function createTimelineEditor(
     }
   });
   list.el.classList.add('block-editor__timeline-items');
-
-  // Unit pages only: they know the unit's lessons. A saved link to a lesson that left the unit stays until changed.
-  function galleryLessonPicker(entry: GalleryItem, n: number, set: (lessonId: string | undefined) => void): HTMLElement[] {
-    if (!unitLessons.length && !entry.lesson_id) return [];
-    const options = [{ value: '', label: 'No lesson' }, ...unitLessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
-    if (entry.lesson_id && !unitLessons.some((l) => l.id === entry.lesson_id)) {
-      options.push({ value: entry.lesson_id, label: 'A lesson outside this unit' });
-    }
-    const picker = createChoice({
-      key: 'Opens lesson',
-      value: entry.lesson_id ?? '',
-      options,
-      className: 'block-editor__gallery-lesson',
-      ariaLabel: `Gallery image ${n} opens lesson`,
-      onChange: (value) => set(value || undefined)
-    });
-    return [picker.el];
-  }
 
   const layoutSelect = createChoice({
     key: 'Layout',

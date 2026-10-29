@@ -1,3 +1,4 @@
+import { HOMEPAGE_BLOCK_GROUPS, pageBlockTypes } from '@/blocks/create-block';
 import { ApiClientError } from '@/api/client';
 import {
   emptyMessageForCollection,
@@ -161,6 +162,7 @@ export function mountHomepageEditor(
   let historyPanel: HistoryPanelHandle | null = null;
 
   const editorContext: BlockEditorContext = {
+    pageTypes: pageBlockTypes(HOMEPAGE_BLOCK_GROUPS),
     resolveCollection: (block) => resolveCollectionBlock(block, options.resolveContext)
   };
 

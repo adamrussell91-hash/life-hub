@@ -250,7 +250,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
     clearError();
     const mime = pickMime();
     if (!mime || !navigator.mediaDevices?.getUserMedia) {
-      showError('This browser can’t record audio. Try Chrome or Safari.');
+      showError('Recording works in Chrome or Safari. Open this page there.');
       return;
     }
     let stream: MediaStream;
