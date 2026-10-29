@@ -54,7 +54,8 @@ export const LOOKS = [
   look('refined', 'Powder blue + white + merlot → luxurious', ['merlot', 'cardigan'], ['powder blue', 'shirt'], ['white', 'trousers'], ['cognac', 'loafers'], ['merlot', 'belt'], 'knit', 'Liaisons Dangereuses'),
   look('artistic', 'Terracotta orange + Tiffany blue → artistic', ['terracotta', 'chore jacket'], ['Tiffany blue', 'tee'], ['cream', 'trousers'], ['chocolate', 'loafers'], ['navy', 'cap'], 'canvas', 'Asad Zanzibar Limited Edition'),
   look('richer', 'Pistachio green + chocolate brown → richer', ['tan', 'overshirt'], ['pistachio', 'knit polo'], ['chocolate', 'trousers'], ['white', 'sneakers'], ['chocolate', 'belt'], 'knit', 'Asad Bourbon'),
-  look('striking', 'Mustard yellow + fuchsia pink → striking', ['mustard', 'overshirt'], ['fuchsia', 'tee'], ['navy', 'jeans'], ['white', 'sneakers'], ['black', 'watch strap'], 'corduroy', 'Velvet Underground')
+  look('striking', 'Mustard yellow + fuchsia pink → striking', ['mustard', 'overshirt'], ['fuchsia', 'tee'], ['navy', 'jeans'], ['white', 'sneakers'], ['black', 'watch strap'], 'corduroy', 'Velvet Underground'),
+  look('sophisticated', 'Light blue and white is nice, but with navy → sophisticated', ['navy', 'linen blazer'], ['powder blue', 'shirt'], ['white', 'trousers'], ['white', 'sneakers'], ['tan', 'belt'], 'linen', 'Orchard Rain')
 ];
 
 /** Quick picks for "Snap a piece" when there is no photo to hand. `slot` says which piece it is. */

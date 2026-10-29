@@ -34,10 +34,10 @@ const SAMPLE_DAY = [
 ];
 
 test('fragrance library mirrors the Notion tracker', () => {
-  assert.equal(FRAGRANCES.length, 52);
+  assert.equal(FRAGRANCES.length, 53);
   const count = s => FRAGRANCES.filter(f => f.status === s).length;
-  assert.deepEqual([count('Owned'), count('Sampling'), count('Wishlist'), count('Retired')], [12, 10, 28, 2]);
-  assert.equal(new Set(FRAGRANCES.map(f => f.name)).size, 52, 'names are unique');
+  assert.deepEqual([count('Owned'), count('Sampling'), count('Wishlist'), count('Retired')], [14, 9, 28, 2]);
+  assert.equal(new Set(FRAGRANCES.map(f => f.name)).size, 53, 'names are unique');
   for (const f of FRAGRANCES) {
     assert.deepEqual(f.notes, ['Top Notes', 'Heart Notes', 'Base Notes'].flatMap(key => f.source.properties[key] ?? []), `${f.name} keeps recorded notes without inventing unset tiers`);
     assert.equal(f.tiers.reduce((a, b) => a + b, 0), f.notes.length, `${f.name} tiers add up to its notes`);
@@ -141,7 +141,7 @@ test('the scent map puts gourmands sweet-warm and vetivers dry', () => {
   assert.ok(at('Gullal').x < 0 && at('Gullal').y < 0);
   const text = mapInsight();
   assert.match(text, /Encre Noire and Gullal/);
-  assert.match(text, /sweet tooth: 9 of 12/);
+  assert.match(text, /sweet tooth: 10 of 14/);
 });
 
 test('snap: colour sampling names the garment and finds looks', () => {
