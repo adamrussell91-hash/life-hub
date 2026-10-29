@@ -11,7 +11,8 @@ import './quiz.css';
  * hints and a "how sure" tap, then the marked result. Every mark comes from
  * the server; answers are kept on the device as the student goes, so a reload
  * or a dropped connection loses nothing. When the teacher runs the quiz live,
- * a join box appears and the class answers together.
+ * a join box takes the start screen's place and the class answers together.
+ * A student already partway through a self-paced go keeps going.
  *
  * A quiz takes answers only for a class. The class page names it; a plain
  * lesson link picks the lesson's class by itself, or asks the student which
@@ -290,6 +291,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     if (view === 'quiz' && status.current) body.replaceChildren(quizView(status.current));
     else if (view === 'review' && status.current) body.replaceChildren(reviewView(status.current));
     else if (view === 'result') body.replaceChildren(resultView());
+    // One way in at a time: while the teacher runs it live, the join box above is the quiz.
+    else if (status.live) body.replaceChildren();
     else body.replaceChildren(landingView(status));
   }
 
@@ -745,6 +748,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       liveState = null;
     }
     paintLive();
+    // The live round ended: bring back the self-paced start.
+    if (!liveState && status?.live && (await call('status')) && view === 'landing') paint();
   }
 
   function paintLive(): void {
