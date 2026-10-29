@@ -95,6 +95,7 @@ const ROLE_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'recruiter', label: 'Recruiter' },
   { value: 'referee', label: 'Referee' },
   { value: 'conference_contact', label: 'Conference contact' },
+  { value: 'parent', label: 'Parent / carer' },
   { value: 'introduction', label: 'Introduction' },
   { value: 'student', label: 'Student' },
   { value: 'other', label: 'Other' }

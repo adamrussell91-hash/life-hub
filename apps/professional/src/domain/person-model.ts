@@ -86,6 +86,7 @@ const ROLE_LABELS: Record<string, string> = {
   recruiter: 'Recruiter',
   referee: 'Referee',
   conference_contact: 'Conference contact',
+  parent: 'Parent / carer',
   introduction: 'Introduction',
   other: 'Other'
 };

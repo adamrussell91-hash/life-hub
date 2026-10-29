@@ -1,8 +1,5 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
-import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
 import {
-  createCommunication,
   createFollowUpTask,
   getCommunication,
   isFollowUpIncompleteError,
@@ -12,7 +9,6 @@ import {
   retryFollowUpTask,
   updateCommunication
 } from '@/api/communications';
-import { searchEntities } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
 import type { CommunicationRecord, FollowUpOperationProjection } from '@/domain/types';
@@ -75,7 +71,7 @@ export async function renderCommunicationsView(
     searchPlaceholder: 'Search subject or channel',
     searchAriaLabel: 'Search communications',
     emptyMessage: 'No communications yet.',
-    primaryAction: { label: 'Compose', href: '#/communication/new' },
+    primaryAction: { label: 'Log a conversation', href: '#/communication/new' },
     listHash: '#/communications',
     isCurrent: options.isCurrent,
     loadRows: async () => {
@@ -83,162 +79,6 @@ export async function renderCommunicationsView(
       return communications.map(toRow);
     }
   });
-}
-
-export async function renderCommunicationNewView(canvas: HTMLElement): Promise<void> {
-  canvas.replaceChildren();
-
-  const form = document.createElement('form');
-  form.className = 'communication-form';
-  form.noValidate = true;
-
-  const direction = document.createElement('select');
-  direction.name = 'direction';
-  direction.setAttribute('aria-label', 'Direction');
-  for (const value of ['outbound', 'inbound'] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = value;
-    direction.append(option);
-  }
-
-  const channel = document.createElement('select');
-  channel.name = 'channel';
-  channel.setAttribute('aria-label', 'Channel');
-  for (const value of ['email', 'phone', 'message', 'in_person', 'video', 'other'] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = value.replace(/_/g, ' ');
-    channel.append(option);
-  }
-
-  const occurred = document.createElement('input');
-  occurred.type = 'datetime-local';
-  occurred.name = 'occurred_at';
-  occurred.required = true;
-  occurred.setAttribute('aria-label', 'Occurred at');
-  const now = new Date();
-  occurred.value = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 16);
-
-  const subject = document.createElement('input');
-  subject.type = 'text';
-  subject.name = 'subject';
-  subject.placeholder = 'Subject';
-  subject.setAttribute('aria-label', 'Subject');
-
-  const summary = document.createElement('textarea');
-  summary.name = 'summary';
-  summary.rows = 5;
-  summary.placeholder = 'Summary';
-  summary.setAttribute('aria-label', 'Summary');
-
-  const recipientInput = document.createElement('input');
-  recipientInput.type = 'text';
-  recipientInput.placeholder = 'Add a recipient';
-  recipientInput.setAttribute('aria-label', 'Recipient');
-
-  const chipsHost = el('div', 'communication-form__chips');
-  const chipList = createEntityChipList({
-    container: chipsHost,
-    chips: [],
-    onRemovePending: () => undefined
-  });
-
-  const picker = createEntityPicker({
-    mode: 'field',
-    input: recipientInput,
-    allowedKinds: ['person'],
-    emptyText: 'No matching people.',
-    search: async (query, signal) => {
-      const result = await searchEntities(query, 'person', { signal });
-      return {
-        groups: {
-          person: result.groups.person,
-          organisation: result.groups.organisation,
-          task: result.groups.task
-        }
-      };
-    },
-    onSelect: (item) => {
-      chipList.addPending({
-        id: `pending:${item.ref}:recipient`,
-        ref: item.ref,
-        label: item.display_label,
-        relationshipType: 'recipient',
-        state: 'pending',
-        supportingLabel: item.supporting_label ?? null,
-        href: item.href ?? null
-      });
-    }
-  });
-
-  const status = el('p', 'communication-form__status');
-  status.hidden = true;
-
-  const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
-  save.type = 'submit';
-
-  const cancel = el('a', 'btn btn--ghost', 'Cancel');
-  cancel.href = '#/communications';
-
-  form.append(
-    el('label', undefined, 'Direction'),
-    direction,
-    el('label', undefined, 'Channel'),
-    channel,
-    el('label', undefined, 'Occurred'),
-    occurred,
-    el('label', undefined, 'Subject'),
-    subject,
-    el('label', undefined, 'Summary'),
-    summary,
-    el('label', undefined, 'Recipient'),
-    recipientInput,
-    picker.root,
-    chipsHost,
-    status,
-    save,
-    cancel
-  );
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    status.hidden = true;
-    save.disabled = true;
-    const occurredAt = new Date(occurred.value).toISOString();
-    const pending = chipList.getChips().filter((chip) => chip.state === 'pending');
-    const links = pending.map((chip) => ({
-      target_ref: chip.ref,
-      relationship_type: 'recipient' as const,
-      occurred_at: occurredAt
-    }));
-    try {
-      const result = await createCommunication({
-        direction: direction.value as 'outbound' | 'inbound',
-        channel: channel.value,
-        occurred_at: occurredAt,
-        subject: subject.value,
-        summary: summary.value,
-        links
-      });
-      location.hash = communicationRoute(result.communication.id);
-    } catch (err) {
-      if (isIncompleteLinksError(err)) {
-        status.hidden = false;
-        status.textContent =
-          'Communication saved, but one or more links are incomplete. Opening detail for retry.';
-        location.hash = communicationRoute(err.data.communication_id);
-        return;
-      }
-      status.hidden = false;
-      status.textContent = err instanceof ApiClientError ? err.message : 'Save failed.';
-      save.disabled = false;
-    }
-  });
-
-  canvas.append(form);
 }
 
 export async function renderCommunicationDetailView(
