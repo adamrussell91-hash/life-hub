@@ -1,14 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tidy } from '../../scripts/import-walkthru-icons.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { CATALOGUE } from '../../packages/walkthrus/catalogue.mjs';
 
-test('the icon importer drops the scan page, title and fixed size', () => {
-  const raw = `<?xml version='1.0'?>\n<svg xmlns="http://www.w3.org/2000/svg" width="141" height="142" viewBox="0 0 141 142" role="img"><title id="t">menu icon Quizzing</title><desc>Traced</desc><path d="M0 0 C46.53 0 93.06 0 141 0 Z" fill="#FDFDFD" transform="translate(0,0)" /><path d="M0 0 C1.71 1.28 3.37 2.62 5.123456 4 Z" fill="#242422" transform="translate(44,52)" /></svg>`;
-  const out = tidy(raw);
-  assert.ok(out.includes('viewBox="0 0 141 142"'));
-  assert.ok(!out.includes('FDFDFD'));
-  assert.ok(!/<title|<desc|width=|role=/.test(out));
-  assert.ok(out.includes('#242422'));
-  assert.ok(out.includes('5.12 4'), 'numbers are rounded');
-  assert.equal(tidy('<svg></svg>'), null);
-});
+const dir = (set) => new URL(`../../packages/walkthrus/glyphs/${set}/`, import.meta.url);
+const techniques = CATALOGUE.filter((e) => e.kind === 'technique');
+
+for (const [set, viewBox] of [['figure', '0 0 120 90'], ['symbol', '0 0 100 100']]) {
+  test(`every technique has a ${set} icon in the drawn grammar`, () => {
+    const files = new Set(readdirSync(dir(set)));
+    for (const { id } of techniques) {
+      assert.ok(files.has(`${id}.svg`), `${set}/${id}.svg is missing`);
+      const svg = readFileSync(new URL(`${id}.svg`, dir(set)), 'utf8');
+      assert.ok(svg.includes(`viewBox="${viewBox}"`), `${id}: ${set} frame`);
+      assert.ok(svg.includes('stroke="currentColor"'), `${id}: line art in currentColor`);
+      assert.doesNotMatch(svg, /#[0-9a-f]{3,6}\b|<image|<text/i, `${id}: no fixed colours, bitmaps or text`);
+    }
+    assert.equal(files.size, techniques.length, `${set}: no stray files`);
+  });
+}

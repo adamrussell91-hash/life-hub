@@ -120,8 +120,8 @@ function buildTile(entry: BoardEntry, cell: Cell, cluster: string, size: number)
     corners: hexCorners(p, drawn),
     // Everything sits clear of the hexagon's edges, so a knot on a shared edge never covers it.
     tab: { x: p.x, y: p.y - half + 0.33 * drawn, w: 0.9 * drawn, h: 0.26 * drawn },
-    glyph: { x: p.x, y: p.y - 0.19 * drawn, w: 0.4 * drawn, h: 0.4 * drawn },
-    title: { x: p.x, y: p.y + 0.2 * drawn, w: 1.1 * drawn, h: 0.3 * drawn },
+    glyph: { x: p.x, y: p.y - 0.135 * drawn, w: 0.72 * drawn, h: 0.53 * drawn },
+    title: { x: p.x, y: p.y + 0.27 * drawn, w: 1.1 * drawn, h: 0.3 * drawn },
     badge: { x: p.x, y: p.y + half - 0.33 * drawn, w: 0.6 * drawn, h: 0.26 * drawn },
     box: { x: p.x, y: p.y, w: drawn * 2, h: half * 2 }
   };
