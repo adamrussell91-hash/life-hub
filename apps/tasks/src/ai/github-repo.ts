@@ -130,7 +130,8 @@ export function defaultAgentRepoClient(
   if (!token) return null;
   return createGithubRepoClient({
     token,
-    repository: env.AGENT_REPO?.trim() || 'adamrussell91-hash/Tasks-Hub',
+    // Agent files are personal, so they live in the private data repo.
+    repository: env.AGENT_REPO?.trim() || 'adamrussell91-hash/life-hub-data',
     branch: env.AGENT_REPO_BRANCH?.trim() || 'main'
   });
 }
