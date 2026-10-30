@@ -18,6 +18,9 @@ import { classWork } from './lesson-work.mjs';
 import { listClassDone } from './profile-done.mjs';
 import { read, reject } from './question-drop.mjs';
 import { markWalkthruDirty } from './walkthru-dirty.mjs';
+import { progressFor, studentPieces } from './profile-feedback.mjs';
+import { classPatterns } from './progress-patterns.mjs';
+import { readFeedbackCodes } from './feedback-codes.mjs';
 import { MARKBOOK_LIMITS, MarkbookSchema, checkColumn, checkMark, pruneMarks } from './markbook-schema.mjs';
 
 const bookKey = (classId) => `markbook/${classId}`;
@@ -195,6 +198,14 @@ async function markbookActionInner(store, classId, body) {
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
       ...(body.skip_done ? {} : { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) })
     };
+  }
+
+  if (action === 'analysis') {
+    const student = roster.students.find((s) => s.id === body.student_id) ?? reject(404, 'no_student', 'That student isn’t on this class list.');
+    const library = await readFeedbackCodes(store);
+    const progress = await progressFor(store, roster, student);
+    const everyone = await mapBounded(roster.students, 4, async (s) => ({ id: s.id, pieces: await studentPieces(store, classId, s.id) }));
+    return { student: progress, class_patterns: classPatterns(everyone, library).map((g) => ({ ...g, names: g.students.map((id) => roster.students.find((s) => s.id === id)?.name ?? id) })) };
   }
 
   if (action === 'save_column') {
