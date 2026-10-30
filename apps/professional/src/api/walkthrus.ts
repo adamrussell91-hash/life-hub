@@ -1,5 +1,5 @@
 import { apiGet, apiPatch, apiPost } from '@/api/client';
-import { newArrowId, normalizeArrows } from '../../../../packages/walkthrus/arrows.mjs';
+import { newArrowId, normalizeArrows, normalizePicked } from '../../../../packages/walkthrus/arrows.mjs';
 import { normalizeWalkthru } from '../../../../packages/walkthrus/goal.mjs';
 import type { BoardArrow } from '../../../../packages/walkthrus/board/route';
 
@@ -42,14 +42,20 @@ export function resetWalkthruTextForTests(): void {
   textCache = null;
 }
 
-export async function loadBoardArrows(): Promise<BoardArrow[]> {
-  const r = await apiGet<{ board: { arrows: unknown } }>('/api/walkthrus-board');
-  return normalizeArrows(r.board.arrows) as BoardArrow[];
+/** Adam's board: his arrows, and the techniques he has put on it (null until he first picks). */
+export async function loadBoard(): Promise<{ arrows: BoardArrow[]; picked: string[] | null }> {
+  const r = await apiGet<{ board: { arrows: unknown; picked?: unknown } }>('/api/walkthrus-board');
+  return { arrows: normalizeArrows(r.board.arrows) as BoardArrow[], picked: Array.isArray(r.board.picked) ? (normalizePicked(r.board.picked) as string[]) : null };
 }
 
 export async function saveBoardArrows(arrows: BoardArrow[]): Promise<BoardArrow[]> {
   const r = await apiPost<{ board: { arrows: unknown } }>('/api/walkthrus-board', { arrows });
   return normalizeArrows(r.board.arrows) as BoardArrow[];
+}
+
+export async function saveBoardPicked(picked: string[]): Promise<string[]> {
+  const r = await apiPost<{ board: { picked: unknown } }>('/api/walkthrus-board', { picked });
+  return normalizePicked(r.board.picked) as string[];
 }
 
 export const makeArrowId = (): string => newArrowId() as string;
