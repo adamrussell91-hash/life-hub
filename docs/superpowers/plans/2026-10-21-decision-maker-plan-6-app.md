@@ -41,7 +41,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md` ("Experience: Landing", "Design language", "Architecture: Client, Tasks hub writes", "Errors").
 **Plans 1–5:** done (Plan 5 HEAD `998e0f148`).
-**Branch and worktree:** `claude/decision-book` in `/Users/example/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
 
 **How this plan was made:** every file below was drafted in the worktree and its tests run green:
 - **Unit suite:** 5,710 tests (5,699 pass, 11 skipped), including 7 new ones.

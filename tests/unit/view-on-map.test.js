@@ -51,31 +51,31 @@ function el(tag = 'div') {
 }
 
 test('isMappablePlace accepts street addresses and rejects remote venues', () => {
-  assert.equal(isMappablePlace('26 Ridge St, North Sydney NSW Australia'), true);
+  assert.equal(isMappablePlace('1 Example St, Exampleton NSW Australia'), true);
   assert.equal(isMappablePlace('Abbotsleigh, Wahroonga'), true);
   assert.equal(isMappablePlace('Zoom'), false);
   assert.equal(isMappablePlace('Telehealth'), false);
   assert.equal(isMappablePlace('online'), false);
-  assert.equal(isMappablePlace('Walker Street Doctors', 'telehealth'), false);
-  assert.equal(isMappablePlace('Walker Street Doctors', 'unknown'), false);
+  assert.equal(isMappablePlace('Example Street Doctors', 'telehealth'), false);
+  assert.equal(isMappablePlace('Example Street Doctors', 'unknown'), false);
   assert.equal(isMappablePlace(''), false);
 });
 
 test('maps URLs encode the query and skip empty addresses', () => {
   assert.equal(
-    mapsSearchUrl('26 Ridge St, North Sydney'),
-    'https://www.google.com/maps/search/?api=1&query=26%20Ridge%20St%2C%20North%20Sydney'
+    mapsSearchUrl('1 Example St, Exampleton'),
+    'https://www.google.com/maps/search/?api=1&query=1%20Example%20St%2C%20Exampleton'
   );
-  assert.match(mapsEmbedUrl('Northern Gastroenterology'), /output=embed/);
-  assert.match(mapsEmbedUrl('Northern Gastroenterology'), /Northern%20Gastroenterology/);
+  assert.match(mapsEmbedUrl('Example Gastroenterology'), /output=embed/);
+  assert.match(mapsEmbedUrl('Example Gastroenterology'), /Example%20Gastroenterology/);
   assert.equal(mapsSearchUrl(''), null);
   assert.equal(mapsEmbedUrl('   '), null);
 });
 
 test('createViewOnMap builds a pill and a Maps link', () => {
   const control = createViewOnMap({
-    locationName: '26 Ridge St, North Sydney NSW Australia',
-    address: '26 Ridge St, North Sydney NSW Australia',
+    locationName: '1 Example St, Exampleton NSW Australia',
+    address: '1 Example St, Exampleton NSW Australia',
     createElement: tag => el(tag)
   });
   assert.ok(control);

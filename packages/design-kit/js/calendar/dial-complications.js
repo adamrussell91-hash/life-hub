@@ -46,7 +46,7 @@ export function drawBezel(g, parent, doses = []) {
   for (const dose of doses) {
     const warn = Math.max(dose.from, dose.to - 0.75);
     const window = s('path', { class: 'dd-fx-dose', d: arcPath(cx, cy, b1 + 1.5, b2 - 1.5, dose.from, dose.to) }, group);
-    s('title', {}, window, `Dexy ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose at ${clock(dose.time)}${dose.left != null ? ` · ${duration(dose.left)} left` : ''}`);
+    s('title', {}, window, `Meds ${dose.slot === 'am' ? 'morning' : 'afternoon'} dose at ${clock(dose.time)}${dose.left != null ? ` · ${duration(dose.left)} left` : ''}`);
     if (dose.gone > dose.from) s('path', { class: 'dd-fx-dose is-gone', d: arcPath(cx, cy, b1 + 1.5, b2 - 1.5, dose.from, Math.min(dose.gone, warn)) }, group);
     if (dose.gone > warn) s('path', { class: 'dd-fx-dose is-late', d: arcPath(cx, cy, b1 + 1.5, b2 - 1.5, warn, dose.gone) }, group);
     else s('path', { class: 'dd-fx-dose is-late is-ahead', d: arcPath(cx, cy, b1 + 1.5, b2 - 1.5, warn, dose.to) }, group);
@@ -128,16 +128,16 @@ export function drawGmtHand(g, parent, { hour, label }) {
   return group;
 }
 
-/** Redacted: the evening at home shaded on the rim, and a C where Redacted is now. */
-export function drawCorey(g, parent, { hour, evening = [18, 22.5] }) {
+/** Partner: the evening at home shaded on the rim, and a P where Partner is now. */
+export function drawPartner(g, parent, { hour, evening = [18, 22.5] }) {
   const { s, cx, cy, R } = g;
-  const group = s('g', { class: 'dd-fx-Redacted', 'data-part': 'Redacted' }, parent);
-  s('path', { class: 'dd-fx-Redacted-eve', d: arcPath(cx, cy, R * 0.885, R * 0.905, evening[0], evening[1]) }, group);
+  const group = s('g', { class: 'dd-fx-partner', 'data-part': 'partner' }, parent);
+  s('path', { class: 'dd-fx-partner-eve', d: arcPath(cx, cy, R * 0.885, R * 0.905, evening[0], evening[1]) }, group);
   if (Number.isFinite(hour)) {
     const p = point(cx, cy, R * 0.8, hour + 0.9);
-    s('circle', { class: 'dd-fx-Redacted-dot', cx: f(p.x), cy: f(p.y), r: 7 }, group);
-    s('text', { class: 'dd-fx-Redacted-c', x: f(p.x), y: f(p.y + 3) }, group, 'C');
-    s('title', {}, group, `Redacted at home: ${clock(hour)}`);
+    s('circle', { class: 'dd-fx-partner-dot', cx: f(p.x), cy: f(p.y), r: 7 }, group);
+    s('text', { class: 'dd-fx-partner-c', x: f(p.x), y: f(p.y + 3) }, group, 'P');
+    s('title', {}, group, `Partner at home: ${clock(hour)}`);
   }
   return group;
 }
@@ -181,7 +181,7 @@ export function drawDress(g, parent, { items = [], pct = 0, nowHour = null, even
   for (const item of items) {
     const mid = (item.start + item.end) / 2;
     const title = `${item.title ?? ''} · ${clock(item.start)}`;
-    if (item.kind === 'Redacted') diamond(mid, R * 0.76, 4.5, { fill: '#e8cf9a', 'fill-opacity': 0.55 }, title);
+    if (item.kind === 'partner') diamond(mid, R * 0.76, 4.5, { fill: '#e8cf9a', 'fill-opacity': 0.55 }, title);
     else if (item.isClass) diamond(mid, R * 0.76, 3.6, { fill: '#e3c47d', 'fill-opacity': 0.5 }, title);
     else diamond(mid, R * 0.76, 3.6, { fill: 'none', stroke: '#e3c47d', 'stroke-opacity': 0.6, 'stroke-width': 0.9 }, title);
   }

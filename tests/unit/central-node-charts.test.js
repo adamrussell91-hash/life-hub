@@ -160,7 +160,7 @@ test('scanTrendBlocks returns the first three **Label:** blocks', () => {
     '**Exercise:**',
     '- EP is the anchor.',
     '**Health Trajectory:**',
-    '- Entocort taper.',
+    '- Medication Y taper.',
     '**Work/Energy:**',
     '- Holidays.'
   ].join('\n');

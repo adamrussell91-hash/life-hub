@@ -13,8 +13,8 @@ describe('map_places payload', () => {
       type: 'map_places',
       focus: 'a',
       places: [
-        { id: 'a', name: 'North Shore Private', lng: 151.19, lat: -33.82, kind: 'medical' },
-        { id: 'b', name: 'Prosper Nutrition', lng: 151.17, lat: -33.81 }
+        { id: 'a', name: 'Example Private', lng: 151.19, lat: -33.82, kind: 'medical' },
+        { id: 'b', name: 'Example Nutrition Clinic', lng: 151.17, lat: -33.81 }
       ]
     });
     assert.equal(ok?.places.length, 2);
@@ -31,18 +31,18 @@ describe('map_places payload', () => {
 
   it('builds medical places only when coordinates are known', () => {
     const visits = [
-      { id: 'v1', location: 'North Shore Private Hospital', location_kind: 'place' },
-      { id: 'v2', location: 'North Shore Private Hospital', location_kind: 'place' },
+      { id: 'v1', location: 'Example Private Hospital', location_kind: 'place' },
+      { id: 'v2', location: 'Example Private Hospital', location_kind: 'place' },
       { id: 'v3', location: 'Telehealth', location_kind: 'telehealth' },
       { id: 'v4', location: 'Unknown Clinic', location_kind: 'place' }
     ];
     const labels = listMedicalPlaceLabels(visits);
     assert.equal(labels.length, 2);
-    assert.equal(labels.find((l) => l.name.includes('North Shore'))?.visitIds.length, 2);
+    assert.equal(labels.find((l) => l.name.includes('Example Private'))?.visitIds.length, 2);
 
     const mapped = mapPlacesFromMedicalVisits(visits, {
       coordsByLocation: {
-        'north shore private hospital': { lng: 151.1936, lat: -33.8225 }
+        'example private hospital': { lng: 151.1936, lat: -33.8225 }
       }
     });
     assert.equal(mapped?.places.length, 1);

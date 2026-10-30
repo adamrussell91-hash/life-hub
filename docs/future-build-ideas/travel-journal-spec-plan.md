@@ -148,7 +148,7 @@ Implement durable queues, version conflicts, search, lazy media loading, export 
 
 ### 5. Optional enrichment
 
-Add photo annotations, souvenir collections, Redacted's separate perspective, transcripts and printable editions. Keep ordinary photo, text and audio access for every enhancement. Panoramas, immersive exhibitions and film generation are later options, never prerequisites.
+Add photo annotations, souvenir collections, Partner's separate perspective, transcripts and printable editions. Keep ordinary photo, text and audio access for every enhancement. Panoramas, immersive exhibitions and film generation are later options, never prerequisites.
 
 ## Candidate reusable code
 

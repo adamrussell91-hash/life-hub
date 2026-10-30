@@ -63,7 +63,7 @@ test('renderNutritionSurfaceWidgets renders meal-plan-week cards', () => {
       props: {
         title: 'Week 2026-W35',
         days: [
-          { key: 'mon', label: 'Mon', text: 'Dinner: Redacted bowl' },
+          { key: 'mon', label: 'Mon', text: 'Dinner: Meal-kit bowl' },
           { key: 'tue', label: 'Tue', text: 'Leftovers' }
         ],
         notes: 'Light lunches'

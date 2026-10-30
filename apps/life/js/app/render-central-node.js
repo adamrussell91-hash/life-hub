@@ -566,7 +566,7 @@ function renderTrain(root, model) {
     ? `Latest week: ${last.minutes} min${last.over ? '. Over the 30 min flare cap.' : '.'}`
     : '');
   setText(goal, last?.over
-    ? 'For your goal: Redacted still wants spine-loading work, but flare sessions stay 20 to 30 min. Cut the session, do not skip the week.'
+    ? 'For your goal: keep the loading work, but flare sessions stay 20 to 30 min. Cut the session, do not skip the week.'
     : 'For your goal: training is holding the flare cap.');
 }
 

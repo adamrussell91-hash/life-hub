@@ -364,7 +364,7 @@ function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
 
 /** Colour key — the same thread colours as the Health Threads strip above. */
 const THREAD_LEGEND = [
-  { thread: 'IBD', label: 'IBD / gut' },
+  { thread: 'Gut', label: 'Gut' },
   { thread: 'Liver', label: 'Liver' },
   { thread: 'Mind', label: 'Mind' },
   { thread: 'Acute', label: 'Acute' },

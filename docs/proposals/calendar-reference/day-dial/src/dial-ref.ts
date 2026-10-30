@@ -255,7 +255,7 @@ function mountDial(size: number) {
     for (const c of chipsFor(date)) {
       if (c.isClass) continue;
       const proposal = ghosts.find(g => g.overItem === c.id && g.status === 'pending');
-      calls.push({ id: c.id, hour: (c.start + c.end) / 2, height: 28, text: c.kind === 'Redacted' ? 'Redacted' : c.title.replace(/ · Dr .*$/, ''), sub: proposal ? `${proposal.agent === 'sara' ? 'Sara' : 'Hammond'}: ${proposal.label.toLowerCase()}` : c.kind === 'Redacted' ? c.title.replace(/ with Redacted$/, '') : c.meta.split(' · ')[0], cls: c.kind === 'Redacted' ? 'is-Redacted' : '' });
+      calls.push({ id: c.id, hour: (c.start + c.end) / 2, height: 28, text: c.kind === 'partner' ? 'Partner' : c.title.replace(/ · Dr .*$/, ''), sub: proposal ? `${proposal.agent === 'sara' ? 'Sara' : 'Hammond'}: ${proposal.label.toLowerCase()}` : c.kind === 'partner' ? c.title.replace(/ with Partner$/, '') : c.meta.split(' · ')[0], cls: c.kind === 'partner' ? 'is-partner' : '' });
     }
     for (const d of logDots) calls.push({ id: d.id, hour: d.h, height: 14, text: d.label, cls: d.cls === 'is-symptom' ? 'is-symptom' : 'is-meal' });
     const room = calloutRoom(size);
@@ -293,7 +293,7 @@ function mountDial(size: number) {
   }
 }
 
-const short = (t: string) => (t.length > 22 ? `${t.slice(0, 21).trimEnd()}…` : t).replace(' · Dr Redacted', '');
+const short = (t: string) => (t.length > 22 ? `${t.slice(0, 21).trimEnd()}…` : t).replace(' · Dr Rowan Example', '');
 
 function mountSide(side: HTMLElement) {
   const date = state.day;
@@ -335,7 +335,7 @@ function renderRows(wrap: HTMLElement, rows: any[], ghosts: Ghost[]) {
   for (const r of rows) {
     const row = el('div', `dd-row k-${r.kind}${r.struck ? ' is-struck' : ''}`, undefined, wrap, { 'data-part': 'row', 'data-title': r.title });
     el('div', 'dd-row__t', r.time, row);
-    const w = el('div', 'dd-row__w', `<b>${r.kind === 'Redacted' ? '<span class="dd-mark"></span>' : ''}${r.title}</b><span>${r.note}</span>`, row);
+    const w = el('div', 'dd-row__w', `<b>${r.kind === 'partner' ? '<span class="dd-mark"></span>' : ''}${r.title}</b><span>${r.note}</span>`, row);
     if (r.ghostId) {
       const g = ghosts.find(x => x.id === r.ghostId)!;
       if (r.suggestion) el('div', 'dd-suggest', `<span class="dd-av ${g.agent === 'sara' ? 'dd-av--sara' : ''}">${AGENT_INITIAL[g.agent]}</span><span>${r.suggestion}</span>`, w);

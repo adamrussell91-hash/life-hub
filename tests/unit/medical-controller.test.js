@@ -212,7 +212,7 @@ test('deleting a visit confirms through chatApi and clears the selection', async
     chatApi: {
       async confirm(next) {
         calls.push(next);
-        return { deleted: true, path: next.path, id: 'Redacted-2' };
+        return { deleted: true, path: next.path, id: 'biologic-2' };
       }
     },
     getDate: () => '2026-10-06',
@@ -221,19 +221,19 @@ test('deleting a visit confirms through chatApi and clears the selection', async
   });
   const hooks = controller.hooks(() => {});
   await hooks.onDelete({
-    id: 'Redacted-2',
-    title: 'Redacted injection',
+    id: 'biologic-2',
+    title: 'Biologic injection',
     date: '2026-11-10',
     record_type: 'Prescription',
-    path: 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md'
+    path: 'data/body/2026/11/2026-11-10-medical-biologic-injection-0000.md'
   });
   assert.equal(calls[0].kind, 'delete_log');
   assert.equal(calls[0].slug, 'sara');
-  assert.equal(calls[0].id, 'Redacted-2');
-  assert.equal(calls[0].path, 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md');
+  assert.equal(calls[0].id, 'biologic-2');
+  assert.equal(calls[0].path, 'data/body/2026/11/2026-11-10-medical-biologic-injection-0000.md');
   assert.equal(controller.filters().selectedId, null);
   assert.equal(written[0].deleted, true);
-  assert.equal(written[0].record.id, 'Redacted-2');
+  assert.equal(written[0].record.id, 'biologic-2');
 });
 
 test('deleting a visit without a path is reported and does not confirm', async () => {
@@ -246,7 +246,7 @@ test('deleting a visit without a path is reported and does not confirm', async (
     onError: message => errors.push(message)
   });
   const hooks = controller.hooks(() => {});
-  await hooks.onDelete({ id: 'Redacted-2', title: 'Redacted injection', date: '2026-11-10' });
+  await hooks.onDelete({ id: 'biologic-2', title: 'Biologic injection', date: '2026-11-10' });
   assert.equal(calls.length, 0);
   assert.equal(errors.length, 1);
 });

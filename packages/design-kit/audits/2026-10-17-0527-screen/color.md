@@ -523,7 +523,7 @@ Every `color`, `background`, `fill`, `stroke`, `border`, and `box-shadow` declar
 | kit | `packages/design-kit/calendar-almanac.css:101` | background | `.alm-opens` | `color-mix(in srgb,#fff 40%,transparent)` |
 | kit | `packages/design-kit/calendar-almanac.css:103` | background | `.alm-open` | `#fff` |
 | kit | `packages/design-kit/calendar-almanac.css:106` | background | `.alm-open.is-held` | `color-mix(in srgb,var(--pastel-sage) calc(var(--held) * 35%),#fff)` |
-| kit | `packages/design-kit/calendar-almanac.css:109` | background | `.alm-open.is-Redacted` | `linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))` |
+| kit | `packages/design-kit/calendar-almanac.css:109` | background | `.alm-open.is-partner` | `linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))` |
 | kit | `packages/design-kit/calendar-almanac.css:130` | color | `.alm-toast` | `#fff` |
 | kit | `packages/design-kit/calendar-almanac.css:137` | background | `.alm-list__line` | `#fff` |
 | kit | `packages/design-kit/calendar-almanac.css:141` | background | `.alm-list__dot` | `#fff` |
@@ -553,7 +553,7 @@ Every `color`, `background`, `fill`, `stroke`, `border`, and `box-shadow` declar
 | kit | `packages/design-kit/calendar-day-dial.css:267` | stroke | `.dd-fx-pip` | `#fff` |
 | kit | `packages/design-kit/calendar-day-dial.css:274` | fill | `.dd-fx-tb-window` | `#fff` |
 | kit | `packages/design-kit/calendar-day-dial.css:279` | stroke | `.dd-fx-gmt-label` | `#fff` |
-| kit | `packages/design-kit/calendar-day-dial.css:281` | fill | `.dd-fx-Redacted-c` | `#fff` |
+| kit | `packages/design-kit/calendar-day-dial.css:281` | fill | `.dd-fx-partner-c` | `#fff` |
 | kit | `packages/design-kit/calendar-day-dial.css:296` | stroke | `.dd-due.is-done` | `color-mix(in srgb,var(--pastel-sage-ink) 40%,#fff)` |
 | kit | `packages/design-kit/calendar-readiness.css:34` | background | `.rf-head` | `color-mix(in srgb, var(--rf-c, var(--rf-cloud)) 10%, #fff)` |
 | kit | `packages/design-kit/calendar-readiness.css:85` | background | `.rf-window` | `color-mix(in srgb, var(--rf-c) 8%, #fff)` |
@@ -565,14 +565,14 @@ Every `color`, `background`, `fill`, `stroke`, `border`, and `box-shadow` declar
 | kit | `packages/design-kit/calendar-readiness.css:171` | background | `.rf--home` | `var(--hub-glass-fill, #fff)` |
 | kit | `packages/design-kit/calendar-term-river.css:43` | stroke | `.tr-point` | `#fff` |
 | kit | `packages/design-kit/calendar-term-river.css:44` | fill | `.tr-point.k-teacher` | `color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff)` |
-| kit | `packages/design-kit/calendar-term-river.css:46` | fill | `.tr-point.k-Redacted.is-sample` | `color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff)` |
+| kit | `packages/design-kit/calendar-term-river.css:46` | fill | `.tr-point.k-partner.is-sample` | `color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff)` |
 | kit | `packages/design-kit/calendar-term-river.css:50` | fill | `.tr-point.k-body` | `#fff` |
 | kit | `packages/design-kit/calendar-term-river.css:55` | fill | `.tr-agent text` | `#fff` |
 | kit | `packages/design-kit/calendar-term-river.css:68` | fill | `.tr-load.is-hol` | `color-mix(in srgb,var(--pastel-sage) 80%,#fff)` |
 | kit | `packages/design-kit/calendar-term-river.css:75` | fill | `.tr-today text` | `#fff` |
 | kit | `packages/design-kit/calendar-term-river.css:97` | color | `.tr-toast` | `#fff` |
 | kit | `packages/design-kit/calendar-term-river.css:102` | background | `.tr-list__lane` | `#fff` |
-| kit | `packages/design-kit/calendar-term-river.css:103` | background | `.tr-list__lane.is-Redacted` | `linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))` |
+| kit | `packages/design-kit/calendar-term-river.css:103` | background | `.tr-list__lane.is-partner` | `linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))` |
 | kit | `packages/design-kit/calendar-term-river.css:109` | color | `.tr-list__item.is-ghost .tr-list__t::before` | `#fff` |
 | kit | `packages/design-kit/calendar-tideline.css:50` | color | `.cal-av` | `#fff` |
 | kit | `packages/design-kit/calendar-tideline.css:99` | color | `.cal-head.is-today .cal-head__num` | `#fff` |
@@ -587,7 +587,7 @@ Every `color`, `background`, `fill`, `stroke`, `border`, and `box-shadow` declar
 | kit | `packages/design-kit/calendar-tideline.css:202` | background | `.cal-tick` | `#fff` |
 | kit | `packages/design-kit/calendar-tideline.css:204` | background | `.cal-tick:hover` | `color-mix(in srgb,var(--pastel-sage) 60%,#fff)` |
 | kit | `packages/design-kit/calendar-tideline.css:207` | border | `.cal-tick.is-done::before` | `solid #fff` |
-| kit | `packages/design-kit/calendar-tideline.css:210` | background | `.cal-chip.is-Redacted` | `linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach))` |
+| kit | `packages/design-kit/calendar-tideline.css:210` | background | `.cal-chip.is-partner` | `linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach))` |
 | kit | `packages/design-kit/calendar-tideline.css:258` | color | `.cal-toast` | `#fff` |
 | kit | `packages/design-kit/calendar-tideline.css:262` | border | `.cal-toast button` | `1px solid #fff` |
 | kit | `packages/design-kit/calendar-tideline.css:262` | background | `.cal-toast button` | `#fff` |

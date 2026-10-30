@@ -11,8 +11,8 @@ test('explainerFor returns seeded copy for CRP and related markers', () => {
 
 test('explainerFor calprotectin names gut inflammation without stool language', () => {
   const copy = explainerFor('calprotectin');
-  assert.match(copy.what, /gut|mucosal|Redacted/i);
-  assert.match(copy.high, /mucosal|inflammation|Redacted/i);
+  assert.match(copy.what, /gut|mucosal/i);
+  assert.match(copy.high, /mucosal|inflammation/i);
   const blob = `${copy.what} ${copy.why} ${copy.high} ${copy.low}`;
   assert.doesNotMatch(blob, /stool|faecal|fecal/i);
 });

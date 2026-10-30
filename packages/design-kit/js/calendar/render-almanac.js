@@ -29,13 +29,13 @@ const HOLD_LABEL = {
 const WAVE_NOTES = [
   ['2026-10-03', 'holidays refill you', -10],
   ['2026-11-22', 'report-writing dip (your T2 pattern)', 20],
-  ['2026-12-31', 'Korea', -10]
+  ['2026-12-31', 'trip', -10]
 ];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** Reference habit card. It is not on the Almanac API; the session count is still computed. */
 const HABIT = Object.freeze({
-  id: 'korean',
-  title: 'Korean for travellers',
+  id: 'trip-language',
+  title: 'Language for the trip',
   minutes: 20,
   perWeek: 3,
   from: '2026-09-28',
@@ -911,10 +911,10 @@ function paint(doc, host, view, options) {
     lab(118, 'Anchors', 'things already fixed');
     lab(186, 'Forecast you', 'capacity from your logs');
     if (view.medication) {
-      // Dexy context sits under the label: short lines, the full sentence on hover.
+      // Medication context sits under the label: short lines, the full sentence on hover.
       const med = view.medication;
       const extra = [med.skipped ? `${med.skipped} skipped` : '', med.unlogged ? `${med.unlogged} not logged` : ''].filter(Boolean).join(' · ');
-      const note = s('text', { class: 'alm-t-sub alm-t-dex', x: ALM.labelX, y: 186 + 32, 'data-part': 'dex-context' }, back, `Dexy ${med.taken}/${med.days} days`);
+      const note = s('text', { class: 'alm-t-sub alm-t-dex', x: ALM.labelX, y: 186 + 32, 'data-part': 'dex-context' }, back, `Meds ${med.taken}/${med.days} days`);
       s('title', {}, note, `${med.summary}. Days after a skipped dose are drawn lighter, not lower.`);
       if (extra) s('text', { class: 'alm-t-sub alm-t-dex', x: ALM.labelX, y: 186 + 46 }, back, extra);
     }
@@ -955,7 +955,7 @@ function paint(doc, host, view, options) {
     const line = view.series.map((point, index) => `${index ? 'L' : 'M'}${pt(index, point.pct)}`).join(' ');
     s('path', { class: 'alm-wave-area', d: `${line} L${pt(N - 1, 0)} L${pt(0, 0)} Z` }, wave);
     s('path', { class: 'alm-wave-band', d: `${up} ${down} Z` }, wave);
-    // Days after a skipped Dexy dose: the band is washed out (less certain), the number stays.
+    // Days after a skipped medication dose: the band is washed out (less certain), the number stays.
     // Runs of days merge; each run is at least 6px so a single day reads at year scale.
     const lighter = (view.medication?.lighter ?? []).filter(date => indexOf.has(date)).map(date => idx(date)).sort((a, b) => a - b);
     const runs = [];
@@ -981,7 +981,7 @@ function paint(doc, host, view, options) {
         rx: 2
       }, wave);
       const label = run.from === run.to ? dd(view.series[run.from].date) : `${dd(view.series[run.from].date)} – ${dd(view.series[run.to].date)}`;
-      s('title', {}, light, `${label}: after a skipped Dexy dose. Forecast drawn lighter, not lower.`);
+      s('title', {}, light, `${label}: after a skipped medication dose. Forecast drawn lighter, not lower.`);
     }
     s('line', { class: 'alm-wave-soften', x1: ALM.x0, x2: X(view.to), y1: Y(ALM.wave.softenPct), y2: Y(ALM.wave.softenPct) }, wave);
     s('text', { class: 'alm-t-soften', x: X(view.to), y: Y(ALM.wave.softenPct) + 14 }, wave, '40%');
@@ -1143,16 +1143,16 @@ function paint(doc, host, view, options) {
     for (const opening of view.openings) {
       if (!opening.dates?.length) continue;
       if (opening.held) state.held.add(opening.wantId);
-      const Redacted = opening.with === 'Redacted';
+      const partner = opening.with === 'partner';
       const held = opening.held === true || state.held.has(opening.wantId);
-      const article = el('article', `alm-open${Redacted ? ' is-Redacted' : ''}${held ? ' is-held' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
+      const article = el('article', `alm-open${partner ? ' is-partner' : ''}${held ? ' is-held' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
       const when = el('div', 'alm-open__when', article);
       const whenLabel = el('span', '', when);
       whenLabel.textContent = whenText(opening);
       const pct = el('b', '', when);
       pct.textContent = `${opening.pct}%`;
       const title = el('h5', '', article);
-      if (Redacted) el('span', 'alm-mark', title);
+      if (partner) el('span', 'alm-mark', title);
       title.append(doc.createTextNode(opening.title ?? ''));
       const why = el('p', '', article);
       why.textContent = WANT_WHY[opening.wantId] ?? '';
@@ -1183,9 +1183,9 @@ function paint(doc, host, view, options) {
     const habitTitle = el('h5', '', habit);
     habitTitle.textContent = HABIT.title;
     const habitWhy = el('p', '', habit);
-    habitWhy.textContent = `${HABIT.minutes} min, ${HABIT.perWeek} times a week is about ${sessions} sessions before Seoul. ${HABIT.why}`;
+    habitWhy.textContent = `${HABIT.minutes} min, ${HABIT.perWeek} times a week is about ${sessions} sessions before the trip. ${HABIT.why}`;
     const habitButtons = el('div', 'alm-open__btns', habit);
-    const plan = el('button', 'btn btn--secondary', habitButtons, { type: 'button', 'data-open': 'korean', 'data-act': 'plan' });
+    const plan = el('button', 'btn btn--secondary', habitButtons, { type: 'button', 'data-open': 'trip-language', 'data-act': 'plan' });
     plan.textContent = 'Plan it with Hammond';
   }
 

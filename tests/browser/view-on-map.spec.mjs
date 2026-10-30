@@ -46,7 +46,7 @@ test('medical sheet View on Map morphs into an embedded map', async () => {
     await page.getByRole('button', { name: /View medical/ }).click();
     await page.locator('#body-medical-dashboard').waitFor({ state: 'visible' });
     const card = page.locator('#medical-timeline [data-visit-id]').filter({
-      hasText: 'Redacted'
+      hasText: 'Avery Quill'
     });
     await card.waitFor();
     await card.click();

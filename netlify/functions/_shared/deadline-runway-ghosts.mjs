@@ -179,7 +179,7 @@ function partsFor(minutes, maxBlock, minBlock) {
  * (`task_block`) on the best-capacity day in the few days before it is due.
  *
  * Never: on a day forecast under 40%; more than two a day; into lessons, meetings, walls,
- * Redacted, protected time, iCloud events or other blocks; before an open blocker is due
+ * Partner, protected time, iCloud events or other blocks; before an open blocker is due
  * (a blocker with no date means nothing is placed). Tasks that need a run-up get evening
  * slots of 45 min or more on school days, never the gaps between classes.
  * Tasks due within 48 h keep the old default of 60 min when they have no estimate.

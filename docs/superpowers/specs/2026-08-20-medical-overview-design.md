@@ -47,7 +47,7 @@ New record `type: "medical"`. Domain stays `body` so the canonical path regex do
 ```yaml
 ---
 schema_version: 1
-id: "notion-medical-2026-05-27-gastro-Redacted"
+id: "notion-medical-2026-05-27-gastro-pike"
 type: "medical"
 date: "2026-05-27"
 date_end: null
@@ -58,10 +58,10 @@ source: "notion_import"
 title: "Gastroenterologist Follow-up"
 record_type: "Appointment"
 lane: "appointment"
-provider: "Dr Redacted"
-location: "Northern Gastroenterology"
+provider: "Dr Rowan Pike"
+location: "Example Gastroenterology"
 location_kind: "place"
-notes: "Review Entocort response, calprotectin results."
+notes: "Review Medication Y response, calprotectin results."
 follow_up_date: null
 cost_aud: null
 insurance_status: "Not Started"
@@ -84,7 +84,7 @@ episode: null
 | `location_kind` | `place` \| `telehealth` \| `unknown`. Telehealth if location/title matches Zoom, video, phone, telehealth |
 | `notes` | Body text. Overview lives here. `Meeting Name` / `Notes and Follow Up` columns append if they add new text |
 | `follow_up_date` | `YYYY-MM-DD` or omit. This is a date on the same record, not a second event |
-| `cost_aud` | Finite number or omit. Parse `A$160.00` → `160` |
+| `cost_aud` | Finite number or omit. Parse `A$150.00` → `160` |
 | `insurance_status` | String or omit |
 | `episode` | `null` or `{ id, title }`. Import does not invent episodes |
 
@@ -103,7 +103,7 @@ Kit pastels only. Connector, spine dot, and card left rule use the pastel fill; 
 | `referral` | `--pastel-lilac` | `Referral` |
 | `vaccine` | `--pastel-gold` | `Vaccination` |
 | `dental` | `--pastel-gold` | Title/provider/location matches dentist, dentistry, dental |
-| `therapy` | `--pastel-lilac` | Title/provider matches therapy, psychologist, psychology, Redacted |
+| `therapy` | `--pastel-lilac` | Title/provider matches therapy, psychologist, psychology, Avery Quill |
 | `eye` | `--pastel-blue` | Title/provider/location matches eye, optom, eyecare |
 | `appointment` | `--pastel-blue` | Default for `Appointment` / `Consultation` |
 
@@ -216,7 +216,7 @@ Do not ship a Notion-dependent runtime. Do not split Sara’s authority into a l
 
 1. Unchanged page header (HISTORY / Medical Overview / ← Body / date pill)
 2. **Three equal cards:** Health Brief · Active Episode · Next
-3. **Health Threads strip** (full content width): IBD / Liver / Mind / Acute lanes, pinchable zoom, TODAY line
+3. **Health Threads strip** (full content width): Gut / Marker watch / Mind / Acute lanes, pinchable zoom, TODAY line
 4. Toolbar (search · Type · Practitioner · density · Show minor · Places · Add)
 5. **Weighted River:** UPCOMING → TODAY → past; major / routine / minor weights; episode `<details>` bands; mini lab panel via Bloods `markerRow({ compact: true })`
 
@@ -230,7 +230,7 @@ Phone (< 720px): cards stack Brief → Episode → Next; strip accordion starts 
 | `record_type: Symptom` + lane `symptom` | Feeling language without visit/provider words |
 | `status` | `planned` \| `to_book` \| `booked` \| `done` |
 | `date_precision` | `day` \| `month` \| `tbd` |
-| `cadence_days` | e.g. Redacted = 56 → virtual next dose in the model (never stored) |
+| `cadence_days` | e.g. Biologic = 56 → virtual next dose in the model (never stored) |
 | `task_id` | Link to Tasks Hub when Next “Add to Tasks” runs |
 | `episode.{status,started,resolved}` | Active episode card + river band; auto soft-resolve after 7 quiet days |
 

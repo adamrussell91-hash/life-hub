@@ -1,7 +1,7 @@
 /**
  * Term River: the term (or year) as identity lanes, a body line and a weekly load strip.
  *
- * Lanes are Adam's identities in the order About Me ranks them: teacher, Redacted (partner),
+ * Lanes are Adam's identities in the order About Me ranks them: teacher, partner,
  * scholar, friends and family. Body runs underneath as the capacity line. Every item on
  * the calendar lands in exactly one lane; nothing is lost and nothing is duplicated.
  *
@@ -13,8 +13,8 @@
 
 export const LANES = Object.freeze([
   Object.freeze({ id: 'teacher', label: 'Teacher', sub: 'classes · HPGE · MindWorks' }),
-  Object.freeze({ id: 'Redacted', label: 'Redacted', sub: 'comes first' }),
-  Object.freeze({ id: 'scholar', label: 'Scholar', sub: 'UNSW done · UOW hum' }),
+  Object.freeze({ id: 'partner', label: 'Partner', sub: 'comes first' }),
+  Object.freeze({ id: 'scholar', label: 'Scholar', sub: 'one degree done · the next one humming' }),
   Object.freeze({ id: 'friends', label: 'Friends & family', sub: 'Newcastle · Bob' }),
   Object.freeze({ id: 'body', label: 'Body', sub: 'capacity from your logs' })
 ]);
@@ -145,7 +145,7 @@ const FRIENDS = /\b(bob|ruby|fletcher|taylor|donna|joe|newcastle|friends?|family
 /**
  * Which lane an item belongs to. First match wins, in this order:
  * 1. An explicit `lane` on the item.
- * 2. Redacted: calendar_block kind Redacted, or `with: 'Redacted'`.
+ * 2. Partner: calendar_block kind partner, or `with: 'partner'`.
  * 3. Body: medical records and appointments, symptoms, sleep, rest blocks.
  * 4. Scholar: study anchors (dream, graduation, tags 'study'), or study words.
  * 5. Friends & family: named people or the friends/family words.
@@ -155,7 +155,7 @@ export function laneFor(item) {
   if (item?.lane && LANES.some(l => l.id === item.lane)) return item.lane;
   const type = item?.type ?? '';
   const text = `${item?.title ?? ''} ${item?.sub ?? ''}`;
-  if ((type === 'calendar_block' && item.kind === 'Redacted') || item?.with === 'Redacted' || item?.kind === 'Redacted') return 'Redacted';
+  if ((type === 'calendar_block' && item.kind === 'partner') || item?.with === 'partner' || item?.kind === 'partner') return 'partner';
   if (type === 'medical' || type === 'sleep' || item?.kind === 'rest' || item?.kind === 'health' || item?.symptom) return 'body';
   const tags = item?.tags ?? [];
   if (item?.kind === 'dream' || tags.includes('graduation') || tags.includes('study') || STUDY.test(text)) return 'scholar';

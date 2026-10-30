@@ -3,7 +3,7 @@
  * No AI. Runs every 10 minutes; most runs end after one Blob read (no devices, or
  * nothing due).
  *
- *   dexy   — a usual dose (learned from Adam's logs) is 30–60 min overdue with no log
+ *   meds   — a usual dose (learned from Adam's logs) is 30–60 min overdue with no log
  *   review — the train-home pass: school day, around leave time, review not done
  *   bookmark — a task's work block (30 min+) ends within 10 min: leave a way back in (max 2/day)
  *   walkthru — a lesson with a WalkThru note ended within 10 min and its rep isn't logged (max 2/day)
@@ -76,9 +76,9 @@ export function decideNotifications({ today, nowHour, nowMs = Date.now(), med, s
     if (unsent(key)) {
       out.push({
         key,
-        title: 'Dexy',
+        title: 'Medication',
         body: `No ${med.prompt.slot === 'am' ? 'morning' : 'afternoon'} dose logged yet. You usually take it around ${clock(med.prompt.usual)}.`,
-        url: '/#/calendar/day?sheet=dexy'
+        url: '/#/calendar/day?sheet=meds'
       });
     }
   }
@@ -160,7 +160,7 @@ export function todaysTaskBlocks(rows, today) {
     });
 }
 
-/** Dose logs from the data repo: all dex files in the last four weeks (small). */
+/** Dose logs from the data repo: all dose files in the last four weeks (small). */
 async function loadDoseLogs(client, decodeBlob, today) {
   const tree = await client.resolveTree();
   const since = new Date(Date.parse(`${today}T00:00:00Z`) - 28 * 86_400_000).toISOString().slice(0, 10);
@@ -193,7 +193,7 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
   const log = await readPushLog(store, today);
   if (Object.keys(log.sent).length >= PUSH_DAILY_CAP) return { sent: [], skipped: 'cap' };
 
-  // Usual dose times: computed once a day (reads the dex files), then reused.
+  // Usual dose times: computed once a day (reads the dose files), then reused.
   // Sprint challenge docs: same — one GitHub open shared across dose + sprints.
   let repoHandle = null;
   const ensureRepo = async () => {

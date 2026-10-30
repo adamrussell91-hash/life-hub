@@ -1,11 +1,36 @@
 import { buildFitnessGoals } from './fitness-charts-model.js';
 import { formatDisplayDate } from '../core/time.js';
+import { bodyCompositionTargets, strengthTargets } from '../core/forecast-targets.js';
 
-// Standing recomp box from Constraints. Shoulder:waist is physique-target.yml.
+// The recomp box, shoulder:waist target and lift deadline come from
+// config/targets.yml `forecast` (private data repo). No numbers live here.
 // These are gaps to a band, not a time-to-goal. A date needs a slope this data does not have.
-const WEIGHT = { min: 78, max: 82 };
-const FAT = { min: 8, max: 10 };
-const SHOULDER_WAIST = 1.6;
+function finite(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function goalTargets(targetsConfig) {
+  const body = bodyCompositionTargets(targetsConfig) ?? {};
+  const deadline = strengthTargets(targetsConfig).deadline;
+  return {
+    weight: { min: finite(body.weight_kg_min), max: finite(body.weight_kg_max) },
+    fat: { min: finite(body.body_fat_pct_min), max: finite(body.body_fat_pct_max) },
+    ratio: finite(body.shoulder_waist_ratio),
+    deadline: deadline && /^\d{4}-\d{2}-\d{2}$/.test(deadline) ? deadline : null
+  };
+}
+
+function deadlineLabel(iso) {
+  if (!iso) return null;
+  const [, month, day] = iso.split('-').map(Number);
+  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${day} ${names[month - 1]}`;
+}
+
+function hasBand(band) {
+  return band.min != null && band.max != null;
+}
 
 function records(events, date) {
   return (events ?? [])
@@ -33,7 +58,10 @@ function bandStatus(value, min, max) {
   return { status: 'inside', gap: 0, edge: 'inside', bound: null };
 }
 
-function weightRow(list) {
+function weightRow(list, WEIGHT) {
+  if (!hasBand(WEIGHT)) {
+    return { id: 'weight', label: 'Weight', status: 'unread', detail: 'No weight target set.' };
+  }
   const record = latest(
     list.filter(item => (
       (item.type === 'weight' || item.type === 'composition') && Number.isFinite(item.weight_kg)
@@ -50,7 +78,10 @@ function weightRow(list) {
   return { id: 'weight', label: 'Weight', status: band.status, detail };
 }
 
-function fatRow(list) {
+function fatRow(list, FAT) {
+  if (!hasBand(FAT)) {
+    return { id: 'fat', label: 'Body fat', status: 'unread', detail: 'No body-fat target set.' };
+  }
   const record = latest(
     list.filter(item => item.type === 'composition' && Number.isFinite(item.body_fat_pct)),
     () => true
@@ -65,7 +96,10 @@ function fatRow(list) {
   return { id: 'fat', label: 'Body fat', status: band.status, detail };
 }
 
-function ratioRow(list) {
+function ratioRow(list, SHOULDER_WAIST) {
+  if (SHOULDER_WAIST == null) {
+    return { id: 'ratio', label: 'Shoulder:waist', status: 'unread', detail: 'No shoulder:waist target set.' };
+  }
   const record = latest(
     list.filter(item => (
       item.type === 'measurements'
@@ -124,32 +158,32 @@ function liftRow(events, date, targetsConfig) {
   };
 }
 
-function judge(rows) {
+function judge(rows, targets) {
   const fat = rows.find(row => row.id === 'fat');
   const weight = rows.find(row => row.id === 'weight');
   const ratio = rows.find(row => row.id === 'ratio');
   const lift = rows.find(row => row.id === 'lift');
   const liftsOpen = lift.status === 'outside' || lift.status === 'unread';
   const conflict = fat.status === 'outside' && liftsOpen
-    ? ' This reading serves the fat band, not the 31 October lifts.'
+    ? (targets.deadline ? ` This reading serves the fat band, not the ${deadlineLabel(targets.deadline)} lifts.` : ' This reading serves the fat band, not the lifts.')
     : '';
 
   if (fat.status === 'outside') {
     return {
       bindingId: 'fat',
-      verdict: `Body fat is binding. It is outside 8–10%, so the recomp box is not met.${conflict}`
+      verdict: `Body fat is binding. It is outside ${targets.fat.min}–${targets.fat.max}%, so the recomp box is not met.${conflict}`
     };
   }
   if (weight.status === 'outside') {
     return {
       bindingId: 'weight',
-      verdict: 'Weight is binding. Body fat is not the open gap, and weight is outside 78–82 kg.'
+      verdict: `Weight is binding. Body fat is not the open gap, and weight is outside ${targets.weight.min}–${targets.weight.max} kg.`
     };
   }
   if (ratio.status === 'outside') {
     return {
       bindingId: 'ratio',
-      verdict: 'Shoulder:waist is binding. Weight and body fat are in band, and the ratio is still short of 1.6.'
+      verdict: `Shoulder:waist is binding. Weight and body fat are in band, and the ratio is still short of ${targets.ratio}.`
     };
   }
   if (lift.status === 'outside') {
@@ -168,6 +202,12 @@ function judge(rows) {
 export function buildBindingGoal({ events, date, targetsConfig = null } = {}) {
   if (!date) throw new RangeError('Binding goal date is unavailable');
   const list = records(events, date);
-  const rows = [weightRow(list), fatRow(list), ratioRow(list), liftRow(events, date, targetsConfig)];
-  return { rows, ...judge(rows) };
+  const targets = goalTargets(targetsConfig);
+  const rows = [
+    weightRow(list, targets.weight),
+    fatRow(list, targets.fat),
+    ratioRow(list, targets.ratio),
+    liftRow(events, date, targetsConfig)
+  ];
+  return { rows, ...judge(rows, targets) };
 }

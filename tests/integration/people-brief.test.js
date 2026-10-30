@@ -104,7 +104,7 @@ test('404s an unknown person id', async () => {
 test('successful response has the full expected shape for a known person', async () => {
   const store = memoryStore();
   const professionalStore = memoryStore();
-  const person = await makePerson(store, { display_name: 'Redacted' });
+  const person = await makePerson(store, { display_name: 'Riley Example' });
 
   // Full resolver (person/organisation/task/meeting) so the meeting create
   // flow below can resolve both its own endpoint and the attendee's.
@@ -148,7 +148,7 @@ test('successful response has the full expected shape for a known person', async
   assert.equal(response.status, 200);
   const body = (await response.json()).data;
 
-  assert.equal(body.header.person.display_name, 'Redacted');
+  assert.equal(body.header.person.display_name, 'Riley Example');
   assert.equal(body.header.next_interaction.title, 'Coffee meeting');
   assert.equal(body.header.next_interaction.location, 'Uni Cafe');
   assert.equal(typeof body.who_they_are, 'string');
@@ -162,7 +162,7 @@ test('successful response has the full expected shape for a known person', async
 test('POST ?action=generate 503s with people_anthropic_unbound when ANTHROPIC_API_KEY is absent', async () => {
   const store = memoryStore();
   const professionalStore = memoryStore();
-  const person = await makePerson(store, { display_name: 'Redacted' });
+  const person = await makePerson(store, { display_name: 'Riley Example' });
   const handler = createPeopleBriefHandler(baseDeps(store, professionalStore));
   const response = await handler(
     request({ url: `${URL_BASE}?id=${person.id}&action=generate`, method: 'POST' })
@@ -176,7 +176,7 @@ test('POST ?action=generate 503s with people_anthropic_unbound when ANTHROPIC_AP
 test('POST with an unsupported action 400s', async () => {
   const store = memoryStore();
   const professionalStore = memoryStore();
-  const person = await makePerson(store, { display_name: 'Redacted' });
+  const person = await makePerson(store, { display_name: 'Riley Example' });
   const handler = createPeopleBriefHandler(baseDeps(store, professionalStore));
   const response = await handler(
     request({ url: `${URL_BASE}?id=${person.id}&action=nonsense`, method: 'POST' })
@@ -199,7 +199,7 @@ test('POST ?action=generate 400s a missing id', async () => {
 test('POST ?action=generate succeeds with an injected fake complete()', async () => {
   const store = memoryStore();
   const professionalStore = memoryStore();
-  const person = await makePerson(store, { display_name: 'Redacted', created_at: '2026-01-01T00:00:00.000Z' });
+  const person = await makePerson(store, { display_name: 'Riley Example', created_at: '2026-01-01T00:00:00.000Z' });
 
   const observationRepo = createObservationRepository({ store: professionalStore });
   await observationRepo.createObservation({
@@ -237,7 +237,7 @@ test('POST ?action=generate succeeds with an injected fake complete()', async ()
 test('POST ?action=generate returns a clean 502 (not a 500 crash) on malformed generated JSON', async () => {
   const store = memoryStore();
   const professionalStore = memoryStore();
-  const person = await makePerson(store, { display_name: 'Redacted' });
+  const person = await makePerson(store, { display_name: 'Riley Example' });
 
   const complete = async () => 'not valid JSON at all';
 

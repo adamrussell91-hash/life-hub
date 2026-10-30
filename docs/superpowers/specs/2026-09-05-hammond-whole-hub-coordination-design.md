@@ -176,7 +176,7 @@ Never:
 
 Observation, not instruction — same rule as the 2026-08-19 Mind spec:
 
-- `Clare→Hammond: 11 open tasks due this week, two collide with the Redacted’s rest flag.`
+- `Clare→Hammond: 11 open tasks due this week, two collide with the Condition A’s rest flag.`
 - `Ann→Hammond: 11PSYCHA double period Thursday sits on the flare rest flag.`
 - `Hammond→Clare: flare constraint still active — do not stack evening deep-work after 21:00 this week.`
 - `Hammond→Ann: flare constraint still active — do not add a third after-school rehearsal this week.`

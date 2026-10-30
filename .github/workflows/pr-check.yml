@@ -6,6 +6,8 @@ name: PR check
 on:
   pull_request:
     branches: [main]
+    # edited: re-run when the title or body changes, so the privacy guard sees it.
+    types: [opened, synchronize, reopened, edited]
 
 concurrency:
   group: pr-check-${{ github.event.pull_request.number }}
@@ -38,3 +40,9 @@ jobs:
       - run: npm run pre-pr-check
         env:
           PRE_PR_BASE: HEAD^1
+          # The privacy guard's private denylist (real names, clinicians,
+          # medications, schools). Findings never print the matched term.
+          PRIVACY_DENYLIST: ${{ secrets.PRIVACY_DENYLIST }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PRIVACY_SCAN_TEXT_ENV: PR_TITLE,PR_BODY

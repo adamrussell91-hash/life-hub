@@ -51,12 +51,12 @@ test('builds the approved Home fixture model through core modules', async () => 
     snack: { protein_g: 0 },
     dessert: { protein_g: 0 }
   });
-  assert.equal(model.targets.calories, 1900);
+  assert.equal(model.targets.calories, 2200);
   assert.equal(model.dayType, 'workout_30');
   assert.deepEqual(model.progress, {
-    calories: 59,
-    protein: 67,
-    fat: 54
+    calories: 51,
+    protein: 73,
+    fat: 39
   });
   assert.ok(model.forecastCards?.paths);
   assert.ok(model.forecastCards?.stimulus);
@@ -93,14 +93,14 @@ test('overFatCeiling is true on Home when fat exceeds the daily ceiling', () => 
   const heavyToday = [{
     record: {
       type: 'meal', date: '2026-07-30', meal: 'dinner',
-      calories: 800, protein_g: 40, fat_g: 55,
+      calories: 800, protein_g: 40, fat_g: 75,
       sodium_mg: 100, calcium_mg: 50, polyphenol_score: 1
     },
     body: '', path: '', legacy: false
   }];
   const model = buildHomeModel({ events: heavyToday, targetsConfig, date: '2026-07-30' });
-  assert.equal(model.nutrition.fat_g, 55);
-  assert.equal(model.targets.fat_ceiling_g, 50);
+  assert.equal(model.nutrition.fat_g, 75);
+  assert.equal(model.targets.fat_ceiling_g, 70);
   assert.equal(model.overFatCeiling, true);
 });
 

@@ -1,9 +1,9 @@
 /**
  * Term River reference data. Today = Thu 24/09/26. Two zooms:
  *   Term: T3 W9 → T4 W3 (14/09/26 – 01/11/26)
- *   Year: 20/07/26 – 10/01/27 (Term 3 start → home from Korea)
+ *   Year: 20/07/26 – 10/01/27 (Term 3 start → home from the trip)
  * Anchors and dates come from central-node.md and the other stops' fixtures. Projects come
- * from the Unified Timeline fixture. Past Redacted evenings are illustrative (`sample: true`).
+ * from the Unified Timeline fixture. Past Partner evenings are illustrative (`sample: true`).
  */
 
 export const TODAY = '2026-09-24';
@@ -20,11 +20,11 @@ export type Item = {
   id: string; title: string; sub?: string; type?: string; kind?: string; with?: string; lane?: string; tags?: string[];
   date?: string; from?: string; to?: string; start?: string; end?: string;
   shape: 'bar' | 'point' | 'diamond' | 'hum' | 'marker'; protected?: boolean; sample?: boolean;
-  ghost?: { agent: 'hammond' | 'sara'; kind: 'protect_block'; date: string; start: string; end: string; title: string; with?: 'Redacted' };
+  ghost?: { agent: 'hammond' | 'sara'; kind: 'protect_block'; date: string; start: string; end: string; title: string; with?: 'partner' };
 };
 
-const coreyEvenings: Item[] = ['2026-09-14', '2026-09-16', '2026-09-17', '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24'].map(d => ({
-  id: `Redacted-${d}`, title: 'Tea + TV', type: 'calendar_block', kind: 'Redacted', date: d, start: '19:30', end: '21:30', shape: 'point', protected: true, sample: true
+const partnerEvenings: Item[] = ['2026-09-14', '2026-09-16', '2026-09-17', '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24'].map(d => ({
+  id: `partner-${d}`, title: 'Tea + TV', type: 'calendar_block', kind: 'partner', date: d, start: '19:30', end: '21:30', shape: 'point', protected: true, sample: true
 }));
 
 export const ITEMS: Item[] = [
@@ -37,13 +37,13 @@ export const ITEMS: Item[] = [
   { id: 'pd', title: 'PD · Hard conversations', type: 'professional_event', date: '2026-09-25', start: '08:30', end: '10:30', shape: 'point' },
   { id: 't4-class', title: 'Y11 becomes Y12 · one class', type: 'marker', date: '2026-10-13', shape: 'marker' },
   { id: 'reports', title: 'Reports due', type: 'task', date: '2026-11-27', shape: 'point' },
-  // Redacted
-  ...coreyEvenings,
-  { id: 'good-night', title: 'Good night: dinner out + a show', type: 'calendar_block', kind: 'Redacted', date: '2026-10-02', start: '18:00', end: '22:00', shape: 'point', protected: true, sub: 'held' },
-  { id: 'g-day-trip', title: 'Blue Mountains day trip', kind: 'Redacted', with: 'Redacted', date: '2026-10-08', start: '09:00', end: '18:00', shape: 'point',
-    ghost: { agent: 'hammond', kind: 'protect_block', date: '2026-10-08', start: '09:00', end: '18:00', title: 'Blue Mountains day trip', with: 'Redacted' }, sub: 'comforting adventure' },
+  // Partner
+  ...partnerEvenings,
+  { id: 'good-night', title: 'Good night: dinner out + a show', type: 'calendar_block', kind: 'partner', date: '2026-10-02', start: '18:00', end: '22:00', shape: 'point', protected: true, sub: 'held' },
+  { id: 'g-day-trip', title: 'Blue Mountains day trip', kind: 'partner', with: 'partner', date: '2026-10-08', start: '09:00', end: '18:00', shape: 'point',
+    ghost: { agent: 'hammond', kind: 'protect_block', date: '2026-10-08', start: '09:00', end: '18:00', title: 'Blue Mountains day trip', with: 'partner' }, sub: 'comforting adventure' },
   // Scholar
-  { id: 'conferral', title: 'UNSW conferral', kind: 'event', tags: ['graduation'], date: '2026-09-30', shape: 'diamond', sub: 'Master of Gifted Education' },
+  { id: 'conferral', title: 'Degree conferral', kind: 'event', tags: ['graduation'], date: '2026-09-30', shape: 'diamond', sub: 'Master's degree' },
   { id: 'uow', title: 'UOW literacy elective', sub: 'background hum, no alarms', from: '2026-07-20', to: '2027-01-10', shape: 'hum' },
   { id: 'dream', title: 'Hammond maps 2027–28 applications', kind: 'dream', date: '2026-11-02', shape: 'point' },
   // Friends & family
@@ -58,7 +58,7 @@ export const ITEMS: Item[] = [
 
 /** Walls drawn across every lane. */
 export const WALLS = [
-  { id: 'korea', title: 'Korea · 23/12 – 10/01', from: '2026-12-23', to: '2027-01-10' }
+  { id: 'big-trip', title: 'Away · 23/12 – 10/01', from: '2026-12-23', to: '2027-01-10' }
 ];
 
 /** Capacity: logged days (from the Tideline fixture) then the Almanac's forecast rule. */
@@ -71,7 +71,7 @@ export const PATTERN = [
   { from: '2026-12-01', to: '2026-12-15', delta: 4 }
 ];
 
-/** Commitments for the load strip (hours). Classes, Redacted time and ghosts never count. */
+/** Commitments for the load strip (hours). Classes, Partner time and ghosts never count. */
 export const COMMITMENTS = [
   { date: '2026-09-16', start: 15.5, end: 18, title: 'Marking' },
   { date: '2026-09-17', start: 15.5, end: 17.5, title: 'UN Voice coaching' },

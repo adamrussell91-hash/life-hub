@@ -54,13 +54,13 @@ export function saraAnalystToolSchemas() {
     {
       name: 'get_treatment_timeline',
       description:
-        'Redacted (Redacted) dose history, cadence, today\'s cycle day, next dose due and whether it is overdue, plus any steroid courses on record. Use for anything involving timing against the injection cycle, dose reminders, or "when is my next one".',
+        'Scheduled biologic / injection / infusion dose history, cadence, today\'s cycle day, next dose due and whether it is overdue, plus any steroid courses on record. Use for anything involving timing against the injection cycle, dose reminders, or "when is my next one".',
       input_schema: { type: 'object', properties: {} }
     },
     {
       name: 'get_symptom_timeline',
       description:
-        'Symptom episodes (onset, duration, resolved) with the Redacted cycle day of each entry, diary symptom days, and an honest post-dose pattern check that refuses to infer from a small sample. Use for "is this related to my injection", "how often do I get X", or when symptoms are mentioned.',
+        'Symptom episodes (onset, duration, resolved) with the dose cycle day of each entry, diary symptom days, and an honest post-dose pattern check that refuses to infer from a small sample. Use for "is this related to my injection", "how often do I get X", or when symptoms are mentioned.',
       input_schema: {
         type: 'object',
         properties: {
@@ -85,13 +85,13 @@ export function saraAnalystToolSchemas() {
     {
       name: 'get_open_loops',
       description:
-        'What is outstanding: ordered-but-not-booked items, overdue follow-ups, abnormal results not repeated, Redacted overdue/due, visits in the next 30 days, and phrases in recent notes that mention orders or referrals (unconfirmed).',
+        'What is outstanding: ordered-but-not-booked items, overdue follow-ups, abnormal results not repeated, scheduled dose overdue/due, visits in the next 30 days, and phrases in recent notes that mention orders or referrals (unconfirmed).',
       input_schema: { type: 'object', properties: {} }
     },
     {
       name: 'build_appointment_brief',
       description:
-        'Brief a visit from its own date: results with trends, symptoms since the last visit, Redacted status, related open loops, generated questions to ask, and data gaps. Pass the visit id (from search/list results) or its date.',
+        'Brief a visit from its own date: results with trends, symptoms since the last visit, scheduled-dose status, related open loops, generated questions to ask, and data gaps. Pass the visit id (from search/list results) or its date.',
       input_schema: {
         type: 'object',
         properties: {

@@ -44,10 +44,10 @@ const workout = (date, exercise, sets, mode = 'constant_force') => ({
 
 test('lift clock never mixes elastic and constant-force series', () => {
   const records = [
-    workout('2026-08-29', 'Cable Bar Wide Grip Curl', [[34, 10]]),
-    workout('2026-09-12', 'Cable Bar Wide Grip Curl', [[36, 10], [40, 10]]),
-    workout('2026-09-12', 'Cable Bar Wide Grip Curl', [[42, 10]], 'elastic'),
-    workout('2026-09-19', 'Cable Bar Wide Grip Curl', [[38, 12]])
+    workout('2026-08-29', 'Cable Bar Wide Grip Curl', [[25, 10]]),
+    workout('2026-09-12', 'Cable Bar Wide Grip Curl', [[27, 10], [30, 10]]),
+    workout('2026-09-12', 'Cable Bar Wide Grip Curl', [[31, 10]], 'elastic'),
+    workout('2026-09-19', 'Cable Bar Wide Grip Curl', [[28, 12]])
   ];
   const curl = buildLiftForecasts(records, '2026-09-21', TARGETS_CONFIG)
     .find(row => row.exercise === 'Cable Bar Wide Grip Curl');

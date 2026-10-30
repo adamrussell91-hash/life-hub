@@ -180,7 +180,7 @@ test('domain tools: tasks focus and teaching context', () => {
 
 test('domain tools: trashed (dead) tasks are not reported as open to Clare', () => {
   const tasks = [
-    { id: 'task_live', title: 'Rohan Arianayagam — Mock Exam', status: 'open', due_date: '2026-09-01', domain: 'teaching' },
+    { id: 'task_live', title: 'Rohan Examplar — Mock Exam', status: 'open', due_date: '2026-09-01', domain: 'teaching' },
     { id: 'task_dead', title: 'Reply to Rohan', status: 'dead', bucket: 'trash', due_date: '2026-09-01', domain: 'teaching' },
     { id: 'task_trash', title: 'Reply to Rohan again', status: 'open', bucket: 'trash', domain: 'teaching' },
     { id: 'task_done', title: 'Rohan reference', status: 'done', domain: 'teaching' }

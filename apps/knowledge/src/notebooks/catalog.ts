@@ -1,6 +1,6 @@
 import { originLabelsForKind, pageMatchesOriginFilter } from "../archive/originFilter";
 import type { Origin } from "../domain/page";
-import notesPlace from "../origin/notesPlace.json";
+import { installedNotebooks } from "../origin/notesPlace";
 
 const COVER_FILES: Record<string, string> = {
   "Boy's Education": "boys-education.jpg",
@@ -56,8 +56,10 @@ export function notebookSlug(label: string) {
     .replace(/^-|-$/g, "");
 }
 
+/** Notebooks from the private place map once it is installed, else the ones with covers. */
 export function notebookCatalog(): NotebookCover[] {
-  return Object.keys(notesPlace.notebook).map(label => ({
+  const installed = installedNotebooks();
+  return (installed.length ? installed : Object.keys(COVER_FILES)).map(label => ({
     label,
     slug: notebookSlug(label),
     ...(COVER_FILES[label] ? { image: notebookCoverSrc(COVER_FILES[label]) } : {}),

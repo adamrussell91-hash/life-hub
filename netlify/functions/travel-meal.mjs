@@ -56,8 +56,8 @@ export function createTravelMealHandler(deps = {}) {
     if (request.method === "GET")
       return okResponse(200, { visit: readable(linked), travel_version: snap.travel.version, food_version: snap.food.version }, PRIVATE_CACHE);
 
-    // Older moments have no author; they are Adam's (parseMomentAuthor).
-    if (moment.author === "Redacted")
+    // Older moments have no author; they are Adam's. Any other author is not (parseMomentAuthor).
+    if (moment.author && moment.author !== "adam")
       return errorResponse(403, "forbidden", "Only your own moments can be meals.", false, PRIVATE_CACHE);
     const body = await readJson(request);
     if (!body) return errorResponse(400, "validation_error", "Journal versions are required.", false, PRIVATE_CACHE);

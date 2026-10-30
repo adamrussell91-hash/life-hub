@@ -7,6 +7,10 @@ import {
   isUniversityNote,
   showAllGroupingMeta,
 } from "./showAllScope";
+import { installUnitDegreeMap } from "../origin/unitDegrees";
+import { TEST_UNIT_DEGREES } from "../origin/unitDegrees.fixture";
+
+installUnitDegreeMap(TEST_UNIT_DEGREES);
 
 const V = TOPIC_VOCABULARY;
 
@@ -32,7 +36,7 @@ function page(
 describe("show all grouping scope", () => {
   it("treats area or degree/unit origins as university notes", () => {
     expect(isUniversityNote(page("u1", { area: "university", origins: [] }))).toBe(true);
-    expect(isUniversityNote(page("u2", { origins: [{ kind: "unit", label: "EDST5805" }] }))).toBe(true);
+    expect(isUniversityNote(page("u2", { origins: [{ kind: "unit", label: "SMPL5805" }] }))).toBe(true);
     expect(isUniversityNote(page("n1", { origins: [{ kind: "notebook", label: "Brown 2022" }] }))).toBe(false);
   });
 
@@ -46,7 +50,7 @@ describe("show all grouping scope", () => {
     const uni = page("uni", {
       area: "university",
       origins: [
-        { kind: "degree", label: "Master of Education (Gifted Education)" },
+        { kind: "degree", label: "Master of Sample Studies" },
         { kind: "notebook", label: "Should not appear in notebooks" },
       ],
     });
@@ -63,9 +67,9 @@ describe("show all grouping scope", () => {
   });
 
   it("groups degrees from the unit map and notebooks from notebook pills", () => {
-    const uni = page("uni", { origins: [{ kind: "unit", label: "EDST5805" }] });
+    const uni = page("uni", { origins: [{ kind: "unit", label: "SMPL5805" }] });
     const notebook = page("nb", { origins: [{ kind: "notebook", label: "Brown 2022" }] });
-    expect(hubLabelsFor(uni, "degrees")).toEqual(["Master of Education (Gifted Education)"]);
+    expect(hubLabelsFor(uni, "degrees")).toEqual(["Master of Sample Studies"]);
     expect(hubLabelsFor(notebook, "notebooks")).toEqual(["Brown 2022"]);
     expect(hubLabelsFor(notebook, "tags")).toEqual([V[0]]);
   });

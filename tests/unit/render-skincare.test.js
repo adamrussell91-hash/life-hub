@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { renderSkincare } from '../../apps/life/js/app/render-skincare.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES } from '../fixtures/skincare-routines.mjs';
 import { formatDisplayDate } from '../../apps/life/js/core/time.js';
 
 class FakeElement {
@@ -347,9 +347,9 @@ test('prefers-reduced-motion marks the drawer for an instant swap', () => {
 test('renderSkincare groups products by category with Sunscreen separate from Other', () => {
   const root = fakeSkincareRoot();
   const routines = amRoutineWithEntries([
-    { id: 'gel', name: 'Korres Greek Yoghurt Probiotic Gel Cream', category: 'Moisturiser' },
-    { id: 'spf', name: 'La Roche Posay Anthelios SPF 50+', category: 'Sunscreen' },
-    { id: 'powder', name: 'Kosas Cloud Set', category: 'Makeup' }
+    { id: 'gel', name: 'Example Probiotic Gel Cream', category: 'Moisturiser' },
+    { id: 'spf', name: 'Example Sunscreen SPF 50+', category: 'Sunscreen' },
+    { id: 'powder', name: 'Example Setting Powder', category: 'Makeup' }
   ]);
   renderSkincare(root, baseModel({ routines }));
 

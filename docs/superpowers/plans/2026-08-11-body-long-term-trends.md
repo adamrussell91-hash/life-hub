@@ -273,18 +273,18 @@ Run:
 
 ```bash
 node scripts/import-notion-history.mjs \
-  --body-log "/Users/example/Downloads/Private & Shared 12/Body Data Record Weight, Body Fat and Measurements 3b9f794f84768016935ce337a1e6c93c.md" \
-  --body-csv "/Users/example/Downloads/Private & Shared 4/Chadwick Flexington/📏 Body Measurements 53f162df8c284691978285e3babbe4c8_all.csv" \
-  --body-dir "/Users/example/Downloads/Private & Shared 4/Chadwick Flexington/📏 Body Measurements" \
-  --out "/Users/example/Documents/Claude/Projects/life-hub-data"
+  --body-log "/Users/you/Downloads/Private & Shared 12/Body Data Record Weight, Body Fat and Measurements 3b9f794f84768016935ce337a1e6c93c.md" \
+  --body-csv "/Users/you/Downloads/Private & Shared 4/Chadwick Flexington/📏 Body Measurements 53f162df8c284691978285e3babbe4c8_all.csv" \
+  --body-dir "/Users/you/Downloads/Private & Shared 4/Chadwick Flexington/📏 Body Measurements" \
+  --out "/Users/you/Documents/Claude/Projects/life-hub-data"
 ```
 
 Expected: JSON with `bodyCount` roughly ≥ 200 from the log plus CSV/dir events; files under `life-hub-data/data/body/`. Spot-check:
 
 ```bash
-ls "/Users/example/Documents/Claude/Projects/life-hub-data/data/body/2015/05/"
-ls "/Users/example/Documents/Claude/Projects/life-hub-data/data/body/2019/12/"
-head -20 "/Users/example/Documents/Claude/Projects/life-hub-data/data/body/2026/07/2026-07-21-"*
+ls "/Users/you/Documents/Claude/Projects/life-hub-data/data/body/2015/05/"
+ls "/Users/you/Documents/Claude/Projects/life-hub-data/data/body/2019/12/"
+head -20 "/Users/you/Documents/Claude/Projects/life-hub-data/data/body/2026/07/2026-07-21-"*
 ```
 
 - [ ] **Step 3: Commit script wiring only (data repo changes are outside this commit)**
@@ -680,7 +680,7 @@ Expected: all PASS.
 - [ ] **Step 2: Confirm import artefacts**
 
 ```bash
-find "/Users/example/Documents/Claude/Projects/life-hub-data/data/body" -name '*.md' | wc -l
+find "/Users/you/Documents/Claude/Projects/life-hub-data/data/body" -name '*.md' | wc -l
 ```
 
 Expected: well above the prior ~8 files (log alone ≈ 200 events).

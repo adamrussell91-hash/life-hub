@@ -36,6 +36,7 @@
 }
 .aes-lede { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); max-width: var(--measure); }
 .aes-meta { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
+.aes-watches--empty > :not(#aes-watch-status) { display: none; }
 .aes-quote { margin: var(--space-1) 0 0; font-family: var(--aes-display); font-style: italic; color: var(--muted); }
 .aes-tabs { justify-self: start; max-width: 100%; }
 .aes-panel { display: grid; gap: var(--space-4); min-width: 0; }

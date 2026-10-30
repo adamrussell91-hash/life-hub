@@ -84,14 +84,14 @@ function riverGhostEntry(item) {
       date: ghost.date,
       start: ghost.start,
       end: ghost.end,
-      kind: ghost.with === 'Redacted' ? 'Redacted' : 'task'
+      kind: ghost.with === 'partner' ? 'partner' : 'task'
     }
   };
 }
 
 /**
  * Materialise a Term River item as a Life / Tasks record when it has a durable type.
- * Bars (projects) become Tasks projects. Redacted blocks and medical visits become Life records.
+ * Bars (projects) become Tasks projects. Partner blocks and medical visits become Life records.
  * Ghosts stay in the pending queue. Professional events / hums / markers stay on RIVER.ITEMS only.
  */
 function materialiseRiverItem(item, files, tasks) {
@@ -146,8 +146,8 @@ function materialiseRiverItem(item, files, tasks) {
     return;
   }
 
-  const isCorey = item.type === 'calendar_block' || item.kind === 'Redacted';
-  if (!isCorey || !item.date || !item.start || !item.end) return;
+  const isPartner = item.type === 'calendar_block' || item.kind === 'partner';
+  if (!isPartner || !item.date || !item.start || !item.end) return;
 
   const record = {
     schema_version: 1,
@@ -156,7 +156,7 @@ function materialiseRiverItem(item, files, tasks) {
     date: item.date,
     time: item.start,
     end_time: item.end,
-    kind: 'Redacted',
+    kind: 'partner',
     protected: true,
     status: item.sub === 'held' ? 'tentative' : 'confirmed',
     title: item.title,

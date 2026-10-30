@@ -1,6 +1,6 @@
 {
   "inspected_at": "2026-10-11",
-  "local_delivery_path": "/Users/example/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals",
+  "local_delivery_path": "~/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/outputs/grove-local-animals",
   "public_models_added": 0,
   "public_repo_private_at_check": false,
   "assets": [
@@ -831,7 +831,7 @@
       ]
     }
   ],
-  "local_installed_path": "/Users/example/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/work/life-hub/apps/life/assets/grove/project-only",
+  "local_installed_path": "~/Documents/Codex/2026-10-10/ground-streams-lakes-generated-in-code/work/life-hub/apps/life/assets/grove/project-only",
   "ready_animal_slots": [
     "animal-rabbit",
     "animal-squirrel",

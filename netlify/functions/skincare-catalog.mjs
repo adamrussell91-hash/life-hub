@@ -17,7 +17,7 @@ import {
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { loadSkincareDefaults } from './_shared/skincare-defaults.mjs';
 import {
   SKINCARE_CATALOG_PATH,
   appendProduct,
@@ -108,7 +108,7 @@ export function createSkincareCatalogHandler({
       const entry = tree.find(item => item.path === SKINCARE_CATALOG_PATH && item.type === 'blob');
       const existing = entry ? parseCatalog(decodeBlob(await github.readBlob(entry.sha))) : null;
       if (entry && !existing) return repositoryError('catalog_corrupt', false);
-      const seed = existing ?? emptyCatalog(SKINCARE_ROUTINES);
+      const seed = existing ?? emptyCatalog(await loadSkincareDefaults({ tree, readBlob: sha => github.readBlob(sha) }));
       const catalog = action === 'append'
         ? appendProduct(seed, routine, name)
         : retireProduct(seed, routine, name);

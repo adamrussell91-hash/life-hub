@@ -4,7 +4,7 @@
  * validates and queues them (POST /api/calendar-rescue) and Accept goes through the
  * existing confirmation path.
  *
- * Never moved: lessons, appointments, meetings, iCloud events, Redacted, protected
+ * Never moved: lessons, appointments, meetings, iCloud events, Partner, protected
  * time, social/family, walls. Unfinished work stays unfinished; tasks due today
  * stay due today unless Adam says he feels worse (then they are listed, not moved).
  */
@@ -35,12 +35,12 @@ const addDays = (date, n) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_4
 /** Rescue moves only Tasks work blocks; everything else on the day is held fixed. */
 function isFlexible(chip) {
   return !chip.ghost && !chip.isClass && !chip.ambient && !chip.protected
-    && chip.kind !== 'Redacted' && canMoveItem(chip) && itemType(chip) === 'work_block';
+    && chip.kind !== 'partner' && canMoveItem(chip) && itemType(chip) === 'work_block';
 }
 
 function loadOf(day) {
   return (day.chips ?? [])
-    .filter((c) => !c.isClass && !c.protected && !c.ghost && !c.ambient && c.kind !== 'Redacted')
+    .filter((c) => !c.isClass && !c.protected && !c.ghost && !c.ambient && c.kind !== 'partner')
     .reduce((sum, c) => sum + Math.max(0, c.end - c.start), 0);
 }
 

@@ -147,17 +147,17 @@ test('confirm passes path for delete_log without a candidate', async () => {
       data: { deleted: true, path: sentBody.path, id: sentBody.id }
     });
   });
-  const path = 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md';
+  const path = 'data/body/2026/11/2026-11-10-medical-biologic-injection-0000.md';
   const result = await chatApi.confirm({
     kind: 'delete_log',
     slug: 'sara',
     path,
-    id: 'Redacted-2'
+    id: 'biologic-2'
   });
   assert.equal(sentBody.kind, 'delete_log');
   assert.equal(sentBody.slug, 'sara');
   assert.equal(sentBody.path, path);
-  assert.equal(sentBody.id, 'Redacted-2');
+  assert.equal(sentBody.id, 'biologic-2');
   assert.equal('candidate' in sentBody, false);
   assert.equal(result.deleted, true);
 });

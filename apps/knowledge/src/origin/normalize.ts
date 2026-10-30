@@ -16,17 +16,31 @@ export function normalizeOriginLabel(label: string) {
   return label.replace(/\s+/g, " ").trim();
 }
 
-const DROPPED_ORIGIN_LABELS = new Set([
+const BASE_DROPPED_ORIGIN_LABELS = [
   "csp-eligible postgraduate degree",
   "trimester 1 2027 entry",
   "notebook cover",
-  "graduate diploma of psychology",
-]);
+];
 
-const ORIGIN_LABEL_ALIASES: Record<string, string> = {
-  "advanced insights in cognitive psychology": "Master of Cognitive Psychology",
-  "transformational leadership certificate": "Graduate Certificate in Transformational Leadership",
-};
+let DROPPED_ORIGIN_LABELS = new Set(BASE_DROPPED_ORIGIN_LABELS);
+let ORIGIN_LABEL_ALIASES: Record<string, string> = {};
+
+/**
+ * Personal label rules: old degree names that now read as another title, and programmes whose
+ * pills are dropped. They live with the university source in the private data repo and are
+ * installed at runtime; until then labels pass through unchanged.
+ */
+export function installOriginLabelRules(rules: { aliases?: Record<string, string>; dropped?: string[] } = {}) {
+  const aliases: Record<string, string> = {};
+  for (const [from, to] of Object.entries(rules.aliases ?? {})) {
+    if (typeof to === "string" && to.trim()) aliases[normalizeOriginLabel(from).toLowerCase()] = to;
+  }
+  ORIGIN_LABEL_ALIASES = aliases;
+  DROPPED_ORIGIN_LABELS = new Set([
+    ...BASE_DROPPED_ORIGIN_LABELS,
+    ...(rules.dropped ?? []).map(label => normalizeOriginLabel(label).toLowerCase()),
+  ]);
+}
 
 export function isDroppedOriginLabel(label: string) {
   return DROPPED_ORIGIN_LABELS.has(normalizeOriginLabel(label).toLowerCase());

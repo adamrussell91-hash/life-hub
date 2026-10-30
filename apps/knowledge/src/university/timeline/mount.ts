@@ -1,6 +1,6 @@
-import catalogue from "./data.json";
 import { wheelIntent, wheelPanPixels } from "./gestures";
 import { cameraForLayer, catalogueSpan, layerForScale, panCamera, spanOf, unitSpanFor, zoomCamera } from "./layout";
+import { loadUniversityCatalogue } from "../../api/privateSources";
 import type { DegreeRecord, TimelineCamera, UniversityCatalogue } from "./types";
 import { timelineChartHtml, timelineFrameHtml, type TimelineSelection, type TimelineViewState } from "./view";
 
@@ -15,10 +15,37 @@ export function paddedSpan(startMs: number, endMs: number, bounds: TimelineCamer
   };
 }
 
+/**
+ * Mount the timeline. With no catalogue it is fetched from the private data repo first
+ * (`/api/knowledge/university`); until then, or if it can't be read, a short status shows.
+ */
 export function mountUniversityTimeline(
   host: HTMLElement,
-  data: UniversityCatalogue = catalogue as UniversityCatalogue,
-) {
+  data?: UniversityCatalogue,
+  load: () => Promise<UniversityCatalogue | null> = loadUniversityCatalogue,
+): () => void {
+  if (data) return mountCatalogue(host, data);
+  let stopped = false;
+  let teardown: (() => void) | null = null;
+  host.innerHTML = `<p class="uni-tl__status" role="status">Loading your university timeline…</p>`;
+  void load()
+    .catch(() => null)
+    .then(catalogue => {
+      if (stopped) return;
+      if (!catalogue?.degrees?.length) {
+        host.innerHTML = `<p class="uni-tl__status" role="status">Your university timeline isn’t available right now. Try again in a moment.</p>`;
+        return;
+      }
+      teardown = mountCatalogue(host, catalogue);
+    });
+  return () => {
+    stopped = true;
+    if (teardown) teardown();
+    else host.replaceChildren();
+  };
+}
+
+function mountCatalogue(host: HTMLElement, data: UniversityCatalogue): () => void {
   const degrees = data.degrees as DegreeRecord[];
   const bounds = catalogueSpan(degrees);
   const state: TimelineViewState = {

@@ -84,7 +84,7 @@ Intro text.
 ---
 ## 📊 This Month (June 2026)
 **Active Goals:**
-- Redacted's remission (Critical)
+- Condition A remission (Critical)
 ---
 ## 🤝 Cross-Agent Coordination
 - Chadwick→Brisket: 31 Jul session completed. Set Day Type to 45 to 60 min Workout.
@@ -122,7 +122,7 @@ test('extractThisWeek matches the heading even though its date-range suffix chan
 
 test('extractThisMonth matches the heading even though its month suffix changes monthly', () => {
   const result = extractThisMonth(sample);
-  assert.match(result, /Redacted's remission/);
+  assert.match(result, /Condition A remission/);
   assert.doesNotMatch(result, /Cross-Agent Coordination/);
 });
 

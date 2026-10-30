@@ -30,14 +30,14 @@ const hit = (ref: string, display_label: string) => ({ ref, display_label, suppo
 
 describe('labelPeopleHits', () => {
   it('collapses copies of one person and says who each remaining row is', () => {
-    const directory = [person('shared:person:student-rohan-a', 'Rohan Arianayagam', { person_type: 'student' })];
+    const directory = [person('shared:person:student-rohan-a', 'Rohan Examplar', { person_type: 'student' })];
     const rows = labelPeopleHits(
-      [hit('shared:person:blob-1', 'Rohan'), hit('shared:person:blob-2', 'Rohan'), hit('shared:person:blob-3', 'Rohan Arianayagam'), hit('shared:person:blob-4', 'Rohan Arianayagam')],
+      [hit('shared:person:blob-1', 'Rohan'), hit('shared:person:blob-2', 'Rohan'), hit('shared:person:blob-3', 'Rohan Examplar'), hit('shared:person:blob-4', 'Rohan Examplar')],
       directory
     );
     expect(rows.map((row) => [row.display_label, row.supporting_label])).toEqual([
       ['Rohan', 'Not in People yet'],
-      ['Rohan Arianayagam', 'Student']
+      ['Rohan Examplar', 'Student']
     ]);
   });
 

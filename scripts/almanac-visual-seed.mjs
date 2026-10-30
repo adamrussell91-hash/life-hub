@@ -68,7 +68,7 @@ export async function loadAlmanacVisualSeed() {
     date: '2026-09-26',
     time: '18:00',
     end_time: '22:00',
-    kind: 'Redacted',
+    kind: 'partner',
     status: 'tentative',
     protected: true,
     title: 'Dinner out + a show',

@@ -10,8 +10,8 @@ const NOW = '2026-10-06T16:00:00+11:00';
 
 // The exact failure from 6 Oct 2026: one GP appointment logged on three dates.
 const gp = (date, extra = {}) => visit(`gp-${date}`, date, {
-  title: 'GP Appointment - Dr Redacted (GGT results review)',
-  record_type: 'Consultation', provider: 'Dr Redacted', time: '14:00',
+  title: 'GP Appointment - Dr Jordan Sample (GGT results review)',
+  record_type: 'Consultation', provider: 'Dr Jordan Sample', time: '14:00',
   created_at: '2026-10-06T15:40:00+11:00', ...extra   // all saved in the same sitting, as happened
 }, 'General appointment to discuss 17 Sep GGT result.');
 const DUPES = [gp('2026-10-06'), gp('2026-10-15'), gp('2026-10-26')];
@@ -22,16 +22,16 @@ test('findDuplicateGroups catches the triplicated GP appointment and ignores rec
   const groups = findDuplicateGroups(all, { today: TODAY });
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].map(v => v.date), ['2026-10-06', '2026-10-15', '2026-10-26']);
-  // Redacted doses 56 days apart share a title and must not be flagged.
+  // Biologic doses 56 days apart share a title and must not be flagged.
   assert.equal(findDuplicateGroups(BASE, { today: TODAY }).length, 0);
 });
 
 test('findLikelyDuplicate guards log_entry: same appointment on another date is refused, a new one is not', () => {
-  const again = { type: 'medical', date: '2026-10-20', time: '14:00', fields: { title: 'GP Appointment - Dr Redacted (GGT results review)', provider: 'Dr Redacted' } };
+  const again = { type: 'medical', date: '2026-10-20', time: '14:00', fields: { title: 'GP Appointment - Dr Jordan Sample (GGT results review)', provider: 'Dr Jordan Sample' } };
   assert.ok(findLikelyDuplicate(all, again, { today: TODAY }));
   const fresh = { type: 'medical', date: '2026-12-01', fields: { title: 'Dentist check-up' } };
   assert.equal(findLikelyDuplicate(all, fresh, { today: TODAY }), null);
-  const dose = { type: 'medical', date: '2026-12-17', fields: { title: 'Redacted injection', cadence_days: 56 } };
+  const dose = { type: 'medical', date: '2026-12-17', fields: { title: 'Biologic injection', cadence_days: 56 } };
   assert.equal(findLikelyDuplicate(all, dose, { today: TODAY }), null);
 });
 
@@ -42,14 +42,14 @@ test('listMedicalVisits filters by status/upcoming and flags duplicates; ids are
   assert.ok(upcoming.visits.find(v => v.id === 'gp-2026-10-26').possible_duplicate);
   const toBook = listMedicalVisits(all, { today: TODAY, status: 'to_book' });
   assert.deepEqual(toBook.visits.map(v => v.id), ['mrcp']);
-  assert.equal(listMedicalVisits(all, { today: TODAY, query: 'nerida' }).total_matching, 3);
+  assert.equal(listMedicalVisits(all, { today: TODAY, query: 'jordan' }).total_matching, 3);
   assert.equal(listMedicalVisits(all, { today: TODAY }).duplicate_groups.length, 1);
 });
 
 test('getMedicalVisit returns the full record and its look-alikes', () => {
   const r = getMedicalVisit(all, { id: 'gp-2026-10-26', today: TODAY });
   assert.equal(r.found, true);
-  assert.equal(r.visit.provider, 'Dr Redacted');
+  assert.equal(r.visit.provider, 'Dr Jordan Sample');
   assert.equal(r.possible_duplicates.length, 2);
   assert.equal(getMedicalVisit(all, { id: 'zzz' }).found, false);
 });
@@ -75,7 +75,7 @@ test('planVisitUpdate: adding detail appends with a date stamp and is safe', () 
 });
 
 test('planVisitUpdate: time, length, provider are safe; date and type are structural; a move re-paths the file', () => {
-  const safe = planVisitUpdate(DUPES[2], { time: '15:30', duration_min: 45, provider: 'Dr N McDonald' }, { nowIso: NOW, today: TODAY });
+  const safe = planVisitUpdate(DUPES[2], { time: '15:30', duration_min: 45, provider: 'Dr J Sample' }, { nowIso: NOW, today: TODAY });
   assert.equal(safe.risk, 'safe');
   assert.equal(safe.record.time, '15:30');
   assert.equal(safe.record.duration_min, 45);
@@ -97,7 +97,7 @@ test('planVisitUpdate: cancelled is a valid status; bad input is rejected with r
   const bad = planVisitUpdate(DUPES[0], { status: 'maybe', time: '25:00', date: 'someday', duration_min: 0 }, { nowIso: NOW, today: TODAY });
   assert.equal(bad.ok, false);
   assert.equal(bad.errors.length, 4);
-  assert.equal(planVisitUpdate(DUPES[0], { status: undefined, provider: 'Dr Redacted' }, { nowIso: NOW, today: TODAY }).noop, true);
+  assert.equal(planVisitUpdate(DUPES[0], { status: undefined, provider: 'Dr Jordan Sample' }, { nowIso: NOW, today: TODAY }).noop, true);
   assert.equal(planVisitUpdate({ record: {} }, { status: 'done' }).ok, false);
 });
 
@@ -134,23 +134,23 @@ test('years of genuine weekly sessions are not duplicates (only recent/upcoming,
   });
   assert.equal(findDuplicateGroups(weekly, { today: TODAY }).length, 0);
   // A visit created today for next week's session still gets the log_entry guard (one retry), not silent duplication.
-  const upcomingSession = visit('s1', '2026-10-12', { title: 'Therapy session', provider: 'Kate', time: '10:00' });
-  const next = { type: 'medical', date: '2026-10-19', time: '10:00', fields: { title: 'Therapy session', provider: 'Kate' } };
+  const upcomingSession = visit('s1', '2026-10-12', { title: 'Therapy session', provider: 'Avery', time: '10:00' });
+  const next = { type: 'medical', date: '2026-10-19', time: '10:00', fields: { title: 'Therapy session', provider: 'Avery' } };
   assert.ok(findLikelyDuplicate([upcomingSession], next, { today: TODAY }));
   assert.equal(findLikelyDuplicate([upcomingSession], { ...next, date: '2026-12-01' }, { today: TODAY }), null);
 });
 
 test('the same dose logged twice on one day IS a duplicate even though doses recur', () => {
-  const a = visit('d1', '2026-10-22', { title: 'Redacted (Redacted) subcutaneous maintenance injection — 90mg', record_type: 'Prescription', cadence_days: 56, provider: 'Walker St Doctors', time: '09:00' });
-  const b = visit('d2', '2026-10-22', { title: 'Redacted (Redacted) 90 mg - subcutaneous injection', record_type: 'Appointment', provider: 'Nurse', time: '09:00' });
+  const a = visit('d1', '2026-10-22', { title: 'Biologic subcutaneous maintenance injection — 90mg', record_type: 'Prescription', cadence_days: 56, provider: 'Example St Doctors', time: '09:00' });
+  const b = visit('d2', '2026-10-22', { title: 'biologic 90 mg - subcutaneous injection', record_type: 'Appointment', provider: 'Nurse', time: '09:00' });
   assert.equal(findDuplicateGroups([a, b], { today: TODAY }).length, 1);
-  const later = visit('d3', '2026-12-17', { title: 'Redacted injection', record_type: 'Prescription', cadence_days: 56, time: '09:00' });
+  const later = visit('d3', '2026-12-17', { title: 'Biologic injection', record_type: 'Prescription', cadence_days: 56, time: '09:00' });
   assert.equal(findDuplicateGroups([a, later], { today: TODAY }).length, 0);
 });
 
 test('same title on the same day is a duplicate even if the time and clinician differ (the "stamped with now" case)', () => {
-  const a = visit('d1', '2026-10-22', { title: 'Redacted injection', record_type: 'Prescription', time: '09:00', provider: 'Walker St Doctors' });
-  const b = visit('d2', '2026-10-22', { title: 'Redacted injection', record_type: 'Appointment', time: '15:42', provider: 'Nurse' });
+  const a = visit('d1', '2026-10-22', { title: 'Biologic injection', record_type: 'Prescription', time: '09:00', provider: 'Example St Doctors' });
+  const b = visit('d2', '2026-10-22', { title: 'Biologic injection', record_type: 'Appointment', time: '15:42', provider: 'Nurse' });
   assert.equal(findDuplicateGroups([a, b], { today: TODAY }).length, 1);
 });
 
@@ -165,7 +165,7 @@ test('retyping a visit moves its lane with it, so a symptom is not left in the p
 });
 
 test('stale date estimates can be cleared (date_end / follow_up_date to null)', () => {
-  const v = visit('s', '2026-08-27', { title: 'Redacted injection', date_end: '2026-10-27', follow_up_date: '2026-12-22' });
+  const v = visit('s', '2026-08-27', { title: 'Biologic injection', date_end: '2026-10-27', follow_up_date: '2026-12-22' });
   const plan = planVisitUpdate(v, { date_end: null, follow_up_date: null }, { nowIso: NOW, today: TODAY });
   assert.equal(plan.record.date_end, undefined);
   assert.equal(plan.record.follow_up_date, undefined);

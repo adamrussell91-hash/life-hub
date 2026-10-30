@@ -47,15 +47,15 @@ If one is wrong, fix it in place, keep its tests passing, and say why in the PR.
 |---|---|
 | Nav | `‹` round 36px, period (`T3 W10 · last week of term` 17px/600 navy; `dd/mm/yy – dd/mm/yy` 12px muted, tabular), `›`, **Today** (`.btn--secondary`), zoom `.hub-pills` Day · Week · Term · Year · Almanac (Week pressed), spacer, "Focus" + `.hub-pills` Balanced · Morning · School · After bell · Yours. |
 | Tray | Paper, 1px `--line`, `--radius-sm`, `--elev-2`. Navy 28px avatar, headline 13px/600, detail muted. Apply all (primary), Review (secondary), Dismiss (ghost). |
-| Sources | Pills 12px/500, 8px round dot in the source stripe colour (changed 26/09/26 for Comms: see `docs/superpowers/specs/2026-09-26-calendar-comms-design.md`). Redacted uses the two-ring mark and peach ink. Ambient pill: dashed border, muted, counts of logs (never records). |
+| Sources | Pills 12px/500, 8px round dot in the source stripe colour (changed 26/09/26 for Comms: see `docs/superpowers/specs/2026-09-26-calendar-comms-design.md`). Partner uses the two-ring mark and peach ink. Ambient pill: dashed border, muted, counts of logs (never records). |
 | Card | Kit glass (`--hub-glass-fill`, 1px `--line`, `--radius-md`, `--hub-elev-card`, blur). Grid `104px / repeat(7, 1fr)`. |
 | Day head | 108px min. DOW 11px caps muted, date 15px/600 in a 30px circle (today: `--danger` fill, white). Right: "over" pill (only if over), then the tag (`Last day T3` gold, `Holidays` sage). Capacity bar 6px: fill ≥60 `--pastel-sage-ink`, ≥40 `--pastel-gold-ink`, else `--high-sea`; forecast = dashed fill at 0.6. Text `NN% · note` 12px (percentage 600 ink; over: `--high-sea-ink`). Vitals 11px muted: moon + sleep h, bolt + energy (low: `--high-sea-ink`), fork + meal count, `● symptom` in `--high-sea-ink`. The over head has a `--warning-surface` fill. |
 | Due row | 56px min. Task chip: sage 80 %, 8px radius, title 2 lines max. A proposal row: agent avatar 18px, label, navy **Move** button. Moved: opacity 0.55, "Moved to T4 W1 Tue". |
 | Band labels | Buttons, absolutely positioned from layout. Label 12px/600 navy + chevron; sub-label 11px muted, opacity `--sub` fades 38→48px. Expanded: Wave 8 % wash, Wave label, chevron rotated 180°. Sleep label: hatch, fixed 30px. |
 | Bands at rest | Morning 58, School 158, After bell 104, Yours 232 (total 552) + sleep 30. School wash `--cal-school-wash` on school days only. Yours wash `--cal-yours-wash` every day. 1px `--line` at each band top. |
 | Band expanded | Expanded band = 552 − 3 × 30 = 462; others 30. |
-| Chip | Absolute, 6px side insets, radius 9, 3px stripe in the kind colour. Card padding 5/8/5/10. Title 12px/600, line-height 1.25, clamp `--lines`. Meta 11px muted, one line, ellipsis. Kinds: teaching/fitness blue, professional lilac, task sage, health `--cal-health`, Redacted peach gradient + peach ink + two-ring mark. Classes: 80 % white, no shadow, Wave 18 % border. Past days: 0.72. |
-| Ghost chip | `--cal-ghost-fill`, 1.5px dashed navy 55 % (Redacted: peach ink 60 %). Agent avatar 18px top right. Inline Accept (navy) / Dismiss only when the chip is ≥ 62px (`CAL.fade.actions`). |
+| Chip | Absolute, 6px side insets, radius 9, 3px stripe in the kind colour. Card padding 5/8/5/10. Title 12px/600, line-height 1.25, clamp `--lines`. Meta 11px muted, one line, ellipsis. Kinds: teaching/fitness blue, professional lilac, task sage, health `--cal-health`, Partner peach gradient + peach ink + two-ring mark. Classes: 80 % white, no shadow, Wave 18 % border. Past days: 0.72. |
+| Ghost chip | `--cal-ghost-fill`, 1.5px dashed navy 55 % (Partner: peach ink 60 %). Agent avatar 18px top right. Inline Accept (navy) / Dismiss only when the chip is ≥ 62px (`CAL.fade.actions`). |
 | Proposal on an item | When a ghost is about an existing item (`overItem`), there's no second chip. The item gets a 1.5px dashed outline offset 2px, the agent avatar, and a line `Sara suggests: skip workout` (11px/600 navy). |
 | Chip popover | Any chip opens it (click, Enter or Space). 288px, paper, `--radius-sm`, `--elev-2`. 8px right of the chip, or to its left when there's no room. For proposals: "SARA SUGGESTS" and "ACCEPT WRITES" caps labels, then a dashed Wave 6 % box with the exact receipt from `acceptPlan()`, then Accept / Dismiss. |
 | Free evening | Dashed 1px navy 18 %, radius 9, inset 8px: "4½ h free" sage-ink 600 + muted line. Hidden when its band is under 90px. |
@@ -107,7 +107,7 @@ Use **Slow motion ×5** in the reference to study every one of these.
 6. Typing capacity numbers into the fixture or view instead of calling `capacityForDates`.
 7. Logs (breakfast, diary) rendered as chips again.
 8. A ghost drawn as a second chip on top of the item it's about.
-9. Every chip the same blue. Kinds carry colour; Redacted is warm and has the mark.
+9. Every chip the same blue. Kinds carry colour; Partner is warm and has the mark.
 10. The "over" flag hidden inside the truncated capacity note. It lives in the name row.
 11. Accept building writes in the browser. Only `{ id, decision }` leaves the client.
 12. Holding the Accept button enabled during the POST, so it gets double writes.

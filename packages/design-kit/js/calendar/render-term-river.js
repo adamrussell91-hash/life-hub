@@ -605,10 +605,10 @@ function mountChart(card) {
   for (const lane of LANES) {
     const top = laneTops[lane.id];
     const h = TR.lanes[lane.id];
-    // The Redacted wash sits behind the whole chart, not over the plot.
-    if (lane.id === 'Redacted') svg.insertBefore(s('rect', { class: 'tr-lane-wash', x: 0, y: top, width: W, height: h }, svg), svg.firstChild);
+    // The Partner wash sits behind the whole chart, not over the plot.
+    if (lane.id === 'partner') svg.insertBefore(s('rect', { class: 'tr-lane-wash', x: 0, y: top, width: W, height: h }, svg), svg.firstChild);
     s('line', { class: 'tr-rule', x1: 0, x2: W, y1: top + h, y2: top + h }, svg);
-    s('text', { class: `tr-t-lane${lane.id === 'Redacted' ? ' is-Redacted' : ''}`, x: 18, y: top + 24 }, labels, lane.label);
+    s('text', { class: `tr-t-lane${lane.id === 'partner' ? ' is-partner' : ''}`, x: 18, y: top + 24 }, labels, lane.label);
     s('text', { class: 'tr-t-sub', x: 18, y: top + 40 }, labels, lane.sub);
     const group = s('g', { 'data-part': 'lane', 'data-lane': lane.id }, plot);
     if (lane.id === 'body') mountBody(group, top, h);
@@ -772,7 +772,7 @@ function mountLaneItems(group, laneId, top, h) {
     const above = k % 2 === 0;
     if (k >= 0) {
       label = s('text', {
-        class: `tr-t-point${item.shape === 'diamond' ? ' is-gold' : ''}${laneId === 'Redacted' ? ' is-Redacted' : ''}`,
+        class: `tr-t-point${item.shape === 'diamond' ? ' is-gold' : ''}${laneId === 'partner' ? ' is-partner' : ''}`,
         y: above ? cy - 19 : cy + 20
       }, group);
     }

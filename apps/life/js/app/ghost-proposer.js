@@ -104,10 +104,10 @@ function restBlockOn(events, date) {
   });
 }
 
-function coreyCoversEvening(events, date) {
+function partnerCoversEvening(events, date) {
   return (events ?? []).some(event => {
     const rec = event?.record ?? event;
-    if (rec?.type !== 'calendar_block' || rec.kind !== 'Redacted' || rec.date !== date) return false;
+    if (rec?.type !== 'calendar_block' || rec.kind !== 'partner' || rec.date !== date) return false;
     const start = typeof rec.time === 'string' ? rec.time : '';
     const end = typeof rec.end_time === 'string' ? rec.end_time : '';
     if (!HHMM.test(start) || !HHMM.test(end)) return false;
@@ -289,7 +289,7 @@ export function proposeGhosts({
     const date = goodNight.dates[0];
     const horizonEnd = addDays(today, GOOD_NIGHT_HORIZON - 1);
     if (DATE_KEY.test(date) && date >= today && date <= horizonEnd
-      && !walls.has(date) && !coreyCoversEvening(events, date)) {
+      && !walls.has(date) && !partnerCoversEvening(events, date)) {
       take({
         id: ghostId('hammond', 'protect_block', date),
         agent: 'hammond',
@@ -298,10 +298,10 @@ export function proposeGhosts({
         start: '18:00',
         end: '22:00',
         title: 'Good night: dinner out + a show',
-        with: 'Redacted',
+        with: 'partner',
         label: 'Good night: dinner out + a show',
         meta: 'Hammond · your definition of a good night',
-        chip: { date, start: '18:00', end: '22:00', kind: 'Redacted' }
+        chip: { date, start: '18:00', end: '22:00', kind: 'partner' }
       });
     }
   }

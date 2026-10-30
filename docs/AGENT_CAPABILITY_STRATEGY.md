@@ -432,10 +432,10 @@ This assessment is based on public documentation and repositories accessed on 6 
 - [Letta memory](https://docs.letta.com/agent-sdk/memory/)
 - [Mem0 open source](https://docs.mem0.ai/open-source/overview)
 
-## Retired: Tasks Hub Network / Redacted pages (2026-09-26)
+## Retired: Tasks Hub Network / Partner pages (2026-09-26)
 
 The Tasks Hub had a "Network" sidebar group — a StressFlag inbox page and a
-Redacted capacity-share page — built ahead of any agent automation actually
+Partner capacity-share page — built ahead of any agent automation actually
 consuming it. Removed because: its rule-based detection duplicated
 `apps/tasks/src/domain/pinch.ts` (which is live, actionable, and rendered on
 Dashboard/Calendar), and its cross-agent routing had no consumer —
@@ -483,8 +483,8 @@ own unit test. Full history: `git show 4f0c54a831826e834fda77be7dd42786c70d3743:
    about pinch points or overlapping excursions should call these, not
    duplicate them.
 
-4. **The Redacted capacity-share pattern is worth keeping as a pattern, not as
-   code:** a rotating public token backing a redacted view (`toCoreyPublicView`
+4. **The Partner capacity-share pattern is worth keeping as a pattern, not as
+   code:** a rotating public token backing a redacted view (`toPartnerPublicView`
    stripped task titles, kept only day-level busy/free labels). If a future
    feature needs to share a read-only, redacted view of Life Hub state with
    someone outside the system, this token-rotation approach

@@ -9,7 +9,7 @@ import { findLikelyDuplicate } from './_shared/sara-records.mjs';
 const SARA_ANALYST_STATUS = {
   get_marker_trend: 'Reading your blood trends…',
   compare_bloods: 'Comparing your blood results…',
-  get_treatment_timeline: 'Checking your Redacted cycle…',
+  get_treatment_timeline: 'Checking your dose cycle…',
   get_symptom_timeline: 'Lining up your symptoms…',
   get_cross_signals: 'Looking across food, training and mood…',
   get_open_loops: 'Checking what is outstanding…',
@@ -55,6 +55,7 @@ import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
 import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol.mjs';
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
+import { loadPrivateAgentContext, withPrivateAgentContext } from './_shared/load-private-agent-context.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
 import {
@@ -144,7 +145,7 @@ import {
 } from '../../apps/life/js/core/nutrition-challenges.js';
 import { syncChallengeToCentralNode } from '../../apps/life/js/core/nutrition-challenge-cn.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
-import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
+import { TARGETS_CONFIG, resolveTargetsConfig } from './_shared/targets-config.mjs';
 import { validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
@@ -287,7 +288,7 @@ import {
   executeHammondProductivity,
   isHammondProductivityTool
 } from './_shared/hammond-productivity.mjs';
-import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
+import { loadIntuitionFor, formatIntuitionForPrompt, loadPrivateIntuitionPacks } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -312,6 +313,7 @@ import {
 } from '../../apps/life/js/app/skincare-routine-membership.js';
 import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../apps/life/js/app/skincare-catalog.js';
 import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { loadSkincareDefaults } from './_shared/skincare-defaults.mjs';
 import {
   formatTemplatesForPrompt,
   isTemplatePath,
@@ -846,6 +848,9 @@ export function createChatHandler({
         let mindEvents = [];
         let medicalEvents = [];
         let repoTree = [];
+        // Live targets come from the private data repo's config/targets.yml; the
+        // bundled TARGETS_CONFIG is a neutral template used only when that is absent.
+        let targetsConfig = TARGETS_CONFIG;
         let completedWorkoutsToday = [];
         try {
           const current = await client.resolveTree();
@@ -1163,7 +1168,15 @@ export function createChatHandler({
           const files = dataEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
             .filter(file => file.content !== null);
-          digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
+          const targetsEntry = current.tree.find(entry => entry.path === 'config/targets.yml' && entry.type === 'blob');
+          if (targetsEntry?.sha) {
+            try {
+              targetsConfig = resolveTargetsConfig(decodeBlob(await client.readBlob(targetsEntry.sha)));
+            } catch {
+              targetsConfig = TARGETS_CONFIG;
+            }
+          }
+          digest = summarizeRecentHistory(files, targetsConfig, today);
 
           if (slug === 'brisket' && nutritionRecords.length === 0) {
             for (const file of files) {
@@ -1312,11 +1325,15 @@ export function createChatHandler({
               libraryLoaded = true;
             }
           }
+          // Cold-start seed: the private config/skincare-routines.yml, else the neutral template.
+          const skincareDefaults = needsSkincareLibrary
+            ? await loadSkincareDefaults({ tree: current.tree, readBlob: sha => client.readBlob(sha) })
+            : SKINCARE_ROUTINES;
           // Prefer legacy catalog migrate over defaults when the shelf blob is absent.
           if (!libraryLoaded && needsSkincareLibrary) {
             skincareLibrary = legacyCatalog
               ? migrateProductLibraryFromCatalog(legacyCatalog)
-              : seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
+              : seedProductLibraryFromDefaults(skincareDefaults);
           }
 
           let membershipLoaded = false;
@@ -1333,7 +1350,7 @@ export function createChatHandler({
           if (!membershipLoaded && needsSkincareLibrary) {
             skincareMembership = legacyCatalog
               ? migrateMembershipFromCatalog(legacyCatalog, skincareLibrary)
-              : seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
+              : seedMembershipFromDefaults(skincareDefaults, skincareLibrary);
           }
 
           const templateContentsLoaded = templateEntries
@@ -1345,7 +1362,7 @@ export function createChatHandler({
           if (needsBodyState) {
             compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
             measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
-            physiqueTargetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
+            physiqueTargetRatio = loadPhysiqueTarget({ config: targetsConfig }).shoulder_waist_ratio;
             bodyState = formatBodyStateForPrompt({
               compositionRecords,
               measurementRecords,
@@ -1413,7 +1430,7 @@ export function createChatHandler({
             hammondEvents = cnEvents;
             const centralNodeModel = buildCentralNodeModel({
               events: cnEvents,
-              targetsConfig: TARGETS_CONFIG,
+              targetsConfig,
               centralNodeMarkdown,
               date: today
             });
@@ -1422,7 +1439,7 @@ export function createChatHandler({
             centralNodeModel.bindingGoal = buildBindingGoal({
               events: [...cnEvents, ...fitnessRecords.map(record => ({ record }))],
               date: today,
-              targetsConfig: TARGETS_CONFIG
+              targetsConfig
             });
             hammondCnSummary = formatCentralNodeModelForPrompt(centralNodeModel);
             hammondDiaryDigest = hammondDiaryDigestForTurn({
@@ -1635,20 +1652,35 @@ export function createChatHandler({
           ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
         ];
 
-        const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
-        const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
-        const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
-        const veraProtocol = slug === 'vera' ? loadVeraProtocol() : '';
-        const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
-        const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
-        const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
-        const clareProtocol = slug === 'clare' ? loadClareProtocol() : '';
-        const annProtocol = slug === 'ann' ? loadAnnProtocol() : '';
-        const clementineProtocol = slug === 'clementine' ? loadClementineProtocol() : '';
+        // Public protocols are generic; Adam-specific standing context is appended
+        // from the private data repo (config/agent-context/<slug>.md) when present.
+        const privateAgentContext = await loadPrivateAgentContext(slug, { client, tree: repoTree });
+        const protocolFor = (agent, load) => (
+          slug === agent ? withPrivateAgentContext(load(), privateAgentContext) : ''
+        );
+        const chadwickProtocol = protocolFor('chadwick', loadChadwickProtocol);
+        const hyaluronicaProtocol = protocolFor('hyaluronica', loadHyaluronicaProtocol);
+        const penelopeProtocol = protocolFor('penelope', loadPenelopeProtocol);
+        const veraProtocol = protocolFor('vera', loadVeraProtocol);
+        const brisketProtocol = protocolFor('brisket', loadBrisketProtocol);
+        const saraProtocol = protocolFor('sara', loadSaraProtocol);
+        const hammondProtocol = protocolFor('hammond', loadHammondProtocol);
+        const clareProtocol = protocolFor('clare', loadClareProtocol);
+        const annProtocol = protocolFor('ann', loadAnnProtocol);
+        const clementineProtocol = protocolFor('clementine', loadClementineProtocol);
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
-        const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
+        let privateIntuitionPacks = [];
+        try {
+          privateIntuitionPacks = await loadPrivateIntuitionPacks(
+            repoTree,
+            async sha => decodeBlob(await client.readBlob(sha))
+          );
+        } catch {
+          privateIntuitionPacks = [];
+        }
+        const intuitionPacks = loadIntuitionFor({ agentSlug: slug, privatePacks: privateIntuitionPacks });
         const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const capacityOneLiners = promptOneLinersForAgent(slug);
         const hubContext = needsHubRetrieval ? await hubContextPromise : '';
@@ -1745,6 +1777,7 @@ export function createChatHandler({
           hammondEvents,
           centralNodeMarkdown,
           nutritionChallenges,
+          targetsConfig,
           templates: [],
           stressFlags: [],
           inbox: [],
@@ -2457,16 +2490,17 @@ export function createChatHandler({
               if (event.name === 'get_nutrition_snapshot') {
                 send({ type: 'status', text: 'Reading Nutrition dashboard…' });
                 return JSON.stringify(getNutritionSnapshot(nutritionRecords, today, {
-                  nutritionChallenges
+                  nutritionChallenges,
+                  targetsConfig
                 }));
               }
               if (event.name === 'get_nutrition_adherence') {
                 send({ type: 'status', text: 'Reading nutrition adherence…' });
-                return JSON.stringify(getNutritionAdherence(nutritionRecords, today));
+                return JSON.stringify(getNutritionAdherence(nutritionRecords, today, { targetsConfig }));
               }
               if (event.name === 'get_nutrition_targets') {
                 send({ type: 'status', text: 'Reading nutrition targets…' });
-                return JSON.stringify(getNutritionTargets(today));
+                return JSON.stringify(getNutritionTargets(today, { targetsConfig }));
               }
               if (event.name === 'search_nutrition_records') {
                 send({ type: 'status', text: 'Searching nutrition records…' });

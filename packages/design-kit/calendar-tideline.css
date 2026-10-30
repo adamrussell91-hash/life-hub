@@ -69,7 +69,7 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-src--shortcut.is-off,.cal-src--shortcut[aria-pressed="false"]{text-decoration:none;color:var(--muted)}
 .cal-src--shortcut[aria-pressed="true"]{color:var(--ink);background:var(--glass);border-color:var(--line)}
 .cal-src--ambient{background:transparent;border-style:dashed;color:var(--muted);cursor:default;text-decoration:none}
-.cal-src--Redacted{color:var(--pastel-peach-ink)}
+.cal-src--partner{color:var(--pastel-peach-ink)}
 .cal-src-hidden{margin-left:auto;border:0;background:transparent;color:var(--muted);font:inherit;font-size:var(--text-2xs);cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:var(--space-1) var(--space-2);white-space:nowrap;flex:none}
 .cal-src-hidden:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
 .cal-empty-filter{margin:0;padding:var(--space-4);text-align:center;color:var(--muted);font-size:var(--text-sm);cursor:pointer}
@@ -207,9 +207,9 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-tick.is-done::before{content:"";position:absolute;left:3.5px;top:1px;width:3px;height:6px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
 .cal-tick:disabled{cursor:progress}
 .cal-chip.is-class{box-shadow:none;--chip-bg:color-mix(in srgb,#fff 80%,transparent);border-color:color-mix(in srgb,var(--wave) calc(var(--t,1) * 18%),transparent)}
-.cal-chip.is-Redacted{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
-.cal-chip.is-Redacted.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
-.cal-chip.is-Redacted.is-ghost::after{border-color:color-mix(in srgb,var(--pastel-peach-ink) 60%,transparent)}
+.cal-chip.is-partner{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
+.cal-chip.is-partner.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
+.cal-chip.is-partner.is-ghost::after{border-color:color-mix(in srgb,var(--pastel-peach-ink) 60%,transparent)}
 .cal-mark{display:inline-block;width:14px;height:9px;position:relative;margin-right:3px;vertical-align:0}
 .cal-mark::before,.cal-mark::after{content:"";position:absolute;top:0;width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
 .cal-mark::before{left:0}.cal-mark::after{left:5px}
@@ -220,7 +220,7 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .k-task{--k-bg:var(--pastel-sage);--k-stripe:var(--cal-sage-stripe)}
 .k-health{--k-bg:var(--cal-health);--k-stripe:var(--cal-health-stripe)}
 .k-study{--k-bg:var(--pastel-gold);--k-stripe:var(--pastel-gold-ink)}
-.k-Redacted{--k-bg:var(--pastel-peach);--k-stripe:var(--pastel-peach-ink);--k-ink:var(--pastel-peach-ink)}
+.k-partner{--k-bg:var(--pastel-peach);--k-stripe:var(--pastel-peach-ink);--k-ink:var(--pastel-peach-ink)}
 
 /* ---------- chip popover ---------- */
 .cal-chip{cursor:pointer}

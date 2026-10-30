@@ -153,7 +153,7 @@ export function proposeCalendarGhostSchema() {
         end: { type: 'string', description: 'protect_block / outing / meal_block / schedule_workout / reschedule end HH:MM' },
         title: { type: 'string', description: 'Block / task / communication title or subject' },
         subject: { type: 'string', description: 'log_comm subject (alias of title)' },
-        with: { type: 'string', description: 'companion (e.g. Redacted) for outing / protect_block' },
+        with: { type: 'string', description: 'companion (e.g. partner) for outing / protect_block' },
         place: { type: 'string', description: 'optional place for outing (stored in notes)' },
         notes: { type: 'string', description: 'create_task notes or outing/meal notes' },
         path: { type: 'string', description: 'Life record path for reschedule_block / cancel_block' },

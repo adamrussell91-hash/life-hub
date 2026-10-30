@@ -91,8 +91,8 @@ const FIXTURE_FILES = [
     source: 'tests/fixtures/valid/data/nutrition/challenges.json'
   },
   {
-    path: 'data/body/2026/07/2026-07-08-therapy-Redacted.md',
-    source: 'tests/fixtures/valid/data/body/2026/07/2026-07-08-therapy-Redacted.md'
+    path: 'data/body/2026/07/2026-07-08-therapy-example-psychologist.md',
+    source: 'tests/fixtures/valid/data/body/2026/07/2026-07-08-therapy-example-psychologist.md'
   }
 ];
 
@@ -760,6 +760,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       const body = request.method === 'POST' ? JSON.stringify(await readJson(request)) : undefined;
       const result = await route(new Request(new URL(url.pathname, 'http://localhost'), { method: request.method, headers: { 'content-type': 'application/json' }, body }), { env: {}, store });
       json(response, result.status, await result.json(), PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/aesthetics/source') {
+      if (!readSession(request)) return unauthenticated(response);
+      // The fragrance library and watch tracker are private: local dev shows the unavailable state.
+      json(response, 200, { ok: true, data: { map: [], fragrances: [], styleNote: null, watches: [], watchSourceUrl: null, watchHunt: null, status: 'unavailable' } }, PRIVATE_HEADERS);
       return true;
     }
 

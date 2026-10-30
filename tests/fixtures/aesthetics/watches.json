@@ -1,0 +1,260 @@
+{
+  "schema": "aesthetics_watches/v1",
+  "synthetic": true,
+  "sourceUrl": "https://notes.example/watches",
+  "watches": [
+    {
+      "id": "fa7c4e00000000000000000000000001",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Exemplar Townsend Automatic – Blue Dial / Brown",
+        "Brand": "Exemplar",
+        "Model": "Townsend Automatic",
+        "Status": "Owned",
+        "Category": "Dress",
+        "Case Diameter mm": 41,
+        "Reference Number": "EX-1001",
+        "Markers": [
+          "Applied",
+          "Roman",
+          "Baton"
+        ],
+        "Dial / Face Colour": "Blue",
+        "Strap / Bracelet Colour": "Brown",
+        "Strap / Bracelet Material": "Leather",
+        "Movement Type": "Mechanical: Automatic",
+        "Origin": "Other",
+        "Complications": [
+          "Date"
+        ],
+        "Engraving Notes": "Caseback: EXEMPLAR / SERIAL 000-TEST-0001",
+        "Water Resistance": "50 m"
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000002",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Samplewerk Quartz Day Date (cal. 9000)",
+        "Brand": "Samplewerk",
+        "Status": "Owned",
+        "Category": "Dress",
+        "Dial / Face Colour": "Black",
+        "Strap / Bracelet Colour": "Black",
+        "Strap / Bracelet Material": "Leather",
+        "Movement Type": "Quartz",
+        "Complications": [
+          "Day Date"
+        ],
+        "Engraving Notes": "Caseback: SAMPLEWERK / 9000-TEST-0002"
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000003",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Fictiva Field 38 – White / Steel",
+        "Brand": "Fictiva",
+        "Status": "Owned",
+        "Category": "Field",
+        "Case Diameter mm": 38,
+        "Dial / Face Colour": "White",
+        "Strap / Bracelet Colour": "Silver",
+        "Strap / Bracelet Material": "Metal bracelet",
+        "Movement Type": "Quartz",
+        "Origin": "Japanese",
+        "Complications": []
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000004",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Exemplar Neutral Chronograph – Black / Steel",
+        "Brand": "Exemplar",
+        "Status": "Wishlist",
+        "Category": "Casual",
+        "Price": 269,
+        "Product URL": "https://exemplar.example/products/neutral-black",
+        "Dial / Face Colour": "Black",
+        "Complications": [
+          "Chronograph"
+        ]
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000005",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Exemplar Neutral Chronograph – Cream / Brown Leather",
+        "Brand": "Exemplar",
+        "Status": "Wishlist",
+        "Category": "Casual",
+        "Price": 249,
+        "Product URL": "https://exemplar.example/products/neutral-cream",
+        "Dial / Face Colour": "Cream",
+        "Complications": [
+          "Chronograph"
+        ]
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000006",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Exemplar Neutral Chronograph – Green / Tan",
+        "Brand": "Exemplar",
+        "Status": "Wishlist",
+        "Category": "Casual",
+        "Price": 279,
+        "Dial / Face Colour": "Green",
+        "Complications": [
+          "Chronograph"
+        ]
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000007",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Samplewerk Original Moonphase",
+        "Brand": "Samplewerk",
+        "Status": "Wishlist",
+        "Category": "Dress",
+        "Price": 400,
+        "Product URL": "https://www.samplewerk.example",
+        "Dial / Face Colour": "Blue",
+        "Complications": [
+          "Moonphase"
+        ]
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000008",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Fictiva Longitude Heritage",
+        "Brand": "Fictiva",
+        "Status": "Wishlist",
+        "Category": "Dress",
+        "Price": 350,
+        "Product URL": "https://fictiva.example/products/longitude",
+        "Origin": "British",
+        "Movement Type": "Mechanical: Automatic",
+        "Complications": []
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000009",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Example 1963 Chronograph",
+        "Brand": "Example",
+        "Status": "Wishlist",
+        "Category": "Casual",
+        "Price": 300,
+        "Product URL": "https://chrono.example/collections/1963",
+        "Complications": [
+          "Chronograph"
+        ]
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000010",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Sample Minimalist",
+        "Brand": "Sample",
+        "Status": "Wishlist",
+        "Category": "Dress",
+        "Complications": []
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000011",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "Passed Example Diver",
+        "Brand": "Example",
+        "Status": "Passed",
+        "Category": "Dive",
+        "Price": 500,
+        "Product URL": "https://diver.example/products/diver",
+        "Complications": []
+      }
+    },
+    {
+      "id": "fa7c4e00000000000000000000000012",
+      "added": "2026-01-01 09:00:00Z",
+      "updated": "2026-01-01 09:00:00Z",
+      "properties": {
+        "Watch": "",
+        "Status": "Wishlist"
+      }
+    }
+  ],
+  "hunt": {
+    "source": "https://notes.example/hunt",
+    "title": "The example watch hunt",
+    "when": "Sample City, some month",
+    "lede": "An invented brief for tests.",
+    "goal": "A small dress watch with an invented history.",
+    "brief": [
+      "34 to 38 mm",
+      "Cream dial",
+      "Leather strap"
+    ],
+    "targets": [
+      {
+        "name": "Exemplar",
+        "note": "Invented first choice."
+      },
+      {
+        "name": "Fictiva",
+        "note": "Invented second choice."
+      }
+    ],
+    "places": [
+      {
+        "name": "Sample City",
+        "note": "Invented market."
+      }
+    ],
+    "checks": [
+      "Dial looks original",
+      "Keeps time",
+      "Winds smoothly"
+    ],
+    "rule": "It only comes home if it passes every check.",
+    "fallback": [
+      "Sample Minimalist"
+    ],
+    "sample": {
+      "id": "hunt-sample",
+      "name": "An example at 34 mm",
+      "mm": 34,
+      "lugWidth": 16,
+      "dial": "Cream",
+      "strap": "Brown",
+      "strapMaterial": "Leather",
+      "markers": [
+        "Arabic"
+      ],
+      "handsColour": "Blue",
+      "complications": [],
+      "caseMaterial": "Stainless steel",
+      "notes": ""
+    }
+  }
+}

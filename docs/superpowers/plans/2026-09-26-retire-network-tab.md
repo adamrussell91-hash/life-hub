@@ -1,12 +1,12 @@
-# Retire the Tasks Hub "Network" Tab (Network + Redacted) Implementation Plan
+# Retire the Tasks Hub "Network" Tab (Network + Partner) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Delete the Tasks Hub "Network" sidebar group entirely — the Network (StressFlag inbox) page, the Redacted (capacity share) page, and the now-empty "Network" nav section left behind — while writing the reusable parts of the concept into `docs/AGENT_CAPABILITY_STRATEGY.md` so they resurface when agent automation work actually starts.
+**Goal:** Delete the Tasks Hub "Network" sidebar group entirely — the Network (StressFlag inbox) page, the Partner (capacity share) page, and the now-empty "Network" nav section left behind — while writing the reusable parts of the concept into `docs/AGENT_CAPABILITY_STRATEGY.md` so they resurface when agent automation work actually starts.
 
-**Why:** The Network page is a read-only inbox of AI-generated "flags" routed to Hammond / Penelope / Vera, but nothing downstream ever consumes those routes (`networkBriefing` in `domain/network-desk.ts` is dead code — nothing calls it outside its own test). Its rule-based detection duplicates `domain/pinch.ts`, which already renders the same signal on Dashboard/Calendar with real one-tap actions. Redacted's capacity-share page is being retired at Adam's request — it's no longer needed. Removing both empties the "Network" sidebar group, so that group goes too.
+**Why:** The Network page is a read-only inbox of AI-generated "flags" routed to Hammond / Penelope / Vera, but nothing downstream ever consumes those routes (`networkBriefing` in `domain/network-desk.ts` is dead code — nothing calls it outside its own test). Its rule-based detection duplicates `domain/pinch.ts`, which already renders the same signal on Dashboard/Calendar with real one-tap actions. Partner's capacity-share page is being retired at Adam's request — it's no longer needed. Removing both empties the "Network" sidebar group, so that group goes too.
 
-**Important — do not break the live assistant:** `netlify/functions/_shared/tasks-stress.mjs` and `netlify/functions/_shared/tasks-capacity.mjs` (pure detection/calculation, no storage) are **also** imported by `netlify/functions/_shared/domain-retrieval.mjs` and `domain-analysis.mjs`, which feed `getTasksOpenLoops` in the general cross-hub assistant (`chat.mjs` → `agent-kernel.mjs` → `evidence-packs.mjs`). Those two files must **not** be deleted — only their now-dead, Network/Redacted-only exports (see Task 4). The persisted StressFlag store (`tasks-network.mjs`, the Netlify functions `stress-flags.mjs` / `capacity.mjs`) is a separate, unrelated layer that only the Network/Redacted UI ever read — confirmed dead: `chat.mjs` hardcodes `stressFlags: []` into the assistant's evidence pack and never reads the persisted store. That whole layer is safe to delete.
+**Important — do not break the live assistant:** `netlify/functions/_shared/tasks-stress.mjs` and `netlify/functions/_shared/tasks-capacity.mjs` (pure detection/calculation, no storage) are **also** imported by `netlify/functions/_shared/domain-retrieval.mjs` and `domain-analysis.mjs`, which feed `getTasksOpenLoops` in the general cross-hub assistant (`chat.mjs` → `agent-kernel.mjs` → `evidence-packs.mjs`). Those two files must **not** be deleted — only their now-dead, Network/Partner-only exports (see Task 4). The persisted StressFlag store (`tasks-network.mjs`, the Netlify functions `stress-flags.mjs` / `capacity.mjs`) is a separate, unrelated layer that only the Network/Partner UI ever read — confirmed dead: `chat.mjs` hardcodes `stressFlags: []` into the assistant's evidence pack and never reads the persisted store. That whole layer is safe to delete.
 
 **Tech Stack:** Tasks Hub SPA (TypeScript/Vite/vitest, `apps/tasks`), Netlify Functions (`.mjs`, `node --test`, `netlify/functions`), root `tests/`.
 
@@ -25,13 +25,13 @@
 
 | Layer | Delete entirely | Keep (used elsewhere) |
 |---|---|---|
-| Netlify functions | `stress-flags.mjs`, `capacity.mjs`, `_shared/tasks-network.mjs` | `_shared/tasks-stress.mjs`, `_shared/tasks-capacity.mjs` (used by `domain-retrieval.mjs`/`domain-analysis.mjs` for the assistant's "open loops"/focus digest) — only trim their Network/Redacted-only exports |
+| Netlify functions | `stress-flags.mjs`, `capacity.mjs`, `_shared/tasks-network.mjs` | `_shared/tasks-stress.mjs`, `_shared/tasks-capacity.mjs` (used by `domain-retrieval.mjs`/`domain-analysis.mjs` for the assistant's "open loops"/focus digest) — only trim their Network/Partner-only exports |
 | Root tests | `tests/integration/tasks-network.test.js` (imports the two deleted handlers) | `tests/unit/tasks-network.test.js` — **trim**, don't delete (2 of its 3 tests exercise the kept pure detectors); `tests/unit/capacity-model.test.js` — **unrelated**, it tests `apps/life/js/app/capacity-model.js` (sleep/mood capacity), do not touch |
-| Tasks Hub views | `apps/tasks/src/views/stress.ts`, `apps/tasks/src/views/Redacted.ts` | — |
-| Tasks Hub domain | `domain/stress.ts`, `domain/network-desk.ts`, `domain/intuitive-scan.ts`, `ai/intuitive-judge.ts`, `domain/intuitive-digest.ts` (confirmed: these four import each other and nothing else touches them) | `domain/pinch.ts` (unrelated, already live), `domain/capacity.ts` — **trim only** (`buildDayCapacity`/`CapacityLevel`/`DayCapacity` stay, used by `views/calendar.ts`; `CapacitySnapshot`/`capacityHeadlines`/`buildCapacitySnapshot`/`toCoreyPublicView` go) |
+| Tasks Hub views | `apps/tasks/src/views/stress.ts`, `apps/tasks/src/views/partner.ts` | — |
+| Tasks Hub domain | `domain/stress.ts`, `domain/network-desk.ts`, `domain/intuitive-scan.ts`, `ai/intuitive-judge.ts`, `domain/intuitive-digest.ts` (confirmed: these four import each other and nothing else touches them) | `domain/pinch.ts` (unrelated, already live), `domain/capacity.ts` — **trim only** (`buildDayCapacity`/`CapacityLevel`/`DayCapacity` stay, used by `views/calendar.ts`; `CapacitySnapshot`/`capacityHeadlines`/`buildCapacitySnapshot`/`toPartnerPublicView` go) |
 | Tasks Hub schemas | `schemas/stress.ts`, `schemas/capacity.ts` | — |
 | Chat | Penelope + Vera entries in `chat/agents.ts` (their only reason to exist is StressFlag texture — no other file references the `'penelope'`/`'vera'` slugs); `clare-tools.ts`'s `list_inbox` tool + `AGENT_LIST_INBOX_TOOL`; the `list_inbox` line in `ai/clare-proposal-judge.ts`; `DEFAULT_PENELOPE_PROTOCOL`/`DEFAULT_VERA_PROTOCOL` and the Network-only parts of `DEFAULT_HAMMOND_PROTOCOL` in `domain/defaults/agent-protocols.ts` | Hammond's `CHAT_AGENTS` entry itself — **keep**, `apps/tasks/src/views/hammond-goal.ts` uses `agentBySlug('hammond').avatarSrc` for the (unrelated, actively developed) Goals feature. Strip Hammond's `protocols`/`inboxName` fields that only make sense with a StressFlag inbox; leave name/colour/accent/avatar/placeholder/waitLines. |
-| Nav | `network` section, `stress`/`Redacted` route ids, their icons in `shell.ts` + `shell/icons.ts` | — |
+| Nav | `network` section, `stress`/`partner` route ids, their icons in `shell.ts` + `shell/icons.ts` | — |
 | Styles | `.stress-*`, `.capacity-share`, `.capacity-hero`, `.capacity-grid`, `.capacity-day*`, `.capacity-public__*` in `styles/views.css` | `.calendar-meta .hub-calendar__capacity` — unrelated calendar rule, keep |
 
 ---
@@ -54,10 +54,10 @@ You'll reference this SHA in the doc so the original UI/behavior can be pulled b
 - [ ] **Step 2: Append this section to the end of `docs/AGENT_CAPABILITY_STRATEGY.md`**
 
 ```markdown
-## Retired: Tasks Hub Network / Redacted pages (2026-09-26)
+## Retired: Tasks Hub Network / Partner pages (2026-09-26)
 
 The Tasks Hub had a "Network" sidebar group — a StressFlag inbox page and a
-Redacted capacity-share page — built ahead of any agent automation actually
+Partner capacity-share page — built ahead of any agent automation actually
 consuming it. Removed because: its rule-based detection duplicated
 `apps/tasks/src/domain/pinch.ts` (which is live, actionable, and rendered on
 Dashboard/Calendar), and its cross-agent routing had no consumer —
@@ -105,8 +105,8 @@ own unit test. Full history: `git show <SHA_FROM_STEP_1>:apps/tasks/src/views/st
    about pinch points or overlapping excursions should call these, not
    duplicate them.
 
-4. **The Redacted capacity-share pattern is worth keeping as a pattern, not as
-   code:** a rotating public token backing a redacted view (`toCoreyPublicView`
+4. **The Partner capacity-share pattern is worth keeping as a pattern, not as
+   code:** a rotating public token backing a redacted view (`toPartnerPublicView`
    stripped task titles, kept only day-level busy/free labels). If a future
    feature needs to share a read-only, redacted view of Life Hub state with
    someone outside the system, this token-rotation approach
@@ -119,7 +119,7 @@ own unit test. Full history: `git show <SHA_FROM_STEP_1>:apps/tasks/src/views/st
 ```bash
 git add docs/AGENT_CAPABILITY_STRATEGY.md
 git commit -m "$(cat <<'EOF'
-docs: preserve StressFlag/Redacted-share concepts before retiring Network tab
+docs: preserve StressFlag/Partner-share concepts before retiring Network tab
 
 EOF
 )"
@@ -174,21 +174,21 @@ Expected: `_shared/tasks-network.mjs` (being deleted), `_shared/domain-retrieval
   title: 'Network',
   items: [
     { id: 'stress', label: 'Network', href: '#/stress' },
-    { id: 'Redacted', label: 'Redacted', href: '#/Redacted' }
+    { id: 'partner', label: 'Partner', href: '#/partner' }
   ]
 }
 ```
-Remove `'stress'` and `'Redacted'` from the route-id union (~line 59-60) and from wherever `#/stress`, `#/Redacted`, and `#/capacity/:token` (the public Redacted share route, ~line 768) are parsed/mounted.
+Remove `'stress'` and `'partner'` from the route-id union (~line 59-60) and from wherever `#/stress`, `#/partner`, and `#/capacity/:token` (the public Partner share route, ~line 768) are parsed/mounted.
 
-- [ ] **Step 2:** In `shell/icons.ts`, delete the `stress` and `Redacted` icon path entries.
+- [ ] **Step 2:** In `shell/icons.ts`, delete the `stress` and `partner` icon path entries.
 
-- [ ] **Step 3:** Run `cd apps/tasks && npx tsc --noEmit -p .` — expect new errors pointing at `views/stress.ts`/`views/Redacted.ts` no longer being reachable from `main.ts`; that's expected and gets fixed in Tasks 4–5.
+- [ ] **Step 3:** Run `cd apps/tasks && npx tsc --noEmit -p .` — expect new errors pointing at `views/stress.ts`/`views/partner.ts` no longer being reachable from `main.ts`; that's expected and gets fixed in Tasks 4–5.
 
 - [ ] **Step 4: Commit**
 ```bash
 git add apps/tasks/src/shell/shell.ts apps/tasks/src/shell/icons.ts
 git commit -m "$(cat <<'EOF'
-chore(tasks): remove Network nav section and stress/Redacted routes
+chore(tasks): remove Network nav section and stress/partner routes
 
 EOF
 )"
@@ -250,28 +250,28 @@ EOF
 
 ---
 
-## Task 5: Delete the Redacted (capacity share) page and its exclusive code
+## Task 5: Delete the Partner (capacity share) page and its exclusive code
 
 **Files to delete:**
-- `apps/tasks/src/views/Redacted.ts`
+- `apps/tasks/src/views/partner.ts`
 - `apps/tasks/src/schemas/capacity.ts`
 - `netlify/functions/capacity.mjs`
 
 **Files to trim:**
 
-- [ ] **`apps/tasks/src/app/main.ts`** — remove the `renderCoreyView` mount/import and the public `#/capacity/:token` route mount.
-- [ ] **`apps/tasks/src/domain/capacity.ts`** — remove `CapacitySnapshot`, `capacityHeadlines`, `buildCapacitySnapshot`, `toCoreyPublicView`. Keep `CapacityLevel`, `DayCapacity`, `buildDayCapacity`, `levelFromLoad`, `effort` — `views/calendar.ts` imports `buildDayCapacity` directly and is unrelated to Redacted.
+- [ ] **`apps/tasks/src/app/main.ts`** — remove the `renderPartnerView` mount/import and the public `#/capacity/:token` route mount.
+- [ ] **`apps/tasks/src/domain/capacity.ts`** — remove `CapacitySnapshot`, `capacityHeadlines`, `buildCapacitySnapshot`, `toPartnerPublicView`. Keep `CapacityLevel`, `DayCapacity`, `buildDayCapacity`, `levelFromLoad`, `effort` — `views/calendar.ts` imports `buildDayCapacity` directly and is unrelated to Partner.
 - [ ] **`apps/tasks/src/services/client-api.ts`** — remove `getCapacity`, `ensureCapacityShare`, `rotateCapacityShare`, `getPublicCapacity`.
 - [ ] **`apps/tasks/src/services/types.ts`** — remove the matching interface methods and the `CapacityShare`/`CapacitySnapshot` imports (keep `CapacityLevel` if still referenced elsewhere in this file).
 - [ ] **`apps/tasks/src/services/store.ts`** — remove `getCapacitySnapshot`, `getCapacityShare`, `ensureCapacityShare`, `rotateCapacityShare`, `getPublicCapacityByToken`, the `CapacityShareSchema` import, and `capacityShareKey` from the `keys` type.
 - [ ] **`apps/tasks/src/storage/keys.ts`** — remove `capacityShareKey`.
-- [ ] **`apps/tasks/src/shell/shell.ts`** — remove the `/** Public Redacted share: \`#/capacity/<token>\` */` route handling (~line 768) if not already removed in Task 3.
+- [ ] **`apps/tasks/src/shell/shell.ts`** — remove the `/** Public Partner share: \`#/capacity/<token>\` */` route handling (~line 768) if not already removed in Task 3.
 - [ ] **`apps/tasks/src/styles/views.css`** — remove `.capacity-share`, `.capacity-hero`, `.capacity-hero__line`, `.capacity-grid`, `.capacity-day`, `.capacity-day--*`, `.capacity-day__name`, `.capacity-day__level`, `.capacity-public__title`, `.capacity-public__note` (lines ~458, 488, 4118-4210 as of this writing — confirm current numbers). **Do not touch** `.calendar-meta .hub-calendar__capacity` (~3885, ~5401) — unrelated calendar rule.
 - [ ] **`apps/tasks/scripts/mock-api.ts`** — remove the dev-mode stub routes for capacity/share.
-- [ ] **`apps/tasks/tests/unit/capacity-closure.test.ts`** — remove only the `describe('capacity (Redacted)', ...)` block and its now-unused `buildCapacitySnapshot`/`toCoreyPublicView` import. **Keep** the `describe('closure loop', ...)` block — unrelated ReviewLog logic, same file.
-- [ ] **`netlify/functions/_shared/tasks-capacity.mjs`** — remove `toCoreyPublicView` only (confirmed sole caller was `tasks-network.mjs`, already deleted in Task 4). Keep `buildDayCapacity`, `capacityHeadlines`, `buildCapacitySnapshot` — still imported by `domain-retrieval.mjs`/`domain-analysis.mjs`.
+- [ ] **`apps/tasks/tests/unit/capacity-closure.test.ts`** — remove only the `describe('capacity (Partner)', ...)` block and its now-unused `buildCapacitySnapshot`/`toPartnerPublicView` import. **Keep** the `describe('closure loop', ...)` block — unrelated ReviewLog logic, same file.
+- [ ] **`netlify/functions/_shared/tasks-capacity.mjs`** — remove `toPartnerPublicView` only (confirmed sole caller was `tasks-network.mjs`, already deleted in Task 4). Keep `buildDayCapacity`, `capacityHeadlines`, `buildCapacitySnapshot` — still imported by `domain-retrieval.mjs`/`domain-analysis.mjs`.
 - [ ] **`netlify/functions/_shared/tasks-stress.mjs`** — after confirming (`grep -rn "DEFAULT_STRESS_ROUTE\|agentSlug(" netlify/functions --include=*.mjs`) neither is imported anywhere but the now-deleted `tasks-network.mjs`, remove `DEFAULT_STRESS_ROUTE` and `agentSlug`. Keep `detectOverlappingExcursions`, `detectDensePinches`, `detectMissedDeadlines` (imported individually by `domain-retrieval.mjs`/`domain-analysis.mjs`); `detectStressPatterns` (the combined wrapper) is also now dead — remove it too if the same grep confirms no other caller.
-- [ ] **`tests/unit/tasks-network.test.js`** — remove only the third test (`'public capacity view strips task titles and counts'`) and the now-unused `toCoreyPublicView` import; keep the first two tests (`detectOverlappingExcursions`, `detectMissedDeadlines` against the kept `tasks-stress.mjs`). Consider renaming this file to `tasks-stress.test.js` since it no longer tests anything Redacted/network-specific — optional, do it if it's a one-line `git mv`.
+- [ ] **`tests/unit/tasks-network.test.js`** — remove only the third test (`'public capacity view strips task titles and counts'`) and the now-unused `toPartnerPublicView` import; keep the first two tests (`detectOverlappingExcursions`, `detectMissedDeadlines` against the kept `tasks-stress.mjs`). Consider renaming this file to `tasks-stress.test.js` since it no longer tests anything Partner/network-specific — optional, do it if it's a one-line `git mv`.
 
 - [ ] **Step: run tests, fix fallout**
 ```bash
@@ -284,7 +284,7 @@ cd ../.. && npm test
 ```bash
 git add -A
 git commit -m "$(cat <<'EOF'
-feat(tasks): remove the Redacted capacity-share page
+feat(tasks): remove the Partner capacity-share page
 
 EOF
 )"
@@ -319,8 +319,8 @@ EOF
 - [ ] `cd apps/tasks && npx tsc --noEmit -p .` — error count must not exceed the Task 0 baseline.
 - [ ] `cd apps/tasks && npx vitest run` — all pass.
 - [ ] `npm test` (repo root) — all pass, same or better than Task 0 baseline.
-- [ ] `grep -rn "stress-flags\|/api/capacity\|StressFlag\|networkBriefing\|toCoreyPublicView\|CapacityShare" apps/tasks/src netlify/functions --include=*.ts --include=*.mjs` — should return nothing except inside `_shared/tasks-stress.mjs` / `_shared/tasks-capacity.mjs` (the kept pure modules) and their two still-live importers.
-- [ ] Manually load the Tasks Hub locally: sidebar has no "Network" group, `#/stress`, `#/Redacted`, and `#/capacity/:token` all 404 cleanly (no broken layout), Dashboard/Calendar pinch strips still work, the goal page still shows Hammond's avatar, and chat still opens with Clare + Hammond only.
+- [ ] `grep -rn "stress-flags\|/api/capacity\|StressFlag\|networkBriefing\|toPartnerPublicView\|CapacityShare" apps/tasks/src netlify/functions --include=*.ts --include=*.mjs` — should return nothing except inside `_shared/tasks-stress.mjs` / `_shared/tasks-capacity.mjs` (the kept pure modules) and their two still-live importers.
+- [ ] Manually load the Tasks Hub locally: sidebar has no "Network" group, `#/stress`, `#/partner`, and `#/capacity/:token` all 404 cleanly (no broken layout), Dashboard/Calendar pinch strips still work, the goal page still shows Hammond's avatar, and chat still opens with Clare + Hammond only.
 
 ---
 
@@ -330,7 +330,7 @@ EOF
 |---|---|
 | Pop what's worth keeping somewhere in the repo for future agent automation | Task 1 |
 | Kill the Network (StressFlag) page | Task 4 |
-| Kill the Redacted page | Task 5 |
+| Kill the Partner page | Task 5 |
 | Kill the resulting empty "Network" tab | Task 3 |
 | Don't break the live cross-hub assistant's capacity/stress signal | Footprint table + Task 2 verification gates |
 | Don't break the actively-developed Goals feature's use of Hammond | Task 2 Step 3, Task 6 |

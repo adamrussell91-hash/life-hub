@@ -34,7 +34,7 @@ const KIND_HUB = Object.freeze({
   task: 'tasks',
   health: 'life',
   fitness: 'life',
-  Redacted: 'life',
+  partner: 'life',
   study: 'life'
 });
 

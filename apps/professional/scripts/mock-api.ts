@@ -841,7 +841,7 @@ export function createMockApi() {
           start_minutes: 490,
           end_minutes: 520,
           start_label: '8:10am',
-          people: [{ ref: null, display_name: 'Fr Ross' }]
+          people: [{ ref: null, display_name: 'Fr Example' }]
         },
         {
           id: 'lesson:p3',
@@ -1114,6 +1114,11 @@ export function createMockApi() {
 
     if (path === '/api/organisations/crest' && method === 'GET') {
       return json(200, { ok: true, data: { url: null, logo_key: null } });
+    }
+
+    // Researched crests are private; local dev shows monograms.
+    if (path === '/api/organisations/crest-image' && method === 'GET') {
+      return json(200, { ok: true, data: { refs: [], status: 'unavailable' } });
     }
 
     // --- Org structure / opportunities / Ann read (Part B) ---
@@ -1762,7 +1767,7 @@ export function createMockApi() {
         name
       });
       const ready = [
-        { kind: 'copy', remove: p(1, 'Rohan'), into: [p(2, 'Rohan Arianayagam')], student: true, links: 2, blocked: null },
+        { kind: 'copy', remove: p(1, 'Rohan'), into: [p(2, 'Rohan Examplar')], student: true, links: 2, blocked: null },
         { kind: 'combined', remove: p(3, 'Wynn Fernleigh, Fern Redgum'), into: [p(4, 'Wynn Fernleigh'), p(5, 'Fern Redgum')], student: true, links: 1, blocked: null }
       ].filter((a) => !mockDedupeDone.has(a.remove.id));
       if (input.action === 'plan_people_dedupe') {
@@ -1770,8 +1775,8 @@ export function createMockApi() {
           ok: true,
           data: {
             ready,
-            kept: [{ kind: 'copy', remove: p(6, 'Max Ziazaras'), into: [p(7, 'Max Ziaziaris')], student: true, links: 0, blocked: 'has_promises' }],
-            unresolved: [{ kind: 'combined', remove: p(8, 'Hector and Hugo Standen'), names: ['Hector Standen', 'Hugo Standen'], missing: ['Hector Standen', 'Hugo Standen'], links: 0 }]
+            kept: [{ kind: 'copy', remove: p(6, 'Max Zedwood'), into: [p(7, 'Max Zedwoode')], student: true, links: 0, blocked: 'has_promises' }],
+            unresolved: [{ kind: 'combined', remove: p(8, 'Hector and Hugo Exampleton'), names: ['Hector Exampleton', 'Hugo Exampleton'], missing: ['Hector Exampleton', 'Hugo Exampleton'], links: 0 }]
           }
         });
       }

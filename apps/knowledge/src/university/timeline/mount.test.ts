@@ -8,17 +8,17 @@ const catalogue: UniversityCatalogue = {
   degrees: [
     {
       id: "med",
-      title: "Master of Education (Gifted Education)",
-      institution: "University of New South Wales",
+      title: "Master of Sample Studies",
+      institution: "Sample Institute",
       status: "completed",
       start: "2025-02-10",
       end: "2026-04-24",
       description: null,
       units: [
         {
-          id: "edst",
-          title: "EDST5448 - Educational Research",
-          code: "EDST5448",
+          id: "smpl",
+          title: "SMPL5448 - Sample Research Methods",
+          code: "SMPL5448",
           status: "completed",
           start: "2025-02-10",
           end: "2025-11-27",
@@ -36,7 +36,7 @@ const catalogue: UniversityCatalogue = {
               gpaPoints: 7,
               grade: "High Distinction",
               description: "High Distinction Achieved",
-              unitNumber: "EDST5448",
+              unitNumber: "SMPL5448",
             },
           ],
         },
@@ -70,7 +70,7 @@ describe("mountUniversityTimeline", () => {
     document.body.append(host);
     const stop = mountUniversityTimeline(host, catalogue);
     await flush();
-    expect(host.querySelector("[data-tl-degree]")?.textContent).toContain("Master of Education");
+    expect(host.querySelector("[data-tl-degree]")?.textContent).toContain("Master of Sample Studies");
     expect(host.querySelector("[data-gpa-toggle]")?.textContent).toMatch(/GPA/);
 
     host.querySelector<HTMLButtonElement>("[data-tl-degree]")!.click();
@@ -114,6 +114,33 @@ describe("mountUniversityTimeline", () => {
     expect(host.classList.contains("is-panning")).toBe(false);
 
     stop();
+    host.remove();
+  });
+
+  it("loads the private catalogue when none is passed in", async () => {
+    const host = document.createElement("section");
+    host.style.width = "900px";
+    document.body.append(host);
+    let resolve!: (value: UniversityCatalogue | null) => void;
+    const stop = mountUniversityTimeline(host, undefined, () => new Promise(r => { resolve = r; }));
+    expect(host.textContent).toMatch(/Loading your university timeline/);
+    resolve(catalogue);
+    await flush();
+    await flush();
+    expect(host.querySelector("[data-tl-degree]")?.textContent).toContain("Master of Sample Studies");
+    stop();
+    host.remove();
+  });
+
+  it("shows a status instead of a chart when the catalogue is unavailable", async () => {
+    const host = document.createElement("section");
+    document.body.append(host);
+    const stop = mountUniversityTimeline(host, undefined, async () => null);
+    await flush();
+    expect(host.querySelector("[data-tl-degree]")).toBe(null);
+    expect(host.textContent).toMatch(/isn’t available right now/);
+    stop();
+    expect(host.childElementCount).toBe(0);
     host.remove();
   });
 });

@@ -11,7 +11,7 @@ import {
 import {
   formatAuthorshipExportLabel,
   resolveMomentAuthor,
-} from '@/journal/Redacted-perspective';
+} from '@/journal/partner-perspective';
 import type { JournalLeg, JournalLifecycle, JournalMedia, JournalMoment } from '@/journal/types';
 import { buildPhotoStops, buildSegments } from '@/journal/map-connections';
 import exportReaderHtml from '@/journal/export-reader/index.html?raw';

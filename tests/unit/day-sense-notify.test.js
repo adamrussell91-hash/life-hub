@@ -27,7 +27,7 @@ function memoryStore(seed = []) {
 
 const SUB = { endpoint: 'https://web.push.apple.com/abc', keys: { p256dh: 'BPk', auth: 'au' } };
 
-test('rules: dexy nudge in its window only; review at leave time on school days; cap and once-a-day', () => {
+test('rules: medication nudge in its window only; review at leave time on school days; cap and once-a-day', () => {
   const med = { prompt: { slot: 'pm', usual: 16 } };
   const base = { today: TODAY, med, schoolDay: true, leave: 16.75, reviewDone: false, log: { sent: {} } };
   assert.deepEqual(decideNotifications({ ...base, nowHour: 16.6 }).map((m) => m.key), ['dex-pm']);
@@ -37,7 +37,7 @@ test('rules: dexy nudge in its window only; review at leave time on school days;
   assert.deepEqual(decideNotifications({ ...base, nowHour: 16.6, log: { sent: { 'dex-pm': 'x' } } }), [], 'never twice');
   assert.deepEqual(decideNotifications({ ...base, nowHour: 16.6, log: { sent: { a: 1, b: 1, c: 1, d: 1 } } }), [], 'daily cap');
   const [dex] = decideNotifications({ ...base, nowHour: 16.6 });
-  assert.equal(dex.url, '/#/calendar/day?sheet=dexy');
+  assert.equal(dex.url, '/#/calendar/day?sheet=meds');
   assert.match(dex.body, /usually take it around 4 pm/);
 });
 

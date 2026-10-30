@@ -16,7 +16,7 @@ const TEACHING = [
 ];
 const WEDDING = ['florist', 'venue', 'wedding', 'suit', 'photographer', 'caterer', 'rsvp'];
 const HEALTH = [
-  'gp', 'doctor', 'blood', 'dex', 'Redacted', 'physio', 'sleep', 'script', 'medical', 'appointment'
+  'gp', 'doctor', 'blood', 'meds', 'medication', 'physio', 'sleep', 'script', 'medical', 'appointment'
 ];
 const LIFE = ['grocer', 'rent', 'bills', 'fragrance', 'laundry', 'home', 'car', 'council'];
 const COMMS = [

@@ -4,8 +4,8 @@ Read `AGENTS.md` first. This file is the extra brief for **Tasks Hub only**. It 
 
 Chrome is Teaching. Board / Graph / Charts are Tasks surfaces; their **look** comes from `CHARTS.md`, not a Tasks-only viz kit. Data models and persistence are out of scope here.
 
-Canonical kit: `/Users/example/Projects/hub-design-kit`  
-Tasks Hub: `/Users/example/Projects/tasks-hub`
+Canonical kit: `/Users/you/Projects/hub-design-kit`  
+Tasks Hub: `/Users/you/Projects/tasks-hub`
 
 ## Shell
 

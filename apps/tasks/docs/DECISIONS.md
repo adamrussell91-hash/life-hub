@@ -40,7 +40,7 @@ AI chat: Anthropic via Netlify Functions (Teaching pattern). Spec’s `jade-melo
 Canonical copy on `main` (`3d8668f`). Load: Inter → `css/tokens.css` → `overlays.css` → `chrome.css` → `sign-in.css` → hub CSS.
 
 - `html[data-hub="tasks"]` — Teaching clone. See `design-kit/TASKS.md`.
-- Board home; Graph / Gantt / stretch Orbit·Branch·Sky; Clare / Network / Redacted rail pages.
+- Board home; Graph / Gantt / stretch Orbit·Branch·Sky; Clare / Network / Partner rail pages.
 - Page header: eyebrow → title → supporting → actions.
 - Sign-in from `snippets/sign-in.html`.
 - Agent writes: propose → **confirm card** → apply.

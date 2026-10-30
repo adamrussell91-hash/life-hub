@@ -1,26 +1,27 @@
 # Organisation Crests
 
-104 researched organisation marks collected on 2 October 2026. `SOURCES.csv` records the source and matching organisation for each image.
+Researched organisation marks are the fallback crest for an organisation that has no uploaded crest. Which organisations have one reflects Adam's network, so the images, the reference map and the source provenance live only in the private data repository. Nothing in this repository lists them.
 
-## Integration
+## Where things live
 
-- PNGs: `apps/professional/public/organisation-crests/`.
-- Canonical reference map: `apps/professional/src/data/organisation-crests.json`.
-- Shared URL resolution: `apps/professional/src/components/org-ui.ts`, also used by People badges.
-- The organisation IDs are the deterministic IDs from `deriveOrganisationId(legacy_id)` in the GitHub professional-data reader.
-- Vite publishes the images below its configured base URL, including `/professional/` on the umbrella deployment.
-- A manually uploaded crest takes precedence. Bundled images are the fallback when an organisation has no uploaded crest or the crest URL cannot be resolved. Unknown organisations retain their monograms; failed image loads also restore the monogram.
+- Private (`adamrussell91-hash/life-hub-data`, `main`): `data/professional/organisation-crests/`
+  - `manifest.json`: `{ "shared:organisation:organisation_<id>": "<file>.png" }`
+  - `<file>.png`: 440 x 520 PNG, at most 512 KiB, padded for the Hub's shield clip
+  - `SOURCES.csv` and `README.md`: source page, asset URL and notes for each image
+- Function: `netlify/functions/org-crest-image.mjs` (`/api/organisations/crest-image`, signed-in only)
+  - `GET` returns `{ refs }`, the organisations that have a researched crest
+  - `GET ?ref=<org ref>` returns the PNG
+  - Reads the private repo with `GITHUB_TOKEN` (and `PROFESSIONAL_GITHUB_REPOSITORY`, default life-hub-data) through `_shared/private-data-file.mjs`; the manifest is cached for five minutes
+- App: `apps/professional/src/components/org-ui.ts` resolves crest URLs for Orgs and People badges
 
-No R2 configuration, credential, or remote third-party image hotlink is required to display the bundled files. Organisation records remain in the private data repository; this collection contains public organisation marks and source provenance, not contact profiles.
+## Resolution order
 
-## Artwork
+1. A manually uploaded crest (`logo_key`, `/api/organisations/crest`) takes precedence.
+2. Otherwise, or if the upload can't be resolved, the researched crest is fetched once with the session cookie and kept as an object URL for the session.
+3. Unknown organisations keep their monograms; a failed image load restores the monogram. If the private repo can't be reached, every organisation shows its monogram.
 
-Images are 440 x 520 pixels and below 512 KiB. Padding protects the full artwork from the Hub's shield clip. Proportions are preserved; some site icons have limited original resolution. White artwork uses a dark background. The SVG wordmarks for Tintern and Sydney were used to extract their intact crests.
+## Adding a crest
 
-Current Xavier Albury, Trinity Adamstown, and Independent Schools NSW branding is used. The separate St Pius X Adamstown record retains its historical crest. Government organisations use their shared NSW Government mark; UConn uses its parent university logo. Learning with Lee uses its official site icon. Secondary sources and other qualifications are recorded in `SOURCES.csv`.
+Add the PNG and its manifest line in the private repo, and record its source in the private `SOURCES.csv`. The organisation IDs are the deterministic IDs from `deriveOrganisationId(legacy_id)` in the GitHub professional-data reader.
 
-## Not Installed
-
-All Areas Education and Douglas Daly School have no confidently verified logo. The historical Wade High candidate was not installed because the current school is changing its branding. Five employer-group labels are not five distinct organisations and retain monograms. Kolbe and the unlinked Mercedes duplicate were removed from the directory at the user's request and are not mapped here.
-
-Logos and crests remain the property of their organisations. This collection does not imply endorsement or grant rights for unrelated commercial use.
+Logos and crests remain the property of their organisations. The collection does not imply endorsement or grant rights for unrelated commercial use.

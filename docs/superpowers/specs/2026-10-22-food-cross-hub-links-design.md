@@ -12,7 +12,7 @@ Log a meal once. A meal logged while travelling lands in the Food Journal as a n
 | Hub | Store | Shape |
 |-----|-------|-------|
 | Food Journal | `data/food-journal/journal.json` in the private data repo | `visits[]` → `dishes[]` (title, cuisine, meal_type, rating, tags, notes, photos). Photos in R2 under `food/photos/<id>.jpg`. Day One import links with `source_id: "dayone:…"` and tombstones. |
-| Travel Journal | `data/travel/journals/<trip>.json` in the private data repo | `moments[]` (leg_id, local_date, local_time, text, place, coordinates, media_ids, author). Media in R2 under `travel/journal/<trip>/…`. `author` is Adam or Redacted (the Travel agent's perspective lane, never authoritative). |
+| Travel Journal | `data/travel/journals/<trip>.json` in the private data repo | `moments[]` (leg_id, local_date, local_time, text, place, coordinates, media_ids, author). Media in R2 under `travel/journal/<trip>/…`. `author` is Adam or Partner (the Travel agent's perspective lane, never authoritative). |
 | Brisket (Life hub) | `data/nutrition/YYYY/MM/<date>-<slug>.md` | Frontmatter meal record: `meal`, `calories`, `protein_g`, `fat_g` required, other macros optional. Written through the `log_entry` Confirm card. |
 
 The data-repo client has `commitFiles`, which writes several files in one commit. The Food Journal photo read (`_shared/food-journal-process.mjs`) already sends dish and menu photos to Claude Sonnet 5.
@@ -20,7 +20,7 @@ The data-repo client has `commitFiles`, which writes several files in one commit
 ## Decisions
 
 1. Food Journal owns the meal. The Travel moment holds a link and travel-only extras.
-2. Only moments Adam writes can be meals. Redacted's lines never flow across.
+2. Only moments Adam writes can be meals. Partner's lines never flow across.
 3. A moment becomes a meal with a Meal switch on the moment.
 4. Deleting the moment, or switching Meal off, moves the linked visit to Food Journal trash. Deleting the visit in Food Journal clears the Meal flag and keeps the moment.
 5. Non-English text is translated automatically, keeping the original beside the English.
@@ -49,7 +49,7 @@ A moment gains an optional `meal` block:
 
 ### Flow
 
-1. On a moment Adam wrote, the edit sheet shows a Meal switch. It is hidden on Redacted's moments.
+1. On a moment Adam wrote, the edit sheet shows a Meal switch. It is hidden on Partner's moments.
 2. Switching it on shows the Food Journal fields inline: dishes (title, meal type, rating), venue prefilled from the moment's place. The travel extras sit above.
 3. Saving saves the moment as usual, then sends the food fields to a new `/api/travel-meal` endpoint. Ordinary `/api/travel-journal` saves keep `meal` blocks exactly as the server has them, so only this endpoint can set or clear one. The endpoint:
    - validates both documents,
@@ -120,7 +120,7 @@ About the same as a Brisket meal log today, roughly A$0.05–0.20 per send or re
 ## Testing
 
 - Schema tests: the moment `meal` block, dish `ingredients` and `*_en` fields, and the meal record's `food_dish_id` and `portion`.
-- Server tests for the two-file commit: create, update, unlink, delete each side, 409 on either sha, Redacted's moment refused, tombstone stops resurrection.
+- Server tests for the two-file commit: create, update, unlink, delete each side, 409 on either sha, Partner's moment refused, tombstone stops resurrection.
 - Capture tests: ingredients filled for ticked items, name-matched photo dishes and dishes that already have notes; extras appended.
 - Prompt fixture for translation (a non-English menu returns `*_en`; an English menu returns none).
 - Portion maths: fractions and pieces.

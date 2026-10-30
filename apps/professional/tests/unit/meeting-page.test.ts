@@ -35,7 +35,7 @@ vi.mock('@/api/universal-links', () => ({
     { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:ben', relationship_type: 'attendee', role: null, status: 'current' },
       endpoint: { ref: 'shared:person:ben', kind: 'person', display_label: 'Ben C.', href: null }, direction: 'outgoing' },
     { link: { id: 'a3', source_ref: MEETING_REF, target_ref: 'shared:person:blob-rohan', relationship_type: 'attendee', role: null, status: 'current' },
-      endpoint: { ref: 'shared:person:blob-rohan', kind: 'person', display_label: 'Rohan Arianayagam', href: null }, direction: 'outgoing' }
+      endpoint: { ref: 'shared:person:blob-rohan', kind: 'person', display_label: 'Rohan Examplar', href: null }, direction: 'outgoing' }
   ], incoming: [] })),
   createTask: vi.fn(async () => ({ id: 'task_1', title: 'x' })),
   createUniversalLink: vi.fn(async () => ({ link: { id: 'a9' }, created: true })),
@@ -161,7 +161,7 @@ describe('meeting page', () => {
     expect(facts).toContain('24/09/26');
     expect(facts).toContain('6:00 pm');
     expect(facts).toContain('Teams');
-    expect(facts).toContain('with Rachel Ford, Ben C., Rohan Arianayagam');
+    expect(facts).toContain('with Rachel Ford, Ben C., Rohan Examplar');
   });
 
   it('someone with two jobs sits under the one the room shares, and can be moved for this meeting', async () => {
@@ -211,7 +211,7 @@ describe('meeting page', () => {
   it('an attendee the directory misses keeps their name (never "Unknown person")', async () => {
     const canvas = await render();
     const room = canvas.querySelector('[data-part="room"]')!;
-    expect(room.textContent).toContain('Rohan Arianayagam');
+    expect(room.textContent).toContain('Rohan Examplar');
     expect(room.textContent).not.toContain('Unknown person');
     expect(room.textContent).not.toContain('New to you');
   });

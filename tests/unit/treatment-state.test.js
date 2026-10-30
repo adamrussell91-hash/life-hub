@@ -99,7 +99,7 @@ test('hyaluronica prompt receives treatment + nutrition blocks; chadwick does no
 });
 
 test('sara clinical context is Constraints-gated', () => {
-  assert.equal(constraintsNeedClinicalContext('Redacted on DEXA'), true);
+  assert.equal(constraintsNeedClinicalContext('bone density scan due'), true);
   assert.equal(constraintsNeedClinicalContext('sleep hygiene'), false);
   const empty = formatSaraClinicalContextForPrompt({
     constraintsText: 'sleep hygiene',
@@ -109,7 +109,7 @@ test('sara clinical context is Constraints-gated', () => {
   });
   assert.equal(empty, '');
   const live = formatSaraClinicalContextForPrompt({
-    constraintsText: 'Iron infusion follow-up pending',
+    constraintsText: 'Ferritin follow-up pending',
     mealRecords: [{ type: 'meal', date: '2026-09-04', calcium_mg: 200, protein_g: 90 }],
     workoutRecords: [{ date: '2026-09-03', title: 'Lower' }],
     today: '2026-09-05'

@@ -28,7 +28,7 @@ test('stimulus gate copy colours recent pace by up or down, not by the gate', ()
 
 test('health threads and rep mix info cover the gap charts', () => {
   assert.equal(healthThreadsInfo.id, 'life.medical.threads');
-  assert.match(healthThreadsInfo.how, /IBD|Liver|Mind|Acute/);
+  assert.match(healthThreadsInfo.how, /Gut|Liver|Mind|Acute/);
   assert.equal(repMixInfo.id, 'life.fitness.rep-mix');
   assert.match(repMixInfo.how, /1–5|6–8|9–12|13\+/);
 });

@@ -33,7 +33,7 @@ import {
 //   copy      — a Blob person whose name (or an alias) matches exactly one
 //               imported person. Its links move to the imported record.
 //   combined  — a Blob person named for several students at once
-//               ("Hector and Hugo Standen", "A, B, C"). Each link is copied
+//               ("Hector and Hugo Exampleton", "A, B, C"). Each link is copied
 //               to every named student, then the record goes. If any name
 //               has no record of its own, nothing happens and the row says
 //               which name is missing.
@@ -76,7 +76,7 @@ export function indexImportedPeople(imported) {
 }
 
 /**
- * "Hector and Hugo Standen" → ["Hector Standen", "Hugo Standen"];
+ * "Hector and Hugo Exampleton" → ["Hector Exampleton", "Hugo Exampleton"];
  * "Wynn Fernleigh, Fern Redgum" → both. Returns null for a single name.
  */
 export function splitCombinedName(raw) {

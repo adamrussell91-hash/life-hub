@@ -67,7 +67,7 @@ import {
   parsePendingCnPatches,
   serializePendingCnPatches
 } from '../cn-patch-queue.mjs';
-import { applyIntuitionEdit } from './intuition.mjs';
+import { applyIntuitionEdit, bundledIntuitionPack } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
 import { listJSON as listTasksJSON, getJSON as getTasksJSON, newTaskId, TASK_PREFIX, taskKey } from '../tasks-blobs.mjs';
 import { isOpenTask } from '../task-liveness.mjs';
@@ -499,7 +499,7 @@ export function shortcutSchemas() {
       input_schema: {
         type: 'object',
         properties: {
-          pack_id: { type: 'string', description: 'Existing intuition pack id, e.g. flare-rules' },
+          pack_id: { type: 'string', description: 'Existing intuition pack id, e.g. knowledge-claim-spine' },
           summary: { type: 'string' },
           guidance: { type: 'string' },
           reason: { type: 'string', description: 'Why this prior is changing' }
@@ -1697,8 +1697,13 @@ async function handleIntuitionEditPack(ctx, input) {
   const reason = String(input.reason || '').trim();
   if (!packId || !reason) return deny('pack_id and reason are required');
   if (!/^[a-z0-9][a-z0-9-]*$/.test(packId)) return deny('pack_id must be a kebab-case id');
+  // Packs are read and written in the private data repo. A generic bundled pack
+  // can seed the first private edit; the private copy then overrides it on read.
   const path = `intuition/${packId}.json`;
-  const { value: existing, sha } = await readJson(ctx, path, null);
+  const { value: privatePack, sha } = await readJson(ctx, path, null);
+  const existing = privatePack && typeof privatePack === 'object'
+    ? privatePack
+    : bundledIntuitionPack(packId);
   if (!existing || typeof existing !== 'object') {
     return deny(`Intuition pack not found: ${packId}`);
   }

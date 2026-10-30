@@ -6,7 +6,7 @@ Filled 2026-08-22 Claude Code run against production (`tasks-api.adam-russell.co
 - Host + build: production (tasks-api.adam-russell.com — local :5175 was not running)
 - Viewport(s): 1440×900 (desktop), 375×812 (mobile). Laptop 1280×800 not separately re-tested beyond desktop findings — see note in Out of scope.
 - Kit: used §2 of this prompt
-- Surfaces visited: `/` (sign-in), `#/board`, `#/clare`, `#/graph`, `#/maps`, `#/gantt`, `#/orbit`, `#/branch`, `#/constellation`, `#/day`, `#/week`, `#/month`, `#/list`, `#/projects`, `#/excursions`, `#/templates`, `#/stress`, `#/Redacted`, `#/capacity/<valid-token>`, `#/capacity/<invalid-token>`, `#/search`, `#/definitely-missing` — none skipped.
+- Surfaces visited: `/` (sign-in), `#/board`, `#/clare`, `#/graph`, `#/maps`, `#/gantt`, `#/orbit`, `#/branch`, `#/constellation`, `#/day`, `#/week`, `#/month`, `#/list`, `#/projects`, `#/excursions`, `#/templates`, `#/stress`, `#/partner`, `#/capacity/<valid-token>`, `#/capacity/<invalid-token>`, `#/search`, `#/definitely-missing` — none skipped.
 
 ## User verdict
 
@@ -20,7 +20,7 @@ Fold the 18 flat rail items into the kit's own `.hub-rail__section` groups:
 - **Plan** — Clare, Templates
 - **Views** — Today, Week, Month, Backlog, Graph, Gantt (all lenses over the same task data — Day/Week/Month/List already behave like modes of one view)
 - **Work** — Projects, Excursions
-- **Network** — Network (StressFlags), Redacted
+- **Network** — Network (StressFlags), Partner
 - **Tools** — Maps, Search
 
 Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don't earn a top-level rail slot each. Graph already proves the pattern (`.hub-pills` for Blockers/Workstreams): fold Orbit/Branch/Sky in as three more pills on the same Graph page ("Blockers / Workstreams / Orbit / Branch / Sky"), filed under Views. That drops the rail from 18 flat items to 6 sections containing ~14 destinations, and stops the rail from scrolling on laptop width. No new colours, no new rail width.
@@ -102,7 +102,7 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 ### D9 — All 18 rail icons are the exact same glyph
 - Severity: S2
 - Surface: left rail, every page
-- Seen: Every `.hub-rail__link svg` has identical inner markup: `<path d="M4 5h16v14H4zM8 9h8M8 13h6"></path>` (a generic document icon) for Board, Clare, Graph, Maps, Gantt, Orbit, Branch, Sky, Today, Week, Month, Backlog, Projects, Excursions, Network, Redacted, Templates, and Search alike.
+- Seen: Every `.hub-rail__link svg` has identical inner markup: `<path d="M4 5h16v14H4zM8 9h8M8 13h6"></path>` (a generic document icon) for Board, Clare, Graph, Maps, Gantt, Orbit, Branch, Sky, Today, Week, Month, Backlog, Projects, Excursions, Network, Partner, Templates, and Search alike.
 - Expected: "Every primary destination is `.hub-rail__link`: distinct 18px outline icon + title-case label."
 - Actual: confirmed programmatically — 18 links, 1 unique icon path.
 - Code: `railIcon()` in `src/shell/shell.ts`.
@@ -128,11 +128,11 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 
 ### D12 — Kit gate classes (`.sign-in__input` / `.quick-add__select`) reused across the canvas
 - Severity: S2
-- Surface: Board quick-add, Clare form, Backlog quick-add, Projects stalled-reason field, Excursions title field, Redacted share-link field
+- Surface: Board quick-add, Clare form, Backlog quick-add, Projects stalled-reason field, Excursions title field, Partner share-link field
 - Seen: Every one of these fields is a literal `.sign-in__input` or `.quick-add__select` — the same classes as the passphrase gate.
 - Expected: "Canvas search, scope, and mode controls use `.hub-search`, `.hub-filter`, `.hub-pills` — not `.sign-in__input` or `.quick-add__select`. AGENTS.md already states this."
 - Actual: confirmed via `className` reads at all six call sites (see Kit table below for the full list).
-- Code: `src/views/board.ts`, `src/views/clare.ts`, `src/views/dashboard.ts`/list view, `src/views/projects.ts`, `src/views/excursions.ts`, `src/views/Redacted.ts`.
+- Code: `src/views/board.ts`, `src/views/clare.ts`, `src/views/dashboard.ts`/list view, `src/views/projects.ts`, `src/views/excursions.ts`, `src/views/partner.ts`.
 - Fix: One shared canvas text-field/select component, styled off `.hub-search`/`.hub-filter`, used everywhere instead of the gate classes.
 
 ### D13 — Confirm cards render below the viewport fold at 1440×900
@@ -164,12 +164,12 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 
 ### D16 — Rail label and page title disagree (pre-existing, confirmed live)
 - Severity: S2
-- Surface: `#/stress`, `#/Redacted`
-- Seen: Rail says "Network," page renders `<h1>StressFlags</h1>`. Rail says "Redacted," page renders `<h1>Redacted capacity</h1>`.
-- Expected: "Header vs rail names must not fight (examples that already exist: rail Network vs title StressFlags; rail Redacted vs title Redacted capacity...)."
+- Surface: `#/stress`, `#/partner`
+- Seen: Rail says "Network," page renders `<h1>StressFlags</h1>`. Rail says "Partner," page renders `<h1>Partner capacity</h1>`.
+- Expected: "Header vs rail names must not fight (examples that already exist: rail Network vs title StressFlags; rail Partner vs title Partner capacity...)."
 - Actual: confirmed live on both pages via screenshot + DOM read.
-- Code: rail link labels vs page `<h1>` in `src/views/stress.ts`, `src/views/Redacted.ts`.
-- Fix: Rename the rail links to match ("StressFlags," "Redacted") or rename the `<h1>`s to match the rail — pick one name per destination.
+- Code: rail link labels vs page `<h1>` in `src/views/stress.ts`, `src/views/partner.ts`.
+- Fix: Rename the rail links to match ("StressFlags," "Partner") or rename the `<h1>`s to match the rail — pick one name per destination.
 
 ### D17 — Production data has stray QA/test records mixed into real work
 - Severity: S2 (data hygiene, not a UI bug per se — flagged because it actively misleads the daily-use verdict)
@@ -265,7 +265,7 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 | Projects stalled "Short reason" input (`projects.ts`) | `.sign-in__input` | kit text field |
 | Projects Frankenstein "Merge into..." select | `.quick-add__select` | kit select |
 | Excursions "Excursion title" input (`excursions.ts`) | `.sign-in__input` | kit text field |
-| Redacted share-link input (`Redacted.ts`) | `.sign-in__input` | kit readonly field |
+| Partner share-link input (`partner.ts`) | `.sign-in__input` | kit readonly field |
 | Sign out button (`.hub-icon-btn`) | no `<svg>` child at all | inline sign-out SVG per `hub-utilities.html` |
 | `.hub-utilities` | Sign out only | add Refresh `.hub-icon-btn` with SVG |
 | All 18 `.hub-rail__link svg` (`railIcon()` in `shell.ts`) | one shared `<path d="M4 5h16v14H4zM8 9h8M8 13h6">` | distinct 18px outline icon per route |
@@ -273,7 +273,7 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 | Excursions confirm (`showConfirm` in `excursions.ts`) | bare `<p>` inside `.confirm-card` | eyebrow + title + supporting, as used in Clare/Templates/Search |
 | Projects "Close project" (`.stall-confirm`) | renders empty | populated retrospective `.confirm-card` |
 | Rail label "Network" vs `<h1>StressFlags</h1>` | mismatched | pick one name for both |
-| Rail label "Redacted" vs `<h1>Redacted capacity</h1>` | mismatched | pick one name for both |
+| Rail label "Partner" vs `<h1>Partner capacity</h1>` | mismatched | pick one name for both |
 
 ## Copy rewrites
 

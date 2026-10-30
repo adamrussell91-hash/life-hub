@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { SYNTHETIC_SKINCARE_YAML } from '../fixtures/skincare-routines.mjs';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createChatHandler } from '../../netlify/functions/chat.mjs';
@@ -1086,21 +1087,21 @@ test('Vera mind_session log_entry writes immediately and emits record_saved', as
 });
 
 test('Sara adds detail to an existing visit with update_medical_visit: written at once, with a record_saved receipt', async () => {
-  const medicalPath = 'data/body/2026/08/2026-08-01-medical-Redacted-maintenance-injection-0930.md';
+  const medicalPath = 'data/body/2026/08/2026-08-01-medical-biologic-maintenance-injection-0930.md';
   const medicalYaml = `---
 schema_version: 1
-id: "stored-Redacted"
+id: "stored-biologic"
 type: "medical"
 date: "2026-08-01"
 time: "09:30"
 created_at: "2026-08-01T09:30:00+10:00"
 updated_at: "2026-08-01T09:30:00+10:00"
 source: "chat"
-title: "Redacted maintenance injection"
+title: "Biologic maintenance injection"
 record_type: "Prescription"
 lane: "prescription"
 location_kind: "place"
-provider: "Dr Redacted"
+provider: "Dr Rowan Pike"
 ---
 Maintenance dose logged.
 `;
@@ -1144,8 +1145,8 @@ Maintenance dose logged.
           id: 'call_1',
           name: 'update_medical_visit',
           input: {
-            visit_id: 'stored-Redacted',
-            notes_append: 'Mild site pain; same-morning cramping likely diet/anxiety, not Redacted.'
+            visit_id: 'stored-biologic',
+            notes_append: 'Mild site pain; same-morning cramping likely diet/anxiety, not Biologic.'
           }
         });
         yield { type: 'done' };
@@ -1153,7 +1154,7 @@ Maintenance dose logged.
     })
   });
   const events = contentEvents(await readSse(await handler(request({
-    message: 'Sara, add that note to the Redacted record',
+    message: 'Sara, add that note to the Biologic record',
     priorAgentSlug: 'sara'
   }))));
   const parsed = JSON.parse(toolResult);
@@ -1172,21 +1173,21 @@ Maintenance dose logged.
 
 
 test('Sara log_entry refuses a visit already on record and points at update_medical_visit', async () => {
-  const medicalPath = 'data/body/2026/08/2026-08-01-medical-Redacted-maintenance-injection-0930.md';
+  const medicalPath = 'data/body/2026/08/2026-08-01-medical-biologic-maintenance-injection-0930.md';
   const medicalYaml = `---
 schema_version: 1
-id: "stored-Redacted"
+id: "stored-biologic"
 type: "medical"
 date: "2026-08-01"
 time: "09:30"
 created_at: "2026-08-01T09:30:00+10:00"
 updated_at: "2026-08-01T09:30:00+10:00"
 source: "chat"
-title: "Redacted maintenance injection"
+title: "Biologic maintenance injection"
 record_type: "Prescription"
 lane: "prescription"
 location_kind: "place"
-provider: "Dr Redacted"
+provider: "Dr Rowan Pike"
 ---
 Maintenance dose logged.
 `;
@@ -1232,8 +1233,8 @@ Maintenance dose logged.
             input: {
             type: 'medical',
             date: '2026-08-01',
-            notes: '[Redacted injection] — mild site pain; same-morning cramping likely diet/anxiety, not Redacted.',
-            fields: { title: 'Redacted injection' }
+            notes: '[Biologic injection] — mild site pain; same-morning cramping likely diet/anxiety, not Biologic.',
+            fields: { title: 'Biologic injection' }
           }
         });
         yield { type: 'done' };
@@ -1241,13 +1242,13 @@ Maintenance dose logged.
     })
   });
   const events = contentEvents(await readSse(await handler(request({
-    message: 'Sara, add that note to the Redacted record',
+    message: 'Sara, add that note to the Biologic record',
     priorAgentSlug: 'sara'
   }))));
   const parsed = JSON.parse(toolResult);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.error, 'possible_duplicate');
-  assert.equal(parsed.existing_visit.id, 'stored-Redacted');
+  assert.equal(parsed.existing_visit.id, 'stored-biologic');
   assert.match(parsed.instruction, /update_medical_visit/);
   assert.equal(puts.length, 0, 'nothing may be written');
   assert.equal(events.find(e => e.type === 'record_saved'), undefined);
@@ -1271,9 +1272,9 @@ title: "GP review (GGT results)"
 record_type: "Consultation"
 lane: "appointment"
 location_kind: "place"
-provider: "Dr Redacted"
+provider: "Dr Jordan Sample"
 ---
-Discuss GGT 233.
+Discuss GGT 196.
 `;
   const gpSha = '2'.repeat(40);
   const puts = [];
@@ -1380,22 +1381,22 @@ test('Sara analyst tools run inside a turn: marker trend, treatment cycle, brief
   assert.equal(h.results[3].visits[0].id, 'gp-visit');
 });
 
-test('Sara future same-title Redacted dose with AU date stays a new Confirm visit', async () => {
-  const medicalPath = 'data/body/2026/08/2026-08-27-medical-Redacted-maintenance-injection-0930.md';
+test('Sara future same-title Biologic dose with AU date stays a new Confirm visit', async () => {
+  const medicalPath = 'data/body/2026/08/2026-08-27-medical-biologic-maintenance-injection-0930.md';
   const medicalYaml = `---
 schema_version: 1
-id: "stored-Redacted"
+id: "stored-biologic"
 type: "medical"
 date: "2026-08-27"
 time: "09:30"
 created_at: "2026-08-27T09:30:00+10:00"
 updated_at: "2026-08-27T09:30:00+10:00"
 source: "chat"
-title: "Redacted maintenance injection"
+title: "Biologic maintenance injection"
 record_type: "Prescription"
 lane: "prescription"
 location_kind: "place"
-provider: "Dr Redacted"
+provider: "Dr Rowan Pike"
 ---
 First SC maintenance dose.
 `;
@@ -1441,8 +1442,8 @@ First SC maintenance dose.
           input: {
             type: 'medical',
             date: '27/10',
-            notes: '[Redacted maintenance] — next 8-weekly SC dose',
-            fields: { title: 'Redacted maintenance injection' }
+            notes: '[Biologic maintenance] — next 8-weekly SC dose',
+            fields: { title: 'Biologic maintenance injection' }
           }
         });
         yield { type: 'done' };
@@ -1450,7 +1451,7 @@ First SC maintenance dose.
     })
   });
   const events = contentEvents(await readSse(await handler(request({
-    message: 'Sara, put the next Redacted in medical logs for 27/10',
+    message: 'Sara, put the next Biologic in medical logs for 27/10',
     priorAgentSlug: 'sara'
   }))));
   const parsed = JSON.parse(toolResult);
@@ -1459,7 +1460,7 @@ First SC maintenance dose.
   const proposal = events.find(e => e.type === 'record_proposal');
   assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
   assert.equal(proposal.record.date, '2026-10-27');
-  assert.equal(proposal.record.title, 'Redacted maintenance injection');
+  assert.equal(proposal.record.title, 'Biologic maintenance injection');
   assert.equal(events.find(e => e.type === 'record_saved'), undefined);
   assert.equal(events.find(e => e.type === 'error'), undefined);
   assert.equal(puts.length, 0);
@@ -1487,8 +1488,8 @@ test('Sara medical log_entry survives resolveTree failures without error SSE', a
           input: {
             type: 'medical',
             date: '27/10/2026',
-            notes: '[Redacted maintenance] — next dose',
-            fields: { title: 'Redacted maintenance dose' }
+            notes: '[Biologic maintenance] — next dose',
+            fields: { title: 'Biologic maintenance dose' }
           }
         });
         yield { type: 'done' };
@@ -1496,7 +1497,7 @@ test('Sara medical log_entry survives resolveTree failures without error SSE', a
     })
   });
   const events = contentEvents(await readSse(await handler(request({
-    message: 'Sara, log next Redacted for 27/10',
+    message: 'Sara, log next Biologic for 27/10',
     priorAgentSlug: 'sara'
   }))));
   assert.equal(events.find(e => e.type === 'error'), undefined, JSON.stringify(events));
@@ -3212,7 +3213,7 @@ test('search_skincare_library returns matches and continues the round', async ()
   const librarySha = 'a'.repeat(40);
   const libraryContent = JSON.stringify({
     schema_version: 1,
-    products: [{ id: 'korres-cleanser', name: 'Korres Cleanser', notes: '' }]
+    products: [{ id: 'example-cleanser', name: 'Example Cleanser', notes: '' }]
   });
   const fetchImpl = async url => {
     if (url.includes('/commits/')) {
@@ -3236,20 +3237,20 @@ test('search_skincare_library returns matches and continues the round', async ()
         const toolResult = await executeTools({
           id: 'call_1',
           name: 'search_skincare_library',
-          input: { query: 'korres' }
+          input: { query: 'example' }
         });
         assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
         const hits = JSON.parse(toolResult);
-        assert.equal(hits[0].name, 'Korres Cleanser');
-        yield { type: 'text', delta: 'Found Korres on your shelf.' };
+        assert.equal(hits[0].name, 'Example Cleanser');
+        yield { type: 'text', delta: 'Found Example on your shelf.' };
         yield { type: 'done' };
       }
     })
   });
 
-  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, search Korres' }))));
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, search Example' }))));
   assert.deepEqual(events[0], { type: 'agent', slug: 'hyaluronica' });
-  assert.deepEqual(events[1], { type: 'text', delta: 'Found Korres on your shelf.' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Found Example on your shelf.' });
   assert.deepEqual(events[2], { type: 'done' });
 });
 
@@ -3260,7 +3261,11 @@ test('save_skincare_library_entry cold-start seeds defaults then writes library 
     if (url.includes('/commits/')) {
       return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
     }
-    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    // Cold-start seed: the private data repo's config/skincare-routines.yml (synthetic here).
+    if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'config/skincare-routines.yml', type: 'blob', sha: 'e'.repeat(40), size: 600 }] });
+    if (url.includes(`/git/blobs/${'e'.repeat(40)}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(SYNTHETIC_SKINCARE_YAML, 'utf8').toString('base64') });
+    }
     if (options?.method === 'PUT') {
       return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
     }
@@ -3302,7 +3307,7 @@ test('save_skincare_library_entry cold-start seeds defaults then writes library 
   const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
   assert.equal(written.schema_version, 1);
   const names = written.products.map(p => p.name);
-  assert.ok(names.includes('Azclear Azelaic Acid 20%'), 'cold-start write must include seeded defaults');
+  assert.ok(names.includes('Example Azelaic Gel 10%'), 'cold-start write must include seeded defaults');
   assert.ok(names.includes('La Roche SPF 50'), 'cold-start write must include the new product');
   assert.ok(written.products.length > 1);
   assert.ok(written.products.some(p => p.id === 'la-roche-spf-50'));
@@ -3376,7 +3381,7 @@ test('save_skincare_library_entry migrates legacy catalog before writing new pro
   const names = written.products.map(p => p.name);
   assert.ok(names.includes(customName), 'first Hyaluronica save must include migrated catalog products');
   assert.ok(names.includes('La Roche SPF 50'), 'first Hyaluronica save must include the new product');
-  assert.ok(!names.includes('Azclear Azelaic Acid 20%'), 'catalog migrate must not replace with defaults-only seed');
+  assert.ok(!names.includes('Example Azelaic Gel 10%'), 'catalog migrate must not replace with defaults-only seed');
 });
 
 test('failed save_skincare_library_entry write leaves in-memory shelf unchanged for the next tool call', async () => {
@@ -3386,7 +3391,11 @@ test('failed save_skincare_library_entry write leaves in-memory shelf unchanged 
     if (url.includes('/commits/')) {
       return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
     }
-    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    // Cold-start seed: the private data repo's config/skincare-routines.yml (synthetic here).
+    if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'config/skincare-routines.yml', type: 'blob', sha: 'e'.repeat(40), size: 600 }] });
+    if (url.includes(`/git/blobs/${'e'.repeat(40)}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(SYNTHETIC_SKINCARE_YAML, 'utf8').toString('base64') });
+    }
     if (options?.method === 'PUT') {
       putAttempts += 1;
       if (putAttempts === 1) {
@@ -3428,7 +3437,7 @@ test('failed save_skincare_library_entry write leaves in-memory shelf unchanged 
   const names = successfulWrite.products.map(p => p.name);
   assert.ok(!names.includes('Ghost Product That Should Not Stick'));
   assert.ok(names.includes('Real Product Keep Me'));
-  assert.ok(names.includes('Azclear Azelaic Acid 20%'));
+  assert.ok(names.includes('Example Azelaic Gel 10%'));
 });
 
 test('set_skincare_routine_membership writes routine-membership.json', async () => {
