@@ -7,9 +7,9 @@
  * quiz attempts, so a question marked later in Results shows at once.
  */
 import { isSafeId } from './class-examples.mjs';
-import { mapBounded } from './blobs-list.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
-import { unitKey } from './teaching-blobs.mjs';
+import { SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { listDone } from './profile-done.mjs';
@@ -49,16 +49,29 @@ async function changeBook(store, classId, fn) {
   reject(409, 'changed', 'The markbook changed in another tab. Reload to see it.');
 }
 
-/** Quiz lessons in the class's active units that someone on the list has handed in. */
+/** This class's live calendar rows. */
+async function scheduledRows(store, classId) {
+  const rowKeys = (await listBlobKeys(store, SCHEDULED_LESSON_PREFIX)).filter((key) => !key.endsWith('/_index'));
+  const rows = await mapBounded(rowKeys, 8, (key) => read(store, key));
+  return rows.filter((row) => row && !isDeletedRecord(row) && row.class_id === classId);
+}
+
+/**
+ * Quiz lessons that someone on the list has handed in, from every lesson a
+ * student can answer for this class (see classesForLesson): the active units,
+ * the current unit, and lessons on the class calendar from any unit.
+ */
 export async function quizColumns(store, roster, book) {
-  const unitIds = (roster.cls.active_unit_ids ?? []).filter(isSafeId);
-  const units = await mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId)));
-  // Lessons keep the order of the class's units.
+  const cls = roster.cls;
+  const unitIds = [...new Set([...(cls.active_unit_ids ?? []), ...(cls.current_unit_id ? [cls.current_unit_id] : [])])].filter(isSafeId);
+  const [units, rows] = await Promise.all([mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId))), scheduledRows(store, cls.id)]);
+  // Lessons keep the order of the class's units; calendar-only lessons follow.
   const lessonIds = new Set();
   for (const unit of units) {
     if (!unit || isDeletedRecord(unit)) continue;
     for (const id of unit.lesson_ids ?? []) if (isSafeId(id)) lessonIds.add(id);
   }
+  for (const row of rows) if (isSafeId(row.lesson_id)) lessonIds.add(row.lesson_id);
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
