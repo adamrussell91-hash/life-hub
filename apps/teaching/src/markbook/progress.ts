@@ -203,7 +203,8 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
         record: view.done?.[s.id]?.[l.id],
         quizSubmitted: Boolean(score?.submitted_at),
         quizMarked: Boolean(score?.submitted_at) && score!.pending === 0,
-        quizStarted: Boolean(quiz?.started?.includes(s.id)),
+        // Written work saved in the lesson counts as under way, like a quiz go not handed in.
+        quizStarted: Boolean(quiz?.started?.includes(s.id)) || Boolean(view.work?.find((w) => w.lesson_id === l.id)?.students[s.id]),
         took: (view.markbook.took?.[s.id] ?? []).includes(l.id),
         today
       });
