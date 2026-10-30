@@ -9,6 +9,8 @@ import { read, reject } from './question-drop.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { piecePrefix, pieceKey } from './piece-feedback.mjs';
 import { handinKey } from './lesson-work.mjs';
+import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload } from './teaching-feedback.mjs';
+import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
 import { targetKeys, targetRow, codeGrid, nextSteps, CHART_MAX } from './progress-patterns.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
@@ -30,6 +32,13 @@ function placesFor(column, mark) {
   return places;
 }
 
+/** The confirmed tags on a student's returned viva takes in one lesson. */
+async function vivaTags(store, lessonId, studentId) {
+  const keys = await listBlobKeys(store, `voice_submissions/${lessonId}/`);
+  const rows = await mapBounded(keys, 8, (k) => read(store, k));
+  return rows.filter((r) => r?.student_id === studentId && r.status === 'returned').flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })));
+}
+
 /** Every returned piece for one student, oldest first. */
 export async function studentPieces(store, classId, studentId) {
   const { book } = await readBook(store, classId);
@@ -40,7 +49,8 @@ export async function studentPieces(store, classId, studentId) {
     if (row?.status !== 'returned') continue;
     const id = key.slice(piecePrefix(classId, studentId).length);
     const column = columns.get(row.column_id);
-    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places: column ? placesFor(column, book.marks?.[column.id]?.[studentId]) : {}, tags: (row.tags ?? []).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })), seen_at: row.seen_at ?? null, comment: row.comment ?? '' });
+    const tags = row.kind === 'viva' ? await vivaTags(store, row.lesson_id, studentId) : (row.tags ?? []).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) }));
+    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places: column ? placesFor(column, book.marks?.[column.id]?.[studentId]) : {}, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '' });
   }
   for (const column of book.columns.filter((c) => c.kind === 'assessment' && !c.piece)) {
     const mark = book.marks?.[column.id]?.[studentId];
@@ -110,13 +120,26 @@ export async function progressFor(store, roster, student) {
 
 export async function returnedFor(store, roster, student) {
   const pieces = await studentPieces(store, roster.cls.id, student.id);
-  const items = pieces.filter((p) => p.kind !== 'assessment').reverse().map((p) => ({ id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))] }));
-  // Released quizzes and feedback documents for this student join here in Task 8.
-  return { items };
+  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))] } }));
+  for (const doc of await studentNotes(store, roster.cls.id, student.id)) {
+    rows.push({ at: doc.returned_at, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), new: !doc.seen_at, codes: [] } });
+  }
+  return { items: rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).map((r) => r.item) };
+}
+
+/** A note that was returned to this student, or a refusal. */
+async function ownNote(store, roster, student, item) {
+  const doc = await getJSON(store, feedbackDocKey(item.slice(2)), { consistency: 'strong' });
+  if (!doc || doc.class_id !== roster.cls.id || doc.student_id !== student.id || !doc.returned_at || doc.revoked_at) reject(404, 'not_found', 'That note isn’t here.');
+  return doc;
 }
 
 export async function pieceFor(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wv]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (item.startsWith('n:')) {
+    const doc = await ownNote(store, roster, student, item);
+    return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: null, ...toPublishedFeedbackPayload(doc, null) };
+  }
   const row = await read(store, pieceKey(roster.cls.id, student.id, item));
   if (row?.status !== 'returned') reject(404, 'not_found', 'That piece isn’t back yet.');
   const library = await readFeedbackCodes(store);
@@ -139,7 +162,11 @@ export async function pieceFor(store, roster, student, item) {
 }
 
 export async function markSeen(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wv]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (item.startsWith('n:')) {
+    await markNoteSeen(store, await ownNote(store, roster, student, item));
+    return { ok: true };
+  }
   const key = pieceKey(roster.cls.id, student.id, item);
   const row = await read(store, key);
   if (row?.status !== 'returned') reject(404, 'not_found', 'That piece isn’t back yet.');
