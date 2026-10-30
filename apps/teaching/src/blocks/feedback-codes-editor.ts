@@ -161,6 +161,15 @@ export function mountFeedbackCodesEditor(): HTMLElement {
       );
     }
 
+    const setResource = (url: string, title: string): void => {
+      const clean = url.trim();
+      change(index, { resource: clean ? { kind: /youtu|vimeo|\.mp4/.test(clean) ? 'video' : 'link', url: clean, title: title.trim() } : undefined });
+    };
+    body.append(
+      input('See how link (optional)', code.resource?.url ?? '', 300, (v) => setResource(v, codes[index]?.resource?.title ?? ''), { placeholder: 'https://' }),
+      input('See how title', code.resource?.title ?? '', 80, (v) => setResource(codes[index]?.resource?.url ?? '', v), { placeholder: 'Topic sentences' })
+    );
+
     const tools = el('div', 'pa-bank__row-actions pa-bank__wide');
     tools.append(
       button(code.hidden ? 'Show this code' : 'Hide this code', 'ghost', () => change(index, { hidden: code.hidden ? undefined : true }, true)),
