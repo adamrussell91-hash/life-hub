@@ -75,3 +75,27 @@ test('no claim, no data', async () => {
   const out = await profileAction(store, 'class1', { action: 'progress', class_token: 'z'.repeat(48) });
   assert.deepEqual(out, { need: 'initials' });
 });
+
+test('a returned viva set shows up as one piece with its confirmed tags', async () => {
+  const { store, ava } = await setup();
+  store.data.set('voice_submissions/lessonV/blk1/s1', { status: 'returned', class_id: 'class1', student_id: ava.id, tags: [{ code_id: 'ts', positive: false, confirmed: true }], returned_at: '2026-10-20T00:00:00Z' });
+  store.data.set('voice_submissions/lessonV/blk2/s2', { status: 'returned', class_id: 'class1', student_id: ava.id, tags: [{ code_id: 'ts', positive: false, confirmed: false }], returned_at: '2026-10-20T00:00:00Z' });
+  store.data.set(`piece_feedback/class1/${ava.id}/v:lessonV`, { kind: 'viva', title: 'Viva practice', lesson_id: 'lessonV', column_id: null, tags: [], comment: 'Clear.', status: 'returned', returned_at: '2026-10-20T00:00:00Z', updated_at: 'x' });
+  const out = await profileAction(store, 'class1', { action: 'returned', class_token: 'a'.repeat(48) });
+  const viva = out.items.find((i) => i.kind === 'viva');
+  assert.equal(viva.title, 'Viva practice');
+  assert.deepEqual(viva.codes, ['ts'], 'only the confirmed tag counts');
+});
+
+test('a feedback document for this student appears as a Note, opens, and is marked seen', async () => {
+  const { store, ava } = await setup();
+  store.data.set('feedback_docs/doc1', { id: 'doc1', title: 'Before your final draft', body_html: '<p>Hi</p>', class_id: 'class1', student_id: ava.id, returned_at: '2026-10-25T00:00:00Z', created_at: 'x', updated_at: 'x', token_hash: 'SECRET' });
+  const out = await profileAction(store, 'class1', { action: 'returned', class_token: 'a'.repeat(48) });
+  assert.ok(out.items.some((i) => i.kind === 'note' && i.title === 'Before your final draft'));
+  const note = await profileAction(store, 'class1', { action: 'piece', item: 'n:doc1', class_token: 'a'.repeat(48) });
+  assert.equal(note.body_html, '<p>Hi</p>');
+  assert.equal(JSON.stringify(note).includes('SECRET'), false);
+  await profileAction(store, 'class1', { action: 'seen', item: 'n:doc1', class_token: 'a'.repeat(48) });
+  assert.ok(store.data.get('feedback_docs/doc1').seen_at);
+  await assert.rejects(profileAction(store, 'class1', { action: 'piece', item: 'n:nothere', class_token: 'a'.repeat(48) }), /isn’t here/);
+});

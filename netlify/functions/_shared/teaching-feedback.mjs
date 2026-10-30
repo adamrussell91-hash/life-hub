@@ -8,6 +8,7 @@ import {
   setJSON,
   deleteKey
 } from './teaching-blobs.mjs';
+import { loadRoster } from './class-claims.mjs';
 
 export const FEEDBACK_DOC_PREFIX = 'feedback_docs/';
 export const FEEDBACK_TOKEN_PREFIX = 'feedback_tokens/';
@@ -37,6 +38,9 @@ export function toTeacherFeedbackDoc(doc) {
     body_html: doc.body_html ?? '',
     audio_media_id: doc.audio_media_id ?? null,
     student_label: doc.student_label ?? null,
+    class_id: doc.class_id ?? null,
+    student_id: doc.student_id ?? null,
+    returned_at: doc.returned_at ?? null,
     has_link: Boolean(doc.token_hash) && !doc.revoked_at,
     expires_at: doc.expires_at ?? null,
     revoked_at: doc.revoked_at ?? null,
@@ -74,8 +78,19 @@ export async function listFeedbackDocs(store) {
     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 }
 
+/** Optional: the class student this note is for. It then shows in their Returned work. */
+async function attachedStudent(store, input) {
+  if (!input?.student_id) return {};
+  const roster = typeof input.class_id === 'string' ? await loadRoster(store, input.class_id) : null;
+  if (!roster?.students.some((s) => s.id === input.student_id)) {
+    throw Object.assign(new Error('That student isn’t on this class list.'), { status: 400, code: 'no_student' });
+  }
+  return { class_id: roster.cls.id, student_id: input.student_id };
+}
+
 export async function createFeedbackDoc(store, input, deps = {}) {
   const now = deps.nowIso ? deps.nowIso() : new Date().toISOString();
+  const attached = await attachedStudent(store, input);
   const id = newId('feedback');
   const title = String(input?.title ?? '').trim() || 'Feedback';
   const body_html = typeof input?.body_html === 'string' ? input.body_html : '';
@@ -97,11 +112,25 @@ export async function createFeedbackDoc(store, input, deps = {}) {
     token_hash: null,
     expires_at: null,
     revoked_at: null,
+    ...attached,
+    ...(attached.student_id ? { returned_at: now } : {}),
     created_at: now,
     updated_at: now
   };
   await setJSON(store, feedbackDocKey(id), doc);
   return toTeacherFeedbackDoc(doc);
+}
+
+/** Notes attached to one student, newest first. These are the full records; the caller picks what a student sees. */
+export async function studentNotes(store, classId, studentId) {
+  const rows = await listJSON(store, FEEDBACK_DOC_PREFIX);
+  return rows
+    .filter((row) => row?.id && row.class_id === classId && row.student_id === studentId && row.returned_at && !row.revoked_at)
+    .sort((a, b) => String(b.returned_at).localeCompare(String(a.returned_at)));
+}
+
+export async function markNoteSeen(store, doc, nowIso = new Date().toISOString()) {
+  if (!doc.seen_at) await setJSON(store, feedbackDocKey(doc.id), { ...doc, seen_at: nowIso });
 }
 
 export async function createFeedbackLink(store, id, deps = {}) {
