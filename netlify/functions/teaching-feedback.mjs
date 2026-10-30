@@ -94,8 +94,13 @@ export function createTeachingFeedbackHandler(deps = {}) {
 
     if (request.method === 'POST') {
       const body = await readBody(request);
-      const doc = await createFeedbackDoc(store, body, deps);
-      return withCors(okResponse(201, { feedback: doc }), request, env);
+      try {
+        const doc = await createFeedbackDoc(store, body, deps);
+        return withCors(okResponse(201, { feedback: doc }), request, env);
+      } catch (error) {
+        if (error?.code !== 'no_student') throw error;
+        return withCors(errorResponse(400, error.code, error.message, false), request, env);
+      }
     }
 
     return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);

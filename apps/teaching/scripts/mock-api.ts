@@ -100,6 +100,11 @@ import { createPublishedExamplesWriteHandler } from '../../../netlify/functions/
 import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
 import { createLessonRecord } from '../../../netlify/functions/lessons.mjs';
 import { createFeedbackCodesHandler } from '../../../netlify/functions/feedback-codes.mjs';
+import { DEFAULT_FEEDBACK_CODES } from '../../../netlify/functions/_shared/feedback-codes.mjs';
+import { createClassPiecesHandler } from '../../../netlify/functions/class-pieces.mjs';
+import { createToMarkHandler } from '../../../netlify/functions/to-mark.mjs';
+import { createPublishedProfileHandler } from '../../../netlify/functions/published-profile.mjs';
+import { createPublishedWorkHandler } from '../../../netlify/functions/published-work.mjs';
 import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.mjs';
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
@@ -645,6 +650,143 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   seedGroupSetQuiz();
+
+  /**
+   * A walkable student progress case, dev walk only: a second class of invented students with five
+   * returned written pieces each, a sixth waiting for feedback from three of them, a linked Markbook
+   * task per piece, and a small skills continuum. The real Functions read all of it from the mock store.
+   * Walk: student `/s/classes/class_2026_12engadv2/profile` (initials AN), teacher `/mark/...` and the Markbook.
+   */
+  function seedStudentProgress(): void {
+    if (process.env.VITEST) return;
+    const unit = options.seed.units[0] as { id: string; lesson_ids: string[] } | undefined;
+    const template = options.seed.classes[0] as Record<string, unknown> | undefined;
+    if (!unit || !template) return;
+    const classId = 'class_2026_12engadv2';
+    const lessonId = 'lesson_progress_para';
+    const stamp = '2026-09-01T09:00:00.000Z';
+    const people: Array<[string, string]> = [
+      ['st_ava', 'Ava Nguyen'], ['st_noah', 'Noah Patel'], ['st_ella', 'Ella Chen'], ['st_jack', 'Jack Lee'],
+      ['st_mia', 'Mia Torres'], ['st_liam', 'Liam Wong'], ['st_zoe', 'Zoe Brooks'], ['st_sam', 'Sam Ortiz']
+    ];
+    store.setJSON(classKey(classId), {
+      ...template,
+      id: classId,
+      code: '12ENGADV2',
+      title: 'Year 12 English Advanced B',
+      slug: '12engadv2',
+      display_name: '12ENGADV2',
+      students: people.map(([id, name]) => ({ id, name, skip_picker: false })),
+      current_scheduled_lesson_id: undefined
+    });
+    seedIds.classes.push(classId);
+
+    // Analysis and Evidence steps (1 Starting .. 4 Extending) per student over six pieces; the sixth is still to mark.
+    const analysis: Record<string, number[]> = {
+      st_ava: [1, 2, 2, 2, 2, 2], st_noah: [2, 2, 2, 2, 2, 2], st_ella: [1, 2, 2, 2, 2, 2], st_jack: [2, 2, 2, 2, 2, 2],
+      st_mia: [2, 3, 3, 3, 3, 3], st_liam: [2, 2, 2, 2, 2, 2], st_zoe: [1, 1, 2, 2, 2, 2], st_sam: [2, 2, 2, 2, 2, 2]
+    };
+    const evidence: Record<string, number[]> = {
+      st_ava: [2, 2, 3, 3, 3, 3], st_noah: [2, 3, 3, 3, 3, 3], st_ella: [2, 2, 2, 3, 3, 3], st_jack: [2, 3, 3, 3, 3, 3],
+      st_mia: [3, 3, 3, 4, 4, 4], st_liam: [2, 2, 2, 2, 3, 3], st_zoe: [2, 2, 3, 3, 3, 3], st_sam: [2, 2, 2, 2, 2, 3]
+    };
+    const stepName = ['starting', 'building', 'secure', 'extending'];
+    const stepMark = [4, 6, 8, 9.5];
+    const rungOf = (id: string, i: number): string => (id === 'st_ava' && i >= 4 ? 'skilled' : id === 'st_mia' && i >= 3 ? 'skilled' : 'capable');
+    const rungMark = (rung: string): number => (rung === 'skilled' ? 3.1 : 2.7);
+
+    const pieces = [
+      { title: 'Road imagery', short: 'Road imagery', date: '2026-09-08', text: 'The poet uses the road to show the speaker’s loneliness. “Gravel hums beneath the tyres” makes the journey feel steady and restless at once. This links to the way the poem treats time.' },
+      { title: 'Close reading', short: 'Close reading', date: '2026-09-15', text: 'Repetition of “again” builds a sense of routine in the opening stanza. “Again the same grey fence” fixes the speaker in one place. That sets up the turn in the final lines.' },
+      { title: 'Tension', short: 'Tension', date: '2026-09-29', text: 'Tension grows as the lines shorten and the pauses lengthen. “The engine ticks, then stills” slows the pace almost to a stop. This shows the speaker waiting for something to change.' },
+      { title: 'Practice essay', short: 'Practice essay', date: '2026-10-06', text: 'The poem argues that memory reshapes a journey after it ends. “Every mile grows softer in the telling” shows the speaker smoothing the past. This suggests memory is a kind of editing.' },
+      { title: 'The turn', short: 'The turn', date: '2026-10-13', text: 'The final stanza turns toward the horizon and away from the road. “A line of light, then nothing” closes the poem on an open question. This leaves the reader to decide what the speaker finds.' },
+      { title: 'Whose view?', short: 'Whose view?', date: '2026-10-21', text: 'The poem gives the road one view, the speaker’s, and keeps every other traveller out of sight. “Nobody waves from the other lane” makes the silence feel chosen. This asks whose story the journey is.' }
+    ];
+    const ids = pieces.map((_, i) => ({ column: `column00${i + 1}`, block: `block_p${i + 1}` }));
+    const shared = { type: 'block', variant: 'medium', visibility: 'student_teacher', layout: {}, print: {}, settings: {}, created_at: stamp, updated_at: stamp, schema_version: 1 };
+    const lesson = {
+      id: lessonId, type: 'lesson', title: 'Paragraphs on The Long Road', slug: 'paragraphs_on_the_long_road', unit_id: unit.id,
+      sequence: unit.lesson_ids.length + 1, pedagogical_mode: 'lesson',
+      blocks: [
+        { ...shared, id: 'block_pp_h', block_type: 'heading', variant: 'page', content: { text: 'Paragraphs on The Long Road' } },
+        ...pieces.map((p, i) => ({ ...shared, id: ids[i]!.block, block_type: 'question_set', content: { title: p.title, questions: [{ id: 'q1', kind: 'short_answer', prompt: `Write your analytical paragraph: ${p.title}.` }] } }))
+      ],
+      status: 'active', created_at: stamp, updated_at: stamp, schema_version: 1, tags: [], syllabus_outcomes: [], outcome_ids: []
+    };
+    store.setJSON(draftLessonKey(lessonId), { ...lesson, published_at: stamp });
+    store.setJSON(publishedLessonKey(lessonId), toPublishedLesson(lesson as unknown as Lesson, stamp));
+    store.setJSON(unitKey(unit.id), { ...(store.getJSON<Record<string, unknown>>(unitKey(unit.id)) ?? unit), lesson_ids: [...unit.lesson_ids, lessonId] });
+    seedIds.lessons.push(lessonId);
+
+    for (const [id, short] of [['EA12-1', 'Analysis'], ['EA12-2', 'Evidence']] as const) {
+      const o = store.getJSON<Record<string, unknown>>(outcomeKey(id));
+      if (o) store.setJSON(outcomeKey(id), { ...o, short });
+    }
+    store.setJSON('feedback_codes/library', {
+      codes: DEFAULT_FEEDBACK_CODES.map((c: { id: string }) =>
+        c.id === 'comp_ts' ? { ...c, resource: { kind: 'link', url: 'https://example.com/topic-sentences', title: 'Writing topic sentences' } } : c.id === 'comp_e' ? { ...c, strength_descriptor: 'Well-chosen evidence that backs the point.' } : c
+      )
+    });
+    const bit = (name: string, i: number) => ({ id: name, name, job: `Part ${i}`, language: [] as string[] });
+    const rungBody = (line: string) => ({ i_can: line, indicators: [], build: { formula: [], parts: [bit('claim', 1), bit('reason', 2)], example: [['A claim, then the reason for it.', null]], why_here: 'A clear claim keeps the paragraph on track.', checks: [], next_move: 'Name the technique and say what it does to the reader.' } });
+    store.setJSON('skills_continuum/v1', {
+      strands: [SkillStrandSchema.parse({
+        schema: 'skills_strand_v1', strand: 'arguing', name: 'Arguing', summary: 'Making and holding a position across a response.',
+        rungs: (['capable', 'skilled', 'accomplished', 'excellent'] as const).map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), marks: '', marker_words: '', meaning: '' })),
+        sub_strands: [{
+          id: 'thesis', name: 'Taking a position', in_hsc: 'A clear line of argument.', draws_on: 'Reading and planning.',
+          rungs: { capable: rungBody('I can state a position on the question.'), skilled: rungBody('I can hold one position through a whole paragraph.'), accomplished: rungBody('I can shape the position as the argument develops.'), excellent: rungBody('I can use the position to weigh other readings.') }
+        }]
+      })],
+      fetched_at: stamp
+    });
+
+    const columns = pieces.map((p, i) => {
+      const criteria: Array<Record<string, unknown>> = [
+        { id: 'crit0001', label: 'Analysis', max: 10, outcomes: ['EA12-1'], concepts: [], steps: { starting: 'Names a technique.', building: 'Explains what a technique does.', secure: 'Shows how techniques shape meaning and ties them to the question.', extending: 'Weighs how techniques work together.' } },
+        { id: 'crit0002', label: 'Evidence', max: 10, outcomes: ['EA12-2'], concepts: [], steps: { secure: 'Chooses short quotes that prove the point.' } }
+      ];
+      if (i >= 2) criteria.push({ id: 'crit0003', label: 'Argument', max: 4, outcomes: [], concepts: [], skill: 'arguing.thesis' });
+      return { id: ids[i]!.column, kind: 'assessment', title: p.title, date: p.date, weight: 0, criteria, piece: { lesson_id: lessonId, block_id: ids[i]!.block, short: p.short } };
+    });
+    const marks: Record<string, Record<string, unknown>> = {};
+    for (const [sid, name] of people) {
+      for (let i = 0; i < 5; i += 1) {
+        const a = (analysis[sid]![i] ?? 2) - 1;
+        const e = (evidence[sid]![i] ?? 2) - 1;
+        const rung = rungOf(sid, i);
+        const criteria: Record<string, number> = { crit0001: stepMark[a]!, crit0002: stepMark[e]! };
+        const steps: Record<string, string> = { crit0001: stepName[a]!, crit0002: stepName[e]! };
+        if (i >= 2) { criteria.crit0003 = rungMark(rung); steps.crit0003 = rung; }
+        (marks[ids[i]!.column] ??= {})[sid] = { criteria, steps };
+        const text = pieces[i]!.text;
+        const span = (needle: string) => { const start = text.indexOf(needle); return { start, end: start + needle.length, quote: needle }; };
+        const sentence = text.split(/(?<=\.)\s/);
+        const tag = (n: number, code_id: string, positive: boolean, needle: string) => ({ id: `t_${sid.slice(3)}${i}${n}`, code_id, positive, part: 'answers', field: 'q1', ...span(needle) });
+        const tags = [
+          tag(1, 'comp_ts', false, sentence[0]!),
+          ...(e >= 2 && /“[^”]+”/.exec(text) ? [tag(2, 'comp_e', true, /“[^”]+”/.exec(text)![0])] : []),
+          ...(i === 1 || i === 2 ? [tag(3, 'comp_as', false, sentence[2]!)] : []),
+          ...(i >= 3 && a >= 1 ? [tag(4, 'comp_t', true, sentence[1]!.split(' ').slice(0, 4).join(' '))] : [])
+        ];
+        const returned_at = `${pieces[i]!.date}T06:00:00.000Z`;
+        store.setJSON(`work_handins/${lessonId}/${ids[i]!.block}/${sid}`, { class_id: classId, student_id: sid, text: { answers: { q1: text } }, handed_in_at: `${pieces[i]!.date}T00:30:00.000Z` });
+        store.setJSON(`piece_feedback/${classId}/${sid}/w:${lessonId}:${ids[i]!.block}`, {
+          kind: 'written', title: pieces[i]!.title, short: pieces[i]!.short, lesson_id: lessonId, block_id: ids[i]!.block, column_id: ids[i]!.column, tags,
+          comment: `${name.split(' ')[0]}, good work on this one. Open the paragraph with your argument, then let the quote prove it.`,
+          status: 'returned', returned_at, ...(sid === 'st_ava' && i === 4 ? {} : { seen_at: `${pieces[i]!.date}T20:00:00.000Z` }), updated_at: returned_at
+        });
+      }
+    }
+    // The sixth piece: three students have handed in and are waiting for feedback.
+    for (const [sid, at] of [['st_ava', '2026-10-27T01:10:00.000Z'], ['st_noah', '2026-10-20T03:00:00.000Z'], ['st_ella', '2026-10-28T02:40:00.000Z']] as const) {
+      store.setJSON(`work_handins/${lessonId}/${ids[5]!.block}/${sid}`, { class_id: classId, student_id: sid, text: { answers: { q1: pieces[5]!.text } }, handed_in_at: at });
+    }
+    store.setJSON(`markbook/${classId}`, { columns, marks, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] });
+  }
+
+  seedStudentProgress();
 
   function sign(payload: string): string {
     return createHmac('sha256', sessionSecret).update(payload).digest('base64url');
@@ -3783,6 +3925,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createClassProfileHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)
+        : /^\/api\/classes\/[^/]+\/pieces$/.test(path)
+      ? createClassPiecesHandler(deps)
+        : path === '/api/to-mark'
+      ? createToMarkHandler(deps)
+        : /^\/api\/published\/profile\/[^/]+$/.test(path)
+      ? createPublishedProfileHandler(deps)
+        : /^\/api\/published\/work\/[^/]+$/.test(path)
+      ? createPublishedWorkHandler(deps)
         : path.startsWith('/api/lessons/')
       ? createQuizHandler(deps)
       : path.startsWith('/api/published/quiz/')
@@ -3876,6 +4026,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/profile$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
+      /^\/api\/classes\/[^/]+\/pieces$/.test(path) ||
+      path === '/api/to-mark' ||
+      /^\/api\/published\/profile\/[^/]+$/.test(path) ||
+      /^\/api\/published\/work\/[^/]+$/.test(path) ||
       /^\/api\/outcomes\/[^/]+(\/(usage|merge))?$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||

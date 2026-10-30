@@ -2,6 +2,7 @@ import { apiPost, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import { readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
 import type { FeedbackCode } from '@/blocks/feedback-codes';
+import { deviceToken } from '@/quiz/dom';
 
 /**
  * Student-side calls for the Voice block. Students have no accounts: the
@@ -109,6 +110,12 @@ async function postPart(path: string, form: FormData): Promise<void> {
   if (!response.ok || !body?.ok) throw new ApiClientError(body?.error ?? { code: 'upload_failed', message: `Upload failed (${response.status})` });
 }
 
+let voiceClass: string | null = null;
+/** The class page this lesson was opened from. A take then says whose it is, using the device's class claim. */
+export function setVoiceClass(classId: string | null): void {
+  voiceClass = classId;
+}
+
 /** Sends one take in ≤4 MB parts, then submits it. Each part retries on its own. */
 export async function submitTake(input: {
   lessonId: string;
@@ -141,6 +148,7 @@ export async function submitTake(input: {
       action: 'submit',
       token,
       initials: input.initials,
+      ...(voiceClass ? { class_id: voiceClass, class_token: deviceToken(`class:${voiceClass}`) } : {}),
       upload_id: uploadId,
       parts: total,
       mime: input.mime,

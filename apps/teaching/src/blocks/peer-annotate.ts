@@ -116,14 +116,14 @@ export function paper(text: string, marks: Mark[], selected: { start: number; en
 }
 
 /** Character offset of a point in the paper, or null when it isn't inside a run. */
-function offsetOf(node: Node, offset: number): number | null {
+export function offsetOf(node: Node, offset: number): number | null {
   const run = (node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element))?.closest<HTMLElement>('.pa-run');
   if (!run) return null;
   const start = Number(run.dataset.start);
   return node.nodeType === Node.TEXT_NODE ? start + offset : offset === 0 ? start : Number(run.dataset.end);
 }
 
-function trimRange(text: string, start: number, end: number): { start: number; end: number } | null {
+export function trimRange(text: string, start: number, end: number): { start: number; end: number } | null {
   while (start < end && /\s/.test(text[start]!)) start++;
   while (end > start && /\s/.test(text[end - 1]!)) end--;
   return end > start ? { start, end } : null;

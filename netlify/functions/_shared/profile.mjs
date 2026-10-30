@@ -4,7 +4,8 @@
  *   profile/{class}/{student}/done/{lesson}   { at, via }   create-only
  *
  * The student is whoever this device has claimed (class-claims.mjs). Nothing here stores a
- * name, and the payload returns only the student's own map and four bar fills.
+ * name, and the payload returns only the student's own map. Feedback and progress come
+ * from profile-feedback.mjs, from returned work only.
  */
 import { isSafeId } from './class-examples.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
@@ -12,9 +13,8 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
-import { profileItems, storedAlignment } from './profile-items.mjs';
-import { highWaterFills, listClassDone, listDone, markDone, recordDone, removeDone } from './profile-done.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen } from './profile-feedback.mjs';
+import { listClassDone, listDone, markDone, recordDone, removeDone } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
@@ -36,7 +36,7 @@ async function unitLessons(store, cls) {
 export async function profileAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'claim'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'claim', 'progress', 'returned', 'piece', 'seen'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
@@ -45,6 +45,10 @@ export async function profileAction(store, classId, body) {
     if (action === 'done') reject(403, 'need_initials', 'Type your initials first.');
     return { need: 'initials' };
   }
+  if (action === 'progress') return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
+  if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
+  if (action === 'piece') return pieceFor(store, roster, student, body.item);
+  if (action === 'seen') return markSeen(store, roster, student, body.item);
   if (action === 'done') await recordDone(store, classId, student.id, body.lesson_id, 'tick');
   return profileFor(store, roster, student);
 }
@@ -81,11 +85,7 @@ async function profileFor(store, roster, student) {
   const done = await listDone(store, classId, student.id);
   const rows = mapRows(lessons, view, done, student.id);
   const next = rows.find((r) => r.role === 'core' && !r.done)?.id ?? null;
-  const alignment = await storedAlignment(store);
-  const mine = markbookEvidence(view, []).evidence.filter((e) => e.student === student.id);
-  const evidence = withPointTags(mine, lessonPointMap(lessons, alignment), new Map());
-  const items = await profileItems(store, roster, lessons, view, alignment);
-  return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) }, fills: await highWaterFills(store, classId, student.id, unit?.id, fillsFor(items, evidence)) };
+  return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) } };
 }
 
 /** Teacher: every student's done records; marking one complete, partial or clearing it. */

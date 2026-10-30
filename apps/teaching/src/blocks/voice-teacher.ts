@@ -41,6 +41,8 @@ type Status = 'new' | 'marked' | 'returned';
 type Row = {
   id: string;
   initials: string;
+  class_id?: string | null;
+  student_id?: string | null;
   device_hash: string;
   submitted_at: string;
   duration_s: number;
@@ -52,6 +54,8 @@ type Row = {
 };
 type MarkTag = VoiceTag & { source: 'tap' | 'suggested'; confirmed: boolean };
 type Submission = Omit<Row, 'tag_count'> & {
+  /** The classes this lesson belongs to, with their lists. */
+  classes?: Array<{ id: string; title: string; students: Array<{ id: string; initials: string; name: string }> }>;
   prompt: string;
   points: Array<{ label: string; t: number }>;
   transcript: WhisperTranscript | null;
@@ -235,6 +239,30 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     saveState.setAttribute('role', 'status');
     top.append(saveState);
     screen.append(top);
+
+    // Whose take this is. A device that claimed its initials in the class page is matched already.
+    const people = (record.classes ?? []).flatMap((c) => c.students.map((st) => ({ classId: c.id, classTitle: c.title, ...st })));
+    if (people.length) {
+      const matched = people.find((p) => p.classId === record.class_id && p.id === record.student_id) ?? null;
+      const guess = matched ?? (people.filter((p) => p.initials === record.initials).length === 1 ? people.find((p) => p.initials === record.initials)! : null);
+      const picker = el('select', 'pa-input voice-mark__student');
+      picker.id = `voice-student-${record.id}`;
+      picker.append(Object.assign(el('option'), { value: '', textContent: 'Pick a student' }));
+      for (const p of people) picker.append(Object.assign(el('option'), { value: `${p.classId}|${p.id}`, textContent: `${p.name} (${p.classTitle})` }));
+      if (guess) picker.value = `${guess.classId}|${guess.id}`;
+      picker.addEventListener('change', () => {
+        const [class_id, student_id] = picker.value.split('|');
+        if (class_id && student_id) void flush({ class_id, student_id });
+      });
+      const label = el('label', 'pf-field__label', 'This is');
+      label.htmlFor = picker.id;
+      const where = el('div', 'pf-field voice-mark__who-field');
+      where.append(label, picker);
+      if (matched && record.student_id) where.append(el('p', 'block-secondary', 'Matched from the student’s class claim.'));
+      screen.append(where);
+      // A confident guess is saved with the first change, so a returned take reaches the right student.
+      if (!matched && guess) void flush({ class_id: guess.classId, student_id: guess.id });
+    }
 
     // Player
     const audio = el('audio');

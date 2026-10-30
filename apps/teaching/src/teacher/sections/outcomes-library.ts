@@ -452,6 +452,7 @@ function outcomeRow(
         for (const key of ['code', 'title', 'description', 'group'] as const) {
           if (values[key] !== outcome[key]) patch[key] = values[key];
         }
+        if ((values.short ?? '') !== (outcome.short ?? '')) patch.short = values.short ?? '';
         if (!Object.keys(patch).length) {
           form.remove();
           view.hidden = false;
@@ -506,6 +507,7 @@ interface OutcomeFormValues {
   title: string;
   description: string;
   group: string;
+  short?: string;
 }
 
 function outcomeForm(config: {
@@ -536,6 +538,8 @@ function outcomeForm(config: {
   const title = field('Short title', 'input', config.values?.title ?? '', 'What the chip shows');
   const group = field('Group', 'input', config.values?.group ?? config.groups[0] ?? 'Custom', 'Module A');
   group.control.setAttribute('list', listId);
+  const short = field('Short name for students', 'input', config.values?.short ?? '', 'Analysis');
+  short.control.maxLength = 40;
   const description = field('Full wording', 'textarea', config.values?.description ?? '', 'The outcome as the syllabus words it');
 
   const error = document.createElement('p');
@@ -558,7 +562,7 @@ function outcomeForm(config: {
   const pair = document.createElement('div');
   pair.className = 'outcomes-lib__form-pair';
   pair.append(code.wrap, group.wrap);
-  form.append(heading, pair, title.wrap, description.wrap, datalist, error, actions);
+  form.append(heading, pair, title.wrap, short.wrap, description.wrap, datalist, error, actions);
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -566,7 +570,8 @@ function outcomeForm(config: {
       code: code.control.value.trim(),
       title: title.control.value.trim(),
       description: description.control.value.trim(),
-      group: group.control.value.trim() || 'Custom'
+      group: group.control.value.trim() || 'Custom',
+      short: short.control.value.trim()
     };
     if (!values.code || !values.title || !values.description) {
       error.hidden = false;

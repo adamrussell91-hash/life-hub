@@ -8,8 +8,8 @@ const essay: AssessmentColumn = {
   date: '2026-11-03',
   weight: 30,
   criteria: [
-    { id: 'crit000001', label: 'Analysis', max: 15, outcomes: ['o1'], bands: [{ label: 'A', min: 13 }, { label: 'B', min: 10 }] },
-    { id: 'crit000002', label: 'Expression', max: 10, outcomes: [] }
+    { id: 'crit000001', label: 'Analysis', max: 15, outcomes: ['o1'], concepts: [], bands: [{ label: 'A', min: 13 }, { label: 'B', min: 10 }] },
+    { id: 'crit000002', label: 'Expression', max: 10, outcomes: [], concepts: [] }
   ]
 };
 const tick: CheckColumn = { id: 'col0000002', kind: 'check', title: 'Bookwork', date: '2026-11-04', scale: 'tick' };

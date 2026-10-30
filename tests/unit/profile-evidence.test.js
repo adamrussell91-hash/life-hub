@@ -53,7 +53,7 @@ test('a quiz that is not published declares nothing', async () => {
   assert.deepEqual(items, []);
 });
 
-test('the profile payload carries only fractions for the bars', async () => {
+test('the profile payload leaves out the old bars; progress comes from marked pieces', async () => {
   const token = '1'.repeat(48);
   const s = world([
     ['classes/class1', { id: 'class1', type: 'class', status: 'active', current_unit_id: 'unit1', students: [{ name: 'Bob Brown' }] }],
@@ -63,6 +63,6 @@ test('the profile payload carries only fractions for the bars', async () => {
   ]);
   await claimInitials(s, await loadRoster(s, 'class1'), token, 'BB');
   const out = await profileAction(s, 'class1', { class_token: token });
-  assert.deepEqual(out.fills.understanding, { mastered: 0, building: 0 });
-  assert.deepEqual(Object.keys(out.fills).sort(), ['concepts', 'responding', 'skills', 'understanding']);
+  assert.equal(out.fills, undefined);
+  assert.ok(out.map);
 });

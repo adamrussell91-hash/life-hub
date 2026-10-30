@@ -372,6 +372,7 @@ export function renderClassPage(
   markbookHost.className = 'class-page__markbook-host';
   disposers.push(mountMarkbook(markbookHost, pageClass, {
     outcomes: outcomeLabels(curriculum.outcomes ?? []),
+    pieceLessons: unitProgressLessons(activeUnits, curriculum.lessons, []).map((l) => ({ id: l.id, title: l.title })),
     // Dates by lesson, whatever unit the calendar row was filed under: the lesson page's Date row
     // files it under the lesson's own unit, which may be trashed or another one.
     progressLessons: unitProgressLessons(

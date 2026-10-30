@@ -5,12 +5,15 @@ import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import { studentSiteOrigin } from '@/app/class-site';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { renderPageHeader } from '@/teacher/page-header';
+import { fetchCurriculum } from '@/teacher/nav';
 
 type FeedbackDoc = {
   id: string;
   title: string;
   body_html: string;
   student_label: string | null;
+  class_id?: string | null;
+  student_id?: string | null;
   has_link: boolean;
   expires_at: string | null;
   revoked_at: string | null;
@@ -40,10 +43,50 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
   newBtn.textContent = 'New';
   actions.append(newBtn);
 
+  // Optional: who the next note is for. A note for a class student appears in their Returned work.
+  const forBox = document.createElement('div');
+  forBox.className = 'feedback-page__for';
+  const classPick = document.createElement('select');
+  classPick.setAttribute('aria-label', 'Class');
+  const studentPick = document.createElement('select');
+  studentPick.setAttribute('aria-label', 'Student');
+  studentPick.disabled = true;
+  const noClass = Object.assign(document.createElement('option'), { value: '', textContent: 'For no one in particular' });
+  classPick.append(noClass);
+  forBox.append(classPick, studentPick);
+  const firstName = (): string => (studentPick.selectedOptions[0]?.textContent ?? '').split(' ')[0] ?? '';
+  const syncButton = (): void => {
+    newBtn.textContent = studentPick.value ? `Return to ${firstName()}` : 'New';
+  };
+  void fetchCurriculum().then(
+    (curriculum) => {
+      for (const cls of curriculum.classes ?? []) {
+        classPick.append(Object.assign(document.createElement('option'), { value: cls.id, textContent: cls.title }));
+      }
+    },
+    () => undefined
+  );
+  classPick.addEventListener('change', () => {
+    studentPick.replaceChildren(Object.assign(document.createElement('option'), { value: '', textContent: 'Pick a student' }));
+    studentPick.disabled = true;
+    syncButton();
+    if (!classPick.value) return;
+    void apiPost<{ students: Array<{ id: string; name: string }> }>(`/api/classes/${encodeURIComponent(classPick.value)}/markbook`, { action: 'load', skip_done: true }).then(
+      (data) => {
+        for (const st of data.students) studentPick.append(Object.assign(document.createElement('option'), { value: st.id, textContent: st.name }));
+        studentPick.disabled = false;
+      },
+      () => {
+        status.textContent = 'Could not load that class list.';
+      }
+    );
+  });
+  studentPick.addEventListener('change', syncButton);
+
   const list = document.createElement('div');
   list.className = 'feedback-page__list';
 
-  root.append(actions, status, list);
+  root.append(forBox, actions, status, list);
   canvas.append(root);
 
   let disposed = false;
@@ -73,6 +116,7 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
       meta.className = 'block-editor__hint';
       meta.textContent = [
         item.student_label ? `For ${item.student_label}` : null,
+        item.student_id ? 'Returned to the student' : null,
         item.has_link ? 'Link active' : item.revoked_at ? 'Link revoked' : 'No link'
       ]
         .filter(Boolean)
@@ -131,11 +175,13 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
     void (async () => {
       const title = await askTextCard({ title: 'Feedback title', placeholder: 'Draft feedback' });
       if (!title) return;
-      const student = await askTextCard({
-        title: 'Student label (optional)',
-        placeholder: 'Optional',
-        optional: true
-      });
+      const student = studentPick.value
+        ? studentPick.selectedOptions[0]?.textContent || null
+        : await askTextCard({
+            title: 'Student label (optional)',
+            placeholder: 'Optional',
+            optional: true
+          });
       const body = await askTextCard({
         title: 'Short note',
         placeholder: 'What to focus on next',
@@ -145,9 +191,10 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
         await apiPost('/api/teaching/feedback', {
           title,
           student_label: student || undefined,
+          ...(studentPick.value ? { class_id: classPick.value, student_id: studentPick.value } : {}),
           body_html: body ? `<p>${body.replace(/</g, '&lt;')}</p>` : ''
         });
-        status.textContent = 'Feedback saved.';
+        status.textContent = studentPick.value ? `Returned to ${firstName()}.` : 'Feedback saved.';
         await refresh();
       } catch (error) {
         status.textContent =

@@ -60,6 +60,7 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-form__field { display: grid; gap: 2px; }
 .mb-form__label { font-weight: var(--weight-semibold); color: var(--muted); }
 .mb-form__input { min-height: 36px; padding: var(--space-1) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; background: var(--paper); color: var(--ink); }
+.mb-form__piece,
 .mb-form__criterion { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .mb-form__remove-criterion { justify-self: start; min-height: 44px; padding: var(--space-2) var(--space-3); border: 0; background: none; color: var(--danger); font: inherit; cursor: pointer; }
 .mb-form__remove-criterion:disabled { color: var(--muted); cursor: default; }
@@ -409,3 +410,6 @@ thead .mb-book__pin small { display: block; font-weight: var(--weight-regular, 4
 .mb-phone .mb-book__chip { min-height: 44px; padding: 2px var(--space-1); border-radius: var(--radius-sm); line-height: 1.2; white-space: normal; }
 .mb-cell__writing { position: absolute; bottom: 1px; right: 3px; font-size: 10px; line-height: 1; color: var(--warning); }
 .mb-attempt__writing { margin: 0; color: var(--warning); font-weight: var(--weight-semibold); }
+
+.mb-col__mark { display: inline-block; margin-top: 2px; font-size: var(--text-xs, .75rem); font-weight: 600; color: var(--wave); text-decoration: none; }
+.mb-col__mark-count { margin-left: 4px; color: var(--muted); font-weight: 500; }

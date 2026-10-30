@@ -162,3 +162,22 @@ describe('mountWorkSync', () => {
     sync.dispose();
   });
 });
+
+describe('hand in', () => {
+  it('adds a Hand in button under a marked block and turns it into Hand in again', async () => {
+    const root = host();
+    const block = Object.assign(document.createElement('div'), { className: 'block' });
+    block.dataset.blockId = 'qset1';
+    root.append(block);
+    const call: WorkCall = async (action) =>
+      action === 'handin' ? { need: null, handed_in_at: '2026-10-30T01:00:00Z' } : { need: null, initials: 'BB', handin_blocks: ['qset1'] };
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call, delayMs: 5 });
+    await settle();
+    const send = [...block.querySelectorAll('button')].find((b) => b.textContent === 'Hand in');
+    expect(send).toBeTruthy();
+    send!.click();
+    await settle();
+    expect(block.querySelector('button')!.textContent).toBe('Hand in again');
+    handle.dispose();
+  });
+});

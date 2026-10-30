@@ -15,8 +15,8 @@ import './work-sync.css';
  * uses. A device without one is asked once, at the top of the lesson.
  */
 
-type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true };
-export type WorkCall = (action: 'status' | 'claim' | 'save', extra?: Record<string, unknown>) => Promise<Reply>;
+type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string };
+export type WorkCall = (action: 'status' | 'claim' | 'save' | 'handin', extra?: Record<string, unknown>) => Promise<Reply>;
 export type WorkSyncOptions = { lessonId: string; classId: string; /** Replaces the network in tests. */ call?: WorkCall; delayMs?: number; retryMs?: number };
 export type WorkSyncHandle = { dispose(): void; /** Sends what is waiting now. */ flush(): Promise<void> };
 
@@ -101,6 +101,40 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   if (blocks) blocks.before(bar);
   else host.prepend(bar);
 
+  /** A Hand in bar under each block the class's Markbook marks. */
+  function showHandIn(blockIds: string[] | undefined): void {
+    for (const id of blockIds ?? []) {
+      const block = [...host.querySelectorAll<HTMLElement>('[data-block-id]')].find((b) => b.dataset.blockId === id);
+      if (!block || block.querySelector(':scope > .ws-handin')) continue;
+      block.append(handInBar(id));
+    }
+  }
+
+  function handInBar(blockId: string): HTMLElement {
+    const handin = el('div', 'ws-handin');
+    const note = el('p', 'ws-handin__note', 'Your teacher marks this one. Hand it in when it’s ready.');
+    note.setAttribute('role', 'status');
+    const send = button('Hand in', 'primary', () => {
+      send.disabled = true;
+      void flush()
+        .then(() => call('handin', { block_id: blockId }))
+        .then(
+          (r) => {
+            note.textContent = `Handed in ${new Date(r.handed_in_at ?? Date.now()).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. You can hand it in again until it comes back.`;
+            send.textContent = 'Hand in again';
+          },
+          (e: unknown) => {
+            note.textContent = errorText(e);
+          }
+        )
+        .finally(() => {
+          send.disabled = false;
+        });
+    });
+    handin.append(note, send);
+    return handin;
+  }
+
   function queue(key: string, value: unknown): void {
     const where = parseWorkKey(lessonId, key);
     if (!where || disposed || state === 'off') return;
@@ -122,9 +156,10 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     const send = button('Send my work', 'primary', () => {
       error.hidden = true;
       void call('claim', { initials: input.value }).then(
-        () => {
+        (reply) => {
           state = 'ready';
           bar.hidden = true;
+          showHandIn(reply.handin_blocks);
           for (const [key, value] of heldParts(lessonId)) queue(key, value);
           void flush();
         },
@@ -155,6 +190,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       } else {
         state = 'ready';
         bar.hidden = true;
+        showHandIn(reply.handin_blocks);
       }
     } catch (error) {
       // A lesson or class the server doesn't know can't take work; a dropped connection tries again later.
