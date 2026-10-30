@@ -502,7 +502,8 @@ describe('markbook section', () => {
   it('Progress marks a lesson complete through the profile endpoint and redraws from its reply', async () => {
     const host = document.createElement('div');
     document.body.append(host);
-    const mark = vi.fn(async () => ({ s1: { l1: { at: 'x', via: 'teacher' } }, s2: {} }));
+    let settle!: (records: Record<string, { at: string; via: string }>) => void;
+    const mark = vi.fn(() => new Promise<Record<string, { at: string; via: string }>>((resolve) => (settle = resolve)));
     mountMarkbook(host, cls, {
       api: fakeApi(view()),
       progressApi: { mark },
@@ -516,9 +517,12 @@ describe('markbook section', () => {
     expect(cell('s1').dataset.state).toBe('open');
     expect(cell('s1').dataset.late).toBe('true');
     cell('s1').click();
-    await vi.waitFor(() => expect(cell('s1').dataset.state).toBe('complete'));
-    expect(mark).toHaveBeenCalledWith('class1', 's1', 'l1', 'complete');
+    // The cell turns before the save comes back.
+    expect(cell('s1').dataset.state).toBe('complete');
     expect(cell('s1').dataset.late).toBeUndefined();
+    await vi.waitFor(() => expect(mark).toHaveBeenCalledWith('class1', 's1', 'l1', 'complete'));
+    settle({ l1: { at: 'x', via: 'teacher' } });
+    await vi.waitFor(() => expect(cell('s1').dataset.override).toBe('true'));
     host.remove();
   });
 
@@ -530,6 +534,8 @@ describe('markbook section', () => {
     await vi.waitFor(() => expect(host.querySelector('.mb-progress__btn')).not.toBeNull());
     host.querySelector<HTMLButtonElement>('.mb-progress__btn')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-progress [role="alert"]')?.textContent).toContain('can’t be saved'));
+    // The tick that could not be saved comes off again.
+    expect(host.querySelector<HTMLButtonElement>('.mb-progress__btn')!.dataset.state).toBe('open');
     host.remove();
   });
 
