@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson Footer Rail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650&display=swap" rel="stylesheet">
+<style>
+/* Layout: one reading column of findings and question cards, then the footer mockup at desktop and phone width. Palette is the Teaching Hub student page. */
+:root {
+  --paper: #fbf8f2;
+  --card: #ffffff;
+  --ink: #13233a;
+  --muted: #5d6a7c;
+  --line: rgba(23, 55, 94, 0.14);
+  --accent: #376fb7;
+  --accent-ink: #ffffff;
+  --navy: #17375e;
+  --good: #2f7a52;
+  --good-bg: #e6f2ea;
+  --warn: #9a5b12;
+  --warn-bg: #fbefdc;
+  --bad: #a3342b;
+  --bad-bg: #f8e5e2;
+  --font-ui: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Source Serif 4", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1724; --card: #172235; --ink: #e7edf6; --muted: #a2afc2; --line: rgba(200, 215, 240, 0.16);
+    --accent: #6f9fe0; --accent-ink: #0b1220; --navy: #a9c4ec;
+    --good: #7fcf9e; --good-bg: #173326; --warn: #f0b867; --warn-bg: #3a2a12; --bad: #f19a90; --bad-bg: #3d1d1a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1724; --card: #172235; --ink: #e7edf6; --muted: #a2afc2; --line: rgba(200, 215, 240, 0.16);
+  --accent: #6f9fe0; --accent-ink: #0b1220; --navy: #a9c4ec;
+  --good: #7fcf9e; --good-bg: #173326; --warn: #f0b867; --warn-bg: #3a2a12; --bad: #f19a90; --bad-bg: #3d1d1a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 var(--font-ui); }
+main { max-width: 980px; margin: 0 auto; padding: 40px 20px 80px; display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 2.1rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.08rem; font-family: var(--font-ui); font-weight: 650; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+section { display: grid; gap: 18px; }
+.eyebrow { font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.status { display: inline-flex; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-size: .82rem; font-weight: 600; width: fit-content; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, label:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Findings */
+.findings { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.finding { display: grid; grid-template-columns: 2.2rem 1fr; gap: 12px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.finding__n { font: 650 1.2rem/1 var(--font-display); color: var(--accent); padding-top: 2px; }
+.finding p + p { margin-top: 4px; }
+.cite { color: var(--muted); font-size: .86rem; }
+.rules { display: grid; gap: 8px; margin: 0; padding-left: 1.2rem; }
+
+/* Question cards */
+.qgroup { display: grid; gap: 12px; }
+.qgroup__head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-size: .75rem; font-weight: 650; padding: 2px 8px; border-radius: 999px; }
+.tag--rec { background: var(--good-bg); color: var(--good); }
+.tag--opt { background: var(--warn-bg); color: var(--warn); }
+.tag--no { background: var(--bad-bg); color: var(--bad); }
+.qcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px; }
+.qcard--opt { border-left-color: var(--warn); }
+.qcard__wording { font: 600 1.06rem/1.4 var(--font-ui); }
+.answers { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.answers li { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .88rem; }
+.meta { display: grid; grid-template-columns: 7.5rem 1fr; gap: 4px 12px; font-size: .9rem; }
+.meta dt { color: var(--muted); font-weight: 600; }
+.meta dd { margin: 0; }
+.reject { width: 100%; border-collapse: collapse; font-size: .92rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.reject th, .reject td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.reject th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.reject tr:last-child td { border-bottom: 0; }
+.table-wrap { overflow-x: auto; }
+
+/* Mockup */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 24px; align-items: start; }
+.device { background: var(--card); border: 1px solid var(--line); border-radius: 14px; display: grid; }
+.device .lesson-tail { min-height: 360px; align-content: start; }
+.device__bar { font-size: .78rem; color: var(--muted); padding: 8px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+.lesson-tail { padding: 20px 20px 0; display: grid; gap: 12px; }
+.lesson-tail .fake { height: 10px; border-radius: 6px; background: var(--line); }
+.lesson-tail .fake:nth-child(2) { width: 82%; } .lesson-tail .fake:nth-child(3) { width: 64%; }
+.handin-hint { font-size: .86rem; color: var(--muted); }
+.rail { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 14px 16px; margin-top: 20px; border-top: 1px solid var(--line); }
+.rail__link { display: grid; gap: 2px; text-decoration: none; color: var(--ink); min-width: 0; padding: 6px 8px; border-radius: 8px; }
+.rail__link:hover { background: var(--paper); }
+.rail__link small { color: var(--muted); font-size: .75rem; }
+.rail__link span { font-weight: 600; font-size: .92rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+.rail__link--next { text-align: right; }
+.rail__mid { display: flex; gap: 10px; align-items: center; }
+.tick, .fb { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; border: 2px solid var(--accent); background: var(--card); color: var(--accent); padding: 0; }
+.fb { width: 40px; height: 40px; border-color: var(--line); color: var(--muted); }
+.fb[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.tick[aria-pressed="true"] { background: var(--good); border-color: var(--good); color: #fff; }
+.tick svg, .fb svg { width: 22px; height: 22px; }
+.fb svg { width: 19px; height: 19px; }
+.pop { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: min(360px, calc(100% - 24px)); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(10, 20, 40, .18); padding: 16px; display: grid; gap: 14px; z-index: 2; }
+.pop[hidden] { display: none; }
+.pop h4 { margin: 0; font: 650 1rem/1.3 var(--font-ui); }
+.pop p.note { font-size: .82rem; color: var(--muted); }
+.pop fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.pop legend { font-weight: 600; font-size: .9rem; padding: 0; margin-bottom: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips label { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: .85rem; cursor: pointer; min-height: 36px; display: inline-flex; align-items: center; }
+.chips input { position: absolute; opacity: 0; pointer-events: none; }
+.chips label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.pop textarea { width: 100%; min-height: 64px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: .9rem; background: var(--paper); color: var(--ink); resize: vertical; }
+.row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.btn { border-radius: 8px; padding: 9px 14px; font: 600 .9rem var(--font-ui); cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-height: 40px; }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.checklist { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: .88rem; }
+.checklist li { display: flex; gap: 8px; }
+.checklist .warn { color: var(--warn); }
+.done-msg { font-size: .86rem; color: var(--good); font-weight: 600; text-align: center; grid-column: 1 / -1; }
+.done-msg[hidden] { display: none; }
+.device--phone .rail { grid-template-columns: 1fr auto 1fr; gap: 6px; padding: 12px 10px; }
+.device--phone .rail__link span { font-size: .82rem; }
+.device--phone .rail__link small { font-size: .7rem; }
+.caption { font-size: .86rem; color: var(--muted); }
+.decisions { display: grid; gap: 10px; margin: 0; padding-left: 1.2rem; }
+@media (max-width: 860px) {
+  .stage { grid-template-columns: 1fr; }
+  .device--phone { max-width: 390px; }
+}
+@media (max-width: 480px) {
+  h1 { font-size: 1.7rem; }
+  .meta { grid-template-columns: 1fr; }
+  main { padding: 28px 16px 64px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tick { transition: background .15s, border-color .15s; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header style="display:grid;gap:12px">
+    <span class="status">For decision · nothing built yet</span>
+    <h1>Lesson footer rail and end-of-lesson questions</h1>
+    <p class="lede">A rail at the bottom of every lesson: previous lesson, a tick to finish the lesson (which hands in the quiz and written work), a small feedback icon, and next lesson. Below: what the research says students can and can't judge, the questions that survive it, and a clickable mockup.</p>
+  </header>
+
+  <section aria-labelledby="h-research">
+    <span class="eyebrow">1 · The research</span>
+    <h2 id="h-research">Students are poor judges of whether a lesson worked</h2>
+    <p>Your instinct is right, and the evidence is strong. Students' sense of how much they learned, or how good a lesson was, tracks how smooth it felt, not how much they learned. The same evidence points to what students <em>can</em> report reliably: concrete things that happened in the room, and their own effort and confusion.</p>
+    <ol class="findings">
+      <li class="finding"><span class="finding__n">1</span><div>
+        <p><strong>Feeling of learning runs the wrong way.</strong> In randomised physics classes, students taught actively scored higher on the test but <em>felt</em> they had learned less than students given a polished lecture. The authors put it down to effort: students read hard thinking as a sign of not learning.</p>
+        <p class="cite">Deslauriers et al. (2019), <a href="https://openlab.citytech.cuny.edu/gamelab/files/2023/01/Deslauriersa-et-al-2019.pdf">PNAS 116(39)</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">2</span><div>
+        <p><strong>Ratings reward short-term ease.</strong> With students randomly assigned to teachers, ratings predicted grades in that course but not performance in the next one. Teachers whose students did better later were rated <em>lower</em>.</p>
+        <p class="cite">Carrell &amp; West (2010), <a href="https://www.nber.org/papers/w14081">Journal of Political Economy 118(3)</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">3</span><div>
+        <p><strong>Overall ratings barely relate to learning.</strong> A re-analysis of 97 multi-section studies found the correlation between student ratings and learning close to zero (about r = .12 at best). It's contested, but no one in the debate argues the link is strong.</p>
+        <p class="cite">Uttl, White &amp; Gonzalez (2017), Studies in Educational Evaluation 54; see <a href="https://www.learningscientists.org/blog/2020/1/30-1">The Learning Scientists</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">4</span><div>
+        <p><strong>Asking about what happened does work.</strong> School student surveys that ask about observable classroom events (whether the teacher checks understanding, whether time is wasted, whether you're pushed to think) predicted achievement gains and were more consistent year to year than observations. The <em>Challenge</em> and <em>Control</em> (classroom order) scales carried the most weight. The Great Teaching Toolkit surveys use the same approach: specific, observable statements.</p>
+        <p class="cite">MET Project, <a href="https://cepr.harvard.edu/sites/g/files/omnuum9881/files/cepr/files/asking_students_summary_doc_0.pdf">Asking Students about Teaching</a> (2012); <a href="https://static.battelleforkids.org/documents/Tulsa/Tripod-Student-Survey-7C-Overview.pdf">Tripod 7Cs</a>; <a href="https://evidencebased.education/student-surveys-perceptions-on-teaching/">Evidence Based Education</a> on the Great Teaching Toolkit (Coe et al., 2020). A <a href="https://nepc.colorado.edu/sites/default/files/ttr-met-studentsurvey_1.pdf">critical review</a> warns against over-trusting these surveys for high-stakes decisions.</p></div></li>
+      <li class="finding"><span class="finding__n">5</span><div>
+        <p><strong>Effort is one thing students rate well.</strong> A single "how much mental effort did that take?" item is the standard measure of cognitive load: reliable, and sensitive to small changes in task difficulty. One caution: changing the wording or the number of points weakens it.</p>
+        <p class="cite">Paas (1992), Journal of Educational Psychology 84; reliability and validity in <a href="https://link.springer.com/article/10.1007/s11251-024-09692-6">Instructional Science (2024)</a> and <a href="https://core.ac.uk/download/127605891.pdf">Sweller, van Merriënboer &amp; Paas review</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">6</span><div>
+        <p><strong>"How well do you understand?" right after the lesson is the least accurate time to ask.</strong> Judgements of learning made straight away are distorted by what's still in short-term memory; made after a delay, they're far better. The quiz is a better measure of understanding than any self-rating.</p>
+        <p class="cite">Nelson &amp; Dunlosky (1991), Psychological Science; Koriat &amp; Bjork (2005) <a href="https://newiipdm.haifa.ac.il/wp-content/uploads/2015/05/2005-Koriat-Bjork-JEPLMC-KBA.pdf">on illusions of competence</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">7</span><div>
+        <p><strong>"What's still unclear?" is useful for planning, not as evidence of learning.</strong> The Muddiest Point is a standard classroom check: fast, anonymous-friendly and good for planning the next lesson. It records what students <em>feel</em> unsure of, not what they got wrong, and there's little controlled evidence that it raises achievement.</p>
+        <p class="cite">Angelo &amp; Cross (1993), Classroom Assessment Techniques; <a href="https://mtei.engineering.cornell.edu/tips-updates/muddiest-point-and-one-minute-papers-for-active-learning-and-feedback">Cornell summary</a>.</p></div></li>
+    </ol>
+    <h3>What that means for the questions</h3>
+    <ol class="rules">
+      <li><strong>Ask about things that happened, or about the student's own experience.</strong> Never ask them to grade the lesson, the teacher, or how much they learned.</li>
+      <li><strong>Don't read high effort as bad.</strong> Read it next to the quiz: high effort with good scores is productive struggle; high effort with low scores is overload.</li>
+      <li><strong>Leave understanding to the quiz.</strong> A self-rating straight after the lesson is the least accurate measure available.</li>
+      <li><strong>Keep it under 20 seconds and optional.</strong> One tap per question, one optional text box.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-questions">
+    <span class="eyebrow">2 · Question options</span>
+    <h2 id="h-questions">The questions that hold up</h2>
+    <p>Recommended: the first three, which together take about 15 seconds. The two optional ones are defensible but weaker; add them if you want the extra signal.</p>
+
+    <div class="qgroup">
+      <div class="qgroup__head"><h3>Recommended</h3><span class="tag tag--rec">use these</span></div>
+
+      <article class="qcard">
+        <p class="eyebrow">A · Clarity of the task</p>
+        <p class="qcard__wording">Did you know what you were meant to be doing?</p>
+        <ul class="answers"><li>All the way through</li><li>Mostly</li><li>Some of the time</li><li>Hardly at all</li></ul>
+        <dl class="meta">
+          <dt>Why it holds</dt><dd>An observable event, not a quality judgement. Close to Tripod's <em>Clarify</em> items, which ask about specific, observable teacher actions.</dd>
+          <dt>What you'd do</dt><dd>Many "some of the time" answers point at the instructions or the order of tasks, not the content. Fix the lesson's structure.</dd>
+        </dl>
+      </article>
+
+      <article class="qcard">
+        <p class="eyebrow">B · Getting unstuck</p>
+        <p class="qcard__wording">When you got stuck, what happened?</p>
+        <ul class="answers"><li>I didn't get stuck</li><li>I worked it out myself</li><li>I got help and kept going</li><li>I stayed stuck</li></ul>
+        <dl class="meta">
+          <dt>Why it holds</dt><dd>Reports what happened, which students can do accurately. Separates productive struggle from lost time without asking them to judge difficulty.</dd>
+          <dt>What you'd do</dt><dd>"I stayed stuck" is the one to act on: compare it with that student's quiz answers and their Markbook pattern. "Didn't get stuck" across the room together with high quiz scores may mean the lesson was too easy.</dd>
+        </dl>
+      </article>
+
+      <article class="qcard">
+        <p class="eyebrow">C · Still unclear (optional text)</p>
+        <p class="qcard__wording">What's one thing that's still unclear?</p>
+        <ul class="answers"><li>Short free text, can be left blank</li></ul>
+        <dl class="meta">
+          <dt>Why it holds</dt><dd>The Muddiest Point. Diagnostic and useful for planning the next lesson. It records what students feel unsure about, so read it next to the quiz, not instead of it.</dd>
+          <dt>What you'd do</dt><dd>Feeds the start of the next lesson: a retrieval question or re-explanation aimed at the most common answer.</dd>
+        </dl>
+      </article>
+    </div>
+
+    <div class="qgroup">
+      <div class="qgroup__head"><h3>Optional</h3><span class="tag tag--opt">defensible, weaker</span></div>
+
+      <article class="qcard qcard--opt">
+        <p class="eyebrow">D · Mental effort</p>
+        <p class="qcard__wording">How hard did you have to think in this lesson?</p>
+        <ul class="answers"><li>Very little</li><li>A little</li><li>A fair amount</li><li>A lot</li><li>As hard as I can</li></ul>
+        <dl class="meta">
+          <dt>Why it holds</dt><dd>Adapted from the Paas mental-effort scale, the best-validated self-report in this area.</dd>
+          <dt>Caution</dt><dd>The original has 9 points; this 5-point, student-friendly version hasn't been re-validated. Only useful read against quiz scores (see the rules above), never on its own, and never as "this lesson was too hard".</dd>
+        </dl>
+      </article>
+
+      <article class="qcard qcard--opt">
+        <p class="eyebrow">E · Pushed to think</p>
+        <p class="qcard__wording">In this lesson I had to explain my thinking, not just give answers.</p>
+        <ul class="answers"><li>Yes, a lot</li><li>A bit</li><li>Not really</li></ul>
+        <dl class="meta">
+          <dt>Why it holds</dt><dd>Close to Tripod's <em>Challenge</em> scale, which carried the most weight in the MET results. Still an observable event.</dd>
+          <dt>Caution</dt><dd>Challenge was validated across a whole course, not one lesson. Treat one lesson's result as a hint, and watch the trend over a unit.</dd>
+        </dl>
+      </article>
+    </div>
+
+    <div class="qgroup">
+      <div class="qgroup__head"><h3>Left out, and why</h3><span class="tag tag--no">don't ask</span></div>
+      <div class="table-wrap">
+        <table class="reject">
+          <thead><tr><th scope="col">Question</th><th scope="col">Why not</th></tr></thead>
+          <tbody>
+            <tr><td>Did you enjoy the lesson?</td><td>Enjoyment isn't needed for learning, and a smooth, easy lesson feels better while teaching less (finding 1).</td></tr>
+            <tr><td>How much did you learn?</td><td>Runs the wrong way: active lessons score lower on this while producing more learning (findings 1–2).</td></tr>
+            <tr><td>How well do you understand this now?</td><td>An immediate judgement of learning, the least accurate kind (finding 6). The quiz already measures it.</td></tr>
+            <tr><td>Rate this lesson out of 5</td><td>A global rating; close to zero relationship with learning (finding 3).</td></tr>
+            <tr><td>Was the lesson too hard / too easy?</td><td>Asks students to judge difficulty against an ideal they can't see. Questions B and D get the same signal from things they can report.</td></tr>
+            <tr><td>What would make this lesson better?</td><td>Asks for a teaching judgement. Answers tend toward "less writing" or "more videos".</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-mock">
+    <span class="eyebrow">3 · Mockup</span>
+    <h2 id="h-mock">The footer rail</h2>
+    <p>Try it: press the feedback icon, then the tick. Example lesson names are invented. The rail replaces the current previous/next links at the bottom of the lesson.</p>
+    <div class="stage">
+      <div>
+        <div class="device" data-device="desk">
+          <div class="device__bar"><span>Year 10 History · Lesson 4 of 9</span><span>Desktop</span></div>
+          <div class="lesson-tail" aria-hidden="true"><div class="fake"></div><div class="fake"></div><div class="fake"></div></div>
+          <p class="handin-hint" style="padding:12px 20px 0">… end of the lesson's last block</p>
+          <div class="rail"></div>
+        </div>
+        <p class="caption" style="margin-top:8px">Desktop, about 900px wide.</p>
+      </div>
+      <div>
+        <div class="device device--phone" data-device="phone">
+          <div class="device__bar"><span>Lesson 4 of 9</span><span>390px</span></div>
+          <div class="lesson-tail" aria-hidden="true"><div class="fake"></div><div class="fake"></div><div class="fake"></div></div>
+          <div class="rail"></div>
+        </div>
+        <p class="caption" style="margin-top:8px">Phone, 390px. Lesson titles shorten; the two buttons stay full size.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-decide">
+    <span class="eyebrow">4 · Before building</span>
+    <h2 id="h-decide">Decisions for you</h2>
+    <ol class="decisions">
+      <li><strong>Which questions?</strong> Recommended A, B and C, with D and E optional.</li>
+      <li><strong>Where feedback goes.</strong> In the codebase I found the per-block pulse dots ("How's this going?") and the Feedback section, which holds feedback documents you send to students. Neither is a lesson feedback collation. Which one did you mean, or does the collation live outside the Hub (for example a Google Form)?</li>
+      <li><strong>Named or anonymous?</strong> Named lets "I stayed stuck" link to that student's Markbook row; anonymous may get more honest answers to C. A middle option is named for you only, never shown to the class.</li>
+      <li><strong>The tick can't be fully undone.</strong> A quiz in a lesson gives one go by default, so handing it in ends that go. The mockup asks once and lists anything left blank. Should students be able to untick the lesson itself (the "done" mark), even though the hand-in stays?</li>
+      <li><strong>Feedback is separate from the tick.</strong> In the mockup, the icon works any time and the tick never forces feedback. Alternatively, the feedback could open straight after the tick, still skippable.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(function () {
+  const ICON_TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const ICON_FB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
+  let uid = 0;
+
+  function chipGroup(name, legend, options) {
+    const id = name + '-' + (++uid);
+    const opts = options.map((o, i) => '<label for="' + id + '-' + i + '"><input type="radio" id="' + id + '-' + i + '" name="' + id + '" value="' + o + '">' + o + '</label>').join('');
+    return '<fieldset><legend>' + legend + '</legend><div class="chips">' + opts + '</div></fieldset>';
+  }
+
+  function build(rail, phone) {
+    const n = ++uid;
+    rail.innerHTML =
+      '<a class="rail__link" href="#h-mock"><small>← Previous</small><span>' + (phone ? 'Sources' : 'Lesson 3 · Reading the sources') + '</span></a>' +
+      '<div class="rail__mid">' +
+        '<button type="button" class="fb" aria-expanded="false" aria-controls="pop-fb-' + n + '" aria-label="Give feedback on this lesson">' + ICON_FB + '</button>' +
+        '<button type="button" class="tick" aria-pressed="false" aria-label="Finish this lesson">' + ICON_TICK + '</button>' +
+      '</div>' +
+      '<a class="rail__link rail__link--next" href="#h-mock"><small>Next →</small><span>' + (phone ? 'Argument' : 'Lesson 5 · Building the argument') + '</span></a>' +
+      '<p class="done-msg" hidden>Lesson finished. Your quiz and written work are handed in.</p>' +
+      '<div class="pop" id="pop-fb-' + n + '" role="dialog" aria-label="Lesson feedback" hidden>' +
+        '<h4>Quick check on this lesson</h4>' +
+        chipGroup('a', 'Did you know what you were meant to be doing?', ['All the way through', 'Mostly', 'Some of the time', 'Hardly at all']) +
+        chipGroup('b', 'When you got stuck, what happened?', ['I didn’t get stuck', 'I worked it out myself', 'I got help and kept going', 'I stayed stuck']) +
+        '<div><label for="mud-' + n + '" style="font-weight:600;font-size:.9rem">What’s one thing that’s still unclear? <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="mud-' + n + '" placeholder="e.g. why the council chose the cheaper route"></textarea></div>' +
+        '<p class="note">Only your teacher sees this. It isn’t marked.</p>' +
+        '<div class="row"><button type="button" class="btn" data-close>Not now</button><button type="button" class="btn btn--primary" data-send>Send</button></div>' +
+      '</div>' +
+      '<div class="pop" id="pop-tick-' + n + '" role="dialog" aria-label="Finish this lesson" hidden>' +
+        '<h4>Finish this lesson?</h4>' +
+        '<p style="font-size:.9rem">This hands in everything for your teacher:</p>' +
+        '<ul class="checklist">' +
+          '<li><span aria-hidden="true">✓</span>Quiz: 6 of 7 answered</li>' +
+          '<li class="warn"><span aria-hidden="true">!</span>1 quiz question left blank: “Explain the council’s decision” (3 marks)</li>' +
+          '<li><span aria-hidden="true">✓</span>Written work: 6 answers</li>' +
+        '</ul>' +
+        '<p class="note">You can’t change your quiz answers after this.</p>' +
+        '<div class="row"><button type="button" class="btn" data-close>Keep working</button><button type="button" class="btn btn--primary" data-finish>Hand in and finish</button></div>' +
+      '</div>';
+
+    const fb = rail.querySelector('.fb');
+    const tick = rail.querySelector('.tick');
+    const popFb = rail.querySelector('#pop-fb-' + n);
+    const popTick = rail.querySelector('#pop-tick-' + n);
+    const done = rail.querySelector('.done-msg');
+    const closeAll = (focus) => {
+      popFb.hidden = true; popTick.hidden = true; fb.setAttribute('aria-expanded', 'false');
+      if (focus) focus.focus();
+    };
+    fb.addEventListener('click', () => {
+      const open = popFb.hidden;
+      closeAll();
+      popFb.hidden = !open;
+      fb.setAttribute('aria-expanded', String(open));
+      if (open) popFb.querySelector('input').focus();
+    });
+    tick.addEventListener('click', () => {
+      if (tick.getAttribute('aria-pressed') === 'true') return;
+      const open = popTick.hidden;
+      closeAll();
+      popTick.hidden = !open;
+      if (open) popTick.querySelector('[data-finish]').focus();
+    });
+    rail.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeAll(b.closest('#pop-fb-' + n) ? fb : tick)));
+    rail.querySelector('[data-send]').addEventListener('click', () => {
+      closeAll(fb);
+      fb.setAttribute('aria-label', 'Feedback sent. Change it');
+      fb.style.borderColor = 'var(--good)'; fb.style.color = 'var(--good)';
+    });
+    rail.querySelector('[data-finish]').addEventListener('click', () => {
+      closeAll(tick);
+      tick.setAttribute('aria-pressed', 'true');
+      tick.setAttribute('aria-label', 'Lesson finished');
+      done.hidden = false;
+    });
+    rail.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(popTick.hidden ? fb : tick); });
+  }
+
+  document.querySelectorAll('.device').forEach((d) => build(d.querySelector('.rail'), d.dataset.device === 'phone'));
+})();
+</script>
+</body>
+</html>
