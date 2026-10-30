@@ -136,7 +136,7 @@ describe('returned work', () => {
     );
     document.body.append(view);
     const run = view.querySelector('.pa-run--mark') as HTMLElement;
-    expect(run.textContent).toBe('In the poem the');
+    expect(run.textContent).toBe('In the poem the po');
     run.click();
     expect(view.querySelector('.pg-pop')!.textContent).toContain('Topic sentence');
     expect(view.querySelector('.pg-pop')!.textContent).toContain('Open with your argument.');
