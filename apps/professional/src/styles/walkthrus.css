@@ -132,3 +132,15 @@
   .wt-robber { transition: none; }
   .wt-tile, .wt-hex { transition: none; }
 }
+
+/* My board / Whole book. My board holds only the techniques Adam picked; the whole book is where he picks them. */
+.wt-viewswitch { display: inline-flex; padding: 3px; border-radius: 999px; background: #111; gap: 2px; }
+.wt-viewswitch__btn { border: 0; border-radius: 999px; padding: 0.4rem 0.9rem; font: inherit; font-weight: 700; font-size: var(--text-sm); color: #fff; background: transparent; cursor: pointer; }
+.wt-viewswitch__btn[aria-pressed='true'] { background: #ffd400; color: #111; }
+.wt-viewswitch__btn:focus-visible { outline: 2px solid #ffd400; outline-offset: 2px; }
+.wt-svg[data-view='book'] .wt-tile.is-mine .wt-hex { stroke-width: 3.6; }
+.wt-svg[data-view='book'] .wt-tile:not(.is-mine) .wt-hex { fill-opacity: 0.55; }
+.wt-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 0.5rem; padding: 1.5rem; text-align: center; }
+.wt-empty[hidden] { display: none; }
+.wt-empty__title { margin: 0; font-weight: 800; font-size: var(--text-lg, 1.15rem); color: #111; }
+.wt-empty__text { margin: 0 0 0.5rem; max-width: 26rem; color: var(--muted); }

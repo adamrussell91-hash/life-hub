@@ -1,16 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
-  loadBoardArrows: vi.fn(),
+  loadBoard: vi.fn(),
   saveBoardArrows: vi.fn(),
+  saveBoardPicked: vi.fn(),
   loadWalkthruGoals: vi.fn(),
   loadWalkthruReps: vi.fn(),
   loadWalkthruText: vi.fn(),
   createWalkthruGoal: vi.fn(),
   patchWalkthruGoal: vi.fn(),
+  loadSuggestions: vi.fn(),
+  dismissSuggestion: vi.fn(),
   makeArrowId: vi.fn(() => 'ar_test')
 }));
 vi.mock('@/api/walkthrus', () => api);
+// The board remembers My board / Whole book in localStorage; this runner has none, so give it one.
+const stored = new Map<string, string>();
+vi.stubGlobal('localStorage', { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => void stored.set(k, String(v)), removeItem: (k: string) => void stored.delete(k), clear: () => stored.clear() });
 
 const { renderLearningBoard } = await import('@/views/walkthrus-board');
 const { renderLearningGoal } = await import('@/views/walkthrus-goal');
@@ -22,12 +28,16 @@ const goal = (over: Record<string, unknown> = {}) => ({ id: 'g1', title: 'Quizzi
 beforeEach(() => {
   for (const fn of Object.values(api)) fn.mockReset();
   api.makeArrowId.mockReturnValue('ar_test');
-  api.loadBoardArrows.mockResolvedValue([]);
+  api.loadBoard.mockResolvedValue({ arrows: [], picked: null });
+  api.saveBoardPicked.mockImplementation(async (p: unknown) => p);
   api.loadWalkthruGoals.mockResolvedValue([]);
   api.loadWalkthruReps.mockResolvedValue([]);
   api.loadWalkthruText.mockResolvedValue(TEXT);
+  api.loadSuggestions.mockResolvedValue([]);
   api.saveBoardArrows.mockImplementation(async (a: unknown) => a);
   location.hash = '#/learning';
+  // These tests walk the whole book; My board has its own tests below.
+  localStorage.setItem('wt-board-view', 'book');
 });
 
 async function mount(technique: string | null = null) {
@@ -81,7 +91,7 @@ describe('the board', () => {
     click(tile(root, 'w1-cold-calling'));
     await flush();
     expect(root.querySelector('.wt-panel__note')!.textContent).toContain('Quizzing');
-    expect(root.querySelector('.wt-panel__actions button')).toBeNull();
+    expect([...root.querySelectorAll('.wt-panel__actions button')].map((b) => b.textContent)).toEqual(['Add to my board']);
   });
 
   it('a technique with a goal shows its piece on the tile', async () => {
@@ -110,7 +120,7 @@ describe('the board', () => {
   });
 
   it('a failed save puts the arrows back and says so', async () => {
-    api.loadBoardArrows.mockResolvedValue([{ id: 'a1', from: 'w1-quizzing', to: 'w1-weekly-and-monthly-review', type: 'leads_to' }]);
+    api.loadBoard.mockResolvedValue({ arrows: [{ id: 'a1', from: 'w1-quizzing', to: 'w1-weekly-and-monthly-review', type: 'leads_to' }], picked: null });
     api.saveBoardArrows.mockRejectedValue(new Error('offline'));
     const root = await mount();
     expect(root.querySelectorAll('.wt-arrow').length).toBe(1);
@@ -122,7 +132,7 @@ describe('the board', () => {
   });
 
   it('says which data didn’t load and still draws the board; all three failing offers a retry', async () => {
-    api.loadBoardArrows.mockRejectedValue(new Error('x'));
+    api.loadBoard.mockRejectedValue(new Error('x'));
     const root = await mount();
     expect(root.querySelectorAll('.wt-tile').length).toBe(52);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('arrows didn’t load');
@@ -132,6 +142,63 @@ describe('the board', () => {
     await renderLearningBoard(failed, { technique: null });
     expect(failed.querySelector('.empty-state')).not.toBeNull();
     expect([...failed.querySelectorAll('button')].some((b) => b.textContent === 'Retry')).toBe(true);
+  });
+});
+
+describe('my board', () => {
+  const button = (root: HTMLElement, text: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === text)!;
+  beforeEach(() => localStorage.setItem('wt-board-view', 'mine'));
+
+  it('starts empty and offers the whole book', async () => {
+    const root = await mount();
+    expect(root.querySelectorAll('.wt-tile').length).toBe(0);
+    expect((root.querySelector('.wt-empty') as HTMLElement).hidden).toBe(false);
+    click(button(root, 'Choose from the whole book'));
+    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
+    expect(localStorage.getItem('wt-board-view')).toBe('book');
+  });
+
+  it('shows only the picked techniques, the live goal and arrow ends, as one cluster', async () => {
+    api.loadBoard.mockResolvedValue({ arrows: [{ id: 'a1', from: 'w1-quizzing', to: 'w1-dual-coding', type: 'leads_to' }], picked: ['w1-cold-calling'] });
+    api.loadWalkthruGoals.mockResolvedValue([goal({ walkthru: { technique_id: 'w1-scaffolding', stage: 'attempt' } })]);
+    const root = await mount();
+    const ids = [...root.querySelectorAll<SVGElement>('.wt-tile')].map((t) => t.dataset.tile).sort();
+    expect(ids).toEqual(['w1-cold-calling', 'w1-dual-coding', 'w1-quizzing', 'w1-scaffolding']);
+    expect([...root.querySelectorAll('.wt-cluster-label')].map((l) => l.textContent)).toEqual(['MY BOARD']);
+  });
+
+  it('adds from the whole book and takes off again with its arrows', async () => {
+    api.loadBoard.mockResolvedValue({ arrows: [{ id: 'a1', from: 'w1-quizzing', to: 'w1-dual-coding', type: 'leads_to' }], picked: ['w1-quizzing'] });
+    const root = await mount();
+    click(button(root, 'Whole book'));
+    click(tile(root, 'w1-cold-calling'));
+    await flush();
+    click(button(root, 'Add to my board'));
+    await flush();
+    expect(api.saveBoardPicked).toHaveBeenLastCalledWith(['w1-quizzing', 'w1-cold-calling']);
+    click(button(root, 'My board'));
+    expect(root.querySelectorAll('.wt-tile').length).toBe(3);
+    click(tile(root, 'w1-quizzing'));
+    await flush();
+    click(button(root, 'Take off my board'));
+    await flush();
+    expect(api.saveBoardPicked).toHaveBeenLastCalledWith(['w1-cold-calling']);
+    expect(api.saveBoardArrows).toHaveBeenLastCalledWith([]);
+    expect([...root.querySelectorAll<SVGElement>('.wt-tile')].map((t) => t.dataset.tile)).toEqual(['w1-cold-calling']);
+    expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('with its arrow');
+  });
+
+  it('keeps the current goal on the board', async () => {
+    api.loadWalkthruGoals.mockResolvedValue([goal()]);
+    const root = await mount('w1-quizzing');
+    await flush();
+    expect(root.querySelector('.wt-panel')!.textContent).not.toContain('Take off my board');
+  });
+
+  it('a link to a technique off the board opens the whole book on it', async () => {
+    const root = await mount('w1-cold-calling');
+    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
+    expect(root.querySelector('.wt-panel__title')!.textContent).toBe('Cold calling');
   });
 });
 

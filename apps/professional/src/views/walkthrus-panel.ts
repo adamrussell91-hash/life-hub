@@ -10,6 +10,8 @@ export interface PanelModel {
   /** Another technique already has the one active goal, so this one can't start. */
   blockedBy: string | null;
   reps: WalkthruRep[];
+  /** Whether it sits on Adam's own board, and why it can't come off if it can't. */
+  board: { on: boolean; locked: string | null };
   text: { state: 'loading' } | { state: 'ready'; value: WalkthruText } | { state: 'missing'; message: string };
 }
 
@@ -17,6 +19,7 @@ export interface PanelActions {
   onClose: () => void;
   onSelect: (id: string) => void;
   onStart: (id: string) => void;
+  onBoardToggle: (id: string) => void;
   onTextRetry: () => void;
 }
 
@@ -157,6 +160,15 @@ export function renderPanel(host: HTMLElement, model: PanelModel, actions: Panel
       actions.onStart(model.id);
     });
     actionsRow.append(start);
+  }
+  if (!model.board.locked) {
+    const toggle = el('button', 'btn btn--secondary', model.board.on ? 'Take off my board' : 'Add to my board');
+    toggle.type = 'button';
+    toggle.addEventListener('click', () => {
+      toggle.disabled = true;
+      actions.onBoardToggle(model.id);
+    });
+    actionsRow.append(toggle);
   }
   body.append(actionsRow);
 
