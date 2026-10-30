@@ -6,9 +6,9 @@ import type { DoneRecord, MarkbookView } from './types';
 export type { DoneRecord };
 
 /**
- * The teacher's Progress view: one row per student, one column per lesson of the class's active units.
- * A tick is complete, a half circle is partial, a grey box is not for that student, and a
- * red dot means it is still not complete a week after its set date. Pure rules first, then the table.
+ * Lesson progress for the markbook's Marks & progress view: which lessons of the class's active units
+ * each student has done. A tick is complete, a half circle is partial, a grey box is not for that
+ * student, and a red dot means it is still not complete a week after its set date.
  */
 
 /** A lesson is late this many days after its set date. */
@@ -123,136 +123,56 @@ const WORD: Record<CellState, string> = { complete: 'complete', partial: 'partia
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** 2026-10-12 → 12 Oct. */
-const shortDate = (day: string): string => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1] ?? ''}`;
+export const shortDate = (day: string): string => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1] ?? ''}`;
 
-export type ProgressOptions = {
-  view: MarkbookView;
-  students: ReadonlyArray<{ id: string; name: string; initials: string }>;
-  lessons: readonly ProgressLesson[];
-  today: string;
-  /** Called when a cell is pressed; the table redraws when it settles. */
-  onMark: (studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear') => void;
-  /** Set while a save is failing, shown above the table. */
-  error?: string;
-};
+/** A lesson's state for one student, from their record, the lesson's quiz and saved work. */
+export function lessonCell(view: MarkbookView, studentId: string, lesson: ProgressLesson, today: string): Cell {
+  const quiz = view.quizzes.find((q) => q.lesson_id === lesson.id);
+  const score = quiz?.scores?.[studentId];
+  return cellFor({
+    lesson,
+    record: view.done?.[studentId]?.[lesson.id],
+    quizSubmitted: Boolean(score?.submitted_at),
+    quizMarked: Boolean(score?.submitted_at) && score!.pending === 0,
+    // Written work saved in the lesson counts as under way, like a quiz go not handed in.
+    quizStarted: Boolean(quiz?.started?.includes(studentId)) || Boolean(view.work?.find((w) => w.lesson_id === lesson.id)?.students[studentId]),
+    took: (view.markbook.took?.[studentId] ?? []).includes(lesson.id),
+    today
+  });
+}
 
-export function renderProgress(options: ProgressOptions): HTMLElement {
-  const { view, students, lessons, today } = options;
-  const root = el('div', 'mb-progress');
-  if (!lessons.length) {
-    root.append(el('p', 'mb__empty', 'This class has no unit lessons yet.'));
-    return root;
+/**
+ * One lesson box: a press marks it complete as the teacher's own mark, and a second press takes that
+ * mark off so the box shows what the student did. A removed student's box can't be pressed.
+ */
+export function lessonButton(
+  view: MarkbookView,
+  student: { id: string; name: string; removed?: true },
+  lesson: ProgressLesson,
+  today: string,
+  onMark: (studentId: string, lessonId: string, state: 'complete' | 'clear') => void
+): HTMLElement {
+  const cell = lessonCell(view, student.id, lesson, today);
+  const override = isOverride(view.done?.[student.id]?.[lesson.id]);
+  const b = el(student.removed ? 'span' : 'button', `mb-progress__btn mb-progress__btn--${cell.state}`, SYMBOL[cell.state]);
+  if (b instanceof HTMLButtonElement) {
+    b.type = 'button';
+    b.addEventListener('click', () => onMark(student.id, lesson.id, override ? 'clear' : 'complete'));
   }
-  if (options.error) {
-    const alert = el('p', 'mb__error', options.error);
-    alert.setAttribute('role', 'alert');
-    root.append(alert);
+  b.dataset.col = `lesson:${lesson.id}`;
+  b.dataset.student = student.id;
+  b.dataset.lesson = lesson.id;
+  b.dataset.state = cell.state;
+  if (override) {
+    b.dataset.override = 'true';
+    b.classList.add('mb-progress__btn--override');
   }
-  const key = el('ul', 'mb-progress__key');
-  const swatch = (cls: string, symbol: string, words: string) => {
-    const li = el('li', 'mb-progress__keyitem');
-    const box = el('span', `mb-progress__swatch ${cls}`, symbol);
-    box.setAttribute('aria-hidden', 'true');
-    li.append(box, words);
-    return li;
-  };
-  key.append(
-    swatch('mb-progress__btn--complete', '✓', 'Complete'),
-    swatch('mb-progress__btn--partial', '◐', 'Partial or waiting to be marked'),
-    swatch('mb-progress__btn--na', '', 'Not for this student'),
-    swatch('mb-progress__btn--late', '', 'Overdue a week after its date'),
-    el('li', 'mb-progress__keyhint', 'Press a cell to mark it complete. Press again to undo.')
-  );
-  root.append(key);
-  const wrap = el('div', 'mb-progress__scroll');
-  const table = el('table', 'mb-progress__table');
-  const thead = el('thead');
-  const units = lessons.map((l) => l.unit ?? '');
-  if (new Set(units).size > 1) {
-    const band = el('tr', 'mb-progress__units');
-    band.append(el('td', 'mb-progress__corner'));
-    for (let i = 0; i < units.length; ) {
-      let n = 1;
-      while (units[i + n] === units[i]) n++;
-      const th = el('th', 'mb-progress__unit');
-      th.scope = 'colgroup';
-      th.colSpan = n;
-      th.title = units[i]!;
-      th.append(el('span', 'mb-progress__unitname', units[i]!));
-      band.append(th);
-      i += n;
-    }
-    thead.append(band);
+  if (cell.late) {
+    b.dataset.late = 'true';
+    b.classList.add('mb-progress__btn--late');
   }
-  const head = el('tr');
-  head.append(el('th', 'mb-progress__corner', 'Student'));
-  for (const l of lessons) {
-    const th = el('th', `mb-progress__lesson mb-progress__lesson--${l.role}`);
-    th.scope = 'col';
-    th.title = l.title;
-    const label = el('div', 'mb-progress__label');
-    label.append(el('span', 'mb-progress__title', l.title));
-    const tag = l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
-    const meta = [l.date ? shortDate(l.date) : '', tag].filter(Boolean).join(' · ');
-    if (meta) label.append(el('span', 'mb-progress__meta', meta));
-    th.append(label);
-    head.append(th);
-  }
-  thead.append(head);
-  table.append(thead);
-  const body = el('tbody');
-  for (const s of students) {
-    const tr = el('tr');
-    const name = el('th', 'mb-progress__student');
-    name.scope = 'row';
-    const who = el('span', 'mb-student');
-    who.append(el('span', 'mb-student__initials', s.initials), el('span', 'mb-student__name', s.name));
-    name.append(who);
-    tr.append(name);
-    for (const l of lessons) {
-      const quiz = view.quizzes.find((q) => q.lesson_id === l.id);
-      const score = quiz?.scores?.[s.id];
-      const record = view.done?.[s.id]?.[l.id];
-      const override = isOverride(record);
-      const cell = cellFor({
-        lesson: l,
-        record,
-        quizSubmitted: Boolean(score?.submitted_at),
-        quizMarked: Boolean(score?.submitted_at) && score!.pending === 0,
-        // Written work saved in the lesson counts as under way, like a quiz go not handed in.
-        quizStarted: Boolean(quiz?.started?.includes(s.id)) || Boolean(view.work?.find((w) => w.lesson_id === l.id)?.students[s.id]),
-        took: (view.markbook.took?.[s.id] ?? []).includes(l.id),
-        today
-      });
-      const td = el('td', 'mb-progress__cell');
-      // A handed-in quiz shows its mark instead of a tick.
-      const scored = Boolean(score?.submitted_at) && score!.max > 0;
-      const b = el('button', `mb-progress__btn mb-progress__btn--${cell.state}`, scored ? `${score!.score}/${score!.max}` : SYMBOL[cell.state]);
-      if (scored) b.classList.add('mb-progress__btn--score');
-      b.type = 'button';
-      b.dataset.student = s.id;
-      b.dataset.lesson = l.id;
-      b.dataset.state = cell.state;
-      if (override) {
-        b.dataset.override = 'true';
-        b.classList.add('mb-progress__btn--override');
-      }
-      if (cell.late) {
-        b.dataset.late = 'true';
-        b.classList.add('mb-progress__btn--late');
-      }
-      const quizWords = score?.submitted_at ? (score.pending ? `, quiz handed in, ${score.pending} to mark` : `, quiz ${score.score}/${score.max}`) : '';
-      const words = `${s.name}, ${l.title}: ${WORD[cell.state]}${override ? ' (marked by you, press to undo)' : ''}${quizWords}${cell.late ? ', overdue' : ''}`;
-      b.setAttribute('aria-label', words);
-      b.title = words;
-      b.addEventListener('click', () => options.onMark(s.id, l.id, override ? 'clear' : 'complete'));
-      td.append(b);
-      tr.append(td);
-    }
-    body.append(tr);
-  }
-  table.append(body);
-  wrap.append(table);
-  root.append(wrap);
-  return root;
+  const words = `${student.name}, ${lesson.title}: ${WORD[cell.state]}${override ? ' (marked by you, press to undo)' : ''}${cell.late ? ', overdue' : ''}`;
+  b.setAttribute('aria-label', words);
+  b.title = words;
+  return b;
 }

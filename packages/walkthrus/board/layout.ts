@@ -120,8 +120,8 @@ function buildTile(entry: BoardEntry, cell: Cell, cluster: string, size: number)
     corners: hexCorners(p, drawn),
     // Everything sits clear of the hexagon's edges, so a knot on a shared edge never covers it.
     tab: { x: p.x, y: p.y - half + 0.33 * drawn, w: 0.9 * drawn, h: 0.26 * drawn },
-    glyph: { x: p.x, y: p.y - 0.19 * drawn, w: 0.4 * drawn, h: 0.4 * drawn },
-    title: { x: p.x, y: p.y + 0.2 * drawn, w: 1.1 * drawn, h: 0.3 * drawn },
+    glyph: { x: p.x, y: p.y - 0.135 * drawn, w: 0.72 * drawn, h: 0.53 * drawn },
+    title: { x: p.x, y: p.y + 0.27 * drawn, w: 1.1 * drawn, h: 0.3 * drawn },
     badge: { x: p.x, y: p.y + half - 0.33 * drawn, w: 0.6 * drawn, h: 0.26 * drawn },
     box: { x: p.x, y: p.y, w: drawn * 2, h: half * 2 }
   };
@@ -198,6 +198,38 @@ export function boardLayout(input: LayoutInput): BoardLayout {
     BOUNDS_PAD
   );
   return { size, drawn, tiles, clusters, labels, boxSlots, bounds };
+}
+
+/**
+ * Adam's own board: only the techniques he has put on it, packed into one cluster in the order
+ * given (first in the middle, the rest spiralling out), so the few he works on sit together.
+ */
+export function pickedLayout(input: { entries: BoardEntry[]; ids: string[]; size?: number }): BoardLayout {
+  const size = input.size ?? DEFAULT_SIZE;
+  const drawn = size - GAP;
+  const byId = new Map(input.entries.map((e) => [e.id, e]));
+  const members = input.ids.map((id) => byId.get(id)).filter((e): e is BoardEntry => Boolean(e && e.kind === 'technique'));
+  const origin: Cell = { q: 0, r: 0 };
+  const key = 'mine';
+  const tiles = spiralCells(members.length, origin).map((cell, i) => buildTile(members[i]!, cell, key, size));
+  const clusters: BoardCluster[] = [];
+  if (tiles.length) {
+    const frame = frameOfBoxes(tiles.map((t) => t.box));
+    const caps = 'MY BOARD';
+    const w = Math.ceil(textWidth(caps, LABEL_FONT, 800) + 24);
+    clusters.push({
+      key, set: members[0]!.set, series: key, code: '', name: 'My board', col: 0, row: 0, origin, x: 0, y: 0,
+      label: { x: 0, y: frame.y - LABEL_GAP - LABEL_H / 2, w, h: LABEL_H },
+      frame
+    });
+  }
+  const labels = clusters.map((c) => c.label);
+  // Never smaller than a few tiles' room, so one or two techniques don't fill the screen at Fit.
+  const frame = frameOfBoxes([...tiles.map((t) => t.box), ...labels], BOUNDS_PAD);
+  const minW = size * 9;
+  const minH = size * 7;
+  const bounds = { x: frame.x + frame.w / 2 - Math.max(frame.w, minW) / 2, y: frame.y + frame.h / 2 - Math.max(frame.h, minH) / 2, w: Math.max(frame.w, minW), h: Math.max(frame.h, minH) };
+  return { size, drawn, tiles, clusters, labels, boxSlots: [], bounds };
 }
 
 export function tileByCell(layout: BoardLayout): Map<string, BoardTile> {
