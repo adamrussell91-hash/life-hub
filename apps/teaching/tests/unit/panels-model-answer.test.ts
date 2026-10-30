@@ -100,6 +100,12 @@ describe('question model answer', () => {
     expect(model.hidden).toBe(true);
     const btn = el.querySelector<HTMLButtonElement>('.block-question-set__model-btn')!;
     expect(btn.textContent).toBe('Check against the model');
+    // Written answer first: the model stays shut until the student has had a go.
+    btn.click();
+    expect(model.hidden).toBe(true);
+    const area = el.querySelector<HTMLTextAreaElement>('textarea.block-question-set__answer')!;
+    area.value = 'My go';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
     btn.click();
     expect(model.hidden).toBe(false);
     expect(model.textContent).toBe('The model');
