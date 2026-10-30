@@ -7,13 +7,13 @@ import { TODAY, BLOODS, MEDICAL, MEALS, DIARY, WORKOUTS, WEIGHTS, visit } from '
 
 const all = [...BLOODS, ...MEDICAL];
 
-test('markerTrend: GGT 98 -> 131 -> 233 is above range and moving away', () => {
+test('markerTrend: GGT 84 -> 117 -> 196 is above range and moving away', () => {
   const r = markerTrend(all, { query: 'ggt', today: TODAY });
   assert.equal(r.found, true);
   const ggt = r.markers[0];
-  assert.deepEqual(ggt.points.map(p => p.value), [98, 131, 233]);
-  assert.equal(ggt.delta_vs_previous, 102);
-  assert.equal(ggt.delta_vs_first, 135);
+  assert.deepEqual(ggt.points.map(p => p.value), [84, 117, 196]);
+  assert.equal(ggt.delta_vs_previous, 79);
+  assert.equal(ggt.delta_vs_first, 112);
   assert.equal(ggt.range_position, 'above');
   assert.equal(ggt.direction_vs_range, 'moving_away_from_range');
   assert.ok(ggt.per_month > 0);
@@ -54,9 +54,9 @@ test('compareBloods: latest two collections, newly abnormal and biggest moves', 
   assert.equal(compareBloods([BLOODS[0]]).found, false);
 });
 
-test('treatmentTimeline: Redacted cycle day, next due and induction', () => {
+test('treatmentTimeline: Biologic cycle day, next due and induction', () => {
   const r = treatmentTimeline(all, { today: TODAY });
-  const { doses, cycle } = r.Redacted;
+  const { doses, cycle } = r.biologic;
   assert.deepEqual(doses.map(d => d.kind), ['induction', 'maintenance']);
   assert.equal(cycle.last_dose_date, '2026-08-27');
   assert.equal(cycle.cycle_day, 40);
@@ -65,7 +65,7 @@ test('treatmentTimeline: Redacted cycle day, next due and induction', () => {
   assert.equal(cycle.days_until_next, 16);
   assert.equal(cycle.overdue, false);
   assert.equal(cycle.planned_next.date, '2026-10-22');
-  const late = treatmentTimeline(all, { today: '2026-11-05' }).Redacted.cycle;
+  const late = treatmentTimeline(all, { today: '2026-11-05' }).biologic.cycle;
   assert.equal(late.overdue, true);
 });
 
@@ -84,15 +84,15 @@ test('symptomTimeline: episodes carry cycle day, and a thin sample is not called
   assert.equal(r.diary_symptom_days[0].date, '2026-09-18');
 });
 
-test('openLoops: to_book, upcoming visits, Redacted due, and notes mentions kept separate', () => {
+test('openLoops: to_book, upcoming visits, Biologic due, and notes mentions kept separate', () => {
   const r = openLoops(all, { today: TODAY });
   assert.ok(r.loops.some(l => l.kind === 'to_book' && l.id === 'mrcp'));
   assert.ok(r.upcoming_30_days.some(u => u.id === 'gp-ggt' && u.days_until === 20 && u.time === '14:00'));
   assert.ok(r.upcoming_30_days.every(u => u.id !== 'mrcp'));
   assert.ok(r.mentioned_in_notes.some(m => m.id === 'gastro' && /MRCP ordered/i.test(m.snippet)));
-  assert.ok(!r.loops.some(l => l.kind === 'Redacted_overdue'));
+  assert.ok(!r.loops.some(l => l.kind === 'biologic_overdue'));
   const far = openLoops(all, { today: '2026-12-15' });
-  assert.ok(far.loops.some(l => l.kind === 'Redacted_overdue'));
+  assert.ok(far.loops.some(l => l.kind === 'biologic_overdue'));
   assert.ok(far.loops.some(l => l.kind === 'abnormal_not_repeated' && l.key === 'ggt'));
 });
 
@@ -121,10 +121,10 @@ test('appointmentBrief for the GP review uses the visit date and writes the ques
   assert.equal(r.results.collection_date, '2026-09-17');
   const keys = r.results.abnormal.map(m => m.key).sort();
   assert.deepEqual(keys, ['alt', 'ggt']);
-  assert.ok(r.questions_to_ask.some(q => /GGT is 233.*131/.test(q)));
+  assert.ok(r.questions_to_ask.some(q => /GGT is 196.*117/.test(q)));
   assert.ok(r.open_loops.some(l => l.id === 'mrcp'));
   assert.ok(r.questions_to_ask.some(q => /MRCP/.test(q)));
-  assert.equal(r.treatment.Redacted.next_due, '2026-10-22');
+  assert.equal(r.treatment.biologic.next_due, '2026-10-22');
   assert.equal(r.last_visit_before.id, 'gastro');
   assert.ok(r.symptoms_since_last_visit.active.length === 0 || Array.isArray(r.symptoms_since_last_visit.active));
 });
@@ -162,7 +162,7 @@ test('dispatch runs each tool; cross signals loads only what it needs from the t
   const ctx = { medicalEvents: all, today: TODAY, loadRecords };
 
   const trend = await executeSaraAnalystTool('get_marker_trend', { marker: 'GGT' }, ctx);
-  assert.equal(trend.markers[0].latest.value, 233);
+  assert.equal(trend.markers[0].latest.value, 196);
   assert.equal(reads, 0, 'a bloods question must not read nutrition/diary history');
 
   const cross = await executeSaraAnalystTool('get_cross_signals', { from: '2026-09-01', to: '2026-09-23', anchors: ['2026-09-17'] }, ctx);
@@ -172,7 +172,7 @@ test('dispatch runs each tool; cross signals loads only what it needs from the t
   const sym = await executeSaraAnalystTool('get_symptom_timeline', {}, ctx);
   assert.equal(sym.diary_symptom_days.length, 1);
   assert.equal((await executeSaraAnalystTool('get_open_loops', {}, ctx)).ok, true);
-  assert.equal((await executeSaraAnalystTool('get_treatment_timeline', {}, ctx)).Redacted.cycle.cycle_day, 40);
+  assert.equal((await executeSaraAnalystTool('get_treatment_timeline', {}, ctx)).biologic.cycle.cycle_day, 40);
   assert.equal((await executeSaraAnalystTool('build_appointment_brief', { visit_id: 'gp-ggt' }, ctx)).found, true);
   assert.equal((await executeSaraAnalystTool('compare_bloods', {}, ctx)).found, true);
   assert.equal((await executeSaraAnalystTool('nope', {}, ctx)).error, 'unknown_tool');
@@ -189,20 +189,20 @@ test('analyse_medical_evidence now carries marker-level blood change', () => {
   assert.deepEqual(bloodsCmp.still_abnormal.map(m => m.key).sort(), ['alt', 'ggt']);
 });
 
-test('a visit that only MENTIONS Redacted in its notes is not a dose, and a dose logged twice counts once', () => {
+test('a visit that only MENTIONS Biologic in its notes is not a dose, and a dose logged twice counts once', () => {
   const events = [
-    visit('dose-a', '2026-08-27', { title: 'Redacted injection', record_type: 'Prescription', cadence_days: 56 }),
-    visit('dose-b', '2026-08-27', { title: 'Redacted (Redacted) maintenance injection — 90mg', record_type: 'Prescription' }),
-    visit('gastro-2', '2026-09-24', { title: 'Gastro follow-up' }, 'Continue Redacted. Next Redacted due October.'),
-    visit('bloods-visit', '2026-09-17', { title: 'Blood Tests - Comprehensive Panel', record_type: 'Lab Work' }, 'Pre-Redacted bloods.')
+    visit('dose-a', '2026-08-27', { title: 'Biologic injection', record_type: 'Prescription', cadence_days: 56 }),
+    visit('dose-b', '2026-08-27', { title: 'Biologic maintenance injection — 90mg', record_type: 'Prescription' }),
+    visit('gastro-2', '2026-09-24', { title: 'Gastro follow-up' }, 'Continue Biologic. Next Biologic due October.'),
+    visit('bloods-visit', '2026-09-17', { title: 'Blood Tests - Comprehensive Panel', record_type: 'Lab Work' }, 'Pre-Biologic bloods.')
   ];
   const r = treatmentTimeline(events, { today: TODAY });
-  assert.deepEqual(r.Redacted.doses.map(d => d.date), ['2026-08-27']);
-  assert.equal(r.Redacted.cycle.cycle_day, 40);
+  assert.deepEqual(r.biologic.doses.map(d => d.date), ['2026-08-27']);
+  assert.equal(r.biologic.cycle.cycle_day, 40);
 });
 
 test('the monthly slope only uses the last 12 months, so old values cannot flip the direction', () => {
-  const rows = [['2019-07-19', 639], ['2023-03-21', 120], ['2026-01-28', 162], ['2026-05-19', 131], ['2026-09-17', 233]].map(([date, value]) => ({
+  const rows = [['2019-07-19', 512], ['2023-03-21', 105], ['2026-01-28', 149], ['2026-05-19', 117], ['2026-09-17', 196]].map(([date, value]) => ({
     path: `data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-bloods.md`,
     record: { type: 'bloods', date, markers: [{ key: 'ggt', label: 'GGT', category: 'Liver Function', value, ref_high: 51, status: 'High' }] }
   }));

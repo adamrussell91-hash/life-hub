@@ -1,8 +1,9 @@
 /**
  * Watches: pure logic for Aesthetics › Dress › Watches.
- * Records come from the Notion snapshot (notion-watch-source.js); nothing here invents a spec.
+ * Records are the Notion watch tracker, kept only in the private data repo
+ * (data/aesthetics/watches.json). The browser gets them from /api/aesthetics/source and the
+ * radar reads them server side; nothing here invents a spec. Until they load, WATCHES is empty.
  */
-import { SOURCE_WATCHES } from './notion-watch-source.js';
 
 const list = v => (Array.isArray(v) ? v : v ? [v] : []);
 
@@ -37,7 +38,42 @@ export function normaliseWatch(src) {
   };
 }
 
-export const WATCHES = SOURCE_WATCHES.map(normaliseWatch);
+/** Tracker records → watches. Untitled or malformed rows are skipped. */
+export function watchesFromSource(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(r => r && typeof r.id === 'string' && r.properties && typeof r.properties.Watch === 'string' && r.properties.Watch.trim())
+    .map(normaliseWatch);
+}
+
+/** Live view of the private source; importers read the current value on each access. */
+export let WATCHES = [];
+export let WATCH_SOURCE_URL = null;
+/** The current watch-hunt brief (a trip plan), or null when there isn't one. */
+export let WATCH_HUNT = null;
+
+/** A hunt brief with the lists the page draws; anything malformed reads as no hunt. */
+export function huntFromSource(raw) {
+  if (!raw || typeof raw !== 'object' || typeof raw.title !== 'string') return null;
+  const strings = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : []);
+  const named = v => (Array.isArray(v) ? v.filter(x => x && typeof x.name === 'string') : []);
+  return {
+    ...raw,
+    brief: strings(raw.brief),
+    checks: strings(raw.checks),
+    fallback: strings(raw.fallback),
+    targets: named(raw.targets),
+    places: named(raw.places),
+    sample: raw.sample && typeof raw.sample.mm === 'number' ? { markers: [], complications: [], ...raw.sample } : null
+  };
+}
+
+/** Install `{ watches, sourceUrl, hunt }` as served by /api/aesthetics/source. */
+export function setWatchSource({ watches = [], sourceUrl = null, hunt = null } = {}) {
+  WATCHES = watchesFromSource(watches);
+  WATCH_SOURCE_URL = typeof sourceUrl === 'string' ? sourceUrl : null;
+  WATCH_HUNT = huntFromSource(hunt);
+  return WATCHES;
+}
 export const isOwned = w => w.status === 'Owned';
 /** Passed watches stay in the record list but leave the wishlist and the radar. */
 export const isWanted = w => !isOwned(w) && w.status !== 'Passed';

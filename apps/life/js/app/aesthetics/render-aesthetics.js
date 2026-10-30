@@ -2,14 +2,17 @@
  * Aesthetics section (route stays `skincare`): Today · Scent · Dress (Looks, Watches) · Skin.
  * The Skin tab is the existing Skincare dashboard, untouched.
  *
- * createAesthetics(doc, { storage }) → { render({ date, events }) }
+ * createAesthetics(doc, { storage, sourceApi }) → { render({ date, events }) }
+ * The fragrance library is private: `sourceApi()` loads it from /api/aesthetics/source.
+ * Until it arrives (or if it can't), Today, Scent and Dress show a short status instead.
  * `events` are today's calendar items ({ time: 'HH:MM', title, type }).
  */
-import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES } from './fragrance-library.js';
+import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES, setFragranceSource } from './fragrance-library.js';
 import { createFragrancePhoto, fragrancePhotoUrl } from './fragrance-photos.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
+import { setWatchSource } from './watch-model.js';
 import { dressForWeather, readGarmentPhoto, SLOTS, slotLabel, styleAround } from './outfit-model.js';
 import {
   combosFor,
@@ -87,11 +90,12 @@ export function createAesthetics(doc, {
   matchMedia = globalThis.matchMedia?.bind(globalThis),
   watchRadarApi = null,
   weatherApi = loadSydneyWeather,
-  sessionStorage = globalThis.sessionStorage
+  sessionStorage = globalThis.sessionStorage,
+  sourceApi = null
 } = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const affinity = noteAffinity(FRAGRANCES);
+  let affinity = noteAffinity(FRAGRANCES);
   const watches = createWatches(doc, { storage, matchMedia, radarApi: watchRadarApi });
 
   /** Tiny element helper; SVG tags get the SVG namespace, CSS-var paints go through style. */
@@ -114,9 +118,9 @@ export function createAesthetics(doc, {
     tab: (() => { try { const t = storage?.getItem?.(TAB_KEY); return TABS.includes(t) ? t : 'today'; } catch { return 'today'; } })(),
     dressView: (() => { try { const v = storage?.getItem?.(DRESS_VIEW_KEY); return DRESS_VIEWS.includes(v) ? v : 'looks'; } catch { return 'looks'; } })(),
     dayIndex: 0,
-    mapSel: 'Neon',
+    mapSel: null,
     mapShow: { Owned: true, Sampling: true, Wishlist: true, Retired: true },
-    wheelSel: 'Neon',
+    wheelSel: null,
     comboPartner: null,
     wheelBuilt: false,
     wheelArcRaf: 0,
@@ -130,8 +134,11 @@ export function createAesthetics(doc, {
     events: [],
     weather: null,
     weatherStatus: 'pending',
-    wired: false
+    wired: false,
+    hydrated: false,
+    source: FRAGRANCES.length ? 'ready' : 'pending'
   };
+  const ready = () => state.source === 'ready';
 
   const bottle = (f, width = 120, eager = false) => createFragrancePhoto(doc, f.name, { width, eager });
 
@@ -171,7 +178,14 @@ export function createAesthetics(doc, {
     state.tab = tab;
     try { storage?.setItem(TAB_KEY, tab); } catch { /* ignore */ }
     for (const b of doc.querySelectorAll('#aes-tabs [data-aes-tab]')) b.setAttribute('aria-selected', String(b.dataset.aesTab === tab));
-    for (const t of TABS) { const p = $(`#aes-${t}`); if (p) p.hidden = t !== tab; }
+    for (const t of TABS) { const p = $(`#aes-${t}`); if (p) p.hidden = t !== tab || (t !== 'skin' && !ready()); }
+    const status = $('#aes-source-status');
+    if (status) {
+      status.hidden = ready() || tab === 'skin';
+      status.textContent = state.source === 'unavailable'
+        ? 'Your fragrance library isn’t available right now. Try again in a moment.'
+        : 'Loading your fragrance library…';
+    }
   }
 
   function showDressView(view) {
@@ -329,7 +343,7 @@ export function createAesthetics(doc, {
   }
 
   // ---------------- SCENT ----------------
-  const placed = FRAGRANCES.map(f => ({ f, ...placeOnMap(f) }));
+  let placed = FRAGRANCES.map(f => ({ f, ...placeOnMap(f) }));
   function renderMap() {
     $('#aes-map-filter').replaceChildren(...[['Owned', '●'], ['Sampling', '◐'], ['Wishlist', '○'], ['Retired', '✕']].map(([s, g]) =>
       el('button', { type: 'button', class: 'hub-pills__btn', 'aria-pressed': String(state.mapShow[s]), onclick: () => { state.mapShow[s] = !state.mapShow[s]; renderMap(); } }, `${g} ${s}`)));
@@ -842,7 +856,6 @@ export function createAesthetics(doc, {
     const ask = $('#aes-ask');
     ask.value = state.query;
     ask.addEventListener('input', () => { state.query = ask.value; renderOracle(); });
-    $('#aes-ask-list').replaceChildren(...[...Object.keys(REFERENCE_FRAGRANCES), ...FRAGRANCES.map(f => f.name)].map(v => el('option', { value: v })));
     $('#aes-ask-presets').replaceChildren(...['Tom Ford Tobacco Vanille', 'Baccarat Rouge 540', 'Creed Aventus', "Kilian Angels' Share"].map(k =>
       el('button', { type: 'button', class: 'hub-pills__btn', onclick: () => { ask.value = k; state.query = k; renderOracle(); } }, k)));
     $('#aes-spin').addEventListener('click', spin);
@@ -854,10 +867,45 @@ export function createAesthetics(doc, {
       $('#aes-snap-plus').textContent = '';
       snapColour(s.colour, { label: s.label, slot: s.slot, garment: s.garment });
     } }, el('i', { class: 'aes-dot', style: `background:${GARMENT_COLOURS[s.colour]}` }), s.label)));
+  }
+
+  /** Data-dependent pieces, built once the private library is in. */
+  function hydrate() {
+    if (state.hydrated || !ready()) return;
+    state.hydrated = true;
+    affinity = noteAffinity(FRAGRANCES);
+    placed = FRAGRANCES.map(f => ({ f, ...placeOnMap(f) }));
+    const owned = FRAGRANCES.filter(f => f.status === 'Owned');
+    const lead = (owned.find(f => f.loved) ?? owned[0] ?? FRAGRANCES[0])?.name ?? null;
+    state.mapSel ??= lead;
+    state.wheelSel ??= lead;
+    $('#aes-ask-list').replaceChildren(...[...Object.keys(REFERENCE_FRAGRANCES), ...FRAGRANCES.map(f => f.name)].map(v => el('option', { value: v })));
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
     renderWheel();
     renderSourceReference(doc);
+  }
+
+  let sourceLoad = null;
+  function loadSource() {
+    if (sourceLoad || typeof sourceApi !== 'function') return sourceLoad;
+    sourceLoad = (async () => {
+      try {
+        const data = await sourceApi();
+        setFragranceSource(data ?? {});
+        setWatchSource({ watches: data?.watches, sourceUrl: data?.watchSourceUrl, hunt: data?.watchHunt });
+        state.source = FRAGRANCES.length ? 'ready' : 'unavailable';
+      } catch {
+        state.source = 'unavailable';
+      }
+      if (ready()) {
+        if (state.pending) api.render(state.pending);
+      } else {
+        showTab(state.tab);
+        sourceLoad = null; // the next render tries again
+      }
+    })();
+    return sourceLoad;
   }
 
   async function refreshWeather() {
@@ -875,10 +923,20 @@ export function createAesthetics(doc, {
     if (todayLook) watches.render({ date: state.date, look: todayLook });
   }
 
-  return {
+  const api = {
     render({ date, events = [] } = {}) {
       if (!$('#aes-stage') || !date) return;
       wire();
+      if (!ready() && FRAGRANCES.length) state.source = 'ready';
+      if (!ready()) {
+        state.pending = { date, events };
+        if (typeof sourceApi === 'function') void loadSource();
+        else state.source = 'unavailable';
+        showTab(state.tab);
+        showDressView(state.dressView);
+        return;
+      }
+      hydrate();
       if (state.date !== date) {
         state.dayIndex = 0;
         state.weather = null;
@@ -898,4 +956,5 @@ export function createAesthetics(doc, {
       renderSnap();
     }
   };
+  return api;
 }

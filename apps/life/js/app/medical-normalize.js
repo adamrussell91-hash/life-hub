@@ -23,7 +23,7 @@ const STATUS_SET = new Set(MEDICAL_STATUSES);
 const DATE_PRECISION_SET = new Set(DATE_PRECISIONS);
 
 const SYMPTOM_LANGUAGE = /\b(sore|sniffles|cough|headache|cramping|nausea|tired|run down|congested|throat|fever|ache|painful|runny nose|cold symptoms)\b/i;
-const VISIT_OR_PROVIDER_LANGUAGE = /\b(dr\.?|doctor|gp|clinic|hospital|appointment|consult|saw |visited |referral|pathology|scan|mri|mrcp|colonoscopy|injection|infusion|Redacted|humira)\b/i;
+const VISIT_OR_PROVIDER_LANGUAGE = /\b(dr\.?|doctor|gp|clinic|hospital|appointment|consult|saw |visited |referral|pathology|scan|mri|mrcp|colonoscopy|injection|infusion|biologic|humira)\b/i;
 
 /** Same-title visits more than this many days apart are new timeline entries, not appends. */
 const APPEND_DATE_SLOP_DAYS = 3;
@@ -139,7 +139,7 @@ export function inferWeight(record = {}) {
     || recordType === 'Referral'
     || (recordType === 'Consultation' && /specialist|gastro|hepat|rheumat|cardio|endocrin|neurolog/i.test(blob))
     || (recordType === 'Lab Work' && (record.lab || /bloods|panel|pathology/i.test(blob)))
-    || /infusion|injection|Redacted|Redacted|humira|adalimumab|biologic/i.test(blob)
+    || /infusion|injection|humira|adalimumab|biologic/i.test(blob)
   ) {
     return 'major';
   }
@@ -172,7 +172,7 @@ export function laneFor(recordType, title, provider, location) {
   if (recordType === 'Referral') return 'referral';
   if (recordType === 'Vaccination') return 'vaccine';
   if (/dentist|dentistry|\bdental\b/i.test(blob)) return 'dental';
-  if (/therap|psycholog|Redacted/i.test(blob)) return 'therapy';
+  if (/therap|psycholog|counsell/i.test(blob)) return 'therapy';
   if (/\beye\b|optom|eyecare/i.test(blob)) return 'eye';
   return 'appointment';
 }
@@ -204,7 +204,7 @@ function recordTypeFromText(text) {
   if (/\blab\b|blood test|pathology|calprotectin|ferritin|panel\b/i.test(lower)) return 'Lab Work';
   if (/surgery|hospital|admission|procedure\b/i.test(lower)) return 'Surgery/Hospital';
   if (
-    /injection|infusion|Redacted|Redacted|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(lower)
+    /injection|infusion|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(lower)
   ) return 'Prescription';
   if (/consult/i.test(lower)) return 'Consultation';
   return null;
@@ -417,7 +417,7 @@ function normaliseTitle(value) {
 }
 
 const TITLE_KEYWORDS = new Set([
-  'Redacted', 'Redacted', 'infusion', 'injection', 'maintenance', 'biologic'
+  'infusion', 'injection', 'maintenance', 'biologic'
 ]);
 
 export function scoreMedicalTitleMatch(candidateTitle, recordTitle) {
@@ -451,7 +451,7 @@ export function parseMedicalEventTolerant(text, path, loadYaml) {
  * and merge onto the stored record's date/time before validation.
  *
  * Same-title visits dated more than APPEND_DATE_SLOP_DAYS apart stay separate
- * timeline entries (e.g. next Redacted dose on 27/10) unless Sara explicitly
+ * timeline entries (e.g. next scheduled dose on 27/10) unless Sara explicitly
  * sets follow_up_date on the prior visit.
  *
  * Symptom / episode updates on a different calendar day become a new dated

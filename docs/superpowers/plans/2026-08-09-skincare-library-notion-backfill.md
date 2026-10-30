@@ -316,7 +316,7 @@ git commit -m "feat(skincare): group routine pills by category; remove toner/sea
 - Optional script: `scripts/skincare-notion-backfill.mjs` (one-shot; can delete after or keep)
 
 - [ ] **Step 1: Generate library JSON** from  
-  `/Users/example/Downloads/Private & Shared 11/Product Library 7132d30c53d141449d6deb3efd9b51e4_all.csv`  
+  `/Users/you/Downloads/Private & Shared 11/Product Library 7132d30c53d141449d6deb3efd9b51e4_all.csv`  
   Map Notion columns → rich fields; drop Usage Log / Rating / Days Lasted. Prefer Adam’s display names where listed. Set Mecca hint to `Backup option only`.
 
 - [ ] **Step 2: Build membership** using product ids from Step 1 matching Adam’s actively-used AM/PM lists (fuzzy name match). Archived items stay off membership.

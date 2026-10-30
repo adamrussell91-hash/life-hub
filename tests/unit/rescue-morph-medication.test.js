@@ -1,5 +1,5 @@
 /**
- * The brief's last two visuals: the Rescue morph, and Dexy context on the Almanac
+ * The brief's last two visuals: the Rescue morph, and medication context on the Almanac
  * (lighter, not lower).
  */
 import test from 'node:test';
@@ -72,13 +72,13 @@ test('dial morph: the arc turns from 1 pm to 5 pm (60°) about the centre', () =
 
 const dose = (date, status, slot = 'am') => ({ type: 'medication', date, status, slot, ...(status === 'taken' ? { time: '07:45' } : {}) });
 
-test('Dexy context: skipped is counted, unlogged is not missed; the day after a skip is lighter', () => {
+test('Medication context: skipped is counted, unlogged is not missed; the day after a skip is lighter', () => {
   const logs = [dose('2026-09-20', 'taken'), dose('2026-09-24', 'skipped'), dose('2026-09-28', 'skipped'), dose('2026-09-29', 'taken')];
   const ctx = medicationContext(logs, { today: '2026-09-29', from: '2026-09-29', to: '2026-12-31' });
   assert.equal(ctx.taken, 2);
   assert.equal(ctx.skipped, 2);
   assert.equal(ctx.unlogged, 10);
-  assert.equal(ctx.summary, 'Dexy: taken 2 of the last 14 days · 2 skipped · 10 not logged');
+  assert.equal(ctx.summary, 'Meds: taken 2 of the last 14 days · 2 skipped · 10 not logged');
   assert.deepEqual(ctx.lighter, ['2026-09-29'], 'only days in view: the day after Monday’s skip');
 });
 

@@ -2,10 +2,51 @@
  * Shared crest + section-host helpers (People Phase 1 pattern, reused by Orgs).
  */
 
-import { fetchOrgCrestUrl } from '@/api/organisations-directory';
-import bundledCrests from '@/data/organisation-crests.json';
+import { fetchCrestImage, fetchCrestRefs, fetchOrgCrestUrl } from '@/api/organisations-directory';
 
 const crestUrlCache = new Map<string, string | null>();
+
+/*
+ * Researched crests (the fallback when no crest was uploaded) live in the private data repo
+ * and arrive through /api/organisations/crest-image. The list of organisations that have one
+ * is read once; each image is fetched once and kept as an object URL for the session.
+ */
+let researchedRefs: Promise<Set<string>> | null = null;
+const researchedUrls = new Map<string, Promise<string | null>>();
+
+function researchedCrestRefs(): Promise<Set<string>> {
+  researchedRefs ??= Promise.resolve()
+    .then(() => fetchCrestRefs())
+    .then((res) => new Set(Array.isArray(res?.refs) ? res.refs : []))
+    .catch(() => {
+      researchedRefs = null; // try again on the next crest
+      return new Set<string>();
+    });
+  return researchedRefs;
+}
+
+async function researchedCrestUrl(orgRef: string): Promise<string | null> {
+  if (!(await researchedCrestRefs()).has(orgRef)) return null;
+  let pending = researchedUrls.get(orgRef);
+  if (!pending) {
+    pending = Promise.resolve()
+      .then(() => fetchCrestImage(orgRef))
+      .then((blob) => (blob ? URL.createObjectURL(blob) : null))
+      .catch(() => null)
+      .then((url) => {
+        if (!url) researchedUrls.delete(orgRef);
+        return url;
+      });
+    researchedUrls.set(orgRef, pending);
+  }
+  return pending;
+}
+
+/** Tests only: forget the researched-crest list and images. */
+export function resetResearchedCrests(): void {
+  researchedRefs = null;
+  researchedUrls.clear();
+}
 
 export function invalidateCrestUrl(orgRef: string): void {
   for (const key of crestUrlCache.keys()) {
@@ -29,17 +70,16 @@ export async function resolveCrestUrl(
   logoKey: string | null | undefined
 ): Promise<string | null> {
   if (!orgRef) return null;
-  const filename = (bundledCrests as Record<string, string>)[orgRef];
-  const fallback = filename ? `${import.meta.env.BASE_URL}organisation-crests/${filename}` : null;
-  if (!logoKey) return fallback;
+  const fallback = () => researchedCrestUrl(orgRef);
+  if (!logoKey) return fallback();
   const cacheKey = `${orgRef}|${logoKey}`;
-  if (crestUrlCache.has(cacheKey)) return crestUrlCache.get(cacheKey) ?? fallback;
+  if (crestUrlCache.has(cacheKey)) return crestUrlCache.get(cacheKey) ?? fallback();
   try {
     const res = await fetchOrgCrestUrl(orgRef);
     crestUrlCache.set(cacheKey, res.url);
-    return res.url ?? fallback;
+    return res.url ?? fallback();
   } catch {
-    return fallback;
+    return fallback();
   }
 }
 

@@ -84,7 +84,7 @@ const NOW = () => '2026-09-17T00:00:00.000Z';
 
 test('header.next_interaction: picks the soonest FUTURE meeting and ignores a past one', async () => {
   const { universalStore, professionalStore, resolveEntity } = setup();
-  const person = await makePerson(universalStore, { display_name: 'Redacted' });
+  const person = await makePerson(universalStore, { display_name: 'Riley Example' });
 
   await makeMeetingWithAttendee(professionalStore, universalStore, resolveEntity, {
     personRef: person.ref,

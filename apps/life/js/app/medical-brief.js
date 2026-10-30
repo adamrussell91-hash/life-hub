@@ -1,7 +1,7 @@
 import { formatDisplayDate, daysBetween, isCalendarDate } from '../core/time.js';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const EPISODE_EMOJI = { Acute: '🤧', IBD: '🩺', Liver: '🫀', Mind: '🧠' };
+const EPISODE_EMOJI = { Acute: '🤧', Gut: '🩺', Liver: '🫀', Mind: '🧠' };
 
 /** Relative / precision-aware label for Next rows and river countdowns. */
 export function formatRelativeMedicalDate(date, today, {
@@ -48,7 +48,7 @@ export function renderBriefRow(root, model, hooks = {}) {
   );
 }
 
-/** One navy card: Active episode · Redacted cycle · Watch (stacked). */
+/** One navy card: Active episode · dose cycle · Watch (stacked). */
 function healthBriefCard(root, model, hooks) {
   const card = root.createElement('article');
   card.className = 'medical-brief-card medical-brief-card--now';
@@ -284,7 +284,7 @@ function buildNextRow(root, visit, model, hooks) {
 function nextEmoji(visit) {
   const title = String(visit.title || '');
   if (visit.status === 'to_book' || visit.date_precision === 'tbd') return '📞';
-  if (/Redacted|Redacted/i.test(title)) return '💉';
+  if (/\b(biologic|injection|infusion)s?\b/i.test(title)) return '💉';
   if (/blood/i.test(title) || visit.lane === 'lab' || visit.record_type === 'Lab Work') return '🩸';
   if (/colonoscop/i.test(title)) return '🔬';
   if (/gastro|review|consult/i.test(title) || visit.record_type === 'Consultation') return '🩺';

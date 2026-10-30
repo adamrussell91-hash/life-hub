@@ -117,7 +117,7 @@ Adam's ruling: the city is not Sydney. It is **Metropolis**, a city made of him.
 | Fireworks for a completed goal | Base | **Keep** | Small, one burst |
 | Skyline height grows with hub busyness | Base | **Cut** | Reflows the layout, hides roads and gives height a second meaning |
 | Grey empty park for skipped exercise | Base | **Cut** | Already reversed by P6 and P11. It is a neglect meter |
-| Sydney geography: work on the north shore, life on the south side, the bridge as the commute | P1 | **Cut** | Adam's ruling: the city is Metropolis, not Sydney. Districts are laid out around his hubs. A link between work and the rest of life can still exist, but it is not the Harbour Bridge |
+| Copying Adam's real-city geography, with the bridge as the commute | P1 | **Cut** | Adam's ruling: the city is Metropolis, not Sydney. Districts are laid out around his hubs. A link between work and the rest of life can still exist, but it is not the Harbour Bridge |
 | Work-to-life link jam as the share of the week work takes | P1 | **Modify** | Define it from scheduled teaching hours against all scheduled hours that week. Drawn on whatever link joins the work district to the rest of the city |
 | Trip planner with an expected arrival date | P1 | **Modify** | Only from the existing pace model. With no pace, no arrival date is shown |
 
@@ -422,7 +422,7 @@ The base doc describes a friendly toy city. The risk is that it ends up generic,
 **1. Sydney's bones, toy-sized.**
 The harbour is the spine of the map, with water running through the middle rather than sitting at the edge. The bridge is the one crossing that everything funnels across. Ferries already exist in the base doc as cross-hub links; in Harbour City they become the most important vehicles on the map rather than a side feature.
 
-- **North shore: work.** The Teaching district sits at the north foot of the bridge, the way Adam's school sits beside the real one. Professional sits beside it.
+- **North shore: work.** The Teaching district sits at the north foot of the bridge. Professional sits beside it.
 - **South side: life.** Body, Mind, Fitness, Nutrition, Skincare, Travel and Knowledge spread along the southern shore.
 - **The bridge is the commute between them.** In heavy school weeks the bridge is jammed northbound in the morning. In holidays it is nearly empty. A glance at the bridge tells Adam how much of his week school is taking.
 - **The CBD is Tasks.** Clare's interchange, where most lines meet, is the city centre.

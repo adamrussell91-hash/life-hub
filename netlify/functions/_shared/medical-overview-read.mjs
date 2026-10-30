@@ -14,7 +14,7 @@ export function searchMedicalRecordsSchema() {
   return {
     name: 'search_medical_records',
     description:
-      'Search Life Hub Medical Overview visits by keyword (provider, title, location, notes, cost, insurance). Use whenever Adam asks about past medical history, a clinician (e.g. Redacted), a visit, cost, address, or insurance — Medical Overview is the store, not Notion. Words are ANDed.',
+      'Search Life Hub Medical Overview visits by keyword (provider, title, location, notes, cost, insurance). Use whenever Adam asks about past medical history, a clinician by name, a visit, cost, address, or insurance — Medical Overview is the store, not Notion. Words are ANDed.',
     input_schema: {
       type: 'object',
       properties: {

@@ -9,7 +9,7 @@
 **Tech Stack:** Existing Life Hub stack — static PWA, Netlify Functions, GitHub-as-database, `node --test`, no new runtime deps.
 
 **Spec:** `docs/superpowers/specs/2026-08-13-mind-session-memory-design.md`  
-**Repo:** `/Users/example/Documents/Claude/Projects/life-hub`  
+**Repo:** `/Users/you/Documents/Claude/Projects/life-hub`  
 **Deploy rule:** Local commits only. **Never `git push`.** Adam pushes himself.  
 **Baseline:** `npm test` then `npm run validate:fixtures` after every task. SW cache currently `life-hub-shell-v69`.
 
@@ -86,7 +86,7 @@ Before the session, silently answer:
 Gap → framework (lead with one; most sessions blend two):
 
 - Knowing-doing gap → ADHD Coaching (interest, time blindness, dysregulation — not generic productivity)
-- Fighting reality (Redacted's, ADHD, load) → ACT
+- Fighting reality (Condition A, ADHD, load) → ACT
 - Shame louder than what happened → Compassion-Focused (Neff), as fact not comfort
 - A specific distorted thought driving behaviour → CBT-Informed, sparingly
 - Identity outside illness/ADHD/teacher → Narrative
@@ -121,7 +121,7 @@ Keep existing Job / Before every session / Presence / Safety. Delete the old "Af
 
 In `config/penelope-protocol.md`:
 
-1. Under "Glance at context", add: scan recent diary + Cross-Agent for relationship dynamics (Redacted, friends, family) and purpose/meaning signals (energy vs hollow). Synthesise; never inventory. Weather/calendar research is out of scope.
+1. Under "Glance at context", add: scan recent diary + Cross-Agent for relationship dynamics (Partner, friends, family) and purpose/meaning signals (energy vs hollow). Synthesise; never inventory. Weather/calendar research is out of scope.
 
 2. Replace the `mood` bullet under Metadata with:
 

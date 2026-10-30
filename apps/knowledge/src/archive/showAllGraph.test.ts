@@ -5,6 +5,10 @@ import { nodeDegrees, noteToNoteLinks } from "./graphMetrics";
 import { buildShowAllGraph, showAllHubTies, showAllNoteRadius } from "./showAllGraph";
 import { NEURAL_DEGREE_CAP, branchLoads, placeTopicAnchors } from "./showAllNeural";
 import { relaxNeural } from "./showAllRelax";
+import { installUnitDegreeMap } from "../origin/unitDegrees";
+import { TEST_UNIT_DEGREES } from "../origin/unitDegrees.fixture";
+
+installUnitDegreeMap(TEST_UNIT_DEGREES);
 
 function page(
   id: string,
@@ -149,7 +153,7 @@ describe("buildShowAllGraph", () => {
       page("n2", "Notebook two", [V[1]], { origins: [{ kind: "notebook", label: "Brown 2022" }] }),
       page("u1", "Unit note", [V[2]], {
         area: "university",
-        origins: [{ kind: "unit", label: "EDST5805" }],
+        origins: [{ kind: "unit", label: "SMPL5805" }],
       }),
     ];
     const notebooks = buildShowAllGraph(pages, "notebooks");
@@ -159,7 +163,7 @@ describe("buildShowAllGraph", () => {
 
     const degrees = buildShowAllGraph(pages, "degrees");
     expect(degrees.nodes.filter(node => node.kind === "major").map(node => node.label)).toEqual([
-      "Master of Education (Gifted Education)",
+      "Master of Sample Studies",
     ]);
     expect(degrees.nodes.filter(node => node.kind === "leaf").map(node => node.pageId)).toEqual(["u1"]);
   });

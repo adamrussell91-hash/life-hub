@@ -22,7 +22,7 @@
   --mid: #b0731e;
   --low: #e0751a;
   --gold: #b8913a;
-  --Redacted: #c4566a;
+  --partner: #c4566a;
   --gmt: #376fb7;
   --sun: #e9b949; --breeze: #7fb8a4; --gust: #8ea3bd; --cloud: #a7adb6;
   --fog: #b5a9c9; --rain: #5f8fc9; --storm: #6b4a7a; --clearing: #f0b38a;
@@ -34,7 +34,7 @@
     --bg: #0d1626; --paper: #142036; --ink: #e7edf6; --navy: #c9d8ee; --muted: #93a1b5;
     --line: rgba(201, 216, 238, 0.14); --wave: #7aa7e6; --school: #1d3352; --yours: #4a3426;
     --track: rgba(201, 216, 238, 0.08); --hand: #ff7a6e; --good: #7cc29a; --mid: #e6a84a; --low: #ff9a4d;
-    --gold: #e0bd68; --Redacted: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
+    --gold: #e0bd68; --partner: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
     color-scheme: dark;
   }
 }
@@ -42,7 +42,7 @@
   --bg: #0d1626; --paper: #142036; --ink: #e7edf6; --navy: #c9d8ee; --muted: #93a1b5;
   --line: rgba(201, 216, 238, 0.14); --wave: #7aa7e6; --school: #1d3352; --yours: #4a3426;
   --track: rgba(201, 216, 238, 0.08); --hand: #ff7a6e; --good: #7cc29a; --mid: #e6a84a; --low: #ff9a4d;
-  --gold: #e0bd68; --Redacted: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
+  --gold: #e0bd68; --partner: #f08a9c; --gmt: #7aa7e6; --chip: #1d2c46; --chip-ink: #b9cff0;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -116,7 +116,7 @@ svg { display: block; width: 100%; height: 100%; }
   <header>
     <p class="kicker">Life Hub · Day Dial · mockup</p>
     <h1>The dial grows complications</h1>
-    <p class="lede">Your green dial stays exactly as it is. These faces add what a watch would: a dive bezel for medication, a GMT hand for Seoul and Redacted, a moon for the term, a retrograde tally, and the day's weather on the Tool watch. Swipe or use the arrows to change face; tap the centre to flip to the caseback.</p>
+    <p class="lede">Your green dial stays exactly as it is. These faces add what a watch would: a dive bezel for medication, a GMT hand for Seoul and Partner, a moon for the term, a retrograde tally, and the day's weather on the Tool watch. Swipe or use the arrows to change face; tap the centre to flip to the caseback.</p>
   </header>
 
   <section class="stage" aria-label="Watch faces">
@@ -184,7 +184,7 @@ svg { display: block; width: 100%; height: 100%; }
 
   /* --- Same battery and weather rules as readiness-hourly.js (inline copy for the mockup). --- */
   const DEMAND = { class: 0.04, deep: 0.04, physical: 0.05, meeting: 0.03, shallow: 0.025, admin: 0.02 };
-  function demandOf(i) { if (i.kind === 'Redacted' || i.protected) return null; if (i.isClass) return 'class'; if (i.depth === 'deep') return 'deep'; return i.kind === 'task' ? 'shallow' : 'meeting'; }
+  function demandOf(i) { if (i.kind === 'partner' || i.protected) return null; if (i.isClass) return 'class'; if (i.depth === 'deep') return 'deep'; return i.kind === 'task' ? 'shallow' : 'meeting'; }
   function project(start, items, wake = 7, bed = 22.5) {
     const pts = []; let level = start, free = 0; const ceil = start;
     for (let h = wake; h <= bed + 1e-9; h += 0.5) {
@@ -221,7 +221,7 @@ svg { display: block; width: 100%; height: 100%; }
     { start: 11.83, end: 12.75, isClass: true }, { start: 13.67, end: 14.58, isClass: true },
     { start: 15, end: 15.5, kind: 'meeting' }, { start: 15.5, end: 16, kind: 'meeting' }, { start: 16, end: 16.5, kind: 'meeting' },
     { start: 16.5, end: 18, kind: 'task', depth: 'deep', title: 'HSC feedback' },
-    { start: 19.5, end: 21.5, kind: 'Redacted' }
+    { start: 19.5, end: 21.5, kind: 'partner' }
   ];
   const DAY = { readiness: 74, note: 'short sleep', why: 'Your check-in said better but still tired. Three classes before lunch and back-to-back meetings at 3 pm will cost the most.' };
   const PTS = project(DAY.readiness, ITEMS);
@@ -231,7 +231,7 @@ svg { display: block; width: 100%; height: 100%; }
   const FACES = [
     { id: 'tool', title: 'Tool watch', sub: 'School day', when: 'Auto on school days, 6 am to 4 pm', now: 13.25, comps: ['weather', 'bezel', 'moon'] },
     { id: 'focus', title: 'Focus', sub: 'Deep work · HSC feedback', when: 'Auto during a deep-work block you started', now: 17.1, dim: true, comps: ['retro', 'bezel'] },
-    { id: 'pilot', title: 'Pilot GMT', sub: 'Travelling · Seoul', when: 'Auto when a trip is on (KL, Seoul)', now: 15.5, gmt: true, comps: ['gmt', 'Redacted', 'bezel'] },
+    { id: 'pilot', title: 'Pilot GMT', sub: 'Travelling · Seoul', when: 'Auto when a trip is on (KL, Seoul)', now: 15.5, gmt: true, comps: ['gmt', 'partner', 'bezel'] },
     { id: 'dress', title: 'Dress watch', sub: 'Weekend', when: 'Auto on weekends and holidays', now: 11, dress: true, comps: [] },
     { id: 'grand', title: 'Grand complication', sub: 'Wedding day', when: 'Auto on the wedding day only', now: 14.5, gold: true, comps: ['bezel', 'moon', 'tourbillon', 'gmt', 'countdown'] }
   ];
@@ -243,7 +243,7 @@ svg { display: block; width: 100%; height: 100%; }
     tourbillon: { name: 'Tourbillon', watch: 'haute horlogerie', text: 'Its own window under the number, with the moon above. Spins only while Clare or Hammond is reworking your day.', status: ['data', 'Needs agent status'] },
     retro: { name: 'Retrograde tally', watch: 'retrograde', text: 'Sweeps one step for each task you close today, then snaps back at midnight. Try the buttons under the dial.', status: ['ready', 'Data ready'] },
     gmt: { name: 'GMT hand', watch: 'pilot / GMT', text: 'A second 24-hour hand for the other place. Home Sydney while you are away.', status: ['data', 'Needs trip dates'] },
-    Redacted: { name: 'Redacted hand', watch: 'second time zone', text: 'Redacted’s time at home while you are in KL or Seoul, with Redacted’s evening shaded on the rim.', status: ['data', 'Needs trip dates'] },
+    partner: { name: 'Partner hand', watch: 'second time zone', text: 'Partner’s time at home while you are in KL or Seoul, with Partner’s evening shaded on the rim.', status: ['data', 'Needs trip dates'] },
     countdown: { name: 'Countdown plaque', watch: 'regatta', text: 'Ceremony countdown, engraved under the dial so the face stays clear.', status: ['ready', 'Data ready'] }
   };
 
@@ -349,7 +349,7 @@ svg { display: block; width: 100%; height: 100%; }
       el('circle', { cx: C + 9 * Math.cos(a), cy: C + 9 * Math.sin(a), r: R * 0.3, 'stroke-opacity': 0.08 }, g);
     }
     // Commitments as small diamonds just inside the indices: filled for classes, outlined for
-    // tasks and meetings, champagne for Redacted time. Quiet enough to ignore, there if you look.
+    // tasks and meetings, champagne for Partner time. Quiet enough to ignore, there if you look.
     const diamond = (h, r, size, attrs) => {
       const [x, y] = pt(r, h), a = ang(h);
       const ux = Math.sin(a), uy = -Math.cos(a), vx = Math.cos(a), vy = Math.sin(a);
@@ -358,7 +358,7 @@ svg { display: block; width: 100%; height: 100%; }
     };
     for (const i of ITEMS) {
       const mid = (i.start + i.end) / 2;
-      if (i.kind === 'Redacted') diamond(mid, R * 0.76, 4.5, { fill: '#e8cf9a', 'fill-opacity': 0.55 });
+      if (i.kind === 'partner') diamond(mid, R * 0.76, 4.5, { fill: '#e8cf9a', 'fill-opacity': 0.55 });
       else if (i.isClass) diamond(mid, R * 0.76, 3.6, { fill: '#e3c47d', 'fill-opacity': 0.5 });
       else diamond(mid, R * 0.76, 3.6, { fill: 'none', stroke: '#e3c47d', 'stroke-opacity': 0.6, 'stroke-width': 0.9 });
     }
@@ -405,7 +405,7 @@ svg { display: block; width: 100%; height: 100%; }
     for (const i of ITEMS) {
       const focus = face.dim && i.title === 'HSC feedback';
       el('path', { d: arc(R * (ring.eventInner + 0.02), R * (ring.eventOuter - 0.02), i.start + 0.03, i.end - 0.03),
-        fill: i.kind === 'Redacted' ? 'var(--yours)' : i.isClass ? 'var(--school)' : 'var(--chip)',
+        fill: i.kind === 'partner' ? 'var(--yours)' : i.isClass ? 'var(--school)' : 'var(--chip)',
         stroke: focus ? 'var(--navy)' : 'var(--line)', 'stroke-width': focus ? 2 : 1, opacity: face.dim && !focus ? 0.35 : 1 }, svg);
     }
     el('path', { d: arc(R * ring.ctxInner, R * ring.ctxOuter, 22.5, 6.5), fill: 'url(#hatch)', opacity: dim }, svg);
@@ -458,11 +458,11 @@ svg { display: block; width: 100%; height: 100%; }
       const [tx, ty] = pt(R * 0.62, other - 0.9);
       el('text', { x: tx, y: ty + 3, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--gmt)', 'paint-order': 'stroke', stroke: 'var(--paper)', 'stroke-width': 3 }, svg, face.gmt ? 'Sydney' : 'Seoul');
     }
-    if (face.comps.includes('Redacted')) {
+    if (face.comps.includes('partner')) {
       const home = face.now + 2;
-      el('path', { d: arc(R * 0.885, R * 0.905, 18, 22.5), fill: 'var(--Redacted)', 'fill-opacity': 0.6 }, svg);
+      el('path', { d: arc(R * 0.885, R * 0.905, 18, 22.5), fill: 'var(--partner)', 'fill-opacity': 0.6 }, svg);
       const [x, y] = pt(R * 0.8, home + 0.9);
-      el('circle', { cx: x, cy: y, r: 7, fill: 'var(--Redacted)' }, svg);
+      el('circle', { cx: x, cy: y, r: 7, fill: 'var(--partner)' }, svg);
       el('text', { x, y: y + 3, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: 'var(--paper)' }, svg, 'C');
     }
 
@@ -504,7 +504,7 @@ svg { display: block; width: 100%; height: 100%; }
       tourbillon: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 1.5 }, s); el('line', { x1: 18, y1: 11, x2: 18, y2: 25, stroke: 'var(--gold)' }, s); el('line', { x1: 12, y1: 22, x2: 24, y2: 14, stroke: 'var(--gold)' }, s); },
       retro: () => { el('path', { d: 'M8 22A10 10 0 0 1 28 22', fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2 }, s); el('line', { x1: 18, y1: 22, x2: 18, y2: 12, stroke: 'var(--good)', 'stroke-width': 2 }, s); },
       gmt: () => { el('line', { x1: 18, y1: 18, x2: 26, y2: 9, stroke: 'var(--gmt)', 'stroke-width': 2 }, s); el('path', { d: 'M26 9L21 10L25 14Z', fill: 'var(--gmt)' }, s); },
-      Redacted: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'var(--Redacted)' }, s); el('text', { x: 18, y: 21.5, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--paper)' }, s, 'C'); },
+      partner: () => { el('circle', { cx: 18, cy: 18, r: 7, fill: 'var(--partner)' }, s); el('text', { x: 18, y: 21.5, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: 'var(--paper)' }, s, 'C'); },
       countdown: () => { el('text', { x: 18, y: 22, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: 'var(--gold)' }, s, '1:30'); }
     };
     map[id]?.();
@@ -532,7 +532,7 @@ svg { display: block; width: 100%; height: 100%; }
     });
     if (face.dress) {
       const row = document.createElement('div'); row.className = 'comp';
-      row.innerHTML = '<span></span><div><b>No complications <span class="watchword">· dress watch</span></b><p>Black lacquer with a rose-engine guilloché, a gold leaf hand pointing to now and readiness as one fine gold arc. No words. Classes are small gold diamonds, tasks and meetings outlined ones, Redacted time a champagne one. Your evening is a whisper of champagne at the rim; the night is the darker crescent.</p></div>';
+      row.innerHTML = '<span></span><div><b>No complications <span class="watchword">· dress watch</span></b><p>Black lacquer with a rose-engine guilloché, a gold leaf hand pointing to now and readiness as one fine gold arc. No words. Classes are small gold diamonds, tasks and meetings outlined ones, Partner time a champagne one. Your evening is a whisper of champagne at the rim; the night is the darker crescent.</p></div>';
       rows.push(row);
     }
     list.replaceChildren(...rows);

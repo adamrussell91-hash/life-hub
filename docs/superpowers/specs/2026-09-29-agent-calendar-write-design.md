@@ -58,7 +58,7 @@ Allowlists: agents that may Accept-write Life `calendar_block` paths need the co
 
 | Kind | Meaning | Accept writes |
 |------|---------|----------------|
-| `outing` | Named Life plan with time (breakfast, dinner out, errand) | Life `calendar_block`: `kind: protected` or `Redacted` if `with: Redacted`; `status: tentative`; title + date + start/end; optional place in title or `notes` field on ghost |
+| `outing` | Named Life plan with time (breakfast, dinner out, errand) | Life `calendar_block`: `kind: protected` or `partner` if `with: partner`; `status: tentative`; title + date + start/end; optional place in title or `notes` field on ghost |
 | `schedule_workout` | Chadwick (any agent) books training time | Life `calendar_block` (`kind: focus` or dedicated workout-friendly kind already used on calendar) **or** update/create workout record path when `workoutPath` supplied — prefer block first; link workout in reason/title. Exact record shape: reuse existing Life validators. |
 | `meal_block` | Brisket/Sara meal time on calendar | Life `calendar_block` titled for the meal (not a nutrition `meal` log — logging food remains `log_entry`) |
 

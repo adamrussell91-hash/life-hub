@@ -19,12 +19,12 @@ const MEETING = {
 };
 
 test('a meeting projection carries where it is and who it is with', () => {
-  const projection = projectMeetingSchedule(MEETING, ['Rohan Arianayagam']);
+  const projection = projectMeetingSchedule(MEETING, ['Rohan Examplar']);
   assert.equal(projection.location, 'Library');
-  assert.deepEqual(projection.with, ['Rohan Arianayagam']);
+  assert.deepEqual(projection.with, ['Rohan Examplar']);
   const [row] = professionalEventsFromProjections([projection]);
   assert.equal(row.record.location, 'Library');
-  assert.deepEqual(row.record.with, ['Rohan Arianayagam']);
+  assert.deepEqual(row.record.with, ['Rohan Examplar']);
 });
 
 test('a meeting with no one linked and no place projects empty context, not undefined', () => {
@@ -57,11 +57,11 @@ test('Notion rows name attendees and the student, without the emoji or the opera
 });
 
 test('meeting chips read time · with · where', () => {
-  assert.equal(withMeta('3:30 pm – 4:30 pm', { with: ['Rohan Arianayagam'], location: 'Library' }), '3:30 pm – 4:30 pm · with Rohan Arianayagam · Library');
+  assert.equal(withMeta('3:30 pm – 4:30 pm', { with: ['Rohan Examplar'], location: 'Library' }), '3:30 pm – 4:30 pm · with Rohan Examplar · Library');
   assert.equal(withMeta('9 am', { with: ['A', 'B', 'C', 'D'] }), '9 am · with A, B +2');
   assert.equal(withMeta('9 am', {}), '9 am');
 
-  const [event] = professionalEventsFromProjections([projectMeetingSchedule(MEETING, ['Rohan Arianayagam'])]);
+  const [event] = professionalEventsFromProjections([projectMeetingSchedule(MEETING, ['Rohan Examplar'])]);
   const model = buildTidelineModel({
     events: [event],
     visual: null,
@@ -71,5 +71,5 @@ test('meeting chips read time · with · where', () => {
     terms: [{ term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' }, { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }]
   });
   const chip = model.days.flatMap((day) => day.chips).find((item) => item.title === 'HSC English Catch-up');
-  assert.equal(chip.meta, '3:30 pm – 4:30 pm · with Rohan Arianayagam · Library');
+  assert.equal(chip.meta, '3:30 pm – 4:30 pm · with Rohan Examplar · Library');
 });

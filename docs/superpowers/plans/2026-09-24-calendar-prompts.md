@@ -37,7 +37,7 @@ Read docs/superpowers/specs/2026-09-24-calendar-design.md, sections "Ghosts and 
 
 apps/life/js/app/ghost-writes.js already exists with tests. It decides what every Accept writes. Use it; do not write a second mapping.
 
-1. calendar_block record type: add it to VALIDATORS in apps/life/js/core/validate.js (kinds Redacted|rest|protected|wall|focus, status tentative|confirmed, time and end_time HH:MM with end > start, protected boolean). Add it to the canonical record paths, and to SOURCE_BY_TYPE, eventDetailTitle and eventBrief in apps/life/js/app/calendar-model.js. Add the optional diary field `symptoms: string[]`.
+1. calendar_block record type: add it to VALIDATORS in apps/life/js/core/validate.js (kinds partner|rest|protected|wall|focus, status tentative|confirmed, time and end_time HH:MM with end > start, protected boolean). Add it to the canonical record paths, and to SOURCE_BY_TYPE, eventDetailTitle and eventBrief in apps/life/js/app/calendar-model.js. Add the optional diary field `symptoms: string[]`.
 2. netlify/functions/calendar-ghosts.mjs:
    - GET ?from=&to= returns pending ghosts from pending-calendar-ghosts.json (data repo).
    - POST { id, decision, reason? }. Load the stored ghost, then run validateGhost and acceptPlan(ghost, { today }) or dismissPlan. Execute exactly as the spec's "Execution order" says: one GitHub commit (Central Node patches via applyCentralNodePatch on one read, life records validated, queue entry marked), then tasks steps via the tasks store code, 207 partial with retry: 'tasks' if step 2 fails, and never re-apply step 1.

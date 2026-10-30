@@ -9,7 +9,7 @@
 **Tech Stack:** Existing Life Hub stack — static PWA, vanilla ES modules, `node --test`, no new runtime deps.
 
 **Spec:** `docs/superpowers/specs/2026-08-13-mind-dashboard-design.md`  
-**Repo:** `/Users/example/Documents/Claude/Projects/life-hub`  
+**Repo:** `/Users/you/Documents/Claude/Projects/life-hub`  
 **Deploy rule:** Local commits only. **Never `git push`.** Adam pushes himself.  
 **Baseline:** `npm test` then `npm run validate:fixtures` after every task. SW cache currently `life-hub-shell-v69`.
 

@@ -15,7 +15,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md` ("Experience: Full session" steps 5–7, "Architecture", "Errors").
 **Plans 1–4:** done (Plan 4 HEAD `575fc6710`).
-**Branch and worktree:** `claude/decision-book` in `/Users/example/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
 
 **How this plan was made:** every file below was drafted in the worktree and its tests run green: 17 new unit tests in `decision-book-decide.test.js`; the full unit suite (5,703 tests: 5,692 pass, 11 skipped as before); and the Problem Solver and Decision Book vitest tests (55 files, 1,088 tests, including the new record-basis test). The Tasks type-check showed no errors in these paths. The drafts were then removed, after a check that this plan rebuilds every file byte for byte from a clean tree. New files are given in full. Changed files are given as patches: apply them with `git apply`, then check with `git diff`. Plan 5 has no client pages, so there was no browser check; that moves to Plan 6.
 

@@ -4,7 +4,8 @@ import { PageSchema, type Page, type PageManifestEntry } from "../src/domain/pag
 import type { OriginKind } from "../src/domain/page";
 import { stampPageOrigins } from "../src/origin/fromPlace";
 import { originKey, pageOrigins } from "../src/origin/normalize";
-import { extractNotionHex } from "../src/origin/notesPlace";
+import { extractNotionHex, installNotesPlace } from "../src/origin/notesPlace";
+import { installUnitDegreeMap } from "../src/origin/unitDegrees";
 import { originsFromNotionPage } from "../src/origin/notion";
 import { excerptFromTidyBody } from "../src/tidy/run";
 import { loadDotEnv } from "./loadLocalPages";
@@ -15,6 +16,10 @@ export type StampArgs = {
   execute?: boolean;
   fromNotion?: boolean;
   count?: number;
+  /** Private university source (life-hub-data data/knowledge/university-timeline.json) for degree pills. */
+  university?: string;
+  /** Private notebook / book / PD map (life-hub-data data/knowledge/notes-place.json). */
+  notesPlace?: string;
 };
 
 export function parseStampArgs(args: string[]): StampArgs {
@@ -31,6 +36,8 @@ export function parseStampArgs(args: string[]): StampArgs {
     ...(args.includes("--execute") ? { execute: true } : {}),
     ...(args.includes("--from-notion") ? { fromNotion: true } : {}),
     ...(count ? { count } : {}),
+    ...(value("--university") ? { university: value("--university") } : {}),
+    ...(value("--notes-place") ? { notesPlace: value("--notes-place") } : {}),
   };
 }
 
@@ -168,6 +175,16 @@ async function main(args = process.argv.slice(2)) {
   const dataDir = parsed.dataDir ?? path.join(process.cwd(), "migrated", "data-repo");
   const token = process.env.NOTION_TOKEN;
   if (parsed.fromNotion && !token) throw new Error("NOTION_TOKEN is required for --from-notion");
+  const universityFile = parsed.university ?? process.env.UNIVERSITY_TIMELINE_JSON;
+  if (universityFile) {
+    const source = await readJson<{ unitDegrees?: Record<string, string> }>(universityFile, {});
+    installUnitDegreeMap(source.unitDegrees ?? {});
+  } else {
+    console.error("No --university file: degree pills from unit codes are skipped.");
+  }
+  const notesPlaceFile = parsed.notesPlace ?? process.env.NOTES_PLACE_JSON;
+  if (notesPlaceFile) installNotesPlace(await readJson(notesPlaceFile, null));
+  else console.error("No --notes-place file: notebook, book and PD pills from Notion ids are skipped.");
   const pageDir = path.join(dataDir, "pages");
   const ids = parsed.id
     ? [parsed.id]

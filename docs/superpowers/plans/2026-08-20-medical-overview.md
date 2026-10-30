@@ -62,14 +62,14 @@ import { parseMedicalCsv } from '../../scripts/lib/medical-csv-import.mjs';
 
 const SAMPLE = `Record Name,Person,Date,Record Type,Doctor/Provider,Location,Notes,Follow-up Date,Cost,Insurance Claim Status,Files,Meeting Name,Notes and Follow Up
 "Follow Up - Eye Exam (https://app.notion.com/p/x)",Adam,11 April 2028,,,,,,,Not Started,,,
-Gastroenterologist Follow-up (Dr Redacted),Adam,27 May 2026 15:45 (GMT+10),Appointment,Dr Redacted,Northern Gastroenterology,Review Entocort.,,,Not Started,,,
-Therapy Session with Redacted,Adam,8 July 2026 09:00 (GMT+10),Appointment,Redacted,"26 Ridge St, North Sydney NSW Australia",,,A$160.00,Not Started,,,
-Dental Check-up — Forum Dentistry,Adam,18 April 2026,Appointment,Dr Redacted,"1 Sergeants Ln, St Leonards",,,A$268.00,Complete,Medical%20Records/x.pdf,,
+Gastroenterologist Follow-up (Dr Rowan Pike),Adam,27 May 2026 15:45 (GMT+10),Appointment,Dr Rowan Pike,Example Gastroenterology,Review Medication Y.,,,Not Started,,,
+Therapy Session with Avery Quill,Adam,8 July 2026 09:00 (GMT+10),Appointment,Avery Quill,"1 Example St, Exampleton NSW Australia",,,A$150.00,Not Started,,,
+Dental Check-up — Example Dentistry,Adam,18 April 2026,Appointment,Dr Casey Placeholder,"2 Example Ln, Exampleton",,,A$200.00,Complete,Medical%20Records/x.pdf,,
 Head Cold,Adam,22 May 2026 → 28 May 2026,Consultation,Self-reported,,Onset Friday.,,,Not Started,,,
-Redacted Infusion,Adam,2 July 2026,Prescription,Dr Redacted,,Biologic started.,27 August 2026,,Not Started,,,
-EP Session 8,Adam,30 April 2026,Appointment,Veronica Morlotti,Movement 101,,,A$196.00,Complete,,,
-EP Session 8,Adam,30 April 2026,Appointment,Veronica Morlotti,Movement 101,,,A$196.00,Complete,,,
-Telehealth GP,Adam,10 February 2026,Appointment,Dr Redacted,Walker Street Doctors (Telehealth),,,,Not Applicable,,,
+Biologic Infusion,Adam,2 July 2026,Prescription,Dr Rowan Pike,,Biologic started.,27 August 2026,,Not Started,,,
+EP Session 8,Adam,30 April 2026,Appointment,Veronica Morlotti,Movement 101,,,A$180.00,Complete,,,
+EP Session 8,Adam,30 April 2026,Appointment,Veronica Morlotti,Movement 101,,,A$180.00,Complete,,,
+Telehealth GP,Adam,10 February 2026,Appointment,Dr Jordan Sample,Example Street Doctors (Telehealth),,,,Not Applicable,,,
 Unknown Visit,Adam,1 January 2020,Wizardry,Merlin,,,,,Not Started,,,
 `;
 
@@ -100,9 +100,9 @@ test('parseMedicalCsv parses datetime, cost, telehealth, range, and lane', () =>
   const cold = events.find(e => e.record.date === '2026-05-22');
   assert.equal(cold.record.date_end, '2026-05-28');
 
-  const Redacted = events.find(e => e.record.date === '2026-07-02');
-  assert.equal(Redacted.record.lane, 'prescription');
-  assert.equal(Redacted.record.follow_up_date, '2026-08-27');
+  const biologic = events.find(e => e.record.date === '2026-07-02');
+  assert.equal(biologic.record.lane, 'prescription');
+  assert.equal(biologic.record.follow_up_date, '2026-08-27');
 
   const tele = events.find(e => e.record.date === '2026-02-10');
   assert.equal(tele.record.location_kind, 'telehealth');
@@ -344,7 +344,7 @@ Medical write: Health/Flags from notes verdict when present; Recent Action line;
 - Import command (local data sibling, not this repo):
 
 ```
-node scripts/import-notion-history.mjs --medical-csv "/Users/example/Downloads/Private & Shared 2/Medical Records 22cf794f847680229ea6dc5e1c9f26e2.csv" --out ../life-hub-data
+node scripts/import-notion-history.mjs --medical-csv "/Users/you/Downloads/Private & Shared 2/Medical Records 22cf794f847680229ea6dc5e1c9f26e2.csv" --out ../life-hub-data
 ```
 
 Only run that when Adam asks; tests must not require the private file.

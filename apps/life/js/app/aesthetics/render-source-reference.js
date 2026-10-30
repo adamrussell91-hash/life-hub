@@ -1,5 +1,5 @@
 import { createFragrancePhoto, FRAGRANCE_PHOTOS } from './fragrance-photos.js';
-import { SOURCE_FRAGRANCES, STYLE_NOTE } from './notion-aesthetics-source.js';
+import { SOURCE_FRAGRANCES, STYLE_NOTE } from './fragrance-library.js';
 import { formatDisplayDate } from '../../../../../packages/design-kit/js/format-display-date.js';
 
 const FIELDS = [
@@ -109,7 +109,7 @@ export function renderSourceReference(doc) {
       const summary = el('summary');
       summary.className = 'aes-record__summary';
       const label = el('span', null, 'aes-record__label');
-      label.append(el('strong', p.Fragrance), el('span', `${p.Brand.replace(/\\([\[\]])/g, '$1')} · ${p.Status}`, 'aes-meta'));
+      label.append(el('strong', p.Fragrance), el('span', `${String(p.Brand ?? '').replace(/\\([\[\]])/g, '$1')} · ${p.Status}`, 'aes-meta'));
       summary.append(createFragrancePhoto(doc, p.Fragrance, { width: 48 }), label);
       const body = el('div', null, 'aes-record__body');
       const fields = el('dl', null, 'aes-record__fields');
@@ -138,11 +138,13 @@ export function renderSourceReference(doc) {
     }));
   }
   const style = doc.querySelector('#aes-style-notes');
-  if (style) {
+  if (style && !STYLE_NOTE) {
+    style.replaceChildren(el('p', 'Style notes aren’t available right now.', 'aes-meta'));
+  } else if (style) {
     const source = el('p', null, 'aes-meta');
     source.textContent = formatDisplayDate(STYLE_NOTE.date);
     style.replaceChildren(source);
-    for (const section of STYLE_NOTE.summary.split(/(?=^### )/m).filter(s => s.trim())) {
+    for (const section of String(STYLE_NOTE.summary ?? '').split(/(?=^### )/m).filter(s => s.trim())) {
       const [heading, ...lines] = section.split('\n');
       const details = el('details', null, 'aes-record');
       details.dataset.styleSection = heading.replace(/^### /, '');
@@ -162,7 +164,7 @@ export function renderSourceReference(doc) {
     transcript.append(el('summary', 'Full transcript'));
     const body = el('div', null, 'aes-source-prose aes-record__body');
     body.append(el('p', 'Original transcript wording, including incomplete phrases.', 'aes-meta'));
-    markdown(body, STYLE_NOTE.transcript);
+    markdown(body, STYLE_NOTE.transcript ?? '');
     transcript.append(body);
     style.append(transcript);
   }

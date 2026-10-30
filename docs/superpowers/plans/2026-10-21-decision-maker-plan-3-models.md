@@ -30,7 +30,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md` ("Catalogue", "Coach knowledge").
 **Plans 1 and 2:** done.
-**Branch and worktree:** `claude/decision-book` in `/Users/example/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
 **Book pages:** `.db-book/` (git-ignored; rebuild per Plan 1 Task 4 if missing). Section *n*'s render for printed page *p* is `<section file>-<p − offset>.png`, with offsets 9, 51, 81 and 123 for sections 1–4.
 
 **How this plan was made:** every file below was drafted in the worktree and its tests run green: 51 model tests, 488 decision-book and Problem Solver node tests, 1,033 vitest tests and the full unit suite (5,660). The Tasks type-check showed no errors in these paths, and the contact sheet drew all 48 models with nothing spilling past its chart. The drafts were then removed. New files are given in full; changed files are given as patches (apply with `git apply`, then check with `git diff`).

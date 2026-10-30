@@ -1350,7 +1350,7 @@ function eventKind(record) {
   if (record.type === 'professional_meeting' || record.type === 'professional_event') return 'professional';
   if (record.type === 'workout') return 'fitness';
   if (record.type === 'medical') return 'health';
-  if (record.type === 'calendar_block') return record.kind === 'Redacted' ? 'Redacted' : record.kind === 'focus' ? 'study' : 'health';
+  if (record.type === 'calendar_block') return record.kind === 'partner' ? 'partner' : record.kind === 'focus' ? 'study' : 'health';
   if (record.type === 'work_block' || record.type === 'task') return 'task';
   return 'task';
 }
@@ -1454,7 +1454,7 @@ Change line 456 to this:
 
 - [ ] **Step 3: Pin chips** (`mountChip`)
 
-After `if (chip.kind === 'Redacted') classes.push('is-Redacted');`, add:
+After `if (chip.kind === 'partner') classes.push('is-partner');`, add:
 
 ```js
   if (chip.pin) classes.push('is-pin');

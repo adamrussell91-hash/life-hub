@@ -1,5 +1,5 @@
 /**
- * Every 10 minutes: the few phone notifications Day Sense sends (dexy, train-home pass).
+ * Every 10 minutes: the few phone notifications Day Sense sends (medication, train-home pass).
  * Deterministic rules in _shared/day-sense-notify.mjs. No AI, capped at 4 a day.
  */
 import { createGitHubClient } from './_shared/github-client.mjs';

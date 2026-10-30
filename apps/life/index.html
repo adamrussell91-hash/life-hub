@@ -804,6 +804,7 @@
             <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="dress" aria-controls="aes-dress" aria-selected="false">Dress</button>
             <button type="button" class="hub-pills__btn" role="tab" data-aes-tab="skin" aria-controls="aes-skin" aria-selected="false">Skin</button>
           </div>
+          <p id="aes-source-status" class="aes-meta" role="status" hidden></p>
 
           <div id="aes-today" class="aes-panel" role="tabpanel" aria-label="Today">
             <div id="aes-stage" class="aes-stage">
@@ -931,6 +932,7 @@
             </div>
 
             <div id="aes-watches" class="aes-watches" role="tabpanel" aria-label="Watches" hidden>
+              <p id="aes-watch-status" class="aes-meta" role="status" hidden></p>
               <section class="aes-stage aes-wrist" aria-label="On the wrist today">
                 <div class="aes-wrist__copy">
                   <p class="aes-eyebrow">On the wrist today</p>
@@ -993,12 +995,12 @@
                 <div id="aes-wish" class="aes-wishes"></div>
               </article>
 
-              <article class="metric-card aes-card">
-                <p class="aes-eyebrow">London and Scotland, December</p>
-                <h2 class="aes-display aes-h2">The vintage British watch hunt</h2>
+              <article id="aes-hunt-card" class="metric-card aes-card" hidden>
+                <p id="aes-hunt-when" class="aes-eyebrow"></p>
+                <h2 id="aes-hunt-title" class="aes-display aes-h2"></h2>
                 <div class="aes-hunt">
                   <div class="aes-hunt__col">
-                    <p class="aes-lede">A classic British looking watch with real history, character and value. Smiths first.</p>
+                    <p id="aes-hunt-lede" class="aes-lede"></p>
                     <div id="aes-hunt-brief" class="aes-hunt__brief"></div>
                     <div id="aes-hunt-sizes" class="aes-hunt__sizes"></div>
                     <p id="aes-hunt-size-note" class="aes-meta"></p>
@@ -1014,7 +1016,7 @@
 
               <article class="metric-card aes-card aes-reference">
                 <h2 class="aes-display aes-h2">Complete watch records</h2>
-                <p class="aes-meta">All 27 entries with every tracker property. Unset fields show “Not recorded”. Source: <span id="aes-watch-source"></span></p>
+                <p class="aes-meta">Every entry with every tracker property. Unset fields show “Not recorded”. Source: <span id="aes-watch-source"></span></p>
                 <div id="aes-watch-records" class="aes-records"></div>
               </article>
             </div>

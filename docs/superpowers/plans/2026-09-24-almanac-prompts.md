@@ -104,7 +104,7 @@ Implement:
 
 Guard rails:
 - Only { id, decision } or { stepId } leaves the browser. The spec checks it.
-- Prove it through the real path: accept the pet-sitter task on the mock, then show it in Tasks with due 28/10/26. Hold the good night, then show it on the Tideline week as a Redacted block.
+- Prove it through the real path: accept the pet-sitter task on the mock, then show it in Tasks with due 28/10/26. Hold the good night, then show it on the Tideline week as a Partner block.
 - Loop: `ALMANAC_APP=1 node --test tests/browser/almanac-visual.spec.mjs` (all 7). Check almanac-popover-1280 and almanac-held-1280.
 
 PR: "Almanac: phase 4 wiring".

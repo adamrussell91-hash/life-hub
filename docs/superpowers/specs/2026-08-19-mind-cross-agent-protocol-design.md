@@ -164,7 +164,7 @@ Consider writing a `cross_agent_note` when any of these hold:
 - This is the third (or later) consecutive day scored low or bad — you'll be told in context if a streak is running.
 - Purpose, meaning, or "hollow" language recurs across two or more entries in a short span, not just today.
 - The day breaks a silence of a week or more since your last diary entry.
-- A relationship or health signal (Redacted, family, a Redacted's/energy crash) surfaces sharply enough that Vera or Sara should know before their next session, not just their next digest read.
+- A relationship or health signal (Partner, family, a Condition A/energy crash) surfaces sharply enough that Vera or Sara should know before their next session, not just their next digest read.
 
 Most days clear none of these — every day has feelings in it, that alone doesn't qualify. `system_note` already carries the day forward on its own.
 

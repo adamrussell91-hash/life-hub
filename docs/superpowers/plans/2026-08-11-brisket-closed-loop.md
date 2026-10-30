@@ -17,7 +17,7 @@ Tagged per the playbook. `config/` has no non-goals doc for Brisket, so "deferre
 | # | Item | Tag | Evidence |
 |---|---|---|---|
 | 1 | **Numeric body-composition target** — Notion: "78 to 82 kg at 8 to 11 percent body fat", waist 75–80 cm, visual markers (ab lines, chest separation, jawline, V-waist). Repo protocol: "Body composition aim: lean athletic look." | **Thinned to nothing** | `grep -rin "78\|waist\|body fat" config/` returns Chadwick and Sara only. Brisket's goal has no number anywhere. |
-| 2 | **Redacted** — Notion makes it the dinner default and the dietitian's fat-control safety net; CN Long-Term Trends calls it "the most significant structural change to dinner quality since tracking began." | **Dropped** | Zero occurrences of "Marley" in `config/`, `netlify/`, `js/`. |
+| 2 | **meal kit** — Notion makes it the dinner default and the dietitian's fat-control safety net; CN Long-Term Trends calls it "the most significant structural change to dinner quality since tracking began." | **Dropped** | Zero occurrences of "Marley" in `config/`, `netlify/`, `js/`. |
 | 3 | **"Adam hates batch cooking. Do not suggest it."** | **Dropped** | Lives only in CN Long-Term Trends, a section Brisket is never sent. He can violate this today. |
 | 4 | **Emulsifier scan as a procedure** — Notion Step 1c: scan packaged/bought foods only, against a named list (carrageenan, polysorbate 80/E433, CMC/E466, guar, xanthan, sodium stearoyl lactylate, mono- and diglycerides), whole foods exempt; plus `Emulsifier Flag` + `Emulsifier Notes` columns in the Food Library. | **Thinned + structurally dropped** | Protocol keeps a 4-item list inside the flare section. `food-library.mjs` has **no emulsifier field at all** — so a flag found once is never cached, and every re-log of the same bar re-derives it or forgets it. |
 | 5 | **Forward-facing Eating Advice surface** — Notion wrote a gameplan (opening anecdote, table, forward plan, sign-off) to a persistent section. Repo Job #4 still says "advice is a gameplan for remaining meals, not a retrospective essay." | **Dropped; the replacement inverts it** | `index.html:279` has a panel labelled advice; `nutrition-model.js:94-108` fills it with **the last meal's `notes`** — a ≤140-char verdict on food already eaten. The forward plan has no home outside a chat message that scrolls away. |
@@ -26,7 +26,7 @@ Tagged per the playbook. `config/` has no non-goals doc for Brisket, so "deferre
 | 8 | **"Always search the web before advising"** | **Deferred, correctly** | Incompatible with `max_uses: 2` and the Netlify budget. |
 | 9 | **Weekly review / 0.5–1 kg per week / pattern analysis** | **Deferred by design** | Reassigned to Hammond in the protocol. See §3 — the reassignment never landed. |
 | 10 | **Calcium 1000 mg/day target and "flag meals contributing 200mg+"** | **Relocated, not lost** | 1000 mg is in `targets.yml` and reaches him inside CN Constraints. Not in his own protocol, and no running total (§2). |
-| 11 | **"Foods to Heal" (Dr Redacted)** | **Unportable** | Image attachment on the Notion page. Never transcribed. Worth an OCR pass if it carries rules. |
+| 11 | **"Foods to Heal" (Dr Jordan Sample)** | **Unportable** | Image attachment on the Notion page. Never transcribed. Worth an OCR pass if it carries rules. |
 
 **Documented fixes that did land** (checked per playbook Pass 1.4, do not re-report): all three items in `2026-08-05-brisket-cn-reliability-design.md` shipped — post-write force refresh (`main.js:105`), food-library tool continuation (`chat.mjs:479-504`), and `centralNodeUpdated` surfaced to chat (`chat-confirm.mjs:179`, `chat-controller.js:475`).
 
@@ -77,9 +77,9 @@ Chadwick programmed without checking whether the body changed. Brisket **records
 
 **What is he actually for?** The evidence in CN Long-Term Trends is unambiguous and it is not macro arithmetic:
 
-> "Feast-or-famine cycle persists on unstructured days… protein target met Tue–Fri (structured Redacted + supplements) but missed Sat–Sun when eating out… Homemade/structured meals outperform fast food on every metric. **The barrier was energy and infrastructure, not skill.**… choice architecture… modifying the food environment is more effective than relying on willpower."
+> "Feast-or-famine cycle persists on unstructured days… protein target met Tue–Fri (structured meal kit + supplements) but missed Sat–Sun when eating out… Homemade/structured meals outperform fast food on every metric. **The barrier was energy and infrastructure, not skill.**… choice architecture… modifying the food environment is more effective than relying on willpower."
 
-The failure mode is structural, weekend-shaped, and already diagnosed. The protocol's Psychology & behaviour section is genuinely good and already says this ("Coach the setup, not just the target"). But the two facts that make it actionable — Redacted is the working infrastructure, weekends are the vulnerability — are in a section he never receives. **He is the environment engineer for a person whose environment he cannot see.**
+The failure mode is structural, weekend-shaped, and already diagnosed. The protocol's Psychology & behaviour section is genuinely good and already says this ("Coach the setup, not just the target"). But the two facts that make it actionable — meal kit is the working infrastructure, weekends are the vulnerability — are in a section he never receives. **He is the environment engineer for a person whose environment he cannot see.**
 
 **Is the goal measurable, and is anyone measuring it?** Twice over, and no:
 - Polyphenol day total: computed, displayed, never sent to him.
@@ -112,7 +112,7 @@ The failure mode is structural, weekend-shaped, and already diagnosed. The proto
 | 5 | **Stop generating Chadwick→Brisket Day Type lines, and purge the backlog.** Day Type is already derived in code. | Removes ~15 stale instructions from every turn and unblocks the Cross-Agent channel for real signal. | small | confirm live CN |
 | 6 | **Post the first Hammond→Brisket directive** — and give Hammond a trigger for it (e.g. on his periodic audit, distil one nutrition pattern). | Makes fiction 4 real. Without it, "patterns are Hammond's job" means patterns are nobody's job. | med | 5 (channel must be readable) |
 | 7 | **Cache judgment on the Food Library entry and print it.** Add `polyphenol_score` + `omega3` to `PROMPT_SUMMARY_FIELDS`; add `emulsifiers: []` / `emulsifier_flag` to the schema and the prompt line. | Consistent scoring across repeat logs, restores Notion's emulsifier memory, and reduces search pressure (see move 9). | small–med | — |
-| 8 | **Restore the two dropped environment facts** to the protocol: Redacted as the dinner default and fat-control anchor; "Adam hates batch cooking — never suggest it." | The protocol tells him to coach the setup; these are the setup. | 3 lines | — |
+| 8 | **Restore the two dropped environment facts** to the protocol: meal kit as the dinner default and fat-control anchor; "Adam hates batch cooking — never suggest it." | The protocol tells him to coach the setup; these are the setup. | 3 lines | — |
 | 9 | **Fix the Food Library prompt slice** — take the *most recently verified* 200, not the first 200. | Silent future failure, wrong direction. | 1 line | — |
 | 10 | **Give the forward plan a surface.** Either rename the Nutrition panel to what it is (last meal verdict) or let Brisket write a short forward gameplan that persists to it. | Job #4 currently has nowhere to land. | med | design decision |
 | 11 | **Make Flags additive or per-agent**, so a skincare log doesn't erase the day's meal verdict. | Affects every agent, not just Brisket. | med | cross-agent |

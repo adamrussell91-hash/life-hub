@@ -1,5 +1,7 @@
 import type { Attachment, Page, PageManifestEntry } from "../domain/page";
 import type { ResearchResult } from "../research/schema";
+import type { UniversityCatalogue } from "../university/timeline/types";
+import type { NotesPlace } from "../origin/notesPlace";
 import { API_BASE } from "./config";
 import { readApiError, searchHits, sessionAuthenticated, unwrapApiPayload } from "./envelope";
 import { localGetPage, localListPages, localSearchPages } from "./localData";
@@ -322,6 +324,18 @@ export function getPodcastAudioUrl(episodeId: string, turnId: string) {
     `/podcast/${encodeURIComponent(episodeId)}/audio/${encodeURIComponent(turnId)}`,
   );
 }
+
+export interface PrivateSourcesResponse {
+  catalogue: UniversityCatalogue | null;
+  unitDegrees: Record<string, string>;
+  originLabels?: { aliases?: Record<string, string>; dropped?: string[] };
+  notesPlace?: Partial<NotesPlace> | null;
+  status: "ready" | "unavailable";
+}
+
+/** The private university timeline, unit → degree map, label rules and notes-place map. */
+export const getPrivateSources = (): Promise<PrivateSourcesResponse> =>
+  apiFetch<PrivateSourcesResponse>("/private-sources");
 
 export async function savePage(page: Page): Promise<Page> {
   if (USE_LOCAL_DATA) {

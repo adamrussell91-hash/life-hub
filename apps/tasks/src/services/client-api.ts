@@ -308,7 +308,7 @@ export const tasksApi = {
       return result;
     }),
 
-  /** Shared by the stall review loop and Redacted's closure loop (same ReviewLog store). */
+  /** Shared by the stall review loop and Partner's closure loop (same ReviewLog store). */
   listReviewLogs: () =>
     apiGet<{ reviews: import('@/schemas/templates').ReviewLog[] }>('/api/reviews').then(
       (r) => r.reviews

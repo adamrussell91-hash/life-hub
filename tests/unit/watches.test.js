@@ -1,25 +1,33 @@
 /**
- * Aesthetics › Dress › Watches: Notion import, today's pick, the price radar and its weekly pass.
+ * Aesthetics › Dress › Watches: tracker import, today's pick, the price radar and its weekly pass.
+ * Runs on a synthetic fixture: the real watch tracker is private.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesthetics.js';
+import { setFragranceSource } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 import { LOOKS } from '../../apps/life/js/app/aesthetics/dress-looks.js';
 import {
-  WATCHES, freshTags, groupByModel, isOwned, isTrackable, isWanted, pingsFrom, radarCoverage,
+  WATCHES, WATCH_HUNT, freshTags, setWatchSource, groupByModel, isOwned, isTrackable, isWanted, pingsFrom, radarCoverage,
   radarItems, radiusFor, rankForLook, zoneFor
 } from '../../apps/life/js/app/aesthetics/watch-model.js';
 import { priceFromJsonLd, priceFromMeta, priceFromShopifyJson, readShopPrice, shopifyCurrency } from '../../netlify/functions/_shared/watch-price.mjs';
-import { RADAR_KEY, TARGETS_KEY, radarWatchList, runWatchRadar } from '../../netlify/functions/_shared/watch-radar.mjs';
+import { RADAR_KEY, TARGETS_KEY, WATCHES_PATH, loadPrivateWatches, radarModelKeys, radarWatchList, runWatchRadar, saveTarget } from '../../netlify/functions/_shared/watch-radar.mjs';
 import { PUSH_SUBSCRIPTIONS_KEY } from '../../netlify/functions/_shared/push.mjs';
 import { createWatchRadarHandler } from '../../netlify/functions/watch-radar.mjs';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 
+// The fragrance library is private; the Dress tab runs on the synthetic fixture.
+setFragranceSource(JSON.parse(readFileSync(new URL('../fixtures/aesthetics/fragrance-source.json', import.meta.url), 'utf8')));
+const WATCH_FIXTURE = JSON.parse(readFileSync(new URL('../fixtures/aesthetics/watches.json', import.meta.url), 'utf8'));
+setWatchSource(WATCH_FIXTURE);
+const loadWatches = async () => WATCHES;
+
 const owned = WATCHES.filter(isOwned);
 const wanted = WATCHES.filter(isWanted);
-const NEUTRA = 'Fossil Neutra Chronograph';
+const NEUTRA = 'Exemplar Neutral Chronograph';
 const lookNamed = vibe => LOOKS.find(l => l.vibe === vibe);
 
 function memoryStore(seed = []) {
@@ -31,26 +39,38 @@ function memoryStore(seed = []) {
   };
 }
 
-test('the Notion import keeps every titled watch and its recorded values', () => {
-  assert.equal(WATCHES.length, 27, 'the untitled empty row is left out');
-  assert.equal(owned.length, 7);
-  assert.equal(wanted.length, 20);
-  const blue = WATCHES.find(w => w.name === 'Fossil Townsman Automatic – Blue Dial / Brown');
-  assert.equal(blue.mm, 44);
-  assert.equal(blue.source.properties['Reference Number'], 'ME3110');
+test('the tracker import keeps every titled watch and its recorded values', () => {
+  assert.equal(WATCHES.length, 11, 'the untitled empty row is left out');
+  assert.equal(owned.length, 3);
+  assert.equal(wanted.length, 7, 'passed watches leave the wishlist');
+  const blue = WATCHES.find(w => w.name === 'Exemplar Townsend Automatic – Blue Dial / Brown');
+  assert.equal(blue.mm, 41);
+  assert.equal(blue.source.properties['Reference Number'], 'EX-1001');
   assert.deepEqual(blue.markers, ['Applied', 'Roman', 'Baton']);
-  const citizen = WATCHES.find(w => w.name.startsWith('Citizen Quartz Day Date'));
-  assert.equal(citizen.mm, null, 'no invented case size');
+  const quartz = WATCHES.find(w => w.name.startsWith('Samplewerk Quartz Day Date'));
+  assert.equal(quartz.mm, null, 'no invented case size');
+});
+
+test('the watch list starts empty until the private tracker is installed', () => {
+  try {
+    assert.deepEqual(setWatchSource({}), []);
+    assert.equal(WATCHES.length, 0);
+    assert.equal(WATCH_HUNT, null);
+    setWatchSource({ watches: WATCH_FIXTURE.watches, hunt: { brief: ['no title'] } });
+    assert.equal(WATCH_HUNT, null, 'a malformed hunt reads as no hunt');
+  } finally {
+    setWatchSource(WATCH_FIXTURE);
+  }
 });
 
 test('colourways share a model; only real product pages are trackable', () => {
   const groups = groupByModel(wanted);
   assert.equal(groups.find(g => g.key === NEUTRA).items.length, 3);
-  assert.equal(groups.length, 18);
-  assert.equal(isTrackable('https://www.behrenswatches.shop'), false);
-  assert.equal(isTrackable('https://en.seagullwatch.com/collections/1963'), false);
-  assert.equal(isTrackable('https://thomas-earnshaw.com/products/es-8006-0a-longitude'), true);
-  assert.deepEqual(radarCoverage(wanted), { tracked: 9, homepage: 5, missing: 6, total: 20 });
+  assert.equal(groups.length, 5);
+  assert.equal(isTrackable('https://www.samplewerk.example'), false);
+  assert.equal(isTrackable('https://chrono.example/collections/1963'), false);
+  assert.equal(isTrackable('https://fictiva.example/products/longitude'), true);
+  assert.deepEqual(radarCoverage(wanted), { tracked: 3, homepage: 2, missing: 2, total: 7 });
 });
 
 test('radar zones and radius are continuous across the rings', () => {
@@ -73,15 +93,15 @@ test('today’s watch matches the leather and echoes the outfit', () => {
 });
 
 test('fresh tags name what nothing in the box does yet', () => {
-  const behrens = WATCHES.find(w => w.name === 'Behrens Original Moonphase');
-  assert.deepEqual(freshTags(behrens, owned), ['Moonphase']);
-  const earnshaw = WATCHES.find(w => w.name.startsWith('Thomas Earnshaw'));
-  assert.ok(freshTags(earnshaw, owned).includes('British'));
+  const moon = WATCHES.find(w => w.name === 'Samplewerk Original Moonphase');
+  assert.deepEqual(freshTags(moon, owned), ['Moonphase']);
+  const heritage = WATCHES.find(w => w.name.startsWith('Fictiva Longitude'));
+  assert.ok(freshTags(heritage, owned).includes('British'));
 });
 
 test('radar items take the cheapest checked colourway and fall back to Notion', () => {
   const groups = groupByModel(wanted);
-  const cream = WATCHES.find(w => w.name.includes('Neutra Chronograph – Cream'));
+  const cream = WATCHES.find(w => w.name.includes('Neutral Chronograph – Cream'));
   const before = radarItems(groups).find(i => i.key === NEUTRA);
   assert.equal(before.live, false);
   assert.equal(before.price, 269, 'first priced colourway from Notion');
@@ -154,9 +174,26 @@ test('the weekly pass records AUD readings, keeps failures and notifies once per
 });
 
 test('the radar list only includes wanted watches with product pages', () => {
-  const list = radarWatchList();
-  assert.equal(list.length, 9);
+  const list = radarWatchList(WATCHES);
+  assert.equal(list.length, 3);
   assert.ok(list.every(w => isTrackable(w.url)));
+  assert.equal(radarWatchList().length, 0, 'no watches until the private list is passed in');
+});
+
+test('the server reads the watch tracker from the private repo', async () => {
+  const reads = [];
+  const read = async (path) => { reads.push(path); return WATCH_FIXTURE; };
+  const watches = await loadPrivateWatches({ env: {}, read });
+  assert.deepEqual(reads, [WATCHES_PATH]);
+  assert.equal(watches.length, 11);
+  assert.ok(radarModelKeys(watches).has(NEUTRA));
+  await assert.rejects(saveTarget(memoryStore(), NEUTRA, 200), /unavailable/, 'no key list, no save');
+});
+
+test('the weekly pass loads the private list when none is given, and fails loudly without it', async () => {
+  const store = memoryStore();
+  await assert.rejects(runWatchRadar({ store, fetchImpl: async () => { throw new Error('offline'); }, rates: { getRate: async () => ({ rate: 1 }) }, env: {} }));
+  assert.equal(store.data.has(RADAR_KEY), false, 'a failed load leaves the radar untouched');
 });
 
 // ---------------- endpoint ----------------
@@ -172,13 +209,13 @@ const req = (method = 'GET', body) => new Request('https://api.example/api/watch
 
 test('/api/watch-radar returns readings and saves only valid buy prices', async () => {
   const store = memoryStore([[RADAR_KEY, { readings: { x: { aud: 1 } }, lastRun: '2026-10-10T21:00:00Z' }]]);
-  const handler = createWatchRadarHandler({ env: ENV, now: () => NOW, getContentStore: async () => store });
+  const handler = createWatchRadarHandler({ env: ENV, now: () => NOW, getContentStore: async () => store, loadWatches });
   const got = await (await handler(req())).json();
   assert.equal(got.data.lastRun, '2026-10-10T21:00:00Z');
   assert.deepEqual(got.data.targets, {});
   assert.equal((await handler(req('PUT', { key: NEUTRA, target: 200 }))).status, 200);
   assert.deepEqual(store.data.get(TARGETS_KEY), { [NEUTRA]: 200 });
-  assert.equal((await handler(req('PUT', { key: 'Rolex Daytona', target: 200 }))).status, 400);
+  assert.equal((await handler(req('PUT', { key: 'Unknown Example Model', target: 200 }))).status, 400);
   assert.equal((await handler(req('PUT', { key: NEUTRA, target: -5 }))).status, 400);
   assert.equal((await handler(req('PUT', { key: NEUTRA, target: null }))).status, 200);
   assert.deepEqual(store.data.get(TARGETS_KEY), {});
@@ -208,27 +245,30 @@ test('Dress switches between Looks and Watches and remembers the choice', async 
 
 test('Watches renders the box, every record, the radar and the hunt', async () => {
   const doc = await renderWatches();
-  assert.equal(doc.querySelectorAll('#aes-box .aes-slot').length, 7);
-  assert.equal(doc.querySelectorAll('#aes-watch-records [data-watch-id]').length, 27);
-  assert.equal(doc.querySelectorAll('#aes-radar-dial .aes-blip').length, 18);
-  assert.equal(doc.querySelectorAll('#aes-radar-dial .aes-blip[data-zone="untracked"]').length, 9);
-  assert.equal(doc.querySelectorAll('#aes-hunt-checks input').length, 10);
+  assert.equal(doc.querySelectorAll('#aes-box .aes-slot').length, 3);
+  assert.equal(doc.querySelectorAll('#aes-watch-records [data-watch-id]').length, 11);
+  assert.equal(doc.querySelectorAll('#aes-radar-dial .aes-blip').length, 5);
+  assert.equal(doc.querySelectorAll('#aes-radar-dial .aes-blip[data-zone="untracked"]').length, 3);
+  assert.equal(doc.querySelector('#aes-hunt-card').hidden, false);
+  assert.equal(doc.querySelector('#aes-hunt-title').textContent, 'The example watch hunt');
+  assert.equal(doc.querySelector('#aes-hunt-when').textContent, 'Sample City, some month');
+  assert.equal(doc.querySelectorAll('#aes-hunt-checks input').length, 3);
   assert.match(doc.querySelector('#aes-radar-status').textContent, /out of reach/);
   assert.ok(doc.querySelector('#aes-wrist-name').textContent.length > 0);
-  const citizen = [...doc.querySelectorAll('#aes-watch-records details')].find(d => d.textContent.includes('cal. 2500'));
-  assert.equal(citizen.querySelector('[data-source-field="Case Diameter mm"]').textContent, 'Not recorded');
+  const quartz = [...doc.querySelectorAll('#aes-watch-records details')].find(d => d.textContent.includes('cal. 9000'));
+  assert.equal(quartz.querySelector('[data-source-field="Case Diameter mm"]').textContent, 'Not recorded');
 });
 
 test('live readings move a watch, and a new buy price is saved to the server', async () => {
-  const cream = WATCHES.find(w => w.name.includes('Neutra Chronograph – Cream'));
+  const cream = WATCHES.find(w => w.name.includes('Neutral Chronograph – Cream'));
   const saves = [];
   const api = {
-    load: async () => ({ lastRun: '2026-10-04T21:00:00Z', targets: {}, readings: { [cream.id]: { amount: 174, currency: 'AUD', aud: 174, host: 'fossil.com', checkedAt: '2026-10-04T21:00:00Z', history: [{ at: '2026-09-27T21:00:00Z', aud: 249 }, { at: '2026-10-04T21:00:00Z', aud: 174 }] } } }),
+    load: async () => ({ lastRun: '2026-10-04T21:00:00Z', targets: {}, readings: { [cream.id]: { amount: 174, currency: 'AUD', aud: 174, host: 'exemplar.example', checkedAt: '2026-10-04T21:00:00Z', history: [{ at: '2026-09-27T21:00:00Z', aud: 249 }, { at: '2026-10-04T21:00:00Z', aud: 174 }] } } }),
     setTarget: async (key, target) => { saves.push([key, target]); return {}; }
   };
   const doc = await renderWatches({ api });
   assert.match(doc.querySelector('#aes-radar-status').textContent, /Shops last checked/);
-  assert.match(doc.querySelector('#aes-radar-card').textContent, /Fossil Neutra Chronograph/, 'the watch at its price is selected first');
+  assert.match(doc.querySelector('#aes-radar-card').textContent, /Exemplar Neutral Chronograph/, 'the watch at its price is selected first');
   assert.match(doc.querySelector('#aes-radar-card').textContent, /A\$174/);
   assert.match(doc.querySelector('#aes-radar-pings').textContent, /down to A\$174 from A\$249\. Under your price\./);
   const slider = doc.querySelector('#aes-radar-target');

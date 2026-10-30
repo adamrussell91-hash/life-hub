@@ -80,7 +80,7 @@ To retune the colours, edit `FAMILIES` in the build script and re-run it. Every 
 ## Still provisional / not done
 
 - The weights are the comparison prototype's design weights. They have not been fitted or evaluated. The band is illustrative, not calibrated. Prospective evaluation and chronological holdouts (see `algorithm.md`) still need to be built from the stored snapshot and observation pairs once enough mornings exist.
-- No predicted Redacted/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
+- No predicted Partner/social lift yet. The weather and explanation code supports one (`lifts`, state 7), but nothing in the stored data supports it yet, so none is shown.
 - `tests/browser/dial-visual.spec.mjs` (in `DIAL_APP=1` mode) and the calendar reference mock-ups still quote the old fixture values (34% Thursday). The fixture day now reads 51 by design. That spec is not in the default browser run, and its header says not to edit it, so this is flagged in the PR instead.
 
 ## Agent insights (offer first, Adam decides)
@@ -123,12 +123,12 @@ Built from `mockups/dial-complications.html` (first committed with #682, which m
 |---|---|---|
 | Tool watch | School days | Weather ring (today), dive bezel, moon phase |
 | Focus | Today, while a tracked work session is running | Retrograde tally, dive bezel; everything but the current block steps back |
-| Pilot GMT | A Travel trip covers the day | GMT hand (trip city), Redacted hand, dive bezel |
+| Pilot GMT | A Travel trip covers the day | GMT hand (trip city), Partner hand, dive bezel |
 | Dress watch | Weekends and school holidays | None: lacquer and gold, readiness as one gold arc |
 | Grand complication | A big day: wedding, ceremony or graduation on the calendar, or the anniversary (13 July) | Dive bezel, moon, tourbillon, GMT hand, countdown plaque |
 
 - Change face with the arrows, the dots or a sideways swipe on the dial. A face picked by hand sticks on that device until **Auto** is tapped.
 - Tap the centre to turn the watch over: the caseback shows today's outlook (score, why, hourly chart, windows).
-- Data: weather ring = today's readiness projection; bezel = logged dexy doses (the log moves off the inner medication ring on bezel faces; skipped/unlogged gaps stay there); moon = committed hours in the shown week (30 h = full); tally = today's tasks closed; tourbillon spins while Clare or Hammond has a pending change on the day; GMT/Redacted = Travel trips (`/api/travel-trips`, `/api/travel-trip`).
+- Data: weather ring = today's readiness projection; bezel = logged stimulant doses (the log moves off the inner medication ring on bezel faces; skipped/unlogged gaps stay there); moon = committed hours in the shown week (30 h = full); tally = today's tasks closed; tourbillon spins while Clare or Hammond has a pending change on the day; GMT/Partner = Travel trips (`/api/travel-trips`, `/api/travel-trip`).
 - Deviations from the mockup: the dial itself stays on Sydney time on Pilot GMT (the second hand shows the trip city). The wedding has happened, so Grand triggers on big days instead of one date.
 - Code: `js/calendar/dial-faces.js` (pure), `js/calendar/dial-complications.js` (drawing), wired in `render-day-dial.js`; styles at the end of `calendar-day-dial.css`. Tests: `tests/unit/dial-faces.test.js`.

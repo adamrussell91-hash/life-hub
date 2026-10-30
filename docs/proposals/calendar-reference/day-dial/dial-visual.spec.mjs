@@ -86,7 +86,7 @@ test('dial phase 2: the day, its capacity, tonight and tomorrow come from the mo
     assert.equal(await page.locator('[data-part="gauge"]').getAttribute('data-pct'), '34');
     assert.match(await page.locator('[data-part="time-left-label"]').textContent(), /3 h 55 m that's yours/);
     assert.deepEqual(await page.locator('[data-part="tonight"] [data-part="row"]').evaluateAll(n => n.map(x => x.dataset.title)),
-      ['Workout · upper body', 'Dinner', 'Tea + TV with Redacted', 'Wind down → lights out 10:00 pm']);
+      ['Workout · upper body', 'Dinner', 'Tea + TV with Partner', 'Wind down → lights out 10:00 pm']);
     assert.match(await page.locator('[data-part="tonight"]').textContent(), /Nothing logged since breakfast \(no lunch\)/);
     assert.match(await page.locator('[data-part="tomorrow-headline"]').textContent(), /Forecast 52%.*Last day T3.*One big thing and 2 classes, then holidays for 17 days\./s);
     assert.equal(await page.locator('[data-part="week"] button').count(), 7);
@@ -105,8 +105,8 @@ test('dial phase 2: noon is up, time runs clockwise, and each arc sits at its ti
     const near = (a, b, tol) => { const d = Math.abs(a - b); return Math.min(d, 2 * Math.PI - d) <= tol; };
     const gastro = await boxOf(page, '[data-id="gastro"].dd-arc');
     assert.ok(near(angleFromTop(c, gastro), angleForHour(13.75), 0.25), 'the 1:15 pm appointment is just right of noon');
-    const Redacted = await boxOf(page, '[data-id="thu-Redacted"].dd-arc');
-    assert.ok(near(angleFromTop(c, Redacted), angleForHour(20.5), 0.25), 'Redacted’s evening is on the lower right');
+    const partner = await boxOf(page, '[data-id="thu-partner"].dd-arc');
+    assert.ok(near(angleFromTop(c, partner), angleForHour(20.5), 0.25), 'Partner’s evening is on the lower right');
     const hand = await page.locator('[data-part="now-hand"]').evaluate(n => ({ x: +n.getAttribute('x2'), y: +n.getAttribute('y2') }));
     const svgBox = await page.locator('[data-part="dial"]').evaluate(s => { const r = s.getBoundingClientRect(); return { left: r.left, top: r.top }; });
     assert.ok(near(angleFromTop(c, { x: svgBox.left + hand.x, y: svgBox.top + hand.y }), angleForHour(NOW_H), 0.03), 'the hand points at 6:05 pm');

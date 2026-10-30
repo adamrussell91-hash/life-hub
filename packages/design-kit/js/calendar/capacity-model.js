@@ -44,13 +44,13 @@ export function capacityForDates(events, dateKeys, { isHoliday = () => false, to
 }
 
 /**
- * Hours of commitment that draw on capacity. Class time, protected time (Redacted, walls)
+ * Hours of commitment that draw on capacity. Class time, protected time (Partner, walls)
  * and logs do not count; appointments, meetings, PD, marking and workouts do.
  * items: [{ start, end, kind, protected?, isClass?, ghost? }] with start/end in hours.
  */
 export function dayLoadHours(items) {
   return (items ?? [])
-    .filter(i => !i.isClass && !i.protected && !i.ghost && i.kind !== 'Redacted' && i.kind !== 'log')
+    .filter(i => !i.isClass && !i.protected && !i.ghost && i.kind !== 'partner' && i.kind !== 'log')
     .reduce((sum, i) => sum + Math.max(0, i.end - i.start), 0);
 }
 

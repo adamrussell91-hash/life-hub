@@ -8,7 +8,7 @@ import {
   appendProduct,
   retireProduct
 } from '../../apps/life/js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES } from '../fixtures/skincare-routines.mjs';
 
 test('SKINCARE_CATALOG_PATH is the GitHub blob path', () => {
   assert.equal(SKINCARE_CATALOG_PATH, 'data/skincare/routine-catalog.json');

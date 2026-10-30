@@ -520,7 +520,7 @@ Desktop-perfect Uppy Dashboard with terrible mobile capture = failure.
 1. Mobile `+` → Voice.  
 2. wavesurfer records.  
 3. Whisper (or Knowledge worker path generalized).  
-4. “Remind me to email Mary-anne” → Tasks confirm-card.  
+4. “Remind me to email Pat” → Tasks confirm-card.  
 5. Clare can later reference the task; audio kept as provenance.
 
 ### Journey 5 — Agent place pick
@@ -622,7 +622,7 @@ curl -sI https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js → 200
 
 **Browser demos (manual, local http://127.0.0.1:8765):**
 - Capture: paste Maps URL → classified `url/maps` → suggest Life `place`
-- MapLibre: OpenFreeMap tiles load; focus North Shore Private Hospital flyTo + popup
+- MapLibre: OpenFreeMap tiles load; focus Example Private Hospital flyTo + popup
 - PhotoSwipe: gallery opens lightbox with full image (local assets; remote Unsplash hotlink failed earlier)
 - Media Chrome: Copy timestamp link → `?t=0` confirmation
 

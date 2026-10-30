@@ -5,7 +5,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Date:** 2026-08-11
-**Repo:** `/Users/example/Documents/Claude/Projects/life-hub` (branch off `main`)
+**Repo:** `/Users/you/Documents/Claude/Projects/life-hub` (branch off `main`)
 **Deploy rule:** Local commits only. **Never `git push`.** Adam pushes himself.
 **Spec:** `docs/superpowers/specs/2026-08-11-hammond-closed-loop-design.md` — read that first; this plan implements it move-by-move and does not repeat its rationale.
 **Precedent:** Build discipline follows `docs/superpowers/plans/2026-08-11-chadwick-closed-loop.md` (all 6 phases shipped 2026-08-11, `docs/IMPLEMENTATION_STATUS.md` Phases 21–26).

@@ -20,7 +20,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-19-problem-solver-full-process-design.md`: Build order items 10 (Record and filmstrips), 12 (Final-words pass and the extended live evaluation) and 13 (Playwright walks, `pre-pr-check`, PR ready with auto-merge); Experience 9–10; Testing. It also covers the hooks at the end of Plans 6, 7 and 8.
 
-**Worktree and branch:** `/Users/example/Projects/life-hub-ps-lightning`, branch `claude/problem-solver-document` (Plans 7 and 8 are on it). Never use `/Users/example/Projects/life-hub-ps-process`, which another session now uses, and never touch `/Users/example/Projects/life-hub`.
+**Worktree and branch:** `/Users/you/Projects/life-hub-ps-lightning`, branch `claude/problem-solver-document` (Plans 7 and 8 are on it). Never use `/Users/you/Projects/life-hub-ps-process`, which another session now uses, and never touch `/Users/you/Projects/life-hub`.
 
 **Commands used throughout:**
 - All root Problem Solver tests: `node --import ./scripts/test-network-guard.mjs --test tests/unit/problem-solver-*.test.js`
@@ -28,7 +28,7 @@
 - Type gate: `cd apps/tasks && npx tsc --noEmit -p . 2>&1 | grep "error TS" | grep -v TS6059 | grep -i -E "problem-solver|page-editor"` must print nothing.
 - Preview with audit: `PS_PREVIEW_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" node scripts/problem-solver-preview.mjs <name> "$PS_SCRATCH/preview" --audit`
 - Browser walks: the throwaway config `$PS_SCRATCH/ps-playwright-ltn.config.mjs` (points at this worktree, system Chrome, port 5187, `reuseExistingServer: false`).
-  - This worktree has no `@playwright/test` installed. Run it from `apps/tasks` with `/Users/example/Projects/life-hub-ps-process/apps/tasks/node_modules/.bin/playwright test -c <config>`.
+  - This worktree has no `@playwright/test` installed. Run it from `apps/tasks` with `/Users/you/Projects/life-hub-ps-process/apps/tasks/node_modules/.bin/playwright test -c <config>`.
   - For the run only, add a symlink at `apps/tasks/node_modules/@playwright/test` pointing to that worktree's package (the folder is git-ignored), and remove it afterwards. Do not commit the config.
 
 ---

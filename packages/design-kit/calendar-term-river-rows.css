@@ -24,7 +24,7 @@
 .tr-rows__item.is-reading-title .tr-rows__title-text{width:max-content;overflow:visible;animation:tr-title-read var(--tr-title-duration,4s) ease-in-out 1 forwards}
 @keyframes tr-title-read{0%,15%{transform:translateX(0)}85%,100%{transform:translateX(var(--tr-title-shift,0))}}
 @media(prefers-reduced-motion:reduce){.tr-rows__item.is-reading-title .tr-rows__title-text{width:max-content;overflow:visible;animation:none}}
-.tr-rows__lane.is-Redacted .tr-rows__marker{background:var(--pastel-peach-ink);border-color:var(--pastel-peach-ink)}
+.tr-rows__lane.is-partner .tr-rows__marker{background:var(--pastel-peach-ink);border-color:var(--pastel-peach-ink)}
 .tr-rows__lane.is-scholar .tr-rows__marker{background:var(--pastel-gold);border-color:var(--pastel-gold-ink)}
 .tr-rows__lane.is-friends .tr-rows__marker{background:var(--pastel-sage);border-color:var(--pastel-sage-ink)}
 .tr-rows__lane.is-body .tr-rows__marker{background:var(--paper);border-color:var(--high-sea-ink)}

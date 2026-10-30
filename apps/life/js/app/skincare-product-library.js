@@ -243,30 +243,13 @@ export function groupProductsByCategory(products) {
   return ordered;
 }
 
-/** Exact names from hardcoded AM/PM defaults → category. */
-const KNOWN_DEFAULT_CATEGORIES = {
-  'Azclear Azelaic Acid 20%': 'Treatment',
-  'Korres Greek Yoghurt Probiotic Gel Cream': 'Moisturiser',
-  'La Roche Posay Anthelios SPF 50+': 'Sunscreen',
-  'Dr Jart+ Cicapair Colour Corrector': 'Makeup',
-  'Maybelline Green and Peach Correctors with BareMinerals Concealer': 'Makeup',
-  'Kosas Cloud Set Translucent Loose Setting and Blurring Powder': 'Makeup',
-  'Dr.G Green Deep Pore Cleansing Balm': 'Cleanser',
-  'Korres Greek Yoghurt Foaming Cream Cleanser': 'Cleanser',
-  Toner: 'Toner',
-  'Retrieve Tretinoin 0.05% (sandwich method)': 'Treatment',
-  'La Roche Posay Cicaplast B5+': 'Moisturiser',
-  'Avene Cicalfate+': 'Moisturiser'
-};
-
 /**
  * Best-effort category for seed/fallback/create when the shelf has no category yet.
- * Prefer exact default-name matches, then light name heuristics; else Other.
+ * Light name heuristics; else Other.
  */
 export function defaultCategoryForProductName(name) {
   const trimmed = typeof name === 'string' ? name.trim() : '';
   if (!trimmed) return 'Other';
-  if (KNOWN_DEFAULT_CATEGORIES[trimmed]) return KNOWN_DEFAULT_CATEGORIES[trimmed];
   const lower = trimmed.toLowerCase();
   if (/\bspf\b/.test(lower) || lower.includes('sunscreen') || lower.includes('superscreen')) {
     return 'Sunscreen';
@@ -276,7 +259,7 @@ export function defaultCategoryForProductName(name) {
   }
   if (lower.includes('toner') || lower.includes('essence')) return 'Toner';
   if (lower.includes('serum')) return 'Serum';
-  if (lower.includes('tretinoin') || lower.includes('azelaic') || lower.includes('retinol')) {
+  if (lower.includes('tretinoin') || lower.includes('azelaic') || lower.includes('retinol') || lower.includes('retinoid')) {
     return 'Treatment';
   }
   if (

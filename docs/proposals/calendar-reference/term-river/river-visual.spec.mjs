@@ -23,7 +23,7 @@ const OUT = path.join(REPO, 'docs/proposals/calendar-reference/term-river/compar
 fs.mkdirSync(OUT, { recursive: true });
 
 const BOB_RECEIPT = 'Hammond → Life: “Lunch with Bob”, Mon 28/09 12:00 pm–2:00 pm, tentative and protected. Hammond→Clare: keep it clear.';
-const TRIP_RECEIPT = 'Hammond → Life: “Blue Mountains day trip” with Redacted, Thu 08/10 9:00 am–6:00 pm, tentative and protected.';
+const TRIP_RECEIPT = 'Hammond → Life: “Blue Mountains day trip” with Partner, Thu 08/10 9:00 am–6:00 pm, tentative and protected.';
 
 let browser;
 let server;
@@ -107,9 +107,9 @@ test('river phase 2: lanes, week labels and load come from the modules', async (
     assert.match(await page.locator('[data-part="period"] b').textContent(), /^Term 3 → Term 4/);
     assert.match(await page.locator('[data-part="period"] span').textContent(), /T3 W9 – T4 W3/);
     assert.equal(await page.locator('[data-part="zoom-pills"] [data-zoom="term"]').getAttribute('aria-pressed'), 'true');
-    assert.deepEqual(await page.locator('[data-part="chart"] [data-part="lane"]').evaluateAll(n => n.map(x => x.dataset.lane)), ['teacher', 'Redacted', 'scholar', 'friends', 'body']);
+    assert.deepEqual(await page.locator('[data-part="chart"] [data-part="lane"]').evaluateAll(n => n.map(x => x.dataset.lane)), ['teacher', 'partner', 'scholar', 'friends', 'body']);
     const lanes = await page.evaluate(() => window.__termRiver.lanes());
-    assert.ok(lanes.Redacted.includes('good-night') && lanes.Redacted.includes('g-day-trip'), 'Redacted time is its own lane');
+    assert.ok(lanes.partner.includes('good-night') && lanes.partner.includes('g-day-trip'), 'Partner time is its own lane');
     assert.ok(lanes.scholar.includes('conferral') && lanes.scholar.includes('uow'), 'study lands in Scholar');
     assert.ok(lanes.friends.includes('g-bob') && lanes.friends.includes('g-newcastle'), 'people land in Friends & family');
     assert.ok(lanes.body.includes('gastro'), 'medical lands in Body');
@@ -122,7 +122,7 @@ test('river phase 2: lanes, week labels and load come from the modules', async (
     const w10 = await page.evaluate(() => window.__termRiver.loads.find(l => l.week === '2026-09-21'));
     assert.equal(w10.booked, 8.5);
     assert.equal(await page.locator('[data-part="load-week"][data-week="2026-11-16"]').getAttribute('data-over'), 'true', 'report week is over capacity');
-    assert.equal(await page.locator('[data-part="wall"]').count(), 1, 'Korea is a wall');
+    assert.equal(await page.locator('[data-part="wall"]').count(), 1, 'the trip is a wall');
     assert.deepEqual(errors, []);
     await shot(page, 'river-term-1280');
   } finally { await context.close(); }
@@ -192,7 +192,7 @@ test('river phase 2: phone is the lanes as lists, and never scrolls sideways', a
   const { context, page } = await open({ width: 390, height: 1500 });
   try {
     assert.equal(await page.locator('[data-part="chart"]').count(), 0, 'no wide chart on a phone');
-    assert.deepEqual(await page.locator('[data-part="lane-list"] [data-part="lane"]').evaluateAll(n => n.map(x => x.dataset.lane)), ['teacher', 'Redacted', 'scholar', 'friends', 'body']);
+    assert.deepEqual(await page.locator('[data-part="lane-list"] [data-part="lane"]').evaluateAll(n => n.map(x => x.dataset.lane)), ['teacher', 'partner', 'scholar', 'friends', 'body']);
     assert.equal(await page.locator('[data-part="lane-list"] [data-part="ghost"]').count(), 3);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     const p = await page.locator('[data-part="period"]').boundingBox();
@@ -230,7 +230,7 @@ test('river phase 3: Term ↔ Year is one continuous tween of the whole chart', 
     const mid = f.find(v => v.t > 0.4 && v.t < 0.6);
     assert.ok(mid && mid.x > x0 && mid.x < x1, 'bars move with the blend, not snapping at the end');
     assert.equal(await page.locator('[data-part="zoom-pills"] [data-zoom="year"]').getAttribute('aria-pressed'), 'true');
-    assert.match(await page.locator('[data-part="period"] b').textContent(), /Korea/);
+    assert.match(await page.locator('[data-part="period"] b').textContent(), /the trip/);
     await page.keyboard.press('+');
     await page.waitForTimeout(800);
     assert.ok(Math.abs(await barX(page, 'accreditation') - x0) < 0.5, 'and back to Term exactly');
@@ -280,7 +280,7 @@ test('river phase 4: a proposal previews what Accept writes; Accept writes it an
   } finally { await context.close(); }
 });
 
-test('river phase 4: the Redacted proposal writes a Redacted block; Dismiss writes nothing', async () => {
+test('river phase 4: the Partner proposal writes a Partner block; Dismiss writes nothing', async () => {
   const { context, page, posts } = await open();
   try {
     await page.locator('[data-part="ghost"][data-id="g-day-trip"]').click();

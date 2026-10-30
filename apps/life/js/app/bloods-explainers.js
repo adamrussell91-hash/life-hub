@@ -39,9 +39,9 @@ const MARKERS = {
     related: ['esr']
   },
   calprotectin: {
-    what: 'Protein from gut white cells. Raised means mucosal inflammation — the Redacted’s signal even when CRP looks calm.',
+    what: 'Protein from gut white cells. Raised means gut mucosal inflammation, which can show even when CRP looks calm.',
     why: 'Tracks mucosal inflammation when systemic markers can look settled.',
-    high: 'Suggests active mucosal inflammation, including Redacted’s activity.',
+    high: 'Suggests active gut mucosal inflammation.',
     low: 'Usually reassuring for mucosal inflammation.',
     related: ['crp', 'esr']
   },
@@ -54,28 +54,28 @@ const MARKERS = {
   },
   ferritin: {
     what: 'Reflects the body\'s stored iron. It can also rise as an inflammation marker, which is why it is read with CRP/ESR.',
-    why: 'Tracked given IBD-related depletion risk.',
+    why: 'Tracked because gut inflammation and some treatments can deplete it.',
     high: 'Can mean iron overload, or can rise simply because ferritin is also an inflammation marker.',
     low: 'An early sign of iron deficiency, often before anaemia shows up.',
     related: ['transferrin', 'transferrin_sat', 'iron']
   },
   transferrin: {
     what: 'The protein that carries iron through the blood.',
-    why: 'Tracked given IBD-related depletion risk.',
+    why: 'Tracked because gut inflammation and some treatments can deplete it.',
     high: 'Often seen with iron deficiency, as the body makes more of it to hunt for scarce iron.',
     low: 'Can reflect inflammation or overload states.',
     related: ['ferritin', 'transferrin_sat', 'iron']
   },
   transferrin_sat: {
     what: 'The percentage of transferrin actually carrying iron.',
-    why: 'Tracked given IBD-related depletion risk.',
+    why: 'Tracked because gut inflammation and some treatments can deplete it.',
     high: 'Possible iron overload.',
     low: 'Possible iron deficiency.',
     related: ['ferritin', 'transferrin', 'iron']
   },
   iron: {
     what: 'The iron currently circulating in blood. It fluctuates through the day so it is read with the other three, not alone.',
-    why: 'Tracked given IBD-related depletion risk.',
+    why: 'Tracked because gut inflammation and some treatments can deplete it.',
     high: 'Possible overload or recent supplementation.',
     low: 'Possible deficiency.',
     related: ['ferritin', 'transferrin', 'transferrin_sat']

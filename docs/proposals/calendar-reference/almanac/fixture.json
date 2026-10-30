@@ -1,8 +1,8 @@
 {
   "ANCHORS": [
     {
-      "id": "korea",
-      "title": "Korea honeymoon",
+      "id": "big-trip",
+      "title": "Overseas holiday",
       "kind": "trip",
       "date": "2026-12-23",
       "returns": "2027-01-10",
@@ -10,7 +10,7 @@
         "international",
         "pets-home-alone",
         "on-biologic",
-        "with-Redacted"
+        "with-partner"
       ],
       "sub": "23/12 – 10/01 · 4 animals home"
     },
@@ -36,17 +36,17 @@
       "tags": [
         "bloods"
       ],
-      "sub": "3–4 months after the 19/06 change"
+      "sub": "a few months after the dose change"
     },
     {
-      "id": "unsw-conferral",
-      "title": "UNSW conferral",
+      "id": "conferral",
+      "title": "Degree conferral",
       "kind": "event",
       "date": "2026-09-30",
       "tags": [
         "graduation"
       ],
-      "sub": "Master of Gifted Education"
+      "sub": "Master's degree"
     },
     {
       "id": "term-4",
@@ -60,12 +60,12 @@
     },
     {
       "id": "dream-study",
-      "title": "Dream · Harvard, Oxford…",
+      "title": "Dream · Study overseas",
       "kind": "dream",
       "tags": [
         "dream"
       ],
-      "sub": "study at one of the four"
+      "sub": "a postgraduate place overseas"
     }
   ],
   "BUSY": [
@@ -108,8 +108,8 @@
     }
   ],
   "HABIT": {
-    "id": "korean",
-    "title": "Korean for travellers",
+    "id": "phrasebook",
+    "title": "Phrasebook for travellers",
     "minutes": 20,
     "perWeek": 3,
     "from": "2026-09-28",
@@ -169,7 +169,7 @@
     {
       "from": "2026-12-23",
       "to": "2027-01-10",
-      "title": "Korea · 23/12 – 10/01"
+      "title": "Away · 23/12 – 10/01"
     }
   ],
   "WORLD": [

@@ -11,12 +11,12 @@ Adam’s `~/Documents` and `~/Desktop` are iCloud Drive. Git objects there go da
 
 | Thing | Path |
 |-------|------|
-| Design kit | `/Users/example/Projects/hub-design-kit` |
-| Teaching Hub | `/Users/example/Teaching Hub` |
-| Knowledge Hub | `/Users/example/Projects/knowledge-hub` |
-| Life Hub | `/Users/example/Projects/life-hub` |
-| Tasks Hub | `/Users/example/Projects/tasks-hub` |
-| New git repos | `/Users/example/Projects/<name>` |
+| Design kit | `~/Projects/hub-design-kit` |
+| Teaching Hub | `~/Teaching Hub` |
+| Knowledge Hub | `~/Projects/knowledge-hub` |
+| Life Hub | `~/Projects/life-hub` |
+| Tasks Hub | `~/Projects/tasks-hub` |
+| New git repos | `~/Projects/<name>` |
 
 If the workspace path contains `/Documents/` or `/Desktop/`: stop. Tell Adam. Relocate to `~/Projects/<name>` (or Teaching Hub), then `move_agent_to_root`. Do not keep editing in place except to finish a move.
 
@@ -29,6 +29,6 @@ If the workspace path contains `/Documents/` or `/Desktop/`: stop. Tell Adam. Re
 
 Teaching, Knowledge, Life, Tasks, and future hubs must **never** need iCloud or any local file to work. Runtime data is git remotes + Cloudflare (Workers, R2, KV, D1). Do not add features that read `~/Documents`, `~/Desktop`, or other machine-local paths in production or as a required fallback.
 
-❌ `/Users/example/Documents/Codex/.../knowledge-hub`  
-❌ `/Users/example/Documents/Claude/Projects/life-hub`  
-✅ `/Users/example/Projects/knowledge-hub`
+❌ `~/Documents/Codex/.../knowledge-hub`  
+❌ `~/Documents/Claude/Projects/life-hub`  
+✅ `~/Projects/knowledge-hub`

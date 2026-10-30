@@ -129,7 +129,7 @@ test('good night lands on the first qualifying evening from findOpenings', () =>
   const goodNight = input.openings.find(o => o.wantId === 'good-night');
   assert.ok(goodNight?.dates?.[0]);
   const ghosts = proposeGhosts(input);
-  const protect = ghosts.find(g => g.kind === 'protect_block' && g.with === 'Redacted');
+  const protect = ghosts.find(g => g.kind === 'protect_block' && g.with === 'partner');
   assert.ok(protect);
   assert.equal(protect.date, goodNight.dates[0]);
   assert.equal(protect.start, '18:00');
@@ -171,13 +171,13 @@ test('fixture ghosts g-skip and g-good block duplicates by meaning, not id', () 
         start: '18:00',
         end: '22:00',
         title: 'Dinner out + a show',
-        with: 'Redacted',
+        with: 'partner',
         status: 'pending'
       }
     ]
   }));
   assert.equal(ghosts.some(g => g.kind === 'skip_workout'), false);
-  assert.equal(ghosts.some(g => g.kind === 'protect_block' && g.with === 'Redacted'), false);
+  assert.equal(ghosts.some(g => g.kind === 'protect_block' && g.with === 'partner'), false);
   // Bedtime still proposed — different meaning.
   assert.ok(ghosts.some(g => g.kind === 'bedtime'));
 });
@@ -210,7 +210,7 @@ test('never proposes into a wall or past 22:00', () => {
   const ghosts = proposeGhosts(baseInput({
     today: '2026-09-27',
     days: ['2026-09-27'],
-    openings: [{ wantId: 'good-night', dates: ['2026-09-27'], title: 'Good night', span: 'evening', with: 'Redacted', pct: 70 }]
+    openings: [{ wantId: 'good-night', dates: ['2026-09-27'], title: 'Good night', span: 'evening', with: 'partner', pct: 70 }]
   }));
   assert.equal(ghosts.some(g => g.date === '2026-09-27'), false);
   assert.equal(bedtimeFromSleep('23:45'), '22:00');

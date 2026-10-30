@@ -94,7 +94,7 @@ test('Today strip: free gaps + You usually meet wording (Phase 7, D1/D2)', () =>
         title: 'Staff briefing',
         scheduled_start: '2026-09-28T08:10:00.000Z',
         scheduled_end: '2026-09-28T08:40:00.000Z',
-        attendees: [{ display_name: 'Fr Ross' }]
+        attendees: [{ display_name: 'Fr Example' }]
       }
     ],
     events: [],

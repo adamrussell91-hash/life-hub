@@ -240,8 +240,8 @@ test('fitness goals track the three named lifts, four-week frequency, and a safe
     events: events([
       volumeSession('2026-08-10', 200, {
         exercises: [
-          { name: 'Bar Press', sets: [{ reps: 9, weight_kg: 45.15 }] },
-          { name: 'Cable Bar Wide Grip Curl', sets: [{ reps: 8, weight_kg: 42 }] },
+          { name: 'Bar Press', sets: [{ reps: 9, weight_kg: 38 }] },
+          { name: 'Cable Bar Wide Grip Curl', sets: [{ reps: 8, weight_kg: 30 }] },
           { name: 'Reverse Wide Grip Bent Over Row', sets: [{ reps: 10, weight_kg: 30 }] }
         ]
       }),
@@ -262,12 +262,12 @@ test('fitness goals track the three named lifts, four-week frequency, and a safe
   assert.deepEqual(charts.map(goal => goal.id), [
     'chest-e1rm', 'arms-e1rm', 'frequency', 'back-e1rm', 'load-consistency'
   ]);
-  assert.deepEqual(charts.filter(goal => goal.kind === 'e1rm').map(goal => goal.target), [65, 60, 47]);
+  assert.deepEqual(charts.filter(goal => goal.kind === 'e1rm').map(goal => goal.target), [55, 45, 50]);
   assert.equal(charts[0].exercise, 'Bar Press');
-  assert.equal(charts[0].current, 58.7);
-  assert.equal(charts[0].remaining, 6.3);
-  assert.equal(charts[0].deadline, '2026-10-31');
-  assert.equal(charts[1].current, 53.2);
+  assert.equal(charts[0].current, 49.4);
+  assert.equal(charts[0].remaining, 5.6);
+  assert.equal(charts[0].deadline, '2027-06-30');
+  assert.equal(charts[1].current, 38);
   assert.equal(charts.find(goal => goal.id === 'back-e1rm').current, 40);
 
   const frequency = charts.find(goal => goal.id === 'frequency');

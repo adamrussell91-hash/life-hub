@@ -18,7 +18,7 @@ function visit(overrides = {}) {
 
 test('medicalVisitNotes keeps the consult body when the property note is only a billing line', () => {
   const billing = 'Level C consultation. Fee $150.';
-  const consult = `${billing}\n\nPlan: iron infusion today. Ferritin is an acute phase reactant.`;
+  const consult = `${billing}\n\nPlan: infusion today. Ferritin is an acute phase reactant.`;
   assert.equal(medicalVisitNotes(billing, consult), consult);
   assert.equal(medicalVisitNotes(billing, ''), billing);
   assert.equal(medicalVisitNotes('', consult), consult);
@@ -44,8 +44,8 @@ test('medicalVisitNotes keeps the consult body when the property note is only a 
 
 test('mapsUrl encodes a place and returns null for telehealth', () => {
   assert.equal(
-    mapsUrl({ location: '26 Ridge St, North Sydney', location_kind: 'place' }),
-    'https://www.google.com/maps/search/?api=1&query=26%20Ridge%20St%2C%20North%20Sydney'
+    mapsUrl({ location: '1 Example St, Exampleton', location_kind: 'place' }),
+    'https://www.google.com/maps/search/?api=1&query=1%20Example%20St%2C%20Exampleton'
   );
   assert.equal(mapsUrl({ location: 'Zoom', location_kind: 'telehealth' }), null);
 });
@@ -56,7 +56,7 @@ test('buildMedicalModel puts upcoming farthest-first above today and past newest
     events: [
       visit({ id: 'past-old', date: '2026-01-01', title: 'Old' }),
       visit({ id: 'past-new', date: '2026-08-01', title: 'Recent' }),
-      visit({ id: 'next', date: '2026-08-27', title: 'Redacted' }),
+      visit({ id: 'next', date: '2026-08-27', title: 'Biologic' }),
       visit({ id: 'later', date: '2028-04-11', title: 'Eye' })
     ]
   });
@@ -70,35 +70,35 @@ test('buildMedicalModel puts upcoming farthest-first above today and past newest
 
 test('buildMedicalModel AND-filters query, type, and provider', () => {
   const events = [
-    visit({ id: 'a', date: '2026-05-01', title: 'Gastro Redacted', record_type: 'Appointment', provider: 'Dr Redacted' }),
-    visit({ id: 'b', date: '2026-05-02', title: 'Therapy', record_type: 'Appointment', provider: 'Redacted' }),
-    visit({ id: 'c', date: '2026-05-03', title: 'Panel', record_type: 'Lab Work', provider: 'Dr Redacted', lane: 'lab' })
+    visit({ id: 'a', date: '2026-05-01', title: 'Gastro Pike', record_type: 'Appointment', provider: 'Dr Rowan Pike' }),
+    visit({ id: 'b', date: '2026-05-02', title: 'Therapy', record_type: 'Appointment', provider: 'Avery Quill' }),
+    visit({ id: 'c', date: '2026-05-03', title: 'Panel', record_type: 'Lab Work', provider: 'Dr Rowan Pike', lane: 'lab' })
   ];
   const model = buildMedicalModel({
     today: '2026-08-20',
     events,
-    query: 'Redacted',
+    query: 'pike',
     recordType: 'Appointment',
-    provider: 'Dr Redacted'
+    provider: 'Dr Rowan Pike'
   });
   const ids = model.items.filter(item => item.kind === 'visit').map(item => item.visit.id);
   assert.deepEqual(ids, ['a']);
 });
 
 test('buildMedicalModel bands all episode visits even when interrupted', () => {
-  const crohns = { id: 'crohns', title: "Redacted's diagnosis" };
+  const conditionA = { id: 'condition-a', title: "Condition A diagnosis" };
   const model = buildMedicalModel({
     today: '2026-08-20',
     events: [
-      visit({ id: 'c1', date: '2026-02-04', title: 'Colonoscopy', episode: crohns }),
+      visit({ id: 'c1', date: '2026-02-04', title: 'Colonoscopy', episode: conditionA }),
       visit({ id: 'other', date: '2026-02-10', title: 'EP' }),
-      visit({ id: 'c2', date: '2026-02-12', title: 'MRI', episode: crohns }),
-      visit({ id: 'c3', date: '2026-02-20', title: 'Follow-up', episode: crohns })
+      visit({ id: 'c2', date: '2026-02-12', title: 'MRI', episode: conditionA }),
+      visit({ id: 'c3', date: '2026-02-20', title: 'Follow-up', episode: conditionA })
     ]
   });
   const bands = model.items.filter(item => item.kind === 'band');
   assert.equal(bands.length, 1);
-  assert.equal(bands[0].episode.title, "Redacted's diagnosis");
+  assert.equal(bands[0].episode.title, "Condition A diagnosis");
   assert.deepEqual(bands[0].visits.map(v => v.id), ['c3', 'c2', 'c1']);
   assert.ok(model.items.some(item => item.kind === 'visit' && item.visit.id === 'other'));
 });
@@ -152,7 +152,7 @@ test('MO-06 displayDate never prints a day for month/tbd; TO BOOK heading; virtu
         date_precision: 'month', weight: 'major'
       }),
       visit({
-        id: 'Redacted-1', date: '2026-08-27', title: 'Redacted 90mg',
+        id: 'biologic-1', date: '2026-08-27', title: 'Biologic 90mg',
         record_type: 'Prescription', cadence_days: 56, weight: 'major'
       })
     ]
@@ -168,26 +168,26 @@ test('MO-06 displayDate never prints a day for month/tbd; TO BOOK heading; virtu
   assert.equal(virtual.displayDate, '~22/10/26');
 });
 
-test('MO-17 Mind lane matches Redacted and Dr Hook titles', () => {
+test('MO-17 Mind lane matches psychologist and ADHD clinic titles', () => {
   const threads = buildThreadModel([
     {
-      id: '1', date: '2026-09-04', title: 'Therapy · Redacted', record_type: 'Appointment',
-      lane: 'therapy', provider: 'Redacted', notes: '', episode: null
+      id: '1', date: '2026-09-04', title: 'Therapy · Avery Quill', record_type: 'Appointment',
+      lane: 'therapy', provider: 'Avery Quill', notes: '', episode: null
     },
     {
-      id: '2', date: '2026-08-06', title: 'Dr Hook · My ADHD Centre', record_type: 'Appointment',
-      lane: 'appointment', provider: 'Dr Hook', notes: '', episode: null
+      id: '2', date: '2026-08-06', title: 'Dr Lane · ADHD clinic', record_type: 'Appointment',
+      lane: 'appointment', provider: 'Dr Lane', notes: '', episode: null
     },
     {
       id: '3', date: '2026-09-24', title: 'Gastro follow-up', record_type: 'Consultation',
-      lane: 'appointment', provider: 'Dr Redacted', notes: 'calprotectin down', episode: null
+      lane: 'appointment', provider: 'Dr Pike', notes: 'calprotectin down', episode: null
     }
   ], [], '2026-09-26');
   const mind = threads.lanes.find(l => l.id === 'Mind');
   assert.ok(mind);
   assert.equal(mind.events.length, 2);
-  assert.ok(mind.events.some(e => /Redacted/i.test(e.title)));
-  assert.ok(mind.events.some(e => /Hook/i.test(e.title)));
+  assert.ok(mind.events.some(e => /Avery Quill/i.test(e.title)));
+  assert.ok(mind.events.some(e => /Lane/i.test(e.title)));
 });
 
 test('buildMedicalModel joins bloods by date and keeps month headings at months zoom', () => {
@@ -277,12 +277,12 @@ test('MO-06 planned status and future dates land in nextItems with to_book first
   assert.ok(model.items.some(item => item.kind === 'upcoming'));
 });
 
-test('MO-07 cadence virtual dose from last Redacted 27/08 + 56d', () => {
+test('MO-07 cadence virtual dose from last Biologic 27/08 + 56d', () => {
   const visits = [
     {
-      id: 'Redacted-1',
+      id: 'biologic-1',
       date: '2026-08-27',
-      title: 'Redacted 90mg',
+      title: 'Biologic 90mg',
       record_type: 'Prescription',
       cadence_days: 56,
       weight: 'major',
@@ -298,7 +298,7 @@ test('MO-07 cadence virtual dose from last Redacted 27/08 + 56d', () => {
 
   const suppressed = deriveVirtualDoses([
     ...visits,
-    { ...visits[0], id: 'Redacted-2', date: '2026-10-20', planned: true }
+    { ...visits[0], id: 'biologic-2', date: '2026-10-20', planned: true }
   ], '2026-09-26');
   assert.equal(suppressed.length, 0);
 
@@ -306,9 +306,9 @@ test('MO-07 cadence virtual dose from last Redacted 27/08 + 56d', () => {
     today: '2026-09-26',
     events: [
       visit({
-        id: 'Redacted-1',
+        id: 'biologic-1',
         date: '2026-08-27',
-        title: 'Redacted 90mg',
+        title: 'Biologic 90mg',
         record_type: 'Prescription',
         cadence_days: 56,
         weight: 'major'
@@ -318,11 +318,11 @@ test('MO-07 cadence virtual dose from last Redacted 27/08 + 56d', () => {
   assert.ok(model.visits.some(v => v.virtual && v.date === '2026-10-22'));
 });
 
-test('a real upcoming Redacted visit suppresses the cadence ghost even when it is not within 7 days', () => {
+test('a real upcoming Biologic visit suppresses the cadence ghost even when it is not within 7 days', () => {
   const last = {
-    id: 'Redacted-1',
+    id: 'biologic-1',
     date: '2026-08-27',
-    title: 'Redacted injection',
+    title: 'Biologic injection',
     record_type: 'Prescription',
     cadence_days: 56,
     notes: '',
@@ -331,9 +331,9 @@ test('a real upcoming Redacted visit suppresses the cadence ghost even when it i
   };
   // Cadence due date is 22/10. A booked visit on 10/11 is 19 days later.
   const booked = {
-    id: 'Redacted-2',
+    id: 'biologic-2',
     date: '2026-11-10',
-    title: 'Redacted injection',
+    title: 'Biologic injection',
     record_type: 'Prescription',
     status: 'booked',
     notes: '',
@@ -343,14 +343,14 @@ test('a real upcoming Redacted visit suppresses the cadence ghost even when it i
   assert.equal(deriveVirtualDoses([last], '2026-10-06').length, 1);
   assert.equal(deriveVirtualDoses([last, booked], '2026-10-06').length, 0);
 
-  const bookedPath = 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md';
+  const bookedPath = 'data/body/2026/11/2026-11-10-medical-biologic-injection-0000.md';
   const model = buildMedicalModel({
     today: '2026-10-06',
     events: [
       visit({
-        id: 'Redacted-1',
+        id: 'biologic-1',
         date: '2026-08-27',
-        title: 'Redacted injection',
+        title: 'Biologic injection',
         record_type: 'Prescription',
         cadence_days: 56,
         weight: 'major'
@@ -359,9 +359,9 @@ test('a real upcoming Redacted visit suppresses the cadence ghost even when it i
         path: bookedPath,
         record: {
           type: 'medical',
-          id: 'Redacted-2',
+          id: 'biologic-2',
           date: '2026-11-10',
-          title: 'Redacted injection',
+          title: 'Biologic injection',
           record_type: 'Prescription',
           status: 'booked',
           lane: 'appointment',
@@ -370,23 +370,23 @@ test('a real upcoming Redacted visit suppresses the cadence ghost even when it i
       }
     ]
   });
-  const upcoming = model.visits.filter(item => item.title === 'Redacted injection' && (item.planned || item.date > '2026-10-06'));
+  const upcoming = model.visits.filter(item => item.title === 'Biologic injection' && (item.planned || item.date > '2026-10-06'));
   assert.equal(upcoming.length, 1);
-  assert.equal(upcoming[0].id, 'Redacted-2');
+  assert.equal(upcoming[0].id, 'biologic-2');
   assert.equal(upcoming[0].virtual, false);
   assert.equal(upcoming[0].path, bookedPath);
-  const ghost = deriveVirtualDoses([{ ...last, path: 'data/body/2026/08/2026-08-27-medical-Redacted-injection-0000.md' }], '2026-10-06');
+  const ghost = deriveVirtualDoses([{ ...last, path: 'data/body/2026/08/2026-08-27-medical-biologic-injection-0000.md' }], '2026-10-06');
   assert.equal(ghost[0].path, null);
 });
 
-test('Health Brief cycle prefers Redacted dose title over notes that mention Redacted', () => {
+test('Health Brief cycle prefers Biologic dose title over notes that mention Biologic', () => {
   const model = buildMedicalModel({
     today: '2026-09-26',
     events: [
       visit({
-        id: 'Redacted-1',
+        id: 'biologic-1',
         date: '2026-08-27',
-        title: 'Redacted 90mg SC',
+        title: 'Biologic 90mg SC',
         record_type: 'Prescription',
         cadence_days: 56,
         weight: 'major'
@@ -397,7 +397,7 @@ test('Health Brief cycle prefers Redacted dose title over notes that mention Red
         title: 'Gastro follow-up — biologics & liver',
         record_type: 'Consultation',
         weight: 'major',
-        notes: 'Calprotectin 15 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Redacted; liver imaging next'
+        notes: 'Calprotectin 22 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Biologic; liver imaging next'
       })
     ]
   });
@@ -407,11 +407,11 @@ test('Health Brief cycle prefers Redacted dose title over notes that mention Red
   assert.equal(model.brief.cycle.nextDate, '2026-10-22');
 });
 
-test('MO-17 buildThreadModel maps IBD Liver Mind Acute', () => {
+test('MO-17 buildThreadModel maps Gut Liver Mind Acute', () => {
   const threads = buildThreadModel([
     {
       id: '1', date: '2026-09-24', title: 'Gastro follow-up', record_type: 'Consultation',
-      lane: 'appointment', provider: 'Dr Redacted', notes: 'calprotectin down', episode: null
+      lane: 'appointment', provider: 'Dr Pike', notes: 'calprotectin down', episode: null
     },
     {
       id: '2', date: '2026-09-24', title: 'Sore throat', record_type: 'Symptom',
@@ -419,17 +419,17 @@ test('MO-17 buildThreadModel maps IBD Liver Mind Acute', () => {
     },
     {
       id: '3', date: '2026-08-01', title: 'Therapy', record_type: 'Appointment',
-      lane: 'therapy', provider: 'Redacted', notes: '', episode: null
+      lane: 'therapy', provider: 'Avery Quill', notes: '', episode: null
     }
   ], [{
     date: '2026-09-17',
     markers: [
-      { key: 'ggt', label: 'GGT', value: 233, status: 'High', ref_low: 0, ref_high: 50 },
+      { key: 'ggt', label: 'GGT', value: 196, status: 'High', ref_low: 0, ref_high: 50 },
       { key: 'calprotectin', label: 'Calprotectin', value: 15, status: 'Normal', ref_low: 0, ref_high: 50 }
     ]
   }], '2026-09-26');
   const ids = threads.lanes.map(l => l.id);
-  assert.ok(ids.includes('IBD'));
+  assert.ok(ids.includes('Gut'));
   assert.ok(ids.includes('Liver'));
   assert.ok(ids.includes('Mind'));
   assert.ok(ids.includes('Acute'));

@@ -314,7 +314,7 @@ export function scentForLook(look, { date, weather = null, time = 'D', fragrance
 
 const GYM = /\b(gym|workout|training|run|swim|pilates|yoga|boxing|lift)\b/i;
 const FORMAL = /\b(wedding|gala|formal|ceremony|awards?)\b/i;
-const DATE = /\b(dinner|date|drinks|Redacted|anniversary|party|bar|restaurant)\b/i;
+const DATE = /\b(dinner|date|drinks|partner|anniversary|party|bar|restaurant)\b/i;
 
 function toHour(time) {
   const m = /^(\d{1,2}):(\d{2})/.exec(String(time ?? ''));

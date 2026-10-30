@@ -1,9 +1,9 @@
 target_sets:
   - valid_from: '2020-01-01'
-    calories: { movement: 1660, workout_30: 1900, workout_45_60: 2200, recovery_bonus: 200 }
-    protein: { daily: 120, recovery_daily: 140, breakfast: 30, lunch: 30, dinner: 40, snack: 20, min_per_meal: 25 }
-    fat_ceiling_g: 50
-    sodium_ceiling_mg: 2000
+    calories: { movement: 2000, workout_30: 2200, workout_45_60: 2400, recovery_bonus: 200 }
+    protein: { daily: 110, recovery_daily: 130, breakfast: 25, lunch: 30, dinner: 35, snack: 20, min_per_meal: 20 }
+    fat_ceiling_g: 70
+    sodium_ceiling_mg: 2300
     calcium_target_mg: 1000
     polyphenol_daily_aim: 10
 trend_thresholds:
@@ -12,28 +12,29 @@ trend_thresholds:
   skeletal_muscle_kg: [0.1, 0.3, 0.6]
   measurement_cm: [0.3, 0.8, 1.5]
   mood_score: [1, 2, 3]
-# Body-composition and strength forecast targets. Authoritative copy — do not
-# restate these numbers in UI code. The server mirror is targets-config.mjs.
+# Synthetic public template. Live targets live only in the private data repo's
+# config/targets.yml (read at runtime). Do not put personal numbers here or
+# restate them in UI code. The server mirror is targets-config.mjs.
 forecast:
   body_composition:
-    weight_kg_min: 78
-    weight_kg_max: 82
-    body_fat_pct_min: 8
-    body_fat_pct_max: 10
-    body_fat_pct_tight: 8
-    shoulder_waist_ratio: 1.60
+    weight_kg_min: 70
+    weight_kg_max: 75
+    body_fat_pct_min: 12
+    body_fat_pct_max: 15
+    body_fat_pct_tight: 12
+    shoulder_waist_ratio: 1.5
   strength:
-    deadline: '2026-10-31'
+    deadline: '2027-06-30'
     lifts:
       - id: chest-e1rm
         label: Chest e1RM
         exercise: Bar Press
-        e1rm_kg: 65
+        e1rm_kg: 55
       - id: arms-e1rm
         label: Arms e1RM
         exercise: Cable Bar Wide Grip Curl
-        e1rm_kg: 60
+        e1rm_kg: 45
       - id: back-e1rm
         label: Back e1RM
         exercise: Reverse Wide Grip Bent Over Row
-        e1rm_kg: 47
+        e1rm_kg: 50

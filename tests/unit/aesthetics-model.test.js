@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FRAGRANCES, REFERENCE_FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
+import { FRAGRANCES, REFERENCE_FRAGRANCES, setFragranceSource } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from '../../apps/life/js/app/aesthetics/dress-looks.js';
 import {
   classifyWeather,
@@ -27,17 +28,20 @@ import {
   weatherAffinity
 } from '../../apps/life/js/app/aesthetics/aesthetics-model.js';
 
+// The real library is private; tests run on a small synthetic fixture.
+setFragranceSource(JSON.parse(readFileSync(new URL('../fixtures/aesthetics/fragrance-source.json', import.meta.url), 'utf8')));
+
 const SAMPLE_DAY = [
   { time: '08:30', title: 'Period 1', type: 'scheduled_lesson' },
   { time: '16:30', title: 'Gym', type: 'workout' },
-  { time: '19:00', title: 'Dinner with Redacted', type: 'event' }
+  { time: '19:00', title: 'Dinner with Partner', type: 'event' }
 ];
 
-test('fragrance library mirrors the Notion tracker', () => {
-  assert.equal(FRAGRANCES.length, 53);
+test('fragrance library mirrors the tracker source', () => {
+  assert.equal(FRAGRANCES.length, 19);
   const count = s => FRAGRANCES.filter(f => f.status === s).length;
-  assert.deepEqual([count('Owned'), count('Sampling'), count('Wishlist'), count('Retired')], [14, 9, 28, 2]);
-  assert.equal(new Set(FRAGRANCES.map(f => f.name)).size, 53, 'names are unique');
+  assert.deepEqual([count('Owned'), count('Sampling'), count('Wishlist'), count('Retired')], [13, 2, 3, 1]);
+  assert.equal(new Set(FRAGRANCES.map(f => f.name)).size, 19, 'names are unique');
   for (const f of FRAGRANCES) {
     assert.deepEqual(f.notes, ['Top Notes', 'Heart Notes', 'Base Notes'].flatMap(key => f.source.properties[key] ?? []), `${f.name} keeps recorded notes without inventing unset tiers`);
     assert.equal(f.tiers.reduce((a, b) => a + b, 0), f.notes.length, `${f.name} tiers add up to its notes`);
@@ -66,7 +70,7 @@ test('a spring school day gets Neon, and dinner gets the evening scent', () => {
   assert.equal(plan.sprayAt, 7.5);
   assert.match(plan.notes[1].title, /Gone by 2:30pm/);
   assert.match(plan.line, /worn off before gym/);
-  assert.match(plan.notes[2].title, /change for Dinner with Redacted/);
+  assert.match(plan.notes[2].title, /change for Dinner with Partner/);
   assert.match(plan.notes[0].body, /bergamot and aldehydes opening.*vanilla and ISO E Super/);
 });
 
@@ -101,9 +105,9 @@ test('anchors classify gym and evening events', () => {
     { time: '08:40', title: 'Year 9 English', type: 'scheduled_lesson' },
     { time: '09:45', title: 'Year 11 English', type: 'scheduled_lesson' },
     { time: '12:30', title: 'Lunch', type: 'meal' },
-    { time: '19:00', title: 'Dinner with Redacted', type: 'event' }
+    { time: '19:00', title: 'Dinner with Partner', type: 'event' }
   ]);
-  assert.deepEqual(busy.map(a => a.title), ['Teaching', 'Dinner with Redacted']);
+  assert.deepEqual(busy.map(a => a.title), ['Teaching', 'Dinner with Partner']);
   const many = dayAnchors(Array.from({ length: 9 }, (_, i) => ({ time: `${String(10 + i).padStart(2, "0")}:00`, title: i === 8 ? 'Drinks' : `Meeting ${i}`, type: 'professional_meeting' })));
   assert.equal(many.length, 5);
   assert.ok(many.some(a => a.kind === 'evening'), 'the evening plan survives the cap');
@@ -141,7 +145,7 @@ test('the scent map puts gourmands sweet-warm and vetivers dry', () => {
   assert.ok(at('Gullal').x < 0 && at('Gullal').y < 0);
   const text = mapInsight();
   assert.match(text, /Encre Noire and Gullal/);
-  assert.match(text, /sweet tooth: 10 of 14/);
+  assert.match(text, /sweet tooth: 10 of 13/);
 });
 
 test('snap: colour sampling names the garment and finds looks', () => {
@@ -196,4 +200,16 @@ test('combo wheel scores adjacent families and orders denser bottles first', () 
   const a0 = placeOnWheel(neon, { index: 0, count: 4 }).angle;
   const a1 = placeOnWheel(neon, { index: 3, count: 4 }).angle;
   assert.ok(a1 > a0, 'siblings fan across the family wedge');
+});
+
+test('the library starts empty and skips map rows without a tracker record', () => {
+  const fixture = JSON.parse(readFileSync(new URL('../fixtures/aesthetics/fragrance-source.json', import.meta.url), 'utf8'));
+  try {
+    assert.deepEqual(setFragranceSource({}), []);
+    assert.equal(FRAGRANCES.length, 0);
+    const one = setFragranceSource({ map: [...fixture.map.slice(0, 1), { name: 'Not in the tracker', family: 'fresh' }], fragrances: fixture.fragrances });
+    assert.deepEqual(one.map(f => f.name), [fixture.map[0].name]);
+  } finally {
+    setFragranceSource(fixture);
+  }
 });

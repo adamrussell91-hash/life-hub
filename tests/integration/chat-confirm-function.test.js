@@ -2017,14 +2017,14 @@ test('screenshot card: explicit Clare 8:30 Korea block writes even when a Monday
   const tasks = memoryBlobStore({
     'tasks/task_mut921wb_spoclx': {
       id: 'task_mut921wb_spoclx',
-      title: 'Korea holiday itinerary — add to with Redacted',
+      title: 'Korea holiday itinerary — add to with Partner',
       due_date: '2026-10-04',
       status: 'open',
       created_at: '2026-10-04T03:16:51.611Z'
     },
     'tasks/task_mut921wb_bya2jc': {
       id: 'task_mut921wb_bya2jc',
-      title: 'Lead accreditation — organise with Redacted',
+      title: 'Lead accreditation — organise with Partner',
       due_date: '2026-10-04',
       status: 'open',
       created_at: '2026-10-04T03:16:51.611Z'
@@ -2996,7 +2996,7 @@ test('abandoned executing fence recovers on Confirm then applies the write', asy
   assert.equal(queue[0].status, 'consumed');
 });
 
-const MEDICAL_DELETE_PATH = 'data/body/2026/11/2026-11-10-medical-Redacted-injection-0000.md';
+const MEDICAL_DELETE_PATH = 'data/body/2026/11/2026-11-10-medical-biologic-injection-0000.md';
 const MEDICAL_DELETE_SHA = 'e'.repeat(40);
 
 function medicalDeleteFetch({ tree = [{ path: MEDICAL_DELETE_PATH, type: 'blob', sha: MEDICAL_DELETE_SHA }] } = {}) {
@@ -3028,16 +3028,16 @@ test('delete_log removes an allowlisted medical visit file', async () => {
     kind: 'delete_log',
     slug: 'sara',
     path: MEDICAL_DELETE_PATH,
-    id: 'Redacted-2'
+    id: 'biologic-2'
   }));
   const payload = await response.json();
   assert.equal(response.status, 200, JSON.stringify(payload));
   assert.equal(payload.data.deleted, true);
   assert.equal(payload.data.path, MEDICAL_DELETE_PATH);
-  assert.equal(payload.data.id, 'Redacted-2');
+  assert.equal(payload.data.id, 'biologic-2');
   const del = calls.find(call => call.options?.method === 'DELETE');
   assert.ok(del);
-  assert.match(String(del.url), /2026-11-10-medical-Redacted-injection-0000\.md/);
+  assert.match(String(del.url), /2026-11-10-medical-biologic-injection-0000\.md/);
   assert.equal(JSON.parse(del.options.body).sha, MEDICAL_DELETE_SHA);
 });
 
@@ -3069,7 +3069,7 @@ test('delete_log 404s when the medical file is not in the tree', async () => {
     kind: 'delete_log',
     slug: 'sara',
     path: MEDICAL_DELETE_PATH,
-    id: 'Redacted-2'
+    id: 'biologic-2'
   }));
   assert.equal(response.status, 404);
 });

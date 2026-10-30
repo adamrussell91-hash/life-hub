@@ -74,8 +74,8 @@ test("a second PUT updates the same visit", async () => {
   assert.equal(s.state.food.visits[0].title, "Long lunch");
 });
 
-test("Redacted's moments cannot be meals", async () => {
-  const s = store(trip("Redacted"));
+test("Partner's moments cannot be meals", async () => {
+  const s = store(trip("partner"));
   const res = await createTravelMealHandler(deps(s))(req("PUT", Q, { ...versions, food }));
   assert.equal(res.status, 403);
   assert.equal(s.state.writes, 0);

@@ -44,13 +44,13 @@ const SEEDED = await loadCalendarVisualSeed();
 
 const SKIP = { id: 'g-skip', agent: 'sara', kind: 'skip_workout', date: '2026-09-24', reason: 'capacity 34%, sore throat', workoutPath: 'records/2026/09/24/workout-1815.md' };
 const BED = { id: 'g-bed', agent: 'sara', kind: 'bedtime', date: '2026-09-24', time: '22:00', reason: '5.4 h last night' };
-const GOOD = { id: 'g-good', agent: 'hammond', kind: 'protect_block', date: '2026-09-26', start: '18:00', end: '22:00', title: 'Dinner out + a show', with: 'Redacted' };
-const MOVE = { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-josh-y10', title: 'Year 10 leadership opportunities for Redacted', from: '2026-09-25', to: '2026-10-13' };
+const GOOD = { id: 'g-good', agent: 'hammond', kind: 'protect_block', date: '2026-09-26', start: '18:00', end: '22:00', title: 'Dinner out + a show', with: 'partner' };
+const MOVE = { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-student-y10', title: 'Year 10 leadership opportunities for Sam Example', from: '2026-09-25', to: '2026-10-13' };
 
 const TASK = {
   schema_version: 1,
-  id: 'task-josh-y10',
-  title: 'Year 10 leadership opportunities for Redacted',
+  id: 'task-student-y10',
+  title: 'Year 10 leadership opportunities for Sam Example',
   description: '',
   kind: 'task',
   bucket: 'active',
@@ -255,7 +255,7 @@ test('visual seed freezes now and loads the reference week', () => {
   const visual = JSON.parse(SEEDED.files.get('calendar-visual.json'));
   assert.equal(visual.GHOSTS.length, 4, 'Tideline ghosts stay on the visual file');
   assert.ok(visual.RIVER?.ITEMS?.some(item => item.id === 'g-bob'), 'Term River fixture is on RIVER');
-  assert.equal(SEEDED.tasks[0].id, 'task-josh-y10');
+  assert.equal(SEEDED.tasks[0].id, 'task-student-y10');
   assert.equal(SEEDED.tasks[0].due_date, '2026-09-25');
 });
 
@@ -314,7 +314,7 @@ test('accept bedtime writes Today’s Status and one protected rest block', asyn
   assert.match(github.files.get('central-node.md'), /\*\*Sleep:\*\* lights out 10:00 pm \(5\.4 h last night\)/);
 });
 
-test('accept protect block writes the Redacted block, This Week, and the Clare line', async () => {
+test('accept protect block writes the Partner block, This Week, and the Clare line', async () => {
   const { handler, github } = harness({ ghosts: [GOOD] });
   const result = await decide(handler, 'g-good', 'accept');
   assert.equal(result.status, 200);
@@ -323,13 +323,13 @@ test('accept protect block writes the Redacted block, This Week, and the Clare l
   for (const [path, content] of records) {
     assert.equal(github.files.get(path), content);
     const event = parseEventDocument(content, path, load);
-    assert.equal(event.record.kind, 'Redacted');
+    assert.equal(event.record.kind, 'partner');
     assert.equal(event.record.status, 'tentative');
     assert.equal(event.record.protected, true);
     assert.equal(event.record.title, 'Dinner out + a show');
     assert.equal(event.record.date, '2026-09-26');
   }
-  assert.match(github.files.get('central-node.md'), /- Hammond→Clare: keep Sat 26\/09 6:00 pm–10:00 pm clear \(Redacted\)\./);
+  assert.match(github.files.get('central-node.md'), /- Hammond→Clare: keep Sat 26\/09 6:00 pm–10:00 pm clear \(Partner\)\./);
 });
 
 test('accept move task patches the task after the Central Node commit', async () => {

@@ -207,7 +207,7 @@ import { FILTER_CHIPS } from '../../packages/design-kit/js/calendar/calendar-fil
 test('chips include Comms, Events and Promises for every hub', () => {
   const ids = FILTER_CHIPS.map((chip) => chip.id);
   assert.deepEqual(ids, [
-    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'Redacted'
+    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'partner'
   ]);
   for (const id of ['comms', 'events', 'promises']) {
     assert.equal(FILTER_CHIPS.find((chip) => chip.id === id).group, 'shared');
@@ -260,7 +260,7 @@ export const FILTER_CHIPS = Object.freeze([
   Object.freeze({ id: 'tasks', label: 'Tasks', group: 'tasks' }),
   Object.freeze({ id: 'health', label: 'Health', group: 'life' }),
   Object.freeze({ id: 'fitness', label: 'Fitness', group: 'life' }),
-  Object.freeze({ id: 'Redacted', label: 'Redacted', group: 'life' })
+  Object.freeze({ id: 'partner', label: 'Partner', group: 'life' })
 ]);
 
 const ALL_IDS = FILTER_CHIPS.map((chip) => chip.id);
@@ -302,7 +302,7 @@ export function filterKeyForItem(item) {
   if (kind === 'task' || source === 'task' || source === 'work_block' || source === 'deadline') return 'tasks';
   if (kind === 'health' || source === 'medical') return 'health';
   if (kind === 'fitness' || source === 'workout') return 'fitness';
-  if (kind === 'Redacted') return 'Redacted';
+  if (kind === 'partner') return 'partner';
   if (item.ghost && item.chip) return filterKeyForItem(item.chip);
   return null;
 }
@@ -315,7 +315,7 @@ Expected: all tests pass, old ones included. (Teaching `events` is still `false`
 
 - [ ] **Step 6: Check nothing else hard-codes the chip list**
 
-Run: `grep -rn "'Redacted'\]\|chips.length\|FILTER_CHIPS.length" packages apps tests --include=*.js --include=*.ts --include=*.mjs | grep -v node_modules`
+Run: `grep -rn "'partner'\]\|chips.length\|FILTER_CHIPS.length" packages apps tests --include=*.js --include=*.ts --include=*.mjs | grep -v node_modules`
 Expected: only the new test. If a browser spec asserts a chip count of 8, update it to 10.
 
 - [ ] **Step 7: Commit**
@@ -432,7 +432,7 @@ In `tideline.template.html`, change line 75 to this:
 In `VISUAL-SPEC.md`, change the Sources row to this:
 
 ```markdown
-| Sources | Pills 12px/500, 8px round dot in the source stripe colour (changed 26/09/26 for Comms: see `docs/superpowers/specs/2026-09-26-calendar-comms-design.md`). Redacted uses the two-ring mark and peach ink. Ambient pill: dashed border, muted, counts of logs (never records). |
+| Sources | Pills 12px/500, 8px round dot in the source stripe colour (changed 26/09/26 for Comms: see `docs/superpowers/specs/2026-09-26-calendar-comms-design.md`). Partner uses the two-ring mark and peach ink. Ambient pill: dashed border, muted, counts of logs (never records). |
 ```
 
 - [ ] **Step 3: Rebuild the reference and run the visual spec**

@@ -33,7 +33,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
   --tr-hatch-b:color-mix(in srgb,var(--navy) 13%,transparent);
   --tr-ghost-fill:color-mix(in srgb,var(--wave) 6%,transparent);
   --tr-ghost-line:color-mix(in srgb,var(--navy) 55%,transparent);
-  --tr-Redacted-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
+  --tr-partner-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
   --tr-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
   --tr-health-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
   position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size
@@ -48,7 +48,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .tr-chart{display:block;font-family:var(--font-ui)} /* laid out at the card's width, never scaled */
 .tr-holiday{fill:var(--tr-holiday)}
 .tr-wall{fill:url(#tr-hatch)}
-.tr-lane-wash{fill:var(--tr-Redacted-wash)}
+.tr-lane-wash{fill:var(--tr-partner-wash)}
 .tr-rule{stroke:var(--line)}
 .tr-weekline{stroke:var(--tr-rule)}
 .tr-tier.is-term{fill:var(--pastel-sage)}
@@ -58,16 +58,16 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .tr-t-week{font-size:12px;font-weight:600;fill:var(--ink)}
 .tr-t-sub{font-size:11px;fill:var(--muted)}
 .tr-t-lane{font-size:13px;font-weight:600;fill:var(--navy)}
-.tr-t-lane.is-Redacted{fill:var(--pastel-peach-ink)}
+.tr-t-lane.is-partner{fill:var(--pastel-peach-ink)}
 .tr-bar{cursor:pointer}
 .tr-bar.k-teacher{fill:var(--pastel-blue)}
 .tr-bar:focus-visible,.tr-point:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5}
 .tr-t-bar{font-size:12px;font-weight:600;fill:var(--pastel-blue-ink);pointer-events:none}
 .tr-point{cursor:pointer;stroke:#fff;stroke-width:2}
 .tr-point.k-teacher{fill:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff)}
-.tr-point.k-Redacted{fill:var(--pastel-peach-ink)}
-.tr-point.k-Redacted.is-sample{fill:color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff);stroke-width:1;cursor:default}
-.tr-point.k-Redacted.is-held{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:2}
+.tr-point.k-partner{fill:var(--pastel-peach-ink)}
+.tr-point.k-partner.is-sample{fill:color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff);stroke-width:1;cursor:default}
+.tr-point.k-partner.is-held{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:2}
 .tr-point.k-scholar{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.6}
 .tr-point.k-friends{fill:var(--pastel-sage);stroke:var(--pastel-sage-ink);stroke-width:1.6}
 .tr-point.k-body{fill:#fff;stroke:var(--tr-health-line);stroke-width:1.8}
@@ -79,7 +79,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .tr-t-point,.tr-t-load,.tr-t-hum{paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}
 .tr-t-point{font-size:11.5px;font-weight:500;fill:var(--ink);pointer-events:none}
 .tr-t-point.is-gold{fill:var(--pastel-gold-ink);font-weight:600}
-.tr-t-point.is-Redacted{fill:var(--pastel-peach-ink);font-weight:600}
+.tr-t-point.is-partner{fill:var(--pastel-peach-ink);font-weight:600}
 .tr-hum{stroke:var(--tr-gold-line);stroke-width:2;stroke-dasharray:1 6;stroke-linecap:round}
 .tr-t-hum{font-size:11px;fill:var(--pastel-gold-ink)}
 .tr-line{fill:none;stroke:var(--wave);stroke-width:2.25;stroke-linejoin:round}
@@ -119,9 +119,9 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .tr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tr-list{padding:var(--space-3) var(--space-4) var(--space-4);display:grid;gap:var(--space-3)}
 .tr-list__lane{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:var(--space-3)}
-.tr-list__lane.is-Redacted{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
+.tr-list__lane.is-partner{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
 .tr-list__lane h3{margin:0;font-size:var(--text-sm);color:var(--navy)}
-.tr-list__lane.is-Redacted h3{color:var(--pastel-peach-ink)}
+.tr-list__lane.is-partner h3{color:var(--pastel-peach-ink)}
 .tr-list__lane > p{margin:2px 0 6px;font-size:var(--text-xs);color:var(--muted)}
 .tr-list__body{font-size:var(--text-xs);color:var(--ink)!important}
 .tr-list__item{display:flex;justify-content:space-between;gap:8px;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:8px 0 6px;font:inherit;font-size:var(--text-xs);text-align:left;color:var(--ink);cursor:pointer}
@@ -151,7 +151,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     <button class="btn btn--secondary" type="button" id="ref-reset">Reset</button>
     <button class="btn btn--secondary" type="button" id="ref-slow" aria-pressed="false">Slow motion ×5</button>
     <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
-    <span>Today is Thu 24/09/26. Past Redacted evenings are examples.</span>
+    <span>Today is Thu 24/09/26. Past Partner evenings are examples.</span>
   </div>
   <div class="page-shell"><div id="app"></div></div>
 </main>
@@ -440,7 +440,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     return engine2;
   }
 
-  // apps/tasks/src/domain/school-time.ts
+  // packages/design-kit/js/school-time.js
   var DAY_MS = 864e5;
   function toMs(key3) {
     return Date.UTC(Number(key3.slice(0, 4)), Number(key3.slice(5, 7)) - 1, Number(key3.slice(8, 10)));
@@ -448,12 +448,35 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
   function toKey(ms3) {
     return new Date(ms3).toISOString().slice(0, 10);
   }
+  function addDaysKey(key3, days) {
+    return toKey(toMs(key3) + days * DAY_MS);
+  }
+  function mondayOf(key3) {
+    const ms3 = toMs(key3);
+    const dow = (new Date(ms3).getUTCDay() + 6) % 7;
+    return toKey(ms3 - dow * DAY_MS);
+  }
   function termAt(key3, terms) {
     return terms.find((t) => key3 >= t.starts_on && key3 <= t.ends_on) ?? null;
   }
   function isHoliday(key3, terms) {
     if (!terms.length) return false;
     return termAt(key3, terms) === null;
+  }
+  function weekLabel(key3, terms) {
+    if (!terms.length) return null;
+    const term = termAt(key3, terms);
+    if (term) {
+      const week2 = Math.floor((toMs(mondayOf(key3)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
+      return `T${term.term} W${week2}`;
+    }
+    const prev = [...terms].filter((t) => t.ends_on < key3).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
+    if (!prev) return null;
+    let start = mondayOf(addDaysKey(prev.ends_on, 1));
+    while (termAt(start, terms)) start = addDaysKey(start, 7);
+    const week = Math.floor((toMs(mondayOf(key3)) - toMs(start)) / (7 * DAY_MS)) + 1;
+    if (week < 1) return null;
+    return `Hol W${week}`;
   }
   function buildTimeScale(options) {
     const factor = options.holidayFactor ?? 0.25;
@@ -496,43 +519,163 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     };
   }
 
-  // apps/life/js/app/capacity-model.js
+  // packages/design-kit/js/calendar/readiness-model.js
+  var READINESS = Object.freeze({
+    baseline: 75,
+    // assumed personal ordinary day until history says otherwise
+    history: Object.freeze({ yesterday: 0.55, week: 0.3, baseline: 0.15 }),
+    weights: Object.freeze({ energy: 0.25, focus: 0.25, mood: 0.1, health: 0.2, sleep: 0.2 }),
+    /** Diary vocabulary → domain anchors (prior-day evidence). */
+    diaryEnergy: Object.freeze({ low: 30, medium: 70, high: 100 }),
+    sleepDuration: Object.freeze([[5, 45], [6, 70], [7, 100]]),
+    recovery: Object.freeze({ missing: 0.7, restorative: 0.4, adequate: 0.7, poor: 1 }),
+    workCost: Object.freeze({ light: 0, moderate: 3, heavy: 8 }),
+    workHours: Object.freeze({ moderate: 3.5, heavy: 6 }),
+    exerciseCost: Object.freeze({ strenuous: 5, gentle: 0 }),
+    poorSleepHeavyWork: 5,
+    /** Uncertainty: half-width of the band in points. Illustrative, not calibrated. */
+    spread: Object.freeze({ base: 4, perMissingWeight: 18, perStaleDay: 1.2, staleCap: 8, answeredOverall: 0.5, perHourAhead: 1.1 }),
+    /** Reported overall readiness wins most of the blend: it is the observation. */
+    reportedWeight: 0.7,
+    discrepancyThreshold: 10,
+    checkinWindow: Object.freeze({ from: 5, to: 12 })
+  });
+  var ANSWERS = Object.freeze({
+    sleep: Object.freeze({
+      worse: { anchor: 20, label: "Worse", trend: "worse", residual: false },
+      still_poor: { anchor: 30, label: "Still poor", trend: "same", residual: false },
+      better_still_tired: { anchor: 60, label: "Better, still tired", trend: "better", residual: true },
+      restorative: { anchor: 100, label: "Restorative", trend: "better", residual: false },
+      poor: { anchor: 25, label: "Poor", trend: null, residual: false },
+      okay: { anchor: 70, label: "Okay", trend: null, residual: false }
+    }),
+    energy: Object.freeze({
+      drained: { anchor: 25, label: "Drained" },
+      heavy_manageable: { anchor: 55, label: "Heavy but manageable" },
+      normal: { anchor: 80, label: "Back to normal" },
+      energised: { anchor: 100, label: "Energised" }
+    }),
+    focus: Object.freeze({
+      foggy: { anchor: 25, label: "Foggy" },
+      brief: { anchor: 50, label: "Can focus briefly" },
+      distractible: { anchor: 65, label: "Clear but distractible" },
+      sharp: { anchor: 100, label: "Sharp" }
+    }),
+    mood: Object.freeze({
+      low: { anchor: 30, label: "Low" },
+      flat: { anchor: 55, label: "Flat" },
+      okay: { anchor: 75, label: "Okay" },
+      good: { anchor: 100, label: "Good" }
+    }),
+    symptoms: Object.freeze({
+      worse: { anchor: 30, label: "Worse" },
+      same: { anchor: 45, label: "Same" },
+      easing: { anchor: 70, label: "Easing" },
+      gone: { anchor: 100, label: "Gone" }
+    }),
+    lingering: Object.freeze({
+      soreness: { label: "Physical soreness", exercise: 1.5, work: 1 },
+      mental: { label: "Mental fatigue", exercise: 1, work: 1.5 },
+      both: { label: "Both", exercise: 1.5, work: 1.5 },
+      recovered: { label: "Feeling recovered", exercise: 0.3, work: 0.3 }
+    }),
+    overall: Object.freeze({
+      empty: { anchor: 20, label: "Running on empty" },
+      limited: { anchor: 40, label: "Limited reserves" },
+      manageable: { anchor: 60, label: "Manageable" },
+      strong: { anchor: 80, label: "Feeling strong" },
+      full: { anchor: 100, label: "Full capacity" }
+    }),
+    break: Object.freeze({
+      not_really: { anchor: null, label: "Not really" },
+      little: { anchor: null, label: "A little" },
+      refreshed: { anchor: null, label: "Refreshed" }
+    })
+  });
+  var REASONS = Object.freeze({
+    sleep_worse: "Sleep worse than expected",
+    work_fatigue: "Work took more out of me",
+    pain_illness: "Pain or illness",
+    break_helped: "A break helped",
+    emotional_lift: "Feeling emotionally lifted",
+    something_else: "Something else",
+    not_sure: "Not sure"
+  });
+  var MEETING_WEIGHT = 0.65;
+  var clamp = (v, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
+  var round = (v) => Math.round(v);
+  var WEATHER_STATES = Object.freeze({
+    1: { name: "Clear skies", meaning: "Full capacity; rested, focused, emotionally settled.", family: "clear" },
+    2: { name: "Brilliant sunshine", meaning: "High energy and strong motivation for demanding work.", family: "clear" },
+    3: { name: "Morning sunshine", meaning: "A strong start, with capacity likely to ease later.", family: "clear" },
+    4: { name: "Afternoon sunshine", meaning: "A slower morning, with better capacity expected later.", family: "clear" },
+    5: { name: "Sunny intervals", meaning: "Useful bursts of capacity between more tiring stretches.", family: "clear" },
+    6: { name: "Sun through cloud", meaning: "Good capacity, with a specific limitation still present.", family: "clear" },
+    7: { name: "Warm front approaching", meaning: "An anticipated event may lift mood and engagement.", family: "clear" },
+    8: { name: "Gentle breeze", meaning: "Steady, comfortable capacity for an ordinary day.", family: "steady" },
+    9: { name: "Building breeze", meaning: "Energy or focus is gradually picking up.", family: "steady" },
+    10: { name: "Gusty conditions", meaning: "Interruptions are likely to fragment usable focus.", family: "wind" },
+    11: { name: "Strong headwind", meaning: "Tasks may require more effort than usual.", family: "wind" },
+    12: { name: "Crosswinds", meaning: "Competing demands may pull attention in different directions.", family: "wind" },
+    13: { name: "High cloud", meaning: "Mild background tiredness; plenty of usable capacity remains.", family: "cloud" },
+    14: { name: "Increasing cloud", meaning: "Capacity is expected to decline as demands accumulate.", family: "cloud" },
+    15: { name: "Overcast", meaning: "Sustained low energy, without sharp changes expected.", family: "cloud" },
+    16: { name: "Heavy cloud", meaning: "Significant fatigue limits what feels manageable.", family: "cloud" },
+    17: { name: "Low cloud", meaning: "Sluggishness makes getting started harder.", family: "cloud" },
+    18: { name: "Morning mist", meaning: "Initial grogginess may clear as the morning progresses.", family: "fog" },
+    19: { name: "Patchy fog", meaning: "Concentration comes and goes.", family: "fog" },
+    20: { name: "Dense fog", meaning: "Mental clarity is substantially reduced.", family: "fog" },
+    21: { name: "Fog lifting", meaning: "Focus is improving after an earlier difficult stretch.", family: "fog" },
+    22: { name: "Light drizzle", meaning: "Mild emotional strain adds friction to the day.", family: "rain" },
+    23: { name: "Passing showers", meaning: "Brief dips are expected, with recovery between them.", family: "rain" },
+    24: { name: "Persistent rain", meaning: "Emotional strain is likely to remain through the forecast period.", family: "rain" },
+    25: { name: "Squally showers", meaning: "Energy, mood, or focus may fluctuate sharply.", family: "rain" },
+    26: { name: "Storm building", meaning: "Several demands are converging; a substantial dip is expected.", family: "storm" },
+    27: { name: "Thunderstorm", meaning: "Overload or distress currently limits usable capacity.", family: "storm" },
+    28: { name: "Storm easing", meaning: "The worst strain is passing, but recovery is incomplete.", family: "recovery" },
+    29: { name: "Cloud breaking", meaning: "Rest or reduced demand is beginning to restore capacity.", family: "recovery" },
+    30: { name: "Calm evening", meaning: "Demands are settling; capacity suits a gentler wind-down.", family: "evening" }
+  });
+  var DEMAND = Object.freeze({
+    // Calendar chip kinds (tideline-model eventKind). Teaching is routine but real work.
+    // Meetings drain about two-thirds as fast as teaching (MEETING_WEIGHT).
+    teaching: 3,
+    professional: 3 * MEETING_WEIGHT,
+    meeting: 3 * MEETING_WEIGHT,
+    event: 2,
+    task: 3,
+    study: 3,
+    work: 3,
+    comm: 1.5,
+    fitness: 2,
+    health: 1.5,
+    social: 1,
+    family: 1,
+    default: 2
+  });
+  var RECOVERY = Object.freeze({ rate: 0.6, holidayLift: 5 });
+  function forecastAhead(lastPct, daysAhead, { holiday = false } = {}) {
+    const gap = READINESS.baseline - lastPct;
+    const recovered = lastPct + gap * (1 - RECOVERY.rate ** Math.max(0, daysAhead));
+    return round(clamp(recovered + (holiday ? RECOVERY.holidayLift : 0)));
+  }
+
+  // packages/design-kit/js/calendar/capacity-model.js
   var CAPACITY = Object.freeze({
-    baseline: 80,
-    floor: 10,
-    ceiling: 95,
-    sleepTarget: 7,
-    // hours; below this costs capacity
-    sleepPoor: 6,
-    // below this the note says "poor sleep", else "short sleep"
-    sleepPerHour: 8,
-    sleepMaxPenalty: 30,
-    energy: Object.freeze({ low: -15, medium: 0, high: 8 }),
-    lowMoodScore: 3,
-    // mood_score (1-10) at or below this costs capacity
-    lowMoodPenalty: 8,
-    symptomPenalty: 15,
-    symptomMaxPenalty: 25,
+    baseline: READINESS.baseline,
+    floor: 0,
+    ceiling: 100,
+    // 100 means full capacity, and it is reachable
     belowParPct: 60,
-    // a day under this counts toward a streak
-    streakPenalty: 4,
-    streakMax: 8,
     softenPct: 40,
     // under this the day is flagged and agents may propose softening it
     budgetHours: 6,
     // discretionary commitment hours a 100% day can carry
-    recovery: 0.6,
-    // forecast: share of the gap to baseline still open after each day
-    holidayLift: 5
+    recovery: RECOVERY.rate,
+    holidayLift: RECOVERY.holidayLift
   });
-  function clamp(pct) {
+  function clamp2(pct) {
     return Math.round(Math.min(CAPACITY.ceiling, Math.max(CAPACITY.floor, pct)));
-  }
-  function forecastCapacity(lastPct, daysAhead, { holiday = false } = {}) {
-    const gap = CAPACITY.baseline - lastPct;
-    const recovered = lastPct + gap * (1 - CAPACITY.recovery ** Math.max(0, daysAhead));
-    const pct = clamp(recovered + (holiday ? CAPACITY.holidayLift : 0));
-    return { pct, note: "forecast", factors: [], soften: pct < CAPACITY.softenPct, forecast: true };
   }
   function forecastSeries(dateKeys, { lastPct, lastDate, isHoliday: isHoliday2 = () => false, pattern: pattern2 = () => 0 }) {
     const DAY3 = 864e5;
@@ -540,17 +683,39 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     return dateKeys.map((date) => {
       const ahead = Math.max(0, Math.round((at(date) - at(lastDate)) / DAY3));
       if (ahead === 0) return { date, pct: lastPct, low: lastPct, high: lastPct };
-      const base = forecastCapacity(lastPct, ahead, { holiday: isHoliday2(date) }).pct;
-      const pct = clamp(base + pattern2(date));
+      const base = forecastAhead(lastPct, ahead, { holiday: isHoliday2(date) });
+      const pct = clamp2(base + pattern2(date));
       const spread = 3 + 1.2 * Math.sqrt(ahead);
       return { date, pct, low: Math.max(CAPACITY.floor, Math.round(pct - spread)), high: Math.min(CAPACITY.ceiling, Math.round(pct + spread)) };
     });
   }
 
-  // apps/life/js/app/term-river.js
+  // packages/design-kit/js/calendar/calendar-filter.js
+  var FILTER_CHIPS = Object.freeze([
+    Object.freeze({ id: "classes", label: "Classes", group: "teaching" }),
+    Object.freeze({ id: "comms", label: "Comms", group: "shared" }),
+    Object.freeze({ id: "meetings", label: "Meetings", group: "professional" }),
+    Object.freeze({ id: "events", label: "Events", group: "shared" }),
+    Object.freeze({ id: "pd", label: "PD", group: "professional" }),
+    Object.freeze({ id: "promises", label: "Promises", group: "shared" }),
+    Object.freeze({ id: "tasks", label: "Tasks", group: "tasks" }),
+    Object.freeze({ id: "health", label: "Health", group: "life" }),
+    Object.freeze({ id: "fitness", label: "Fitness", group: "life" }),
+    Object.freeze({ id: "partner", label: "Partner", group: "life" }),
+    Object.freeze({ id: "social", label: "Social", group: "life" }),
+    Object.freeze({ id: "family", label: "Family", group: "life" })
+  ]);
+  var ALL_IDS = FILTER_CHIPS.map((chip) => chip.id);
+  var HUB_DEFAULTS = Object.freeze({
+    teaching: ["classes", "comms", "promises"],
+    professional: ["comms", "meetings", "events", "pd", "promises"],
+    tasks: ["tasks", "promises"]
+  });
+
+  // packages/design-kit/js/calendar/term-river.js
   var LANES = Object.freeze([
     Object.freeze({ id: "teacher", label: "Teacher", sub: "classes \xB7 HPGE \xB7 MindWorks" }),
-    Object.freeze({ id: "Redacted", label: "Redacted", sub: "comes first" }),
+    Object.freeze({ id: "partner", label: "Partner", sub: "comes first" }),
     Object.freeze({ id: "scholar", label: "Scholar", sub: "UNSW done \xB7 UOW hum" }),
     Object.freeze({ id: "friends", label: "Friends & family", sub: "Newcastle \xB7 Bob" }),
     Object.freeze({ id: "body", label: "Body", sub: "capacity from your logs" })
@@ -561,7 +726,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     if (item?.lane && LANES.some((l) => l.id === item.lane)) return item.lane;
     const type = item?.type ?? "";
     const text = `${item?.title ?? ""} ${item?.sub ?? ""}`;
-    if (type === "calendar_block" && item.kind === "Redacted" || item?.with === "Redacted" || item?.kind === "Redacted") return "Redacted";
+    if (type === "calendar_block" && item.kind === "partner" || item?.with === "partner" || item?.kind === "partner") return "partner";
     if (type === "medical" || type === "sleep" || item?.kind === "rest" || item?.kind === "health" || item?.symptom) return "body";
     const tags = item?.tags ?? [];
     if (item?.kind === "dream" || tags.includes("graduation") || tags.includes("study") || STUDY.test(text)) return "scholar";
@@ -603,16 +768,11 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     });
   }
   function riverWeekLabel(week, terms) {
-    const t = terms.find((x) => week <= x.ends_on && key(ms(week) + 6 * DAY) >= x.starts_on);
-    if (t) {
-      const n2 = Math.floor((ms(week) - (ms(t.starts_on) - (weekday(t.starts_on) + 6) % 7 * DAY)) / (7 * DAY)) + 1;
-      return `T${t.term} W${n2}`;
+    for (let i = 0; i < 7; i++) {
+      const label = weekLabel(key(ms(week) + i * DAY), terms ?? []);
+      if (label?.startsWith("T")) return label;
     }
-    const prev = [...terms].filter((x) => x.ends_on < week).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
-    if (!prev) return `${week.slice(8)}/${week.slice(5, 7)}`;
-    const firstHolMonday = ms(prev.ends_on) + DAY + (8 - weekday(key(ms(prev.ends_on) + DAY))) % 7 * DAY;
-    const n = Math.floor((ms(week) - firstHolMonday) / (7 * DAY)) + 1;
-    return n >= 1 ? `Hol W${n}` : `${week.slice(8)}/${week.slice(5, 7)}`;
+    return weekLabel(week, terms ?? []) ?? `${week.slice(8)}/${week.slice(5, 7)}`;
   }
 
   // packages/design-kit/js/format-display-date.js
@@ -649,14 +809,12 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     return text;
   }
 
-  // apps/life/js/core/central-node-write.js
+  // packages/design-kit/js/calendar/ghost-writes.js
   var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function formatLogDate(dateKey) {
     const [, month, day] = dateKey.split("-").map(Number);
     return `${day} ${SHORT_MONTHS[month - 1]}`;
   }
-
-  // apps/life/js/app/ghost-writes.js
   var GHOST_AGENTS = Object.freeze({
     sara: "Sara",
     hammond: "Hammond",
@@ -664,9 +822,34 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     chadwick: "Chadwick",
     brisket: "Brisket",
     penelope: "Penelope",
-    vera: "Vera"
+    vera: "Vera",
+    hyaluronica: "Hyaluronica",
+    ann: "Ann",
+    clementine: "Clementine"
   });
-  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
+  var GHOST_KINDS = Object.freeze([
+    "skip_workout",
+    "bedtime",
+    "protect_block",
+    "move_task",
+    "create_task",
+    "draft_message",
+    "split_task",
+    "goal_rest_weeks",
+    "book_comm",
+    "outing",
+    "meal_block",
+    "schedule_workout",
+    "reschedule_block",
+    "cancel_block",
+    "log_comm",
+    "pro_meeting",
+    "pro_event",
+    "move_block",
+    "task_block"
+  ]);
+  var LOG_COMM_DIRECTIONS = /* @__PURE__ */ new Set(["outbound", "inbound"]);
+  var LOG_COMM_CHANNELS = /* @__PURE__ */ new Set(["email", "phone", "message", "in_person", "video", "other"]);
   var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
   var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   function short(dateKey) {
@@ -703,7 +886,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
     if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
     if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
-    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    const dated = !["move_task", "create_task", "draft_message", "split_task", "goal_rest_weeks"].includes(ghost.kind);
     if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
     if (ghost.kind === "create_task") {
       if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
@@ -713,15 +896,101 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
       if (!oneLine(ghost.to) || !String(ghost.text ?? "").trim()) throw new TypeError("draft_message needs to and text");
     }
     if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
+    if (ghost.kind === "book_comm") {
+      if (!HHMM.test(ghost.time ?? "")) throw new TypeError("book_comm needs time HH:MM");
+      if (!Number.isInteger(ghost.duration_min) || ghost.duration_min < 5 || ghost.duration_min > 240) throw new TypeError("book_comm needs duration_min 5\u2013240");
+      if (!oneLine(ghost.title)) throw new TypeError("book_comm needs a title");
+      if (!Array.isArray(ghost.person_refs) || !ghost.person_refs.length) throw new TypeError("book_comm needs at least one person");
+    }
     if (ghost.kind === "protect_block") {
       if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
         throw new TypeError("protect_block needs start < end (HH:MM)");
       }
       if (!oneLine(ghost.title)) throw new TypeError("protect_block needs a title");
     }
+    if (ghost.kind === "outing" || ghost.kind === "meal_block" || ghost.kind === "schedule_workout") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError(`${ghost.kind} needs start < end (HH:MM)`);
+      }
+      if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
+    }
+    if (ghost.follow_up_task != null) {
+      if (ghost.kind !== "outing" && ghost.kind !== "protect_block") {
+        throw new TypeError("follow_up_task is only allowed on outing or protect_block");
+      }
+      if (!ghost.follow_up_task || typeof ghost.follow_up_task !== "object" || Array.isArray(ghost.follow_up_task)) {
+        throw new TypeError("follow_up_task must be an object");
+      }
+      if (!oneLine(ghost.follow_up_task.title) && !oneLine(ghost.title)) {
+        throw new TypeError("follow_up_task needs a title");
+      }
+    }
+    if (ghost.kind === "reschedule_block") {
+      if (typeof ghost.path !== "string" || !ghost.path) throw new TypeError("reschedule_block needs path");
+      const hasChange = DATE_KEY2.test(ghost.date ?? "") || HHMM.test(ghost.start ?? "") || HHMM.test(ghost.end ?? "") || Boolean(oneLine(ghost.title));
+      if (!hasChange) throw new TypeError("reschedule_block needs date, start, end, and/or title");
+      if (ghost.start != null && ghost.start !== "" && !HHMM.test(ghost.start)) {
+        throw new TypeError("reschedule_block start must be HH:MM");
+      }
+      if (ghost.end != null && ghost.end !== "" && !HHMM.test(ghost.end)) {
+        throw new TypeError("reschedule_block end must be HH:MM");
+      }
+      if (HHMM.test(ghost.start ?? "") && HHMM.test(ghost.end ?? "") && ghost.start >= ghost.end) {
+        throw new TypeError("reschedule_block needs start < end (HH:MM)");
+      }
+    }
+    if (ghost.kind === "cancel_block") {
+      if (typeof ghost.path !== "string" || !ghost.path) throw new TypeError("cancel_block needs path");
+    }
+    if (ghost.kind === "log_comm") {
+      if (!LOG_COMM_DIRECTIONS.has(ghost.direction)) throw new TypeError("log_comm needs direction outbound|inbound");
+      if (!LOG_COMM_CHANNELS.has(ghost.channel)) throw new TypeError("log_comm needs a valid channel");
+      if (!oneLine(ghost.title) && !oneLine(ghost.subject)) throw new TypeError("log_comm needs a title or subject");
+      if (ghost.time != null && ghost.time !== "" && !HHMM.test(ghost.time)) {
+        throw new TypeError("log_comm time must be HH:MM");
+      }
+      if (ghost.person_refs != null && (!Array.isArray(ghost.person_refs) || ghost.person_refs.some((ref) => typeof ref !== "string" || !ref))) {
+        throw new TypeError("log_comm person_refs must be an array of refs");
+      }
+    }
+    if (ghost.kind === "pro_meeting" || ghost.kind === "pro_event") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError(`${ghost.kind} needs start < end (HH:MM)`);
+      }
+      if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
+    }
+    if (ghost.kind === "task_block") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("task_block needs taskId");
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("task_block needs start < end (HH:MM)");
+      }
+      if (!oneLine(ghost.title)) throw new TypeError("task_block needs a title");
+    }
+    if (ghost.kind === "move_block") {
+      if (typeof ghost.blockId !== "string" || !ghost.blockId) throw new TypeError("move_block needs blockId");
+      if (!DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_block needs from (YYYY-MM-DD)");
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("move_block needs start < end (HH:MM)");
+      }
+    }
     if (ghost.kind === "move_task") {
       if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
       if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    if (ghost.kind === "split_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("split_task needs taskId");
+      if (!Array.isArray(ghost.steps) || ghost.steps.length < 1 || ghost.steps.length > 6 || ghost.steps.some((step) => !oneLine(step))) {
+        throw new TypeError("split_task needs 1\u20136 step titles");
+      }
+    }
+    if (ghost.kind === "goal_rest_weeks") {
+      if (typeof ghost.goalId !== "string" || !ghost.goalId) throw new TypeError("goal_rest_weeks needs goalId");
+      if (!Array.isArray(ghost.weeks) || !ghost.weeks.length || ghost.weeks.some((week) => !DATE_KEY2.test(week ?? ""))) {
+        throw new TypeError("goal_rest_weeks needs weeks (YYYY-MM-DD)");
+      }
+      if (!Array.isArray(ghost.rest_weeks) || ghost.weeks.some((week) => !ghost.rest_weeks.includes(week))) {
+        throw new TypeError("goal_rest_weeks needs rest_weeks containing weeks");
+      }
     }
     return ghost;
   }
@@ -757,7 +1026,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
         break;
       }
       case "protect_block": {
-        const withCorey = ghost.with === "Redacted";
+        const withPartner = ghost.with === "partner";
         const title = oneLine(ghost.title);
         const span = `${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
         steps.push({
@@ -768,16 +1037,68 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
             date: ghost.date,
             time: ghost.start,
             end_time: ghost.end,
-            kind: withCorey ? "Redacted" : "protected",
+            kind: withPartner ? "partner" : "protected",
             status: "tentative",
             protected: true,
             title,
             source_agent: ghost.agent
           }
         });
-        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Redacted" : ""} (protected).` }));
-        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Redacted)" : ""}.` }));
-        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Redacted" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        if (ghost.follow_up_task && typeof ghost.follow_up_task === "object") {
+          const task = ghost.follow_up_task;
+          const taskTitle = oneLine(task.title) || title;
+          steps.push({
+            target: "tasks",
+            method: "POST",
+            body: {
+              title: taskTitle,
+              due_date: DATE_KEY2.test(task.due ?? "") ? task.due : ghost.date,
+              status: "open",
+              ...oneLine(task.notes) || oneLine(task.person_ref) ? {
+                notes: [oneLine(task.notes), oneLine(task.person_ref) ? `Person: ${oneLine(task.person_ref)}` : ""].filter(Boolean).join("\n")
+              } : {},
+              ...task.domain ? { domain: task.domain } : {},
+              ...HHMM.test(task.due_time ?? "") ? { due_time: task.due_time } : {},
+              source: "suggested_by_agent"
+            }
+          });
+        }
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withPartner ? " with Partner" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withPartner ? " (Partner)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withPartner ? " with Partner" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        break;
+      }
+      case "task_block": {
+        const [sh, sm] = ghost.start.split(":").map(Number);
+        const [eh, em] = ghost.end.split(":").map(Number);
+        const minutes = eh * 60 + em - (sh * 60 + sm);
+        const title = oneLine(ghost.title);
+        steps.push({
+          target: "tasks",
+          method: "POST",
+          collection: "work_blocks",
+          body: { title, date: ghost.date, start_time: ghost.start, duration_minutes: minutes, task_id: ghost.taskId, source: "runway" }
+        });
+        const where = `${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
+        steps.push(recentAction(actedOn, who, `blocked out \u201C${title}\u201D ${where}${why}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, ${where}.`;
+        break;
+      }
+      case "move_block": {
+        const [sh, sm] = ghost.start.split(":").map(Number);
+        const [eh, em] = ghost.end.split(":").map(Number);
+        const minutes = eh * 60 + em - (sh * 60 + sm);
+        const title = oneLine(ghost.title) || "Work block";
+        steps.push({
+          target: "tasks",
+          method: "PATCH",
+          collection: "work_blocks",
+          id: ghost.blockId,
+          body: { date: ghost.date, start_time: ghost.start, duration_minutes: minutes }
+        });
+        const where = `${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}`;
+        steps.push(recentAction(actedOn, who, `moved \u201C${title}\u201D ${short(ghost.from)} \u2192 ${where}${why}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D \u2192 ${where}.`;
         break;
       }
       case "move_task": {
@@ -788,7 +1109,15 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
       }
       case "create_task": {
         const title = oneLine(ghost.title);
-        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        const body = {
+          title,
+          due_date: ghost.due,
+          status: "open",
+          ...ghost.notes ? { notes: oneLine(ghost.notes) } : {},
+          ...ghost.source ? { source: ghost.source } : {},
+          ...ghost.goalId ? { parent_goal_id: ghost.goalId } : {},
+          ...ghost.domain ? { domain: ghost.domain } : {}
+        };
         steps.push({ target: "tasks", method: "POST", body });
         steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
         receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
@@ -797,6 +1126,190 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
       case "draft_message": {
         steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
         receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
+        break;
+      }
+      case "split_task": {
+        const parent = oneLine(ghost.title) || ghost.taskId;
+        ghost.steps.forEach((stepTitle, index) => {
+          steps.push({
+            target: "tasks",
+            method: "POST",
+            suffix: `s${index + 1}`,
+            body: {
+              title: oneLine(stepTitle),
+              kind: "step",
+              parent_task_id: ghost.taskId,
+              step_order: index + 1,
+              status: "open",
+              ...ghost.goalId ? { parent_goal_id: ghost.goalId } : {},
+              ...ghost.domain ? { domain: ghost.domain } : {}
+            }
+          });
+        });
+        steps.push(recentAction(actedOn, who, `split \u201C${parent}\u201D into ${ghost.steps.length} steps`));
+        receipt = `${who} \u2192 Tasks: \u201C${parent}\u201D now has ${ghost.steps.length} steps.`;
+        break;
+      }
+      case "goal_rest_weeks": {
+        const title = oneLine(ghost.title) || ghost.goalId;
+        const list = ghost.weeks.map(short).join(", ");
+        steps.push({ target: "tasks", collection: "goals", method: "PATCH", id: ghost.goalId, body: { rest_weeks: [...ghost.rest_weeks] } });
+        steps.push(recentAction(actedOn, who, `planned rest for \u201C${title}\u201D: weeks of ${list}`));
+        receipt = `${who} \u2192 Goals: \u201C${title}\u201D rests the weeks of ${list}. Those weeks won't count as misses.`;
+        break;
+      }
+      case "book_comm": {
+        steps.push({
+          target: "professional",
+          action: "create_communication",
+          date: ghost.date,
+          time: ghost.time,
+          duration_min: ghost.duration_min,
+          time_zone: ghost.time_zone || "Australia/Sydney",
+          title: oneLine(ghost.title),
+          channel: ghost.channel || "in_person",
+          purpose_tag: ghost.purpose_tag ?? null,
+          thread_ref: ghost.thread_ref ?? null,
+          person_refs: [...ghost.person_refs]
+        });
+        steps.push(recentAction(actedOn, who, `booked \u201C${oneLine(ghost.title)}\u201D ${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.time)}${why}`));
+        receipt = `${who} \u2192 Calendar: \u201C${oneLine(ghost.title)}\u201D, ${weekday2(ghost.date)} ${formatDisplayDate(ghost.date)} at ${clock12(ghost.time)}.`;
+        break;
+      }
+      case "outing":
+      case "meal_block":
+      case "schedule_workout": {
+        const withPartner = ghost.with === "partner";
+        const title = oneLine(ghost.title);
+        const span = `${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
+        const blockKind = ghost.kind === "schedule_workout" ? "workout" : withPartner ? "partner" : "plan";
+        const notes = oneLine(ghost.notes) || oneLine(ghost.place) || "";
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: {
+            type: "calendar_block",
+            date: ghost.date,
+            time: ghost.start,
+            end_time: ghost.end,
+            kind: blockKind,
+            status: "tentative",
+            protected: ghost.kind !== "schedule_workout",
+            title,
+            source_agent: ghost.agent,
+            ...notes ? { notes } : {}
+          }
+        });
+        if (ghost.follow_up_task && typeof ghost.follow_up_task === "object") {
+          const task = ghost.follow_up_task;
+          const taskTitle = oneLine(task.title) || title;
+          steps.push({
+            target: "tasks",
+            method: "POST",
+            body: {
+              title: taskTitle,
+              due_date: DATE_KEY2.test(task.due ?? "") ? task.due : ghost.date,
+              status: "open",
+              ...oneLine(task.notes) || oneLine(task.person_ref) ? {
+                notes: [oneLine(task.notes), oneLine(task.person_ref) ? `Person: ${oneLine(task.person_ref)}` : ""].filter(Boolean).join("\n")
+              } : {},
+              ...task.domain ? { domain: task.domain } : {},
+              ...HHMM.test(task.due_time ?? "") ? { due_time: task.due_time } : {},
+              source: "suggested_by_agent"
+            }
+          });
+        }
+        steps.push(recentAction(actedOn, who, `${ghost.kind === "outing" ? "outing" : ghost.kind === "meal_block" ? "meal" : "workout"} \u201C${title}\u201D ${span}${why}`));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D, ${span}, tentative${ghost.kind === "schedule_workout" ? "" : " and protected"}.`;
+        break;
+      }
+      case "reschedule_block": {
+        const fields = {};
+        if (DATE_KEY2.test(ghost.date ?? "")) fields.date = ghost.date;
+        if (HHMM.test(ghost.start ?? "")) fields.time = ghost.start;
+        if (HHMM.test(ghost.end ?? "")) fields.end_time = ghost.end;
+        if (oneLine(ghost.title)) fields.title = oneLine(ghost.title);
+        steps.push({ target: "life_record", mode: "update", path: ghost.path, fields });
+        const label = oneLine(ghost.title) || ghost.path;
+        const when = DATE_KEY2.test(ghost.date ?? "") && HHMM.test(ghost.start ?? "") ? ` \u2192 ${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}${HHMM.test(ghost.end ?? "") ? `\u2013${clock12(ghost.end)}` : ""}` : "";
+        steps.push(recentAction(actedOn, who, `rescheduled \u201C${label}\u201D${when}${why}`));
+        receipt = `${who} \u2192 Life: rescheduled \u201C${label}\u201D${when}.`;
+        break;
+      }
+      case "cancel_block": {
+        steps.push({
+          target: "life_record",
+          mode: "update",
+          path: ghost.path,
+          fields: { status: "cancelled" }
+        });
+        const label = oneLine(ghost.title) || ghost.path;
+        steps.push(recentAction(actedOn, who, `cancelled \u201C${label}\u201D${why}`));
+        receipt = `${who} \u2192 Life: cancelled \u201C${label}\u201D.`;
+        break;
+      }
+      case "log_comm": {
+        const time = HHMM.test(ghost.time ?? "") ? ghost.time : "12:00";
+        const subject = oneLine(ghost.title) || oneLine(ghost.subject);
+        steps.push({
+          target: "professional",
+          action: "log_communication",
+          date: ghost.date,
+          time,
+          time_zone: ghost.time_zone || "Australia/Sydney",
+          direction: ghost.direction,
+          channel: ghost.channel,
+          title: subject,
+          summary: typeof ghost.summary === "string" ? ghost.summary.trim() : "",
+          person_refs: Array.isArray(ghost.person_refs) ? [...ghost.person_refs] : []
+        });
+        steps.push(recentAction(actedOn, who, `logged ${ghost.direction} ${ghost.channel} \u201C${subject}\u201D ${weekday2(ghost.date)} ${short(ghost.date)}${why}`));
+        receipt = `${who} \u2192 Comms: logged ${ghost.direction} ${ghost.channel} \u201C${subject}\u201D on ${formatDisplayDate(ghost.date)}.`;
+        break;
+      }
+      case "pro_meeting": {
+        const title = oneLine(ghost.title);
+        const tz = ghost.time_zone || "Australia/Sydney";
+        steps.push({
+          target: "professional",
+          action: "create_meeting",
+          title,
+          date: ghost.date,
+          start: ghost.start,
+          end: ghost.end,
+          time_zone: tz,
+          scheduled_start: ghost.scheduled_start || null,
+          scheduled_end: ghost.scheduled_end || null,
+          location_text: ghost.location_text ?? null,
+          agenda: ghost.agenda ?? null,
+          notes: ghost.notes ?? null,
+          attendee_refs: Array.isArray(ghost.attendee_refs) ? [...ghost.attendee_refs] : []
+        });
+        steps.push(recentAction(actedOn, who, `booked meeting \u201C${title}\u201D ${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}${why}`));
+        receipt = `${who} \u2192 Meetings: \u201C${title}\u201D, ${weekday2(ghost.date)} ${formatDisplayDate(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}.`;
+        break;
+      }
+      case "pro_event": {
+        const title = oneLine(ghost.title);
+        const tz = ghost.time_zone || "Australia/Sydney";
+        steps.push({
+          target: "professional",
+          action: "create_event",
+          title,
+          date: ghost.date,
+          start: ghost.start,
+          end: ghost.end,
+          time_zone: tz,
+          start_iso: ghost.start_iso || null,
+          end_iso: ghost.end_iso || null,
+          event_type: ghost.event_type || "professional_development",
+          all_day: ghost.all_day === true,
+          location_text: ghost.location_text ?? null,
+          hours: ghost.hours ?? null,
+          attendee_refs: Array.isArray(ghost.attendee_refs) ? [...ghost.attendee_refs] : []
+        });
+        steps.push(recentAction(actedOn, who, `booked event \u201C${title}\u201D ${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}${why}`));
+        receipt = `${who} \u2192 Events: \u201C${title}\u201D, ${weekday2(ghost.date)} ${formatDisplayDate(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}.`;
         break;
       }
       default:
@@ -823,7 +1336,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     ".pcard"
   ].join(",");
   var MAGNET_SELECTOR = [
-    ".hub-pulse-card",
+    ".now-jump",
     ".home-class-tile",
     ".dashboard-overview__tile"
   ].join(",");
@@ -837,8 +1350,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
   var COUNT_SELECTOR = [
     "[data-value]",
     "[data-hub-count]",
-    "[data-percent]",
-    ".hub-pulse-card__count"
+    "[data-percent]"
   ].join(",");
   function prefersReducedMotion(root2 = document) {
     const view = root2.defaultView ?? globalThis;
@@ -902,6 +1414,11 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     group.classList.toggle("is-animated", animate);
     return box;
   }
+  var CHAT_PAGE_SELECTOR = [
+    ".chat-view:not([hidden]):not([data-panel-mode])",
+    ".teacher-chat",
+    ".coach.chat"
+  ].join(", ");
 
   // docs/proposals/calendar-reference/term-river/src/fixture.ts
   var TODAY = "2026-09-24";
@@ -913,11 +1430,11 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     term: { from: "2026-09-14", to: "2026-11-01", holidayFactor: 0.65 },
     year: { from: "2026-07-20", to: "2027-01-10", holidayFactor: 0.5 }
   };
-  var coreyEvenings = ["2026-09-14", "2026-09-16", "2026-09-17", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"].map((d) => ({
-    id: `Redacted-${d}`,
+  var partnerEvenings = ["2026-09-14", "2026-09-16", "2026-09-17", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"].map((d) => ({
+    id: `partner-${d}`,
     title: "Tea + TV",
     type: "calendar_block",
-    kind: "Redacted",
+    kind: "partner",
     date: d,
     start: "19:30",
     end: "21:30",
@@ -935,23 +1452,23 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     { id: "pd", title: "PD \xB7 Hard conversations", type: "professional_event", date: "2026-09-25", start: "08:30", end: "10:30", shape: "point" },
     { id: "t4-class", title: "Y11 becomes Y12 \xB7 one class", type: "marker", date: "2026-10-13", shape: "marker" },
     { id: "reports", title: "Reports due", type: "task", date: "2026-11-27", shape: "point" },
-    // Redacted
-    ...coreyEvenings,
-    { id: "good-night", title: "Good night: dinner out + a show", type: "calendar_block", kind: "Redacted", date: "2026-10-02", start: "18:00", end: "22:00", shape: "point", protected: true, sub: "held" },
+    // Partner
+    ...partnerEvenings,
+    { id: "good-night", title: "Good night: dinner out + a show", type: "calendar_block", kind: "partner", date: "2026-10-02", start: "18:00", end: "22:00", shape: "point", protected: true, sub: "held" },
     {
       id: "g-day-trip",
       title: "Blue Mountains day trip",
-      kind: "Redacted",
-      with: "Redacted",
+      kind: "partner",
+      with: "partner",
       date: "2026-10-08",
       start: "09:00",
       end: "18:00",
       shape: "point",
-      ghost: { agent: "hammond", kind: "protect_block", date: "2026-10-08", start: "09:00", end: "18:00", title: "Blue Mountains day trip", with: "Redacted" },
+      ghost: { agent: "hammond", kind: "protect_block", date: "2026-10-08", start: "09:00", end: "18:00", title: "Blue Mountains day trip", with: "partner" },
       sub: "comforting adventure"
     },
     // Scholar
-    { id: "conferral", title: "UNSW conferral", kind: "event", tags: ["graduation"], date: "2026-09-30", shape: "diamond", sub: "Master of Gifted Education" },
+    { id: "conferral", title: "Degree conferral", kind: "event", tags: ["graduation"], date: "2026-09-30", shape: "diamond", sub: "Master's degree" },
     { id: "uow", title: "UOW literacy elective", sub: "background hum, no alarms", from: "2026-07-20", to: "2027-01-10", shape: "hum" },
     { id: "dream", title: "Hammond maps 2027\u201328 applications", kind: "dream", date: "2026-11-02", shape: "point" },
     // Friends & family
@@ -978,7 +1495,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     { id: "symptom", title: "sore throat", symptom: true, kind: "health", date: "2026-09-24", shape: "marker" }
   ];
   var WALLS = [
-    { id: "korea", title: "Korea \xB7 23/12 \u2013 10/01", from: "2026-12-23", to: "2027-01-10" }
+    { id: "big-trip", title: "Away \xB7 23/12 \u2013 10/01", from: "2026-12-23", to: "2027-01-10" }
   ];
   var LOGGED = {
     "2026-09-14": 62,
@@ -1017,7 +1534,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     // label column
     padR: 24,
     axis: { tiers: 30, weekLabel: 50, weekDate: 63, h: 76 },
-    lanes: { teacher: 160, Redacted: 76, scholar: 64, friends: 72, body: 104 },
+    lanes: { teacher: 160, partner: 76, scholar: 64, friends: 72, body: 104 },
     load: 104,
     bar: { h: 18, rx: 7, gap: 6 },
     point: 5,
@@ -1245,9 +1762,9 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     for (const lane of LANES) {
       const top = laneTops[lane.id];
       const h = TR.lanes[lane.id];
-      if (lane.id === "Redacted") s("rect", { class: "tr-lane-wash", x: 0, y: top, width: W, height: h }, svg).parentNode.insertBefore(svg.lastChild, svg.firstChild);
+      if (lane.id === "partner") s("rect", { class: "tr-lane-wash", x: 0, y: top, width: W, height: h }, svg).parentNode.insertBefore(svg.lastChild, svg.firstChild);
       s("line", { class: "tr-rule", x1: 0, x2: W, y1: top + h, y2: top + h }, svg);
-      s("text", { class: `tr-t-lane${lane.id === "Redacted" ? " is-Redacted" : ""}`, x: 18, y: top + 24 }, labels, lane.label);
+      s("text", { class: `tr-t-lane${lane.id === "partner" ? " is-partner" : ""}`, x: 18, y: top + 24 }, labels, lane.label);
       s("text", { class: "tr-t-sub", x: 18, y: top + 40 }, labels, lane.sub);
       const g = s("g", { "data-part": "lane", "data-lane": lane.id }, plot);
       if (lane.id === "body") mountBody(g, top, h);
@@ -1327,7 +1844,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
       let label = null;
       const k = labelled.indexOf(it);
       const above = k % 2 === 0;
-      if (k >= 0) label = s("text", { class: `tr-t-point${it.shape === "diamond" ? " is-gold" : ""}${laneId === "Redacted" ? " is-Redacted" : ""}`, y: above ? cy - 19 : cy + 20 }, g);
+      if (k >= 0) label = s("text", { class: `tr-t-point${it.shape === "diamond" ? " is-gold" : ""}${laneId === "partner" ? " is-partner" : ""}`, y: above ? cy - 19 : cy + 20 }, g);
       placers.push((X) => {
         const x = X(it.date) + 0.5 * (X(addDays(it.date, 1)) - X(it.date));
         if (it.shape === "marker") set(n, { x1: x, x2: x });
@@ -1414,7 +1931,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
   }
   function updatePeriod() {
     const z = ZOOMS[state.zoom];
-    const title = state.zoom === "term" ? "Term 3 \u2192 Term 4" : "2026 \xB7 Term 3 to home from Korea";
+    const title = state.zoom === "term" ? "Term 3 \u2192 Term 4" : "2026 \xB7 Term 3 to home from the trip";
     nodes.get("period").innerHTML = `<b>${title}</b><span>${riverWeekLabel(weeksBetween(z.from, z.from)[0], TERMS)} \u2013 ${riverWeekLabel(weeksBetween(z.to, z.to)[0], TERMS)} \xB7 ${dd(z.from)}/${z.from.slice(2, 4)} \u2013 ${dd(z.to)}/${z.to.slice(2, 4)}</span>`;
   }
   function setZoom(z) {

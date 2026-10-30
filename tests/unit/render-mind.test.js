@@ -566,9 +566,9 @@ test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
     empty: false,
     themeCooccurrence: [
       { themeA: 'burnout', themeB: 'marking', count: 4 },
-      { themeA: 'burnout', themeB: 'Redacted', count: 3 },
-      { themeA: 'marking', themeB: 'Redacted', count: 2 },
-      { themeA: 'Redacted', themeB: 'exhaustion', count: 2 }
+      { themeA: 'burnout', themeB: 'partner', count: 3 },
+      { themeA: 'marking', themeB: 'partner', count: 2 },
+      { themeA: 'partner', themeB: 'exhaustion', count: 2 }
     ]
   }));
   const svg = root.querySelector('#mind-chord');

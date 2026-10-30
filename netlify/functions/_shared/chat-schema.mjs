@@ -6,6 +6,9 @@ import { coerceCalendarDate, normalizeMedicalFields, splitLongTitle } from '../.
 import { provisionAmrapCircuitRounds } from '../../../apps/life/js/core/workout-plan-groups.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
+import { MEDICATION } from '../../../packages/design-kit/js/calendar/medication-model.js';
+
+const DAILY_MEDICATION_NAME = MEDICATION.name.toLowerCase();
 
 const RECORD_TYPES = ['meal', 'creatine', 'creatine_plan', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical', 'medication'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -324,7 +327,7 @@ const DOMAIN_PROPERTIES = {
     source_agent: { type: 'string', enum: ['vera', 'import'] }
   },
   medical: {
-    title: { type: 'string', description: 'Short visit label of a few words, e.g. "Redacted injection". Required. Put detail, symptoms and context in notes, never in the title.' },
+    title: { type: 'string', description: 'Short visit label of a few words, e.g. "Biologic injection". Required. Put detail, symptoms and context in notes, never in the title.' },
     record_type: {
       type: 'string',
       description: 'Set this explicitly — the automatic guess from title/notes is unreliable (symptoms get filed as Prescription). Symptoms and feelings are always Symptom. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
@@ -358,7 +361,7 @@ const DOMAIN_PROPERTIES = {
     },
     cadence_days: {
       type: 'number',
-      description: 'Optional dosing interval in days (e.g. Redacted = 56). Omit when unknown.'
+      description: 'Optional dosing interval in days (e.g. 28 for a four-weekly injection). Omit when unknown.'
     },
     task_id: {
       type: 'string',
@@ -499,7 +502,10 @@ export function buildRecordSlug(record) {
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
   if (record.type === 'medication') {
     // dex-am-0740 / dex-pm-skipped: one file per dose slot per day, a correction overwrites it.
-    const stem = String(record.medication ?? 'med').toLowerCase().startsWith('dex') ? 'dex' : 'med';
+    // `dex-` is the stored path prefix for the daily-medication slot (kept for existing
+    // private records); any other named medication gets `med-`.
+    const medication = String(record.medication ?? 'med').toLowerCase();
+    const stem = medication.startsWith('dex') || medication === DAILY_MEDICATION_NAME ? 'dex' : 'med';
     const slot = record.slot === 'pm' ? 'pm' : 'am';
     const when = record.status === 'skipped' ? 'skipped' : String(record.time ?? '0000').replace(':', '');
     return `${stem}-${slot}-${when}`;

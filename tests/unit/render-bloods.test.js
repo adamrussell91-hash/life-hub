@@ -414,7 +414,7 @@ test('a marker with history gets a trend card: what-line, status, band, and date
   const tile = root._host.querySelector('.bloods-metric');
   assert.ok(tile, 'three draws earn a card, not a row');
   assert.equal(root._host.querySelector('.bloods-row'), null);
-  assert.match(String(tile.textContent), /gut|mucosal|Redacted/i);
+  assert.match(String(tile.textContent), /gut|mucosal/i);
   assert.match(String(tile.textContent), /High/);
   assert.match(String(tile.textContent), /<50|0–50|0-50/);
   assert.match(String(tile.textContent), /↓125/);

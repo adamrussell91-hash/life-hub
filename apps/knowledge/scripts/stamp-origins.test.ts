@@ -8,17 +8,30 @@ import {
   stampOrigins,
   syncManifestOrigins,
 } from "./stamp-origins";
+import { installUnitDegreeMap } from "../src/origin/unitDegrees";
+import { TEST_UNIT_DEGREES } from "../src/origin/unitDegrees.fixture";
+import { installOriginLabelRules } from "../src/origin/normalize";
+import { installNotesPlace } from "../src/origin/notesPlace";
+import { TEST_NOTES_PLACE } from "../src/origin/notesPlace.fixture";
+
+installNotesPlace(TEST_NOTES_PLACE);
+
+installUnitDegreeMap(TEST_UNIT_DEGREES);
+installOriginLabelRules({
+  aliases: { "Sample Leadership Certificate": "Graduate Certificate in Sample Leadership" },
+  dropped: ["Graduate Diploma of Sample"],
+});
 
 const page = (overrides: Partial<Page> = {}): Page => ({
   id: "page_notion_abc",
   title: "Lecture",
   area: "notes",
-  tags: ["Note", "EDST5805"],
+  tags: ["Note", "SMPL5805"],
   body: "Degree: MEd\n\nBody.",
   connected: [],
   attachments: [],
-  source_notion_id: "13ef794f84768078bbe7d30d66a8709c",
-  source_notion_url: "https://notion.so/13ef794f84768078bbe7d30d66a8709c",
+  source_notion_id: "d0000000000000000000000000000004",
+  source_notion_url: "https://notion.so/d0000000000000000000000000000004",
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-02T00:00:00.000Z",
   schema_version: 1,
@@ -35,30 +48,30 @@ describe("stamp origins", () => {
     });
   });
 
-  it("stamps notebook, book, and PD from the committed Notion snapshot", () => {
+  it("stamps notebook, book, and PD from the installed Notion place map", () => {
     expect(
       applyStampedOrigins(
         page({
           tags: ["Note"],
           body: "Lecture.",
-          source_notion_id: "163f794f84768001aebffe92627dc423",
+          source_notion_id: "b0000000000000000000000000000002",
         }),
       )?.origins,
     ).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
     expect(
       applyStampedOrigins(
         page({
-          id: "page_notion_163f794f84768001aebffe92627dc423",
+          id: "page_notion_b0000000000000000000000000000002",
           tags: ["Note"],
           body: "Lecture.",
-          source_notion_id: "page_notion_163f794f84768001aebffe92627dc423",
+          source_notion_id: "page_notion_b0000000000000000000000000000002",
         }),
       )?.origins,
     ).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
   });
@@ -66,43 +79,43 @@ describe("stamp origins", () => {
   it("counts how many pages carry each origin kind", () => {
     expect(
       originKindCounts([
-        { origins: [{ kind: "notebook", label: "Literacy" }, { kind: "book", label: "Atomic Habits" }] },
+        { origins: [{ kind: "notebook", label: "Literacy" }, { kind: "book", label: "Example Book" }] },
         { origins: [{ kind: "notebook", label: "Literacy" }] },
-        { origins: [{ kind: "unit", label: "EDST5805" }] },
+        { origins: [{ kind: "unit", label: "SMPL5805" }] },
       ]),
     ).toEqual({ degree: 0, unit: 1, notebook: 2, book: 1, pd: 0 });
   });
 
   it("stamps degree and unit from body and tags without Notion", () => {
     expect(applyStampedOrigins(page())?.origins).toEqual([
-      { kind: "degree", label: "Master of Education (Gifted Education)" },
+      { kind: "degree", label: "Master of Sample Studies" },
       { kind: "degree", label: "MEd" },
-      { kind: "unit", label: "EDST5805" },
+      { kind: "unit", label: "SMPL5805" },
     ]);
   });
 
-  it("renames the Newcastle graduate certificate and does not restore the UNE diploma", () => {
+  it("renames an aliased certificate and does not restore a dropped programme", () => {
     expect(
       applyStampedOrigins(
         page({
-          tags: ["EDUC6119"],
+          tags: ["SMPL6119"],
           body: "Lecture.",
           origins: [
-            { kind: "degree", label: "Transformational Leadership Certificate" },
-            { kind: "degree", label: "Graduate Diploma of Psychology" },
-            { kind: "unit", label: "EDUC6119" },
+            { kind: "degree", label: "Sample Leadership Certificate" },
+            { kind: "degree", label: "Graduate Diploma of Sample" },
+            { kind: "unit", label: "SMPL6119" },
           ],
         }),
       )?.origins,
     ).toEqual([
-      { kind: "degree", label: "Graduate Certificate in Transformational Leadership" },
-      { kind: "unit", label: "EDUC6119" },
+      { kind: "degree", label: "Graduate Certificate in Sample Leadership" },
+      { kind: "unit", label: "SMPL6119" },
     ]);
   });
 
   it("copies existing page pills onto a list row that never got them", () => {
     const ready = page({
-      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      id: "page_notion_a0000000000000000000000000000001",
       origins: [{ kind: "notebook", label: "Boy's Education" }],
     });
     expect(
@@ -115,7 +128,7 @@ describe("stamp origins", () => {
 
   it("backfills created_at from the page file onto a list row that never got it", () => {
     const ready = page({
-      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      id: "page_notion_a0000000000000000000000000000001",
       created_at: "2025-06-12T00:00:00.000Z",
     });
     expect(
@@ -128,7 +141,7 @@ describe("stamp origins", () => {
 
   it("copies tidied topic tags from the page file onto a stale list row", () => {
     const ready = page({
-      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      id: "page_notion_a0000000000000000000000000000001",
       tags: ["Note", "Learning Science and Cognition"],
       body: "A cleaned lecture body.",
     });
@@ -146,7 +159,7 @@ describe("stamp origins", () => {
 
   it("appends notebook pages that exist as files but never reached the list", () => {
     const ready = page({
-      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      id: "page_notion_a0000000000000000000000000000001",
       origins: [{ kind: "notebook", label: "Boy's Education" }],
     });
     const extra = extraOriginEntries(
@@ -160,14 +173,14 @@ describe("stamp origins", () => {
 
   it("matches a list row whose id is a dashed Notion UUID", () => {
     const ready = page({
-      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      id: "page_notion_a0000000000000000000000000000001",
       origins: [{ kind: "notebook", label: "Boy's Education" }],
     });
     expect(
       syncManifestOrigins(
         [
           {
-            id: "00c518fb-7b88-4781-a60f-702ec3185eb3",
+            id: "a0000000-0000-0000-0000-000000000001",
             title: ready.title,
             area: ready.area,
             tags: ready.tags,
@@ -184,9 +197,9 @@ describe("stamp origins", () => {
       applyStampedOrigins(
         page({
           origins: [
-            { kind: "degree", label: "Master of Education (Gifted Education)" },
+            { kind: "degree", label: "Master of Sample Studies" },
             { kind: "degree", label: "MEd" },
-            { kind: "unit", label: "EDST5805" },
+            { kind: "unit", label: "SMPL5805" },
           ],
         }),
       ),
@@ -209,10 +222,10 @@ describe("stamp origins", () => {
       fetchImpl,
     });
     expect(changed[0]?.origins).toEqual([
-      { kind: "degree", label: "Master of Education (Gifted Education)" },
+      { kind: "degree", label: "Master of Sample Studies" },
       { kind: "degree", label: "MEd" },
       { kind: "notebook", label: "Brown 2022" },
-      { kind: "unit", label: "EDST5805" },
+      { kind: "unit", label: "SMPL5805" },
     ]);
   });
 });

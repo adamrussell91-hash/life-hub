@@ -657,16 +657,18 @@ export function applyLogToCentralNode(content, {
 
 /**
  * Adam's floor: Central Node is a pattern board, not an archive.
- * Anything dated before August 2026 is noise; unbooked penicillin TBC is noise;
- * day-by-day macro dumps and present-tense Entocort taper copy are noise.
+ * Anything dated before August 2026 is noise; an unbooked drug-allergy challenge TBC is noise;
+ * day-by-day macro dumps and present-tense copy about a ceased budesonide taper are noise.
  */
 export const CENTRAL_NODE_HISTORY_CUTOFF = '2026-08-01';
 
 const UPCOMING_APPOINTMENTS_HEADING = '### Upcoming Appointments';
 const DAY_MACRO_DUMP_RE = /^\s*(?:[-*]\s*)?(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b[^:\n]{0,24}:\s*.*\b(?:kcal|g P|protein)\b/i;
 const WEEK_NONE_LOGGED_RE = /^\s*(?:[-*]\s*)?(?:\*\*)?Exercise:\s*none logged\b/i;
-const ENTCORT_ACTIVE_RE = /\bEntocort\b.*\b(taper|Day\s+\d+|Week\s+\d+|active|begins|6mg|9mg)\b|\b(taper|active).*\bEntocort\b/i;
-const PENICILLIN_CHALLENGE_RE = /penicillin\s+challenge/i;
+const TAPER_DRUG = '(?:budesonide|entocort)';
+const CEASED_TAPER_ACTIVE_RE = new RegExp(`\\b${TAPER_DRUG}\\b.*\\b(taper|Day\\s+\\d+|Week\\s+\\d+|active|begins|\\d+\\s?mg)\\b|\\b(taper|active).*\\b${TAPER_DRUG}\\b`, 'i');
+const CEASED_TAPER_DIRECTORY_RE = new RegExp(`,?\\s*${TAPER_DRUG} taper skin protocol`, 'i');
+const ALLERGY_CHALLENGE_RE = /\b(?:penicillin|antibiotic|drug)\s+(?:allergy\s+)?challenge\b/i;
 const CROSS_AGENT_DATE_RE = /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/i;
 const APPT_DATE_RE = /^\s*[-*]\s*\*\*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\b/;
 
@@ -683,21 +685,21 @@ export function sanitizeCentralNode(content, today, {
   next = rollStaleSections(next, today, { rollTodaysStatus });
   next = purgeStaleRecentActions(next, today);
   next = purgePastUpcomingAppointments(next, today);
-  next = purgePenicillinChallengeLines(next);
+  next = purgeAllergyChallengeLines(next);
   // August floor only engages once we are in/after August — otherwise July fixtures
   // and mid-year writes would wipe the current month's Cross-Agent lines.
   if (today >= historyCutoff) {
     next = purgeCrossAgentBeforeCutoff(next, historyCutoff, today);
   }
   next = stripDayByDayMacroDumps(next);
-  next = stripEntocortActiveNoiseOutsideConstraints(next);
+  next = stripCeasedTaperNoiseOutsideConstraints(next);
   next = dedupeCrossAgentSection(next);
   next = trimCrossAgentSection(next);
   next = dedupeRecentActions(next);
   return next;
 }
 
-/** Drop dated Upcoming Appointments that are already past. Keep undated TBC (except penicillin). */
+/** Drop dated Upcoming Appointments that are already past. Keep undated TBC (except drug-allergy challenges). */
 export function purgePastUpcomingAppointments(content, today) {
   if (typeof content !== 'string' || !isCalendarDate(today)) return content;
   const headingIndex = content.indexOf(UPCOMING_APPOINTMENTS_HEADING);
@@ -723,10 +725,10 @@ export function purgePastUpcomingAppointments(content, today) {
   return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
 }
 
-export function purgePenicillinChallengeLines(content) {
+export function purgeAllergyChallengeLines(content) {
   if (typeof content !== 'string' || !content) return content;
   const lines = content.split('\n');
-  const kept = lines.filter(line => !PENICILLIN_CHALLENGE_RE.test(line));
+  const kept = lines.filter(line => !ALLERGY_CHALLENGE_RE.test(line));
   return kept.length === lines.length ? content : kept.join('\n');
 }
 
@@ -783,10 +785,10 @@ export function stripDayByDayMacroDumps(content) {
 }
 
 /**
- * Entocort course is ceased — present-tense taper copy outside Constraints is stale.
+ * A ceased budesonide course — present-tense taper copy outside Constraints is stale.
  * Constraints keep the medical history; everywhere else drops active-taper framing.
  */
-export function stripEntocortActiveNoiseOutsideConstraints(content) {
+export function stripCeasedTaperNoiseOutsideConstraints(content) {
   if (typeof content !== 'string' || !content) return content;
   const constraintsStart = content.indexOf('## 🔴 Current Constraints & Priorities');
   const constraintsEnd = constraintsStart === -1
@@ -806,10 +808,10 @@ export function stripEntocortActiveNoiseOutsideConstraints(content) {
     const inConstraints = constraintsStart !== -1
       && lineStart >= constraintsStart
       && lineStart < constraintsEnd;
-    if (!inConstraints && ENTCORT_ACTIVE_RE.test(line)) continue;
+    if (!inConstraints && CEASED_TAPER_ACTIVE_RE.test(line)) continue;
     // Agent Directory one-liner still advertising an active taper protocol.
-    if (!inConstraints && /Entocort taper skin protocol/i.test(line)) {
-      kept.push(line.replace(/,\s*Entocort taper skin protocol/i, ''));
+    if (!inConstraints && CEASED_TAPER_DIRECTORY_RE.test(line)) {
+      kept.push(line.replace(CEASED_TAPER_DIRECTORY_RE, ''));
       continue;
     }
     kept.push(line);

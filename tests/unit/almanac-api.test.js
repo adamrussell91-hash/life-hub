@@ -199,8 +199,8 @@ test('readSchoolTerms flattens the year-nested school_terms hub-prefs writes, so
 test('a bad anchor row is skipped with a warning', () => {
   const warnings = [];
   const anchors = parseAlmanacAnchors([
-    '- id: korea',
-    '  title: Korea honeymoon',
+    '- id: big-trip',
+    '  title: Overseas holiday',
     '  kind: trip',
     "  date: '2026-12-23'",
     "  returns: '2027-01-10'",
@@ -216,7 +216,7 @@ test('a bad anchor row is skipped with a warning', () => {
     '  tags: []',
     '  sub: both'
   ].join('\n'), { warn: message => warnings.push(message) });
-  assert.deepEqual(anchors.map(anchor => anchor.id), ['korea']);
+  assert.deepEqual(anchors.map(anchor => anchor.id), ['big-trip']);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /bad/);
 });
@@ -306,12 +306,12 @@ test('GET on the seed matches the reference summary and openings, and done drops
 
 test('accepting the pet-sitter ghost creates one task, and a retry does not create another', async () => {
   const { handler, github, store } = ghostHarness();
-  const first = await handler(post({ id: 'alm-korea:pet-sitter', decision: 'accept' }));
+  const first = await handler(post({ id: 'alm-big-trip:pet-sitter', decision: 'accept' }));
   const firstBody = await first.json();
   assert.equal(first.status, 200, JSON.stringify(firstBody));
-  const again = await handler(post({ id: 'alm-korea:pet-sitter', decision: 'accept' }));
+  const again = await handler(post({ id: 'alm-big-trip:pet-sitter', decision: 'accept' }));
   assert.equal(again.status, 200);
-  const id = ghostTaskId('alm-korea:pet-sitter');
+  const id = ghostTaskId('alm-big-trip:pet-sitter');
   const taskIds = [...store.data.keys()].filter(key => key.startsWith('tasks/') && key !== TASKS_INDEX_KEY);
   assert.deepEqual(taskIds, [taskKey(id)]);
   assert.equal(store.data.get(taskKey(id)).due_date, '2026-10-28');
@@ -392,9 +392,9 @@ test('accepting a draft writes nothing and returns the text', async () => {
 test('decision requests: done, not doing, not going, moved; anything else is rejected', () => {
   assert.deepEqual(readDoneRequest({ stepId: 'a:b' }), { stepId: 'a:b' });
   assert.deepEqual(readDoneRequest({ stepId: 'a:b', status: 'not_doing' }), { stepId: 'a:b', status: 'not_doing' });
-  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'not_going', reason: ' not attending ' }), { anchorId: 'unsw', status: 'not_going', reason: 'not attending' });
-  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'moved', date: '2026-10-02' }), { anchorId: 'unsw', status: 'moved', date: '2026-10-02' });
-  assert.deepEqual(readDoneRequest({ anchorId: 'unsw', status: 'moved' }), { error: 'invalid_request' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'uni', status: 'not_going', reason: ' not attending ' }), { anchorId: 'uni', status: 'not_going', reason: 'not attending' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'uni', status: 'moved', date: '2026-10-02' }), { anchorId: 'uni', status: 'moved', date: '2026-10-02' });
+  assert.deepEqual(readDoneRequest({ anchorId: 'uni', status: 'moved' }), { error: 'invalid_request' });
   assert.deepEqual(readDoneRequest({ stepId: 'a:b', title: 'x' }), { error: 'client_write_rejected' });
   assert.deepEqual(readDoneRequest({ stepId: 'a:b', status: 'deleted' }), { error: 'invalid_request' });
 });
@@ -403,16 +403,16 @@ test('decision rows parse alongside old done rows, and anchors honour not going 
   const rows = parseAlmanacDone(JSON.stringify([
     { stepId: 'x:y', at: 't1' },
     { stepId: 'x:z', at: 't2', status: 'not_doing' },
-    { anchorId: 'unsw', at: 't3', status: 'not_going', reason: 'skipping it' },
-    { anchorId: 'korea', at: 't4', status: 'moved', date: '2026-12-26' },
+    { anchorId: 'uni', at: 't3', status: 'not_going', reason: 'skipping it' },
+    { anchorId: 'big-trip', at: 't4', status: 'moved', date: '2026-12-26' },
     { anchorId: 'bad', at: 't5', status: 'moved' }
   ]), { warn: () => {} });
   assert.equal(rows.length, 4);
   const anchors = applyAnchorDecisions([
-    { id: 'unsw', title: 'UNSW conferral', kind: 'event', date: '2026-09-30', tags: [], sub: 'x' },
-    { id: 'korea', title: 'Korea', kind: 'trip', date: '2026-12-23', returns: '2027-01-06', tags: [], sub: 'x' }
+    { id: 'uni', title: 'Degree conferral', kind: 'event', date: '2026-09-30', tags: [], sub: 'x' },
+    { id: 'big-trip', title: 'Away', kind: 'trip', date: '2026-12-23', returns: '2027-01-06', tags: [], sub: 'x' }
   ], rows);
-  assert.deepEqual(anchors.map(anchor => anchor.id), ['korea']);
+  assert.deepEqual(anchors.map(anchor => anchor.id), ['big-trip']);
   assert.equal(anchors[0].date, '2026-12-26');
   assert.equal(anchors[0].returns, '2027-01-09', 'a trip keeps its length when moved');
 });

@@ -1,15 +1,20 @@
 import type { JournalDocument } from '@/api/journal';
 import type { JournalMoment, JournalMomentAuthor } from '@/journal/types';
 
-/** Agent-context integrity: Redacted lines are coordination/perspective — not proven user state. */
-export const Redacted_PERSPECTIVE_AUTHORITY_RULE =
-  "Redacted's journal lines are a separate perspective lane. They are not authoritative user truth and must not override your corrections in digests or summaries.";
+/** Agent-context integrity: Partner lines are coordination/perspective — not proven user state. */
+export const PARTNER_PERSPECTIVE_AUTHORITY_RULE =
+  "Partner's journal lines are a separate perspective lane. They are not authoritative user truth and must not override your corrections in digests or summaries.";
 
-export const Redacted_EXPORT_AUTHORSHIP_LABEL = "[Redacted's perspective — not your words]";
+export const PARTNER_EXPORT_AUTHORSHIP_LABEL = "[Partner's perspective — not your words]";
 export const ADAM_EXPORT_AUTHORSHIP_LABEL = '[Adam — your journal]';
 
+/**
+ * Only a missing author or 'adam' is Adam's own words. Any other value,
+ * including author ids saved before the rename to 'partner', is someone
+ * else's perspective, so it can never pass as authoritative user truth.
+ */
 export function parseMomentAuthor(raw: unknown): JournalMomentAuthor {
-  return raw === 'Redacted' ? 'Redacted' : 'adam';
+  return raw === undefined || raw === null || raw === '' || raw === 'adam' ? 'adam' : 'partner';
 }
 
 export function resolveMomentAuthor(moment: Pick<JournalMoment, 'author'>): JournalMomentAuthor {
@@ -21,20 +26,20 @@ export function isAuthoritativeUserMoment(moment: Pick<JournalMoment, 'author'>)
 }
 
 export function formatAuthorshipExportLabel(author: JournalMomentAuthor): string {
-  return author === 'Redacted' ? Redacted_EXPORT_AUTHORSHIP_LABEL : ADAM_EXPORT_AUTHORSHIP_LABEL;
+  return author === 'partner' ? PARTNER_EXPORT_AUTHORSHIP_LABEL : ADAM_EXPORT_AUTHORSHIP_LABEL;
 }
 
-export function journalHasCoreyMoments(journal: JournalDocument): boolean {
+export function journalHasPartnerMoments(journal: JournalDocument): boolean {
   return journal.moments.some(
-    (m) => m.lifecycle === 'live' && resolveMomentAuthor(m) === 'Redacted',
+    (m) => m.lifecycle === 'live' && resolveMomentAuthor(m) === 'partner',
   );
 }
 
 export function filterMomentsForPerspectiveDisplay(
   moments: JournalMoment[],
-  showCoreyPerspective: boolean,
+  showPartnerPerspective: boolean,
 ): JournalMoment[] {
-  if (showCoreyPerspective) return moments;
+  if (showPartnerPerspective) return moments;
   return moments.filter((m) => isAuthoritativeUserMoment(m));
 }
 
@@ -45,13 +50,13 @@ export function authoritativeLiveMoments(journal: JournalDocument): JournalMomen
   );
 }
 
-export function coreyPerspectiveVisibleStorageKey(tripId: string): string {
-  return `lifehub.travel.journal.showCoreyPerspective.${tripId}`;
+export function partnerPerspectiveVisibleStorageKey(tripId: string): string {
+  return `lifehub.travel.journal.showPartnerPerspective.${tripId}`;
 }
 
-export function readCoreyPerspectiveVisible(tripId: string): boolean {
+export function readPartnerPerspectiveVisible(tripId: string): boolean {
   try {
-    const raw = localStorage.getItem(coreyPerspectiveVisibleStorageKey(tripId));
+    const raw = localStorage.getItem(partnerPerspectiveVisibleStorageKey(tripId));
     if (raw === '0' || raw === 'false') return false;
     return true;
   } catch {
@@ -59,9 +64,9 @@ export function readCoreyPerspectiveVisible(tripId: string): boolean {
   }
 }
 
-export function writeCoreyPerspectiveVisible(tripId: string, visible: boolean): void {
+export function writePartnerPerspectiveVisible(tripId: string, visible: boolean): void {
   try {
-    localStorage.setItem(coreyPerspectiveVisibleStorageKey(tripId), visible ? '1' : '0');
+    localStorage.setItem(partnerPerspectiveVisibleStorageKey(tripId), visible ? '1' : '0');
   } catch {
     /* ignore quota */
   }

@@ -56,7 +56,7 @@ const KEYWORD_HINTS = [
   },
   {
     ids: ['plan.week-meals'],
-    patterns: [/meal plan/i, /plan (?:the |my )?week/i, /Redacted/i]
+    patterns: [/meal plan/i, /plan (?:the |my )?week/i, /meal kit/i, /dinners? (?:for|this) week/i]
   },
   {
     ids: ['lookup.food-brand-au', 'lookup.save-food-library', 'log.entry'],

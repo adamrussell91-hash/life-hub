@@ -40,17 +40,17 @@ export function visit(id, date, fields = {}, body = '') {
 }
 
 export const BLOODS = [
-  bloods('2026-03-04', { ggt: 98, alt: 36, crp: 6.1, ferritin: 90 }),
-  bloods('2026-06-10', { ggt: 131, alt: 41, crp: 3.0, ferritin: 120 }),
-  bloods('2026-09-17', { ggt: 233, alt: 43, crp: 2.1, ferritin: 143 })
+  bloods('2026-03-04', { ggt: 84, alt: 36, crp: 6.1, ferritin: 90 }),
+  bloods('2026-06-10', { ggt: 117, alt: 41, crp: 3.0, ferritin: 120 }),
+  bloods('2026-09-17', { ggt: 196, alt: 43, crp: 2.1, ferritin: 143 })
 ];
 
 export const MEDICAL = [
-  visit('Redacted-induction', '2026-07-02', { title: 'Redacted induction infusion', record_type: 'Prescription', lane: 'prescription', weight: 'major', provider: 'Dr Redacted' }),
-  visit('Redacted-1', '2026-08-27', { title: 'Redacted injection', record_type: 'Prescription', lane: 'prescription', weight: 'major', cadence_days: 56, provider: 'Dr Redacted' }),
-  visit('Redacted-2', '2026-10-22', { title: 'Redacted injection', record_type: 'Prescription', lane: 'prescription', status: 'planned', cadence_days: 56 }),
-  visit('gastro', '2026-09-24', { title: 'Gastro follow-up', provider: 'Dr Redacted', time: '10:30' }, 'Calprotectin 15. GGT concern. MRCP ordered.'),
-  visit('gp-ggt', '2026-10-26', { title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Redacted', status: 'booked', time: '14:00', duration_min: 30 }, 'Discuss 17 Sep GGT 233 and ALT 43.'),
+  visit('biologic-induction', '2026-07-02', { title: 'Biologic induction infusion', record_type: 'Prescription', lane: 'prescription', weight: 'major', provider: 'Dr Rowan Pike' }),
+  visit('biologic-1', '2026-08-27', { title: 'Biologic injection', record_type: 'Prescription', lane: 'prescription', weight: 'major', cadence_days: 56, provider: 'Dr Rowan Pike' }),
+  visit('biologic-2', '2026-10-22', { title: 'Biologic injection', record_type: 'Prescription', lane: 'prescription', status: 'planned', cadence_days: 56 }),
+  visit('gastro', '2026-09-24', { title: 'Gastro follow-up', provider: 'Dr Rowan Pike', time: '10:30' }, 'Calprotectin 22. GGT concern. MRCP ordered.'),
+  visit('gp-ggt', '2026-10-26', { title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Jordan Sample', status: 'booked', time: '14:00', duration_min: 30 }, 'Discuss 17 Sep GGT 196 and ALT 43.'),
   visit('mrcp', '2026-11-01', { title: 'MRCP', record_type: 'Imaging', lane: 'imaging', status: 'to_book', date_precision: 'month' }),
   visit('sore-1', '2026-08-29', { title: 'Sore throat', record_type: 'Symptom', lane: 'symptom', weight: 'minor', episode: { id: 'cold-aug', title: 'Head cold', status: 'resolved', started: '2026-08-29', resolved: '2026-09-02' } }, 'Sore throat two days after injection.'),
   visit('sore-2', '2026-08-30', { title: 'Congested', record_type: 'Symptom', lane: 'symptom', weight: 'minor', episode: { id: 'cold-aug', title: 'Head cold', status: 'resolved', started: '2026-08-29', resolved: '2026-09-02' } }),

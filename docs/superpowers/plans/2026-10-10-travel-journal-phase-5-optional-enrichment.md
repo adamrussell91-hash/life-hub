@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Optional enhancements that never block Phases 1–4: photo annotations, souvenir collections, Redacted’s separate perspective, transcripts, printable editions. Ordinary photo/text/audio access remains for every enhancement.
+**Goal:** Optional enhancements that never block Phases 1–4: photo annotations, souvenir collections, Partner’s separate perspective, transcripts, printable editions. Ordinary photo/text/audio access remains for every enhancement.
 
 **Architecture:** Each enrichment is an additive module behind explicit UI entry points. No enrichment may replace the basic reader or require a paid API for core journal access. Prefer pinning Codex candidate libraries only when the named feature is requested.
 
@@ -28,7 +28,7 @@
 | --- | --- |
 | `apps/travel/src/journal/annotations.ts` | Photo region notes; store as derived JSON beside media id |
 | `apps/travel/src/journal/souvenirs.ts` | Collection of object moments / attached objects |
-| `apps/travel/src/journal/Redacted-perspective.ts` | Separate author lane; never promoted to Adam truth without explicit confirm |
+| `apps/travel/src/journal/partner-perspective.ts` | Separate author lane; never promoted to Adam truth without explicit confirm |
 | `apps/travel/src/journal/transcripts.ts` | Editable derived text linked to audio media id |
 | `apps/travel/src/journal/print-edition.ts` | Printable layout / PDF export |
 | Matching `tests/unit/journal-*.test.ts` | Per feature |
@@ -54,12 +54,12 @@
 
 ---
 
-### Task C: Redacted perspective (only if Adam asks)
+### Task C: Partner perspective (only if Adam asks)
 
-- [ ] **Step 1:** Parallel author field on moments or sibling moment stream with `author: 'Redacted' | 'adam'`.
-- [ ] **Step 2:** Agent-context integrity: Redacted lines are not authoritative user truth; digests must not override Adam corrections (`agent-context-integrity` rules).
+- [ ] **Step 1:** Parallel author field on moments or sibling moment stream with `author: 'partner' | 'adam'`.
+- [ ] **Step 2:** Agent-context integrity: Partner lines are not authoritative user truth; digests must not override Adam corrections (`agent-context-integrity` rules).
 - [ ] **Step 3:** Filter toggles in toolbar; export labels authorship.
-- [ ] **Step 4: Commit** `feat(travel): Redacted journal perspective lane`
+- [ ] **Step 4: Commit** `feat(travel): Partner journal perspective lane`
 
 ---
 
@@ -97,7 +97,7 @@
 | --- | --- |
 | Photo annotations | A |
 | Souvenir collections | B |
-| Redacted perspective | C |
+| Partner perspective | C |
 | Transcripts | D |
 | Printable editions | E |
 | Panoramas / immersive / film | Deferred |

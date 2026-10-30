@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalizeManifestRow } from "./localData";
+import { installNotesPlace } from "../origin/notesPlace";
+import { TEST_NOTES_PLACE } from "../origin/notesPlace.fixture";
+
+installNotesPlace(TEST_NOTES_PLACE);
 
 describe("normalizeManifestRow", () => {
   it("keeps created_at when the staged manifest has it", () => {
@@ -24,7 +28,7 @@ describe("normalizeManifestRow", () => {
   it("recovers notebook pills from a page_notion id", () => {
     expect(
       normalizeManifestRow({
-        id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+        id: "page_notion_a0000000000000000000000000000001",
         title: "Boys",
         area: "notes",
         tags: [],

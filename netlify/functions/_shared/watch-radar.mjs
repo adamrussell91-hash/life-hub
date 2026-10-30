@@ -9,7 +9,8 @@
  * A failed check keeps the last good price and records the error, so one blocked
  * page never wipes a watch off the radar.
  */
-import { WATCHES, defaultTarget, groupByModel, isTrackable, isWanted } from '../../../apps/life/js/app/aesthetics/watch-model.js';
+import { defaultTarget, groupByModel, isTrackable, isWanted, watchesFromSource } from '../../../apps/life/js/app/aesthetics/watch-model.js';
+import { readPrivateJsonFile } from './private-data-file.mjs';
 import { getJSON, setJSON } from './tasks-blobs.mjs';
 import { readShopPrice } from './watch-price.mjs';
 import { PUSH_DAILY_CAP, readPushLog, readSubscriptions, sendToAll, writePushLog } from './push.mjs';
@@ -19,12 +20,21 @@ export const RADAR_KEY = 'meta/watch_radar';
 export const TARGETS_KEY = 'meta/watch_radar_targets';
 const HISTORY_WEEKS = 26;
 
+/** The watch tracker lives only in the private data repo. */
+export const WATCHES_PATH = 'data/aesthetics/watches.json';
+
+/** Every tracked watch, read from the private repo. Throws when it can't be read. */
+export async function loadPrivateWatches({ env = process.env, fetchImpl = fetch, read = readPrivateJsonFile } = {}) {
+  const raw = await read(WATCHES_PATH, { env, fetchImpl, label: 'watch tracker' });
+  return watchesFromSource(raw?.watches);
+}
+
 /** The wanted watches, by model, that the radar can actually check. */
-export function radarWatchList(watches = WATCHES) {
+export function radarWatchList(watches = []) {
   return groupByModel(watches.filter(isWanted)).flatMap(g =>
     g.items.filter(w => isTrackable(w.url)).map(w => ({ id: w.id, url: w.url, key: g.key, name: g.name, price: w.price })));
 }
-export function radarModelKeys(watches = WATCHES) {
+export function radarModelKeys(watches = []) {
   return new Set(groupByModel(watches.filter(isWanted)).map(g => g.key));
 }
 
@@ -38,7 +48,8 @@ export async function readTargets(store) {
 }
 
 /** Validates and stores one buy price. `null` clears it back to the default. */
-export async function saveTarget(store, key, target, { keys = radarModelKeys() } = {}) {
+export async function saveTarget(store, key, target, { keys } = {}) {
+  if (!keys) throw Object.assign(new Error('The watch list is unavailable'), { code: 'watches_unavailable' });
   if (typeof key !== 'string' || !keys.has(key)) throw Object.assign(new Error('Unknown watch'), { code: 'unknown_watch' });
   if (target !== null && !(typeof target === 'number' && Number.isFinite(target) && target > 0 && target <= 100000)) {
     throw Object.assign(new Error('Target must be a price in dollars'), { code: 'validation_error' });
@@ -52,13 +63,14 @@ export async function saveTarget(store, key, target, { keys = radarModelKeys() }
 
 export async function runWatchRadar({
   store,
-  watches = radarWatchList(),
+  watches,
   fetchImpl = fetch,
   rates,
   now = () => new Date(),
   send = sendToAll,
   env = process.env
 }) {
+  if (!watches) watches = radarWatchList(await loadPrivateWatches({ env, fetchImpl }));
   const at = now().toISOString();
   const radar = await readRadar(store);
   const targets = await readTargets(store);

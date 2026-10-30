@@ -10,12 +10,19 @@ import {
   stampPageOrigins,
   unitCodeFromLabel,
 } from "./fromPlace";
-import { applyUnitDegreeMap } from "./unitDegrees";
+import { applyUnitDegreeMap, installUnitDegreeMap } from "./unitDegrees";
+import { TEST_UNIT_DEGREES } from "./unitDegrees.fixture";
+import { installNotesPlace } from "./notesPlace";
+import { TEST_NOTES_PLACE } from "./notesPlace.fixture";
+
+installNotesPlace(TEST_NOTES_PLACE);
+
+installUnitDegreeMap(TEST_UNIT_DEGREES);
 
 describe("origins from existing place data", () => {
   it("lifts unit codes already sitting in tags", () => {
-    expect(originsFromUnitTags(["Note", "EDST5805", "Philosophy Knowledge and Society"])).toEqual([
-      { kind: "unit", label: "EDST5805" },
+    expect(originsFromUnitTags(["Note", "SMPL5805", "Philosophy Knowledge and Society"])).toEqual([
+      { kind: "unit", label: "SMPL5805" },
     ]);
   });
 
@@ -24,7 +31,7 @@ describe("origins from existing place data", () => {
       originsFromBody(`# Lecture
 
 Degree: MEd
-Unit: EDST5805, EDGL909
+Unit: SMPL5805, SMPL909
 Notebook: Brown 2022
 Book: Make It Stick
 PD: HALT workshop 2024
@@ -35,8 +42,8 @@ The lecture itself.`),
       { kind: "degree", label: "MEd" },
       { kind: "notebook", label: "Brown 2022" },
       { kind: "pd", label: "HALT workshop 2024" },
-      { kind: "unit", label: "EDGL909" },
-      { kind: "unit", label: "EDST5805" },
+      { kind: "unit", label: "SMPL5805" },
+      { kind: "unit", label: "SMPL909" },
     ]);
   });
 
@@ -44,13 +51,13 @@ The lecture itself.`),
     expect(
       originsFromNotionProperties({
         Notebooks: { type: "select", select: { name: "Cognitive Psychology" } },
-        "Unit Number": { type: "select", select: { name: "EDST5805: Curriculum Differentiation and Assessment in Gifted Education" } },
+        "Unit Number": { type: "select", select: { name: "SMPL5805: Sample Curriculum Design" } },
         "Book/Journal": { type: "relation", relation: [{ id: "15df794f-8476-80f7-ae79-f77b0001c400" }] },
         Tags: { type: "multi_select", multi_select: [{ name: "Note" }] },
       }),
     ).toEqual([
       { kind: "notebook", label: "Cognitive Psychology" },
-      { kind: "unit", label: "EDST5805" },
+      { kind: "unit", label: "SMPL5805" },
     ]);
   });
 
@@ -58,14 +65,14 @@ The lecture itself.`),
     expect(
       originsFromNotionProperties({
         Degree: { type: "select", select: { name: "MEd" } },
-        Unit: { type: "multi_select", multi_select: [{ name: "EDST5805" }] },
+        Unit: { type: "multi_select", multi_select: [{ name: "SMPL5805" }] },
         Type: { type: "select", select: { name: "Notebook — Blue 2019" } },
         Tags: { type: "multi_select", multi_select: [{ name: "Note" }] },
       }),
     ).toEqual([
       { kind: "degree", label: "MEd" },
       { kind: "notebook", label: "Notebook — Blue 2019" },
-      { kind: "unit", label: "EDST5805" },
+      { kind: "unit", label: "SMPL5805" },
     ]);
   });
 
@@ -77,39 +84,39 @@ The lecture itself.`),
   });
 
   it("dashes a stored Notion id for the API", () => {
-    expect(notionIdFromSource("13ef794f84768078bbe7d30d66a8709c")).toBe("13ef794f-8476-8078-bbe7-d30d66a8709c");
-    expect(notionIdFromSource("page_notion_13ef794f84768078bbe7d30d66a8709c")).toBe(
-      "13ef794f-8476-8078-bbe7-d30d66a8709c",
+    expect(notionIdFromSource("d0000000000000000000000000000004")).toBe("d0000000-0000-0000-0000-000000000004");
+    expect(notionIdFromSource("page_notion_d0000000000000000000000000000004")).toBe(
+      "d0000000-0000-0000-0000-000000000004",
     );
     expect(notionIdFromSource("not-an-id")).toBeNull();
   });
 
   it("keeps the unit code from a Unit Number select", () => {
-    expect(unitCodeFromLabel("EDST5805: Curriculum Differentiation and Assessment in Gifted Education")).toBe("EDST5805");
+    expect(unitCodeFromLabel("SMPL5805: Sample Curriculum Design")).toBe("SMPL5805");
     expect(notionRelationIds({ type: "relation", relation: [{ id: "15df794f-8476-80f7-ae79-f77b0001c400" }] })).toEqual([
       "15df794f-8476-80f7-ae79-f77b0001c400",
     ]);
   });
 
-  it("fills notebook, book, and PD from the recovered Notion snapshot", () => {
+  it("fills notebook, book, and PD from the installed Notion place map", () => {
     expect(
       stampPageOrigins({
         tags: ["Note"],
         body: "Lecture notes.",
-        source_notion_id: "163f794f84768001aebffe92627dc423",
+        source_notion_id: "b0000000000000000000000000000002",
       }),
     ).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
     expect(
       stampPageOrigins({
-        id: "page_notion_163f794f84768001aebffe92627dc423",
+        id: "page_notion_b0000000000000000000000000000002",
         tags: ["Note"],
         body: "Lecture notes.",
       }),
     ).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
   });
@@ -129,29 +136,29 @@ The lecture itself.`),
   });
 
   it("fills the degree from the unit’s Notion parent", () => {
-    expect(stampPageOrigins({ tags: ["EDST5805"], body: "Lecture notes." })).toEqual([
-      { kind: "degree", label: "Master of Education (Gifted Education)" },
-      { kind: "unit", label: "EDST5805" },
+    expect(stampPageOrigins({ tags: ["SMPL5805"], body: "Lecture notes." })).toEqual([
+      { kind: "degree", label: "Master of Sample Studies" },
+      { kind: "unit", label: "SMPL5805" },
     ]);
     expect(
       applyUnitDegreeMap(
         [
-          { kind: "unit", label: "HNO6014" },
+          { kind: "unit", label: "EXMP6014" },
           { kind: "notebook", label: "Wellbeing" },
         ],
       ),
     ).toEqual([
-      { kind: "degree", label: "Graduate Certificate in Child and Adolescent Mental Health" },
+      { kind: "degree", label: "Graduate Certificate in Example Wellbeing" },
       { kind: "notebook", label: "Wellbeing" },
-      { kind: "unit", label: "HNO6014" },
+      { kind: "unit", label: "EXMP6014" },
     ]);
-    expect(applyUnitDegreeMap([{ kind: "unit", label: "EDUC6119" }])).toEqual([
-      { kind: "degree", label: "Graduate Certificate in Transformational Leadership" },
-      { kind: "unit", label: "EDUC6119" },
+    expect(applyUnitDegreeMap([{ kind: "unit", label: "SMPL6119" }])).toEqual([
+      { kind: "degree", label: "Graduate Certificate in Sample Leadership" },
+      { kind: "unit", label: "SMPL6119" },
     ]);
-    expect(applyUnitDegreeMap([{ kind: "unit", label: "EDUC9733" }])).toEqual([
-      { kind: "degree", label: "Master of Cognitive Psychology" },
-      { kind: "unit", label: "EDUC9733" },
+    expect(applyUnitDegreeMap([{ kind: "unit", label: "EXMP9733" }])).toEqual([
+      { kind: "degree", label: "Master of Example Psychology" },
+      { kind: "unit", label: "EXMP9733" },
     ]);
   });
 });

@@ -59,7 +59,7 @@ function panel(html) {
 function paintChoose(opts) {
   const p = panel(
     `<div class="cal-rescue__head"><b>What changed?</b><button type="button" class="cal-rescue__x" data-rescue="close" aria-label="Close">×</button></div>`
-    + `<p class="cal-rescue__sub">Hammond rearranges the rest of today. Lessons, appointments, Redacted and anything social stay put. Nothing changes until you accept.</p>`
+    + `<p class="cal-rescue__sub">Hammond rearranges the rest of today. Lessons, appointments, Partner and anything social stay put. Nothing changes until you accept.</p>`
     + `<div class="cal-rescue__choices">`
     + `<button type="button" class="cal-rescue__choice" data-rescue="late"><b>${RESCUE_REASONS.late}</b><span>shift what's next</span></button>`
     + `<button type="button" class="cal-rescue__choice" data-rescue="derailed"><b>${RESCUE_REASONS.derailed}</b><span>keep today's must-do, move the rest</span></button>`

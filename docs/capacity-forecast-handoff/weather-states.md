@@ -45,4 +45,4 @@ Show only meaningful predicted changes, supported by observations or clearly lab
 
 Under the headline score, explain why: “Recent energy is improving, but yesterday’s heavy workload may still limit recovery. Last night’s sleep is unconfirmed.” With new answers, update that explanation. Generic “Bright spells” alone was explicitly rejected.
 
-A Redacted event explanation could say “Your previous check-ins suggest an emotional lift around time together; physical fatigue may remain.” Scheduled lunch/tea may indicate a possible lift, never confirm intake or automatic recovery.
+A Partner event explanation could say “Your previous check-ins suggest an emotional lift around time together; physical fatigue may remain.” Scheduled lunch/tea may indicate a possible lift, never confirm intake or automatic recovery.

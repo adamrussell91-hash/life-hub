@@ -568,9 +568,9 @@ Do all four. These break visually more than they 404.
 - [ ] Cards and Table modes. Sort by Name / Month / Organiser / Level / Cost actually reorders.
 - [ ] Open a program if one is clickable. View on Map if it has a venue.
 
-### 4.15 Network / Redacted — **retired**
+### 4.15 Network / Partner — **retired**
 
-- [ ] **SKIP.** `#/stress` (Network / StressFlags) and `#/Redacted` were removed with the Network tab retirement. Do **not** report them as broken missing pages. Pure capacity helpers may still exist for timelines; there is no Network flags UI to walk.
+- [ ] **SKIP.** `#/stress` (Network / StressFlags) and `#/partner` were removed with the Network tab retirement. Do **not** report them as broken missing pages. Pure capacity helpers may still exist for timelines; there is no Network flags UI to walk.
 
 ### 4.16 Maps `#/maps`
 
@@ -707,4 +707,4 @@ If a rail item or hash exists in the product and is missing here, add it in the 
 
 **Knowledge views:** Archive, Notebooks, Graph (show-all / clusters / universe / constellations), Timeline, Chat, Podcast, Quiz, note `#page/:id`, Compose.
 
-**Tasks hashes:** `#/board`, `#/clare`, `#/day`, `#/week`, `#/week?layout=day`, `#/month`, `#/list`, `#/graph`, `#/graph?mode=workstreams`, `#/gantt`, `#/timeline`, `#/universe`, `#/orbit`, `#/branch`, `#/constellation`, `#/goals`, `#/someday`, `#/templates`, `#/projects`, `#/excursions`, `#/excursions/new`, `#/programs`, `#/maps`, `#/maps/:mapId/station/:id`, `#/maps/:mapId/event/:id`, `#/search`, `#/properties`, `#/task/:id`, `#/project/:id`. (`#/stress` and `#/Redacted` retired — see §4.15.)
+**Tasks hashes:** `#/board`, `#/clare`, `#/day`, `#/week`, `#/week?layout=day`, `#/month`, `#/list`, `#/graph`, `#/graph?mode=workstreams`, `#/gantt`, `#/timeline`, `#/universe`, `#/orbit`, `#/branch`, `#/constellation`, `#/goals`, `#/someday`, `#/templates`, `#/projects`, `#/excursions`, `#/excursions/new`, `#/programs`, `#/maps`, `#/maps/:mapId/station/:id`, `#/maps/:mapId/event/:id`, `#/search`, `#/properties`, `#/task/:id`, `#/project/:id`. (`#/stress` and `#/partner` retired — see §4.15.)

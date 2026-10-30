@@ -26,7 +26,7 @@ export const TR = {
   labelW: 196, // label column
   padR: 24,
   axis: { tiers: 30, weekLabel: 50, weekDate: 63, h: 76 },
-  lanes: { teacher: 160, Redacted: 76, scholar: 64, friends: 72, body: 104 } as Record<string, number>,
+  lanes: { teacher: 160, partner: 76, scholar: 64, friends: 72, body: 104 } as Record<string, number>,
   load: 104,
   bar: { h: 18, rx: 7, gap: 6 },
   point: 5,
@@ -260,9 +260,9 @@ function mountChart(card: HTMLElement) {
   for (const lane of LANES) {
     const top = laneTops[lane.id];
     const h = TR.lanes[lane.id];
-    if (lane.id === 'Redacted') s('rect', { class: 'tr-lane-wash', x: 0, y: top, width: W, height: h }, svg).parentNode!.insertBefore(svg.lastChild!, svg.firstChild);
+    if (lane.id === 'partner') s('rect', { class: 'tr-lane-wash', x: 0, y: top, width: W, height: h }, svg).parentNode!.insertBefore(svg.lastChild!, svg.firstChild);
     s('line', { class: 'tr-rule', x1: 0, x2: W, y1: top + h, y2: top + h }, svg);
-    s('text', { class: `tr-t-lane${lane.id === 'Redacted' ? ' is-Redacted' : ''}`, x: 18, y: top + 24 }, labels, lane.label);
+    s('text', { class: `tr-t-lane${lane.id === 'partner' ? ' is-partner' : ''}`, x: 18, y: top + 24 }, labels, lane.label);
     s('text', { class: 'tr-t-sub', x: 18, y: top + 40 }, labels, lane.sub);
     const g = s('g', { 'data-part': 'lane', 'data-lane': lane.id }, plot);
     if (lane.id === 'body') mountBody(g, top, h);
@@ -344,7 +344,7 @@ function mountLaneItems(g: Element, laneId: string, top: number, h: number) {
     let label: SVGTextElement | null = null;
     const k = labelled.indexOf(it);
     const above = k % 2 === 0;
-    if (k >= 0) label = s('text', { class: `tr-t-point${it.shape === 'diamond' ? ' is-gold' : ''}${laneId === 'Redacted' ? ' is-Redacted' : ''}`, y: above ? cy - 19 : cy + 20 }, g) as SVGTextElement;
+    if (k >= 0) label = s('text', { class: `tr-t-point${it.shape === 'diamond' ? ' is-gold' : ''}${laneId === 'partner' ? ' is-partner' : ''}`, y: above ? cy - 19 : cy + 20 }, g) as SVGTextElement;
     placers.push(X => {
       const x = X(it.date!) + 0.5 * (X(addDays(it.date!, 1)) - X(it.date!));
       if (it.shape === 'marker') set(n, { x1: x, x2: x });
@@ -442,7 +442,7 @@ function apply(id: string, p: Readonly<Props>) {
 
 function updatePeriod() {
   const z = F.ZOOMS[state.zoom];
-  const title = state.zoom === 'term' ? 'Term 3 → Term 4' : '2026 · Term 3 to home from Korea';
+  const title = state.zoom === 'term' ? 'Term 3 → Term 4' : '2026 · Term 3 to home from the trip';
   (nodes.get('period') as HTMLElement).innerHTML = `<b>${title}</b><span>${riverWeekLabel(weeksBetween(z.from, z.from)[0], F.TERMS)} – ${riverWeekLabel(weeksBetween(z.to, z.to)[0], F.TERMS)} · ${dd(z.from)}/${z.from.slice(2, 4)} – ${dd(z.to)}/${z.to.slice(2, 4)}</span>`;
 }
 

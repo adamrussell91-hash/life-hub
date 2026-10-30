@@ -130,7 +130,7 @@ Stay on Board first, then keep judging the chrome as you move.
 
 - Skip link: Tab from the document start. `.skip-link` must appear and move focus to `#hub-main`. Two conflicting skip-link rules live in `src/styles/hub.css` and `src/styles/views.css` — say which one wins and whether focus works.
 - Rail: count items, screenshot the full rail including overflow. Are icons identical (`src/shell/shell.ts` `railIcon()`)? Are there sections? Does `aria-current="page"` match the hash?
-- Header vs rail names must not fight (examples that already exist: rail **Network** vs title **StressFlags**; rail **Redacted** vs title **Redacted capacity**; rail **Sky** vs constellation copy).
+- Header vs rail names must not fight (examples that already exist: rail **Network** vs title **StressFlags**; rail **Partner** vs title **Partner capacity**; rail **Sky** vs constellation copy).
 - Utilities: Refresh present and wired? Sign out has the kit SVG? Tile after utilities?
 - Dual classes `.primary-nav__link.hub-rail__link` plus leftover `.primary-nav` rules in `hub.css` — report whether they override `rail.css` (min-height 2.75rem vs kit 2.5rem, extra hover paint).
 
@@ -199,12 +199,12 @@ Stretch, but they are in the rail, so they must be usable.
 - Excursions: template / title / event date / group. Preview dates `dd/mm/yy` and match the picker. Review & create → confirm (Cancel/Discard first). Drafts readable. Confirm uses kit `.confirm-card` eyebrow + title + supporting, not a one-line custom card (`showConfirm` in `excursions.ts`).
 - Templates: Task / Project / Excursion. Use → confirm → land on Today or Projects. Excursion **Use** that only hashes to `#/excursions` with no prefill is a broken handoff.
 
-### 3.11 Network / Redacted / Search
+### 3.11 Network / Partner / Search
 
-`#/stress` `#/Redacted` `#/search`
+`#/stress` `#/partner` `#/search`
 
 - Network: leaves “Scanning…”. Flags have texture, not “things are busy.” Rail label vs page title vs supporting.
-- Redacted: leaves “Loading capacity…”. Headlines + 14-day grid, no task titles. Share field class. Copy link. Public `#/capacity/<token>` — still no task titles; invalid token is unknown/rotated. **Do not rotate** a production link unless you will record the new URL.
+- Partner: leaves “Loading capacity…”. Headlines + 14-day grid, no task titles. Share field class. Copy link. Public `#/capacity/<token>` — still no task titles; invalid token is unknown/rotated. **Do not rotate** a production link unless you will record the new URL.
 - Search: `.hub-search` (not a naked input missing the snippet label). 1 character: what happens? 2+ `Mind` → MindWorks. `zzzznope` → **No matches.** Done / Delete on a `[UX-AUDIT]` result through confirm.
 
 ### 3.12 Unknown route + scroll
@@ -240,7 +240,7 @@ Walk these once across the whole site:
 ## 5. Safety
 
 - Prefix new records `[UX-AUDIT]`.
-- Discard confirms on real projects. Do not bury MindWorks. Do not rotate Redacted in production.
+- Discard confirms on real projects. Do not bury MindWorks. Do not rotate Partner in production.
 - Delete `[UX-AUDIT]` tasks before you finish.
 - Do not commit code, restyle tokens, or “just fix the obvious ones” in this run.
 

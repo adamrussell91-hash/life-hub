@@ -95,7 +95,7 @@ test('feedback loop: Week Due shows Clare dump tasks; Day Dial Tonight must too'
   const med = dialHost.querySelector('[data-part="medication"]');
   if (med) {
     const pos = tonightPanel.compareDocumentPosition(med);
-    assert.equal(Boolean(pos & dialWin.Node.DOCUMENT_POSITION_FOLLOWING), true, 'Tonight (with Due) stacks above Dexy on phone');
+    assert.equal(Boolean(pos & dialWin.Node.DOCUMENT_POSITION_FOLLOWING), true, 'Tonight (with Due) stacks above medication on phone');
   }
   unmountDayDial();
   dialWin.close();
@@ -113,8 +113,8 @@ test('a timed Life log with no title (creatine at 7 pm) is never a "task" block'
 
 test('a block for a task due later that day names the deadline it serves', () => {
   const events = [
-    ...tasksEventsFromTasks([{ id: 't', title: 'Korea itinerary', due_date: TODAY, due_time: '10:30', status: 'open' }]),
-    { path: 'work_block:b', record: { type: 'work_block', id: 'b', task_id: 't', date: TODAY, time: '13:00', duration_min: 60, title: 'Korea itinerary' } }
+    ...tasksEventsFromTasks([{ id: 't', title: 'Trip itinerary', due_date: TODAY, due_time: '10:30', status: 'open' }]),
+    { path: 'work_block:b', record: { type: 'work_block', id: 'b', task_id: 't', date: TODAY, time: '13:00', duration_min: 60, title: 'Trip itinerary' } }
   ];
   const day = buildTidelineModel({ events, week: WEEK, today: TODAY, nowHour: 9 }).days.find((row) => row.date === TODAY);
   assert.equal(day.chips[0].meta, '1 pm – 2 pm · due 10:30 am');

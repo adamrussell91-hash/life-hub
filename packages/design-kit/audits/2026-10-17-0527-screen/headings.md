@@ -8,7 +8,7 @@ Kit page title is `--text-2xl` (42px) desktop, `--text-xl` (32px) under 720px, w
 |---|---|---|---|---|---|---|---|---|---|---|
 | kit | `packages/design-kit/calendar-almanac.css:102` |  | `.alm-opens h4` | var(--text-2xs) | var(--weight-semibold) | var(--muted) | uppercase | var(--tracking-caps) |  | 0 |
 | kit | `packages/design-kit/calendar-almanac.css:107` |  | `.alm-open h5` | var(--text-sm) | var(--weight-semibold) |  |  |  | 1.3 | 0 |
-| kit | `packages/design-kit/calendar-almanac.css:108` |  | `.alm-open.is-Redacted h5` |  |  | var(--pastel-peach-ink) |  |  |  |  |
+| kit | `packages/design-kit/calendar-almanac.css:108` |  | `.alm-open.is-partner h5` |  |  | var(--pastel-peach-ink) |  |  |  |  |
 | kit | `packages/design-kit/calendar-almanac.css:138` |  | `.alm-list__line h3` | var(--text-sm) |  | var(--navy) |  |  |  | 0 |
 | kit | `packages/design-kit/calendar-day-dial.css:221` |  | `.dd-face__name` |  |  |  |  |  | 1.2 |  |
 | kit | `packages/design-kit/calendar-day-dial.css:222` |  | `.dd-face__name b` | var(--text-md) | var(--weight-semibold) | var(--navy) |  |  |  |  |
@@ -19,7 +19,7 @@ Kit page title is `--text-2xl` (42px) desktop, `--text-xl` (32px) under 720px, w
 | kit | `packages/design-kit/calendar-term-river-rows.css:11` |  | `.tr-rows__week-heading` | var(--text-xs) |  |  |  |  |  |  |
 | kit | `packages/design-kit/calendar-term-river-rows.css:12` |  | `.tr-rows__week-heading span` | var(--text-2xs) |  | var(--muted) |  |  |  |  |
 | kit | `packages/design-kit/calendar-term-river.css:104` |  | `.tr-list__lane h3` | var(--text-sm) |  | var(--navy) |  |  |  | 0 |
-| kit | `packages/design-kit/calendar-term-river.css:105` |  | `.tr-list__lane.is-Redacted h3` |  |  | var(--pastel-peach-ink) |  |  |  |  |
+| kit | `packages/design-kit/calendar-term-river.css:105` |  | `.tr-list__lane.is-partner h3` |  |  | var(--pastel-peach-ink) |  |  |  |  |
 | kit | `packages/design-kit/calendar-tideline.css:179` |  | `.cal-chip__title` | var(--text-xs) | var(--weight-semibold) | var(--k-ink,var(--ink)) |  |  | 1.25 |  |
 | kit | `packages/design-kit/calendar-tideline.css:195` |  | `.cal-chip.is-skipped .cal-chip__title` |  |  | var(--muted) |  |  |  |  |
 | kit | `packages/design-kit/calendar-tideline.css:199` |  | `.cal-chip.is-done .cal-chip__title,.cal-due.is-done b` |  | var(--weight-medium) | var(--muted) |  |  |  |  |

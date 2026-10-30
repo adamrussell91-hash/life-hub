@@ -182,7 +182,7 @@ export function mount(host: HTMLElement, options: { clock?: Clock; reducedMotion
   // Sources
   const src = el('div', 'cal__sources', undefined, root, { 'data-part': 'sources' });
   for (const s of F.SOURCES) {
-    el('span', `cal-src k-${s.id}${s.id === 'Redacted' ? ' cal-src--Redacted' : ''}`, `${s.id === 'Redacted' ? '<span class="cal-mark"></span>' : '<i></i>'}${s.label} ${s.count}`, src);
+    el('span', `cal-src k-${s.id}${s.id === 'partner' ? ' cal-src--partner' : ''}`, `${s.id === 'partner' ? '<span class="cal-mark"></span>' : '<i></i>'}${s.label} ${s.count}`, src);
   }
   el('span', 'cal-src cal-src--ambient', `Ambient: ${F.AMBIENT}`, src, { 'data-part': 'ambient' });
 
@@ -310,9 +310,9 @@ function mountChip(body: HTMLElement, c: Chip) {
   const g = c.ghost;
   const classes = ['cal-chip', `k-${c.kind}`];
   if (c.isClass) classes.push('is-class');
-  if (c.kind === 'Redacted') classes.push('is-Redacted');
+  if (c.kind === 'partner') classes.push('is-partner');
   if (g) classes.push('is-ghost');
-  const title = `${c.kind === 'Redacted' ? '<span class="cal-mark"></span>' : ''}${c.title}`;
+  const title = `${c.kind === 'partner' ? '<span class="cal-mark"></span>' : ''}${c.title}`;
   const agent = g ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${g.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[g.agent]}</span></span>` : '';
   const acts = g && g.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${g.id}">Accept</button><button type="button" data-dismiss="${g.id}">Dismiss</button></div>`

@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import notesPlace from "../origin/notesPlace.json";
 import { notebookCards, notebookCatalog, notebookCoverSrc, notebookSlug, notesForNotebook } from "./catalog";
+import { installNotesPlace } from "../origin/notesPlace";
+import { TEST_NOTES_PLACE } from "../origin/notesPlace.fixture";
+
+installNotesPlace(TEST_NOTES_PLACE);
 
 const cover = (file: string) => notebookCoverSrc(file);
 
 describe("notebook catalog", () => {
-  it("lists the recovered notebooks and only the covers we have", () => {
+  it("lists the installed notebooks, or the ones with covers before the private map loads", () => {
+    expect(notebookCatalog().map(item => item.label)).toEqual(Object.keys(TEST_NOTES_PLACE.notebook));
+    installNotesPlace(null);
     const catalog = notebookCatalog();
-    expect(catalog.map(item => item.label)).toEqual(Object.keys(notesPlace.notebook));
+    installNotesPlace(TEST_NOTES_PLACE);
     expect(catalog).toHaveLength(12);
     expect(catalog.find(item => item.label === "Cognitive Psychology")?.image).toBe(cover("cognitive-psychology.jpg"));
     expect(catalog.find(item => item.label === "Educational Neuroscience")?.image).toBe(

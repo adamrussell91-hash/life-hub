@@ -1,11 +1,16 @@
+import { load } from 'js-yaml';
+
+// Neutral, synthetic template. Live personal targets live only in the private
+// data repo's config/targets.yml, which chat reads at runtime through
+// resolveTargetsConfig. This mirror must equal the public config/targets.yml.
 export const TARGETS_CONFIG = {
   target_sets: [
     {
       valid_from: '2020-01-01',
-      calories: { movement: 1660, workout_30: 1900, workout_45_60: 2200, recovery_bonus: 200 },
-      protein: { daily: 120, recovery_daily: 140, breakfast: 30, lunch: 30, dinner: 40, snack: 20, min_per_meal: 25 },
-      fat_ceiling_g: 50,
-      sodium_ceiling_mg: 2000,
+      calories: { movement: 2000, workout_30: 2200, workout_45_60: 2400, recovery_bonus: 200 },
+      protein: { daily: 110, recovery_daily: 130, breakfast: 25, lunch: 30, dinner: 35, snack: 20, min_per_meal: 20 },
+      fat_ceiling_g: 70,
+      sodium_ceiling_mg: 2300,
       calcium_target_mg: 1000,
       polyphenol_daily_aim: 10
     }
@@ -19,20 +24,40 @@ export const TARGETS_CONFIG = {
   },
   forecast: {
     body_composition: {
-      weight_kg_min: 78,
-      weight_kg_max: 82,
-      body_fat_pct_min: 8,
-      body_fat_pct_max: 10,
-      body_fat_pct_tight: 8,
-      shoulder_waist_ratio: 1.6
+      weight_kg_min: 70,
+      weight_kg_max: 75,
+      body_fat_pct_min: 12,
+      body_fat_pct_max: 15,
+      body_fat_pct_tight: 12,
+      shoulder_waist_ratio: 1.5
     },
     strength: {
-      deadline: '2026-10-31',
+      deadline: '2027-06-30',
       lifts: [
-        { id: 'chest-e1rm', label: 'Chest e1RM', exercise: 'Bar Press', e1rm_kg: 65 },
-        { id: 'arms-e1rm', label: 'Arms e1RM', exercise: 'Cable Bar Wide Grip Curl', e1rm_kg: 60 },
-        { id: 'back-e1rm', label: 'Back e1RM', exercise: 'Reverse Wide Grip Bent Over Row', e1rm_kg: 47 }
+        { id: 'chest-e1rm', label: 'Chest e1RM', exercise: 'Bar Press', e1rm_kg: 55 },
+        { id: 'arms-e1rm', label: 'Arms e1RM', exercise: 'Cable Bar Wide Grip Curl', e1rm_kg: 45 },
+        { id: 'back-e1rm', label: 'Back e1RM', exercise: 'Reverse Wide Grip Bent Over Row', e1rm_kg: 50 }
       ]
     }
   }
 };
+
+function isUsableTargets(value) {
+  return Boolean(value && typeof value === 'object' && Array.isArray(value.target_sets) && value.target_sets.length);
+}
+
+/**
+ * Parse the private config/targets.yml text (or an already parsed object).
+ * Falls back to the neutral bundled template when absent or invalid.
+ * `forecastOnly` accepts a file that only carries the `forecast` block.
+ */
+export function resolveTargetsConfig(source, fallback = TARGETS_CONFIG, { forecastOnly = false } = {}) {
+  if (source == null || source === '') return fallback;
+  try {
+    const parsed = typeof source === 'string' ? load(source) : source;
+    if (forecastOnly) return parsed && typeof parsed === 'object' && parsed.forecast ? parsed : fallback;
+    return isUsableTargets(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}

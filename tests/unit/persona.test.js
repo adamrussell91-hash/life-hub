@@ -13,14 +13,14 @@ test('builds a named agent prompt naming its writable record types', () => {
   assert.match(prompt, /workout/);
   assert.match(prompt, /Streak: 2/);
   assert.match(prompt, /Fat < 50g/);
-  assert.doesNotMatch(prompt, /Redacted comes first every time/);
+  assert.doesNotMatch(prompt, /Partner comes first every time/);
 });
 
 test('About Me reaches a non-Hammond prompt and is not repeated when Hammond already has the full node', () => {
-  const aboutMe = 'Redacted comes first every time. Do not recommend leaving or quitting a job unless he is explicitly talking about that.';
+  const aboutMe = 'Partner comes first every time. Do not recommend leaving or quitting a job unless he is explicitly talking about that.';
   const brisket = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', aboutMe });
   assert.match(brisket, /About Me \(standing personal context/);
-  assert.match(brisket, /Redacted comes first every time/);
+  assert.match(brisket, /Partner comes first every time/);
   assert.match(brisket, /Do not recommend leaving or quitting a job/);
   const hammond = buildSystemPrompt({
     slug: 'hammond',
@@ -29,7 +29,7 @@ test('About Me reaches a non-Hammond prompt and is not repeated when Hammond alr
     aboutMe,
     centralNodeFull: `## 👤 About Me\n${aboutMe}`
   });
-  assert.equal(hammond.split('Redacted comes first every time').length - 1, 1);
+  assert.equal(hammond.split('Partner comes first every time').length - 1, 1);
 });
 
 test('penelope prompt includes protocol when provided', () => {
@@ -100,14 +100,14 @@ test('Sara prompt mandates Medical Overview read tools and rejects Notion-as-sto
     digest: '',
     constraints: '',
     capacities: '- research.save-brief: Save a research brief',
-    intuition: 'Built intuition:\n- Redacted-cycle: Redacted cadence'
+    intuition: 'Built intuition:\n- biologic-cycle: Biologic cadence'
   });
   assert.match(prompt, /search_medical_records/);
   assert.match(prompt, /brief_medical_appointment/);
   assert.match(prompt, /Medical Overview is the medical record in Life Hub/);
   assert.match(prompt, /not Notion/);
   assert.match(prompt, /capacities this turn/i);
-  assert.match(prompt, /Redacted-cycle/);
+  assert.match(prompt, /biologic-cycle/);
   assert.match(prompt, /tool-using specialist|domain read or write tool/i);
 });
 

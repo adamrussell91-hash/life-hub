@@ -3813,7 +3813,7 @@ Locked steps: 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64. Values below are padding,
 | travel | `apps/travel/src/styles/journal.css:4` | padding-bottom | `.journal` | `calc(var(--space-4) + env(safe-area-inset-bottom, 0px))` |
 | travel | `apps/travel/src/styles/journal.css:18` | padding-left | `.journal__timeline` | `calc(var(--journal-gutter) + var(--journal-gutter-gap))` |
 | travel | `apps/travel/src/styles/journal.css:72` | margin | `.journal-toolbar__title` | `0` |
-| travel | `apps/travel/src/styles/journal.css:96` | margin | `.journal-moment__Redacted-badge` | `0 0 var(--space-2)` |
+| travel | `apps/travel/src/styles/journal.css:96` | margin | `.journal-moment__partner-badge` | `0 0 var(--space-2)` |
 | travel | `apps/travel/src/styles/journal.css:124` | margin | `.journal-empty__lead` | `0 0 var(--space-4)` |
 | travel | `apps/travel/src/styles/journal.css:180` | inset | `.journal-leg__pattern` | `0` |
 | travel | `apps/travel/src/styles/journal.css:203` | margin | `.journal-leg__title` | `0 0 var(--space-4)` |

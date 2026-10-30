@@ -16,7 +16,7 @@ const DAYS = [
   day('2026-10-05', 85), day('2026-10-06', 85), day('2026-10-07', 85), day('2026-10-08', 85)
 ];
 
-test('the real wants find real windows, Redacted first', () => {
+test('the real wants find real windows, Partner first', () => {
   const got = findOpenings(DAYS, ALMANAC_WANTS);
   assert.deepEqual(got.map(o => [o.wantId, o.dates]), [
     ['good-night', ['2026-10-02']],
@@ -24,7 +24,7 @@ test('the real wants find real windows, Redacted first', () => {
     ['bob', ['2026-09-28']],
     ['newcastle', ['2026-10-05', '2026-10-06']]
   ]);
-  assert.equal(got[0].with, 'Redacted');
+  assert.equal(got[0].with, 'partner');
 });
 
 test('an opening is the earliest window that clears the bar', () => {

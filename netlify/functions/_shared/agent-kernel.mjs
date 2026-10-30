@@ -139,10 +139,10 @@ const HEALTH = new Set([
   'medications', 'meds', 'body', 'unusual', 'history', 'pathology', 'lab', 'labs',
   'brief', 'result', 'results', 'compare', 'trend',
   // Specifics Adam actually says: the analysis must not depend on him saying "health".
-  'Redacted', 'Redacted', 'injection', 'dose', 'cramp', 'cramping', 'cramps', 'sore', 'pain',
+  'biologic', 'infusion', 'injection', 'dose', 'cramp', 'cramping', 'cramps', 'sore', 'pain',
   'fatigue', 'tired', 'unwell', 'sick', 'nausea', 'headache', 'fever', 'ggt', 'alt', 'ast', 'crp',
-  'ferritin', 'iron', 'liver', 'calprotectin', 'mrcp', 'colonoscopy', 'Redacted', 'crohns', 'scan',
-  'referral', 'script', 'prescription', 'specialist', 'gastro', 'bone', 'steroid', 'entocort'
+  'ferritin', 'iron', 'liver', 'calprotectin', 'mrcp', 'colonoscopy', 'endoscopy', 'flare', 'scan',
+  'referral', 'script', 'prescription', 'specialist', 'gastro', 'bone', 'steroid', 'prednisolone', 'budesonide'
 ]);
 const LESSON = new Set([
   'lesson', 'lessons', 'class', 'unit', 'teach', 'teaching', 'improve',
@@ -497,6 +497,7 @@ function runTool(name, stores, today, now, message, options = {}) {
   const lessons = stores.lessons ?? [];
   const meals = stores.meals ?? [];
   const loadErrors = stores.loadErrors ?? {};
+  const targetsOpt = stores.targetsConfig ? { targetsConfig: stores.targetsConfig } : {};
   const query = options.query != null ? String(options.query).trim() : String(message ?? '').trim();
   const limit = options.limit;
 
@@ -546,19 +547,20 @@ function runTool(name, stores, today, now, message, options = {}) {
     return withStore(planWork('collisions', { tasks, lessons, date: today, now }), 'tasks_hub');
   }
   if (name === 'get_nutrition_snapshot') {
-    return getNutritionSnapshot(meals, today, { nutritionChallenges: stores.nutritionChallenges });
+    return getNutritionSnapshot(meals, today, { nutritionChallenges: stores.nutritionChallenges, ...targetsOpt });
   }
-  if (name === 'get_nutrition_adherence') return getNutritionAdherence(meals, today);
-  if (name === 'get_nutrition_targets') return getNutritionTargets(today);
+  if (name === 'get_nutrition_adherence') return getNutritionAdherence(meals, today, targetsOpt);
+  if (name === 'get_nutrition_targets') return getNutritionTargets(today, targetsOpt);
   if (name === 'get_nutrition_day_remaining') {
-    return getNutritionDayRemaining(meals, today, { nutritionChallenges: stores.nutritionChallenges });
+    return getNutritionDayRemaining(meals, today, { nutritionChallenges: stores.nutritionChallenges, ...targetsOpt });
   }
   if (name === 'compare_nutrition_periods') {
-    return compareNutritionPeriods(meals, today);
+    return compareNutritionPeriods(meals, today, targetsOpt);
   }
   if (name === 'analyse_nutrition_evidence') {
     return analyseNutritionEvidence(meals, today, {
       nutritionChallenges: stores.nutritionChallenges,
+      ...targetsOpt,
       message
     });
   }

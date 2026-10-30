@@ -85,7 +85,7 @@ Intro text.
 ---
 ## 📊 This Month (June 2026)
 **Active Goals:**
-- Redacted's remission (Critical)
+- Condition A remission (Critical)
 ---
 ## 📈 Long-Term Trends & Patterns
 **Nutrition:** Protein target consistency improving month over month.

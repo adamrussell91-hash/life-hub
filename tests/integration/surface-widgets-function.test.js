@@ -99,8 +99,8 @@ test('surface widgets returns approved meal-plan-week instances', async () => {
     title: 'Week plan',
     props: {
       week_id: '2026-W35',
-      meals: { mon: 'Redacted chicken bowl', tue: 'Leftovers' },
-      notes: 'Redacted-light lunches'
+      meals: { mon: 'Meal-kit chicken bowl', tue: 'Leftovers' },
+      notes: 'Light lunches'
     },
     owner_agent: 'brisket',
     created_at: '2026-08-31T00:00:00.000Z',

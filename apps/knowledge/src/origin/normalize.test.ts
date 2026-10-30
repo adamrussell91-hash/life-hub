@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addOrigin, normalizeOrigins, pageMatchesOrigins, removeOrigin } from "./normalize";
+import { addOrigin, installOriginLabelRules, normalizeOrigins, pageMatchesOrigins, removeOrigin } from "./normalize";
 
 describe("origin normalize", () => {
   it("trims, dedupes, and sorts", () => {
@@ -27,21 +27,30 @@ describe("origin normalize", () => {
     ]);
   });
 
-  it("drops placeholder labels and remaps misnamed programmes", () => {
-    expect(
-      normalizeOrigins([
-        { kind: "degree", label: "Transformational Leadership Certificate" },
-        { kind: "degree", label: "Advanced Insights in Cognitive Psychology" },
-        { kind: "degree", label: "Graduate Diploma of Psychology" },
-        { kind: "degree", label: "CSP-eligible postgraduate degree" },
-        { kind: "degree", label: "Trimester 1 2027 entry" },
-        { kind: "notebook", label: "Notebook Cover" },
-        { kind: "unit", label: "EDUC6119" },
-      ]),
-    ).toEqual([
-      { kind: "degree", label: "Graduate Certificate in Transformational Leadership" },
-      { kind: "degree", label: "Master of Cognitive Psychology" },
-      { kind: "unit", label: "EDUC6119" },
+  it("drops placeholder labels and remaps misnamed programmes from the installed rules", () => {
+    installOriginLabelRules({
+      aliases: { "Sample Leadership Certificate": "Graduate Certificate in Sample Leadership" },
+      dropped: ["Graduate Diploma of Sample"],
+    });
+    try {
+      expect(
+        normalizeOrigins([
+          { kind: "degree", label: "Sample Leadership Certificate" },
+          { kind: "degree", label: "Graduate Diploma of Sample" },
+          { kind: "degree", label: "CSP-eligible postgraduate degree" },
+          { kind: "degree", label: "Trimester 1 2027 entry" },
+          { kind: "notebook", label: "Notebook Cover" },
+          { kind: "unit", label: "SMPL6119" },
+        ]),
+      ).toEqual([
+        { kind: "degree", label: "Graduate Certificate in Sample Leadership" },
+        { kind: "unit", label: "SMPL6119" },
+      ]);
+    } finally {
+      installOriginLabelRules();
+    }
+    expect(normalizeOrigins([{ kind: "degree", label: "Sample Leadership Certificate" }])).toEqual([
+      { kind: "degree", label: "Sample Leadership Certificate" },
     ]);
   });
 

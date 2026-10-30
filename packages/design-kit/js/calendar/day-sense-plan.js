@@ -45,7 +45,7 @@ export function textureFor(chip) {
   const explicit = chip?.record?.availability;
   if (explicit && AVAILABILITY[explicit]) return explicit;
   if (!chip || chip.ghost) return null;
-  if (chip.protected || chip.kind === 'Redacted') return RECOVERY.test(chip.title ?? '') ? 'recovery' : 'protected';
+  if (chip.protected || chip.kind === 'partner') return RECOVERY.test(chip.title ?? '') ? 'recovery' : 'protected';
   if (chip.isClass || FIXED_SOURCES.has(chip.source)) return TRAVEL.test(chip.title ?? '') ? 'travel' : 'fixed';
   if (chip.source === 'work_block') return 'focus';
   if (TRAVEL.test(chip.title ?? '')) return 'travel';
