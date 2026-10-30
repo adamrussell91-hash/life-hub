@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cellFor, renderProgress, withMark, type ProgressLesson } from '@/markbook/progress';
+import { cellFor, withMark, type ProgressLesson } from '@/markbook/progress';
+import { renderBook, renderBookPhone } from '@/markbook/book';
 
 const core: ProgressLesson = { id: 'l1', title: 'Poem', role: 'core', assessment: false, date: '2026-10-01' };
 const base = { lesson: core, record: undefined, quizSubmitted: false, quizStarted: false, took: false, today: '2026-10-05' };
@@ -37,16 +38,33 @@ describe('cellFor', () => {
   });
 });
 
-describe('renderProgress', () => {
-  const view = {
-    markbook: { took: {} },
-    quizzes: [],
-    done: { s1: { l1: { at: 'x', via: 'tick' }, l2: { at: 'x', via: 'teacher' } } }
-  } as never;
+describe('withMark', () => {
+  it('lays a teacher mark over the student record and clearing brings it back', () => {
+    const tick = { at: 'a', via: 'tick' };
+    const marked = withMark({ l1: tick }, 'l1', 'complete', 'b');
+    expect(marked.l1).toEqual({ at: 'b', via: 'teacher', was: tick });
+    expect(withMark(marked, 'l1', 'clear', 'c')).toEqual({ l1: tick });
+    expect(withMark({}, 'l1', 'clear', 'c')).toEqual({});
+  });
+});
+
+describe('renderBook', () => {
   const students = [{ id: 's1', name: 'Bob Brown', initials: 'BB' }, { id: 's2', name: 'Tom Tills', initials: 'TT' }];
-  it('draws a cell per student and lesson, with words for each, and marks on press', () => {
+  const noop = () => {};
+  const actions = { setMark: noop, openAssessment: noop, openQuiz: noop, openWork: noop, editColumn: noop, hideQuiz: noop, openHeatmap: noop, openStudent: noop };
+  const quiz = (extra = {}) => ({
+    kind: 'quiz', id: 'quiz:l2', lesson_id: 'l2', title: 'Test', date: '2026-10-03', hidden: false, confidence: false, questions: [{ id: 'q', prompt: '', marks: 20, outcomes: [] }],
+    scores: { s1: { attempt_id: 'a', submitted_at: '2026-10-03', score: 15, max: 20, pending: 0, rows: [] }, s2: { attempt_id: 'b', submitted_at: '2026-10-03', score: 4, max: 20, pending: 2, rows: [] } },
+    ...extra
+  });
+  const book = (done: object, quizzes: object[] = [], columns: object[] = []) =>
+    ({ markbook: { columns, hidden_quizzes: [], marks: {}, updated_at: '', took: {} }, students, quizzes, done }) as never;
+  const draw = (view: never, lessons: ProgressLesson[], onMark = vi.fn(), show: 'all' | 'marked' | 'lessons' = 'all', setShow = vi.fn()) =>
+    renderBook({ view, students, lessons, actions, today: '2026-10-20', show, setShow, onMark });
+
+  it('draws a lesson box per student, ticks on press and undoes a tick of yours on the next', () => {
     const onMark = vi.fn();
-    const root = renderProgress({ view, students, lessons: [core, { ...core, id: 'l2', title: 'Extra', role: 'extension' }], today: '2026-10-20', onMark });
+    const root = draw(book({ s1: { l1: { at: 'x', via: 'tick' }, l2: { at: 'x', via: 'teacher' } } }), [core, { ...core, id: 'l2', title: 'Extra', role: 'extension' }], onMark);
     const cell = (s: string, l: string) => root.querySelector<HTMLButtonElement>(`[data-student="${s}"][data-lesson="${l}"]`)!;
     expect(cell('s1', 'l1').dataset.state).toBe('complete');
     expect(cell('s2', 'l1').dataset.state).toBe('open');
@@ -54,40 +72,57 @@ describe('renderProgress', () => {
     expect(cell('s2', 'l2').dataset.state).toBe('na');
     expect(cell('s2', 'l1').getAttribute('aria-label')).toContain('overdue');
     expect(cell('s1', 'l2').dataset.override).toBe('true');
-    expect(cell('s1', 'l1').dataset.override).toBeUndefined();
     cell('s2', 'l1').click();
     cell('s1', 'l1').click();
     cell('s1', 'l2').click();
-    expect(onMark).toHaveBeenNthCalledWith(1, 's2', 'l1', 'complete');
-    expect(onMark).toHaveBeenNthCalledWith(2, 's1', 'l1', 'complete');
-    expect(onMark).toHaveBeenNthCalledWith(3, 's1', 'l2', 'clear');
+    expect(onMark.mock.calls).toEqual([['s2', 'l1', 'complete'], ['s1', 'l1', 'complete'], ['s1', 'l2', 'clear']]);
   });
-  it('counts a marked quiz on an assessment lesson, with the score in the cell, and bands lessons by unit', () => {
-    const marked = {
-      ...view,
-      done: {},
-      quizzes: [{ lesson_id: 'l2', scores: { s1: { submitted_at: '2026-10-03', score: 15, max: 20, pending: 0 }, s2: { submitted_at: '2026-10-03', score: 4, max: 20, pending: 2 } } }]
-    } as never;
-    const lessons = [{ ...core, unit: 'Poetry' }, { ...core, id: 'l2', title: 'Test', assessment: true, unit: 'Novel' }];
-    const root = renderProgress({ view: marked, students, lessons, today: '2026-10-20', onMark: vi.fn() });
-    const cell = (s: string) => root.querySelector<HTMLButtonElement>(`[data-student="${s}"][data-lesson="l2"]`)!;
-    expect(cell('s1').dataset.state).toBe('complete');
-    expect(cell('s1').title).toContain('quiz 15/20');
-    expect(cell('s2').dataset.state).toBe('partial');
-    expect(cell('s2').title).toContain('2 to mark');
-    expect(cell('s1').textContent).toBe('15/20');
-    expect(cell('s2').textContent).toBe('4/20');
+
+  it('shows a quiz lesson once, as its mark, in date order with the lessons and a unit band', () => {
+    const lessons = [{ ...core, unit: 'Poetry' }, { ...core, id: 'l2', title: 'Test', date: '2026-10-03', unit: 'Novel' }];
+    const root = draw(book({}, [quiz()]), lessons);
+    expect(root.querySelector('[data-lesson="l2"]')).toBeNull();
+    const marks = [...root.querySelectorAll<HTMLButtonElement>('.mb-cell--quiz')];
+    expect(marks.map((b) => b.textContent)).toEqual(['15/20', '4/20']);
+    expect(marks.map((b) => b.dataset.result)).toEqual(['done', 'waiting']);
+    expect([...root.querySelectorAll('thead .mb-col__title, thead .mb-progress__title')].map((n) => n.textContent)).toEqual(['Poem', 'Test']);
     expect([...root.querySelectorAll('.mb-progress__unit')].map((n) => n.textContent)).toEqual(['Poetry', 'Novel']);
   });
-  it('withMark lays a teacher mark over the student record and clearing brings it back', () => {
-    const tick = { at: 'a', via: 'tick' };
-    const marked = withMark({ l1: tick }, 'l1', 'complete', 'b');
-    expect(marked.l1).toEqual({ at: 'b', via: 'teacher', was: tick });
-    expect(withMark(marked, 'l1', 'clear', 'c')).toEqual({ l1: tick });
-    expect(withMark({}, 'l1', 'clear', 'c')).toEqual({});
+
+  it('pins Done (core lessons so far) and Overall on the right', () => {
+    const later = { ...core, id: 'l3', title: 'Later', date: '2026-11-30' };
+    const root = draw(book({ s1: { l1: { at: 'x', via: 'tick' } } }), [core, later]);
+    const done = [...root.querySelectorAll('tbody .mb-book__pin--done')].map((n) => n.textContent);
+    expect(done).toEqual(['1/1', '0/1']);
+    expect(root.querySelectorAll('tbody .mb-book__pin--overall')).toHaveLength(2);
   });
-  it('says so when there are no lessons', () => {
-    expect(renderProgress({ view, students, lessons: [], today: '2026-10-20', onMark: vi.fn() }).textContent).toContain('no unit lessons');
+
+  it('filters to marked work or lessons, and the chips say which is on', () => {
+    const setShow = vi.fn();
+    const view = book({}, [quiz()]);
+    const lessons = [core];
+    expect(draw(view, lessons, vi.fn(), 'marked').querySelector('[data-lesson="l1"]')).toBeNull();
+    const onlyLessons = draw(view, lessons, vi.fn(), 'lessons', setShow);
+    expect(onlyLessons.querySelector('.mb-cell--quiz')).toBeNull();
+    expect(onlyLessons.querySelector('[data-show="lessons"]')!.getAttribute('aria-pressed')).toBe('true');
+    onlyLessons.querySelector<HTMLButtonElement>('[data-show="all"]')!.click();
+    expect(setShow).toHaveBeenCalledWith('all');
+  });
+
+  it('on a phone, lists one student by unit: lesson boxes, marks, Done and Overall', () => {
+    const onMark = vi.fn();
+    const lessons = [{ ...core, unit: 'Poetry' }, { ...core, id: 'l2', title: 'Test', date: '2026-10-03', unit: 'Poetry' }];
+    const card = renderBookPhone({ view: book({ s1: { l1: { at: 'x', via: 'tick' } } }, [quiz()]), students, lessons, actions, today: '2026-10-20', show: 'all', setShow: vi.fn(), onMark, index: 0, move: vi.fn() });
+    expect(card.querySelector('.mb-book__unit')!.textContent).toBe('Poetry');
+    // The handed-in quiz counts as a core lesson done.
+    expect(card.querySelector('.mb-phone__done')!.textContent).toBe('2/2');
+    expect(card.querySelector('.mb-cell--quiz')!.textContent).toBe('15/20');
+    card.querySelector<HTMLButtonElement>('[data-lesson="l1"]')!.click();
+    expect(onMark).toHaveBeenCalledWith('s1', 'l1', 'complete');
+  });
+  it('says so when there is nothing to show', () => {
+    expect(draw(book({}), []).textContent).toContain('no unit lessons');
+    expect(draw(book({}), [core], vi.fn(), 'marked').textContent).toContain('No marked work yet');
   });
 });
 

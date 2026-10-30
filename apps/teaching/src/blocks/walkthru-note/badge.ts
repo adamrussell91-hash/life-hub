@@ -1,11 +1,11 @@
-import { GLYPH_SVGS } from '../../../../../packages/walkthrus/glyphs';
+import { SYMBOL_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import type { Block } from '@/schemas/block';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { attachedTechniques } from './attach';
 import { renderStepsInto } from './note';
 
-const glyphs = createGlyphSet({ svgs: GLYPH_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
+const glyphs = createGlyphSet({ svgs: SYMBOL_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
 
 /**
  * Teacher view only: the icon of a technique this block embodies, opening its five steps in place.

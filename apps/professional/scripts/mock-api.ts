@@ -1,5 +1,5 @@
 import { CATALOGUE } from '../../../packages/walkthrus/catalogue.mjs';
-import { normalizeArrows } from '../../../packages/walkthrus/arrows.mjs';
+import { normalizeArrows, normalizePicked } from '../../../packages/walkthrus/arrows.mjs';
 import { checkOneActive } from '../../../packages/walkthrus/goal.mjs';
 import { normalizeGoalRecord } from '../../../netlify/functions/_shared/goal-record.mjs';
 import { isDeletedRecord, withoutDeleted } from '../../../netlify/functions/_shared/record-liveness.mjs';
@@ -218,6 +218,7 @@ function timelineLabel(
 }
 
 let walkthruArrows: Array<Record<string, unknown>> = [];
+let walkthruPicked: string[] | null = null;
 let walkthruGoals: Array<Record<string, any>> = [];
 // Invented demo suggestion (no real class or quiz names).
 let walkthruSuggestions: Array<Record<string, any>> = [
@@ -445,9 +446,10 @@ export function createMockApi() {
       return json(200, { ok: true, data: { text: { sets: [{ set: 1, techniques, frameworks: [] }] } } });
     }
     if (path === '/api/walkthrus-board') {
-      if (method === 'GET') return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
-      walkthruArrows = normalizeArrows((body as { arrows?: unknown })?.arrows);
-      return json(200, { ok: true, data: { board: { arrows: walkthruArrows } } });
+      const sent = (body ?? {}) as { arrows?: unknown; picked?: unknown };
+      if (method !== 'GET' && 'arrows' in sent) walkthruArrows = normalizeArrows(sent.arrows);
+      if (method !== 'GET' && 'picked' in sent) walkthruPicked = normalizePicked(sent.picked);
+      return json(200, { ok: true, data: { board: { arrows: walkthruArrows, picked: walkthruPicked } } });
     }
     if (path === '/api/walkthru-suggestions') {
       if (method === 'GET') return json(200, { ok: true, data: { suggestions: walkthruSuggestions } });

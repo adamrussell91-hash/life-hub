@@ -1,10 +1,10 @@
-import { GLYPH_SVGS } from '../../../../packages/walkthrus/glyphs';
+import { FIGURE_SVGS } from '../../../../packages/walkthrus/glyphs';
 import { CATALOGUE, SERIES, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import { SETS } from '../../../../packages/walkthrus/sets.mjs';
 import { checkOneActive, isLiveWalkthruGoal, normalizeWalkthru, pieceFor } from '../../../../packages/walkthrus/goal.mjs';
 import { countsAsRep, hasLapsed } from '../../../../packages/walkthrus/reps.mjs';
 import { ARROW_TYPES, MAX_LABEL } from '../../../../packages/walkthrus/arrows.mjs';
-import { boardLayout, clusterFrame, type BoardEntry, type BoardLayout, type BoardSeries, type BoardTile } from '../../../../packages/walkthrus/board/layout';
+import { boardLayout, clusterFrame, pickedLayout, type BoardEntry, type BoardLayout, type BoardSeries, type BoardTile } from '../../../../packages/walkthrus/board/layout';
 import { routeArrows, type ArrowType, type BoardArrow, type RoutedArrow } from '../../../../packages/walkthrus/board/route';
 import { labelLevel, type LabelLevel } from '../../../../packages/walkthrus/board/labels';
 import { directionBetween } from '../../../../packages/walkthrus/board/hex';
@@ -16,7 +16,7 @@ import {
 } from '../../design-kit/js/board-camera.js';
 import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import {
-  createWalkthruGoal, dismissSuggestion, loadBoardArrows, loadSuggestions, loadWalkthruGoals, loadWalkthruReps, loadWalkthruText, makeArrowId, saveBoardArrows,
+  createWalkthruGoal, dismissSuggestion, loadBoard, loadSuggestions, loadWalkthruGoals, loadWalkthruReps, loadWalkthruText, makeArrowId, saveBoardArrows, saveBoardPicked,
   type DismissKind, type WalkthruGoal, type WalkthruRep, type WalkthruSuggestion, type WalkthruText
 } from '@/api/walkthrus';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
@@ -25,6 +25,11 @@ import { renderPanel, type PanelModel } from '@/views/walkthrus-panel';
 const NS = 'http://www.w3.org/2000/svg';
 const FALLBACK_VIEWPORT = { w: 1000, h: 640 };
 const PHONE = '(max-width: 719px)';
+/** Which board shows: Adam's own few techniques, or the whole book to pick from. Remembered per browser. */
+type BoardView = 'mine' | 'book';
+const VIEW_KEY = 'wt-board-view';
+const readView = (): BoardView => { try { return localStorage.getItem(VIEW_KEY) === 'book' ? 'book' : 'mine'; } catch { return 'mine'; } };
+const keepView = (view: BoardView): void => { try { localStorage.setItem(VIEW_KEY, view); } catch { /* a convenience only */ } };
 const TYPE_LABEL: Record<ArrowType, string> = { leads_to: 'Leads to', pairs_with: 'Pairs with', free: 'Free' };
 
 export interface LearningOptions {
@@ -50,7 +55,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 
 const entries = CATALOGUE as unknown as BoardEntry[];
 const seriesList = SERIES as unknown as BoardSeries[];
-const glyphs = createGlyphSet({ svgs: GLYPH_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wt-glyph' });
+const glyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wt-glyph' });
 
 /** Caps title wrapped to a few short lines, with an ellipsis if it still doesn't fit. */
 export function wrapTitle(name: string, maxChars: number, maxLines: number): string[] {
@@ -90,18 +95,19 @@ function robberIcon(x: number, y: number, size: number): SVGElement {
   return g;
 }
 
-interface BoardData { arrows: BoardArrow[]; goals: WalkthruGoal[]; reps: WalkthruRep[]; suggestions: WalkthruSuggestion[]; notices: string[] }
+interface BoardData { arrows: BoardArrow[]; picked: string[] | null; goals: WalkthruGoal[]; reps: WalkthruRep[]; suggestions: WalkthruSuggestion[]; notices: string[] }
 
 async function loadData(): Promise<BoardData> {
-  const [arrows, goals, reps, suggestions] = await Promise.allSettled([loadBoardArrows(), loadWalkthruGoals(), loadWalkthruReps(), loadSuggestions()]);
-  if (arrows.status === 'rejected' && goals.status === 'rejected' && reps.status === 'rejected') throw arrows.reason;
+  const [boardRead, goals, reps, suggestions] = await Promise.allSettled([loadBoard(), loadWalkthruGoals(), loadWalkthruReps(), loadSuggestions()]);
+  if (boardRead.status === 'rejected' && goals.status === 'rejected' && reps.status === 'rejected') throw boardRead.reason;
   const notices: string[] = [];
-  if (arrows.status === 'rejected') notices.push('Your arrows didn’t load.');
+  if (boardRead.status === 'rejected') notices.push('Your arrows didn’t load.');
   if (goals.status === 'rejected') notices.push('Your goal didn’t load.');
   if (reps.status === 'rejected') notices.push('Lesson reps didn’t load.');
   if (suggestions.status === 'rejected') notices.push('Suggestions didn’t load.');
   return {
-    arrows: arrows.status === 'fulfilled' ? arrows.value : [],
+    arrows: boardRead.status === 'fulfilled' ? boardRead.value.arrows : [],
+    picked: boardRead.status === 'fulfilled' ? boardRead.value.picked : null,
     goals: goals.status === 'fulfilled' ? goals.value : [],
     reps: reps.status === 'fulfilled' ? reps.value : [],
     suggestions: suggestions.status === 'fulfilled' ? suggestions.value : [],
@@ -126,7 +132,7 @@ export async function renderLearningBoard(root: HTMLElement, options: LearningOp
 
 function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions): void {
   const opened = SETS.map((s: { id: number }) => s.id).filter((id: number) => entries.some((e) => e.set === id));
-  const layout: BoardLayout = boardLayout({ entries, sets: SETS as never, series: seriesList, opened });
+  const bookLayout: BoardLayout = boardLayout({ entries, sets: SETS as never, series: seriesList, opened });
   const setColour = new Map<number, string>(SETS.map((s: { id: number; colour: string }) => [s.id, s.colour]));
   const state = {
     selected: null as string | null,
@@ -140,8 +146,25 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     textError: null as string | null,
     draw: 'off' as 'off' | 'from' | 'to',
     drawFrom: null as string | null,
-    level: null as LabelLevel | null
+    level: null as LabelLevel | null,
+    view: readView(),
+    picked: data.picked ?? []
   };
+
+  /**
+   * What sits on Adam's own board: what he picked, in order, then the live goal and anything an
+   * arrow touches, so nothing he is working on or has linked ever drops off.
+   */
+  function onBoardIds(): string[] {
+    const ids = [...state.picked];
+    const add = (id: string | null | undefined): void => { if (id && !ids.includes(id)) ids.push(id); };
+    const live = state.goals.find((g) => isLiveWalkthruGoal(g));
+    add(live ? normalizeWalkthru(live.walkthru)?.technique_id : null);
+    for (const a of state.arrows) { add(a.from); add(a.to); }
+    return ids;
+  }
+  const layoutFor = (): BoardLayout => (state.view === 'book' ? bookLayout : pickedLayout({ entries, ids: onBoardIds() }));
+  let layout: BoardLayout = layoutFor();
 
   // ── shell ──
   const view = el('div', 'wt-view');
@@ -162,7 +185,9 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   const panel = el('aside', 'wt-panel');
   panel.hidden = true;
   panel.setAttribute('aria-label', 'Technique');
-  stage.append(board, tip, pop);
+  const empty = el('div', 'wt-empty');
+  empty.hidden = true;
+  stage.append(board, tip, pop, empty);
   view.append(toolbar, stage, panel);
   root.replaceChildren(view);
 
@@ -379,11 +404,13 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     for (const r of routed) arrowLayer.append(arrowNodes(r, bookIds.has(r.id)));
     children.push(arrowLayer);
     const tileLayer = svg('g', { class: 'wt-tiles' });
+    const mine = new Set(onBoardIds());
     for (const t of layout.tiles) {
       const node = tileNode(t);
       if (t.id === state.selected) node.classList.add('is-selected');
       else if (selectedTile && neighbours.has(t.id)) node.classList.add('is-neighbour');
       if (state.draw !== 'off' && t.id === state.drawFrom) node.classList.add('is-draw-from');
+      if (state.view === 'book' && mine.has(t.id)) node.classList.add('is-mine');
       tileLayer.append(node);
     }
     children.push(tileLayer);
@@ -410,6 +437,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (focusId) ([...world.querySelectorAll<SVGElement>('[data-tile]')].find((n) => n.dataset.tile === focusId))?.focus();
     board.classList.toggle('has-selection', Boolean(selectedTile));
     board.dataset.draw = state.draw;
+    board.dataset.view = state.view;
     applyCamera();
   }
 
@@ -422,6 +450,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       goal: goalFor(state.selected),
       blockedBy: live && liveId !== state.selected ? techniqueById(liveId)?.name ?? 'another technique' : null,
       reps: state.reps,
+      board: boardState(state.selected),
       text: state.text ? { state: 'ready', value: state.text } : state.textError ? { state: 'missing', message: state.textError } : { state: 'loading' }
     };
     panel.hidden = false;
@@ -429,6 +458,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       onClose: () => select(null),
       onSelect: (id) => select(id),
       onStart: (id) => void startGoal(id),
+      onBoardToggle: (id) => void toggleOnBoard(id),
       onTextRetry: () => { state.textError = null; void ensureText(); paintPanel(); }
     });
   }
@@ -461,6 +491,82 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (tile) focusTile(tile);
   }
 
+  // ── my board ──
+  function boardState(id: string): { on: boolean; locked: string | null } {
+    const on = onBoardIds().includes(id);
+    if (!on) return { on, locked: null };
+    const live = liveGoal();
+    if (live && normalizeWalkthru(live.walkthru)?.technique_id === id) return { on, locked: 'It’s your current goal, so it stays on your board.' };
+    return { on, locked: null };
+  }
+
+  function paintEmpty(): void {
+    const show = state.view === 'mine' && !layout.tiles.length;
+    empty.hidden = !show;
+    if (!show) return;
+    empty.replaceChildren(
+      el('p', 'wt-empty__title', 'Your board is empty'),
+      el('p', 'wt-empty__text', 'Pick the few techniques you’re working on. They sit together here, ready to link with arrows.'),
+      button('Choose from the whole book', () => setView('book'), 'btn btn--primary')
+    );
+  }
+
+  function waitingNote(): string {
+    if (state.view !== 'mine') return '';
+    const on = new Set(onBoardIds());
+    const off = state.suggestions.filter((x) => x.technique_id && !on.has(x.technique_id)).length;
+    return off ? ` ${off === 1 ? 'A suggestion is' : `${off} suggestions are`} waiting in the whole book.` : '';
+  }
+
+  /** Lays the board out again after the view or Adam's picks change. */
+  function relayout(fit: boolean): void {
+    layout = layoutFor();
+    if (state.selected && !layout.tiles.some((t) => t.id === state.selected)) {
+      state.selected = null;
+      try { history.replaceState(null, '', '#/learning'); } catch { /* ignore */ }
+    }
+    paint();
+    paintPanel();
+    paintEmpty();
+    if (fit) glideTo(fitAll());
+  }
+
+  function setView(next: BoardView): void {
+    if (state.view === next) return;
+    state.view = next;
+    keepView(next);
+    viewButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === next)));
+    if (state.draw !== 'off') endDraw();
+    status.textContent = next === 'book'
+      ? 'The whole book. Open a technique and choose Add to my board.'
+      : `Your board.${waitingNote()}`;
+    relayout(true);
+  }
+
+  async function toggleOnBoard(id: string): Promise<void> {
+    const name = techniqueById(id)?.name ?? 'That technique';
+    const { on, locked } = boardState(id);
+    if (locked) { status.textContent = locked; return; }
+    const beforePicked = state.picked;
+    const beforeArrows = state.arrows;
+    const dropped = on ? state.arrows.filter((a) => a.from === id || a.to === id) : [];
+    state.picked = on ? state.picked.filter((x) => x !== id) : [...state.picked, id];
+    if (dropped.length) state.arrows = state.arrows.filter((a) => !dropped.includes(a));
+    relayout(state.view === 'mine');
+    try {
+      state.picked = await saveBoardPicked(state.picked);
+      if (dropped.length) state.arrows = await saveBoardArrows(state.arrows);
+      status.textContent = on
+        ? `Took ${name} off your board${dropped.length ? `, with its ${dropped.length === 1 ? 'arrow' : `${dropped.length} arrows`}` : ''}.`
+        : `Added ${name} to your board.`;
+    } catch (err) {
+      state.picked = beforePicked;
+      state.arrows = beforeArrows;
+      status.textContent = `That didn’t save. ${errorMessage(err)}`;
+    }
+    relayout(false);
+  }
+
   async function startGoal(id: string): Promise<void> {
     const entry = techniqueById(id);
     if (!entry) return;
@@ -471,6 +577,11 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       const goal = await createWalkthruGoal({ title: `Get better at ${entry.name}`, walkthru: { technique_id: id, stage: 'attempt' } });
       state.goals = [...state.goals, goal];
       status.textContent = `Started working on ${entry.name}.`;
+      // Working on it puts it on Adam's board for good, so it stays there once the goal ends.
+      if (!state.picked.includes(id)) {
+        state.picked = [...state.picked, id];
+        void saveBoardPicked(state.picked).then((saved) => { state.picked = saved; }, () => { /* the live goal keeps it on the board meanwhile */ });
+      }
     } catch (err) {
       status.textContent = errorMessage(err);
     }
@@ -695,7 +806,18 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     zoomAt(t, vp.w / 2, vp.h / 2, factor);
     glideTo(t);
   };
+  const viewSwitch = el('div', 'wt-viewswitch');
+  viewSwitch.setAttribute('role', 'group');
+  viewSwitch.setAttribute('aria-label', 'Board');
+  const viewButtons = (['mine', 'book'] as const).map((v) => {
+    const b = button(v === 'mine' ? 'My board' : 'Whole book', () => setView(v), 'wt-viewswitch__btn');
+    b.dataset.view = v;
+    b.setAttribute('aria-pressed', String(state.view === v));
+    return b;
+  });
+  viewSwitch.append(...viewButtons);
   toolbar.append(
+    viewSwitch,
     button('Fit', () => glideTo(fitAll())),
     button('+', () => zoomBy(1.3)),
     button('−', () => zoomBy(1 / 1.3)),
@@ -816,19 +938,27 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   }
 
   // ── first paint: the camera is final before anything shows ──
-  assignCamera(cam, initialCamera());
-  if (!layout.tiles.length) {
+  if (!bookLayout.tiles.length) {
     stage.replaceChildren(el('p', 'empty-state', 'No WalkThrus techniques are in the catalogue yet.'));
     return;
   }
+  // A link to a technique that isn't on Adam's board opens the whole book on it.
+  if (options.technique && !layout.tiles.some((t) => t.id === options.technique) && bookLayout.tiles.some((t) => t.id === options.technique)) {
+    state.view = 'book';
+    viewButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === 'book')));
+    layout = layoutFor();
+  }
+  assignCamera(cam, initialCamera());
   if (options.technique && layout.tiles.some((t) => t.id === options.technique)) state.selected = options.technique;
   paint();
   paintPanel();
+  paintEmpty();
   if (state.selected) {
     void ensureText();
     const tile = layout.tiles.find((t) => t.id === state.selected);
     if (tile) assignCamera(cam, focusPoint(cam, viewport(), tile.x, tile.y + tile.box.h * 0.9, Math.max(cam.k, isPhone() ? 0.9 : 1.15), panelOffset().x));
     applyCamera();
   }
-  if (!state.arrows.length && !data.notices.length) status.textContent = 'Draw arrow joins two techniques. Click a hexagon to open it.';
+  if (!state.arrows.length && !data.notices.length) status.textContent = `Draw arrow joins two techniques. Click a hexagon to open it.${waitingNote()}`;
+  else if (!data.notices.length) status.textContent = waitingNote().trim();
 }

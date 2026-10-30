@@ -1,11 +1,11 @@
 import { el, formatMarks } from '@/quiz/dom';
 import type { AssessmentMark, CheckMark, HandinMark } from './schema';
 import type { AnyColumn, MarkbookActions, MarkbookView, RosterStudent } from './types';
-import { assessmentResult, dateOf, formatDay, formatPercent, markOf, orderedColumns, overallFor, quizPercent, workCount, type Overall } from './calc';
+import { assessmentResult, formatPercent, markOf, quizPercent, workCount, type Overall } from './calc';
 import { HANDIN_LABEL, nextCheck, nextHandin } from './cells';
 import { isConfidentlyWrong, isDropping, quizSeries } from './insight';
 
-/** The desktop grid: students down the side, columns in date order, overall pinned right. */
+/** Marked-column cells, headers and the student head, shared by Marks & progress and its phone list. */
 
 export const KIND_LABEL = { quiz: 'Quiz', assessment: 'Task', handin: 'Hand-in', check: 'Check', work: 'Work' } as const;
 
@@ -35,7 +35,12 @@ function clearOn(b: HTMLElement, clear: () => void, hint: boolean): void {
   });
 }
 
-export type CellOptions = { /** Say "Delete to clear" in the label. Defaults to true. */ clearHint?: boolean };
+export type CellOptions = {
+  /** Say "Delete to clear" in the label. Defaults to true. */
+  clearHint?: boolean;
+  /** Show a handed-in quiz as its mark, 13/20, instead of a percentage. */
+  quizScore?: boolean;
+};
 
 export function cellFor(
   view: MarkbookView,
@@ -45,7 +50,7 @@ export function cellFor(
   today: string,
   options: CellOptions = {}
 ): HTMLElement {
-  let cell = cellButton(view, column, student, actions, today, options.clearHint ?? true);
+  let cell = cellButton(view, column, student, actions, today, options.clearHint ?? true, options.quizScore ?? false);
   if (student.removed && cell instanceof HTMLButtonElement) {
     // The server refuses writes for students no longer on the class list, so their rows are read-only.
     const span = el('span', cell.className);
@@ -57,7 +62,7 @@ export function cellFor(
   return cell;
 }
 
-function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string, hint: boolean): HTMLElement {
+function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string, hint: boolean, asScore: boolean): HTMLElement {
   const sid = student.id;
   if (column.kind === 'quiz') {
     const score = column.scores[sid];
@@ -82,7 +87,10 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
     }
     const toMark = score.pending > 0 ? `, ${score.pending} to mark` : '';
     const group = column.groups?.[sid];
-    const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}${toMark}${group ? ` · ${group}` : ''}`);
+    const shown = asScore ? `${formatMarks(score.score)}/${formatMarks(score.max)}` : formatPercent(quizPercent(score));
+    const b = button('mb-cell mb-cell--quiz', shown, `${column.title}, ${student.name}: ${shown}${toMark}${group ? ` · ${group}` : ''}`);
+    const percent = quizPercent(score);
+    b.dataset.result = score.pending > 0 ? 'waiting' : percent !== null && percent < 50 ? 'low' : 'done';
     if (group) b.title = group;
     if (score.pending > 0) {
       const dot = el('span', 'mb-cell__pending');
@@ -137,42 +145,6 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
   return b;
 }
 
-export function headerFor(column: AnyColumn, actions: MarkbookActions): HTMLTableCellElement {
-  const th = el('th', `mb-col mb-col--${column.kind}`);
-  th.scope = 'col';
-  // Written work has no class view or settings: its title is a label.
-  const title = column.kind === 'work' ? el('span', 'mb-col__title', column.title) : el('button', 'mb-col__title', column.title);
-  if (title instanceof HTMLButtonElement) {
-    title.type = 'button';
-    title.addEventListener('click', () => (column.kind === 'quiz' ? actions.openHeatmap(column.lesson_id) : actions.editColumn(column.id)));
-  }
-  title.title = column.title;
-  title.dataset.col = column.id;
-  th.append(el('span', 'mb-col__kind', KIND_LABEL[column.kind]), title, el('span', 'mb-col__date', formatDay(dateOf(column))));
-  if (column.kind === 'assessment') th.append(el('span', 'mb-col__weight', `${column.weight}%`));
-  // A task linked to a lesson block opens the marking screen, with how many handed-in pieces still wait.
-  const mark = column.kind === 'assessment' && column.piece ? actions.markLink?.(column.id) : undefined;
-  if (mark) {
-    const link = el('a', 'mb-col__mark', 'Mark');
-    link.setAttribute('href', mark.href);
-    link.addEventListener('click', (event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-      event.preventDefault();
-      mark.open();
-    });
-    if (mark.waiting) link.append(el('span', 'mb-col__mark-count', `${mark.waiting} waiting`));
-    th.append(link);
-  }
-  if (column.kind === 'quiz') {
-    const hide = el('button', 'mb-col__hide', 'Hide');
-    hide.type = 'button';
-    hide.setAttribute('aria-label', `Hide ${column.title}`);
-    hide.addEventListener('click', () => actions.hideQuiz(column.lesson_id, true));
-    th.append(hide);
-  }
-  return th;
-}
-
 export function sparkline(series: number[]): SVGSVGElement {
   const NS = 'http://www.w3.org/2000/svg';
   const w = 48;
@@ -209,37 +181,5 @@ export function studentHead(view: MarkbookView, student: RosterStudent, onOpen?:
   if (series.length >= 2) wrap.append(sparkline(series));
   if (isDropping(series)) wrap.append(flag('Dropping', 'The last three quizzes are 15 or more points below the ones before.'));
   if (isConfidentlyWrong(view, student.id)) wrap.append(flag('Confident and wrong', 'Often sure of answers that scored zero.'));
-  return wrap;
-}
-
-export function renderGrid(view: MarkbookView, students: RosterStudent[], actions: MarkbookActions, today: string): HTMLElement {
-  const columns = orderedColumns(view);
-  const wrap = el('div', 'mb-grid');
-  const table = el('table', 'mb-grid__table');
-  const headRow = el('tr');
-  const corner = el('th', 'mb-grid__student', 'Student');
-  corner.scope = 'col';
-  const overallHead = el('th', 'mb-grid__overall', 'Overall');
-  overallHead.scope = 'col';
-  headRow.append(corner, ...columns.map((c) => headerFor(c, actions)), overallHead);
-  const body = el('tbody');
-  for (const s of students) {
-    const row = el('tr');
-    const head = el('th', 'mb-grid__student');
-    head.scope = 'row';
-    head.append(studentHead(view, s, actions.openStudent));
-    row.append(head);
-    for (const c of columns) {
-      const td = el('td', 'mb-grid__cell');
-      td.append(cellFor(view, c, s, actions, today));
-      row.append(td);
-    }
-    row.append(el('td', 'mb-grid__overall', overallText(overallFor(view.markbook, s.id))));
-    body.append(row);
-  }
-  const thead = el('thead');
-  thead.append(headRow);
-  table.append(thead, body);
-  wrap.append(table);
   return wrap;
 }

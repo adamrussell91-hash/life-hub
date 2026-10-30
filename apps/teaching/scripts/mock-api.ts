@@ -120,6 +120,7 @@ import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-p
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
+import { createClassProfileHandler } from '../../../netlify/functions/class-profile.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
@@ -3920,6 +3921,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createFeedbackCodesHandler(deps)
       : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
       ? createMarkbookHandler(deps)
+      : /^\/api\/classes\/[^/]+\/profile$/.test(path)
+      ? createClassProfileHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)
         : /^\/api\/classes\/[^/]+\/pieces$/.test(path)
@@ -4021,6 +4024,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (
       path === '/api/feedback-codes' ||
       /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
+      /^\/api\/classes\/[^/]+\/profile$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
       /^\/api\/classes\/[^/]+\/pieces$/.test(path) ||
       path === '/api/to-mark' ||
