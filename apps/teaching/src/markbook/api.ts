@@ -1,6 +1,7 @@
 import { apiPost } from '@/api/client';
 import type { Column, HistoryEvent, Markbook } from './schema';
 import type { MarkbookView } from './types';
+import type { AnalysisData } from './analysis-panel';
 
 export type NewMember = { student: string; why: string };
 
@@ -16,6 +17,7 @@ export type MarkbookApi = {
   addMembers: (classId: string, groupId: string, members: NewMember[], today: string) => Promise<Markbook>;
   removeMember: (classId: string, groupId: string, student: string, today: string) => Promise<Markbook>;
   renameGroup: (classId: string, groupId: string, name: string) => Promise<Markbook>;
+  analysis: (classId: string, studentId: string) => Promise<AnalysisData>;
   recordHistory: (classId: string, events: HistoryEvent[], leaves: Array<{ group_id: string; student: string; day: string; why: string }>) => Promise<Markbook>;
 };
 
@@ -34,5 +36,6 @@ export const httpMarkbookApi: MarkbookApi = {
   addMembers: (classId, groupId, members, today) => write(classId, { action: 'add_members', group_id: groupId, members, today }),
   removeMember: (classId, groupId, student, today) => write(classId, { action: 'remove_member', group_id: groupId, student, today }),
   renameGroup: (classId, groupId, name) => write(classId, { action: 'rename_group', group_id: groupId, name }),
+  analysis: (classId, studentId) => apiPost<AnalysisData>(path(classId), { action: 'analysis', student_id: studentId }),
   recordHistory: (classId, events, leaves) => write(classId, { action: 'record_history', events, leaves })
 };

@@ -402,6 +402,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
         pins: pinsNow(),
         pinsNow,
         history: (view.markbook.history ?? []),
+        loadAnalysis: () => Promise.resolve().then(() => api.analysis(cls.id, studentId)),
+        outcomeName: (key) => analysisName(key),
+        onGroup: (ids, pattern) => void saveHoldingGroup(ids, pattern.key, analysisName(pattern.key), pattern.step),
         overall: formatPercent(overallFor(view.markbook, studentId).percent),
         onPins: (next) =>
           change({ kind: 'focus', studentId, pinned: next.pinned, dismissed: next.dismissed }, () => api.setFocus(cls.id, studentId, next.pinned, next.dismissed)),
@@ -470,6 +473,19 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       // The next load tries again; nothing is lost.
       synced = false;
     }
+  }
+
+  /** A readable name for an `out:`, `con:` or `skill:` key. */
+  function analysisName(key: string): string {
+    const rest = key.slice(key.indexOf(':') + 1);
+    return rest.replace(/^skill:/, '').replace(/[-_.]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  }
+
+  /** Saves the students holding on one target as a group, with the evidence as the why. */
+  async function saveHoldingGroup(students: string[], key: string, name: string, step: string): Promise<void> {
+    const why = `Holding at ${step} on ${name}.`;
+    const group = { id: newGroupId(), name: `${name} · holding at ${step}`.slice(0, 120), tags: [key], members: students.map((s) => ({ student: s, why })) };
+    await writeGroups(() => api.saveGroup(cls.id, group, today()));
   }
 
   async function saveGroup(current: MarkbookView, context: InsightContext, tags: string[], students: string[]): Promise<void> {
