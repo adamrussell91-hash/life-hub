@@ -68,3 +68,18 @@ test('the board endpoint keeps only valid arrows', async () => {
   const read = await make(true)(new Request('https://example.test/api/walkthrus-board'));
   assert.deepEqual((await read.json()).data.board.arrows.map((a) => a.id), ['a1']);
 });
+
+test('the board endpoint keeps Adam’s picks apart from his arrows', async () => {
+  const s = store();
+  const handler = createWalkthrusBoardHandler({ env: gateEnv, getContentStore: async () => s, verifySessionToken: () => ({ valid: true }) });
+  const read = async () => (await (await handler(new Request('https://example.test/api/walkthrus-board'))).json()).data.board;
+  assert.equal((await read()).picked, null, 'null until he first picks');
+  await handler(post('https://example.test/api/walkthrus-board', { picked: [T, 'nope', T, 'w1-quizzing'] }));
+  assert.deepEqual((await read()).picked, [T, 'w1-quizzing']);
+  // saving arrows alone keeps the picks, and picks alone keep the arrows
+  await handler(post('https://example.test/api/walkthrus-board', { arrows: [{ id: 'a1', from: T, to: 'w1-quizzing', type: 'leads_to' }] }));
+  await handler(post('https://example.test/api/walkthrus-board', { picked: [T] }));
+  const board = await read();
+  assert.deepEqual(board.picked, [T]);
+  assert.deepEqual(board.arrows.map((a) => a.id), ['a1']);
+});
