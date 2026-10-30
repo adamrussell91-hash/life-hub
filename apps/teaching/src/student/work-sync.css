@@ -1,0 +1,40 @@
+/* Work sync: the one-time initials ask and the offline note at the top of a lesson. Tokens only. */
+.ws-bar {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  min-width: 0;
+  margin-block-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.ws-bar[hidden],
+.ws-bar__error[hidden] {
+  display: none;
+}
+
+.ws-bar p {
+  margin: 0;
+}
+
+.ws-bar__title {
+  font-weight: 600;
+}
+
+.ws-bar .btn {
+  min-height: 44px;
+}
+
+.ws-bar__initials {
+  min-height: 44px;
+  width: min(100%, 14rem);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.ws-bar__error {
+  color: var(--danger);
+}
