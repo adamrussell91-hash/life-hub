@@ -111,7 +111,7 @@ In the Markbook student panel:
 
 - **Viva marking:** gets a **This is** student picker, prefilled from the student's class claim. New submissions save `student_id` and `class_id` from the claim when the device has one.
 - **Feedback documents:** get a **For** picker (class, then student). The one-off link still works.
-- **Code library:** each code gets an optional **See how** resource and a growth or strength flag. The existing `positive` field and the annotation `positive` field already carry the second.
+- **Code library:** each code gets an optional **See how** resource, in the same shape as the peer bank's `resource`. Growth or strength is set per tag, as in viva marking: a tag is `positive` when the teacher applies the code as a strength, and the code's `strength_descriptor` is then the sentence the student sees.
 
 ## Data
 
@@ -134,15 +134,15 @@ All data stays in the `teaching-blobs` store. Nothing stores a student name outs
   title, short?, lesson_id, block_id?,
   tags: [{ id, code_id, field, start, end, quote, note? }],   // written: character range in the frozen text
   comment?,
-  placements: { [criterionId]: 'starting'|'building'|'secure'|'extending' | 'capable'|'skilled'|'accomplished'|'excellent' },
-  column_id?,          // the Markbook assessment column whose criteria it uses
+  column_id,           // the Markbook assessment column whose criteria are the rubric
   status: 'draft' | 'returned',
   returned_at?, seen_at?, updated_at
 }
 ```
 
-- Viva tags stay where they are (`voice_submissions`). The viva piece record holds the comment, the placements and the returned status for the whole set.
-- **Rubric source:** a markable task links to a Markbook assessment column, either picked or created when **Set to be marked** is switched on. Its criteria (`outcomes[]`, `skill?`, and a new `concepts[]`) are the rubric.
+- Viva tags stay where they are (`voice_submissions`). The viva piece record holds the comment and the returned status for the whole set.
+- **Rubric source and the marking switch are the same thing.** A Markbook assessment column gains `piece?: { lesson_id, block_id, short? }`. Linking a column to a lesson block is what "Set to be marked" means for that class, and the student then sees **Hand in** on that block. The column's criteria (`outcomes[]`, `skill?` and a new `concepts[]`) are the rubric.
+- **Placements live on the Markbook mark**, so the Markbook stays the gradebook: `AssessmentMark.steps?: { [criterionId]: step or rung }`. Numeric `criteria` marks stay optional.
 - **New on a criterion:** `concepts[]` (concept keys from the syllabus alignment) and `steps?: { starting, building, secure, extending }`, the one-line "looks like" text for each step.
 
 ### Turning a numeric mark into a step
@@ -167,7 +167,7 @@ When a student opens a returned item, `seen_at` is written: on `piece_feedback` 
 
 `patterns.mjs` takes a student's pieces in date order and returns rows, stories and next steps. The teacher's Analysis panel and the student page both use it.
 
-- **Piece order:** by returned date, oldest first. The charts show at most the last 8 pieces, and older pieces fold into "Earlier".
+- **Piece order:** by returned date, oldest first. The charts show at most the last 8 pieces, and older pieces fold into "Earlier". Pieces are labelled with their short name and a short date ("27 Oct"), not a school week.
 - **Holding:** the same step on 3 or more pieces in a row that assessed this outcome, concept or skill, below the top step (Extending, or Excellent for skills).
 - **Moved up:** the step rose between two pieces in a row: "Moved up from Starting to Building in Week 4". If the step fell, the story describes the current step only ("Now at Building"). It never says "dropped".
 - **Few pieces:** fewer than 3 gives "N pieces so far. More pieces will show the pattern."
