@@ -35,6 +35,9 @@ describe('gate answers', () => {
     const reveal = renderBlock(b('k1', 'self_check', { mode: 'reveal', prompt: 'Why?', answer: 'Because' }), 'student');
     const sure = renderBlock(b('k2', 'self_check', { mode: 'confidence', prompt: 'How sure?', answer: 'x' }), 'student');
     host.append(reveal, sure);
+    const area = reveal.querySelector<HTMLTextAreaElement>('.block-self-check__response')!;
+    area.value = 'My go';
+    area.dispatchEvent(new Event('input'));
     reveal.querySelector<HTMLButtonElement>('.block-self-check__btn')!.click();
     sure.querySelector<HTMLButtonElement>('.block-self-check__confidence-btn')!.click();
     expect(got).toEqual([{ blockId: 'k1', result: 'done' }, { blockId: 'k2', result: 'done' }]);

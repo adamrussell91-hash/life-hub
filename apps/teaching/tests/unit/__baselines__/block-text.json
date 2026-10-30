@@ -483,6 +483,8 @@
   ],
   "every-block/every_self_check/student": [
     "Show answer",
+    "Write your answer, then you can check it.",
+    "Your answer",
     "self_check.answer filler",
     "self_check.answer filler",
     "self_check.prompt filler",

@@ -1951,6 +1951,24 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
 .block-self-check__answer[hidden] {
   display: none;
 }
+.block-self-check__response {
+  display: block;
+  width: 100%;
+  border: 1.5px solid var(--wave);
+  border-radius: var(--radius-xs);
+  background: #fff;
+  padding: 11px 12px;
+  font-size: var(--text-sm);
+  font-family: var(--font-ui);
+  color: var(--ink);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+.block-self-check__response:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.block-self-check__response[readonly] { background: var(--paper); border-color: var(--line); }
+.block-self-check__hint[hidden] { display: none; }
+.block-self-check__btn:disabled,
+.block-question-set__model-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .block-self-check__answer-hidden {
   color: var(--muted);
