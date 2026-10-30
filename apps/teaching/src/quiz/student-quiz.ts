@@ -339,7 +339,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     return box;
   }
 
-  function initialsView(): HTMLElement {
+  // `opensQuestion`: typed in a question card, so the go starts and that question opens to answer.
+  function initialsView(opensQuestion = false): HTMLElement {
     const box = el('div', 'qz-panel qz-initials');
     box.append(
       el('p', 'qz-panel__title', 'Type your initials'),
@@ -355,7 +356,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       this.disabled = true;
       const next = await call('claim', { initials: input.value });
       this.disabled = false;
-      if (next && !next.identity?.need) paint();
+      if (!next || next.identity?.need) return;
+      const fresh = !next.current && !next.live && next.open && !next.results.length && next.attempts_allowed > next.attempts_used;
+      if (opensQuestion && fresh) await startAttempt();
+      else paint();
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') go.click();
@@ -650,7 +654,13 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     if (!s) box.append(el('p', 'qz-note', 'Loading…'));
     else if (current) box.append(el('p', 'qz-note', 'This question isn’t part of your current go.'));
     else if (s.live) box.append(el('p', 'qz-note', 'Your teacher is running this quiz live. Join at the end of the lesson.'), toBox('Go to the quiz'));
-    else if (s.identity?.need) box.append(el('p', 'qz-note', 'Start at the end of the lesson, then answer here.'), toBox('Go to the start'));
+    else if (s.identity?.need === 'initials') box.append(initialsView(true));
+    else if (s.identity?.need === 'class') {
+      const classes = pickClass ? s.identity.classes ?? [] : [];
+      if (classes.length === 1 && autoPick) box.append(el('p', 'qz-note', 'Loading…'));
+      else if (classes.length) box.append(classPicker(classes));
+      else box.append(el('p', 'qz-note', 'Open this quiz from your class page.'));
+    }
     else if (!s.open) box.append(el('p', 'qz-note', 'This quiz has closed.'));
     else if (s.attempts_allowed - s.attempts_used > 0) {
       box.append(
