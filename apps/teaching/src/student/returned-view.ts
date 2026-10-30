@@ -10,7 +10,7 @@ import type { Place, ReturnedItem } from '@/progress/types';
 
 const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', note: 'Note' };
 
-export function returnedList(items: ReturnedItem[], onOpen: (id: string) => void): HTMLElement {
+export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew: boolean) => void): HTMLElement {
   const box = el('section', 'pg-returned');
   if (!items.length) {
     box.append(el('p', 'pm-empty', 'Feedback from your teacher appears here once it is returned.'));
@@ -23,7 +23,7 @@ export function returnedList(items: ReturnedItem[], onOpen: (id: string) => void
     const t = el('span', 'pg-returned__title', item.title);
     if (item.new) t.append(el('span', 'pg-returned__new', 'New'));
     card.append(t, el('span', 'pg-returned__meta', `Returned ${item.date}`), el('span', 'pg-returned__chev', '›'));
-    card.addEventListener('click', () => onOpen(item.id));
+    card.addEventListener('click', () => onOpen(item.id, Boolean(item.new)));
     box.append(card);
   }
   return box;

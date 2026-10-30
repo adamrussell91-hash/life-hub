@@ -208,6 +208,15 @@ function tabs(unseen: number, panels: { progress: HTMLElement; returned: HTMLEle
   return bar;
 }
 
+// The Returned work count goes down as soon as a new piece is opened.
+function dropBadge(root: Element | null): void {
+  const badge = root?.querySelector('.pg-tab__badge');
+  if (!badge) return;
+  const left = Number(badge.textContent) - 1;
+  if (left > 0) badge.textContent = String(left);
+  else badge.remove();
+}
+
 function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () => void {
   const showList = (): void => {
     panel.replaceChildren(el('p', 'pm-empty', 'Loading…'));
@@ -216,11 +225,12 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () =>
       (error: unknown) => panel.replaceChildren(el('p', 'pm-empty', errorText(error, 'Couldn’t load your returned work. Try again.')))
     );
   };
-  const open = (id: string): void => {
+  const open = (id: string, wasNew = false): void => {
     void options.loadPiece?.(id).then(
       (piece) => {
         panel.replaceChildren(pieceView(piece, showList));
         options.markSeen?.(id);
+        if (wasNew) dropBadge(panel.closest('.pm-profile'));
       },
       (error: unknown) => panel.replaceChildren(el('p', 'pm-empty', errorText(error, 'Couldn’t open that piece. Try again.')))
     );

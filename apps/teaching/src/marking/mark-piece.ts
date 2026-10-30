@@ -31,6 +31,15 @@ const STEPS = [['starting', 'Starting'], ['building', 'Building'], ['secure', 'S
 const RUNGS = [['capable', 'Capable'], ['skilled', 'Skilled'], ['accomplished', 'Accompl.'], ['excellent', 'Excellent']] as const;
 const first = (name: string) => name.split(' ')[0] ?? name;
 
+/** A rough selection grows to the whole words it touches, so a highlight never stops mid-word. */
+export function wholeWords(text: string, r: { start: number; end: number } | null): { start: number; end: number } | null {
+  if (!r) return null;
+  let { start, end } = r;
+  while (start > 0 && /[\p{L}\p{N}'’]/u.test(text[start - 1]!)) start--;
+  while (end < text.length && /[\p{L}\p{N}'’]/u.test(text[end]!)) end++;
+  return { start, end };
+}
+
 export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElement {
   let tags: Tag[] = [...(d.feedback?.tags ?? [])];
   const steps: Record<string, string> = { ...(d.mark?.steps ?? {}) };
@@ -82,7 +91,7 @@ export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElem
   const rubric = el('div', 'mk-rubric');
   for (const c of d.column.criteria) {
     const row = el('div', 'mk-rubric__row');
-    row.append(el('b', undefined, c.label), el('small', undefined, c.skill ? `Skill · ${c.skill}` : [...c.outcomes, ...c.concepts].join(' · ')));
+    row.append(el('b', undefined, c.label), el('small', undefined, c.skill ? `Skill · ${(c as { skill_name?: string }).skill_name ?? c.skill}` : [...c.outcomes, ...c.concepts].join(' · ')));
     const btns = el('div', 'mk-rubric__steps');
     for (const [id, name] of c.skill ? RUNGS : STEPS) {
       const b = el('button', 'mk-step', name);
@@ -137,7 +146,7 @@ export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElem
           const a = offsetOf(s.anchorNode, s.anchorOffset);
           const b = offsetOf(s.focusNode, s.focusOffset);
           if (a === null || b === null) return;
-          const range = trimRange(text, Math.min(a, b), Math.max(a, b));
+          const range = wholeWords(text, trimRange(text, Math.min(a, b), Math.max(a, b)));
           if (range) root.dispatchEvent(new CustomEvent('pm:select', { detail: { part, field, ...range } }));
           s.removeAllRanges();
         });
