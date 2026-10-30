@@ -150,6 +150,19 @@ export function headerFor(column: AnyColumn, actions: MarkbookActions): HTMLTabl
   title.dataset.col = column.id;
   th.append(el('span', 'mb-col__kind', KIND_LABEL[column.kind]), title, el('span', 'mb-col__date', formatDay(dateOf(column))));
   if (column.kind === 'assessment') th.append(el('span', 'mb-col__weight', `${column.weight}%`));
+  // A task linked to a lesson block opens the marking screen, with how many handed-in pieces still wait.
+  const mark = column.kind === 'assessment' && column.piece ? actions.markLink?.(column.id) : undefined;
+  if (mark) {
+    const link = el('a', 'mb-col__mark', 'Mark');
+    link.setAttribute('href', mark.href);
+    link.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+      event.preventDefault();
+      mark.open();
+    });
+    if (mark.waiting) link.append(el('span', 'mb-col__mark-count', `${mark.waiting} waiting`));
+    th.append(link);
+  }
   if (column.kind === 'quiz') {
     const hide = el('button', 'mb-col__hide', 'Hide');
     hide.type = 'button';

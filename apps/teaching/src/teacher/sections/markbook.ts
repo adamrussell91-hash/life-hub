@@ -33,7 +33,10 @@ import { openHeatmap, openQuizAttempt, openWorkSheet } from '@/markbook/heatmap'
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
-import { ApiClientError } from '@/api/client';
+import { ApiClientError, apiGet } from '@/api/client';
+import { loadAlignment } from '@/alignment/api';
+import { getLesson } from '@/teacher/lessons-library/api';
+import { visitBlocks } from '@/blocks/walk-blocks';
 import { loadSkills } from '@/skills/api';
 import type { SkillsContinuum } from '@/skills/schema';
 import '@/markbook/markbook.css';
@@ -52,7 +55,23 @@ type Options = {
   progressLessons?: ProgressLesson[];
   /** Test seam. Defaults to POST /api/classes/:id/profile. */
   progressApi?: ProgressApi;
+  /** The class's unit lessons, for linking a task to a lesson block. */
+  pieceLessons?: { id: string; title: string }[];
+  /** Test seam. The blocks of a lesson that students can hand in through. */
+  loadPieceBlocks?: (lessonId: string) => Promise<{ id: string; label: string }[]>;
 };
+
+/** Question-set blocks of a lesson, labelled by title or position, for the column form's block picker. */
+async function lessonPieceBlocks(lessonId: string): Promise<{ id: string; label: string }[]> {
+  const lesson = await getLesson(lessonId);
+  const out: { id: string; label: string }[] = [];
+  visitBlocks(lesson.blocks, (block) => {
+    if (block.block_type !== 'question_set') return;
+    const title = block.content.title?.trim();
+    out.push({ id: block.id, label: title || `Question set ${out.length + 1}` });
+  });
+  return out;
+}
 
 /** `grid` is the syllabus Grid; `marks` is the table of quizzes and tasks. */
 type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks' | 'progress';
@@ -146,6 +165,19 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   /** The skills continuum for skill-linked criteria; the markbook works without it. */
   let skills: SkillsContinuum | null = null;
   void loadSkills().then((c) => { skills = c; }, () => {});
+  /** Concept keys for tagging a criterion, and how many handed-in pieces wait on each linked task. Skipped under a test api. */
+  let conceptChoices: { key: string; name: string }[] = [];
+  const waitingByColumn = new Map<string, number>();
+  if (!options.api) {
+    void loadAlignment().then((a) => { conceptChoices = a.concepts.map((c) => ({ key: c.key, name: c.name })); }, () => {});
+    void apiGet<{ tasks: { class_id: string; column_id: string; waiting: number }[] }>('/api/to-mark').then(
+      (r) => {
+        for (const task of r.tasks) if (task.class_id === cls.id) waitingByColumn.set(task.column_id, task.waiting);
+        if (!disposed && view) paint();
+      },
+      () => {}
+    );
+  }
   const queued: Change[] = [];
   /** Told about each queued save that fails, e.g. by an open marking panel. */
   const saveErrorListeners = new Set<(change: Change, message: string) => void>();
@@ -278,6 +310,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       column,
       outcomes: options.outcomes ?? [],
       skills,
+      lessons: options.pieceLessons,
+      loadBlocks: options.loadPieceBlocks ?? lessonPieceBlocks,
+      concepts: conceptChoices,
       today: today(),
       returnFocus: () => (columnId ? findInBody('.mb-col__title', columnId) : null) ?? title,
       // A throw stays in the form, which shows the message and keeps the teacher's typing.
@@ -340,6 +375,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   }
 
   const actions: MarkbookActions = {
+    markLink: (columnId) => {
+      const path = `/mark/${encodeURIComponent(cls.id)}/${encodeURIComponent(columnId)}`;
+      return { href: withAppBase(path), waiting: waitingByColumn.get(columnId) ?? 0, open: () => navigate(path) };
+    },
     openStudent: (studentId) => {
       const student = view?.students.find((s) => s.id === studentId);
       // One panel at a time; a panel whose overlay has gone without closing counts as closed.

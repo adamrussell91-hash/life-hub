@@ -23,6 +23,8 @@ import {
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { mountHomeClock } from '@/teacher/home-clock';
+import { mountToMark, type ToMarkTask } from '@/marking/to-mark-view';
+import { apiGet } from '@/api/client';
 import type { CurriculumResponse } from './nav';
 
 export interface TeacherHomeOptions {
@@ -80,6 +82,11 @@ export function renderTeacherHome(
     onCreated: options.onCreated ?? (() => undefined)
   });
   disposers.push(createControl.dispose);
+
+  // To mark: handed-in work across classes; stays empty until a Markbook task is linked to a lesson block.
+  const toMarkHost = document.createElement('div');
+  toMarkHost.className = 'home-dashboard__to-mark';
+  mountToMark(toMarkHost, () => apiGet<{ tasks: ToMarkTask[] }>('/api/to-mark').then((r) => r.tasks));
 
   const calendarHost = document.createElement('div');
   calendarHost.className = 'home-dashboard__calendar';
@@ -153,6 +160,7 @@ export function renderTeacherHome(
 
   root.append(
     bannerHost,
+    toMarkHost,
     calendarHost,
     buildClassesPanel(
       curriculum.classes.filter((cls) => cls.status === 'active'),
