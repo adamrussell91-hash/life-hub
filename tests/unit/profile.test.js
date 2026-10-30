@@ -166,8 +166,14 @@ test('the teacher marks complete, partial and clear; a student tick replaces a p
   const after = (await teacherProfileAction(s, 'class1', { action: 'list' })).done[bob.id].l1;
   assert.equal(after.via, 'tick');
   assert.equal(after.partial, undefined);
+  // A complete override keeps the student's tick underneath; clearing it brings the tick back.
   assert.equal((await mark('complete')).done[bob.id].l1.via, 'teacher');
+  assert.equal((await mark('clear')).done[bob.id].l1.via, 'tick');
   assert.deepEqual((await mark('clear')).done[bob.id], {});
+  // A tick made while the override stands is kept for when it is cleared.
+  await mark('complete');
+  await profileAction(s, 'class1', { action: 'done', class_token: token(1), lesson_id: 'l1' });
+  assert.equal((await mark('clear')).done[bob.id].l1.via, 'tick');
   await assert.rejects(mark('bogus'), { code: 'bad_request' });
   await assert.rejects(teacherProfileAction(s, 'class1', { action: 'mark', student_id: 'nobody', lesson_id: 'l1', state: 'complete' }), { code: 'bad_request' });
 });
