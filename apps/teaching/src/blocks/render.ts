@@ -26,7 +26,14 @@ import { resolvedCalloutStyle, calloutIdentity, decorateCalloutReferences } from
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
-import { buildChartSvg, buildChartTableRows, chartAriaLabel } from '@/blocks/chart-svg';
+import {
+  buildChartPivot,
+  buildChartSvg,
+  buildChartTableRows,
+  chartAriaLabel,
+  chartHoverModel,
+  chartSeries
+} from '@/blocks/chart-svg';
 import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { AnthologyData } from '@/blocks/anthology-collect';
@@ -2307,6 +2314,110 @@ function buildChartScreenReaderTable(content: Extract<Block, { block_type: 'char
   return holder;
 }
 
+/** Hover or tap a column, bar, dot or slice to read its values. */
+function wireChartHover(
+  wrap: HTMLElement,
+  content: Extract<Block, { block_type: 'chart' }>['content']
+): void {
+  const svg = wrap.querySelector('svg');
+  const model = chartHoverModel(content);
+  if (!svg || !model.length) return;
+  const tip = document.createElement('div');
+  tip.className = 'block-chart__tip';
+  tip.hidden = true;
+  wrap.append(tip);
+  const guide = svg.querySelector('.block-chart__guide');
+  let active = -1;
+
+  const hide = () => {
+    active = -1;
+    tip.hidden = true;
+    wrap.classList.remove('is-hovering');
+    guide?.setAttribute('visibility', 'hidden');
+    svg.querySelectorAll('.is-active').forEach((el) => el.classList.remove('is-active'));
+  };
+
+  const show = (hit: Element) => {
+    const index = Number(hit.getAttribute('data-hit'));
+    const entry = model[index];
+    if (!entry) return hide();
+    if (index === active) return;
+    active = index;
+    wrap.classList.add('is-hovering');
+    const marks = [...svg.querySelectorAll(`[data-col="${index}"]`)];
+    svg.querySelectorAll('[data-col]').forEach((el) => el.classList.toggle('is-active', marks.includes(el)));
+    const gx = hit.getAttribute('data-gx');
+    if (guide && gx) {
+      guide.setAttribute('x1', gx);
+      guide.setAttribute('x2', gx);
+      guide.removeAttribute('visibility');
+    }
+
+    const title = document.createElement('strong');
+    title.className = 'block-chart__tip-title';
+    title.textContent = entry.title;
+    const rows = entry.rows.map((row) => {
+      const line = document.createElement('span');
+      line.className = 'block-chart__tip-row';
+      if (row.fill) {
+        const swatch = document.createElement('i');
+        swatch.className = 'block-chart__swatch';
+        swatch.style.background = row.fill;
+        line.append(swatch);
+      }
+      const label = document.createElement('span');
+      label.textContent = row.label;
+      const value = document.createElement('b');
+      value.textContent = row.value;
+      line.append(label, value);
+      return line;
+    });
+    tip.replaceChildren(title, ...rows);
+    tip.hidden = false;
+
+    const box = wrap.getBoundingClientRect();
+    const hitBox = hit.getBoundingClientRect();
+    const top = Math.min(
+      hitBox.top + hitBox.height / 2,
+      ...marks.map((el) => el.getBoundingClientRect().top)
+    );
+    const half = tip.offsetWidth / 2;
+    const x = Math.min(Math.max(hitBox.left + hitBox.width / 2 - box.left, half), box.width - half);
+    tip.style.left = `${x}px`;
+    tip.style.top = `${Math.max(top - box.top, 0)}px`;
+  };
+
+  svg.addEventListener('pointerover', (event) => {
+    const hit = (event.target as Element).closest('[data-hit]');
+    if (hit) show(hit);
+  });
+  svg.addEventListener('pointerleave', (event) => {
+    // A tap leaves the reading up until the next tap.
+    if (event.pointerType !== 'touch') hide();
+  });
+  wrap.addEventListener('pointerdown', (event) => {
+    if (!(event.target as Element).closest('[data-hit]')) hide();
+  });
+}
+
+function buildChartLegend(
+  content: Extract<Block, { block_type: 'chart' }>['content']
+): HTMLElement | null {
+  const series = chartSeries(content);
+  if (content.chart_type === 'pie' || series.length < 2) return null;
+  const list = document.createElement('ul');
+  list.className = 'block-chart__legend';
+  for (const s of series) {
+    const item = document.createElement('li');
+    const swatch = document.createElement('i');
+    swatch.className = 'block-chart__swatch';
+    swatch.style.background = s.fill;
+    item.append(swatch, document.createTextNode(s.name));
+    list.append(item);
+  }
+  return list;
+}
+
 export function renderChartBlock(
   block: Extract<Block, { block_type: 'chart' }>,
   mode: RenderMode
@@ -2321,9 +2432,13 @@ export function renderChartBlock(
     root.append(cap);
   }
 
+  const legend = buildChartLegend(block.content);
+  if (legend) root.append(legend);
+
   const wrap = document.createElement('div');
   wrap.className = 'block-chart__svg';
   wrap.innerHTML = buildChartSvg(block.content);
+  wireChartHover(wrap, block.content);
   root.append(wrap);
   root.append(buildChartScreenReaderTable(block.content));
 
@@ -2332,11 +2447,14 @@ export function renderChartBlock(
   const summary = document.createElement('summary');
   summary.className = 'block-disclosure__toggle';
   summary.textContent = 'Chart data';
+  const pivot = buildChartPivot(block.content);
+  const scroller = document.createElement('div');
+  scroller.className = 'block-chart__table-wrap';
   const table = document.createElement('table');
   table.className = 'block-chart__table';
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
-  for (const label of ['Series', 'X', 'Y']) {
+  for (const label of pivot.head) {
     const th = document.createElement('th');
     th.scope = 'col';
     th.textContent = label;
@@ -2345,17 +2463,19 @@ export function renderChartBlock(
   thead.append(headerRow);
   table.append(thead);
   const tbody = document.createElement('tbody');
-  for (const row of buildChartTableRows(block.content)) {
+  for (const row of pivot.rows) {
     const tr = document.createElement('tr');
-    for (const value of [row.series, row.x, row.y]) {
-      const td = document.createElement('td');
-      td.textContent = value;
-      tr.append(td);
-    }
+    row.forEach((value, index) => {
+      const cell = document.createElement(index === 0 ? 'th' : 'td');
+      if (index === 0) (cell as HTMLTableCellElement).scope = 'row';
+      cell.textContent = value;
+      tr.append(cell);
+    });
     tbody.append(tr);
   }
   table.append(tbody);
-  details.append(summary, table);
+  scroller.append(table);
+  details.append(summary, scroller);
   root.append(details);
 
   return wrapBlock(root, block, mode);
