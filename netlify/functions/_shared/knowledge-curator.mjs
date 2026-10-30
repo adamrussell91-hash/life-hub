@@ -8,7 +8,8 @@ import {
 export const PENDING_FILE = '_curator/pending-proposals.json';
 export const DISMISSED_FILE = '_curator/dismissed.json';
 export const AUTO_APPROVED_FILE = '_curator/auto-approved.json';
-export const DEFAULT_KNOWLEDGE_CODE_REPO = 'adamrussell91-hash/knowledge-hub';
+// The curator workflows run in the private data repo so their logs stay private.
+export const DEFAULT_KNOWLEDGE_CODE_REPO = 'adamrussell91-hash/knowledge-hub-data';
 export const KNOWLEDGE_CODE_REPO_ENV = 'KNOWLEDGE_CODE_REPO';
 export const KNOWLEDGE_WORKFLOW_TOKEN_ENV = 'GITHUB_WORKFLOW_TOKEN';
 
