@@ -11,8 +11,11 @@ import {
   type QuestionKey,
   type QuizQuestion,
   type QuizResponse,
-  type QuizSettings
+  type QuizSettings,
+  type WritingLog,
+  type WritingSummary
 } from '@/quiz/core';
+import { writingPanel } from '@/quiz/writing-replay';
 import { answerLines } from '@/blocks/quiz-question';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
@@ -68,11 +71,24 @@ type Submission = {
   quiz_block_id: string | null;
 };
 
-type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey; codes: string[]; set?: string };
+type Row = {
+  id: string;
+  mark: MarkResult;
+  awarded: number | null;
+  hinted: boolean;
+  response: QuizResponse | null;
+  confidence: number | null;
+  question: PublicQuestion;
+  key: QuestionKey;
+  codes: string[];
+  set?: string;
+  /** How a written answer was typed, when the writing check was on. */
+  writing?: WritingSummary & { log?: WritingLog };
+};
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
 
-type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; go: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean; practice?: Record<string, { score: number; max: number; pending: number }> };
+type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; go: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean; writing_flags?: number; practice?: Record<string, { score: number; max: number; pending: number }> };
 type QuestionStats = {
   id: string;
   question: PublicQuestion;
@@ -530,6 +546,22 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     );
     feedback.addEventListener('change', () => save({ feedback: feedback.value as QuizSettings['feedback'] }));
     grid.append(labelled('Show right answers', feedback));
+    const writing = select(
+      [
+        { value: 'flag', label: 'Show me how they were typed' },
+        { value: 'block', label: 'Also stop pasting' },
+        { value: 'off', label: 'Off' }
+      ],
+      s.writing_check
+    );
+    writing.addEventListener('change', () => save({ writing_check: writing.value as QuizSettings['writing_check'] }));
+    grid.append(
+      labelled(
+        'Written answers',
+        writing,
+        'Results shows paste attempts, typing time, text that appeared at once and a replay. Students are told. No AI is used.'
+      )
+    );
     const hint = select(
       [
         { value: '0', label: 'Free' },
@@ -690,7 +722,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
             cell.dataset.set = set.id;
             return cell;
           }),
-          el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
+          el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.writing_flags ? `Check writing (${a.writing_flags})` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
         );
         if (a.pending) b.dataset.pending = 'true';
         b.addEventListener('click', () => {
@@ -904,6 +936,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       if (r.set) item.append(practiceChip());
       item.append(mountQuestionPlayer({ question: r.question, response: r.response, number: i + 1, result: { mark: r.mark, key: r.key, hinted: r.hinted, awarded: r.awarded } }));
       if (r.confidence) item.append(el('p', 'qz-note block-secondary', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
+      if (r.writing) item.append(writingPanel(r.writing, r.writing.log, r.response && 'text' in r.response ? r.response.text : ''));
       const markRow = el('div', 'qz-mark');
       const input = el('input', 'qz-input qz-input--marks');
       input.type = 'number';

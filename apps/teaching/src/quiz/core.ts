@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { DEFAULT_WRITING_CHECK, WritingCheckSchema } from './writing';
+
+export * from './writing';
 
 /**
  * Quiz questions: the shared engine behind quiz lessons and the Question drop
@@ -433,6 +436,8 @@ export const QuizSettingsSchema = z.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z.number().min(0).max(1).optional(),
   confidence: z.boolean().optional(),
+  /** Written answers: off, flag how they were typed, or also block paste. Blank means flag. */
+  writing_check: WritingCheckSchema.optional(),
   closes_at: z.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
   move_on: z.number().int().min(1).max(100).optional(),
@@ -453,7 +458,8 @@ export const DEFAULT_QUIZ_SETTINGS = {
   timer_hard: false,
   shuffle_questions: false,
   shuffle_options: true,
-  confidence: false
+  confidence: false,
+  writing_check: DEFAULT_WRITING_CHECK
 } as const satisfies QuizSettings;
 
 export function resolveQuizSettings(settings: QuizSettings | undefined | null): QuizSettings & typeof DEFAULT_QUIZ_SETTINGS {

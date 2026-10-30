@@ -1964,3 +1964,81 @@
 .qz-save[data-state='failed'] { color: var(--danger, #b3261e); font-weight: 600; }
 .qz-receipt { border: 2px solid var(--success, #2e7d32); border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
 .qz-receipt__title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--success, #2e7d32); }
+
+/* ── Written answers: how they were typed ── */
+
+.qz-writing-note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.qz-writing-note[data-state='blocked'] {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.qz-writing {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  border-left: 4px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.qz-writing[data-flagged='true'] {
+  background: var(--warning-surface);
+  border-left-color: var(--warning);
+}
+
+.qz-writing__line,
+.qz-writing__flags {
+  margin: 0;
+}
+
+.qz-writing__flags {
+  padding-left: var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.qz-writing > .btn {
+  justify-self: start;
+}
+
+.qz-replay {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.qz-replay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.qz-replay__scrub {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.qz-replay__page {
+  min-height: 6rem;
+  max-height: 20rem;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--cotton);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
+.qz-replay__status {
+  margin: 0;
+  color: var(--muted);
+}
