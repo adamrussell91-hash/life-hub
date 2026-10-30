@@ -547,6 +547,13 @@
   justify-items: stretch;
 }
 
+/* Initials or class asked in the card itself: no second box inside it. */
+.qz-slot .qz-panel {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
 .qz-card__head {
   display: flex;
   justify-content: space-between;

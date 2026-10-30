@@ -20,6 +20,7 @@ const current = { n: 1, version: 'v1', settings, questions: [q1, q2], started_at
 let state = { ...base };
 const apiPost = vi.fn(async (_url: string, body: Record<string, unknown>) => {
   if (body.action === 'live_status') return { live: null };
+  if (body.action === 'claim') state = { ...base, identity: { need: null, initials: String(body.initials) } };
   if (body.action === 'start') state = { ...base, current };
   if (body.action === 'submit') state = { ...base, attempts_used: 1, current: null, results: [{ n: 1, submitted_at: '2026-10-29T00:05:00.000Z', released: false }] };
   return state;
@@ -109,6 +110,30 @@ describe('quiz questions answered where they sit', () => {
     expect(root.textContent).toContain('Handed in');
     expect(first.querySelector('.qz-player')).toBeNull();
     expect(first.textContent).toContain('Handed in');
+    page.remove();
+  });
+  it('a student types initials in the question card and answers there', async () => {
+    state = { ...base, identity: { need: 'initials', initials: null } };
+    const slots = new Map([
+      ['block_q1', document.createElement('div')],
+      ['block_q2', document.createElement('div')]
+    ]);
+    const page = document.body.appendChild(document.createElement('div'));
+    page.append(...slots.values());
+    page.appendChild(mountStudentQuiz(lesson, { classId: 'c1', slots }));
+    await settle();
+
+    const first = slots.get('block_q1') as HTMLElement;
+    expect(first.textContent).not.toContain('end of the lesson');
+    const input = first.querySelector('.qz-initials__input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    input.value = 'AB';
+    (buttonNamed(first, /Continue/) as HTMLButtonElement).click();
+    await settle();
+    expect(apiPost.mock.calls.find(([, b]) => (b as { action: string }).action === 'claim')?.[1]).toMatchObject({ initials: 'AB' });
+    // The go starts straight away, so the question is open to answer where it sits.
+    expect(first.querySelector('.qz-player')).toBeTruthy();
+    expect((slots.get('block_q2') as HTMLElement).querySelector('.qz-player')).toBeTruthy();
     page.remove();
   });
 });
