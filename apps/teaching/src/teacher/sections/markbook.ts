@@ -775,7 +775,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     return (current.work ?? []).some((w) => Object.values(w.students).some((s) => Date.parse(s.at) > recent));
   };
   const live = window.setInterval(() => {
-    if (disposed || document.hidden || !section.isConnected || busy()) return;
+    if (disposed) return;
+    // A section that has left the page (or a torn-down test page) stops polling for good.
+    if (typeof document === 'undefined' || !section.isConnected) { clearInterval(live); return; }
+    if (document.hidden || busy()) return;
     if (Date.now() - lastLoad < (working(view) ? LIVE_EVERY_MS : IDLE_EVERY_MS)) return;
     lastLoad = Date.now();
     void load();
