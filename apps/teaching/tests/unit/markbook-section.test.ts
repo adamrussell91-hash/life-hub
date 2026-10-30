@@ -98,18 +98,18 @@ const mount = async (v: MarkbookView, narrow = false) => {
   document.body.append(host);
   const api = fakeApi(v);
   mountMarkbook(host, cls, { api, narrow: () => narrow, today: () => '2026-11-03', view: 'marks' });
-  await vi.waitFor(() => expect(host.querySelector('.mb-grid, .mb-phone, .mb__empty')).not.toBeNull());
+  await vi.waitFor(() => expect(host.querySelector('.mb-book__table, .mb-phone, .mb__empty')).not.toBeNull());
   return { host, api };
 };
 
 describe('markbook section', () => {
   it('draws students by surname, columns by date, and the overall mark', async () => {
     const { host } = await mount(view());
-    expect([...host.querySelectorAll('.mb-grid__student .mb-student__initials')].map((n) => n.textContent)).toEqual(['BB', 'TT']);
+    expect([...host.querySelectorAll('.mb-progress__student .mb-student__initials')].map((n) => n.textContent)).toEqual(['BB', 'TT']);
     expect([...host.querySelectorAll('.mb-col__title')].map((n) => n.textContent)).toEqual(['Draft', 'Bookwork', 'Essay']);
     const bobRow = host.querySelectorAll('tbody tr')[0]!;
     expect(bobRow.querySelector('.mb-cell--assessment')?.textContent).toBe('15/20 · 75%');
-    expect(bobRow.querySelector('.mb-grid__overall')?.textContent).toBe('75%');
+    expect(bobRow.querySelector('.mb-book__pin--overall')?.textContent).toBe('75%');
   });
 
   it('warns when weights don’t add to 100', async () => {
@@ -139,7 +139,8 @@ describe('markbook section', () => {
     const quiz = { kind: 'quiz' as const, id: 'quiz:l1', lesson_id: 'l1', title: 'Quiz 1', date: '2026-10-20', hidden: false, confidence: false, questions: [], scores: { s1: { attempt_id: 'x~0', submitted_at: '', score: 3, max: 4, pending: 1, rows: [] } } };
     const { host } = await mount(view({ quizzes: [quiz] }));
     const cell = host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--quiz')!;
-    expect(cell.textContent).toContain('75%');
+    // The mark itself, not a percentage, now that marks and progress share one table.
+    expect(cell.textContent).toContain('3/4');
     expect(cell.querySelector('.mb-cell__pending')).not.toBeNull();
     host.querySelector<HTMLButtonElement>('.mb-col__hide')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-col--quiz')).toBeNull());
@@ -158,7 +159,7 @@ describe('markbook section', () => {
     expect(removed.querySelector('.mb-student__name')?.textContent).toBe('Removed student 1');
     expect(removed.querySelectorAll('button.mb-cell')).toHaveLength(0);
     expect(removed.querySelector('.mb-cell--handin')?.textContent).toBe('Late');
-    expect(removed.querySelector('.mb-grid__overall')?.textContent).toBe('–');
+    expect(removed.querySelector('.mb-book__pin--overall')?.textContent).toBe('–');
   });
 
   it('sends three rapid taps in order and ends on the last one', async () => {
@@ -499,7 +500,7 @@ describe('markbook section', () => {
     host.remove();
   });
 
-  it('Progress marks a lesson complete through the profile endpoint and redraws from its reply', async () => {
+  it('a lesson box ticks through the profile endpoint and settles from its reply', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     let settle!: (records: Record<string, { at: string; via: string }>) => void;
@@ -526,14 +527,14 @@ describe('markbook section', () => {
     host.remove();
   });
 
-  it('Progress shows a failed save instead of pretending', async () => {
+  it('a lesson tick that fails to save says so instead of pretending', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     const mark = vi.fn(async () => { throw new ApiClientError({ code: 'bad_request', message: 'That change can’t be saved.' } as never); });
     mountMarkbook(host, cls, { api: fakeApi(view()), progressApi: { mark }, progressLessons: [{ id: 'l1', title: 'Poem', role: 'core', assessment: false }], narrow: () => false, today: () => '2026-11-03', view: 'progress' });
     await vi.waitFor(() => expect(host.querySelector('.mb-progress__btn')).not.toBeNull());
     host.querySelector<HTMLButtonElement>('.mb-progress__btn')!.click();
-    await vi.waitFor(() => expect(host.querySelector('.mb-progress [role="alert"]')?.textContent).toContain('can’t be saved'));
+    await vi.waitFor(() => expect(host.querySelector('.mb-book [role="alert"]')?.textContent).toContain('can’t be saved'));
     // The tick that could not be saved comes off again.
     expect(host.querySelector<HTMLButtonElement>('.mb-progress__btn')!.dataset.state).toBe('open');
     host.remove();
@@ -545,7 +546,7 @@ describe('markbook section', () => {
     mountMarkbook(host, cls, { api: fakeApi(view({ quizzes: [outcomeQuiz()] })), narrow: () => false, today: () => '2026-11-03' });
     await vi.waitFor(() => expect(host.querySelector('.mbg')).not.toBeNull());
     expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('true');
-    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks', 'Progress']);
+    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks & progress']);
     host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="next"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-next')).not.toBeNull());
     host.remove();
@@ -702,7 +703,7 @@ describe('markbook section', () => {
 
   it('shows one student at a time on a phone, with the same tap controls', async () => {
     const { host, api } = await mount(view(), true);
-    expect(host.querySelector('.mb-grid')).toBeNull();
+    expect(host.querySelector('.mb-book__table')).toBeNull();
     expect(host.querySelector('.mb-phone__name')?.textContent).toBe('BB · Bob Brown');
     expect([...host.querySelectorAll('.mb-phone__row .mb-phone__label')].map((n) => n.firstChild?.textContent)).toEqual(['Draft', 'Bookwork', 'Essay']);
     expect(host.querySelector('.mb-phone__overall')?.textContent).toBe('75%');
@@ -878,7 +879,7 @@ describe('markbook section', () => {
 
   it('keeps the Delete hint on grid cells', async () => {
     const { host } = await mount(view());
-    expect(host.querySelector('.mb-grid .mb-cell--handin')?.getAttribute('aria-label')).toContain('Delete to clear');
+    expect(host.querySelector('.mb-book__table .mb-cell--handin')?.getAttribute('aria-label')).toContain('Delete to clear');
   });
 
   describe('follows the phone-width media query', () => {
@@ -911,14 +912,14 @@ describe('markbook section', () => {
           const host = document.createElement('div');
           document.body.append(host);
           const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03', view: 'marks' });
-          await vi.waitFor(() => expect(host.querySelector('.mb-grid')).not.toBeNull());
+          await vi.waitFor(() => expect(host.querySelector('.mb-book__table')).not.toBeNull());
           expect(media.listeners.size).toBe(1);
           const listener = [...media.listeners][0]!;
           media.flip(true);
           expect(host.querySelector('.mb-phone')).not.toBeNull();
-          expect(host.querySelector('.mb-grid')).toBeNull();
+          expect(host.querySelector('.mb-book__table')).toBeNull();
           media.flip(false);
-          expect(host.querySelector('.mb-grid')).not.toBeNull();
+          expect(host.querySelector('.mb-book__table')).not.toBeNull();
           expect(host.querySelector('.mb-phone')).toBeNull();
           dispose();
           expect(media.listeners.size).toBe(0);
