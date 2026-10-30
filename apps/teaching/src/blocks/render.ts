@@ -1033,7 +1033,15 @@ export function renderQuestionSetBlock(
         );
         toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
         model.hidden = !revealed;
+        // A typed response comes first: the model opens once the student has written something.
+        const writes = typing && question.kind === 'short_answer' && question.response_space !== 'none';
+        const gate = () => {
+          toggle.disabled = writes && !revealed && !answers[question.id]?.trim();
+        };
+        gate();
+        li.addEventListener('input', gate);
         toggle.addEventListener('click', () => {
+          if (toggle.disabled) return;
           revealed = !revealed;
           toggle.textContent = revealed ? 'Hide the model' : 'Check against the model';
           toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
@@ -2217,7 +2225,7 @@ export function renderSelfCheckBlock(
     return wrapBlock(root, block, mode);
   }
 
-  type AnswerState = { revealed: boolean; rating?: number };
+  type AnswerState = { revealed: boolean; rating?: number; response?: string; seen?: boolean };
   const rawSaved = objectValue(loadActivityState<unknown>(key));
   let rating =
     typeof rawSaved?.rating === 'number' &&
@@ -2237,20 +2245,52 @@ export function renderSelfCheckBlock(
   }
 
   if (block.content.mode === 'reveal') {
+    // Write first, then reveal: the answer stays shut until the student has had a go,
+    // and their go locks once they have seen it.
+    let response = typeof rawSaved?.response === 'string' ? rawSaved.response : '';
+    let seen = rawSaved?.seen === true || revealed;
+    const label = document.createElement('p');
+    label.className = 'block-self-check__response-label block-eyebrow';
+    label.textContent = 'Your answer';
+    const area = document.createElement('textarea');
+    area.className = 'block-self-check__response';
+    area.rows = 3;
+    area.maxLength = 4000;
+    area.placeholder = 'Write your answer here…';
+    area.setAttribute('aria-label', `Your answer: ${block.content.prompt}`);
+    area.value = response;
+    const hint = document.createElement('p');
+    hint.className = 'block-self-check__hint block-secondary';
+    hint.textContent = 'Write your answer, then you can check it.';
     const toggle = disclosureToggle(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    const save = () => saveActivityState(key, { revealed, response, seen } satisfies AnswerState);
+    const paintGate = () => {
+      area.readOnly = seen;
+      toggle.disabled = !seen && !response.trim();
+      hint.hidden = !toggle.disabled;
+    };
     toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
+    area.addEventListener('input', () => {
+      response = area.value;
+      paintGate();
+      save();
+    });
     toggle.addEventListener('click', () => {
+      if (toggle.disabled) return;
       revealed = !revealed;
+      if (revealed) seen = true;
       toggle.textContent = revealed ? 'Hide answer' : 'Show answer';
       toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
       paintAnswer();
-      saveActivityState(key, { revealed } satisfies AnswerState);
+      paintGate();
+      save();
       if (revealed) emitAnswered(root, block.id, 'done');
     });
+    paintGate();
     const disclosure = document.createElement('div');
     disclosure.className = 'block-self-check__disclosure block-disclosure';
     disclosure.append(toggle, answer);
-    root.append(disclosure);
+    root.append(label, area, hint, disclosure);
   } else {
     const scale = document.createElement('div');
     scale.className = 'block-self-check__confidence';

@@ -686,6 +686,35 @@ describe('learning activity rendering', () => {
     expect(el.querySelector('.block-cloze__score')?.textContent).toBe('');
   });
 
+  it('self check reveal: students write first, then their go locks once they see the answer', () => {
+    const block = BlockSchema.parse({
+      ...baseBlock,
+      id: 'sc-write-first',
+      block_type: 'self_check',
+      content: { mode: 'reveal', prompt: 'Reveal the first line.', answer: 'The road is long.' }
+    });
+    const el = renderBlock(block, 'student');
+    const area = el.querySelector<HTMLTextAreaElement>('.block-self-check__response')!;
+    const toggle = el.querySelector<HTMLButtonElement>('.block-self-check__btn')!;
+    const answer = el.querySelector<HTMLElement>('.block-self-check__answer')!;
+
+    expect(toggle.disabled).toBe(true);
+    toggle.click();
+    expect(answer.hidden).toBe(true);
+
+    area.value = 'Something about a road';
+    area.dispatchEvent(new Event('input'));
+    expect(toggle.disabled).toBe(false);
+    toggle.click();
+    expect(answer.hidden).toBe(false);
+    expect(area.readOnly).toBe(true);
+
+    // Coming back keeps their go, still locked.
+    const again = renderBlock(block, 'student');
+    expect(again.querySelector<HTMLTextAreaElement>('.block-self-check__response')!.value).toBe('Something about a road');
+    expect(again.querySelector<HTMLTextAreaElement>('.block-self-check__response')!.readOnly).toBe(true);
+  });
+
   it('honours case-sensitive cloze comparison', () => {
     const block = BlockSchema.parse({
       ...baseBlock,
@@ -797,6 +826,9 @@ describe('learning activity rendering', () => {
 
     expect(answer.hidden).toBe(true);
     expect(toggle.textContent).toBe('Show answer');
+    const area = el.querySelector<HTMLTextAreaElement>('.block-self-check__response')!;
+    area.value = 'My go';
+    area.dispatchEvent(new Event('input'));
     toggle.click();
     expect(answer.hidden).toBe(false);
     expect(toggle.textContent).toBe('Hide answer');
