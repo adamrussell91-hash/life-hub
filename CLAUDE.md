@@ -2,6 +2,15 @@
 
 # Life Hub — Claude Code entry
 
+## Public repo privacy (mandatory)
+
+This repository, its PR titles and bodies, and its commit messages are public. Personal content goes only to the private `adamrussell91-hash/life-hub-data` repository; the app reads it at runtime through the authenticated data client.
+
+- Personal content means real people (partner, family, students, parents, colleagues, clinicians), health (conditions, medications, doses, appointments, results), diary or session text, finances, addresses, travel bookings, employer and school history, academic records, and exports from Notion, Day One or Gmail.
+- Code, prompts, tests, fixtures, docs, mockups, screenshots and PR text use invented people and synthetic records. Code refers to roles ("partner", "gastroenterologist"), never names.
+- Prompts point agents at the private Central Node for facts about Adam. They do not state those facts.
+- `scripts/privacy-guard.mjs` runs in `pre-pr-check` and in PR CI. It checks files, file names, and the PR title and body against generic rules and a private denylist. Never weaken it, or allowlist a real term, to get green; move the content instead.
+
 ## Before any PR (mandatory)
 
 Run and pass `npm run pre-pr-check` (or `node scripts/pre-pr-check.mjs`) from the repo root before opening or updating any life-hub PR. Exit 0 required. See root `AGENTS.md` and Project store `docs/mandatory-pre-pr-check.md`.

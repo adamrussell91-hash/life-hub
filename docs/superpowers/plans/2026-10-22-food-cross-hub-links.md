@@ -1146,8 +1146,8 @@ test("PUT links a moment to a new visit in one write", async () => {
   assert.deepEqual(s.state.travel.moments[0].meal, { food_visit_id: visit.id, mood: "buzzing" });
 });
 
-test("Corey's moments cannot be meals", async () => {
-  const h = createTravelMealHandler(deps(store(trip("corey"))));
+test("Partner's moments cannot be meals", async () => {
+  const h = createTravelMealHandler(deps(store(trip("partner"))));
   const res = await h(req("PUT", "trip=trp_test1&moment=mom_abcd1234", { ...versions, food }));
   assert.equal(res.status, 403);
 });
@@ -1372,7 +1372,7 @@ describe('meal section', () => {
   it('only your own moments can be meals', () => {
     expect(canBeMeal({ author: 'adam' } as never)).toBe(true);
     expect(canBeMeal({} as never)).toBe(true);
-    expect(canBeMeal({ author: 'corey' } as never)).toBe(false);
+    expect(canBeMeal({ author: 'partner' } as never)).toBe(false);
   });
   it('builds the PUT body from the form state, dropping empty extras and blank dishes', () => {
     expect(
@@ -1445,7 +1445,7 @@ git commit -m "Travel Journal: Meal switch saves the moment's meal into the Food
 **Files:**
 - Modify: `tests/browser/travel.spec.mjs` (read it first for its route-mocking pattern)
 
-- [ ] **Step 1: Write the test.** Mock `GET /api/travel-meal` (no visit) and `PUT /api/travel-meal` (records the body, returns a visit). Open a moment you wrote, switch Meal on, enter dish "Tortilla", rating 4, mood "buzzing", Save. Assert the PUT body has `food.dishes[0].title === "Tortilla"` and `extras.mood === "buzzing"`. Also assert a Corey-authored moment shows no Meal switch. Run at desktop and at 390px wide.
+- [ ] **Step 1: Write the test.** Mock `GET /api/travel-meal` (no visit) and `PUT /api/travel-meal` (records the body, returns a visit). Open a moment you wrote, switch Meal on, enter dish "Tortilla", rating 4, mood "buzzing", Save. Assert the PUT body has `food.dishes[0].title === "Tortilla"` and `extras.mood === "buzzing"`. Also assert a Partner-authored moment shows no Meal switch. Run at desktop and at 390px wide.
 
 - [ ] **Step 2: Run it.** `node --test tests/browser/travel.spec.mjs`. Expected: PASS after A8. If it fails, fix the section, not the test.
 

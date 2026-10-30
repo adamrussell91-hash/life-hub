@@ -6,7 +6,7 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { readRadar, readTargets, saveTarget } from './_shared/watch-radar.mjs';
+import { loadPrivateWatches, radarModelKeys, readRadar, readTargets, saveTarget } from './_shared/watch-radar.mjs';
 
 export const config = { path: '/api/watch-radar' };
 
@@ -22,7 +22,13 @@ export function createWatchRadarHandler(deps = {}) {
       if (request.method !== 'PUT') return withCors(methodNotAllowed('GET, PUT, OPTIONS'), request, env);
       const parsed = await readJsonObject(request);
       if (parsed.error) return withCors(parsed.error, request, env);
-      const targets = await saveTarget(store, parsed.value.key, parsed.value.target ?? null);
+      let keys;
+      try {
+        keys = radarModelKeys(await (deps.loadWatches ?? loadPrivateWatches)({ env, fetchImpl: deps.fetchImpl ?? fetch }));
+      } catch {
+        return withCors(errorResponse(503, 'watches_unavailable', 'The watch list can’t be reached right now.', true), request, env);
+      }
+      const targets = await saveTarget(store, parsed.value.key, parsed.value.target ?? null, { keys });
       return withCors(okResponse(200, { targets }), request, env);
     } catch (error) {
       const code = error?.code === 'unknown_watch' || error?.code === 'validation_error' ? error.code : 'bad_request';

@@ -43,9 +43,11 @@ export function buildSlotsFromEvents(events, today, { days = 14, terms = [] } = 
   return slotsFromCapacity(daysIn, today);
 }
 
-export function bindingFromEvents(events, today) {
+// targetsConfig is the private data repo's config/targets.yml (parsed). Without it
+// the bands read as unset rather than borrowing anyone's numbers.
+export function bindingFromEvents(events, today, targetsConfig = null) {
   try {
-    return buildBindingGoal({ events: events ?? [], date: today });
+    return buildBindingGoal({ events: events ?? [], date: today, targetsConfig });
   } catch {
     return null;
   }

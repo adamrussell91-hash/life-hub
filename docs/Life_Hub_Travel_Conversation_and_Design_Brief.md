@@ -6,7 +6,7 @@
 
 Travel is a distinct section within the Life Hub website. It inherits the shared Life Hub design kit, navigation, coding patterns, authentication, deployment approach and data boundaries. It works on desktop and mobile. The owner plans trips, follows the journey while travelling, manages changes and costs, and shares a separate view with trusted people.
 
-The initial test is Adam's December 2026 journey from Sydney through Kuala Lumpur and Istanbul, then onward through Europe to South Korea. The Travel section should support future trips too. This document records the whole design discussion, including research, rejected ideas, accepted ideas, mockup feedback and the current direction. A proposed feature is marked as a proposal. The existing mockup is a concept, not an implemented Life Hub page.
+The first test is a real multi-leg trip of Adam's, which lives only in the private data repository. Examples here use an invented trip: a home city, an overnight stopover city and a destination city. This document records the whole design discussion, including research, rejected ideas, accepted ideas, mockup feedback and the current direction. A proposed feature is marked as a proposal. The existing mockup is a concept, not an implemented Life Hub page.
 
 ## The original request
 
@@ -27,7 +27,7 @@ The first research pass examined official product pages and help documentation. 
 7. [TravelSpend](https://travel-spend.com/) emphasises fast expense entry, offline use and currency conversion.
 8. [Rome2Rio](https://www.rome2rio.com/) compares transport modes, routes, estimated duration and costs.
 9. [Stippl](https://www.stippl.io/itinerary-planner) joins route, daily timeline, budget, packing and a travel record.
-10. [Apple Check In](https://support.apple.com/guide/personal-safety/use-check-in-for-messages-ips56b5bc469/web) provides a destination or timer check in, an opportunity to extend time, and selected information for a trusted contact after a missed response. Its documentation notes that location sharing through Check In is unsupported in South Korea.
+10. [Apple Check In](https://support.apple.com/guide/personal-safety/use-check-in-for-messages-ips56b5bc469/web) provides a destination or timer check in, an opportunity to extend time, and selected information for a trusted contact after a missed response.
 11. [Smartraveller's solo travel guidance](https://www.smartraveller.gov.au/news-and-updates/safety-tips-solo-travellers) recommends sharing a detailed itinerary, accommodation contacts, key documents, emergency contacts and regular check in plans with a trusted person.
 
 The initial synthesis merely combined existing product features. Adam rejected that as insufficiently original. Research remains useful as a reference and quality benchmark. The product concept must have its own organising idea.
@@ -52,7 +52,7 @@ Adam rejected a proposed catalogue of hypothetical disruption rehearsals. No set
 
 The traveller taps the affected part of the route, describes the problem or pastes a message or screenshot. The assistant examines the relevant confirmed bookings, local times, connected transport, accommodation, cost, check in plan and later commitments. It presents workable options, with any uncertain facts clearly labelled. Adam chooses an option and approves changes to the trip and messages to trusted people.
 
-Example: if D7 604 from Kuala Lumpur is delayed, the assistant shows the revised arrival at Sabiha Gökçen, transfer to The Story Hotel Pera, any accommodation consequence, extra spending and the changed check in time with Corey. The old schedule stays in the history. Flight status supplied by an external source, a prediction and an owner confirmed change must have distinct labels.
+Example: if the onward flight from the stopover city is delayed, the assistant shows the revised arrival, the transfer to the hotel, any accommodation consequence, extra spending and the changed check in time with the trusted contact. The old schedule stays in the history. Flight status supplied by an external source, a prediction and an owner confirmed change must have distinct labels.
 
 This is an interaction concept. It requires reliable data sources, clear evidence and explicit approval before a booking or trusted contact record changes. The mockup does not execute AI or contact anyone.
 
@@ -78,43 +78,30 @@ The mobile concept currently uses Itinerary, Travel day and Changes views within
 
 Adam rejected the initial neutral dashboard. He asked for a distinctly travel oriented visual language, with tickets, aircraft moving across route lines, place and country identity, colour, playfulness and whimsy. The latest concept introduced:
 
-1. A route from SYD to KUL to SAW with aircraft on the connecting lines.
+1. A route from the home city through the stopover to the destination, with aircraft on the connecting lines.
 2. Ticket inspired flight entries with a perforation and a compact boarding pass layout.
-3. A destination artwork area at the top. Sydney, Kuala Lumpur and Istanbul each have different colour and skyline forms. Selecting a city changes the scene, title and caption. In the final product, the scene should change with the current trip state or location, while also permitting manual exploration.
-4. A sunrise palette and twin towers for Kuala Lumpur, a dusk skyline with domes and minarets for Istanbul, and a Sydney harbour inspired departure scene. These are rough concept illustrations, not final artwork or geographically exact scenes.
+3. A destination artwork area at the top. Each city has its own colour and skyline forms. Selecting a city changes the scene, title and caption. In the final product, the scene should change with the current trip state or location, while also permitting manual exploration.
+4. A sunrise palette for the stopover, a dusk skyline for the destination, and a harbour inspired departure scene. These are rough concept illustrations, not final artwork or geographically exact scenes.
 5. A Travel day view with actual booked transport and suggested pauses that make the day feel like travel rather than administration.
 
 Adam still found the earlier versions bland. The current artwork and layout are another iteration, not an approved visual design. The eventual country scene should feel like an authored travel experience while keeping critical times, tickets and status easy to read.
 
-## Actual first leg details from Notion
-
-These facts came from Adam's Notion pages [Leg 1: Sydney to Kuala Lumpur](https://app.notion.com/p/340f794f847681cdaf91d45fc1bad4dc), [Leg 2: Kuala Lumpur to Istanbul](https://app.notion.com/p/340f794f84768132850af30f8a9c6b66) and [Stopover: Istanbul](https://app.notion.com/p/340f794f847681e180f7ddfcb718c519). The pages were last edited in August 2026. The design must refresh records before treating the details as current on travel day. Booking references are deliberately omitted from this brief.
-
-| Event | Confirmed details in Notion |
-| --- | --- |
-| Sydney to Kuala Lumpur | Batik Air Malaysia OD120. Departs Sydney on Tuesday 1 December 2026 at 22:15 local time. Arrives Kuala Lumpur on Wednesday 2 December at 04:10 local time, Terminal 1. Economy, Airbus A330. No meal included. Combined personal item and cabin bag allowance of 7 kg, plus 20 kg checked baggage in the booking. Trip.com recommends arrival at Sydney Airport at least three hours before departure. |
-| Kuala Lumpur accommodation | Royale Chulan Kuala Lumpur, No. 5 Jalan Conlay. Superior King Room. Check in after 15:00 on 2 December, check out before 12:00 on 4 December. Two nights, paid A$154.26. No meals included. Early check in was requested, though availability is not confirmed. |
-| Kuala Lumpur to Istanbul | AirAsia X D7 604. Departs Kuala Lumpur Terminal 2 on Friday 4 December at 09:35 local time. Arrives at Istanbul Sabiha Gökçen at 16:05 local time. Nonstop, 11 hours 30 minutes. Economy Promo, 7 kg cabin allowance, no seats selected and no meal included. Paid A$428.71 through Expedia. |
-| Istanbul accommodation | The Story Hotel Pera, Tomtom, Kumbaracı Ykş. No: 66, Beyoğlu. Four nights from 4 to 8 December. Check in after 14:00 and check out before 12:00. Paid A$296.94. No meals included. Non refundable and cannot be modified. |
-
-The 04:10 arrival in Kuala Lumpur and 15:00 hotel check in create a real planning gap. This should be prominent within the flow. The KL stopover page also records ideas such as Central Market and a SugarBomb fragrance visit. Those are ideas, not reservations.
-
 ## Illustrative Travel day itinerary
 
-Adam explicitly asked the mockup to invent itinerary stops. The following times and activities are suggested design content, not confirmed bookings or verified operating hours.
+The mockup invents itinerary stops around one booked arrival. The pattern, with invented content:
 
-| 2 December, Kuala Lumpur local time | Status |
+| Arrival day, local time | Status |
 | --- | --- |
-| 04:10, land at KUL Terminal 1 | Booked flight arrival |
-| Around 06:00, travel into the city | Suggested estimate, transfer mode to choose |
-| Around 07:00, reach Royale Chulan | Suggested estimate, ask about early check in or luggage storage |
-| 08:00, a slow breakfast near the hotel | Optional idea after overnight travel |
-| 10:00, KLCC and Petronas Towers walk | Optional idea |
-| After 15:00, hotel check in | Confirmed hotel policy |
-| Evening, Central Market and SugarBomb | Optional idea from Notion, dependent on energy |
-| After arrival, check in with Corey | Proposed reminder, exact time to set |
+| Early morning, land at the stopover airport | Booked flight arrival |
+| A couple of hours later, travel into the city | Suggested estimate, transfer mode to choose |
+| Reach the hotel | Suggested estimate, ask about early check in or luggage storage |
+| A slow breakfast near the hotel | Optional idea after overnight travel |
+| A landmark walk | Optional idea |
+| Afternoon, hotel check in | Confirmed hotel policy |
+| Evening, a market visit | Optional idea, dependent on energy |
+| After arrival, check in with the trusted contact | Proposed reminder, exact time to set |
 
-The Istanbul arrival day similarly combines the real 09:35 departure and 16:05 arrival with a suggested transfer to Beyoğlu, hotel check in and a short first evening near Pera. Full market and fragrance exploration belongs on another day. The interface must distinguish booked, suggested, estimated and completed entries.
+An early arrival and an afternoon hotel check in create a real planning gap, which should be prominent within the flow. The interface must distinguish booked, suggested, estimated and completed entries.
 
 ## Ideas rejected or reduced
 
@@ -134,12 +121,12 @@ The Istanbul arrival day similarly combines the real 09:35 departure and 16:05 a
 5. The assistant proposed a living trip with a pulse, reasons for decisions, scenario rehearsals, a separate trusted view and a memory of the actual journey.
 6. Adam kept the live state and memory. He rejected decision rationales and rehearsals, substituted a reactive AI assistant, and called the trusted view a base expectation.
 7. The assistant reframed Travel as a route with planned, expected and actual layers, and the “something broke” interaction.
-8. Adam requested a mobile mockup of the Sydney, Kuala Lumpur and Istanbul leg.
+8. Adam requested a mobile mockup of the first two legs.
 9. The first mockup was too sparse. Adam pointed out the absence of flight details, hotel details, time and an itinerary, and asked for a stronger travel theme.
 10. A second mockup introduced tickets and an itinerary, though it still used sample data.
 11. Adam asked for budgets and documents to sit inside the flow, rather than in separate tabs. The mockup was adjusted.
-12. Adam noted the details were already in Notion and criticised the lack of visual energy. The assistant fetched the actual bookings and stopovers and replaced the sample flight and hotel details.
-13. Adam asked for a top art area that changes by country and for invented travel day stops. The latest mockup added selectable destination scenes and suggested Kuala Lumpur and Istanbul day flows, while retaining the real flight and hotel details.
+12. Adam noted the details were already in his own notes and criticised the lack of visual energy. The real bookings stay in the private data repository; this brief keeps only the design lessons.
+13. Adam asked for a top art area that changes by country and for invented travel day stops. The latest mockup added selectable destination scenes and suggested day flows for the stopover and the destination.
 
 ## Practical next design decisions
 
@@ -147,7 +134,7 @@ The Istanbul arrival day similarly combines the real 09:35 departure and 16:05 a
 2. Decide how location state changes the scene. Explicit check ins and itinerary progress are more dependable than assuming constant GPS.
 3. Design the exact interaction for “something broke”, including evidence, options, cost impact, approved changes and trusted contact updates.
 4. Establish the private owner view, trusted contact view and broader share view, with clear access for booking references and health information.
-5. Validate the first leg details against current bookings before implementation. Preserve local time zones and distinguish booked information from illustrative suggestions.
+5. Validate trip details against current private bookings before implementation. Preserve local time zones and distinguish booked information from illustrative suggestions.
 6. Adapt the approved concept to the existing Life Hub design kit and architecture when work on the repository begins.
 
 This brief records the conversation and current direction. No repository change, live travel integration or published trusted contact page resulted from the mockups.

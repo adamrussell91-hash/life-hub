@@ -129,9 +129,22 @@ function lifeFiles() {
     updated_at: '2026-11-01T00:00:00+11:00',
     source: 'goal-reads-test'
   }, '');
+  // Synthetic private targets: the binding bands come from the data repo, not code.
+  const targets = [
+    'target_sets: []',
+    'forecast:',
+    '  body_composition:',
+    '    weight_kg_min: 76',
+    '    weight_kg_max: 84',
+    '    body_fat_pct_min: 10',
+    '    body_fat_pct_max: 12',
+    '    shoulder_waist_ratio: 1.5',
+    ''
+  ].join('\n');
   return new Map([
     ['data/calendar/2026/11/2026-11-05-busy.md', calendar],
-    ['data/body/2026/11/2026-11-01-composition.md', composition]
+    ['data/body/2026/11/2026-11-01-composition.md', composition],
+    ['config/targets.yml', targets]
   ]);
 }
 

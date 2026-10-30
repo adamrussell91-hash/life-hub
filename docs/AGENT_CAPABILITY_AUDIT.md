@@ -120,11 +120,11 @@ Plus `log_entry` when the agent has record types for the turn.
 
 | Agent | Domain / tab | Record types | Exclusive capabilities | Domain tools (beyond OS floor) | Intuition | Protocol | Voice |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Brisket Lasso** (`brisket`) | nutrition / Nutrition | meal | `log.entry`, `lookup.save-food-library`, `plan.week-meals`, `lookup.food-brand-au` | `log_entry`, `save_food_library_entry`, `plan_week_meals`, `lookup_food_brand_au` | `flare-rules`, `marley-spoon-default`, `vyvanse-appetite-window`, `weekend-fat-risk` | `config/brisket-protocol.md` | `brisket.md` |
+| **Brisket Lasso** (`brisket`) | nutrition / Nutrition | meal | `log.entry`, `lookup.save-food-library`, `plan.week-meals`, `lookup.food-brand-au` | `log_entry`, `save_food_library_entry`, `plan_week_meals`, `lookup_food_brand_au` | `flare-rules`, `meal-kit-default`, `adhd-medication-appetite-window`, `weekend-fat-risk` | `config/brisket-protocol.md` | `brisket.md` |
 | **Chadwick Flexington** (`chadwick`) | fitness / Fitness | workout | `log.entry`, `lookup.save-exercise-library` | `log_entry`, `search_exercise_library`, `save_exercise_library_entry`, `get_last_workout`, `search_workout_records`, `compare_workout_windows`, `get_region_strength`, `get_fitness_snapshot`, `get_training_volume`, `get_working_weights`, `get_long_term_fitness`, `get_session_comparisons`, `get_exercise_history`, `get_load_status`, `get_pain_training_summary`, `get_body_state`, `get_workout_template` | `flare-rules` | `config/chadwick-protocol.md` | `chadwick.md` |
 | **Hyaluronica St. Claire** (`hyaluronica`) | skincare / Skincare | skincare | `log.entry` | `log_entry`, `list_skincare_routines`, `search_skincare_library`, `save_skincare_library_entry`, `set_skincare_routine_membership` | — | `config/hyaluronica-protocol.md` | `hyaluronica.md` |
 | **Penelope Rose Quillian** (`penelope`) | diary / Mind | diary | `log.entry` | `log_entry` | — | `config/penelope-protocol.md` | `penelope.md` |
-| **Dr Sara Tonin** (`sara`) | body / Body | weight, composition, measurements, medical | `log.entry` | `log_entry`, `search_medical_records`, `brief_medical_appointment` | `bone-iron-watch`, `flare-rules`, `kate-semple-therapy`, `stelara-cycle` | `config/sara-protocol.md` | `sara.md` |
+| **Dr Sara Tonin** (`sara`) | body / Body | weight, composition, measurements, medical | `log.entry` | `log_entry`, `search_medical_records`, `brief_medical_appointment` | `bone-iron-watch`, `flare-rules`, `avery-quill-therapy`, `biologic-cycle` | `config/sara-protocol.md` | `sara.md` |
 | **Dr Vera Lenz** (`vera`) | psychology / Mind | mind_session | `log.entry` | `log_entry`, `get_mind_session`, `search_mind_records` | — | `config/vera-protocol.md` | `vera.md` |
 | **General Hammond** (`hammond`) | life_coaching / Central Node | — | `publish.cn-patch`, `publish.governance-log-entry` | `propose_central_node_patch`, `append_governance_log` | — | `config/hammond-protocol.md` | `hammond.md` |
 | **Ann O'Tation** (`ann`) | teaching / Teaching | — | `publish.cn-patch` | `propose_central_node_patch` | `teaching-diagnosis-first` | `apps/teaching/config/ann-protocol.md` | `ann.md` |
@@ -237,9 +237,9 @@ Plus `log_entry` when the agent has record types for the turn.
 
 **Intuition packs:**
 
-- `flare-rules`: Crohn's flare accommodation: lower fibre intensity, easier foods, training deload coordination.
-- `marley-spoon-default`: Marley Spoon is the default dinner most weeknights.
-- `vyvanse-appetite-window`: Vyvanse suppresses appetite for hours after the morning dose; realistic first eating window is often afternoon.
+- `flare-rules`: Condition A flare accommodation: lower fibre intensity, easier foods, training deload coordination.
+- `meal-kit-default`: meal kit is the default dinner most weeknights.
+- `adhd-medication-appetite-window`: ADHD medication suppresses appetite for hours after the morning dose; realistic first eating window is often afternoon.
 - `weekend-fat-risk`: Weekend eating is the main fat/sodium risk window.
 
 **Protocol:** `config/brisket-protocol.md`
@@ -350,7 +350,7 @@ Plus `log_entry` when the agent has record types for the turn.
 
 **Intuition packs:**
 
-- `flare-rules`: Crohn's flare accommodation: lower fibre intensity, easier foods, training deload coordination.
+- `flare-rules`: Condition A flare accommodation: lower fibre intensity, easier foods, training deload coordination.
 
 **Protocol:** `config/chadwick-protocol.md`
 
@@ -629,10 +629,10 @@ Plus `log_entry` when the agent has record types for the turn.
 
 **Intuition packs:**
 
-- `bone-iron-watch`: Crohn's + steroid eras raise osteopenia and iron-repletion monitoring priority.
-- `flare-rules`: Crohn's flare accommodation: lower fibre intensity, easier foods, training deload coordination.
-- `kate-semple-therapy`: Kate Semple psychology sessions are part of the MHCP / mental-health lane on Medical Overview.
-- `stelara-cycle`: Stelara (ustekinumab) maintenance cadence and post-dose monitoring are standing clinical context for Sara.
+- `bone-iron-watch`: Condition A + steroid eras raise low bone density and iron-repletion monitoring priority.
+- `flare-rules`: Condition A flare accommodation: lower fibre intensity, easier foods, training deload coordination.
+- `avery-quill-therapy`: Avery Quill psychology sessions are part of the MHCP / mental-health lane on Medical Overview.
+- `biologic-cycle`: Biologic maintenance cadence and post-dose monitoring are standing clinical context for Sara.
 
 **Protocol:** `config/sara-protocol.md`
 

@@ -75,8 +75,8 @@ const session = createSessionToken({
 const CENTRAL_NODE = `# Central Node
 
 ## Constraints & Priorities
-- Crohn's / IBD awareness; fat ceiling 50 g/day when flared.
-- No seafood.
+- Condition A awareness; fat ceiling 60 g/day when flared.
+- No shellfish.
 - Protein target ~120 g/day.
 
 ## Today's Status

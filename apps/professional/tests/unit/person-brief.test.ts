@@ -12,7 +12,7 @@ const MUTUAL_ID = 'person_00000000-0000-4000-8000-000000000002';
 function briefFixture(overrides: Partial<PersonBrief> = {}): PersonBrief {
   return {
     header: {
-      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Dr Vicky Leighton', href: `/professional/#/people/${PERSON_ID}` },
+      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Dr Jane Example', href: `/professional/#/people/${PERSON_ID}` },
       role: 'Senior Lecturer',
       organisation: {
         ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000099',
@@ -104,7 +104,7 @@ describe('renderPersonBrief', () => {
     const canvas = document.createElement('div');
     await renderPersonBrief(canvas, PERSON_ID);
 
-    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Vicky Leighton');
+    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Jane Example');
     expect(canvas.querySelector('.person-brief__role')?.textContent).toBe('Senior Lecturer · University of Melbourne');
     expect(canvas.querySelector('.person-brief__meta .eyebrow')?.textContent).toBe('Coffee meeting');
     expect(canvas.querySelector('.person-brief__meta .value')?.textContent).toContain('Uni Cafe');
@@ -168,7 +168,7 @@ describe('renderPersonBrief', () => {
     await renderPersonBrief(canvas, PERSON_ID);
 
     // The synchronous sections are already fully rendered...
-    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Vicky Leighton');
+    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Jane Example');
 
     // ...while the LLM sections are present, marked, and mid-flight.
     const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
@@ -265,7 +265,7 @@ describe('renderPersonBrief', () => {
     expect(meta.textContent).toContain('No upcoming interaction found.');
     expect(meta.textContent).toContain('Open a person and create a meeting or event first.');
     // The rest of the Brief still renders — only the meeting-meta slot is empty-state.
-    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Vicky Leighton');
+    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Jane Example');
   });
 
   it('renders honest empty states for open loops, shared work, and mutual connections when all are empty', async () => {
@@ -286,7 +286,7 @@ describe('renderPersonBrief', () => {
     const onTitleReady = vi.fn();
     await renderPersonBrief(canvas, PERSON_ID, { onTitleReady });
 
-    expect(onTitleReady).toHaveBeenCalledWith('Dr Vicky Leighton');
+    expect(onTitleReady).toHaveBeenCalledWith('Dr Jane Example');
   });
 
   it('does not render a stale response when isCurrent() has gone false', async () => {

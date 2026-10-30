@@ -15,7 +15,7 @@ import {
   defaultCategoryForProductName,
   upgradeOtherProductCategories
 } from '../../apps/life/js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES } from '../fixtures/skincare-routines.mjs';
 
 test('path is data/skincare/product-library.json', () => {
   assert.equal(SKINCARE_PRODUCT_LIBRARY_PATH, 'data/skincare/product-library.json');
@@ -93,7 +93,7 @@ test('searchProductLibrary matches tokens', () => {
 
 test('searchProductLibrary matches brand category status', () => {
   const lib = saveProductLibraryEntry(emptyProductLibrary(), {
-    name: 'Cicaplast',
+    name: 'Example Barrier Cream',
     category: 'Moisturiser',
     brand: 'La Roche Posay',
     status: 'in_use'
@@ -143,20 +143,20 @@ test('groupProductsByCategory orders and skips empty', () => {
 });
 
 test('defaultCategoryForProductName maps SPF and known defaults', () => {
-  assert.equal(defaultCategoryForProductName('La Roche Posay Anthelios SPF 50+'), 'Sunscreen');
-  assert.equal(defaultCategoryForProductName('Korres Greek Yoghurt Probiotic Gel Cream'), 'Moisturiser');
-  assert.equal(defaultCategoryForProductName('Dr Jart+ Cicapair Colour Corrector'), 'Makeup');
-  assert.equal(defaultCategoryForProductName('Korres Greek Yoghurt Foaming Cream Cleanser'), 'Cleanser');
-  assert.equal(defaultCategoryForProductName('Retrieve Tretinoin 0.05% (sandwich method)'), 'Treatment');
+  assert.equal(defaultCategoryForProductName('Example Sunscreen SPF 50+'), 'Sunscreen');
+  assert.equal(defaultCategoryForProductName('Example Probiotic Gel Cream'), 'Moisturiser');
+  assert.equal(defaultCategoryForProductName('Example Green Colour Corrector'), 'Makeup');
+  assert.equal(defaultCategoryForProductName('Example Foaming Cream Cleanser'), 'Cleanser');
+  assert.equal(defaultCategoryForProductName('Example Retinol Night Treatment'), 'Treatment');
   assert.equal(defaultCategoryForProductName('Mystery Bottle'), 'Other');
 });
 
 test('seedProductLibraryFromDefaults assigns real categories not Other for SPF', () => {
   const lib = seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
-  const spf = lib.products.find(p => p.name.includes('Anthelios'));
+  const spf = lib.products.find(p => p.name.includes('Sunscreen SPF'));
   assert.ok(spf);
   assert.equal(spf.category, 'Sunscreen');
-  const gel = lib.products.find(p => p.name === 'Korres Greek Yoghurt Probiotic Gel Cream');
+  const gel = lib.products.find(p => p.name === 'Example Probiotic Gel Cream');
   assert.equal(gel.category, 'Moisturiser');
 });
 
@@ -164,7 +164,7 @@ test('upgradeOtherProductCategories rewrites Other using name inference', () => 
   const library = {
     schema_version: 1,
     products: [
-      { id: 'spf', name: 'La Roche Posay Anthelios SPF 50+', category: 'Other', notes: '' },
+      { id: 'spf', name: 'Example Sunscreen SPF 50+', category: 'Other', notes: '' },
       { id: 'keep', name: 'Custom Gadget', category: 'Other', notes: '' },
       { id: 'serum', name: 'Already Serum', category: 'Serum', notes: '' }
     ]

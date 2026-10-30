@@ -118,7 +118,7 @@ function laneFor(recordType, title, provider, location) {
   if (recordType === 'Referral') return 'referral';
   if (recordType === 'Vaccination') return 'vaccine';
   if (/dentist|dentistry|\bdental\b/i.test(blob)) return 'dental';
-  if (/therap|psycholog|kate semple/i.test(blob)) return 'therapy';
+  if (/therap|psycholog|counsell/i.test(blob)) return 'therapy';
   if (/\beye\b|optom|eyecare/i.test(blob)) return 'eye';
   return 'appointment';
 }

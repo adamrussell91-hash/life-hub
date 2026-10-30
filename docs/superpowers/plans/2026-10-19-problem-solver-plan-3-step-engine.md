@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-19-problem-solver-full-process-design.md`. This is plan 3 of the v2 build. Plans 4–8 (Analyse and Devise tools; Decide and Implement with Tasks integration; Improve and Document; Lightning; Final-words evaluation and gate) are written after this one lands, against the real code. All plans ship in one PR on `claude/problem-solver-process`.
 
-**Worktree:** `/Users/adamrussell/Projects/life-hub-ps-process` (branch `claude/problem-solver-process`). Run every command from there.
+**Worktree:** `/Users/you/Projects/life-hub-ps-process` (branch `claude/problem-solver-process`). Run every command from there.
 
 **Commands used throughout:**
 

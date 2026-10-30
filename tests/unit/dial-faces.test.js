@@ -80,7 +80,7 @@ test('drawing: moon, retrograde tally and the dress face', () => {
   assert.ok(svg.querySelector('[data-part="moon"] .dd-fx-moon-lit'));
   drawRetro(g, svg, { cx: 200, cy: 230, r: 16, closed: 2, total: 4 });
   assert.match(svg.querySelector('[data-part="retro"]').textContent, /2 of 4 closed/);
-  drawDress(g, svg, { items: [{ start: 9, end: 10, isClass: true, title: 'Y12' }, { start: 19, end: 21, kind: 'corey', title: 'Tea' }], pct: 62, nowHour: 9.2 });
+  drawDress(g, svg, { items: [{ start: 9, end: 10, isClass: true, title: 'Y12' }, { start: 19, end: 21, kind: 'partner', title: 'Tea' }], pct: 62, nowHour: 9.2 });
   assert.equal(svg.querySelectorAll('[data-part="dress-diamond"]').length, 2);
   assert.ok(svg.querySelector('[data-part="dress-hand"]'));
   assert.equal(svg.querySelector('[data-part="dress"] text'), null, 'no words on the dress face');

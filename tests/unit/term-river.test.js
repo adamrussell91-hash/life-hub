@@ -18,7 +18,7 @@ const TERMS = [
 ];
 
 test('lanes are Adam’s identities in About Me order, with Body last', () => {
-  assert.deepEqual(LANES.map(l => l.id), ['teacher', 'corey', 'scholar', 'friends', 'body']);
+  assert.deepEqual(LANES.map(l => l.id), ['teacher', 'partner', 'scholar', 'friends', 'body']);
 });
 
 test('every kind of item lands in the right lane', () => {
@@ -26,12 +26,12 @@ test('every kind of item lands in the right lane', () => {
     [{ type: 'scheduled_lesson', title: 'Y12 English Adv' }, 'teacher'],
     [{ type: 'professional_event', title: 'Courageously Navigating Hard Conversations' }, 'teacher'],
     [{ type: 'project', title: 'Tournament of Minds' }, 'teacher'],
-    [{ type: 'calendar_block', kind: 'corey', title: 'Good night: dinner out + a show' }, 'corey'],
-    [{ kind: 'protect_block', with: 'corey', title: 'Blue Mountains' }, 'corey'],
+    [{ type: 'calendar_block', kind: 'partner', title: 'Good night: dinner out + a show' }, 'partner'],
+    [{ kind: 'protect_block', with: 'partner', title: 'Blue Mountains' }, 'partner'],
     [{ type: 'medical', title: 'Gastroenterologist follow-up' }, 'body'],
     [{ type: 'calendar_block', kind: 'rest', title: 'Wind down' }, 'body'],
-    [{ kind: 'event', tags: ['graduation'], title: 'UNSW conferral' }, 'scholar'],
-    [{ kind: 'dream', title: 'Study at Harvard, Cambridge, Oxford or Yale' }, 'scholar'],
+    [{ kind: 'event', tags: ['graduation'], title: 'Degree conferral' }, 'scholar'],
+    [{ kind: 'dream', title: 'Study at a university overseas' }, 'scholar'],
     [{ title: 'UOW literacy elective' }, 'scholar'],
     [{ title: 'Lunch with Bob' }, 'friends'],
     [{ title: 'Newcastle, 2 days · friends' }, 'friends'],
@@ -54,7 +54,7 @@ test('weeks run Monday to Sunday', () => {
   assert.deepEqual(weeksBetween('2026-09-24', '2026-10-06'), ['2026-09-21', '2026-09-28', '2026-10-05']);
 });
 
-test('the load strip uses the capacity model’s rule: classes, Corey time and ghosts never count', () => {
+test('the load strip uses the capacity model’s rule: classes, Partner time and ghosts never count', () => {
   const pct = d => (d >= '2026-11-16' && d <= '2026-11-22' ? 40 : d < '2026-09-26' ? 60 : 80);
   const reports = Array.from({ length: 5 }, (_, i) => ({ date: `2026-11-${16 + i}`, start: 15.5, end: 20, title: 'Reports' }));
   const load = weeklyLoad({
@@ -63,7 +63,7 @@ test('the load strip uses the capacity model’s rule: classes, Corey time and g
       { date: '2026-09-21', start: 10.85, end: 14.85, title: 'Resource day' },
       { date: '2026-09-24', start: 13.25, end: 14.25, title: 'Gastro' },
       { date: '2026-09-22', start: 8.67, end: 9.58, title: 'Y12', isClass: true },
-      { date: '2026-09-24', start: 19.5, end: 21.5, title: 'Corey', protected: true },
+      { date: '2026-09-24', start: 19.5, end: 21.5, title: 'Partner', protected: true },
       { date: '2026-09-26', start: 18, end: 22, title: 'Good night', ghost: true },
       ...reports
     ],
@@ -101,7 +101,7 @@ test('hub overlays become river points even when visual.RIVER.ITEMS is empty (Ye
     { path: 'p:2', record: { type: 'professional_meeting', id: 'meet-1', date: '2026-02-05', time: '10:00', title: 'Seth planning' } },
     { path: 'p:3', record: { type: 'professional_event', id: 'pd-1', date: '2026-02-06', time: '15:00', title: 'Warlight PL', event_type: 'professional_development' } },
     { path: 'task:1', record: { type: 'task', id: 'task-1', date: '2026-02-07', title: 'Mark drafts' } },
-    { path: 'life:1', record: { type: 'calendar_block', id: 'corey-1', date: '2026-02-07', kind: 'corey', title: 'Tea + TV', time: '19:30', end_time: '21:30' } },
+    { path: 'life:1', record: { type: 'calendar_block', id: 'partner-1', date: '2026-02-07', kind: 'partner', title: 'Tea + TV', time: '19:30', end_time: '21:30' } },
     { path: 'log:1', record: { type: 'meal', id: 'meal-1', date: '2026-02-07', title: 'Lunch' } }
   ]);
   assert.equal(hub.some((item) => item.id === 'lesson-1' && item.filterKey === 'classes'), true);
@@ -109,7 +109,7 @@ test('hub overlays become river points even when visual.RIVER.ITEMS is empty (Ye
   assert.equal(hub.some((item) => item.id === 'meet-1' && item.filterKey === 'meetings'), true);
   assert.equal(hub.some((item) => item.id === 'pd-1' && item.filterKey === 'pd'), true);
   assert.equal(hub.some((item) => item.id === 'task-1' && item.filterKey === 'tasks'), true);
-  assert.equal(hub.some((item) => item.id === 'corey-1' && laneFor(item) === 'corey'), true);
+  assert.equal(hub.some((item) => item.id === 'partner-1' && laneFor(item) === 'partner'), true);
   assert.equal(hub.some((item) => item.id === 'meal-1'), false, 'meals stay off the river');
 
   const merged = mergeRiverItems(

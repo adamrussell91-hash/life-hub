@@ -44,6 +44,7 @@ import {
 } from '../../netlify/functions/_shared/capabilities/intent-router.mjs';
 import {
   loadIntuitionFor,
+  loadPrivateIntuitionPacks,
   formatIntuitionForPrompt,
   applyIntuitionEdit
 } from '../../netlify/functions/_shared/capabilities/intuition.mjs';
@@ -789,13 +790,46 @@ test('publish_surface_widget requires Adam-approved template', async () => {
   assert.equal(ok.kind, 'propose');
 });
 
-test('intuition packs load for Brisket and stay judgment-only', () => {
-  const packs = loadIntuitionFor({ agentSlug: 'brisket' });
-  assert.ok(packs.some(pack => pack.id === 'vyvanse-appetite-window'));
+test('intuition packs merge bundled generic packs with private packs and stay judgment-only', () => {
+  const privatePacks = [{
+    id: 'synthetic-meal-window',
+    agents: ['brisket'],
+    capacities: ['plan.week-meals'],
+    summary: 'Synthetic private prior for tests.',
+    guidance: 'Synthetic guidance.'
+  }];
+  const packs = loadIntuitionFor({ agentSlug: 'brisket', privatePacks });
+  assert.ok(packs.some(pack => pack.id === 'synthetic-meal-window'));
   const text = formatIntuitionForPrompt(packs);
   assert.match(text, /never block a capacity/i);
   const edited = applyIntuitionEdit(packs[0], { guidance: 'Updated guidance' });
   assert.equal(edited.guidance, 'Updated guidance');
+});
+
+test('intuition falls back to bundled generic packs only when no private packs load', () => {
+  const packs = loadIntuitionFor({ agentSlug: 'clementine' });
+  assert.ok(packs.some(pack => pack.id === 'knowledge-claim-spine'));
+  assert.equal(loadIntuitionFor({ agentSlug: 'brisket' }).length, 0);
+});
+
+test('private intuition packs load from the data repo tree and override bundled ids', async () => {
+  const blobs = new Map([
+    ['s1', JSON.stringify({ id: 'knowledge-claim-spine', agents: ['clementine'], summary: 'Private override.' })],
+    ['s2', JSON.stringify({ id: 'synthetic-flag', agents: ['sara'], summary: 'Synthetic.' })],
+    ['s3', 'not json']
+  ]);
+  const tree = [
+    { type: 'blob', path: 'intuition/knowledge-claim-spine.json', sha: 's1' },
+    { type: 'blob', path: 'intuition/synthetic-flag.json', sha: 's2' },
+    { type: 'blob', path: 'intuition/broken.json', sha: 's3' },
+    { type: 'blob', path: 'data/other.json', sha: 's2' }
+  ];
+  const privatePacks = await loadPrivateIntuitionPacks(tree, async sha => blobs.get(sha));
+  assert.deepEqual(privatePacks.map(pack => pack.id).sort(), ['knowledge-claim-spine', 'synthetic-flag']);
+  const clementine = loadIntuitionFor({ agentSlug: 'clementine', privatePacks });
+  assert.equal(clementine.find(pack => pack.id === 'knowledge-claim-spine').summary, 'Private override.');
+  assert.deepEqual(await loadPrivateIntuitionPacks(tree, async () => { throw new Error('offline'); }), []);
+  assert.deepEqual(await loadPrivateIntuitionPacks(null, null), []);
 });
 
 test('capability scoreboard returns rows when asked', async () => {
@@ -835,21 +869,52 @@ test('capability scoreboard includes promoted shortcut drafts when detail is on'
 });
 
 
-test('intuition_edit_pack updates owned pack for Sara', async () => {
+test('intuition_edit_pack updates owned private pack for Sara', async () => {
   resetCapabilityCaches();
   const { ctx, writes } = mockCtx('sara');
-  // Seed flare-rules into the mock tree via a prior write
-  const seed = await import('node:fs');
-  const raw = seed.readFileSync(new URL('../../intuition/flare-rules.json', import.meta.url), 'utf8');
-  await ctx.client.writeFile({ path: 'intuition/flare-rules.json', content: raw, message: 'seed' });
+  const raw = JSON.stringify({
+    id: 'synthetic-flare-rules',
+    agents: ['sara'],
+    capacities: ['log.entry'],
+    summary: 'Synthetic flare prior.',
+    guidance: 'Synthetic guidance.'
+  });
+  await ctx.client.writeFile({ path: 'intuition/synthetic-flare-rules.json', content: raw, message: 'seed' });
   writes.length = 0;
   const result = await executeShortcut(
     'intuition_edit_pack',
-    { pack_id: 'flare-rules', guidance: 'Deload earlier in flare week 2.', reason: 'Hard flare week' },
+    { pack_id: 'synthetic-flare-rules', guidance: 'Deload earlier in week 2.', reason: 'Hard week' },
     ctx
   );
   assert.equal(result.kind, 'ok');
-  assert.equal(writes[0].path, 'intuition/flare-rules.json');
+  assert.equal(writes[0].path, 'intuition/synthetic-flare-rules.json');
+});
+
+test('intuition_edit_pack seeds a private copy from a bundled generic pack', async () => {
+  resetCapabilityCaches();
+  const { ctx, writes } = mockCtx('clementine');
+  const result = await executeShortcut(
+    'intuition_edit_pack',
+    { pack_id: 'knowledge-claim-spine', guidance: 'Name the claim in one line.', reason: 'Tighter briefs' },
+    ctx
+  );
+  assert.equal(result.kind, 'ok');
+  assert.equal(writes[0].path, 'intuition/knowledge-claim-spine.json');
+  assert.equal(writes[0].sha, undefined);
+  const privatePacks = await loadPrivateIntuitionPacks(ctx.repoTree, sha => ctx.readBlob(sha));
+  const merged = loadIntuitionFor({ agentSlug: 'clementine', privatePacks });
+  assert.equal(merged.find(pack => pack.id === 'knowledge-claim-spine').guidance, 'Name the claim in one line.');
+});
+
+test('intuition_edit_pack denies unknown packs', async () => {
+  const { ctx } = mockCtx('sara');
+  const result = await executeShortcut(
+    'intuition_edit_pack',
+    { pack_id: 'no-such-pack', guidance: 'x', reason: 'y' },
+    ctx
+  );
+  assert.equal(result.kind, 'error');
+  assert.match(result.error, /not found/);
 });
 
 test('os_promote_shortcut returns Confirm draft under data/os', async () => {

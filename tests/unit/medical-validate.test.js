@@ -40,7 +40,7 @@ test('accepts a null episode and a named episode object', () => {
   assert.deepEqual(validateRecord({ ...common, episode: null }), []);
   assert.deepEqual(validateRecord({
     ...common,
-    episode: { id: 'crohns-dx', title: "Crohn's diagnosis" }
+    episode: { id: 'condition-a-dx', title: "Condition A diagnosis" }
   }), []);
 });
 

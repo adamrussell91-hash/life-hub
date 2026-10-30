@@ -36,21 +36,21 @@ function imported(n, name, { student = true, aliases = [] } = {}) {
 const light = () => ({ links: 0, blocked: null });
 
 test('splitCombinedName carries the shared surname and splits comma lists', () => {
-  assert.deepEqual(splitCombinedName('Hector and Hugo Standen'), ['Hector Standen', 'Hugo Standen']);
+  assert.deepEqual(splitCombinedName('Hector and Hugo Exampleton'), ['Hector Exampleton', 'Hugo Exampleton']);
   assert.deepEqual(splitCombinedName('Wynn Fernleigh,<br>Fern Redgum'), ['Wynn Fernleigh', 'Fern Redgum']);
   assert.deepEqual(splitCombinedName('Hamish McEwan-Webber, Harry Payne, Billy Lytas'), [
     'Hamish McEwan-Webber',
     'Harry Payne',
     'Billy Lytas'
   ]);
-  assert.equal(splitCombinedName('Rohan Arianayagam'), null);
+  assert.equal(splitCombinedName('Rohan Examplar'), null);
 });
 
 test('a Blob copy of an imported student merges into it, by name or by alias', () => {
   const plan = planPeopleDedupe({
-    blobPeople: [blob(1, 'Rohan Arianayagam'), blob(2, 'Rohan'), blob(3, 'Tom Lidbetter')],
+    blobPeople: [blob(1, 'Rohan Examplar'), blob(2, 'Rohan'), blob(3, 'Tom Lidbetter')],
     imported: [
-      imported(101, 'Rohan Arianayagam', { aliases: ['Rohan'] }),
+      imported(101, 'Rohan Examplar', { aliases: ['Rohan'] }),
       imported(102, 'Thomas Lidbetter', { aliases: ['Tom Lidbetter'] })
     ],
     weightOf: light
@@ -58,8 +58,8 @@ test('a Blob copy of an imported student merges into it, by name or by alias', (
   assert.deepEqual(
     plan.ready.map((a) => [a.kind, a.remove.name, a.into.map((p) => p.name), a.student]),
     [
-      ['copy', 'Rohan', ['Rohan Arianayagam'], true],
-      ['copy', 'Rohan Arianayagam', ['Rohan Arianayagam'], true],
+      ['copy', 'Rohan', ['Rohan Examplar'], true],
+      ['copy', 'Rohan Examplar', ['Rohan Examplar'], true],
       ['copy', 'Tom Lidbetter', ['Thomas Lidbetter'], true]
     ]
   );
@@ -67,8 +67,8 @@ test('a Blob copy of an imported student merges into it, by name or by alias', (
 
 test('a Blob record that IS the imported person (adopted id) and the self record are never touched', () => {
   const plan = planPeopleDedupe({
-    blobPeople: [blob(101, 'Rohan Arianayagam'), blob(5, 'Adam Russell', { is_self: true })],
-    imported: [imported(101, 'Rohan Arianayagam'), imported(102, 'Adam Russell', { student: false })],
+    blobPeople: [blob(101, 'Rohan Examplar'), blob(5, 'Adam Russell', { is_self: true })],
+    imported: [imported(101, 'Rohan Examplar'), imported(102, 'Adam Russell', { student: false })],
     weightOf: light
   });
   assert.deepEqual(plan.ready, []);
@@ -85,14 +85,14 @@ test('a name two imported people share is ambiguous and never merges', () => {
 
 test('a combined-name record splits into each student, or waits when one has no record', () => {
   const plan = planPeopleDedupe({
-    blobPeople: [blob(1, 'Wynn Fernleigh, Fern Redgum'), blob(2, 'Hector and Hugo Standen')],
-    imported: [imported(101, 'Wynn Fernleigh'), imported(102, 'Fern Redgum'), imported(103, 'Hugo Standen')],
+    blobPeople: [blob(1, 'Wynn Fernleigh, Fern Redgum'), blob(2, 'Hector and Hugo Exampleton')],
+    imported: [imported(101, 'Wynn Fernleigh'), imported(102, 'Fern Redgum'), imported(103, 'Hugo Exampleton')],
     weightOf: light
   });
   assert.equal(plan.ready.length, 1);
   assert.equal(plan.ready[0].kind, 'combined');
   assert.deepEqual(plan.ready[0].into.map((p) => p.name), ['Wynn Fernleigh', 'Fern Redgum']);
-  assert.deepEqual(plan.unresolved.map((u) => [u.remove.name, u.missing]), [['Hector and Hugo Standen', ['Hector Standen']]]);
+  assert.deepEqual(plan.unresolved.map((u) => [u.remove.name, u.missing]), [['Hector and Hugo Exampleton', ['Hector Exampleton']]]);
 });
 
 test('Blob-only twins keep the linked one; a twin with its own links is left alone', () => {
@@ -153,7 +153,7 @@ test('apply moves every link onto the kept record, ends ended ones, deletes the 
   };
   const plan = {
     ready: [
-      { kind: 'copy', remove: { id: id(2), ref: ref(2), name: 'Rohan' }, into: [{ id: id(101), ref: ref(101), name: 'Rohan Arianayagam' }], student: true, links: 3, blocked: null },
+      { kind: 'copy', remove: { id: id(2), ref: ref(2), name: 'Rohan' }, into: [{ id: id(101), ref: ref(101), name: 'Rohan Examplar' }], student: true, links: 3, blocked: null },
       { kind: 'copy', remove: { id: id(3), ref: ref(3), name: 'Other' }, into: [{ id: id(102), ref: ref(102), name: 'X' }], student: true, links: 0, blocked: null }
     ],
     kept: [],

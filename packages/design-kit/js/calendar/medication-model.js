@@ -1,5 +1,5 @@
 /**
- * Dexamphetamine timing for the calendar. Pure: medication logs in, day status out.
+ * Daily medication timing for the calendar. Pure: medication logs in, day status out.
  *
  * Honesty rules (Day Sense brief §3.3):
  * - A missing log is unknown, never "skipped". Only a logged skip is a skip.
@@ -8,8 +8,8 @@
  */
 
 export const MEDICATION = Object.freeze({
-  name: 'Dexamphetamine',
-  short: 'Dexy',
+  name: 'Daily medication',
+  short: 'Meds',
   effectHours: 4, // drawn window after a dose; a guide, labelled "about"
   onsetHours: 0.5,
   promptAfterHours: 0.5, // one prompt this long after the usual time with no log
@@ -202,5 +202,5 @@ export function medicationContext(logs, { today, from, to, days = 14 }) {
   const parts = [`taken ${taken} of the last ${days} days`];
   if (skipped) parts.push(`${skipped} skipped`);
   if (unlogged) parts.push(`${unlogged} not logged`);
-  return { summary: `Dexy: ${parts.join(' · ')}`, taken, skipped, unlogged, days, lighter };
+  return { summary: `${MEDICATION.short}: ${parts.join(' · ')}`, taken, skipped, unlogged, days, lighter };
 }

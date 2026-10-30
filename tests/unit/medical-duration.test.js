@@ -73,10 +73,10 @@ test('a medical visit logged without a time is all-day (00:00), not stamped with
 
 test('a long chat title is shortened and the remainder lands in the notes', () => {
   const v = validateLogEntry(
-    { type: 'medical', date: '2026-10-20', fields: { title: 'Stelara 90mg — painful at the injection site; same-morning cramping was the bacon and egg breakfast' }, notes: 'Next dose in 8 weeks.' },
+    { type: 'medical', date: '2026-10-20', fields: { title: 'Biologic 90mg — painful at the injection site; same-morning cramping was the bacon and egg breakfast' }, notes: 'Next dose in 8 weeks.' },
     { id: 'medical-x', now: '2026-10-06T15:42:00+11:00' }
   );
-  assert.equal(v.record.title, 'Stelara 90mg');
+  assert.equal(v.record.title, 'Biologic 90mg');
   assert.match(v.notes, /painful at the injection site/);
   assert.match(v.notes, /Next dose in 8 weeks/);
 });

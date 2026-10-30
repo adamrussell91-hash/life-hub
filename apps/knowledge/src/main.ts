@@ -110,6 +110,7 @@ import { bindUniverseKey, universeKeyHtml } from "./archive/universeKey";
 import { enterPodcastRail, leavePodcastRail, renderPodcastRail } from "./podcast/rail";
 import { enterQuizRail, leaveQuizRail, renderQuizRail } from "./quiz/view";
 import { mountUniversityTimeline } from "./university/timeline/mount";
+import { loadPrivateSources } from "./api/privateSources";
 import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
 import type { GraphPreviewNote } from "./archive/graphPreview";
@@ -2480,7 +2481,12 @@ function renderLogin(message?: string) {
 
 async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean }) {
   try {
-    entries = await listPages();
+    // Private reference data (degree, notebook, book and PD pills): give it a moment, never block on it.
+    const university = Promise.race([
+      loadPrivateSources(),
+      new Promise(resolve => setTimeout(resolve, 1500)),
+    ]);
+    [entries] = await Promise.all([listPages(), university]);
     await ensurePageReviews();
     await refreshVisible();
     view = "notebooks";

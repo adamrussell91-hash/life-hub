@@ -16,7 +16,7 @@ import {
   seedProductLibraryFromDefaults,
   findProductByName
 } from '../../apps/life/js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES } from '../fixtures/skincare-routines.mjs';
 
 test('path is data/skincare/routine-membership.json', () => {
   assert.equal(SKINCARE_ROUTINE_MEMBERSHIP_PATH, 'data/skincare/routine-membership.json');

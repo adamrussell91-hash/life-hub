@@ -20,7 +20,7 @@ describe('meal section', () => {
   it('only your own moments can be meals', () => {
     expect(canBeMeal({ author: 'adam' } as never)).toBe(true);
     expect(canBeMeal({} as never)).toBe(true);
-    expect(canBeMeal({ author: 'corey' } as never)).toBe(false);
+    expect(canBeMeal({ author: 'partner' } as never)).toBe(false);
   });
 
   it('builds the PUT body from the form state, dropping empty extras and blank dishes', () => {

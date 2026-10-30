@@ -657,7 +657,7 @@ import assert from 'node:assert/strict';
 import { buildCalendarMarkers, getSearchExtension, searchEvents } from '../../js/core/search.js';
 
 const events = [
-  { record: { id: 'm1', type: 'meal', date: '2026-07-30', meal: 'lunch' }, body: 'Marley Spoon chicken bowl.' },
+  { record: { id: 'm1', type: 'meal', date: '2026-07-30', meal: 'lunch' }, body: 'meal kit chicken bowl.' },
   { record: { id: 'd1', type: 'diary', date: '2026-07-30', tags: ['evening'], highlights: 'Solid workout' }, body: 'Private prose.' },
   { record: { id: 'w1', type: 'workout', date: '2026-07-29', title: 'Chest and Curls' }, body: 'Good session.' }
 ];

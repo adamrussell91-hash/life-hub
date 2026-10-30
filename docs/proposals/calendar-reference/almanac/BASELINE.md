@@ -23,7 +23,7 @@ Opened `docs/proposals/calendar-reference/almanac/almanac.html` from the repo (k
 
 Matched the contract:
 
-- Mount: the tide clip grows 0 → 1198, monotonic, full at ~650ms (~3.2s at ×5; 700ms ×5). The four rails (`unsw-conferral`, `term-4`, `solo-travel`, `korea`) start ~60ms apart and only move backwards. Beads leave scale 0.4 about halfway through their row, ~40ms apart, and settle at scale 1. ×5 stretches the same sequence. Vitamin D (window pill) and the dream (dotted line) have no rail; their beads still pop.
+- Mount: the tide clip grows 0 → 1198, monotonic, full at ~650ms (~3.2s at ×5; 700ms ×5). The four rails (`conferral`, `term-4`, `solo-travel`, `big-trip`) start ~60ms apart and only move backwards. Beads leave scale 0.4 about halfway through their row, ~40ms apart, and settle at scale 1. ×5 stretches the same sequence. Vitamin D (window pill) and the dream (dotted line) have no rail; their beads still pop.
 - Popover open: opacity 0→1 and y 4→0. At ×5 that stretch is visible (~180ms → ~900ms). Every bead opens below-right of itself, inside the card, with both buttons and the module receipt (last safe day, days left, the rule's why).
 - Already done: status is `done` on the click. Scale is placed at 1.25 and springs back to 1 over ~320ms (~1.5s at ×5), with a small overshoot under 1. Unbooked goes 2→1 once during the 420ms count (the digit flips early because 2 and 1 round; ×5 stretches that flip). Toast: "Marked done. The Almanac stops asking about it."
 - Hold: the button disables and reads "Saving…" for ~350ms at both speeds (that wait is a timer). Then `--held` runs 0→1 over ~320ms (~1.6s at ×5) and the label becomes "Held for you both" / "Walled" / "Held". Toasts are the protect_block receipts. Newcastle's toast includes both days.

@@ -41,7 +41,7 @@ The original eight source assets are recorded in
 For another **local checkout on Adam's Mac**, run from its repository root:
 
 ```bash
-node tools/grove-previews/install-project-animals.mjs "/Users/adamrussell/Documents/Codex/2026-10-11/on-x20/outputs/grove-final/animals"
+node tools/grove-previews/install-project-animals.mjs "/Users/you/Documents/Codex/2026-10-11/on-x20/outputs/grove-final/animals"
 node tools/grove-previews/serve-animal-gallery.mjs apps/life/assets/grove/project-only
 ```
 

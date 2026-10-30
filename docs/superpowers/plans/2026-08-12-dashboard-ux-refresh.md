@@ -249,12 +249,12 @@ EOF
 
 ```bash
 mkdir -p assets/body assets/fitness/regions
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/Full_Body_Diagram-d6883b4e-03af-44cb-b480-a486d5772bdd.png" assets/body/full-body-diagram.png
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_chest_blank-50f8cf39-41ff-407b-a81f-c703f942d0b6.png" assets/fitness/regions/chest.png
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_bicep_-_flexed-4f7f864a-626d-407d-af86-c290a5995576.png" assets/fitness/regions/arms.png
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_abs_blank-b7aaf27a-b00d-42d5-857c-b96b8181886e.png" assets/fitness/regions/abs.png
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/back_legs_blank-a2805300-acd4-4250-93a8-6b2837ed98a6.png" assets/fitness/regions/legs.png
-cp "/Users/adamrussell/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/back_torso_blank-44089ec9-1e5f-4478-a93d-6f60380cf898.png" assets/fitness/regions/back.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/Full_Body_Diagram-d6883b4e-03af-44cb-b480-a486d5772bdd.png" assets/body/full-body-diagram.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_chest_blank-50f8cf39-41ff-407b-a81f-c703f942d0b6.png" assets/fitness/regions/chest.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_bicep_-_flexed-4f7f864a-626d-407d-af86-c290a5995576.png" assets/fitness/regions/arms.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/front_abs_blank-b7aaf27a-b00d-42d5-857c-b96b8181886e.png" assets/fitness/regions/abs.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/back_legs_blank-a2805300-acd4-4250-93a8-6b2837ed98a6.png" assets/fitness/regions/legs.png
+cp "/Users/you/.cursor/projects/Users-adamrussell-Documents-Claude-Projects-life-hub/assets/back_torso_blank-44089ec9-1e5f-4478-a93d-6f60380cf898.png" assets/fitness/regions/back.png
 ```
 
 - [ ] **Step 2: Commit**
@@ -465,7 +465,7 @@ EOF
 
 ```bash
 node scripts/import-notion-history.mjs \
-  --body-history-csv "/Users/adamrussell/.codex/.chatgpt-projects/g-p-6a77f0eb110c81919b5397fa1bb3b535/outputs/body-records/body_measurements_full_history.csv" \
+  --body-history-csv "/Users/you/.codex/.chatgpt-projects/g-p-6a77f0eb110c81919b5397fa1bb3b535/outputs/body-records/body_measurements_full_history.csv" \
   --out ../life-hub-data
 ```
 

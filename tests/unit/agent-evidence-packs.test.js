@@ -59,7 +59,7 @@ const BASE_STORES = {
     { date: '2026-07-20', routine: 'procedure', notes: 'laser', is_procedure: true }
   ],
   medicalEvents: [
-    { record: { type: 'medical', date: '2026-07-08', title: 'Kate Semple', notes: 'therapy review' } }
+    { record: { type: 'medical', date: '2026-07-08', title: 'Avery Quill', notes: 'therapy review' } }
   ],
   tasks: [
     { id: 't1', title: 'Mark Year 10 essays', status: 'open', due_date: '2026-08-19', priority: 'high', updated_at: '2026-08-01' },

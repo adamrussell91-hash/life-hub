@@ -75,9 +75,9 @@ const FOOD_LIBRARY = JSON.stringify([
 const CENTRAL_NODE = `# Central Node
 
 ## Constraints & Priorities
-- Crohn's / IBD: flare protocol often active; fat ceiling 50 g/day when flared.
-- No seafood.
-- Protein target ~120 g/day (140 g post-workout).
+- Condition A: flare protocol sometimes active; fat ceiling 60 g/day when flared.
+- No shellfish.
+- Protein target ~110 g/day (130 g post-workout).
 
 ## Today's Status (Friday 7 August 2026)
 Nutrition so far: breakfast yoghurt logged. Protein ~15 g. Fat low.
@@ -187,7 +187,7 @@ const CASES = [
   {
     id: 'brisket-weekend-out',
     protocol: 'brisket',
-    message: 'Brisket, weekend no Vyvanse — going to Nomad for dinner, any ordering tips?',
+    message: 'Brisket, unstructured weekend day — going out for dinner, any ordering tips?',
     expectAgent: 'brisket',
     requireText: true
   },
@@ -235,7 +235,7 @@ const CASES = [
   {
     id: 'sara',
     protocol: 'sara',
-    message: 'Sara, weight this morning was 84.2 kg — anything to note given Crohn\'s and Vyvanse?',
+    message: 'Sara, weight this morning was 74.2 kg — anything to note given Condition A and Medication X?',
     expectAgent: 'sara',
     requireText: true
   },

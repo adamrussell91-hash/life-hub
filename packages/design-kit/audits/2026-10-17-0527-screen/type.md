@@ -129,7 +129,7 @@ A size is off-scale when it is not one of those eight steps and not a `var(--tex
 | kit | `packages/design-kit/calendar-day-dial.css:247` | `.dd-cb__big` | `2.25rem` |
 | kit | `packages/design-kit/calendar-day-dial.css:269` | `.dd-fx-small` | `9px` |
 | kit | `packages/design-kit/calendar-day-dial.css:279` | `.dd-fx-gmt-label` | `9.5px` |
-| kit | `packages/design-kit/calendar-day-dial.css:281` | `.dd-fx-corey-c` | `8px` |
+| kit | `packages/design-kit/calendar-day-dial.css:281` | `.dd-fx-partner-c` | `8px` |
 | kit | `packages/design-kit/calendar-term-river-rows.css:40` | `.tr-rows__soften-label` | `10px` |
 | kit | `packages/design-kit/calendar-term-river.css:33` | `.tr-t-tier` | `10.5px` |
 | kit | `packages/design-kit/calendar-term-river.css:55` | `.tr-agent text` | `9px` |

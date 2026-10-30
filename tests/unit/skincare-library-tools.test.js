@@ -83,12 +83,12 @@ test('formatSkincareLibraryForPrompt lists name and id, capped', () => {
     schema_version: 1,
     products: [
       { id: 'cera-foaming', name: 'CeraVe Foaming', notes: '' },
-      { id: 'korres-cleanser', name: 'Korres Cleanser', notes: 'AM' }
+      { id: 'example-cleanser', name: 'Example Cleanser', notes: 'AM' }
     ]
   };
   assert.equal(
     formatSkincareLibraryForPrompt(library),
-    '- CeraVe Foaming (cera-foaming)\n- Korres Cleanser (korres-cleanser)'
+    '- CeraVe Foaming (cera-foaming)\n- Example Cleanser (example-cleanser)'
   );
   assert.equal(formatSkincareLibraryForPrompt(library, 1), '- CeraVe Foaming (cera-foaming)');
 });

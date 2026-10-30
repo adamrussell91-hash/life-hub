@@ -13,7 +13,7 @@ export const FILTER_CHIPS = Object.freeze([
   Object.freeze({ id: 'tasks', label: 'Tasks', group: 'tasks' }),
   Object.freeze({ id: 'health', label: 'Health', group: 'life' }),
   Object.freeze({ id: 'fitness', label: 'Fitness', group: 'life' }),
-  Object.freeze({ id: 'corey', label: 'Corey', group: 'life' }),
+  Object.freeze({ id: 'partner', label: 'Partner', group: 'life' }),
   Object.freeze({ id: 'social', label: 'Social', group: 'life' }),
   Object.freeze({ id: 'family', label: 'Family', group: 'life' })
 ]);
@@ -86,7 +86,7 @@ export function filterKeyForItem(item) {
   if (kind === 'task' || source === 'task' || source === 'project' || source === 'work_block' || source === 'deadline') return 'tasks';
   if (kind === 'health' || source === 'medical') return 'health';
   if (kind === 'fitness' || source === 'workout') return 'fitness';
-  if (kind === 'corey') return 'corey';
+  if (kind === 'partner') return 'partner';
   if (kind === 'social' || kind === 'family') return kind;
   if (source === 'ical_event') {
     const feed = item.feed ?? item.record?.feed;
@@ -158,13 +158,13 @@ export function paintSourceFilter(doc, host, opts) {
     const shortcut = extraClass.includes('cal-src--shortcut');
     const btn = doc.createElement('button');
     btn.type = 'button';
-    btn.className = `cal-src k-${id}${pressed ? '' : ' is-off'}${id === 'corey' ? ' cal-src--corey' : ''}${extraClass}`;
+    btn.className = `cal-src k-${id}${pressed ? '' : ' is-off'}${id === 'partner' ? ' cal-src--partner' : ''}${extraClass}`;
     btn.setAttribute('aria-pressed', String(pressed));
     if (btn.dataset) btn.dataset.filter = id;
     else btn.setAttribute('data-filter', id);
     if (!shortcut) {
-      const mark = doc.createElement(id === 'corey' ? 'span' : 'i');
-      if (id === 'corey') mark.className = 'cal-mark';
+      const mark = doc.createElement(id === 'partner' ? 'span' : 'i');
+      if (id === 'partner') mark.className = 'cal-mark';
       attach(btn, mark);
     }
     const text = doc.createElement('span');

@@ -9,8 +9,8 @@
 **Tech Stack:** TypeScript, Zod, Vitest, Netlify Functions, Anthropic Messages API, Brave Search API, Cloudflare Workers/Wrangler, existing Teaching Hub `BlockSchema` and AI proposal tools.
 
 **Repositories:**
-- Teaching Hub: `/Users/adamrussell/Teaching Hub`
-- Knowledge Hub research Worker: `/Users/adamrussell/Projects/knowledge-hub`
+- Teaching Hub: `/Users/you/Teaching Hub`
+- Knowledge Hub research Worker: `/Users/you/Projects/knowledge-hub`
 
 **Design:** `docs/superpowers/specs/2026-08-16-ai-web-search-blocks-design.md`
 
@@ -130,7 +130,7 @@ describe('SearchPack', () => {
 Run:
 
 ```bash
-cd "/Users/adamrussell/Teaching Hub"
+cd "/Users/you/Teaching Hub"
 npx vitest run tests/unit/search-pack.test.ts
 ```
 
@@ -948,7 +948,7 @@ git commit -m "Give Clementine the shared web search pack"
 
 ### Task 8: Implement Knowledge Hub `/lesson_proposal`
 
-Work in `/Users/adamrussell/Projects/knowledge-hub`.
+Work in `/Users/you/Projects/knowledge-hub`.
 
 **Files:**
 - Create: `src/research/lessonProposal.ts`
@@ -981,7 +981,7 @@ Test `runLessonProposal` sends `claude-sonnet-4-6`, includes the full prompt, an
 - [ ] **Step 2: Run and verify failure**
 
 ```bash
-cd "/Users/adamrussell/Projects/knowledge-hub"
+cd "/Users/you/Projects/knowledge-hub"
 npm test -- src/research/lessonProposal.test.ts
 ```
 
@@ -1173,7 +1173,7 @@ Confirm it is available to Functions/runtime and not exposed to frontend build v
 Load the Wrangler skill before running deployment commands, then:
 
 ```bash
-cd "/Users/adamrussell/Projects/knowledge-hub"
+cd "/Users/you/Projects/knowledge-hub"
 npm run research:deploy
 ```
 
@@ -1182,10 +1182,10 @@ Expected: successful deployment of `knowledge-hub-research`; `/lesson_proposal` 
 - [ ] **Step 3: Push both repositories**
 
 ```bash
-cd "/Users/adamrussell/Projects/knowledge-hub"
+cd "/Users/you/Projects/knowledge-hub"
 git push
 
-cd "/Users/adamrussell/Teaching Hub"
+cd "/Users/you/Teaching Hub"
 git push
 ```
 

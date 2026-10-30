@@ -147,8 +147,8 @@ Alongside deadline-driven prioritisation, the system should account for Adam's a
 ### 5.11 Graceful project lifecycle for stalled work
 If a project has not moved in a defined window (suggest six weeks as a default, configurable), it gets flagged as stalled rather than silently accumulating in the backlog. Adam is prompted to choose one of three outcomes, revive, Frankenstein (merge or repurpose into something else), or bury, with a short reason captured in ReviewLog either way. This keeps the system honest and avoids the guilt-ghost backlog problem.
 
-### 5.12 Corey-facing capacity view
-A live, shareable read-only URL that shows Adam's availability and rough workload level, not task content or detail, so Corey can see something like "slammed until Thursday" or "free Saturday afternoon" without needing task-level visibility into Adam's work.
+### 5.12 Partner-facing capacity view
+A live, shareable read-only URL that shows Adam's availability and rough workload level, not task content or detail, so Partner can see something like "slammed until Thursday" or "free Saturday afternoon" without needing task-level visibility into Adam's work.
 
 ## 6. Usability and Interaction Requirements
 
@@ -214,7 +214,7 @@ These are genuinely novel rather than borrowed from standard project management 
 8. Pinch point detection, the "shrink this" action, and simple due-soon reminders and notifications
 9. Stalled project detection and the revive, Frankenstein, bury flow
 10. StressFlag cross-agent routing
-11. Corey-facing capacity view
+11. Partner-facing capacity view
 12. Review and closure loop, including the baseline versus current_end_date planned-vs-actual comparison on Project
 
 Stretch phase, after the above is stable and in daily use, the orbit view, branch or decision tree view, and (optional) capacity constellation from section 6.5.

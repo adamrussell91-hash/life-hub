@@ -28,7 +28,7 @@ Intro text.
 ---
 ## 📊 This Month (June 2026)
 **Active Goals:**
-- Crohn's remission (Critical)
+- Condition A remission (Critical)
 ---
 ## 📈 Long-Term Trends & Patterns
 **Nutrition:** Protein target consistency improving month over month.
@@ -54,8 +54,8 @@ test('returns an empty string when the heading is missing', () => {
 });
 
 test('extractAboutMe stops before the next section', () => {
-  const result = extractAboutMe('## 👤 About Me\n- Corey comes first every time.\n## 🔴 Current Constraints & Priorities\n- Fat < 50g\n');
-  assert.match(result, /Corey comes first every time/);
+  const result = extractAboutMe('## 👤 About Me\n- Partner comes first every time.\n## 🔴 Current Constraints & Priorities\n- Fat < 50g\n');
+  assert.match(result, /Partner comes first every time/);
   assert.doesNotMatch(result, /Fat < 50g/);
 });
 
@@ -77,7 +77,7 @@ test('extractThisWeek matches the heading even though its date-range suffix chan
 
 test('extractThisMonth matches the heading even though its month suffix changes monthly', () => {
   const result = extractThisMonth(sample);
-  assert.match(result, /Crohn's remission/);
+  assert.match(result, /Condition A remission/);
   assert.doesNotMatch(result, /Cross-Agent Coordination/);
 });
 

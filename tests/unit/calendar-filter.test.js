@@ -15,7 +15,7 @@ test('Life default turns every chip on; Teaching defaults to Classes only', () =
   const life = defaultFilterForHub('life');
   assert.equal(life.classes, true);
   assert.equal(life.tasks, true);
-  assert.equal(life.corey, true);
+  assert.equal(life.partner, true);
   const teaching = defaultFilterForHub('teaching');
   assert.equal(teaching.classes, true);
   assert.equal(teaching.events, false);
@@ -72,7 +72,7 @@ test('sessionStorage read/write is per hub and survives try/catch failure', () =
 test('chips include Comms, Events and Promises for every hub', () => {
   const ids = FILTER_CHIPS.map((chip) => chip.id);
   assert.deepEqual(ids, [
-    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'
+    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'partner', 'social', 'family'
   ]);
   for (const id of ['comms', 'events', 'promises']) {
     assert.equal(FILTER_CHIPS.find((chip) => chip.id === id).group, 'shared');

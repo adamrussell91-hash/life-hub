@@ -158,7 +158,7 @@ export function mount(host: HTMLElement, options = mountOptions) {
 
   const nav = el('header', 'alm__nav', undefined, root, { 'data-part': 'nav' });
   el('button', 'alm__round', '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>', nav, { type: 'button', 'aria-label': 'Earlier' });
-  el('div', 'alm__period', '<b>The Almanac · until you’re home from Korea</b><span>24/09/26 → 10/01/27 · 15 weeks</span>', nav, { 'data-part': 'period' });
+  el('div', 'alm__period', '<b>The Almanac · until you’re home from the trip</b><span>24/09/26 → 10/01/27 · 15 weeks</span>', nav, { 'data-part': 'period' });
   el('button', 'alm__round', '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>', nav, { type: 'button', 'aria-label': 'Later' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button' });
   const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
@@ -213,7 +213,7 @@ export function mount(host: HTMLElement, options = mountOptions) {
 function mountChart() {
   const g = (cls: string) => s('g', { class: cls }, svg);
   const back = g('alm-layer-back');
-  // holiday washes and the Korea wall
+  // holiday washes and the trip wall
   s('rect', { class: 'alm-holiday', x: X('2026-09-26'), y: 30, width: X('2026-10-13') - X('2026-09-26'), height: 610 }, back);
   s('rect', { class: 'alm-holiday', x: X('2026-12-18'), y: 30, width: X('2026-12-23') - X('2026-12-18'), height: 610 }, back);
   for (const w of F.WALLS) s('rect', { class: 'alm-wall', x: X(w.from), y: 98, width: X(w.to) + 6 - X(w.from), height: 542, 'data-part': 'wall' }, back);
@@ -257,14 +257,14 @@ function mountChart() {
     s('text', { class: 'alm-t-anchor', x: x + 13, y: y - 2 }, anc, t);
     s('text', { class: 'alm-t-sub', x: x + 13, y: y + 11 }, anc, sub);
   };
-  flag('2026-09-30', 0, 'UNSW conferral', '30/09');
+  flag('2026-09-30', 0, 'Degree conferral', '30/09');
   flag('2026-10-13', 1, 'T4 starts', '13/10');
   flag('2026-12-01', 0, 'Solo travel', 'from 01/12');
   flag('2026-12-17', 1, 'T4 ends', '17/12');
   // The wall pill starts at the wall but never runs past the chart's right edge.
   const pill = s('g', { transform: `translate(${Math.min(X('2026-12-23') + 6, ALM.width - ALM.rightPad - 150)} 106)` }, anc);
   s('rect', { class: 'alm-pill', width: 150, height: 20, rx: 10 }, pill);
-  s('text', { class: 'alm-t-pill', x: 75, y: 14 }, pill, 'Korea · 23/12 – 10/01');
+  s('text', { class: 'alm-t-pill', x: 75, y: 14 }, pill, 'Away · 23/12 – 10/01');
   // forecast wave (revealed by a clip that grows left to right)
   const clip = s('clipPath', { id: 'alm-reveal' }, s('defs', {}, svg));
   nodes.set('wave-clip', s('rect', { x: 0, y: 0, width: 0, height: 640 }, clip));
@@ -283,7 +283,7 @@ function mountChart() {
   const note = (d: string, t: string, dy = -10) => s('text', { class: 'alm-t-wave', x: X(d), y: Y(SERIES[idx(d)].pct) + dy }, wave, t);
   note('2026-10-03', 'holidays refill you');
   note('2026-11-22', 'report-writing dip (your T2 pattern)', 20);
-  note('2026-12-31', 'Korea');
+  note('2026-12-31', 'Away');
   for (const o of OPENINGS) for (const d of o.dates) s('circle', { class: 'alm-open-dot', cx: X(d), cy: Y(SERIES[idx(d)].pct), r: 4.5, 'data-part': 'opening-dot' }, wave);
   // lead lines
   s('line', { class: 'alm-divider', x1: 0, x2: ALM.width, y1: ALM.lanes.divider, y2: ALM.lanes.divider }, svg);
@@ -365,10 +365,10 @@ function mountOpenings(card: HTMLElement) {
   const wrap = el('div', 'alm-opens', '<h4>Openings · free, high-capacity windows held for you</h4>', card, { 'data-part': 'openings' });
   for (const o of OPENINGS) {
     if (!o.dates.length) continue;
-    const corey = o.with === 'corey';
-    const c = el('article', `alm-open${corey ? ' is-corey' : ''}`, undefined, wrap, { 'data-part': 'opening', 'data-want': o.wantId });
+    const partner = o.with === 'partner';
+    const c = el('article', `alm-open${partner ? ' is-partner' : ''}`, undefined, wrap, { 'data-part': 'opening', 'data-want': o.wantId });
     el('div', 'alm-open__when', `<span>${whenText(o)}</span><b>${o.pct}%</b>`, c);
-    el('h5', '', `${corey ? '<span class="alm-mark"></span>' : ''}${o.title}`, c);
+    el('h5', '', `${partner ? '<span class="alm-mark"></span>' : ''}${o.title}`, c);
     el('p', '', WANT_WHY[o.wantId] ?? '', c);
     const btns = el('div', 'alm-open__btns', undefined, c);
     if (o.wantId === 'good-night') el('button', 'btn btn--primary', 'Hold it', btns, { type: 'button', 'data-open': o.wantId, 'data-act': 'hold' });
@@ -381,8 +381,8 @@ function mountOpenings(card: HTMLElement) {
   const c = el('article', 'alm-open is-habit', undefined, wrap, { 'data-part': 'opening', 'data-want': F.HABIT.id });
   el('div', 'alm-open__when', `<span>Hol W1 → ${dd(F.HABIT.until)}</span><b>habit</b>`, c);
   el('h5', '', F.HABIT.title, c);
-  el('p', '', `${F.HABIT.minutes} min, ${F.HABIT.perWeek} times a week is about ${Math.round(weeks * F.HABIT.perWeek)} sessions before Seoul. ${F.HABIT.why}`, c);
-  el('div', 'alm-open__btns', '<button class="btn btn--secondary" type="button" data-open="korean" data-act="plan">Plan it with Hammond</button>', c);
+  el('p', '', `${F.HABIT.minutes} min, ${F.HABIT.perWeek} times a week is about ${Math.round(weeks * F.HABIT.perWeek)} sessions before the trip. ${F.HABIT.why}`, c);
+  el('div', 'alm-open__btns', '<button class="btn btn--secondary" type="button" data-open="phrasebook" data-act="plan">Plan it with Hammond</button>', c);
 }
 
 /* ======================================================================== 4. Layout + 5. Render */
@@ -537,7 +537,7 @@ async function openingAction(wantId: string, act: string, btn: HTMLButtonElement
     return;
   }
   const blocks = wantId === 'good-night'
-    ? [{ date: o.dates[0], start: '18:00', end: '22:00', title: 'Good night: dinner out + a show', with: 'corey' }]
+    ? [{ date: o.dates[0], start: '18:00', end: '22:00', title: 'Good night: dinner out + a show', with: 'partner' }]
     : wantId === 'keep-empty'
       ? [{ date: o.dates[0], start: '06:00', end: '22:00', title: 'Keep empty (daylight saving)' }]
       : o.dates.map(date => ({ date, start: '08:00', end: '21:00', title: 'Newcastle · friends' }));

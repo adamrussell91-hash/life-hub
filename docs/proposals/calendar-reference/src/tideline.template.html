@@ -74,7 +74,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .cal-src{display:inline-flex;align-items:center;gap:4px;font-size:var(--text-2xs);font-weight:var(--weight-medium);line-height:1.25;padding:1px 6px 1px 5px;border-radius:var(--radius-full);background:var(--glass);border:1px solid var(--line);color:var(--ink);white-space:nowrap;flex:none}
 .cal-src i{width:6px;height:6px;border-radius:50%;background:var(--k-stripe)}
 .cal-src--ambient{background:transparent;border-style:dashed;color:var(--muted)}
-.cal-src--corey{color:var(--pastel-peach-ink)}
+.cal-src--partner{color:var(--pastel-peach-ink)}
 @media (max-width:719px){
   .cal__sources{gap:var(--space-2)}
   .cal-src{min-height:44px;min-width:max-content;padding:8px 12px;flex:none;font-size:var(--text-xs);gap:6px}
@@ -184,9 +184,9 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .cal-chip.is-over-item{background:color-mix(in srgb,var(--warm-white) 88%,transparent)}
 .cal-chip.is-skipped .cal-chip__title{text-decoration:line-through;color:var(--muted)}
 .cal-chip.is-class{box-shadow:none;--chip-bg:color-mix(in srgb,#fff 80%,transparent);border-color:color-mix(in srgb,var(--wave) calc(var(--t,1) * 18%),transparent)}
-.cal-chip.is-corey{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
-.cal-chip.is-corey.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
-.cal-chip.is-corey.is-ghost::after{border-color:color-mix(in srgb,var(--pastel-peach-ink) 60%,transparent)}
+.cal-chip.is-partner{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
+.cal-chip.is-partner.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
+.cal-chip.is-partner.is-ghost::after{border-color:color-mix(in srgb,var(--pastel-peach-ink) 60%,transparent)}
 .cal-mark{display:inline-block;width:14px;height:9px;position:relative;margin-right:3px;vertical-align:0}
 .cal-mark::before,.cal-mark::after{content:"";position:absolute;top:0;width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
 .cal-mark::before{left:0}.cal-mark::after{left:5px}
@@ -197,7 +197,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .k-task{--k-bg:var(--pastel-sage);--k-stripe:var(--cal-sage-stripe)}
 .k-health{--k-bg:var(--cal-health);--k-stripe:var(--cal-health-stripe)}
 .k-study{--k-bg:var(--pastel-gold);--k-stripe:var(--pastel-gold-ink)}
-.k-corey{--k-bg:var(--pastel-peach);--k-stripe:var(--pastel-peach-ink);--k-ink:var(--pastel-peach-ink)}
+.k-partner{--k-bg:var(--pastel-peach);--k-stripe:var(--pastel-peach-ink);--k-ink:var(--pastel-peach-ink)}
 
 /* ---------- chip popover ---------- */
 .cal-chip{cursor:pointer}

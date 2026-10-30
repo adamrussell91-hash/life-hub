@@ -7,10 +7,10 @@ const TODAY = '2026-09-24';
 const TERMS = [{ starts_on: '2026-07-21', ends_on: '2026-09-25' }, { starts_on: '2026-10-13', ends_on: '2026-12-17' }];
 // Adam's real anchors (central-node.md, 24/09/26).
 const ANCHORS = [
-  { id: 'korea', title: 'Korea honeymoon', kind: 'trip', date: '2026-12-23', returns: '2027-01-10', tags: ['international', 'pets-home-alone', 'on-biologic'] },
+  { id: 'big-trip', title: 'Overseas holiday', kind: 'trip', date: '2026-12-23', returns: '2027-01-10', tags: ['international', 'pets-home-alone', 'on-biologic'] },
   { id: 'solo-travel', title: 'Solo travel', kind: 'trip', date: '2026-12-01', returns: '2026-12-15', tags: ['undecided'] },
   { id: 'vitamin-d', title: 'Vitamin D recheck', kind: 'medical', window: { opens: addMonths('2026-06-19', 3), closes: addMonths('2026-06-19', 4) }, tags: ['bloods'] },
-  { id: 'unsw-conferral', title: 'UNSW conferral', kind: 'event', date: '2026-09-30', tags: ['graduation'] },
+  { id: 'conferral', title: 'Degree conferral', kind: 'event', date: '2026-09-30', tags: ['graduation'] },
   { id: 'term-4', title: 'Term 4', kind: 'term', date: '2026-10-13', tags: ['new-class'] },
   { id: 'dream-study', title: 'Dream', kind: 'dream', tags: ['dream'] }
 ];
@@ -34,14 +34,14 @@ test('step status thresholds', () => {
   assert.equal(stepStatus('2026-12-01', TODAY, { windowOpen: true }), 'now');
 });
 
-test('Korea: passport, pet sitter, Stelara plan and insurance, in last-safe order', () => {
+test('Overseas trip: passport, pet sitter, medication plan and insurance, in last-safe order', () => {
   const line = leadLine(ANCHORS[0], ALMANAC_RULES, ctx);
   assert.deepEqual(steps(line), [
     'passport@2026-10-23:soon', 'pet-sitter@2026-10-28:soon', 'medication-plan@2026-11-18:later', 'insurance@2026-12-02:later'
   ]);
   assert.equal(line.from, '2026-10-23');
   assert.equal(line.status, 'soon');
-  assert.equal(line.steps.find(s => s.ruleId === 'leave'), undefined, 'Korea starts after term, so no leave form');
+  assert.equal(line.steps.find(s => s.ruleId === 'leave'), undefined, 'The trip starts after term, so no leave form');
 });
 
 test('solo travel during term needs leave approval', () => {
@@ -67,7 +67,7 @@ test('dreams get a runway from absolute dates', () => {
 
 test('all lines: most urgent first, past anchors dropped, headline numbers', () => {
   const lines = leadLines([...ANCHORS, { id: 'old', title: 'Past', kind: 'event', date: '2026-09-01', tags: ['graduation'] }], ALMANAC_RULES, ctx);
-  assert.deepEqual(lines.map(l => l.anchor.id), ['unsw-conferral', 'vitamin-d', 'term-4', 'solo-travel', 'korea', 'dream-study']);
+  assert.deepEqual(lines.map(l => l.anchor.id), ['conferral', 'vitamin-d', 'term-4', 'solo-travel', 'big-trip', 'dream-study']);
   assert.deepEqual(almanacSummary(lines), { unbooked: 2, lastSafeSoon: 7 });
 });
 

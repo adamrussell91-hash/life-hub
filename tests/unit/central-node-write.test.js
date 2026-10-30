@@ -643,9 +643,9 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
     '### Medical Status',
     '- Entocort course completed. Now ceased.',
     '### Upcoming Appointments',
-    '- **7 Jul 2026 (11:00 AM):** Mary-anne Chamoun, Dietitian.',
-    '- **TBC:** Dr Monica Falk (Allergist, penicillin challenge)',
-    '- **TBC:** Dr Chris Keily follow-up (biologics review)',
+    '- **7 Jul 2026 (11:00 AM):** Pat Example, Dietitian.',
+    '- **TBC:** Dr Morgan Example (Allergist, penicillin challenge)',
+    '- **TBC:** Dr Rowan Pike follow-up (biologics review)',
     '- **20 Sep 2026:** Future keep.',
     '---',
     "## ⚡ Today's Status (Tuesday 8 September 2026)",
@@ -656,7 +656,7 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
     '- Key: keep this.',
     '---',
     '## 📊 This Month (September 2026)',
-    '- **TBC:** Dr Monica Falk (Allergist, penicillin challenge)',
+    '- **TBC:** Dr Morgan Example (Allergist, penicillin challenge)',
     '---',
     '## 📈 Long-Term Trends & Patterns',
     '- Entocort Day 38, Week 6 of 8. Taper to 6mg begins ~3 Apr.',
@@ -673,9 +673,9 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
 
   const next = sanitizeCentralNode(dirty, '2026-09-09');
   assert.doesNotMatch(next, /penicillin challenge/i);
-  assert.doesNotMatch(next, /Mary-anne Chamoun/);
+  assert.doesNotMatch(next, /Pat Example/);
   assert.match(next, /Future keep/);
-  assert.match(next, /Dr Chris Keily/);
+  assert.match(next, /Dr Rowan Pike/);
   assert.doesNotMatch(next, /30 Jul session completed/);
   assert.match(next, /8 Sep AC quiet today/);
   assert.doesNotMatch(next, /1,578 kcal/);

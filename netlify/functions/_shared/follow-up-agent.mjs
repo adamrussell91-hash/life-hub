@@ -41,7 +41,7 @@ export function proposeFollowUpSchema() {
         domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
         person_ref: { type: 'string' },
         notes: { type: 'string' },
-        with: { type: 'string', description: 'Companion for outing/protect (e.g. corey).' }
+        with: { type: 'string', description: 'Companion for outing/protect (e.g. partner).' }
       },
       required: ['summary', 'title'],
       additionalProperties: false

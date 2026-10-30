@@ -16,19 +16,19 @@
 export const FACES = Object.freeze([
   { id: 'tool', title: 'Tool watch', when: 'Auto on school days', comps: ['weather', 'bezel', 'moon'] },
   { id: 'focus', title: 'Focus', when: 'Auto while a work session you started is running', comps: ['retro', 'bezel'] },
-  { id: 'pilot', title: 'Pilot GMT', when: 'Auto when a trip is on', comps: ['gmt', 'corey', 'bezel'] },
+  { id: 'pilot', title: 'Pilot GMT', when: 'Auto when a trip is on', comps: ['gmt', 'partner', 'bezel'] },
   { id: 'dress', title: 'Dress watch', when: 'Auto on weekends and holidays', comps: [] },
   { id: 'grand', title: 'Grand complication', when: 'Auto on a big day (wedding, ceremony, graduation, anniversary)', comps: ['bezel', 'moon', 'tourbillon', 'gmt', 'countdown'] }
 ]);
 
 export const COMPLICATIONS = Object.freeze({
   weather: { name: 'Weather ring', watch: 'the quiet band', text: 'Hour-by-hour readiness, coloured by condition. Solid behind the hand, softer ahead. Today only.' },
-  bezel: { name: 'Dive bezel', watch: 'dive watch', text: 'The outer ring. The pip is when you logged the dexy dose; the band is its usual window, solid for time gone, orange for the last 45 minutes.' },
+  bezel: { name: 'Dive bezel', watch: 'dive watch', text: 'The outer ring. The pip is when you logged the medication dose; the band is its usual window, solid for time gone, orange for the last 45 minutes.' },
   moon: { name: 'Moon phase', watch: 'moonphase', text: 'Under the number. How full the week is: new moon in a quiet week, full moon when it is all happening at once.' },
   tourbillon: { name: 'Tourbillon', watch: 'haute horlogerie', text: 'Under the number. Spins while Clare or Hammond has a change to your day waiting.' },
   retro: { name: 'Retrograde tally', watch: 'retrograde', text: 'Sweeps one step for each task you close today, and snaps back at midnight.' },
   gmt: { name: 'GMT hand', watch: 'pilot / GMT', text: 'A second 24-hour hand for the other place: where the trip is. The dial itself stays on Sydney time.' },
-  corey: { name: 'Corey hand', watch: 'second time zone', text: 'Corey’s evening at home, shaded on the rim, with a C where Corey is now.' },
+  partner: { name: 'Partner hand', watch: 'second time zone', text: 'Partner’s evening at home, shaded on the rim, with a P where Partner is now.' },
   countdown: { name: 'Countdown plaque', watch: 'regatta', text: 'Time to the big event, engraved under the dial so the face stays clear.' }
 });
 

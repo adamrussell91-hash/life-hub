@@ -3,7 +3,7 @@
 > Revised brief (29/09/26). It starts from ChatGPT Astra's "context-aware, ADHD-aware
 > assistant" brief and keeps its honesty rules and its Friday acceptance test word for
 > word in spirit. It changes three things: **you see the day before anyone asks you
-> about it**, **questions are batched onto the train home**, and **dexamphetamine timing
+> about it**, **questions are batched onto the train home**, and **ADHD medication timing
 > is a first-class input**. All of it is in scope; the order below is build order, not a
 > wishlist.
 
@@ -49,7 +49,7 @@ point, there is no prompt.
 **Week (Tideline)**
 
 - **"What this day costs you"** under each day header: `63% forecast · 4½ h booked · move Marking to Fri (74%) keeps your evening`. The clause is a link that highlights the ghost that would do it.
-- **Ghost time-blocks** for open tasks with estimates, placed into the best-capacity free slots before the due date (extends the 05:30 deadline-runway ghosts from 48 h to the whole runway). Max one or two a day. Never into Corey or walls. Never on days forecast under 40%.
+- **Ghost time-blocks** for open tasks with estimates, placed into the best-capacity free slots before the due date (extends the 05:30 deadline-runway ghosts from 48 h to the whole runway). Max one or two a day. Never into Partner or walls. Never on days forecast under 40%.
 - Same textures as the dial on the bands, so the week reads the same way.
 - The Due row carries the bookmark's first words and the count progress ("16 of 28 reports").
 
@@ -73,7 +73,7 @@ reduced-motion parity, every shape has an aria-label and a keyboard route.
 During the day, prompts are limited to: a fixed event about to interrupt a bookmarked
 block (one tap: "Add bookmark"), a leave-by threshold, and anything you started yourself.
 
-### 3.3 Dexamphetamine as a first-class input
+### 3.3 ADHD medication as a first-class input
 
 You have said the timing may be shared with all agents and that a missed dose drives
 night-time binge eating. So:

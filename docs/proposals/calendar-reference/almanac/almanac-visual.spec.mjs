@@ -75,15 +75,15 @@ test('almanac phase 2: summary, lead lines and openings come from the modules', 
     const n = id => page.locator(`[data-part="stat-${id}"] .alm-top__n`).textContent();
     assert.deepEqual([await n('unbooked'), await n('soon'), await n('openings')], ['2', '7', '4']);
     assert.deepEqual(await page.locator('[data-part="lead-line"]').evaluateAll(ns => ns.map(x => x.getAttribute('data-anchor'))),
-      ['unsw-conferral', 'vitamin-d', 'term-4', 'solo-travel', 'korea', 'dream-study'], 'most urgent first');
+      ['conferral', 'vitamin-d', 'term-4', 'solo-travel', 'big-trip', 'dream-study'], 'most urgent first');
     const st = await statuses(page);
     assert.equal(st['vitamin-d:book-recheck'], 'now', 'window open, nothing booked');
-    assert.equal(st['unsw-conferral:gown'], 'now');
-    assert.equal(st['korea:passport'], 'soon');
+    assert.equal(st['conferral:gown'], 'now');
+    assert.equal(st['big-trip:passport'], 'soon');
     assert.equal(st['solo-travel:leave'], 'later');
-    assert.equal(st['korea:leave'], undefined, 'Korea starts after term: no leave step');
+    assert.equal(st['big-trip:leave'], undefined, 'The trip starts after term: no leave step');
     assert.deepEqual(await page.locator('[data-part="opening"]').evaluateAll(ns => ns.map(x => x.getAttribute('data-want'))),
-      ['good-night', 'keep-empty', 'bob', 'newcastle', 'korean']);
+      ['good-night', 'keep-empty', 'bob', 'newcastle', 'phrasebook']);
     assert.match(await page.locator('[data-want="good-night"] .alm-open__when').textContent(), /Fri 02\/10 · 6–10 pm\s*84%/);
     assert.match(await page.locator('[data-want="newcastle"] .alm-open__when').textContent(), /Mon 05 – Tue 06\/10/);
     const worldExamples = await page.locator('.alm-t-sub').allTextContents();
@@ -144,7 +144,7 @@ test('almanac phase 3: lead lines draw back from their anchors, beads pop, the t
   const { context, page } = await open({ settle: 0 });
   try {
     const frames = await page.evaluate(async () => {
-      const rail = () => Number(document.querySelector('[data-anchor="korea"] .alm-rail').getAttribute('x1'));
+      const rail = () => Number(document.querySelector('[data-anchor="big-trip"] .alm-rail').getAttribute('x1'));
       const clip = () => Number(document.querySelector('#alm-reveal rect').getAttribute('width'));
       const out = [];
       const t0 = performance.now();
@@ -152,7 +152,7 @@ test('almanac phase 3: lead lines draw back from their anchors, beads pop, the t
       return out;
     });
     const rails = frames.map(f => f.rail);
-    for (let i = 1; i < rails.length; i++) assert.ok(rails[i] <= rails[i - 1] + 0.01, 'the Korea line only grows backwards');
+    for (let i = 1; i < rails.length; i++) assert.ok(rails[i] <= rails[i - 1] + 0.01, 'the trip line only grows backwards');
     assert.ok(new Set(rails.map(v => v.toFixed(1))).size >= 8, 'a drawn line, not a jump');
     const chartW = await page.locator('[data-part="chart"]').evaluate(n => Number(n.getAttribute('width')));
     assert.ok(frames.at(-1).clip >= chartW - 1, 'the tide chart is fully revealed');
@@ -164,8 +164,8 @@ test('almanac phase 3: reduced motion lands everything at once', async () => {
   const { context, page } = await open({ reducedMotion: 'reduce', settle: 0 });
   try {
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const x1 = await page.locator('[data-anchor="korea"] .alm-rail').evaluate(n => Number(n.getAttribute('x1')));
-    const from = await page.locator('[data-anchor="korea"] .alm-rail').evaluate(n => Number(n.dataset.from));
+    const x1 = await page.locator('[data-anchor="big-trip"] .alm-rail').evaluate(n => Number(n.getAttribute('x1')));
+    const from = await page.locator('[data-anchor="big-trip"] .alm-rail').evaluate(n => Number(n.dataset.from));
     assert.ok(Math.abs(x1 - from) < 1);
   } finally { await context.close(); }
 });
@@ -175,17 +175,17 @@ test('almanac phase 3: reduced motion lands everything at once', async () => {
 test('almanac phase 4: a step previews its write, becomes a task, or is marked done', async () => {
   const { context, page, posts } = await open();
   try {
-    await page.locator('[data-step="korea:pet-sitter"]').click();
+    await page.locator('[data-step="big-trip:pet-sitter"]').click();
     const pop = page.locator('[data-part="popover"]');
     await pop.waitFor({ state: 'visible' });
     assert.match(await pop.textContent(), /Last safe day 28\/10\/26 · 34 days left/);
-    assert.match(await pop.locator('[data-part="write-preview"]').textContent(), /Hammond → Tasks: “Pet sitter for Leo, Maxxie, SJ & Hunter”, due 28\/10\/26 \(the last safe day\)\./);
+    assert.match(await pop.locator('[data-part="write-preview"]').textContent(), /Hammond → Tasks: “Pet sitter for the animals”, due 28\/10\/26 \(the last safe day\)\./);
     await shot(page, 'almanac-popover-1280');
     await pop.getByRole('button', { name: 'Add as task' }).click();
     await page.waitForTimeout(700);
     assert.match(await page.locator('[data-part="toast"]').textContent(), /Written\. Hammond → Tasks/);
-    assert.match(await page.locator('[data-step="korea:pet-sitter"]').getAttribute('class'), /is-tasked/);
-    if (APP) assert.deepEqual(posts.at(-1), { id: 'alm-korea:pet-sitter', decision: 'accept' });
+    assert.match(await page.locator('[data-step="big-trip:pet-sitter"]').getAttribute('class'), /is-tasked/);
+    if (APP) assert.deepEqual(posts.at(-1), { id: 'alm-big-trip:pet-sitter', decision: 'accept' });
     await page.locator('[data-step="vitamin-d:book-recheck"]').click();
     await pop.getByRole('button', { name: 'Already done' }).click();
     await page.waitForTimeout(600);
@@ -194,7 +194,7 @@ test('almanac phase 4: a step previews its write, becomes a task, or is marked d
   } finally { await context.close(); }
 });
 
-test('almanac phase 4: openings hold time for Corey and draft messages that are never sent', async () => {
+test('almanac phase 4: openings hold time for Partner and draft messages that are never sent', async () => {
   const { context, page, posts } = await open();
   try {
     await page.locator('[data-want="bob"] [data-act="draft"]').click();
@@ -203,7 +203,7 @@ test('almanac phase 4: openings hold time for Corey and draft messages that are 
     assert.match(await page.locator('[data-part="toast"]').textContent(), /Draft ready for Bob\. Nothing sent\./);
     await page.locator('[data-want="good-night"] [data-act="hold"]').click();
     await page.waitForTimeout(800);
-    assert.match(await page.locator('[data-part="toast"]').textContent(), /with Corey, Fri 02\/10 6:00 pm–10:00 pm, tentative and protected/);
+    assert.match(await page.locator('[data-part="toast"]').textContent(), /with Partner, Fri 02\/10 6:00 pm–10:00 pm, tentative and protected/);
     assert.match(await page.locator('[data-want="good-night"]').getAttribute('class'), /is-held/);
     if (APP) assert.ok(posts.every(p => Object.keys(p).sort().join() === 'decision,id'), 'only { id, decision } leaves the browser');
     await shot(page, 'almanac-held-1280');

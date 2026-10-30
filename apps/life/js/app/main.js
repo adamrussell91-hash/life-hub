@@ -64,6 +64,7 @@ import { SKINCARE_ROUTINES, currentRoutineKey } from './skincare-routines-data.j
 import { renderSkincare } from './render-skincare.js';
 import { createAesthetics } from './aesthetics/render-aesthetics.js';
 import { createWatchRadarApi } from './watch-radar-api.js';
+import { createAestheticsSourceApi } from './aesthetics-source-api.js';
 import { buildCalendarModel } from './calendar-model.js';
 import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
@@ -240,7 +241,7 @@ controller = createAppController({
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
-  aesthetics: createAesthetics(document, { watchRadarApi: createWatchRadarApi(fetchImpl) }),
+  aesthetics: createAesthetics(document, { watchRadarApi: createWatchRadarApi(fetchImpl), sourceApi: createAestheticsSourceApi(fetchImpl) }),
   buildCalendarModel,
   renderCalendar,
   chatApi,

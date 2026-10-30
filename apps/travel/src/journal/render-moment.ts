@@ -16,7 +16,7 @@ import {
   momentHasPhotoAnnotations,
   regionSvgAttrs,
 } from '@/journal/annotations';
-import { resolveMomentAuthor } from '@/journal/corey-perspective';
+import { resolveMomentAuthor } from '@/journal/partner-perspective';
 import { bindDismissableMenu } from '@/journal/menu-dismiss';
 import { isAudioMedia } from '@/journal/transcripts';
 import { journalAudioSrc } from '@/journal/media-loading';
@@ -387,16 +387,16 @@ export function renderMomentArticle(
 ): HTMLElement {
   const article = document.createElement('article');
   article.className = 'journal-moment';
-  if (resolveMomentAuthor(moment) === 'corey') {
-    article.classList.add('journal-moment--corey');
+  if (resolveMomentAuthor(moment) === 'partner') {
+    article.classList.add('journal-moment--partner');
   }
   article.id = moment.id;
   article.setAttribute('data-journal-moment', moment.id);
 
-  if (resolveMomentAuthor(moment) === 'corey') {
+  if (resolveMomentAuthor(moment) === 'partner') {
     const badge = document.createElement('p');
-    badge.className = 'journal-moment__corey-badge';
-    badge.textContent = "Corey's perspective — not your words";
+    badge.className = 'journal-moment__partner-badge';
+    badge.textContent = "Partner's perspective — not your words";
     article.append(badge);
   }
 

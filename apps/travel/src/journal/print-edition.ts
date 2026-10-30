@@ -3,7 +3,7 @@ import {
   filterMomentsForPerspectiveDisplay,
   formatAuthorshipExportLabel,
   resolveMomentAuthor,
-} from '@/journal/corey-perspective';
+} from '@/journal/partner-perspective';
 import { formatMediaAnnotationsPlainText, getMediaPhotoAnnotations } from '@/journal/annotations';
 import { isFixtureMediaUrl, journalMediaDerivativeUrl } from '@/journal/media-loading';
 import { transitionForFromLeg } from '@/journal/transitions';
@@ -101,7 +101,7 @@ export const JOURNAL_PRINT_CSS = `
 export interface JournalPrintEditionOptions {
   tripId: string;
   title?: string;
-  showCoreyPerspective?: boolean;
+  showPartnerPerspective?: boolean;
 }
 
 function escapeHtml(text: string): string {
@@ -191,7 +191,7 @@ export function renderJournalPrintBody(
   options: JournalPrintEditionOptions,
 ): string {
   const tripId = options.tripId;
-  const showCorey = options.showCoreyPerspective !== false;
+  const showPartner = options.showPartnerPerspective !== false;
   const mediaById = new Map(journal.media.map((m) => [m.id, m]));
   const legs = [...journal.legs]
     .filter((l) => l.lifecycle === 'live')
@@ -227,7 +227,7 @@ export function renderJournalPrintBody(
               m.local_date === day.local_date,
           )
           .sort((a, b) => a.display_order - b.display_order),
-        showCorey,
+        showPartner,
       );
 
       if (day.empty_marker && moments.length === 0) {

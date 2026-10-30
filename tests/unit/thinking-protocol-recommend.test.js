@@ -41,7 +41,7 @@ test('screenshot: recomposition "which thinking protocol" is Mirror Council, not
 test('screenshot: open "what thinking protocol" on stay-vs-leave / HPGE is Horizon Council, not Direction Session', () => {
   const pick = recommendThinkingProtocol({
     message: "I want to do a thinking protocol but I don't know what one to do or what to do it on. What is your suggestion?",
-    context: "The stay-vs-leave / HPGE direction thread. Possible leadership role at Corey's school, staying put, or the Department of Ed. Grief layer — family, unlived life — and a flake label distorting both options."
+    context: "The stay-vs-leave / HPGE direction thread. Possible leadership role at Partner's school, staying put, or the Department of Ed. Grief layer — family, unlived life — and a flake label distorting both options."
   });
   assert.equal(pick.id, 'horizon');
   assert.equal(pick.name, 'The Horizon Council');

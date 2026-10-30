@@ -8,12 +8,12 @@ const CHIPS = [
   { id: 'class-p1', start: 8 + 40 / 60, end: 9 + 35 / 60, kind: 'teaching', title: 'Y12 English Adv', isClass: true },
   { id: 'gastro', start: 13.25, end: 14.25, kind: 'health', title: 'Gastroenterologist follow-up', meta: '1:15 pm' },
   { id: 'thu-workout', start: 18.25, end: 19 + 25 / 60, kind: 'fitness', title: 'Workout · upper body', meta: 'Chadwick’s plan' },
-  { id: 'thu-corey', start: 19.5, end: 21.5, kind: 'corey', title: 'Tea + TV with Corey', protected: true }
+  { id: 'thu-partner', start: 19.5, end: 21.5, kind: 'partner', title: 'Tea + TV with Partner', protected: true }
 ];
 const GHOSTS = [
   { id: 'g-skip', agent: 'sara', kind: 'skip_workout', date: '2026-09-24', label: 'Skip workout', overItem: 'thu-workout' },
   { id: 'g-bed', agent: 'sara', kind: 'bedtime', date: '2026-09-24', time: '22:00', reason: '5.4 h last night', label: 'Lights out 10:00' },
-  { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-josh-y10', label: '→ T4 W1' }
+  { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-student-y10', label: '→ T4 W1' }
 ];
 const LOGS = [
   { type: 'meal', date: '2026-09-24', meal: 'breakfast', time: '07:10' },
@@ -34,7 +34,7 @@ test('tonight: 3 h 55 m left, and what fills it', () => {
   assert.equal(t.timeLeft.label, '3 h 55 m that’s yours'.replace('’', "'"));
   assert.equal(t.timeLeft.until, '10:00 pm');
   assert.equal(t.timeLeft.by, 'Sara');
-  assert.deepEqual(t.rows.map(r => r.title), ['Workout · upper body', 'Dinner', 'Tea + TV with Corey', 'Wind down → lights out 10:00 pm']);
+  assert.deepEqual(t.rows.map(r => r.title), ['Workout · upper body', 'Dinner', 'Tea + TV with Partner', 'Wind down → lights out 10:00 pm']);
   const workout = t.rows[0];
   assert.equal(workout.ghostId, 'g-skip');
   assert.equal(workout.suggestion, 'Sara: skip workout');
@@ -91,7 +91,7 @@ test('tomorrow: the PD, the task with Hammond’s move, and the holidays after',
       { id: 'c3', start: 10.83, end: 11.75, kind: 'teaching', title: 'Y11 English Adv', isClass: true },
       { id: 'c5', start: 13.33, end: 14.25, kind: 'teaching', title: 'Y12 English Adv', isClass: true }
     ],
-    due: [{ id: 'task-josh-y10', title: 'Find out about Year 10 leadership opportunities for Josh Lizzio' }],
+    due: [{ id: 'task-student-y10', title: 'Find out about Year 10 leadership opportunities for Sam Example' }],
     ghosts: GHOSTS,
     capacity: { pct: 52, forecast: true },
     tag: { text: 'Last day T3' },

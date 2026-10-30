@@ -13,14 +13,14 @@ import { actualSpans, dayCost } from './day-sense.js';
 
 const DAY_MS = 86_400_000;
 const LOG_TYPES = new Set(['meal', 'diary', 'sleep', 'skincare', 'heart', 'weight', 'composition', 'measurements', 'bloods', 'fragrance', 'medication', 'work_session']);
-const SOURCE_ORDER = ['teaching', 'professional', 'task', 'health', 'fitness', 'corey', 'study'];
+const SOURCE_ORDER = ['teaching', 'professional', 'task', 'health', 'fitness', 'partner', 'study'];
 const SOURCE_LABEL = {
   teaching: 'Teaching',
   professional: 'Professional',
   task: 'Tasks',
   health: 'Health',
   fitness: 'Fitness',
-  corey: 'Corey',
+  partner: 'Partner',
   study: 'Study'
 };
 const SUBS = {
@@ -116,7 +116,7 @@ function eventKind(record) {
   if (record.type === 'workout') return 'fitness';
   if (record.type === 'medical') return 'health';
   if (record.type === 'calendar_block') {
-    if (record.kind === 'corey') return 'corey';
+    if (record.kind === 'partner') return 'partner';
     if (record.kind === 'focus') return 'study';
     if (record.kind === 'workout') return 'fitness';
     // plan (outing / meal_block) and rest → health chip
@@ -184,7 +184,7 @@ export function chipFromEvent(event) {
           ? (record.type === 'professional_meeting' ? 'meetings' : 'pd')
           : kind === 'task'
             ? 'tasks'
-            : kind === 'health' || kind === 'fitness' || kind === 'corey' || kind === 'social' || kind === 'family'
+            : kind === 'health' || kind === 'fitness' || kind === 'partner' || kind === 'social' || kind === 'family'
               ? kind
               : null;
   const feedMeta = record.feed && record.location ? `${clockMeta(start, end)} · ${record.location}` : null;
@@ -214,7 +214,7 @@ export function chipFromEvent(event) {
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
     meta: workout?.meta ?? feedMeta ?? peopleMeta ?? [done ? `Done · ${classMeta}` : classMeta, also].filter(Boolean).join(' · '),
     isClass,
-    protected: record.protected === true || kind === 'corey',
+    protected: record.protected === true || kind === 'partner',
     provider: record.provider || record.clinician || '',
     source: record.type,
     filterKey,

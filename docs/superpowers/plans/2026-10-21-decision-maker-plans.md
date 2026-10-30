@@ -1,7 +1,7 @@
 # Decision Maker: plan set
 
 Spec: `docs/superpowers/specs/2026-10-21-decision-book-design.md`.
-Branch: `claude/decision-book`, worktree `/Users/adamrussell/Projects/life-hub-decision-book`.
+Branch: `claude/decision-book`, worktree `/Users/you/Projects/life-hub-decision-book`.
 
 There are seven plans and **one PR**, opened at the end of Plan 7 with auto-merge, following the "Minimise PRs" rule. Each plan is written in full, with exact code, only once the plan before it has landed. Each one builds on real code rather than guesses, which is how Problem Solver's Plans 1–9 were run.
 

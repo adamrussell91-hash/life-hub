@@ -4,14 +4,17 @@ import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesthetics.js';
 import { fragrancePhotoUrl } from '../../apps/life/js/app/aesthetics/fragrance-photos.js';
-import { FRAGRANCES, REFERENCE_FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
+import { FRAGRANCES, REFERENCE_FRAGRANCES, setFragranceSource } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
+
+// The real library is private; tests run on a small synthetic fixture.
+setFragranceSource(JSON.parse(readFileSync(new URL('../fixtures/aesthetics/fragrance-source.json', import.meta.url), 'utf8')));
 
 // No bundled bottle photo yet.
 const NO_PHOTO = new Set(['Tea Soirée']);
 
 test('recommendations use exact source names, perfumers and recorded note tiers', () => {
   assert.ok(FRAGRANCES.some(f => f.name === 'Asad Zanzibar Limited Edition'));
-  assert.equal(FRAGRANCES.find(f => f.name === 'Milk Orchid').perfumer, 'Emma / Perfumerism x Commodity');
+  assert.equal(FRAGRANCES.find(f => f.name === 'Milk Orchid').perfumer, 'Fixture Perfumer');
   assert.deepEqual(FRAGRANCES.find(f => f.name === 'Syzygy').notes, ['Bergamot', 'Raspberry', 'Oud', 'Norlimbanol', 'Musk', 'Ambroxan']);
   assert.deepEqual(FRAGRANCES.find(f => f.name === 'Verge').notes, [], 'no invented pyramid when Notion only records a review');
 });
@@ -41,34 +44,33 @@ test('the full source name preserves previously logged wear and compliments', ()
 
 test('Scent exposes every full tracker record, including zero values and page-only notes', () => {
   const doc = render();
-  assert.equal(doc.querySelectorAll('#aes-library [data-fragrance-id]').length, 53);
+  assert.equal(doc.querySelectorAll('#aes-library [data-fragrance-id]').length, FRAGRANCES.length);
   const versace = [...doc.querySelectorAll('#aes-library details')].find(el => el.querySelector('summary')?.textContent.includes('Versace Pour Homme'));
   assert.equal(versace.querySelector('[data-source-field="Price (AUD)"]').textContent, '$0.00');
   assert.equal(versace.querySelector('[data-source-field="Compliments"]').textContent, '0');
   const text = doc.querySelector('#aes-library').textContent;
-  assert.match(text, /Maybe I was wrong about the longevity/);
-  assert.match(text, /I LOVE the dry down on this/);
-  assert.match(text, /detectable freshness, definitely cypress like green sap/);
+  assert.match(text, /Follow up: the drydown is the best part/);
+  assert.match(text, /no pyramid recorded for this one/);
+  assert.match(text, /Synthetic page note: cypress and vetiver/);
   assert.match(text, /Asad Zanzibar Limited Edition/);
 });
 
-test('Dress exposes all seven summary sections and the complete transcript with source links', () => {
+test('Dress exposes every summary section and the complete transcript with source links', () => {
   const doc = render();
-  assert.equal(doc.querySelectorAll('#aes-style-notes [data-style-section]').length, 7);
+  assert.equal(doc.querySelectorAll('#aes-style-notes [data-style-section]').length, 2);
   const text = doc.querySelector('#aes-style-notes').textContent;
-  assert.match(text, /Collar \+ tie \+ lapel proportions/);
-  assert.match(text, /Build to at least five pieces/);
-  assert.match(text, /Olive khaki with white feels clean/);
-  assert.match(text, /shirt's collar should be proportionate to the size of your face/);
-  assert.match(text, /Intentional pieces will help make your outfit look intentional and dynamic instead of uninspired and boring/);
-  assert.ok(doc.querySelector('#aes-style-notes a[href*="392f794f8476802ea9f9d06c30e34694"]'));
+  assert.match(text, /Colour pairings/);
+  assert.match(text, /Build every outfit to at least five pieces/);
+  assert.match(text, /Camel with cream reads relaxed/);
+  assert.match(text, /Add a fifth piece and the outfit looks finished/);
+  assert.ok(doc.querySelector('#aes-style-notes a[href*="notes.example/style#pairings"]'));
 });
 
 
 test('photos appear in the shelf, full records, selected scent and Today without losing interactions', () => {
   const doc = render();
   assert.equal(doc.querySelectorAll('#aes-shelf img').length, FRAGRANCES.filter(f => f.status === 'Owned' && !NO_PHOTO.has(f.name)).length);
-  assert.equal(doc.querySelectorAll('#aes-library summary img').length, 52);
+  assert.equal(doc.querySelectorAll('#aes-library summary img').length, FRAGRANCES.filter(f => !NO_PHOTO.has(f.name)).length);
   assert.match(doc.querySelector('#aes-mapcard img').src, /criminal-elements-neon\.webp$/);
   assert.equal(doc.querySelectorAll('#aes-today-bottle img').length, 1);
   doc.querySelector('#aes-reroll').click();

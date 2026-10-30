@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-26-group-sets-design.md`
 
-**Worktree:** `/Users/adamrussell/Projects/life-hub-group-sets`, branch `claude/group-sets`. Run every command from there.
+**Worktree:** `/Users/you/Projects/life-hub-group-sets`, branch `claude/group-sets`. Run every command from there.
 
 **Test commands:**
 - Server: `node --import ./scripts/test-network-guard.mjs --test tests/unit/<file>.test.js`

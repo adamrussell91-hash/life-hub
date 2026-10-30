@@ -4,8 +4,8 @@ import type { AssessmentRecord, UnitRecord } from "./types";
 
 const unit: UnitRecord = {
   id: "unit",
-  title: "EDST5448 - Educational Research",
-  code: "EDST5448",
+  title: "SMPL5448 - Sample Research Methods",
+  code: "SMPL5448",
   status: "completed",
   start: "2025-02-10",
   end: "2025-11-27",
@@ -26,7 +26,7 @@ function assessment(partial: Partial<AssessmentRecord>): AssessmentRecord {
     gpaPoints: null,
     grade: null,
     description: null,
-    unitNumber: "EDST5448",
+    unitNumber: "SMPL5448",
     ...partial,
   };
 }

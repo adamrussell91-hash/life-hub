@@ -50,13 +50,13 @@ describe('groupRoom', () => {
   });
 
   it('matches a duplicate copy to its directory row by name when exactly one row has it', () => {
-    const students = [...directory, row('shared:person:student-rohan', 'Rohan Arianayagam', null, 'warm')];
-    const room = groupRoom([{ ref: 'shared:person:blob-twin', role: null, name: 'Rohan Arianayagam' }], students, new Date('2026-09-24T08:00:00.000Z'));
-    expect(room[0]!.people[0]).toMatchObject({ name: 'Rohan Arianayagam', warmthDots: 3, known: true });
+    const students = [...directory, row('shared:person:student-rohan', 'Rohan Examplar', null, 'warm')];
+    const room = groupRoom([{ ref: 'shared:person:blob-twin', role: null, name: 'Rohan Examplar' }], students, new Date('2026-09-24T08:00:00.000Z'));
+    expect(room[0]!.people[0]).toMatchObject({ name: 'Rohan Examplar', warmthDots: 3, known: true });
   });
 
   it('marks students so the room can colour their initials apart from colleagues', () => {
-    const withStudent = [...directory, { ...row('shared:person:student-rohan', 'Rohan Arianayagam', null, 'warm'), person_type: 'student' as const }];
+    const withStudent = [...directory, { ...row('shared:person:student-rohan', 'Rohan Examplar', null, 'warm'), person_type: 'student' as const }];
     const room = groupRoom(
       [
         { ref: 'shared:person:student-rohan', role: null },

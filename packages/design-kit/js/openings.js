@@ -3,7 +3,7 @@
  * anything else can take them.
  *
  * Pure. The view passes one entry per day (capacity from capacity-model.js, free hours
- * from the calendar) and a list of wants in priority order. Corey comes first in the
+ * from the calendar) and a list of wants in priority order. Partner comes first in the
  * default wants because About Me says he outranks every tie-break.
  *
  * Day: { date, pct, holiday?, weekday (0 Sun .. 6 Sat), freeEvening, freeDay, walled?, tags?: string[] }

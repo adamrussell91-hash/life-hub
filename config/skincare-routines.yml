@@ -1,23 +1,14 @@
+# Neutral template. The live AM/PM routine lives only in the private data repo's
+# config/skincare-routines.yml (server cold-start seed) and its data/skincare/
+# product library + routine membership. Do not list real products here.
 am:
   label: Morning routine
   duration_hint: ~20 min
-  products:
-    - Azclear Azelaic Acid 20%
-    - Korres Greek Yoghurt Probiotic Gel Cream
-    - La Roche Posay Anthelios SPF 50+
-    - Dr Jart+ Cicapair Colour Corrector
-    - Maybelline Green and Peach Correctors with BareMinerals Concealer
-    - Kosas Cloud Set Translucent Loose Setting and Blurring Powder
+  products: []
 pm:
   label: Evening routine
   duration_hint: ~20 min
-  products:
-    - Dr.G Green Deep Pore Cleansing Balm
-    - Korres Greek Yoghurt Foaming Cream Cleanser
-    - Toner
-    - Retrieve Tretinoin 0.05% (sandwich method)
-    - La Roche Posay Cicaplast B5+
-    - Avene Cicalfate+
+  products: []
 extras:
   - Sheet mask
 note_chips:

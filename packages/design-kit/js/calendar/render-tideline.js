@@ -766,7 +766,7 @@ function mountHead(grid, date) {
   if (day.symptom) bits.push(`<span class="is-symptom">● ${day.symptom}</span>`);
   if (day.med?.summary) {
     const flagged = day.med.doses.some((dose) => dose.status === 'skipped' || dose.late);
-    bits.push(`<span class="cal-vit__med${flagged ? ' is-flag' : ''}" title="Dexy · ${escapeHtml(day.med.summary)}">${ICON.pill}${escapeHtml(day.med.summary)}</span>`);
+    bits.push(`<span class="cal-vit__med${flagged ? ' is-flag' : ''}" title="Medication · ${escapeHtml(day.med.summary)}">${ICON.pill}${escapeHtml(day.med.summary)}</span>`);
   }
   el('div', 'cal-vit', bits.join('') || '<span>nothing logged yet</span>', chips, { 'data-part': 'vitals' });
   nodes.set(`colhead:${date}`, head);
@@ -1018,7 +1018,7 @@ function mountChip(body, chip) {
   const classes = ['cal-chip', `k-${chip.kind}`];
   if (chip.isClass) classes.push('is-class');
   if (chip.skipped) classes.push('is-skipped');
-  if (chip.kind === 'corey') classes.push('is-corey');
+  if (chip.kind === 'partner') classes.push('is-partner');
   if (chip.pin) classes.push('is-pin');
   if (chip.done) classes.push('is-done');
   else if (chip.ambient) classes.push('is-ambient');
@@ -1030,7 +1030,7 @@ function mountChip(body, chip) {
   if (tick) classes.push('has-tick');
   const title = tick
     ? `<span class="cal-chip__text">${chip.title}</span>`
-    : `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
+    : `${chip.kind === 'partner' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
   const agent = ghost ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span></span>` : '';
   const acts = ghost && ghost.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`

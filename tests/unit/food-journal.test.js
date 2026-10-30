@@ -821,7 +821,7 @@ test("merged notes show shared sections once, after the dishes", () => {
       "### Location",
       "Ibby's Burgers and Shakes",
       "### Shared with/occasion",
-      "Day outing with Corey!",
+      "Day outing with Partner!",
     ].join("\n");
   const notes = [
     part("The Cheese", "Smashed beef", "4.5/5 great"),
@@ -835,7 +835,7 @@ test("merged notes show shared sections once, after the dishes", () => {
     "Nashville Tenders", "Description", "Crispy fried", "Rating and recommendation", "4/5 very hot",
     "Oklahoma", "Description", "Double smashed beef", "Rating and recommendation", "4/5 was good",
     "Location", "Ibby's Burgers and Shakes",
-    "Shared with/occasion", "Day outing with Corey!",
+    "Shared with/occasion", "Day outing with Partner!",
   ]);
   // A single entry is unchanged.
   const one = noteBlocks(part("The Cheese", "Smashed beef", "4.5/5 great"));

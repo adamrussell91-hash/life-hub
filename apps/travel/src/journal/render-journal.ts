@@ -24,10 +24,10 @@ import { openSouvenirsCollection } from '@/journal/souvenirs-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
 import {
   filterMomentsForPerspectiveDisplay,
-  journalHasCoreyMoments,
-  readCoreyPerspectiveVisible,
-  writeCoreyPerspectiveVisible,
-} from '@/journal/corey-perspective';
+  journalHasPartnerMoments,
+  readPartnerPerspectiveVisible,
+  writePartnerPerspectiveVisible,
+} from '@/journal/partner-perspective';
 import { downloadJournalExportBundle, stripJournalForExport } from '@/journal/export-bundle';
 import { openJournalPrintEdition } from '@/journal/print-edition';
 import {
@@ -235,22 +235,22 @@ export function renderJournal(
     });
   }
 
-  let showCoreyPerspective = readCoreyPerspectiveVisible(liveFixture.trip_id);
+  let showPartnerPerspective = readPartnerPerspectiveVisible(liveFixture.trip_id);
 
   function orderedMomentsForView(): ReturnType<typeof orderedLiveMoments> {
     return filterMomentsForPerspectiveDisplay(
       orderedLiveMoments(liveFixture),
-      showCoreyPerspective,
+      showPartnerPerspective,
     );
   }
 
   const toolbar = renderToolbar({
     title: toolbarTitle(),
-    hasCoreyMoments: journalHasCoreyMoments(journalDoc()),
-    showCoreyPerspective,
-    onToggleCoreyPerspective: (next) => {
-      showCoreyPerspective = next;
-      writeCoreyPerspectiveVisible(liveFixture.trip_id, next);
+    hasPartnerMoments: journalHasPartnerMoments(journalDoc()),
+    showPartnerPerspective,
+    onTogglePartnerPerspective: (next) => {
+      showPartnerPerspective = next;
+      writePartnerPerspectiveVisible(liveFixture.trip_id, next);
       rebuildStory(true);
     },
     onAddMoment: () => openCapture(),
@@ -293,7 +293,7 @@ export function renderJournal(
       openJournalPrintEdition(stripJournalForExport(journalDoc()), {
         tripId: liveFixture.trip_id,
         title: toolbarTitle(),
-        showCoreyPerspective,
+        showPartnerPerspective,
       });
     },
     onShareJournal: () => {
@@ -513,7 +513,7 @@ export function renderJournal(
               m.local_date === day.local_date,
           )
           .sort((a, b) => a.display_order - b.display_order),
-        showCoreyPerspective,
+        showPartnerPerspective,
       );
 
       if (day.empty_marker && moments.length === 0) {

@@ -169,7 +169,7 @@ Floating positioning, accessible state machines, AI chat UX, structured tool UI,
 **Hubs:** All.  
 **Combines with:** Calendar projections, Knowledge `connected[]`, Tasks projects, Teaching classes.  
 **Why new:** Cross-hub today is projection + prose mail, not typed references.  
-**UX:** Open “Corey” → every diary/trip/task/lesson mention with provenance.  
+**UX:** Open “Partner” → every diary/trip/task/lesson mention with provenance.  
 **Plausibility:** Medium — entity resolution is the hard part.  
 **Upside:** Umbrella coherence.  
 **Complication:** Identity merge conflicts; privacy of people entities.
@@ -263,7 +263,7 @@ Floating positioning, accessible state machines, AI chat UX, structured tool UI,
 **Inspiration:** Constraint programming + decision analysis.  
 **Projects:** Google OR-Tools, MiniZinc, Timefold/OptaPlanner (mechanism quarry).  
 **Mechanism:** Hard/soft constraints → solver explores; human pins preferences; agent interprets.  
-**Inside Life Hub:** Week meal/workout/task load under Crohn’s + school bells + deadlines.  
+**Inside Life Hub:** Week meal/workout/task load under Condition A’s + school bells + deadlines.  
 **Hubs:** Life, Tasks, Teaching.  
 **Combines with:** Targets, CN Constraints, Clare, Ann sequencing.  
 **Why new:** Agents advise; solvers *search*.  
@@ -360,7 +360,7 @@ Floating positioning, accessible state machines, AI chat UX, structured tool UI,
 **Inspiration:** CRM dedupe + genealogy merge + DH NER.  
 **Projects:** Recogito NER; Gramps person merge patterns.  
 **Mechanism:** Extract candidate entities; propose merges with evidence; human Confirm.  
-**Inside Life Hub:** “Mary-anne Chamoun” across diary, CN, appointments, tasks.  
+**Inside Life Hub:** “Pat Example” across diary, CN, appointments, tasks.  
 **Hubs:** Life, Knowledge, Tasks.  
 **Combines with:** #5, calendar, capture tidy.  
 **Why new:** Names are strings today.  
@@ -401,7 +401,7 @@ Floating positioning, accessible state machines, AI chat UX, structured tool UI,
 
 **Inspiration:** Logistics / rostering.  
 **Projects:** Timefold/OR-Tools; personalise with Life hard rules.  
-**Mechanism:** Compose week under hard clinical + school-bell constraints; soft prefer spicy/Marley Spoon/etc.  
+**Mechanism:** Compose week under hard clinical + school-bell constraints; soft prefer spicy/meal kit/etc.  
 **Hubs:** Life, Tasks.  
 **Combines with:** `plan.week-meals`, school bells in CN, AEKE sessions.  
 **Why new:** Meal plan capability exists; *multi-domain constrained composition* does not.  
@@ -586,7 +586,7 @@ Floating positioning, accessible state machines, AI chat UX, structured tool UI,
 
 ### Constraint solvers (OR-Tools / Timefold)
 **Mechanism:** Hard/soft constraint search.  
-**Reinterpretation:** Week composition under Crohn’s + bells + deadlines.
+**Reinterpretation:** Week composition under Condition A’s + bells + deadlines.
 
 ### Video/NLE transport
 **Mechanism:** Scrubbing continuous media.  

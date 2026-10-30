@@ -149,14 +149,14 @@
     const events = [
       {
         record: {
-          type: 'medical', id: 'mrcp', date: '2026-09-26', title: 'MRCP — liver / bile ducts',
+          type: 'medical', id: 'imaging-scan', date: '2026-09-26', title: 'Imaging scan',
           record_type: 'Imaging', lane: 'imaging', weight: 'major', status: 'to_book', date_precision: 'tbd',
           notes: 'Ordered 24/09/26'
         }
       },
       {
         record: {
-          type: 'medical', id: 'colo', date: '2027-02-01', title: 'Colonoscopy',
+          type: 'medical', id: 'colo', date: '2027-03-15', title: 'Procedure',
           record_type: 'Surgery/Hospital', lane: 'hospital', weight: 'major', status: 'planned', date_precision: 'month'
         }
       },
@@ -168,9 +168,9 @@
       },
       {
         record: {
-          type: 'medical', id: 'gastro-mar', date: '2027-03-01', title: 'Gastro review',
+          type: 'medical', id: 'gastro-mar', date: '2027-04-15', title: 'Gastro review',
           record_type: 'Consultation', lane: 'appointment', weight: 'routine', status: 'planned', date_precision: 'month',
-          provider: 'Dr Chris Keily'
+          provider: 'Dr Rowan Pike'
         }
       },
       {
@@ -196,26 +196,26 @@
       },
       {
         record: {
-          type: 'medical', id: 'gastro', date: '2026-09-24', title: 'Gastro follow-up — biologics & liver',
-          record_type: 'Consultation', lane: 'appointment', weight: 'major', provider: 'Dr Chris Keily',
-          notes: 'Calprotectin 15 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Stelara; liver imaging next'
+          type: 'medical', id: 'gastro', date: '2026-09-24', title: 'Gastro follow-up — biologic review',
+          record_type: 'Consultation', lane: 'appointment', weight: 'major', provider: 'Dr Rowan Pike',
+          notes: 'Calprotectin 22 ↓ — GGT still main concern — Imaging scan ordered\n— Stay the course on Biologic; imaging next'
         }
       },
       {
         record: {
-          type: 'medical', id: 'kate', date: '2026-09-04', title: 'Therapy · Kate Semple',
-          record_type: 'Appointment', lane: 'therapy', weight: 'routine', provider: 'Kate Semple'
+          type: 'medical', id: 'avery', date: '2026-09-04', title: 'Therapy · Avery Quill',
+          record_type: 'Appointment', lane: 'therapy', weight: 'routine', provider: 'Avery Quill'
         }
       },
       {
         record: {
-          type: 'medical', id: 'hook', date: '2026-08-06', title: 'Dr Hook · My ADHD Centre',
-          record_type: 'Appointment', lane: 'appointment', weight: 'routine', provider: 'Dr Hook'
+          type: 'medical', id: 'lane', date: '2026-08-06', title: 'Dr Lane · ADHD clinic',
+          record_type: 'Appointment', lane: 'appointment', weight: 'routine', provider: 'Dr Lane'
         }
       },
       {
         record: {
-          type: 'medical', id: 'stelara', date: '2026-08-27', title: 'Stelara 90mg SC',
+          type: 'medical', id: 'biologic', date: '2026-08-27', title: 'Biologic dose SC',
           record_type: 'Prescription', lane: 'prescription', weight: 'major', cadence_days: 56,
           notes: 'first maintenance dose'
         }
@@ -230,9 +230,9 @@
         record: {
           type: 'bloods', id: 'bloods-1', date: '2026-09-17',
           markers: [
-            { key: 'ggt', label: 'GGT', value: 233, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 },
+            { key: 'ggt', label: 'GGT', value: 196, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 },
             { key: 'alt', label: 'ALT', value: 68, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 40 },
-            { key: 'calprotectin', label: 'Calprotectin', value: 15, status: 'Normal', unit: 'ug/g', ref_low: 0, ref_high: 50 },
+            { key: 'calprotectin', label: 'Calprotectin', value: 22, status: 'Normal', unit: 'ug/g', ref_low: 0, ref_high: 50 },
             { key: 'crp', label: 'CRP', value: 2, status: 'Normal', unit: 'mg/L', ref_low: 0, ref_high: 5 }
           ]
         }
@@ -241,7 +241,7 @@
         record: {
           type: 'bloods', id: 'bloods-0', date: '2026-05-19',
           markers: [
-            { key: 'calprotectin', label: 'Calprotectin', value: 244, status: 'High', unit: 'ug/g', ref_low: 0, ref_high: 50 },
+            { key: 'calprotectin', label: 'Calprotectin', value: 180, status: 'High', unit: 'ug/g', ref_low: 0, ref_high: 50 },
             { key: 'ggt', label: 'GGT', value: 180, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 }
           ]
         }

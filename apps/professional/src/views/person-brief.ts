@@ -58,7 +58,7 @@ function link(href: string, text: string, className?: string): HTMLAnchorElement
 const NAME_TITLES = new Set(['dr', 'mr', 'mrs', 'ms', 'miss', 'prof', 'professor']);
 
 /** Best-effort two-letter avatar initials — skips a leading honorific
- * ("Dr", "Prof", ...) so "Dr Vicky Leighton" reads as "VL", not "DV". */
+ * ("Dr", "Prof", ...) so "Dr Jane Example" reads as "JE", not "DJ". */
 function initialsFor(name: string): string {
   const words = name
     .split(/\s+/)

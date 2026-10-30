@@ -119,7 +119,7 @@ test('B3: cancelled calendar_block produces 0 chips and is skipped by term-river
     date: DATE,
     time: '09:00',
     end_time: '10:00',
-    kind: 'corey',
+    kind: 'partner',
     status: 'cancelled',
     protected: true,
     title: 'Breakfast at Cafe X'

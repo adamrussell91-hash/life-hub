@@ -219,7 +219,7 @@ git commit -m "feat: add resumable tidy archive backfill"
 - Test: `scripts/run-tidy-backfill.test.ts`
 
 **Interfaces:**
-- Produces command: `npm run tidy:backfill -- --data-dir /Users/adamrussell/Projects/knowledge-hub-data --model-limit 100 --batch-size 5`.
+- Produces command: `npm run tidy:backfill -- --data-dir /Users/you/Projects/knowledge-hub-data --model-limit 100 --batch-size 5`.
 - Uses: `scripts/push-data-repo.sh` after non-empty commits.
 
 - [ ] **Step 1: Write failing argument and git-boundary tests**
@@ -252,10 +252,10 @@ git commit -m "feat: wire tidy backfill and one-note schedule"
 ### Task 6: Verify, publish the code PR, and run the 100-page pilot
 
 **Files:**
-- Modify during execution only: `/Users/adamrussell/Projects/knowledge-hub-data/pages/*.json`
-- Modify during execution only: `/Users/adamrussell/Projects/knowledge-hub-data/manifest.json`
-- Modify during execution only: `/Users/adamrussell/Projects/knowledge-hub-data/_tidy/state.json`
-- Create during execution only: `/Users/adamrussell/Projects/knowledge-hub-data/_tidy/backfill-skip-list.json`
+- Modify during execution only: `/Users/you/Projects/knowledge-hub-data/pages/*.json`
+- Modify during execution only: `/Users/you/Projects/knowledge-hub-data/manifest.json`
+- Modify during execution only: `/Users/you/Projects/knowledge-hub-data/_tidy/state.json`
+- Create during execution only: `/Users/you/Projects/knowledge-hub-data/_tidy/backfill-skip-list.json`
 
 **Interfaces:**
 - Produces: GitHub pull request for the code branch and a pushed 100-page pilot in the data repository.
@@ -276,14 +276,14 @@ Push `codex/tidy-backfill-one-note`, open a PR summarizing failure cooldown, one
 
 - [ ] **Step 4: Fast-forward and validate the data checkout**
 
-Fast-forward `/Users/adamrussell/Projects/knowledge-hub-data` to `origin/main`, confirm it is clean, and verify `ANTHROPIC_API_KEY` is available without printing it.
+Fast-forward `/Users/you/Projects/knowledge-hub-data` to `origin/main`, confirm it is clean, and verify `ANTHROPIC_API_KEY` is available without printing it.
 
 - [ ] **Step 5: Run exactly the 100-page pilot**
 
 Run:
 
 ```bash
-npm run tidy:backfill -- --data-dir /Users/adamrussell/Projects/knowledge-hub-data --model-limit 100 --batch-size 5
+npm run tidy:backfill -- --data-dir /Users/you/Projects/knowledge-hub-data --model-limit 100 --batch-size 5
 ```
 
 Expected: clean notes are stamped in the preflight, at most 100 Claude-eligible page IDs are attempted, every successful five-page batch is committed and pushed, and the process exits cleanly with a JSON cost summary.

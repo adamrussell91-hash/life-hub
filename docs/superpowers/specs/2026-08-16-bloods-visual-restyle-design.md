@@ -20,7 +20,7 @@ Make Bloods look like Life Hub Clinical Glass instead of a maroon lab dump. Ever
 | Sparse chart | Range track: sage in-range segment, shore overflow, solid latest dot, ghost previous, Wave arrow for direction |
 | Series chart | Body-style line in a sage reference band, **a marker (dot) on every point**. Latest out-of-range dot uses danger / High Sea |
 | Meaning on tile | One-line “what this is” on **every** numeric tile, plus ref numbers, previous value, date |
-| Language | Never “stool”. Never “faecal” / “fecal”. Gut / mucosal / Crohn’s as appropriate |
+| Language | Never “stool”. Never “faecal” / “fecal”. Gut / mucosal / Condition A’s as appropriate |
 | Implementation | CSS + targeted `render-bloods.js` / `bloods-charts.js` / explainer copy. No new layout packer |
 
 ## Out of scope
@@ -102,7 +102,7 @@ Every numeric marker tile, in order:
 
 Qualitative markers: status line + one-liner, no chart.
 
-### Combined strip (iron, liver enzymes)
+### Combined strip (iron, marker enzymes)
 
 The model already expresses each point as its position inside that marker’s own reference range (0 = lower limit, 1 = upper). The strip must therefore draw **all series on one shared y-scale** — scaling each series separately makes the lines unrelated squiggles. A single sage band spans 0–1, each line takes a kit colour by index (Wave, marine, High Sea ink, success) with a dot on the latest point, and a legend plus one caption explains the scale. Viewport is `960 × 160` so a full-width strip stays short.
 
@@ -132,7 +132,7 @@ Glucose zoned charts keep zones; restyle zone fills to kit pastels, not maroon.
 
 `explainerFor` must not leave clinical markers on the generic fallback (“a laboratory marker from your bloods history”).
 
-**Required new/filled copy** (at least): calprotectin, and any other keys that currently hit `FALLBACK` in live data. Calprotectin: protein from gut white cells; raised means mucosal inflammation; Crohn’s signal even when CRP is calm. **Forbidden words:** stool, faecal, fecal.
+**Required new/filled copy** (at least): calprotectin, and any other keys that currently hit `FALLBACK` in live data. Calprotectin: protein from gut white cells; raised means mucosal inflammation; Condition A’s signal even when CRP is calm. **Forbidden words:** stool, faecal, fecal.
 
 The explainer sheet (tap `i`) keeps what / why / high / low + disclaimer. Never put a NotebookLM or other URL in `title`, `aria-label`, or visible tooltip text.
 

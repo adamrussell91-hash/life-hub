@@ -12,7 +12,7 @@ test('body fat outside the band is binding and is not treated as a lift plan', (
     targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
-      event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 14 }),
+      event({ type: 'composition', date: '2026-08-01', weight_kg: 72, body_fat_pct: 18 }),
       event({
         type: 'measurements',
         date: '2026-07-01',
@@ -30,11 +30,11 @@ test('body fat outside the band is binding and is not treated as a lift plan', (
 
   assert.match(goal.verdict, /^Body fat is binding/);
   assert.equal(goal.bindingId, 'fat');
-  assert.match(goal.verdict, /serves the fat band, not the 31 October lifts/);
-  assert.match(goal.rows.find(row => row.id === 'fat').detail, /14% on 01\/08\/26, 4 points above 10/);
-  assert.match(goal.rows.find(row => row.id === 'weight').detail, /inside 78–82 kg/);
+  assert.match(goal.verdict, /serves the fat band, not the 30 June lifts/);
+  assert.match(goal.rows.find(row => row.id === 'fat').detail, /18% on 01\/08\/26, 3 points above 15/);
+  assert.match(goal.rows.find(row => row.id === 'weight').detail, /inside 70–75 kg/);
   assert.match(goal.rows.find(row => row.id === 'ratio').detail, /Frozen until the next tape/);
-  assert.match(goal.rows.find(row => row.id === 'lift').detail, /short of 65/);
+  assert.match(goal.rows.find(row => row.id === 'lift').detail, /short of 55/);
 });
 
 test('in-band weight and fat leave shoulder:waist binding', () => {
@@ -42,14 +42,14 @@ test('in-band weight and fat leave shoulder:waist binding', () => {
     targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
-      event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 9 }),
-      event({ type: 'measurements', date: '2026-06-01', shoulders: 45, waist: 30 })
+      event({ type: 'composition', date: '2026-08-01', weight_kg: 72, body_fat_pct: 13 }),
+      event({ type: 'measurements', date: '2026-06-01', shoulders: 42, waist: 30 })
     ]
   });
 
   assert.match(goal.verdict, /^Shoulder:waist is binding/);
   assert.equal(goal.bindingId, 'ratio');
-  assert.doesNotMatch(goal.verdict, /31 October/);
+  assert.doesNotMatch(goal.verdict, /30 June/);
   assert.equal(goal.rows.find(row => row.id === 'ratio').status, 'outside');
   assert.equal(goal.rows.find(row => row.id === 'lift').status, 'unread');
 });
@@ -59,16 +59,16 @@ test('a full set of in-band readings is not called binding', () => {
     targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
-      event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 9 }),
+      event({ type: 'composition', date: '2026-08-01', weight_kg: 72, body_fat_pct: 13 }),
       event({ type: 'measurements', date: '2026-08-01', shoulders: 50, waist: 30 }),
       event({
         type: 'workout',
         date: '2026-08-02',
         status: 'completed',
         exercises: [
-          { name: 'Bar Press', sets: [{ reps: 1, weight_kg: 65 }] },
-          { name: 'Cable Bar Wide Grip Curl', sets: [{ reps: 1, weight_kg: 60 }] },
-          { name: 'Reverse Wide Grip Bent Over Row', sets: [{ reps: 1, weight_kg: 47 }] }
+          { name: 'Bar Press', sets: [{ reps: 1, weight_kg: 55 }] },
+          { name: 'Cable Bar Wide Grip Curl', sets: [{ reps: 1, weight_kg: 45 }] },
+          { name: 'Reverse Wide Grip Bent Over Row', sets: [{ reps: 1, weight_kg: 50 }] }
         ]
       })
     ]
@@ -85,13 +85,13 @@ test('weight outside the band is binding when body fat is already inside', () =>
     date: '2026-08-11',
     events: [
       event({ type: 'weight', date: '2026-08-01', weight_kg: 88 }),
-      event({ type: 'composition', date: '2026-07-15', weight_kg: 88, body_fat_pct: 9 })
+      event({ type: 'composition', date: '2026-07-15', weight_kg: 88, body_fat_pct: 13 })
     ]
   });
 
   assert.match(goal.verdict, /^Weight is binding/);
   assert.equal(goal.bindingId, 'weight');
-  assert.doesNotMatch(goal.verdict, /31 October/);
+  assert.doesNotMatch(goal.verdict, /30 June/);
 });
 
 test('missing readings stay missing and a future weigh-in is ignored', () => {

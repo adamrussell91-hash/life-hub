@@ -88,12 +88,12 @@ test('fixture: gastro visit + planned MRCP/colonoscopy/March review payloads', (
   const visit = validateLogEntry({
     type: 'medical',
     date: '2026-09-24',
-    notes: 'calpro 15, MRCP ordered',
+    notes: 'calpro 22, MRCP ordered',
     fields: {
       title: 'Gastro follow-up — biologics & liver',
       record_type: 'Consultation',
       weight: 'major',
-      provider: 'Dr Chris Keily'
+      provider: 'Dr Rowan Pike'
     }
   }, { id: 'gastro', now: `${TODAY}T12:00:00+10:00` });
   assert.equal(visit.valid, true);
@@ -101,7 +101,7 @@ test('fixture: gastro visit + planned MRCP/colonoscopy/March review payloads', (
   const mrcp = validateLogEntry({
     type: 'medical',
     date: TODAY,
-    notes: 'Ordered 24 Sep — exclude PSC',
+    notes: 'Ordered 24 Sep — exclude condition B',
     fields: {
       title: 'MRCP — liver / bile ducts',
       status: 'to_book',
@@ -129,7 +129,7 @@ test('fixture: gastro visit + planned MRCP/colonoscopy/March review payloads', (
     type: 'medical',
     date: '2027-03-01',
     fields: {
-      title: 'Gastro review — Dr Chris Keily',
+      title: 'Gastro review — Dr Rowan Pike',
       status: 'planned',
       date_precision: 'month',
       weight: 'major'
@@ -138,18 +138,18 @@ test('fixture: gastro visit + planned MRCP/colonoscopy/March review payloads', (
   assert.equal(review.valid, true);
 });
 
-test('fixture: Stelara today → cadence 56 + virtual next dose', () => {
+test('fixture: Biologic today → cadence 56 + virtual next dose', () => {
   const dose = validateLogEntry({
     type: 'medical',
     date: TODAY,
-    notes: 'had my Stelara today',
+    notes: 'had my Biologic today',
     fields: {
-      title: 'Stelara 90mg',
+      title: 'Biologic 90mg',
       record_type: 'Prescription',
       weight: 'major',
       cadence_days: 56
     }
-  }, { id: 'stelara', now: `${TODAY}T12:00:00+10:00` });
+  }, { id: 'biologic', now: `${TODAY}T12:00:00+10:00` });
   assert.equal(dose.valid, true);
   assert.equal(dose.record.cadence_days, 56);
 

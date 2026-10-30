@@ -1,5 +1,5 @@
 /**
- * Dexamphetamine timing: record type, usual times from logs, day status, prompt,
+ * Medication timing: record type, usual times from logs, day status, prompt,
  * missed-dose evening plan, and one-tap logging from the Day dial.
  */
 import test from 'node:test';
@@ -23,7 +23,7 @@ for (const g of [globalThis, global]) {
 
 const TODAY = '2026-09-29';
 const log = (date, time, slot, status = 'taken') => ({
-  type: 'medication', id: `m-${date}-${slot}`, date, ...(time ? { time } : {}), medication: 'Dexamphetamine', status, slot
+  type: 'medication', id: `m-${date}-${slot}`, date, ...(time ? { time } : {}), medication: 'Daily medication', status, slot
 });
 const HISTORY = [
   log('2026-09-22', '07:40', 'am'), log('2026-09-22', '16:00', 'pm'),
@@ -131,7 +131,7 @@ test('Day dial: dose band drawn, prompt shown, Taken now posts a medication reco
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], '/api/chat/confirm');
   assert.equal(calls[0][1].slug, 'sara');
-  assert.deepEqual(calls[0][1].candidate.fields, { medication: 'Dexamphetamine', status: 'taken', slot: 'pm' });
+  assert.deepEqual(calls[0][1].candidate.fields, { medication: 'Daily medication', status: 'taken', slot: 'pm' });
   assert.match(calls[0][1].candidate.time, /^\d{2}:\d{2}$/);
   unmountDayDial();
 });

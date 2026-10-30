@@ -664,11 +664,11 @@ test('formatActionWriteDisplay prefers a sibling title over a due_date patch dum
   const display = formatActionWriteDisplay({
     path: 'tasks:task:task_mut921wb_spoclx',
     mode: 'append',
-    title: 'Korea holiday itinerary — add to with Corey',
+    title: 'Korea holiday itinerary — add to with Partner',
     content: JSON.stringify({ due_date: '2026-10-05' }),
     diff: 'update task_mut921wb_spoclx: due_date'
   });
-  assert.equal(display.label, 'Korea holiday itinerary — add to with Corey');
+  assert.equal(display.label, 'Korea holiday itinerary — add to with Partner');
   assert.equal(display.detail, 'update task_mut921wb_spoclx: due_date');
   assert.equal(display.useCode, false);
 });

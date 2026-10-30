@@ -5,7 +5,7 @@ import { validateProposeActionInput } from '../../netlify/functions/_shared/capa
 import { MEDICAL, TODAY, visit } from '../support/sara-fixtures.mjs';
 
 const gp = date => visit(`gp-${date}`, date, {
-  title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Nerida McDonald', time: '14:00',
+  title: 'GP review (GGT results)', record_type: 'Consultation', provider: 'Dr Jordan Sample', time: '14:00',
   created_at: '2026-10-06T15:40:00+11:00'
 }, 'Discuss GGT.');
 const BASE = MEDICAL.filter(v => v.record.id !== 'gp-ggt');
@@ -85,7 +85,7 @@ test('unknown ids, invalid input and no-ops are reported, not guessed', async ()
   const bad = await executeSaraRecordTool('update_medical_visit', { visit_id: 'gp-2026-10-15', time: '99:99' }, h.ctx);
   assert.equal(bad.ok, false);
   assert.ok(bad.errors[0].includes('HH:MM'));
-  const same = await executeSaraRecordTool('update_medical_visit', { visit_id: 'gp-2026-10-15', provider: 'Dr Nerida McDonald' }, h.ctx);
+  const same = await executeSaraRecordTool('update_medical_visit', { visit_id: 'gp-2026-10-15', provider: 'Dr Jordan Sample' }, h.ctx);
   assert.equal(same.status, 'no_change');
   assert.equal((await executeSaraRecordTool('merge_medical_visits', { keep_visit_id: 'gp-2026-10-26', merge_visit_ids: ['x'] }, h.ctx)).error, 'unknown_merge_visit_id');
   assert.equal(h.saved.length + h.proposed.length, 0);

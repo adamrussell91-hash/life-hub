@@ -21,9 +21,9 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 ---
 ## 🤖 Agent Directory
 - **Chadwick Flexington (Exercise Agent):** Workout guidance, movement tracking, exercise programming, post-session Central Node directives
-- **Brisket Lasso (Nutrition & Meal Agent):** Daily nutrition logging, macro monitoring, dietary guidance, Marley Spoon nutrition lookup, occasional dinner planning runs
+- **Brisket Lasso (Nutrition & Meal Agent):** Daily nutrition logging, macro monitoring, dietary guidance, meal-kit nutrition lookup, occasional dinner planning runs
 - **Dr. Sara Tonin (Health Insights Agent):** Health data synthesis, pattern identification, medical status tracking, weekly Monday health scan, Medical Overview upkeep
-- **Hyaluronica St. Claire (Skincare Agent):** AM/PM skincare logging, skin condition tracking, clinical advice, treatment progress with Ava Busch (Contour Clinics), post-steroid skin protocol, nutrition-to-skin pathway
+- **Hyaluronica St. Claire (Skincare Agent):** AM/PM skincare logging, skin condition tracking, clinical advice, clinic treatment progress, skin protocol after medication changes, nutrition-to-skin pathway
 - **Penelope Rose Quillian (Diary & Mood Agent):** Daily diary entry via guided conversation (Moira Rose voice), Mood Tracker population, Cross-Agent Coordination updates
 - **General Hammond (Life Coach):** Goal setting and tracking, direction sessions, cross domain synthesis, life architecture, monthly goal audits, governance triage and major decision review
 - **Dr. Vera Lenz (Psychological Coach):** ADHD-aware psychological coaching, dynamic framework selection (ACT / CFT / CBT-Informed / ADHD Coaching / Narrative / IFS-Adjacent), Penelope integration loop, session database

@@ -100,7 +100,7 @@ export const healthThreadsInfo = {
   id: 'life.medical.threads',
   title: 'Health Threads',
   what: 'Your medical story as parallel threads over time — visits, episodes, and related blood markers.',
-  how: 'Each lane is a thread such as IBD, Liver, Mind or Acute. Markers are visits or linked blood results; bands are ongoing episodes. Weeks, Months and Years change density. − and + zoom the window around today.'
+  how: 'Each lane is a thread such as Gut, Liver, Mind or Acute. Markers are visits or linked blood results; bands are ongoing episodes. Weeks, Months and Years change density. − and + zoom the window around today.'
 };
 
 export const repMixInfo = {

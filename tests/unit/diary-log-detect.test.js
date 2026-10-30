@@ -26,7 +26,7 @@ test('isDiaryFinalize ignores ordinary interview chatter', () => {
   for (const text of [
     'I felt flat after lunch',
     'Start a diary',
-    'what about Corey',
+    'what about Partner',
     'catalogue my thoughts later'
   ]) {
     assert.equal(isDiaryFinalize(text), false, text);

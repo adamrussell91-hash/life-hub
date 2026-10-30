@@ -1,16 +1,14 @@
 /**
  * Aesthetics › Dress › Watches: today's watch, the box, the price radar, the wishlist,
- * the London and Scotland hunt and every Notion record.
+ * the watch hunt (from the private tracker file) and every tracker record.
  *
  * createWatches(doc, { storage, radarApi, matchMedia }) → { render({ date, look }) }
  * `look` is today's outfit from dress-looks.js (the one paired with today's scent).
  */
-import { WATCH_SOURCE_URL } from './notion-watch-source.js';
 import { WATCH_PHOTOS } from './watch-photos.js';
-import { WATCH_HUNT } from './watch-hunt.js';
 import { DIAL_COLOURS, watchFace } from './watch-face.js';
 import {
-  WATCHES, boxFacts, colourway, formatAud, freshTags, groupByModel, isOwned, isTrackable, isWanted,
+  WATCHES, WATCH_HUNT, boxFacts, colourway, formatAud, freshTags, groupByModel, isOwned, isTrackable, isWanted,
   lookLine, modelName, pingsFrom, radarCoverage, radarItems, radiusFor, rankForLook
 } from './watch-model.js';
 
@@ -45,9 +43,10 @@ const sectorOf = w => (SECTORS.includes(w.category) ? w.category : 'Other');
 export function createWatches(doc, { storage = globalThis.localStorage, radarApi = null, matchMedia = globalThis.matchMedia?.bind(globalThis), now = () => new Date() } = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const owned = WATCHES.filter(isOwned);
-  const wanted = WATCHES.filter(isWanted);
-  const groups = groupByModel(wanted);
+  // Filled from the private tracker on the first render that has it (see render()).
+  let owned = [];
+  let wanted = [];
+  let groups = [];
 
   function el(tag, attrs = {}, ...kids) {
     const node = doc.createElement(tag);
@@ -100,6 +99,7 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
   }
   function renderToday() {
     const ranked = rankForLook(owned, state.look, { lastWornId: lastWornId() });
+    if (!ranked.length) return;
     const pick = ranked[state.pick % ranked.length];
     const w = pick.watch;
     const t = now();
@@ -112,6 +112,7 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
   }
   function wearIt() {
     const ranked = rankForLook(owned, state.look, { lastWornId: lastWornId() });
+    if (!ranked.length) return;
     const w = ranked[state.pick % ranked.length].watch;
     const log = wearLog();
     log[state.date] = w.id;
@@ -363,12 +364,18 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
   // ---------------- the hunt ----------------
   function renderHunt() {
     const H = WATCH_HUNT;
+    const card = $('#aes-hunt-card');
+    if (card) card.hidden = !H;
+    if (!H) return;
+    $('#aes-hunt-when').textContent = H.when ?? '';
+    $('#aes-hunt-title').textContent = H.title;
+    $('#aes-hunt-lede').textContent = H.lede ?? H.goal ?? '';
     $('#aes-hunt-brief').replaceChildren(...H.brief.map(b => el('span', { text: b })));
     const small = [...owned].filter(w => w.mm).sort((a, b) => a.mm - b.mm)[0];
     const large = [...owned].filter(w => w.mm).sort((a, b) => b.mm - a.mm)[0];
-    $('#aes-hunt-sizes').replaceChildren(...[[small, `Your ${shortName(small).split(' ')[0]}`], [H.sample, 'The brief'], [large, `Your ${shortName(large).split(' ').slice(0, 2).join(' ')}`]].map(([w, label]) =>
+    if (small && large && H.sample) $('#aes-hunt-sizes').replaceChildren(...[[small, `Your ${shortName(small).split(' ')[0]}`], [H.sample, 'The brief'], [large, `Your ${shortName(large).split(' ').slice(0, 2).join(' ')}`]].map(([w, label]) =>
       el('figure', { class: 'aes-hunt__size' }, watchFace(doc, w, { px: 64 }), el('figcaption', {}, el('b', { text: `${w.mm} mm` }), el('br'), label))));
-    $('#aes-hunt-size-note').textContent = `Drawn to the same scale. Your ${shortName(small)} is ${small.mm} mm, so small already works for you. Try older watches on before writing them off.`;
+    if (small) $('#aes-hunt-size-note').textContent = `Drawn to the same scale. Your ${shortName(small)} is ${small.mm} mm, so small already works for you. Try older watches on before writing them off.`;
     $('#aes-hunt-targets').replaceChildren(...H.targets.map(t => el('li', {}, el('b', { text: t.name }), ` ${t.note}`)));
     const done = new Set(readJson(storage, CHECK_KEY, []));
     $('#aes-hunt-checks').replaceChildren(...H.checks.map((c, i) => {
@@ -378,7 +385,7 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
       box.addEventListener('change', () => { box.checked ? done.add(i) : done.delete(i); writeJson(storage, CHECK_KEY, [...done]); });
       return el('li', {}, el('label', { for: id }, box, c));
     }));
-    $('#aes-hunt-rule').textContent = H.rule;
+    $('#aes-hunt-rule').textContent = H.rule ?? '';
   }
 
   // ---------------- every record ----------------
@@ -417,7 +424,20 @@ export function createWatches(doc, { storage = globalThis.localStorage, radarApi
 
   return {
     render({ date, look } = {}) {
-      if (!$('#aes-watches') || !date || !look) return;
+      const host = $('#aes-watches');
+      if (!host || !date || !look) return;
+      const status = $('#aes-watch-status');
+      host.classList.toggle('aes-watches--empty', !WATCHES.length);
+      if (status) {
+        status.hidden = WATCHES.length > 0;
+        status.textContent = 'Your watch box isn’t available right now. Try again in a moment.';
+      }
+      if (!WATCHES.length) return;
+      if (!state.wired) {
+        owned = WATCHES.filter(isOwned);
+        wanted = WATCHES.filter(isWanted);
+        groups = groupByModel(wanted);
+      }
       if (state.date !== date) state.pick = 0;
       state.date = date;
       state.look = look;

@@ -1,0 +1,13 @@
+---
+description: Keep personal content out of the public life-hub repo
+alwaysApply: true
+---
+
+# Public repo privacy
+
+life-hub is a public repository. Its files, file names, commit messages, PR titles and PR bodies can all be read by anyone.
+
+- Personal content goes only to the private `adamrussell91-hash/life-hub-data` repository. The app reads it at runtime through the authenticated data client. Personal content means real people (partner, family, students, parents, colleagues, clinicians), health, diary text, finances, addresses, travel bookings, employer history, academic records, and Notion, Day One or Gmail exports.
+- Code, prompts, tests, fixtures, docs, mockups, screenshots and PR text use invented people and synthetic records. Use roles such as "partner" or "gastroenterologist", never names.
+- Prompts tell agents to read facts about Adam from the private Central Node. They don't restate those facts.
+- `scripts/privacy-guard.mjs` runs in `npm run pre-pr-check` and PR CI. A finding means move the content to life-hub-data. Never weaken the guard to pass.

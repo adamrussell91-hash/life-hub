@@ -24,8 +24,8 @@ Purpose body.
 // The four ghosts on the Tideline reference week.
 const SKIP = { id: 'g-skip', agent: 'sara', kind: 'skip_workout', date: '2026-09-24', reason: 'capacity 34%, sore throat', workoutPath: 'records/2026/09/24/workout-1815.md' };
 const BED = { id: 'g-bed', agent: 'sara', kind: 'bedtime', date: '2026-09-24', time: '22:00', reason: '5.4 h last night' };
-const GOOD = { id: 'g-good', agent: 'hammond', kind: 'protect_block', date: '2026-09-26', start: '18:00', end: '22:00', title: 'Dinner out + a show', with: 'corey' };
-const MOVE = { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-josh-y10', title: 'Year 10 leadership opportunities for Josh Lizzio', from: '2026-09-25', to: '2026-10-13' };
+const GOOD = { id: 'g-good', agent: 'hammond', kind: 'protect_block', date: '2026-09-26', start: '18:00', end: '22:00', title: 'Dinner out + a show', with: 'partner' };
+const MOVE = { id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-student-y10', title: 'Year 10 leadership opportunities for Sam Example', from: '2026-09-25', to: '2026-10-13' };
 
 function cnSteps(plan) {
   return plan.steps.filter(s => s.target === 'central_node').map(s => s.patch);
@@ -66,24 +66,24 @@ test('Sara bedtime: Today’s Status Sleep field and a protected rest event', ()
   assert.equal(rec.protected, true);
 });
 
-test('Hammond good night with Corey: tentative protected corey event, This Week line, Clare told', () => {
+test('Hammond good night with Partner: tentative protected partner event, This Week line, Clare told', () => {
   const plan = acceptPlan(GOOD);
   const rec = plan.steps.find(s => s.target === 'life_record').record;
   assert.equal(rec.type, 'calendar_block');
-  assert.equal(rec.kind, 'corey');
+  assert.equal(rec.kind, 'partner');
   assert.equal(rec.status, 'tentative');
-  assert.ok(lifeEventToBusySpan(rec), 'Clare treats the Corey block as busy');
+  assert.ok(lifeEventToBusySpan(rec), 'Clare treats the Partner block as busy');
   assert.equal(rec.end_time, '22:00');
   let content = CN;
   for (const patch of cnSteps(plan)) content = applyCentralNodePatch(content, patch);
-  assert.match(content, /- Sat 26\/09 6:00 pm–10:00 pm: Dinner out \+ a show with Corey \(protected\)\./);
-  assert.match(content, /- Hammond→Clare: keep Sat 26\/09 6:00 pm–10:00 pm clear \(Corey\)\./);
+  assert.match(content, /- Sat 26\/09 6:00 pm–10:00 pm: Dinner out \+ a show with Partner \(protected\)\./);
+  assert.match(content, /- Hammond→Clare: keep Sat 26\/09 6:00 pm–10:00 pm clear \(Partner\)\./);
   assert.match(plan.receipt, /Nothing is booked or paid without you/);
 });
 
 test('move task goes through the Tasks API and nowhere else', () => {
   const plan = acceptPlan(MOVE);
-  assert.deepEqual(plan.steps[0], { target: 'tasks', method: 'PATCH', id: 'task-josh-y10', body: { due_date: '2026-10-13' } });
+  assert.deepEqual(plan.steps[0], { target: 'tasks', method: 'PATCH', id: 'task-student-y10', body: { due_date: '2026-10-13' } });
   assert.equal(plan.steps.filter(s => s.target === 'tasks').length, 1);
   assert.match(plan.receipt, /due 25\/09\/26 → 13\/10\/26/);
   const recent = acceptPlan(MOVE, { today: '2026-09-24' }).steps.find(s => s.patch?.section === 'recent_actions');
@@ -105,8 +105,8 @@ test('bad proposals are rejected before any write exists', () => {
 });
 
 test('Almanac: a lead-line step becomes a task due on its last safe day', () => {
-  const plan = acceptPlan({ id: 'g-pet', agent: 'hammond', kind: 'create_task', title: 'Pet sitter for Leo, Maxxie, SJ & Hunter', due: '2026-10-28', source: 'almanac:korea:pet-sitter' }, { today: '2026-09-24' });
-  assert.deepEqual(plan.steps[0], { target: 'tasks', method: 'POST', body: { title: 'Pet sitter for Leo, Maxxie, SJ & Hunter', due_date: '2026-10-28', status: 'open', source: 'almanac:korea:pet-sitter' } });
+  const plan = acceptPlan({ id: 'g-pet', agent: 'hammond', kind: 'create_task', title: 'Pet sitter for the animals', due: '2026-10-28', source: 'almanac:big-trip:pet-sitter' }, { today: '2026-09-24' });
+  assert.deepEqual(plan.steps[0], { target: 'tasks', method: 'POST', body: { title: 'Pet sitter for the animals', due_date: '2026-10-28', status: 'open', source: 'almanac:big-trip:pet-sitter' } });
   assert.match(plan.receipt, /due 28\/10\/26 \(the last safe day\)/);
 });
 

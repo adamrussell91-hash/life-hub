@@ -31,7 +31,7 @@ AIS supports rapid loading ~0.3g/kg/day split for 5–7 days, or maintenance-sty
 ## Ledger
 
 Baseline: npm test, 5538 passed, 0 failed, 1 skipped.
-Isolated fresh clone: /Users/adamrussell/Projects/life-hub-creatine, branch feat/creatine-tracker.
+Isolated fresh clone: /Users/you/Projects/life-hub-creatine, branch feat/creatine-tracker.
 
 Verification after updating to main 7a8cbb79: mandatory pre-PR gate passed, 5,585 root tests (one skipped), 1,128 Tasks tests, Professional typecheck and static guards. Independent review resolved single-dose/meal coverage, 3g calibration, schema and responsive heading findings.
 

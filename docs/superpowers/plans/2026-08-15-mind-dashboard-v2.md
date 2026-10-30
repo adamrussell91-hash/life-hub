@@ -9,7 +9,7 @@
 **Tech Stack:** Static PWA, vanilla ES modules, existing `chart-kit`, `node --test`. Vendored `d3-shape` / `d3-sankey` / `d3-chord` / `d3-force` under `js/app/chart-kit/vendor/` (no runtime CDN, no bundler).
 
 **Spec:** `docs/superpowers/specs/2026-08-15-mind-dashboard-v2-design.md`  
-**Repo:** `/Users/adamrussell/Documents/Claude/Projects/life-hub`  
+**Repo:** `/Users/you/Documents/Claude/Projects/life-hub`  
 **Deploy rule:** Local commits only. **Never `git push`.** Adam pushes himself.  
 **Baseline:** After every task: `npm test` (and `npm run validate:fixtures` when records/fixtures change). `CACHE_NAME` is currently `life-hub-shell-v77` — bump once on the first client HTML/JS/CSS change, then again if later tasks add precache paths.
 
@@ -1601,7 +1601,7 @@ Expected: all tests pass.
 - [ ] **Step 3: Local import (Adam’s machine)**
 
 ```bash
-node scripts/import-mind-notion.mjs "/Users/adamrussell/Downloads/ExportBlock-65d09965-7b8e-476c-b443-c34df88140c6-Part-1"
+node scripts/import-mind-notion.mjs "/Users/you/Downloads/ExportBlock-65d09965-7b8e-476c-b443-c34df88140c6-Part-1"
 ```
 
 Then `npm run validate:fixtures` if imported files are in-repo, or validate records individually. Commit imported `data/mind` **only if Adam asks** (sensitive). Default: importer runs locally, Adam reviews `git status` before any data commit.

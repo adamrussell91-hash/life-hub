@@ -36,7 +36,7 @@ An understandable, personalised capacity forecast across Life Hub, driven by hig
 - A Monday uses available Sunday evidence even if the displayed calendar starts Monday.
 - A diary entered at 10 pm does not enter an archived 7 am forecast's feature set.
 - A scheduled lunch does not prove a meal was eaten; free time is recovery opportunity, not guaranteed recovery.
-- Corey may produce a predicted emotional lift if supported by personal data; this does not erase physical fatigue.
+- Partner may produce a predicted emotional lift if supported by personal data; this does not erase physical fatigue.
 - Check-in corrections update readiness immediately. Reason gathering does not discard or postpone the observation.
 - A discrepancy record stores the original issued prediction, not the revised number or a post-answer prediction.
 - Duplicate diary/health/Central Node descriptions of one episode are counted once.

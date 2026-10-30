@@ -12,7 +12,8 @@ async function envValue(name: string) { const env = await readFile(path.join(pro
 async function main() {
   const pages = JSON.parse(await readFile(path.join(process.cwd(), "migrated", "pages-dry-run.json"), "utf8")) as Page[];
   const attachments = uniqueAttachments(pages.flatMap(page => page.attachments));
-  const exportRoot = "/Users/adamrussell/Downloads/uni export";
+  const exportRoot = process.env.UNI_EXPORT_ROOT || await envValue("UNI_EXPORT_ROOT");
+  if (!exportRoot) throw new Error("Set UNI_EXPORT_ROOT to the local uni export folder");
   const missing = await Promise.all(attachments.map(async attachment => { try { await stat(path.join(exportRoot, attachment.source_path)); return null; } catch { return attachment.source_path; } }));
   const dryRun = !process.argv.includes("--execute");
   if (dryRun) return console.log(JSON.stringify({ mode: "dry-run", files: attachments.length, missing: missing.filter(Boolean), execute: "npm run upload-attachments -- --execute" }, null, 2));
