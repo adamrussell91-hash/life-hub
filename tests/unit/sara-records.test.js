@@ -47,7 +47,7 @@ test('listMedicalVisits filters by status/upcoming and flags duplicates; ids are
 });
 
 test('getMedicalVisit returns the full record and its look-alikes', () => {
-  const r = getMedicalVisit(all, { id: 'gp-2026-10-26' });
+  const r = getMedicalVisit(all, { id: 'gp-2026-10-26', today: TODAY });
   assert.equal(r.found, true);
   assert.equal(r.visit.provider, 'Dr Redacted');
   assert.equal(r.possible_duplicates.length, 2);
