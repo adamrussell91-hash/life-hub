@@ -13,8 +13,8 @@ import { openFollowUpPlan } from '@/evidence/follow-up';
 import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
-import { renderGrid } from '@/markbook/grid';
-import { httpProgressApi, renderProgress, withMark, type DoneRecord, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
+import { renderBook, renderBookPhone, type BookShow, type PhoneControl } from '@/markbook/book';
+import { httpProgressApi, withMark, type DoneRecord, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
 import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
@@ -30,7 +30,6 @@ import { newHistoryState, renderHistory } from '@/markbook/history-view';
 import { mixUpText } from '@/evidence/views/parts';
 import { openTutorialPlan } from '@/tutorial/plan-sheet';
 import { openHeatmap, openQuizAttempt, openWorkSheet } from '@/markbook/heatmap';
-import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
 import { ApiClientError } from '@/api/client';
@@ -47,16 +46,17 @@ type Options = {
   /** Test seam for today's date, YYYY-MM-DD. */
   today?: () => string;
   /** The view the markbook opens on. Defaults to the syllabus Grid. */
-  view?: Mode;
-  /** The class's unit lessons in order, for the Progress view. */
+  /** 'progress' is the old name for Marks & progress. */
+  view?: Mode | 'progress';
+  /** The class's unit lessons in order, for the lesson columns of Marks & progress. */
   progressLessons?: ProgressLesson[];
   /** Test seam. Defaults to POST /api/classes/:id/profile. */
   progressApi?: ProgressApi;
 };
 
-/** `grid` is the syllabus Grid; `marks` is the table of quizzes and tasks. */
-type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks' | 'progress';
-const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks'], ['progress', 'Progress']];
+/** `grid` is the syllabus Grid; `marks` is Marks & progress, every lesson and marked column in one table. */
+type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks';
+const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks & progress']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -122,7 +122,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let view: MarkbookView | null = null;
   /** The last view the server confirmed, with no local changes on it. */
   let confirmed: MarkbookView | null = null;
-  let mode: Mode = options.view ?? 'grid';
+  let mode: Mode = options.view === 'progress' ? 'marks' : (options.view ?? 'grid');
+  /** Which columns Marks & progress shows. */
+  let bookShow: BookShow = 'all';
   /** Sort orders and open rows, kept across redraws. */
   const nextState = newNextState();
   const gridState = newSyllabusGridState();
@@ -484,7 +486,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       (control && !control.disabled ? control : body.querySelector<HTMLElement>('[data-phone="pick"]'))?.focus();
       return;
     }
-    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell', key.col, key.student)?.focus();
+    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell, .mb-progress__btn', key.col, key.student)?.focus();
   }
 
   function paintHidden(current: MarkbookView): void {
@@ -533,13 +535,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode === 'progress') {
-      body.replaceChildren(
-        renderProgress({ view: current, students, lessons: options.progressLessons ?? [], today: today(), error: progressError, onMark: markProgress })
-      );
-      restoreFocus(key);
-      return;
-    }
     if (mode !== 'marks') {
       const context = ctx;
       if (!context) body.replaceChildren(el('p', 'mb__status', ctxError ?? 'Loading…'));
@@ -588,23 +583,43 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
           renderPatterns(current, students, context, { openStudent: actions.openStudent, followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence) }, detailState)
         );
     }
-    else if (narrow()) {
-      const found = students.findIndex((s) => s.id === phoneStudentId);
-      // Clamp only when the student has left the list (or none was chosen yet).
-      phoneIndex = found >= 0 ? found : Math.max(0, Math.min(students.length - 1, phoneIndex));
-      phoneStudentId = students[phoneIndex]?.id ?? null;
-      body.replaceChildren(
-        renderPhone(current, students, actions, phoneIndex, (i) => {
-          const s = students[i];
-          if (!s) return;
-          phoneIndex = i;
-          phoneStudentId = s.id;
-          announce.textContent = `${s.name}, ${i + 1} of ${students.length}`;
+    else {
+      const book = {
+        view: current,
+        students,
+        lessons: options.progressLessons ?? [],
+        actions,
+        today: today(),
+        show: bookShow,
+        setShow: (show: BookShow) => {
+          bookShow = show;
           paint();
-        }, today())
-      );
+          body.querySelector<HTMLElement>(`[data-show="${show}"]`)?.focus();
+        },
+        onMark: markProgress,
+        error: progressError
+      };
+      if (narrow()) {
+        const found = students.findIndex((s) => s.id === phoneStudentId);
+        // Clamp only when the student has left the list (or none was chosen yet).
+        phoneIndex = found >= 0 ? found : Math.max(0, Math.min(students.length - 1, phoneIndex));
+        phoneStudentId = students[phoneIndex]?.id ?? null;
+        body.replaceChildren(
+          renderBookPhone({
+            ...book,
+            index: phoneIndex,
+            move: (i) => {
+              const s = students[i];
+              if (!s) return;
+              phoneIndex = i;
+              phoneStudentId = s.id;
+              announce.textContent = `${s.name}, ${i + 1} of ${students.length}`;
+              paint();
+            }
+          })
+        );
+      } else body.replaceChildren(renderBook(book));
     }
-    else body.replaceChildren(renderGrid(current, students, actions, today()));
     restoreFocus(key);
   }
 
