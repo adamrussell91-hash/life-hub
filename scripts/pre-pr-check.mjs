@@ -246,6 +246,13 @@ checkRailViewIds();
 checkRegistryCountParity();
 checkProfessionalContentsMocks();
 
+// Personal content lives in the private life-hub-data repo (CLAUDE.md storage rule).
+// CI also scans the PR title and body, which are public too.
+run('Privacy guard (no personal content in the public repo)', process.execPath, [
+  'scripts/privacy-guard.mjs',
+  ...(process.env.PRIVACY_SCAN_TEXT_ENV ? ['--text-env', process.env.PRIVACY_SCAN_TEXT_ENV] : [])
+]);
+
 if (failures.length) {
   console.error(`\nStatic guards failed (${failures.length}). Fix before npm test.`);
   process.exit(1);
