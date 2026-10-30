@@ -198,6 +198,23 @@ test('a deleted unit is skipped and a lesson in two units gives one column', asy
   assert.deepEqual(quizzes.map((q) => q.id), ['quiz:quiz1']);
 });
 
+test('a quiz handed in from the class calendar or current unit shows, even outside the active units', async () => {
+  const { store } = await setup();
+  await handIn(store);
+  const cls = await store.get('classes/class1');
+  // The quiz's unit is no longer active; the student still reached it through the calendar.
+  await store.setJSON('classes/class1', { ...cls, active_unit_ids: [] });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes, [], 'nothing links the class to the quiz');
+  await store.setJSON('scheduled_lessons/row_other', { id: 'row_other', class_id: 'class2', unit_id: 'unit1', lesson_id: 'quiz1' });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes, [], 'another class’s calendar row doesn’t count');
+  await store.setJSON('scheduled_lessons/row1', { id: 'row1', class_id: 'class1', unit_id: 'unit1', lesson_id: 'quiz1' });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes.map((q) => q.id), ['quiz:quiz1']);
+  await store.setJSON('scheduled_lessons/row1', { id: 'row1', class_id: 'class1', unit_id: 'unit1', lesson_id: 'quiz1', status: 'trashed', trashed_at: '2026-10-18T00:00:00.000Z' });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes, [], 'a trashed row doesn’t count');
+  await store.setJSON('classes/class1', { ...cls, active_unit_ids: [], current_unit_id: 'unit1' });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes.map((q) => q.id), ['quiz:quiz1'], 'the current unit counts');
+});
+
 test('load reads the class’s units together', async () => {
   const { store } = await setup();
   const cls = store.data.get('classes/class1');
