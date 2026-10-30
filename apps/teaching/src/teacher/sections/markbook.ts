@@ -815,6 +815,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     return (current.work ?? []).some((w) => Object.values(w.students).some((s) => Date.parse(s.at) > recent));
   };
   const live = window.setInterval(() => {
+    // The page can be gone before the timer stops (tests tear the DOM down first).
+    if (typeof document === 'undefined') return window.clearInterval(live);
     if (disposed || document.hidden || !section.isConnected || busy()) return;
     if (Date.now() - lastLoad < (working(view) ? LIVE_EVERY_MS : IDLE_EVERY_MS)) return;
     lastLoad = Date.now();
