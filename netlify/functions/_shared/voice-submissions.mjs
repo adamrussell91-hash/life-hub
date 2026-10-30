@@ -25,7 +25,7 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
-import { claimFor, loadRoster } from './class-claims.mjs';
+import { claimFor, classesForLesson, loadRoster } from './class-claims.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
 export const AUDIO_RETENTION_DAYS = 28;
@@ -310,7 +310,14 @@ async function readSubmission(store, lesson, block, id) {
 }
 
 export async function getVoiceSubmission(store, lesson, block, id) {
-  return teacherRecord(await readSubmission(store, lesson, block, id));
+  const record = teacherRecord(await readSubmission(store, lesson, block, id));
+  // The classes this lesson belongs to, so the teacher can say whose take it is.
+  const classes = [];
+  for (const { id: classId, title } of await classesForLesson(store, lesson)) {
+    const roster = await loadRoster(store, classId);
+    if (roster) classes.push({ id: classId, title, students: roster.students.map(({ id: sid, initials, name }) => ({ id: sid, initials, name })) });
+  }
+  return { ...record, classes };
 }
 
 function cleanTags(raw, wordCount) {
