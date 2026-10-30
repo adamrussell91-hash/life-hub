@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cellFor, renderProgress, type ProgressLesson } from '@/markbook/progress';
+import { cellFor, renderProgress, withMark, type ProgressLesson } from '@/markbook/progress';
 
 const core: ProgressLesson = { id: 'l1', title: 'Poem', role: 'core', assessment: false, date: '2026-10-01' };
 const base = { lesson: core, record: undefined, quizSubmitted: false, quizStarted: false, took: false, today: '2026-10-05' };
@@ -75,7 +75,16 @@ describe('renderProgress', () => {
     expect(cell('s1').title).toContain('quiz 15/20');
     expect(cell('s2').dataset.state).toBe('partial');
     expect(cell('s2').title).toContain('2 to mark');
+    expect(cell('s1').textContent).toBe('15/20');
+    expect(cell('s2').textContent).toBe('4/20');
     expect([...root.querySelectorAll('.mb-progress__unit')].map((n) => n.textContent)).toEqual(['Poetry', 'Novel']);
+  });
+  it('withMark lays a teacher mark over the student record and clearing brings it back', () => {
+    const tick = { at: 'a', via: 'tick' };
+    const marked = withMark({ l1: tick }, 'l1', 'complete', 'b');
+    expect(marked.l1).toEqual({ at: 'b', via: 'teacher', was: tick });
+    expect(withMark(marked, 'l1', 'clear', 'c')).toEqual({ l1: tick });
+    expect(withMark({}, 'l1', 'clear', 'c')).toEqual({});
   });
   it('says so when there are no lessons', () => {
     expect(renderProgress({ view, students, lessons: [], today: '2026-10-20', onMark: vi.fn() }).textContent).toContain('no unit lessons');

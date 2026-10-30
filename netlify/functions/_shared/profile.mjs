@@ -14,7 +14,7 @@ import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
 import { fillsFor, lessonPointMap, markbookEvidence, withPointTags } from './profile-evidence.mjs';
 import { profileItems, storedAlignment } from './profile-items.mjs';
-import { highWaterFills, listDone, markDone, recordDone, removeDone } from './profile-done.mjs';
+import { highWaterFills, listClassDone, listDone, markDone, recordDone, removeDone } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
@@ -100,10 +100,10 @@ export async function teacherProfileAction(store, classId, body) {
     }
     const state = action === 'remove' ? 'clear' : body.state;
     if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
-    if (state === 'clear') await removeDone(store, classId, body.student_id, body.lesson_id);
+    if (action === 'remove') await removeDone(store, classId, body.student_id, body.lesson_id);
     else await markDone(store, classId, body.student_id, body.lesson_id, state);
+    // Only the one student changed, so only their records go back.
+    return { done: { [body.student_id]: await listDone(store, classId, body.student_id) } };
   }
-  const done = {};
-  for (const s of roster.students) done[s.id] = await listDone(store, classId, s.id);
-  return { done };
+  return { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) };
 }
