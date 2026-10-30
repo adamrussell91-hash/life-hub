@@ -169,7 +169,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let conceptChoices: { key: string; name: string }[] = [];
   const waitingByColumn = new Map<string, number>();
   if (!options.api) {
-    void loadAlignment().then((a) => { conceptChoices = a.concepts.map((c) => ({ key: c.key, name: c.name })); }, () => {});
+    void loadAlignment().then((a) => { conceptChoices = (a?.concepts ?? []).map((c) => ({ key: c.key, name: c.name })); }, () => {});
     void apiGet<{ tasks: { class_id: string; column_id: string; waiting: number }[] }>('/api/to-mark').then(
       (r) => {
         for (const task of r.tasks) if (task.class_id === cls.id) waitingByColumn.set(task.column_id, task.waiting);
