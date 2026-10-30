@@ -838,3 +838,43 @@ test('autosave: an attempt with nothing saved is left open, not handed in blank'
   store.data.set(key, { ...store.data.get(key), deadline: new Date(Date.now() - 5 * 60_000).toISOString() });
   assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts.length, 0);
 });
+
+test('writing check: typing logs are kept for written answers, summed at hand-in and shown only to the teacher', async () => {
+  const store = baseStore({ quizBlocks: [qBlock('qa', sa), qBlock('qe', essay)] });
+  await publishQuiz(store);
+  const me = { token: token(31) };
+  const started = await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  assert.equal(started.current.settings.writing_check, 'flag', 'on by default, and students are told');
+  const text = 'The ending is tragic because the lovers die.';
+  const log = { start: Date.now(), base: '', ms: 40_000, pastes: 2, away: 1, jumps: 0, steps: [[0, 0, 0, text]] };
+  const stray = { start: 1, base: '', ms: 1, pastes: 9, away: 0, jumps: 0, steps: [] };
+  await quizAction(store, 'quiz1', { ...me, action: 'save', responses: { qe: { text } }, writing: { qe: log, qa: stray } });
+  const kept = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/writing/'))[1];
+  assert.deepEqual(Object.keys(kept), ['qe'], 'short answers carry no log');
+  const back = await quizAction(store, 'quiz1', { ...me, action: 'status' });
+  assert.equal(back.current.saved.writing.qe.pastes, 2, 'a new browser carries on the same log');
+  const done = await quizAction(store, 'quiz1', { ...me, action: 'submit', responses: { qe: { text } } });
+  assert.equal(JSON.stringify(done).includes('pastes'), false, 'students never see the summary');
+  const result = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
+  assert.deepEqual(result.writing.qe.flags, ['Pasted twice']);
+  const list = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  assert.equal(list.attempts[0].writing_flags, 1);
+  const detail = await quizTeacherAction(store, 'quiz1', { action: 'attempt', attempt_id: list.attempts[0].id });
+  const row = detail.attempt.rows.find((r) => r.id === 'qe');
+  assert.equal(row.writing.typed_s, 40);
+  assert.equal(row.writing.log.steps.length, 1, 'the replay comes with the attempt');
+  assert.equal(detail.attempt.rows.find((r) => r.id === 'qa').writing, undefined);
+  await quizTeacherAction(store, 'quiz1', { action: 'delete_attempt', attempt_id: list.attempts[0].id });
+  assert.equal([...store.data.keys()].some((k) => k.startsWith('quiz/quiz1/writing/')), false, 'deleting the attempt deletes its log');
+});
+
+test('writing check: off keeps no logs', async () => {
+  const store = baseStore({ quizSettings: { writing_check: 'off' }, quizBlocks: [qBlock('qe', essay)] });
+  await publishQuiz(store);
+  const me = { token: token(32) };
+  await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  await quizAction(store, 'quiz1', { ...me, action: 'submit', responses: { qe: { text: 'Tragic.' } }, writing: { qe: { start: 1, base: '', ms: 1, pastes: 3, away: 0, jumps: 0, steps: [] } } });
+  assert.equal([...store.data.keys()].some((k) => k.startsWith('quiz/quiz1/writing/')), false);
+  const result = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
+  assert.equal(result.writing, undefined);
+});

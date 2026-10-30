@@ -119,9 +119,11 @@ export function openQuizAttempt(quiz: QuizColumn, student: RosterStudent, result
   const note = saved
     ? el('p', 'mb-attempt__note', `Not handed in. ${saved.answered} of ${saved.total} answered, ${saved.score}/${saved.max} so far${saved.saved_at ? `, last saved ${savedAt(saved.saved_at)}` : ''}. Closing the quiz in Results hands this in.`)
     : null;
+  const flagged = score?.writing_flags ?? 0;
+  const writing = flagged ? el('p', 'mb-attempt__writing', `${flagged} written ${flagged === 1 ? 'answer' : 'answers'} to check for how ${flagged === 1 ? 'it was' : 'they were'} typed. Results has the replay.`) : null;
   const link = el('a', 'mb-attempt__link', saved ? 'Open Results' : 'Mark in Results');
   link.href = resultsHref;
-  return present(heading, [el('p', 'mb-panel__task', quiz.title), heading, ...(note ? [note] : []), list, link], opts);
+  return present(heading, [el('p', 'mb-panel__task', quiz.title), heading, ...(note ? [note] : []), list, ...(writing ? [writing] : []), link], opts);
 }
 
 /** A readable name for a field the page saved: the question it answers, else its own name in words. */
