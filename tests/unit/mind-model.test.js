@@ -672,11 +672,11 @@ test('isSalientTheme drops times of day and keeps life themes', () => {
   assert.equal(isSalientTheme('evening'), false);
   assert.equal(isSalientTheme('night'), false);
   assert.equal(isSalientTheme('work'), true);
-  assert.equal(isSalientTheme('Corey'), true);
+  assert.equal(isSalientTheme('Partner'), true);
 });
 
 test('WATCHLIST_PRESETS exposes topics and inner eights', () => {
-  assert.deepEqual(WATCHLIST_PRESETS.topics, ['work', 'school', 'sleep', 'rest', 'Corey', 'flare', 'family', 'weekend']);
+  assert.deepEqual(WATCHLIST_PRESETS.topics, ['work', 'school', 'sleep', 'rest', 'Partner', 'flare', 'family', 'weekend']);
   assert.deepEqual(WATCHLIST_PRESETS.inner, ['behind', 'hollow', 'shame', 'pressure', 'stuck', 'tired', 'lonely', 'dread']);
 });
 

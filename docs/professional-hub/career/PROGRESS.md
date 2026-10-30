@@ -20,7 +20,7 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 | Done task with `apst_focus` | Seed has done tasks (`task_demo_close_done`, `task_ha_writeup`) but **none carry `apst_focus`**. Live Tasks store required for a real APST-tagged done task. |
 | Adam's current `employee_at` | **Confirmed** in `life-hub-data/data/professional/relationships.json`: **Gifted Education Teacher** at Tallowwood College (`154f794f-8476-8096-8d33-cb09f6411dc9`), `valid_from: 2025-01-22`, `valid_to: null`. Full role history stays in that private file. |
 
-**Current + past `employee_at`:** 15 periods across 8 employers, including concurrent roles at one school. The full list lives in the private `life-hub-data` repo (`data/professional/relationships.json`); it is not copied here because this repo is public.
+**Current + past `employee_at`:** Several periods across several employers, some concurrent. The full list lives in the private `life-hub-data` repo (`data/professional/relationships.json`); it is not copied here because this repo is public.
 
 ### 0.2 Stone "done" field for project / program
 

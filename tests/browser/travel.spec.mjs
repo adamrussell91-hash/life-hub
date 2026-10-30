@@ -77,7 +77,7 @@ test('life rail Travel link is present', { skip: !hasTravelBuild }, async () => 
 
 const TRIP = 'trp_meal_spec';
 const MOMENT_PLAIN = 'mom_plain';
-const MOMENT_COREY = 'mom_corey';
+const MOMENT_PARTNER = 'mom_partner';
 const MOMENT_MEAL = 'mom_linked';
 
 function mealJournal() {
@@ -102,8 +102,8 @@ function mealJournal() {
     moments: [
       { ...base, id: MOMENT_PLAIN, display_order: 1, local_time: '12:30', text: 'Plain lunch note',
         place: { name: 'Casa Exemplo' } },
-      { ...base, id: MOMENT_COREY, display_order: 2, local_time: '15:00', text: 'Corey sees a quiet square',
-        author: 'corey' },
+      { ...base, id: MOMENT_PARTNER, display_order: 2, local_time: '15:00', text: 'Partner sees a quiet square',
+        author: 'partner' },
       { ...base, id: MOMENT_MEAL, display_order: 3, local_time: '19:00', text: 'Dinner already logged',
         place: { name: 'Taberna Ficticia' }, meal: { food_visit_id: 'fv_linked', mood: 'calm' } }
     ],
@@ -209,13 +209,13 @@ for (const [label, viewport] of [
     }
   });
 
-  test(`travel meal (${label}): Corey's moment has no Meal switch`, { skip: !hasTravelBuild }, async () => {
+  test(`travel meal (${label}): Partner's moment has no Meal switch`, { skip: !hasTravelBuild }, async () => {
     const { context, page, calls } = await openMealJournal(browser, appUrl, viewport, {
       ...noMeal,
       put: () => ok({})
     });
     try {
-      await openEdit(page, 'Corey sees a quiet square');
+      await openEdit(page, 'Partner sees a quiet square');
       const sheet = page.locator('.journal-edit-moment-sheet');
       assert.equal(await sheet.getByRole('switch', { name: 'This was a meal' }).count(), 0);
       assert.equal(calls.mealGets, 0);

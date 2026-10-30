@@ -44,7 +44,7 @@ import {
   agentsReworking, bezelDoses, bigEvent, COMPLICATIONS, duration, faceById, FACES, hourIn, moonFill,
   readFaceChoice, resolveFace, stepFace, taskTally, tripOn, writeFaceChoice
 } from './dial-faces.js';
-import { drawBezel, drawCorey, drawDress, drawGmtHand, drawMoon, drawRetro, drawTourbillon, drawWeatherRing } from './dial-complications.js';
+import { drawBezel, drawPartner, drawDress, drawGmtHand, drawMoon, drawRetro, drawTourbillon, drawWeatherRing } from './dial-complications.js';
 import { onCheckinsChange, withCheckins } from './readiness-checkins.js';
 
 /* ======================================================================== 1. Constants */
@@ -712,7 +712,7 @@ function mountFaceFooter(cell) {
     el('li', '', `<b>${escapeHtml(c.name)}</b> <span>· ${escapeHtml(c.watch)}</span><p>${escapeHtml(c.text)}${note ? ` <em>${escapeHtml(note)}</em>` : ''}</p>`, list);
   }
   if (!def.comps.length) {
-    el('li', '', '<b>No complications</b> <span>· dress watch</span><p>Black lacquer and gold. Readiness is the fine gold arc; classes are filled diamonds, tasks and meetings outlined ones, Corey time champagne. Your evening is a whisper of champagne at the rim; the night is the darker crescent. Everything is still listed beside the dial.</p>', list);
+    el('li', '', '<b>No complications</b> <span>· dress watch</span><p>Black lacquer and gold. Readiness is the fine gold arc; classes are filled diamonds, tasks and meetings outlined ones, Partner time champagne. Your evening is a whisper of champagne at the rim; the night is the darker crescent. Everything is still listed beside the dial.</p>', list);
   }
   el('p', 'dd-face__when', escapeHtml(FACES.map(f => `${f.title}: ${f.when.replace(/^Auto /, '')}`).join(' · ')), about);
 }
@@ -723,8 +723,8 @@ function complicationNote(id) {
   const isToday = date === input.today;
   if (id === 'weather' && !isToday) return 'Shown for today only.';
   if (id === 'weather' && !readinessCtx()) return 'Needs the Life readiness forecast.';
-  if ((id === 'gmt' || id === 'corey') && !gmtTarget(date)) return trips.status === 'loading' ? 'Loading trips…' : 'Shows when a trip is in Travel.';
-  if ((id === 'gmt' || id === 'corey') && !isToday) return 'Shown for today only.';
+  if ((id === 'gmt' || id === 'partner') && !gmtTarget(date)) return trips.status === 'loading' ? 'Loading trips…' : 'Shows when a trip is in Travel.';
+  if ((id === 'gmt' || id === 'partner') && !isToday) return 'Shown for today only.';
   if (id === 'bezel' && !bezelDoses(dayAt(date)?.med, nowHour, isToday).length) return 'No dose logged this day.';
   return '';
 }
@@ -1165,8 +1165,8 @@ function mountDial(size) {
     const record = logs.find(log => log.time && Math.abs(toHour(log.time) - dot.h) < 1e-6 && (log.type === 'meal' ? `log-${log.meal}` === dot.id : dot.id === 'log-symptom')) ?? null;
     const title = dot.id === 'log-nolunch' ? 'No lunch logged' : `${String(dot.label).charAt(0).toUpperCase()}${String(dot.label).slice(1)}`;
     const plannedWhy = day?.med?.evening?.reason === 'skipped'
-      ? 'afternoon dexy skipped today'
-      : day?.med?.evening?.reason === 'late' ? 'afternoon dexy later than usual' : 'no afternoon dexy logged';
+      ? 'afternoon meds skipped today'
+      : day?.med?.evening?.reason === 'late' ? 'afternoon meds later than usual' : 'no afternoon meds logged';
     logItems.set(dot.id, {
       id: dot.id,
       kind: 'health',
@@ -1215,15 +1215,15 @@ function mountDial(size) {
         id: chip.id,
         hour: (chip.start + chip.end) / 2,
         height: 28,
-        text: chip.kind === 'corey' ? 'Corey' : String(chip.title ?? '').replace(/ · Dr .*$/, ''),
+        text: chip.kind === 'partner' ? 'Partner' : String(chip.title ?? '').replace(/ · Dr .*$/, ''),
         sub: proposal
           ? `${agentName(proposal.agent)}: ${String(proposal.label ?? '').toLowerCase()}`
           : chip.bookmark?.note
             ? `↳ ${chip.bookmark.note}`
-          : chip.kind === 'corey'
-            ? String(chip.title ?? '').replace(/ with Corey$/, '')
+          : chip.kind === 'partner'
+            ? String(chip.title ?? '').replace(/ with \S+$/, '')
             : String(chip.meta ?? '').split(' · ')[0],
-        cls: chip.kind === 'corey' ? 'is-corey' : ''
+        cls: chip.kind === 'partner' ? 'is-partner' : ''
       });
     }
     for (const due of deadlines) {
@@ -1313,11 +1313,11 @@ function mountDial(size) {
   }
 
   // Second time zones (today only: they show the time now somewhere else).
-  if (isToday && (comps.has('gmt') || comps.has('corey'))) {
+  if (isToday && (comps.has('gmt') || comps.has('partner'))) {
     const target = gmtTarget(date);
     const now = input.now ?? new Date();
     if (target?.city && comps.has('gmt')) drawGmtHand(g, svg, { hour: hourIn(target.city.tz, now), label: target.city.name });
-    if (target?.during && comps.has('corey')) drawCorey(g, svg, { hour: hourIn(target.homeTz, now) });
+    if (target?.during && comps.has('partner')) drawPartner(g, svg, { hour: hourIn(target.homeTz, now) });
   }
 
   // Now hand (today only)
@@ -1339,7 +1339,7 @@ function weekFill() {
   let hours = 0;
   for (const day of model?.days ?? []) {
     for (const chip of day.chips ?? []) {
-      if (chip.ambient || chip.ghost || chip.kind === 'corey' || chip.kind === 'log') continue;
+      if (chip.ambient || chip.ghost || chip.kind === 'partner' || chip.kind === 'log') continue;
       if (Number.isFinite(chip.start) && Number.isFinite(chip.end) && chip.end > chip.start) hours += chip.end - chip.start;
     }
   }
@@ -1554,7 +1554,7 @@ function mountReviewEntry(side, date) {
   void checkReviewed(date);
 }
 
-/** Notification taps land on #/calendar/day?review=1 or ?sheet=dexy. Handle once, then tidy the URL. */
+/** Notification taps land on #/calendar/day?review=1 or ?sheet=meds. Handle once, then tidy the URL. */
 function handleDeepLink(view, side) {
   const hash = String(view?.location?.hash ?? '');
   const query = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)) : null;
@@ -1586,7 +1586,7 @@ function handleDeepLink(view, side) {
     const prompt = doc.querySelector?.('[data-part="bookmark-prompt"]') ?? mountBookmarkPrompt(side, state.day, askedBookmark);
     prompt?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     prompt?.querySelector?.('input')?.focus?.({ preventScroll: true });
-  } else if (query.get('sheet') === 'dexy') {
+  } else if (query.get('sheet') === 'meds') {
     clean();
     const panel = doc.querySelector?.('[data-part="medication"]');
     panel?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
@@ -1599,7 +1599,7 @@ function mountPushControl(side) {
   const row = el('div', 'dd-push', undefined, side, { 'data-part': 'push' });
   const paint = (status) => {
     pushNow = status;
-    const text = status === 'on' ? 'Phone notifications on' : status === 'denied' ? 'Notifications blocked in Settings' : status === 'unsupported' ? '' : 'Get the dexy nudge and the train-home pass on your phone';
+    const text = status === 'on' ? 'Phone notifications on' : status === 'denied' ? 'Notifications blocked in Settings' : status === 'unsupported' ? '' : 'Get the medication nudge and the train-home pass on your phone';
     const action = status === 'on' ? 'Turn off' : status === 'off' ? 'Turn on' : '';
     row.innerHTML = text ? `<span>${escapeHtml(text)}</span>${action ? `<button type="button" class="dd-link" data-push="${status === 'on' ? 'off' : 'on'}">${action}</button>` : ''}` : '';
   };
@@ -1632,7 +1632,7 @@ function mountSide(side) {
   }
   mountBookmarkPrompt(side, date);
   mountReviewEntry(side, date);
-  // Agenda before Dexy / offers: on phone the side stacks under the dial, and Due
+  // Agenda before medication / offers: on phone the side stacks under the dial, and Due
   // tasks from a Clare dump must not sit below the medication panel.
   const dayDue = (dayAt(date)?.due ?? [])
     .filter(item => item.kind !== 'allday' && item.kind !== 'promise' && !item.onGrid)
@@ -1710,7 +1710,7 @@ function renderRows(wrap, rows, ghosts) {
       ...(row.itemId ? { 'data-row-item': row.itemId, role: 'button', tabindex: '0', title: `${row.title} · click for details` } : {})
     });
     el('div', 'dd-row__t', row.time, node);
-    const mark = row.kind === 'corey' ? '<span class="dd-mark"></span>' : '';
+    const mark = row.kind === 'partner' ? '<span class="dd-mark"></span>' : '';
     // Tasks and work blocks tick off right here, the same gesture as the Tasks board.
     const item = row.itemId ? findDialItem(row.itemId) : null;
     const tick = item && canTickItem(item) ? tickHtml(item) : '';

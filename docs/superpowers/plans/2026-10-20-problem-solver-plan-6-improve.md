@@ -25,9 +25,9 @@ The session gains two actions, `start_review` and `task_status`, and one suggest
 
 It builds on Plans 3, 4 and 5 (`docs/superpowers/plans/2026-10-19-problem-solver-plan-{3-step-engine,4-analyse-devise,5-decide-implement}.md`), all done and in PR adamrussell91-hash/life-hub#971. The "Hooks the later plans need" section at the end of Plan 5 lists what this plan picks up.
 
-**Worktree and branch:** `/Users/adamrussell/Projects/life-hub-ps-process`, branch `claude/problem-solver-improve` (cut from `claude/problem-solver-process` at `76382e50`). Run every command from the worktree. Never touch `/Users/adamrussell/Projects/life-hub`.
+**Worktree and branch:** `/Users/you/Projects/life-hub-ps-process`, branch `claude/problem-solver-improve` (cut from `claude/problem-solver-process` at `76382e50`). Run every command from the worktree. Never touch `/Users/you/Projects/life-hub`.
 
-**Book references (local only, never commit):** the Improve pages are rendered in `/Users/adamrussell/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
+**Book references (local only, never commit):** the Improve pages are rendered in `/Users/you/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
 - `improve-intro.png` (p.131)
 - `double-loop-intro.png` (p.133) and `double-loop.png` (p.135)
 - `feedback-matrix.png` (p.137, part one) and `feedback-matrix-2.png` (p.139, part two)

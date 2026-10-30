@@ -80,7 +80,7 @@ Provenance: EXIF, inferred, and manual recorded separately. Corrected pin locati
 | 2 | `…phase-2-capture-import.md` | Schema API, R2 signed upload, EXIF worker, import review FSM, photo/text/voice persist | Full split/merge/Trash, sharing, export |
 | 3 | `…phase-3-owner-control.md` | Edit, pin, order, split, merge, move, delete, undo, Trash/restore, straight connections, transitions | Offline queues, portable export, public share |
 | 4 | `…phase-4-reliability-export.md` | Durable queues, conflicts, search, lazy media, export/restore, then sharing after privacy checks | Optional enrichment |
-| 5 | `…phase-5-optional-enrichment.md` | Annotations, souvenirs, Corey, transcripts, print — only when asked | Never block Phases 1–4 |
+| 5 | `…phase-5-optional-enrichment.md` | Annotations, souvenirs, Partner, transcripts, print — only when asked | Never block Phases 1–4 |
 
 Execute in order. Each phase ends with Codex acceptance checks that apply to that phase, plus `npm run pre-pr-check` before any life-hub PR that touches runtime.
 
@@ -96,4 +96,4 @@ Codex acceptance checks 1–12 and Scenarios A–E remain the product bar. Imple
 
 ## Out of scope until Phase 5 / later
 
-Photo annotations, souvenir collections, Corey’s perspective, auto transcripts, printable editions, panoramas, immersive exhibitions, film generation.
+Photo annotations, souvenir collections, Partner’s perspective, auto transcripts, printable editions, panoramas, immersive exhibitions, film generation.

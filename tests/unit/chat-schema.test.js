@@ -394,7 +394,7 @@ test('validates a structured bloods panel and exposes bloods to log_entry', () =
           key: 'ggt',
           label: 'GGT',
           category: 'Liver Function',
-          value: 233,
+          value: 196,
           unit: 'U/L',
           ref_high: 51,
           status: 'High'
@@ -426,8 +426,8 @@ test('medical slugs include a title stem so same-day visits do not collide', () 
     'medical-gp-review-0915'
   );
   assert.equal(
-    buildRecordSlug({ type: 'medical', title: 'Therapy Session with Kate', time: '15:45' }),
-    'medical-therapy-session-with-kate-1545'
+    buildRecordSlug({ type: 'medical', title: 'Therapy Session with Avery', time: '15:45' }),
+    'medical-therapy-session-with-avery-1545'
   );
   assert.equal(
     buildCanonicalPath({
@@ -449,8 +449,8 @@ test('validates a well-formed medical log entry', () => {
       title: 'GP review',
       record_type: 'Appointment',
       lane: 'appointment',
-      provider: 'Dr Nerida McDonald',
-      location: 'Walker Street Doctors',
+      provider: 'Dr Jordan Sample',
+      location: 'Example Street Doctors',
       location_kind: 'place',
       episode: null
     }
@@ -465,8 +465,8 @@ test('normalizes a title-only medical log entry from chat', () => {
   const result = validateLogEntry({
     type: 'medical',
     date: '2026-08-26',
-    notes: 'Just had my stelara injection at the doctors',
-    fields: { title: 'Stelara injection' }
+    notes: 'Just had my biologic injection at the doctors',
+    fields: { title: 'Biologic injection' }
   }, { id: 'med-2', now: '2026-08-26T21:33:00+10:00' });
   assert.equal(result.valid, true, JSON.stringify(result.errors));
   assert.equal(result.record.record_type, 'Prescription');
@@ -476,7 +476,7 @@ test('normalizes a title-only medical log entry from chat', () => {
 
 test('logEntryRejectionPayload includes a retry hint for medical payloads', () => {
   const payload = logEntryRejectionPayload(
-    { type: 'medical', date: '2026-08-01', fields: { title: 'Stelara injection' } },
+    { type: 'medical', date: '2026-08-01', fields: { title: 'Biologic injection' } },
     ['lane must be one of: prescription']
   );
   assert.equal(payload.ok, false);

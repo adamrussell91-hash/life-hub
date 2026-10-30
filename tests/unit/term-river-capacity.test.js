@@ -68,7 +68,7 @@ test('river load uses shared class, protected, ghost, log and finished-work excl
   const input = { events: [
     commitment({ id: 'class', type: 'scheduled_lesson', end_time: '15:00' }),
     commitment({ id: 'protected', type: 'calendar_block', kind: 'focus', protected: true, end_time: '15:00' }),
-    commitment({ id: 'corey', type: 'calendar_block', kind: 'corey', end_time: '15:00' }),
+    commitment({ id: 'partner', type: 'calendar_block', kind: 'partner', end_time: '15:00' }),
     commitment({ id: 'ghost', type: 'work_block', ghost: true, duration_min: 120 }),
     commitment({ id: 'proposed', type: 'work_block', status: 'proposed', duration_min: 120 }),
     commitment({ id: 'log', type: 'work_session', end_time: '15:00' }),

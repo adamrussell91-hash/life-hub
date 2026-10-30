@@ -247,7 +247,7 @@ export function acceptPlan(ghost, { today = null } = {}) {
       break;
     }
     case 'protect_block': {
-      const withCorey = ghost.with === 'corey';
+      const withPartner = ghost.with === 'partner';
       const title = oneLine(ghost.title);
       const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}`;
       steps.push({
@@ -258,7 +258,7 @@ export function acceptPlan(ghost, { today = null } = {}) {
           date: ghost.date,
           time: ghost.start,
           end_time: ghost.end,
-          kind: withCorey ? 'corey' : 'protected',
+          kind: withPartner ? 'partner' : 'protected',
           status: 'tentative',
           protected: true,
           title,
@@ -288,9 +288,9 @@ export function acceptPlan(ghost, { today = null } = {}) {
           }
         });
       }
-      steps.push(cn('this_week', 'append_line', { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? ' with Corey' : ''} (protected).` }));
-      steps.push(cn('cross_agent', 'append_line', { summary: `${who}→Clare: keep ${short(ghost.date)} clear`, text: `- ${who}→Clare: keep ${span} clear${withCorey ? ' (Corey)' : ''}.` }));
-      receipt = `${who} → Life: “${title}”${withCorey ? ' with Corey' : ''}, ${span}, tentative and protected. ${who}→Clare: keep it clear. Nothing is booked or paid without you.`;
+      steps.push(cn('this_week', 'append_line', { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withPartner ? ' with Partner' : ''} (protected).` }));
+      steps.push(cn('cross_agent', 'append_line', { summary: `${who}→Clare: keep ${short(ghost.date)} clear`, text: `- ${who}→Clare: keep ${span} clear${withPartner ? ' (Partner)' : ''}.` }));
+      receipt = `${who} → Life: “${title}”${withPartner ? ' with Partner' : ''}, ${span}, tentative and protected. ${who}→Clare: keep it clear. Nothing is booked or paid without you.`;
       break;
     }
     case 'task_block': {
@@ -407,14 +407,14 @@ export function acceptPlan(ghost, { today = null } = {}) {
     case 'outing':
     case 'meal_block':
     case 'schedule_workout': {
-      const withCorey = ghost.with === 'corey';
+      const withPartner = ghost.with === 'partner';
       const title = oneLine(ghost.title);
       const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}`;
       // Display kinds: plan (outing/meal) and workout stay visible on Tideline.
       // protect_block keeps kind 'protected' (hidden). protected:true still tells Clare to avoid the slot.
       const blockKind = ghost.kind === 'schedule_workout'
         ? 'workout'
-        : (withCorey ? 'corey' : 'plan');
+        : (withPartner ? 'partner' : 'plan');
       const notes = oneLine(ghost.notes) || oneLine(ghost.place) || '';
       steps.push({
         target: 'life_record',

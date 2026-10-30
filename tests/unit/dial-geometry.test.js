@@ -63,7 +63,7 @@ test('callouts never overlap, stay on their side and inside the box', () => {
   const items = [
     { id: 'breakfast', hour: 7.15, height: 14 }, { id: 'symptom', hour: 7.67, height: 14 },
     { id: 'lunch', hour: 12.75, height: 14 }, { id: 'gastro', hour: 13.75, height: 28 },
-    { id: 'workout', hour: 18.8, height: 28 }, { id: 'corey', hour: 20.5, height: 28 },
+    { id: 'workout', hour: 18.8, height: 28 }, { id: 'partner', hour: 20.5, height: 28 },
     { id: 'lights', hour: 21.9, height: 14 }
   ];
   const { height } = ringRadii(560);

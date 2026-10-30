@@ -181,10 +181,10 @@ function sampleModel(overrides = {}) {
     title: 'Gastroenterologist Follow-up',
     record_type: 'Appointment',
     lane: 'appointment',
-    provider: 'Dr Chris Keily',
-    location: 'Northern Gastroenterology',
+    provider: 'Dr Rowan Pike',
+    location: 'Example Gastroenterology',
     location_kind: 'place',
-    notes: 'Review Entocort response.',
+    notes: 'Review Medication Y response.',
     mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Northern%20Gastroenterology',
     lab: null,
     episode: null,
@@ -198,7 +198,7 @@ function sampleModel(overrides = {}) {
     provider: '',
     selected: overrides.selected === undefined ? null : overrides.selected,
     recordTypes: ['Appointment'],
-    providers: ['Dr Chris Keily'],
+    providers: ['Dr Rowan Pike'],
     count: 1,
     showMinor: false,
     brief: overrides.brief ?? { cycle: null, watch: [], verdict: null },
@@ -220,7 +220,7 @@ test('renderMedical lists visit titles on the timeline', () => {
   renderMedical(root, sampleModel());
   const timeline = root.querySelector('#medical-timeline');
   assert.match(timeline.textContent, /Gastroenterologist Follow-up/);
-  assert.match(timeline.textContent, /Dr Chris Keily/);
+  assert.match(timeline.textContent, /Dr Rowan Pike/);
   assert.equal(root.querySelector('#body-medical-dashboard').hidden, false);
 });
 
@@ -250,12 +250,12 @@ test('renderMedical wraps an episode band and shows a Maps link in the sheet', (
     selected: visit,
     items: [
       { kind: 'today', date: '2026-08-20' },
-      { kind: 'band', episode: { id: 'crohns', title: "Crohn's diagnosis", status: 'active' }, visits: [visit] }
+      { kind: 'band', episode: { id: 'condition-a', title: "Condition A diagnosis", status: 'active' }, visits: [visit] }
     ]
   }));
-  assert.match(root.querySelector('#medical-timeline').textContent, /Crohn's diagnosis/);
+  assert.match(root.querySelector('#medical-timeline').textContent, /Condition A diagnosis/);
   const sheet = root.querySelector('#medical-sheet');
-  assert.match(sheet.textContent, /Review Entocort response/);
+  assert.match(sheet.textContent, /Review Medication Y response/);
   const link = sheet.querySelector('a');
   assert.ok(link);
   assert.match(link.href, /google\.com\/maps/);
@@ -283,9 +283,9 @@ test('renderMedical shows compact mini-lab rows on a major lab card', () => {
         lab: {
           inRange: 12,
           total: 14,
-          flags: [{ label: 'γ-GT', status: 'High', key: 'ggt', value: 233 }],
+          flags: [{ label: 'γ-GT', status: 'High', key: 'ggt', value: 196 }],
           markers: [
-            { key: 'ggt', label: 'γ-GT', status: 'High', value: 233, ref_low: 0, ref_high: 60 },
+            { key: 'ggt', label: 'γ-GT', status: 'High', value: 196, ref_low: 0, ref_high: 60 },
             { key: 'alt', label: 'ALT', status: 'Normal', value: 30, ref_low: 0, ref_high: 45 }
           ]
         }
@@ -498,10 +498,10 @@ test('a saved visit sheet has Delete; a cadence ghost does not', () => {
 
   const ghost = {
     ...visit,
-    id: 'virtual-stelara-2026-10-22',
+    id: 'virtual-biologic-2026-10-22',
     virtual: true,
     planned: true,
-    title: 'Stelara injection'
+    title: 'Biologic injection'
   };
   renderMedical(root, sampleModel({ selected: ghost }));
   assert.equal(sheetButtons(root).some(btn => btn.textContent === 'Delete'), false);

@@ -41,11 +41,11 @@ Finished modules, with tests. Use them; don't write your own:
 | Nav | ‹, period ("Thursday 24/09/26 · T3 W10" / "6:05 pm · second-last school day of term"), ›, Today, zoom pills with **Day** pressed, spacer, Dial · Linear pills. |
 | Body | Grid `minmax(0,1fr) 340px`. Under a 780px card (container query) the panels move under the dial. The dial cell aligns to the top. |
 | Rings (fractions of R) | Log dots at 0.94. Ticks at the rim (major every 6 h). Event ring 0.70–0.88 (classes inset 4px, others 2px). Context ring 0.575–0.66 (sleep hatch, school blue, yours peach, the rest quiet). Gauge at 0.43, 10px. Hour labels (noon, 6 pm, midnight, 6 am) at R + 18, 11.5px/600 navy. |
-| Arcs | Teaching/fitness blue, professional lilac, health sand, Corey peach with peach-ink stroke. Classes are paler. Proposal: dashed navy stroke. Ghost: Wave 6 % fill, dashed. Skipped: 0.35 opacity. |
+| Arcs | Teaching/fitness blue, professional lilac, health sand, Partner peach with peach-ink stroke. Classes are paler. Proposal: dashed navy stroke. Ghost: Wave 6 % fill, dashed. Skipped: 0.35 opacity. |
 | Time left | A High Sea lip just outside the event ring, from now to lights out. |
 | Now hand | 2.5px `--danger` from the gauge to past the event ring, with a 5px dot and "now 6:05" (no label on compact dials). |
 | Centre | FORECAST/CAPACITY caps 11px, the % in the capacity colour (`clamp(28px, 0.42 × gauge, 48px)`), the note and streak 12px muted. |
-| Callouts | 12px/600 title (Corey in peach ink, symptoms in High Sea ink, meals in gold ink) and an 11px muted sub-line. Leader lines are navy 22 %. |
+| Callouts | 12px/600 title (Partner in peach ink, symptoms in High Sea ink, meals in gold ink) and an 11px muted sub-line. Leader lines are navy 22 %. |
 | Tonight | "3 h 55 m that's yours" (22px/700 navy) with "Now 6:05 pm · lights out 10:00 pm (Sara)". Rows are a 56px time plus a title/note, with a dashed suggestion and Skip/Keep, Accept or Move/Dismiss where a proposal exists. A struck row for skipped items. |
 | Tomorrow | "Forecast 52%" with its day tag and note, then rows. |
 | Week | Seven 68px mini dials: context ring, non-class arcs, capacity ring and number. The pressed day has a `--danger` 5 % wash. |

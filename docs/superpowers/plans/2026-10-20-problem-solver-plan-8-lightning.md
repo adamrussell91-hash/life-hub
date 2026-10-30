@@ -40,9 +40,9 @@
 
 It builds on Plan 7 (`docs/superpowers/plans/2026-10-20-problem-solver-plan-7-document.md`), done on this branch. Its "Hooks the later plans need" section says an escalated full session starts with no case file, and that a Lightning run never writes one.
 
-**Worktree and branch:** `/Users/adamrussell/Projects/life-hub-ps-process`, branch `claude/problem-solver-document` (Plan 7's commits are on it). Run every command from the worktree. Never touch `/Users/adamrussell/Projects/life-hub`.
+**Worktree and branch:** `/Users/you/Projects/life-hub-ps-process`, branch `claude/problem-solver-document` (Plan 7's commits are on it). Run every command from the worktree. Never touch `/Users/you/Projects/life-hub`.
 
-**Book references (local only, never commit):** in `/Users/adamrussell/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
+**Book references (local only, never commit):** in `/Users/you/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
 - `lightning-intro.png` (p.155)
 - `lightning-intro-157.png` (p.157: the four questions)
 - `lightning-chart.png` (pp.158–159: the whole flowchart as one spread)

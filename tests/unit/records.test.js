@@ -206,7 +206,7 @@ test('accepts every canonical domain record and nullable observations', () => {
       lane: 'appointment', location_kind: 'unknown', episode: null
     },
     {
-      ...common, type: 'calendar_block', title: 'Dinner out + a show', kind: 'corey',
+      ...common, type: 'calendar_block', title: 'Dinner out + a show', kind: 'partner',
       status: 'tentative', protected: true, time: '18:00', end_time: '22:00', source_agent: 'hammond'
     }
   ];

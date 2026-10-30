@@ -225,10 +225,10 @@
       "shape": "point"
     },
     {
-      "id": "corey-2026-09-14",
+      "id": "partner-2026-09-14",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-14",
       "start": "19:30",
       "end": "21:30",
@@ -237,10 +237,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-16",
+      "id": "partner-2026-09-16",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-16",
       "start": "19:30",
       "end": "21:30",
@@ -249,10 +249,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-17",
+      "id": "partner-2026-09-17",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-17",
       "start": "19:30",
       "end": "21:30",
@@ -261,10 +261,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-21",
+      "id": "partner-2026-09-21",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-21",
       "start": "19:30",
       "end": "21:30",
@@ -273,10 +273,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-22",
+      "id": "partner-2026-09-22",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-22",
       "start": "19:30",
       "end": "21:30",
@@ -285,10 +285,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-23",
+      "id": "partner-2026-09-23",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-23",
       "start": "19:30",
       "end": "21:30",
@@ -297,10 +297,10 @@
       "sample": true
     },
     {
-      "id": "corey-2026-09-24",
+      "id": "partner-2026-09-24",
       "title": "Tea + TV",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-09-24",
       "start": "19:30",
       "end": "21:30",
@@ -312,7 +312,7 @@
       "id": "good-night",
       "title": "Good night: dinner out + a show",
       "type": "calendar_block",
-      "kind": "corey",
+      "kind": "partner",
       "date": "2026-10-02",
       "start": "18:00",
       "end": "22:00",
@@ -323,8 +323,8 @@
     {
       "id": "g-day-trip",
       "title": "Blue Mountains day trip",
-      "kind": "corey",
-      "with": "corey",
+      "kind": "partner",
+      "with": "partner",
       "date": "2026-10-08",
       "start": "09:00",
       "end": "18:00",
@@ -336,20 +336,20 @@
         "start": "09:00",
         "end": "18:00",
         "title": "Blue Mountains day trip",
-        "with": "corey"
+        "with": "partner"
       },
       "sub": "comforting adventure"
     },
     {
       "id": "conferral",
-      "title": "UNSW conferral",
+      "title": "Degree conferral",
       "kind": "event",
       "tags": [
         "graduation"
       ],
       "date": "2026-09-30",
       "shape": "diamond",
-      "sub": "Master of Gifted Education"
+      "sub": "Master's degree"
     },
     {
       "id": "uow",
@@ -467,8 +467,8 @@
   "TODAY": "2026-09-24",
   "WALLS": [
     {
-      "id": "korea",
-      "title": "Korea · 23/12 – 10/01",
+      "id": "big-trip",
+      "title": "Away · 23/12 – 10/01",
       "from": "2026-12-23",
       "to": "2027-01-10"
     }

@@ -221,11 +221,20 @@ export function compareBloods(events, { date_a = null, date_b = null, today } = 
   };
 }
 
-// ---------- treatment (Stelara cycle) ----------
+// ---------- treatment (scheduled biologic / infusion cycle) ----------
 
-const STELARA_RE = /stelara|ustekinumab/i;
-const STEROID_RE = /prednisolone|prednisone|entocort|budesonide|steroid/i;
-const DEFAULT_STELARA_CADENCE = 56;
+// A scheduled dose is recognised by role, not by drug name: a prescription-lane
+// record titled as a biologic, injection or infusion. The interval comes from the
+// record's own cadence_days; nothing here knows a real medication or schedule.
+const SCHEDULED_DOSE_TITLE_RE = /\b(biologic|injection|infusion)s?\b/i;
+const STEROID_RE = /prednisolone|prednisone|methylprednisolone|hydrocortisone|dexamethasone|budesonide|entocort|cortisone|corticosteroid|steroid/i;
+const DEFAULT_CADENCE_DAYS = null;
+
+function isScheduledDose(v) {
+  if (v.record_type === 'Symptom' || v.record_type === 'Vaccination') return false;
+  if (!SCHEDULED_DOSE_TITLE_RE.test(v.title ?? '')) return false;
+  return v.record_type === 'Prescription' || v.lane === 'prescription' || Number(v.cadence_days) > 0;
+}
 
 function doseKind(visit, index) {
   if (/induction|infusion/i.test(visit.title ?? '')) return 'induction';
@@ -245,30 +254,29 @@ function dedupeNearby(sorted, days) {
 const isPlannedLike = v => v.status === 'planned' || v.status === 'to_book';
 
 /**
- * Stelara dose history and where today sits in the cycle. Cycle day 0 is dose day.
- * A dose is any non-planned Stelara visit on or before today; planned/future ones
+ * Scheduled-dose history and where today sits in the cycle. Cycle day 0 is dose day.
+ * A dose is any non-planned scheduled-dose visit on or before today; planned/future ones
  * feed `planned_next`.
  */
 export function treatmentTimeline(events, { today } = {}) {
   if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
   const visits = medicalRecords(events);
-  // A dose is a visit TITLED as Stelara and as a dose. A gastro visit whose notes mention Stelara is not one.
-  const isDose = v => STELARA_RE.test(v.title ?? '')
-    && v.record_type !== 'Symptom'
-    && (v.record_type === 'Prescription' || v.record_type === 'Vaccination' || /injection|infusion|dose|maintenance|induction/i.test(v.title ?? ''));
-  const stelara = dedupeNearby(visits.filter(isDose), 7);
-  const doses = stelara.filter(v => !isPlanned(v, today))
+  // A dose is a visit TITLED as a scheduled dose. A specialist visit whose notes mention the medication is not one.
+  const scheduled = dedupeNearby(visits.filter(isScheduledDose), 7);
+  const doses = scheduled.filter(v => !isPlanned(v, today))
     .map((v, i) => ({ id: v.id, date: v.date, title: v.title, kind: doseKind(v, i), cadence_days: v.cadence_days ?? null }));
-  const planned = stelara.filter(v => isPlanned(v, today) && v.date >= today).sort(byDateAsc);
+  const planned = scheduled.filter(v => isPlanned(v, today) && v.date >= today).sort(byDateAsc);
   const last = doses[doses.length - 1] ?? null;
-  const cadence = [...doses].reverse().find(d => d.cadence_days)?.cadence_days ?? planned[0]?.cadence_days ?? DEFAULT_STELARA_CADENCE;
+  const cadence = [...doses].reverse().find(d => d.cadence_days)?.cadence_days ?? planned[0]?.cadence_days ?? DEFAULT_CADENCE_DAYS;
 
   const steroids = visits.filter(v => STEROID_RE.test(`${v.title ?? ''} ${v.notes_body ?? ''}`) && v.record_type !== 'Symptom')
     .map(v => ({ id: v.id, date: v.date, title: v.title, planned: isPlanned(v, today) }));
 
   let cycle = null;
   if (last) {
-    const dueDate = new Date(Date.parse(`${last.date}T00:00:00Z`) + cadence * DAY).toISOString().slice(0, 10);
+    const dueDate = Number(cadence) > 0
+      ? new Date(Date.parse(`${last.date}T00:00:00Z`) + cadence * DAY).toISOString().slice(0, 10)
+      : null;
     const sinceLast = daysBetween(last.date, today);
     cycle = {
       last_dose_date: last.date,
@@ -276,18 +284,18 @@ export function treatmentTimeline(events, { today } = {}) {
       cycle_day: sinceLast,
       cadence_days: cadence,
       next_due: dueDate,
-      days_until_next: daysBetween(today, dueDate),
-      overdue: today > dueDate,
-      days_overdue: today > dueDate ? daysBetween(dueDate, today) : 0,
+      days_until_next: dueDate ? daysBetween(today, dueDate) : null,
+      overdue: dueDate ? today > dueDate : false,
+      days_overdue: dueDate && today > dueDate ? daysBetween(dueDate, today) : 0,
       planned_next: planned[0] ? { id: planned[0].id, date: planned[0].date, status: planned[0].status ?? null } : null
     };
   }
   return {
     ok: true,
     store: 'life_hub_medical_overview',
-    stelara: { found: doses.length > 0, dose_count: doses.length, doses, cycle },
+    biologic: { found: doses.length > 0, dose_count: doses.length, doses, cycle },
     steroids,
-    how_to_read: 'cycle_day is days since the last logged Stelara dose (0 = dose day). '
+    how_to_read: 'cycle_day is days since the last logged scheduled dose (0 = dose day). next_due is null when no cadence_days is recorded. '
       + 'A dose only counts if it is logged and not planned; if the next dose is overdue per cadence, say the log may be missing it rather than assuming it was skipped.'
   };
 }
@@ -305,8 +313,8 @@ const POST_DOSE_WINDOW_DAYS = 3;
 export function symptomTimeline(events, { today, diary = [], from = null, to = null } = {}) {
   if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
   const visits = medicalRecords(events);
-  const { stelara } = treatmentTimeline(events, { today });
-  const doses = stelara.doses;
+  const { biologic } = treatmentTimeline(events, { today });
+  const doses = biologic.doses;
   const inRange = d => (!from || d >= from) && (!to || d <= to);
 
   const symptomVisits = visits.filter(v => (v.record_type === 'Symptom' || v.lane === 'symptom' || v.episode?.id) && inRange(v.date));
@@ -348,8 +356,8 @@ export function symptomTimeline(events, { today, diary = [], from = null, to = n
   // Onset days only: how many episodes began within 3 days of a dose, against what chance predicts.
   const onsets = list.filter(ep => ep.onset_cycle_day != null);
   const nearDose = onsets.filter(ep => ep.onset_cycle_day <= POST_DOSE_WINDOW_DAYS).length;
-  const cadence = stelara.cycle?.cadence_days ?? DEFAULT_STELARA_CADENCE;
-  const expectedShare = round(((POST_DOSE_WINDOW_DAYS + 1) / cadence) * 100, 0);
+  const cadence = biologic.cycle?.cadence_days ?? DEFAULT_CADENCE_DAYS;
+  const expectedShare = Number(cadence) > 0 ? round(((POST_DOSE_WINDOW_DAYS + 1) / cadence) * 100, 0) : null;
   return {
     ok: true,
     store: 'life_hub_medical_overview',
@@ -403,11 +411,11 @@ export function openLoops(events, { today } = {}) {
     }
   }
 
-  const { stelara } = treatmentTimeline(events, { today });
-  if (stelara.cycle) {
-    const c = stelara.cycle;
-    if (c.overdue) loops.push({ kind: 'stelara_overdue', next_due: c.next_due, days_overdue: c.days_overdue, note: 'No dose logged since; the log may be missing it.' });
-    else if (c.days_until_next <= 14 && !c.planned_next) loops.push({ kind: 'stelara_due_soon_unplanned', next_due: c.next_due, days_until: c.days_until_next });
+  const { biologic } = treatmentTimeline(events, { today });
+  if (biologic.cycle) {
+    const c = biologic.cycle;
+    if (c.overdue) loops.push({ kind: 'biologic_overdue', next_due: c.next_due, days_overdue: c.days_overdue, note: 'No dose logged since; the log may be missing it.' });
+    else if (c.days_until_next != null && c.days_until_next <= 14 && !c.planned_next) loops.push({ kind: 'biologic_due_soon_unplanned', next_due: c.next_due, days_until: c.days_until_next });
   }
 
   const upcoming = visits
@@ -529,7 +537,7 @@ function questionsFor({ abnormal, activeEpisodes, cycle, loops, visit }) {
   for (const ep of activeEpisodes) {
     questions.push(`I have had ${String(ep.title).toLowerCase()} since ${ep.started}. Is it worth investigating, and what should I watch for?`);
   }
-  if (cycle?.overdue) questions.push('My next Stelara dose looks overdue on my records. Can we confirm the date?');
+  if (cycle?.overdue) questions.push('My next scheduled dose looks overdue on my records. Can we confirm the date?');
   for (const loop of loops.filter(l => l.kind === 'to_book')) {
     questions.push(`${loop.title} is on my list but not booked. Who books it, and what should I do beforehand?`);
   }
@@ -573,7 +581,7 @@ export function appointmentBrief(events, { visit_id = null, date = null, today }
   if (!latest) gaps.push('No bloods on record.');
   else if (daysBetween(latest.date, asOf) > 90) gaps.push(`Latest bloods are ${daysBetween(latest.date, asOf)} days old at this visit.`);
   if (!visit.provider) gaps.push('No clinician recorded on this visit.');
-  if (!treatment.stelara.found) gaps.push('No Stelara doses logged.');
+  if (!treatment.biologic.found) gaps.push('No scheduled doses logged.');
 
   return {
     ok: true,
@@ -591,9 +599,9 @@ export function appointmentBrief(events, { visit_id = null, date = null, today }
     last_visit_before: lastAny ? { id: lastAny.id, date: lastAny.date, title: lastAny.title } : null,
     results: { collection_date: latest?.date ?? null, abnormal },
     symptoms_since_last_visit: { since: sinceDate, episodes: symptoms.episodes, active: activeEpisodes },
-    treatment: treatment.stelara.cycle ? { stelara: treatment.stelara.cycle } : { stelara: null },
+    treatment: treatment.biologic.cycle ? { biologic: treatment.biologic.cycle } : { biologic: null },
     open_loops: related,
-    questions_to_ask: questionsFor({ abnormal, activeEpisodes, cycle: treatment.stelara.cycle, loops: related, visit }),
+    questions_to_ask: questionsFor({ abnormal, activeEpisodes, cycle: treatment.biologic.cycle, loops: related, visit }),
     data_gaps: gaps
   };
 }

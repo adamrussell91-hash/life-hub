@@ -89,7 +89,7 @@ Every hub uses `snippets/rail.html` + `rail.css`. Full rules: `RAIL.md`.
 
 No per-hub rail width, no stacked wordmark, no logo on the brand, no mixing dots and icons.
 
-Canonical repo: `/Users/adamrussell/Projects/hub-design-kit`  
+Canonical repo: `/Users/you/Projects/hub-design-kit`  
 GitHub: https://github.com/adamrussell91-hash/hub-design-kit  
 In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `packages/design-kit`. Life loads `packages/design-kit/` directly.
 

@@ -8,7 +8,7 @@
   --tr-hatch-b:color-mix(in srgb,var(--navy) 13%,transparent);
   --tr-ghost-fill:color-mix(in srgb,var(--wave) 6%,transparent);
   --tr-ghost-line:color-mix(in srgb,var(--navy) 55%,transparent);
-  --tr-corey-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
+  --tr-partner-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
   --tr-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
   --tr-health-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
   position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size;
@@ -25,7 +25,7 @@
 .tr-chart{display:block;font-family:var(--font-ui)} /* laid out at the card's width, never scaled */
 .tr-holiday{fill:var(--tr-holiday)}
 .tr-wall{fill:url(#tr-hatch)}
-.tr-lane-wash{fill:var(--tr-corey-wash)}
+.tr-lane-wash{fill:var(--tr-partner-wash)}
 .tr-rule{stroke:var(--line)}
 .tr-weekline{stroke:var(--tr-rule)}
 .tr-tier.is-term{fill:var(--pastel-sage)}
@@ -35,16 +35,16 @@
 .tr-t-week{font-size:12px;font-weight:600;fill:var(--ink)}
 .tr-t-sub{font-size:11px;fill:var(--muted)}
 .tr-t-lane{font-size:13px;font-weight:600;fill:var(--navy)}
-.tr-t-lane.is-corey{fill:var(--pastel-peach-ink)}
+.tr-t-lane.is-partner{fill:var(--pastel-peach-ink)}
 .tr-bar{cursor:pointer}
 .tr-bar.k-teacher{fill:var(--pastel-blue)}
 .tr-bar:focus-visible,.tr-point:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5}
 .tr-t-bar{font-size:12px;font-weight:600;fill:var(--pastel-blue-ink);pointer-events:none}
 .tr-point{cursor:pointer;stroke:#fff;stroke-width:2}
 .tr-point.k-teacher{fill:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff)}
-.tr-point.k-corey{fill:var(--pastel-peach-ink)}
-.tr-point.k-corey.is-sample{fill:color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff);stroke-width:1;cursor:default}
-.tr-point.k-corey.is-held{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:2}
+.tr-point.k-partner{fill:var(--pastel-peach-ink)}
+.tr-point.k-partner.is-sample{fill:color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff);stroke-width:1;cursor:default}
+.tr-point.k-partner.is-held{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:2}
 .tr-point.k-scholar{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.6}
 .tr-point.k-friends{fill:var(--pastel-sage);stroke:var(--pastel-sage-ink);stroke-width:1.6}
 .tr-point.k-body{fill:#fff;stroke:var(--tr-health-line);stroke-width:1.8}
@@ -56,7 +56,7 @@
 .tr-t-point,.tr-t-load,.tr-t-hum{paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}
 .tr-t-point{font-size:11.5px;font-weight:500;fill:var(--ink);pointer-events:none}
 .tr-t-point.is-gold{fill:var(--pastel-gold-ink);font-weight:600}
-.tr-t-point.is-corey{fill:var(--pastel-peach-ink);font-weight:600}
+.tr-t-point.is-partner{fill:var(--pastel-peach-ink);font-weight:600}
 .tr-hum{stroke:var(--tr-gold-line);stroke-width:2;stroke-dasharray:1 6;stroke-linecap:round}
 .tr-t-hum{font-size:11px;fill:var(--pastel-gold-ink)}
 .tr-line{fill:none;stroke:var(--wave);stroke-width:2.25;stroke-linejoin:round}
@@ -100,9 +100,9 @@
 .tr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tr-list{padding:var(--space-3) var(--space-4) var(--space-4);display:grid;gap:var(--space-3)}
 .tr-list__lane{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:var(--space-3)}
-.tr-list__lane.is-corey{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
+.tr-list__lane.is-partner{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
 .tr-list__lane h3{margin:0;font-size:var(--text-sm);color:var(--navy)}
-.tr-list__lane.is-corey h3{color:var(--pastel-peach-ink)}
+.tr-list__lane.is-partner h3{color:var(--pastel-peach-ink)}
 .tr-list__lane > p{margin:2px 0 6px;font-size:var(--text-xs);color:var(--muted)}
 .tr-list__body{font-size:var(--text-xs);color:var(--ink)!important}
 .tr-list__item{display:flex;justify-content:space-between;gap:8px;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:8px 0 6px;font:inherit;font-size:var(--text-xs);text-align:left;color:var(--ink);cursor:pointer}

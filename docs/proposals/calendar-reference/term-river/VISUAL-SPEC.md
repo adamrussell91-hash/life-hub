@@ -1,6 +1,6 @@
 # Calendar B · Term River: visual, motion and wiring contract
 
-The Term and Year stops. The term (or the year, Term 3 to home from Korea) is drawn as **lanes, one per identity**, in About Me's order: Teacher, Corey, Scholar, Friends & family. Body runs underneath as the capacity line, and a Load strip shows booked hours against capacity each week. Holidays are narrower, not removed. Hammond's proposals sit in their lane as dashed points with an H badge.
+The Term and Year stops. The term (or the year, Term 3 to home from the trip) is drawn as **lanes, one per identity**, in About Me's order: Teacher, Partner, Scholar, Friends & family. Body runs underneath as the capacity line, and a Load strip shows booked hours against capacity each week. Holidays are narrower, not removed. Hammond's proposals sit in their lane as dashed points with an H badge.
 
 Behaviour and data: `docs/superpowers/specs/2026-09-24-calendar-design.md` ("B · Term River"). This folder is **how it looks, moves and writes. Port it. Don't reinterpret it.**
 
@@ -12,7 +12,7 @@ Behaviour and data: `docs/superpowers/specs/2026-09-24-calendar-design.md` ("B �
 | `golden/*.png` | 2× targets: `river-term-1280`, `river-year-1280`, `river-term-960`, `river-year-960`, `river-popover-1280`, `river-390`. |
 | `river-visual.spec.mjs` | 11 browser tests named `river phase N`. The reference passes 10; the eleventh (reload) is app-only. |
 | `compare.html` | Goldens vs your build. |
-| `src/fixture.ts` | The data: two terms, the two zoom ranges, items, the Korea wall, logged capacity, the term pattern and commitments. Today is Thu 24/09/26. |
+| `src/fixture.ts` | The data: two terms, the two zoom ranges, items, the trip wall, logged capacity, the term pattern and commitments. Today is Thu 24/09/26. |
 
 Finished modules, with tests. Use them; don't write your own:
 
@@ -30,18 +30,18 @@ Finished modules, with tests. Use them; don't write your own:
 4. **Labels are fitted, never collide.** Bar titles fit to the visible bar (clamped to the plot edge). Point labels alternate above and below the lane line, each budgeted to the next label on the same side. The UOW hum's label runs to the first label below the line. Labels above sit at `cy − 19`, above the agent badge (`cy − 8`), so a badge never cuts a label. Two badges closer than 18px show one. Measured-text cache; the full title is in the popover and `aria-label`.
 5. **Weeks, not months, while they fit.** Week labels (`T3 W10`, `Hol W1`) show when a *school* week is ≥ `minWeekLabel` (46px). Each label fits its own week or falls back to the short form (`W10`, `H1`), else hides. Below 46px the axis shows months. Nothing labels past the plot edge.
 6. **Every number is computed.** Lanes from `byLane`, week labels from the module, load from `weeklyLoad`, the body line from `forecastSeries` over logs. Never type them in.
-7. **Proposals are the same objects as everywhere else.** The popover previews the `acceptPlan()` receipt. Accept sends only `{ id, decision }`. Accepted, a proposal becomes a held point (Corey: peach fill, ink ring) with no badge. Dismissed, it leaves the river.
+7. **Proposals are the same objects as everywhere else.** The popover previews the `acceptPlan()` receipt. Accept sends only `{ id, decision }`. Accepted, a proposal becomes a held point (Partner: peach fill, ink ring) with no badge. Dismissed, it leaves the river.
 8. **Phone is lists.** Under 720px there's no chart: each lane is a card listing this range's items in date order (ghosts with the H mark), and Body shows today and next week's forecast. The period title gets its own row; the zoom pills sit under it.
 
 ## Layout contract
 
 | Part | Spec |
 |---|---|
-| Nav | ‹, period ("Term 3 → Term 4" / "T3 W9 – T4 W3 · 14/09/26 – 01/11/26"; Year: "2026 · Term 3 to home from Korea"), ›, Today, zoom pills with **Term** or **Year** pressed. |
+| Nav | ‹, period ("Term 3 → Term 4" / "T3 W9 – T4 W3 · 14/09/26 – 01/11/26"; Year: "2026 · Term 3 to home from the trip"), ›, Today, zoom pills with **Term** or **Year** pressed. |
 | Axis | Tier bar (TERM 3, HOLIDAYS, TERM 4 · ONE CLASS, SUMMER) 18px at y 8; week label 12px/600 at y 50 and date 11px muted at y 63; week lines full height. Today: a dashed Wave line and a Wave pill on the axis rule (`axis.h − 9`). |
-| Lanes (heights) | Teacher 160, Corey 76 (peach wash), Scholar 64, Friends 72, Body 104, then Load 104. Label column 196: lane name 14px/600 (Corey in peach ink) and a muted sub-line. |
+| Lanes (heights) | Teacher 160, Partner 76 (peach wash), Scholar 64, Friends 72, Body 104, then Load 104. Label column 196: lane name 14px/600 (Partner in peach ink) and a muted sub-line. |
 | Bars | 18px, radius 7, 6px gap, pastel blue, 12px/600 navy titles. |
-| Points | 5px. Teacher lilac, Corey peach ink (past sample evenings small and pale), Scholar gold, Friends sage, Body white with a health ring. Diamond for milestones (conferral). Marker line for "Y11 becomes Y12". Ghost: dashed, faint fill, navy H badge. |
+| Points | 5px. Teacher lilac, Partner peach ink (past sample evenings small and pale), Scholar gold, Friends sage, Body white with a health ring. Diamond for milestones (conferral). Marker line for "Y11 becomes Y12". Ghost: dashed, faint fill, navy H badge. |
 | Hum | UOW: a dotted gold line across the range, label below at its start. |
 | Body | Logged capacity solid Wave, forecast dashed with its band, the 40% line dashed High Sea with "40%". |
 | Load | A bar per week (booked h), a dashed navy capacity tick, the value above ("8.5 h", "22.5 h · over"). Holidays sage; over-capacity warning fill with a High Sea ring. |
@@ -67,7 +67,7 @@ Finished modules, with tests. Use them; don't write your own:
 5. Months at the Term zoom because the week width was measured across compressed holidays.
 6. Holidays drawn full width, or removed.
 7. Replaying the reveal on resize.
-8. Classes or Corey time counted in Load.
+8. Classes or Partner time counted in Load.
 9. An accepted proposal vanishing instead of becoming held.
 
 ## Test hooks

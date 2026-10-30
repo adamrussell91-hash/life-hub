@@ -26,9 +26,9 @@
 
 It builds on Plans 3–6, all merged to `main` (PRs adamrussell91-hash/life-hub#971 and adamrussell91-hash/life-hub#980). The "Hooks the later plans need" section at the end of Plan 6 (`docs/superpowers/plans/2026-10-20-problem-solver-plan-6-improve.md`) lists what this plan picks up.
 
-**Worktree and branch:** `/Users/adamrussell/Projects/life-hub-ps-process`, branch `claude/problem-solver-document` (cut from `origin/main` at `e177c007`, after PR 980 merged). Run every command from the worktree. Never touch `/Users/adamrussell/Projects/life-hub`.
+**Worktree and branch:** `/Users/you/Projects/life-hub-ps-process`, branch `claude/problem-solver-document` (cut from `origin/main` at `e177c007`, after PR 980 merged). Run every command from the worktree. Never touch `/Users/you/Projects/life-hub`.
 
-**Book references (local only, never commit):** the Document pages are rendered in `/Users/adamrussell/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
+**Book references (local only, never commit):** the Document pages are rendered in `/Users/you/Projects/life-hub-ps-process/.ps-book/` (git-excluded):
 - `document-intro.png` (p.144) and `fivecs-intro.png` (p.145)
 - `fivecs-a.png` (p.146) and `five-cs.png` (p.147, the pie)
 - `fivecs-b.png` (p.148) and `five-cs-2.png` (p.149, the Correspond card)

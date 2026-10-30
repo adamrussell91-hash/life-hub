@@ -13,8 +13,8 @@ export type JournalLocationSource = 'exif' | 'inferred' | 'manual' | 'device';
 
 export type JournalTransitionMode = 'flight' | 'train' | 'car' | 'ferry' | 'other';
 
-/** Owner journal vs Corey's separate perspective lane (never authoritative user truth). */
-export type JournalMomentAuthor = 'adam' | 'corey';
+/** Owner journal vs Partner's separate perspective lane (never authoritative user truth). */
+export type JournalMomentAuthor = 'adam' | 'partner';
 
 export interface JournalCoordinates {
   lat: number;

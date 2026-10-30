@@ -3,7 +3,7 @@ export const TR = {
   labelW: 196, // label column
   padR: 24,
   axis: { tiers: 30, weekLabel: 50, weekDate: 63, h: 76 },
-  lanes: { teacher: 160, corey: 76, scholar: 64, friends: 72, body: 104 },
+  lanes: { teacher: 160, partner: 76, scholar: 64, friends: 72, body: 104 },
   load: 104,
   bar: { h: 18, rx: 7, gap: 6 },
   point: 5,

@@ -50,7 +50,7 @@ test('the caseback weather report is identical on Life and Tasks', async () => {
   const calls = [];
   const tasks = await caseback('tasks', calls);
   const life = await caseback('life');
-  assert.ok(calls.includes('/api/travel-trips'), 'Pilot GMT and Corey look up trips on Tasks, not only Life');
+  assert.ok(calls.includes('/api/travel-trips'), 'Pilot GMT and Partner look up trips on Tasks, not only Life');
   assert.match(life.big, /\/100/, 'Life shows the full forecast');
   assert.ok(life.chart && life.cards.length > 0, 'Life shows the chart and window cards');
   assert.deepEqual(tasks, life);

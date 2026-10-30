@@ -47,7 +47,7 @@ const EVE_END = 22 * 60;
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 1024;
 const HOLD_TITLES = {
-  'good-night': { start: '18:00', end: '22:00', title: 'Good night: dinner out + a show', with: 'corey' },
+  'good-night': { start: '18:00', end: '22:00', title: 'Good night: dinner out + a show', with: 'partner' },
   'keep-empty': { start: '06:00', end: '22:00', title: 'Keep empty (daylight saving)' },
   newcastle: { start: '08:00', end: '21:00', title: 'Newcastle · friends' }
 };
@@ -565,7 +565,7 @@ export function buildAlmanac({
   const summary = { ...almanacSummary(lines), openings: openings.filter(opening => opening.dates.length).length };
   const world = EXAMPLE_WORLD.filter(entry => entry.date >= from && entry.date <= to);
   const horizon = horizonEnd(today, merged);
-  // Dexy context: an overlay on the forecast band, never a lower number (§3.1).
+  // Medication context: an overlay on the forecast band, never a lower number (§3.1).
   const medication = medicationLogs.length ? medicationContext(medicationLogs, { today, from, to }) : null;
   return { lines, summary, series, openings, world, terms, today, from, to, horizon, ...(medication ? { medication } : {}) };
 }
@@ -579,8 +579,8 @@ function heldDatesForWant(wantId, blocks, today) {
     const id = typeof block.id === 'string' ? block.id : '';
     if (id === `cb-alm-hold-${wantId}` || id.startsWith(`cb-alm-hold-${wantId}:`)) return true;
     if (block.title !== spec.title) return false;
-    if (spec.with === 'corey') return block.kind === 'corey';
-    return block.type === 'calendar_block' || block.kind === 'protected' || block.kind === 'corey';
+    if (spec.with === 'partner') return block.kind === 'partner';
+    return block.type === 'calendar_block' || block.kind === 'protected' || block.kind === 'partner';
   });
   if (!matched.length) return null;
   return [...new Set(matched.map(block => block.date))].sort();

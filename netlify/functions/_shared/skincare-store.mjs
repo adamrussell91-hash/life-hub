@@ -16,7 +16,7 @@ import {
   SKINCARE_CATALOG_PATH,
   parseCatalog
 } from '../../../apps/life/js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../../apps/life/js/app/skincare-routines-data.js';
+import { loadSkincareDefaults } from './skincare-defaults.mjs';
 
 function findBlob(tree, path) {
   return tree.find(item => item.path === path && item.type === 'blob');
@@ -50,14 +50,15 @@ export async function loadOrSeedLibrary(github) {
   }
 
   const catalogEntry = findBlob(tree, SKINCARE_CATALOG_PATH);
+  const defaults = await loadSkincareDefaults({ tree, readBlob: sha => github.readBlob(sha) });
   let library;
   if (catalogEntry) {
     const catalog = parseCatalog(decodeBlob(await github.readBlob(catalogEntry.sha)));
     library = catalog
       ? migrateProductLibraryFromCatalog(catalog)
-      : seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
+      : seedProductLibraryFromDefaults(defaults);
   } else {
-    library = seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
+    library = seedProductLibraryFromDefaults(defaults);
   }
 
   const result = await writeJson(
@@ -83,14 +84,15 @@ export async function loadOrSeedMembership(github, library) {
   }
 
   const catalogEntry = findBlob(tree, SKINCARE_CATALOG_PATH);
+  const defaults = await loadSkincareDefaults({ tree, readBlob: sha => github.readBlob(sha) });
   let membership;
   if (catalogEntry) {
     const catalog = parseCatalog(decodeBlob(await github.readBlob(catalogEntry.sha)));
     membership = catalog
       ? migrateMembershipFromCatalog(catalog, library)
-      : seedMembershipFromDefaults(SKINCARE_ROUTINES, library);
+      : seedMembershipFromDefaults(defaults, library);
   } else {
-    membership = seedMembershipFromDefaults(SKINCARE_ROUTINES, library);
+    membership = seedMembershipFromDefaults(defaults, library);
   }
 
   const result = await writeJson(

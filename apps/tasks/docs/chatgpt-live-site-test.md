@@ -79,11 +79,11 @@ This is **not** a simple to-do list. It is Clare DeMind’s task/project hub. Sa
 | Projects | `#/projects` | Arcs / Projects | Stall revive / Frankenstein / bury. Close-with-retrospective. Review log. |
 | Excursions | `#/excursions` | Events / Excursions | Create from Ethics Olympiad / Da Vinci templates. Admin tasks + drafts. |
 | ~~Network~~ | ~~`#/stress`~~ | **Retired** | Network / StressFlags / `/api/stress-flags` removed — do not test. |
-| ~~Corey~~ | ~~`#/corey`~~ | **Retired** | Corey capacity page / public `#/capacity/<token>` removed with Network — do not test. |
+| ~~Partner~~ | ~~`#/partner`~~ | **Retired** | Partner capacity page / public `#/capacity/<token>` removed with Network — do not test. |
 | Templates | `#/templates` | Reuse / Templates | Use task template → Today. Use excursion template → Excursions. |
 | Search | `#/search` | Find / Search | Live search of task + project titles/descriptions (min 2 chars). |
 
-**Public (no sign-in):** capacity share routes were retired with Corey — skip.
+**Public (no sign-in):** capacity share routes were retired with Partner — skip.
 
 Seeded content you should see (production may already have extra user data on top):
 
@@ -106,7 +106,7 @@ Prefix every task / excursion / map you create with **`[LIVE-TEST]`** so they ar
 
 - bury, Frankenstein, or close **MindWorks** or any project you did not create
 - delete map stations/ticks you did not just add
-- rotate Corey share **if a real person already has the current link** — test **Copy** first; only rotate if you will paste the new URL into the report and not leave Corey with a dead link. If unsure, **skip rotate** and mark the step `SKIPPED — safety`.
+- rotate Partner share **if a real person already has the current link** — test **Copy** first; only rotate if you will paste the new URL into the report and not leave Partner with a dead link. If unsure, **skip rotate** and mark the step `SKIPPED — safety`.
 
 Do **not** sign out until the last auth step. Do **not** change the passphrase. Do **not** wipe the store.
 
@@ -373,9 +373,9 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 
 78–82. **Do not run.** `#/stress` and `GET/POST /api/stress-flags` were deleted with the Network tab. A 404 here is expected and is **not** a deploy failure.
 
-### L. Corey (`#/corey`) + public share — **RETIRED — SKIP**
+### L. Partner (`#/partner`) + public share — **RETIRED — SKIP**
 
-83–88. **Do not run.** `#/corey` and `#/capacity/<token>` were removed with Network. Do not treat missing capacity API as a live regression.
+83–88. **Do not run.** `#/partner` and `#/capacity/<token>` were removed with Network. Do not treat missing capacity API as a live regression.
 
 ### M. Templates + Search
 
@@ -388,7 +388,7 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 
 ### N. Cross-cutting
 
-95. Click **every remaining live rail item** you have not opened in this session (Network / Corey are retired — skip those hashes). Each live item sets `aria-current="page"`, correct header, and a painted canvas (not the previous view leftover).
+95. Click **every remaining live rail item** you have not opened in this session (Network / Partner are retired — skip those hashes). Each live item sets `aria-current="page"`, correct header, and a painted canvas (not the previous view leftover).
 96. Browser Back / Forward through 4 hashes. Views remount correctly.
 97. Hard reload on `#/gantt` and `#/clare` (deep link). Session persists; correct view paints.
 98. Unknown API outage simulation: DevTools → Network → Offline, click Board. Expect a sign-in fallback or visible error, **not** a permanent white screen. Go online again and recover.
@@ -416,7 +416,7 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 
 | Severity | Meaning |
 |---|---|
-| **S1 Blocker** | Cannot sign in, blank app, data loss, public Corey leak of task titles, uncaught exception on a primary view |
+| **S1 Blocker** | Cannot sign in, blank app, data loss, public Partner leak of task titles, uncaught exception on a primary view |
 | **S2 High** | A primary write path fails, a rail route opens the wrong view, API 404 on a shipped feature, confirm card skipped |
 | **S3 Medium** | Control no-op, persist fail on a secondary path, layout broken at desktop, a11y fail on a primary control |
 | **S4 Low** | Copy, polish, empty-state wording, minor overflow, cosmetic token drift |
@@ -484,7 +484,7 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 - `[LIVE-TEST]` records created (titles + ids if visible):
 - Writes you confirmed (list):
 - Writes you discarded (list):
-- Corey tokens: last 4 chars old/new if rotated; otherwise “not rotated”
+- Partner tokens: last 4 chars old/new if rotated; otherwise “not rotated”
 
 ## UX notes (no crash, still wrong)
 - numbered list

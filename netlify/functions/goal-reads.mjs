@@ -20,6 +20,7 @@ import { createGitHubClient } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { githubOpenCommit, readEvents } from './_shared/calendar-ghosts-propose.mjs';
 import { bindingFromEvents, buildSlotsFromEvents } from './_shared/goal-calendar-context.mjs';
+import { resolveTargetsConfig } from './_shared/targets-config.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
 import { addDays } from '../../packages/design-kit/js/lead-lines.js';
 import { readinessEvidenceEvents, READINESS_LOOKBACK_DAYS } from './_shared/readiness-evidence.mjs';
@@ -150,6 +151,12 @@ export async function defaultLoadCalendarContext({
     const from = addDays(today, -(READINESS_LOOKBACK_DAYS + 2));
     const to = addDays(today, 14);
     const events = await readEvents(paths, path => opened.readFile(path), from, to, warn);
+    let targetsConfig = null;
+    try {
+      targetsConfig = resolveTargetsConfig(await opened.readFile('config/targets.yml'), null, { forecastOnly: true });
+    } catch {
+      targetsConfig = null;
+    }
     let readinessEvents = [];
     let terms = [];
     try {
@@ -161,7 +168,7 @@ export async function defaultLoadCalendarContext({
     }
     return {
       slots: buildSlotsFromEvents([...events, ...readinessEvents], today, { terms }),
-      binding: bindingFromEvents(events, today),
+      binding: bindingFromEvents(events, today, targetsConfig),
       calendarLooked: true,
       lifeHubLooked: true
     };

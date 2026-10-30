@@ -120,14 +120,14 @@ test('calendar_block is a Life event with its title and span', () => {
   const record = {
     type: 'calendar_block',
     title: 'Dinner out + a show',
-    kind: 'corey',
+    kind: 'partner',
     time: '18:00',
     end_time: '22:00',
     protected: true,
     status: 'tentative'
   };
   assert.equal(eventDetailTitle(record), 'Dinner out + a show');
-  assert.equal(eventBrief({ record }), 'corey · 18:00–22:00 · protected · tentative');
+  assert.equal(eventBrief({ record }), 'partner · 18:00–22:00 · protected · tentative');
   const life = calendarSourceSummary([{ record }]).find(source => source.id === 'life');
   assert.equal(life.count, 1);
 });
@@ -142,11 +142,11 @@ test('medical events title from the visit and brief from provider or type', () =
   assert.equal(eventDetailTitle({ type: 'medical', title: 'GP review' }), 'GP review');
   assert.equal(eventDetailTitle({ type: 'medical' }), 'Medical');
   assert.equal(
-    eventBrief({ record: { type: 'medical', title: 'GP review', provider: 'Dr Nerida McDonald' } }),
-    'Dr Nerida McDonald'
+    eventBrief({ record: { type: 'medical', title: 'GP review', provider: 'Dr Jordan Sample' } }),
+    'Dr Jordan Sample'
   );
   assert.equal(
-    eventBrief({ record: { type: 'medical', title: 'Stelara', record_type: 'Prescription' } }),
+    eventBrief({ record: { type: 'medical', title: 'Biologic', record_type: 'Prescription' } }),
     'Prescription'
   );
 });

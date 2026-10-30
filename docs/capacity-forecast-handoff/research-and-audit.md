@@ -30,7 +30,7 @@ Canonical implementation: `packages/design-kit/js/calendar/capacity-model.js`; L
 
 A numeric sleep record or any diary makes the day logged rather than forecast. It is not specifically mood that makes it solid, and logged does not mean well evidenced. Missing days do not independently reset the tracked low-day streak. Maximum 95 also conflicts with Adam's 100 endpoint.
 
-`dayLoadHours` excludes class/protected/Corey/ghost/log items. `isOverCapacity` compares load hours to `(pct/100) × 6`; load does not alter the readiness score itself.
+`dayLoadHours` excludes class/protected/Partner/ghost/log items. `isOverCapacity` compares load hours to `(pct/100) × 6`; load does not alter the readiness score itself.
 
 Earlier audit found `tideline-model.js` passes displayed-week dates to `capacityForDates`, excluding earlier context even if loaded. Almanac separately uses recent logged dates and term-pattern constants; its widening band is arbitrary rather than calibrated. Re-verify these view-specific details against the eventual implementation branch. Medication timing is a visual guide, not an existing readiness effect.
 

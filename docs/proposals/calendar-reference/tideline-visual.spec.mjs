@@ -106,10 +106,10 @@ test('phase 2: week layout, capacity and chrome match the reference', async () =
     // Logs never take a slot
     assert.equal(await page.locator('[data-part="chip"]:has-text("breakfast"), [data-part="chip"]:has-text("Diary")').count(), 0);
     assert.match(await page.locator('[data-part="ambient"]').textContent(), /12 notes touched/);
-    // Corey is first-class: warm fill, peach ink, the two-ring mark
-    const corey = page.locator('[data-id="thu-corey"]');
-    assert.equal(await corey.locator('.cal-chip__title').evaluate(n => getComputedStyle(n).color), 'rgb(122, 80, 56)');
-    assert.equal(await corey.locator('.cal-mark').count(), 1);
+    // Partner is first-class: warm fill, peach ink, the two-ring mark
+    const partner = page.locator('[data-id="thu-partner"]');
+    assert.equal(await partner.locator('.cal-chip__title').evaluate(n => getComputedStyle(n).color), 'rgb(122, 80, 56)');
+    assert.equal(await partner.locator('.cal-mark').count(), 1);
     // Walls, free time, now
     assert.ok(await page.locator('[data-part="day-body"][data-date="2026-09-27"] [data-part="wall"]').isVisible());
     assert.match(await page.locator('[data-part="free"]').textContent(), /4½ h free/);
@@ -206,7 +206,7 @@ test('phase 3: a band springs open in one smooth tween and the stack never chang
     // Density follows height
     assert.equal(await page.locator('[data-id="class-2026-09-24-p1"]').getAttribute('data-density'), 'card');
     assert.ok(Number(await page.locator('[data-id="class-2026-09-24-p1"] .cal-chip__meta').evaluate(n => getComputedStyle(n).opacity)) > 0.95);
-    assert.equal(await page.locator('[data-id="thu-corey"]').getAttribute('data-density'), 'sliver');
+    assert.equal(await page.locator('[data-id="thu-partner"]').getAttribute('data-density'), 'sliver');
     await shot(page, 'school-1280');
     // Same band again folds back to rest
     await page.locator('[data-part="band-school"]').click();
@@ -290,7 +290,7 @@ test('phase 4: dismiss writes nothing; Apply all writes every pending ghost once
     await page.waitForTimeout(1200);
     assert.match(await page.locator('[data-part="toast"]').textContent(), /3 changes written\./);
     assert.equal(await page.locator('[data-part="ghost"]').count(), 0, 'no dashed ghosts left');
-    assert.match(await page.locator('[data-part="due"][data-id="task-josh-y10"]').getAttribute('class'), /is-moved/);
+    assert.match(await page.locator('[data-part="due"][data-id="task-student-y10"]').getAttribute('class'), /is-moved/);
     await shot(page, 'accepted-1280');
   } finally {
     await context.close();
@@ -313,7 +313,7 @@ test('phase 4: what Accept wrote is what the calendar shows after a reload (app 
     assert.match(await workout.getAttribute('class'), /is-skipped/, 'the skipped workout record renders as skipped');
     assert.doesNotMatch(await workout.getAttribute('class'), /has-proposal/);
     assert.match(await workout.locator('.cal-chip__meta').textContent(), /^Skipped/);
-    assert.match(await page.locator('[data-part="due"][data-id="task-josh-y10"]').getAttribute('class') ?? '', /is-moved/, 'or the task is gone from 25/09');
+    assert.match(await page.locator('[data-part="due"][data-id="task-student-y10"]').getAttribute('class') ?? '', /is-moved/, 'or the task is gone from 25/09');
     assert.deepEqual(await page.locator('[data-part="ghost"]').evaluateAll(n => n.map(x => x.dataset.id).sort()), ['g-bed', 'g-good']);
   } finally {
     await context.close();

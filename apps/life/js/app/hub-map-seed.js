@@ -146,7 +146,7 @@ export function buildHubMapSeed() {
   add('tasks-programs', 'Programs', 'tasks', 'page', 'hub-tasks', { route: '#/programs' });
   add('tasks-archive', 'Archive', 'tasks', 'page', 'hub-tasks', { route: '#/archive' });
   add('tasks-stress', 'Network', 'tasks', 'page', 'hub-tasks', { route: '#/stress' });
-  add('tasks-corey', 'Corey', 'tasks', 'page', 'hub-tasks', { route: '#/corey' });
+  add('tasks-partner', 'Partner', 'tasks', 'page', 'hub-tasks', { route: '#/partner' });
   add('tasks-maps', 'Maps', 'tasks', 'page', 'hub-tasks', {
     route: '#/maps',
     features: ['Transit-style lines and stations', 'Planned and active items']

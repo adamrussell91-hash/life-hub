@@ -1,5 +1,5 @@
 /**
- * The Almanac reference: Thu 24/09/26 → Sun 10/01/27 (until Adam is home from Korea).
+ * The Almanac reference: Thu 24/09/26 → Sun 10/01/27 (until Adam is home from the trip).
  * Clock frozen at 2026-09-24. Mirrors ../fixture.json (generated from this file).
  *
  * Anchors come from central-node.md (About Me, Constraints). World entries are EXAMPLES of
@@ -21,15 +21,15 @@ export type Anchor = {
 };
 
 export const ANCHORS: Anchor[] = [
-  { id: 'korea', title: 'Korea honeymoon', kind: 'trip', date: '2026-12-23', returns: '2027-01-10',
-    tags: ['international', 'pets-home-alone', 'on-biologic', 'with-corey'], sub: '23/12 – 10/01 · 4 animals home' },
+  { id: 'big-trip', title: 'Overseas holiday', kind: 'trip', date: '2026-12-23', returns: '2027-01-10',
+    tags: ['international', 'pets-home-alone', 'on-biologic', 'with-partner'], sub: '23/12 – 10/01 · 4 animals home' },
   { id: 'solo-travel', title: 'Solo travel', kind: 'trip', date: '2026-12-01', returns: '2026-12-15',
     tags: ['undecided'], sub: 'from 01/12 · term runs to 17/12' },
   { id: 'vitamin-d', title: 'Vitamin D recheck', kind: 'medical', window: { opens: '2026-09-19', closes: '2026-10-19' },
-    tags: ['bloods'], sub: '3–4 months after the 19/06 change' },
-  { id: 'unsw-conferral', title: 'UNSW conferral', kind: 'event', date: '2026-09-30', tags: ['graduation'], sub: 'Master of Gifted Education' },
+    tags: ['bloods'], sub: 'a few months after the dose change' },
+  { id: 'conferral', title: 'Degree conferral', kind: 'event', date: '2026-09-30', tags: ['graduation'], sub: 'Master's degree' },
   { id: 'term-4', title: 'Term 4 · new Year 12', kind: 'term', date: '2026-10-13', tags: ['new-class'], sub: 'one class from 13/10' },
-  { id: 'dream-study', title: 'Dream · Harvard, Oxford…', kind: 'dream', tags: ['dream'], sub: 'study at one of the four' }
+  { id: 'dream-study', title: 'Dream · Study overseas', kind: 'dream', tags: ['dream'], sub: 'a postgraduate place overseas' }
 ];
 
 /** Things fixed on the calendar that aren't anchors (drawn on the anchors row). */
@@ -54,7 +54,7 @@ export const PATTERN: { from: string; to: string; delta: number; label?: string 
   { from: '2026-12-01', to: '2026-12-15', delta: 4 }
 ];
 
-export const WALLS = [{ from: '2026-12-23', to: '2027-01-10', title: 'Korea · 23/12 – 10/01' }];
+export const WALLS = [{ from: '2026-12-23', to: '2027-01-10', title: 'Away · 23/12 – 10/01' }];
 
 /** Busy facts the openings finder needs beyond "term weekday = busy day". */
 export const BUSY = [
@@ -65,7 +65,7 @@ export const DAY_TAGS: Record<string, string[]> = { '2026-10-04': ['dst-start'] 
 /** Evenings already taken (Tideline: Sat 26/09 good night proposed; treat as taken). */
 export const TAKEN_EVENINGS = ['2026-09-26'];
 
-export const HABIT = { id: 'korean', title: 'Korean for travellers', minutes: 20, perWeek: 3, from: '2026-09-28', until: '2026-12-23',
+export const HABIT = { id: 'phrasebook', title: 'Phrasebook for travellers', minutes: 20, perWeek: 3, from: '2026-09-28', until: '2026-12-23',
   why: 'Enough to order, ask directions and get home: comforting adventure.' };
 
 /** Drafts for openings that involve other people. {when} is filled from the opening's dates. Never sent. */

@@ -4,6 +4,6 @@ export type CalendarSourceId =
   | 'tasks'
   | 'health'
   | 'fitness'
-  | 'corey';
+  | 'partner';
 export const CALENDAR_SOURCES: readonly Readonly<{ id: CalendarSourceId; label: string }>[];
 export function listCalendarSources(): readonly Readonly<{ id: CalendarSourceId; label: string }>[];

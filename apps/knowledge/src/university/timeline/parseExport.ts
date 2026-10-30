@@ -12,18 +12,38 @@ const UNIT_HEADING = /^#### (\d+)\.(\d+) (.+)$/;
 const ITEM_HEADING = /^###### (\d+)\.(\d+)\.(\d+) (.+)$/;
 const TABLE_ROW = /^\| ([^|]+) \| (.+) \|$/;
 
-const TITLE_OVERRIDES: Record<string, string> = {
-  "Graduate Certificate in Child and Adolescent|Charles Sturt University":
-    "Graduate Certificate in Child and Adolescent Welfare",
-  "Graduate Certificate in Child and Adolescent|Victoria University":
-    "Graduate Certificate in Child and Adolescent Mental Health",
-  "Advanced Insights in Cognitive Psychology|Flinders University":
-    "Master of Cognitive Psychology",
-  "Transformational Leadership Certificate|University of Newcastle":
-    "Graduate Certificate in Transformational Leadership",
-};
+/**
+ * Per-export corrections. The real ones (which degrees to rename or leave out, and which
+ * campus suffixes to trim from a place name) are personal and live in the private data repo
+ * next to the catalogue; the parser itself knows none of them.
+ */
+export interface ParseExportOptions {
+  /** `"<Notion name>|<institution>"` → display title. */
+  titleOverrides?: Record<string, string>;
+  /** Degree titles (any case) to drop from the catalogue. */
+  excludedProgrammes?: string[];
+  /** Suffixes trimmed from `Place` names after a hyphen, e.g. a campus. */
+  placeSuffixes?: string[];
+}
 
-const EXCLUDED_PROGRAMMES = new Set(["graduate diploma of psychology"]);
+interface ParseContext {
+  titleOverrides: Record<string, string>;
+  excluded: Set<string>;
+  placeSuffix: RegExp | null;
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseContext(options: ParseExportOptions = {}): ParseContext {
+  const suffixes = (options.placeSuffixes ?? []).filter(Boolean);
+  return {
+    titleOverrides: options.titleOverrides ?? {},
+    excluded: new Set((options.excludedProgrammes ?? []).map(name => name.replace(/\s+/g, " ").trim().toLowerCase())),
+    placeSuffix: suffixes.length ? new RegExp(`-(${suffixes.map(escapeRegExp).join("|")})$`, "i") : null,
+  };
+}
 
 function slug(parts: string[]) {
   return parts
@@ -63,11 +83,12 @@ function parseGpa(value: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function parsePlaceName(value: string | null): string | null {
+function parsePlaceName(value: string | null, ctx: ParseContext): string | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as { name?: string };
-    return parsed.name?.replace(/-(Armidale|Kensington Campus|Footscray Park Campus)$/i, "") ?? null;
+    const name = parsed.name ?? null;
+    return name && ctx.placeSuffix ? name.replace(ctx.placeSuffix, "") : name;
   } catch {
     return null;
   }
@@ -81,8 +102,8 @@ function unitCode(name: string, unitNumber: string | null): string | null {
   return match?.[1] ?? null;
 }
 
-function isExcludedProgramme(name: string) {
-  return EXCLUDED_PROGRAMMES.has(name.replace(/\s+/g, " ").trim().toLowerCase());
+function isExcludedProgramme(name: string, ctx: ParseContext) {
+  return ctx.excluded.has(name.replace(/\s+/g, " ").trim().toLowerCase());
 }
 
 function degreeNumber(id: string) {
@@ -99,9 +120,9 @@ function fillMissingUnitCodes(degrees: DegreeRecord[]) {
   }
 }
 
-function displayTitle(name: string, _description: string | null, institution: string | null) {
+function displayTitle(name: string, institution: string | null, ctx: ParseContext) {
   const key = `${name}|${institution ?? ""}`;
-  if (TITLE_OVERRIDES[key]) return TITLE_OVERRIDES[key];
+  if (ctx.titleOverrides[key]) return ctx.titleOverrides[key];
   return name.replace(/\s+/g, " ").trim();
 }
 
@@ -127,7 +148,8 @@ function recordKind(uniType: string | null): AssessmentKind {
   return uniType?.toLowerCase() === "test" ? "test" : "assessment";
 }
 
-export function parseUniversityExport(markdown: string): UniversityCatalogue {
+export function parseUniversityExport(markdown: string, options: ParseExportOptions = {}): UniversityCatalogue {
+  const ctx = parseContext(options);
   const lines = markdown.split(/\r?\n/);
   const generated =
     markdown.match(/Generated on ([^\n]+)/)?.[1]?.trim() ?? new Date().toISOString();
@@ -162,8 +184,8 @@ export function parseUniversityExport(markdown: string): UniversityCatalogue {
     if (line === "### Degree properties" && currentDegree) {
       const { props, next } = tableProps(lines, i + 1);
       const dates = parseDates(blank(props.Dates));
-      const institution = parsePlaceName(blank(props.Place));
-      currentDegree.title = displayTitle(blank(props.Name) ?? currentDegree.title, blank(props.Description), institution);
+      const institution = parsePlaceName(blank(props.Place), ctx);
+      currentDegree.title = displayTitle(blank(props.Name) ?? currentDegree.title, institution, ctx);
       currentDegree.id = slug(["degree", degreeNumber(currentDegree.id), currentDegree.title]);
       currentDegree.institution = institution;
       currentDegree.status = parseStatus(blank(props.Status));
@@ -228,6 +250,6 @@ export function parseUniversityExport(markdown: string): UniversityCatalogue {
   fillMissingUnitCodes(degrees);
   return {
     generated,
-    degrees: degrees.filter(degree => !isExcludedProgramme(degree.title)),
+    degrees: degrees.filter(degree => !isExcludedProgramme(degree.title, ctx)),
   };
 }

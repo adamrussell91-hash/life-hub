@@ -17,8 +17,8 @@
 **Tech Stack:** Node ESM (`.mjs`), `node:test` (root `tests/unit`), Netlify functions, an encrypted R2 cognitive store, and plain HTML and CSS for the mockups.
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md`.
-**Branch and worktree:** `claude/decision-book` in `/Users/adamrussell/Projects/life-hub-decision-book`. Run every command from that worktree's root.
-**Graphics source (never committed as a folder, only copied glyphs):** `/Users/adamrussell/Desktop/Decision Book Graphics`.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root.
+**Graphics source (never committed as a folder, only copied glyphs):** `/Users/you/Desktop/Decision Book Graphics`.
 
 **Public repo rule:** life-hub is public. No book text, scans or page renders are committed. `.db-book/` is git-ignored.
 
@@ -396,7 +396,7 @@ console.log(`Copied ${CATALOGUE.length} model emblems, ${SECTIONS.length} sectio
 
 - [ ] **Step 4: Run the script**
 
-Run: `node scripts/import-decision-book-glyphs.mjs "/Users/adamrussell/Desktop/Decision Book Graphics"`
+Run: `node scripts/import-decision-book-glyphs.mjs "/Users/you/Desktop/Decision Book Graphics"`
 Expected: `Copied 52 model emblems, 4 section emblems and 3 identity marks.`
 
 - [ ] **Step 5: Run the test to verify it passes**
@@ -455,7 +455,7 @@ Add this line to `.gitignore`, directly after `.ps-book/`:
 
 Run:
 ```bash
-mkdir -p .db-book && for f in "/Users/adamrussell/Desktop/Decision Book Graphics/The_Decision_Book_Chapter_PDFs/"*.pdf; do pdftoppm -r 100 -png "$f" ".db-book/$(basename "$f" .pdf)"; done && ls .db-book | wc -l
+mkdir -p .db-book && for f in "/Users/you/Desktop/Decision Book Graphics/The_Decision_Book_Chapter_PDFs/"*.pdf; do pdftoppm -r 100 -png "$f" ".db-book/$(basename "$f" .pdf)"; done && ls .db-book | wc -l
 ```
 Expected: a count of 150 (pages across the six PDFs: 4 + 40 + 30 + 42 + 26 + 8).
 

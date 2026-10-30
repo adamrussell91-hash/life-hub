@@ -6,7 +6,7 @@ import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month', 'year'];
 export const DEFAULT_MIND_RANGE = 'monthly';
 export const WATCHLIST_PRESETS = {
-  topics: ['work', 'school', 'sleep', 'rest', 'Corey', 'flare', 'family', 'weekend'],
+  topics: ['work', 'school', 'sleep', 'rest', 'Partner', 'flare', 'family', 'weekend'],
   inner: ['behind', 'hollow', 'shame', 'pressure', 'stuck', 'tired', 'lonely', 'dread']
 };
 export const DEFAULT_MIND_WATCHLIST = WATCHLIST_PRESETS.topics;

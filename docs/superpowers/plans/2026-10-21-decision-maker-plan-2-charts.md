@@ -19,7 +19,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md` ("Diagrams").
 **Plan 1:** `docs/superpowers/plans/2026-10-21-decision-maker-plan-1-foundations.md` (done).
-**Branch and worktree:** `claude/decision-book` in `/Users/adamrussell/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise.
 **Before starting:** run `npm ci` at the worktree root and in `apps/tasks`. The Tasks Vite config loads the mock API, which needs the root packages. The worktree has neither installed.
 
 **How this plan was made:** every file below was drafted in the worktree and its tests run green before the plan was written: 17 factory tests, 5 stylesheet tests, 205 chart tests, 437 node tests and 981 Problem Solver and Decision Book vitest tests in all. The Tasks type-check showed no errors in these paths. The drafts were then removed, so the code here is the code that passed.

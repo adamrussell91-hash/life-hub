@@ -13,4 +13,5 @@ migrated/pages-dry-run.json
 migrated/pages-dry-run-*.json
 migrated/lexical-corpus.json
 migrated/index.json
+migrated/migration-audit.json
 migrated/data-repo/

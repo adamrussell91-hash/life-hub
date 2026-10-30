@@ -1,8 +1,11 @@
 import type { Origin } from "../domain/page";
 import { mergeOrigins, normalizeOrigins, pageOrigins } from "./normalize";
-import notesPlace from "./notesPlace.json";
-
 type NotesPlaceKind = "notebook" | "book" | "pd";
+
+/** Recovered Notion place map: label → Notion page ids, per kind. */
+export type NotesPlace = Record<NotesPlaceKind, Record<string, string[]>>;
+
+const KINDS: NotesPlaceKind[] = ["notebook", "book", "pd"];
 
 /** Pull a Notion page hex out of a bare id, dashed UUID, page_notion_* id, or URL. */
 export function extractNotionHex(value: string | undefined): string | null {
@@ -18,23 +21,39 @@ export function extractNotionHex(value: string | undefined): string | null {
   return embedded?.[embedded.length - 1] ?? null;
 }
 
+/*
+ * Which notes came from which notebook, book or PD event is personal (the PD list is a record of
+ * what Adam attended), so the map lives in the private data repo (data/knowledge/notes-place.json)
+ * and is installed at runtime by `loadPrivateSources()`. Until then no pills are recovered.
+ */
 const byId = new Map<string, Origin[]>();
+let notebookLabels: string[] = [];
 
-function indexKind(kind: NotesPlaceKind) {
-  for (const [label, ids] of Object.entries(notesPlace[kind])) {
-    for (const id of ids) {
-      const hex = extractNotionHex(id);
-      if (!hex) continue;
-      const list = byId.get(hex) ?? [];
-      list.push({ kind, label });
-      byId.set(hex, list);
+/** Replace the installed map. Malformed entries are skipped. */
+export function installNotesPlace(data?: Partial<Record<NotesPlaceKind, unknown>> | null) {
+  byId.clear();
+  notebookLabels = [];
+  for (const kind of KINDS) {
+    const group = data?.[kind];
+    if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+    for (const [label, ids] of Object.entries(group as Record<string, unknown>)) {
+      if (!Array.isArray(ids)) continue;
+      if (kind === "notebook") notebookLabels.push(label);
+      for (const id of ids) {
+        const hex = typeof id === "string" ? extractNotionHex(id) : null;
+        if (!hex) continue;
+        const list = byId.get(hex) ?? [];
+        list.push({ kind, label });
+        byId.set(hex, list);
+      }
     }
   }
 }
 
-indexKind("notebook");
-indexKind("book");
-indexKind("pd");
+/** Notebook labels from the installed map, in its order. */
+export function installedNotebooks(): string[] {
+  return [...notebookLabels];
+}
 
 /** Recovered Notion notebook / book / PD pills, keyed by Notion page hex. */
 export function originsFromNotesPlace(sourceNotionId?: string): Origin[] {

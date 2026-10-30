@@ -8,7 +8,7 @@
  */
 
 export type LogEvent = { record: Record<string, any>; body?: string };
-export type Kind = 'teaching' | 'professional' | 'task' | 'health' | 'fitness' | 'corey' | 'study';
+export type Kind = 'teaching' | 'professional' | 'task' | 'health' | 'fitness' | 'partner' | 'study';
 export type TimedItem = {
   id: string;
   date: string;
@@ -31,7 +31,7 @@ export type Ghost = {
   end?: string;
   time?: string;
   title?: string;
-  with?: 'corey';
+  with?: 'partner';
   reason?: string;
   workoutPath?: string;
   taskId?: string;
@@ -87,25 +87,25 @@ export const ITEMS: TimedItem[] = [
   cls('2026-09-21', 1, 'Y12 English Adv', 'Common Module revision'),
   cls('2026-09-21', 2, 'Y11 English Adv', 'Module C drafts'),
   { id: 'resource-day', date: '2026-09-21', start: '10:51', end: '14:50', kind: 'professional', title: 'Focus Area: Texts and human experience · resource day', meta: '10:51 am – 2:50 pm' },
-  { id: 'mon-corey', date: '2026-09-21', start: '19:30', end: '21:30', kind: 'corey', title: 'Tea + TV', meta: '7:30 – 9:30 pm', protected: true, sample: true },
+  { id: 'mon-partner', date: '2026-09-21', start: '19:30', end: '21:30', kind: 'partner', title: 'Tea + TV', meta: '7:30 – 9:30 pm', protected: true, sample: true },
 
   cls('2026-09-22', 1, 'Y11 English Adv', 'Module C'),
   cls('2026-09-22', 3, 'Y12 English Adv', 'HSC practice paper'),
   cls('2026-09-22', 5, 'HPGE planning', 'with Leader of Learning'),
   { id: 'tue-workout', date: '2026-09-22', start: '17:45', end: '18:15', kind: 'fitness', title: 'Workout · 30 min', meta: '5:45 pm', sample: true },
-  { id: 'tue-corey', date: '2026-09-22', start: '19:15', end: '21:15', kind: 'corey', title: 'Dinner at home', meta: '7:15 – 9:15 pm', protected: true, sample: true },
+  { id: 'tue-partner', date: '2026-09-22', start: '19:15', end: '21:15', kind: 'partner', title: 'Dinner at home', meta: '7:15 – 9:15 pm', protected: true, sample: true },
 
   cls('2026-09-23', 2, 'Y12 English Adv', 'Paper 1 timing'),
   cls('2026-09-23', 4, 'Y11 English Adv', 'peer feedback'),
   cls('2026-09-23', 6, 'MindWorks', 'UN Voice coaching'),
   { id: 'wed-marking', date: '2026-09-23', start: '15:40', end: '17:20', kind: 'teaching', title: 'Mark Y11 Module C drafts', meta: '3:40 – 5:20 pm', sample: true },
-  { id: 'wed-corey', date: '2026-09-23', start: '19:30', end: '21:30', kind: 'corey', title: 'Tea + TV', meta: '7:30 – 9:30 pm', protected: true, sample: true },
+  { id: 'wed-partner', date: '2026-09-23', start: '19:30', end: '21:30', kind: 'partner', title: 'Tea + TV', meta: '7:30 – 9:30 pm', protected: true, sample: true },
 
   cls('2026-09-24', 1, 'Y12 English Adv', 'last full lesson'),
   cls('2026-09-24', 3, 'Y11 English Adv', 'drafts returned'),
-  { id: 'gastro', date: '2026-09-24', start: '13:15', end: '14:15', kind: 'health', title: 'Gastroenterologist follow-up · Dr Chris Keily', meta: '1:15 pm · 2 records merged', mergedRecords: 2 },
+  { id: 'gastro', date: '2026-09-24', start: '13:15', end: '14:15', kind: 'health', title: 'Gastroenterologist follow-up · Dr Rowan Example', meta: '1:15 pm · 2 records merged', mergedRecords: 2 },
   { id: 'thu-workout', date: '2026-09-24', start: '18:15', end: '19:25', kind: 'fitness', title: 'Workout · upper body', meta: 'Chadwick’s plan', sample: true },
-  { id: 'thu-corey', date: '2026-09-24', start: '19:30', end: '21:30', kind: 'corey', title: 'Tea + TV with Corey', meta: 'Protected · 7:30 – 9:30 pm', protected: true, sample: true },
+  { id: 'thu-partner', date: '2026-09-24', start: '19:30', end: '21:30', kind: 'partner', title: 'Tea + TV with Partner', meta: 'Protected · 7:30 – 9:30 pm', protected: true, sample: true },
 
   { id: 'pd-hard-conversations', date: '2026-09-25', start: '08:30', end: '10:30', kind: 'professional', title: 'Courageously Navigating Hard Conversations', meta: '8:30 – 10:30 am · PD' },
   cls('2026-09-25', 3, 'Y11 English Adv', 'end of term'),
@@ -115,7 +115,7 @@ export const ITEMS: TimedItem[] = [
 ];
 
 export const DUE: DueItem[] = [
-  { id: 'task-josh-y10', date: '2026-09-25', title: 'Find out about Year 10 leadership opportunities for Josh Lizzio', kind: 'task', ghostId: 'g-move' }
+  { id: 'task-student-y10', date: '2026-09-25', title: 'Find out about Year 10 leadership opportunities for Sam Example', kind: 'task', ghostId: 'g-move' }
 ];
 
 export const WALLS: Wall[] = [{ date: '2026-09-27', label: 'Your day · protected' }];
@@ -135,11 +135,11 @@ export const GHOSTS: Ghost[] = [
   },
   {
     id: 'g-good', agent: 'hammond', kind: 'protect_block', date: '2026-09-26', start: '18:00', end: '22:00',
-    title: 'Dinner out + a show', with: 'corey', label: 'Good night: dinner out + a show', meta: 'Hammond · your definition of a good night',
-    chip: { date: '2026-09-26', start: '18:00', end: '22:00', kind: 'corey' }
+    title: 'Dinner out + a show', with: 'partner', label: 'Good night: dinner out + a show', meta: 'Hammond · your definition of a good night',
+    chip: { date: '2026-09-26', start: '18:00', end: '22:00', kind: 'partner' }
   },
   {
-    id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-josh-y10', title: 'Year 10 leadership opportunities for Josh Lizzio',
+    id: 'g-move', agent: 'hammond', kind: 'move_task', taskId: 'task-student-y10', title: 'Year 10 leadership opportunities for Sam Example',
     from: '2026-09-25', to: '2026-10-13', label: '→ T4 W1', meta: 'Hammond'
   }
 ];
@@ -155,6 +155,6 @@ export const SOURCES = [
   { id: 'professional', label: 'Professional', count: 3 },
   { id: 'task', label: 'Tasks', count: 1 },
   { id: 'health', label: 'Health', count: 2 },
-  { id: 'corey', label: 'Corey', count: 4 }
+  { id: 'partner', label: 'Partner', count: 4 }
 ];
 export const AMBIENT = '9 meals · 3 diary · 2 symptoms · 12 notes touched';

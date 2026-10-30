@@ -3939,6 +3939,11 @@ body.is-universe-fullscreen .local-banner {
   gap: var(--hub-tile-gap);
 }
 
+.uni-tl__status {
+  margin: 0;
+  color: var(--muted);
+}
+
 .uni-tl__toolbar {
   display: flex;
   flex-wrap: wrap;

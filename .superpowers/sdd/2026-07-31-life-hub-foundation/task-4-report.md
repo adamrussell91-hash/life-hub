@@ -20,7 +20,7 @@ The Notion skill was used read-only to retrieve the authoritative section 5 and 
 After creating `tests/unit/records.test.js` and before either production module existed, ran:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
 ```
 
 Observed expected failure:
@@ -39,7 +39,7 @@ This was the expected RED state: the test imported the not-yet-created canonical
 Focused command after the minimal parser/validator implementation:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
 ```
 
 Focused result:
@@ -59,7 +59,7 @@ fixtures verified: valid meal parsed; negative meal rejected
 Fresh full-suite command, run once after focused GREEN and fixture verification:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test
 ```
 
 Full result:
@@ -116,7 +116,7 @@ The existing `marks missing historical common metadata as legacy without inventi
 Provenance regression command:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
 ```
 
 Observed expected failure before changing production code:
@@ -132,7 +132,7 @@ The parser returned successfully because missing `id` incorrectly made the schem
 Duplicate-ID regression command after adding the second test and before adding the API:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
 ```
 
 Observed expected failure:
@@ -156,7 +156,7 @@ The wished-for collection API was absent, so the optional lookup returned `undef
 Focused command after both fixes:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
 ```
 
 Exact summary:
@@ -168,7 +168,7 @@ tests 12; pass 12; fail 0
 Full-suite command, run once after focused GREEN:
 
 ```sh
-/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test
+/Users/you/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test
 ```
 
 Exact summary:

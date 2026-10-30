@@ -26,7 +26,7 @@
 
 Extend `scripts/import-notion-history.mjs` with `--body-log <markdown>` for:
 
-`/Users/adamrussell/Downloads/Private & Shared 12/Body Data Record Weight, Body Fat and Measurements 3b9f794f84768016935ce337a1e6c93c.md`
+`/Users/you/Downloads/Private & Shared 12/Body Data Record Weight, Body Fat and Measurements 3b9f794f84768016935ce337a1e6c93c.md`
 
 | Rule | Behaviour |
 |------|-----------|

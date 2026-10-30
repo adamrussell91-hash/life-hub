@@ -1,31 +1,22 @@
-/** Client-side routines (mirrors config/skincare-routines.yml). */
+/**
+ * Neutral routine template (labels, extras, note chips). No products: the live
+ * shelf and AM/PM rotation come from the private data repo through the
+ * authenticated skincare APIs (product library + routine membership), and the
+ * server's cold-start seed reads the private config/skincare-routines.yml.
+ */
 
 export const SKINCARE_ROUTINES = {
   am: {
     label: 'Morning routine',
     duration_hint: '~20 min',
     choices: {},
-    products: [
-      'Azclear Azelaic Acid 20%',
-      'Korres Greek Yoghurt Probiotic Gel Cream',
-      'La Roche Posay Anthelios SPF 50+',
-      'Dr Jart+ Cicapair Colour Corrector',
-      'Maybelline Green and Peach Correctors with BareMinerals Concealer',
-      'Kosas Cloud Set Translucent Loose Setting and Blurring Powder'
-    ]
+    products: []
   },
   pm: {
     label: 'Evening routine',
     duration_hint: '~20 min',
     choices: {},
-    products: [
-      'Dr.G Green Deep Pore Cleansing Balm',
-      'Korres Greek Yoghurt Foaming Cream Cleanser',
-      'Toner',
-      'Retrieve Tretinoin 0.05% (sandwich method)',
-      'La Roche Posay Cicaplast B5+',
-      'Avene Cicalfate+'
-    ]
+    products: []
   },
   extras: ['Sheet mask'],
   note_chips: [
@@ -38,6 +29,31 @@ export const SKINCARE_ROUTINES = {
     'Sensitive'
   ]
 };
+
+/** Merge a parsed routines document (same shape as config/skincare-routines.yml) over the template. */
+export function mergeSkincareRoutines(parsed, base = SKINCARE_ROUTINES) {
+  if (!parsed || typeof parsed !== 'object') return base;
+  const routine = key => {
+    const source = parsed[key] && typeof parsed[key] === 'object' ? parsed[key] : {};
+    const products = Array.isArray(source.products)
+      ? source.products.map(name => String(name ?? '').trim()).filter(Boolean)
+      : base[key].products;
+    return {
+      ...base[key],
+      ...(typeof source.label === 'string' ? { label: source.label } : {}),
+      ...(typeof source.duration_hint === 'string' ? { duration_hint: source.duration_hint } : {}),
+      choices: source.choices && typeof source.choices === 'object' ? source.choices : base[key].choices,
+      products
+    };
+  };
+  const list = (value, fallback) => (Array.isArray(value) ? value.map(String).filter(Boolean) : fallback);
+  return {
+    am: routine('am'),
+    pm: routine('pm'),
+    extras: list(parsed.extras, base.extras),
+    note_chips: list(parsed.note_chips, base.note_chips)
+  };
+}
 
 export function currentRoutineKey(date = new Date(), timeZone = 'Australia/Sydney') {
   const hour = Number(new Intl.DateTimeFormat('en-AU', {

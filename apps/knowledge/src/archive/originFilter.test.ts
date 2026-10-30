@@ -8,13 +8,17 @@ import {
   toggleOriginKind,
   toggleOriginLabel,
 } from "./originFilter";
+import { installNotesPlace } from "../origin/notesPlace";
+import { TEST_NOTES_PLACE } from "../origin/notesPlace.fixture";
+
+installNotesPlace(TEST_NOTES_PLACE);
 
 const pages = [
   {
     title: "Habits",
     origins: [
       { kind: "notebook" as const, label: "Cognitive Psychology" },
-      { kind: "book" as const, label: "Atomic Habits" },
+      { kind: "book" as const, label: "Example Book" },
     ],
   },
   {
@@ -33,8 +37,8 @@ describe("archive origin filters", () => {
     expect(pageMatchesOriginFilter(pages[0]!, emptyOriginFilter())).toBe(true);
     expect(pageMatchesOriginFilter(pages[0]!, { kind: "notebook", label: "" })).toBe(true);
     expect(pageMatchesOriginFilter(pages[2]!, { kind: "notebook", label: "" })).toBe(false);
-    expect(pageMatchesOriginFilter(pages[0]!, { kind: "book", label: "Atomic Habits" })).toBe(true);
-    expect(pageMatchesOriginFilter(pages[1]!, { kind: "book", label: "Atomic Habits" })).toBe(false);
+    expect(pageMatchesOriginFilter(pages[0]!, { kind: "book", label: "Example Book" })).toBe(true);
+    expect(pageMatchesOriginFilter(pages[1]!, { kind: "book", label: "Example Book" })).toBe(false);
   });
 
   it("lists labels that already sit on notes", () => {
@@ -46,7 +50,7 @@ describe("archive origin filters", () => {
   });
 
   it("recovers notebook and book pills from a page_notion id when the manifest stored none", () => {
-    const recovered = [{ id: "page_notion_00c518fb7b884781a60f702ec3185eb3", title: "Boys" }];
+    const recovered = [{ id: "page_notion_a0000000000000000000000000000001", title: "Boys" }];
     expect(pageMatchesOriginFilter(recovered[0]!, { kind: "notebook", label: "" })).toBe(true);
     expect(originLabelsForKind(recovered, "notebook")).toEqual([{ label: "Boy's Education", count: 1 }]);
     expect(originLabelsForKind(recovered, "book")).toEqual([]);
@@ -67,18 +71,18 @@ describe("archive origin filters", () => {
   });
 
   it("renders kind chips and the chosen label without dumping the catalog", () => {
-    const html = originFilterHtml(pages, { kind: "book", label: "Atomic Habits" });
+    const html = originFilterHtml(pages, { kind: "book", label: "Example Book" });
     expect(html).toContain('class="tag-pill is-selected"');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('data-origin-kind="notebook"');
     expect(html).toContain('data-origin-kind="book"');
     expect(html).toContain('data-origin-kind="pd"');
-    expect(html).toContain('data-origin-label="Atomic Habits"');
+    expect(html).toContain('data-origin-label="Example Book"');
     expect(html).toContain("Change");
-    expect(html).toContain("Clear Atomic Habits");
+    expect(html).toContain("Clear Example Book");
     expect(html).not.toContain("origin-label-search");
     expect(html).not.toContain("filter-chip");
-    expect(originFilterTitle({ kind: "book", label: "Atomic Habits" })).toBe("Atomic Habits");
+    expect(originFilterTitle({ kind: "book", label: "Example Book" })).toBe("Example Book");
   });
 
   it("opens a searchable list instead of a pill dump when a kind is chosen", () => {

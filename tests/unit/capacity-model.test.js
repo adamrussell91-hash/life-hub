@@ -80,12 +80,12 @@ test('100 is reachable and the old 95 ceiling is gone', () => {
   assert.equal(CAPACITY.ceiling, 100);
 });
 
-test('load ignores classes, Corey time, protected walls, logs and ghosts', () => {
+test('load ignores classes, Partner time, protected walls, logs and ghosts', () => {
   const thursday = [
     { start: 8 + 40 / 60, end: 9 + 35 / 60, kind: 'teaching', isClass: true },
     { start: 13.25, end: 14.25, kind: 'health' },
     { start: 18.25, end: 19 + 25 / 60, kind: 'fitness' },
-    { start: 19.5, end: 21.5, kind: 'corey' },
+    { start: 19.5, end: 21.5, kind: 'partner' },
     { start: 21.5, end: 22, kind: 'health', ghost: true }
   ];
   const load = dayLoadHours(thursday);

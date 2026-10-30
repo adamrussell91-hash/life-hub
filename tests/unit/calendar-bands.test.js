@@ -77,7 +77,7 @@ test('expanding School turns a 55 minute class from a line into a card', () => {
   assert.equal(chipDensity(after.height), 'card');
 });
 
-test('folding Yours turns the Corey evening into a sliver', () => {
+test('folding Yours turns the Partner evening into a sliver', () => {
   const g = blockGeometry(bands, bandTargets(bands, 1), '19:30', '21:30');
   assert.equal(chipDensity(g.height), 'sliver');
 });

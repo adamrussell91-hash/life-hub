@@ -26,10 +26,12 @@ test('protocol coaches eating psychology and environmental habit stacking, not j
   assert.match(text, /capable of more/i);
 });
 
-test('protocol anticipates the Vyvanse eating baseline rather than treating it as news', () => {
+test('protocol anticipates known baselines from private standing context rather than treating them as news', () => {
   const text = loadBrisketProtocol();
-  assert.match(text, /Known baseline/i);
-  assert.match(text, /skipped breakfast\/lunch on a workday is the expected pattern/i);
+  assert.match(text, /Known baselines are standing facts/i);
+  assert.match(text, /private standing context/i);
+  assert.match(text, /config\/targets\.yml/);
+  assert.doesNotMatch(text, /\b\d{2}[–-]\d{2} kg at \d+[–-]\d+% body fat/i);
 });
 
 test('protocol owns weekly challenge trackers instead of refusing a counter', () => {

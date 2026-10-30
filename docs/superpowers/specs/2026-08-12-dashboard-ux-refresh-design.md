@@ -42,7 +42,7 @@
 ### 1. Body — data
 
 **Source file (re-import):**  
-`/Users/adamrussell/.codex/.chatgpt-projects/g-p-6a77f0eb110c81919b5397fa1bb3b535/outputs/body-records/body_measurements_full_history.csv`
+`/Users/you/.codex/.chatgpt-projects/g-p-6a77f0eb110c81919b5397fa1bb3b535/outputs/body-records/body_measurements_full_history.csv`
 
 **Schema (`MEASUREMENT_NUMBERS` / `TAPE_SITES`):**
 - Keep: `waist`, `chest`, `hips`, `shoulders`, `neck`, `right_thigh`, `left_thigh`, `calves`

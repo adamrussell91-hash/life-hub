@@ -10147,7 +10147,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
 /* Medical timeline — readable colour key, clearer weight, pills that hug their text. */
 .medical-card, .medical-minor, .medical-legend__item { --lane: var(--muted); }
-[data-thread="IBD"] { --lane: var(--wave); }
+[data-thread="Gut"] { --lane: var(--wave); }
 [data-thread="Liver"] { --lane: var(--high-sea); }
 [data-thread="Mind"] { --lane: var(--navy-2); }
 [data-thread="Acute"] { --lane: var(--shallow); }

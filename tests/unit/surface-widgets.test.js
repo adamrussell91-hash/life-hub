@@ -43,17 +43,17 @@ test('normalizeMealPlanWeekWidget builds day rows from meals object', () => {
     props: {
       week_id: '2026-W35',
       meals: {
-        mon: { dinner: 'Marley Spoon chicken bowl', dessert: 'Yoghurt' },
+        mon: { dinner: 'Meal-kit chicken bowl', dessert: 'Yoghurt' },
         tue: 'Leftovers + salad'
       },
-      notes: 'Vyvanse-light lunches'
+      notes: 'Light lunches'
     }
   });
   assert.equal(normalized.props.week_id, '2026-W35');
   assert.equal(normalized.props.days.length, 2);
-  assert.match(normalized.props.days[0].text, /Marley Spoon/);
+  assert.match(normalized.props.days[0].text, /Meal-kit/);
   assert.match(normalized.props.days[0].text, /Dessert: Yoghurt/);
-  assert.equal(normalized.props.notes, 'Vyvanse-light lunches');
+  assert.equal(normalized.props.notes, 'Light lunches');
 });
 
 test('normalizeSurfaceWidget accepts meal-plan-week', () => {

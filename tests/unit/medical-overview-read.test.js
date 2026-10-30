@@ -11,16 +11,16 @@ import {
 } from '../../netlify/functions/_shared/medical-overview-read.mjs';
 
 const KATE = {
-  path: 'data/body/2026/07/2026-07-08-medical-therapy-session-with-kate-semple-0900.md',
+  path: 'data/body/2026/07/2026-07-08-medical-therapy-session-with-avery-quill-0900.md',
   record: {
     type: 'medical',
     date: '2026-07-08',
     time: '09:00',
-    title: 'Therapy Session with Kate Semple',
+    title: 'Therapy Session with Avery Quill',
     record_type: 'Appointment',
     lane: 'therapy',
-    provider: 'Kate Semple',
-    location: '26 Ridge St, North Sydney NSW Australia',
+    provider: 'Avery Quill',
+    location: '1 Example St, Exampleton NSW Australia',
     location_kind: 'place',
     cost_aud: 160,
     insurance_status: 'Not Started'
@@ -28,15 +28,15 @@ const KATE = {
   body: 'Psychology session under MHCP.'
 };
 
-const STELARA = {
-  path: 'data/body/2026/07/2026-07-02-medical-stelara-infusion.md',
+const BIOLOGIC = {
+  path: 'data/body/2026/07/2026-07-02-medical-biologic-infusion.md',
   record: {
     type: 'medical',
     date: '2026-07-02',
-    title: 'Stelara Infusion',
+    title: 'Biologic Infusion',
     record_type: 'Prescription',
     lane: 'prescription',
-    provider: 'Dr Chris Keily',
+    provider: 'Dr Rowan Pike',
     cost_aud: null,
     insurance_status: null
   },
@@ -69,13 +69,13 @@ test('selectMedicalEntries and selectBloodsEntries filter body paths', () => {
   assert.deepEqual(selectBloodsEntries(tree).map(e => e.path), [BLOODS.path]);
 });
 
-test('searchMedicalRecords finds Kate Semple visit with location and cost', () => {
-  const result = searchMedicalRecords([KATE, STELARA], { query: 'Kate Semple' });
+test('searchMedicalRecords finds Avery Quill visit with location and cost', () => {
+  const result = searchMedicalRecords([KATE, BIOLOGIC], { query: 'Avery Quill' });
   assert.equal(result.ok, true);
   assert.equal(result.store, 'life_hub_medical_overview');
   assert.equal(result.count, 1);
-  assert.equal(result.results[0].provider, 'Kate Semple');
-  assert.equal(result.results[0].location, '26 Ridge St, North Sydney NSW Australia');
+  assert.equal(result.results[0].provider, 'Avery Quill');
+  assert.equal(result.results[0].location, '1 Example St, Exampleton NSW Australia');
   assert.equal(result.results[0].cost_aud, 160);
   assert.equal(result.results[0].insurance_status, 'Not Started');
 });
@@ -85,11 +85,11 @@ test('searchMedicalRecords rejects empty queries', () => {
 });
 
 test('briefMedicalAppointment returns visits and joined bloods for a date', () => {
-  const result = briefMedicalAppointment([KATE, STELARA, BLOODS], { date: '2026-07-08' });
+  const result = briefMedicalAppointment([KATE, BIOLOGIC, BLOODS], { date: '2026-07-08' });
   assert.equal(result.ok, true);
   assert.equal(result.found, true);
   assert.equal(result.visit_count, 1);
-  assert.equal(result.visits[0].title, 'Therapy Session with Kate Semple');
+  assert.equal(result.visits[0].title, 'Therapy Session with Avery Quill');
   assert.equal(result.bloods.length, 1);
   assert.equal(result.bloods[0].type, 'bloods');
 });
@@ -104,5 +104,5 @@ test('briefMedicalAppointmentWithFallback loads from tree when memory misses', a
     parseDocument: () => KATE
   });
   assert.equal(result.found, true);
-  assert.equal(result.visits[0].provider, 'Kate Semple');
+  assert.equal(result.visits[0].provider, 'Avery Quill');
 });

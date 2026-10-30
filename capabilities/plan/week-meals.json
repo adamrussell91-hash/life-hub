@@ -7,7 +7,7 @@
   ],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Save a forward week meal plan. Fold in Marley Spoon default dinner and Vyvanse appetite-window intuition.",
+  "prompt_one_liner": "Save a forward week meal plan. Fold in the default-dinner and appetite-window priors from intuition and private standing context.",
   "surfaces": [
     "confirm_card",
     "nutrition_tab",

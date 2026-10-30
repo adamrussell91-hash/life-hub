@@ -3,7 +3,7 @@
 # Chadwick Closed-Loop Coaching — Implementation Plan
 
 **Date:** 2026-08-11
-**Repo:** `/Users/adamrussell/Documents/Claude/Projects/life-hub` (branch off `main`)
+**Repo:** `/Users/you/Documents/Claude/Projects/life-hub` (branch off `main`)
 **Deploy rule:** Local commits only. **Never `git push`.** Adam pushes himself.
 **Scope:** Phases 1–6 below. Hammond arc-ownership is explicitly **out of scope**.
 

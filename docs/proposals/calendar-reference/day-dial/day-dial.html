@@ -64,7 +64,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .dd-arc.k-teaching,.dd-arc.k-fitness{fill:var(--pastel-blue)}
 .dd-arc.k-professional{fill:var(--pastel-lilac);stroke:var(--dd-lilac-line);stroke-width:1.2}
 .dd-arc.k-health{fill:var(--dd-health);stroke:var(--dd-health-line);stroke-width:1.2}
-.dd-arc.k-corey{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:1.4}
+.dd-arc.k-partner{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:1.4}
 .dd-arc.is-class{fill:color-mix(in srgb,var(--pastel-blue) 70%,#fff)}
 .dd-arc.is-proposal{stroke:var(--dd-ghost-line);stroke-width:1.5;stroke-dasharray:4 3}
 .dd-arc.is-ghost{fill:var(--dd-ghost-fill);stroke:var(--dd-ghost-line);stroke-width:1.4;stroke-dasharray:3 3}
@@ -84,7 +84,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .dd-t-ring.is-sleep{fill:var(--navy)}.dd-t-ring.is-school{fill:var(--pastel-blue-ink)}.dd-t-ring.is-yours{fill:var(--pastel-peach-ink)}
 .dd-lead{stroke:color-mix(in srgb,var(--navy) 22%,transparent);fill:none}
 .dd-t-call{font-size:12px;font-weight:600;fill:var(--ink)}
-.dd-t-call.is-corey{fill:var(--pastel-peach-ink)}
+.dd-t-call.is-partner{fill:var(--pastel-peach-ink)}
 .dd-t-call.is-symptom{fill:var(--high-sea-ink)}
 .dd-t-call.is-meal{fill:var(--pastel-gold-ink)}
 .dd-t-sub{font-size:11px;fill:var(--muted)}
@@ -107,7 +107,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .dd-row__w b{display:block;font-size:var(--text-sm);font-weight:var(--weight-semibold);line-height:1.3}
 .dd-row__w > span{font-size:var(--text-xs);color:var(--muted)}
 .dd-row.is-struck .dd-row__w b{text-decoration:line-through;color:var(--muted)}
-.dd-row.k-corey .dd-row__w b{color:var(--pastel-peach-ink)}
+.dd-row.k-partner .dd-row__w b{color:var(--pastel-peach-ink)}
 .dd-suggest{display:flex;gap:var(--space-2);align-items:flex-start;margin-top:6px;padding:6px 8px;border-radius:10px;background:var(--dd-ghost-fill);border:1.5px dashed var(--dd-ghost-line);font-size:var(--text-xs)}
 .dd-acts{display:flex;gap:6px;margin-top:6px}
 .dd-acts .btn{min-height:1.75rem;padding:2px var(--space-3);font-size:var(--text-xs)}
@@ -999,7 +999,7 @@ ${body ?? ""}`;
         break;
       }
       case "protect_block": {
-        const withCorey = ghost.with === "corey";
+        const withPartner = ghost.with === "partner";
         const title = oneLine(ghost.title);
         const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock122(ghost.start)}\u2013${clock122(ghost.end)}`;
         steps.push({
@@ -1010,16 +1010,16 @@ ${body ?? ""}`;
             date: ghost.date,
             time: ghost.start,
             end_time: ghost.end,
-            kind: withCorey ? "corey" : "protected",
+            kind: withPartner ? "partner" : "protected",
             status: "tentative",
             protected: true,
             title,
             source_agent: ghost.agent
           }
         });
-        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Corey" : ""} (protected).` }));
-        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Corey)" : ""}.` }));
-        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Corey" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withPartner ? " with Partner" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withPartner ? " (Partner)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withPartner ? " with Partner" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
         break;
       }
       case "move_task": {
@@ -1183,29 +1183,29 @@ ${body ?? ""}`;
     cls("2026-09-21", 1, "Y12 English Adv", "Common Module revision"),
     cls("2026-09-21", 2, "Y11 English Adv", "Module C drafts"),
     { id: "resource-day", date: "2026-09-21", start: "10:51", end: "14:50", kind: "professional", title: "Focus Area: Texts and human experience \xB7 resource day", meta: "10:51 am \u2013 2:50 pm" },
-    { id: "mon-corey", date: "2026-09-21", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    { id: "mon-partner", date: "2026-09-21", start: "19:30", end: "21:30", kind: "partner", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
     cls("2026-09-22", 1, "Y11 English Adv", "Module C"),
     cls("2026-09-22", 3, "Y12 English Adv", "HSC practice paper"),
     cls("2026-09-22", 5, "HPGE planning", "with Leader of Learning"),
     { id: "tue-workout", date: "2026-09-22", start: "17:45", end: "18:15", kind: "fitness", title: "Workout \xB7 30 min", meta: "5:45 pm", sample: true },
-    { id: "tue-corey", date: "2026-09-22", start: "19:15", end: "21:15", kind: "corey", title: "Dinner at home", meta: "7:15 \u2013 9:15 pm", protected: true, sample: true },
+    { id: "tue-partner", date: "2026-09-22", start: "19:15", end: "21:15", kind: "partner", title: "Dinner at home", meta: "7:15 \u2013 9:15 pm", protected: true, sample: true },
     cls("2026-09-23", 2, "Y12 English Adv", "Paper 1 timing"),
     cls("2026-09-23", 4, "Y11 English Adv", "peer feedback"),
     cls("2026-09-23", 6, "MindWorks", "UN Voice coaching"),
     { id: "wed-marking", date: "2026-09-23", start: "15:40", end: "17:20", kind: "teaching", title: "Mark Y11 Module C drafts", meta: "3:40 \u2013 5:20 pm", sample: true },
-    { id: "wed-corey", date: "2026-09-23", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    { id: "wed-partner", date: "2026-09-23", start: "19:30", end: "21:30", kind: "partner", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
     cls("2026-09-24", 1, "Y12 English Adv", "last full lesson"),
     cls("2026-09-24", 3, "Y11 English Adv", "drafts returned"),
-    { id: "gastro", date: "2026-09-24", start: "13:15", end: "14:15", kind: "health", title: "Gastroenterologist follow-up \xB7 Dr Chris Keily", meta: "1:15 pm \xB7 2 records merged", mergedRecords: 2 },
+    { id: "gastro", date: "2026-09-24", start: "13:15", end: "14:15", kind: "health", title: "Gastroenterologist follow-up \xB7 Dr Rowan Example", meta: "1:15 pm \xB7 2 records merged", mergedRecords: 2 },
     { id: "thu-workout", date: "2026-09-24", start: "18:15", end: "19:25", kind: "fitness", title: "Workout \xB7 upper body", meta: "Chadwick\u2019s plan", sample: true },
-    { id: "thu-corey", date: "2026-09-24", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV with Corey", meta: "Protected \xB7 7:30 \u2013 9:30 pm", protected: true, sample: true },
+    { id: "thu-partner", date: "2026-09-24", start: "19:30", end: "21:30", kind: "partner", title: "Tea + TV with Partner", meta: "Protected \xB7 7:30 \u2013 9:30 pm", protected: true, sample: true },
     { id: "pd-hard-conversations", date: "2026-09-25", start: "08:30", end: "10:30", kind: "professional", title: "Courageously Navigating Hard Conversations", meta: "8:30 \u2013 10:30 am \xB7 PD" },
     cls("2026-09-25", 3, "Y11 English Adv", "end of term"),
     cls("2026-09-25", 5, "Y12 English Adv", "farewell lesson"),
     { id: "sat-gym", date: "2026-09-26", start: "09:00", end: "10:00", kind: "fitness", title: "Gym \xB7 lower body", meta: "9 \u2013 10 am \xB7 Chadwick", sample: true }
   ];
   var DUE = [
-    { id: "task-josh-y10", date: "2026-09-25", title: "Find out about Year 10 leadership opportunities for Josh Lizzio", kind: "task", ghostId: "g-move" }
+    { id: "task-student-y10", date: "2026-09-25", title: "Find out about Year 10 leadership opportunities for Sam Example", kind: "task", ghostId: "g-move" }
   ];
   var GHOSTS = [
     {
@@ -1239,17 +1239,17 @@ ${body ?? ""}`;
       start: "18:00",
       end: "22:00",
       title: "Dinner out + a show",
-      with: "corey",
+      with: "partner",
       label: "Good night: dinner out + a show",
       meta: "Hammond \xB7 your definition of a good night",
-      chip: { date: "2026-09-26", start: "18:00", end: "22:00", kind: "corey" }
+      chip: { date: "2026-09-26", start: "18:00", end: "22:00", kind: "partner" }
     },
     {
       id: "g-move",
       agent: "hammond",
       kind: "move_task",
-      taskId: "task-josh-y10",
-      title: "Year 10 leadership opportunities for Josh Lizzio",
+      taskId: "task-student-y10",
+      title: "Year 10 leadership opportunities for Sam Example",
       from: "2026-09-25",
       to: "2026-10-13",
       label: "\u2192 T4 W1",
@@ -1493,7 +1493,7 @@ ${body ?? ""}`;
       for (const c of chipsFor(date)) {
         if (c.isClass) continue;
         const proposal = ghosts.find((g2) => g2.overItem === c.id && g2.status === "pending");
-        calls.push({ id: c.id, hour: (c.start + c.end) / 2, height: 28, text: c.kind === "corey" ? "Corey" : c.title.replace(/ · Dr .*$/, ""), sub: proposal ? `${proposal.agent === "sara" ? "Sara" : "Hammond"}: ${proposal.label.toLowerCase()}` : c.kind === "corey" ? c.title.replace(/ with Corey$/, "") : c.meta.split(" \xB7 ")[0], cls: c.kind === "corey" ? "is-corey" : "" });
+        calls.push({ id: c.id, hour: (c.start + c.end) / 2, height: 28, text: c.kind === "partner" ? "Partner" : c.title.replace(/ · Dr .*$/, ""), sub: proposal ? `${proposal.agent === "sara" ? "Sara" : "Hammond"}: ${proposal.label.toLowerCase()}` : c.kind === "partner" ? c.title.replace(/ with Partner$/, "") : c.meta.split(" \xB7 ")[0], cls: c.kind === "partner" ? "is-partner" : "" });
       }
       for (const d of logDots) calls.push({ id: d.id, hour: d.h, height: 14, text: d.label, cls: d.cls === "is-symptom" ? "is-symptom" : "is-meal" });
       const room = calloutRoom(size);
@@ -1557,7 +1557,7 @@ ${body ?? ""}`;
     for (const r of rows) {
       const row = el("div", `dd-row k-${r.kind}${r.struck ? " is-struck" : ""}`, void 0, wrap, { "data-part": "row", "data-title": r.title });
       el("div", "dd-row__t", r.time, row);
-      const w = el("div", "dd-row__w", `<b>${r.kind === "corey" ? '<span class="dd-mark"></span>' : ""}${r.title}</b><span>${r.note}</span>`, row);
+      const w = el("div", "dd-row__w", `<b>${r.kind === "partner" ? '<span class="dd-mark"></span>' : ""}${r.title}</b><span>${r.note}</span>`, row);
       if (r.ghostId) {
         const g = ghosts.find((x) => x.id === r.ghostId);
         if (r.suggestion) el("div", "dd-suggest", `<span class="dd-av ${g.agent === "sara" ? "dd-av--sara" : ""}">${AGENT_INITIAL[g.agent]}</span><span>${r.suggestion}</span>`, w);

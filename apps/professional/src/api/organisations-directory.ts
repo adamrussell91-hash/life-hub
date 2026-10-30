@@ -1,4 +1,5 @@
 import { apiGet, apiPatch, apiPost } from './client';
+import { getApiBaseUrl } from './config';
 import type { WarmthBand } from '@/domain/warmth-score';
 import type { FirstTouchKind, RelationshipChip } from '@/domain/organisation-model';
 import type { SparkPoint } from '@/domain/organisation-spark';
@@ -83,6 +84,24 @@ export async function uploadSignedCrest(putUrl: string, file: Blob, contentType:
     headers: { 'Content-Type': contentType }
   });
   if (!res.ok) throw new Error(`Crest upload failed (${res.status})`);
+}
+
+/** Organisations that have a researched crest in the private data repo. */
+export function fetchCrestRefs(
+  options: { signal?: AbortSignal } = {}
+): Promise<{ refs: string[]; status?: 'ready' | 'unavailable' }> {
+  return apiGet('/api/organisations/crest-image', { signal: options.signal });
+}
+
+/** One researched crest PNG, fetched with the session cookie; null when there isn't one. */
+export async function fetchCrestImage(ref: string): Promise<Blob | null> {
+  const params = new URLSearchParams({ ref });
+  const response = await fetch(`${getApiBaseUrl()}/api/organisations/crest-image?${params.toString()}`, {
+    credentials: 'include'
+  });
+  if (!response.ok) return null;
+  const type = response.headers.get('content-type') ?? '';
+  return type.startsWith('image/') ? response.blob() : null;
 }
 
 export function fetchOrgCrestUrl(

@@ -52,7 +52,7 @@ GitHub Actions on `main`:
 
 - Merge **only** PR 22 (`Fix live-site QA defects from the 2026-08-21 pass`) into `main`.
 - Do not force-push, do not delete `main`, do not change DNS.
-- Do not rotate Corey’s share link.
+- Do not rotate Partner’s share link.
 - Do not change the passphrase hash unless a screen tells you auth is broken **and** you stop to report that first.
 - Never write a Netlify token or GitHub secret value into the report. Say “set” or “not set”.
 
@@ -86,7 +86,7 @@ If Pages is green but Maps is still Board, the old Pages artifact is cached — 
 
 ## 5. Step C — production Netlify (this is the real blocker)
 
-The API host is what failed last time (`Failed to fetch` on Clare; Network/Corey hung; stub homepage).
+The API host is what failed last time (`Failed to fetch` on Clare; Network/Partner hung; stub homepage).
 
 ### C1. Netlify UI (do this first — most reliable)
 
@@ -114,7 +114,7 @@ The API host is what failed last time (`Failed to fetch` on Clare; Network/Corey
 
 ## 6. Success checks (all required)
 
-Do these on a hard-reloaded tab. Record HTTP status, UI behaviour, and asset hashes. There is **no** `/api/bootstrap`, `/api/health`, `/api/network`, `/api/corey`, `/api/stress-flags`, or `/api/capacity` route — do not treat those as missing-deploy evidence. Network (`#/stress`) and Corey (`#/corey`) were **retired** with the Network tab.
+Do these on a hard-reloaded tab. Record HTTP status, UI behaviour, and asset hashes. There is **no** `/api/bootstrap`, `/api/health`, `/api/network`, `/api/partner`, `/api/stress-flags`, or `/api/capacity` route — do not treat those as missing-deploy evidence. Network (`#/stress`) and Partner (`#/partner`) were **retired** with the Network tab.
 
 ### 6.1 Hosts, cache, and build identity
 
@@ -149,7 +149,7 @@ Authenticated success envelope is `{ "ok": true, "data": … }`.
 | Projects, signed in | `GET https://tasks-api.adam-russell.com/api/projects` | HTTP **200** `{ "ok": true, "data": { "projects": […] } }` |
 | Maps API | `GET https://tasks-api.adam-russell.com/api/maps` | HTTP **200** `{ "ok": true, "data": { "maps": […] } }` — not HTML 404 |
 | ~~Network API~~ | ~~`GET …/api/stress-flags`~~ | **SKIP — retired** (404 expected; not a deploy fail) |
-| ~~Corey API~~ | ~~`GET …/api/capacity`~~ | **SKIP — retired** |
+| ~~Partner API~~ | ~~`GET …/api/capacity`~~ | **SKIP — retired** |
 | Stall API | `GET https://tasks-api.adam-russell.com/api/stall` | HTTP **200** `{ "ok": true, "data": { "reviews": […] } }` |
 | Clare propose | `POST https://tasks-api.adam-russell.com/api/clare` from `#/clare` | HTTP **200** `{ "ok": true, … }` |
 
@@ -161,7 +161,7 @@ Prefer the API host so `/api/*` is same-origin.
 |---|---|---|
 | Maps | `https://tasks-api.adam-russell.com/#/maps` and `https://tasks-hub.adam-russell.com/#/maps` | Heading Maps / Pathways. **Not** Board columns. No infinite load. |
 | ~~Network~~ | ~~`#/stress`~~ | **SKIP — retired** (do not report missing Network as a fail) |
-| ~~Corey~~ | ~~`#/corey`~~ | **SKIP — retired** |
+| ~~Partner~~ | ~~`#/partner`~~ | **SKIP — retired** |
 | Clare | `https://tasks-api.adam-russell.com/#/clare` | Ask Clare on `[LIVE-TEST] deploy check` → proposal, not `Failed to fetch`. |
 | Unknown hash | `https://tasks-api.adam-russell.com/#/definitely-missing` | Not-found (**That view isn’t in Tasks Hub** / Back to Board). **Not** Board. |
 
@@ -230,7 +230,7 @@ Do not try a second product. Do not “fix” code. This task is merge + deploy 
 | Maps on Pages #/maps | | |
 | POST /api/clare | | |
 | ~~#/stress left Loading/Scanning~~ | SKIP — retired | |
-| ~~#/corey left Loading capacity~~ | SKIP — retired | |
+| ~~#/partner left Loading capacity~~ | SKIP — retired | |
 | #/definitely-missing not-found | | |
 
 ## Rollback (if used)

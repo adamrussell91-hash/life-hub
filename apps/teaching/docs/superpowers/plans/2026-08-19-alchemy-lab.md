@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Vitest, Vite, Netlify Functions, Cotton Glass tokens. Two repos: `teaching-hub` (this plan’s home) and `knowledge-hub`.
 
-**Worktrees:** `/Users/adamrussell/Teaching Hub/.worktrees/alchemy-lab` (`feature/alchemy-lab`) and `/Users/adamrussell/Projects/knowledge-hub/.worktrees/alchemy-lab` (`feature/alchemy-lab`).
+**Worktrees:** `/Users/you/Teaching Hub/.worktrees/alchemy-lab` (`feature/alchemy-lab`) and `/Users/you/Projects/knowledge-hub/.worktrees/alchemy-lab` (`feature/alchemy-lab`).
 
 **Specs:** `docs/superpowers/specs/2026-08-19-alchemy-lab-design.md` (this repo) and Knowledge Hub `docs/superpowers/specs/2026-08-19-alchemist-off-the-rail-design.md`.
 

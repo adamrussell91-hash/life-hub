@@ -8,7 +8,7 @@ import {
   toSkincareConfirmPayload
 } from '../../apps/life/js/app/skincare-routines-data.js';
 import { buildSkincareModel } from '../../apps/life/js/app/skincare-model.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES } from '../fixtures/skincare-routines.mjs';
 
 test('currentRoutineKey is am before noon Sydney', () => {
   assert.equal(currentRoutineKey(new Date('2026-08-05T01:00:00Z')), 'am');
@@ -17,9 +17,10 @@ test('currentRoutineKey is am before noon Sydney', () => {
 
 test('buildProductList includes extras without exclusive choices', () => {
   const products = buildProductList('am', {
+    activeProducts: SKINCARE_ROUTINES.am.products,
     extras: ['Sheet mask']
   });
-  assert.ok(products.includes('Azclear Azelaic Acid 20%'));
+  assert.ok(products.includes('Example Azelaic Gel 10%'));
   assert.ok(products.includes('Sheet mask'));
   assert.equal(products.at(-1), 'Sheet mask');
 });
@@ -63,11 +64,11 @@ test('procedure payload prefixes notes and slugifies title', () => {
     routine: 'pm',
     products: ['Laser'],
     notes: 'Mild redness',
-    procedureTitle: 'Contour Clinics Laser'
+    procedureTitle: 'Example Skin Clinic Laser'
   });
-  assert.equal(slug, 'contour-clinics-laser');
-  assert.match(candidate.notes, /^Procedure: Contour Clinics Laser/);
-  assert.equal(slugifySkincareTitle('Contour Clinics Laser'), 'contour-clinics-laser');
+  assert.equal(slug, 'example-skin-clinic-laser');
+  assert.match(candidate.notes, /^Procedure: Example Skin Clinic Laser/);
+  assert.equal(slugifySkincareTitle('Example Skin Clinic Laser'), 'example-skin-clinic-laser');
 });
 
 test('buildSkincareModel marks am/pm logged and lists procedures', () => {
@@ -117,12 +118,12 @@ test('buildSkincareModel resolves products and entries from library + membership
     { id: 'catalog-cleanser', name: 'Catalog cleanser', category: 'Cleanser', hint: '' }
   ]);
   assert.deepEqual(SKINCARE_ROUTINES.am.products, [
-    'Azclear Azelaic Acid 20%',
-    'Korres Greek Yoghurt Probiotic Gel Cream',
-    'La Roche Posay Anthelios SPF 50+',
-    'Dr Jart+ Cicapair Colour Corrector',
-    'Maybelline Green and Peach Correctors with BareMinerals Concealer',
-    'Kosas Cloud Set Translucent Loose Setting and Blurring Powder'
+    'Example Azelaic Gel 10%',
+    'Example Probiotic Gel Cream',
+    'Example Sunscreen SPF 50+',
+    'Example Green Colour Corrector',
+    'Example Peach Corrector and Concealer',
+    'Example Loose Setting Powder'
   ]);
 });
 
@@ -137,11 +138,11 @@ test('buildSkincareModel preserves default products without shelf data', () => {
   });
   assert.deepEqual(model.routines.am.products, SKINCARE_ROUTINES.am.products);
   assert.equal(
-    model.routines.am.productEntries.find(e => e.name.includes('Anthelios'))?.category,
+    model.routines.am.productEntries.find(e => e.name.includes('Sunscreen SPF'))?.category,
     'Sunscreen'
   );
   assert.equal(
-    model.routines.am.productEntries.find(e => e.name === 'Korres Greek Yoghurt Probiotic Gel Cream')?.category,
+    model.routines.am.productEntries.find(e => e.name === 'Example Probiotic Gel Cream')?.category,
     'Moisturiser'
   );
   assert.deepEqual(model.routines.pm.products, SKINCARE_ROUTINES.pm.products);

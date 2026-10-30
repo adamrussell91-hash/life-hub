@@ -39,16 +39,16 @@
     // Round D enables: lat/lng + place_id as first-class fields; map is a representation, not a store.
     const places = [
       {
-        id: 'place_northshore_private',
-        name: 'North Shore Private Hospital',
-        address: '3 Westbourne St, St Leonards NSW',
+        id: 'place_example_hospital',
+        name: 'Example Private Hospital',
+        address: '1 Example St, Exampleton NSW',
         kind: 'medical',
         lng: 151.1936,
         lat: -33.8225
       },
       {
-        id: 'place_prosper_nutrition',
-        name: 'Prosper Nutrition',
+        id: 'place_example_nutrition',
+        name: 'Example Nutrition Clinic',
         address: 'Lane Cove NSW',
         kind: 'medical',
         lng: 151.1689,
@@ -111,7 +111,7 @@
     // Agent Tool UI contract demo: structured payload, trusted renderer.
     window.__hubMapPayloadExample = {
       type: 'map_places',
-      focus: 'place_northshore_private',
+      focus: 'place_example_hospital',
       places: places.map(({ id, name, address, kind, lng, lat }) => ({ id, name, address, kind, lng, lat }))
     };
   </script>

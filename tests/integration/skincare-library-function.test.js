@@ -5,7 +5,10 @@ import { createSkincareLibraryHandler } from '../../netlify/functions/skincare-l
 import { SKINCARE_PRODUCT_LIBRARY_PATH } from '../../apps/life/js/app/skincare-product-library.js';
 import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../apps/life/js/app/skincare-routine-membership.js';
 import { SKINCARE_CATALOG_PATH } from '../../apps/life/js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { SYNTHETIC_SKINCARE_ROUTINES as SKINCARE_ROUTINES, SYNTHETIC_SKINCARE_YAML } from '../fixtures/skincare-routines.mjs';
+
+// The cold-start seed comes from the private data repo's config/skincare-routines.yml.
+const PRIVATE_ROUTINES_SHA = 'f'.repeat(40);
 
 const SECRET = 's'.repeat(32);
 const COMMIT_SHA = 'c'.repeat(40);
@@ -74,7 +77,7 @@ function githubFetchStub({
       return Response.json({ sha: COMMIT_SHA, commit: { tree: { sha: TREE_SHA } } });
     }
     if (url.includes('/git/trees/')) {
-      const tree = [];
+      const tree = [{ path: 'config/skincare-routines.yml', type: 'blob', sha: PRIVATE_ROUTINES_SHA }];
       if (library !== undefined) {
         tree.push({ path: SKINCARE_PRODUCT_LIBRARY_PATH, type: 'blob', sha: LIBRARY_SHA });
       }
@@ -85,6 +88,9 @@ function githubFetchStub({
         tree.push({ path: SKINCARE_CATALOG_PATH, type: 'blob', sha: CATALOG_SHA });
       }
       return Response.json({ truncated: false, tree });
+    }
+    if (url.includes(`/git/blobs/${PRIVATE_ROUTINES_SHA}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(SYNTHETIC_SKINCARE_YAML, 'utf8').toString('base64') });
     }
     for (const [sha, value] of Object.entries(blobBySha)) {
       if (url.includes(`/git/blobs/${sha}`)) return Response.json(encodeBlob(value));

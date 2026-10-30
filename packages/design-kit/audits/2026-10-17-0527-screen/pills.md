@@ -36,8 +36,8 @@ Kit pill button (`.hub-pills__btn`): padding `0.35rem 0.75rem`, min-height `2.2r
 | kit | `packages/design-kit/calendar-tideline.css:195` | `.cal-chip.is-skipped .cal-chip__title` |  |  |  |  |  | var(--muted) |  |  |
 | kit | `packages/design-kit/calendar-tideline.css:197` | `.cal-chip.is-done` |  |  |  |  |  |  | var(--chip-bg) |  |
 | kit | `packages/design-kit/calendar-tideline.css:199` | `.cal-chip.is-done .cal-chip__title,.cal-due.is-done b` |  | var(--weight-medium) |  |  |  | var(--muted) |  |  |
-| kit | `packages/design-kit/calendar-tideline.css:210` | `.cal-chip.is-corey` |  |  |  |  |  |  | linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach)) | color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent) |
-| kit | `packages/design-kit/calendar-tideline.css:211` | `.cal-chip.is-corey.is-ghost` |  |  |  |  |  |  | color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent) |  |
+| kit | `packages/design-kit/calendar-tideline.css:210` | `.cal-chip.is-partner` |  |  |  |  |  |  | linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach)) | color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent) |
+| kit | `packages/design-kit/calendar-tideline.css:211` | `.cal-chip.is-partner.is-ghost` |  |  |  |  |  |  | color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent) |  |
 | kit | `packages/design-kit/calendar-tideline.css:298` | `.cal-chip.is-pin` |  |  |  | 2px 8px | var(--radius-full) |  | var(--paper) | 1px solid color-mix(in srgb,var(--wave) 35%,transparent) |
 | kit | `packages/design-kit/calendar-tideline.css:301` | `.cal-chip.is-pin .cal-chip__title` | var(--text-2xs) |  |  |  |  |  |  |  |
 | kit | `packages/design-kit/calendar-tideline.css:332` | `.cal-chip__grip::after` |  |  |  |  | 2px |  | color-mix(in srgb,var(--navy) 35%,transparent) |  |
@@ -448,7 +448,7 @@ Kit pill button (`.hub-pills__btn`): padding `0.35rem 0.75rem`, min-height `2.2r
 | teaching | `apps/teaching/src/styles/toolkit.css:359` | `.tk-chip--value` |  |  |  |  |  | var(--depth) | var(--high-sea) | var(--high-sea) |
 | teaching | `apps/teaching/src/styles/toolkit.css:365` | `.tk-chip--community` |  |  |  |  |  | var(--navy) | var(--shore) | var(--line) |
 | teaching | `apps/teaching/src/styles/toolkit.css:887` | `.tk-note__pill` | 11px | var(--weight-bold) |  | 1px 8px | 999px | var(--high-sea-ink) | #fff | 1px solid color-mix(in srgb, var(--high-sea) 45%, transparent) |
-| travel | `apps/travel/src/styles/journal.css:96` | `.journal-moment__corey-badge` | var(--text-xs) | var(--weight-medium) |  |  |  | var(--ink-muted) |  |  |
+| travel | `apps/travel/src/styles/journal.css:96` | `.journal-moment__partner-badge` | var(--text-xs) | var(--weight-medium) |  |  |  | var(--ink-muted) |  |  |
 | travel | `apps/travel/src/styles/travel.css:121` | `.status-chip` | .8125rem |  |  | 8px 12px | var(--radius-sm) |  | rgba(251,248,242,.94) |  |
 | travel | `apps/travel/src/styles/travel.css:125` | `.chips` |  |  |  | 12px 2px 4px |  |  |  |  |
 | travel | `apps/travel/src/styles/travel.css:127` | `.chip` |  |  |  | 8px 14px 9px | var(--radius-md) |  | var(--paper) | 0 |

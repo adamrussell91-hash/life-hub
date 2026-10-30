@@ -1,39 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { extractNotionHex, originsFromNotesPlace, resolvedOrigins } from "./notesPlace";
+import { extractNotionHex, installNotesPlace, originsFromNotesPlace, resolvedOrigins } from "./notesPlace";
+import { TEST_NOTES_PLACE } from "./notesPlace.fixture";
 
-describe("origins from the recovered Notion place snapshot", () => {
+installNotesPlace(TEST_NOTES_PLACE);
+
+describe("origins from the installed Notion place map", () => {
   it("returns notebook, book, and PD pills for known notes", () => {
-    expect(originsFromNotesPlace("00c518fb7b884781a60f702ec3185eb3")).toEqual([
+    expect(originsFromNotesPlace("a0000000000000000000000000000001")).toEqual([
       { kind: "notebook", label: "Boy's Education" },
     ]);
-    expect(originsFromNotesPlace("163f794f-8476-8001-aebf-fe92627dc423")).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+    expect(originsFromNotesPlace("b0000000-0000-0000-0000-000000000002")).toEqual([
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
-    expect(originsFromNotesPlace("2b1f794f84768055a63de8af7786916e")).toEqual([
+    expect(originsFromNotesPlace("c0000000000000000000000000000003")).toEqual([
       { kind: "notebook", label: "Literacy" },
-      { kind: "pd", label: "ETA Conference 2025" },
+      { kind: "pd", label: "Sample Conference 2025" },
     ]);
   });
 
   it("extracts a Notion hex from page ids and URLs", () => {
-    expect(extractNotionHex("page_notion_00c518fb7b884781a60f702ec3185eb3")).toBe(
-      "00c518fb7b884781a60f702ec3185eb3",
+    expect(extractNotionHex("page_notion_a0000000000000000000000000000001")).toBe(
+      "a0000000000000000000000000000001",
     );
-    expect(extractNotionHex("https://www.notion.so/Habits-163f794f84768001aebffe92627dc423")).toBe(
-      "163f794f84768001aebffe92627dc423",
+    expect(extractNotionHex("https://www.notion.so/Habits-b0000000000000000000000000000002")).toBe(
+      "b0000000000000000000000000000002",
     );
-    expect(extractNotionHex("00c518fb-7b88-4781-a60f-702ec3185eb3")).toBe("00c518fb7b884781a60f702ec3185eb3");
+    expect(extractNotionHex("a0000000-0000-0000-0000-000000000001")).toBe("a0000000000000000000000000000001");
   });
 
   it("fills recovered pills from a page_notion id when the row has none stored", () => {
-    expect(resolvedOrigins({ id: "page_notion_00c518fb7b884781a60f702ec3185eb3" })).toEqual([
+    expect(resolvedOrigins({ id: "page_notion_a0000000000000000000000000000001" })).toEqual([
       { kind: "notebook", label: "Boy's Education" },
     ]);
     expect(
-      originsFromNotesPlace("page_notion_163f794f84768001aebffe92627dc423"),
+      originsFromNotesPlace("page_notion_b0000000000000000000000000000002"),
     ).toEqual([
-      { kind: "book", label: "Atomic Habits" },
+      { kind: "book", label: "Example Book" },
       { kind: "notebook", label: "Cognitive Psychology" },
     ]);
   });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildCalendarMarkers, getSearchExtension, searchEvents } from '../../apps/life/js/core/search.js';
 
 const events = [
-  { record: { id: 'm1', type: 'meal', date: '2026-07-30', meal: 'lunch' }, body: 'Marley Spoon chicken bowl.', path: 'data/nutrition/2026/07/2026-07-30-lunch.md' },
+  { record: { id: 'm1', type: 'meal', date: '2026-07-30', meal: 'lunch' }, body: 'Meal-kit chicken bowl.', path: 'data/nutrition/2026/07/2026-07-30-lunch.md' },
   { record: { id: 'd1', type: 'diary', date: '2026-07-30', tags: ['evening'], highlights: 'Solid workout' }, body: 'Private prose.', path: 'data/mind/2026/07/2026-07-30-diary.md' },
   { record: { id: 'w1', type: 'workout', date: '2026-07-29', title: 'Chest and Curls' }, body: 'Good session.', path: 'data/fitness/2026/07/2026-07-29-workout.md' }
 ];

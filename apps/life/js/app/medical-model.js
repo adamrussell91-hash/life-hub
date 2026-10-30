@@ -6,17 +6,35 @@ export const DEFAULT_MEDICAL_DENSITY = 'months';
 
 /* Kit palette only — no mockup hex (Tailwind blue/violet). */
 export const MEDICAL_THREAD_COLOURS = {
-  IBD: '#376fb7',   /* --wave */
+  Gut: '#376fb7',   /* --wave */
   Liver: '#f68620', /* --high-sea */
   Mind: '#244f7c',  /* --navy-2 */
   Acute: '#a7abb9'  /* --shallow */
 };
 
+// A scheduled dose is recognised by role (prescription-lane biologic / injection /
+// infusion titles, or a record carrying cadence_days), never by a drug name.
+const SCHEDULED_DOSE_RE = /\b(biologic|injection|infusion)s?\b/i;
+
+function isScheduledDoseVisit(visit) {
+  if (!visit || visit.record_type === 'Symptom' || visit.record_type === 'Vaccination') return false;
+  if (!SCHEDULED_DOSE_RE.test(visit.title || '')) return false;
+  return visit.record_type === 'Prescription' || visit.lane === 'prescription' || Number(visit.cadence_days) > 0;
+}
+
+/** Cycle label from the record itself: the title before the dose word ("Medication X injection" → "Medication X"). */
+function doseLabel(visit) {
+  const title = String(visit.title || '').split(/\s*[(—–]/)[0].trim();
+  const stem = title.replace(/\s*\b(maintenance|induction|subcutaneous|biologic|injection|infusion|dose)s?\b.*$/i, '').trim();
+  return stem || 'Next dose';
+}
+
 const THREAD_RULES = [
   {
-    thread: 'IBD',
+    thread: 'Gut',
     test: (visit, bloods) =>
-      /gastro|stelara|ustekinumab|calprotectin|crohn|ibd|biologic/i.test(visitBlob(visit))
+      /gastro|calprotectin|bowel|colon|endoscop|\bibd\b|biologic|budesonide|entocort/i.test(visitBlob(visit))
+      || isScheduledDoseVisit(visit)
       || hasMarker(bloods, /calprotectin/i)
   },
   {
@@ -29,7 +47,7 @@ const THREAD_RULES = [
     thread: 'Mind',
     test: visit =>
       visit.lane === 'therapy'
-      || /therap|psycholog|psychiatr|adhd(?:\s+centre)?|kate semple|hook|vera|mind/i.test(visitBlob(visit))
+      || /therap|psycholog|psychiatr|counsell|adhd|vera|mind/i.test(visitBlob(visit))
   },
   {
     thread: 'Acute',
@@ -209,7 +227,7 @@ export function buildThreadModel(visits = [], bloods = [], today) {
 }
 
 function collectThreadMarkers(thread, bloods) {
-  const keys = thread === 'IBD'
+  const keys = thread === 'Gut'
     ? [/calprotectin/i]
     : thread === 'Liver'
       ? [/\bggt\b/i, /\balt\b/i]
@@ -303,7 +321,7 @@ export function formatMedicalDisplayDate(visit) {
 
 /**
  * Cadence-derived virtual next dose (MO-07). Never written to storage.
- * Last Stelara 27/08 cadence 56 → ~22/10.
+ * Last dose 01/03 with cadence 28 → ~29/03.
  * A real record within ±7 days of that date, or any real upcoming / planned /
  * booked / to-book visit for the same medication, suppresses the ghost.
  */
@@ -356,8 +374,10 @@ function suppressesVirtualDose(visit, last, nextDate, today) {
 
 function medicationKey(visit) {
   const blob = `${visit.title || ''} ${visit.notes || ''}`.toLowerCase();
-  if (/stelara|ustekinumab/.test(blob)) return 'stelara';
-  if (/humira|adalimumab/.test(blob)) return 'humira';
+  // Group doses of one medication by the first word of the title ("Medication X injection"
+  // and "Medication X maintenance" share a key); no medication names live in code.
+  const first = String(visit.title || '').trim().split(/[\s(—–-]+/)[0];
+  if (first && SCHEDULED_DOSE_RE.test(blob)) return first.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return (visit.title || visit.id || 'med').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 }
 
@@ -447,22 +467,23 @@ function precisionRank(visit) {
 }
 
 function buildHealthBrief(visits, bloods, today) {
-  // Cycle meter needs a dose row with cadence — not a visit whose notes merely mention Stelara.
-  const stelara = visits
-    .filter(visit => /stelara|ustekinumab/i.test(visit.title || ''))
+  // Cycle meter needs a dose row with cadence — not a visit whose notes merely mention the medication.
+  const dose = visits
+    .filter(isScheduledDoseVisit)
     .filter(visit => !visit.virtual && visit.date <= today && visit.cadence_days)
     .sort(compareNewest)[0];
   let cycle = null;
-  if (stelara) {
-    const elapsed = daysBetween(stelara.date, today);
-    const week = Math.min(8, Math.max(1, Math.floor(elapsed / 7) + 1));
+  if (dose) {
+    const elapsed = daysBetween(dose.date, today);
+    const of = Math.round(dose.cadence_days / 7) || 1;
+    const week = Math.min(of, Math.max(1, Math.floor(elapsed / 7) + 1));
     cycle = {
-      label: 'Stelara',
+      label: doseLabel(dose),
       week,
-      of: Math.round(stelara.cadence_days / 7) || 8,
-      lastDate: stelara.date,
-      cadence_days: stelara.cadence_days,
-      nextDate: addDays(stelara.date, stelara.cadence_days)
+      of,
+      lastDate: dose.date,
+      cadence_days: dose.cadence_days,
+      nextDate: addDays(dose.date, dose.cadence_days)
     };
   }
 

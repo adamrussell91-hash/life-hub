@@ -12,8 +12,11 @@ import {
   scentForLook,
   scentPolish
 } from '../../apps/life/js/app/aesthetics/aesthetics-model.js';
-import { FRAGRANCES } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
+import { FRAGRANCES, setFragranceSource } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesthetics.js';
+
+// The real library is private; tests run on a small synthetic fixture.
+setFragranceSource(JSON.parse(readFileSync(new URL('../fixtures/aesthetics/fragrance-source.json', import.meta.url), 'utf8')));
 
 const bottleNamed = name => FRAGRANCES.find(f => f.name === name);
 const lookNamed = vibe => LOOKS.find(l => l.vibe === vibe);

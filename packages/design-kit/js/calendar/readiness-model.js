@@ -662,7 +662,7 @@ const RECOVERY_PER_FREE_HOUR = 1.5;
 
 function demandRate(item) {
   if (item.isClass) return DEMAND.teaching;
-  if (item.kind === 'corey' || item.kind === 'log' || item.protected) return 0;
+  if (item.kind === 'partner' || item.kind === 'log' || item.protected) return 0;
   return DEMAND[item.kind] ?? DEMAND.default;
 }
 

@@ -20,7 +20,7 @@
 
 **Rules for every task:**
 - Real people's names never go in code, tests or fixtures. Use invented names: Bob Brown, Tom Tills, Ben Bates, Ava Moss.
-- Run commands from the repo root `/Users/adamrussell/Projects/life-hub-quiz-initials` unless a step says otherwise.
+- Run commands from the repo root `/Users/you/Projects/life-hub-quiz-initials` unless a step says otherwise.
 - Server tests: `node --import ./scripts/test-network-guard.mjs --test tests/unit/<file>.test.js`.
 - Client tests: `cd apps/teaching && npx vitest run tests/unit/<file>.test.ts`.
 

@@ -1,0 +1,952 @@
+{
+  "schema": "aesthetics_fragrances/v1",
+  "synthetic": true,
+  "map": [
+    {
+      "name": "Orchard Rain",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Neon",
+      "family": "fresh",
+      "loved": true,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Liaisons Dangereuses",
+      "family": "floral",
+      "loved": true,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Versace Pour Homme",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Aether",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Milk Orchid",
+      "family": "floral",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Asad Zanzibar Limited Edition",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Khamrah",
+      "family": "gourmand",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Irish Creme",
+      "family": "gourmand",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Velvet Underground",
+      "family": "gourmand",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Asad Bourbon",
+      "family": "gourmand",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Asad Elixir",
+      "family": "amber",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Asad",
+      "family": "amber",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Encre Noire",
+      "family": "woody",
+      "loved": true,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Syzygy",
+      "family": "woody",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Gullal",
+      "family": "fresh",
+      "loved": true,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Verge",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Tea Soirée",
+      "family": "fresh",
+      "loved": false,
+      "hated": false,
+      "tryAt": null
+    },
+    {
+      "name": "Summer Oud",
+      "family": "woody",
+      "loved": false,
+      "hated": true,
+      "tryAt": null
+    }
+  ],
+  "fragrances": [
+    {
+      "id": "f1c7u4e000000000000000000000001",
+      "properties": {
+        "Fragrance": "Orchard Rain",
+        "Brand": "Feily",
+        "Top Notes": [
+          "Snow Pear",
+          "Peach",
+          "Nashi Pear",
+          "Mandarin",
+          "Lychee"
+        ],
+        "Heart Notes": [
+          "Lily Petals",
+          "Orchid Flower",
+          "Plum Blossom"
+        ],
+        "Base Notes": [
+          "Sheer Musk",
+          "Pale Wood",
+          "Petrichor",
+          "Amber"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual"
+        ],
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Orchard Rain. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 100,
+        "Added": "2026-01-01T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/01"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-01T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000002",
+      "properties": {
+        "Fragrance": "Neon",
+        "Brand": "Criminal Elements",
+        "Top Notes": [
+          "Bergamot",
+          "Aldehydes"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "ISO E Super"
+        ],
+        "Season": [
+          "Spring",
+          "Summer",
+          "Autumn"
+        ],
+        "Time of Day": [
+          "Day",
+          "Night"
+        ],
+        "Occasion": [
+          "Casual",
+          "Date Night"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Neon. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Rating": 8,
+        "Compliments": 0,
+        "Price (AUD)": 110,
+        "Added": "2026-01-02T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/02"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-02T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000003",
+      "properties": {
+        "Fragrance": "Liaisons Dangereuses",
+        "Brand": "By Kilian",
+        "Top Notes": [
+          "Peach",
+          "Plum",
+          "Black Currant",
+          "Coconut"
+        ],
+        "Heart Notes": [
+          "Rose",
+          "Geranium",
+          "Cinnamon"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Musk",
+          "Sandalwood",
+          "Vetiver",
+          "Amber",
+          "Oakmoss"
+        ],
+        "Season": [
+          "Spring",
+          "Summer",
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Day",
+          "Night"
+        ],
+        "Occasion": [
+          "Date Night",
+          "Formal",
+          "Signature Scent"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Liaisons Dangereuses. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 120,
+        "Added": "2026-01-03T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/03"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-03T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000004",
+      "properties": {
+        "Fragrance": "Versace Pour Homme",
+        "Brand": "Versace",
+        "Top Notes": [
+          "Bergamot",
+          "Lemon",
+          "Petitgrain"
+        ],
+        "Heart Notes": [
+          "Geranium",
+          "Clary Sage"
+        ],
+        "Base Notes": [
+          "Tonka Bean",
+          "Musk",
+          "Amber"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual",
+          "Office"
+        ],
+        "Longevity": "Moderate (4 to 6 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Toilette",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Versace Pour Homme. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 0,
+        "Added": "2026-01-04T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/04"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-04T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000005",
+      "properties": {
+        "Fragrance": "Aether",
+        "Brand": "French Avenue",
+        "Top Notes": [
+          "Bergamot",
+          "Apple"
+        ],
+        "Heart Notes": [
+          "Violet"
+        ],
+        "Base Notes": [
+          "Cedarwood",
+          "Cashmeran",
+          "Oakmoss",
+          "Musk",
+          "Ambroxan"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual"
+        ],
+        "Longevity": "Short (2 to 4 hrs)",
+        "Sillage": "Intimate (skin scent)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Aether. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 140,
+        "Added": "2026-01-05T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/05"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-05T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000006",
+      "properties": {
+        "Fragrance": "Milk Orchid",
+        "Brand": "Commodity",
+        "Top Notes": [
+          "Coconut"
+        ],
+        "Heart Notes": [
+          "Magnolia",
+          "Fig"
+        ],
+        "Base Notes": [
+          "Sandalwood",
+          "Vanilla"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual",
+          "Office",
+          "Date Night"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "Fixture Perfumer",
+        "Review": "Synthetic review for Milk Orchid. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 150,
+        "Added": "2026-01-06T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/06"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-06T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000007",
+      "properties": {
+        "Fragrance": "Asad Zanzibar Limited Edition",
+        "Brand": "Lattafa",
+        "Top Notes": [
+          "Black Pepper",
+          "Marine"
+        ],
+        "Heart Notes": [
+          "Iris"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Olibanum"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Asad Zanzibar Limited Edition. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 160,
+        "Added": "2026-01-07T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/07"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-07T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000008",
+      "properties": {
+        "Fragrance": "Khamrah",
+        "Brand": "Lattafa",
+        "Top Notes": [
+          "Cinnamon"
+        ],
+        "Heart Notes": [
+          "Tuberose",
+          "Nutmeg"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Tonka Bean",
+          "Amber",
+          "Benzoin",
+          "Musk"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Occasion": [
+          "Date Night",
+          "Formal"
+        ],
+        "Longevity": "All Day (8 to 12 hrs)",
+        "Sillage": "Strong (room presence)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Khamrah. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 170,
+        "Added": "2026-01-08T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/08"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-08T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000009",
+      "properties": {
+        "Fragrance": "Irish Creme",
+        "Brand": "Jalu Fragrances",
+        "Top Notes": [
+          "Bergamot"
+        ],
+        "Heart Notes": [
+          "Cinnamon",
+          "Nutmeg"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Tonka Bean",
+          "Musk"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Occasion": [
+          "Casual",
+          "Date Night"
+        ],
+        "Longevity": "Eternal (12+ hrs)",
+        "Sillage": "Enormous (fills a room)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Irish Creme. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 180,
+        "Added": "2026-01-09T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/09"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-09T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000010",
+      "properties": {
+        "Fragrance": "Velvet Underground",
+        "Brand": "Àerre",
+        "Top Notes": [
+          "Sour Cherry",
+          "Bitter Almond"
+        ],
+        "Heart Notes": [
+          "Rose",
+          "Jasmine",
+          "Plum"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Tonka Bean"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Occasion": [
+          "Date Night",
+          "Formal"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Velvet Underground. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 190,
+        "Added": "2026-01-10T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/10"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-10T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000011",
+      "properties": {
+        "Fragrance": "Asad Bourbon",
+        "Brand": "Lattafa",
+        "Top Notes": [
+          "Lavender",
+          "Plum",
+          "Pink Pepper"
+        ],
+        "Heart Notes": [
+          "Davana",
+          "Nutmeg",
+          "Cocoa"
+        ],
+        "Base Notes": [
+          "Vanilla",
+          "Amber",
+          "Vetiver"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Strong (room presence)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Asad Bourbon. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 200,
+        "Added": "2026-01-11T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/11"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-11T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000012",
+      "properties": {
+        "Fragrance": "Asad Elixir",
+        "Brand": "Lattafa",
+        "Top Notes": [
+          "Pink Pepper",
+          "Grapefruit",
+          "Saffron"
+        ],
+        "Base Notes": [
+          "Olibanum",
+          "Amber",
+          "Cashmeran",
+          "Patchouli",
+          "Vanilla",
+          "Tobacco",
+          "Cedarwood"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Longevity": "All Day (8 to 12 hrs)",
+        "Sillage": "Strong (room presence)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Asad Elixir. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 210,
+        "Added": "2026-01-12T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/12"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-12T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000013",
+      "properties": {
+        "Fragrance": "Asad",
+        "Brand": "Lattafa",
+        "Base Notes": [
+          "Amber",
+          "Benzoin",
+          "Dry Wood",
+          "Labdanum",
+          "Vanilla"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Day",
+          "Night"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Strong (room presence)",
+        "Type": "Eau de Parfum",
+        "Status": "Owned",
+        "Perfumer": "",
+        "Review": "Synthetic review for Asad. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 220,
+        "Added": "2026-01-13T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/13"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-13T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000014",
+      "properties": {
+        "Fragrance": "Encre Noire",
+        "Brand": "Lalique",
+        "Top Notes": [
+          "Cypress",
+          "Vetiveryl acetate"
+        ],
+        "Heart Notes": [
+          "Bourbon vetiver",
+          "Haitian vetiver"
+        ],
+        "Base Notes": [
+          "Cashmere wood",
+          "Musk"
+        ],
+        "Season": [
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Occasion": [
+          "Date Night",
+          "Formal"
+        ],
+        "Longevity": "Long (6 to 8 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Toilette",
+        "Status": "Sampling",
+        "Perfumer": "",
+        "Review": "Synthetic review for Encre Noire. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 230,
+        "Added": "2026-01-14T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/14"
+      },
+      "content": "- Synthetic page note: cypress and vetiver, very dry.",
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-14T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000015",
+      "properties": {
+        "Fragrance": "Syzygy",
+        "Brand": "\\[noun\\] collection",
+        "Top Notes": [
+          "Bergamot",
+          "Raspberry"
+        ],
+        "Heart Notes": [
+          "Oud",
+          "Norlimbanol"
+        ],
+        "Base Notes": [
+          "Musk",
+          "Ambroxan"
+        ],
+        "Season": [
+          "Spring",
+          "Autumn",
+          "Winter"
+        ],
+        "Time of Day": [
+          "Night"
+        ],
+        "Occasion": [
+          "Date Night",
+          "Formal"
+        ],
+        "Type": "Parfum",
+        "Status": "Sampling",
+        "Perfumer": "",
+        "Review": "Synthetic review for Syzygy. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 240,
+        "Added": "2026-01-15T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/15"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-15T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000016",
+      "properties": {
+        "Fragrance": "Gullal",
+        "Brand": "PEOSYM",
+        "Top Notes": [
+          "Grapefruit",
+          "Pink Pepper",
+          "Salt"
+        ],
+        "Heart Notes": [
+          "Orris Root",
+          "Fennel"
+        ],
+        "Base Notes": [
+          "Dry Wood",
+          "Ambergris"
+        ],
+        "Season": [
+          "Spring"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual"
+        ],
+        "Longevity": "Moderate (4 to 6 hrs)",
+        "Sillage": "Moderate (arm's length)",
+        "Type": "Eau de Parfum",
+        "Status": "Wishlist",
+        "Perfumer": "",
+        "Review": "Synthetic review for Gullal. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 250,
+        "Added": "2026-01-16T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/16"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-16T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000017",
+      "properties": {
+        "Fragrance": "Verge",
+        "Brand": "Criminal Elements",
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Status": "Wishlist",
+        "Perfumer": "",
+        "Review": "Synthetic review only: no pyramid recorded for this one.",
+        "Compliments": 0,
+        "Price (AUD)": 260,
+        "Added": "2026-01-17T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/17"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-17T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000018",
+      "properties": {
+        "Fragrance": "Tea Soirée",
+        "Brand": "Form Of",
+        "Top Notes": [
+          "Bergamot"
+        ],
+        "Base Notes": [
+          "Musk"
+        ],
+        "Season": [
+          "Spring",
+          "Summer"
+        ],
+        "Time of Day": [
+          "Day"
+        ],
+        "Occasion": [
+          "Casual",
+          "Office"
+        ],
+        "Type": "Eau de Parfum",
+        "Status": "Wishlist",
+        "Perfumer": "",
+        "Review": "Synthetic review for Tea Soirée. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 270,
+        "Added": "2026-01-18T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/18"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-18T10:00:00.000Z"
+    },
+    {
+      "id": "f1c7u4e000000000000000000000019",
+      "properties": {
+        "Fragrance": "Summer Oud",
+        "Brand": "Ahmed Al Maghribi",
+        "Top Notes": [
+          "Mandarin"
+        ],
+        "Heart Notes": [
+          "Rose",
+          "Saffron"
+        ],
+        "Base Notes": [
+          "Oud",
+          "Leather",
+          "Musk",
+          "Oakmoss",
+          "Vetiver",
+          "Patchouli",
+          "Amber",
+          "Incense",
+          "Cashmeran",
+          "Cypriol"
+        ],
+        "Type": "Eau de Parfum",
+        "Status": "Retired",
+        "Perfumer": "",
+        "Review": "Synthetic review for Summer Oud. Opens bright, settles soft.<br><br>Follow up: the drydown is the best part.",
+        "Compliments": 0,
+        "Price (AUD)": 280,
+        "Added": "2026-01-19T09:00:00.000Z",
+        "Parfumo URL": "https://fragrance.example/19"
+      },
+      "content": null,
+      "icon": null,
+      "cover": null,
+      "lastEditedAt": "2026-02-19T10:00:00.000Z"
+    }
+  ],
+  "styleNote": {
+    "title": "Synthetic style note",
+    "date": "2026-01-15",
+    "sourceUrl": "https://notes.example/style",
+    "summary": "### Colour pairings\n- **Neutral swaps** change the feel [^https://notes.example/style#pairings]\n\t- Camel with cream reads relaxed\n### Five pieces\n- Build every outfit to at least five pieces\n",
+    "notes": "<empty-block/>",
+    "transcript": "Synthetic transcript. Add a fifth piece and the outfit looks finished."
+  }
+}

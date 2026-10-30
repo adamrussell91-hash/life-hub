@@ -113,7 +113,7 @@ const halfHours = (value) => {
  */
 export function dayCost(day, days, today) {
   const load = (day.chips ?? [])
-    .filter((chip) => !chip.isClass && !chip.protected && !chip.ghost && !chip.ambient && chip.kind !== 'corey')
+    .filter((chip) => !chip.isClass && !chip.protected && !chip.ghost && !chip.ambient && chip.kind !== 'partner')
     .reduce((sum, chip) => sum + Math.max(0, chip.end - chip.start), 0);
   const pct = day.cap?.pct ?? CAPACITY.baseline;
   const over = load > 0 && isOverCapacity(pct, load);

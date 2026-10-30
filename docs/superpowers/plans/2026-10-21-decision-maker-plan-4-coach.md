@@ -16,7 +16,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-decision-book-design.md` ("Experience: Full session", "Coach knowledge", "Errors").
 **Plans 1–3:** done (Plan 3 HEAD `9cf6c6a31`).
-**Branch and worktree:** `claude/decision-book` in `/Users/adamrussell/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
+**Branch and worktree:** `claude/decision-book` in `/Users/you/Projects/life-hub-decision-book`. Run every command from that worktree's root unless a step says otherwise. Run `npm ci` at the root and in `apps/tasks` first if `node_modules` is missing.
 
 **How this plan was made:** every file below was drafted in the worktree and its tests run green: 14 new prompt tests, the full unit suite (5,686 tests: 5,675 pass, 11 skipped as before), and the Problem Solver and Decision Book vitest tests (54 files, 1,087 tests, with the 54 canvas tests among them). The Tasks type-check showed no errors in these paths, and the contact sheet showed the Drexler/Sibbet track stacked and readable with no console errors. The drafts were then removed. New files are given in full; changed files are given as patches (apply with `git apply`, then check with `git diff`).
 

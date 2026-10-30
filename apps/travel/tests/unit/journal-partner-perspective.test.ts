@@ -3,21 +3,21 @@ import type { JournalDocument } from '@/api/journal';
 import {
   ADAM_EXPORT_AUTHORSHIP_LABEL,
   authoritativeLiveMoments,
-  COREY_EXPORT_AUTHORSHIP_LABEL,
+  PARTNER_EXPORT_AUTHORSHIP_LABEL,
   filterMomentsForPerspectiveDisplay,
   formatAuthorshipExportLabel,
   isAuthoritativeUserMoment,
-  journalHasCoreyMoments,
+  journalHasPartnerMoments,
   parseMomentAuthor,
   resolveMomentAuthor,
-} from '@/journal/corey-perspective';
+} from '@/journal/partner-perspective';
 import { formatJournalPlainText, stripJournalForExport } from '@/journal/export-bundle';
 
 function miniJournal(): JournalDocument {
   return {
-    id: 'jrn_corey',
+    id: 'jrn_partner',
     schema_version: 1,
-    trip_id: 'trp_corey',
+    trip_id: 'trp_partner',
     title: 'Perspective trip',
     revision: 1,
     lifecycle: 'live',
@@ -27,7 +27,7 @@ function miniJournal(): JournalDocument {
     legs: [
       {
         id: 'leg_a',
-        trip_id: 'trp_corey',
+        trip_id: 'trp_partner',
         pattern_id: 'kul',
         destination: 'KL',
         timezone: 'Asia/Kuala_Lumpur',
@@ -47,13 +47,13 @@ function miniJournal(): JournalDocument {
         text: 'My note',
       },
       {
-        id: 'mom_corey',
+        id: 'mom_partner',
         leg_id: 'leg_a',
         local_date: '2026-03-01',
         media_ids: [],
         display_order: 2,
         lifecycle: 'live',
-        author: 'corey',
+        author: 'partner',
         text: 'Agent line',
       },
     ],
@@ -62,17 +62,20 @@ function miniJournal(): JournalDocument {
   };
 }
 
-describe('journal Corey perspective', () => {
-  it('defaults missing author to adam and treats corey as non-authoritative', () => {
+describe('journal Partner perspective', () => {
+  it('defaults missing author to adam and treats partner as non-authoritative', () => {
     expect(parseMomentAuthor(undefined)).toBe('adam');
-    expect(parseMomentAuthor('corey')).toBe('corey');
-    expect(isAuthoritativeUserMoment({ author: 'corey' })).toBe(false);
-    expect(resolveMomentAuthor({ author: 'corey' })).toBe('corey');
+    expect(parseMomentAuthor('partner')).toBe('partner');
+    expect(parseMomentAuthor('adam')).toBe('adam');
+    // Ids saved before the rename are someone else's perspective, never Adam's words.
+    expect(parseMomentAuthor('legacy-name')).toBe('partner');
+    expect(isAuthoritativeUserMoment({ author: 'partner' })).toBe(false);
+    expect(resolveMomentAuthor({ author: 'partner' })).toBe('partner');
   });
 
   it('filters display moments and authoritative digests separately', () => {
     const journal = miniJournal();
-    expect(journalHasCoreyMoments(journal)).toBe(true);
+    expect(journalHasPartnerMoments(journal)).toBe(true);
     const all = journal.moments;
     expect(filterMomentsForPerspectiveDisplay(all, true)).toHaveLength(2);
     expect(filterMomentsForPerspectiveDisplay(all, false).map((m) => m.id)).toEqual(['mom_adam']);
@@ -81,9 +84,9 @@ describe('journal Corey perspective', () => {
 
   it('labels authorship in plain-text export', () => {
     const text = formatJournalPlainText(stripJournalForExport(miniJournal()));
-    expect(text).toContain(COREY_EXPORT_AUTHORSHIP_LABEL);
+    expect(text).toContain(PARTNER_EXPORT_AUTHORSHIP_LABEL);
     expect(text).toContain(ADAM_EXPORT_AUTHORSHIP_LABEL);
     expect(text).toContain('Agent line');
-    expect(formatAuthorshipExportLabel('corey')).toBe(COREY_EXPORT_AUTHORSHIP_LABEL);
+    expect(formatAuthorshipExportLabel('partner')).toBe(PARTNER_EXPORT_AUTHORSHIP_LABEL);
   });
 });

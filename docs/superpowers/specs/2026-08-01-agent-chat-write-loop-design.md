@@ -35,12 +35,12 @@ It excludes:
 - verbatim migration of Notion-authored agent instructions (deferred — needs Notion MCP access);
 - Day One diary email delivery (Phase 5);
 - multi-record or retroactive-edit tool calls (e.g., "log yesterday's three meals at once", editing a previously written record) — first version is single-record, same-day, forward-only;
-- voice input, image/photo logging, or Marley Spoon/recipe lookups;
+- voice input, image/photo logging, or meal kit/recipe lookups;
 - production credentials and production promotion (Phase 6).
 
 ## Deferred: persona fidelity
 
-`config/agents.yml` gives each agent a name, domain, tab, colour, and trigger words, but not the full instruction text that lives in Adam's Notion pages (tone, specific protocols like the Vyvanse-timing nutrition strategy, sprint protocols, etc.). For this phase, each persona's system prompt is assembled from:
+`config/agents.yml` gives each agent a name, domain, tab, colour, and trigger words, but not the full instruction text that lives in Adam's Notion pages (tone, specific protocols like the ADHD medication-timing nutrition strategy, sprint protocols, etc.). For this phase, each persona's system prompt is assembled from:
 
 - the agent's identity fields in `agents.yml`;
 - the relevant `Constraints & Priorities` subsection of `central-node.md` (e.g. Brisket receives the Dietary and Iron Absorption Rules sections, Chadwick receives none of the medical detail unless it is training-relevant);

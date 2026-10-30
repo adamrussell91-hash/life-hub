@@ -201,7 +201,7 @@ Run:
 ```bash
 mkdir -p docs/specs
 for n in 01 02 03 04 05 06 08 09 10; do
-  textutil -convert txt -stdout "/Users/adamrussell/Downloads/$n.rtf" > "docs/specs/${n}_TMP.txt"
+  textutil -convert txt -stdout "/Users/you/Downloads/$n.rtf" > "docs/specs/${n}_TMP.txt"
 done
 ```
 

@@ -26,7 +26,7 @@ One calendar object with four zoom stops. They replace Day / Week / Month everyw
 |---|---|---|
 | Day | C · Day Dial | Run today honestly: what's left tonight, what tomorrow needs |
 | Week | **A · Tideline** | Plan the week with elastic hours, capacity, ghosts and walls |
-| Term | B · Term River | The term in identity lanes (teacher, Corey, scholar, friends and family), body line, load strip |
+| Term | B · Term River | The term in identity lanes (teacher, Partner, scholar, friends and family), body line, load strip |
 | Almanac | D · The Almanac | What nobody booked: last safe days, world calendar, forecast, openings |
 
 The zoom pills read **Day · Week · Term · Year · Almanac**. Year reuses Term River at year scale.
@@ -64,7 +64,7 @@ The time axis is a stack of bands from `bandsFromProfile(profile)` in `calendar-
 | Tasks with a due date | Due row | Timed work blocks go on the grid. |
 | Life `workout` (planned) | Timed chip (blue) | Completed workouts go to the vitals line. |
 | Life `medical` appointments | Timed chip (health) | **Merge duplicates**: same date, start within 2h, same provider or ≥ 0.6 title similarity. Meta says "N records merged". |
-| `calendar_block` (new, below) | Timed chip | `kind: corey` is warm with the two-ring mark; `protected` blocks never count as load. |
+| `calendar_block` (new, below) | Timed chip | `kind: partner` is warm with the two-ring mark; `protected` blocks never count as load. |
 | Walls | Hatched overlay | A `calendar_block` with `kind: wall` (all-day or timed). Sunday "Your day" comes from `day_profile.protected_weekday`. |
 | Meals, diary, sleep, skincare, heart, body | **Never on the grid** | Vitals line under the date, and counts in the Ambient pill. |
 | Knowledge pages | Never on the grid | "N notes touched" in Ambient. |
@@ -93,7 +93,7 @@ A ghost is an agent's proposal on the calendar. Kinds (see `apps/life/js/app/gho
 |---|---|---|
 | `skip_workout` | Sara | Central Node Cross-Agent line `- Sara→Chadwick: skip Thu 24/09 workout (reason).`; workout `status: skipped`; a Recent Actions line |
 | `bedtime` | Sara | Today's Status `**Sleep:** lights out 10:00 pm (reason)`; a protected `calendar_block` (`kind: rest`, 30-minute wind-down); a Recent Actions line |
-| `protect_block` | Hammond | `calendar_block` (tentative, protected; `kind: corey` when with Corey); This Week line; `- Hammond→Clare: keep … clear.` |
+| `protect_block` | Hammond | `calendar_block` (tentative, protected; `kind: partner` when with Partner); This Week line; `- Hammond→Clare: keep … clear.` |
 | `move_task` | Hammond or Clare | `PATCH /api/tasks?id=` `{ due_date }`; a Recent Actions line |
 
 Every Central Node patch these produce is auto-class (tested), validates with `validateCentralNodePatchInput`, and lands in the live format (tested against `applyCentralNodePatch`).
@@ -120,7 +120,7 @@ type: calendar_block
 date: 2026-09-26
 time: "18:00"          # start
 end_time: "22:00"
-kind: corey | rest | protected | wall | focus
+kind: partner | rest | protected | wall | focus
 status: tentative | confirmed
 protected: true
 title: Dinner out + a show
@@ -141,7 +141,7 @@ Add it to `VALIDATORS` in `core/validate.js`, to `SOURCE_BY_TYPE`/`eventDetailTi
 
 Behaviour as in the signed-off mockups. Each gets its own reference folder (`docs/proposals/calendar-reference/{term-river,day-dial,almanac}/`) built the same way as Tideline before any build prompt is written. Notes that constrain them now:
 
-- **B · Term River** is ready to build: reference in `docs/proposals/calendar-reference/term-river/`, one-prompt build in `docs/superpowers/plans/2026-09-26-term-river-prompt.md`. Lanes are identities from About Me in their order (teacher, Corey, scholar, friends and family), plus Body; `apps/life/js/app/term-river.js` routes every item to one lane and computes weekly load against `CAPACITY.budgetHours` (classes, protected time and ghosts don't count). The build promotes `school-time.ts` (holiday compression, week labels) to `packages/design-kit/js/school-time.js` so Life can use it, and the Tideline drops its duplicate `weekLabel`. Term and Year are one chart with one zoom blend, not two views. It uses the existing ghost endpoints unchanged.
+- **B · Term River** is ready to build: reference in `docs/proposals/calendar-reference/term-river/`, one-prompt build in `docs/superpowers/plans/2026-09-26-term-river-prompt.md`. Lanes are identities from About Me in their order (teacher, Partner, scholar, friends and family), plus Body; `apps/life/js/app/term-river.js` routes every item to one lane and computes weekly load against `CAPACITY.budgetHours` (classes, protected time and ghosts don't count). The build promotes `school-time.ts` (holiday compression, week labels) to `packages/design-kit/js/school-time.js` so Life can use it, and the Tideline drops its duplicate `weekLabel`. Term and Year are one chart with one zoom blend, not two views. It uses the existing ghost endpoints unchanged.
 - **C · Day Dial** is ready to build: reference in `docs/proposals/calendar-reference/day-dial/`, one-prompt build in `docs/superpowers/plans/2026-09-25-day-dial-prompt.md`. It uses the Tideline's data and ghost endpoints unchanged; new modules are `dial-geometry.js` (kit) and `day-brief.js` (Life). Linear is the Tideline one-day view.
 - **D · The Almanac** is ready to build: reference in `docs/proposals/calendar-reference/almanac/`, prompts in `docs/superpowers/plans/2026-09-24-almanac-prompts.md`. Its data and server contract:
   - **Anchors** live in `almanac-anchors.yml` in the data repo: `{ id, title, kind, date | window, returns?, tags[], sub }`. Hammond seeds it from About Me and Constraints, and new anchors are confirm-class. Term dates (hub prefs) add `term` anchors automatically. Any `calendar_block` or Professional event with `anchor: true` becomes one too.

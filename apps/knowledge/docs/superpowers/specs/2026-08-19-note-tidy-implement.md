@@ -1,6 +1,6 @@
 # IMPLEMENT THIS: Knowledge Hub note tidy (Clean up + midnight pass)
 
-You are implementing this in `/Users/adamrussell/Projects/knowledge-hub`. Do not invent a second design. Do not add a Netlify function. Read this whole file before touching code.
+You are implementing this in `/Users/you/Projects/knowledge-hub`. Do not invent a second design. Do not add a Netlify function. Read this whole file before touching code.
 
 **Product:** Knowledge Hub archive notes (`pages/{id}.json` in `knowledge-hub-data`).
 **Date:** 2026-08-19

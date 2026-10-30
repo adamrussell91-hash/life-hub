@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCentralNodeSeed } from '../../netlify/functions/_shared/load-central-node-seed.mjs';
+import { compileDenylist, loadDenylist } from '../../scripts/privacy-guard.mjs';
 
 test('loads the checked-in central-node.md seed', () => {
   const text = loadCentralNodeSeed();
@@ -29,7 +30,11 @@ test('public seed is a structural template without personal records', () => {
   const text = loadCentralNodeSeed();
   assert.match(text, /Public structural template only/);
   assert.match(text, /adamrussell91-hash\/life-hub-data/);
-  assert.doesNotMatch(text, /Crohn|Vyvanse|Stelara|calprotectin|honeymoon|Tallowwood|Corey/);
+  assert.doesNotMatch(text, /calprotectin|honeymoon/i);
+  // Real names, conditions and medications live in the private denylist (see scripts/privacy-guard.mjs).
+  for (const { index, re } of compileDenylist(loadDenylist().terms)) {
+    assert.equal(re.test(text), false, `private denylist term #${index} found in the public seed`);
+  }
 });
 
 test('returns an empty string when the seed file cannot be read', () => {

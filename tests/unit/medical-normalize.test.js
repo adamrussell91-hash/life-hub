@@ -21,14 +21,14 @@ import { validateRecord } from '../../apps/life/js/core/validate.js';
 
 test('infers prescription type for injections and biologics', () => {
   assert.equal(
-    inferRecordType('', 'Stelara injection', 'Just had my stelara injection at the doctors'),
+    inferRecordType('', 'Biologic injection', 'Just had my biologic injection at the doctors'),
     'Prescription'
   );
 });
 
 test('normalizes empty placeholders and infers required medical enums', () => {
   const normalized = normalizeMedicalFields({
-    title: 'Stelara injection',
+    title: 'Biologic injection',
     record_type: '',
     lane: '',
     location_kind: '',
@@ -36,11 +36,11 @@ test('normalizes empty placeholders and infers required medical enums', () => {
     follow_up_date: 'TBD',
     episode: ''
   }, {
-    notes: 'Just had my stelara injection at the doctors'
+    notes: 'Just had my biologic injection at the doctors'
   });
 
   assert.deepEqual(normalized, {
-    title: 'Stelara injection',
+    title: 'Biologic injection',
     record_type: 'Prescription',
     lane: 'prescription',
     location_kind: 'unknown',
@@ -52,9 +52,9 @@ test('validateLogEntry accepts a minimal messy medical chat payload after normal
   const result = validateLogEntry({
     type: 'medical',
     date: '2026-08-26',
-    notes: 'Just had my stelara injection at the doctors',
+    notes: 'Just had my biologic injection at the doctors',
     fields: {
-      title: 'Stelara injection',
+      title: 'Biologic injection',
       record_type: 'Injection',
       lane: 'doctor',
       location_kind: '',
@@ -74,58 +74,58 @@ test('validateLogEntry accepts a minimal messy medical chat payload after normal
 });
 
 test('lane and location kind follow record context', () => {
-  assert.equal(laneFor('Lab Work', 'Bloods panel', 'Dr Keily', 'Laverty'), 'lab');
+  assert.equal(laneFor('Lab Work', 'Bloods panel', 'Dr Pike', 'Laverty'), 'lab');
   assert.equal(locationKindFor('Telehealth review', 'Zoom'), 'telehealth');
-  assert.equal(locationKindFor('GP review', 'Walker Street Doctors'), 'place');
+  assert.equal(locationKindFor('GP review', 'Example Street Doctors'), 'place');
 });
 
 test('mergeMedicalFields keeps the stored visit title when titles match loosely', () => {
   const merged = mergeMedicalFields(
-    { title: 'Stelara maintenance injection', record_type: 'Prescription', lane: 'prescription' },
-    { title: 'Stelara injection' },
+    { title: 'Biologic maintenance injection', record_type: 'Prescription', lane: 'prescription' },
+    { title: 'Biologic injection' },
     { notes: 'Follow-up note.' }
   );
-  assert.equal(merged.fields.title, 'Stelara maintenance injection');
+  assert.equal(merged.fields.title, 'Biologic maintenance injection');
 });
 
 test('mergeMedicalFields appends notes and keeps existing visit details', () => {
   const merged = mergeMedicalFields(
     {
-      title: 'Stelara injection',
+      title: 'Biologic injection',
       record_type: 'Prescription',
       lane: 'prescription',
-      provider: 'Dr Keily'
+      provider: 'Dr Pike'
     },
-    { title: 'Stelara injection', notes: 'Nurse administered at clinic.' },
+    { title: 'Biologic injection', notes: 'Nurse administered at clinic.' },
     {
       existingNotes: 'First maintenance dose logged.',
       notes: 'Nurse administered at clinic.'
     }
   );
 
-  assert.equal(merged.fields.title, 'Stelara injection');
-  assert.equal(merged.fields.provider, 'Dr Keily');
+  assert.equal(merged.fields.title, 'Biologic injection');
+  assert.equal(merged.fields.provider, 'Dr Pike');
   assert.equal(merged.fields.lane, 'prescription');
   assert.match(merged.notes, /First maintenance dose logged/);
   assert.match(merged.notes, /Nurse administered at clinic/);
 });
 
-test('scoreMedicalTitleMatch links Stelara variants', () => {
-  assert.ok(scoreMedicalTitleMatch('Stelara injection', 'Stelara maintenance injection') >= 55);
-  assert.ok(scoreMedicalTitleMatch('add note to stelara record', 'Stelara (ustekinumab) SC') >= 55);
+test('scoreMedicalTitleMatch links Biologic variants', () => {
+  assert.ok(scoreMedicalTitleMatch('Biologic injection', 'Biologic maintenance injection') >= 55);
+  assert.ok(scoreMedicalTitleMatch('add note to biologic record', 'Biologic SC') >= 55);
 });
 
 test('validateRecord coerces legacy medical records missing lane metadata', () => {
   const record = {
     schema_version: 1,
-    id: 'legacy-stelara',
+    id: 'legacy-biologic',
     type: 'medical',
     date: '2026-08-27',
     time: '09:30',
     created_at: '2026-08-27T09:30:00+10:00',
     updated_at: '2026-08-27T09:30:00+10:00',
     source: 'chat',
-    title: 'Stelara injection',
+    title: 'Biologic injection',
     record_type: 'Prescription'
   };
   assert.deepEqual(validateRecord(record), []);
@@ -145,8 +145,8 @@ test('validateLogEntry coerces AU medical dates like 27/10', () => {
   const result = validateLogEntry({
     type: 'medical',
     date: '27/10',
-    notes: '[Stelara maintenance] — next 8-weekly SC dose booked',
-    fields: { title: 'Stelara maintenance dose' }
+    notes: '[Biologic maintenance] — next 8-weekly SC dose booked',
+    fields: { title: 'Biologic maintenance dose' }
   }, { id: 'med-oct', now: '2026-08-29T12:05:00+10:00' });
 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
@@ -158,7 +158,7 @@ test('validateLogEntry coerces AU follow_up_date', () => {
     type: 'medical',
     date: '2026-08-27',
     fields: {
-      title: 'Stelara maintenance injection',
+      title: 'Biologic maintenance injection',
       follow_up_date: '27/10/2026'
     }
   }, { id: 'med-fu', now: '2026-08-29T12:05:00+10:00' });
@@ -170,18 +170,18 @@ test('validateLogEntry coerces AU follow_up_date', () => {
 test('resolveMedicalLogCandidate keeps a far-future same-title dose as a new visit', async () => {
   const yaml = `---
 schema_version: 1
-id: "stored-stelara"
+id: "stored-biologic"
 type: "medical"
 date: "2026-08-27"
 time: "09:30"
 created_at: "2026-08-27T09:30:00+10:00"
 updated_at: "2026-08-27T09:30:00+10:00"
 source: "chat"
-title: "Stelara maintenance injection"
+title: "Biologic maintenance injection"
 record_type: "Prescription"
 lane: "prescription"
 location_kind: "place"
-provider: "Dr Keily"
+provider: "Dr Pike"
 ---
 First SC maintenance dose.
 `;
@@ -189,7 +189,7 @@ First SC maintenance dose.
     resolveTree: async () => ({
       tree: [{
         type: 'blob',
-        path: 'data/body/2026/08/2026-08-27-medical-stelara-maintenance-injection-0930.md',
+        path: 'data/body/2026/08/2026-08-27-medical-biologic-maintenance-injection-0930.md',
         sha: 'sha-1'
       }]
     }),
@@ -198,8 +198,8 @@ First SC maintenance dose.
   const resolved = await resolveMedicalLogCandidate(client, {
     type: 'medical',
     date: '27/10',
-    notes: '[Stelara maintenance] — next 8-weekly SC dose',
-    fields: { title: 'Stelara maintenance injection' }
+    notes: '[Biologic maintenance] — next 8-weekly SC dose',
+    fields: { title: 'Biologic maintenance injection' }
   }, {
     today: '2026-08-29',
     loadYaml: load,
@@ -207,7 +207,7 @@ First SC maintenance dose.
   });
 
   assert.equal(resolved.date, '2026-10-27');
-  assert.equal(resolved.fields.title, 'Stelara maintenance injection');
+  assert.equal(resolved.fields.title, 'Biologic maintenance injection');
   assert.equal(resolved.fields.follow_up_date, undefined);
 });
 
@@ -223,31 +223,31 @@ test('resolveMedicalLogCandidate survives GitHub resolveTree failures', async ()
   const resolved = await resolveMedicalLogCandidate(client, {
     type: 'medical',
     date: '27/10/2026',
-    fields: { title: 'Stelara maintenance dose' }
+    fields: { title: 'Biologic maintenance dose' }
   }, {
     today: '2026-08-29',
     loadYaml: load,
     decodeBlob: () => ''
   });
   assert.equal(resolved.date, '2026-10-27');
-  assert.equal(resolved.fields.title, 'Stelara maintenance dose');
+  assert.equal(resolved.fields.title, 'Biologic maintenance dose');
 });
 
 test('resolveMedicalLogCandidate merges onto a matching stored visit', async () => {
   const yaml = `---
 schema_version: 1
-id: "stored-stelara"
+id: "stored-biologic"
 type: "medical"
 date: "2026-08-27"
 time: "09:30"
 created_at: "2026-08-27T09:30:00+10:00"
 updated_at: "2026-08-27T09:30:00+10:00"
 source: "chat"
-title: "Stelara maintenance injection"
+title: "Biologic maintenance injection"
 record_type: "Prescription"
 lane: "prescription"
 location_kind: "place"
-provider: "Dr Keily"
+provider: "Dr Pike"
 ---
 Maintenance dose logged.
 `;
@@ -255,7 +255,7 @@ Maintenance dose logged.
     resolveTree: async () => ({
       tree: [{
         type: 'blob',
-        path: 'data/body/2026/08/2026-08-27-medical-stelara-maintenance-injection-0930.md',
+        path: 'data/body/2026/08/2026-08-27-medical-biologic-maintenance-injection-0930.md',
         sha: 'sha-1'
       }]
     }),
@@ -265,7 +265,7 @@ Maintenance dose logged.
     type: 'medical',
     date: '2026-08-26',
     notes: 'Mild pain at injection site; cramping likely diet/anxiety-related.',
-    fields: { title: 'Stelara injection' }
+    fields: { title: 'Biologic injection' }
   }, {
     today: '2026-08-26',
     loadYaml: load,
@@ -274,21 +274,21 @@ Maintenance dose logged.
 
   assert.equal(resolved.date, '2026-08-27');
   assert.equal(resolved.time, '09:30');
-  assert.equal(resolved.fields.provider, 'Dr Keily');
+  assert.equal(resolved.fields.provider, 'Dr Pike');
   assert.match(resolved.notes, /Maintenance dose logged/);
   assert.match(resolved.notes, /Mild pain at injection site/);
 });
 
 test('parseMedicalEventTolerant reads yaml without schema validation', () => {
   const parsed = parseMedicalEventTolerant(`---
-title: "Stelara injection"
+title: "Biologic injection"
 type: "medical"
 date: "2026-08-27"
 record_type: "Prescription"
 ---
 Old note
-`, 'data/body/2026/08/2026-08-27-medical-stelara.md', load);
-  assert.equal(parsed.record.title, 'Stelara injection');
+`, 'data/body/2026/08/2026-08-27-medical-biologic.md', load);
+  assert.equal(parsed.record.title, 'Biologic injection');
   assert.equal(parsed.body, 'Old note');
 });
 
@@ -326,9 +326,9 @@ test('MO-02 inferWeight covers major routine minor rows', () => {
   assert.equal(inferWeight({ record_type: 'Surgery/Hospital', title: 'Admission' }), 'major');
   assert.equal(inferWeight({ record_type: 'Imaging', title: 'MRI' }), 'major');
   assert.equal(inferWeight({ record_type: 'Referral', title: 'MRCP referral' }), 'major');
-  assert.equal(inferWeight({ record_type: 'Consultation', title: 'Gastro specialist', provider: 'Dr Keily' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Consultation', title: 'Gastro specialist', provider: 'Dr Pike' }), 'major');
   assert.equal(inferWeight({ record_type: 'Lab Work', title: 'Bloods panel', lab: true }), 'major');
-  assert.equal(inferWeight({ record_type: 'Prescription', title: 'Stelara injection' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Prescription', title: 'Biologic injection' }), 'major');
   assert.equal(inferWeight({ record_type: 'Appointment', title: 'GP review' }), 'routine');
   assert.equal(inferWeight({ record_type: 'Vaccination', title: 'Flu shot' }), 'routine');
   assert.equal(inferWeight({ record_type: 'Symptom', title: 'Sore throat' }), 'minor');
@@ -415,16 +415,16 @@ test('a symptom titled by feeling is not reclassified by words in its notes', ()
     'Symptom'
   );
   assert.equal(inferRecordType('', 'Feeling run down, possible viral illness', 'saw nothing, medication later'), 'Symptom');
-  assert.equal(inferRecordType('', 'Stelara injection', 'felt a bit tired'), 'Prescription');
+  assert.equal(inferRecordType('', 'Biologic injection', 'felt a bit tired'), 'Prescription');
   assert.equal(inferRecordType('', 'GP appointment', 'sore throat'), 'Appointment');
 });
 
 test('an over-long title is cut to a short label and the rest is kept as notes', () => {
-  const long = 'Stelara (ustekinumab) 90mg — first subcutaneous maintenance injection, painful at site; same-morning cramping attributed to bacon/egg breakfast + anxiety, not Stelara';
+  const long = 'Biologic 90mg — first subcutaneous maintenance injection, painful at site; same-morning cramping attributed to bacon/egg breakfast + anxiety, not Biologic';
   const out = normalizeMedicalFields({ title: long }, { notes: 'Original note.' });
-  assert.equal(out.title, 'Stelara (ustekinumab) 90mg');
+  assert.equal(out.title, 'Biologic 90mg');
   const split = splitLongTitle(long);
-  assert.equal(split.title, 'Stelara (ustekinumab) 90mg');
+  assert.equal(split.title, 'Biologic 90mg');
   assert.match(split.overflow, /first subcutaneous maintenance injection/);
   assert.deepEqual(splitLongTitle('Gastro follow-up'), { title: 'Gastro follow-up', overflow: '' });
 });

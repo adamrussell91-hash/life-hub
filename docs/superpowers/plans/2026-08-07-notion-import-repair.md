@@ -485,7 +485,7 @@ Keep the script focused; if `recountInvalid` is awkward inline, a second dry wal
 Run:
 
 ```bash
-node scripts/repair-notion-import.mjs --out /Users/adamrussell/Documents/Claude/Projects/life-hub-data
+node scripts/repair-notion-import.mjs --out /Users/you/Documents/Claude/Projects/life-hub-data
 ```
 
 Expected JSON roughly: `deletedDupes` ≈ 253, `repaired` ≈ 109+, `differingDupes` ≈ 0, `apply: false`.
@@ -602,18 +602,18 @@ EOF
 ### Task 6: Apply repair + verify
 
 **Files:**
-- Mutate: `/Users/adamrussell/Documents/Claude/Projects/life-hub-data/data/**` (separate repo)
+- Mutate: `/Users/you/Documents/Claude/Projects/life-hub-data/data/**` (separate repo)
 
 - [ ] **Step 1: Re-run dry-run and confirm counts**
 
 ```bash
-node scripts/repair-notion-import.mjs --out /Users/adamrussell/Documents/Claude/Projects/life-hub-data
+node scripts/repair-notion-import.mjs --out /Users/you/Documents/Claude/Projects/life-hub-data
 ```
 
 - [ ] **Step 2: Apply**
 
 ```bash
-node scripts/repair-notion-import.mjs --out /Users/adamrussell/Documents/Claude/Projects/life-hub-data --apply
+node scripts/repair-notion-import.mjs --out /Users/you/Documents/Claude/Projects/life-hub-data --apply
 ```
 
 Expected: `stillInvalid` ≈ 0 for event paths (templates excluded). `deletedDupes` ≈ 253, `repaired` covering the missing-time / demotion set.
@@ -628,7 +628,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { load } from 'js-yaml';
 import { parseEventDocument, parseCanonicalPath } from './js/core/records.js';
-const root = '/Users/adamrussell/Documents/Claude/Projects/life-hub-data';
+const root = '/Users/you/Documents/Claude/Projects/life-hub-data';
 let valid = 0, invalid = 0, spaced = 0;
 const samples = [];
 function walk(dir) {
@@ -659,7 +659,7 @@ Expected: `spaced: 0`, `invalid: 0`.
 - [ ] **Step 4: Idempotence check**
 
 ```bash
-node scripts/repair-notion-import.mjs --out /Users/adamrussell/Documents/Claude/Projects/life-hub-data --apply
+node scripts/repair-notion-import.mjs --out /Users/you/Documents/Claude/Projects/life-hub-data --apply
 ```
 
 Expected: `deletedDupes: 0`, `repaired: 0`.

@@ -18,7 +18,7 @@ const ICS = [
   'UID:one-off',
   'DTSTART;TZID=Australia/Sydney:20260930T161500',
   'DTEND;TZID=Australia/Sydney:20260930T171500',
-  'SUMMARY:Physio with Dr Keily',
+  'SUMMARY:Physio with Dr Pike',
   'LOCATION:Bondi Junction\\, NSW',
   'DESCRIPTION:Bring the referral.\\nLevel 3.',
   'BEGIN:VALARM',
@@ -81,8 +81,8 @@ test('Sydney wall clock survives the DST change (4 Oct 2026)', () => {
 test('occurrences: timed, UTC, repeats with EXDATE and a moved one, all-day span, ordinal monthly, cancelled', () => {
   const rows = icalOccurrences(ICS, { feed: 'work', from: '2026-09-28', to: '2026-12-31' });
   const titles = rows.map((row) => `${row.date} ${row.time ?? 'all-day'} ${row.title}`);
-  assert.ok(titles.includes('2026-09-30 16:15 Physio with Dr Keily'));
-  const physio = rows.find((row) => row.title === 'Physio with Dr Keily');
+  assert.ok(titles.includes('2026-09-30 16:15 Physio with Dr Pike'));
+  const physio = rows.find((row) => row.title === 'Physio with Dr Pike');
   assert.equal(physio.end_time, '17:15');
   assert.equal(physio.location, 'Bondi Junction, NSW');
   assert.equal(physio.notes, 'Bring the referral.\nLevel 3.');
@@ -158,7 +158,7 @@ test('endpoint: reads configured feeds, caches 15 minutes, never returns the URL
   assert.deepEqual(payload.data.feeds.map((feed) => [feed.id, feed.status]), [
     ['work', 'live'], ['social', 'unconfigured'], ['family', 'unconfigured'], ['health', 'live']
   ]);
-  assert.ok(payload.data.events.some((row) => row.feed === 'health' && row.title === 'Physio with Dr Keily'));
+  assert.ok(payload.data.events.some((row) => row.feed === 'health' && row.title === 'Physio with Dr Pike'));
   assert.equal(h.calls.length, 2);
   await h.get();
   assert.equal(h.calls.length, 2, 'second read within 15 minutes comes from the cache');
@@ -197,7 +197,7 @@ test('mapping: health → medical (Health), work → Events, social/family → q
   const model = buildTidelineModel({ events, week: ['2026-09-30'], today: '2026-09-30', nowHour: 9 });
   const day = model.days[0];
   const byTitle = Object.fromEntries(day.chips.map((chip) => [chip.title, chip]));
-  assert.equal(filterKeyForItem(byTitle['Physio with Dr Keily']), 'health');
+  assert.equal(filterKeyForItem(byTitle['Physio with Dr Pike']), 'health');
   assert.equal(filterKeyForItem(byTitle['Staff meeting']), 'events');
   assert.equal(filterKeyForItem(byTitle['Dinner at Mum’s']), 'family');
   assert.equal(byTitle['Dinner at Mum’s'].ambient, true);
@@ -312,7 +312,7 @@ test('paintSourceFilter: ical feed note is fail-visible under the filter chips',
   paintSourceFilter(doc, host, {
     hub: 'life',
     state: Object.fromEntries(
-      ['classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey', 'social', 'family'].map(
+      ['classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'partner', 'social', 'family'].map(
         (id) => [id, true]
       )
     ),

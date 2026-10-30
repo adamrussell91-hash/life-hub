@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v217';
+const CACHE_NAME = 'life-hub-shell-v220';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -274,16 +274,14 @@ const SHELL_FILES = [
   'js/app/aesthetics/outfit-model.js',
   'js/app/aesthetics/fragrance-library.js',
   'js/app/aesthetics/sydney-weather.js',
-  'js/app/aesthetics/notion-aesthetics-source.js',
   'js/app/aesthetics/render-aesthetics.js',
   'js/app/aesthetics/render-source-reference.js',
-  'js/app/aesthetics/notion-watch-source.js',
   'js/app/aesthetics/render-watches.js',
   'js/app/aesthetics/watch-face.js',
-  'js/app/aesthetics/watch-hunt.js',
   'js/app/aesthetics/watch-model.js',
   'js/app/aesthetics/watch-photos.js',
   'js/app/watch-radar-api.js',
+  'js/app/aesthetics-source-api.js',
   'js/app/skincare-api.js',
   'js/app/skincare-controller.js',
   'js/app/skincare-model.js',
@@ -391,7 +389,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Day Sense notifications (dexy, train-home pass). Tapping opens the right place in Life.
+// Day Sense notifications (medication, train-home pass). Tapping opens the right place in Life.
 self.addEventListener('push', event => {
   let data = {};
   try {
