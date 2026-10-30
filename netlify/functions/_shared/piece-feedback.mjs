@@ -9,6 +9,8 @@ import { randomBytes } from 'node:crypto';
 import { loadRoster } from './class-claims.mjs';
 import { markbookAction, readBook } from './markbook.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
+import { codeApplies } from './progress-patterns.mjs';
+import { readStoredSkills } from './skills-continuum.mjs';
 import { read, reject } from './question-drop.mjs';
 import { handinKey, pieceId } from './lesson-work.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
@@ -70,7 +72,7 @@ export async function piecesAction(store, classId, body) {
 
   const student = studentOf(roster, body.student_id);
   const key = pieceKey(classId, student.id, piece);
-  const [handin, feedback, codes] = await Promise.all([read(store, handinKey(lesson_id, block_id, student.id)), read(store, key), readFeedbackCodes(store)]);
+  const [handin, feedback, codes] = await Promise.all([read(store, handinKey(lesson_id, block_id, student.id)), read(store, key), readFeedbackCodes(store).then((all) => all.filter((c) => codeApplies(c, { kind: 'written' })))]);
   if (!handin) reject(409, 'not_in', 'This student hasn’t handed this in yet.');
 
   if (action === 'load') {
@@ -80,7 +82,14 @@ export async function piecesAction(store, classId, body) {
       if (row?.status === 'returned' && k !== key) recent.push({ at: row.returned_at, codes: [...new Set((row.tags ?? []).filter((t) => !t.positive).map((t) => t.code_id))] });
     }
     recent.sort((a, b) => (a.at < b.at ? -1 : 1));
-    return { column, student: { id: student.id, initials: student.initials, name: student.name }, text: handin.text, handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes) };
+    // Skill criteria show the continuum's name for the sub-strand, not its id.
+    const continuum = column.criteria.some((c) => c.skill) ? await readStoredSkills(store).catch(() => null) : null;
+    const skillName = (ref) => {
+      const [strandId, subId] = String(ref).split('.');
+      return continuum?.strands.find((s) => s.strand === strandId)?.sub_strands.find((s) => s.id === subId)?.name ?? ref;
+    };
+    const named = { ...column, criteria: column.criteria.map((c) => (c.skill ? { ...c, skill_name: skillName(c.skill) } : c)) };
+    return { column: named, student: { id: student.id, initials: student.initials, name: student.name }, text: handin.text, handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes) };
   }
 
   const now = new Date().toISOString();
