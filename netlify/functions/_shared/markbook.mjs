@@ -15,7 +15,7 @@ import { SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { classWork } from './lesson-work.mjs';
-import { listDone } from './profile-done.mjs';
+import { listClassDone } from './profile-done.mjs';
 import { read, reject } from './question-drop.mjs';
 import { markWalkthruDirty } from './walkthru-dirty.mjs';
 import { MARKBOOK_LIMITS, MarkbookSchema, checkColumn, checkMark, pruneMarks } from './markbook-schema.mjs';
@@ -193,7 +193,7 @@ async function markbookActionInner(store, classId, body) {
       quizzes,
       work,
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
-      ...(body.skip_done ? {} : { done: Object.fromEntries(await Promise.all(roster.students.map(async (s) => [s.id, await listDone(store, classId, s.id)]))) })
+      ...(body.skip_done ? {} : { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) })
     };
   }
 

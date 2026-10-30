@@ -3,6 +3,9 @@ import type { AssessmentMark, Column, Markbook } from './schema';
 
 /** What the markbook endpoint's `load` returns, and the shapes the views draw. */
 
+/** A lesson marked done: by the student ('tick', 'quiz') or by the teacher, with what the student did kept as `was`. */
+export type DoneRecord = { at: string; via: string; partial?: boolean; was?: DoneRecord };
+
 export type RosterStudent = { id: string; name: string; initials: string; removed?: true };
 
 export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[]; set?: string; /** Left blank by the student. */ unanswered?: true };
@@ -83,7 +86,7 @@ export type MarkbookView = {
   /** Written work by lesson. Missing from an older server. */
   work?: WorkColumn[];
   /** Lessons each student marked done, by student id then lesson id. */
-  done?: Record<string, Record<string, { at: string; via: string; partial?: boolean; was?: { at: string; via: string } }>>;
+  done?: Record<string, Record<string, DoneRecord>>;
 };
 export type AnyColumn = Column | QuizColumn | WorkColumn;
 export type OutcomeLabel = { id: string; code: string; title: string; group: string };

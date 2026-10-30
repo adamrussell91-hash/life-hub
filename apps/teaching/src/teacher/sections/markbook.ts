@@ -14,7 +14,7 @@ import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
-import { httpProgressApi, renderProgress, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
+import { httpProgressApi, renderProgress, withMark, type DoneRecord, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
 import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
@@ -535,7 +535,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const students = rowStudents(current, showRemoved);
     if (mode === 'progress') {
       body.replaceChildren(
-        renderProgress({ view: current, students, lessons: options.progressLessons ?? [], today: today(), error: progressError, onMark: (studentId, lessonId, state) => void markProgress(studentId, lessonId, state) })
+        renderProgress({ view: current, students, lessons: options.progressLessons ?? [], today: today(), error: progressError, onMark: markProgress })
       );
       restoreFocus(key);
       return;
@@ -674,23 +674,52 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   }
 
   /** The Progress view's marks go to the profile endpoint; its reply is every student's records. */
-  async function markProgress(studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear'): Promise<void> {
-    try {
-      const done = await progressApi.mark(cls.id, studentId, lessonId, state);
-      progressError = '';
-      if (confirmed) confirmed = { ...confirmed, done };
-      if (view) view = { ...view, done };
-    } catch (error) {
-      progressError = error instanceof ApiClientError && error.code !== 'network_error' ? error.message : 'Couldn’t save that mark. Try again.';
-    }
-    if (!disposed) paint();
+  /** Progress saves, one at a time, and how many are still waiting for each student. */
+  let progressQueue: Promise<void> = Promise.resolve();
+  const progressPending = new Map<string, number>();
+
+  /** Sets one student's done records on the shown view and the confirmed copy. */
+  function setDone(studentId: string, records: Record<string, DoneRecord>): void {
+    const lay = (v: MarkbookView): MarkbookView => ({ ...v, done: { ...v.done, [studentId]: records } });
+    if (confirmed) confirmed = lay(confirmed);
+    if (view) view = lay(view);
+  }
+
+  /** The cell changes at once; the save runs behind it, and a failed one puts the student's row back. */
+  function markProgress(studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear'): void {
+    const before = view?.done?.[studentId] ?? {};
+    setDone(studentId, withMark(before, lessonId, state, new Date().toISOString()));
+    progressPending.set(studentId, (progressPending.get(studentId) ?? 0) + 1);
+    paint();
+    progressQueue = progressQueue.then(async () => {
+      let reply: Record<string, DoneRecord> | null = null;
+      try {
+        reply = await progressApi.mark(cls.id, studentId, lessonId, state);
+        progressError = '';
+      } catch (error) {
+        progressError = error instanceof ApiClientError && error.code !== 'network_error' ? error.message : 'Couldn’t save that mark. Try again.';
+        const row = { ...(view?.done?.[studentId] ?? {}) };
+        if (before[lessonId]) row[lessonId] = before[lessonId];
+        else delete row[lessonId];
+        setDone(studentId, row);
+      }
+      const left = (progressPending.get(studentId) ?? 1) - 1;
+      progressPending.set(studentId, left);
+      // Later presses for this student are already shown; only the last reply settles the row.
+      if (reply && left === 0) setDone(studentId, reply);
+      if (!disposed) paint();
+    });
   }
 
   /** Fetches a fresh view; changes still queued are laid over it. Says whether the server answered. */
   async function load(repaint = true): Promise<boolean> {
     if (disposed) return false;
     try {
-      confirmed = await api.load(cls.id);
+      const fresh = await api.load(cls.id);
+      const shown = view?.done;
+      confirmed = fresh;
+      // A Progress save still on its way keeps its row as shown.
+      for (const [id, n] of progressPending) if (n > 0 && shown?.[id]) confirmed = { ...confirmed, done: { ...confirmed.done, [id]: shown[id] } };
       view = queued.reduce(applyChange, confirmed);
       if (repaint) paint();
       void syncGroups();
