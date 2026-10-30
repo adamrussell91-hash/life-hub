@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Progress mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --shore: #eae7da; --line: rgba(23,55,94,.10);
+  --pastel-blue: #dceafa; --sage: #dfe9e1; --sage-ink: #3d6b4a;
+  --peach: #f8e1cf; --peach-ink: #8a5420; --gold: #f6ecc4; --gold-ink: #7a6216;
+  --lilac: #e7e2f5; --lilac-ink: #5a4a8c;
+  --l1: #c9d9ee; --l2: #8fb1dc; --l3: #376fb7; --l4: #17375e;
+  --r-sm: .875rem; --r-md: 1.25rem; --r-xs: .375rem;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font: inherit; font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.note { max-width: 1240px; margin: 14px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.stage { max-width: 1240px; margin: 0 auto; padding: 16px; display: none; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.stage.on { display: flex; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 680px; min-width: 0; }
+.desk .screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 820px; overflow-y: auto; background: var(--paper); border-radius: 36px; border: 10px solid #1d2633; box-shadow: 0 10px 30px rgba(19,35,58,.18); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: #fff; }
+.chrome .dot { width: 26px; height: 26px; border-radius: 8px; background: var(--wave); }
+.chrome b { color: var(--navy); font-size: 14px; }
+.chrome span { color: var(--muted); font-size: 13px; margin-left: auto; }
+.tchrome { background: var(--navy); } .tchrome b { color: #fff; } .tchrome span { color: rgba(255,255,255,.7); } .tchrome .dot { background: #fff; }
+.page { padding: 24px 28px 40px; max-width: 62rem; margin: 0 auto; }
+.phone .page { padding: 18px 16px 32px; }
+h1.pt { margin: 0; font-size: 28px; color: var(--navy); letter-spacing: -.01em; }
+.phone h1.pt { font-size: 24px; }
+.who { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.tabs { display: flex; gap: 4px; margin: 16px 0 20px; border-bottom: 1px solid var(--line); }
+.tab { position: relative; border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); padding: 10px 14px; min-height: 44px; }
+.tab.on { color: var(--navy); } .tab.on::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px; background: var(--wave); }
+.newdot { display: inline-block; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--wave); color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+h2.sec { margin: 26px 0 4px; font-size: 18px; color: var(--navy); }
+.sec-sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; }
+
+/* Next steps */
+.steps { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.step { background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--wave); border-radius: var(--r-sm); padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.step .do { font-weight: 600; color: var(--navy); font-size: 15px; line-height: 1.4; }
+.step .why { font-size: 13px; color: var(--muted); }
+.step .why b { color: var(--ink); font-weight: 600; }
+.step a { font-size: 13px; color: var(--wave); font-weight: 600; text-decoration: none; }
+.code { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
+.c-blue { background: var(--pastel-blue); color: var(--navy); }
+.c-sage { background: var(--sage); color: var(--sage-ink); }
+.c-peach { background: var(--peach); color: var(--peach-ink); }
+.c-gold { background: var(--gold); color: var(--gold-ink); }
+.c-lilac { background: var(--lilac); color: var(--lilac-ink); }
+
+/* Outcome story rows */
+.scale { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.scale i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.outcomes { display: grid; gap: 10px; }
+.oc { background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 6px 20px; align-items: center; }
+.oc .name { font-weight: 600; color: var(--navy); }
+.oc .name small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.oc .story { font-size: 14px; }
+.oc .story b { font-weight: 600; }
+.oc .now { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; justify-self: start; }
+.oc .left { display: grid; gap: 6px; }
+.lv1 { background: var(--l1); color: var(--navy); } .lv2 { background: var(--l2); color: #fff; } .lv3 { background: var(--l3); color: #fff; } .lv4 { background: var(--l4); color: #fff; }
+.spark { width: 100%; height: 74px; }
+.spark text { font-size: 9px; fill: var(--muted); font-family: inherit; }
+.holding { border-left: 4px solid var(--gold-ink); padding-left: 13px; }
+.flag { font-size: 12px; font-weight: 600; color: var(--gold-ink); }
+.phone .oc { grid-template-columns: 1fr; }
+
+/* Code pattern grid */
+.pat { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pat th { font-weight: 600; color: var(--muted); font-size: 11px; text-align: center; padding: 4px 2px 8px; }
+.pat th:first-child { text-align: left; }
+.pat td { padding: 6px 2px; border-top: 1px solid var(--line); text-align: center; }
+.pat td:first-child { text-align: left; }
+.pat td.cnt { font-weight: 700; color: var(--navy); text-align: right; padding-right: 4px; white-space: nowrap; }
+.pip { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--shore); }
+.pip.on { background: var(--peach-ink); } .pip.good { background: var(--sage-ink); }
+.pat .lab { color: var(--ink); }
+.pat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 14px 0 6px; flex-wrap: wrap; }
+.pat-head b { color: var(--navy); font-size: 14px; }
+.pat-head span { font-size: 12px; color: var(--muted); }
+
+/* Returned list */
+.ret { display: grid; gap: 8px; }
+.rcard { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 16px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
+.rcard.new { border-left: 4px solid var(--wave); padding-left: 13px; }
+.rcard b { color: var(--navy); }
+.rcard .meta { font-size: 13px; color: var(--muted); }
+.rcard .codes { grid-column: 1; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.rcard .chev { grid-row: 1 / span 3; grid-column: 2; align-self: center; color: var(--muted); }
+.newword { font-size: 11px; font-weight: 700; color: var(--wave); margin-left: 6px; }
+
+/* Annotated paper (student + teacher) */
+.paper { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px 22px; font-size: 16px; line-height: 1.9; }
+.paper p { margin: 0 0 14px; }
+.hl { border-radius: 3px; padding: 1px 0; cursor: pointer; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.hl sup { font-size: 10px; font-weight: 700; margin-left: 2px; padding: 0 4px; border-radius: 4px; vertical-align: 4px; }
+.h-peach { background: rgba(240,180,130,.35); border-bottom: 2px solid var(--peach-ink); } .h-peach sup { background: var(--peach-ink); color: #fff; }
+.h-sage { background: rgba(140,190,150,.32); border-bottom: 2px solid var(--sage-ink); } .h-sage sup { background: var(--sage-ink); color: #fff; }
+.h-blue { background: rgba(143,177,220,.35); border-bottom: 2px solid var(--wave); } .h-blue sup { background: var(--wave); color: #fff; }
+.h-gold { background: rgba(230,200,100,.38); border-bottom: 2px solid var(--gold-ink); } .h-gold sup { background: var(--gold-ink); color: #fff; }
+.h-active { outline: 2px solid var(--navy); outline-offset: 1px; }
+.pop { margin-top: 10px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--peach-ink); border-radius: var(--r-sm); padding: 12px 14px; font-size: 14px; }
+.pop .h { font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+.pop .note { margin: 6px 0 0; padding: 0; color: var(--ink); font-style: italic; max-width: none; font-size: 14px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.place { display: grid; gap: 10px; }
+.place .row { display: grid; gap: 4px; }
+.place .row .t { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.place .row .t b { color: var(--navy); font-weight: 600; }
+.ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.ladder span { font-size: 10px; text-align: center; padding: 4px 1px; border-radius: 4px; background: var(--shore); color: var(--muted); }
+.ladder span.on { background: var(--wave); color: #fff; font-weight: 700; }
+.ladder span.was { box-shadow: inset 0 0 0 2px var(--l2); }
+.delta { font-size: 12px; color: var(--muted); }
+.comment { font-size: 15px; line-height: 1.6; margin: 0; }
+.back { border: 0; background: none; font: inherit; color: var(--wave); font-weight: 600; padding: 8px 0; min-height: 44px; }
+.hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.phone .cols { grid-template-columns: 1fr; }
+
+/* Teacher marking */
+.tpage { padding: 18px 22px 30px; }
+.tbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.tbar h2 { margin: 0; font-size: 19px; color: var(--navy); margin-right: auto; }
+.btn { font: inherit; font-size: 14px; font-weight: 600; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--navy); cursor: pointer; }
+.btn.primary { background: var(--wave); color: #fff; border-color: var(--wave); }
+.pager { font-size: 13px; color: var(--muted); }
+.palette { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; align-items: center; }
+.palette .k { font-size: 11px; color: var(--muted); margin-right: 4px; }
+.chipbtn { font: inherit; font-size: 13px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px 4px 4px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.chipbtn .code { font-size: 11px; }
+.chipbtn.armed { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(23,55,94,.15); }
+.side { display: grid; gap: 12px; }
+.side .box { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; }
+.side h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.side textarea { width: 100%; min-height: 84px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 8px 10px; resize: vertical; }
+.rub { display: grid; gap: 10px; }
+.rub .r .t { font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+.rub .r .t b { color: var(--navy); }
+.rub .r .t small { color: var(--muted); }
+.rub .bands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 4px; }
+.rub .bands button { font: inherit; font-size: 11px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 2px; cursor: pointer; color: var(--muted); }
+.rub .bands button.on { background: var(--wave); border-color: var(--wave); color: #fff; font-weight: 700; }
+.tally { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.story-t { display: grid; gap: 8px; font-size: 14px; }
+.story-t li { margin: 0; }
+.story-t ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.mini { display: grid; gap: 8px; }
+.mini .oc { grid-template-columns: minmax(0, 1fr) 200px; padding: 10px 12px; }
+.mini .spark { height: 56px; }
+
+/* Level columns: labelled steps, one column per piece */
+.oc { grid-template-columns: minmax(0, 1fr) auto; }
+.lvchart { display: grid; grid-template-columns: auto repeat(var(--n), 58px); column-gap: 6px; row-gap: 3px; align-items: end; }
+.lvchart .yl { font-size: 10px; color: var(--muted); text-align: right; padding-right: 4px; height: 14px; line-height: 14px; }
+.lvchart .col { display: grid; grid-template-rows: repeat(4, 14px); gap: 3px; grid-row: 1 / span 4; }
+.lvchart .cell { border-radius: 3px; background: #f1efe7; }
+.lvchart .cell.f1 { background: var(--l1); } .lvchart .cell.f2 { background: var(--l2); } .lvchart .cell.f3 { background: var(--l3); } .lvchart .cell.f4 { background: var(--l4); }
+.lvchart .col.latest { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 4px; }
+.lvchart .xl.latest b::after { content: " · latest"; color: var(--muted); font-weight: 500; }
+.lvchart .xl { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.2; padding-top: 4px; }
+.lvchart .xl b { display: block; color: var(--ink); font-weight: 600; }
+.lvchart .xl.none { opacity: .5; }
+.lvchart .col.none .cell { background: transparent; border: 1px dashed var(--line); }
+.mini .lvchart { grid-template-columns: auto repeat(var(--n), 48px); }
+.phone .lvchart { grid-template-columns: auto repeat(var(--n), 1fr); }
+/* Code counts per piece */
+.cg { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cg th { font-size: 10px; font-weight: 500; color: var(--muted); padding: 0 2px 8px; text-align: center; line-height: 1.25; vertical-align: bottom; }
+.cg th b { display: block; color: var(--ink); font-weight: 600; }
+.cg th:first-child { text-align: left; }
+.cg td { border-top: 1px solid var(--line); padding: 7px 2px; text-align: center; }
+.cg td:first-child { text-align: left; white-space: nowrap; padding-right: 8px; }
+.cg .grp td { border-top: 0; padding-top: 14px; font-weight: 600; color: var(--navy); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+.n.z { width: 6px; height: 6px; background: #d9d5c8; }
+.n.w1 { background: #f3d2b6; color: var(--peach-ink); } .n.w2 { background: #e2a678; color: #fff; } .n.w3 { background: var(--peach-ink); color: #fff; }
+.n.g1 { background: #cfe2d4; color: var(--sage-ink); } .n.g2 { background: #8dbb99; color: #fff; } .n.g3 { background: var(--sage-ink); color: #fff; }
+.cg td.sum { text-align: left; font-size: 12px; color: var(--muted); padding-left: 10px; min-width: 130px; }
+.cg td.sum b { color: var(--ink); }
+.cg .na { color: #c9c4b4; font-size: 11px; }
+.phone .cg td.sum { display: none; } .phone .cg td:first-child .lbltxt { display: none; }
+.phone .cgsum { display: block; } .cgsum { display: none; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+/* To mark queue */
+.q { display: grid; gap: 10px; }
+.qi { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 4px 16px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 16px; }
+.qi b { color: var(--navy); }
+.qi .where { font-size: 13px; color: var(--muted); grid-column: 1; }
+.qi .count { font-size: 13px; text-align: right; }
+.qi .count b { font-size: 18px; display: block; }
+.qi.late { border-left: 4px solid var(--peach-ink); padding-left: 13px; }
+.age { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 9px; background: var(--shore); color: var(--muted); white-space: nowrap; }
+.age.late { background: var(--peach); color: var(--peach-ink); }
+.qgroup { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 2px; }
+
+
+.grouph { margin: 14px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.grouph:first-child { margin-top: 0; }
+.looks { font-size: 13px; color: var(--muted); border-left: 2px solid var(--l2); padding-left: 8px; }
+.lv1 { background: var(--l1); color: var(--navy); }
+/* Unit map */
+.umap { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; }
+.umap .uh { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.umap .uh b { color: var(--navy); font-size: 15px; }
+.route { display: grid; gap: 0; }
+.stop { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; min-height: 44px; position: relative; }
+.stop::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 4px; background: var(--wave); }
+.stop:first-child::before { top: 50%; } .stop:last-child::before { bottom: 50%; }
+.stop.todo::before { background: #d9d5c8; }
+.stop .st { width: 18px; height: 18px; border-radius: 50%; background: var(--wave); border: 4px solid var(--wave); justify-self: center; position: relative; z-index: 1; }
+.stop.todo .st { border-color: #d9d5c8; background: #fff; }
+.stop.next .st { border-color: var(--navy); background: var(--navy); box-shadow: 0 0 0 4px rgba(23,55,94,.15); }
+.stop .nm { font-size: 14px; }
+.stop.todo .nm { color: var(--muted); }
+.stop.next .nm { font-weight: 700; color: var(--navy); }
+.stop .kind { font-size: 11px; color: var(--muted); }
+.stop .kind.ev { background: var(--pastel-blue); color: var(--navy); border-radius: 999px; padding: 2px 8px; font-weight: 600; }
+.branch { margin-left: 40px; font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
+
+
+/* Skills: a continuum path, different from outcome columns */
+.skills { display: grid; gap: 12px; }
+.sk-card { background: linear-gradient(180deg, #f4f1fa, #fff 60px); border: 1px solid rgba(90,74,140,.18); border-radius: var(--r-md); padding: 14px 16px; display: grid; gap: 14px; }
+.sk-strand { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--lilac-ink); }
+.sk-row { display: grid; gap: 8px; }
+.sk-row + .sk-row { border-top: 1px solid rgba(90,74,140,.12); padding-top: 12px; }
+.sk-row.holding { border-left: 4px solid var(--gold-ink); padding-left: 12px; }
+.sk-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.sk-head b { color: var(--navy); }
+.sk-n { font-size: 12px; color: var(--muted); }
+.sk-track { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+.rung { position: relative; padding: 22px 6px 4px; text-align: center; border-top: 6px solid #e6e1ef; }
+.rung:first-child { border-top-left-radius: 6px; } .rung:last-child { border-top-right-radius: 6px; }
+.rung.past { border-top-color: #b9add8; }
+.rung.now { border-top-color: var(--lilac-ink); }
+.rung.now::before { content: ""; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; border-radius: 50%; background: var(--lilac-ink); box-shadow: 0 0 0 4px #fff, 0 0 0 5px var(--lilac-ink); }
+.rung.nextr { border-top-style: dashed; border-top-color: #b9add8; }
+.rn { display: block; font-size: 12px; color: var(--muted); }
+.rung.now .rn { color: var(--lilac-ink); font-weight: 700; }
+.tally { display: block; font-size: 11px; color: var(--muted); min-height: 16px; }
+.here { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; color: #fff; background: var(--lilac-ink); border-radius: 999px; padding: 1px 7px; }
+.here.nx { background: transparent; color: var(--lilac-ink); border: 1px dashed var(--lilac-ink); }
+.sk-text p { margin: 0; font-size: 14px; }
+.ican { color: var(--ink); font-style: italic; }
+.sk-next { margin-top: 4px !important; color: var(--ink); }
+.sk-next a { color: var(--wave); font-weight: 600; text-decoration: none; font-size: 13px; }
+
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .oc { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Student progress · mockup v5</h1>
+  <button data-go="progress" aria-pressed="true">1 · Student: My progress</button>
+  <button data-go="piece" aria-pressed="false">2 · Student: a returned piece</button>
+  <button data-go="mark" aria-pressed="false">3 · Teacher: annotate + mark</button>
+  <button data-go="story" aria-pressed="false">4 · Teacher: Analysis</button>
+  <button data-go="queue" aria-pressed="false">5 · Teacher: To mark</button>
+</div>
+<p class="note">The students, tasks and codes are invented. Every outcome, skill and concept uses the same four steps: Starting, Building, Secure and Extending. They describe how secure the learning is, not the student. Secure is the standard. Each criterion gives a one-line "looks like" for each step.</p>
+
+<section class="stage on" id="progress">
+  <div class="desk"><p class="label">Desktop</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Year 12 English · 12E1</b><span>class.adam-russell.com</span></div>
+    <div class="page" data-tpl="tpl-progress"></div>
+  </div></div>
+  <div class="phone"><p class="label">Phone · 390px</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>12E1</b></div>
+    <div class="page" data-tpl="tpl-progress"></div>
+  </div></div>
+</section>
+
+<section class="stage" id="piece">
+  <div class="desk"><p class="label">Desktop</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Year 12 English · 12E1</b><span>class.adam-russell.com</span></div>
+    <div class="page" data-tpl="tpl-piece"></div>
+  </div></div>
+  <div class="phone"><p class="label">Phone · 390px</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>12E1</b></div>
+    <div class="page" data-tpl="tpl-piece"></div>
+  </div></div>
+</section>
+
+<section class="stage" id="mark">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · marking a typed paragraph (same tool as viva marking, with no audio)</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>Teaching · Mark written work</b><span>12E1 · Analytical paragraph 4</span></div>
+    <div class="tpage">
+      <div class="tbar"><h2>Patel, Noah</h2><span class="pager">3 of 24 · ← →</span><button class="btn">Save</button><button class="btn primary">Return to Noah</button></div>
+      <div class="palette"><span class="k">Tap a code, then the words.</span>
+        <button class="chipbtn armed"><span class="code c-peach">TS</span>Topic sentence</button>
+        <button class="chipbtn"><span class="code c-peach">QI</span>Weave the quote</button>
+        <button class="chipbtn"><span class="code c-gold">EF</span>Explain the effect</button>
+        <button class="chipbtn"><span class="code c-blue">LQ</span>Link to question</button>
+        <button class="chipbtn"><span class="code c-lilac">CP</span>Composer's purpose</button>
+        <button class="chipbtn"><span class="code c-sage">✓P</span>Precise evidence</button>
+        <button class="chipbtn"><span class="code c-sage">✓V</span>Strong verb</button>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="paper">
+            <p><span class="hl h-peach h-active">In the poem the poet uses a lot of imagery.<sup>TS</sup></span> The speaker describes the road as <span class="hl h-sage">"a grey ribbon pulled tight"<sup>✓P</sup></span>, which shows the tension. <span class="hl h-gold">This makes the reader feel tense.<sup>EF</sup></span> Later the word "still" is repeated, and this <span class="hl h-sage">anchors<sup>✓V</sup></span> the reader in the moment the car stops.</p>
+            <p>Overall the imagery is effective and <span class="hl h-blue">shows the ideas of the poem.<sup>LQ</sup></span></p>
+          </div>
+          <div class="pop"><div class="h"><span class="code c-peach">TS</span> Topic sentence</div>Open with your argument about the question, not a fact about the text.<p class="note">Add a note for Noah… (optional)</p></div>
+        </div>
+        <div class="side">
+          <div class="box"><h3>Rubric · where this piece sits</h3>
+            <div class="rub">
+              <div class="r"><div class="t"><b>Analysis</b><small>Responding · R2</small></div><div class="bands"><button>Starting</button><button class="on">Building</button><button>Secure</button><button>Extending</button></div></div>
+              <div class="r"><div class="t"><b>Evidence</b><small>Responding · R3</small></div><div class="bands"><button>Starting</button><button>Building</button><button class="on">Secure</button><button>Extending</button></div></div>
+              <div class="r"><div class="t"><b>Expression</b><small>Composing · structure</small></div><div class="bands"><button>Starting</button><button class="on">Building</button><button>Secure</button><button>Extending</button></div></div>
+            </div>
+            <p class="hint">Each criterion is tied to the outcome or skill set on the task. Your band placement sets where Noah sits. The codes don't.</p>
+          </div>
+          <div class="box"><h3>Codes on this piece</h3>
+            <div class="tally"><span><span class="code c-peach">TS</span> 1</span><span><span class="code c-gold">EF</span> 1</span><span><span class="code c-blue">LQ</span> 1</span><span><span class="code c-sage">✓P</span> 1</span><span><span class="code c-sage">✓V</span> 1</span></div>
+            <p class="hint" style="color:var(--gold-ink)">TS has come up in Noah's last 4 pieces.</p>
+          </div>
+          <div class="box"><h3>Comment</h3><textarea>Your evidence is sharp. Now open with your argument: what does the imagery do, and why does it matter to the question?</textarea></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="stage" id="story">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · Markbook student panel: Analysis</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>Teaching · Markbook</b><span>12E1</span></div>
+    <div class="tpage">
+      <div class="tbar"><h2>Patel, Noah · Analysis</h2><span class="pager">6 pieces since Week 1</span></div>
+      <div class="cols">
+        <div>
+          <div class="mini" data-tpl="tpl-ocs"></div>
+        </div>
+        <div class="side">
+          <div class="box"><h3>What the data says</h3>
+            <div class="story-t"><ul>
+              <li><b>Holding at Building on Analysis</b> for 5 pieces. TS each time. Try: model a topic sentence, then have them rewrite one.</li>
+              <li><b>Secure on Evidence</b> since Week 3, ready for Extending. ✓P on 5 of 6 pieces.</li>
+              <li><b>Composer's purpose</b> has just started showing up (CP on the last 2).</li>
+            </ul></div>
+          </div>
+          <div class="box"><h3>Class · holding on the same step</h3>
+            <div class="story-t"><ul>
+              <li><b>7 students</b> holding at Building on Analysis, and TS is their top code. <a href="#" style="color:var(--wave)">Make a group</a></li>
+              <li><b>4 students</b> holding at Secure on Evidence for 4+ pieces. Ready for an Extending task.</li>
+            </ul></div>
+            <p class="hint">"Holding" means the same step on three or more pieces in a row, below Extending.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+
+<section class="stage" id="queue">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · To mark (Teaching home and Markbook)</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>Teaching · To mark</b><span>all classes</span></div>
+    <div class="tpage">
+      <div class="tbar"><h2>To mark</h2><span class="pager">31 pieces waiting · oldest 6 days</span></div>
+      <p class="hint" style="margin:0 0 6px">Work arrives here when a student hands in a piece that is set to be marked. Open a task to start marking at the first student, and use ← → to move through the class.</p>
+      <div class="q">
+        <p class="qgroup">Due back this week</p>
+        <div class="qi late"><div><b>Analytical paragraph 3</b><div class="where">12E1 · Lesson: Reading the turn · handed in Fri 24 Oct</div></div><span class="age late">6 days</span><div class="count"><b>9</b>of 24 left</div></div>
+        <div class="qi"><div><b>Viva: the poem's turning point</b><div class="where">12E1 · Voice block in Lesson: Viva practice · recorded Wed 29 Oct</div></div><span class="age">1 day</span><div class="count"><b>14</b>of 22 left</div></div>
+        <p class="qgroup">Coming in</p>
+        <div class="qi"><div><b>Analytical paragraph 4</b><div class="where">12E1 · Lesson: Imagery and tension · 3 handed in so far, closes Fri 31 Oct</div></div><span class="age">open</span><div class="count"><b>3</b>of 24 in</div></div>
+        <div class="qi"><div><b>Short response: perspective</b><div class="where">11E2 · Quiz written answers · 5 of 26 handed in</div></div><span class="age">open</span><div class="count"><b>5</b>to mark</div></div>
+      </div>
+      <p class="hint" style="margin-top:14px">"Set to be marked" is a switch on the written work block (and on quiz written answers). Practice writing stays out of this list.</p>
+    </div>
+  </div></div>
+</section>
+
+<!-- ───────── Templates ───────── -->
+<template id="tpl-progress">
+  <h1 class="pt">Your progress</h1>
+  <p class="who">AN on this device · Year 12 English</p>
+  <div class="tabs"><button class="tab on">My progress</button><button class="tab">Returned work<span class="newdot">1</span></button></div>
+
+  <h2 class="sec" style="margin-top:0">Your next steps</h2>
+  <p class="sec-sub">Built from what your teacher keeps writing on your work.</p>
+  <div class="steps">
+    <div class="step"><span class="do">Open each paragraph with your argument about the question.</span><span class="why"><span class="code c-peach">TS</span> on <b>4 of your last 5</b> pieces</span><a href="#">See how →</a></div>
+    <div class="step"><span class="do">After each quote, say what it makes the reader think or feel, and why.</span><span class="why"><span class="code c-gold">EF</span> on <b>3 of your last 5</b></span><a href="#">See how →</a></div>
+    <div class="step" style="border-top-color:var(--sage-ink)"><span class="do">Keep choosing short, precise quotes. It's working.</span><span class="why"><span class="code c-sage">✓P</span> on <b>5 of your last 5</b></span></div>
+  </div>
+
+  <h2 class="sec">Where your learning is</h2>
+  <p class="sec-sub">Each column is one piece your teacher marked, oldest to newest. The taller the column, the higher the step.</p>
+  <div class="outcomes" data-tpl="tpl-ocs"></div>
+
+  <h2 class="sec">Your skills</h2>
+  <p class="sec-sub">Skills are measured on the HSC skills continuum, a different scale from your outcomes. The dot shows where you are now. Under each rung is how many of your pieces landed there.</p>
+  <div data-render="skills"></div>
+
+  <h2 class="sec">What your feedback keeps saying</h2>
+  <p class="sec-sub">Every piece your teacher annotated, oldest to newest. A number shows how many times that code is on that piece.</p>
+  <div class="panel" data-render="codes"></div>
+
+  <h2 class="sec">Your unit</h2>
+  <p class="sec-sub">Where you are in the unit. Filled stops are done. Marked pieces are tagged.</p>
+  <div class="umap">
+    <div class="uh"><b>Poetry and perspective</b><span>Term 4 · 7 of 12 done</span></div>
+    <div class="route">
+      <div class="stop"><span class="st"></span><span class="nm">Reading the road</span><span class="kind ev">Paragraph</span></div>
+      <div class="stop"><span class="st"></span><span class="nm">Viva practice</span><span class="kind ev">Viva · 8 Qs</span></div>
+      <div class="stop"><span class="st"></span><span class="nm">Imagery and tension</span><span class="kind ev">Paragraph</span></div>
+      <div class="stop"><span class="st"></span><span class="nm">Practice essay</span><span class="kind ev">Essay</span></div>
+      <div class="branch">↳ Support: Sustained interpretation (done)</div>
+      <div class="stop"><span class="st"></span><span class="nm">Reading the turn</span><span class="kind ev">Paragraph</span></div>
+      <div class="stop"><span class="st"></span><span class="nm">Whose view?</span><span class="kind ev">Paragraph</span></div>
+      <div class="stop next"><span class="st"></span><span class="nm">Comparing two poems</span><span class="kind">Next</span></div>
+      <div class="stop todo"><span class="st"></span><span class="nm">Competing readings</span><span class="kind">Extension</span></div>
+      <div class="stop todo"><span class="st"></span><span class="nm">Seminar</span><span class="kind"></span></div>
+      <div class="stop todo"><span class="st"></span><span class="nm">Final essay</span><span class="kind">Assessment</span></div>
+    </div>
+    <p class="hint">In the build this is the existing unit map (the same coverage map you use), drawn with the student's progress. This is a simplified stand-in.</p>
+  </div>
+</template>
+
+<template id="tpl-ocs"><div data-render="ocs"></div></template>
+
+<template id="tpl-piece">
+  <button class="back">← Your progress</button>
+  <h1 class="pt" style="font-size:24px">Analytical paragraph 4</h1>
+  <p class="who">Returned today · Thursday 30 October</p>
+  <div class="cols" style="margin-top:16px">
+    <div>
+      <div class="paper">
+        <p><span class="hl h-peach h-active">In the poem the poet uses a lot of imagery.<sup>TS</sup></span> The speaker describes the road as <span class="hl h-sage">"a grey ribbon pulled tight"<sup>✓P</sup></span>, which shows the tension. <span class="hl h-gold">This makes the reader feel tense.<sup>EF</sup></span> Later the word "still" is repeated, and this <span class="hl h-sage">anchors<sup>✓V</sup></span> the reader in the moment the car stops.</p>
+        <p>Overall the imagery is effective and <span class="hl h-blue">shows the ideas of the poem.<sup>LQ</sup></span></p>
+      </div>
+      <div class="pop"><div class="h"><span class="code c-peach">TS</span> Topic sentence</div>Open with your argument about the question, not a fact about the text.<br><a href="#" style="color:var(--wave);font-weight:600;font-size:13px">See how →</a></div>
+      <p class="hint">Tap any highlight to see what it means.</p>
+    </div>
+    <div class="side">
+      <div class="box"><h3>Your teacher's comment</h3><p class="comment">Your evidence is sharp. Now open with your argument: what does the imagery do, and why does it matter to the question?</p></div>
+      <div class="box"><h3>Where this piece sits</h3>
+        <div class="place">
+          <div class="row"><div class="t"><b>Analysis</b><span class="delta">same as last time</span></div><div class="ladder"><span>Starting</span><span class="on">Building</span><span>Secure</span><span>Extending</span></div></div>
+          <div class="row"><div class="t"><b>Evidence</b><span class="delta">same as last time</span></div><div class="ladder"><span>Starting</span><span>Building</span><span class="on">Secure</span><span>Extending</span></div></div>
+          <div class="row"><div class="t"><b>Expression</b><span class="delta">up from Starting</span></div><div class="ladder"><span class="was">Starting</span><span class="on">Building</span><span>Secure</span><span>Extending</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const fill = (root) => root.querySelectorAll('[data-tpl]').forEach((host) => {
+  host.append(document.getElementById(host.dataset.tpl).content.cloneNode(true));
+  fill(host);
+});
+fill(document);
+
+const PIECES = [['Road imagery','Wk 1'],['Viva practice','Wk 2 · 8 Qs'],['Tension','Wk 3'],['Practice essay','Wk 4'],['The turn','Wk 5'],['Whose view?','Wk 6']];
+const LEVELS = ['Starting','Building','Secure','Extending'];
+const OUTCOMES = [
+  { name: 'Analysis', sub: 'Responding · how texts shape meaning', lv: [1,2,2,2,2,2], hold: true,
+    story: '<b>Holding at Building</b> for your last 5 pieces. Next step to Secure: open with your argument <span class="code c-peach">TS</span>', looks: 'Secure looks like: shows how techniques shape meaning and ties them to the question.' },
+  { name: 'Evidence', sub: 'Responding · using textual detail', lv: [2,2,3,3,3,3],
+    story: '<b>Secure since Week 3.</b> Next step to Extending: choose evidence that shows a second reading <span class="code c-sage">✓P</span>', looks: 'Extending looks like: weighs two readings of the same detail.' },
+  { name: 'Expression', sub: 'Composing · structure and control', lv: [1,0,1,2,2,2],
+    story: '<b>Moved up</b> from Starting to Building in Week 4.' },
+];
+const RUNGS = ['Capable','Skilled','Accomplished','Excellent'];
+const SKILLS = [
+  { strand: 'Composing', subs: [
+    { name: 'Paragraph control', trail: [1,1,2,2,2], now: 2, hold: true,
+      ican: 'I can build a paragraph that moves from claim to evidence to effect.',
+      next: 'To reach Accomplished: end each paragraph by linking back to the question.', code: '<span class="code c-blue">LQ</span>' },
+    { name: 'Sentence craft', trail: [2,2,3], now: 3,
+      ican: 'I can vary sentence openings and embed quotes smoothly.',
+      next: 'To reach Excellent: use sentence length on purpose to land your key point.' } ] },
+  { strand: 'Arguing', subs: [
+    { name: 'Line of argument', trail: [1,2,2,3], now: 3,
+      ican: 'I can carry one thesis through every paragraph.',
+      next: 'To reach Excellent: qualify your thesis, and say when it holds and when it bends.' } ] },
+  { strand: 'Speaking', subs: [
+    { name: 'Explaining aloud (viva)', trail: [2], now: 2,
+      ican: 'I can explain a technique and its effect without notes.',
+      next: 'To reach Accomplished: answer the follow-up question with a second example.' } ] }
+];
+const CONCEPTS = [
+  { name: 'Perspective', sub: 'Concept · whose view, and why it matters', lv: [0,0,0,1,0,2],
+    story: '<b>Moved up</b> to Building on your latest piece.' }
+];
+function lvChart(lv) {
+  const g = document.createElement('div'); g.className = 'lvchart'; g.style.setProperty('--n', lv.length);
+  g.setAttribute('role','img'); g.setAttribute('aria-label', lv.map((v,i)=>`${PIECES[i][0]}: ${v?LEVELS[v-1]:'not marked on this'}`).join(', '));
+  let html = '';
+  [3,2,1,0].forEach((r, i) => { html += `<span class="yl" style="grid-row:${i+1};grid-column:1">${LEVELS[r]}</span>`; });
+  const last = lv.map((v,i)=>v?i:-1).filter(i=>i>=0).pop();
+  lv.forEach((v, i) => {
+    html += `<div class="col${v?'':' none'}${i===last?' latest':''}" style="grid-column:${i+2}">` + [4,3,2,1].map((step)=>`<span class="cell${v>=step?' f'+v:''}"></span>`).join('') + '</div>';
+  });
+  html += lv.map((v,i)=>`<span class="xl${v?'':' none'}" style="grid-row:5;grid-column:${i+2}"><b>${PIECES[i][0]}</b>${PIECES[i][1]}</span>`).join('');
+  g.innerHTML = html; return g;
+}
+document.querySelectorAll('[data-render="ocs"]').forEach((host) => {
+  host.className = 'outcomes';
+  for (const [title, list] of [['Outcomes', OUTCOMES], ['Concepts', CONCEPTS]]) {
+  const h = document.createElement('h3'); h.className = 'grouph'; h.textContent = title; host.append(h);
+  for (const o of list) {
+    const now = o.lv.filter(Boolean).pop();
+    const row = document.createElement('div'); row.className = 'oc' + (o.hold ? ' holding' : '');
+    row.innerHTML = `<div class="left"><span class="name">${o.name} <small>${o.sub}</small></span><span class="now lv${now}">Now: ${LEVELS[now-1]}</span><span class="story">${o.story}</span>${o.looks?`<span class="looks">${o.looks}</span>`:''}${o.hold?'<span class="flag">Your next step is here</span>':''}</div>`;
+    row.append(lvChart(o.lv)); host.append(row);
+  }
+  }
+});
+
+function skillTrack(sub) {
+  const w = document.createElement('div'); w.className = 'sk-track';
+  const counts = [0,0,0,0]; sub.trail.forEach((r) => counts[r-1]++);
+  w.innerHTML = RUNGS.map((r, i) => `<div class="rung${i+1 < sub.now ? ' past' : ''}${i+1 === sub.now ? ' now' : ''}${i+1 === sub.now + 1 ? ' nextr' : ''}"><span class="rn">${r}</span><span class="tally">${counts[i] ? `${counts[i]} piece${counts[i]>1?'s':''}` : ''}</span>${i+1 === sub.now ? '<span class="here">You are here</span>' : ''}${i+1 === sub.now+1 ? '<span class="here nx">Next</span>' : ''}</div>`).join('');
+  w.setAttribute('role','img'); w.setAttribute('aria-label', `${sub.name}: now ${RUNGS[sub.now-1]}`);
+  return w;
+}
+document.querySelectorAll('[data-render="skills"]').forEach((host) => {
+  host.className = 'skills';
+  for (const st of SKILLS) {
+    const card = document.createElement('div'); card.className = 'sk-card';
+    card.innerHTML = `<div class="sk-strand">${st.strand}</div>`;
+    for (const sub of st.subs) {
+      const row = document.createElement('div'); row.className = 'sk-row' + (sub.hold ? ' holding' : '');
+      row.innerHTML = `<div class="sk-head"><b>${sub.name}</b><span class="sk-n">${sub.trail.length} piece${sub.trail.length>1?'s':''}</span></div>`;
+      row.append(skillTrack(sub));
+      const txt = document.createElement('div'); txt.className = 'sk-text';
+      txt.innerHTML = `<p class="ican">“${sub.ican}”</p><p class="sk-next">${sub.next} ${sub.code||''} <a href="#">See how →</a></p>${sub.hold?'<span class="flag">Skilled on your last 3 pieces</span>':''}`;
+      row.append(txt); card.append(row);
+    }
+    host.append(card);
+  }
+});
+
+const CODES = [
+  { grp: 'Working on' },
+  { c: 'TS', cls: 'c-peach', label: 'Topic sentence', n: [0,null,1,2,1,1], kind: 'w' },
+  { c: 'EF', cls: 'c-gold', label: 'Explain the effect', n: [2,1,0,3,1,0], kind: 'w' },
+  { c: 'QI', cls: 'c-peach', label: 'Weave the quote', n: [3,null,1,0,0,0], kind: 'w', note: 'none in 3 pieces' },
+  { grp: 'Doing well' },
+  { c: '✓P', cls: 'c-sage', label: 'Precise evidence', n: [0,1,2,2,1,1], kind: 'g' },
+  { c: '✓V', cls: 'c-sage', label: 'Strong verb', n: [0,null,0,1,0,1], kind: 'g' }
+];
+document.querySelectorAll('[data-render="codes"]').forEach((host) => {
+  let h = '<table class="cg"><tr><th></th>' + PIECES.map(([n,w])=>`<th><b>${n}</b>${w}</th>`).join('') + '<th></th></tr>';
+  for (const r of CODES) {
+    if (r.grp) { h += `<tr class="grp"><td colspan="${PIECES.length+2}">${r.grp}</td></tr>`; continue; }
+    const asked = r.n.filter((v)=>v!==null); const hit = asked.filter((v)=>v>0); const total = hit.reduce((a,b)=>a+b,0);
+    h += `<tr><td><span class="code ${r.cls}">${r.c}</span> <span class="lbltxt">${r.label}</span></td>` + r.n.map((v)=> v===null ? '<td><span class="na">n/a</span></td>' : `<td><span class="n ${v?r.kind+Math.min(v,3):'z'}">${v||''}</span></td>`).join('') +
+      `<td class="sum"><b>${hit.length} of ${asked.length}</b> pieces · ${total} in all${r.note?`<br>${r.note}`:''}</td></tr>`;
+  }
+  h += '</table><p class="cgsum">TS: on 4 of 5 pieces, 5 times in all. QI: none in your last 3 pieces.</p><p class="hint">n/a means the code doesn\'t apply to that piece. Topic sentences aren\'t marked in a viva.</p>';
+  host.innerHTML = h;
+});
+
+const go = (id) => {
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === id));
+  document.querySelectorAll('.top button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.go === id)));
+  window.scrollTo(0, 0);
+};
+document.querySelectorAll('.top button').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+document.querySelectorAll('.back').forEach((b) => b.addEventListener('click', () => go('progress')));
+</script>
+</body>
+</html>
