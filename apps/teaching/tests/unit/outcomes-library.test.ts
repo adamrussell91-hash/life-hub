@@ -73,6 +73,6 @@ describe('Resource Library outcomes view', () => {
     canvas.querySelector<HTMLButtonElement>('[data-outcomes-edit="o3"]')!.click();
     const form = canvas.querySelector('[data-outcome-id="o3"] [data-outcomes-form]');
     const values = [...form!.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')].map((el) => el.value);
-    expect(values).toEqual(['EAV-12-06', 'Module B', 'EAV-12-06', 'Own compositional processes']);
+    expect(values).toEqual(['EAV-12-06', 'Module B', 'EAV-12-06', '', 'Own compositional processes']);
   });
 });

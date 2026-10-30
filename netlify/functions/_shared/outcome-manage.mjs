@@ -25,7 +25,9 @@ const REFERENCE_PREFIXES = [
   { prefix: SCOPE_SEQUENCE_PREFIX, kind: 'scope_sequence' }
 ];
 
-const FIELD_LIMITS = { code: 32, title: 200, description: 2000, group: 80 };
+const FIELD_LIMITS = { code: 32, title: 200, description: 2000, group: 80, short: 40 };
+/** Fields that may be cleared. */
+const OPTIONAL_FIELDS = new Set(['short']);
 
 export function normaliseCode(code) {
   return String(code ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -61,7 +63,7 @@ export function cleanOutcomePatch(body) {
   for (const [field, max] of Object.entries(FIELD_LIMITS)) {
     if (!(field in body)) continue;
     const value = typeof body[field] === 'string' ? body[field].trim() : '';
-    if (!value) throw teachingWriteError(400, 'validation_error', `${field} cannot be empty`);
+    if (!value && !OPTIONAL_FIELDS.has(field)) throw teachingWriteError(400, 'validation_error', `${field} cannot be empty`);
     if (value.length > max) throw teachingWriteError(400, 'validation_error', `${field} is too long`);
     patch[field] = value;
   }

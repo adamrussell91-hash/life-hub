@@ -32,7 +32,7 @@ export function sprintColumn(lesson: Lesson, kind: MarkKind, columnId: string): 
     title: `${lesson.title}: ${kind === 'prototype' ? 'Prototype' : 'Reflection'}`.slice(0, 120),
     date,
     weight: 0,
-    criteria: list.map((c) => ({ id: markId(c.id), label: c.text, max: 3, outcomes: c.outcome ? [c.outcome] : [], bands: BANDS }))
+    criteria: list.map((c) => ({ id: markId(c.id), label: c.text, max: 3, outcomes: c.outcome ? [c.outcome] : [], concepts: [], bands: BANDS }))
   };
 }
 

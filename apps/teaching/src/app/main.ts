@@ -32,6 +32,7 @@ import { renderUnitsIndex, renderUnitPage } from '@/teacher/sections/units';
 import { renderDocumentPage } from '@/teacher/sections/documents';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
+import { mountMarkPage } from '@/marking/mark-page';
 import { renderTrashSection } from '@/teacher/sections/trash';
 import { renderFeedbackSection } from '@/teacher/sections/feedback';
 import { fetchContentSearch } from '@/teacher/search/api';
@@ -129,6 +130,7 @@ let classesIndexHandle: { dispose?: () => void } | null = null;
 let classPageHandle: { dispose?: () => void } | null = null;
 let unitsIndexHandle: { dispose?: () => void } | null = null;
 let lessonsIndexHandle: { dispose?: () => void } | null = null;
+let markPageHandle: { dispose?: () => void } | null = null;
 let trashSectionHandle: { dispose?: () => void } | null = null;
 let feedbackSectionHandle: { dispose?: () => void } | null = null;
 let unitPageHandle: { dispose?: () => void } | null = null;
@@ -234,6 +236,12 @@ function teardownLessonsIndex(): void {
   if (!lessonsIndexHandle) return;
   lessonsIndexHandle.dispose?.();
   lessonsIndexHandle = null;
+}
+
+function teardownMarkPage(): void {
+  if (!markPageHandle) return;
+  markPageHandle.dispose?.();
+  markPageHandle = null;
 }
 
 function teardownTrashSection(): void {
@@ -719,6 +727,17 @@ function renderTeacherTemplatesRoute(token: number): void {
   });
 }
 
+function renderTeacherMarkRoute(classId: string, columnId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'classes', classId, () => {
+    teardownMarkPage();
+    markPageHandle = mountMarkPage(refs.canvas, classId, columnId, new URLSearchParams(window.location.search).get('student'));
+  });
+}
+
 function renderTeacherTrashRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -1021,6 +1040,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-feedback':
       renderTeacherFeedbackRoute(token);
       break;
+    case 'teacher-mark':
+      renderTeacherMarkRoute(match.params.classId, match.params.columnId, token);
+      break;
     case 'teacher-trash':
       renderTeacherTrashRoute(token);
       break;
@@ -1096,6 +1118,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownClassPage();
   teardownUnitsIndex();
   teardownLessonsIndex();
+  teardownMarkPage();
   teardownTrashSection();
   teardownFeedbackSection();
   teardownUnitPage();

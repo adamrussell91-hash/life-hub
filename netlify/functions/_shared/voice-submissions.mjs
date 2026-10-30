@@ -25,6 +25,7 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
+import { claimFor, classesForLesson, loadRoster } from './class-claims.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
 export const AUDIO_RETENTION_DAYS = 28;
@@ -167,6 +168,9 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
   if (!validToken(body.token)) reject(400, 'bad_token', 'Reload the page and try again.');
   const deviceHash = hashToken(body.token);
   const initials = cleanInitials(body.initials);
+  // A device that has claimed its initials in the class page says who this take belongs to.
+  const roster = typeof body.class_id === 'string' ? await loadRoster(store, body.class_id) : null;
+  const owner = roster ? await claimFor(store, roster, body.class_token) : null;
   const parts = Number(body.parts);
   if (!Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS) reject(400, 'bad_parts', 'Reload the page and try again.');
   if (!isUploadIdFor(body.upload_id, deviceHash)) reject(400, 'bad_upload', 'Reload the page and try again.');
@@ -195,6 +199,7 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
     lesson_id: lesson,
     block_id: block,
     initials,
+    ...(owner ? { class_id: roster.cls.id, student_id: owner.id } : {}),
     device_hash: deviceHash,
     submitted_at: submittedAt,
     mode: live.content.mode,
@@ -272,6 +277,8 @@ function teacherRow(record) {
   return {
     id: record.id,
     initials: record.initials,
+    class_id: record.class_id ?? null,
+    student_id: record.student_id ?? null,
     device_hash: record.device_hash.slice(0, 6),
     submitted_at: record.submitted_at,
     duration_s: record.duration_s,
@@ -303,7 +310,14 @@ async function readSubmission(store, lesson, block, id) {
 }
 
 export async function getVoiceSubmission(store, lesson, block, id) {
-  return teacherRecord(await readSubmission(store, lesson, block, id));
+  const record = teacherRecord(await readSubmission(store, lesson, block, id));
+  // The classes this lesson belongs to, so the teacher can say whose take it is.
+  const classes = [];
+  for (const { id: classId, title } of await classesForLesson(store, lesson)) {
+    const roster = await loadRoster(store, classId);
+    if (roster) classes.push({ id: classId, title, students: roster.students.map(({ id: sid, initials, name }) => ({ id: sid, initials, name })) });
+  }
+  return { ...record, classes };
 }
 
 function cleanTags(raw, wordCount) {
@@ -339,6 +353,12 @@ export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}
   if (body.tags !== undefined) next.tags = cleanTags(body.tags, record.transcript?.words?.length ?? 0);
   if (body.comment !== undefined) next.comment = String(body.comment ?? '').slice(0, MAX_COMMENT);
   if (body.initials !== undefined) next.initials = cleanInitials(body.initials);
+  if (body.student_id !== undefined) {
+    const roster = typeof body.class_id === 'string' ? await loadRoster(store, body.class_id) : null;
+    if (!roster?.students.some((st) => st.id === body.student_id)) reject(400, 'no_student', 'That student isn’t on this class list.');
+    next.class_id = roster.cls.id;
+    next.student_id = body.student_id;
+  }
   if (body.fillers_suggested === true) next.fillers_suggested = true;
   const marked = (next.tags ?? []).some((t) => t.confirmed !== false) || Boolean(next.comment?.trim());
   if (record.status === 'new' && marked) next.status = 'marked';
@@ -352,6 +372,14 @@ export async function returnVoiceSubmission(store, lesson, block, id, deps = {})
   const now = new Date(deps.now ? deps.now() : Date.now()).toISOString();
   const next = { ...record, status: 'returned', returned_at: record.returned_at ?? now, updated_at: now };
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
+  // A returned take that belongs to a student puts the lesson's viva set in their Returned work.
+  if (next.class_id && next.student_id) {
+    const key = `piece_feedback/${next.class_id}/${next.student_id}/v:${lesson}`;
+    const kept = await read(store, key);
+    const title = (await read(store, draftLessonKey(lesson)))?.title;
+    const { seen_at: _seen, ...rest } = kept ?? {};
+    await store.setJSON(key, { kind: 'viva', title: kept?.title || title || 'Viva practice', lesson_id: lesson, column_id: null, tags: [], comment: '', ...rest, status: 'returned', returned_at: now, updated_at: now });
+  }
   return teacherRecord(next);
 }
 

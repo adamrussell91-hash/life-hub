@@ -18,6 +18,8 @@ const Day = z
     const d = new Date(`${v}T00:00:00Z`);
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
   }, 'Pick a date.');
+export const PLACE_IDS = ['starting', 'building', 'secure', 'extending', 'below', 'capable', 'skilled', 'accomplished', 'excellent'] as const;
+const StepText = z.string().trim().max(200);
 const Title = z.string().trim().min(1, 'Give it a title.').max(MARKBOOK_LIMITS.title);
 
 export const BandSchema = z.object({ label: z.string().trim().min(1).max(MARKBOOK_LIMITS.band), min: z.number().min(0) });
@@ -27,6 +29,10 @@ export const CriterionSchema = z.object({
   label: z.string().trim().min(1, 'Name each criterion.').max(MARKBOOK_LIMITS.label),
   max: z.number().positive('Each criterion needs marks.').max(1000, 'A criterion is worth at most 1000 marks.'),
   outcomes: z.array(z.string().trim().min(1).max(64)).max(MARKBOOK_LIMITS.outcomes).default([]),
+  /** Concept keys from the syllabus alignment that this criterion assesses. */
+  concepts: z.array(z.string().trim().min(1).max(64)).max(MARKBOOK_LIMITS.outcomes).default([]),
+  /** What each step looks like on this criterion, one line each, shown to students. */
+  steps: z.object({ starting: StepText, building: StepText, secure: StepText, extending: StepText }).partial().optional(),
   bands: z.array(BandSchema).max(MARKBOOK_LIMITS.bands).optional(),
   /** A skills-continuum sub-strand, `strand.sub`, that this criterion assesses. */
   skill: z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, 'Pick a skill from the list.').optional()
@@ -38,7 +44,9 @@ export const AssessmentColumnSchema = z.object({
   title: Title,
   date: Day,
   weight: z.number().min(0, 'Weight can’t be below 0.').max(100, 'Weight is at most 100.'),
-  criteria: z.array(CriterionSchema).min(1, 'Add at least one criterion.').max(MARKBOOK_LIMITS.criteria)
+  criteria: z.array(CriterionSchema).min(1, 'Add at least one criterion.').max(MARKBOOK_LIMITS.criteria),
+  /** The lesson block students hand this in through. Linking it switches on Hand in for this class. */
+  piece: z.object({ lesson_id: z.string().min(1).max(80), block_id: z.string().min(1).max(80), short: z.string().trim().max(40).optional() }).optional()
 });
 export const HandinColumnSchema = z.object({ id: MarkbookIdSchema, kind: z.literal('handin'), title: Title, due: Day });
 export const CheckColumnSchema = z.object({ id: MarkbookIdSchema, kind: z.literal('check'), title: Title, date: Day, scale: z.enum(['tick', 'four']) });
@@ -51,7 +59,9 @@ export const AssessmentMarkSchema = z.object({
   /** Feedback-code ids per criterion: why marks were lost. */
   codes: z.record(z.string(), z.array(z.string().min(1).max(64)).max(8)).optional(),
   exempt: z.boolean().optional(),
-  note: z.string().trim().max(MARKBOOK_LIMITS.note).optional()
+  note: z.string().trim().max(MARKBOOK_LIMITS.note).optional(),
+  /** The teacher's placement per criterion: a step for outcomes and concepts, a rung for a skill. */
+  steps: z.record(z.string(), z.enum(PLACE_IDS)).optional()
 });
 export const HandinMarkSchema = z.object({ status: z.enum(HANDIN_STATUSES), at: Day.optional() });
 export const CheckMarkSchema = z.union([z.boolean(), z.number().int().min(1).max(4)]);
@@ -150,8 +160,9 @@ export function checkMark(column: Column, value: unknown): { mark: Mark } | { pr
       if (!column.criteria.some((c) => c.id === id)) return { problem: 'Unknown criterion.' };
     }
     const codes = Object.fromEntries(Object.entries(mark.codes ?? {}).filter(([, list]) => list.length).map(([id, list]) => [id, [...new Set(list)]]));
-    const { feedback, note, codes: _codes, ...rest } = mark;
-    return { mark: { ...rest, ...(feedback ? { feedback } : {}), ...(note ? { note } : {}), ...(Object.keys(codes).length ? { codes } : {}) } };
+    const steps = Object.fromEntries(Object.entries(mark.steps ?? {}).filter(([id]) => column.criteria.some((c) => c.id === id)));
+    const { feedback, note, codes: _codes, steps: _steps, ...rest } = mark;
+    return { mark: { ...rest, ...(feedback ? { feedback } : {}), ...(note ? { note } : {}), ...(Object.keys(codes).length ? { codes } : {}), ...(Object.keys(steps).length ? { steps } : {}) } };
   }
   if (column.kind === 'handin') {
     const parsed = HandinMarkSchema.safeParse(value);

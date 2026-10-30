@@ -6,6 +6,7 @@ import { openOverlay } from './overlay';
 import type { RosterStudent } from './types';
 import type { HistoryEvent } from './schema';
 import { studentTimeline } from './history-view';
+import { analysisPanel, type AnalysisData, type ClassPattern } from './analysis-panel';
 
 export type StudentPanelOptions = {
   student: RosterStudent;
@@ -17,6 +18,10 @@ export type StudentPanelOptions = {
   onPins: (pins: FocusPins) => void;
   overall: string;
   history?: HistoryEvent[];
+  /** Loads the student's patterns from returned work; the Analysis section is left out without it. */
+  loadAnalysis?: () => Promise<AnalysisData>;
+  outcomeName?: (key: string) => string;
+  onGroup?: (studentIds: string[], pattern: ClassPattern) => void;
 };
 
 /** One student's focus areas, secure tags and confidence, for the panel and for tests. */
@@ -79,6 +84,17 @@ export function studentPanelBody(o: StudentPanelOptions, headingId?: string): HT
     history.append(list);
   }
   body.append(history);
+  if (o.loadAnalysis) {
+    const section = el('section', 'mb-panel-analysis');
+    section.append(el('h4', 'mb-form__label', 'Analysis'));
+    const slot = el('div', 'mb-panel-analysis__body', 'Loading…');
+    section.append(slot);
+    body.append(section);
+    o.loadAnalysis().then(
+      (data) => slot.replaceChildren(analysisPanel(data, { outcomeName: o.outcomeName ?? ((k) => k), onGroup: o.onGroup ?? (() => {}) })),
+      () => slot.replaceChildren(el('p', 'mb__empty', 'The analysis couldn’t load just now.'))
+    );
+  }
   return body;
 }
 

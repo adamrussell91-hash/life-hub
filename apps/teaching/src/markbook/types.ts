@@ -100,6 +100,8 @@ export type MarkbookActions = {
   hideQuiz: (lessonId: string, hidden: boolean) => void;
   openHeatmap: (lessonId: string) => void;
   openStudent: (studentId: string) => void;
+  /** Where Mark goes for a task linked to a lesson block, and how many handed-in pieces are still waiting. */
+  markLink?: (columnId: string) => { href: string; waiting: number; open: () => void } | undefined;
 };
 
 export type { AssessmentMark };

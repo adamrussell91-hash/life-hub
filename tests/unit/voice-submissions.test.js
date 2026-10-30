@@ -224,3 +224,37 @@ test('routes: students reach only the published voice routes; the inbox needs th
   assert.equal((await returned.json()).data.status, 'returned');
   assert.equal((await teacher(operatorRequest(`/api/voice/lesson1/viva1/${id}`, 'DELETE'), {})).status, 200);
 });
+
+const classSeed = () => [['classes/class1', { id: 'class1', type: 'class', title: '12 English', active_unit_ids: [], students: [{ name: 'Ava Nguyen' }, { name: 'Noah Patel' }] }]];
+
+test('a submission from a claimed device carries the class and student', async () => {
+  const { claimInitials, loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = memoryStore([...lessonSeed(), ...classSeed()]);
+  const roster = await loadRoster(store, 'class1');
+  const [ava] = roster.students;
+  await claimInitials(store, roster, TOKEN, ava.initials);
+  await submit(store, TOKEN, { class_id: 'class1', class_token: TOKEN });
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  assert.equal(row.class_id, 'class1');
+  assert.equal(row.student_id, ava.id);
+  // A device that never claimed carries nothing.
+  await submit(store, OTHER, { class_id: 'class1', class_token: OTHER });
+  const rows = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  assert.equal(rows.filter((r) => r.student_id).length, 1);
+});
+
+test('the teacher can set or change who a submission belongs to, and a return adds the viva set to their Returned work', async () => {
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = memoryStore([...lessonSeed(), ...classSeed()]);
+  const roster = await loadRoster(store, 'class1');
+  const [ava] = roster.students;
+  await submit(store);
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  await assert.rejects(saveVoiceMarking(store, 'lesson1', 'viva1', row.id, { class_id: 'class1', student_id: 'st_nobody' }), /isn’t on this class list/);
+  const saved = await saveVoiceMarking(store, 'lesson1', 'viva1', row.id, { class_id: 'class1', student_id: ava.id });
+  assert.deepEqual([saved.class_id, saved.student_id], ['class1', ava.id]);
+  await returnVoiceSubmission(store, 'lesson1', 'viva1', row.id, { now: () => NOW });
+  const piece = store.data.get(`piece_feedback/class1/${ava.id}/v:lesson1`);
+  assert.equal(piece.status, 'returned');
+  assert.equal(piece.kind, 'viva');
+});

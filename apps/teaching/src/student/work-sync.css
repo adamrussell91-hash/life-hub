@@ -38,3 +38,7 @@
 .ws-bar__error {
   color: var(--danger);
 }
+
+.ws-handin { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
+.ws-handin__note { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.ws-handin .btn { min-height: 44px; }
