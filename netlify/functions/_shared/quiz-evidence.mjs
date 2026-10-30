@@ -1,7 +1,14 @@
 // Generated from apps/teaching/src/quiz/evidence.ts; regenerate with scripts/generate-alchemy-schema.mjs.
 
 // apps/teaching/src/quiz/core.ts
+import { z as z2 } from "zod";
+
+// apps/teaching/src/quiz/writing.ts
 import { z } from "zod";
+var WRITING_CHECKS = ["off", "flag", "block"];
+var WritingCheckSchema = z.enum(WRITING_CHECKS);
+
+// apps/teaching/src/quiz/core.ts
 var QUIZ_QUESTION_KINDS = [
   "multiple_choice",
   "multi_select",
@@ -19,7 +26,7 @@ var QUIZ_QUESTION_KINDS = [
   "extended_response",
   "explain_effect"
 ];
-var QuizQuestionKindSchema = z.enum(QUIZ_QUESTION_KINDS);
+var QuizQuestionKindSchema = z2.enum(QUIZ_QUESTION_KINDS);
 var QUIZ_LIMITS = {
   prompt: 1e3,
   option: 300,
@@ -31,102 +38,102 @@ var QUIZ_LIMITS = {
   response: 6e3,
   marksMax: 20
 };
-var Id = z.string().min(1).max(64);
-var Text = (max) => z.string().trim().min(1).max(max);
-var OptionalText = (max) => z.string().trim().max(max).optional();
-var QuizImageSchema = z.object({
-  url: z.string().min(1).max(2e3),
-  alt: z.string().max(300).default("")
+var Id = z2.string().min(1).max(64);
+var Text = (max) => z2.string().trim().min(1).max(max);
+var OptionalText = (max) => z2.string().trim().max(max).optional();
+var QuizImageSchema = z2.object({
+  url: z2.string().min(1).max(2e3),
+  alt: z2.string().max(300).default("")
 });
-var QuizChoiceSchema = z.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
-var QuizPairSchema = z.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
-var QuizGroupSchema = z.object({ id: Id, name: Text(120) });
-var QuizSortItemSchema = z.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
-var QuizSpotTargetSchema = z.object({
+var QuizChoiceSchema = z2.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
+var QuizPairSchema = z2.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
+var QuizGroupSchema = z2.object({ id: Id, name: Text(120) });
+var QuizSortItemSchema = z2.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+var QuizSpotTargetSchema = z2.object({
   id: Id,
   /** The words, copied exactly from the passage. */
   quote: Text(QUIZ_LIMITS.option),
   /** Every technique a fair marker would accept for these words. */
-  correct: z.array(Id).min(1).max(10)
+  correct: z2.array(Id).min(1).max(10)
 });
-var QuizPinSchema = z.object({
+var QuizPinSchema = z2.object({
   id: Id,
-  x: z.number().min(0).max(1),
-  y: z.number().min(0).max(1),
+  x: z2.number().min(0).max(1),
+  y: z2.number().min(0).max(1),
   label: Text(120)
 });
 var base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
   // other kinds are still told to write one by questionProblems.
-  prompt: z.string().trim().max(QUIZ_LIMITS.prompt).default(""),
-  marks: z.number().int().min(1).max(QUIZ_LIMITS.marksMax),
+  prompt: z2.string().trim().max(QUIZ_LIMITS.prompt).default(""),
+  marks: z2.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z.array(z.string().min(1).max(64)).max(8).optional(),
+  outcomes: z2.array(z2.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z.array(z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
+  skills: z2.array(z2.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
 };
-var QuizQuestionSchema = z.discriminatedUnion("kind", [
-  z.object({ ...base, kind: z.literal("multiple_choice"), options: z.array(QuizChoiceSchema).min(2).max(6), correct: z.array(Id).length(1) }),
-  z.object({ ...base, kind: z.literal("multi_select"), options: z.array(QuizChoiceSchema).min(2).max(8), correct: z.array(Id).min(1).max(8) }),
-  z.object({ ...base, kind: z.literal("true_false"), answer: z.boolean() }),
-  z.object({
+var QuizQuestionSchema = z2.discriminatedUnion("kind", [
+  z2.object({ ...base, kind: z2.literal("multiple_choice"), options: z2.array(QuizChoiceSchema).min(2).max(6), correct: z2.array(Id).length(1) }),
+  z2.object({ ...base, kind: z2.literal("multi_select"), options: z2.array(QuizChoiceSchema).min(2).max(8), correct: z2.array(Id).min(1).max(8) }),
+  z2.object({ ...base, kind: z2.literal("true_false"), answer: z2.boolean() }),
+  z2.object({
     ...base,
-    kind: z.literal("short_answer"),
-    accepted: z.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
-    case_sensitive: z.boolean().optional()
+    kind: z2.literal("short_answer"),
+    accepted: z2.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
+    case_sensitive: z2.boolean().optional()
   }),
-  z.object({ ...base, kind: z.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z.boolean().optional() }),
-  z.object({ ...base, kind: z.literal("odd_one_out"), options: z.array(QuizChoiceSchema).min(3).max(6), correct: z.array(Id).length(1) }),
-  z.object({ ...base, kind: z.literal("matching"), pairs: z.array(QuizPairSchema).min(2).max(8) }),
-  z.object({ ...base, kind: z.literal("ordering"), items: z.array(QuizChoiceSchema).min(3).max(8) }),
-  z.object({
+  z2.object({ ...base, kind: z2.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z2.boolean().optional() }),
+  z2.object({ ...base, kind: z2.literal("odd_one_out"), options: z2.array(QuizChoiceSchema).min(3).max(6), correct: z2.array(Id).length(1) }),
+  z2.object({ ...base, kind: z2.literal("matching"), pairs: z2.array(QuizPairSchema).min(2).max(8) }),
+  z2.object({ ...base, kind: z2.literal("ordering"), items: z2.array(QuizChoiceSchema).min(3).max(8) }),
+  z2.object({
     ...base,
-    kind: z.literal("categorise"),
-    groups: z.array(QuizGroupSchema).min(2).max(4),
-    items: z.array(QuizSortItemSchema).min(2).max(16)
+    kind: z2.literal("categorise"),
+    groups: z2.array(QuizGroupSchema).min(2).max(4),
+    items: z2.array(QuizSortItemSchema).min(2).max(16)
   }),
-  z.object({
+  z2.object({
     ...base,
-    kind: z.literal("quote_technique"),
+    kind: z2.literal("quote_technique"),
     quote: Text(QUIZ_LIMITS.passage),
-    options: z.array(QuizChoiceSchema.extend({ technique_id: z.string().max(64).optional() })).min(2).max(6),
-    correct: z.array(Id).length(1)
+    options: z2.array(QuizChoiceSchema.extend({ technique_id: z2.string().max(64).optional() })).min(2).max(6),
+    correct: z2.array(Id).length(1)
   }),
-  z.object({
+  z2.object({
     ...base,
-    kind: z.literal("find_it"),
-    segments: z.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
-    correct: z.array(Id).min(1).max(40)
+    kind: z2.literal("find_it"),
+    segments: z2.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
+    correct: z2.array(Id).min(1).max(40)
   }),
-  z.object({
+  z2.object({
     ...base,
-    kind: z.literal("spot_technique"),
+    kind: z2.literal("spot_technique"),
     passage: Text(QUIZ_LIMITS.passage),
-    options: z.array(
+    options: z2.array(
       QuizChoiceSchema.extend({
-        technique_id: z.string().max(64).optional(),
+        technique_id: z2.string().max(64).optional(),
         /** How many times students may name it: 2 for a passage with two similes. */
-        uses: z.number().int().min(1).max(12).optional()
+        uses: z2.number().int().min(1).max(12).optional()
       })
     ).min(2).max(10),
-    targets: z.array(QuizSpotTargetSchema).min(1).max(12),
+    targets: z2.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
-    find: z.number().int().min(1).max(12).optional()
+    find: z2.number().int().min(1).max(12).optional()
   }),
-  z.object({ ...base, kind: z.literal("label_image"), image: QuizImageSchema, pins: z.array(QuizPinSchema).min(2).max(8) }),
-  z.object({
+  z2.object({ ...base, kind: z2.literal("label_image"), image: QuizImageSchema, pins: z2.array(QuizPinSchema).min(2).max(8) }),
+  z2.object({
     ...base,
-    kind: z.literal("extended_response"),
+    kind: z2.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model)
   }),
-  z.object({
+  z2.object({
     ...base,
-    kind: z.literal("explain_effect"),
+    kind: z2.literal("explain_effect"),
     quote: Text(QUIZ_LIMITS.passage),
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
@@ -134,10 +141,10 @@ var QuizQuestionSchema = z.discriminatedUnion("kind", [
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    ctx.addIssue({ code: z2.ZodIssueCode.custom, message });
   }
 });
-var QuizQuestionDraftSchema = z.custom(
+var QuizQuestionDraftSchema = z2.custom(
   (value) => !!value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string" && QUIZ_QUESTION_KINDS.includes(value.kind),
   { message: "A quiz question needs an id and a known kind." }
 );
@@ -287,31 +294,33 @@ function matchSpots(words, spots, targets) {
   }
   return out;
 }
-var QuizFeedbackSchema = z.enum(["instant", "end", "released"]);
-var QuizSettingsSchema = z.object({
+var QuizFeedbackSchema = z2.enum(["instant", "end", "released"]);
+var QuizSettingsSchema = z2.object({
   /** Whole-quiz countdown in minutes. */
-  timer_minutes: z.number().int().min(1).max(180).optional(),
+  timer_minutes: z2.number().int().min(1).max(180).optional(),
   /** Per-question countdown in seconds. */
-  question_seconds: z.number().int().min(10).max(600).optional(),
+  question_seconds: z2.number().int().min(10).max(600).optional(),
   /** Hard timers lock answers at zero; soft timers only show the time. */
-  timer_hard: z.boolean().optional(),
-  shuffle_questions: z.boolean().optional(),
-  shuffle_options: z.boolean().optional(),
-  attempts: z.number().int().min(1).max(5).optional(),
+  timer_hard: z2.boolean().optional(),
+  shuffle_questions: z2.boolean().optional(),
+  shuffle_options: z2.boolean().optional(),
+  attempts: z2.number().int().min(1).max(5).optional(),
   feedback: QuizFeedbackSchema.optional(),
   /** Share of a question's marks a hint costs, 0 to 1. */
-  hint_cost: z.number().min(0).max(1).optional(),
-  confidence: z.boolean().optional(),
-  closes_at: z.string().datetime().optional(),
+  hint_cost: z2.number().min(0).max(1).optional(),
+  confidence: z2.boolean().optional(),
+  /** Written answers: off, flag how they were typed, or also block paste. Blank means flag. */
+  writing_check: WritingCheckSchema.optional(),
+  closes_at: z2.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z.number().int().min(1).max(100).optional(),
+  move_on: z2.number().int().min(1).max(100).optional(),
   /** A follow-up quiz: only these students (class-list ids) may sit it. */
-  for_students: z.array(z.string().min(1).max(64)).max(60).optional(),
+  for_students: z2.array(z2.string().min(1).max(64)).max(60).optional(),
   /** The quiz this one follows up, and the flag that prompted it. */
-  follow_up_of: z.string().max(64).optional(),
-  follow_up_flag: z.string().max(160).optional(),
+  follow_up_of: z2.string().max(64).optional(),
+  follow_up_flag: z2.string().max(160).optional(),
   /** Teacher only: an earlier quiz to show before-and-after against. */
-  compare_with: z.string().max(64).optional()
+  compare_with: z2.string().max(64).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();

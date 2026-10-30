@@ -108,7 +108,9 @@ export function openQuizAttempt(quiz: QuizColumn, student: RosterStudent, result
     const r = score?.rows.find((x) => x.id === q.id);
     list.append(el('li', undefined, `${short(q.prompt)} · ${!r ? 'not answered' : r.awarded === null ? 'to mark' : `${r.awarded}/${r.max}`}`));
   }
+  const flagged = score?.writing_flags ?? 0;
+  const writing = flagged ? el('p', 'mb-attempt__writing', `${flagged} written ${flagged === 1 ? 'answer' : 'answers'} to check for how ${flagged === 1 ? 'it was' : 'they were'} typed. Results has the replay.`) : null;
   const link = el('a', 'mb-attempt__link', 'Mark in Results');
   link.href = resultsHref;
-  return present(heading, [el('p', 'mb-panel__task', quiz.title), heading, list, link], opts);
+  return present(heading, [el('p', 'mb-panel__task', quiz.title), heading, list, ...(writing ? [writing] : []), link], opts);
 }

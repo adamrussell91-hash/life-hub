@@ -7,7 +7,17 @@ export type RosterStudent = { id: string; name: string; initials: string; remove
 
 export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[]; set?: string; /** Left blank by the student. */ unanswered?: true };
 export type PracticeScore = { score: number; max: number; pending: number };
-export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[]; practice?: Record<string, PracticeScore> };
+export type QuizScore = {
+  attempt_id: string;
+  submitted_at: string;
+  score: number;
+  max: number;
+  pending: number;
+  rows: QuizRow[];
+  practice?: Record<string, PracticeScore>;
+  /** Written answers whose typing stood out (pasting, text appearing at once). */
+  writing_flags?: number;
+};
 /** A quiz's group set, as the markbook sees it. */
 export type QuizSet = { id: string; group_id: string; name: string; students: string[]; questions: number };
 export type QuizQuestionMeta = { id: string; prompt: string; marks: number; outcomes: string[] };

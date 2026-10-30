@@ -10,6 +10,7 @@ import {
 } from '@/quiz/core';
 import { el, formatMarks, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
+import { watchWriting, type WritingWatch } from '@/quiz/writing-watch';
 import './quiz.css';
 
 /**
@@ -35,6 +36,8 @@ export type PlayerOptions = {
   number?: number;
   /** Shown big for the class board in live mode. */
   board?: boolean;
+  /** Written answers only: record how the answer is typed, and maybe block paste. */
+  writing?: WritingWatch;
 };
 
 type Choice = { id: string; text: string };
@@ -252,8 +255,11 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
       const input = textArea(text, QUIZ_LIMITS.response, 6, 'Write your answer.');
       input.setAttribute('aria-labelledby', promptId);
       input.disabled = locked;
+      // Watched first, so the log is up to date when the answer's own save runs.
+      const note = options.writing && !locked ? watchWriting(input, options.writing) : null;
       input.addEventListener('input', () => emit({ text: input.value }));
       body.append(input);
+      if (note) body.append(note);
       if (key?.answer.type === 'manual' && key.answer.model_answer) {
         const model = el('details', 'qz-model');
         model.append(el('summary', '', 'Model answer'), el('p', '', key.answer.model_answer));

@@ -80,6 +80,12 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
       dot.title = `${score.pending} to mark`;
       b.append(dot);
     }
+    if (score.writing_flags) {
+      const mark = el('span', 'mb-cell__writing', '✎');
+      mark.title = `${score.writing_flags} written ${score.writing_flags === 1 ? 'answer' : 'answers'} to check: open Results to see how they were typed`;
+      b.append(mark);
+      b.setAttribute('aria-label', `${b.getAttribute('aria-label') ?? ''}, ${mark.title}`);
+    }
     const practice = Object.values(score.practice ?? {});
     if (practice.length) {
       const got = practice.reduce((n, p) => n + p.score, 0);

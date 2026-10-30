@@ -363,3 +363,5 @@ span.mb-cell { display: inline-block; cursor: default; }
 /* Overdue: a small red dot tucked inside the corner. */
 .mb-progress__btn--late::after { content: ''; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--danger); }
 .mb-progress__btn:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.mb-cell__writing { position: absolute; bottom: 1px; right: 3px; font-size: 10px; line-height: 1; color: var(--warning); }
+.mb-attempt__writing { margin: 0; color: var(--warning); font-weight: var(--weight-semibold); }

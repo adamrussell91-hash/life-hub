@@ -1,8 +1,9 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { PublishedLesson } from '@/schemas/published-lesson';
-import { hasAnswer, QUIZ_KIND_INFO, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse } from '@/quiz/core';
+import { hasAnswer, QUIZ_KIND_INFO, WRITTEN_KINDS, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse, type WritingLog } from '@/quiz/core';
 import { mountQuestionPlayer, seededShuffle } from '@/quiz/player';
+import type { WritingWatch } from '@/quiz/writing-watch';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import './quiz.css';
 
@@ -33,7 +34,7 @@ type Current = {
   started_at: string;
   deadline: string | null;
   hints: Record<string, string>;
-  saved?: { responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; at?: string };
+  saved?: { responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; writing?: Record<string, WritingLog>; at?: string };
   answers: Record<string, { response: QuizResponse | null; mark: MarkResult; key: QuestionKey | null }>;
 };
 type Status = {
@@ -53,7 +54,15 @@ type Status = {
   mark?: MarkResult;
   key?: QuestionKey | null;
 };
-type Draft = { order: string[]; index: number; responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; spent: Record<string, number> };
+type Draft = {
+  order: string[];
+  index: number;
+  responses: Record<string, QuizResponse>;
+  confidence: Record<string, 1 | 2 | 3>;
+  spent: Record<string, number>;
+  /** How each written answer was typed (writing.ts). */
+  writing?: Record<string, WritingLog>;
+};
 type LiveView = {
   session: string;
   phase: 'lobby' | 'question' | 'reveal';
@@ -174,6 +183,11 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     const fromServer = (d: Draft): Draft => {
       for (const [id, response] of Object.entries(current.saved?.responses ?? {})) if (byId.has(id) && !hasAnswer(d.responses[id])) d.responses[id] = response;
       for (const [id, value] of Object.entries(current.saved?.confidence ?? {})) if (byId.has(id) && !d.confidence[id]) d.confidence[id] = value;
+      for (const [id, log] of Object.entries(current.saved?.writing ?? {})) {
+        if (!byId.has(id)) continue;
+        d.writing ??= {};
+        if (!d.writing[id]) d.writing[id] = log;
+      }
       return d;
     };
     if (saved && saved.order?.length === questions.length && saved.order.every((id) => byId.has(id))) return fromServer(saved);
@@ -196,6 +210,28 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   let saveTimer: number | undefined;
   let saving = false;
   const saveChips = new Set<HTMLElement>();
+  /** Written answers whose typing log changed since the last save. Only those go out, since a log can run to kilobytes. */
+  const writingDirty = new Set<string>();
+
+  /** Watches a written question's box, when the quiz has the writing check on. */
+  function writingWatch(d: Draft, q: PublicQuestion): WritingWatch | undefined {
+    const check = settings.writing_check ?? 'flag';
+    if (check === 'off' || !WRITTEN_KINDS.includes(q.kind)) return undefined;
+    return {
+      check,
+      log: d.writing?.[q.id] ?? null,
+      onLog: (log) => {
+        d.writing = { ...(d.writing ?? {}), [q.id]: log };
+        writingDirty.add(q.id);
+        saveDraft();
+      }
+    };
+  }
+
+  /** Marks a written answer's log as changed, after typing in it. */
+  function typed(d: Draft, id: string): void {
+    if (d.writing?.[id]) writingDirty.add(id);
+  }
 
   function paintSaveChip(chip: HTMLElement): void {
     chip.dataset.state = saveState;
@@ -225,14 +261,18 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     saveState = 'saving';
     paintSaveChips();
     const sent = JSON.stringify([draft.responses, draft.confidence]);
+    const logs = draft.writing ?? {};
+    const writing = Object.fromEntries([...writingDirty].filter((id) => logs[id]).map((id) => [id, logs[id]]));
+    writingDirty.clear();
     try {
-      await apiPost(endpoint, { action: 'save', ...(token ? { token } : {}), ...classFields, responses: draft.responses, confidence: draft.confidence });
+      await apiPost(endpoint, { action: 'save', ...(token ? { token } : {}), ...classFields, responses: draft.responses, confidence: draft.confidence, ...(Object.keys(writing).length ? { writing } : {}) });
       lastSavedAt = Date.now();
       if (draft && JSON.stringify([draft.responses, draft.confidence]) === sent) dirty = false;
       saveState = 'saved';
     } catch (error) {
       // The attempt may have ended (handed in elsewhere, or closed): nothing to keep saving.
       if (error instanceof ApiClientError && ['no_attempt', 'need_class', 'need_initials'].includes(error.code ?? '')) dirty = false;
+      else for (const id of Object.keys(writing)) writingDirty.add(id);
       saveState = dirty ? 'failed' : 'saved';
     }
     saving = false;
@@ -382,6 +422,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     fact(FEEDBACK_TEXT[settings.feedback ?? 'end']);
     if (slots) fact('You answer each question where it sits in the lesson, then hand in here.');
     if ((settings.attempts ?? 1) > 1 && settings.feedback !== 'released') fact('Right answers show after your last go.');
+    const check = settings.writing_check ?? 'flag';
+    if (check !== 'off' && questions.some((q) => WRITTEN_KINDS.includes(q.kind))) {
+      fact(check === 'block' ? 'Pasting is off in written answers. Your teacher sees how each one was typed.' : 'Your teacher sees how written answers were typed.');
+    }
     if (settings.closes_at) fact(`Closes ${new Date(settings.closes_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`);
     wrap.append(facts);
 
@@ -483,8 +527,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       shuffle: !!settings.shuffle_options,
       seed: `${token ?? ''}:${current.n}`,
       result: checked ? { mark: checked.mark, key: checked.key } : null,
+      writing: writingWatch(d, q),
       onChange: (response) => {
         d.responses[id] = response;
+        typed(d, id);
         saveDraft();
         paintDotsState();
       }
@@ -686,8 +732,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
         shuffle: !!settings.shuffle_options,
         seed: `${token ?? ''}:${current.n}`,
         result: checked ? { mark: checked.mark, key: checked.key } : null,
+        writing: writingWatch(d, q),
         onChange: (response) => {
           d.responses[id] = response;
+          typed(d, id);
           saveDraft();
           // The hand-in box counts what's left to answer.
           paintBody();
@@ -805,7 +853,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     window.clearTimeout(saveTimer);
     const n = status.current.n;
     const d = draft ?? loadDraft(status.current);
-    const res = await call('submit', { responses: d.responses, confidence: d.confidence });
+    const res = await call('submit', { responses: d.responses, confidence: d.confidence, ...(d.writing ? { writing: d.writing } : {}) });
     submitting = false;
     // Handed in only when the server's own list says so; anything else keeps the answers and says so.
     const confirmed = res?.results.find((r) => r.n === n);

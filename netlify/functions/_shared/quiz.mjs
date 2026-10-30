@@ -8,6 +8,7 @@
  *   quiz/{lesson}/checked/{device}/{n}/{question}    an answer checked in instant mode (create-only)
  *   quiz/{lesson}/results/{device}/{n}               the hand-in (create-only)
  *   quiz/{lesson}/marks/{device}~{n}                 { question id: marks | { marks, codes } } teacher marking
+ *   quiz/{lesson}/writing/{device}/{n}               { question id: how a written answer was typed (writing.ts) }
  *   quiz/{lesson}/cleared/{device}                   { from } goes before `from` were cleared by the teacher
  *   quiz/{lesson}/release                            { released } when feedback waits for the teacher
  *   quiz/{lesson}/live/active                        live round (teacher writes only)
@@ -41,14 +42,17 @@ import { claimFor, claimInitials, classesForLesson, loadRoster } from './class-c
 import { QuizError, deviceHash, listSubmissions, read, reject, reviewSubmission, validToken, walkBlocks } from './question-drop.mjs';
 import {
   QuizSettingsSchema,
+  WRITTEN_KINDS,
   afterHint,
   checkQuestion,
   cleanResponse,
+  cleanWritingLog,
   hasAnswer,
   markResponse,
   resolveQuizSettings,
   roundMarks,
-  splitQuestion
+  splitQuestion,
+  summariseWriting
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
 import { exitUnlocked } from './tutorial-status.mjs';
@@ -72,6 +76,7 @@ const keys = (lesson) => ({
   result: (device, n) => `quiz/${lesson}/results/${device}/${n}`,
   marks: (device, n) => `quiz/${lesson}/marks/${device}~${n}`,
   draft: (device, n) => `quiz/${lesson}/drafts/${device}/${n}`,
+  writing: (device, n) => `quiz/${lesson}/writing/${device}/${n}`,
   cleared: (device) => `quiz/${lesson}/cleared/${device}`,
   swept: `quiz/${lesson}/swept`,
   release: `quiz/${lesson}/release`,
@@ -101,8 +106,30 @@ function publicSettings(settings) {
     feedback: s.feedback,
     hint_cost: s.hint_cost,
     confidence: !!s.confidence,
+    writing_check: s.writing_check,
     ...(s.closes_at ? { closes_at: s.closes_at } : {})
   };
+}
+
+/** Typing logs sent with a save or hand-in, for written questions only. Empty when the check is off. */
+function cleanWriting(record, sent) {
+  const out = {};
+  if (resolveQuizSettings(record.settings).writing_check === 'off') return out;
+  if (!sent || typeof sent !== 'object' || Array.isArray(sent)) return out;
+  for (const id of record.order) {
+    if (!Object.hasOwn(sent, id) || !WRITTEN_KINDS.includes(record.questions[id].key.kind)) continue;
+    const log = cleanWritingLog(sent[id]);
+    if (log) out[id] = log;
+  }
+  return out;
+}
+
+/** Keeps the newest log for each question the request sent; the rest stay as they were. */
+async function saveWriting(store, k, device, n, record, sent) {
+  const logs = cleanWriting(record, sent);
+  if (!Object.keys(logs).length) return;
+  const kept = (await read(store, k.writing(device, n))) ?? {};
+  await store.setJSON(k.writing(device, n), { ...kept, ...logs });
 }
 
 export function mapTree(blocks, fn) {
@@ -294,7 +321,7 @@ function entryFor(record, id) {
   return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
 }
 
-const INSIGHT_SCHEMA = 4;
+const INSIGHT_SCHEMA = 5;
 
 /** Closed by the teacher's Close now, or by the Closes date. */
 async function closedState(store, k, settings, now = Date.now()) {
@@ -591,7 +618,7 @@ export async function quizAction(store, lessonId, body) {
     const kept = await read(store, k.draft(device, current.n));
     const saved = mergeDrafts(kept, cleanDraft(attemptRecord, body.responses, body.confidence), body);
     const at = new Date(now).toISOString();
-    await store.setJSON(k.draft(device, current.n), { ...saved, at });
+    await Promise.all([store.setJSON(k.draft(device, current.n), { ...saved, at }), saveWriting(store, k, device, current.n, attemptRecord, body.writing)]);
     return { saved: true, at, count: Object.keys(saved.responses).length };
   }
 
@@ -599,6 +626,7 @@ export async function quizAction(store, lessonId, body) {
     needCurrent();
     const draft = await read(store, k.draft(device, current.n));
     const merged = mergeDrafts(draft, cleanDraft(attemptRecord, body.responses, body.confidence), body);
+    await saveWriting(store, k, device, current.n, attemptRecord, body.writing);
     await handIn(store, k, lessonId, device, current, attemptRecord, merged, now, pastDeadline || closed);
     attempts = await deviceAttempts(store, k, device, from);
     current = null;
@@ -638,7 +666,7 @@ export async function quizAction(store, lessonId, body) {
   );
 
   const open = current && !current.result ? current : null;
-  const kept = open ? await read(store, k.draft(device, open.n)) : null;
+  const [kept, typing] = open ? await Promise.all([read(store, k.draft(device, open.n)), read(store, k.writing(device, open.n))]) : [null, null];
   return {
     ...shared,
     ...(reply ?? {}),
@@ -653,7 +681,8 @@ export async function quizAction(store, lessonId, body) {
           settings: { ...publicSettings(attemptRecord.settings), version: attemptRecord.version },
           questions: publicQuestions(attemptRecord),
           practice: Object.keys(attemptRecord.practice ?? {}),
-          ...(kept ? { saved: { responses: kept.responses ?? {}, confidence: kept.confidence ?? {}, at: kept.at } } : {}),
+          // The student's own typing logs come back, so a new browser carries on the same replay.
+          ...(kept || typing ? { saved: { responses: kept?.responses ?? {}, confidence: kept?.confidence ?? {}, ...(typing ? { writing: typing } : {}), at: kept?.at } } : {}),
           hints: Object.fromEntries(Object.keys(open.hints).filter((id) => entryFor(attemptRecord, id)).map((id) => [id, attemptRecord.questions[id].key.hint ?? ''])),
           answers: Object.fromEntries(
             Object.entries(open.answers)
@@ -715,10 +744,12 @@ async function handIn(store, k, lessonId, device, current, record, draft, now, o
     marks[id] = markResponse(entry.key, response);
     if (draft.confidence[id]) confidence[id] = draft.confidence[id];
   }
+  const writing = await writingSummaries(store, k, device, current.n, record, responses);
   const result = {
     responses,
     confidence,
     marks,
+    ...(Object.keys(writing).length ? { writing } : {}),
     hints: current.hints,
     submitted_at: new Date(now).toISOString(),
     overtime: !!overtime,
@@ -727,6 +758,23 @@ async function handIn(store, k, lessonId, device, current, record, draft, now, o
   await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
   await markInsightChanged(store, lessonId);
 }
+
+/** Each written answer's typing summary, kept on the hand-in so lists read it without the full logs. */
+async function writingSummaries(store, k, device, n, record, responses) {
+  const check = resolveQuizSettings(record.settings).writing_check;
+  if (check === 'off') return {};
+  const logs = (await read(store, k.writing(device, n))) ?? {};
+  const out = {};
+  for (const id of record.order) {
+    const log = cleanWritingLog(logs[id]);
+    const text = responses[id]?.text;
+    if (log && typeof text === 'string' && text.trim()) out[id] = summariseWriting(log, text, check);
+  }
+  return out;
+}
+
+/** How many handed-in answers have something worth a look. */
+const flaggedAnswers = (result) => Object.values(result?.writing ?? {}).filter((w) => w?.flags?.length).length;
 
 /** The sweep runs at most once a minute per quiz, however often insight is read. */
 const SWEEP_EVERY_MS = 60_000;
@@ -787,7 +835,7 @@ async function clearOwner(store, k, lessonId, device) {
   const goes = await deviceAttempts(store, k, device, from);
   const next = goes.next;
   await store.setJSON(k.cleared(device), { from: next, at: new Date().toISOString() });
-  const prefixes = ['attempts', 'hints', 'checked', 'results'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
+  const prefixes = ['attempts', 'hints', 'checked', 'results', 'writing'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
   const doomed = (await Promise.all(prefixes.map((prefix) => listBlobKeys(store, prefix)))).flat();
   await mapBounded(doomed, 8, (key) => store.delete(key));
 }
@@ -852,7 +900,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     if (!start || start.deleted || !(await read(store, k.result(device, n)))) reject(404, 'not_found', 'That attempt is gone.');
     await store.setJSON(k.attempt(device, n), { n, deleted: true, deleted_at: new Date().toISOString(), ...(start.class_id ? { class_id: start.class_id } : {}), ...(start.student_id ? { student_id: start.student_id } : {}) });
     const doomed = (await Promise.all([listBlobKeys(store, k.hints(device, n)), listBlobKeys(store, k.checked(device, n))])).flat();
-    await mapBounded([k.result(device, n), k.marks(device, n), ...doomed], 8, (key) => store.delete(key));
+    await mapBounded([k.result(device, n), k.marks(device, n), k.writing(device, n), ...doomed], 8, (key) => store.delete(key));
     await markInsightChanged(store, lessonId);
   }
 
@@ -890,7 +938,13 @@ export async function quizTeacherAction(store, lessonId, body) {
 
   if (action === 'attempt' || action === 'mark') {
     const { device, n, start, result, rec } = await handedIn();
-    const scored = scoreAttempt(rec, result, await read(store, k.marks(device, n)));
+    const [marks, logs] = await Promise.all([read(store, k.marks(device, n)), read(store, k.writing(device, n))]);
+    const scored = scoreAttempt(rec, result, marks);
+    const typed = (id) => {
+      const summary = result.writing?.[id];
+      const log = cleanWritingLog(logs?.[id]);
+      return summary ? { writing: { ...summary, ...(log ? { log } : {}) } } : {};
+    };
     return {
       published: true,
       attempt: {
@@ -905,7 +959,7 @@ export async function quizTeacherAction(store, lessonId, body) {
         pending: scored.pending,
         practice: scored.practice,
         current: start.version === record.version,
-        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key }))
+        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key, ...typed(r.id) }))
       }
     };
   }
@@ -937,6 +991,7 @@ export async function quizTeacherAction(store, lessonId, body) {
       max: scored.max,
       pending: scored.pending,
       practice: scored.practice,
+      writing_flags: flaggedAnswers(result),
       current: start.version === record.version
     });
     for (const r of scored.rows) {
@@ -1023,6 +1078,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
       max: scored.max,
       pending: scored.pending,
       practice: scored.practice,
+      writing_flags: flaggedAnswers(a.result),
       rows: scored.rows.map((r) => {
         const entry = rec.questions[r.id];
         const outcomes = entry.key.outcomes ?? fallback;
@@ -1180,7 +1236,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   let firstAt = null;
   for (const a of insight.attempts) {
     if (!wanted.has(a.student)) continue;
-    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, practice: a.practice ?? {}, rows: a.rows };
+    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
   const started = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store);
