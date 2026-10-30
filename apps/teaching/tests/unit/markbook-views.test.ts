@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
-import type { MarkbookView, QuizColumn } from '@/markbook/types';
+import { openHeatmap, openQuizAttempt, openWorkSheet, workLabel } from '@/markbook/heatmap';
+import type { MarkbookView, QuizColumn, WorkColumn } from '@/markbook/types';
 
 const quiz: QuizColumn = {
   kind: 'quiz', id: 'quiz:l1', lesson_id: 'l1', title: 'Quiz 1', date: '2026-10-20', hidden: false, confidence: false,
@@ -68,5 +68,44 @@ describe('heatmap', () => {
     const root = openQuizAttempt(stale, view.students[0]!, '/lessons/l1');
     expect(root.querySelectorAll('.mb-attempt li')).toHaveLength(2);
     expect(root.textContent).not.toContain('old9');
+  });
+});
+
+describe('work not handed in', () => {
+  it('shows a quiz go as it stands, says it isn’t handed in, and how to hand it in', () => {
+    const open: QuizColumn = {
+      ...quiz,
+      scores: {},
+      started: ['s1'],
+      saved: { s1: { started_at: '2026-10-20T00:00:00.000Z', saved_at: '2026-10-20T00:10:00.000Z', answered: 1, total: 2, score: 2, max: 6, pending: 0, rows: [{ id: 'q1', awarded: 2, max: 2 }, { id: 'q2', awarded: 0, max: 4, unanswered: true }] } }
+    };
+    const root = openQuizAttempt(open, view.students[0]!, '/lessons/l1');
+    expect([...root.querySelectorAll('.mb-attempt li')].map((n) => n.textContent)).toEqual(['Name the device · 2/2', 'Explain the ending · not answered yet']);
+    expect(root.querySelector('.mb-attempt__note')!.textContent).toMatch(/^Not handed in\. 1 of 2 answered, 2\/6 so far, last saved .+\. Closing the quiz in Results hands this in\.$/);
+    expect(root.querySelector('.mb-attempt__link')!.textContent).toBe('Open Results');
+  });
+
+  it('reads a student’s writing under each question, in lesson order', () => {
+    const work: WorkColumn = {
+      kind: 'work', id: 'work:l1', lesson_id: 'l1', title: 'Highway case', date: '2026-10-24',
+      blocks: [
+        { id: 'b1', block_type: 'question_set', title: 'The crash', prompts: { q1: 'Who decided?' } },
+        { id: 'b2', block_type: 'question_set', title: '', prompts: {} }
+      ],
+      students: { s1: { at: '2026-10-24T01:00:00.000Z', blocks: { b2: { 'lens.kaplan': { 'notes.s1': 'First idea' } }, b1: { answers: { q1: 'The state' } } } } }
+    };
+    const root = openWorkSheet(work, view.students[0]!, '/lessons/l1');
+    expect(root.querySelector('.mb-work__block')!.textContent).toBe('The crash');
+    expect([...root.querySelectorAll('.mb-work__item')].map((n) => [n.querySelector('.mb-work__label')!.textContent, n.querySelector('.mb-work__text')!.textContent])).toEqual([
+      ['Who decided?', 'The state'],
+      ['Kaplan · notes step 1', 'First idea']
+    ]);
+    const empty = openWorkSheet(work, view.students[1]!, '/lessons/l1');
+    expect(empty.querySelector('.mb-work')!.textContent).toBe('Nothing written yet.');
+  });
+
+  it('names fields it has no prompt for in words', () => {
+    expect(workLabel({}, 'answers', 'q9')).toBe('Q9');
+    expect(workLabel({}, 'format.because_but_so', 'because')).toBe('Because but so · because');
   });
 });

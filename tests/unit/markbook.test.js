@@ -215,6 +215,31 @@ test('a quiz handed in from the class calendar or current unit shows, even outsi
   assert.deepEqual((await call(store, { action: 'load' })).quizzes.map((q) => q.id), ['quiz:quiz1'], 'the current unit counts');
 });
 
+test('a go not handed in shows its saved answers, marked so far, and the column appears', async () => {
+  const { store, bob } = await setup();
+  const device = { token: 'a'.repeat(48), class_id: 'class1', class_token: 'b'.repeat(48) };
+  await quizAction(store, 'quiz1', { ...device, action: 'claim', initials: 'BB' });
+  await quizAction(store, 'quiz1', { ...device, action: 'start' });
+  assert.deepEqual((await call(store, { action: 'load' })).quizzes, [], 'opened with nothing saved: no column yet');
+  await quizAction(store, 'quiz1', { ...device, action: 'save', responses: { qs: { text: 'Romeo' } } });
+  const [quiz] = (await call(store, { action: 'load' })).quizzes;
+  assert.equal(quiz.id, 'quiz:quiz1');
+  assert.deepEqual(quiz.scores, {}, 'nothing handed in');
+  assert.deepEqual(quiz.started, [bob.id]);
+  const saved = quiz.saved[bob.id];
+  assert.equal(saved.answered, 1);
+  assert.equal(saved.total, 1);
+  assert.equal(saved.score, 1);
+  assert.equal(saved.max, 1);
+  assert.match(saved.saved_at, /^\d{4}-/);
+  assert.match(quiz.date, /^2\d{3}-\d{2}-\d{2}$/, 'dated from the go, not 1970');
+  assert.notEqual(quiz.date.slice(0, 4), '1970');
+  await quizAction(store, 'quiz1', { ...device, action: 'submit', responses: { qs: { text: 'Romeo' } } });
+  const after = (await call(store, { action: 'load' })).quizzes[0];
+  assert.equal(after.saved, undefined, 'handed in: the real score takes over');
+  assert.equal(after.scores[bob.id].score, 1);
+});
+
 test('load reads the class’s units together', async () => {
   const { store } = await setup();
   const cls = store.data.get('classes/class1');

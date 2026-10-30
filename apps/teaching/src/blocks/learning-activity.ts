@@ -63,6 +63,13 @@ export function loadActivityState<T>(key: string): T | null {
   }
 }
 
+/** Told about every save, so a student lesson can send written work on to the teacher (student/work-sync.ts). */
+let activityListener: ((key: string, value: unknown) => void) | null = null;
+
+export function setActivityListener(listener: ((key: string, value: unknown) => void) | null): void {
+  activityListener = listener;
+}
+
 export function saveActivityState(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -70,4 +77,5 @@ export function saveActivityState(key: string, value: unknown): void {
     // localStorage may be unavailable (private mode, quota); activity state is
     // a convenience, not critical, so failures are silently ignored.
   }
+  activityListener?.(key, value);
 }

@@ -4,7 +4,9 @@
  *   markbook/{class}   { columns, hidden_quizzes, marks: { column: { student: mark } }, updated_at }
  *
  * Quiz columns are not stored. They are built on every load from the class's
- * quiz attempts, so a question marked later in Results shows at once.
+ * quiz attempts, so a question marked later in Results shows at once. A go not
+ * handed in shows as it stands from the answers its page saved. Work columns
+ * are built the same way from what students typed (lesson-work.mjs).
  */
 import { isSafeId } from './class-examples.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
@@ -12,6 +14,7 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
+import { classWork } from './lesson-work.mjs';
 import { listDone } from './profile-done.mjs';
 import { read, reject } from './question-drop.mjs';
 import { markWalkthruDirty } from './walkthru-dirty.mjs';
@@ -57,11 +60,10 @@ async function scheduledRows(store, classId) {
 }
 
 /**
- * Quiz lessons that someone on the list has handed in, from every lesson a
- * student can answer for this class (see classesForLesson): the active units,
- * the current unit, and lessons on the class calendar from any unit.
+ * Every lesson a student can answer for this class (see classesForLesson):
+ * the active units, the current unit, and lessons on the class calendar from any unit.
  */
-export async function quizColumns(store, roster, book) {
+async function classLessonIds(store, roster) {
   const cls = roster.cls;
   const unitIds = [...new Set([...(cls.active_unit_ids ?? []), ...(cls.current_unit_id ? [cls.current_unit_id] : [])])].filter(isSafeId);
   const [units, rows] = await Promise.all([mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId))), scheduledRows(store, cls.id)]);
@@ -72,12 +74,33 @@ export async function quizColumns(store, roster, book) {
     for (const id of unit.lesson_ids ?? []) if (isSafeId(id)) lessonIds.add(id);
   }
   for (const row of rows) if (isSafeId(row.lesson_id)) lessonIds.add(row.lesson_id);
+  return [...lessonIds];
+}
+
+/** Each lesson's written work, saved as students on the list typed it. */
+export async function workColumns(store, roster, lessonIds) {
+  const ids = roster.students.map((s) => s.id);
+  const found = await mapBounded(lessonIds, 4, (lessonId) => classWork(store, lessonId, roster.cls.id, ids));
+  return found.filter(Boolean).map((w) => ({
+    kind: 'work',
+    id: `work:${w.lesson_id}`,
+    lesson_id: w.lesson_id,
+    title: w.title,
+    date: sydneyDay(w.first_at),
+    blocks: w.blocks,
+    students: w.students
+  }));
+}
+
+/** Quiz lessons that someone on the list has handed in, or saved answers on. */
+export async function quizColumns(store, roster, book, lessonIds) {
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded([...lessonIds], 4, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, 4, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
   return found
-    .filter((q) => q && Object.keys(q.scores).length)
+    // A quiz shows once someone handed in, or has answers saved on a go they haven't handed in.
+    .filter((q) => q && (Object.keys(q.scores).length || q.saved))
     .map((q) => ({
       kind: 'quiz',
       id: `quiz:${q.lesson_id}`,
@@ -92,6 +115,7 @@ export async function quizColumns(store, roster, book) {
       questions: q.questions,
       scores: q.scores,
       ...(q.started ? { started: q.started } : {}),
+      ...(q.saved ? { saved: q.saved } : {}),
       ...(q.sets ? { sets: q.sets } : {}),
       ...(q.groups ? { groups: q.groups } : {})
     }));
@@ -161,11 +185,13 @@ async function markbookActionInner(store, classId, body) {
   const action = body.action ?? 'load';
 
   if (action === 'load') {
-    const { book } = await readBook(store, classId);
+    const [{ book }, lessonIds] = await Promise.all([readBook(store, classId), classLessonIds(store, roster)]);
+    const [quizzes, work] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds)]);
     return {
       markbook: book,
       students: roster.students.map(({ id, name, initials }) => ({ id, name, initials })),
-      quizzes: await quizColumns(store, roster, book),
+      quizzes,
+      work,
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
       ...(body.skip_done ? {} : { done: Object.fromEntries(await Promise.all(roster.students.map(async (s) => [s.id, await listDone(store, classId, s.id)]))) })
     };
