@@ -79,7 +79,8 @@ export function analysisPanel(data: AnalysisData, o: AnalysisOptions): HTMLEleme
   const cls = el('div', 'an-class');
   cls.append(el('h5', 'mb-form__label', 'Class: holding on the same step'));
   if (!data.class_patterns.length) cls.append(el('p', 'mb__empty', 'No group of three or more is holding together yet.'));
-  const known = new Map([...student.outcomes, ...student.concepts].map((r) => [r.key, r.name]));
+  const known = new Map<string, string>([...student.outcomes, ...student.concepts].map((r) => [r.key, r.name]));
+  for (const g of student.skills) for (const r of g.rows) known.set(r.key, r.name);
   for (const p of data.class_patterns) {
     const code = codeOf(p.code_id) ?? (p.code_id ? p.code_id.toUpperCase() : null);
     const line = el('p', 'an-class__line', `${p.students.length} students holding at ${placeName(p.step)} on ${known.get(p.key) ?? o.outcomeName(p.key)}${code ? `; top code ${code}` : ''}`);
