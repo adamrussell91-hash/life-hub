@@ -30,4 +30,11 @@ export function normalizeArrows(value) {
   return out;
 }
 
+/** The techniques Adam has put on his own board, in the order he added them. Unknown ids drop out. */
+export function normalizePicked(value) {
+  const out = [];
+  for (const id of Array.isArray(value) ? value : []) if (isTechniqueId(id) && !out.includes(id)) out.push(id);
+  return out;
+}
+
 export const newArrowId = () => `ar_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
