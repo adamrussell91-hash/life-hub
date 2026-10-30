@@ -54,7 +54,7 @@ export function unitProgressLessons(
   return out.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0));
 }
 
-export type DoneRecord = { at: string; via: string; partial?: boolean };
+export type DoneRecord = { at: string; via: string; partial?: boolean; was?: DoneRecord };
 export type CellState = 'complete' | 'partial' | 'na' | 'open';
 export type Cell = { state: CellState; late: boolean };
 
@@ -101,8 +101,8 @@ export const httpProgressApi: ProgressApi = {
     (await apiPost<{ done: Record<string, Record<string, DoneRecord>> }>(`/api/classes/${encodeURIComponent(classId)}/profile`, { action: 'mark', student_id: studentId, lesson_id: lessonId, state })).done
 };
 
-/** What a press does: open becomes complete, complete becomes partial, partial is cleared. */
-const NEXT: Record<CellState, 'complete' | 'partial' | 'clear'> = { open: 'complete', na: 'complete', complete: 'partial', partial: 'clear' };
+/** A teacher's complete mark overrides the cell; a second press clears it back to what the student did. */
+const isOverride = (record: DoneRecord | undefined): boolean => record?.via === 'teacher' && !record.partial;
 
 const SYMBOL: Record<CellState, string> = { complete: '✓', partial: '◐', na: '', open: '' };
 const WORD: Record<CellState, string> = { complete: 'complete', partial: 'partial', na: 'not for this student', open: 'not done' };
@@ -147,7 +147,7 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
     swatch('mb-progress__btn--partial', '◐', 'Partial or waiting to be marked'),
     swatch('mb-progress__btn--na', '', 'Not for this student'),
     swatch('mb-progress__btn--late', '', 'Overdue a week after its date'),
-    el('li', 'mb-progress__keyhint', 'Press a cell to change it.')
+    el('li', 'mb-progress__keyhint', 'Press a cell to mark it complete. Press again to undo.')
   );
   root.append(key);
   const wrap = el('div', 'mb-progress__scroll');
@@ -198,9 +198,11 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
     for (const l of lessons) {
       const quiz = view.quizzes.find((q) => q.lesson_id === l.id);
       const score = quiz?.scores?.[s.id];
+      const record = view.done?.[s.id]?.[l.id];
+      const override = isOverride(record);
       const cell = cellFor({
         lesson: l,
-        record: view.done?.[s.id]?.[l.id],
+        record,
         quizSubmitted: Boolean(score?.submitted_at),
         quizMarked: Boolean(score?.submitted_at) && score!.pending === 0,
         // Written work saved in the lesson counts as under way, like a quiz go not handed in.
@@ -214,15 +216,19 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
       b.dataset.student = s.id;
       b.dataset.lesson = l.id;
       b.dataset.state = cell.state;
+      if (override) {
+        b.dataset.override = 'true';
+        b.classList.add('mb-progress__btn--override');
+      }
       if (cell.late) {
         b.dataset.late = 'true';
         b.classList.add('mb-progress__btn--late');
       }
       const quizWords = score?.submitted_at ? (score.pending ? `, quiz handed in, ${score.pending} to mark` : `, quiz ${score.score}/${score.max}`) : '';
-      const words = `${s.name}, ${l.title}: ${WORD[cell.state]}${quizWords}${cell.late ? ', overdue' : ''}`;
+      const words = `${s.name}, ${l.title}: ${WORD[cell.state]}${override ? ' (marked by you, press to undo)' : ''}${quizWords}${cell.late ? ', overdue' : ''}`;
       b.setAttribute('aria-label', words);
       b.title = words;
-      b.addEventListener('click', () => options.onMark(s.id, l.id, NEXT[cell.state]));
+      b.addEventListener('click', () => options.onMark(s.id, l.id, override ? 'clear' : 'complete'));
       td.append(b);
       tr.append(td);
     }

@@ -73,7 +73,7 @@ export type MarkbookView = {
   /** Written work by lesson. Missing from an older server. */
   work?: WorkColumn[];
   /** Lessons each student marked done, by student id then lesson id. */
-  done?: Record<string, Record<string, { at: string; via: string }>>;
+  done?: Record<string, Record<string, { at: string; via: string; partial?: boolean; was?: { at: string; via: string } }>>;
 };
 export type AnyColumn = Column | QuizColumn | WorkColumn;
 export type OutcomeLabel = { id: string; code: string; title: string; group: string };
