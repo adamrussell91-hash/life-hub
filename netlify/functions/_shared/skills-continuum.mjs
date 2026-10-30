@@ -24,7 +24,7 @@ export async function readPrivateSkills(deps = {}) {
   return { strands, fetched_at: new Date().toISOString() };
 }
 
-async function readStored(store) {
+export async function readStoredSkills(store) {
   const raw = await store.get(KEY, { type: 'json', consistency: 'strong' });
   if (!raw) return null;
   const parsed = SkillsContinuumSchema.safeParse(raw);
@@ -33,7 +33,7 @@ async function readStored(store) {
 
 /** The continuum, copied from the private repo on first use. */
 export async function loadSkills(store, deps = {}) {
-  const stored = await readStored(store);
+  const stored = await readStoredSkills(store);
   if (stored) return stored;
   return refreshSkills(store, deps);
 }
