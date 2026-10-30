@@ -1,7 +1,9 @@
 import { apiPost } from '@/api/client';
 import { el } from '@/quiz/dom';
 import type { ScheduledLesson, Unit } from '@/schemas';
-import type { MarkbookView } from './types';
+import type { DoneRecord, MarkbookView } from './types';
+
+export type { DoneRecord };
 
 /**
  * The teacher's Progress view: one row per student, one column per lesson of the class's active units.
@@ -54,7 +56,6 @@ export function unitProgressLessons(
   return out.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0));
 }
 
-export type DoneRecord = { at: string; via: string; partial?: boolean; was?: DoneRecord };
 export type CellState = 'complete' | 'partial' | 'na' | 'open';
 export type Cell = { state: CellState; late: boolean };
 
@@ -93,13 +94,26 @@ export function cellFor(input: CellInput): Cell {
 }
 
 export type ProgressApi = {
-  mark: (classId: string, studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear') => Promise<Record<string, Record<string, DoneRecord>>>;
+  /** Saves one mark and answers with that student's done records. */
+  mark: (classId: string, studentId: string, lessonId: string, state: 'complete' | 'partial' | 'clear') => Promise<Record<string, DoneRecord>>;
 };
 
 export const httpProgressApi: ProgressApi = {
   mark: async (classId, studentId, lessonId, state) =>
-    (await apiPost<{ done: Record<string, Record<string, DoneRecord>> }>(`/api/classes/${encodeURIComponent(classId)}/profile`, { action: 'mark', student_id: studentId, lesson_id: lessonId, state })).done
+    (await apiPost<{ done: Record<string, Record<string, DoneRecord>> }>(`/api/classes/${encodeURIComponent(classId)}/profile`, { action: 'mark', student_id: studentId, lesson_id: lessonId, state })).done[studentId] ?? {}
 };
+
+/** The student's records as they will be once a mark lands, so the cell can change before the save does. */
+export function withMark(records: Record<string, DoneRecord>, lessonId: string, state: 'complete' | 'partial' | 'clear', at: string): Record<string, DoneRecord> {
+  const held = records[lessonId];
+  const own = held?.via === 'teacher' ? held.was : held;
+  const out = { ...records };
+  if (state === 'clear') {
+    if (own) out[lessonId] = own;
+    else delete out[lessonId];
+  } else out[lessonId] = { at, via: 'teacher', ...(state === 'partial' ? { partial: true } : {}), ...(own ? { was: own } : {}) };
+  return out;
+}
 
 /** A teacher's complete mark overrides the cell; a second press clears it back to what the student did. */
 const isOverride = (record: DoneRecord | undefined): boolean => record?.via === 'teacher' && !record.partial;
@@ -211,7 +225,10 @@ export function renderProgress(options: ProgressOptions): HTMLElement {
         today
       });
       const td = el('td', 'mb-progress__cell');
-      const b = el('button', `mb-progress__btn mb-progress__btn--${cell.state}`, SYMBOL[cell.state]);
+      // A handed-in quiz shows its mark instead of a tick.
+      const scored = Boolean(score?.submitted_at) && score!.max > 0;
+      const b = el('button', `mb-progress__btn mb-progress__btn--${cell.state}`, scored ? `${score!.score}/${score!.max}` : SYMBOL[cell.state]);
+      if (scored) b.classList.add('mb-progress__btn--score');
       b.type = 'button';
       b.dataset.student = s.id;
       b.dataset.lesson = l.id;

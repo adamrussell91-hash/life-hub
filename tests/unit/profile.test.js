@@ -169,11 +169,18 @@ test('the teacher marks complete, partial and clear; a student tick replaces a p
   // A complete override keeps the student's tick underneath; clearing it brings the tick back.
   assert.equal((await mark('complete')).done[bob.id].l1.via, 'teacher');
   assert.equal((await mark('clear')).done[bob.id].l1.via, 'tick');
-  assert.deepEqual((await mark('clear')).done[bob.id], {});
-  // A tick made while the override stands is kept for when it is cleared.
-  await mark('complete');
-  await profileAction(s, 'class1', { action: 'done', class_token: token(1), lesson_id: 'l1' });
+  // Clearing again leaves the student's own tick alone.
   assert.equal((await mark('clear')).done[bob.id].l1.via, 'tick');
+  // Teacher marks live in one class record, and a mark answers with only that student.
+  const tom = roster.students.find((x) => x.initials === 'TT');
+  const reply = await teacherProfileAction(s, 'class1', { action: 'mark', student_id: tom.id, lesson_id: 'l2', state: 'complete' });
+  assert.deepEqual(Object.keys(reply.done), [tom.id]);
+  assert.equal(s.data.get('profile/class1/teacher-marks')[tom.id].l2.via, 'teacher');
+  assert.equal(s.data.has(`profile/class1/${tom.id}/done/l2`), false);
+  // An older teacher mark kept under done/ goes when cleared.
+  s.data.set(`profile/class1/${tom.id}/done/l3`, { at: 'x', via: 'teacher' });
+  assert.equal((await teacherProfileAction(s, 'class1', { action: 'list' })).done[tom.id].l3.via, 'teacher');
+  assert.equal((await teacherProfileAction(s, 'class1', { action: 'mark', student_id: tom.id, lesson_id: 'l3', state: 'clear' })).done[tom.id].l3, undefined);
   await assert.rejects(mark('bogus'), { code: 'bad_request' });
   await assert.rejects(teacherProfileAction(s, 'class1', { action: 'mark', student_id: 'nobody', lesson_id: 'l1', state: 'complete' }), { code: 'bad_request' });
 });
