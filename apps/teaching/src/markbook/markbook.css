@@ -370,6 +370,8 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-progress__btn--partial { background: var(--pastel-gold); border-color: transparent; color: var(--pastel-gold-ink); }
 /* Not for this student: a grey box, still pressable. */
 .mb-progress__btn--na { background: var(--shore); border-color: transparent; }
+/* Marked complete by the teacher: a green rim, so it reads as an override that a press undoes. */
+.mb-progress__btn--override { border-color: var(--success); }
 /* Overdue: a small red dot tucked inside the corner. */
 .mb-progress__btn--late::after { content: ''; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--danger); }
 .mb-progress__btn:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }

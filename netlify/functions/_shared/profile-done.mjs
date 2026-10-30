@@ -16,14 +16,24 @@ export async function recordDone(store, classId, studentId, lessonId, via) {
   const key = doneKey(classId, studentId, lessonId);
   const record = { at: new Date().toISOString(), via };
   const written = await store.setJSON(key, record, { onlyIfNew: true });
-  // A teacher's "partial" mark yields to the student's own tick; anything else is left as it was.
-  if (written?.modified === false && (await read(store, key))?.partial) await store.setJSON(key, record);
+  if (written?.modified !== false) return;
+  const held = await read(store, key);
+  // A teacher's "partial" mark yields to the student's own tick.
+  if (held?.partial) await store.setJSON(key, record);
+  // Under a teacher's "complete" override, keep the tick so clearing the override brings it back.
+  else if (held?.via === 'teacher' && !held.was) await store.setJSON(key, { ...held, was: record });
 }
 
-/** Teacher: mark a lesson complete or partial for a student, replacing whatever was there. */
+/**
+ * Teacher: mark a lesson complete or partial for a student. The student's own record is kept
+ * underneath as `was`, so clearing the teacher's mark returns the cell to what the student did.
+ */
 export async function markDone(store, classId, studentId, lessonId, state) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
-  await store.setJSON(doneKey(classId, studentId, lessonId), { at: new Date().toISOString(), via: 'teacher', ...(state === 'partial' ? { partial: true } : {}) });
+  const key = doneKey(classId, studentId, lessonId);
+  const held = await read(store, key);
+  const was = held?.via === 'teacher' ? held.was : held && !held.partial ? held : undefined;
+  await store.setJSON(key, { at: new Date().toISOString(), via: 'teacher', ...(state === 'partial' ? { partial: true } : {}), ...(was ? { was } : {}) });
 }
 
 export async function listDone(store, classId, studentId) {
@@ -38,9 +48,13 @@ export async function listDone(store, classId, studentId) {
   return out;
 }
 
+/** Teacher: drop their own mark; a student record kept underneath comes back. */
 export async function removeDone(store, classId, studentId, lessonId) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
-  await deleteKey(store, doneKey(classId, studentId, lessonId));
+  const key = doneKey(classId, studentId, lessonId);
+  const was = (await read(store, key))?.was;
+  if (was) await store.setJSON(key, was);
+  else await deleteKey(store, key);
 }
 
 const fillsKey = (classId, studentId, unitId) => `profile/${classId}/${studentId}/fills/${unitId}`;

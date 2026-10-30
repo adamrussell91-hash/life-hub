@@ -41,7 +41,7 @@ describe('renderProgress', () => {
   const view = {
     markbook: { took: {} },
     quizzes: [],
-    done: { s1: { l1: { at: 'x', via: 'tick' } } }
+    done: { s1: { l1: { at: 'x', via: 'tick' }, l2: { at: 'x', via: 'teacher' } } }
   } as never;
   const students = [{ id: 's1', name: 'Bob Brown', initials: 'BB' }, { id: 's2', name: 'Tom Tills', initials: 'TT' }];
   it('draws a cell per student and lesson, with words for each, and marks on press', () => {
@@ -53,10 +53,14 @@ describe('renderProgress', () => {
     expect(cell('s2', 'l1').dataset.late).toBe('true');
     expect(cell('s2', 'l2').dataset.state).toBe('na');
     expect(cell('s2', 'l1').getAttribute('aria-label')).toContain('overdue');
+    expect(cell('s1', 'l2').dataset.override).toBe('true');
+    expect(cell('s1', 'l1').dataset.override).toBeUndefined();
     cell('s2', 'l1').click();
     cell('s1', 'l1').click();
+    cell('s1', 'l2').click();
     expect(onMark).toHaveBeenNthCalledWith(1, 's2', 'l1', 'complete');
-    expect(onMark).toHaveBeenNthCalledWith(2, 's1', 'l1', 'partial');
+    expect(onMark).toHaveBeenNthCalledWith(2, 's1', 'l1', 'complete');
+    expect(onMark).toHaveBeenNthCalledWith(3, 's1', 'l2', 'clear');
   });
   it('counts a marked quiz on an assessment lesson, with the score in the cell, and bands lessons by unit', () => {
     const marked = {
