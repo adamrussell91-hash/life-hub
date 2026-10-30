@@ -29,7 +29,7 @@ import { historyEventsFor, joinWhy, leavesFor, newGroupId } from '@/evidence/gro
 import { newHistoryState, renderHistory } from '@/markbook/history-view';
 import { mixUpText } from '@/evidence/views/parts';
 import { openTutorialPlan } from '@/tutorial/plan-sheet';
-import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
+import { openHeatmap, openQuizAttempt, openWorkSheet } from '@/markbook/heatmap';
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
@@ -107,6 +107,10 @@ function withServerCopy(view: MarkbookView, markbook: Markbook, queued: readonly
   const fresh: MarkbookView = { ...view, markbook, quizzes: view.quizzes.map((q) => ({ ...q, hidden: hidden.has(q.lesson_id) })) };
   return queued.reduce(applyChange, fresh);
 }
+
+/** How often the markbook reloads while students are mid-way through work, and otherwise. */
+const LIVE_EVERY_MS = 30_000;
+const IDLE_EVERY_MS = 120_000;
 
 export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = {}): () => void {
   const api = options.api ?? httpMarkbookApi;
@@ -380,6 +384,14 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       if (!quiz || !student) return;
       openQuizAttempt(quiz, student, withAppBase(`/lessons/${encodeURIComponent(lessonId)}`), {
         returnFocus: () => findInBody('.mb-cell', quiz.id, studentId) ?? title
+      });
+    },
+    openWork: (lessonId, studentId) => {
+      const work = view?.work?.find((w) => w.lesson_id === lessonId);
+      const student = view?.students.find((s) => s.id === studentId);
+      if (!work || !student) return;
+      openWorkSheet(work, student, withAppBase(`/lessons/${encodeURIComponent(lessonId)}`), {
+        returnFocus: () => findInBody('.mb-cell', work.id, studentId) ?? title
       });
     },
     openHeatmap: (lessonId) => {
@@ -704,6 +716,26 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   if (typeof media?.addEventListener === 'function') media.addEventListener('change', onMedia);
   else media?.addListener?.(onMedia);
   void load();
+  // Live: students' saved answers come in as they work. Reload while the page is in view,
+  // more often while someone is mid-way, and never under the teacher's hands.
+  let lastLoad = Date.now();
+  const busy = (): boolean => {
+    if (queued.length || document.querySelector('[role="dialog"], .mb-sheet')) return true;
+    const active = document.activeElement;
+    return !!active && section.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+  };
+  const working = (current: MarkbookView | null): boolean => {
+    if (!current) return false;
+    if (current.quizzes.some((q) => q.started?.length)) return true;
+    const recent = Date.now() - 3 * 3600_000;
+    return (current.work ?? []).some((w) => Object.values(w.students).some((s) => Date.parse(s.at) > recent));
+  };
+  const live = window.setInterval(() => {
+    if (disposed || document.hidden || !section.isConnected || busy()) return;
+    if (Date.now() - lastLoad < (working(view) ? LIVE_EVERY_MS : IDLE_EVERY_MS)) return;
+    lastLoad = Date.now();
+    void load();
+  }, 5_000);
   void loadInsightContext().then(
     (loaded) => {
       if (disposed) return;
@@ -727,6 +759,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   );
   return () => {
     disposed = true;
+    window.clearInterval(live);
     // Closing releases the overlay's hold on the rest of the page.
     studentPanel?.close();
     studentPanel = null;

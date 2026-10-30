@@ -697,7 +697,8 @@ function mergeDrafts(kept, sent, body = null) {
  * Marks an open attempt and writes its hand-in. Answers checked one by one
  * come from the server; the rest from the draft the student sent or saved.
  */
-async function handIn(store, k, lessonId, device, current, record, draft, now, overtime, auto = false) {
+/** An open attempt's answers as they stand, marked: checked answers from the server, the rest from the draft. */
+function answersSoFar(current, record, draft) {
   const responses = {};
   const confidence = {};
   const marks = {};
@@ -715,11 +716,12 @@ async function handIn(store, k, lessonId, device, current, record, draft, now, o
     marks[id] = markResponse(entry.key, response);
     if (draft.confidence[id]) confidence[id] = draft.confidence[id];
   }
+  return { responses, confidence, marks, hints: current.hints };
+}
+
+async function handIn(store, k, lessonId, device, current, record, draft, now, overtime, auto = false) {
   const result = {
-    responses,
-    confidence,
-    marks,
-    hints: current.hints,
+    ...answersSoFar(current, record, draft),
     submitted_at: new Date(now).toISOString(),
     overtime: !!overtime,
     ...(auto ? { auto: true } : {})
@@ -1038,19 +1040,39 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
 /**
  * Listed students who opened this quiz but have nothing handed in yet, so the
  * markbook can show "In progress" rather than a blank that reads as not done.
- * A teacher's clear is honoured: attempts before it don't count.
+ * A teacher's clear is honoured: attempts before it don't count. `saved` is
+ * each one's open go marked as it stands, from what the student's page saved
+ * as they went, so the teacher sees work that may never be handed in.
  */
-async function startedNotHandedIn(k, lessonId, classId, studentIds, scores, store) {
+async function startedNotHandedIn(k, lessonId, classId, studentIds, scores, store, record) {
   const owners = new Map(studentIds.filter((id) => !scores[id]).map((id) => [deviceHash(`student:${classId}:${id}`), id]));
-  if (!owners.size) return [];
-  const latest = new Map();
+  if (!owners.size) return { started: [], saved: {} };
+  const seen = new Set();
   for (const key of await listBlobKeys(store, `quiz/${lessonId}/attempts/`)) {
-    const [, , , owner, nText] = key.split('/');
-    const n = Number(nText);
-    if (owners.has(owner) && Number.isInteger(n)) latest.set(owner, Math.max(latest.get(owner) ?? 0, n));
+    const owner = key.split('/')[3];
+    if (owners.has(owner)) seen.add(owner);
   }
-  const open = await mapBounded([...latest], 8, async ([owner, n]) => (n >= (await clearedFrom(store, k, owner)) ? owners.get(owner) : null));
-  return open.filter(Boolean);
+  const open = await mapBounded([...seen], 8, async (owner) => {
+    const goes = await deviceAttempts(store, k, owner, await clearedFrom(store, k, owner));
+    const current = goes.find((a) => !a.result);
+    if (!current) return null;
+    const rec = narrow(await recordFor(store, lessonId, current.version, record), current.student_id);
+    const kept = await read(store, k.draft(owner, current.n));
+    const scored = scoreAttempt(rec, answersSoFar(current, rec, mergeDrafts(kept, { responses: {}, confidence: {} })), null);
+    const answered = scored.rows.filter((r) => hasAnswer(r.response)).length;
+    return [owners.get(owner), {
+      started_at: current.started_at,
+      saved_at: kept?.at ?? null,
+      answered,
+      total: rec.order.length,
+      score: scored.score,
+      max: scored.max,
+      pending: scored.pending,
+      rows: scored.rows.map((r) => ({ id: r.id, awarded: r.awarded, max: r.mark.max, ...(hasAnswer(r.response) ? {} : { unanswered: true }) }))
+    }];
+  });
+  const found = open.filter(Boolean);
+  return { started: found.map(([id]) => id), saved: Object.fromEntries(found.filter(([, s]) => s.answered > 0)) };
 }
 
 /** Quiz lessons in the same unit, and the follow-ups made from this one. */
@@ -1173,7 +1195,14 @@ function tutorialGroupNames(draft) {
  */
 export async function classQuizScores(store, lessonId, classId, studentIds) {
   if (!studentIds.length) return null;
-  const insight = await classInsight(store, lessonId, classId, null, { family: false });
+  let loaded;
+  try {
+    loaded = await loadQuiz(store, lessonId);
+  } catch (error) {
+    if (error instanceof QuizError) return null;
+    throw error;
+  }
+  const insight = await classInsight(store, lessonId, classId, loaded, { family: false });
   if (!insight) return null;
   const wanted = new Set(studentIds);
   const scores = {};
@@ -1183,7 +1212,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, practice: a.practice ?? {}, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
-  const started = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store);
+  const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store, loaded.record);
   return {
     lesson_id: lessonId,
     title: insight.title,
@@ -1191,8 +1220,10 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     confidence: insight.confidence,
     timed: insight.timed,
     closed: insight.closed,
-    first_at: firstAt,
+    // Nobody handed in yet: the column dates from the first go started.
+    first_at: firstAt ?? Object.values(saved).reduce((min, x) => (!min || x.started_at < min ? x.started_at : min), null),
     ...(started.length ? { started } : {}),
+    ...(Object.keys(saved).length ? { saved } : {}),
     questions: insight.questions.map(({ id, prompt, marks, outcomes }) => ({ id, prompt, marks, outcomes })),
     scores,
     ...(insight.sets.length ? { sets: insight.sets } : {}),

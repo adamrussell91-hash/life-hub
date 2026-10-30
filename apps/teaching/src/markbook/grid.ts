@@ -1,13 +1,13 @@
 import { el, formatMarks } from '@/quiz/dom';
 import type { AssessmentMark, CheckMark, HandinMark } from './schema';
 import type { AnyColumn, MarkbookActions, MarkbookView, RosterStudent } from './types';
-import { assessmentResult, dateOf, formatDay, formatPercent, markOf, orderedColumns, overallFor, quizPercent, type Overall } from './calc';
+import { assessmentResult, dateOf, formatDay, formatPercent, markOf, orderedColumns, overallFor, quizPercent, workCount, type Overall } from './calc';
 import { HANDIN_LABEL, nextCheck, nextHandin } from './cells';
 import { isConfidentlyWrong, isDropping, quizSeries } from './insight';
 
 /** The desktop grid: students down the side, columns in date order, overall pinned right. */
 
-export const KIND_LABEL = { quiz: 'Quiz', assessment: 'Task', handin: 'Hand-in', check: 'Check' } as const;
+export const KIND_LABEL = { quiz: 'Quiz', assessment: 'Task', handin: 'Hand-in', check: 'Check', work: 'Work' } as const;
 
 export const overallText = (o: Overall): string => (o.percent === null ? '–' : `${formatPercent(o.percent)}${o.partial ? ' so far' : ''}`);
 
@@ -64,6 +64,15 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
     if (!score) {
       // A tutorial's exit check is for the students in its groups; everyone else isn't missing it.
       if (column.groups && !column.groups[sid]) return el('span', 'mb-cell mb-cell--quiz mb-cell--blank mb-cell--na', '');
+      const saved = column.saved?.[sid];
+      if (saved) {
+        // Not handed in, but their page saved answers as they went: show how far they got.
+        const text = `${saved.answered}/${saved.total}`;
+        const b = button('mb-cell mb-cell--quiz mb-cell--started mb-cell--saved', text, `${column.title}, ${student.name}: not handed in, ${saved.answered} of ${saved.total} answered, ${formatMarks(saved.score)}/${formatMarks(saved.max)} so far`);
+        b.title = 'Not handed in. Answers saved as they went.';
+        b.addEventListener('click', () => actions.openQuiz(column.lesson_id, sid));
+        return b;
+      }
       if (column.started?.includes(sid)) {
         const open = el('span', 'mb-cell mb-cell--quiz mb-cell--blank mb-cell--started', 'Started');
         open.title = 'Opened this quiz but hasn’t handed it in';
@@ -89,6 +98,14 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
       b.append(line);
     }
     b.addEventListener('click', () => actions.openQuiz(column.lesson_id, sid));
+    return b;
+  }
+  if (column.kind === 'work') {
+    const n = workCount(column, sid);
+    if (!n) return el('span', 'mb-cell mb-cell--work mb-cell--blank', '');
+    const text = `${n} written`;
+    const b = button('mb-cell mb-cell--work', text, `${column.title}, ${student.name}: ${n} ${n === 1 ? 'answer' : 'answers'} written`);
+    b.addEventListener('click', () => actions.openWork(column.lesson_id, sid));
     return b;
   }
   if (column.kind === 'assessment') {
@@ -117,11 +134,14 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
 export function headerFor(column: AnyColumn, actions: MarkbookActions): HTMLTableCellElement {
   const th = el('th', `mb-col mb-col--${column.kind}`);
   th.scope = 'col';
-  const title = el('button', 'mb-col__title', column.title);
-  title.type = 'button';
+  // Written work has no class view or settings: its title is a label.
+  const title = column.kind === 'work' ? el('span', 'mb-col__title', column.title) : el('button', 'mb-col__title', column.title);
+  if (title instanceof HTMLButtonElement) {
+    title.type = 'button';
+    title.addEventListener('click', () => (column.kind === 'quiz' ? actions.openHeatmap(column.lesson_id) : actions.editColumn(column.id)));
+  }
   title.title = column.title;
   title.dataset.col = column.id;
-  title.addEventListener('click', () => (column.kind === 'quiz' ? actions.openHeatmap(column.lesson_id) : actions.editColumn(column.id)));
   th.append(el('span', 'mb-col__kind', KIND_LABEL[column.kind]), title, el('span', 'mb-col__date', formatDay(dateOf(column))));
   if (column.kind === 'assessment') th.append(el('span', 'mb-col__weight', `${column.weight}%`));
   if (column.kind === 'quiz') {
