@@ -12,7 +12,12 @@ import {
 import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '@/blocks/sanitize-svg';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import { validateMindMap, validateConceptMap } from '@/blocks/graph-layout';
-import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
+import {
+  buildChartPivot,
+  buildChartSvg,
+  buildChartTableRows,
+  chartHoverModel
+} from '@/blocks/chart-svg';
 import {
   createBlockEditor,
   createChartEditor,
@@ -443,6 +448,65 @@ describe('chart-svg', () => {
       ]
     });
     expect(svg).toMatch(/var\(--danger\)/);
+  });
+});
+
+describe('chart readability', () => {
+  const prisoners = {
+    chart_type: 'line' as const,
+    x_label: 'Year',
+    y_label: 'Prisoners',
+    series: [
+      {
+        id: 's1',
+        name: 'Series 1',
+        points: [
+          { x: 2023, y: 13852 },
+          { x: 2024, y: 15871 },
+          { x: 2025, y: 17432 }
+        ]
+      },
+      { id: 's2', name: 'Series 2', points: [{ x: '', y: 0 }] }
+    ]
+  };
+
+  it('drops a series with no usable points', () => {
+    expect(buildChartTableRows(prisoners).map((r) => r.series)).not.toContain('Series 2');
+    expect(chartHoverModel(prisoners)).toHaveLength(3);
+  });
+
+  it('fits a line chart to its data instead of starting at zero', () => {
+    const svg = buildChartSvg(prisoners);
+    expect(svg).toMatch(/>13K</);
+    expect(svg).toMatch(/>18K</);
+    expect(svg).not.toMatch(/>0</);
+  });
+
+  it('keeps bars on a zero baseline', () => {
+    expect(buildChartSvg({ ...prisoners, chart_type: 'bar' })).toMatch(/>0</);
+  });
+
+  it('pivots the data table to one row per category with formatted numbers', () => {
+    expect(buildChartPivot(prisoners)).toEqual({
+      head: ['Year', 'Prisoners'],
+      rows: [
+        ['2023', '13,852'],
+        ['2024', '15,871'],
+        ['2025', '17,432']
+      ]
+    });
+  });
+
+  it('shows every series value for a hovered category', () => {
+    const entry = chartHoverModel({
+      chart_type: 'bar',
+      series: [
+        { id: 'a', name: 'Boys', points: [{ x: 'Jan', y: 4 }] },
+        { id: 'b', name: 'Girls', points: [{ x: 'Jan', y: 6 }] }
+      ]
+    })[0]!;
+    expect(entry.title).toBe('Jan');
+    expect(entry.rows.map((r) => `${r.label} ${r.value}`)).toEqual(['Boys 4', 'Girls 6']);
   });
 });
 

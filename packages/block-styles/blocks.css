@@ -2118,10 +2118,166 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
   color: var(--ink);
 }
 
+.block-chart__svg {
+  position: relative;
+}
+
+.block-chart__svg svg text.block-chart__tick {
+  fill: var(--muted);
+  fill-opacity: 1;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .block-chart__svg svg text.block-chart__tick { font-size: 13px; }
+  .block-chart__svg svg text.block-chart__axis-label { font-size: 14px; }
+  .block-chart__svg svg text.block-chart__tick--thin { display: none; }
+}
+
+.block-chart__grid {
+  stroke: var(--line);
+  stroke-opacity: 1;
+}
+
+.block-chart__grid--base {
+  stroke: var(--muted);
+  stroke-opacity: 0.45;
+}
+
+.block-chart__hit {
+  cursor: crosshair;
+}
+
+.block-chart__mark,
+.block-chart__dot {
+  transition: opacity 120ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.block-chart__svg.is-hovering .block-chart__mark:not(.is-active) {
+  opacity: 0.4;
+}
+
+.block-chart__dot.is-active {
+  transform: scale(1.7);
+}
+
+.block-chart__tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, calc(-100% - 10px));
+  display: grid;
+  gap: 2px;
+  min-width: 7rem;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper, #fff);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
+  font-size: var(--font-size-meta);
+  line-height: 1.35;
+  color: var(--ink);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.block-chart__tip-title {
+  font-weight: 600;
+}
+
+.block-chart__tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.block-chart__tip-row b {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.block-chart__swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.block-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-meta);
+  color: var(--muted);
+}
+
+.block-chart__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .block-chart__data {
   margin-top: var(--space-2);
   font-size: var(--font-size-meta);
   color: var(--muted);
+}
+
+.block-chart__table-wrap {
+  max-height: 20rem;
+  margin-top: var(--space-2);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.block-chart__table {
+  width: 100%;
+  min-width: 12rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.block-chart__table th,
+.block-chart__table td {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.block-chart__table th:first-child {
+  text-align: left;
+}
+
+.block-chart__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--paper, #fff);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.block-chart__table tbody th {
+  font-weight: 500;
+}
+
+.block-chart__table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.block-chart__table tbody tr:hover {
+  background: rgb(0 0 0 / 3%);
 }
 
 .block-equation__math {
