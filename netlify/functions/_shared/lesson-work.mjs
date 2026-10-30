@@ -16,6 +16,7 @@ import { publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject, walkBlocks } from './question-drop.mjs';
+import { readBook } from './markbook.mjs';
 
 export const WORK_LIMITS = { blocks: 60, parts: 6, fields: 60, field: 80, text: 4000 };
 const PART = /^(answers|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
@@ -23,7 +24,15 @@ const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 const workPrefix = (lesson) => `work/${lesson}/`;
 const workKey = (lesson, owner) => `work/${lesson}/${owner}`;
+export const handinKey = (lesson, block, student) => `work_handins/${lesson}/${block}/${student}`;
+export const pieceId = (lesson, block) => `w:${lesson}:${block}`;
 export const workOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
+
+/** Blocks in this lesson that the class's Markbook links to an assessment column. */
+async function handinBlocks(store, classId, lessonId) {
+  const { book } = await readBook(store, classId);
+  return book.columns.filter((c) => c.kind === 'assessment' && c.piece?.lesson_id === lessonId).map((c) => c.piece.block_id);
+}
 
 /** Blocks a student can see in the published lesson, by id. */
 async function studentBlocks(store, lessonId) {
@@ -53,7 +62,7 @@ function cleanFields(fields) {
 export async function workAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'claim', 'save'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'claim', 'save', 'handin'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { blocks } = await studentBlocks(store, lessonId);
   const roster = await loadRoster(store, body.class_id);
   if (!roster) reject(404, 'need_class', 'Open this lesson from your class page.');
@@ -70,7 +79,20 @@ export async function workAction(store, lessonId, body) {
     return { need: 'initials' };
   }
   const identity = { need: null, initials: student.initials };
-  if (action !== 'save') return identity;
+  const marked = await handinBlocks(store, roster.cls.id, lessonId);
+  if (action === 'status' || action === 'claim') return { ...identity, ...(marked.length ? { handin_blocks: marked } : {}) };
+
+  if (action === 'handin') {
+    if (typeof body.block_id !== 'string' || !marked.includes(body.block_id)) reject(400, 'not_marked', 'This part of the lesson isn’t set to be handed in.');
+    const feedback = await read(store, `piece_feedback/${roster.cls.id}/${student.id}/${pieceId(lessonId, body.block_id)}`);
+    if (feedback?.status === 'returned') reject(409, 'returned', 'This has already been returned. Ask your teacher to take it back first.');
+    const kept = await read(store, workKey(lessonId, workOwner(roster.cls.id, student.id)));
+    const text = kept?.blocks?.[body.block_id];
+    if (!text || !Object.keys(text).length) reject(400, 'empty', 'Write something before you hand it in.');
+    const handed_in_at = new Date().toISOString();
+    await store.setJSON(handinKey(lessonId, body.block_id, student.id), { class_id: roster.cls.id, student_id: student.id, text, handed_in_at });
+    return { ...identity, handed_in_at };
+  }
 
   if (typeof body.block_id !== 'string' || !blocks.has(body.block_id)) reject(400, 'bad_block', 'That part of the lesson has changed. Reload the page.');
   if (typeof body.part !== 'string' || !PART.test(body.part)) reject(400, 'bad_part', 'That answer can’t be saved.');

@@ -29,7 +29,7 @@ export function sydneyDay(iso) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-async function readBook(store, classId) {
+export async function readBook(store, classId) {
   const row = await store.getWithMetadata(bookKey(classId), { type: 'json', consistency: 'strong' });
   const parsed = MarkbookSchema.safeParse(row?.data ?? {});
   if (!parsed.success) reject(500, 'corrupt', 'This markbook couldn’t be read. Nothing was changed.');
