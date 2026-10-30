@@ -8,11 +8,12 @@ export function createCustomOutcome(body: {
   title: string;
   description: string;
   group?: string;
+  short?: string;
 }): Promise<CurriculumOutcome> {
   return apiPost('/api/outcomes', body);
 }
 
-export type OutcomePatch = Partial<Pick<CurriculumOutcome, 'code' | 'title' | 'description' | 'group'>>;
+export type OutcomePatch = Partial<Pick<CurriculumOutcome, 'code' | 'title' | 'description' | 'group' | 'short'>>;
 
 export function patchOutcome(id: string, patch: OutcomePatch): Promise<CurriculumOutcome> {
   return apiPatch(`/api/outcomes/${encodeURIComponent(id)}`, patch);

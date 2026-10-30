@@ -11,6 +11,8 @@ export const CurriculumOutcomeSchema = z.object({
   source: OutcomeSourceSchema,
   code: z.string().min(1).max(32),
   description: z.string().min(1).max(2000),
+  /** A plain name for students, e.g. "Analysis". Falls back to the code and the first clause of the description. */
+  short: z.string().trim().max(40).optional(),
   group: z.string().min(1).max(80),
   subject_id: z.string().min(1),
   syllabus: z.string().min(1).max(80).optional(),

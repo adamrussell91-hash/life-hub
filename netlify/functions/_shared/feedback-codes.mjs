@@ -68,6 +68,19 @@ export class FeedbackCodesError extends Error {
 
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
+const MAX_RESOURCE_TITLE = 80;
+/** A See how link the teacher sets on a code: a page or a video (optionally from a time). http(s) only. */
+function cleanResource(raw) {
+  if (!raw || typeof raw !== 'object' || !['link', 'video'].includes(raw.kind)) return null;
+  let url;
+  try { url = new URL(String(raw.url)); } catch { return null; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  const out = { kind: raw.kind, url: url.toString(), title: text(raw.title, MAX_RESOURCE_TITLE) };
+  const start = Math.floor(Number(raw.start));
+  if (raw.kind === 'video' && Number.isFinite(start) && start > 0) out.start = Math.min(start, 24 * 3600);
+  return out;
+}
+
 /** Validates a library sent by the teacher. Ids stay stable so old feedback still finds its code. */
 export function cleanFeedbackCodes(input) {
   const raw = Array.isArray(input?.codes) ? input.codes : null;
@@ -106,6 +119,8 @@ export function cleanFeedbackCodes(input) {
     if (strength) out.strength_descriptor = strength;
     // Optional: the WalkThrus problem type this code points to, set by the teacher in the editor.
     if (isProblemType(row?.problem_type)) out.problem_type = row.problem_type;
+    const resource = cleanResource(row?.resource);
+    if (resource) out.resource = resource;
     if (row?.hidden === true) out.hidden = true;
     return out;
   });

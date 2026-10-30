@@ -63,3 +63,10 @@ test('the route is behind the teacher session and saves the library', async () =
   assert.equal(saved.data.codes[0].code, 'FW');
   assert.equal((await readFeedbackCodes(store))[0].key, '1');
 });
+
+test('a code can carry a See how resource', () => {
+  const [code] = cleanFeedbackCodes({ codes: [{ code: 'TS', label: 'Topic sentence', resource: { kind: 'video', url: 'https://example.com/v', title: 'Topic sentences', start: 12 } }] });
+  assert.deepEqual(code.resource, { kind: 'video', url: 'https://example.com/v', title: 'Topic sentences', start: 12 });
+  const [plain] = cleanFeedbackCodes({ codes: [{ code: 'TS', label: 'Topic sentence', resource: { kind: 'link', url: 'javascript:alert(1)' } }] });
+  assert.equal(plain.resource, undefined);
+});

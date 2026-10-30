@@ -32,6 +32,8 @@ export type FeedbackCode = {
   strength_descriptor?: string;
   /** Optional. The WalkThrus problem type this code points to; codes without one add nothing to the pattern monitor. */
   problem_type?: CodeProblemType;
+  /** Optional See how link a student can open from their next steps. */
+  resource?: { kind: 'link' | 'video'; url: string; title?: string; start?: number };
   hidden?: boolean;
 };
 

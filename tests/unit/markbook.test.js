@@ -287,3 +287,16 @@ test('load: carries each student’s done records, and the profile counts a subm
   const out = await profileAction(store, 'class1', { class_token: device.class_token });
   assert.deepEqual(out.map.lessons.map((l) => [l.id, l.kind, l.done]), [['quiz1', 'quiz', true], ['lesson2', 'lesson', true]]);
 });
+
+test('criteria take concepts and step descriptors; a column can link a lesson block; marks take steps', async () => {
+  const { AssessmentColumnSchema, AssessmentMarkSchema } = await import('../../netlify/functions/_shared/markbook-schema.mjs');
+  const column = AssessmentColumnSchema.parse({
+    id: 'col1', kind: 'assessment', title: 'Imagery paragraph', date: '2026-10-27', weight: 0,
+    piece: { lesson_id: 'lesson1', block_id: 'qset1', short: 'Imagery' },
+    criteria: [{ id: 'c1', label: 'Analysis', max: 10, outcomes: ['out_a'], concepts: ['perspective'], steps: { secure: 'Shows how techniques shape meaning.' } }]
+  });
+  assert.equal(column.piece.block_id, 'qset1');
+  assert.deepEqual(column.criteria[0].concepts, ['perspective']);
+  assert.equal(AssessmentMarkSchema.parse({ steps: { c1: 'building' } }).steps.c1, 'building');
+  assert.throws(() => AssessmentMarkSchema.parse({ steps: { c1: 'great' } }));
+});
