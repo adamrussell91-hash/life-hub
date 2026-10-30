@@ -5,6 +5,7 @@ import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
 import { readJSON, writeJSON } from '@/quiz/dom';
+import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
 import { tutorialClient } from '@/tutorial/api';
@@ -320,9 +321,15 @@ export function mountStudentLessonView(
     // Class examples hang off rendered blocks; the lecture player redraws them per scene.
     examples = lecture ? null : mountStudentClassExamples(content, { lessonId, classId });
   };
+  let work: WorkSyncHandle | null = null;
   const show = (content: HTMLElement, lesson: PublishedLesson, extras: Parameters<typeof renderPublishedLesson>[2]) => {
     lecture?.dispose();
+    work?.dispose();
+    work = null;
     lecture = renderPublishedLesson(content, lesson, extras);
+    // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
+    const workClass = extras?.cls?.id ?? extras?.quizClassId;
+    if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
   };
 
   root.replaceChildren();
@@ -441,6 +448,8 @@ export function mountStudentLessonView(
       examples = null;
       lecture?.dispose();
       lecture = null;
+      work?.dispose();
+      work = null;
     }
   };
 }

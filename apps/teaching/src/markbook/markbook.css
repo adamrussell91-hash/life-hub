@@ -32,6 +32,10 @@
 .mb-cell--blank { display: inline-block; cursor: default; }
 .mb-cell--na { background: color-mix(in srgb, var(--muted) 14%, transparent); }
 .mb-cell--started { color: var(--warning); font-size: 0.8em; }
+/* Not handed in: answers saved so far. A dashed edge says it isn't a final mark. */
+.mb-cell--saved { border: 1px dashed var(--warning); background: var(--warning-surface); color: var(--ink); }
+.mb-cell--saved:hover, .mb-cell--saved:focus-visible { border-style: solid; border-color: var(--warning); }
+.mb-cell--work { font-size: 0.8em; white-space: nowrap; }
 span.mb-cell { display: inline-block; cursor: default; }
 .mb-cell.is-exempt { color: var(--muted); font-style: italic; }
 .mb-cell__pending { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
@@ -92,6 +96,12 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-heat--pending { background: repeating-linear-gradient(45deg, var(--line) 0 3px, transparent 3px 6px); }
 .mb-heat--none { background: none; }
 .mb-attempt__link { color: var(--marine); font-weight: var(--weight-semibold); }
+.mb-attempt__note { margin: 0; color: var(--muted); font: var(--text-sm) / 1.4 var(--font-ui); }
+.mb-work { margin: 0; display: grid; gap: var(--space-3); }
+.mb-work__block { margin: 0; font: var(--weight-semibold) var(--text-sm) / 1.4 var(--font-ui); }
+.mb-work__item { display: grid; gap: var(--space-1); }
+.mb-work__label { margin: 0; color: var(--muted); font: var(--text-xs) / 1.4 var(--font-ui); }
+.mb-work__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mb-grid { position: relative; }
 .mb-heat th[scope="row"] { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; }
 .mb-heat-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-xs); color: var(--muted); }

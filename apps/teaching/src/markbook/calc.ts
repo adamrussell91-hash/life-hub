@@ -1,5 +1,5 @@
 import type { AssessmentColumn, AssessmentMark, Criterion, Markbook } from './schema';
-import type { AnyColumn, MarkbookView, QuizScore, RosterStudent } from './types';
+import type { AnyColumn, MarkbookView, QuizScore, RosterStudent, WorkColumn } from './types';
 
 /** Plain sums behind the markbook. No DOM, so tests and every view share them. */
 
@@ -65,9 +65,9 @@ export function dateOf(column: AnyColumn): string {
 /** Oldest first; same-day columns fall back to title. */
 export const compareColumns = (a: AnyColumn, b: AnyColumn): number => dateOf(a).localeCompare(dateOf(b)) || collator.compare(a.title, b.title);
 
-/** Teacher columns and shown quizzes, oldest first. */
+/** Teacher columns, shown quizzes and written work, oldest first. */
 export function orderedColumns(view: MarkbookView): AnyColumn[] {
-  const all: AnyColumn[] = [...view.markbook.columns, ...view.quizzes.filter((q) => !q.hidden)];
+  const all: AnyColumn[] = [...view.markbook.columns, ...view.quizzes.filter((q) => !q.hidden), ...(view.work ?? [])];
   return all.sort(compareColumns);
 }
 
@@ -106,3 +106,12 @@ export function todayInSydney(now: Date = new Date()): string {
 
 /** The Sydney calendar day an ISO timestamp falls on. */
 export const sydneyDay = (iso: string): string => todayInSydney(new Date(iso));
+
+/** How many answers a student has written in a lesson. */
+export function workCount(column: WorkColumn, studentId: string): number {
+  let n = 0;
+  for (const parts of Object.values(column.students[studentId]?.blocks ?? {})) {
+    for (const fields of Object.values(parts)) n += Object.values(fields).filter((t) => t.trim()).length;
+  }
+  return n;
+}

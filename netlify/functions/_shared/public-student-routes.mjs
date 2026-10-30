@@ -13,6 +13,7 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/continuum\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/quiz\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/profile\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/work\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/lecture\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/tutorial\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/case\/[^/]+$/ },

@@ -1,6 +1,6 @@
 import type { AssessmentMark, CheckMark, HandinMark } from './schema';
 import type { AnyColumn, MarkbookView } from './types';
-import { assessmentResult, formatPercent, markOf, orderedColumns, overallFor, quizPercent, sortStudents } from './calc';
+import { assessmentResult, formatPercent, markOf, orderedColumns, overallFor, quizPercent, sortStudents, workCount } from './calc';
 import { HANDIN_LABEL } from './cells';
 
 /** Quote when needed, and defuse text a spreadsheet would run as a formula. */
@@ -11,8 +11,14 @@ const cell = (raw: string): string => {
 const blankDash = (text: string): string => (text === '–' ? '' : text);
 
 function value(view: MarkbookView, column: AnyColumn, studentId: string): string {
+  if (column.kind === 'work') {
+    const n = workCount(column, studentId);
+    return n ? `${n} written` : '';
+  }
   if (column.kind === 'quiz') {
     const score = column.scores[studentId];
+    const saved = column.saved?.[studentId];
+    if (!score && saved) return `Not handed in (${saved.answered}/${saved.total} answered)`;
     const text = blankDash(formatPercent(quizPercent(score)));
     // A score with answers still to mark is not final; say so rather than look like a finished mark.
     return text && score && score.pending > 0 ? `${text} (${score.pending} to mark)` : text;
