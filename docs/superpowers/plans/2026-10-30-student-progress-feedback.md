@@ -18,7 +18,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-30-student-progress-feedback-design.md`
 **Mockup:** `docs/mockups/student-progress/student-progress.html`
-**Worktree:** `/Users/adamrussell/Projects/life-hub-student-progress` on branch `claude/student-progress`. Another session works in `life-hub-quiz-initials`: never switch branches there.
+**Worktree:** `../life-hub-student-progress` (a sibling worktree) on branch `claude/student-progress`. Another session works in `life-hub-quiz-initials`: never switch branches there.
 
 **House rules that apply to every task:**
 - This repo is public. Use invented students in tests and the mock (Ava Nguyen, Noah Patel, Ella Chen, Jack Lee, Mia Torres).
