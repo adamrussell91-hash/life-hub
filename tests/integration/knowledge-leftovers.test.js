@@ -200,7 +200,7 @@ test('Curator lists pending and can queue a run without Teaching Blobs', async (
   }));
   assert.equal(queued.status, 200);
   assert.equal((await queued.json()).data.status, 'queued');
-  assert.ok(urls.some(url => url.includes('knowledge-hub/actions/workflows/curator.yml/dispatches')));
+  assert.ok(urls.some(url => url.includes('knowledge-hub-data/actions/workflows/curator.yml/dispatches')));
 });
 
 test('Podcast start and audio sign stay on the research Worker and R2', async () => {
