@@ -176,9 +176,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 <body>
 <main>
   <header style="display:grid;gap:12px">
-    <span class="status">For decision · version 2 · nothing built yet</span>
+    <span class="status">For decision · version 3 · nothing built yet</span>
     <h1>Lesson footer rail and end-of-lesson questions</h1>
-    <p class="lede">A rail at the bottom of every lesson: previous lesson, a tick to finish, next lesson. Ticking hands in the quiz and written work, then asks two quick questions about <em>the lesson</em>, drawn from a bank of ten, and says “Lesson completed”. Answers are anonymous and pool across students, so each lesson builds up a picture without anyone answering everything.</p>
+    <p class="lede">A rail at the bottom of every lesson: previous lesson, a tick to finish, next lesson. Ticking hands in the quiz and written work, then asks two quick questions about <em>the lesson</em>, drawn from a bank of seven, and says “Lesson completed”. Answers are anonymous and pool across students, so each lesson builds up a picture without anyone answering everything.</p>
   </header>
 
   <section aria-labelledby="h-changes">
@@ -189,6 +189,33 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
       <li><strong>Anonymous.</strong> The tick is named (it's the hand-in); the feedback is stored with no link to the student.</li>
       <li><strong>One flow:</strong> tick → check what's unanswered → hand in → two questions → Lesson completed. The separate feedback icon is gone.</li>
     </ul>
+  </section>
+
+  <section aria-labelledby="h-push">
+    <span class="eyebrow">Version 3 · Pushback</span>
+    <h2 id="h-push">Where version 2 didn't hold up</h2>
+    <p>Version 2 took your design at face value. Tested against the research, six things need changing or watching.</p>
+    <ol class="findings">
+      <li class="finding"><span class="finding__n">1</span><div>
+        <p><strong>Ten questions won't give ten separate signals.</strong> When the Tripod survey's seven areas were tested on 25,000 students, the answers didn't split into seven. They collapsed into one general “good teaching” factor plus a separate classroom-management factor. Students who like a lesson tend to rate everything well (a halo effect). So a bank works best when each question asks about a concrete event the student could check (“did the lesson check before moving on?”), not one more angle on the same overall impression.</p>
+        <p class="cite">Wallace, Kelcey &amp; Ruzek (2016), <a href="https://metatoc.com/papers/93091-what-can-student-perception-surveys-tell-us-about-teaching-empirically-testing-the-underlying-structure-of-the-tripod-student-perception-survey">AERJ 53(6)</a>; replicated in Australia by <a href="https://acuresearchbank.acu.edu.au/download/38476f2a39e820b4f38f041331b9ca17fd693ac330999ac53fdad1f98d389941/1669357/OA_Witter_2024_Students_can_identify_quality_teachers_but.pdf">Witter &amp; Rowe (2024)</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">2</span><div>
+        <p><strong>Some things change from lesson to lesson; others hardly do.</strong> Measured across one teacher's lessons, classroom management and learning support barely changed between lessons. Cognitive activation, how hard students are made to think, varied a lot, and one study estimated about nine lessons are needed to judge it reliably. So your instinct to read “explain your thinking” as a trend across a unit is right. A time-wasted question will mostly describe the class, not the lesson's design.</p>
+        <p class="cite">Praetorius et al. (2014), <a href="https://www.pedocs.de/volltexte/2025/21660/pdf/One_lesson_is_all_you_need_2014_Praetorius_A.pdf">Learning and Instruction 31</a>; these were trained observers' ratings, not student ratings. The nine-lesson figure comes from a summary I couldn't check against the paper itself.</p></div></li>
+      <li class="finding"><span class="finding__n">3</span><div>
+        <p><strong>Five answers is too few to trust.</strong> How reliable a class average is depends on how much students in the same class agree. With agreement at levels common in this research (an assumption I haven't checked against your classes), 5 answers gives a reliability of about .5. You need roughly 10 to 14 to reach the usual .70 bar. Ten questions with two each means about 5 answers per question per class, so most single-lesson results would sit below that. Fix: fewer questions (7 gives about 7 each), pool classes taking the same lesson, and label anything under 10 as “early read”.</p>
+        <p class="cite">Lüdtke, Robitzsch, Trautwein &amp; Kunter (2009), Contemporary Educational Psychology 34(2); a worked example of the same calculation in <a href="https://files.eric.ed.gov/fulltext/EJ1088668.pdf">this ERIC study</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">4</span><div>
+        <p><strong>The students who never tick are the ones you most need to hear from.</strong> Feedback only appears after the tick, so a lesson that ran out of time, as El Diablo Highway did, hears only from students who finished. That is non-response bias in its plainest form. Two fixes: count the share who ticked as a result in itself (it's an objective pacing signal, better than any self-report), and offer the two questions the next time a student opens a lesson they didn't finish.</p></div></li>
+      <li class="finding"><span class="finding__n">5</span><div>
+        <p><strong>Every lesson is a lot of asking, and novelty fades.</strong> Repeated surveys of the same students lower response rates over time. Random picking helps for a few weeks, not a year. Watch the skip rate and how quickly answers come in, and be ready to ask on only some lessons, for example a different half of the class each time.</p>
+        <p class="cite">Porter, Whitcomb &amp; Weitzer (2004), <a href="https://www.purdue.edu/idata/documents/Porter-et-al-2004-survey-fatigue.pdf">Multiple surveys of students and survey fatigue</a>.</p></div></li>
+      <li class="finding"><span class="finding__n">6</span><div>
+        <p><strong>Several version 2 questions broke basic wording rules.</strong> Good survey items ask one thing, use answer options that fit the question (not agree/disagree), and keep the options in a clear order. Three failed: “could you follow the explanation” is a feeling of understanding in disguise (finding 1 of the research); “used something from an earlier lesson, and did you remember it” asks two things at once, one of them about the student; “how much of the lesson was spent on the work” asks for a proportion students can't estimate, about classmates' behaviour. “When you got stuck” has answers that aren't one ordered scale, so it needs a different chart.</p>
+        <p class="cite">Gehlbach &amp; Brinkworth (2011), Review of General Psychology 15(4); <a href="https://www.panoramaed.com/blog/survey-design-checklist">Panorama/Gehlbach survey checklist</a>.</p></div></li>
+    </ol>
+    <h3>One more catch: a low answer isn't always a problem</h3>
+    <p>Not every lesson should check before moving on, give examples, or end with a summary. A reading lesson may rightly ask for little explaining. So read low results against what the lesson was meant to do, and let a question be switched off for lesson types where it doesn't apply, rather than treating every bar as a score.</p>
   </section>
 
   <section aria-labelledby="h-research">
@@ -216,63 +243,62 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
   <section aria-labelledby="h-bank">
     <span class="eyebrow">2 · The bank</span>
-    <h2 id="h-bank">Ten questions about the lesson</h2>
-    <p>Each student gets two at the end. The two are picked from the questions this lesson has the fewest answers to so far, with ties broken at random. To a student that still feels random, and every question gets answers on every lesson.</p>
+    <h2 id="h-bank">Seven questions about the lesson</h2>
+    <p>Each student gets two, picked from the questions this lesson has the fewest answers to, ties broken at random, in random order. Every question asks about something the student could have seen happen.</p>
     <div class="bank">
-      <article class="qcard"><p class="eyebrow">1 · Clear task <span class="tag tag--rec">your A</span></p>
+      <article class="qcard"><p class="eyebrow">1 · Clear task <span class="tag tag--rec">your A · kept</span></p>
         <p class="qcard__wording">Did you know what you were meant to be doing?</p>
         <ul class="answers"><li>All the way through</li><li>Mostly</li><li>Some of the time</li><li>Hardly at all</li></ul>
-        <p class="src">Tripod <em>Clarify</em>. Low answers point at the instructions or the order of tasks.</p></article>
-      <article class="qcard"><p class="eyebrow">2 · Getting unstuck <span class="tag tag--rec">your B</span></p>
+        <p class="src">Tripod <em>Clarify</em>. One thing asked, ordered answers, every answer labelled.</p></article>
+      <article class="qcard"><p class="eyebrow">2 · Getting unstuck <span class="tag tag--rec">your B · kept, read differently</span></p>
         <p class="qcard__wording">When you got stuck, what happened?</p>
         <ul class="answers"><li>I didn't get stuck</li><li>I worked it out myself</li><li>I got help and kept going</li><li>I stayed stuck</li></ul>
-        <p class="src">Tripod <em>Clarify</em> (“explains it another way”). Many “stayed stuck” answers point at the lesson's support or examples.</p></article>
-      <article class="qcard"><p class="eyebrow">3 · Still unclear <span class="tag tag--rec">your C</span></p>
+        <p class="src">Report two numbers, not one bar: the share who got stuck, and of those, the share who stayed stuck. The second is the one to act on.</p></article>
+      <article class="qcard"><p class="eyebrow">3 · Still unclear <span class="tag tag--rec">your C · kept</span></p>
         <p class="qcard__wording">What's one thing from this lesson that's still unclear?</p>
         <ul class="answers"><li>Short text</li><li>Nothing</li></ul>
-        <p class="src">Muddiest Point. Feeds the start of the next lesson.</p></article>
-      <article class="qcard"><p class="eyebrow">4 · Explain thinking <span class="tag tag--rec">your E</span></p>
-        <p class="qcard__wording">In this lesson, did you have to explain your thinking, not just give answers?</p>
+        <p class="src">Muddiest Point. Open to consider: make it a standing optional box under the two, as it's the most useful for planning the next lesson.</p></article>
+      <article class="qcard"><p class="eyebrow">4 · Explain thinking <span class="tag tag--rec">your E · trend only</span></p>
+        <p class="qcard__wording">Did this lesson make you explain your thinking, not just give answers?</p>
         <ul class="answers"><li>Yes, a lot</li><li>A bit</li><li>Not really</li></ul>
-        <p class="src">Tripod <em>Challenge</em>, the strongest predictor. Read as a trend across the unit.</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">5 · Following explanations</p>
-        <p class="qcard__wording">When something new was explained, could you follow it?</p>
-        <ul class="answers"><li>Easily</li><li>Mostly</li><li>Only after help</li><li>Not really</li></ul>
-        <p class="src">Tripod <em>Clarify</em> (“explains difficult things clearly”).</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">6 · Examples</p>
-        <p class="qcard__wording">Did the examples help you do the task yourself?</p>
-        <ul class="answers"><li>Yes</li><li>Partly</li><li>Not really</li><li>There weren't any</li></ul>
-        <p class="src">Worked examples and modelling, from the Great Teaching Toolkit's structuring dimension.</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">7 · Checked before moving on</p>
+        <p class="src">Tripod <em>Challenge</em>. Varies a lot lesson to lesson (pushback 2), so it's shown only as a unit trend.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">5 · Checked before moving on</p>
         <p class="qcard__wording">Did the lesson check whether you'd got it before moving on?</p>
         <ul class="answers"><li>Yes, more than once</li><li>Once</li><li>Not that I noticed</li></ul>
-        <p class="src">Tripod <em>Clarify</em> (“checks to make sure we understand”).</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">8 · Earlier learning</p>
-        <p class="qcard__wording">Did this lesson use something from an earlier lesson?</p>
-        <ul class="answers"><li>Yes, and I remembered it</li><li>Yes, but I'd forgotten it</li><li>No</li><li>Not sure</li></ul>
-        <p class="src">Great Teaching Toolkit (“helps us remember ideas from previous lessons”). “Forgotten” answers flag what to bring back.</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">9 · Time on the work</p>
-        <p class="qcard__wording">How much of the lesson was spent on the actual work?</p>
-        <ul class="answers"><li>Nearly all</li><li>Most</li><li>About half</li><li>Less than half</li></ul>
-        <p class="src">Tripod <em>Control</em> (“we don't waste time”), the other strong predictor.</p></article>
-      <article class="qcard qcard--opt"><p class="eyebrow">10 · Pulled together</p>
-        <p class="qcard__wording">Did the lesson end by pulling the main ideas together?</p>
-        <ul class="answers"><li>Yes</li><li>Sort of</li><li>No</li></ul>
-        <p class="src">Tripod <em>Consolidate</em> (“summarises what we learned”).</p></article>
+        <p class="src">Tripod <em>Clarify</em> (“checks to make sure we understand”). A clear event a student can confirm.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">6 · Examples</p>
+        <p class="qcard__wording">Was there a worked example before you had to do it yourself?</p>
+        <ul class="answers"><li>Yes, and I used it</li><li>Yes, but I didn't need it</li><li>No</li></ul>
+        <p class="src">Reworded from “did the examples help” (a judgement) to whether one was there (an event). Worked examples and modelling: Great Teaching Toolkit, structuring.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">7 · Earlier learning</p>
+        <p class="qcard__wording">Did this lesson bring back something from an earlier lesson?</p>
+        <ul class="answers"><li>Yes</li><li>No</li><li>Not sure</li></ul>
+        <p class="src">Split from v2: now asks only about the lesson. Whether they remembered it is the quiz's job.</p></article>
     </div>
-    <p class="caption">Green edge: the four you picked. Amber edge: new ones, built the same way (each asks about something that happened in the lesson). Drop any you don't want; the bank works with eight or more.</p>
+    <h3>Taken out</h3>
+    <div class="table-wrap">
+      <table class="reject">
+        <thead><tr><th scope="col">Question (v2)</th><th scope="col">Why it went</th></tr></thead>
+        <tbody>
+          <tr><td>When something new was explained, could you follow it?</td><td>A feeling of understanding, which a smooth explanation inflates. The same problem as “how much did you learn”.</td></tr>
+          <tr><td>How much of the lesson was spent on the actual work?</td><td>Asks for a proportion students can't estimate, mostly about classmates' behaviour, and that barely changes from lesson to lesson. Better seen in the share who finish.</td></tr>
+          <tr><td>Did the lesson end by pulling the main ideas together?</td><td>“Pulling together” is teacher language, and close to 5 in what it picks up. Could come back reworded if you want a closing-review signal.</td></tr>
+          <tr><td>Did you enjoy / how much did you learn / rate the lesson</td><td>Unchanged from v1: these track how smooth the lesson felt, not learning.</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section aria-labelledby="h-maths">
     <span class="eyebrow">3 · How the numbers add up</span>
-    <h2 id="h-maths">Enough answers to read, without asking everyone everything</h2>
+    <h2 id="h-maths">When a result is worth reading</h2>
     <div class="maths">
-      <div class="stat"><b>25 × 2</b><span>students × questions each = 50 answers per lesson per class</span></div>
-      <div class="stat"><b>≈ 5</b><span>answers per question per lesson, with ten questions</span></div>
-      <div class="stat"><b>≈ 45</b><span>answers per question across a nine-lesson unit</span></div>
-      <div class="stat"><b>5</b><span>the fewest answers before a result is shown; below that it says “not enough yet”</span></div>
+      <div class="stat"><b>≈ 7</b><span>answers per question per lesson, for a class of 25 answering 2 of 7</span></div>
+      <div class="stat"><b>≈ .55–.65</b><span>reliability of a 7-answer average (assumed agreement, see pushback 3)</span></div>
+      <div class="stat"><b>10–14</b><span>answers for the usual .70 bar: two classes on the same lesson, or a few lessons pooled</span></div>
+      <div class="stat"><b>% ticked</b><span>share of the class who finished: objective, every student, every lesson</span></div>
     </div>
-    <p>One lesson in one class gives a rough read; it gets solid when the same lesson runs with more than one class or as answers build up over a unit. That suits question 4 especially, which you'd read as a trend.</p>
+    <p>Show each result with its count. Under 10 answers, label it “early read”; under 5, don't show it. The pooled view across a unit and across classes is where the numbers firm up.</p>
   </section>
 
   <section aria-labelledby="h-mock">
@@ -304,14 +330,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
     <h2 id="h-collate">The pooled results for one lesson</h2>
     <p>A sketch with invented numbers, to show how the answers collate. Where it lives (the lesson page, or a Feedback view) is still to decide.</p>
     <div class="collate">
-      <div class="collate__head"><h3>Lesson 4 · Weighing the evidence</h3><span class="caption">Two classes · 47 students finished · 94 answers · anonymous</span></div>
-      <div class="citem"><p class="citem__q">Did you know what you were meant to be doing? <small>n = 10</small></p>
-        <div class="bar" role="img" aria-label="All the way through 5, Mostly 3, Some of the time 2, Hardly at all 0"><span class="s1" style="flex:5">5</span><span class="s2" style="flex:3">3</span><span class="s3" style="flex:2">2</span></div></div>
-      <div class="citem"><p class="citem__q">When you got stuck, what happened? <small>n = 9</small></p>
-        <div class="bar" role="img" aria-label="Didn't get stuck 2, Worked it out 3, Got help 1, Stayed stuck 3"><span class="s1" style="flex:2">2</span><span class="s2" style="flex:3">3</span><span class="s3" style="flex:1">1</span><span class="s4" style="flex:3">3</span></div></div>
-      <div class="citem"><p class="citem__q">How much of the lesson was spent on the actual work? <small>n = 4</small></p>
-        <p class="thin">Not enough answers yet (needs 5).</p></div>
-      <div class="legend"><span><i class="s1"></i>Best answer</span><span><i class="s2"></i>Next</span><span><i class="s3"></i>Weaker</span><span><i class="s4"></i>Worst answer</span></div>
+      <div class="collate__head"><h3>Lesson 4 · Weighing the evidence</h3><span class="caption">Two classes · 41 of 50 ticked (82%) · 82 answers · anonymous</span></div>
+      <div class="citem"><p class="citem__q">Did you know what you were meant to be doing? <small>n = 13</small></p>
+        <div class="bar" role="img" aria-label="All the way through 7, Mostly 4, Some of the time 2, Hardly at all 0"><span class="s1" style="flex:7">7</span><span class="s2" style="flex:4">4</span><span class="s3" style="flex:2">2</span></div></div>
+      <div class="citem"><p class="citem__q">When you got stuck, what happened? <small>n = 14 · got stuck: 9 of 14</small></p>
+        <div class="bar" role="img" aria-label="Of the 9 who got stuck: worked it out 4, got help 2, stayed stuck 3"><span class="s1" style="flex:4">4 worked it out</span><span class="s2" style="flex:2">2 got help</span><span class="s4" style="flex:3">3 stayed stuck</span></div></div>
+      <div class="citem"><p class="citem__q">Did the lesson check whether you'd got it before moving on? <small>n = 7 · early read</small></p>
+        <div class="bar" role="img" aria-label="More than once 1, Once 2, Not that I noticed 4"><span class="s1" style="flex:1">1</span><span class="s2" style="flex:2">2</span><span class="s3" style="flex:4">4</span></div></div>
+      <div class="legend"><span><i class="s1"></i>Most</span><span><i class="s2"></i>Some</span><span><i class="s3"></i>Little</span><span><i class="s4"></i>Stayed stuck</span></div>
       <div class="citem"><p class="citem__q">Still unclear <small>9 answers · 3 said “Nothing”</small></p>
         <ul class="quotes"><li>how to tell if a source is reliable or just old</li><li>what counts as corroboration</li><li>the difference between bias and perspective</li></ul></div>
       <div class="citem"><p class="citem__q">Had to explain their thinking: share answering “Yes, a lot”, across the unit</p>
@@ -326,11 +352,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
     <span class="eyebrow">6 · Before building</span>
     <h2 id="h-decide">Still to decide</h2>
     <ol class="decisions">
-      <li><strong>The bank.</strong> Keep all ten, or drop some? Any wording changes?</li>
-      <li><strong>Where results appear.</strong> I couldn't find a lesson feedback collation in the Hub. The per-block “How's this going?” dots are counted in the lesson editor, and the Feedback section holds documents you send to students. Should results sit beside the pulse counts on the lesson, in their own view, or somewhere outside the Hub?</li>
-      <li><strong>How anonymous.</strong> Feedback is stored with no student id. To stop one device sending feedback twice for a lesson, the server keeps a one-way hash of the device, which can't be traced back to a name. In a small class, free-text answers can still give someone away by how they write.</li>
-      <li><strong>Skipping.</strong> In the mockup, students can press “Skip” and still finish. Should skipping be allowed?</li>
-      <li><strong>Unticking.</strong> The quiz hand-in can't be undone (one go by default). Can a student untick the lesson's “done” mark itself?</li>
+      <li><strong>The seven.</strong> Keep, reword or swap any? Should “still unclear” become a standing optional box?</li>
+      <li><strong>Students who don't finish.</strong> Offer the two questions when a student reopens an unfinished lesson? And show the share who ticked next to the results?</li>
+      <li><strong>Asking less often.</strong> Every lesson to start, then switch to half the class per lesson if the skip rate climbs?</li>
+      <li><strong>Questions that don't fit a lesson.</strong> Let you switch a question off per lesson or lesson type (for example, worked examples in a discussion lesson)?</li>
+      <li><strong>Where results appear.</strong> Beside the per-block pulse counts on the lesson, or in their own view?</li>
+      <li><strong>A pilot.</strong> Run it for a term, then drop any question whose answers barely change between lessons or barely line up with quiz results.</li>
     </ol>
   </section>
 </main>
@@ -340,15 +367,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   const ICON_TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const BANK = [
     { q: 'Did you know what you were meant to be doing?', a: ['All the way through', 'Mostly', 'Some of the time', 'Hardly at all'] },
-    { q: 'When you got stuck, what happened?', a: ['I didn’t get stuck', 'I worked it out myself', 'I got help and kept going', 'I stayed stuck'] },
-    { q: 'What’s one thing from this lesson that’s still unclear?', text: true },
-    { q: 'Did you have to explain your thinking, not just give answers?', a: ['Yes, a lot', 'A bit', 'Not really'] },
-    { q: 'When something new was explained, could you follow it?', a: ['Easily', 'Mostly', 'Only after help', 'Not really'] },
-    { q: 'Did the examples help you do the task yourself?', a: ['Yes', 'Partly', 'Not really', 'There weren’t any'] },
-    { q: 'Did the lesson check whether you’d got it before moving on?', a: ['Yes, more than once', 'Once', 'Not that I noticed'] },
-    { q: 'Did this lesson use something from an earlier lesson?', a: ['Yes, and I remembered it', 'Yes, but I’d forgotten it', 'No', 'Not sure'] },
-    { q: 'How much of the lesson was spent on the actual work?', a: ['Nearly all', 'Most', 'About half', 'Less than half'] },
-    { q: 'Did the lesson end by pulling the main ideas together?', a: ['Yes', 'Sort of', 'No'] }
+    { q: 'When you got stuck, what happened?', a: ['I didn\u2019t get stuck', 'I worked it out myself', 'I got help and kept going', 'I stayed stuck'] },
+    { q: 'What\u2019s one thing from this lesson that\u2019s still unclear?', text: true },
+    { q: 'Did this lesson make you explain your thinking, not just give answers?', a: ['Yes, a lot', 'A bit', 'Not really'] },
+    { q: 'Did the lesson check whether you\u2019d got it before moving on?', a: ['Yes, more than once', 'Once', 'Not that I noticed'] },
+    { q: 'Was there a worked example before you had to do it yourself?', a: ['Yes, and I used it', 'Yes, but I didn\u2019t need it', 'No'] },
+    { q: 'Did this lesson bring back something from an earlier lesson?', a: ['Yes', 'No', 'Not sure'] }
   ];
   let uid = 0;
   const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
