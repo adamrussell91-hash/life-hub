@@ -8,7 +8,7 @@
 import { apiPost } from '@/api/client';
 import { button, deviceToken, el, errorText } from '@/quiz/dom';
 import { ensureNoIndex } from '@/student/feedback-view';
-import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor } from '@/student/shell';
+import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor, STUDENT_BRAND } from '@/student/shell';
 import { buildCoverageMap, type CoverageMapInput } from '@/network/coverage-map/model';
 import { mountProgressMap } from '@/network/coverage-map/progress';
 import { scheduleFromRows, type ScheduleRow } from '@/network/schedule';
@@ -286,7 +286,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   root.replaceChildren();
   const { surface, header, content } = createStudentShell('student-surface__content--profile');
   root.append(surface);
-  renderStudentChrome(header, { brand: 'Teaching Hub', links: [{ href: `/s/classes/${classId}`, label: 'Back to class' }] });
+  renderStudentChrome(header, { brand: STUDENT_BRAND, links: [{ href: `/s/classes/${classId}`, label: 'Back to class' }] });
   renderStudentStatus(content, 'Loading your progress…');
 
   const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen', extra: Record<string, unknown> = {}): Promise<T> =>

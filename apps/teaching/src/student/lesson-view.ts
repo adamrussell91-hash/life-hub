@@ -35,8 +35,7 @@ import {
 import {
   createStudentShell,
   renderStudentChrome,
-  renderStudentStatus
-} from '@/student/shell';
+  renderStudentStatus, STUDENT_BRAND } from '@/student/shell';
 
 export interface MountStudentLessonViewOptions {
   root: HTMLElement;
@@ -306,7 +305,7 @@ export function mountStudentLessonView(
   root.replaceChildren();
   const { surface, header, content } = createStudentShell();
   root.append(surface);
-  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentChrome(header, { brand: STUDENT_BRAND });
   renderStudentStatus(content, 'Loading lesson…');
 
   if (classId) {
@@ -349,7 +348,7 @@ export function mountStudentLessonView(
       }
 
       renderStudentChrome(header, {
-        brand: cls.code || 'Teaching Hub',
+        brand: cls.code || STUDENT_BRAND,
         links: [
           {
             href: `/s/classes/${classId}`,

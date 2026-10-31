@@ -2,7 +2,8 @@
  * Public student feedback page `/s/feedback/:token` (4f). noindex.
  */
 import { apiGet, ApiClientError } from '@/api/client';
-import { createStudentShell, renderStudentChrome, renderStudentStatus } from '@/student/shell';
+import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { createStudentShell, renderStudentChrome, renderStudentStatus, STUDENT_BRAND } from '@/student/shell';
 
 export type MountStudentFeedbackViewOptions = {
   root: HTMLElement;
@@ -48,7 +49,7 @@ export function mountStudentFeedbackView(
   root.replaceChildren();
   const { surface, header, content } = createStudentShell('student-feedback-surface');
   root.append(surface);
-  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentChrome(header, { brand: STUDENT_BRAND });
   renderStudentStatus(content, 'Loading feedback…');
 
   void (async () => {
@@ -76,7 +77,7 @@ export function mountStudentFeedbackView(
 
       const body = document.createElement('div');
       body.className = 'student-feedback__body';
-      body.innerHTML = data.body_html || '';
+      body.innerHTML = sanitizeRichTextHtml(data.body_html || '');
       article.append(body);
 
       if (data.audio_url) {

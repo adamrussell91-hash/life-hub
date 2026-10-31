@@ -45,7 +45,11 @@ test('student paths are the published lesson, unit, and class routes only', () =
     studentPath('/s/classes/class_1/lessons/lesson_1'),
     '/s/classes/class_1/lessons/lesson_1'
   );
-  assert.equal(studentPath('/teaching/s/lessons/lesson_1'), '/s/lessons/lesson_1');
+  assert.equal(studentPath('/s/classes/class_1/profile'), '/s/classes/class_1/profile');
+  assert.equal(studentPath('/s/feedback/tok_1'), '/s/feedback/tok_1');
+  assert.equal(studentPath('/s/feedback'), null);
+  assert.equal(studentPath('/s/classes/class_1/profile/x'), null);
+  assert.equal(studentPath('/teaching/s/lessons/lesson_1'), null);
   assert.equal(studentPath('/'), null);
   assert.equal(studentPath('/sign-in'), null);
   assert.equal(studentPath('/teaching/'), null);
@@ -65,6 +69,7 @@ test('only flat teaching build assets are proxied', () => {
 test('shell scrub removes the umbrella redirect', () => {
   const html = scrubTeachingShell(SHELL);
   assert.equal(html.includes('life-hub'), false);
+  assert.equal(/hub/i.test(html.match(/<title>[^<]*<\/title>/)[0]), false);
   assert.match(html, /\/teaching\/assets\/index-abc\.js/);
 });
 
@@ -155,6 +160,7 @@ test('the published personal line is served on the class host', async () => {
   assert.equal(response.status, 200);
   assert.equal(html.includes('life-hub'), false);
   assert.match(html, /\/tasks\/assets\/line-abc\.js/);
+  assert.match(html, /<title>MindWorks Pathways<\/title>/);
 });
 
 test('tasks build assets proxy, the tasks app does not', async () => {

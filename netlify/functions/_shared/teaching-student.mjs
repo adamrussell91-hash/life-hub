@@ -464,7 +464,7 @@ export function buildPublishedClass({
   let current_lesson;
   if (cls.current_scheduled_lesson_id) {
     const row = scheduled.find(entry => entry.id === cls.current_scheduled_lesson_id);
-    if (row) {
+    if (row && publishedLessonIds.has(row.lesson_id)) {
       const lesson = lessonById.get(row.lesson_id);
       if (lesson) {
         current_lesson = {
@@ -476,7 +476,10 @@ export function buildPublishedClass({
     }
   }
 
-  const schedule = [...scheduled]
+  // Students only ever see published lessons, so unpublished rows (and their
+  // titles) never leave the server.
+  const schedule = scheduled
+    .filter(row => publishedLessonIds.has(row.lesson_id))
     .sort((a, b) => (a.schedule_order ?? 0) - (b.schedule_order ?? 0))
     .map(row => {
       const lesson = lessonById.get(row.lesson_id);

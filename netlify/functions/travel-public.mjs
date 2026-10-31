@@ -7,6 +7,7 @@ import {
 } from './_shared/http.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
 import { redactTrip } from './_shared/travel-redact.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 
 export const config = { path: '/api/travel-public' };
 
@@ -38,11 +39,15 @@ export function createTravelPublicHandler(deps = {}) {
     const { map } = await repo.getShareTokens();
     const hash = createHash('sha256').update(token).digest('hex');
     const row = map[hash];
-    if (!row?.trip_id) {
+    // Journal tokens open the journal page only; the whole trip needs a trip link.
+    if (!row?.trip_id || (row.kind && row.kind !== 'trip')) {
       return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);
     }
     try {
       const { trip } = await repo.getTrip(row.trip_id);
+      if (isDeletedRecord(trip)) {
+        return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);
+      }
       return okResponse(200, { trip: redactTrip(trip) }, NO_STORE);
     } catch {
       return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);

@@ -29,3 +29,21 @@ test('foreign origins stay rejected', () => {
   assert.equal(isAllowedRequestOrigin('https://knowledge-hub.adam-russell.com', {}), true);
   assert.equal(isAllowedRequestOrigin('https://tasks-hub.adam-russell.com', {}), true);
 });
+
+test('the class host never carries or changes the owner session', async () => {
+  const { readUmbrellaSessionCookie, withCors } = await import('../../netlify/functions/_shared/http.mjs');
+  const cookie = 'life_hub_session=tok';
+  const fromClass = new Request('https://api.adam-russell.com/api/session', {
+    headers: { origin: 'https://class.adam-russell.com', cookie }
+  });
+  const fromHub = new Request('https://api.adam-russell.com/api/session', {
+    headers: { origin: 'https://life-hub.adam-russell.com', cookie }
+  });
+  assert.equal(readUmbrellaSessionCookie(fromClass), null);
+  assert.equal(readUmbrellaSessionCookie(fromHub), 'tok');
+
+  const clearing = new Response('{}', { status: 401, headers: { 'set-cookie': 'life_hub_session=; Max-Age=0' } });
+  assert.equal(withCors(clearing, fromClass, {}).headers.get('set-cookie'), null);
+  assert.ok(withCors(clearing, fromHub, {}).headers.get('set-cookie'));
+  assert.equal(withCors(clearing, fromClass, {}).headers.get('access-control-allow-origin'), 'https://class.adam-russell.com');
+});

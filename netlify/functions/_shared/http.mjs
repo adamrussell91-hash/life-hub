@@ -3,7 +3,7 @@ import {
   UMBRELLA_SESSION_COOKIE,
   UMBRELLA_SESSION_SECRET_ENV
 } from './umbrella-auth.mjs';
-import { isAllowedRequestOrigin } from './umbrella-origins.mjs';
+import { isAllowedRequestOrigin, isStudentOnlyOrigin } from './umbrella-origins.mjs';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -64,6 +64,8 @@ export function corsHeaders(request, env) {
 
 export function withCors(response, request, env) {
   const headers = new Headers(response.headers);
+  // A class-host request never had the session, so it must not clear or refresh it either.
+  if (isStudentOnlyOrigin(request.headers.get('origin'))) headers.delete('set-cookie');
   for (const [key, value] of Object.entries(corsHeaders(request, env))) headers.set(key, value);
   return new Response(response.body, { status: response.status, headers });
 }
@@ -85,6 +87,7 @@ export function readCookie(request, name) {
 }
 
 export function readUmbrellaSessionCookie(request) {
+  if (isStudentOnlyOrigin(request.headers.get('origin'))) return null;
   return readCookie(request, UMBRELLA_SESSION_COOKIE);
 }
 
