@@ -115,6 +115,8 @@ import { createPublishedTutorialHandler } from '../../../netlify/functions/publi
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createPublishedCaseHandler } from '../../../netlify/functions/published-case.mjs';
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
+import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
+import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
 import { createPublishedSprintHandler } from '../../../netlify/functions/published-sprint.mjs';
 import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
 import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-practice.mjs';
@@ -3954,6 +3956,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedTutorialHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
+      : /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path)
+        ? createAnthologyKnowledgeHandler(deps)
+      : path.startsWith('/api/published/anthology-knowledge/')
+        ? createPublishedAnthologyKnowledgeHandler(deps)
       : path.startsWith('/api/published/case/')
         ? createPublishedCaseHandler(deps)
       : /^\/api\/lessons\/[^/]+\/sprint$/.test(path)
@@ -4104,6 +4110,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
+      /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path) ||
+      /^\/api\/published\/anthology-knowledge\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint-practice$/.test(path) ||
       /^\/api\/published\/sprint\/[^/]+$/.test(path) ||

@@ -58,6 +58,10 @@ included_files = [
 [functions.alchemy-agent]
   timeout = 26
 
+# Drawing a fused WalkThru tile: one Sonnet call, two with the retry.
+[functions.walkthrus-fusion]
+  timeout = 26
+
 # Network Ecology assembles the full professional graph (GitHub import +
 # Blobs). NOTE: the live deploy still reports the 10s default for every
 # function, so these lines are not relied on — `/world` serves a Blob

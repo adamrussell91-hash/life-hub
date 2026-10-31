@@ -1,20 +1,22 @@
 /**
  * Lesson reps for WalkThrus: one small record per lesson, class and technique.
  *
- *   walkthru_reps/<technique>/<lesson>~<class|any>   { state, note, lesson_end, goal_id, at }
+ *   walkthru_reps/<tile>/<lesson>~<class|any>   { state, note, lesson_end, goal_id, steps_done, at }
+ *
+ * A tile is a book technique or a fusion (packages/walkthrus/tiles.mjs).
  *
  * A tap writes (or undoes) one record, so a second device never overwrites a shared counter.
  * Teacher only; no student ever reads these.
  */
-import { applyTap, isSafeRepId, normalizeRep, repStoreKey, TAP_STATES } from '../../../packages/walkthrus/reps.mjs';
-import { isTechniqueId } from '../../../packages/walkthrus/catalogue.mjs';
+import { applyStepTick, applyTap, isSafeRepId, normalizeRep, repStoreKey, TAP_STATES } from '../../../packages/walkthrus/reps.mjs';
+import { isTileId } from '../../../packages/walkthrus/tiles.mjs';
 import { deleteKey, getJSON, listJSON, setJSON } from './teaching-blobs.mjs';
 import { reject } from './question-drop.mjs';
 
 const PREFIX = 'walkthru_reps/';
 
 function readTarget(body) {
-  if (!isTechniqueId(body?.technique_id) || !isSafeRepId(body?.lesson_id)) reject(400, 'invalid_field', 'Unknown technique or lesson.');
+  if (!isTileId(body?.technique_id) || !isSafeRepId(body?.lesson_id)) reject(400, 'invalid_field', 'Unknown technique or lesson.');
   const classId = body.class_id == null || body.class_id === '' ? null : body.class_id;
   if (classId !== null && !isSafeRepId(classId)) reject(400, 'invalid_field', 'Unknown class.');
   return { techniqueId: body.technique_id, lessonId: body.lesson_id, classId };
@@ -22,7 +24,7 @@ function readTarget(body) {
 
 /** Every rep, or one technique's. */
 export async function listReps(store, techniqueId = null) {
-  if (techniqueId !== null && !isTechniqueId(techniqueId)) reject(400, 'invalid_field', 'Unknown technique.');
+  if (techniqueId !== null && !isTileId(techniqueId)) reject(400, 'invalid_field', 'Unknown technique.');
   const prefix = techniqueId ? `${PREFIX}${techniqueId}/` : PREFIX;
   return (await listJSON(store, prefix, { consistency: 'strong' })).map(normalizeRep).filter(Boolean);
 }
@@ -52,6 +54,26 @@ export async function tapRep(store, body, now = new Date().toISOString()) {
     return null;
   }
   const kept = normalizeRep({ ...next, goal_id: body.goal_id ?? next.goal_id });
+  await setJSON(store, key, kept);
+  return kept;
+}
+
+/** A step ticked (or unticked) in class. Saves at once; the state follows the ticks. */
+export async function stepRep(store, body, now = new Date().toISOString()) {
+  const step = body?.step;
+  const total = body?.steps_total;
+  if (!Number.isInteger(step) || step < 1 || step > 9 || typeof body.done !== 'boolean') reject(400, 'invalid_field', 'Unknown step.');
+  if (!Number.isInteger(total) || total < step || total > 9) reject(400, 'invalid_field', 'Unknown step count.');
+  const { techniqueId, lessonId, classId } = readTarget(body);
+  const key = repStoreKey(techniqueId, lessonId, classId);
+  const existing = normalizeRep(await getJSON(store, key, { consistency: 'strong' }));
+  const fresh = normalizeRep({ technique_id: techniqueId, lesson_id: lessonId, class_id: classId, goal_id: body.goal_id, state: 'planned', note: '', lesson_end: typeof body.lesson_end === 'string' ? body.lesson_end : null, at: now });
+  const next = applyStepTick(existing, { step, done: body.done, steps_total: total, fresh }, now);
+  if (!next) {
+    if (existing) await deleteKey(store, key);
+    return null;
+  }
+  const kept = normalizeRep(next);
   await setJSON(store, key, kept);
   return kept;
 }

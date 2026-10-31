@@ -55,8 +55,17 @@ Copy `snippets/rail.html`. Do not invent a parallel aside.
 
 - Markup: `<a class="hub-rail__brand" href="…">Life Hub</a>` inside `.hub-rail__brand-block`.
 - No logo, concentric mark, hub tile, or stacked `<br>` wordmark beside or above the brand. The hub tile is deleted from product chrome (`ICONS.md`).
-- No collapse chevron attached to the brand. If a hub collapses the rail, that control is a separate `.hub-icon-btn`, not the wordmark.
+- No collapse chevron attached to the brand. The collapse control is the shared edge tab (see **Collapse**), never the wordmark.
 - Optional `.hub-rail__tagline` is not a link (e.g. Life’s “Private dashboard”).
+
+## Collapse
+
+Every hub's rail collapses on desktop. Call `mountRailCollapse()` from `js/hub-rail-collapse.js` once the shell is on the page (safe to call on every render). It mounts one `.hub-rail-collapse` edge tab on `body`, toggles `html.hub-rail-collapsed`, remembers the choice per browser, and binds Ctrl/⌘+\\.
+
+- Shell grids and insets read `--rail-shown`, never `--rail-width`, for the rail's column (`.hub-layout`, Knowledge `.app-shell`, `.teacher-layout`, Life `.page-frame`). It is `--rail-width` open and `0` collapsed.
+- The rail keeps its 15rem and slides out by its own width while the column shrinks, so nothing squashes. Collapsed, it is `visibility: hidden` (out of the tab order).
+- A new shell grid adds its selector to the transition list in `rail.css`.
+- Phones (≤720px) have no rail, so no tab.
 
 ## Major destinations
 

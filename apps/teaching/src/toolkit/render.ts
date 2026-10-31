@@ -46,7 +46,7 @@ import {
 } from '@/toolkit/library';
 
 export type TkRenderMode = 'teacher' | 'student' | 'print';
-export type TkRenderContext = { lessonId?: string; pageBlocks?: Block[] };
+export type TkRenderContext = { lessonId?: string; pageBlocks?: Block[]; display?: boolean };
 
 type ToolkitBlock =
   | ToolkitSkillBlock

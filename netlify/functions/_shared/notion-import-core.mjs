@@ -1902,8 +1902,9 @@ var AnalogyTypesContentSchema = z11.object({
 });
 var TeacherNoteWalkthruSchema = z11.object({
   set: z11.number().int().min(1).max(20).default(1),
-  id: z11.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
-  jots: z11.record(z11.string().regex(/^[1-5]$/), z11.string().max(2e3)).default({})
+  // A book technique (w1-…) or a fusion from the board (fu_…), whose steps can run to nine.
+  id: z11.string().regex(/^(?:w\d+-[a-z0-9-]{2,80}|fu_[a-z0-9]{6,24})$/),
+  jots: z11.record(z11.string().regex(/^[1-9]$/), z11.string().max(2e3)).default({})
 });
 var TeacherNoteBlockContentSchema = z11.object({
   title: z11.string().default("Teacher note"),

@@ -105,6 +105,8 @@ export type ForceGraphOptions = {
   theme?: ShowAllTheme;
   /** Show All only: how far past the overview (×) topic names and every note name appear. A small map can name more sooner. */
   labelZoom?: { topics: number; notes: number };
+  /** Show All only: notes drawn as hollow rings (a second kind of note, such as class additions). */
+  ringFor?: (pageId: string) => boolean;
 };
 
 function curve(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
@@ -868,11 +870,19 @@ export function mountForceGraph(
         ctx.arc(node.x, node.y, haloR, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = hot ? (dark ? "#ffd2a8" : "#a8501a") : tint(node.color, dark ? 0.3 : 0.2);
+      const bodyR = (((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k) * grown;
+      const ring = Boolean(node.pageId && options.ringFor?.(node.pageId));
       ctx.globalAlpha = (hot ? 1 : dark ? 0.85 : 0.75) * fade;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, (((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k) * grown, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(node.x, node.y, ring ? Math.max(bodyR * 1.5, 2.6 / view.k) : bodyR, 0, Math.PI * 2);
+      if (ring) {
+        ctx.lineWidth = 1.3 / view.k;
+        ctx.strokeStyle = hot ? (dark ? "#ffd2a8" : "#a8501a") : node.color;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = hot ? (dark ? "#ffd2a8" : "#a8501a") : tint(node.color, dark ? 0.3 : 0.2);
+        ctx.fill();
+      }
     }
 
     ctx.globalCompositeOperation = "source-over";

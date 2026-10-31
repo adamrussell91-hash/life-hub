@@ -132,6 +132,10 @@
   /* Locked. Every hub uses this labeled rail. Overlays and hub sheets must not
      override it (Knowledge is not an icon column). Spec: RAIL.md. */
   --rail-width: 15rem;
+  /* What the canvas gives the rail right now: --rail-width, or 0 once the
+     rail is collapsed (rail.css). Shell grids and insets read this one. */
+  --rail-shown: var(--rail-width);
+  --rail-slide: 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   --measure: 68ch;
 
   font-family: var(--font-ui);

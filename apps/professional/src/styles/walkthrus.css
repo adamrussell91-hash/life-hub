@@ -3,21 +3,41 @@
 .wt-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .wt-toolbar__status { margin: 0 0 0 0.25rem; font-size: var(--text-sm); color: var(--muted); min-width: 0; flex: 1 1 14rem; }
 .wt-stage { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: #fff; touch-action: none; outline-offset: 2px; }
-.wt-svg { width: 100%; height: 100%; display: block; user-select: none; -webkit-user-select: none; cursor: grab; }
+.wt-svg { --wt-paper: #fff; width: 100%; height: 100%; display: block; user-select: none; -webkit-user-select: none; cursor: grab; }
 .wt-svg:active { cursor: grabbing; }
 .wt-svg[data-draw='from'], .wt-svg[data-draw='to'] { cursor: crosshair; }
 
-.wt-hex { stroke: #111; stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; transition: opacity 180ms; }
+.wt-hex { stroke: #111; stroke-width: 4; stroke-linejoin: round; transition: opacity 180ms; }
 .wt-tile { cursor: pointer; transition: opacity 220ms; outline: none; }
-.wt-tile:hover .wt-hex, .wt-tile:focus-visible .wt-hex { stroke-width: 2.6; }
-.wt-tile.is-selected .wt-hex { stroke-width: 3.2; }
-.wt-tile.is-draw-from .wt-hex { stroke: var(--wave); stroke-width: 3.2; }
+.wt-tile:hover .wt-hex, .wt-tile:focus-visible .wt-hex { stroke-width: 5.5; }
+.wt-tile.is-selected .wt-hex { stroke-width: 6; }
+.wt-tile.is-draw-from .wt-hex { stroke: var(--wave); stroke-width: 6; }
+/* A fusion: its own frame (packages/walkthrus/board/fused.ts), welded to the parents it touches. */
+.wt-weld { fill: #111; }
+.wt-weld-line { stroke: #111; stroke-width: 1.5; fill: none; }
+.wt-fused-tile text { user-select: none; -webkit-user-select: none; }
+/* Progress, only when there is some: the piece in a white disc on the top corner, rep dots beside it. */
+.wt-progress__disc { fill: #fff; stroke: #111; stroke-width: 1.6; }
+.wt-progress .wt-piece { color: #111; }
+.wt-progress .wt-dot { fill: #111; stroke: #111; }
+.wt-progress .wt-dot.is-hollow { fill: #fff; }
+.wt-mark circle { fill: #fff; stroke: #111; stroke-width: 1.6; }
+.wt-mark text { fill: #111; font-weight: 800; font-family: var(--font-ui); }
+.wt-mark--up circle { fill: #ffd400; }
+.wt-mark--down circle { fill: #111; }
+.wt-mark--down text { fill: #fff; }
+/* Drag to arrange My board. */
+.wt-svg[data-view='mine'] .wt-cluster-label { cursor: move; }
+.wt-svg.is-dragging, .wt-svg.is-dragging * { cursor: grabbing; }
+.wt-tile.is-dragged { opacity: 0.85; pointer-events: none; }
+.wt-tile.is-dragged .wt-hex { filter: drop-shadow(0 6px 10px rgba(10, 21, 54, 0.3)); }
+.wt-cluster-slot { fill: none; stroke: #111; stroke-width: 2; stroke-dasharray: 8 6; opacity: 0.5; }
+.wt-cluster-label .wt-cluster-slot__text { fill: var(--muted); font-size: 11px; letter-spacing: 0; font-weight: 600; font-family: var(--font-ui); }
 .has-selection .wt-arrow { opacity: 0.35; }
 .wt-tab { fill: #111; }
 .wt-tab__text { fill: #fff; font-weight: 700; font-family: var(--font-ui); letter-spacing: 0.02em; }
 .wt-icon { color: #111; }
 .wt-title { fill: #111; font-weight: 800; font-family: var(--font-ui); letter-spacing: 0.01em; }
-.wt-badge { fill: #111; }
 .wt-dot { fill: #ffd400; stroke: #ffd400; stroke-width: 0.8; }
 .wt-dot.is-hollow { fill: none; }
 .wt-cluster-label text { fill: #111; font-weight: 800; font-size: 28px; font-family: var(--font-ui); letter-spacing: 0.04em; }
@@ -28,8 +48,14 @@
 .wt-svg[data-level='clusters'] .wt-title, .wt-svg[data-level='clusters'] .wt-tab__text, .wt-svg[data-level='clusters'] .wt-tab { display: none; }
 .wt-svg[data-level='tabs'] .wt-title { display: none; }
 
-.wt-arrow__line { fill: none; stroke: #111; stroke-width: 1.6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.wt-arrow.is-free .wt-arrow__line { stroke-dasharray: 5 4; stroke-width: 1.2; }
+.wt-arrow__line { fill: none; stroke: #111; stroke-width: 2.4; stroke-linecap: butt; stroke-linejoin: round; }
+.wt-arrow.is-free .wt-arrow__line { stroke-dasharray: 7 5; stroke-width: 2; }
+.wt-arrow__start { fill: #fff; stroke: #111; stroke-width: 2; }
+.wt-arrow.is-book .wt-arrow__start { stroke: #9aa1ab; }
+.wt-arrowlabel__pill { fill: #fff; stroke: #111; stroke-width: 1.4; }
+.wt-arrowlabel__type { fill: #111; font-size: 10px; font-weight: 800; font-family: var(--font-ui); }
+.wt-arrowlabel__divider { stroke: #111; stroke-width: 0.8; }
+.wt-arrowlabel__text { fill: #111; font-size: 12px; font-weight: 500; font-family: var(--font-ui); }
 .wt-knot path, .wt-knot line { vector-effect: non-scaling-stroke; }
 .wt-arrow__hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
 .wt-arrow__head { fill: #111; }
@@ -39,8 +65,6 @@
 .wt-arrow__leader { stroke: #9aa1ab; stroke-width: 0.8; stroke-dasharray: 2 2; }
 .wt-knot path, .wt-knot line { fill: none; stroke: #111; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .wt-knot__hit { fill: transparent; cursor: pointer; }
-.wt-chiplabel { fill: #fff; stroke: #111; stroke-width: 0.8; }
-.wt-chiplabel__text { fill: #111; font-size: 12px; font-weight: 500; font-family: var(--font-ui); }
 @keyframes wt-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 
 
@@ -55,18 +79,31 @@
 .wt-pop__types, .wt-pop__row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .wt-pop__input { width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
 .wt-pop__err { margin: 0; color: var(--danger); font-size: var(--text-xs); min-height: 0; }
+.wt-pop__choices { display: grid; gap: 0.35rem; max-height: 14rem; overflow: auto; }
+.wt-pop__choices .btn { justify-content: flex-start; text-align: left; }
 
 .wt-panel { position: absolute; z-index: 20; top: 3rem; right: 0.5rem; bottom: 0.5rem; width: min(380px, calc(100% - 1rem)); overflow: auto; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 12px 32px rgba(10, 21, 54, 0.18); }
 .wt-panel__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
 .wt-panel__code { margin: 0; font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .wt-panel__title { margin: 0.15rem 0 0; font-size: var(--text-xl, 1.25rem); text-transform: uppercase; letter-spacing: 0.01em; }
-.wt-panel__close { border: 0; background: transparent; color: var(--wave); font: inherit; cursor: pointer; padding: 0.25rem; min-height: 2.75rem; }
+.wt-panel__head > div { min-width: 0; }
+.wt-panel__close { flex: 0 0 auto; border: 0; background: transparent; color: var(--wave); font: inherit; cursor: pointer; padding: 0.25rem; min-height: 2.75rem; }
 .wt-panel__body { display: grid; gap: 0.9rem; margin-top: 0.75rem; }
 .wt-panel__h, .wt-goal__h { margin: 0 0 0.35rem; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .wt-panel__reps, .wt-panel__evidence, .wt-panel__note { margin: 0; font-size: var(--text-sm); }
 .wt-panel__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .wt-panel__also { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .wt-panel__also .wt-panel__h { flex-basis: 100%; }
+.wt-panel__fused svg { display: block; width: min(200px, 60%); height: auto; margin: 0 auto; }
+.wt-panel__why { margin: 0; font-size: var(--text-sm); font-weight: 700; }
+.wt-panel__draw { display: grid; gap: 0.5rem; }
+.wt-steps__loop { margin: 0.2rem 0 0; font-size: var(--text-xs); font-weight: 700; }
+.wt-fusepick { display: grid; gap: 0.25rem; max-height: 14rem; overflow: auto; }
+.wt-fusepick__item { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; font-size: var(--text-sm); cursor: pointer; }
+.wt-fusepick__item input { width: 1.1rem; height: 1.1rem; accent-color: #111; }
+/* What's working, in place of the board. */
+.wt-proofpane { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 1rem; }
+.wt-proofpane[hidden], .wt-stage[hidden] { display: none; }
 .wt-chip { border: 1px solid #111; border-radius: 999px; background: #fff; padding: 0.35rem 0.7rem; font: inherit; font-size: var(--text-sm); cursor: pointer; min-height: 2.75rem; }
 
 .wt-chain { display: grid; gap: 0.25rem; }
@@ -78,6 +115,17 @@
 .wt-chain__name { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .wt-chain__btn { display: grid; place-items: center; width: 100%; height: 100%; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0; }
 .wt-chain__loop { font-size: var(--text-xs); color: var(--muted); }
+/* The panel's A·D·A·P·T chain: one line at any width. */
+.wt-adapt { display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; min-width: 0; }
+.wt-adapt__row { display: flex; gap: 0.2rem; list-style: none; margin: 0; padding: 0; flex: 0 0 auto; }
+.wt-adapt__step { display: block; }
+.wt-adapt__hex { display: block; width: 2.2rem; height: 1.95rem; overflow: visible; }
+.wt-adapt__hex polygon { fill: #fff; stroke: #111; stroke-width: 2; stroke-linejoin: round; }
+.wt-adapt__hex text { fill: #111; font-size: 15px; font-weight: 800; font-family: var(--font-ui); }
+.wt-adapt__step.is-done polygon { fill: #ffd400; }
+.wt-adapt__step.is-current polygon { fill: #111; }
+.wt-adapt__step.is-current text { fill: #fff; }
+.wt-adapt__note { min-width: 0; font-size: var(--text-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .wt-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
 .wt-steps__label { margin: 0; font-weight: 700; font-size: var(--text-sm); }
@@ -132,7 +180,7 @@
 .wt-viewswitch__btn[aria-pressed='true'] { background: #ffd400; color: #111; }
 .wt-viewswitch__btn:focus-visible { outline: 2px solid #ffd400; outline-offset: 2px; }
 /* Every tile keeps the book's full yellow; picked ones get a heavy outline, never a faded fill. */
-.wt-svg[data-view='book'] .wt-tile.is-mine .wt-hex { stroke-width: 4; }
+.wt-svg[data-view='book'] .wt-tile.is-mine .wt-hex { stroke-width: 7; }
 .wt-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 0.5rem; padding: 1.5rem; text-align: center; }
 .wt-empty[hidden] { display: none; }
 .wt-empty__title { margin: 0; font-weight: 800; font-size: var(--text-lg, 1.15rem); color: #111; }

@@ -18,6 +18,8 @@ import {
 } from '@/blocks/anthology-collect';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createBlock } from '@/blocks/create-block';
+import { gatherTeacherAnthology } from '@/blocks/anthology-load';
+import { teacherKnowledgeApi } from '@/blocks/anthology-knowledge';
 import {
   chunkItems,
   composeQuoteToTechniqueCards,
@@ -936,23 +938,7 @@ function mountUnitPlanEditor(
   }
 
   async function refreshAnthology(): Promise<void> {
-    const snapshots: AnthologySnapshot[] = [];
-    await Promise.all(
-      options.unit.lesson_ids.map(async (lessonId) => {
-        try {
-          const lesson = await apiGet<Lesson>(`/api/lessons/${lessonId}`);
-          const summary = options.curriculum.lessons.find((row) => row.id === lessonId);
-          snapshots.push({
-            lesson_id: lessonId,
-            lesson_title: lesson.title,
-            published: summary?.published === true,
-            blocks: filterBlocksForStudent(lesson.blocks ?? [])
-          });
-        } catch {
-          // Preview stays empty for lessons that fail to load.
-        }
-      })
-    );
+    const snapshots = await gatherTeacherAnthology(options.unit.lesson_ids, options.curriculum.lessons);
     if (destroyed) return;
     anthologySnapshots = snapshots;
     anthologyData = collectAnthology(snapshots, {
@@ -1032,6 +1018,7 @@ function mountUnitPlanEditor(
         network: unitNetworkContext(options.curriculum, options.unit),
         attachedOutcomes,
         anthology: anthologyData,
+        anthologyKnowledge: teacherKnowledgeApi(options.unit.id),
         onMakeAnthologyCards: (request) => {
           void makeCardsFromAnthology(request);
         }

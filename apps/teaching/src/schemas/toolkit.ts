@@ -309,13 +309,14 @@ export const AnalogyTypesContentSchema = z.object({
 });
 
 /**
- * A WalkThru technique on a teacher note: the technique's id and your own jots, step by step.
+ * A WalkThru technique (or a fusion) on a teacher note: its id and your own jots, step by step.
  * The book's wording is fetched from the private endpoint when the note renders and never stored here.
  */
 export const TeacherNoteWalkthruSchema = z.object({
   set: z.number().int().min(1).max(20).default(1),
-  id: z.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
-  jots: z.record(z.string().regex(/^[1-5]$/), z.string().max(2000)).default({})
+  // A book technique (w1-…) or a fusion from the board (fu_…), whose steps can run to nine.
+  id: z.string().regex(/^(?:w\d+-[a-z0-9-]{2,80}|fu_[a-z0-9]{6,24})$/),
+  jots: z.record(z.string().regex(/^[1-9]$/), z.string().max(2000)).default({})
 });
 
 export const TeacherNoteBlockContentSchema = z.object({
