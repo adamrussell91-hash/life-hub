@@ -67,6 +67,8 @@ export interface BoardLayout {
   labels: Box[];
   boxSlots: BoxSlot[];
   bounds: Frame;
+  /** What Fit frames: the opened techniques and their labels, not the sets still in the box. */
+  focus: Frame;
 }
 
 export const DEFAULT_SIZE = 64;
@@ -82,7 +84,7 @@ const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** The cell a cluster's first tile sits on. Rows stay level because the column step is even. */
 export function clusterOrigin(col: number, row: number): Cell {
-  return { q: 8 * col, r: 8 * row - 4 * col };
+  return { q: 6 * col, r: 6 * row - 3 * col };
 }
 
 export function frameOfBoxes(boxes: Box[], pad = 0): Frame {
@@ -197,7 +199,8 @@ export function boardLayout(input: LayoutInput): BoardLayout {
     [...tiles.map((t) => t.box), ...labels, ...boxSlots.map((b) => boxOf(b.frame))],
     BOUNDS_PAD
   );
-  return { size, drawn, tiles, clusters, labels, boxSlots, bounds };
+  const focus = tiles.length ? frameOfBoxes([...tiles.map((t) => t.box), ...labels], BOUNDS_PAD) : bounds;
+  return { size, drawn, tiles, clusters, labels, boxSlots, bounds, focus };
 }
 
 /**
@@ -229,7 +232,7 @@ export function pickedLayout(input: { entries: BoardEntry[]; ids: string[]; size
   const minW = size * 9;
   const minH = size * 7;
   const bounds = { x: frame.x + frame.w / 2 - Math.max(frame.w, minW) / 2, y: frame.y + frame.h / 2 - Math.max(frame.h, minH) / 2, w: Math.max(frame.w, minW), h: Math.max(frame.h, minH) };
-  return { size, drawn, tiles, clusters, labels, boxSlots: [], bounds };
+  return { size, drawn, tiles, clusters, labels, boxSlots: [], bounds, focus: bounds };
 }
 
 export function tileByCell(layout: BoardLayout): Map<string, BoardTile> {
