@@ -25,6 +25,8 @@ export interface PulseSummaryOptions {
   pulse: TeacherBlockPulseHandle;
   getBlocks: () => Block[];
   isLessonOff: () => boolean;
+  /** A section kept at the foot of the panel (end-of-lesson questions), told when the panel opens. */
+  extra?: { element: HTMLElement; onOpen?: () => void };
 }
 
 export interface PulseSummaryHandle {
@@ -161,7 +163,10 @@ export function mountPulseSummary(options: PulseSummaryOptions): PulseSummaryHan
     panel.hidden = !open;
     chip.setAttribute('aria-expanded', String(open));
     chip.classList.toggle('is-open', open);
-    if (open) draw();
+    if (open) {
+      draw();
+      options.extra?.onOpen?.();
+    }
   }
 
   function drawChip(summary: ReturnType<typeof summarisePulse>): void {
@@ -259,6 +264,7 @@ export function mountPulseSummary(options: PulseSummaryOptions): PulseSummaryHan
         pulseEl('p', 'pulse-summary__meta', `${summary.quiet} other ${summary.quiet === 1 ? 'block has' : 'blocks have'} no taps.`)
       );
     }
+    if (options.extra) body.push(options.extra.element);
     panel.replaceChildren(...body);
   }
 

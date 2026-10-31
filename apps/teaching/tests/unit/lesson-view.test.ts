@@ -152,7 +152,7 @@ describe('mountStudentLessonView', () => {
       expect(root.textContent).toContain('Memory');
       expect(root.querySelector('a.student-surface__back')).toBeNull();
     });
-    expect(root.querySelector('.student-lesson__nav')).toBeNull();
+    expect(root.querySelector('.lf')).toBeNull();
     expect(root.querySelector('a.student-surface__back-class')).toBeNull();
   });
 
@@ -181,8 +181,8 @@ describe('mountStudentLessonView', () => {
       expect(root.textContent).not.toContain('Back to unit');
     });
 
-    const prev = root.querySelector('a.student-lesson__nav-prev') as HTMLAnchorElement;
-    const next = root.querySelector('a.student-lesson__nav-next') as HTMLAnchorElement;
+    const prev = root.querySelector('a.lf__link--prev') as HTMLAnchorElement;
+    const next = root.querySelector('a.lf__link--next') as HTMLAnchorElement;
     expect(prev.getAttribute('href')).toBe(
       `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
     );
