@@ -3741,10 +3741,18 @@ body.is-universe-fullscreen .local-banner {
 .chat-overlay__save {
   display: flex;
   justify-content: flex-end;
+  padding-left: calc(52px + var(--space-2));
 }
 
-.chat-overlay__save .btn {
+.chat-overlay__save .chat__text-btn {
   min-height: 44px;
+  padding-inline: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.chat-overlay__save .chat__text-btn:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 @media (max-width: 720px) {

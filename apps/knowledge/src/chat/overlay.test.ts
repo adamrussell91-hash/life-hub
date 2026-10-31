@@ -166,7 +166,50 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     );
     ensureChatOverlay({ visible: true });
     expect(document.querySelector("textarea#overlay-chat-input")).toBeTruthy();
-    expect(document.querySelector("[data-save-brief]")?.textContent).toBe("Save as new page");
+    expect(document.querySelector("[data-save-brief]")?.textContent?.trim()).toBe("Save as new page");
+  });
+
+  it("does not open a Waiting on Confirm tray just to offer Save as new page", () => {
+    sessionStorage.setItem(
+      "knowledge-hub-overlay-chat-v1",
+      JSON.stringify({
+        personality: "clementine",
+        open: true,
+        input: "",
+        turns: [
+          { role: "user", content: "Is anything in the archive about tide tables?" },
+          {
+            role: "assistant",
+            content: `Short answer: no. I swept the notes in this retrieval and none of them mention tide tables. The archive is an education research collection, so the nearest material is policy documentation.`,
+          },
+        ],
+      }),
+    );
+    ensureChatOverlay({ visible: true });
+    expect(document.querySelector(".chat-pending-confirms")).toBeNull();
+    const save = document.querySelector(".chat-messages [data-save-brief]");
+    expect(save?.closest(".confirm-card")).toBeNull();
+  });
+
+  it("leaves the thread and its scroll alone when the host repaints with nothing new", () => {
+    sessionStorage.setItem(
+      "knowledge-hub-overlay-chat-v1",
+      JSON.stringify({
+        personality: "clementine",
+        open: true,
+        input: "",
+        turns: [
+          { role: "user", content: "What does the archive say about spacing?" },
+          { role: "assistant", content: "Spacing beats massing. ".repeat(40) },
+        ],
+      }),
+    );
+    ensureChatOverlay({ visible: true });
+    const thread = document.querySelector<HTMLElement>(".chat-messages")!;
+    thread.scrollTop = 180;
+    ensureChatOverlay({ visible: true });
+    expect(document.querySelector(".chat-messages")).toBe(thread);
+    expect(thread.scrollTop).toBe(180);
   });
 
   it("keeps Confirm cards in the sticky tray above the composer, not in the thread", () => {
@@ -198,7 +241,8 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     const messages = document.querySelector(".chat-messages");
     expect(tray).toBeTruthy();
     expect(tray?.querySelector("[data-confirm-edit]")).toBeTruthy();
-    expect(tray?.querySelector("[data-save-brief]")).toBeTruthy();
+    expect(tray?.querySelector("[data-save-brief]")).toBeNull();
+    expect(messages?.querySelector("[data-save-brief]")).toBeTruthy();
     expect(messages?.querySelector(".confirm-card")).toBeNull();
     const overlay = document.querySelector(".chat-overlay")!;
     const kids = [...overlay.children];
