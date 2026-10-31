@@ -46,7 +46,7 @@ On send, a clean item appears on the map at once. An item that the shared text f
 
 ### Teacher controls
 
-On the Class tab, a student card also shows the teacher the initials and a time, plus **Hide** and **Delete**. Flagged items appear for the teacher only, marked "Waiting", with **Show** and **Delete**. Students never see initials.
+On the Class tab, a student card also shows the teacher the initials and a time, plus **Hide** and **Delete**. Waiting (flagged) and hidden items stay off the map; the teacher sees them in a "Waiting or hidden" list under the map, with **Show** and **Delete**. Students never see initials.
 
 ## Data
 
@@ -63,7 +63,7 @@ anthology-knowledge/{unit}/moderation/{id}   { status: shown | hidden }  teacher
 
 ### Endpoints
 
-- `GET /api/published-anthology-knowledge/{unit}`: public; shown items without initials. The unit must be published and its plan must contain an anthology block.
+- `GET /api/published-anthology-knowledge/{unit}`: public; shown items without initials. The unit must exist and its plan must contain an anthology block that students can see.
 - `POST /api/published-anthology-knowledge/{unit}`: public; adds one item. Validation as above.
 - Teacher (signed in): list all items with initials and status; set moderation; delete.
 
@@ -82,6 +82,6 @@ Students adding poem quotes; editing after posting; QTEP output; linking an item
 
 ## Tests
 
-- Server: tag allow-list, required fields and lengths, flag → waiting, cap, moderation, delete, unpublished unit refused.
+- Server: tag allow-list, required fields and lengths, flag → waiting, cap, moderation, delete, unit without an anthology block refused.
 - Client: graph includes knowledge only on Class; student entries carry the ring marker and title label; form refuses no-tag sends.
 - Browser walk at desktop and 390px, on both the teacher page and the student page.
