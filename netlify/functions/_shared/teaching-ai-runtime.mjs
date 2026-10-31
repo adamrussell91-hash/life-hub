@@ -4491,7 +4491,7 @@ var BLOCK_GROUPS = [
     ]
   }
 ];
-var PAGE_ONLY_TYPES = /* @__PURE__ */ new Set(["collection", "anthology"]);
+var PAGE_ONLY_TYPES = /* @__PURE__ */ new Set(["collection"]);
 var UNIT_ONLY_TYPES = /* @__PURE__ */ new Set(["curriculum_lines"]);
 var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value", "definition", "html"]);
 var TOOLKIT_GROUP_TYPES = [
@@ -5157,7 +5157,7 @@ function isSidePath(block) {
 }
 
 // apps/teaching/src/teacher/lesson-canvas/drop.ts
-var PAGE_ONLY = /* @__PURE__ */ new Set(["collection", "anthology"]);
+var PAGE_ONLY = /* @__PURE__ */ new Set(["collection"]);
 var LESSON_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => !PAGE_ONLY.has(t));
 function countBlocksInTree(blocks) {
   let count = 0;
