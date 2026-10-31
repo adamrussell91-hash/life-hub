@@ -6,6 +6,7 @@ import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
 import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
+import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
@@ -33,7 +34,6 @@ import {
 } from '@/student/published-class';
 import {
   createStudentShell,
-  studentAnchor,
   renderStudentChrome,
   renderStudentStatus
 } from '@/student/shell';
@@ -251,48 +251,6 @@ function readNoteHash(): string | undefined {
   return id || undefined;
 }
 
-function renderLessonNav(
-  content: HTMLElement,
-  classId: string,
-  lessonId: string,
-  cls: PublishedClass
-): void {
-  const { prev, next } = scheduleNeighbors(cls.schedule, lessonId);
-  if (!prev && !next) return;
-
-  const nav = document.createElement('nav');
-  nav.className = 'student-lesson__nav student-pager';
-  nav.setAttribute('aria-label', 'Lesson');
-
-  if (prev) {
-    const href = `/s/classes/${classId}/lessons/${prev.lesson_id}`;
-    const link = studentAnchor(href, 'student-lesson__nav-prev student-pager__link');
-    const dir = document.createElement('span');
-    dir.className = 'student-pager__dir';
-    dir.textContent = 'Previous';
-    const title = document.createElement('span');
-    title.className = 'student-pager__title';
-    title.textContent = prev.title;
-    link.append(dir, title);
-    nav.append(link);
-  }
-
-  if (next) {
-    const href = `/s/classes/${classId}/lessons/${next.lesson_id}`;
-    const link = studentAnchor(href, 'student-lesson__nav-next student-pager__link');
-    const dir = document.createElement('span');
-    dir.className = 'student-pager__dir';
-    dir.textContent = 'Next';
-    const title = document.createElement('span');
-    title.className = 'student-pager__title';
-    title.textContent = next.title;
-    link.append(dir, title);
-    nav.append(link);
-  }
-
-  content.append(nav);
-}
-
 function isNotFound(error: unknown): boolean {
   return error instanceof ApiClientError && error.code === 'not_found';
 }
@@ -323,15 +281,26 @@ export function mountStudentLessonView(
     examples = lecture ? null : mountStudentClassExamples(content, { lessonId, classId });
   };
   let work: WorkSyncHandle | null = null;
+  let footer: LessonFooterHandle | null = null;
   const show = (content: HTMLElement, lesson: PublishedLesson, extras: Parameters<typeof renderPublishedLesson>[2]) => {
     lecture?.dispose();
     work?.dispose();
     work = null;
+    footer?.dispose();
+    footer = null;
     lecture = renderPublishedLesson(content, lesson, extras);
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);
     if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
+    // Previous, the finish tick and next. Neighbours come from the class's schedule when the lesson was opened from it.
+    if (workClass) {
+      const cls = extras?.cls;
+      const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
+      const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
+      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), work: () => work });
+      content.append(footer.element);
+    }
   };
 
   root.replaceChildren();
@@ -390,7 +359,6 @@ export function mountStudentLessonView(
         ]
       });
       show(content, lesson, { cls });
-      renderLessonNav(content, classId, lessonId, cls);
       mountExamples(content);
     });
   } else {
@@ -452,6 +420,8 @@ export function mountStudentLessonView(
       lecture = null;
       work?.dispose();
       work = null;
+      footer?.dispose();
+      footer = null;
     }
   };
 }

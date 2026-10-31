@@ -181,3 +181,32 @@ describe('hand in', () => {
     handle.dispose();
   });
 });
+
+describe('mountWorkSync: the lesson footer’s handle', () => {
+  it('counts what’s written, then sends it all and hands in the marked blocks with writing', async () => {
+    localStorage.setItem(answersKey, JSON.stringify({ q1: 'One', q2: 'Two' }));
+    localStorage.setItem(`${storageKey(lesson, 'qset2')}.answers`, JSON.stringify({ q1: 'Three' }));
+    const sent: Array<[string, Record<string, unknown>]> = [];
+    const call: WorkCall = async (action, extra = {}) => {
+      sent.push([action, extra]);
+      return action === 'handin' ? { need: null, handed_in_at: '2026-10-31T01:00:00Z' } : { need: null, initials: 'BB', handin_blocks: ['qset1', 'qset9'] };
+    };
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call, delayMs: 0 });
+    await settle();
+    expect(sync.progress()).toEqual({ written: 3, toHandIn: 1 });
+    expect(await sync.handInAll()).toBe(true);
+    expect(sent.filter(([a]) => a === 'handin').map(([, e]) => e)).toEqual([{ block_id: 'qset1' }]);
+    expect(sent.filter(([a]) => a === 'save').length).toBe(2);
+    sync.dispose();
+  });
+
+  it('says it couldn’t hand in while the device still needs initials', async () => {
+    const server = fakeServer('initials');
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 0 });
+    await settle();
+    expect(await sync.handInAll()).toBe(false);
+    server.claim();
+    expect(await sync.handInAll()).toBe(true);
+    sync.dispose();
+  });
+});

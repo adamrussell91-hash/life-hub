@@ -30,6 +30,7 @@ import { addToScene } from '@/lecture/tree';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
+import { mountEndQuestions } from '@/teacher/end-questions';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -1601,10 +1602,17 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const stripHost = syllabus.outcomes;
 
   // Every dot's counts in one panel above the canvas, opened from the meta row.
+  // The questions after the finish tick sit at the foot of the same panel: settings, then answers.
+  const endQuestions = mountEndQuestions({
+    lessonId: lesson.id,
+    getLesson: () => lesson,
+    onChange: (next) => emitLesson({ ...lesson, end_questions: next })
+  });
   const pulseSummary = mountPulseSummary({
     pulse,
     getBlocks: () => lesson.blocks,
-    isLessonOff: () => lesson.feedback_off === true
+    isLessonOff: () => lesson.feedback_off === true,
+    extra: { element: endQuestions.element, onOpen: endQuestions.refresh }
   });
   metaRow.append(pulseSummary.chip);
   canvasHost.before(pulseSummary.panel);
