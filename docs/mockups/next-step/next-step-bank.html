@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next Step Bank mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.10); --line2: rgba(23,55,94,.18);
+  --lilac: #e7e2f5; --lilac-ink: #5a4a8c; --blue: #dceafa; --gold: #f6ecd2; --gold-ink: #7a5a14;
+  --sage: #dfe9e1; --sage-ink: #3d6b4a;
+  --card: #fff; --r-sm: .875rem; --r-xs: .375rem;
+  --font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 var(--font); }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font: inherit; font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; min-height: 34px; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.note { max-width: 1180px; margin: 16px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.note b { color: var(--navy); }
+.stage { max-width: 1180px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 640px; min-width: 0; }
+.desk .screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 760px; overflow-y: auto; background: var(--paper); border-radius: 36px; border: 10px solid #1d2633; box-shadow: 0 10px 30px rgba(19,35,58,.18); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: #fff; }
+.chrome .dot { width: 26px; height: 26px; border-radius: 8px; background: var(--wave); }
+.chrome b { color: var(--navy); font-size: 14px; }
+.chrome span { color: var(--muted); font-size: 13px; margin-left: auto; }
+.page { padding: 24px 28px 40px; max-width: 52rem; margin: 0 auto; }
+.phone .page { padding: 18px 14px 32px; }
+.h { margin: 0 0 4px; font-size: 22px; color: var(--navy); letter-spacing: -.01em; }
+.sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+.block { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 18px; margin-bottom: 16px; }
+.phone .block { padding: 14px; }
+.code { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; border-radius: 6px; padding: 1px 6px; background: var(--lilac); color: var(--lilac-ink); vertical-align: 1px; white-space: nowrap; }
+.code.blue { background: var(--blue); color: var(--navy); }
+
+/* Builder: block editor */
+.ed-type { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.ed-type .grip { color: #b5bcc6; letter-spacing: -2px; }
+.field { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
+.input { width: 100%; border: 1px solid var(--line2); border-radius: var(--r-xs); padding: 9px 11px; font: inherit; color: var(--ink); background: #fff; }
+.row { margin-bottom: 14px; }
+.skills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.skill { font: inherit; font-size: 13px; border: 1px solid var(--line2); background: #fff; color: var(--ink); border-radius: 999px; padding: 5px 12px; min-height: 34px; cursor: pointer; }
+.skill[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.skill.add { color: var(--wave); border-style: dashed; }
+
+/* The bank panel, collapsed by default */
+.bank { border: 1px solid var(--line); border-radius: var(--r-xs); background: #faf9fd; }
+.bank-head { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; background: none; font: inherit; text-align: left; padding: 10px 12px; cursor: pointer; min-height: 44px; }
+.bank-head b { color: var(--navy); font-size: 14px; }
+.bank-head .meta { color: var(--muted); font-size: 12.5px; }
+.bank-head .chev { margin-left: auto; color: var(--muted); transition: transform .2s; }
+.bank.open .chev { transform: rotate(90deg); }
+.bank-body { display: none; padding: 0 12px 12px; }
+.bank.open .bank-body { display: block; }
+.code-tabs { display: flex; gap: 6px; margin: 2px 0 10px; flex-wrap: wrap; }
+.ctab { font: inherit; font-size: 12.5px; border: 1px solid var(--line2); background: #fff; border-radius: 999px; padding: 4px 10px 4px 6px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+.ctab[aria-pressed="true"] { border-color: var(--lilac-ink); box-shadow: 0 0 0 1px var(--lilac-ink); }
+.ladder { display: grid; gap: 6px; }
+.rungrow { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 8px 10px; }
+.rungrow .r { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
+.rungrow .r small { display: block; font-weight: 500; font-size: 11px; color: #9aa3af; }
+.rungrow .t { font-size: 13.5px; outline: none; border-radius: 4px; padding: 1px 3px; margin: -1px -3px; }
+.rungrow .t:focus { background: #f3f0fa; box-shadow: 0 0 0 2px var(--lilac); }
+.rungrow .ic { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; min-width: 28px; min-height: 28px; }
+.rungrow.edited { border-color: rgba(90,74,140,.35); }
+.rungrow .tag { font-size: 10.5px; font-weight: 600; color: var(--lilac-ink); margin-left: 6px; }
+.bank-foot { display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.link { border: 0; background: none; color: var(--wave); font: inherit; font-size: 12.5px; cursor: pointer; padding: 0; }
+.phone .rungrow { grid-template-columns: 1fr auto; }
+.phone .rungrow .r { grid-column: 1 / -1; padding: 0; }
+.phone .rungrow .r small { display: inline; margin-left: 4px; }
+
+/* Code ladders library */
+.lib { display: grid; gap: 14px; }
+.lib-skill { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 6px 0 -4px; }
+.lib-card { background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; }
+.lib-card h3 { margin: 0 0 2px; font-size: 15px; color: var(--navy); display: flex; gap: 8px; align-items: center; }
+.lib-card p.d { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+
+/* Student side */
+.who { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0 0 16px; font-size: 12.5px; color: var(--muted); }
+.who button { font: inherit; font-size: 12.5px; border: 1px solid var(--line2); background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; min-height: 30px; }
+.who button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.q-kicker { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
+.q { margin: 0 0 10px; font-weight: 600; color: var(--navy); }
+.step { display: flex; gap: 8px; align-items: baseline; margin: 0 0 10px; font-size: 13.5px; }
+.step .k { color: var(--lilac-ink); font-weight: 600; white-space: nowrap; }
+.box { width: 100%; min-height: 120px; border: 1px solid var(--line2); border-radius: var(--r-xs); padding: 12px; font: inherit; background: #fff; display: block; resize: vertical; }
+.behind { margin-top: 14px; font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line2); padding-top: 10px; }
+.behind b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Next-step bank</h1>
+  <button data-view="builder" aria-pressed="true">1 · Builder: tag + bank</button>
+  <button data-view="ladders" aria-pressed="false">2 · Code ladders</button>
+  <button data-view="student" aria-pressed="false">3 · What students see</button>
+</div>
+<p class="note" id="note"></p>
+<div class="stage">
+  <div class="desk"><p class="label">Desktop</p><div class="screen" data-frame></div></div>
+  <div class="phone"><p class="label">390px</p><div class="screen" data-frame></div></div>
+</div>
+
+<script>
+const RUNGS = [
+  ['below', 'Building to Capable'],
+  ['capable', 'Capable'],
+  ['skilled', 'Skilled'],
+  ['accomplished', 'Accomplished'],
+  ['excellent', 'Excellent']
+];
+const QUESTION = 'How does the poet use the river to show change in the town?';
+const SKILLS = [
+  { id: 'argue', name: 'Building an argument', codes: ['TS', 'AR', 'SD'] },
+  { id: 'evidence', name: 'Using evidence', codes: ['E', 'T'] },
+  { id: 'express', name: 'Expression', codes: ['EX'] }
+];
+const CODE = {
+  TS: { name: 'Topic sentence', colour: '' },
+  AR: { name: 'Analysis – relevance', colour: '' },
+  SD: { name: 'Structure – development', colour: '' },
+  E: { name: 'Evidence', colour: 'blue' },
+  T: { name: 'Techniques', colour: 'blue' }
+};
+// The ladder: one positive step per code per rung, about any question.
+const LADDER = {
+  TS: [
+    'Start with one sentence that answers the question in your own words.',
+    'Name the idea your paragraph will prove, then answer the question with it.',
+    'Make your opening a claim a reader could argue with.',
+    'Build your opening around a concept, so every later sentence can lean on it.',
+    'Let your opening sentence hold a tension or nuance that the paragraph resolves.'
+  ],
+  AR: [
+    'After each point, write one sentence that links it back to the question.',
+    'Pick the point that best answers the question and spend the most words on it.',
+    'Use the question’s key word in each link sentence, so the reader sees the thread.',
+    'Show how each point moves your answer forward, step by step.',
+    'Weigh your points: say which one answers the question most fully, and why.'
+  ],
+  SD: [
+    'Give each sentence a new piece of the idea.',
+    'Use a linking word (so, because, which means) to carry the idea forward.',
+    'Make your last sentence say more than your first.',
+    'Order your points so each one builds on the last.',
+    'Let the paragraph arrive at a sharper version of your opening idea.'
+  ],
+  E: [
+    'Add a short quote that shows your point.',
+    'Choose the few words from the quote that do the most work, and use just those.',
+    'Bring in a second, different piece of evidence that backs the same point.',
+    'Weave your quotes into your own sentences.',
+    'Pick evidence that surprises: a detail other readers might pass over.'
+  ]
+};
+// The question bank: the ladder line, rewritten for this question.
+const BANK = {
+  TS: [
+    'Start with one sentence that says what the river shows about the town.',
+    'Name the change the river shows, then say how the poet makes us see it.',
+    'Open with a claim about the town’s change that a reader could argue with.',
+    'Open with a concept (memory, loss, slow erosion) that the river carries through the poem.',
+    'Open with a tension: the river keeps flowing as the town fades. Let the paragraph resolve it.'
+  ],
+  AR: [
+    'After each point about the river, add one sentence on what it says about the town.',
+    'Choose the river detail that shows the most change and spend the most words on it.',
+    'Use the word “change” in each link sentence, so the thread back to the question is clear.',
+    'Show how each river detail takes your answer about the town one step further.',
+    'Say which river detail shows the town’s change most fully, and why.'
+  ],
+  SD: LADDER.SD,
+  E: [
+    'Add a short quote about the river that shows the change.',
+    'Zoom in on “narrower, browner, quieter”: pick the word doing the most work.',
+    'Add a second river detail from a different stanza that shows the same change.',
+    'Weave the river quotes into your own sentences about the town.',
+    'Find a river detail most readers would skip, and show what it adds.'
+  ]
+};
+
+const notes = {
+  builder: '<b>1 · Builder.</b> Tag the box with skills. The bank appears underneath (collapsed in the real builder, open here): it shows to see one line per rung for each code under those skills, already rewritten for this question. Click any line to edit it. <i>Regenerate</i> redoes a code’s lines; your edits are kept.',
+  ladders: '<b>2 · Code ladders.</b> One page in your code library: each code’s positive step at every rung, about any question. Claude drafts it once and you edit. Every question bank is built from these lines.',
+  student: '<b>3 · What students see.</b> Switch between the made-up students. Same box, same TS code, a different step for each rung. Nothing is generated while they wait: the box serves the line from its bank.'
+};
+
+let view = 'builder', tagged = new Set(['argue']), openBank = true, codeTab = 'TS', student = 'skilled', ladderCode = null;
+const edited = new Set(['TS-2']);
+const frames = [...document.querySelectorAll('[data-frame]')];
+const codeChip = (c) => `<span class="code ${CODE[c]?.colour ?? ''}">${c}</span>`;
+
+function rungRows(code, lines, editable) {
+  return `<div class="ladder">${RUNGS.map(([id, name], i) => `
+    <div class="rungrow${edited.has(code + '-' + i) && editable ? ' edited' : ''}">
+      <span class="r">${name}${edited.has(code + '-' + i) && editable ? '<span class="tag">edited</span>' : ''}</span>
+      <span class="t" contenteditable="true" spellcheck="true" data-k="${code}-${i}">${lines[i]}</span>
+      <button class="ic" title="Edit" aria-label="Edit">✎</button>
+    </div>`).join('')}</div>`;
+}
+
+function builder() {
+  const codes = SKILLS.filter((s) => tagged.has(s.id)).flatMap((s) => s.codes).filter((c) => BANK[c]);
+  if (!codes.includes(codeTab)) codeTab = codes[0];
+  const bank = codes.length ? `
+    <div class="bank${openBank ? ' open' : ''}">
+      <button class="bank-head" data-act="toggle"><b>Next steps for this box</b><span class="meta">${codes.length} codes · ${codes.length * 5} lines</span><span class="chev">›</span></button>
+      <div class="bank-body">
+        <div class="code-tabs">${codes.map((c) => `<button class="ctab" data-code="${c}" aria-pressed="${c === codeTab}">${codeChip(c)}${CODE[c].name}</button>`).join('')}</div>
+        ${rungRows(codeTab, BANK[codeTab], true)}
+        <div class="bank-foot"><button class="link">Regenerate ${codeTab}</button><span>· Built from the ${codeTab} ladder and this question.</span></div>
+      </div>
+    </div>` : '<p class="sub" style="margin:0">Tag a skill to make next steps for this box.</p>';
+  return `<div class="chrome"><span class="dot"></span><b>Lesson builder</b><span>The river as memory</span></div>
+  <div class="page">
+    <h2 class="h">The river as memory</h2><p class="sub">Lesson 4 · Editing</p>
+    <div class="block">
+      <div class="ed-type"><span class="grip">⋮⋮</span>Writing box</div>
+      <div class="row"><span class="field">Question</span><input class="input" value="${QUESTION}"></div>
+      <div class="row"><span class="field">Skills this box practises</span>
+        <div class="skills">${SKILLS.map((s) => `<button class="skill" data-skill="${s.id}" aria-pressed="${tagged.has(s.id)}">${s.name}</button>`).join('')}<button class="skill add">+ Skill</button></div>
+      </div>
+      ${bank}
+    </div>
+  </div>`;
+}
+
+function ladders() {
+  const cards = SKILLS.filter((s) => s.id !== 'express').map((s) => `
+    <p class="lib-skill">${s.name}</p>
+    ${s.codes.filter((c) => LADDER[c]).map((c) => `
+      <div class="lib-card"><h3>${codeChip(c)}${CODE[c].name}</h3><p class="d">The step at each rung, for any question.</p>${rungRows(c, LADDER[c], false)}</div>`).join('')}`).join('');
+  return `<div class="chrome"><span class="dot"></span><b>Feedback codes</b><span>Ladders</span></div>
+  <div class="page"><h2 class="h">Code ladders</h2><p class="sub">Each code links to one skill. Every line is something to do next.</p><div class="lib">${cards}</div></div>`;
+}
+
+function studentView() {
+  const i = RUNGS.findIndex(([id]) => id === student);
+  return `<div class="chrome"><span class="dot"></span><b>Year 11 English</b><span>Made-up students</span></div>
+  <div class="page">
+    <div class="who">Viewing as:${RUNGS.map(([id], k) => `<button data-stu="${id}" aria-pressed="${id === student}">Student ${String.fromCharCode(65 + k)}</button>`).join('')}</div>
+    <div class="block">
+      <p class="q-kicker">Question 2 · Analytical paragraph</p>
+      <p class="q">${QUESTION}</p>
+      <p class="step">${codeChip('TS')}<span><span class="k">Next step:</span> ${BANK.TS[i]}</span></p>
+      <textarea class="box" placeholder="Write your paragraph here…"></textarea>
+      <p class="behind">Mockup only, never shown to students: repeating code <b>TS</b> · rung <b>${RUNGS[i][1]}</b> · bank line ${i + 1} of 5.</p>
+    </div>
+  </div>`;
+}
+
+function render() {
+  for (const f of frames) {
+    f.innerHTML = view === 'builder' ? builder() : view === 'ladders' ? ladders() : studentView();
+    f.querySelectorAll('[data-skill]').forEach((b) => b.addEventListener('click', () => { const id = b.dataset.skill; tagged.has(id) ? tagged.delete(id) : tagged.add(id); render(); }));
+    f.querySelector('[data-act="toggle"]')?.addEventListener('click', () => { openBank = !openBank; render(); });
+    f.querySelectorAll('[data-code]').forEach((b) => b.addEventListener('click', () => { codeTab = b.dataset.code; render(); }));
+    f.querySelectorAll('[data-stu]').forEach((b) => b.addEventListener('click', () => { student = b.dataset.stu; render(); }));
+    f.querySelectorAll('.t').forEach((t) => t.addEventListener('blur', () => { edited.add(t.dataset.k); }));
+  }
+  document.getElementById('note').innerHTML = notes[view];
+}
+document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+  view = b.dataset.view;
+  document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+}));
+render();
+</script>
+</body>
+</html>
