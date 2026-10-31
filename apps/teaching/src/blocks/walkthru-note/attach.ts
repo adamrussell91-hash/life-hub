@@ -2,18 +2,16 @@ import type { Block } from '@/schemas/block';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 
 /**
- * Blocks that embody a technique carry its icon in the teacher's view, opening the same steps.
- * A teacher-only registry: nothing here is stored on the block or reaches students.
- * (Markbook feedback → Whole class feedback has no block to carry it, so it isn't listed.)
+ * The WalkThru a teacher chose for a block, kept in its settings. Nothing attaches on its own.
+ * The field is teacher-only: the student feed and Display drop it (see visibility.ts).
  */
-const ATTACH: Partial<Record<Block['block_type'], string[]>> = {
-  hinge_question: ['w1-check-for-understanding'],
-  quiz_question: ['w1-quizzing'],
-  question_set: ['w1-quizzing'],
-  faded_example: ['w1-worked-examples-and-backward-fading']
-};
+export function attachedTechniques(block: Pick<Block, 'settings'>): string[] {
+  const id = (block.settings as Record<string, unknown> | undefined)?.walkthru;
+  return typeof id === 'string' && techniqueById(id)?.kind === 'technique' ? [id] : [];
+}
 
-/** The technique ids a block can carry. Only ids in the catalogue are returned. */
-export function attachedTechniques(block: Pick<Block, 'block_type'>): string[] {
-  return (ATTACH[block.block_type] ?? []).filter((id) => techniqueById(id));
+/** The block with this WalkThru on it, or with none when `id` is null. */
+export function withTechnique<T extends Block>(block: T, id: string | null): T {
+  const { walkthru: _old, ...settings } = (block.settings ?? {}) as Record<string, unknown>;
+  return { ...block, settings: id ? { ...settings, walkthru: id } : settings };
 }

@@ -308,6 +308,38 @@ class MockHeaders {
   }
 }
 
+/** Filler WalkThru text for every technique, with lesson cues on the first one (dev walk only). */
+function mockWalkthruText() {
+  const cues: Record<number, unknown> = {
+    1: { time: 'Before you ask', do: ['Say the rule, then ask the whole room.'], say: ['“No hands up. Everyone think.”', '“Everyone: {question}”'] },
+    2: { time: '15 seconds', do: ['Start the timer under the step. Wait in silence.'], say: ['“Have one sentence ready.”'], tool: { kind: 'timer', seconds: 15 } },
+    3: { time: 'Pick one', do: ['Pick a name under the step.'], say: ['“{name}, what were you thinking?”'], tool: { kind: 'names' } },
+    4: { time: 'Short exchange', do: ['Push a strong answer one step further.'], say: ['“Yes, {name}. How do you know?”'] },
+    5: { time: '3 or 4 more', do: ['Pick again.'], say: ['“{name}, do you agree? Why?”'], tool: { kind: 'names' } }
+  };
+  const ids = ['w1-cold-calling', 'w1-think-pair-share', 'w1-show-me-boards', 'w1-check-for-understanding', 'w1-quizzing'];
+  return {
+    sets: [{
+      set: 1,
+      frameworks: [],
+      techniques: ids.map((id, i) => ({
+        id,
+        steps: [1, 2, 3, 4, 5].map((n) => ({
+          n,
+          label: `STEP ${n} FILLER LABEL`,
+          text: `Filler coaching text for step ${n}. The real wording is read from the private data repo.`,
+          ...(i === 0 ? { cue: cues[n] } : {})
+        }))
+      }))
+    }]
+  };
+}
+
+/** A placeholder step drawing: a numbered frame, nothing from the book. */
+function mockWalkthruPicture(n: number): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" fill="none" stroke="currentColor" stroke-width="3"><rect x="20" y="20" width="200" height="140" rx="10" stroke-dasharray="6 8"/><circle cx="120" cy="80" r="26" fill="var(--wt-paper, white)"/><path d="M95 150c0-30 50-30 50 0"/><text x="120" y="88" text-anchor="middle" font-size="24" fill="currentColor" stroke="none">${n}</text></svg>`;
+}
+
 function jsonResponse(
   status: number,
   body: unknown,
@@ -4102,6 +4134,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return job ? okResponse(200, job) : errorResponse(404, 'not_found', 'Import job not found.');
     }
 
+    // WalkThrus, dev walk only: filler step text and placeholder drawings. The real text and
+    // pictures live in the private data repo and never come into this repository.
+    if (method === 'GET' && path === '/api/walkthrus-text') return okResponse(200, { text: mockWalkthruText() });
+    if (method === 'GET' && path === '/api/walkthrus-pictures') {
+      return okResponse(200, { pictures: { id: query.get('id'), steps: [1, 2, 3, 4, 5].map(mockWalkthruPicture) } });
+    }
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);

@@ -1,79 +1,10 @@
 // Practice and retrieval (P&R).
-import { P, circle, path, rect, dashed, thin, standing, seated, desk, bubble, q, arrow, figure, symbol } from './parts.mjs';
+import { P, circle, path, rect, thin, q, arrow, symbol } from './parts.mjs';
 
 const cube = (x, y, s) => rect(x, y, s, s, 2) + path(`M${x} ${y}l${s / 3} ${-s / 3}h${s}l${-s / 3} ${s / 3}M${x + s * 4 / 3} ${y - s / 3}v${s}l${-s / 3} ${s / 3}`);
 const stopwatch = (x, y, r, hand) =>
   circle(x, y, r) + path(`M${x} ${y - r}v-6M${x - 7} ${y - r - 7}h14`) + path(P([x, y], hand)) + circle(x, y, 3.5, true) +
   thin(`M${x} ${y - r + 5}v4M${x + r - 5} ${y}h-4M${x} ${y + r - 5}v-4M${x - r + 5} ${y}h4`);
-
-export const figures = {
-  'w1-quizzing': figure([
-    rect(34, 4, 52, 36, 4),
-    rect(40, 10, 6, 6, 1.5), thin('M52 13H78'),
-    rect(40, 19, 6, 6, 1.5, true), thin('M52 22H74'),
-    rect(40, 28, 6, 6, 1.5), thin('M52 31H70'),
-    seated(30, 54), seated(60, 54), seated(90, 54),
-    desk(16, 104, 76)
-  ].join('')),
-
-  'w1-weekly-and-monthly-review': figure([
-    seated(20, 52), desk(6, 36, 74),
-    rect(52, 12, 60, 50, 4), rect(52, 12, 60, 12, 4, true), path('M64 6v10M100 6v10'),
-    thin('M52 37H112M52 50H112M72 24V62M92 24V62'),
-    arrow([58, 68], [32, 48], [46, 82])
-  ].join('')),
-
-  'w1-elaborative-interrogation': figure([
-    seated(18, 54), desk(4, 34, 76),
-    bubble(24, 10, 22, 18, [20, 40]), q(35, 17, 0.6),
-    circle(56, 64, 6), arrow([61, 59], [72, 47]), circle(78, 41, 6), arrow([83, 36], [94, 24]), circle(101, 17, 7, true)
-  ].join('')),
-
-  'w1-using-a-knowledge-organiser': figure([
-    seated(22, 54), desk(6, 40, 76),
-    rect(50, 4, 64, 70, 4), path('M82 4V74M50 39H114'),
-    rect(55, 9, 22, 25, 2, true),
-    thin('M88 15H108M88 24H102M56 50H76M56 59H70M88 50H108M88 59H100'),
-    dashed('M34 46L46 38')
-  ].join('')),
-
-  'w1-rehearsal-and-performance': figure([
-    rect(30, 62, 60, 8, 2),
-    standing(60, 62, { s: 0.7, arms: [[-14, -10], [14, -10]] }),
-    circle(110, 8, 4, true), dashed('M106 12L88 58'),
-    path('M30 34A12 12 0 1 1 18 22'), path(P([23, 17], [18, 22], [23, 27]))
-  ].join('')),
-
-  'w1-peer-supported-retrieval': figure([
-    seated(22, 52), seated(98, 52), desk(6, 114, 74),
-    path(P([28, 62], [42, 34])), rect(36, 12, 26, 20, 3, true),
-    bubble(76, 8, 30, 18, [94, 40], { lines: 1, rx: 4 })
-  ].join('')),
-
-  'w1-concrete-examples': figure([
-    standing(18, 84, { arms: [[-8, 16], [24, -4]] }),
-    path('M42 74H116M46 74v10M112 74v10'),
-    cube(48, 56, 16), circle(88, 64, 9, true), path('M98 72L107 52L116 72Z')
-  ].join('')),
-
-  'w1-guided-practice': figure([
-    standing(40, 84, { arms: [[-8, 16], [30, 10]] }),
-    seated(84, 52), desk(64, 116, 74),
-    path('M74 24H94'), dashed('M99 24H116'), circle(74, 24, 4, true)
-  ].join('')),
-
-  'w1-independent-practice': figure([
-    rect(12, 10, 16, 20, 2), thin('M16 17H24M16 23H22'), seated(20, 48), desk(8, 32, 72),
-    rect(52, 10, 16, 20, 2, true), seated(60, 48), desk(48, 72, 72),
-    rect(92, 10, 16, 20, 2), thin('M96 17H104M96 23H102'), seated(100, 48), desk(88, 112, 72)
-  ].join('')),
-
-  'w1-building-fluency': figure([
-    seated(22, 52), desk(6, 40, 74),
-    stopwatch(86, 48, 24, [98, 36]),
-    thin('M48 40H56M44 50H56M48 60H56')
-  ].join(''))
-};
 
 export const symbols = {
   'w1-quizzing': symbol([

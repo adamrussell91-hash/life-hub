@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// Draws the WalkThrus technique icons as plain SVG, two sets per technique:
+// Draws the WalkThrus symbol icons as plain SVG, one per technique:
 //
-//   figure/<id>.svg  little stick people acting the technique out (Professional board hexes)
-//   symbol/<id>.svg  the same idea as a symbol, no people (Teaching cards and planning strips)
+//   symbol/<id>.svg  the technique as a symbol, no people (Teaching cards and planning strips)
 //
 //   node scripts/draw-walkthru-icons.mjs
 //
-// One grammar for every icon: black line art in currentColor, one stroke weight, round ends,
-// open heads with no faces or hands, and at most one filled shape as the focus. Figures use a
-// 120 × 90 frame so a classroom scene fits the hex; symbols use 100 × 100 for the small badge.
-// The drawings live in scripts/walkthru-icons/, one file per series, built from parts.mjs.
-// They are original. Never trace or copy the book's artwork.
+// Black line art in currentColor, one stroke weight, round ends, at most one filled shape as the
+// focus, in a 100 × 100 frame. The drawings live in scripts/walkthru-icons/, one file per series,
+// built from parts.mjs.
+//
+// figure/<id>.svg (the people in the board hexes and on a block's WalkThru bar) is not drawn here.
+// It is the hexagon from the same set as the step pictures, drawn in the private data repo
+// (data/teaching/walkthrus/pictures/source) and copied in from pictures/hexagons/.
 import { writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../packages/walkthrus/catalogue.mjs';
@@ -18,11 +19,10 @@ import { CATALOGUE } from '../packages/walkthrus/catalogue.mjs';
 const OUT = fileURLToPath(new URL('../packages/walkthrus/glyphs/', import.meta.url));
 const SERIES = ['qf', 'pr', 'em', 'cp', 'br', 'mb'];
 
-const sets = { figure: {}, symbol: {} };
+const sets = { symbol: {} };
 for (const key of SERIES) {
   const mod = await import(`./walkthru-icons/${key}.mjs`).catch(() => null);
   if (!mod) continue;
-  Object.assign(sets.figure, mod.figures);
   Object.assign(sets.symbol, mod.symbols);
 }
 

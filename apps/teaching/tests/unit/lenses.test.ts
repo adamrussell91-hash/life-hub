@@ -76,13 +76,13 @@ describe('Add lens picker', () => {
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     document.body.append(editor);
     const items = [...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent);
-    expect(items).toEqual(['Add lens…']);
+    expect(items).toEqual(['Add lens…', 'Add WalkThru…']);
     click(editor, 'Add lens…');
     expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Literature', 'Questioning', 'Writing', 'Thinking', 'Frameworks', 'Judgement', 'Thinking toolkit']);
     click(editor, 'DiscernInitial answer → against → for → step back');
     expect(editor.querySelector<HTMLElement>('.discern-setup')!.hidden).toBe(false);
   });
-  it('hides the menu once every lens is attached', () => {
+  it('drops Add lens once every lens is attached, keeping the WalkThru item', () => {
     let block: Block = questionBlock();
     for (const lens of ['patterns', 'multiple_perspectives', 'ethics'] as const) block = withKaplanQualifier(block, { ...qualifier, lens });
     for (const id of ['windows_mirrors', 'question_levels', 'because_but_so', 'reasoning', 'fw_rosenshine', 'fw_willingham', 'fw_marge', 'fw_wiliam', 'fw_berger']) block = withLens(block, id, { focus: '' });
@@ -90,7 +90,7 @@ describe('Add lens picker', () => {
     // Two sleeves is the most a block holds.
     for (const sleeve of SLEEVE_LENSES.slice(0, 2)) block = sleeve.write(block, sleeve.create());
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
-    expect(editor.querySelector<HTMLElement>('.kaplan-author__options')!.hidden).toBe(true);
+    expect([...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent)).toEqual(['Add WalkThru…']);
     expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(15);
   });
 });

@@ -1,8 +1,9 @@
 // packages/walkthrus/glyphs/index.ts
-// Technique icons by catalogue id, in two drawn sets made by scripts/draw-walkthru-icons.mjs:
-// FIGURE_SVGS (little people acting the technique out) for the Professional board hexes, and
-// SYMBOL_SVGS (the same idea without people) for Teaching's cards and planning strips. An id
-// with no file falls back to the placeholder hexagon.
+// Technique icons by catalogue id, in two drawn sets:
+// FIGURE_SVGS (outlined people acting the technique out, the same set as the private step
+// pictures) for the Professional board hexes and a block's WalkThru bar, and SYMBOL_SVGS (the
+// idea without people, made by scripts/draw-walkthru-icons.mjs) for Teaching's cards and
+// planning strips. An id with no file falls back to the placeholder hexagon.
 const figures = import.meta.glob('./figure/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const symbols = import.meta.glob('./symbol/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
