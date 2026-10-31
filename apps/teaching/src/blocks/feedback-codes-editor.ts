@@ -13,11 +13,21 @@ import {
   type FeedbackCode,
   type FeedbackCodeGroup
 } from '@/blocks/feedback-codes';
+import { askInline, costText, estimateNextStepJob, runNextStepJob, type LaddersDone } from '@/blocks/next-step-run';
+import { flagText, rungLabel } from '@/blocks/next-step-bank';
+import { RUNG_ORDER, checkWording } from '@/progress/wording';
+import { loadSkills } from '@/skills/api';
+import { skillSelect } from '@/skills/select';
+import type { SkillsContinuum } from '@/skills/schema';
+import '@/styles/next-step-teacher.css';
 
 /**
  * Editor for the feedback code library. One library for every lesson, so it
  * saves on its own (not with the lesson) by its own button, like the peer
  * feedback bank. Each code folds away to one line so 25 codes stay scannable.
+ * A code can link to a continuum skill and carry a ladder: its next step at
+ * each placement rung, which writing boxes rewrite for their question. Wording
+ * that students read is checked as it is typed; the flags are advice only.
  */
 
 const COLOURS: CodeColour[] = ['lilac', 'blue', 'gold', 'peach', 'sage'];
@@ -26,7 +36,7 @@ const GROUPS: FeedbackCodeGroup[] = ['composition', 'viva', 'speaking'];
 const MAX_CODES = 60;
 
 let seq = 0;
-function input(label: string, value: string, max: number, onInput: (v: string) => void, opts: { multiline?: boolean; placeholder?: string } = {}): HTMLElement {
+function input(label: string, value: string, max: number, onInput: (v: string) => void, opts: { multiline?: boolean; placeholder?: string; check?: boolean } = {}): HTMLElement {
   const id = `fc-edit-${++seq}`;
   const wrap = el('div', 'pf-field');
   const lab = el('label', 'pf-field__label', label);
@@ -40,7 +50,21 @@ function input(label: string, value: string, max: number, onInput: (v: string) =
   box.placeholder = opts.placeholder ?? '';
   box.addEventListener('input', () => onInput(box.value));
   wrap.append(lab, box);
+  if (opts.check) wrap.append(wordingFlag(box));
   return wrap;
+}
+
+/** The wording check under a field students read. An empty optional field passes. */
+function wordingFlag(box: HTMLInputElement | HTMLTextAreaElement, max = 600): HTMLElement {
+  const flag = el('p', 'nst-flag');
+  flag.setAttribute('aria-live', 'polite');
+  const show = () => {
+    flag.textContent = box.value.trim() ? flagText(checkWording(box.value, max)) : '';
+    flag.hidden = !flag.textContent;
+  };
+  box.addEventListener('input', show);
+  show();
+  return flag;
 }
 
 function pills<T extends string | number>(label: string, options: Array<{ value: T; label: string }>, current: T | null, onPick: (v: T) => void): HTMLElement {
@@ -74,6 +98,9 @@ export function mountFeedbackCodesEditor(): HTMLElement {
   let codes: FeedbackCode[] = [];
   let dirty = false;
   let openIndex: number | null = null;
+  let skills: SkillsContinuum | null = null;
+  /** Codes Draft ladders filled, with the descriptor each had before. */
+  const drafted = new Map<string, string>();
 
   const say = (text: string, tone: 'info' | 'error' = 'info') => {
     status.textContent = text;
@@ -142,14 +169,18 @@ export function mountFeedbackCodesEditor(): HTMLElement {
     colour.append(swatches);
     body.append(colour);
 
-    const descriptor = input('What the student reads', code.descriptor, 600, (v) => change(index, { descriptor: v }), { multiline: true });
+    const descriptor = input('What the student reads', code.descriptor, 600, (v) => change(index, { descriptor: v }), { multiline: true, check: true });
     const strength = input('As a strength (Shift + code, optional)', code.strength_descriptor ?? '', 600, (v) => change(index, { strength_descriptor: v || undefined }), {
       multiline: true,
-      placeholder: 'Leave empty to show “Strength: …”'
+      placeholder: 'Leave empty to show “Strength: …”',
+      check: true
     });
     descriptor.classList.add('pa-bank__wide');
     strength.classList.add('pa-bank__wide');
-    body.append(descriptor, strength);
+    const before = drafted.get(code.id);
+    if (before !== undefined) descriptor.append(el('p', 'fc-draft__note', before ? `Drafted. It read: “${before}”` : 'Drafted.'));
+    body.append(descriptor, strength, skillField(code, index));
+    if (code.skill) body.append(ladderField(code, index));
     if (code.group !== 'speaking') {
       body.append(
         pills(
@@ -189,6 +220,96 @@ export function mountFeedbackCodesEditor(): HTMLElement {
     return item;
   }
 
+  /** The continuum skill the code works on: it links the code to writing boxes tagged with that skill. */
+  function skillField(code: FeedbackCode, index: number): HTMLElement {
+    const id = `fc-edit-${++seq}`;
+    const wrap = el('div', 'pf-field');
+    const lab = el('label', 'pf-field__label', 'Skill (optional)');
+    lab.htmlFor = id;
+    const pick = skillSelect(code.skill ?? '', skills, 'pa-input fc-editor__skill');
+    pick.id = id;
+    pick.addEventListener('change', () => change(index, { skill: pick.value || undefined }, true));
+    wrap.append(lab, el('p', 'pf-field__hint', 'Writing boxes that practise this skill show students this code’s next step.'), pick);
+    wrap.classList.add('pa-bank__wide');
+    return wrap;
+  }
+
+  /** One next step per placement rung, each the step toward the rung above. */
+  function ladderField(code: FeedbackCode, index: number): HTMLElement {
+    const wrap = el('div', 'pf-field fc-ladder pa-bank__wide');
+    wrap.append(
+      el('span', 'pf-field__label', 'Ladder: the next step at each rung'),
+      el('p', 'pf-field__hint', 'One sentence each, something to do. Writing boxes rewrite these for their own question.')
+    );
+    const hint = el('p', 'fc-ladder__hint');
+    const lines = () => codes[index]?.ladder ?? RUNG_ORDER.map(() => '');
+    const showHint = () => {
+      const filled = lines().filter((l) => l.trim()).length;
+      hint.textContent = filled && filled < RUNG_ORDER.length ? 'Fill all five lines to keep the ladder.' : '';
+    };
+    RUNG_ORDER.forEach((_, i) => {
+      const row = el('div', 'fc-ladder__row');
+      const id = `fc-edit-${++seq}`;
+      const lab = el('label', 'pf-field__label', rungLabel(i));
+      lab.htmlFor = id;
+      const box = el('input', 'pa-input');
+      box.type = 'text';
+      box.id = id;
+      box.maxLength = 160;
+      box.value = code.ladder?.[i] ?? '';
+      box.addEventListener('input', () => {
+        const next = [...lines()];
+        next[i] = box.value;
+        change(index, { ladder: next.every((l) => !l.trim()) ? undefined : next });
+        showHint();
+      });
+      row.append(lab, box, wordingFlag(box, 160));
+      wrap.append(row);
+    });
+    showHint();
+    wrap.append(hint);
+    return wrap;
+  }
+
+  /** Draft ladders: Claude drafts every linked code's ladder and a positive descriptor, for review here. */
+  const draftHost = el('div', 'fc-draft pa-bank__wide');
+  const draft = button('Draft ladders', 'secondary', async function () {
+    if (dirty) {
+      say('Save your codes first, so the drafts start from them.');
+      return;
+    }
+    this.disabled = true;
+    try {
+      say('Working out the cost…');
+      const estimate = await estimateNextStepJob({ kind: 'ladders_draft' });
+      if (!estimate.codes) {
+        say('Give a code a skill first.');
+        return;
+      }
+      say('');
+      const ok = await askInline(draftHost, `Draft ladders for ${estimate.codes} ${estimate.codes === 1 ? 'code' : 'codes'}, ${costText(estimate)}. Nothing is saved until you save.`, 'Draft them');
+      if (!ok) return;
+      say('Drafting ladders…');
+      const done = await runNextStepJob<LaddersDone>({ kind: 'ladders_draft' });
+      let n = 0;
+      for (const d of done.ladders ?? []) {
+        const at = codes.findIndex((c) => c.id === d.id);
+        if (at === -1 || !codes[at]!.skill) continue;
+        if (!drafted.has(d.id)) drafted.set(d.id, codes[at]!.descriptor);
+        codes = codes.map((c, i) => (i === at ? { ...c, ladder: d.ladder, ...(d.descriptor ? { descriptor: d.descriptor } : {}) } : c));
+        n += 1;
+      }
+      dirty = n > 0 || dirty;
+      paint();
+      say(n ? `Ladders drafted for ${n} ${n === 1 ? 'code' : 'codes'}. Open each to check, then Save codes.` : 'No ladders came back. Try again.');
+    } catch (error) {
+      say(errorText(error), 'error');
+    } finally {
+      this.disabled = false;
+    }
+  });
+  root.insertBefore(draftHost, status);
+
   const add = button('Add a code', 'secondary', () => {
     codes = [...codes, { id: '', code: '', label: '', group: 'composition', criterion: 1, colour: 'lilac', descriptor: '' }];
     openIndex = codes.length - 1;
@@ -204,6 +325,7 @@ export function mountFeedbackCodesEditor(): HTMLElement {
       codes = saved.codes;
       primeFeedbackCodes(codes);
       dirty = false;
+      drafted.clear();
       paint();
       say('Saved. Every Voice block and annotation uses these now.');
     } catch (error) {
@@ -212,12 +334,21 @@ export function mountFeedbackCodesEditor(): HTMLElement {
       this.disabled = false;
     }
   });
-  actions.append(add, save);
+  actions.append(add, draft, save);
 
   function paint(): void {
     rows.replaceChildren(...codes.map(row));
     add.disabled = codes.length >= MAX_CODES;
   }
+
+  void loadSkills().then(
+    (loaded) => {
+      skills = loaded;
+      // A field being typed in keeps its caret; the open code's skill list fills in on the next repaint.
+      if (!rows.contains(document.activeElement)) paint();
+    },
+    () => undefined
+  );
 
   say('Loading codes…');
   void apiGet<{ codes: FeedbackCode[] }>(FEEDBACK_CODES_ENDPOINT)
