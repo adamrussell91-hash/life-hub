@@ -13,7 +13,7 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { progressFor, returnedFor, pieceFor, markSeen } from './profile-feedback.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen, stepsFor } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
@@ -36,7 +36,7 @@ async function unitLessons(store, cls) {
 export async function profileAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
@@ -52,6 +52,11 @@ export async function profileAction(store, classId, body) {
   }
   if (action === 'progress') return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
+  // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
+  if (action === 'steps') {
+    if (body.lesson_id !== undefined && !isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    return stepsFor(store, classId, student.id);
+  }
   if (action === 'piece') return pieceFor(store, roster, student, body.item);
   if (action === 'seen') return markSeen(store, roster, student, body.item);
   if (action === 'done') await recordDone(store, classId, student.id, body.lesson_id, 'tick');

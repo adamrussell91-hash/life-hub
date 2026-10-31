@@ -12,7 +12,8 @@ import { handinKey } from './lesson-work.mjs';
 import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload } from './teaching-feedback.mjs';
 import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
-import { targetKeys, targetRow, codeGrid, nextSteps, CHART_MAX } from './progress-patterns.mjs';
+import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from './progress-patterns.mjs';
+import { stepsBySkill } from './next-steps.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
@@ -116,6 +117,20 @@ export async function progressFor(store, roster, student) {
     outcomes, concepts, skills, codes: grid, next,
     unseen: all.filter((p) => p.kind !== 'assessment' && !p.seen_at).length
   };
+}
+
+/**
+ * What a writing box needs to pick this student's next step: per skill, their
+ * latest placed rung and their top repeating growth code linked to that skill.
+ * The client picks the bank line; rungs and codes are never shown.
+ */
+export async function stepsFor(store, classId, studentId) {
+  const pieces = await studentPieces(store, classId, studentId);
+  const library = await readFeedbackCodes(store);
+  const rungs = {};
+  for (const key of targetKeys(pieces)) if (key.startsWith('skill:')) rungs[key.slice(6)] = targetRow(pieces, key).now;
+  const codes = new Map(library.map((c) => [c.id, c]));
+  return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs) };
 }
 
 export async function returnedFor(store, roster, student) {
