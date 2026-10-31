@@ -15,7 +15,8 @@ import {
   type KnowledgeItem
 } from '@/blocks/anthology-knowledge';
 import { lessonCollectionHref } from '@/blocks/collection-resolve';
-import { cleanInitials, rememberInitials, voiceDevice } from '@/blocks/voice-client';
+import { rememberInitials, voiceDevice } from '@/blocks/voice-client';
+import { INITIALS_PATTERN, normaliseInitials } from '@/schemas/student-initials';
 import type { AnthologyView, Block } from '@/schemas/block';
 import type { DockTool } from '../../../knowledge/src/archive/showAllDock';
 import type { GraphMount } from '../../../knowledge/src/archive/forceGraphBehavior';
@@ -247,8 +248,8 @@ function knowledgeForm(
   info.placeholder = 'What it tells us';
   const initials = document.createElement('input');
   initials.name = 'initials';
-  initials.maxLength = 4;
-  initials.placeholder = 'AB';
+  initials.maxLength = 6;
+  initials.placeholder = 'TT or TT2';
   initials.autocomplete = 'off';
   initials.value = voiceDevice().initials ?? '';
 
@@ -315,7 +316,7 @@ function knowledgeForm(
       info: info.value.trim(),
       themes: [...picked].filter((tag) => kindOf.get(tag) === 'theme'),
       concepts: [...picked].filter((tag) => kindOf.get(tag) === 'concept'),
-      initials: cleanInitials(initials.value)
+      initials: normaliseInitials(initials.value)
     };
     const problem = !draft.title
       ? 'Give it a short title.'
@@ -323,8 +324,8 @@ function knowledgeForm(
         ? 'Add the quote or line from the article.'
         : !draft.themes.length && !draft.concepts.length
           ? 'Pick at least one theme or concept.'
-          : draft.initials.length < 2
-            ? 'Type your initials.'
+          : !INITIALS_PATTERN.test(draft.initials)
+            ? 'Type your initials, as on the class list.'
             : '';
     error.textContent = problem;
     if (problem) return;

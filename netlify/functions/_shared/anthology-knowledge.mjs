@@ -15,6 +15,7 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { PUBLISHED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { collectAnthology } from './teaching-anthology.mjs';
+import { INITIALS_PATTERN, normaliseInitials } from './student-initials.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
 export const LIMITS = { title: 80, quote: 600, info: 1200 };
@@ -90,7 +91,6 @@ const paragraph = (value, max) =>
 const pick = (values, allowed) => [
   ...new Set((Array.isArray(values) ? values : []).filter((v) => typeof v === 'string' && allowed.has(v)))
 ];
-const cleanInitials = (value) => (typeof value === 'string' ? value.replace(/[^A-Za-z]/g, '').toUpperCase() : '');
 
 function statusOf(item, moderation) {
   if (moderation?.status === 'hidden') return 'hidden';
@@ -124,10 +124,10 @@ async function addItem(store, unit, live, body) {
   const title = oneLine(body.title, LIMITS.title);
   const quote = paragraph(body.quote, LIMITS.quote);
   const info = paragraph(body.info, LIMITS.info);
-  const initials = cleanInitials(body.initials);
+  const initials = normaliseInitials(body.initials);
   if (!title) reject(400, 'missing_title', 'Give it a short title.');
   if (!quote) reject(400, 'missing_quote', 'Add the quote or line from the article.');
-  if (initials.length < 2 || initials.length > 4) reject(400, 'bad_initials', 'Type your initials (2 to 4 letters).');
+  if (!INITIALS_PATTERN.test(initials)) reject(400, 'bad_initials', 'Type your initials, as on the class list (like TT or TT2).');
   const allowed = allowedTags(live);
   const themes = pick(body.themes, allowed.themes);
   const concepts = pick(body.concepts, allowed.concepts);
