@@ -114,6 +114,26 @@ describe('BlockSchema', () => {
     ).toBe('question_set');
   });
 
+  it('keeps a question_set question\'s skills and next-step bank', () => {
+    const bank = { comp_ts: { lines: ['a', 'b', 'c', 'd', 'e'], edited: [false, false, false, false, false], source: 'k1' } };
+    const parsed = BlockSchema.parse({
+      ...baseBlock,
+      id: 'block_qs',
+      block_type: 'question_set',
+      content: { questions: [{ id: 'q1', prompt: 'Why?', kind: 'short_answer', skills: ['arguing.thesis'], next_steps: bank }] }
+    }) as { content: { questions: Array<{ skills?: string[]; next_steps?: unknown }> } };
+    expect(parsed.content.questions[0].skills).toEqual(['arguing.thesis']);
+    expect(parsed.content.questions[0].next_steps).toEqual(bank);
+    expect(() =>
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_qs',
+        block_type: 'question_set',
+        content: { questions: [{ id: 'q1', prompt: 'Why?', kind: 'short_answer', skills: ['Thesis'] }] }
+      })
+    ).toThrow();
+  });
+
   it('rejects heading with invalid variant', () => {
     expect(() =>
       BlockSchema.parse({

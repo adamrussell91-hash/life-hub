@@ -438,6 +438,15 @@ var QuizPinSchema = z9.object({
   y: z9.number().min(0).max(1),
   label: Text(120)
 });
+var NextStepEntrySchema = z9.object({
+  lines: z9.array(z9.string().max(160)).length(5),
+  /** Lines the teacher changed by hand; Regenerate keeps these. */
+  edited: z9.array(z9.boolean()).length(5),
+  /** Hash of the question, skills and ladder it was built from (bankSource), for the stale note. */
+  source: z9.string().max(32)
+});
+var NextStepBankSchema = z9.record(z9.string().min(1).max(64), NextStepEntrySchema);
+var SkillRefPattern = /^[a-z]{3,20}\.[a-z-]{2,40}$/;
 var base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
@@ -450,7 +459,7 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z9.array(z9.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z9.array(z9.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
+  skills: z9.array(z9.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z9.discriminatedUnion("kind", [
   z9.object({ ...base, kind: z9.literal("multiple_choice"), options: z9.array(QuizChoiceSchema).min(2).max(6), correct: z9.array(Id).length(1) }),
@@ -505,7 +514,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     ...base,
     kind: z9.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   }),
   z9.object({
     ...base,
@@ -513,7 +523,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     quote: Text(QUIZ_LIMITS.passage),
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
@@ -1404,7 +1415,11 @@ var QuestionItemSchema = z11.object({
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z11.enum(["reveal", "confidence"]).optional(),
   /** Success criteria the student ticks off against their answer. */
-  checklist: z11.array(z11.object({ id: z11.string().min(1), label: z11.string() })).max(12).optional()
+  checklist: z11.array(z11.object({ id: z11.string().min(1), label: z11.string() })).max(12).optional(),
+  /** Skills-continuum sub-strands (`strand.sub`) this box practises; they pick the student's next step. */
+  skills: z11.array(z11.string().regex(SkillRefPattern)).max(4).optional(),
+  /** The box's next steps, one entry per linked feedback code. */
+  next_steps: NextStepBankSchema.optional()
 });
 var PeerFeedbackBlockSchema = z11.object({
   id: z11.string().min(1),
@@ -2761,6 +2776,8 @@ export {
   NetworkLineModeSchema,
   NetworkLineSchema,
   NetworkNudgesSchema,
+  NextStepBankSchema,
+  NextStepEntrySchema,
   NoteCueBlockSchema,
   NoteCueKindSchema,
   OutcomesBlockSchema,

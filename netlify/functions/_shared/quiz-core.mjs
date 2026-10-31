@@ -167,6 +167,15 @@ var QuizPinSchema = z2.object({
   y: z2.number().min(0).max(1),
   label: Text(120)
 });
+var NextStepEntrySchema = z2.object({
+  lines: z2.array(z2.string().max(160)).length(5),
+  /** Lines the teacher changed by hand; Regenerate keeps these. */
+  edited: z2.array(z2.boolean()).length(5),
+  /** Hash of the question, skills and ladder it was built from (bankSource), for the stale note. */
+  source: z2.string().max(32)
+});
+var NextStepBankSchema = z2.record(z2.string().min(1).max(64), NextStepEntrySchema);
+var SkillRefPattern = /^[a-z]{3,20}\.[a-z-]{2,40}$/;
 var base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
@@ -179,7 +188,7 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z2.array(z2.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z2.array(z2.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
+  skills: z2.array(z2.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z2.discriminatedUnion("kind", [
   z2.object({ ...base, kind: z2.literal("multiple_choice"), options: z2.array(QuizChoiceSchema).min(2).max(6), correct: z2.array(Id).length(1) }),
@@ -234,7 +243,8 @@ var QuizQuestionSchema = z2.discriminatedUnion("kind", [
     ...base,
     kind: z2.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   }),
   z2.object({
     ...base,
@@ -242,7 +252,8 @@ var QuizQuestionSchema = z2.discriminatedUnion("kind", [
     quote: Text(QUIZ_LIMITS.passage),
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
@@ -476,6 +487,10 @@ function techniquesOf(options, ids) {
   for (const o of options) if (o.technique_id) map[ids.get(o.id)] = o.technique_id;
   return Object.keys(map).length ? { techniques: map } : {};
 }
+function writingSteps(q) {
+  if (!q.skills?.length || !q.next_steps || !Object.keys(q.next_steps).length) return {};
+  return { skills: [...q.skills], next_steps: q.next_steps };
+}
 function splitQuestion(q, random = Math.random) {
   const fresh = idMaker(random);
   const head = {
@@ -612,12 +627,12 @@ function splitQuestion(q, random = Math.random) {
     }
     case "extended_response":
       return {
-        question: { ...head, kind: "extended_response" },
+        question: { ...head, kind: "extended_response", ...writingSteps(q) },
         key: { ...keyHead, answer: { type: "manual", model_answer: q.model_answer, guide: q.guide } }
       };
     case "explain_effect":
       return {
-        question: { ...head, kind: "explain_effect", quote: q.quote, ...q.technique ? { technique: q.technique } : {} },
+        question: { ...head, kind: "explain_effect", quote: q.quote, ...q.technique ? { technique: q.technique } : {}, ...writingSteps(q) },
         key: { ...keyHead, answer: { type: "manual", model_answer: q.model_answer, guide: q.guide } }
       };
   }
@@ -874,6 +889,8 @@ function checkQuestion(input) {
 export {
   DEFAULT_QUIZ_SETTINGS,
   DEFAULT_WRITING_CHECK,
+  NextStepBankSchema,
+  NextStepEntrySchema,
   QUIZ_KIND_INFO,
   QUIZ_LIMITS,
   QUIZ_QUESTION_KINDS,
@@ -883,6 +900,7 @@ export {
   QuizQuestionKindSchema,
   QuizQuestionSchema,
   QuizSettingsSchema,
+  SkillRefPattern,
   WRITING_CHECKS,
   WRITING_LIMITS,
   WRITTEN_KINDS,
