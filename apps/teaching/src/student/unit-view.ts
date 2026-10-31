@@ -2,6 +2,7 @@ import { FAILURE } from '@/app/failure';
 import { CLASS_SITE_ORIGIN } from '@/app/class-site';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
+import { studentKnowledgeApi } from '@/blocks/anthology-knowledge';
 import type { PublishedUnit } from '@/schemas/published-unit';
 import { renderStudentHero } from '@/student/hero';
 import { mountPublicOutcomeChips } from '@/outcomes/strip';
@@ -67,7 +68,8 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
             }))
           },
           attachedOutcomes: publishedOutcomes,
-          anthology: unit.anthology
+          anthology: unit.anthology,
+          anthologyKnowledge: studentKnowledgeApi(unit.unit_id)
         })
       );
     }

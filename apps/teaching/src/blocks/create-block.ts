@@ -268,7 +268,8 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   }
 ];
 
-const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
+/** Pages only: a collection lists the lessons it sits beside. */
+const PAGE_ONLY_TYPES = new Set(['collection']);
 /** Unit plan pages only: it maps the unit's lessons. */
 const UNIT_ONLY_TYPES = new Set(['curriculum_lines']);
 /** The old toolkit cards: kept for saved lessons, never offered for new ones (they are sleeves now). */

@@ -6022,6 +6022,98 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
   background: var(--line);
   color: var(--text);
 }
+.block-anthology__layers {
+  flex: none;
+}
+
+.block-anthology__add[hidden] {
+  display: none;
+}
+
+.block-anthology__pop--form {
+  top: var(--space-3);
+  padding-top: 0;
+}
+
+.block-anthology__pop--form .block-anthology__card::before {
+  display: none;
+}
+
+.block-anthology__card-title {
+  font-weight: 600;
+}
+
+.block-anthology__card--class .block-anthology__card-quote {
+  font-size: 0.98rem;
+}
+
+.block-anthology__add-form {
+  gap: var(--space-3);
+}
+
+.block-anthology__field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+
+.block-anthology__field input,
+.block-anthology__field textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, #fff);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.block-anthology__field-label {
+  font-size: var(--text-sm);
+}
+
+.block-anthology__tag {
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.block-anthology__tag[aria-pressed='true'] {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+  font-weight: 600;
+}
+
+.block-anthology__add-error {
+  margin: 0;
+  color: var(--danger, #a33);
+  font-size: var(--text-sm);
+}
+
+.block-anthology__add-error:empty {
+  display: none;
+}
+
+.block-anthology__review {
+  margin-top: var(--space-3);
+}
+
+.block-anthology__review[hidden] {
+  display: none;
+}
+
+.block-anthology__review > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.block-anthology__review-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
 
 .block-anthology__hint {
   margin: 0;

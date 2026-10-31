@@ -25,6 +25,7 @@ import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, re
 import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { attachCardSleeve, NO_SLEEVE_TARGET, SLEEVE_CONVERT_EVENT, type SleeveConvertDetail } from '@/blocks/lenses/sleeve-convert';
 import { renderBlock } from '@/blocks/render';
+import { teacherUnitAnthology } from '@/blocks/anthology-load';
 import { mountLecturePanel, type LecturePanelHandle } from '@/lecture/teacher-panel';
 import { addToScene } from '@/lecture/tree';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
@@ -1584,7 +1585,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       renderBlock(block, 'teacher', {
         lessonId: lesson.id,
         pageBlocks: lesson.blocks,
-        attachedOutcomes: publicOutcomesForPage(lesson, options.outcomesCatalog ?? [])
+        attachedOutcomes: publicOutcomesForPage(lesson, options.outcomesCatalog ?? []),
+        loadAnthology: () => teacherUnitAnthology(lesson.unit_id)
       })
   });
 
