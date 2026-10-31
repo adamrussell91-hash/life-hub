@@ -14,6 +14,7 @@ import { mountFocusController, type FocusStepView } from '@/teacher/focus/focus-
 import { mountQuizLive } from '@/teacher/focus/quiz-live';
 import { focusSteps } from '@/teacher/focus/steps';
 import { tutorialCommon } from '@/tutorial/model';
+import { mountDisplayTimer } from '@/blocks/walkthru-note/display-timer';
 
 /**
  * Display view: the page the teacher projects. It shows the published lesson,
@@ -101,6 +102,8 @@ export function mountLessonDisplayView(
   header.append(brand, actions);
 
   const focus = mountFocusController({ surface, actions, stage: content, lessonId });
+  // A WalkThru step timer started on the teacher's page counts down here, over everything.
+  const stopTimer = mountDisplayTimer(surface);
 
   function render(lesson: PublishedLesson): void {
     examples?.dispose();
@@ -177,6 +180,7 @@ export function mountLessonDisplayView(
       disposed = true;
       document.removeEventListener('fullscreenchange', syncFullScreen);
       focus.dispose();
+      stopTimer();
       examples?.dispose();
       examples = null;
     }

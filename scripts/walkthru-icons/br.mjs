@@ -1,56 +1,9 @@
 // Behaviour and relationships (B&R).
-import { P, FILL, circle, path, rect, thin, standing, seated, desk, bubble, tick, cross, arrow, figure, symbol } from './parts.mjs';
+import { P, FILL, circle, path, rect, thin, bubble, tick, cross, arrow, symbol } from './parts.mjs';
 
 /** A heart centred on (x, y), about 18·s wide. */
 const heart = (x, y, s = 1, fill = true) =>
   path(`M${x} ${y + 7 * s}C${x - 13 * s} ${y - 2 * s} ${x - 7 * s} ${y - 13 * s} ${x} ${y - 5 * s}C${x + 7 * s} ${y - 13 * s} ${x + 13 * s} ${y - 2 * s} ${x} ${y + 7 * s}Z`, fill ? FILL : '');
-
-export const figures = {
-  'w1-rehearse-routines': figure([
-    standing(14, 84, { arms: [[-6, 18], [16, -2]] }),
-    standing(46, 84, { s: 0.62, arms: [[-6, 16], [6, 16]], legs: 'walk', fill: true }),
-    standing(72, 84, { s: 0.62, arms: [[-6, 16], [6, 16]], legs: 'walk' }),
-    standing(98, 84, { s: 0.62, arms: [[-6, 16], [6, 16]], legs: 'walk' }),
-    arrow([104, 28], [40, 26], [72, -2])
-  ].join('')),
-
-  'w1-positive-relationships': figure([
-    standing(36, 84, { arms: [[-8, 16], [16, 4]] }),
-    standing(82, 84, { s: 0.74, arms: [[-16, 2], [8, 16]] }),
-    heart(59, 18, 1.1)
-  ].join('')),
-
-  'w1-establish-your-expectations': figure([
-    standing(16, 84, { arms: [[-8, 16], [20, -6]] }),
-    rect(38, 8, 76, 66, 3),
-    rect(46, 18, 8, 8, 2, true), thin('M62 22H104'),
-    tick(50, 40, 0.8), thin('M62 40H104'),
-    tick(50, 58, 0.8), thin('M62 58H96')
-  ].join('')),
-
-  'w1-signal-pause-insist': figure([
-    standing(18, 84, { arms: [[-8, 16], [4, -26]] }),
-    rect(36, 12, 7, 22, 2, true), rect(48, 12, 7, 22, 2, true),
-    seated(72, 52), seated(90, 52), seated(108, 52),
-    desk(62, 118, 74)
-  ].join('')),
-
-  'w1-positive-framing': figure([
-    standing(18, 84, { arms: [[-8, 16], [20, -4]] }),
-    rect(38, 10, 48, 42, 3), rect(45, 17, 34, 28, 2),
-    path('M62 23V39M54 31H70', 'stroke-width="5"'),
-    seated(102, 52), desk(88, 118, 74)
-  ].join('')),
-
-  'w1-choices-and-consequences': figure([
-    standing(16, 84, { arms: [[-6, 18], [16, 4]] }),
-    path('M32 56H56'),
-    arrow([56, 56], [96, 24], [72, 30]),
-    arrow([56, 56], [96, 76], [72, 74]),
-    circle(56, 56, 4.5, true),
-    tick(108, 20, 1.1), cross(108, 76, 1.1)
-  ].join(''))
-};
 
 export const symbols = {
   'w1-rehearse-routines': symbol([
