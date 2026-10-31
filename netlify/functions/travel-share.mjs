@@ -25,9 +25,9 @@ export function createTravelShareHandler(deps = {}) {
     if (request.method === 'POST') {
       const { trip, version } = await ctx.repo.getTrip(tripId);
       const { map, version: shareVersion } = await ctx.repo.getShareTokens();
-      // revoke prior tokens for this trip
+      // Revoke this trip's earlier trip links; journal links have their own switch.
       for (const [hash, row] of Object.entries(map)) {
-        if (row.trip_id === tripId) delete map[hash];
+        if (row.trip_id === tripId && row.kind !== 'journal') delete map[hash];
       }
       const token = randomBytes(32).toString('base64url');
       const created_at = new Date(ctx.now()).toISOString();
@@ -45,7 +45,7 @@ export function createTravelShareHandler(deps = {}) {
       const { trip, version } = await ctx.repo.getTrip(tripId);
       const { map, version: shareVersion } = await ctx.repo.getShareTokens();
       for (const [hash, row] of Object.entries(map)) {
-        if (row.trip_id === tripId) delete map[hash];
+        if (row.trip_id === tripId && row.kind !== 'journal') delete map[hash];
       }
       await ctx.repo.saveShareTokens(map, shareVersion);
       trip.share = { enabled: false, created_at: null };
