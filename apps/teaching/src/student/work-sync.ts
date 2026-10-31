@@ -18,7 +18,15 @@ import './work-sync.css';
 type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string };
 export type WorkCall = (action: 'status' | 'claim' | 'save' | 'handin', extra?: Record<string, unknown>) => Promise<Reply>;
 export type WorkSyncOptions = { lessonId: string; classId: string; /** Replaces the network in tests. */ call?: WorkCall; delayMs?: number; retryMs?: number };
-export type WorkSyncHandle = { dispose(): void; /** Sends what is waiting now. */ flush(): Promise<void> };
+export type WorkSyncHandle = {
+  dispose(): void;
+  /** Sends what is waiting now. */
+  flush(): Promise<void>;
+  /** For the lesson footer: answers written on this device, and the marked blocks with writing to hand in. */
+  progress(): { written: number; toHandIn: number };
+  /** Sends everything, then hands in every marked block with writing. True when all went through. */
+  handInAll(): Promise<boolean>;
+};
 
 /** The parts of a block's saved state that hold writing. Must match lesson-work.mjs. */
 const PART = /^(answers|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
@@ -101,8 +109,12 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   if (blocks) blocks.before(bar);
   else host.prepend(bar);
 
+  /** Blocks the class's Markbook marks, as the server last said. */
+  let marked: string[] = [];
+
   /** A Hand in bar under each block the class's Markbook marks. */
   function showHandIn(blockIds: string[] | undefined): void {
+    marked = blockIds ?? [];
     for (const id of blockIds ?? []) {
       const block = [...host.querySelectorAll<HTMLElement>('[data-block-id]')].find((b) => b.dataset.blockId === id);
       if (!block || block.querySelector(':scope > .ws-handin')) continue;
@@ -252,8 +264,40 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     if (state === 'ready') for (const [key, value] of heldParts(lessonId)) queue(key, value);
   });
 
+  /** Written fields on this device, by block. */
+  function writtenByBlock(): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const [key, value] of heldParts(lessonId)) {
+      const where = parseWorkKey(lessonId, key);
+      if (where) counts.set(where.blockId, (counts.get(where.blockId) ?? 0) + Object.keys(writtenFields(value)).length);
+    }
+    return counts;
+  }
+
   return {
     flush,
+    progress() {
+      const counts = writtenByBlock();
+      return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => (counts.get(id) ?? 0) > 0).length };
+    },
+    async handInAll() {
+      // Initials may have just been claimed by the footer or the quiz: look again before giving up.
+      if (state !== 'ready') await check();
+      if (state !== 'ready') return state === 'off';
+      await flush();
+      if (pending.size) return false;
+      const counts = writtenByBlock();
+      let ok = true;
+      for (const id of marked) {
+        if (!(counts.get(id) ?? 0)) continue;
+        try {
+          await call('handin', { block_id: id });
+        } catch {
+          ok = false;
+        }
+      }
+      return ok;
+    },
     dispose() {
       disposed = true;
       window.clearTimeout(timer);

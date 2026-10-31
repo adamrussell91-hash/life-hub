@@ -62,6 +62,14 @@ export const LessonSchema = z.object({
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
   feedback_off: z.boolean().optional(),
+  /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
+  end_questions: z
+    .object({
+      on: z.boolean().optional(),
+      skip: z.array(z.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+      unclear: z.boolean().optional()
+    })
+    .optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
   /** Tutorial lessons only: the class and its groups. */

@@ -1,0 +1,23 @@
+/* End-of-lesson questions in the lesson editor's Student feedback panel. Tokens only. */
+.eq { display: grid; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.eq__title { margin: 0; font-size: var(--text-base, 1rem); }
+.eq__switches { display: grid; gap: var(--space-2); }
+.eq__switch { font-weight: 600; display: inline-flex; align-items: center; gap: var(--space-1); }
+.eq__pool { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.eq__pool:disabled { opacity: 0.55; }
+.eq__legend { padding: 0; margin-bottom: var(--space-1); font-size: var(--text-sm); color: var(--muted); width: 100%; }
+.eq__check { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); }
+.eq__hint, .eq__meta, .eq__legend-row, .eq__stuck { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.eq__stuck { color: var(--ink); }
+.eq__results { display: grid; gap: var(--space-3); }
+.eq__class { justify-self: start; }
+.eq__item { display: grid; gap: var(--space-1); }
+.eq__q { margin: 0; display: flex; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; font-weight: 600; font-size: var(--text-sm); }
+.eq__n { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.eq__bar { display: flex; min-height: 24px; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.eq__seg { display: grid; place-items: center; min-width: 1.5rem; font-size: var(--text-xs); font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+.eq__seg--0 { background: var(--success); }
+.eq__seg--1 { background: color-mix(in oklab, var(--success) 60%, var(--paper)); color: var(--ink); }
+.eq__seg--2 { background: color-mix(in oklab, var(--warning) 70%, var(--paper)); color: var(--ink); }
+.eq__seg--3 { background: var(--danger); }
+.eq__unclear { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); font-size: var(--text-sm); }
