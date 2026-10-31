@@ -3,15 +3,16 @@ import type { Block } from '@/schemas/block';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { attachedTechniques } from './attach';
-import { renderStepsInto } from './note';
+import { lessonSlots, renderStepsInto } from './note';
 
 const glyphs = createGlyphSet({ svgs: SYMBOL_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
 
 /**
  * Teacher view only: the icon of a technique this block embodies, opening its five steps in place.
- * Nothing about it is stored on the block.
+ * Nothing about it is stored on the block. In a lesson each step carries a tick that saves against
+ * the lesson and class; never on Display (`ctx.display`), which shares the teacher render mode.
  */
-export function renderTechniqueBadge(block: Block): HTMLElement | null {
+export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string; display?: boolean } = {}): HTMLElement | null {
   const ids = attachedTechniques(block);
   if (!ids.length) return null;
   const wrap = document.createElement('div');
@@ -33,7 +34,8 @@ export function renderTechniqueBadge(block: Block): HTMLElement | null {
     details.addEventListener('toggle', () => {
       if (!details.open || loaded) return;
       loaded = true;
-      renderStepsInto(body, entry.id, {});
+      const lessonId = ctx.display ? undefined : ctx.lessonId;
+      renderStepsInto(body, entry.id, {}, lessonId ? { lessonId, slots: lessonSlots(lessonId) } : null);
     });
     details.append(summary, body);
     wrap.append(details);

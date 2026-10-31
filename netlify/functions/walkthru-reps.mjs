@@ -1,5 +1,5 @@
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
-import { listReps, planRep, tapRep, unplanRep } from './_shared/walkthru-reps.mjs';
+import { listReps, planRep, stepRep, tapRep, unplanRep } from './_shared/walkthru-reps.mjs';
 import { QuizError } from './_shared/question-drop.mjs';
 import { errorResponse, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
 
@@ -9,6 +9,7 @@ export const config = { path: '/api/walkthru-reps' };
  * Teacher only.
  * GET  /api/walkthru-reps[?technique=<id>]                          → { reps }
  * POST /api/walkthru-reps { action: 'plan' | 'tap' | 'unplan', technique_id, lesson_id, class_id?, ... }
+ * POST /api/walkthru-reps { action: 'steps', technique_id, lesson_id, class_id?, step, done, steps_total } → { rep | null }
  */
 export function createWalkthruRepsHandler(deps = {}) {
   return createOperatorHandler(async (request, context) => {
@@ -24,6 +25,7 @@ export function createWalkthruRepsHandler(deps = {}) {
         const now = deps.nowIso ? deps.nowIso() : undefined;
         if (body?.action === 'plan') return withCors(okResponse(200, { rep: await planRep(store, body, now) }, headers), request, env);
         if (body?.action === 'tap') return withCors(okResponse(200, { rep: await tapRep(store, body, now) }, headers), request, env);
+        if (body?.action === 'steps') return withCors(okResponse(200, { rep: await stepRep(store, body, now) }, headers), request, env);
         if (body?.action === 'unplan') return withCors(okResponse(200, await unplanRep(store, body), headers), request, env);
         return withCors(errorResponse(400, 'bad_request', 'Unknown action.', false), request, env);
       }

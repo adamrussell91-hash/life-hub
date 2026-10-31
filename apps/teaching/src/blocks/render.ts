@@ -2920,7 +2920,7 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
     attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));
   }
   if (mode === 'teacher') {
-    const technique = renderTechniqueBadge(block);
+    const technique = renderTechniqueBadge(block, { lessonId: ctx.lessonId, display: ctx.display });
     if (technique) attachments.push(technique);
   }
   if (attachments.length) {

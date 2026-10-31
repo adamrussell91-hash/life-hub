@@ -12,7 +12,10 @@ describe('WalkThru note content', () => {
     expect(parsed.walkthru).toEqual({ set: 1, id: 'w1-cold-calling', jots: { 1: 'mine' } });
     expect(Object.keys(parsed.walkthru!).sort()).toEqual(['id', 'jots', 'set']);
     expect(TeacherNoteBlockContentSchema.safeParse({ title: 'T', html: '', walkthru: { id: 'Not An Id' } }).success).toBe(false);
-    expect(TeacherNoteBlockContentSchema.safeParse({ title: 'T', html: '', walkthru: { id: 'w1-cold-calling', jots: { 9: 'x' } } }).success).toBe(false);
+    expect(TeacherNoteBlockContentSchema.safeParse({ title: 'T', html: '', walkthru: { id: 'w1-cold-calling', jots: { 0: 'x' } } }).success).toBe(false);
+    // a fusion from the board is a tile too
+    expect(TeacherNoteBlockContentSchema.parse({ title: 'T', html: '', walkthru: { id: 'fu_abc12345', jots: { 7: 'x' } } }).walkthru!.id).toBe('fu_abc12345');
+    expect(TeacherNoteBlockContentSchema.safeParse({ title: 'T', html: '', walkthru: { id: 'fu_X' } }).success).toBe(false);
     expect(TeacherNoteBlockContentSchema.parse({ title: 'T', html: '' }).walkthru).toBeUndefined();
   });
 
@@ -44,7 +47,9 @@ const api = vi.hoisted(() => ({
   listAllReps: vi.fn(),
   planRep: vi.fn(),
   tapRep: vi.fn(),
-  unplanRep: vi.fn()
+  unplanRep: vi.fn(),
+  stepRep: vi.fn(),
+  loadFusions: vi.fn()
 }));
 vi.mock('@/blocks/walkthru-note/api', () => api);
 const curriculum = vi.hoisted(() => ({ rows: [] as unknown[] }));
@@ -65,6 +70,8 @@ beforeEach(() => {
   api.planRep.mockResolvedValue({});
   api.tapRep.mockResolvedValue({ state: 'ran', technique_id: 'w1-cold-calling', lesson_id: 'lesson1', class_id: null, goal_id: null, note: '', lesson_end: null, at: '2026-10-20T00:00:00.000Z' });
   api.unplanRep.mockResolvedValue(undefined);
+  api.stepRep.mockImplementation(async (t: { step: number; class_id: string | null }) => ({ state: 'partly', technique_id: 'w1-cold-calling', lesson_id: 'lesson1', class_id: t.class_id, goal_id: null, note: '', lesson_end: null, steps_done: [t.step], at: '2026-10-20T00:00:00.000Z' }));
+  api.loadFusions.mockResolvedValue([]);
   curriculum.rows = [];
 });
 
@@ -175,5 +182,133 @@ describe('WalkThru note editor', () => {
     const editor = walkthruEditorFields({ set: 1, id: 'w1-cold-calling', jots: { 1: 'one' } }, () => undefined);
     expect(editor.querySelector('.hub-filter')!.textContent).toContain('Cold calling');
     expect((editor.querySelector('textarea') as HTMLTextAreaElement).value).toBe('one');
+  });
+});
+
+// ── step ticks ──────────────────────────────────────────────────────────────
+
+const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+const { pickTickClasses } = await import('@/blocks/walkthru-note/ticks');
+
+describe('WalkThru step ticks', () => {
+  it('each step gets a tick in the lesson; a tap saves at once and shows Partly', async () => {
+    const section = renderWalkthruSection(content, { lessonId: 'lesson1' })!;
+    await flush();
+    const ticks = [...section.querySelectorAll<HTMLButtonElement>('.tk-wt__tick')];
+    expect(ticks).toHaveLength(5);
+    expect(ticks[1]!.getAttribute('aria-label')).toBe('Did step 2 in class');
+    expect(ticks[1]!.getAttribute('aria-pressed')).toBe('false');
+    ticks[1]!.click();
+    // optimistic: on before the server answers
+    expect(ticks[1]!.getAttribute('aria-pressed')).toBe('true');
+    await flush();
+    expect(api.stepRep).toHaveBeenCalledWith(expect.objectContaining({ technique_id: 'w1-cold-calling', lesson_id: 'lesson1', class_id: null, step: 2, done: true, steps_total: 5 }));
+    expect(section.querySelector('.tk-wt__tickstate')!.textContent).toBe('Partly');
+    // the strip below hears about it
+    expect(section.querySelector('.tk-wt__counted')!.textContent).toContain('hollow dot');
+  });
+
+  it('a failed save puts the tick back and says so', async () => {
+    api.stepRep.mockRejectedValue(new Error('offline'));
+    const section = renderWalkthruSection(content, { lessonId: 'lesson1' })!;
+    await flush();
+    const tick = section.querySelector<HTMLButtonElement>('.tk-wt__tick')!;
+    tick.click();
+    await flush();
+    await flush();
+    expect(tick.getAttribute('aria-pressed')).toBe('false');
+    expect(section.querySelector('.tk-wt__tickmsg')!.textContent).toContain('didn’t save');
+  });
+
+  it('shows saved ticks for this lesson and its derived state', async () => {
+    api.listReps.mockResolvedValue([{ technique_id: 'w1-cold-calling', lesson_id: 'lesson1', class_id: null, goal_id: null, state: 'ran', note: '', lesson_end: null, steps_done: [1, 2, 3, 4, 5], at: 'x' }]);
+    const section = renderWalkthruSection(content, { lessonId: 'lesson1' })!;
+    await flush();
+    await flush();
+    expect([...section.querySelectorAll('.tk-wt__tick')].every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true);
+    expect(section.querySelector('.tk-wt__tickstate')!.textContent).toBe('Ran it');
+  });
+
+  it('never on Display, and not without a lesson', async () => {
+    const shown = renderWalkthruSection(content, { lessonId: 'lesson1', display: true })!;
+    const bare = renderWalkthruSection(content, {})!;
+    await flush();
+    expect(shown.querySelectorAll('.tk-wt__step')).toHaveLength(5);
+    expect(shown.querySelector('.tk-wt__tick, .tk-wt__tickbar')).toBeNull();
+    expect(bare.querySelector('.tk-wt__tick')).toBeNull();
+  });
+
+  it('several classes: a chooser, starting on the class whose lesson is nearest now', async () => {
+    const now = Date.parse('2026-10-20T03:00:00.000Z');
+    const slots = [
+      { lessonId: 'lesson1', classId: 'c1', label: 'a', endIso: '2026-10-13T03:00:00.000Z', delivered: true },
+      { lessonId: 'lesson1', classId: 'c2', label: 'b', endIso: '2026-10-20T02:00:00.000Z', delivered: false },
+      { lessonId: 'lesson1', classId: 'c2', label: 'c', endIso: '2026-11-20T02:00:00.000Z', delivered: false }
+    ];
+    const picked = pickTickClasses(slots, now);
+    expect(picked.chosen).toBe('c2');
+    expect(picked.classes.map((c) => c.classId).sort()).toEqual(['c1', 'c2']);
+    expect(picked.classes.find((c) => c.classId === 'c2')!.endIso).toBe('2026-10-20T02:00:00.000Z');
+    expect(pickTickClasses([{ lessonId: 'lesson1', classId: null, label: 'This lesson', endIso: null, delivered: false }])).toEqual({ classes: [{ classId: null, label: 'This lesson', endIso: null }], chosen: null });
+
+    curriculum.rows = [
+      { lesson_id: 'lesson1', class_id: 'c1', date: '2020-01-01', end_time: '10:00', delivery_status: 'delivered' },
+      { lesson_id: 'lesson1', class_id: 'c2', date: '2020-01-02', end_time: '10:00', delivery_status: 'delivered' }
+    ];
+    const section = renderWalkthruSection(content, { lessonId: 'lesson1' })!;
+    await flush();
+    const choices = [...section.querySelectorAll<HTMLButtonElement>('.tk-wt__tickclass')];
+    expect(choices).toHaveLength(2);
+    expect(choices.find((b) => b.getAttribute('aria-pressed') === 'true')!.dataset.classId).toBe('c2');
+    choices.find((b) => b.dataset.classId === 'c1')!.click();
+    section.querySelector<HTMLButtonElement>('.tk-wt__tick')!.click();
+    await flush();
+    expect(api.stepRep).toHaveBeenCalledWith(expect.objectContaining({ class_id: 'c1', step: 1 }));
+  });
+
+  it('the badge on a quiz or hinge block ticks in a lesson, never on Display', async () => {
+    const block = { id: 'b1', block_type: 'hinge_question' } as unknown as Block;
+    api.loadWalkthruText.mockResolvedValue({ sets: [{ set: 1, techniques: [{ id: 'w1-check-for-understanding', steps: [1, 2, 3, 4, 5].map((n) => ({ n, label: `L${n}`, text: `T${n}` })) }] }] });
+    const open = async (badge: HTMLElement) => {
+      const details = badge.querySelector('details')!;
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+      await flush();
+    };
+    const lesson = renderTechniqueBadge(block, { lessonId: 'lesson1' })!;
+    await open(lesson);
+    expect(lesson.querySelectorAll('.tk-wt__tick').length).toBeGreaterThan(0);
+    const display = renderTechniqueBadge(block, { lessonId: 'lesson1', display: true })!;
+    await open(display);
+    expect(display.querySelector('.tk-wt__tick')).toBeNull();
+    const nowhere = renderTechniqueBadge(block)!;
+    await open(nowhere);
+    expect(nowhere.querySelector('.tk-wt__tick')).toBeNull();
+  });
+
+  it('a note can carry a fusion: its name, parents and steps come from the board', async () => {
+    api.loadFusions.mockResolvedValue([{ id: 'fu_abc12345', name: 'Call and check', parents: ['w1-cold-calling', 'w1-quizzing'], steps: [1, 2, 3, 4, 5, 6].map((n) => ({ n, label: `Fused ${n}`, text: `Made-up ${n}` })) }]);
+    const section = renderWalkthruSection({ set: 1, id: 'fu_abc12345', jots: {} }, { lessonId: 'lesson1' })!;
+    await flush();
+    await flush();
+    expect(section.querySelector('.tk-wt__name')!.textContent).toBe('Call and check');
+    expect(section.querySelector('.tk-wt__code')!.textContent).toContain('+');
+    expect(section.querySelectorAll('.tk-wt__step')).toHaveLength(6);
+    section.querySelectorAll<HTMLButtonElement>('.tk-wt__tick')[5]!.click();
+    await flush();
+    expect(api.stepRep).toHaveBeenCalledWith(expect.objectContaining({ technique_id: 'fu_abc12345', step: 6, steps_total: 6 }));
+  });
+
+  it('the editor offers the board’s fusions next to the book’s techniques', async () => {
+    api.loadFusions.mockResolvedValue([{ id: 'fu_abc12345', name: 'Call and check', parents: [], steps: [1, 2, 3, 4, 5, 6, 7].map((n) => ({ n, label: `S${n}`, text: '' })) }]);
+    const emitted: unknown[] = [];
+    const editor = walkthruEditorFields(undefined, (next) => emitted.push(next));
+    document.body.append(editor);
+    await flush();
+    (editor.querySelector('.hub-filter') as HTMLButtonElement).click();
+    (document.querySelector('.hub-menu__opt[data-hub-option="fu_abc12345"]') as HTMLElement).click();
+    expect(emitted.at(-1)).toEqual({ set: 1, id: 'fu_abc12345', jots: {} });
+    expect(editor.querySelectorAll('textarea')).toHaveLength(7);
+    editor.remove();
   });
 });

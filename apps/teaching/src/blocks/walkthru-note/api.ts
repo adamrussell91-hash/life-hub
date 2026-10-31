@@ -9,11 +9,23 @@ export type RepState = 'planned' | 'ran' | 'partly' | 'skipped';
 export interface Rep {
   technique_id: string; lesson_id: string; class_id: string | null; goal_id: string | null;
   state: RepState; note: string; lesson_end: string | null; at: string;
+  /** Steps ticked in class, 1–9 in order. Older records have none. */
+  steps_done?: number[];
 }
+/** A fusion from the WalkThrus board: a technique built from two or three others. Teacher only. */
+export interface Fusion { id: string; name: string; parents: string[]; steps: WalkthruStepText[] }
 export interface GoalLite { id: string; status: string; sphere: string; walkthru?: { technique_id: string; adapted?: Record<string, string> } }
 
 let textCache: Promise<WalkthruText> | null = null;
 let goalsCache: Promise<GoalLite[]> | null = null;
+let fusionsCache: Promise<Fusion[]> | null = null;
+
+/** The board's fusions (name and steps), fetched once per page load. A failed load isn't kept. */
+export function loadFusions(): Promise<Fusion[]> {
+  fusionsCache ??= apiGet<{ fusions: Fusion[] }>('/api/walkthrus-proof?fusions=1').then((r) => r.fusions ?? []);
+  fusionsCache.catch(() => { fusionsCache = null; });
+  return fusionsCache;
+}
 
 /** The step text, fetched once per page load. A failed load isn't kept. */
 export function loadWalkthruText(): Promise<WalkthruText> {
@@ -51,6 +63,11 @@ export async function tapRep(target: RepTarget & { state: Exclude<RepState, 'pla
   return (await apiPost<{ rep: Rep | null }>('/api/walkthru-reps', { action: 'tap', ...target })).rep;
 }
 
+/** Tick or untick one step in class. The server works out the rep (all = ran, some = partly). */
+export async function stepRep(target: RepTarget & { step: number; done: boolean; steps_total: number }): Promise<Rep | null> {
+  return (await apiPost<{ rep: Rep | null }>('/api/walkthru-reps', { action: 'steps', ...target })).rep;
+}
+
 export async function unplanRep(target: RepTarget): Promise<void> {
   await apiPost('/api/walkthru-reps', { action: 'unplan', ...target });
 }
@@ -58,4 +75,5 @@ export async function unplanRep(target: RepTarget): Promise<void> {
 export function resetWalkthruNoteCachesForTests(): void {
   textCache = null;
   goalsCache = null;
+  fusionsCache = null;
 }
