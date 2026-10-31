@@ -4,7 +4,8 @@
 
 // US$ per million tokens; web search is US$ per search.
 const PRICES = {
-  'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5, search: 0.01 }
+  'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5, search: 0.01 },
+  'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5, search: 0.01 }
 };
 
 export function createTurnUsage() {
