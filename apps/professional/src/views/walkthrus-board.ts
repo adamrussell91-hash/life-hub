@@ -25,6 +25,12 @@ import { renderPanel, type PanelModel } from '@/views/walkthrus-panel';
 const NS = 'http://www.w3.org/2000/svg';
 const FALLBACK_VIEWPORT = { w: 1000, h: 640 };
 const PHONE = '(max-width: 719px)';
+/** A mouse wheel moves in whole notches (120 a click) and only up and down; a trackpad drifts in small steps. */
+function isMouseWheel(e: WheelEvent, dx: number, dy: number): boolean {
+  if (e.deltaMode !== 0) return true;
+  const notch = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
+  return dx === 0 && Math.abs(dy) >= 40 && typeof notch === 'number' && notch !== 0 && notch % 120 === 0;
+}
 /** Which board shows: Adam's own few techniques, or the whole book to pick from. Remembered per browser. */
 type BoardView = 'mine' | 'book';
 const VIEW_KEY = 'wt-board-view';
@@ -228,7 +234,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (!anim) { applyCamera(); return; }
     if (!raf) raf = requestAnimationFrame(frame);
   }
-  const fitAll = (): Camera => fitFrameCamera(layout.bounds, viewport(), 16);
+  const fitAll = (): Camera => fitFrameCamera(layout.focus, viewport(), 16);
 
   /** Desktop shows the whole board. A phone starts on the active goal's cluster, else the first one. */
   function initialCamera(): Camera {
@@ -246,13 +252,18 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (panel.hidden) return { x: 0, y: 0 };
     return isPhone() ? { x: 0, y: panel.getBoundingClientRect().height || viewport().h * 0.55 } : { x: panel.getBoundingClientRect().width || 380, y: 0 };
   }
-  function focusTile(tile: BoardTile): void {
+  /** Opening a technique shows its whole cluster in the room beside the panel; it never zooms out. */
+  function focusZoom(tile: BoardTile, vp: { w: number; h: number }, off: { x: number; y: number }): number {
+    const f = clusterFrame(layout, tile.cluster);
+    const fit = f ? fitFrameCamera(f, { w: vp.w - off.x, h: vp.h - off.y }, 16).k : 1;
+    return Math.max(cam.k, Math.min(fit, isPhone() ? 0.9 : 1.15));
+  }
+  function focusCamera(tile: BoardTile): Camera {
     const vp = viewport();
     const off = panelOffset();
-    const k = Math.max(cam.k, isPhone() ? 0.9 : 1.15);
-    const target = focusPoint(cam, { w: vp.w, h: vp.h - off.y }, tile.x, tile.y + tile.box.h * 0.9, k, off.x);
-    glideTo(target);
+    return focusPoint(cam, { w: vp.w, h: vp.h - off.y }, tile.x, tile.y, focusZoom(tile, vp, off), off.x);
   }
+  function focusTile(tile: BoardTile): void { glideTo(focusCamera(tile)); }
 
   // ── data helpers ──
   const goalFor = (id: string): WalkthruGoal | null => state.goals.find((g) => normalizeWalkthru(g.walkthru)?.technique_id === id) ?? null;
@@ -336,34 +347,6 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     return g;
   }
 
-  function stripNode(tile: BoardTile): SVGElement | null {
-    const text = state.text;
-    const master = text?.sets.flatMap((s) => s.techniques).find((t) => t.id === tile.id);
-    const cardW = 78;
-    const cardH = 52;
-    const gap = 8;
-    const total = 5 * cardW + 4 * gap;
-    const top = tile.y + tile.box.h / 2 + 22;
-    const g = svg('g', { class: 'wt-strip' });
-    g.append(svg('path', { class: 'wt-strip__connector', d: `M${tile.x},${tile.y + tile.box.h / 2} V${top - 10} H${tile.x} ` }));
-    for (let i = 0; i < 5; i++) {
-      const x = tile.x - total / 2 + i * (cardW + gap);
-      const step = master?.steps.find((s) => s.n === i + 1);
-      const card = svg('g', { class: 'wt-strip__card' });
-      card.append(
-        svg('rect', { x, y: top, width: cardW, height: cardH, rx: 6 }),
-        svg('text', { class: 'wt-strip__n', x: x + 8, y: top + 15 }, String(i + 1))
-      );
-      wrapTitle(step?.label ?? '', 14, 2).forEach((line, j) => card.append(svg('text', { class: 'wt-strip__label', x: x + 8, y: top + 29 + j * 11 }, line)));
-      g.append(card);
-    }
-    g.append(svg('path', { class: 'wt-strip__connector', d: `M${tile.x - total / 2 + cardW / 2},${top} V${top - 10} H${tile.x + total / 2 - cardW / 2} V${top}` }));
-    const close = svg('g', { class: 'wt-strip__close', role: 'button', tabindex: 0, 'aria-label': 'Close the steps', 'data-close': '1' });
-    close.append(svg('circle', { cx: tile.x + total / 2 + 20, cy: top + cardH / 2, r: 12 }), svg('path', { d: `M${tile.x + total / 2 + 15},${top + cardH / 2} h10` }));
-    g.append(close);
-    return g;
-  }
-
   function paint(): void {
     const focused = (document.activeElement as Element | null)?.closest?.('[data-tile]') as SVGElement | null;
     const focusId = focused?.dataset.tile ?? null;
@@ -429,10 +412,6 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
       robberLayer.append(robber);
     }
     children.push(robberLayer);
-    if (selectedTile) {
-      const strip = stripNode(selectedTile);
-      if (strip) children.push(strip);
-    }
     world.replaceChildren(...children);
     if (focusId) ([...world.querySelectorAll<SVGElement>('[data-tile]')].find((n) => n.dataset.tile === focusId))?.focus();
     board.classList.toggle('has-selection', Boolean(selectedTile));
@@ -819,8 +798,8 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   toolbar.append(
     viewSwitch,
     button('Fit', () => glideTo(fitAll())),
-    button('+', () => zoomBy(1.3)),
-    button('−', () => zoomBy(1 / 1.3)),
+    button('+', () => zoomBy(1.6)),
+    button('−', () => zoomBy(1 / 1.6)),
     drawButton,
     status
   );
@@ -866,13 +845,34 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   const release = (e: PointerEvent): void => { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = 0; };
   board.addEventListener('pointerup', release);
   board.addEventListener('pointercancel', release);
+  // A trackpad's two-finger scroll pans; a pinch (ctrl + wheel, or Safari's gesture events) and a
+  // mouse wheel's notches zoom, quickly enough that a few moves cross the whole book.
   board.addEventListener('wheel', (e) => {
     e.preventDefault();
     const r = board.getBoundingClientRect();
     stopAnim();
-    wheelZoom(cam, e.clientX - r.left, e.clientY - r.top, e.deltaY);
+    hideTip();
+    const lines = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? r.height : 1;
+    const dx = e.deltaX * lines;
+    const dy = e.deltaY * lines;
+    if (e.ctrlKey) zoomAt(cam, e.clientX - r.left, e.clientY - r.top, Math.exp(-dy * 0.012));
+    else if (isMouseWheel(e, dx, dy)) wheelZoom(cam, e.clientX - r.left, e.clientY - r.top, dy * 2.5);
+    else panBy(cam, -dx, -dy);
     applyCamera();
   }, { passive: false });
+  let gestureK = 1;
+  const onGesture = (e: Event & { scale?: number; clientX?: number; clientY?: number }): void => {
+    e.preventDefault();
+    if (e.type === 'gesturestart') { gestureK = 1; return; }
+    const scale = e.scale ?? 1;
+    const r = board.getBoundingClientRect();
+    stopAnim();
+    zoomAt(cam, (e.clientX ?? r.left + r.width / 2) - r.left, (e.clientY ?? r.top + r.height / 2) - r.top, scale / gestureK);
+    gestureK = scale;
+    applyCamera();
+  };
+  board.addEventListener('gesturestart', onGesture as EventListener, { passive: false });
+  board.addEventListener('gesturechange', onGesture as EventListener, { passive: false });
 
   board.addEventListener('click', (e) => {
     if (dragged) { dragged = false; return; }
@@ -956,7 +956,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   if (state.selected) {
     void ensureText();
     const tile = layout.tiles.find((t) => t.id === state.selected);
-    if (tile) assignCamera(cam, focusPoint(cam, viewport(), tile.x, tile.y + tile.box.h * 0.9, Math.max(cam.k, isPhone() ? 0.9 : 1.15), panelOffset().x));
+    if (tile) assignCamera(cam, focusCamera(tile));
     applyCamera();
   }
   if (!state.arrows.length && !data.notices.length) status.textContent = `Draw arrow joins two techniques. Click a hexagon to open it.${waitingNote()}`;
