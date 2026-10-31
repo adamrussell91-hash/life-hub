@@ -59,6 +59,17 @@ test('return, then take back', async () => {
   assert.equal(back.returned_at, undefined);
 });
 
+test('load leaves step picks out of the text and places them on their answers', async () => {
+  const { store, ava } = await setup();
+  const pick = { code_id: 'ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 11 };
+  store.data.set('published/lessons/lesson1', { lesson_id: 'lesson1', blocks: [{ id: 'qset1', block_type: 'question_set', content: { questions: [{ id: 'q1', prompt: 'How is imagery used?' }] } }] });
+  const key = `work_handins/lesson1/qset1/${ava.id}`;
+  store.data.set(key, { ...store.data.get(key), text: { answers: { q1: 'In the poem the poet uses imagery.' }, 'step.0': { pick: JSON.stringify(pick) } } });
+  const out = await piecesAction(store, 'class1', { action: 'load', column_id: 'column001', student_id: ava.id });
+  assert.deepEqual(Object.keys(out.text), ['answers']);
+  assert.deepEqual(out.steps, [{ part: 'answers', field: 'q1', pick }]);
+});
+
 test('nothing returns without a hand-in', async () => {
   const { store } = await setup();
   const roster = await loadRoster(store, 'class1');

@@ -33,6 +33,32 @@ export const handinKey = (lesson, block, student) => `work_handins/${lesson}/${b
 export const pieceId = (lesson, block) => `w:${lesson}:${block}`;
 export const workOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
 
+/** A block's written parts without its step picks, which are JSON for the marking page, never text to read. */
+export function writingParts(parts) {
+  return Object.fromEntries(Object.entries(parts ?? {}).filter(([part]) => !STEP_PART.test(part)));
+}
+
+/**
+ * The step picks in a question set's hand-in, each against the answer it sits
+ * in: `[{ part: 'answers', field: question id, pick }]`. A pick that no
+ * longer fits its answer is left out.
+ */
+export function stepPicks(parts, block) {
+  const questions = Array.isArray(block?.content?.questions) ? block.content.questions : [];
+  const out = [];
+  for (const [part, fields] of Object.entries(parts ?? {})) {
+    const index = STEP_PART.exec(part)?.[1];
+    const question = index === undefined ? null : questions[Number(index)];
+    if (!question || typeof question.id !== 'string') continue;
+    let raw = null;
+    try { raw = JSON.parse(fields?.pick); } catch { continue; }
+    const answer = parts.answers?.[question.id];
+    const pick = cleanStepPick(raw, typeof answer === 'string' ? answer : '', WORK_LIMITS.text);
+    if (pick) out.push({ part: 'answers', field: question.id, pick });
+  }
+  return out;
+}
+
 /** Blocks in this lesson that the class's Markbook links to an assessment column. */
 async function handinBlocks(store, classId, lessonId) {
   const { book } = await readBook(store, classId);
@@ -169,8 +195,11 @@ export async function classWork(store, lessonId, classId, studentIds) {
   for (const [studentId, row] of rows) {
     // A record stamped for someone else, or with nothing in it, is skipped.
     if (!row?.blocks || row.class_id !== classId || row.student_id !== studentId || !Object.keys(row.blocks).length) continue;
-    students[studentId] = { at: row.at, blocks: row.blocks };
-    for (const id of Object.keys(row.blocks)) used.add(id);
+    // Step picks stay out: the markbook reads and counts writing.
+    const blocks = Object.fromEntries(Object.entries(row.blocks).map(([id, parts]) => [id, writingParts(parts)]).filter(([, parts]) => Object.keys(parts).length));
+    if (!Object.keys(blocks).length) continue;
+    students[studentId] = { at: row.at, blocks };
+    for (const id of Object.keys(blocks)) used.add(id);
   }
   if (!Object.keys(students).length) return null;
   const lesson = await read(store, publishedLessonKey(lessonId));

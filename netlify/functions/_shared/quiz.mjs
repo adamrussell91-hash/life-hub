@@ -986,7 +986,8 @@ export async function quizTeacherAction(store, lessonId, body) {
         pending: scored.pending,
         practice: scored.practice,
         current: start.version === record.version,
-        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key, ...typed(r.id) }))
+        // A written answer's next-step pick shows on the teacher's marking view; never as a teacher code.
+        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key, ...typed(r.id), ...(result.steps?.[r.id] ? { step: result.steps[r.id] } : {}) }))
       }
     };
   }

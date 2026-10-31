@@ -8,7 +8,7 @@ import { readFeedbackCodes } from './feedback-codes.mjs';
 import { read, reject } from './question-drop.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { piecePrefix, pieceKey } from './piece-feedback.mjs';
-import { handinKey } from './lesson-work.mjs';
+import { handinKey, writingParts } from './lesson-work.mjs';
 import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload } from './teaching-feedback.mjs';
 import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
@@ -166,7 +166,7 @@ export async function pieceFor(store, roster, student, item) {
   const handin = row.kind === 'written' ? await read(store, handinKey(row.lesson_id, row.block_id, student.id)) : null;
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
-    text: handin?.text ?? null,
+    text: handin?.text ? writingParts(handin.text) : null,
     tags: (row.tags ?? []).map((t) => { const c = codes.get(t.code_id); return { part: t.part, field: t.field, start: t.start, end: t.end, positive: t.positive, code: c?.code, label: c?.label, colour: c?.colour, action: t.positive ? c?.strength_descriptor || c?.descriptor : c?.descriptor, ...(t.note ? { note: t.note } : {}), ...(c?.resource ? { resource: c.resource } : {}) }; }),
     criteria: (column?.criteria ?? []).map((c) => {
       const step = placesFor({ criteria: [c] }, mark)[c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`] ?? null;
