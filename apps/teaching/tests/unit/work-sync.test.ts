@@ -96,6 +96,21 @@ describe('mountWorkSync', () => {
     expect(server.saves()).toHaveLength(2);
   });
 
+  it('sends a next-step pick after its answer, and never counts it as writing', async () => {
+    vi.useFakeTimers();
+    const stepKey = `${storageKey(lesson, 'qset1')}.step.0`;
+    const server = fakeServer('ready');
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 100 });
+    await vi.runAllTimersAsync();
+    // A pick from earlier is still waiting when the answer under it changes.
+    saveActivityState(stepKey, { pick: '{"code_id":"ts","line":"L","start":0,"end":4}' });
+    saveActivityState(answersKey, { q1: 'Kept. More.' });
+    await vi.runAllTimersAsync();
+    expect(server.saves().map((s) => s.part)).toEqual(['answers', 'step.0']);
+    expect(sync.progress().written).toBe(1);
+    sync.dispose();
+  });
+
   it('asks a new device for initials once, then sends everything waiting', async () => {
     const server = fakeServer('initials');
     const page = host();

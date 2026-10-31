@@ -1,0 +1,52 @@
+/* A writing box's next step for the student (student/next-step.ts). The code's own colour, tokens only. */
+/* Box styles set display on the answer area, so hidden needs saying outright. */
+.ns-host[hidden], .ns-line[hidden], .ns-prompt[hidden], .ns-read[hidden], .ns-tick[hidden], .ns-foot[hidden] { display: none !important; }
+
+.ns--blue { --ns-tint: var(--pastel-blue); --ns-ink: var(--pastel-blue-ink); }
+.ns--sage { --ns-tint: var(--pastel-sage); --ns-ink: var(--pastel-sage-ink); }
+.ns--peach { --ns-tint: var(--pastel-peach); --ns-ink: var(--pastel-peach-ink); }
+.ns--gold { --ns-tint: var(--pastel-gold); --ns-ink: var(--pastel-gold-ink); }
+.ns--lilac { --ns-tint: var(--pastel-lilac); --ns-ink: var(--pastel-lilac-ink); }
+
+/* The line above the box: one quiet action, faded back once the student is writing. */
+.ns-line { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-2); font-size: var(--text-sm); line-height: 1.45; color: var(--ink); transition: opacity .25s; }
+.ns-line--writing { opacity: .7; }
+.ns-line .pg-code { flex: none; }
+.ns-line__text { min-width: 0; overflow-wrap: anywhere; }
+.ns-line__label { color: var(--ns-ink, var(--navy)); font-weight: 600; margin-right: .2em; }
+
+/* Show me where: the prompt and the answer as sentences. */
+.ns-prompt { display: flex; gap: var(--space-2); align-items: baseline; margin: 0 0 var(--space-2); padding: 10px 12px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--ns-tint, var(--pastel-blue)) 45%, #fff); font-size: var(--text-sm); }
+.ns-prompt .pg-code { flex: none; }
+.ns-prompt__sub { display: block; color: var(--muted); font-size: var(--text-xs); margin-top: 2px; }
+.ns-read { border: 1px solid rgba(23, 55, 94, .2); border-radius: var(--radius-xs); padding: 12px; background: #fff; font-size: var(--text-sm); line-height: 1.8; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ns-read[role="button"] { cursor: text; }
+.ns-read[role="button"]:hover { border-color: var(--wave); }
+.ns-read:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.ns-sent { padding: 1px 0; border-radius: 3px; transition: background .15s, box-shadow .15s; }
+button.ns-sent { all: unset; display: inline; padding: 1px 0; border-radius: 3px; cursor: pointer; white-space: pre-wrap; }
+.ns-read--picking .ns-sent:hover { background: color-mix(in srgb, var(--ns-tint, var(--pastel-blue)) 45%, #fff); }
+button.ns-sent:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.ns-sent--on { background: color-mix(in srgb, var(--ns-tint, var(--pastel-blue)) 70%, #fff); box-shadow: inset 0 -2px 0 var(--ns-ink, var(--navy)); }
+.ns-sent__tag { display: inline-block; margin-right: 4px; padding: 0 5px; border-radius: 5px; background: var(--ns-ink, var(--navy)); color: #fff; font-size: .625rem; font-weight: 700; letter-spacing: .03em; line-height: 16px; vertical-align: 1px; }
+
+/* Done, Save and Not this time; then the small tick. */
+.ns-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+.ns-tick { display: flex; gap: 6px; align-items: center; margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--muted); }
+.ns-tick--step { font-size: var(--text-sm); color: var(--ns-ink); }
+.ns-tick__icon { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* In a question set, everything lines up under the numbered answer box. */
+.block-question-set__question > .ns-line,
+.block-question-set__question > .ns-prompt,
+.block-question-set__question > .ns-read,
+.block-question-set__question > .ns-tick,
+.block-question-set__question > .ns-foot { margin-left: 2rem; }
+
+/* A phone: each sentence is its own tap target, at least 44px tall. */
+@media (max-width: 640px) {
+  .ns-read--picking { display: grid; gap: 2px; padding: 4px; line-height: 1.5; }
+  .ns-read--picking button.ns-sent { display: flex; align-items: center; flex-wrap: wrap; min-height: 44px; padding: 6px 8px; box-sizing: border-box; }
+  .ns-read--picking .ns-gap { display: none; }
+  .ns-foot .btn { min-height: 44px; }
+}

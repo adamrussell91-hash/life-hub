@@ -5,6 +5,7 @@ import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderDone } from '@/blocks/done';
+import { mountNextStep, readStepPick, type StepFor } from '@/student/next-step';
 import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderHingeQuestion } from '@/blocks/hinge-question';
 import { renderContinuumLine } from '@/blocks/continuum-line';
@@ -113,6 +114,8 @@ export type RenderContext = {
   pageBlocks?: Block[];
   /** A student lesson whose quiz questions sit inside sections or columns: the answer space for a question, by block id. */
   quizSlot?: (blockId: string) => HTMLElement;
+  /** A student lesson with a class: each writing box's next step for this student (student/next-step.ts). */
+  stepFor?: StepFor;
   /** Lessons a unit plan block may link to, resolved for this viewer (Curriculum lines). */
   unitLessons?: Array<{ id: string; title: string; href: string }>;
   /** Curriculum network for a unit map: the subject's lines, the unit's lessons and their week bands. */
@@ -933,6 +936,16 @@ export function renderQuestionSetBlock(
           if (area.value.trim()) emitAnswered(wrap, block.id, 'done');
         });
         li.append(label, area);
+        // Done under every box; the step and its pick save beside the answers, as part step.{index}.
+        const stepKey = scope ? `${storageKey(scope, block.id)}.step.${block.content.questions.indexOf(question)}` : undefined;
+        mountNextStep({
+          input: area,
+          step: ctx.stepFor?.(question, `${block.id}.${question.id}`) ?? null,
+          pick: stepKey ? readStepPick(loadActivityState<{ pick?: string }>(stepKey)) : null,
+          onPick: (pick) => {
+            if (stepKey) saveActivityState(stepKey, pick ? { pick: JSON.stringify(pick) } : {});
+          }
+        });
       } else {
         const box = document.createElement('div');
         box.className = 'block-question-set__answer';
