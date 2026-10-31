@@ -7,6 +7,7 @@ import type { PageManifestEntry } from '../../../knowledge/src/domain/page';
 import { KEYWORD_PALETTE, type ArchiveGraphModel } from '../../../knowledge/src/archive/keywordGraph';
 import { buildShowAllGraph } from '../../../knowledge/src/archive/showAllGraph';
 import type { AnthologyData, AnthologyItem } from '@/blocks/anthology-collect';
+import { CLASS_KNOWLEDGE_TEXT, knowledgeNoteId, type KnowledgeItem } from '@/blocks/anthology-knowledge';
 
 export type AnthologyGrouping = 'theme' | 'concept' | 'poem';
 
@@ -48,14 +49,18 @@ export function anthologyMapItems(data: AnthologyData): AnthologyItem[] {
 /** Hub labels in a steady order (texts by unit order, the rest alphabetical), each with its own colour. */
 export function anthologyHubColours(
   data: AnthologyData,
-  grouping: AnthologyGrouping
+  grouping: AnthologyGrouping,
+  knowledge: readonly KnowledgeItem[] = []
 ): Map<string, (typeof KEYWORD_PALETTE)[number]> {
   const titles = textTitles(data);
   const labels =
     grouping === 'poem'
-      ? data.texts.map((text) => text.title)
+      ? [...data.texts.map((text) => text.title), ...(knowledge.length ? [CLASS_KNOWLEDGE_TEXT] : [])]
       : [
-          ...new Set(anthologyMapItems(data).flatMap((item) => anthologyLabelsFor(item, grouping, titles)))
+          ...new Set([
+            ...anthologyMapItems(data).flatMap((item) => anthologyLabelsFor(item, grouping, titles)),
+            ...knowledge.flatMap((item) => (grouping === 'theme' ? item.themes : item.concepts))
+          ])
         ].sort((a, b) => a.localeCompare(b));
   return new Map(labels.map((label, index) => [label, KEYWORD_PALETTE[index % KEYWORD_PALETTE.length]!]));
 }
@@ -65,7 +70,11 @@ function shortQuote(quote: string): string {
   return flat.length > 64 ? `${flat.slice(0, 61).trimEnd()}…` : flat;
 }
 
-export function buildAnthologyGraph(data: AnthologyData, grouping: AnthologyGrouping): ArchiveGraphModel {
+export function buildAnthologyGraph(
+  data: AnthologyData,
+  grouping: AnthologyGrouping,
+  knowledge: readonly KnowledgeItem[] = []
+): ArchiveGraphModel {
   const titles = textTitles(data);
   const items = anthologyMapItems(data);
   const labelsById = new Map<string, string[]>();
@@ -82,7 +91,19 @@ export function buildAnthologyGraph(data: AnthologyData, grouping: AnthologyGrou
         .join(' · ')
     };
   });
-  const colours = anthologyHubColours(data, grouping);
+  // The class's additions sit under the same hubs, so reading and poem lines meet on a shared theme.
+  for (const item of knowledge) {
+    const id = knowledgeNoteId(item.id);
+    labelsById.set(id, grouping === 'poem' ? [CLASS_KNOWLEDGE_TEXT] : grouping === 'theme' ? item.themes : item.concepts);
+    entries.push({
+      id,
+      title: item.title,
+      area: 'notes',
+      tags: [],
+      excerpt: [item.quote, item.info, ...item.themes, ...item.concepts].filter(Boolean).join(' · ')
+    });
+  }
+  const colours = anthologyHubColours(data, grouping, knowledge);
   return buildShowAllGraph(entries, 'tags', {
     labelsFor: (entry) => labelsById.get(entry.id) ?? [],
     colorFor: (label) => colours.get(label) ?? KEYWORD_PALETTE[0]!

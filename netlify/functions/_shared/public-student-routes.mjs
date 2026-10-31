@@ -20,6 +20,8 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/case\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/sprint\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/sprint-file\/[^/]+$/ },
+  { method: 'GET', pattern: /^\/api\/published\/anthology-knowledge\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/anthology-knowledge\/[^/]+$/ },
   { method: 'GET', pattern: /^\/\.netlify\/functions\/published-lesson(?:\/|$)/ },
   { method: 'GET', pattern: /^\/api\/published\/lessons\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/units\/[^/]+$/ },

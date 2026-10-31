@@ -38,6 +38,7 @@ import { renderGraphView } from '../../../../packages/graph-blocks';
 import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { AnthologyData } from '@/blocks/anthology-collect';
 import { buildAnthologyView } from '@/blocks/anthology-view';
+import type { KnowledgeApi } from '@/blocks/anthology-knowledge';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { buildAnnotationView } from '@/blocks/annotation-view';
@@ -108,6 +109,10 @@ export type RenderContext = {
   classId?: string;
   attachedOutcomes?: PublicOutcome[];
   anthology?: AnthologyData;
+  /** The unit's class additions to the Anthology map, read and written for this viewer. */
+  anthologyKnowledge?: KnowledgeApi;
+  /** A lesson's Anthology block: the unit's map, fetched once the page is open. */
+  loadAnthology?: () => Promise<{ data: AnthologyData; knowledge?: KnowledgeApi }>;
   openNoteId?: string;
   /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
   pageBlocks?: Block[];
@@ -2718,17 +2723,31 @@ export function renderAnthologyBlock(
   mode: RenderMode,
   ctx: RenderContext = {}
 ): HTMLElement {
-  const data = ctx.anthology ?? { items: [], texts: [] };
-  return wrapBlock(
+  const build = (data: AnthologyData, knowledge?: KnowledgeApi) =>
     buildAnthologyView(block, {
       data,
       mode,
       title: block.content.title,
-      onMakeCards: mode === 'teacher' ? ctx.onMakeAnthologyCards : undefined
-    }),
-    block,
-    mode
-  );
+      onMakeCards: mode === 'teacher' ? ctx.onMakeAnthologyCards : undefined,
+      knowledge
+    });
+  if (!ctx.anthology && ctx.loadAnthology && mode !== 'print') {
+    // In a lesson the unit's notes arrive after the page opens.
+    const holder = document.createElement('div');
+    holder.className = 'block-anthology';
+    const note = document.createElement('p');
+    note.className = 'block-anthology__empty block-empty';
+    note.textContent = 'Loading the class map…';
+    holder.append(note);
+    void ctx
+      .loadAnthology()
+      .then(({ data, knowledge }) => holder.replaceWith(build(data, knowledge)))
+      .catch(() => {
+        note.textContent = "The class map didn't load. Refresh to try again.";
+      });
+    return wrapBlock(holder, block, mode);
+  }
+  return wrapBlock(build(ctx.anthology ?? { items: [], texts: [] }, ctx.anthologyKnowledge), block, mode);
 }
 
 function renderBlockContent(

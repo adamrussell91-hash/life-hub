@@ -2,6 +2,7 @@ import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import {
   createTeacherClassExamples,
   type TeacherClassExamplesHandle
@@ -131,7 +132,9 @@ export function mountLessonDisplayView(
             lessonId: lesson.lesson_id,
             display: true,
             pageBlocks: lesson.blocks,
-            attachedOutcomes: outcomes
+            attachedOutcomes: outcomes,
+            // The class screen shows the students' view: no initials, no review list.
+            loadAnthology: () => studentUnitAnthology(lesson.unit_id)
           })
         );
         examples.decorate(row, block);

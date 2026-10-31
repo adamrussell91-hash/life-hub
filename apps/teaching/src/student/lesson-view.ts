@@ -2,6 +2,7 @@ import { revealBlockFromHash } from '@/app/block-hash';
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
 import { readJSON, writeJSON } from '@/quiz/dom';
@@ -217,6 +218,7 @@ function renderPublishedLesson(
         pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
         openNoteId,
+        loadAnthology: () => studentUnitAnthology(lesson.unit_id),
         ...(quizSlot ? { quizSlot } : {})
       })
     );
