@@ -59,19 +59,17 @@ describe('the board', () => {
     expect(root.querySelector('.wt-panel')!.hasAttribute('hidden')).toBe(true);
   });
 
-  it('opening a technique shows the strip and the panel, with other tiles faded', async () => {
+  it('opening a technique shows its steps in the panel; the board keeps every tile at full colour', async () => {
     const root = await mount();
     click(tile(root, 'w1-quizzing'));
     await flush();
-    expect(root.querySelectorAll('.wt-strip__card').length).toBe(5);
+    expect(root.querySelectorAll('.wt-strip__card').length).toBe(0);
     expect(root.querySelector('.wt-panel')!.hasAttribute('hidden')).toBe(false);
     expect(root.querySelector('.wt-panel__title')!.textContent).toBe('Quizzing');
     expect(root.querySelectorAll('.wt-steps__item').length).toBe(5);
     expect(root.querySelector('.wt-svg')!.classList.contains('has-selection')).toBe(true);
-    // the strip's magnifier closes it
-    click(root.querySelector('[data-close]'));
-    expect(root.querySelectorAll('.wt-strip__card').length).toBe(0);
-    expect(root.querySelector('.wt-panel')!.hasAttribute('hidden')).toBe(true);
+    // the empty arrow pop-up stays out of sight
+    expect(root.querySelector('.wt-pop')!.hasAttribute('hidden')).toBe(true);
   });
 
   it('a technique in the route opens on load', async () => {

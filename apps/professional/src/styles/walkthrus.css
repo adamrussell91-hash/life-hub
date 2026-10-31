@@ -12,7 +12,6 @@
 .wt-tile:hover .wt-hex, .wt-tile:focus-visible .wt-hex { stroke-width: 2.6; }
 .wt-tile.is-selected .wt-hex { stroke-width: 3.2; }
 .wt-tile.is-draw-from .wt-hex { stroke: var(--wave); stroke-width: 3.2; }
-.has-selection .wt-tile:not(.is-selected):not(.is-neighbour) { opacity: 0.22; }
 .has-selection .wt-arrow { opacity: 0.35; }
 .wt-tab { fill: #111; }
 .wt-tab__text { fill: #fff; font-weight: 700; font-family: var(--font-ui); letter-spacing: 0.02em; }
@@ -44,13 +43,6 @@
 .wt-chiplabel__text { fill: #111; font-size: 12px; font-weight: 500; font-family: var(--font-ui); }
 @keyframes wt-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 
-.wt-strip__card rect { fill: #fff; stroke: #111; stroke-width: 1.4; }
-.wt-strip__n { font-size: 13px; font-weight: 800; fill: #111; font-family: var(--font-ui); }
-.wt-strip__label { font-size: 9px; font-weight: 600; fill: #111; font-family: var(--font-ui); }
-.wt-strip__connector { fill: none; stroke: #111; stroke-width: 1.4; }
-.wt-strip__close { cursor: pointer; }
-.wt-strip__close circle { fill: #fff; stroke: #111; stroke-width: 1.4; }
-.wt-strip__close path { fill: none; stroke: #111; stroke-width: 1.8; stroke-linecap: round; }
 
 .wt-tip { position: fixed; z-index: 30; max-width: 18rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--depth); color: var(--on-dark); font-size: var(--text-sm); box-shadow: 0 8px 24px rgba(10, 21, 54, 0.25); pointer-events: none; }
 .wt-tip__code { margin: 0; font-size: var(--text-2xs); letter-spacing: 0.06em; color: var(--on-dark-muted); }
@@ -58,6 +50,7 @@
 .wt-tip__steps { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: var(--text-xs); }
 .wt-pop { position: fixed; z-index: 30; display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 10px 30px rgba(10, 21, 54, 0.2); width: min(20rem, calc(100% - 2rem)); left: 50%; top: 4.5rem; transform: translateX(-50%); }
 .wt-pop[style*='top'] { transform: none; }
+.wt-pop[hidden] { display: none; }
 .wt-pop__title { margin: 0; font-weight: 700; font-size: var(--text-sm); }
 .wt-pop__types, .wt-pop__row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .wt-pop__input { width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
@@ -138,8 +131,8 @@
 .wt-viewswitch__btn { border: 0; border-radius: 999px; padding: 0.4rem 0.9rem; font: inherit; font-weight: 700; font-size: var(--text-sm); color: #fff; background: transparent; cursor: pointer; }
 .wt-viewswitch__btn[aria-pressed='true'] { background: #ffd400; color: #111; }
 .wt-viewswitch__btn:focus-visible { outline: 2px solid #ffd400; outline-offset: 2px; }
-.wt-svg[data-view='book'] .wt-tile.is-mine .wt-hex { stroke-width: 3.6; }
-.wt-svg[data-view='book'] .wt-tile:not(.is-mine) .wt-hex { fill-opacity: 0.55; }
+/* Every tile keeps the book's full yellow; picked ones get a heavy outline, never a faded fill. */
+.wt-svg[data-view='book'] .wt-tile.is-mine .wt-hex { stroke-width: 4; }
 .wt-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 0.5rem; padding: 1.5rem; text-align: center; }
 .wt-empty[hidden] { display: none; }
 .wt-empty__title { margin: 0; font-weight: 800; font-size: var(--text-lg, 1.15rem); color: #111; }
