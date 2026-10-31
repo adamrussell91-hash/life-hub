@@ -378,12 +378,15 @@ button.hub-rail__section:focus-visible {
 
 /* ── Collapse ───────────────────────────────────────────────────────────
    js/hub-rail-collapse.js toggles html.hub-rail-collapsed. The shell column
-   (or Life's inset) reads --rail-shown and shrinks to 0 while the rail slides
+   (or Life's inset) reads --rail-shown and shrinks to the tab's gutter while the rail slides
    out by its own width, so the rail's edge and the canvas edge move as one.
    The edge tab is the only control; it is never on the brand. */
 @media (min-width: 721px) {
+  /* Collapsed, the canvas keeps a gutter the width of the edge tab so the
+     tab never sits on page headings. */
   html.hub-rail-collapsed {
-    --rail-shown: 0rem;
+    --rail-shown: 1.25rem;
+    --rail-tab-left: 0rem;
   }
 
   html.hub-rail-collapsed .hub-rail {
@@ -414,7 +417,7 @@ button.hub-rail__section:focus-visible {
   position: fixed;
   z-index: 40;
   top: var(--space-5);
-  left: var(--rail-shown);
+  left: var(--rail-tab-left, var(--rail-shown));
   display: grid;
   place-items: center;
   width: 1.25rem;
