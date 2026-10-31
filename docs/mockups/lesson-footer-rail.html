@@ -144,143 +144,146 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: no-preference) {
   .tick { transition: background .15s, border-color .15s; }
 }
+.bank { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.bank .qcard { padding: 14px 16px; gap: 8px; }
+.bank .qcard__wording { font-size: .98rem; }
+.src { font-size: .82rem; color: var(--muted); }
+.maths { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.stat b { font: 650 1.6rem/1.1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--navy); }
+.stat span { font-size: .85rem; color: var(--muted); }
+.progress-dots { display: flex; gap: 6px; justify-content: center; }
+.progress-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.progress-dots i.on { background: var(--accent); }
+.collate { display: grid; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.collate__head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.citem { display: grid; gap: 6px; }
+.citem__q { max-width: none; font-weight: 600; font-size: .92rem; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.citem__q small { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: grid; place-items: center; font-size: .74rem; font-weight: 600; color: #fff; min-width: 0; overflow: hidden; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.s1 { background: #2f7a52; } .s2 { background: #6aa77f; } .s3 { background: #d39a3d; } .s4 { background: #b4483e; } .s0 { background: #8a96a8; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.thin { color: var(--muted); font-size: .84rem; font-style: italic; }
+.quotes { margin: 0; padding-left: 1.1rem; display: grid; gap: 4px; font-size: .9rem; }
+.trend { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; align-items: end; height: 80px; }
+.trend div { background: var(--accent); border-radius: 4px 4px 0 0; opacity: .85; }
+.trend div.na { background: var(--line); }
+.trend-x { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; font-size: .72rem; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
 <main>
   <header style="display:grid;gap:12px">
-    <span class="status">For decision · nothing built yet</span>
+    <span class="status">For decision · version 2 · nothing built yet</span>
     <h1>Lesson footer rail and end-of-lesson questions</h1>
-    <p class="lede">A rail at the bottom of every lesson: previous lesson, a tick to finish the lesson (which hands in the quiz and written work), a small feedback icon, and next lesson. Below: what the research says students can and can't judge, the questions that survive it, and a clickable mockup.</p>
+    <p class="lede">A rail at the bottom of every lesson: previous lesson, a tick to finish, next lesson. Ticking hands in the quiz and written work, then asks two quick questions about <em>the lesson</em>, drawn from a bank of ten, and says “Lesson completed”. Answers are anonymous and pool across students, so each lesson builds up a picture without anyone answering everything.</p>
   </header>
+
+  <section aria-labelledby="h-changes">
+    <span class="eyebrow">What changed from version 1</span>
+    <ul class="rules">
+      <li><strong>About the lesson, not the student.</strong> The effort question is gone: a student's effort says more about their day than about the lesson's design. Self-ratings of understanding stay out too.</li>
+      <li><strong>A bank of ten, two asked each time.</strong> Answers pool across the class, so each question still gets answers on every lesson.</li>
+      <li><strong>Anonymous.</strong> The tick is named (it's the hand-in); the feedback is stored with no link to the student.</li>
+      <li><strong>One flow:</strong> tick → check what's unanswered → hand in → two questions → Lesson completed. The separate feedback icon is gone.</li>
+    </ul>
+  </section>
 
   <section aria-labelledby="h-research">
     <span class="eyebrow">1 · The research</span>
-    <h2 id="h-research">Students are poor judges of whether a lesson worked</h2>
-    <p>Your instinct is right, and the evidence is strong. Students' sense of how much they learned, or how good a lesson was, tracks how smooth it felt, not how much they learned. The same evidence points to what students <em>can</em> report reliably: concrete things that happened in the room, and their own effort and confusion.</p>
+    <h2 id="h-research">Ask about what happened in the lesson, never whether it was good</h2>
+    <p>Students judge lesson quality by how smooth it felt, which runs against how much they learned. They're much better witnesses to concrete things that happened in the room. So every question in the bank asks about an observable event in the lesson.</p>
     <ol class="findings">
       <li class="finding"><span class="finding__n">1</span><div>
-        <p><strong>Feeling of learning runs the wrong way.</strong> In randomised physics classes, students taught actively scored higher on the test but <em>felt</em> they had learned less than students given a polished lecture. The authors put it down to effort: students read hard thinking as a sign of not learning.</p>
+        <p><strong>Feeling of learning runs the wrong way.</strong> In randomised physics classes, students taught actively scored higher but <em>felt</em> they learned less than students given a polished lecture.</p>
         <p class="cite">Deslauriers et al. (2019), <a href="https://openlab.citytech.cuny.edu/gamelab/files/2023/01/Deslauriersa-et-al-2019.pdf">PNAS 116(39)</a>.</p></div></li>
       <li class="finding"><span class="finding__n">2</span><div>
-        <p><strong>Ratings reward short-term ease.</strong> With students randomly assigned to teachers, ratings predicted grades in that course but not performance in the next one. Teachers whose students did better later were rated <em>lower</em>.</p>
-        <p class="cite">Carrell &amp; West (2010), <a href="https://www.nber.org/papers/w14081">Journal of Political Economy 118(3)</a>.</p></div></li>
+        <p><strong>Overall ratings reward short-term ease and barely track learning.</strong> Highly rated teachers' students did worse in the next course; across 97 studies the link between ratings and learning was close to zero.</p>
+        <p class="cite">Carrell &amp; West (2010), <a href="https://www.nber.org/papers/w14081">JPE 118(3)</a>; Uttl, White &amp; Gonzalez (2017), via <a href="https://www.learningscientists.org/blog/2020/1/30-1">The Learning Scientists</a>.</p></div></li>
       <li class="finding"><span class="finding__n">3</span><div>
-        <p><strong>Overall ratings barely relate to learning.</strong> A re-analysis of 97 multi-section studies found the correlation between student ratings and learning close to zero (about r = .12 at best). It's contested, but no one in the debate argues the link is strong.</p>
-        <p class="cite">Uttl, White &amp; Gonzalez (2017), Studies in Educational Evaluation 54; see <a href="https://www.learningscientists.org/blog/2020/1/30-1">The Learning Scientists</a>.</p></div></li>
+        <p><strong>Questions about observable classroom events do predict learning.</strong> Student surveys built from specific statements (the teacher checks we understand, we're made to explain our thinking, time isn't wasted) predicted achievement gains, with <em>Challenge</em> and <em>Control</em> carrying most weight. The bank below draws on those statements and on the Great Teaching Toolkit's.</p>
+        <p class="cite">MET Project, <a href="https://cepr.harvard.edu/sites/g/files/omnuum9881/files/cepr/files/asking_students_summary_doc_0.pdf">Asking Students about Teaching</a>; <a href="https://static.battelleforkids.org/documents/Tulsa/Tripod-Student-Survey-7C-Overview.pdf">Tripod 7Cs</a>; <a href="https://evidencebased.education/student-surveys-perceptions-on-teaching/">Great Teaching Toolkit surveys</a>. Caution: <a href="https://nepc.colorado.edu/sites/default/files/ttr-met-studentsurvey_1.pdf">NEPC review</a>.</p></div></li>
       <li class="finding"><span class="finding__n">4</span><div>
-        <p><strong>Asking about what happened does work.</strong> School student surveys that ask about observable classroom events (whether the teacher checks understanding, whether time is wasted, whether you're pushed to think) predicted achievement gains and were more consistent year to year than observations. The <em>Challenge</em> and <em>Control</em> (classroom order) scales carried the most weight. The Great Teaching Toolkit surveys use the same approach: specific, observable statements.</p>
-        <p class="cite">MET Project, <a href="https://cepr.harvard.edu/sites/g/files/omnuum9881/files/cepr/files/asking_students_summary_doc_0.pdf">Asking Students about Teaching</a> (2012); <a href="https://static.battelleforkids.org/documents/Tulsa/Tripod-Student-Survey-7C-Overview.pdf">Tripod 7Cs</a>; <a href="https://evidencebased.education/student-surveys-perceptions-on-teaching/">Evidence Based Education</a> on the Great Teaching Toolkit (Coe et al., 2020). A <a href="https://nepc.colorado.edu/sites/default/files/ttr-met-studentsurvey_1.pdf">critical review</a> warns against over-trusting these surveys for high-stakes decisions.</p></div></li>
+        <p><strong>Asking each student only a few questions is an established survey design.</strong> In “matrix sampling”, each person answers a subset of the items and the results are pooled. It cuts the burden on each respondent while still covering every question. The cost is fewer answers per question, so results are read across many responses, not one lesson in one class.</p>
+        <p class="cite">Graham, Taylor, Olchowski &amp; Cumsille (2006), <a href="https://pure.psu.edu/en/publications/planned-missing-data-designs-in-psychological-research/">Planned missing data designs</a>, Psychological Methods 11(4); <a href="https://psychmodels.ucdavis.edu/sites/g/files/dgvnsk12156/files/inline-files/rhemtullasavaleilittle_2016.pdf">Rhemtulla, Savalei &amp; Little (2016)</a>.</p></div></li>
       <li class="finding"><span class="finding__n">5</span><div>
-        <p><strong>Effort is one thing students rate well.</strong> A single "how much mental effort did that take?" item is the standard measure of cognitive load: reliable, and sensitive to small changes in task difficulty. One caution: changing the wording or the number of points weakens it.</p>
-        <p class="cite">Paas (1992), Journal of Educational Psychology 84; reliability and validity in <a href="https://link.springer.com/article/10.1007/s11251-024-09692-6">Instructional Science (2024)</a> and <a href="https://core.ac.uk/download/127605891.pdf">Sweller, van Merriënboer &amp; Paas review</a>.</p></div></li>
-      <li class="finding"><span class="finding__n">6</span><div>
-        <p><strong>"How well do you understand?" right after the lesson is the least accurate time to ask.</strong> Judgements of learning made straight away are distorted by what's still in short-term memory; made after a delay, they're far better. The quiz is a better measure of understanding than any self-rating.</p>
-        <p class="cite">Nelson &amp; Dunlosky (1991), Psychological Science; Koriat &amp; Bjork (2005) <a href="https://newiipdm.haifa.ac.il/wp-content/uploads/2015/05/2005-Koriat-Bjork-JEPLMC-KBA.pdf">on illusions of competence</a>.</p></div></li>
-      <li class="finding"><span class="finding__n">7</span><div>
-        <p><strong>"What's still unclear?" is useful for planning, not as evidence of learning.</strong> The Muddiest Point is a standard classroom check: fast, anonymous-friendly and good for planning the next lesson. It records what students <em>feel</em> unsure of, not what they got wrong, and there's little controlled evidence that it raises achievement.</p>
-        <p class="cite">Angelo &amp; Cross (1993), Classroom Assessment Techniques; <a href="https://mtei.engineering.cornell.edu/tips-updates/muddiest-point-and-one-minute-papers-for-active-learning-and-feedback">Cornell summary</a>.</p></div></li>
-    </ol>
-    <h3>What that means for the questions</h3>
-    <ol class="rules">
-      <li><strong>Ask about things that happened, or about the student's own experience.</strong> Never ask them to grade the lesson, the teacher, or how much they learned.</li>
-      <li><strong>Don't read high effort as bad.</strong> Read it next to the quiz: high effort with good scores is productive struggle; high effort with low scores is overload.</li>
-      <li><strong>Leave understanding to the quiz.</strong> A self-rating straight after the lesson is the least accurate measure available.</li>
-      <li><strong>Keep it under 20 seconds and optional.</strong> One tap per question, one optional text box.</li>
+        <p><strong>“What's still unclear?” is good for planning the next lesson.</strong> The Muddiest Point records what students feel unsure of, not what they got wrong; read it next to the quiz.</p>
+        <p class="cite">Angelo &amp; Cross (1993); <a href="https://mtei.engineering.cornell.edu/tips-updates/muddiest-point-and-one-minute-papers-for-active-learning-and-feedback">Cornell summary</a>.</p></div></li>
     </ol>
   </section>
 
-  <section aria-labelledby="h-questions">
-    <span class="eyebrow">2 · Question options</span>
-    <h2 id="h-questions">The questions that hold up</h2>
-    <p>Recommended: the first three, which together take about 15 seconds. The two optional ones are defensible but weaker; add them if you want the extra signal.</p>
-
-    <div class="qgroup">
-      <div class="qgroup__head"><h3>Recommended</h3><span class="tag tag--rec">use these</span></div>
-
-      <article class="qcard">
-        <p class="eyebrow">A · Clarity of the task</p>
+  <section aria-labelledby="h-bank">
+    <span class="eyebrow">2 · The bank</span>
+    <h2 id="h-bank">Ten questions about the lesson</h2>
+    <p>Each student gets two at the end. The two are picked from the questions this lesson has the fewest answers to so far, with ties broken at random. To a student that still feels random, and every question gets answers on every lesson.</p>
+    <div class="bank">
+      <article class="qcard"><p class="eyebrow">1 · Clear task <span class="tag tag--rec">your A</span></p>
         <p class="qcard__wording">Did you know what you were meant to be doing?</p>
         <ul class="answers"><li>All the way through</li><li>Mostly</li><li>Some of the time</li><li>Hardly at all</li></ul>
-        <dl class="meta">
-          <dt>Why it holds</dt><dd>An observable event, not a quality judgement. Close to Tripod's <em>Clarify</em> items, which ask about specific, observable teacher actions.</dd>
-          <dt>What you'd do</dt><dd>Many "some of the time" answers point at the instructions or the order of tasks, not the content. Fix the lesson's structure.</dd>
-        </dl>
-      </article>
-
-      <article class="qcard">
-        <p class="eyebrow">B · Getting unstuck</p>
+        <p class="src">Tripod <em>Clarify</em>. Low answers point at the instructions or the order of tasks.</p></article>
+      <article class="qcard"><p class="eyebrow">2 · Getting unstuck <span class="tag tag--rec">your B</span></p>
         <p class="qcard__wording">When you got stuck, what happened?</p>
         <ul class="answers"><li>I didn't get stuck</li><li>I worked it out myself</li><li>I got help and kept going</li><li>I stayed stuck</li></ul>
-        <dl class="meta">
-          <dt>Why it holds</dt><dd>Reports what happened, which students can do accurately. Separates productive struggle from lost time without asking them to judge difficulty.</dd>
-          <dt>What you'd do</dt><dd>"I stayed stuck" is the one to act on: compare it with that student's quiz answers and their Markbook pattern. "Didn't get stuck" across the room together with high quiz scores may mean the lesson was too easy.</dd>
-        </dl>
-      </article>
-
-      <article class="qcard">
-        <p class="eyebrow">C · Still unclear (optional text)</p>
-        <p class="qcard__wording">What's one thing that's still unclear?</p>
-        <ul class="answers"><li>Short free text, can be left blank</li></ul>
-        <dl class="meta">
-          <dt>Why it holds</dt><dd>The Muddiest Point. Diagnostic and useful for planning the next lesson. It records what students feel unsure about, so read it next to the quiz, not instead of it.</dd>
-          <dt>What you'd do</dt><dd>Feeds the start of the next lesson: a retrieval question or re-explanation aimed at the most common answer.</dd>
-        </dl>
-      </article>
-    </div>
-
-    <div class="qgroup">
-      <div class="qgroup__head"><h3>Optional</h3><span class="tag tag--opt">defensible, weaker</span></div>
-
-      <article class="qcard qcard--opt">
-        <p class="eyebrow">D · Mental effort</p>
-        <p class="qcard__wording">How hard did you have to think in this lesson?</p>
-        <ul class="answers"><li>Very little</li><li>A little</li><li>A fair amount</li><li>A lot</li><li>As hard as I can</li></ul>
-        <dl class="meta">
-          <dt>Why it holds</dt><dd>Adapted from the Paas mental-effort scale, the best-validated self-report in this area.</dd>
-          <dt>Caution</dt><dd>The original has 9 points; this 5-point, student-friendly version hasn't been re-validated. Only useful read against quiz scores (see the rules above), never on its own, and never as "this lesson was too hard".</dd>
-        </dl>
-      </article>
-
-      <article class="qcard qcard--opt">
-        <p class="eyebrow">E · Pushed to think</p>
-        <p class="qcard__wording">In this lesson I had to explain my thinking, not just give answers.</p>
+        <p class="src">Tripod <em>Clarify</em> (“explains it another way”). Many “stayed stuck” answers point at the lesson's support or examples.</p></article>
+      <article class="qcard"><p class="eyebrow">3 · Still unclear <span class="tag tag--rec">your C</span></p>
+        <p class="qcard__wording">What's one thing from this lesson that's still unclear?</p>
+        <ul class="answers"><li>Short text</li><li>Nothing</li></ul>
+        <p class="src">Muddiest Point. Feeds the start of the next lesson.</p></article>
+      <article class="qcard"><p class="eyebrow">4 · Explain thinking <span class="tag tag--rec">your E</span></p>
+        <p class="qcard__wording">In this lesson, did you have to explain your thinking, not just give answers?</p>
         <ul class="answers"><li>Yes, a lot</li><li>A bit</li><li>Not really</li></ul>
-        <dl class="meta">
-          <dt>Why it holds</dt><dd>Close to Tripod's <em>Challenge</em> scale, which carried the most weight in the MET results. Still an observable event.</dd>
-          <dt>Caution</dt><dd>Challenge was validated across a whole course, not one lesson. Treat one lesson's result as a hint, and watch the trend over a unit.</dd>
-        </dl>
-      </article>
+        <p class="src">Tripod <em>Challenge</em>, the strongest predictor. Read as a trend across the unit.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">5 · Following explanations</p>
+        <p class="qcard__wording">When something new was explained, could you follow it?</p>
+        <ul class="answers"><li>Easily</li><li>Mostly</li><li>Only after help</li><li>Not really</li></ul>
+        <p class="src">Tripod <em>Clarify</em> (“explains difficult things clearly”).</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">6 · Examples</p>
+        <p class="qcard__wording">Did the examples help you do the task yourself?</p>
+        <ul class="answers"><li>Yes</li><li>Partly</li><li>Not really</li><li>There weren't any</li></ul>
+        <p class="src">Worked examples and modelling, from the Great Teaching Toolkit's structuring dimension.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">7 · Checked before moving on</p>
+        <p class="qcard__wording">Did the lesson check whether you'd got it before moving on?</p>
+        <ul class="answers"><li>Yes, more than once</li><li>Once</li><li>Not that I noticed</li></ul>
+        <p class="src">Tripod <em>Clarify</em> (“checks to make sure we understand”).</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">8 · Earlier learning</p>
+        <p class="qcard__wording">Did this lesson use something from an earlier lesson?</p>
+        <ul class="answers"><li>Yes, and I remembered it</li><li>Yes, but I'd forgotten it</li><li>No</li><li>Not sure</li></ul>
+        <p class="src">Great Teaching Toolkit (“helps us remember ideas from previous lessons”). “Forgotten” answers flag what to bring back.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">9 · Time on the work</p>
+        <p class="qcard__wording">How much of the lesson was spent on the actual work?</p>
+        <ul class="answers"><li>Nearly all</li><li>Most</li><li>About half</li><li>Less than half</li></ul>
+        <p class="src">Tripod <em>Control</em> (“we don't waste time”), the other strong predictor.</p></article>
+      <article class="qcard qcard--opt"><p class="eyebrow">10 · Pulled together</p>
+        <p class="qcard__wording">Did the lesson end by pulling the main ideas together?</p>
+        <ul class="answers"><li>Yes</li><li>Sort of</li><li>No</li></ul>
+        <p class="src">Tripod <em>Consolidate</em> (“summarises what we learned”).</p></article>
     </div>
+    <p class="caption">Green edge: the four you picked. Amber edge: new ones, built the same way (each asks about something that happened in the lesson). Drop any you don't want; the bank works with eight or more.</p>
+  </section>
 
-    <div class="qgroup">
-      <div class="qgroup__head"><h3>Left out, and why</h3><span class="tag tag--no">don't ask</span></div>
-      <div class="table-wrap">
-        <table class="reject">
-          <thead><tr><th scope="col">Question</th><th scope="col">Why not</th></tr></thead>
-          <tbody>
-            <tr><td>Did you enjoy the lesson?</td><td>Enjoyment isn't needed for learning, and a smooth, easy lesson feels better while teaching less (finding 1).</td></tr>
-            <tr><td>How much did you learn?</td><td>Runs the wrong way: active lessons score lower on this while producing more learning (findings 1–2).</td></tr>
-            <tr><td>How well do you understand this now?</td><td>An immediate judgement of learning, the least accurate kind (finding 6). The quiz already measures it.</td></tr>
-            <tr><td>Rate this lesson out of 5</td><td>A global rating; close to zero relationship with learning (finding 3).</td></tr>
-            <tr><td>Was the lesson too hard / too easy?</td><td>Asks students to judge difficulty against an ideal they can't see. Questions B and D get the same signal from things they can report.</td></tr>
-            <tr><td>What would make this lesson better?</td><td>Asks for a teaching judgement. Answers tend toward "less writing" or "more videos".</td></tr>
-          </tbody>
-        </table>
-      </div>
+  <section aria-labelledby="h-maths">
+    <span class="eyebrow">3 · How the numbers add up</span>
+    <h2 id="h-maths">Enough answers to read, without asking everyone everything</h2>
+    <div class="maths">
+      <div class="stat"><b>25 × 2</b><span>students × questions each = 50 answers per lesson per class</span></div>
+      <div class="stat"><b>≈ 5</b><span>answers per question per lesson, with ten questions</span></div>
+      <div class="stat"><b>≈ 45</b><span>answers per question across a nine-lesson unit</span></div>
+      <div class="stat"><b>5</b><span>the fewest answers before a result is shown; below that it says “not enough yet”</span></div>
     </div>
+    <p>One lesson in one class gives a rough read; it gets solid when the same lesson runs with more than one class or as answers build up over a unit. That suits question 4 especially, which you'd read as a trend.</p>
   </section>
 
   <section aria-labelledby="h-mock">
-    <span class="eyebrow">3 · Mockup</span>
+    <span class="eyebrow">4 · Mockup</span>
     <h2 id="h-mock">The footer rail</h2>
-    <p>Try it: press the feedback icon, then the tick. Example lesson names are invented. The rail replaces the current previous/next links at the bottom of the lesson.</p>
+    <p>Press the tick. Each run draws a fresh pair from the bank. Lesson names are invented.</p>
     <div class="stage">
       <div>
         <div class="device" data-device="desk">
           <div class="device__bar"><span>Year 10 History · Lesson 4 of 9</span><span>Desktop</span></div>
           <div class="lesson-tail" aria-hidden="true"><div class="fake"></div><div class="fake"></div><div class="fake"></div></div>
-          <p class="handin-hint" style="padding:12px 20px 0">… end of the lesson's last block</p>
           <div class="rail"></div>
         </div>
         <p class="caption" style="margin-top:8px">Desktop, about 900px wide.</p>
@@ -291,20 +294,43 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
           <div class="lesson-tail" aria-hidden="true"><div class="fake"></div><div class="fake"></div><div class="fake"></div></div>
           <div class="rail"></div>
         </div>
-        <p class="caption" style="margin-top:8px">Phone, 390px. Lesson titles shorten; the two buttons stay full size.</p>
+        <p class="caption" style="margin-top:8px">Phone, 390px.</p>
       </div>
     </div>
   </section>
 
+  <section aria-labelledby="h-collate">
+    <span class="eyebrow">5 · What you'd see</span>
+    <h2 id="h-collate">The pooled results for one lesson</h2>
+    <p>A sketch with invented numbers, to show how the answers collate. Where it lives (the lesson page, or a Feedback view) is still to decide.</p>
+    <div class="collate">
+      <div class="collate__head"><h3>Lesson 4 · Weighing the evidence</h3><span class="caption">Two classes · 47 students finished · 94 answers · anonymous</span></div>
+      <div class="citem"><p class="citem__q">Did you know what you were meant to be doing? <small>n = 10</small></p>
+        <div class="bar" role="img" aria-label="All the way through 5, Mostly 3, Some of the time 2, Hardly at all 0"><span class="s1" style="flex:5">5</span><span class="s2" style="flex:3">3</span><span class="s3" style="flex:2">2</span></div></div>
+      <div class="citem"><p class="citem__q">When you got stuck, what happened? <small>n = 9</small></p>
+        <div class="bar" role="img" aria-label="Didn't get stuck 2, Worked it out 3, Got help 1, Stayed stuck 3"><span class="s1" style="flex:2">2</span><span class="s2" style="flex:3">3</span><span class="s3" style="flex:1">1</span><span class="s4" style="flex:3">3</span></div></div>
+      <div class="citem"><p class="citem__q">How much of the lesson was spent on the actual work? <small>n = 4</small></p>
+        <p class="thin">Not enough answers yet (needs 5).</p></div>
+      <div class="legend"><span><i class="s1"></i>Best answer</span><span><i class="s2"></i>Next</span><span><i class="s3"></i>Weaker</span><span><i class="s4"></i>Worst answer</span></div>
+      <div class="citem"><p class="citem__q">Still unclear <small>9 answers · 3 said “Nothing”</small></p>
+        <ul class="quotes"><li>how to tell if a source is reliable or just old</li><li>what counts as corroboration</li><li>the difference between bias and perspective</li></ul></div>
+      <div class="citem"><p class="citem__q">Had to explain their thinking: share answering “Yes, a lot”, across the unit</p>
+        <div class="trend" role="img" aria-label="Lessons 1 to 9: 20, 35, 30, 55, 45, not enough yet, 60, 50, 65 percent">
+          <div style="height:20%"></div><div style="height:35%"></div><div style="height:30%"></div><div style="height:55%"></div><div style="height:45%"></div><div class="na" style="height:8%"></div><div style="height:60%"></div><div style="height:50%"></div><div style="height:65%"></div>
+        </div>
+        <div class="trend-x"><span>L1</span><span>L2</span><span>L3</span><span>L4</span><span>L5</span><span>L6</span><span>L7</span><span>L8</span><span>L9</span></div></div>
+    </div>
+  </section>
+
   <section aria-labelledby="h-decide">
-    <span class="eyebrow">4 · Before building</span>
-    <h2 id="h-decide">Decisions for you</h2>
+    <span class="eyebrow">6 · Before building</span>
+    <h2 id="h-decide">Still to decide</h2>
     <ol class="decisions">
-      <li><strong>Which questions?</strong> Recommended A, B and C, with D and E optional.</li>
-      <li><strong>Where feedback goes.</strong> In the codebase I found the per-block pulse dots ("How's this going?") and the Feedback section, which holds feedback documents you send to students. Neither is a lesson feedback collation. Which one did you mean, or does the collation live outside the Hub (for example a Google Form)?</li>
-      <li><strong>Named or anonymous?</strong> Named lets "I stayed stuck" link to that student's Markbook row; anonymous may get more honest answers to C. A middle option is named for you only, never shown to the class.</li>
-      <li><strong>The tick can't be fully undone.</strong> A quiz in a lesson gives one go by default, so handing it in ends that go. The mockup asks once and lists anything left blank. Should students be able to untick the lesson itself (the "done" mark), even though the hand-in stays?</li>
-      <li><strong>Feedback is separate from the tick.</strong> In the mockup, the icon works any time and the tick never forces feedback. Alternatively, the feedback could open straight after the tick, still skippable.</li>
+      <li><strong>The bank.</strong> Keep all ten, or drop some? Any wording changes?</li>
+      <li><strong>Where results appear.</strong> I couldn't find a lesson feedback collation in the Hub. The per-block “How's this going?” dots are counted in the lesson editor, and the Feedback section holds documents you send to students. Should results sit beside the pulse counts on the lesson, in their own view, or somewhere outside the Hub?</li>
+      <li><strong>How anonymous.</strong> Feedback is stored with no student id. To stop one device sending feedback twice for a lesson, the server keeps a one-way hash of the device, which can't be traced back to a name. In a small class, free-text answers can still give someone away by how they write.</li>
+      <li><strong>Skipping.</strong> In the mockup, students can press “Skip” and still finish. Should skipping be allowed?</li>
+      <li><strong>Unticking.</strong> The quiz hand-in can't be undone (one go by default). Can a student untick the lesson's “done” mark itself?</li>
     </ol>
   </section>
 </main>
@@ -312,33 +338,34 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 <script>
 (function () {
   const ICON_TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-  const ICON_FB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
+  const BANK = [
+    { q: 'Did you know what you were meant to be doing?', a: ['All the way through', 'Mostly', 'Some of the time', 'Hardly at all'] },
+    { q: 'When you got stuck, what happened?', a: ['I didn’t get stuck', 'I worked it out myself', 'I got help and kept going', 'I stayed stuck'] },
+    { q: 'What’s one thing from this lesson that’s still unclear?', text: true },
+    { q: 'Did you have to explain your thinking, not just give answers?', a: ['Yes, a lot', 'A bit', 'Not really'] },
+    { q: 'When something new was explained, could you follow it?', a: ['Easily', 'Mostly', 'Only after help', 'Not really'] },
+    { q: 'Did the examples help you do the task yourself?', a: ['Yes', 'Partly', 'Not really', 'There weren’t any'] },
+    { q: 'Did the lesson check whether you’d got it before moving on?', a: ['Yes, more than once', 'Once', 'Not that I noticed'] },
+    { q: 'Did this lesson use something from an earlier lesson?', a: ['Yes, and I remembered it', 'Yes, but I’d forgotten it', 'No', 'Not sure'] },
+    { q: 'How much of the lesson was spent on the actual work?', a: ['Nearly all', 'Most', 'About half', 'Less than half'] },
+    { q: 'Did the lesson end by pulling the main ideas together?', a: ['Yes', 'Sort of', 'No'] }
+  ];
   let uid = 0;
+  const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  function chipGroup(name, legend, options) {
-    const id = name + '-' + (++uid);
-    const opts = options.map((o, i) => '<label for="' + id + '-' + i + '"><input type="radio" id="' + id + '-' + i + '" name="' + id + '" value="' + o + '">' + o + '</label>').join('');
-    return '<fieldset><legend>' + legend + '</legend><div class="chips">' + opts + '</div></fieldset>';
+  function pickTwo() {
+    const idx = BANK.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    return idx.slice(0, 2).map((i) => BANK[i]);
   }
 
   function build(rail, phone) {
     const n = ++uid;
     rail.innerHTML =
       '<a class="rail__link" href="#h-mock"><small>← Previous</small><span>' + (phone ? 'Sources' : 'Lesson 3 · Reading the sources') + '</span></a>' +
-      '<div class="rail__mid">' +
-        '<button type="button" class="fb" aria-expanded="false" aria-controls="pop-fb-' + n + '" aria-label="Give feedback on this lesson">' + ICON_FB + '</button>' +
-        '<button type="button" class="tick" aria-pressed="false" aria-label="Finish this lesson">' + ICON_TICK + '</button>' +
-      '</div>' +
+      '<div class="rail__mid"><button type="button" class="tick" aria-pressed="false" aria-label="Finish this lesson">' + ICON_TICK + '</button></div>' +
       '<a class="rail__link rail__link--next" href="#h-mock"><small>Next →</small><span>' + (phone ? 'Argument' : 'Lesson 5 · Building the argument') + '</span></a>' +
-      '<p class="done-msg" hidden>Lesson finished. Your quiz and written work are handed in.</p>' +
-      '<div class="pop" id="pop-fb-' + n + '" role="dialog" aria-label="Lesson feedback" hidden>' +
-        '<h4>Quick check on this lesson</h4>' +
-        chipGroup('a', 'Did you know what you were meant to be doing?', ['All the way through', 'Mostly', 'Some of the time', 'Hardly at all']) +
-        chipGroup('b', 'When you got stuck, what happened?', ['I didn’t get stuck', 'I worked it out myself', 'I got help and kept going', 'I stayed stuck']) +
-        '<div><label for="mud-' + n + '" style="font-weight:600;font-size:.9rem">What’s one thing that’s still unclear? <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="mud-' + n + '" placeholder="e.g. why the council chose the cheaper route"></textarea></div>' +
-        '<p class="note">Only your teacher sees this. It isn’t marked.</p>' +
-        '<div class="row"><button type="button" class="btn" data-close>Not now</button><button type="button" class="btn btn--primary" data-send>Send</button></div>' +
-      '</div>' +
+      '<p class="done-msg" hidden>Lesson completed ✓</p>' +
       '<div class="pop" id="pop-tick-' + n + '" role="dialog" aria-label="Finish this lesson" hidden>' +
         '<h4>Finish this lesson?</h4>' +
         '<p style="font-size:.9rem">This hands in everything for your teacher:</p>' +
@@ -349,44 +376,63 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
         '</ul>' +
         '<p class="note">You can’t change your quiz answers after this.</p>' +
         '<div class="row"><button type="button" class="btn" data-close>Keep working</button><button type="button" class="btn btn--primary" data-finish>Hand in and finish</button></div>' +
-      '</div>';
+      '</div>' +
+      '<div class="pop" id="pop-fb-' + n + '" role="dialog" aria-label="Two quick questions" hidden></div>';
 
-    const fb = rail.querySelector('.fb');
     const tick = rail.querySelector('.tick');
-    const popFb = rail.querySelector('#pop-fb-' + n);
     const popTick = rail.querySelector('#pop-tick-' + n);
+    const popFb = rail.querySelector('#pop-fb-' + n);
     const done = rail.querySelector('.done-msg');
-    const closeAll = (focus) => {
-      popFb.hidden = true; popTick.hidden = true; fb.setAttribute('aria-expanded', 'false');
-      if (focus) focus.focus();
-    };
-    fb.addEventListener('click', () => {
-      const open = popFb.hidden;
-      closeAll();
-      popFb.hidden = !open;
-      fb.setAttribute('aria-expanded', String(open));
-      if (open) popFb.querySelector('input').focus();
-    });
-    tick.addEventListener('click', () => {
-      if (tick.getAttribute('aria-pressed') === 'true') return;
-      const open = popTick.hidden;
-      closeAll();
-      popTick.hidden = !open;
-      if (open) popTick.querySelector('[data-finish]').focus();
-    });
-    rail.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeAll(b.closest('#pop-fb-' + n) ? fb : tick)));
-    rail.querySelector('[data-send]').addEventListener('click', () => {
-      closeAll(fb);
-      fb.setAttribute('aria-label', 'Feedback sent. Change it');
-      fb.style.borderColor = 'var(--good)'; fb.style.color = 'var(--good)';
-    });
-    rail.querySelector('[data-finish]').addEventListener('click', () => {
-      closeAll(tick);
+
+    function complete() {
+      popFb.hidden = true;
       tick.setAttribute('aria-pressed', 'true');
-      tick.setAttribute('aria-label', 'Lesson finished');
+      tick.setAttribute('aria-label', 'Lesson completed');
       done.hidden = false;
+      tick.focus();
+    }
+
+    function askFeedback() {
+      const pair = pickTwo();
+      let step = 0;
+      const show = () => {
+        const item = pair[step];
+        const id = 'fb-' + n + '-' + step;
+        const dots = '<div class="progress-dots" aria-hidden="true"><i class="' + (step >= 0 ? 'on' : '') + '"></i><i class="' + (step >= 1 ? 'on' : '') + '"></i></div>';
+        let field;
+        if (item.text) {
+          field = '<label for="' + id + '" style="font-weight:600;font-size:.95rem">' + esc(item.q) + '</label><textarea id="' + id + '" placeholder="Or leave it blank"></textarea>' +
+            '<div class="row"><button type="button" class="btn btn--primary" data-next>' + (step === 1 ? 'Send' : 'Next') + '</button></div>';
+        } else {
+          field = '<fieldset><legend>' + esc(item.q) + '</legend><div class="chips">' +
+            item.a.map((o, i) => '<label for="' + id + '-' + i + '"><input type="radio" id="' + id + '-' + i + '" name="' + id + '" value="' + esc(o) + '">' + esc(o) + '</label>').join('') +
+            '</div></fieldset>';
+        }
+        popFb.innerHTML = '<h4>Two quick questions about this lesson</h4>' + dots + field +
+          '<p class="note">Anonymous. Your teacher sees everyone’s answers together, not yours.</p>' +
+          '<div class="row"><button type="button" class="btn" data-skip>Skip</button></div>';
+        const first = popFb.querySelector('input, textarea');
+        if (first) first.focus();
+        popFb.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => setTimeout(advance, 250)));
+        const next = popFb.querySelector('[data-next]');
+        if (next) next.addEventListener('click', advance);
+        popFb.querySelector('[data-skip]').addEventListener('click', complete);
+      };
+      const advance = () => { step += 1; if (step > 1) complete(); else show(); };
+      popFb.hidden = false;
+      show();
+    }
+
+    tick.addEventListener('click', () => {
+      if (tick.getAttribute('aria-pressed') === 'true') {
+        tick.setAttribute('aria-pressed', 'false'); tick.setAttribute('aria-label', 'Finish this lesson'); done.hidden = true; return;
+      }
+      popTick.hidden = !popTick.hidden;
+      if (!popTick.hidden) popTick.querySelector('[data-finish]').focus();
     });
-    rail.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(popTick.hidden ? fb : tick); });
+    popTick.querySelector('[data-close]').addEventListener('click', () => { popTick.hidden = true; tick.focus(); });
+    popTick.querySelector('[data-finish]').addEventListener('click', () => { popTick.hidden = true; askFeedback(); });
+    rail.addEventListener('keydown', (e) => { if (e.key === 'Escape') { popTick.hidden = true; if (!popFb.hidden) complete(); } });
   }
 
   document.querySelectorAll('.device').forEach((d) => build(d.querySelector('.rail'), d.dataset.device === 'phone'));
