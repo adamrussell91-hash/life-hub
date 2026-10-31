@@ -1891,8 +1891,9 @@ var AnalogyTypesContentSchema = z11.object({
 });
 var TeacherNoteWalkthruSchema = z11.object({
   set: z11.number().int().min(1).max(20).default(1),
-  id: z11.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
-  jots: z11.record(z11.string().regex(/^[1-5]$/), z11.string().max(2e3)).default({})
+  // A book technique (w1-…) or a fusion from the board (fu_…), whose steps can run to nine.
+  id: z11.string().regex(/^(?:w\d+-[a-z0-9-]{2,80}|fu_[a-z0-9]{6,24})$/),
+  jots: z11.record(z11.string().regex(/^[1-9]$/), z11.string().max(2e3)).default({})
 });
 var TeacherNoteBlockContentSchema = z11.object({
   title: z11.string().default("Teacher note"),
@@ -4626,6 +4627,12 @@ var LessonSchema = z16.object({
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
   feedback_off: z16.boolean().optional(),
+  /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
+  end_questions: z16.object({
+    on: z16.boolean().optional(),
+    skip: z16.array(z16.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z16.boolean().optional()
+  }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
   /** Tutorial lessons only: the class and its groups. */

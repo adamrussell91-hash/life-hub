@@ -1,7 +1,7 @@
 // packages/walkthrus/arrows.mjs
-// The arrows Adam draws between techniques. Typed, with an optional short label (required for
+// The arrows Adam draws between tiles (techniques or fusions). Typed, with an optional short label (required for
 // the free kind). The book's own cross-references come from the catalogue and are not stored.
-import { isTechniqueId } from './catalogue.mjs';
+import { isTileId } from './tiles.mjs';
 
 export const ARROW_TYPES = Object.freeze(['leads_to', 'pairs_with', 'free']);
 export const MAX_ARROWS = 300;
@@ -15,7 +15,7 @@ export function normalizeArrows(value) {
   const out = [];
   for (const raw of Array.isArray(value) ? value : []) {
     if (!raw || typeof raw !== 'object') continue;
-    if (!ID.test(raw.id ?? '') || !isTechniqueId(raw.from) || !isTechniqueId(raw.to) || raw.from === raw.to) continue;
+    if (!ID.test(raw.id ?? '') || !isTileId(raw.from) || !isTileId(raw.to) || raw.from === raw.to) continue;
     if (!ARROW_TYPES.includes(raw.type)) continue;
     const label = typeof raw.label === 'string' ? raw.label.trim().slice(0, MAX_LABEL) : '';
     if (raw.type === 'free' && !label) continue;
@@ -30,10 +30,10 @@ export function normalizeArrows(value) {
   return out;
 }
 
-/** The techniques Adam has put on his own board, in the order he added them. Unknown ids drop out. */
+/** The tiles Adam had put on his own board before clusters, in the order he added them. Unknown ids drop out. */
 export function normalizePicked(value) {
   const out = [];
-  for (const id of Array.isArray(value) ? value : []) if (isTechniqueId(id) && !out.includes(id)) out.push(id);
+  for (const id of Array.isArray(value) ? value : []) if (isTileId(id) && !out.includes(id)) out.push(id);
   return out;
 }
 

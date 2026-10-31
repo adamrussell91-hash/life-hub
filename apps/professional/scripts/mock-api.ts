@@ -1,6 +1,9 @@
 import { CATALOGUE } from '../../../packages/walkthrus/catalogue.mjs';
 import { normalizeArrows, normalizePicked } from '../../../packages/walkthrus/arrows.mjs';
 import { checkOneActive } from '../../../packages/walkthrus/goal.mjs';
+import { normalizeClusters } from '../../../packages/walkthrus/clusters.mjs';
+import { fusionById, normalizeFusions } from '../../../packages/walkthrus/fusions.mjs';
+import { renderScene } from '../../../packages/walkthrus/draw/scene.mjs';
 import { normalizeGoalRecord } from '../../../netlify/functions/_shared/goal-record.mjs';
 import { isDeletedRecord, withoutDeleted } from '../../../netlify/functions/_shared/record-liveness.mjs';
 /**
@@ -219,6 +222,30 @@ function timelineLabel(
 
 let walkthruArrows: Array<Record<string, unknown>> = [];
 let walkthruPicked: string[] | null = null;
+let walkthruClusters: Array<Record<string, unknown>> | null = null;
+let walkthruFusions: Array<Record<string, any>> = [];
+/** A canned scene for the mock's Draw: kit calls only, no model. */
+const MOCK_SCENE = [
+  { fn: 'person', args: [22, 88, { s: 0.58, turn: 1 }] },
+  { fn: 'talk', args: [34, 6, 24, 18, [40, 30], { text: '?' }] },
+  { fn: 'pupil', args: [70, 46, { s: 0.6, ink: true }] },
+  { fn: 'pupil', args: [98, 46, { s: 0.6 }] },
+  { fn: 'desk', args: [56, 116, 66] }
+];
+/** Invented Proof: one tile and class with enough lessons each side, one without. */
+const mockProof = () => {
+  const lessons = (scores: number[], from: number) => scores.map((score, i) => ({ lesson_id: `lesson_mock_${from + i}`, score, date: `2026-10-${String(from + i).padStart(2, '0')}` }));
+  const ran = lessons([0.72, 0.8, 0.68, 0.77, 0.83], 1);
+  return {
+    rows: [
+      { tile_id: 'w1-cold-calling', class_id: 'demo-class', ran: { n: 5, mean: 0.76, lessons: ran }, partly: { n: 1, lessons: lessons([0.6], 9) }, none: { n: 6, mean: 0.64 }, diff: 0.12, enough: true },
+      { tile_id: 'w1-quizzing', class_id: 'demo-class-b', ran: { n: 2, mean: 0.58, lessons: lessons([0.55, 0.61], 12) }, partly: { n: 0, lessons: [] }, none: { n: 3, mean: 0.62 }, diff: -0.04, enough: false }
+    ],
+    classes: { 'demo-class': 'Demo class', 'demo-class-b': 'Second demo class' },
+    lessons_scored: 17,
+    generated_at: new Date().toISOString()
+  };
+};
 let walkthruGoals: Array<Record<string, any>> = [];
 // Invented demo suggestion (no real class or quiz names).
 let walkthruSuggestions: Array<Record<string, any>> = [
@@ -446,10 +473,24 @@ export function createMockApi() {
       return json(200, { ok: true, data: { text: { sets: [{ set: 1, techniques, frameworks: [] }] } } });
     }
     if (path === '/api/walkthrus-board') {
-      const sent = (body ?? {}) as { arrows?: unknown; picked?: unknown };
+      // Like the real store: a PUT or POST replaces only the fields it sends.
+      const sent = (body ?? {}) as { arrows?: unknown; picked?: unknown; clusters?: unknown; fusions?: unknown };
       if (method !== 'GET' && 'arrows' in sent) walkthruArrows = normalizeArrows(sent.arrows);
       if (method !== 'GET' && 'picked' in sent) walkthruPicked = normalizePicked(sent.picked);
-      return json(200, { ok: true, data: { board: { arrows: walkthruArrows, picked: walkthruPicked } } });
+      if (method !== 'GET' && 'clusters' in sent) walkthruClusters = normalizeClusters(sent.clusters);
+      if (method !== 'GET' && 'fusions' in sent) walkthruFusions = normalizeFusions(sent.fusions);
+      const board = { arrows: walkthruArrows, picked: walkthruPicked, fusions: walkthruFusions, ...(walkthruClusters ? { clusters: walkthruClusters } : {}) };
+      return json(200, { ok: true, data: { board } });
+    }
+    if (path === '/api/walkthrus-proof' && method === 'GET') return json(200, { ok: true, data: { proof: mockProof() } });
+    if (path === '/api/walkthrus-fusion-draw') {
+      if (method === 'GET') return json(200, { ok: true, data: { low_aud: 0.1, high_aud: 0.25 } });
+      const { fusion_id: id, note } = (body ?? {}) as { fusion_id?: string; note?: string };
+      const fusion = fusionById(walkthruFusions, id);
+      if (!fusion) return json(404, { ok: false, error: { code: 'not_found', message: 'No fusion with that id.' } });
+      const drawing = { status: 'drawn', scene: MOCK_SCENE, svg: renderScene(MOCK_SCENE), note: note || null, at: new Date().toISOString() };
+      walkthruFusions = normalizeFusions(walkthruFusions.map((f) => (f.id === id ? { ...f, drawing } : f)));
+      return json(200, { ok: true, data: { fusion: fusionById(walkthruFusions, id), cost_usd: 0 } });
     }
     if (path === '/api/walkthru-suggestions') {
       if (method === 'GET') return json(200, { ok: true, data: { suggestions: walkthruSuggestions } });

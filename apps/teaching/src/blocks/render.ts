@@ -2921,7 +2921,7 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   }
   if (mode === 'teacher' && !ctx.display) {
     // The chosen WalkThru is the teacher's alone: never on Display, even before publishing strips it.
-    const technique = renderTechniqueBadge(block, { lessonId: ctx.lessonId });
+    const technique = renderTechniqueBadge(block, { lessonId: ctx.lessonId, display: ctx.display });
     if (technique) attachments.push(technique);
   }
   if (attachments.length) {

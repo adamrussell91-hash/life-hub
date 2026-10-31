@@ -1,0 +1,67 @@
+/* The fuse bench: a sheet over the board. Same language as the board: ink, #ffd400, heavy caps. */
+.wt-fuse { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: rgb(17 17 17 / 0.45); }
+.wt-fuse__sheet { display: grid; grid-template-rows: auto 1fr auto; width: min(64rem, 100%); max-height: calc(100vh - 2rem); overflow: hidden; background: #fff; color: #111; border: 3px solid #111; border-radius: 14px; box-shadow: 0 12px 40px rgb(0 0 0 / 0.25); }
+.wt-fuse__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; padding: 0.9rem 1rem 0.75rem; border-bottom: 6px solid #ffd400; }
+.wt-fuse__kicker { margin: 0; font-size: var(--text-2xs, 0.7rem); font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.wt-fuse__title { margin: 0.15rem 0 0; font-size: var(--text-xl, 1.25rem); font-weight: 900; text-transform: uppercase; letter-spacing: 0.01em; }
+.wt-fuse__close { border: 0; background: transparent; color: var(--wave, #111); font: inherit; cursor: pointer; padding: 0.25rem 0.5rem; min-height: 2.75rem; }
+
+.wt-fuse__grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 1rem; padding: 1rem; overflow: auto; }
+.wt-fuse__sources, .wt-fuse__build { display: grid; gap: 0.75rem; align-content: start; min-width: 0; }
+.wt-fuse__parents { display: grid; gap: 1rem; }
+.wt-fuse__parent-title { margin: 0 0 0.4rem; font-size: var(--text-sm, 0.875rem); font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+.wt-fuse__source-steps, .wt-fuse__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+.wt-fuse__source { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.6rem; border: 1px solid #111; border-radius: 8px; background: #fff; }
+.wt-fuse__source.is-used { opacity: 0.45; }
+.wt-fuse__source-text { flex: 1 1 auto; min-width: 0; }
+.wt-fuse__source-label { margin: 0; font-weight: 700; font-size: var(--text-sm, 0.875rem); }
+.wt-fuse__source-body { margin: 0.1rem 0 0; font-size: var(--text-xs, 0.8rem); }
+.wt-fuse__use { flex: none; border: 2px solid #111; border-radius: 999px; background: #ffd400; color: #111; font: inherit; font-weight: 700; font-size: var(--text-sm, 0.875rem); padding: 0.3rem 0.7rem; min-height: 2.75rem; cursor: pointer; }
+.wt-fuse__use:disabled { background: #fff; cursor: default; }
+.wt-fuse__own { justify-self: start; min-height: 2.75rem; }
+
+.wt-fuse__field { display: grid; gap: 0.2rem; font-size: var(--text-sm, 0.875rem); }
+.wt-fuse__field--inline { grid-template-columns: auto 1fr; align-items: center; gap: 0.5rem; }
+.wt-fuse__label { font-weight: 700; font-size: var(--text-xs, 0.8rem); text-transform: uppercase; letter-spacing: 0.06em; }
+.wt-fuse__input { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid #111; border-radius: 8px; font: inherit; background: #fff; color: #111; min-height: 2.75rem; }
+.wt-fuse__text { resize: vertical; }
+.wt-fuse__input:focus-visible, .wt-fuse__use:focus-visible, .wt-fuse__grip:focus-visible, .wt-fuse__move:focus-visible, .wt-fuse__remove:focus-visible { outline: 3px solid #ffd400; outline-offset: 1px; }
+.wt-fuse__hint, .wt-fuse__muted, .wt-fuse__status { margin: 0; font-size: var(--text-sm, 0.875rem); color: var(--muted, #555); }
+.wt-fuse__status { min-height: 1.25rem; }
+
+.wt-fuse__step { display: grid; gap: 0.45rem; padding: 0.6rem; border: 2px solid #111; border-radius: 10px; background: #fff; border-left-width: 8px; border-left-color: #ffd400; }
+.wt-fuse__step.is-dragging { opacity: 0.6; }
+.wt-fuse__step.is-drop { box-shadow: 0 -4px 0 #111; }
+.wt-fuse__empty { padding: 1rem; border: 2px dashed #111; border-radius: 10px; font-size: var(--text-sm, 0.875rem); }
+.wt-fuse__step-top { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.wt-fuse__grip { touch-action: none; cursor: grab; border: 0; background: transparent; font-size: 1.2rem; line-height: 1; padding: 0.3rem; min-width: 2.75rem; min-height: 2.75rem; color: #111; }
+.wt-fuse__num { display: grid; place-items: center; width: 1.8rem; height: 1.6rem; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); background: #111; color: #fff; font-weight: 900; font-size: var(--text-sm, 0.875rem); }
+.wt-fuse__chip { border: 1px solid #111; border-radius: 999px; padding: 0.15rem 0.55rem; font-size: var(--text-xs, 0.8rem); background: #fff8cc; }
+.wt-fuse__tools { margin-left: auto; display: flex; gap: 0.25rem; }
+.wt-fuse__move, .wt-fuse__remove { border: 1px solid #111; border-radius: 8px; background: #fff; color: #111; font: inherit; min-width: 2.75rem; min-height: 2.75rem; cursor: pointer; }
+.wt-fuse__move:disabled { opacity: 0.35; cursor: default; }
+.wt-fuse__remove { padding: 0 0.6rem; font-size: var(--text-xs, 0.8rem); }
+
+.wt-fuse__foot { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem 1rem; align-items: center; padding: 0.75rem 1rem; border-top: 1px solid #111; }
+.wt-fuse__preview:empty { display: none; }
+.wt-fuse__preview svg { display: block; width: 5.5rem; height: auto; }
+.wt-fuse__draw { grid-column: 1 / -1; display: grid; gap: 0.4rem; }
+.wt-fuse__draw:empty { display: none; }
+.wt-fuse__ask { margin: 0; font-weight: 700; }
+.wt-fuse__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.wt-fuse__actions .btn, .wt-fuse__redraw .btn { min-height: 2.75rem; }
+.wt-fuse__redraw { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; }
+.wt-fuse__redraw .wt-fuse__field { flex: 1 1 14rem; }
+
+/* Phone: one column, the parents above, the sheet fills the screen. */
+@media (max-width: 719px) {
+  .wt-fuse { padding: 0; place-items: stretch; }
+  .wt-fuse__sheet { max-height: 100vh; height: 100%; border-radius: 0; border-width: 0; }
+  .wt-fuse__grid { grid-template-columns: 1fr; padding: 0.75rem 1rem; }
+  .wt-fuse__foot { grid-template-columns: 1fr; }
+  .wt-fuse__actions { justify-content: stretch; }
+  .wt-fuse__actions .btn { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wt-fuse__step { transition: none; }
+}

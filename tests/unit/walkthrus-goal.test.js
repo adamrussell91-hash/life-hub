@@ -25,6 +25,13 @@ test('a WalkThru section needs a real technique and fills in the rest', () => {
   assert.deepEqual(STAGES, ['attempt', 'develop', 'adapt', 'practise', 'test']);
 });
 
+test('a fusion can be the technique, keeping the set it was sent with', () => {
+  const wt = normalizeWalkthru({ technique_id: 'fu_abc123', set: 2, stage: 'develop' });
+  assert.equal(wt.technique_id, 'fu_abc123');
+  assert.equal(wt.set, 2);
+  assert.equal(normalizeWalkthru({ technique_id: 'fu_abc123' }).set, 1);
+});
+
 test('an old goal without a WalkThru section is untouched, and only professional goals carry one', () => {
   const old = normalizeGoalRecord({ id: 'g1', title: 'Old', sphere: 'work' });
   assert.equal('walkthru' in old, false);

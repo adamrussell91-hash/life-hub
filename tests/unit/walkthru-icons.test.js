@@ -14,9 +14,9 @@ for (const [set, viewBox] of [['figure', '0 0 120 90'], ['symbol', '0 0 100 100'
       const svg = readFileSync(new URL(`${id}.svg`, dir(set)), 'utf8');
       assert.ok(svg.includes(`viewBox="${viewBox}"`), `${id}: ${set} frame`);
       assert.ok(svg.includes('stroke="currentColor"'), `${id}: line art in currentColor`);
-      // Figures fill their people with the paper token and may letter a question mark; nothing else is fixed.
-      const plain = set === 'figure' ? svg.replaceAll('var(--wt-paper, #fff)', '').replace(/<text[^>]*>\?<\/text>/g, '') : svg;
-      assert.doesNotMatch(plain, /#[0-9a-f]{3,6}\b|<image|<text/i, `${id}: no fixed colours, bitmaps or text`);
+      // Paper is a themeable token; speech-bubble marks (?, …) are single glyphs in currentColor.
+      const bare = svg.replaceAll('var(--wt-paper, #fff)', 'paper').replace(/<text[^>]*fill="(currentColor|paper)"[^>]*>.{1,2}<\/text>/g, '');
+      assert.doesNotMatch(bare, /#[0-9a-f]{3,6}\b|<image|<text/i, `${id}: no fixed colours, bitmaps or words`);
     }
     assert.equal(files.size, techniques.length, `${set}: no stray files`);
   });

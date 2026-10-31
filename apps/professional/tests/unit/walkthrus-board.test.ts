@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGUE, SERIES } from '../../../../packages/walkthrus/catalogue.mjs';
 import { SETS } from '../../../../packages/walkthrus/sets.mjs';
 import { axialToPixel, directionBetween, hexCorners, hitTest, pixelToAxial, sharedEdge, spiralCells, neighbours, pointInPolygon } from '../../../../packages/walkthrus/board/hex';
-import { boardLayout, clusterFrame, fitFrame, type BoardEntry, type BoardLayout, type Box } from '../../../../packages/walkthrus/board/layout';
-import { pathHitsBox, routeArrows, segmentHitsBox, type BoardArrow } from '../../../../packages/walkthrus/board/route';
+import { boardLayout, clusterFrame, clusterOriginPx, clustersLayout, fitFrame, type BoardEntry, type BoardLayout, type Box, type ClusterData } from '../../../../packages/walkthrus/board/layout';
+import { distToPolygon, LANE_GAP, pathHitsBox, routeArrows, segmentHitsBox, type BoardArrow, type RoutedArrow } from '../../../../packages/walkthrus/board/route';
+import { clustersFromPicked } from '../../../../packages/walkthrus/clusters.mjs';
 import { labelLevel } from '../../../../packages/walkthrus/board/labels';
 
 const entries = CATALOGUE as unknown as BoardEntry[];
@@ -25,7 +26,7 @@ const set2: BoardEntry[] = ['Make everyone think', 'No opt out', 'Normalise erro
 const make = (extra: BoardEntry[] = [], opened?: number[]) =>
   boardLayout({ entries: [...entries, ...extra], sets: SETS as never, series: SERIES as never, opened });
 
-const tileBoxes = (l: BoardLayout): Box[] => l.tiles.flatMap((t) => [t.tab, t.glyph, t.title, t.badge]);
+const tileBoxes = (l: BoardLayout): Box[] => l.tiles.flatMap((t) => [t.tab, t.glyph, t.title]);
 const shuffled = <T,>(xs: T[]): T[] => xs.map((x, i) => [x, (i * 7919) % 13] as const).sort((a, b) => a[1] - b[1]).map((p) => p[0]);
 
 describe('hex maths', () => {
@@ -123,49 +124,124 @@ describe('board layout', () => {
   });
 });
 
+const byIdEntry = new Map(entries.map((e) => [e.id, e]));
+const mine = (clusters: ClusterData[]) => clustersLayout({ clusters, entryOf: (x) => byIdEntry.get(x) ?? null });
+const techniques = entries.filter((e) => e.kind === 'technique').map((e) => e.id);
+/** Three clusters of Adam's, spaced apart, with a tile in two of them. */
+const myClusters = (): ClusterData[] => {
+  const [a] = clustersFromPicked(techniques.slice(0, 7)) as ClusterData[];
+  const [b] = clustersFromPicked(techniques.slice(7, 12)) as ClusterData[];
+  const [c] = clustersFromPicked([techniques[0]!, ...techniques.slice(12, 15)]) as ClusterData[];
+  return [{ ...a!, id: 'cl_a', name: 'Starts' }, { ...b!, id: 'cl_b', name: 'Checks', x: 640, y: 40 }, { ...c!, id: 'cl_c', name: 'Endings', x: 260, y: 560 }];
+};
+
+describe('my board layout', () => {
+  it('hangs each cluster’s tiles under its title, at the title’s place', () => {
+    const l = mine(myClusters());
+    expect(l.clusters.map((c) => c.name)).toEqual(['Starts', 'Checks', 'Endings']);
+    for (const c of l.clusters) {
+      const tiles = l.tiles.filter((t) => t.cluster === c.key);
+      for (const t of tiles) expect(t.box.y - t.box.h / 2, `${t.id} under ${c.name}`).toBeGreaterThan(c.label.y + c.label.h / 2);
+    }
+    const o = clusterOriginPx({ x: 640, y: 40 });
+    const first = l.tiles.find((t) => t.cluster === 'cl_b')!;
+    expect({ x: first.x, y: first.y }).toEqual(o);
+  });
+  it('keys each placement, so a tile may sit in two clusters', () => {
+    const l = mine(myClusters());
+    const twice = l.tiles.filter((t) => t.id === techniques[0]);
+    expect(twice.map((t) => t.key)).toEqual([`cl_a/${techniques[0]}`, `cl_c/${techniques[0]}`]);
+    expect(new Set(l.tiles.map((t) => t.key)).size).toBe(l.tiles.length);
+  });
+  it('an empty cluster keeps its title and a place for its first tile', () => {
+    const l = mine([{ id: 'cl_new', name: 'New', x: 0, y: 0, tiles: [] }]);
+    expect(l.tiles).toEqual([]);
+    expect(l.clusters[0]!.empty).toBe(true);
+  });
+});
+
+/** Every segment of a routed path keeps clear of every hexagon (and so of the gaps between touching ones). */
+function expectClearOfTiles(layout: BoardLayout, r: RoutedArrow, margin: number): void {
+  if (r.kind !== 'path') return;
+  const endKeys = new Set([r.fromKey, r.toKey]);
+  for (let i = 1; i < r.points.length; i++) {
+    const a = r.points[i - 1]!;
+    const b = r.points[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 2));
+    for (let k = 0; k <= n; k++) {
+      const p = { x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n };
+      for (const t of layout.tiles) {
+        // The stubs at either end run up to their own tile's edge; a surrounded tile's stub crosses one neighbour.
+        if (endKeys.has(t.key) && (i === 1 || i === r.points.length - 1)) continue;
+        if ((i === 1 && r.over.start) || (i === r.points.length - 1 && r.over.end)) continue;
+        expect(distToPolygon(p, t.corners), `${r.id} segment ${i} into ${t.key}`).toBeGreaterThanOrEqual(margin);
+      }
+    }
+  }
+}
+
 describe('arrow routing', () => {
   const boards: Array<[string, BoardLayout, BoardArrow[]]> = [
     ['demo', make(), demoArrows],
     ['crowded cluster', make(), crowded],
-    ['set 2 opened', make(set2, [1, 2]), [...demoArrows, { id: 'z1', from: id('quizzing'), to: 'w2-make-everyone-think', type: 'leads_to', label: 'then' }]]
+    ['set 2 opened', make(set2, [1, 2]), [...demoArrows, { id: 'z1', from: id('quizzing'), to: 'w2-make-everyone-think', type: 'leads_to', label: 'then' }]],
+    ['my clusters', mine(myClusters()), techniques.slice(1, 15).map((from, i) => ({ id: `m${i}`, from, to: techniques[(i * 5 + 3) % 15]!, type: 'leads_to' as const, label: i % 2 ? 'before the hinge' : undefined })).filter((a) => a.from !== a.to)]
   ];
 
   for (const [name, layout, arrows] of boards) {
     describe(name, () => {
       const routed = routeArrows(layout, arrows);
-      it('routes every arrow', () => expect(routed.length).toBe(arrows.length));
-
-      it('arrow_crosses_text: no path meets a tab, title, badge, cluster label or another arrow’s label', () => {
-        for (const r of routed) {
-          if (r.kind === 'knot') continue;
-          for (const box of [...tileBoxes(layout), ...layout.labels]) expect(pathHitsBox(r.points, box), `${r.id} over a box`).toBe(false);
-          for (const o of routed) if (o.id !== r.id && o.label) expect(pathHitsBox(r.points, o.label), `${r.id} through ${o.id}'s label`).toBe(false);
-        }
+      it('routes every arrow, round the clusters rather than straight across', () => {
+        expect(routed.length).toBe(arrows.length);
+        for (const r of routed) if (r.kind === 'path') expect(r.over.start && r.over.end && r.points.length === 2, `${r.id} fell back to a straight line`).toBe(false);
       });
 
-      it('arrows never run through a hexagon', () => {
-        for (const r of routed) for (let i = 1; i < r.points.length; i++) {
-          const a = r.points[i - 1]!;
-          const b = r.points[i]!;
-          for (let k = 1; k < 10; k++) {
-            const p = { x: a.x + ((b.x - a.x) * k) / 10, y: a.y + ((b.y - a.y) * k) / 10 };
-            const cell = pixelToAxial(p, layout.size);
-            const tile = layout.tiles.find((t) => t.cell.q === cell.q && t.cell.r === cell.r);
-            if (tile) expect(pointInPolygon(p, tile.corners), `${r.id} inside ${tile.id}`).toBe(false);
+      it('runs only horizontal and vertical lines between its end stubs', () => {
+        for (const r of routed) {
+          if (r.kind !== 'path') continue;
+          expect(r.points.length).toBeGreaterThanOrEqual(2);
+          for (let i = 2; i < r.points.length - 1; i++) {
+            const a = r.points[i - 1]!;
+            const b = r.points[i]!;
+            expect(Math.abs(a.x - b.x) < 0.01 || Math.abs(a.y - b.y) < 0.01, `${r.id} segment ${i} is orthogonal`).toBe(true);
           }
         }
       });
 
-      it('label_overlaps: no label meets a hexagon, a cluster label or another label', () => {
+      it('no segment crosses a tile, or the gap between two touching tiles', () => {
+        for (const r of routed) expectClearOfTiles(layout, r, 2);
+      });
+
+      it('no path crosses a tab, title or cluster label of another tile', () => {
+        for (const r of routed) {
+          if (r.kind === 'knot') continue;
+          const ends = new Set([r.fromKey, r.toKey]);
+          const boxes = [...layout.tiles.filter((t) => !ends.has(t.key)).flatMap((t) => [t.tab, t.glyph, t.title]), ...layout.labels];
+          const pts = r.points.slice(r.over.start ? 1 : 0, r.over.end ? -1 : undefined);
+          for (const box of boxes) expect(pathHitsBox(pts, box), `${r.id} over a box`).toBe(false);
+        }
+      });
+
+      it('corners are rounded, starts get a circle and ends a long head', () => {
+        for (const r of routed) {
+          if (r.kind !== 'path') continue;
+          if (r.points.length > 2) expect(r.d).toContain('Q');
+          expect(r.heads.length).toBe(r.type === 'pairs_with' ? 2 : 1);
+          if (r.type !== 'pairs_with') expect(r.start).toEqual(r.points[0]);
+        }
+      });
+
+      it('labels read TYPE | text and keep off every hexagon, title and other label', () => {
         const labels = routed.filter((r) => r.label).map((r) => r.label!);
         for (const l of labels) {
-          for (const t of layout.tiles) expect(Math.abs(l.x - t.box.x) * 2 >= l.w + t.box.w || Math.abs(l.y - t.box.y) * 2 >= l.h + t.box.h, `label ${l.text} over ${t.id}`).toBe(true);
+          expect(l.type).toMatch(/^[A-Z ]+$/);
+          for (const t of layout.tiles) for (const k of t.corners) expect(Math.abs(k.x - l.x) <= l.w / 2 && Math.abs(k.y - l.y) <= l.h / 2, `label ${l.text} over ${t.id}`).toBe(false);
           for (const c of layout.labels) expect(Math.abs(l.x - c.x) * 2 >= l.w + c.w || Math.abs(l.y - c.y) * 2 >= l.h + c.h).toBe(true);
           for (const o of labels) if (o !== l) expect(Math.abs(l.x - o.x) * 2 >= l.w + o.w || Math.abs(l.y - o.y) * 2 >= l.h + o.h).toBe(true);
         }
       });
 
-      it('knot_off_edge: every knot sits on its shared edge, clear of every tab, title and badge', () => {
+      it('knot_off_edge: every knot sits on its shared edge, clear of every tab and title', () => {
         for (const r of routed) {
           if (!r.knot) continue;
           const k = r.knot;
@@ -196,10 +272,45 @@ describe('arrow routing', () => {
     for (const a of demoArrows) {
       const r = byId.get(a.id)!;
       expect(r.kind).toBe(touching(a.from, a.to) ? 'knot' : 'path');
-      if (r.kind === 'path') expect(r.heads.length).toBe(a.type === 'pairs_with' ? 2 : 1);
       if (r.knot) expect(r.knot.chevrons).toBe(a.type === 'leads_to' ? 1 : a.type === 'pairs_with' ? 2 : 0);
       expect(r.dashed).toBe(a.type === 'free');
     }
+  });
+
+  it('arrows sharing a lane run on parallel lanes', () => {
+    // Several arrows from one cluster to another far cluster all want the same corridor.
+    const clusters: ClusterData[] = [
+      { id: 'cl_l', name: 'Left', x: 0, y: 0, tiles: techniques.slice(0, 3).map((t, i) => ({ id: t, q: 0, r: i })) },
+      { id: 'cl_r', name: 'Right', x: 900, y: 0, tiles: techniques.slice(3, 6).map((t, i) => ({ id: t, q: 0, r: i })) }
+    ];
+    const l = mine(clusters);
+    const arrows: BoardArrow[] = [0, 1, 2].map((i) => ({ id: `p${i}`, from: techniques[i]!, to: techniques[3 + i]!, type: 'leads_to', quiet: true }));
+    const routed = routeArrows(l, arrows);
+    const horizontal = routed.flatMap((r) => r.points.slice(1).map((b, i) => ({ id: r.id, a: r.points[i]!, b }))).filter((s) => Math.abs(s.a.y - s.b.y) < 0.01 && Math.abs(s.a.x - s.b.x) > 200);
+    expect(horizontal.length).toBeGreaterThanOrEqual(3);
+    // No two long horizontal runs of different arrows lie on top of each other.
+    for (const s of horizontal) for (const o of horizontal) {
+      if (s.id === o.id) continue;
+      const overlapX = Math.min(Math.max(s.a.x, s.b.x), Math.max(o.a.x, o.b.x)) - Math.max(Math.min(s.a.x, s.b.x), Math.min(o.a.x, o.b.x));
+      if (overlapX > 1) expect(Math.abs(s.a.y - o.a.y), `${s.id} / ${o.id}`).toBeGreaterThanOrEqual(LANE_GAP - 0.01);
+    }
+    for (const r of routed) expectClearOfTiles(l, r, 2);
+  });
+
+  it('routes 30 tiles and 40 arrows quickly', () => {
+    const many: ClusterData[] = [0, 1, 2, 3, 4].map((k) => {
+      const [c] = clustersFromPicked(techniques.slice(k * 6, k * 6 + 6)) as ClusterData[];
+      return { ...c!, id: `cl_${k}`, name: `Group ${k}`, x: (k % 3) * 560, y: Math.floor(k / 3) * 560 };
+    });
+    const l = mine(many);
+    const ids = l.tiles.map((t) => t.id);
+    const arrows: BoardArrow[] = Array.from({ length: 40 }, (_, i) => ({ id: `q${i}`, from: ids[i % ids.length]!, to: ids[(i * 7 + 11) % ids.length]!, type: (i % 4 ? 'leads_to' : 'pairs_with') as BoardArrow['type'], label: i % 3 ? undefined : 'then' })).filter((a) => a.from !== a.to);
+    routeArrows(l, arrows);
+    const t0 = performance.now();
+    const routed = routeArrows(l, arrows);
+    const ms = performance.now() - t0;
+    expect(routed.length).toBe(arrows.length);
+    expect(ms).toBeLessThan(150);
   });
 
   it('skips arrows whose tiles are not on the board', () => {

@@ -5,6 +5,8 @@ import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { attachedTechniques } from './attach';
 import { loadLiveGoal, loadWalkthruPictures, loadWalkthruText, type GoalLite, type WalkthruStepText } from './api';
 import { miniNames, miniTimer, type StripState } from './mini-tools';
+import { lessonSlots } from './note';
+import { createStepTicks } from './ticks';
 
 const glyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
 
@@ -48,15 +50,16 @@ function sayLine(line: string, state: StripState, question: string | null): HTML
   return item;
 }
 
-interface StripData { steps: WalkthruStepText[]; pictures: Array<string | null>; goal: GoalLite | null }
+interface StripData { techniqueId: string; steps: WalkthruStepText[]; pictures: Array<string | null>; goal: GoalLite | null }
 
 /**
  * Teacher view only: the WalkThru a teacher chose for this block. Closed, a slim bar. Open, the
  * five step pictures as a strip, small classroom tools under the steps that use one, and a cue
  * card for the step you are on: what to do, what to say, and the book's coaching folded away.
  * Display and student pages never get it (the chosen id is stripped from the published lesson).
+ * In a lesson each step also carries a tick that saves against the lesson and class.
  */
-export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string } = {}): HTMLElement | null {
+export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string; display?: boolean } = {}): HTMLElement | null {
   const [id] = attachedTechniques(block);
   const entry = id ? techniqueById(id) : null;
   if (!entry) return null;
@@ -83,15 +86,18 @@ export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string } = 
           body.replaceChildren(el('p', 'wts__status', 'The private file has no steps for this technique yet.'));
           return;
         }
-        body.replaceChildren(...buildStrip({ steps: master.steps, pictures, goal }, block, ctx));
+        body.replaceChildren(...buildStrip({ techniqueId: entry.id, steps: master.steps, pictures, goal }, block, ctx));
       })
       .catch(() => body.replaceChildren(el('p', 'wts__status', 'The steps couldn’t be loaded. Check the private WalkThrus file.')));
   });
   return details;
 }
 
-function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string }): HTMLElement[] {
+function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string; display?: boolean }): HTMLElement[] {
   const question = blockQuestion(block);
+  const ticks = ctx.lessonId && !ctx.display
+    ? createStepTicks({ techniqueId: data.techniqueId, lessonId: ctx.lessonId, slots: lessonSlots(ctx.lessonId), total: Math.min(9, data.steps.length) })
+    : null;
   const strip = el('ol', 'wts__strip');
   const card = el('div', 'wts__card');
   card.setAttribute('aria-live', 'polite');
@@ -171,6 +177,7 @@ function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string }): 
     panel.append(pic, label);
     panel.addEventListener('click', () => state.goTo(step.n));
     cell.append(panel);
+    if (ticks) cell.append(ticks.button(step.n));
     const tool = step.cue?.tool;
     if (tool?.kind === 'timer') cell.append(miniTimer(tool.seconds, step.n, state));
     else if (tool?.kind === 'names') cell.append(miniNames(step.n, state));
@@ -179,5 +186,5 @@ function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string }): 
   }
   paintCells();
   paintCard();
-  return [strip, card];
+  return ticks ? [ticks.el, strip, card] : [strip, card];
 }
