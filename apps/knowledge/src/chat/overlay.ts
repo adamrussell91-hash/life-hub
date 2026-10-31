@@ -518,11 +518,18 @@ function saveCardHtml() {
       </div>
     </section>`;
   }
-  return `<section class="confirm-card chat-overlay__save" role="region" aria-label="Save as new page">
-    <div class="confirm-card__actions">
-      <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
-    </div>
-  </section>`;
+  return "";
+}
+
+/** Optional save for a plain reply. It is not a pending write, so it rides
+ *  under the reply in the thread instead of the Waiting on Confirm tray. */
+function saveLinkHtml() {
+  const last = lastAssistant();
+  if (working || fromBookSelected() || makeNoteSelected()) return "";
+  if (!last || turns[turns.length - 1] !== last || !briefIsSavable(last.content) || savedBrief) return "";
+  return `<li class="chat-overlay__save">
+    <button class="chat__text-btn" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
+  </li>`;
 }
 
 function editConfirmHtml(edit: RetagProposal) {
@@ -640,6 +647,7 @@ function overlayHtml() {
                 <div class="chat-message__body">${empty}</div>
               </li>`
         }
+        ${saveLinkHtml()}
         ${
           working
             ? `<li class="chat-message chat-message--assistant chat-message--status chat-message--tail" data-agent="${personality}" style="--agent-colour:${who.colour}">
@@ -819,16 +827,46 @@ function bind(root: HTMLElement) {
   });
 }
 
+let paintedHtml = "";
+let paintedTurns = 0;
+
+function threadEl(root: HTMLElement) {
+  return root.querySelector<HTMLElement>(".chat-overlay .chat-messages");
+}
+
 function paint() {
   const root = rootEl();
   if (!currentHost?.visible) {
     root.replaceChildren();
     root.hidden = true;
+    paintedHtml = "";
     return;
   }
   root.hidden = false;
-  root.innerHTML = `${open ? overlayHtml() : ""}${fabHtml()}`;
+  const html = `${open ? overlayHtml() : ""}${fabHtml()}`;
+  // The app shell re-renders the overlay host on every view paint. Rebuilding
+  // identical markup kills an in-flight touch scroll on iOS and snaps the
+  // thread back to the top, so leave the DOM alone when nothing changed.
+  if (html === paintedHtml && root.firstElementChild) return;
+  const before = threadEl(root);
+  const keepTop = before?.scrollTop ?? 0;
+  const grew = turns.length > paintedTurns;
+  root.innerHTML = html;
+  paintedHtml = html;
+  paintedTurns = turns.length;
   bind(root);
+  const thread = threadEl(root);
+  if (!thread) return;
+  if (grew || !before) {
+    // New turn or fresh open: bring the latest question (or reply) to the top of the thread.
+    const lastUser = [...thread.querySelectorAll<HTMLElement>(".chat-message--user")].pop();
+    const anchor = lastUser ?? thread.lastElementChild;
+    if (anchor instanceof HTMLElement) {
+      thread.scrollTop += anchor.getBoundingClientRect().top - thread.getBoundingClientRect().top;
+    }
+  } else {
+    thread.scrollTop = keepTop;
+  }
 }
 
 export function ensureChatOverlay(host: ChatOverlayHost) {
