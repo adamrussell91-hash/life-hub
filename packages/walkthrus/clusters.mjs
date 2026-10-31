@@ -58,13 +58,21 @@ export function normalizeClusters(value) {
   return out;
 }
 
+/** Whether a tile at (q, r) would have tiles on all six sides. */
+const enclosed = (taken, q, r) => DIRS.every(([dq, dr]) => taken.has(cellKey(q + dq, r + dr)));
+
 /**
  * The free cells a tile may snap to in a cluster: every empty cell touching one of its tiles, under
- * the title. An empty cluster offers only its origin.
+ * the title. An empty cluster offers only its origin. A cell is never offered when filling it would
+ * close a tile in on all six sides: every tile keeps an open edge for arrows.
  */
 export function touchingFreeCells(tiles) {
   if (!tiles.length) return [{ q: 0, r: 0 }];
   const taken = new Set(tiles.map((t) => cellKey(t.q, t.r)));
+  const closesIn = (q, r) => {
+    const after = new Set(taken).add(cellKey(q, r));
+    return enclosed(after, q, r) || DIRS.some(([dq, dr]) => after.has(cellKey(q + dq, r + dr)) && enclosed(after, q + dq, r + dr));
+  };
   const seen = new Set();
   const out = [];
   for (const t of tiles) {
@@ -74,6 +82,7 @@ export function touchingFreeCells(tiles) {
       const key = cellKey(q, r);
       if (taken.has(key) || seen.has(key) || !belowTitle(q, r)) continue;
       seen.add(key);
+      if (closesIn(q, r)) continue;
       out.push({ q, r });
     }
   }

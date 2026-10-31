@@ -124,3 +124,17 @@ test('the board endpoint serves clusters, made from picks until some are saved',
   await handler(post(URL_, { fusions: [{ id: 'nope' }] }));
   assert.deepEqual((await read()).fusions, []);
 });
+
+test('no tile is ever closed in on all six sides', async () => {
+  const { CATALOGUE } = await import('../../packages/walkthrus/catalogue.mjs');
+  const { clustersFromPicked: fromPicked, touchingFreeCells: free } = await import('../../packages/walkthrus/clusters.mjs');
+  const six = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  const ids = CATALOGUE.filter((e) => e.kind === 'technique').slice(0, 30).map((e) => e.id);
+  const [cluster] = fromPicked(ids);
+  assert.equal(cluster.tiles.length, 30);
+  const taken = new Set(cluster.tiles.map((t) => `${t.q},${t.r}`));
+  for (const t of cluster.tiles) assert.ok(!six.every(([dq, dr]) => taken.has(`${t.q + dq},${t.r + dr}`)), `${t.id} is closed in`);
+  // A ring with an empty middle never offers the middle.
+  const ring = six.map(([q, r], i) => ({ id: ids[i], q: q + 1, r: r + 1 }));
+  assert.ok(!free(ring).some((c) => c.q === 1 && c.r === 1));
+});
