@@ -135,3 +135,10 @@ test('students cannot moderate', async () => {
   const [item] = (await teacher(store, 'GET')).items;
   await assert.rejects(knowledgeAction(store, 'unit1', 'POST', { action: 'hide', id: item.id }), { code: 'bad_action' });
 });
+
+test('the public routes are open to students without a session', async () => {
+  const { isPublicStudentApi } = await import('../../netlify/functions/_shared/public-student-routes.mjs');
+  assert.equal(isPublicStudentApi('GET', '/api/published/anthology-knowledge/unit1'), true);
+  assert.equal(isPublicStudentApi('POST', '/api/published/anthology-knowledge/unit1'), true);
+  assert.equal(isPublicStudentApi('DELETE', '/api/published/anthology-knowledge/unit1'), false);
+});
