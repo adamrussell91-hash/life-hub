@@ -29,7 +29,7 @@ export type WorkSyncHandle = {
 };
 
 /** The parts of a block's saved state that hold writing. Must match lesson-work.mjs. */
-const PART = /^(answers|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
+const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
 /** Saved alongside the writing, but not writing. */
 const SKIP = new Set(['step', 'level', 'done', 'index', 'order', 'flipped', 'revealed', 'rating']);
 const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;

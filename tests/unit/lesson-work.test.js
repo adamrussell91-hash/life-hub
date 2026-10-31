@@ -129,6 +129,27 @@ test('hand in freezes the block text and can be redone until it is returned', as
   await assert.rejects(workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' }), /already been returned/);
 });
 
+test('a next-step pick saves as step.N, is checked, and freezes with the hand-in', async () => {
+  const { store, bob } = await setup();
+  linkColumn(store);
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await save(store, { block_id: 'qset1', part: 'answers', fields: { q2: 'The town grows. It changes.' } });
+  const pick = { code_id: 'comp_ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 15 };
+  await save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify(pick) } });
+  await save(store, { block_id: 'qset1', part: 'step.0', fields: { pick: JSON.stringify({ code_id: 'comp_e', line: 'Add a short quote.', skipped: true, extra: 'dropped' }) } });
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' });
+  const text = store.data.get(`work_handins/lesson1/qset1/${bob.id}`).text;
+  assert.deepEqual(JSON.parse(text['step.1'].pick), pick);
+  assert.deepEqual(JSON.parse(text['step.0'].pick), { code_id: 'comp_e', line: 'Add a short quote.', skipped: true });
+  // Past the end of the answer, backwards, no such question, or not JSON: refused.
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, end: 99 }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, start: 15, end: 15 }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, line: 'x'.repeat(161) }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.5', fields: { pick: JSON.stringify(pick) } }), /can’t be saved/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: 'not json' } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.x', fields: { pick: JSON.stringify(pick) } }), /can’t be saved/);
+});
+
 test('hand in is refused for a block this class does not mark', async () => {
   const { store } = await setup();
   await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });

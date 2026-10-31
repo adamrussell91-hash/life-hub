@@ -49,3 +49,21 @@ export function stepsBySkill(rankedGrowth, codesById, rungs) {
   }
   return skills;
 }
+
+/**
+ * A student's next-step pick, cleaned: `{ code_id, line, start, end }` for the
+ * sentence they tapped in `answer`, or `{ code_id, line, skipped: true }`.
+ * `line` is the step they saw, so marking never depends on a regenerated bank.
+ * Null when it doesn't fit. Without the answer text, offsets are checked against `max`.
+ */
+export function cleanStepPick(raw, answer, max = 4000) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (typeof raw.code_id !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(raw.code_id)) return null;
+  const line = typeof raw.line === 'string' ? raw.line.trim() : '';
+  if (!line || line.length > LADDER_MAX) return null;
+  if (raw.skipped === true) return { code_id: raw.code_id, line, skipped: true };
+  const limit = typeof answer === 'string' ? answer.length : max;
+  const { start, end } = raw;
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || start >= end || end > limit) return null;
+  return { code_id: raw.code_id, line, start, end };
+}

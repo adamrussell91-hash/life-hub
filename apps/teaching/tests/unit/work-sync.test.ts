@@ -54,6 +54,8 @@ describe('work-sync helpers', () => {
     expect(parseWorkKey(lesson, answersKey)).toEqual({ blockId: 'qset1', part: 'answers' });
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.format.because_but_so`)).toEqual({ blockId: 'q2', part: 'format.because_but_so' });
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.kaplan.see`)).toEqual({ blockId: 'q2', part: 'kaplan.see' });
+    expect(parseWorkKey(lesson, `${storageKey(lesson, 'qset1')}.step.2`)).toEqual({ blockId: 'qset1', part: 'step.2' });
+    expect(parseWorkKey(lesson, `${storageKey(lesson, 'qset1')}.step.x`)).toBeNull();
     expect(parseWorkKey(lesson, storageKey(lesson, 'cards'))).toBeNull();
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.discern`)).toBeNull();
     expect(parseWorkKey('other', answersKey)).toBeNull();
