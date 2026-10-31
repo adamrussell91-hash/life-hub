@@ -87,7 +87,8 @@ test('title, quote and initials are required, and long text is cut', async () =>
   const store = storeFixture();
   await assert.rejects(add(store, { title: '  ' }), { code: 'missing_title' });
   await assert.rejects(add(store, { quote: '' }), { code: 'missing_quote' });
-  await assert.rejects(add(store, { initials: 'a' }), { code: 'bad_initials' });
+  await assert.rejects(add(store, { initials: '' }), { code: 'bad_initials' });
+  await assert.rejects(add(store, { initials: 'TT22' }), { code: 'bad_initials' });
   await add(store, { title: 'x'.repeat(200) });
   assert.equal((await studentList(store)).items[0].title.length, 80);
 });
@@ -141,4 +142,11 @@ test('the public routes are open to students without a session', async () => {
   assert.equal(isPublicStudentApi('GET', '/api/published/anthology-knowledge/unit1'), true);
   assert.equal(isPublicStudentApi('POST', '/api/published/anthology-knowledge/unit1'), true);
   assert.equal(isPublicStudentApi('DELETE', '/api/published/anthology-knowledge/unit1'), false);
+});
+
+test('initials with a number for a double-up stay apart', async () => {
+  const store = storeFixture();
+  await add(store, { initials: 'TT' });
+  await add(store, { initials: 'tt2' });
+  assert.deepEqual((await teacher(store, 'GET')).items.map((item) => item.initials).sort(), ['TT', 'TT2']);
 });
