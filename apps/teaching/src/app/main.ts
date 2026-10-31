@@ -1158,10 +1158,16 @@ async function handleRoute(match: RouteMatch): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  try {
-    session = await fetchSession();
-  } catch {
+  // The class host only shows student pages; the API never honours the owner's
+  // session from it, so do not ask.
+  if (isClassSiteHost()) {
     session = { authenticated: false };
+  } else {
+    try {
+      session = await fetchSession();
+    } catch {
+      session = { authenticated: false };
+    }
   }
 
   window.addEventListener('beforeunload', () => {
@@ -1173,7 +1179,7 @@ async function init(): Promise<void> {
 
   window.addEventListener('keydown', (event) => {
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
-    if (!session.authenticated) return;
+    if (!session.authenticated || isClassSiteHost()) return;
     if (currentAppPath().startsWith('/s/')) return;
     event.preventDefault();
     openTeacherSearch();

@@ -329,6 +329,7 @@ test('html-app-ai stays public, 503s without Blobs, and completes an enabled lan
   const handler = createHtmlAppAiHandler({
     env,
     getContentStore: async () => memoryStore({
+      'lessons/week-1': { id: 'week-1', title: 'Week 1' },
       'published/lessons/week-1': {
         blocks: [{
           id: 'b1',
@@ -351,6 +352,29 @@ test('html-app-ai stays public, 503s without Blobs, and completes an enabled lan
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data.text, 'hello');
   assert.equal(completed, 1);
+});
+
+test('html-app-ai stops spending once the lesson is trashed', async () => {
+  let completed = 0;
+  const handler = createHtmlAppAiHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'lessons/week-1': { id: 'week-1', title: 'Week 1', deleted_at: '2026-10-01T00:00:00.000Z' },
+      'published/lessons/week-1': {
+        blocks: [{ id: 'b1', block_type: 'html_app', content: { ai: { provider: 'anthropic', model: 'm', system: 'Help', max_tokens: 200 } } }]
+      }
+    }),
+    completeWithProvider: async () => {
+      completed += 1;
+      return 'hello';
+    }
+  });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/html-app-ai', {
+    method: 'POST',
+    body: { lesson_id: 'week-1', block_id: 'b1', messages: [{ role: 'user', content: 'Hi' }] }
+  }));
+  assert.equal(response.status, 404);
+  assert.equal(completed, 0);
 });
 
 test('media file responses are nosniff', async () => {

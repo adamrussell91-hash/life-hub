@@ -10,14 +10,16 @@ import {
   ProviderUpstreamError
 } from './_shared/html-app-providers.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
-import { getJSON, publishedLessonKey } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
+import { draftLessonKey, getJSON, publishedLessonKey } from './_shared/teaching-blobs.mjs';
 import {
   clampHtmlAppAiRequest,
   findBlockById,
   resolveHtmlAppAiLane
 } from './_shared/teaching-student.mjs';
 
-export const config = { path: '/api/html-app-ai' };
+// Public and paid: a school shares one IP, so the cap is per class-sized burst, not per student.
+export const config = { path: '/api/html-app-ai', rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 120, windowSize: 60 } };
 
 export function createHtmlAppAiHandler(deps = {}) {
   const complete = deps.completeWithProvider ?? defaultCompleteWithProvider;
@@ -45,7 +47,9 @@ export function createHtmlAppAiHandler(deps = {}) {
     }
 
     const snapshot = await getJSON(store, publishedLessonKey(lessonId));
-    if (!snapshot || typeof snapshot !== 'object') {
+    // A trashed lesson's snapshot outlives it; it must stop spending as well as showing.
+    const draft = snapshot ? await getJSON(store, draftLessonKey(lessonId)) : null;
+    if (!snapshot || typeof snapshot !== 'object' || !draft || isDeletedRecord(draft)) {
       return withCors(errorResponse(404, 'not_found', 'Lesson is not published', false), request, env);
     }
 

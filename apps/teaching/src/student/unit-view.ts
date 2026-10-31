@@ -10,8 +10,7 @@ import {
   createStudentShell,
   renderStudentChrome,
   renderStudentStatus,
-  studentAnchor
-} from '@/student/shell';
+  studentAnchor, STUDENT_BRAND } from '@/student/shell';
 
 export interface MountStudentUnitViewOptions {
   root: HTMLElement;
@@ -122,7 +121,7 @@ export function mountStudentUnitView(
   root.replaceChildren();
   const { surface, header, content } = createStudentShell();
   root.append(surface);
-  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentChrome(header, { brand: STUDENT_BRAND });
   renderStudentStatus(content, 'Loading unit…');
 
   void apiGet<PublishedUnit>(`/api/published/units/${unitId}`)
