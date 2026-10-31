@@ -24,8 +24,7 @@ import {
   renderStudentChrome,
   renderStudentStatus,
   studentAnchor,
-  wireStudentAnchor
-} from '@/student/shell';
+  wireStudentAnchor, STUDENT_BRAND } from '@/student/shell';
 
 export interface MountStudentClassViewOptions {
   root: HTMLElement;
@@ -257,13 +256,13 @@ export function mountStudentClassView(
     'student-surface__content--class'
   );
   root.append(surface);
-  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentChrome(header, { brand: STUDENT_BRAND });
   renderStudentStatus(content, 'Loading class…');
 
   void fetchPublishedClass(classId)
     .then((cls) => {
       if (disposed || isStale()) return;
-      renderStudentChrome(header, { brand: cls.code || 'Teaching Hub' });
+      renderStudentChrome(header, { brand: cls.code || STUDENT_BRAND });
       renderPublishedClass(content, cls);
     })
     .catch((error: unknown) => {

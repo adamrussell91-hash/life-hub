@@ -89,6 +89,24 @@ test('the published class page never carries the class list', () => {
   assert.equal(text.includes('skip_picker'), false);
 });
 
+test('the published class page never names an unpublished lesson', () => {
+  const published = buildPublishedClass({
+    cls: { ...CLASS, current_scheduled_lesson_id: 'sch_draft' },
+    units: [],
+    lessons: [{ id: 'lesson_live', title: 'Live lesson' }, { id: 'lesson_draft', title: 'Secret draft' }],
+    scheduled: [
+      { id: 'sch_live', lesson_id: 'lesson_live', schedule_order: 1, date: '2026-11-02' },
+      { id: 'sch_draft', lesson_id: 'lesson_draft', schedule_order: 2, date: '2026-11-03' }
+    ],
+    publishedLessonIds: new Set(['lesson_live'])
+  });
+  const text = JSON.stringify(published);
+  assert.equal(text.includes('Secret draft'), false);
+  assert.equal(text.includes('lesson_draft'), false);
+  assert.deepEqual(published.schedule.map(row => row.lesson_id), ['lesson_live']);
+  assert.equal(published.current_lesson, undefined);
+});
+
 test('server schema knows the new blocks, and old dividers get the gear', () => {
   const stamp = { type: 'block', visibility: 'student_teacher', created_at: CLASS.created_at, updated_at: CLASS.updated_at, schema_version: 1 };
   assert.deepEqual(BlockSchema.parse({ ...stamp, id: 'd', block_type: 'divider', content: {} }).content, { tools: true, timer_stack: [] });

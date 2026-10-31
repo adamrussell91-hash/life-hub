@@ -15,7 +15,9 @@ const STUDENT_PATHS = [
   /^\/s\/lessons\/[^/]+$/,
   /^\/s\/units\/[^/]+$/,
   /^\/s\/classes\/[^/]+$/,
-  /^\/s\/classes\/[^/]+\/lessons\/[^/]+$/
+  /^\/s\/classes\/[^/]+\/lessons\/[^/]+$/,
+  /^\/s\/classes\/[^/]+\/profile$/,
+  /^\/s\/feedback\/[^/]+$/
 ];
 
 const ASSET_PATH =
@@ -74,10 +76,6 @@ export function normalisePath(pathname) {
 export function studentPath(pathname) {
   const path = normalisePath(pathname);
   if (!path) return null;
-  if (path.startsWith('/teaching/')) {
-    const rest = path.slice('/teaching'.length);
-    return STUDENT_PATHS.some((pattern) => pattern.test(rest)) ? rest : null;
-  }
   return STUDENT_PATHS.some((pattern) => pattern.test(path)) ? path : null;
 }
 
@@ -90,8 +88,12 @@ export function isTeachingAsset(pathname) {
   return Boolean(path && ASSET_PATH.test(path));
 }
 
-export function scrubTeachingShell(html) {
-  return html.replace(REDIRECT_SCRIPT, '').replaceAll(`${UPSTREAM_ORIGIN}`, '');
+export const STUDENT_TITLE = 'Classroom';
+
+export function scrubTeachingShell(html, { retitle = true } = {}) {
+  const scrubbed = html.replace(REDIRECT_SCRIPT, '').replaceAll(`${UPSTREAM_ORIGIN}`, '');
+  // The shell's own title names the hub; student pages carry a neutral one.
+  return retitle ? scrubbed.replace(/<title>[^<]*<\/title>/i, `<title>${STUDENT_TITLE}</title>`) : scrubbed;
 }
 
 function passedHeaders(upstream) {
@@ -131,7 +133,7 @@ export async function handleClassSiteRequest(request, fetchImpl = fetch) {
   if (line || studentPath(url.pathname)) {
     const upstream = await fetchUpstream(line ? LINE_SHELL_PATH : SHELL_PATH, fetchImpl);
     if (!upstream) return deadPage(502);
-    const html = scrubTeachingShell(await upstream.text());
+    const html = scrubTeachingShell(await upstream.text(), { retitle: !line });
     return new Response(request.method === 'HEAD' ? null : html, {
       status: 200,
       headers: {

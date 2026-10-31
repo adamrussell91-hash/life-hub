@@ -15,3 +15,14 @@ export function allowedRequestOrigins(env) {
 export function isAllowedRequestOrigin(origin, env) {
   return Boolean(origin) && allowedRequestOrigins(env).includes(origin);
 }
+
+/**
+ * The public class host only ever runs student pages. A request from it never
+ * carries the owner's session, even when the owner's browser holds the cookie,
+ * so nothing running there can act as the owner.
+ */
+export const STUDENT_ONLY_ORIGIN = 'https://class.adam-russell.com';
+
+export function isStudentOnlyOrigin(origin) {
+  return origin === STUDENT_ONLY_ORIGIN;
+}
