@@ -5,7 +5,19 @@ import { z } from 'zod';
 const Label = z.string().max(120);
 const Body = z.string().max(2000);
 
-export const WalkthruStepSchema = z.object({ n: z.number().int().min(1).max(5), label: Label, text: Body });
+// The lesson's version of a step: what to do and say while teaching it, and the classroom tool it runs.
+// {name} in a Say line is the student the picker chose; {question} is the block's own question.
+const Cue = z.string().max(300);
+export const WalkthruCueSchema = z.object({
+  time: z.string().max(60).optional(),
+  do: z.array(Cue).max(6).default([]),
+  say: z.array(Cue).max(6).default([]),
+  tool: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('timer'), seconds: z.number().int().min(5).max(600) }),
+    z.object({ kind: z.literal('names') })
+  ]).optional()
+});
+export const WalkthruStepSchema = z.object({ n: z.number().int().min(1).max(5), label: Label, text: Body, cue: WalkthruCueSchema.optional() });
 export const WalkthruTechniqueTextSchema = z.object({
   id: z.string().regex(/^w\d+-[a-z0-9-]{2,80}$/),
   steps: z.array(WalkthruStepSchema).min(1).max(5),

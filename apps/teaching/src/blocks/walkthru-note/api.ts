@@ -1,7 +1,10 @@
 import { apiGet, apiPost } from '@/api/client';
 
 /** The private step text. Fetched from the teacher-only endpoint, never stored in a lesson. */
-export interface WalkthruStepText { n: number; label: string; text: string }
+export type WalkthruTool = { kind: 'timer'; seconds: number } | { kind: 'names' };
+/** The lesson's version of a step. {name} in a Say line is the picked student; {question} is the block's question. */
+export interface WalkthruCue { time?: string; do: string[]; say: string[]; tool?: WalkthruTool }
+export interface WalkthruStepText { n: number; label: string; text: string; cue?: WalkthruCue }
 export interface WalkthruTechniqueText { id: string; steps: WalkthruStepText[]; footer?: string }
 export interface WalkthruText { sets: Array<{ set: number; techniques: WalkthruTechniqueText[] }> }
 
@@ -17,6 +20,7 @@ export interface Fusion { id: string; name: string; parents: string[]; steps: Wa
 export interface GoalLite { id: string; status: string; sphere: string; walkthru?: { technique_id: string; adapted?: Record<string, string> } }
 
 let textCache: Promise<WalkthruText> | null = null;
+const pictureCache = new Map<string, Promise<Array<string | null>>>();
 let goalsCache: Promise<GoalLite[]> | null = null;
 let fusionsCache: Promise<Fusion[]> | null = null;
 
@@ -32,6 +36,17 @@ export function loadWalkthruText(): Promise<WalkthruText> {
   textCache ??= apiGet<{ text: WalkthruText }>('/api/walkthrus-text').then((r) => r.text);
   textCache.catch(() => { textCache = null; });
   return textCache;
+}
+
+/** A technique's five step pictures (private line art), fetched once per page load. */
+export function loadWalkthruPictures(id: string): Promise<Array<string | null>> {
+  let pending = pictureCache.get(id);
+  if (!pending) {
+    pending = apiGet<{ pictures: { steps: Array<string | null> } }>(`/api/walkthrus-pictures?id=${encodeURIComponent(id)}`).then((r) => r.pictures.steps);
+    pending.catch(() => pictureCache.delete(id));
+    pictureCache.set(id, pending);
+  }
+  return pending;
 }
 
 /** The goal that is being worked on for a technique, if any (its adapted notes show under the steps). */
@@ -76,4 +91,5 @@ export function resetWalkthruNoteCachesForTests(): void {
   textCache = null;
   goalsCache = null;
   fusionsCache = null;
+  pictureCache.clear();
 }

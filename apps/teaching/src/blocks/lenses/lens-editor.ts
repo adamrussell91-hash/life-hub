@@ -11,6 +11,14 @@ import { SLEEVE_LENSES, STEPPED_LENSES, attachedSleeves, attachedSteppedLenses, 
 import { MAX_SLEEVES } from './sleeve-lens';
 import { renderSteppedLenses } from './stepped-view';
 import { LEVEL_LABELS, type LensConfig, type SleeveLens, type SteppedLens } from './types';
+import { CATALOGUE, SERIES, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
+import { FIGURE_SVGS } from '../../../../../packages/walkthrus/glyphs';
+import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
+import { attachedTechniques, withTechnique } from '../walkthru-note/attach';
+
+const walkthruGlyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
+/** Any block can carry a WalkThru, bar teacher notes (which carry their own). */
+const canHaveWalkthru = (block: Block): boolean => block.block_type !== 'teacher_note';
 
 type Options<T extends Block> = { getBlock: () => T; onChange: (block: T) => void };
 
@@ -38,7 +46,7 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
   if (!classroomExtras()) return root;
   const available = () => STEPPED_LENSES.filter((lens) => lens.canAttach(options.getBlock()));
   const sleevable = () => SLEEVE_LENSES.some((item) => item.canAttach(options.getBlock()));
-  if (!available().length && !sleevable() && !canHaveDiscern(options.getBlock())) return root;
+  if (!available().length && !sleevable() && !canHaveDiscern(options.getBlock()) && !canHaveWalkthru(options.getBlock())) return root;
   const bar = document.createElement('div');
   bar.className = 'kaplan-author__bar';
   const attached = document.createElement('div');
@@ -167,6 +175,20 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     }
     const discernChip = discern.chip();
     if (discernChip) attached.append(discernChip);
+    if (canHaveWalkthru(options.getBlock())) {
+      const [chosen] = attachedTechniques(options.getBlock());
+      const entry = button(chosen ? 'Change WalkThru…' : 'Add WalkThru…', () => { menu.open = false; status.textContent = ''; chooseWalkthru(); });
+      entry.className = 'page-options__item';
+      entries.append(entry);
+      const technique = chosen ? techniqueById(chosen) : null;
+      if (technique) {
+        const chip = button(technique.name, () => chooseWalkthru());
+        chip.className = 'kaplan-chip wts-chip';
+        chip.prepend(walkthruGlyphs.element(technique.id));
+        chip.setAttribute('aria-label', `Change the ${technique.name} WalkThru (only you see it)`);
+        attached.append(chip);
+      }
+    }
     menu.hidden = !entries.childElementCount;
   }
   function title(text: string, symbol?: Element): void {
@@ -234,6 +256,67 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     }
     sleeveChoices();
     actions(button('Cancel', close));
+  }
+  /** One WalkThru per block: the teacher's step strip under it in the lesson, never on Display. */
+  function chooseWalkthru(): void {
+    const [chosen] = attachedTechniques(options.getBlock());
+    title(chosen ? 'Change the WalkThru' : 'Add a WalkThru');
+    const caption = document.createElement('p');
+    caption.className = 'kaplan-caption';
+    caption.textContent = 'Its five steps sit under this block in your lesson view. Students and Display never see it.';
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'input wts-pick__search';
+    search.placeholder = 'Find a technique';
+    search.setAttribute('aria-label', 'Find a technique');
+    panel.append(caption, search);
+    const lists: Array<{ heading: HTMLElement; list: HTMLElement; picks: Array<[string, HTMLButtonElement]> }> = [];
+    for (const series of SERIES) {
+      const items = CATALOGUE.filter((e) => e.kind === 'technique' && e.series === series.key);
+      if (!items.length) continue;
+      const heading = document.createElement('h4');
+      heading.className = 'kaplan-lens-group';
+      heading.textContent = series.name;
+      const list = document.createElement('div');
+      list.className = 'kaplan-lens-choices';
+      const picks: Array<[string, HTMLButtonElement]> = items.map((item) => {
+        const pick = choice(item.name, item.id === chosen ? 'On this block now' : `${item.code} | ${item.page}`, walkthruGlyphs.element(item.id), () => {
+          options.onChange(withTechnique(options.getBlock(), item.id));
+          close();
+          renderBar();
+          status.textContent = `${item.name} WalkThru added. Only you see it, under this block.`;
+        });
+        if (item.id === chosen) pick.setAttribute('aria-current', 'true');
+        list.append(pick);
+        return [item.name.toLowerCase(), pick];
+      });
+      lists.push({ heading, list, picks });
+      panel.append(heading, list);
+    }
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      for (const group of lists) {
+        let shown = 0;
+        // The choice styles set display, which would win over `hidden`.
+        for (const [name, pick] of group.picks) {
+          const match = !q || name.includes(q);
+          pick.style.display = match ? '' : 'none';
+          if (match) shown += 1;
+        }
+        group.heading.style.display = group.list.style.display = shown ? '' : 'none';
+      }
+    });
+    const buttons = [button('Cancel', close)];
+    if (chosen) {
+      buttons.unshift(button('Take the WalkThru off', () => {
+        const name = techniqueById(chosen)?.name ?? 'The';
+        options.onChange(withTechnique(options.getBlock(), null));
+        close();
+        renderBar();
+        status.textContent = `${name} WalkThru taken off this block.`;
+      }));
+    }
+    actions(...buttons);
   }
   /** Thinking toolkit sleeves, under Values, Tools and Skills, in library order. */
   function sleeveChoices(): void {

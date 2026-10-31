@@ -40,9 +40,18 @@ async function readStored(store) {
   return parsed.success ? parsed.data : null;
 }
 
-/** The text, copied from the private repo on first use. */
+/** A stored copy older than this is fetched again, so edits in the private repo reach the app. */
+export const WALKTHRUS_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+const isStale = (copy, now) => !copy.fetched_at || now - Date.parse(copy.fetched_at) > WALKTHRUS_MAX_AGE_MS;
+
+/** The text, copied from the private repo on first use and again once the copy is stale. */
 export async function loadWalkthrus(store, deps = {}) {
-  return (await readStored(store)) ?? refreshWalkthrus(store, deps);
+  const stored = await readStored(store);
+  if (!stored) return refreshWalkthrus(store, deps);
+  if (!isStale(stored, deps.now ?? Date.now())) return stored;
+  // A stale copy still beats nothing when the private repo can't be reached.
+  return refreshWalkthrus(store, deps).catch(() => stored);
 }
 
 /** Copy the text again from the private repo, replacing the stored copy. */

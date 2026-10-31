@@ -2713,4 +2713,73 @@ button.tk-qdot {
 .tk-wt-badge__glyph svg { width: 100%; height: 100%; }
 .tk-wt-badge__body { padding: 0.25rem 0 0.5rem; }
 .tk-wt-badge__body .tk-wt__steps { gap: 0.15rem; }
-@media print { .tk-wt, .tk-wt-badges, .tk-wt-plan { display: none; } }
+/* A block's WalkThru: a slim bar that opens to the five-step strip, its small tools, and a cue card. Teacher view only. */
+.wts { margin-top: 0.75rem; border: 1px solid #f2c200; border-radius: 12px; background: #fff7cc; color: #111; }
+.wts__sum { display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0.35rem 0.75rem; cursor: pointer; list-style: none; }
+.wts__sum::-webkit-details-marker { display: none; }
+.wts__sum::after { content: '+'; margin-left: auto; padding-left: 0.5rem; font-weight: 700; color: var(--muted); }
+.wts[open] > .wts__sum::after { content: '–'; }
+.wts__hex { display: inline-grid; place-items: center; flex: none; width: 2.75rem; height: 2.4rem; padding: 0.2rem 0.45rem; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); background: #ffd400; color: #111; }
+.wts__hex svg { width: 100%; height: 100%; }
+.wts__title { font-weight: 800; }
+.wts__meta { font-size: var(--text-xs); color: var(--muted); }
+.wts__body { padding: 0 0.75rem 0.75rem; }
+.wts__status { margin: 0 0 0.5rem; font-size: var(--text-sm); color: var(--muted); }
+.wts__strip { list-style: none; margin: 0; padding: 0.15rem 0 0.25rem; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+.wts__cell { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; padding: 0.4rem; border: 2px solid #111; border-radius: 8px; background: #ffd400; }
+.wts__cell.is-on { outline: 3px solid #111; outline-offset: 2px; }
+.wts__panel { all: unset; box-sizing: border-box; flex: 1; display: grid; grid-template-rows: auto 1fr; align-content: start; gap: 0.25rem; cursor: pointer; color: #111; }
+.wts__panel:focus-visible { outline: 2px solid #111; outline-offset: 2px; border-radius: 4px; }
+.wts__pic { display: block; aspect-ratio: 4 / 3; --wt-paper: #fff; }
+.wts__pic svg { display: block; width: 100%; height: 100%; }
+.wts__pic.is-empty { border: 1.5px dashed rgba(0, 0, 0, 0.35); border-radius: 6px; }
+.wts__label { font-size: var(--text-xs); line-height: 1.25; font-weight: 700; }
+.wts__label b { display: inline-grid; place-items: center; width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; border-radius: 50%; background: #111; color: #ffd400; font-size: 0.7rem; }
+.wts-tool { display: flex; align-items: center; gap: 0.25rem; height: 1.85rem; padding: 0.15rem; border: 1.5px solid #111; border-radius: 999px; background: #fff; }
+.wts-tool__go { all: unset; flex: none; display: grid; place-items: center; width: 1.45rem; height: 1.45rem; border-radius: 50%; background: #111; color: #ffd400; font-size: 0.7rem; cursor: pointer; }
+/* Block buttons get a 44px floor; these small round ones size themselves (the pill is the touch target). */
+.wts .wts-tool .wts-tool__go, .wts .wts-tool .wts-tool__aux { min-height: 0; min-width: 0; }
+/* Touch screens: a bigger pill and button, still round. */
+@media (pointer: coarse) {
+  .wts-tool { height: 2.75rem; padding: 0.2rem; }
+  .wts .wts-tool .wts-tool__go { width: 2.3rem; height: 2.3rem; font-size: 0.85rem; }
+  .wts .wts-tool .wts-tool__aux { padding: 0.5rem 0.4rem; }
+}
+.wts-tool__go:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+.wts-tool__val { flex: 1; min-width: 0; overflow: hidden; text-align: center; white-space: nowrap; text-overflow: ellipsis; font: 800 var(--text-sm) / 1 ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.wts-tool--names .wts-tool__val { font-family: inherit; }
+.wts-tool__val.is-rolling { opacity: 0.5; }
+.wts-tool__val.is-done { color: var(--danger, #b42318); }
+.wts-tool__aux { all: unset; flex: none; padding: 0 0.35rem; font-size: 0.68rem; font-weight: 700; color: var(--muted); cursor: pointer; }
+span.wts-tool__aux { cursor: default; }
+.wts__card { margin-top: 0.6rem; padding: 0.75rem 0.9rem; border-left: 4px solid #111; border-radius: 8px; background: #fff; font-size: var(--text-sm); }
+.wts__card p { margin: 0.25rem 0; }
+.wts__step { font-weight: 800; font-size: var(--text-base); }
+.wts__time { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; background: #ffd400; font-size: var(--text-xs); font-weight: 700; }
+.wts__h { margin: 0.6rem 0 0.15rem !important; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.wts__do { margin: 0; padding-left: 1.1rem; }
+.wts__do li { margin: 0.1rem 0; }
+.wts__say { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.wts__say li { padding: 0.3rem 0.6rem; border: 1px solid #f2c200; border-radius: 8px; background: #fff7cc; font-weight: 600; }
+.wts__name { padding: 0 0.25rem; border-radius: 4px; background: #111; color: #ffd400; }
+.wts__name.is-empty { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
+.wts__adapted { padding-left: 0.6rem; border-left: 3px solid #ffd400; font-style: italic; }
+.wts__book { margin-top: 0.6rem; padding-top: 0.35rem; border-top: 1px solid var(--line); color: var(--muted); }
+.wts__book summary { min-height: 2.25rem; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.wts__book--open { color: inherit; border-top: 0; margin-top: 0.25rem; padding-top: 0; }
+.wts__next { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; min-height: 2.75rem; margin-top: 0.6rem; padding: 0 0.9rem; border: 2px solid #111; border-radius: 8px; background: #ffd400; font-weight: 700; cursor: pointer; }
+.wts__next:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+.wts-chip .wts__hex { width: 1.6rem; height: 1.4rem; padding: 0.1rem 0.25rem; }
+.wts-pick__search { width: 100%; margin: 0.25rem 0 0.5rem; }
+/* A narrow block (a phone, a column, a squeezed page) swipes through the steps, the next one peeking in. */
+.wts__body { container-type: inline-size; }
+@container (max-width: 620px) {
+  .wts__strip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 0.25rem; padding: 0.25rem 0.25rem 0.5rem; }
+  .wts__cell { flex: 0 0 min(58%, 13rem); scroll-snap-align: start; }
+}
+@media (max-width: 640px) { .wts__meta { display: none; } }
+/* Display: a WalkThru step timer started on the teacher's page. */
+.wts-display-timer { position: fixed; right: 2rem; bottom: 2rem; z-index: 50; padding: 0.5rem 1.5rem; border-radius: 16px; background: #111; color: #ffd400; font: 800 clamp(3rem, 9vw, 7rem) / 1 ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.wts-display-timer.is-done { color: #ff6b5b; }
+.wts-display-timer[hidden] { display: none; }
+@media print { .tk-wt, .tk-wt-badges, .tk-wt-plan, .wts { display: none; } }

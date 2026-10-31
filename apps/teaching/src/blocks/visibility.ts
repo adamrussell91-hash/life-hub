@@ -109,12 +109,20 @@ function stripToolkitTeacherFields(block: Block): Block {
   return { ...block, content } as Block;
 }
 
-/** WalkThru notes and jots are teacher-only wherever they sit; students never get the field. */
+/** WalkThru notes, jots and a block's chosen WalkThru are teacher-only wherever they sit; students never get the field. */
 function stripWalkthruField(block: Block): Block {
-  const content = block.content as Record<string, unknown> | undefined;
-  if (!content || !Object.prototype.hasOwnProperty.call(content, 'walkthru')) return block;
-  const { walkthru: _walkthru, ...rest } = content;
-  return { ...block, content: rest } as Block;
+  let out = block;
+  const content = out.content as Record<string, unknown> | undefined;
+  if (content && Object.prototype.hasOwnProperty.call(content, 'walkthru')) {
+    const { walkthru: _walkthru, ...rest } = content;
+    out = { ...out, content: rest } as Block;
+  }
+  const settings = (out as { settings?: Record<string, unknown> }).settings;
+  if (settings && Object.prototype.hasOwnProperty.call(settings, 'walkthru')) {
+    const { walkthru: _chosen, ...rest } = settings;
+    out = { ...out, settings: rest } as Block;
+  }
+  return out;
 }
 
 function filterBlocksForStudentInner(

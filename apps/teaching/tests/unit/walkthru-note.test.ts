@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { TeacherNoteBlockContentSchema } from '@/schemas/toolkit';
 import { filterBlocksForStudent } from '@/blocks/visibility';
-import { attachedTechniques } from '@/blocks/walkthru-note/attach';
+import { attachedTechniques, withTechnique } from '@/blocks/walkthru-note/attach';
+import { blockQuestion } from '@/blocks/walkthru-note/badge';
 import type { Block } from '@/schemas/block';
 
 const SENTINEL = 'JOT-SENTINEL-1357';
@@ -28,11 +29,26 @@ describe('WalkThru note content', () => {
     expect(out).toContain('<p>Hi</p>');
   });
 
-  it('blocks that embody a technique attach it, teacher-side only', () => {
-    expect(attachedTechniques({ block_type: 'hinge_question' })).toEqual(['w1-check-for-understanding']);
-    expect(attachedTechniques({ block_type: 'question_set' })).toEqual(['w1-quizzing']);
-    expect(attachedTechniques({ block_type: 'faded_example' })).toEqual(['w1-worked-examples-and-backward-fading']);
-    expect(attachedTechniques({ block_type: 'rich_text' })).toEqual([]);
+  it('a block carries only the WalkThru the teacher chose; nothing attaches on its own', () => {
+    expect(attachedTechniques({ settings: {} })).toEqual([]);
+    expect(attachedTechniques({ settings: { walkthru: 'w1-cold-calling' } })).toEqual(['w1-cold-calling']);
+    expect(attachedTechniques({ settings: { walkthru: 'w1-not-a-technique' } })).toEqual([]);
+    const block = { id: 'r1', type: 'block', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher', content: { html: '<p>Hi</p>' }, settings: { size: 2 } } as unknown as Block;
+    const on = withTechnique(block, 'w1-cold-calling');
+    expect(on.settings).toEqual({ size: 2, walkthru: 'w1-cold-calling' });
+    expect(withTechnique(on, null).settings).toEqual({ size: 2 });
+  });
+
+  it('students never get the chosen WalkThru', () => {
+    const block = { id: 'r1', type: 'block', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher', content: { html: '<p>Hi</p>' }, settings: { size: 2, walkthru: 'w1-cold-calling' } } as unknown as Block;
+    const out = JSON.stringify(filterBlocksForStudent([block]));
+    expect(out).not.toContain('walkthru');
+    expect(out).toContain('"size":2');
+  });
+
+  it('finds the block’s question for a Say line', () => {
+    expect(blockQuestion({ content: { html: '<h3>Why does the river keep rising?</h3><p>Think first.</p>' } } as unknown as Block)).toBe('Why does the river keep rising?');
+    expect(blockQuestion({ content: { html: '<p>Read the page.</p>' } } as unknown as Block)).toBeNull();
   });
 });
 
@@ -49,7 +65,8 @@ const api = vi.hoisted(() => ({
   tapRep: vi.fn(),
   unplanRep: vi.fn(),
   stepRep: vi.fn(),
-  loadFusions: vi.fn()
+  loadFusions: vi.fn(),
+  loadWalkthruPictures: vi.fn()
 }));
 vi.mock('@/blocks/walkthru-note/api', () => api);
 const curriculum = vi.hoisted(() => ({ rows: [] as unknown[] }));
@@ -267,13 +284,14 @@ describe('WalkThru step ticks', () => {
   });
 
   it('the badge on a quiz or hinge block ticks in a lesson, never on Display', async () => {
-    const block = { id: 'b1', block_type: 'hinge_question' } as unknown as Block;
+    const block = { id: 'b1', type: 'block', block_type: 'rich_text', content: {}, settings: { walkthru: 'w1-check-for-understanding' } } as unknown as Block;
+    api.loadWalkthruPictures.mockResolvedValue([null, null, null, null, null]);
     api.loadWalkthruText.mockResolvedValue({ sets: [{ set: 1, techniques: [{ id: 'w1-check-for-understanding', steps: [1, 2, 3, 4, 5].map((n) => ({ n, label: `L${n}`, text: `T${n}` })) }] }] });
     const open = async (badge: HTMLElement) => {
-      const details = badge.querySelector('details')!;
+      const details = badge as HTMLDetailsElement;
       details.open = true;
       details.dispatchEvent(new Event('toggle'));
-      await flush();
+      await flush(); await flush();
     };
     const lesson = renderTechniqueBadge(block, { lessonId: 'lesson1' })!;
     await open(lesson);
@@ -310,5 +328,50 @@ describe('WalkThru step ticks', () => {
     expect(emitted.at(-1)).toEqual({ set: 1, id: 'fu_abc12345', jots: {} });
     expect(editor.querySelectorAll('textarea')).toHaveLength(7);
     editor.remove();
+  });
+});
+
+// ── the strip under a block ─────────────────────────────────────────────────
+
+describe('WalkThru strip under a block', () => {
+  const CUED = { sets: [{ set: 1, techniques: [{ id: 'w1-cold-calling', steps: [1, 2, 3, 4, 5].map((n) => ({
+    n, label: `LABEL ${n}`, text: `Filler text ${n}`,
+    cue: n === 1 ? { time: 'Before you ask', do: ['Ask everyone.'], say: ['“Everyone: {question}”'] }
+      : n === 2 ? { do: ['Wait.'], say: [], tool: { kind: 'timer', seconds: 15 } }
+      : n === 3 ? { do: [], say: ['“{name}, what were you thinking?”'], tool: { kind: 'names' } }
+      : undefined
+  })) }] }] };
+  const block = { id: 'r1', type: 'block', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher', content: { html: '<p>Why does the river keep rising?</p>' }, settings: { walkthru: 'w1-cold-calling' } } as unknown as Block;
+
+  it('shows nothing for a block with no WalkThru chosen', async () => {
+    const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+    expect(renderTechniqueBadge({ ...block, settings: {} } as Block)).toBeNull();
+  });
+
+  it('opens to five pictured steps, tools under the steps that use one, and a cue card', async () => {
+    api.loadWalkthruText.mockResolvedValue(CUED);
+    api.loadWalkthruPictures.mockResolvedValue(['<svg id="p1"></svg>', null, null, null, null]);
+    const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+    const node = renderTechniqueBadge(block) as HTMLDetailsElement;
+    node.open = true;
+    node.dispatchEvent(new Event('toggle'));
+    await flush(); await flush();
+    expect(node.querySelectorAll('.wts__cell')).toHaveLength(5);
+    expect(node.querySelector('#p1')).not.toBeNull();
+    expect(node.querySelectorAll('.wts__pic.is-empty')).toHaveLength(4);
+    expect(node.querySelector('[data-technique]') ?? node).toBeTruthy();
+    const cells = [...node.querySelectorAll('.wts__cell')];
+    expect(cells[1]!.querySelector('.wts-tool__val')!.textContent).toBe('0:15');
+    expect(cells[2]!.querySelector('.wts-tool--names')).not.toBeNull();
+    expect(cells[0]!.querySelector('.wts-tool')).toBeNull();
+    const card = node.querySelector('.wts__card')!;
+    expect(card.textContent).toContain('Before you ask');
+    expect(card.textContent).toContain('Everyone: Why does the river keep rising?');
+    expect(card.querySelector('details.wts__book')).not.toBeNull();
+    (cells[2]!.querySelector('.wts__panel') as HTMLButtonElement).click();
+    expect(card.textContent).toContain('3. Label 3');
+    expect(card.querySelector('.wts__name.is-empty')).not.toBeNull();
+    (cells[3]!.querySelector('.wts__panel') as HTMLButtonElement).click();
+    expect(card.querySelector('.wts__book--open')!.textContent).toContain('Filler text 4');
   });
 });

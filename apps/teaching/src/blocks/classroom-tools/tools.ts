@@ -391,10 +391,10 @@ function rememberClass(lessonId: string | undefined, classId: string): void {
   }
 }
 
-type ClassLists = { classes: Class[]; preferred: string | null };
+export type ClassLists = { classes: Class[]; preferred: string | null };
 
 /** Teacher side only: the class lists, read from the class records at run time. */
-async function loadClassLists(env: ToolEnv): Promise<ClassLists> {
+export async function loadClassLists(env: Pick<ToolEnv, 'lessonId'>): Promise<ClassLists> {
   const { getCurriculum } = await import('@/app/curriculum-state');
   const curriculum = await getCurriculum();
   const classes = curriculum.classes.filter((cls) => (cls.students?.length ?? 0) > 0);
@@ -408,7 +408,7 @@ async function loadClassLists(env: ToolEnv): Promise<ClassLists> {
   return { classes, preferred };
 }
 
-function className(cls: Class): string {
+export function className(cls: Class): string {
   return cls.display_name?.trim() || cls.code;
 }
 
