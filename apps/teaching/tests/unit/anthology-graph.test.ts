@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AnthologyData, AnthologyItem } from '@/blocks/anthology-collect';
 import { anthologyMapItems, anthologyNoteId, buildAnthologyGraph } from '@/blocks/anthology-graph';
-import { buildAnthologyView } from '@/blocks/anthology-view';
+import { buildAnthologyView, mountWhileConnected } from '@/blocks/anthology-view';
 import { createBlock } from '@/blocks/create-block';
 
 function item(block: string, id: string, themes: string[], concepts: string[] = []): AnthologyItem {
@@ -83,5 +83,38 @@ describe('anthology map', () => {
     ]);
     expect(view.querySelector('.block-anthology__stage')).not.toBeNull();
     expect(view.querySelector('.block-anthology__count')?.textContent).toBe('3 notes · 2 texts');
+  });
+
+  it('keeps the floating note card hidden until a dot is chosen', () => {
+    const block = createBlock('anthology', 'anth_1');
+    if (block.block_type !== 'anthology') throw new Error('expected anthology');
+    const view = buildAnthologyView(block, { data, mode: 'student' });
+    const pop = view.querySelector<HTMLElement>('.block-anthology__map .block-anthology__pop');
+    expect(pop?.hidden).toBe(true);
+  });
+});
+
+describe('map mount', () => {
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('starts the map again when the block is moved back onto the page', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const stop = vi.fn();
+    const mount = vi.fn(() => stop);
+    mountWhileConnected(host, mount);
+    await nextFrame();
+    expect(mount).toHaveBeenCalledTimes(1);
+
+    host.remove();
+    await settle();
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    document.body.append(host);
+    await settle();
+    expect(mount).toHaveBeenCalledTimes(2);
+    host.remove();
+    await settle();
   });
 });

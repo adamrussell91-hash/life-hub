@@ -2687,6 +2687,19 @@ button.tk-qdot {
 .tk-wt__taps { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .tk-wt__taps .btn { min-height: 2.75rem; }
 .tk-wt__taps .btn.is-on { background: var(--depth); color: #fff; }
+.tk-wt__step.has-tick { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0.5rem; }
+.tk-wt__stepbody { min-width: 0; }
+.tk-wt__tick { flex: none; width: 2.75rem; height: 2.75rem; margin: -0.5rem 0 -0.5rem -0.5rem; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; border-radius: 50%; }
+.tk-wt__tick::before { content: ''; width: 1.4rem; height: 1.4rem; box-sizing: border-box; border: 2px solid #111; border-radius: 50%; background: #fff; }
+.tk-wt__tick.is-done::before { background: #ffd400 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23111' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 80% no-repeat; }
+.tk-wt__tick:focus-visible { outline: 2px solid var(--depth); outline-offset: 1px; }
+.tk-wt__tickbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; margin-bottom: 0.35rem; min-height: 1.25rem; }
+.tk-wt__tickclasses { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tk-wt__tickclass { min-height: 2.75rem; padding: 0 0.7rem; border: 1px solid #111; border-radius: 999px; background: #fff; color: #111; font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer; }
+.tk-wt__tickclass[aria-pressed='true'] { background: #111; color: #fff; }
+.tk-wt__tickstate { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.tk-wt__tickstate:empty, .tk-wt__tickmsg:empty { display: none; }
+.tk-wt__tickmsg { font-size: var(--text-xs); }
 .tk-wt-ed__jots { display: grid; gap: 0.4rem; margin-top: 0.5rem; }
 .tk-ed__jot { width: 100%; resize: vertical; }
 .tk-wt-badges { margin-top: 0.5rem; }

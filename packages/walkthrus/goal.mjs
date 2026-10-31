@@ -2,7 +2,8 @@
 // The WalkThru section of a professional goal: its shape, the one-active-technique rule, the
 // piece the board shows for it and what "keep going" and "move on" write. Pure, so the server
 // (goal-record.mjs) and the Professional hub read it the same way.
-import { isTechniqueId, techniqueById } from './catalogue.mjs';
+import { techniqueById } from './catalogue.mjs';
+import { isTileId } from './tiles.mjs';
 import { isProblemType } from './problem-types.mjs';
 
 /** The ADAPT chain: attempt it, develop it, adapt it, practise it, test it. */
@@ -62,12 +63,14 @@ function normalizeOrigin(value) {
 
 /**
  * The goal's `walkthru` section, or null when it isn't one (unknown technique, not an object).
+ * A fusion counts as a technique; it keeps the set it was sent with (its parents' set).
  * @param {any} value
  * @returns {any}
  */
 export function normalizeWalkthru(value) {
-  if (!isObject(value) || !isTechniqueId(value.technique_id)) return null;
+  if (!isObject(value) || !isTileId(value.technique_id)) return null;
   const entry = techniqueById(value.technique_id);
+  const set = entry ? entry.set : Number.isInteger(value.set) && value.set > 0 ? value.set : 1;
   const adaptedIn = isObject(value.adapted) ? value.adapted : {};
   const adapted = {};
   for (const key of STEP_KEYS) {
@@ -75,8 +78,8 @@ export function normalizeWalkthru(value) {
     if (note) adapted[key] = note;
   }
   return {
-    set: entry.set,
-    technique_id: entry.id,
+    set,
+    technique_id: value.technique_id,
     stage: STAGES.includes(value.stage) ? value.stage : 'attempt',
     problem_type: isProblemType(value.problem_type) ? value.problem_type : null,
     adapted,

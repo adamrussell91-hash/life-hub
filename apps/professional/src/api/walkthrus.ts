@@ -1,6 +1,7 @@
 import { apiGet, apiPatch, apiPost } from '@/api/client';
 import { newArrowId, normalizeArrows, normalizePicked } from '../../../../packages/walkthrus/arrows.mjs';
 import { normalizeWalkthru } from '../../../../packages/walkthrus/goal.mjs';
+import { clustersFromPicked, normalizeClusters } from '../../../../packages/walkthrus/clusters.mjs';
 import type { BoardArrow } from '../../../../packages/walkthrus/board/route';
 
 /** The private step text for one technique. Served only to the signed-in teacher, never stored in a lesson. */
@@ -42,10 +43,31 @@ export function resetWalkthruTextForTests(): void {
   textCache = null;
 }
 
-/** Adam's board: his arrows, and the techniques he has put on it (null until he first picks). */
-export async function loadBoard(): Promise<{ arrows: BoardArrow[]; picked: string[] | null }> {
-  const r = await apiGet<{ board: { arrows: unknown; picked?: unknown } }>('/api/walkthrus-board');
-  return { arrows: normalizeArrows(r.board.arrows) as BoardArrow[], picked: Array.isArray(r.board.picked) ? (normalizePicked(r.board.picked) as string[]) : null };
+/** One named cluster on Adam's own board: the title anchor (board units) and its tiles on axial cells from the cluster origin. */
+export interface BoardCluster { id: string; name: string; x: number; y: number; tiles: Array<{ id: string; q: number; r: number }> }
+/** A fusion as the board needs it; the Fuse bench owns the full shape. */
+export interface BoardFusion { id: string; name: string; parents?: string[]; [key: string]: unknown }
+
+export interface LoadedBoard { arrows: BoardArrow[]; picked: string[] | null; clusters: BoardCluster[]; fusions: BoardFusion[] }
+
+const fusionsOf = (value: unknown): BoardFusion[] =>
+  Array.isArray(value) ? value.filter((f): f is BoardFusion => Boolean(f) && typeof f.id === 'string' && typeof f.name === 'string') : [];
+
+/**
+ * Adam's board: his arrows, the techniques he had picked (null until he first picks), his clusters
+ * (made from the picks until he saves some) and his fusions.
+ */
+export async function loadBoard(): Promise<LoadedBoard> {
+  const r = await apiGet<{ board: { arrows: unknown; picked?: unknown; clusters?: unknown; fusions?: unknown } }>('/api/walkthrus-board');
+  const picked = Array.isArray(r.board.picked) ? (normalizePicked(r.board.picked) as string[]) : null;
+  const clusters = (Array.isArray(r.board.clusters) ? normalizeClusters(r.board.clusters) : clustersFromPicked(picked ?? [])) as BoardCluster[];
+  return { arrows: normalizeArrows(r.board.arrows) as BoardArrow[], picked, clusters, fusions: fusionsOf(r.board.fusions) };
+}
+
+/** Saves the clusters whole. A server that doesn't echo them back keeps what was sent. */
+export async function saveBoardClusters(clusters: BoardCluster[]): Promise<BoardCluster[]> {
+  const r = await apiPost<{ board: { clusters?: unknown } }>('/api/walkthrus-board', { clusters });
+  return normalizeClusters(Array.isArray(r.board?.clusters) ? r.board.clusters : clusters) as BoardCluster[];
 }
 
 export async function saveBoardArrows(arrows: BoardArrow[]): Promise<BoardArrow[]> {

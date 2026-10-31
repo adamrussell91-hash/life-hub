@@ -1,45 +1,60 @@
 // packages/walkthrus/board/route.ts
-// Arrows between tiles. Touching tiles get a chevron knot on their shared edge. Other arrows run
-// along the lattice of hexagon edges (the white gaps between tiles, and the open space around
-// clusters), are pulled straight wherever the way is clear, then rounded into curves. Every tile,
-// tab, title, cluster label and other arrow's label is an obstacle. Pure geometry: no DOM.
-import { placeChips, textWidth, type Chip } from '../../graph-blocks/graph';
-import {
-  DIRS, addCell, cellKey, directionBetween, edgeOf, pixelToAxial, pointInPolygon, SQRT3,
-  type Cell, type Pt
-} from './hex';
+// Arrows between tiles, drawn the way the book draws them. Touching tiles get a chevron knot on
+// their shared edge. Every other arrow runs as horizontal and vertical lines with rounded corners
+// through the open space around and between clusters: a coarse grid over the board, with every
+// cell near a tile blocked (so the narrow white gaps between touching tiles are never used), and
+// an A* search that pays for length, more for each bend and something for sharing a lane. Arrows
+// that still share a lane are pulled apart onto parallel lanes. Each starts with a small open
+// circle on the source tile's edge and ends in a long narrow head at the target's edge; its label
+// sits on its longest straight run as "TYPE | text". Pure geometry: no DOM.
+import { textWidth } from '../../graph-blocks/graph';
+import { directionBetween, edgeOf, pointInPolygon, SQRT3, type Pt } from './hex';
 import type { BoardLayout, BoardTile, Box } from './layout';
 
 export type ArrowType = 'leads_to' | 'pairs_with' | 'free';
-export interface BoardArrow { id: string; from: string; to: string; type: ArrowType; label?: string }
+/** `quiet` arrows (the book's own suggestions) draw without a label. */
+export interface BoardArrow { id: string; from: string; to: string; type: ArrowType; label?: string; quiet?: boolean }
 export interface Head { x: number; y: number; angle: number }
 export interface Knot { x: number; y: number; angle: number; chevrons: 0 | 1 | 2; edge: [Pt, Pt] }
-export interface PlacedLabel { text: string; x: number; y: number; w: number; h: number; anchor: Pt }
+/** The book-style label: bold caps `type`, a thin divider, then `text` (which may be empty). */
+export interface PlacedLabel { type: string; text: string; typeW: number; x: number; y: number; w: number; h: number; anchor: Pt }
 export interface RoutedArrow {
   id: string;
   type: ArrowType;
   from: string;
   to: string;
+  /** The placements (BoardTile.key) the arrow joins, since a tile may sit in several clusters. */
+  fromKey: string;
+  toKey: string;
   kind: 'knot' | 'path';
-  /** SVG path data; empty for a knot. */
+  /** SVG path data with rounded corners; empty for a knot. */
   d: string;
-  /** The curve sampled as a polyline, for hit tests. */
+  /** The orthogonal polyline the path follows (its corner points before rounding), for hit tests. */
   points: Pt[];
+  /** Small open circle on the source edge; null for a knot or a two-way arrow. */
+  start: Pt | null;
+  /**
+   * A tile surrounded on all six sides has no clear way in, so the stub at that end crosses one
+   * neighbour. The view draws such arrows above the tiles.
+   */
+  over: { start: boolean; end: boolean };
   heads: Head[];
   knot: Knot | null;
   dashed: boolean;
   label: PlacedLabel | null;
 }
 
-const CHIP_H = 22;
-const CORNER_RADIUS = 10;
-const BOX_MARGIN = 4;
-const CHANNEL_COST = 2.6;
-const CLEAR_EDGE_BIAS = 0.8;
-const REUSE_COST = 0.6;
-const PASSES = 3;
+export const TYPE_CAPS: Record<ArrowType, string> = { leads_to: 'LEADS TO', pairs_with: 'PAIRS WITH', free: 'NOTE' };
+export const LANE_GAP = 6;
+export const HEAD_LENGTH = 18;
+export const HEAD_HALF = 4.5;
+export const LABEL_TYPE_FONT = 10;
+export const LABEL_TEXT_FONT = 12;
+export const LABEL_PAD = 10;
+export const LABEL_DIVIDER = 14;
+const LABEL_H = 22;
 
-// ── segment and box tests ────────────────────────────────────────────────────
+// ── segment, box and polygon tests ───────────────────────────────────────────
 
 const inBox = (p: Pt, b: Box, m = 0): boolean => Math.abs(p.x - b.x) <= b.w / 2 + m && Math.abs(p.y - b.y) <= b.h / 2 + m;
 
@@ -72,98 +87,180 @@ export function pathHitsBox(points: Pt[], box: Box, margin = 0): boolean {
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 
-function pointAlong(points: Pt[], t: number): Pt {
-  if (points.length === 1) return points[0]!;
-  const lens: number[] = [];
-  let total = 0;
-  for (let i = 1; i < points.length; i++) { const l = dist(points[i - 1]!, points[i]!); lens.push(l); total += l; }
-  let want = total * t;
-  for (let i = 0; i < lens.length; i++) {
-    if (want <= lens[i]! || i === lens.length - 1) {
-      const f = lens[i]! ? Math.min(1, want / lens[i]!) : 0;
-      const a = points[i]!;
-      const b = points[i + 1]!;
-      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
-    }
-    want -= lens[i]!;
-  }
-  return points[points.length - 1]!;
+function distToSegment(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
 }
 
-// ── context: tiles, obstacles and the edge lattice ──────────────────────────
+/** Distance from a point to a polygon's outline; 0 inside it. */
+export function distToPolygon(p: Pt, poly: Pt[]): number {
+  if (pointInPolygon(p, poly)) return 0;
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) best = Math.min(best, distToSegment(p, poly[j]!, poly[i]!));
+  return best;
+}
 
-interface Graph {
-  pts: Pt[];
-  adj: Array<Array<{ to: number; w: number; mult: number; key: string; a: Pt; b: Pt }>>;
-  index: Map<string, number>;
+/** Does the segment come within `margin` of the polygon (or cross it)? Sampled every 2 units. */
+export function segmentNearPolygon(a: Pt, b: Pt, poly: Pt[], margin: number): boolean {
+  const n = Math.max(1, Math.ceil(dist(a, b) / 2));
+  for (let i = 0; i <= n; i++) {
+    const p = { x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n };
+    if (distToPolygon(p, poly) < margin) return true;
+  }
+  return false;
+}
+
+function rectHitsPolygon(r: Box, poly: Pt[]): boolean {
+  const corners = [
+    { x: r.x - r.w / 2, y: r.y - r.h / 2 }, { x: r.x + r.w / 2, y: r.y - r.h / 2 },
+    { x: r.x + r.w / 2, y: r.y + r.h / 2 }, { x: r.x - r.w / 2, y: r.y + r.h / 2 }
+  ];
+  if (corners.some((c) => pointInPolygon(c, poly))) return true;
+  if (poly.some((p) => inBox(p, r))) return true;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if (segmentHitsBox(poly[j]!, poly[i]!, r)) return true;
+  return false;
+}
+
+const overlaps = (a: Box, b: Box, m = 0): boolean => Math.abs(a.x - b.x) * 2 < a.w + b.w + m && Math.abs(a.y - b.y) * 2 < a.h + b.h + m;
+
+// ── the grid ─────────────────────────────────────────────────────────────────
+
+/** Directions on the grid: right, down, left, up. Odd ones are vertical. */
+const DX = [1, 0, -1, 0];
+const DY = [0, 1, 0, -1];
+const FREE = 0;
+const SOFT = 1;
+const HARD = 2;
+
+/** A way out of a tile: a free grid cell, the direction away from the tile, and the stub to its edge. `over` stubs cross a neighbour. */
+interface Port { cell: number; away: number; hit: Pt; len: number; over: boolean }
+
+interface Grid {
+  x0: number;
+  y0: number;
+  step: number;
+  cols: number;
+  rows: number;
+  /** FREE; SOFT (within the margin of a tile or a cluster title: only at a steep price); HARD (inside a tile). */
+  block: Uint8Array;
+  /** Free cells hugging the margin cost a little more, so lanes keep to the middle of open space. */
+  near: Uint8Array;
 }
 
 interface Context {
   layout: BoardLayout;
-  byCell: Map<string, BoardTile>;
-  byId: Map<string, BoardTile>;
-  staticBoxes: Box[];
-  graph: Graph;
+  grid: Grid;
+  margin: number;
+  byId: Map<string, BoardTile[]>;
+  ports: Map<string, Port[]>;
 }
 
-const nodeKey = (p: Pt): string => `${Math.round(p.x * 2)},${Math.round(p.y * 2)}`;
+const centreOf = (g: Grid, i: number): Pt => ({ x: g.x0 + (i % g.cols) * g.step, y: g.y0 + Math.floor(i / g.cols) * g.step });
 
-function buildGraph(layout: BoardLayout, byCell: Map<string, BoardTile>, staticBoxes: Box[]): Graph {
-  const { size, bounds } = layout;
-  const pad = size * 2;
-  const x0 = bounds.x - pad;
-  const x1 = bounds.x + bounds.w + pad;
-  const y0 = bounds.y - pad;
-  const y1 = bounds.y + bounds.h + pad;
-  const graph: Graph = { pts: [], adj: [], index: new Map() };
-  const node = (p: Pt): number => {
-    const k = nodeKey(p);
-    let i = graph.index.get(k);
-    if (i === undefined) { i = graph.pts.length; graph.index.set(k, i); graph.pts.push(p); graph.adj.push([]); }
-    return i;
-  };
-  const seen = new Set<string>();
-  const qMin = Math.floor(x0 / (1.5 * size)) - 1;
-  const qMax = Math.ceil(x1 / (1.5 * size)) + 1;
-  for (let q = qMin; q <= qMax; q++) {
-    const rMin = Math.floor(y0 / (SQRT3 * size) - q / 2) - 1;
-    const rMax = Math.ceil(y1 / (SQRT3 * size) - q / 2) + 1;
-    for (let r = rMin; r <= rMax; r++) {
-      const cell: Cell = { q, r };
-      for (let d = 0; d < 6; d++) {
-        const { a, b, mid } = edgeOf(cell, d, size);
-        const ka = nodeKey(a);
-        const kb = nodeKey(b);
-        const ek = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-        if (seen.has(ek)) continue;
-        seen.add(ek);
-        const other = addCell(cell, DIRS[d]!);
-        const occupied = (byCell.has(cellKey(cell)) ? 1 : 0) + (byCell.has(cellKey(other)) ? 1 : 0);
-        const mult = occupied === 2 ? CHANNEL_COST : 1;
-        const ia = node(a);
-        const im = node(mid);
-        const ib = node(b);
-        for (const [u, v, pu, pv] of [[ia, im, a, mid], [im, ib, mid, b]] as const) {
-          if (staticBoxes.some((box) => segmentHitsBox(pu, pv, box, BOX_MARGIN))) continue;
-          const len = dist(pu, pv);
-          const key = u < v ? `${u}-${v}` : `${v}-${u}`;
-          graph.adj[u]!.push({ to: v, w: len * mult, mult, key, a: pu, b: pv });
-          graph.adj[v]!.push({ to: u, w: len * mult, mult, key, a: pv, b: pu });
+function buildGrid(layout: BoardLayout, margin: number): Grid {
+  const step = layout.size / 2;
+  const pad = layout.size * 2;
+  const x0 = Math.floor((layout.bounds.x - pad) / step) * step;
+  const y0 = Math.floor((layout.bounds.y - pad) / step) * step;
+  const cols = Math.ceil((layout.bounds.w + pad * 2) / step) + 2;
+  const rows = Math.ceil((layout.bounds.h + pad * 2) / step) + 2;
+  const block = new Uint8Array(cols * rows);
+  const near = new Uint8Array(cols * rows);
+  const span = (lo: number, hi: number, n: number): [number, number] => [Math.max(0, Math.floor(lo / step)), Math.min(n - 1, Math.ceil(hi / step))];
+  for (const t of layout.tiles) {
+    const reach = layout.drawn + margin + step;
+    const [i0, i1] = span(t.x - reach - x0, t.x + reach - x0, cols);
+    const [j0, j1] = span(t.y - reach - y0, t.y + reach - y0, rows);
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const idx = j * cols + i;
+        const d = distToPolygon({ x: x0 + i * step, y: y0 + j * step }, t.corners);
+        if (d === 0) block[idx] = HARD;
+        else if (d < margin) block[idx] = Math.max(block[idx]!, SOFT);
+        else if (d < margin + step * 0.75) near[idx] = 1;
+      }
+    }
+  }
+  for (const l of layout.labels) {
+    const [i0, i1] = span(l.x - l.w / 2 - 8 - x0, l.x + l.w / 2 + 8 - x0, cols);
+    const [j0, j1] = span(l.y - l.h / 2 - 8 - y0, l.y + l.h / 2 + 8 - y0, rows);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      if (inBox({ x: x0 + i * step, y: y0 + j * step }, l, 6)) block[j * cols + i] = Math.max(block[j * cols + i]!, SOFT);
+    }
+  }
+  return { x0, y0, step, cols, rows, block, near };
+}
+
+/** Where a ray from `p` in direction (dx, dy) first meets the polygon's outline, within `max`. */
+function rayHit(p: Pt, dx: number, dy: number, poly: Pt[], max: number): { hit: Pt; len: number } | null {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[j]!;
+    const b = poly[i]!;
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a.x - p.x) * ey - (a.y - p.y) * ex) / den;
+    const u = ((a.x - p.x) * dy - (a.y - p.y) * dx) / den;
+    if (t > 0 && u >= 0 && u <= 1 && t < best) best = t;
+  }
+  return best <= max ? { hit: { x: p.x + dx * best, y: p.y + dy * best }, len: best } : null;
+}
+
+/**
+ * The ways out of a tile: free cells close to it from which a straight horizontal or vertical stub
+ * reaches its edge without passing near any other tile (so never down a gap between two touching
+ * tiles), and clear of its corners. A tile with no such way (one surrounded on all sides) gets
+ * stubs that cross a single neighbour instead.
+ */
+function portsOf(ctx: Context, tile: BoardTile): Port[] {
+  const cached = ctx.ports.get(tile.key);
+  if (cached) return cached;
+  let out = scanPorts(ctx, tile, false);
+  if (!out.length) out = scanPorts(ctx, tile, true);
+  ctx.ports.set(tile.key, out);
+  return out;
+}
+
+function scanPorts(ctx: Context, tile: BoardTile, over: boolean): Port[] {
+  const { grid: g, layout } = ctx;
+  const reach = ctx.margin + g.step * 1.6 + (over ? layout.size * 2 : 0);
+  const out: Port[] = [];
+  const others = layout.tiles.filter((t) => t.key !== tile.key && dist(t, tile) < layout.size * 5);
+  const i0 = Math.max(0, Math.floor((tile.x - layout.drawn - reach - g.x0) / g.step));
+  const i1 = Math.min(g.cols - 1, Math.ceil((tile.x + layout.drawn + reach - g.x0) / g.step));
+  const j0 = Math.max(0, Math.floor((tile.y - layout.drawn - reach - g.y0) / g.step));
+  const j1 = Math.min(g.rows - 1, Math.ceil((tile.y + layout.drawn + reach - g.y0) / g.step));
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const cell = j * g.cols + i;
+      if (g.block[cell] !== FREE) continue;
+      const c = centreOf(g, cell);
+      for (let d = 0; d < 4; d++) {
+        const hit = rayHit(c, DX[d]!, DY[d]!, tile.corners, reach);
+        if (!hit) continue;
+        if (tile.corners.some((k) => dist(k, hit.hit) < layout.drawn * 0.18)) continue;
+        const nearBy = others.filter((o) => segmentHitsBox(c, hit.hit, o.box, ctx.margin));
+        if (over) {
+          // Cross exactly one neighbour, through its body rather than along a gap.
+          const crossed = nearBy.filter((o) => segmentNearPolygon(c, hit.hit, o.corners, 3));
+          if (crossed.length !== 1 || distToSegment(crossed[0]!, c, hit.hit) > layout.drawn * 0.5) continue;
+          out.push({ cell, away: (d + 2) % 4, hit: hit.hit, len: hit.len + g.step * 4, over });
+        } else {
+          if (nearBy.some((o) => segmentNearPolygon(c, hit.hit, o.corners, ctx.margin * 0.5))) continue;
+          out.push({ cell, away: (d + 2) % 4, hit: hit.hit, len: hit.len, over });
         }
       }
     }
   }
-  return graph;
+  return out;
 }
 
-function makeContext(layout: BoardLayout): Context {
-  const byCell = new Map(layout.tiles.map((t) => [cellKey(t.cell), t]));
-  const byId = new Map(layout.tiles.map((t) => [t.id, t]));
-  const staticBoxes = [...layout.labels];
-  return { layout, byCell, byId, staticBoxes, graph: buildGraph(layout, byCell, staticBoxes) };
-}
-
-// ── shortest path over the edge lattice ──────────────────────────────────────
+// ── search ───────────────────────────────────────────────────────────────────
 
 class Heap {
   private items: Array<[number, number]> = [];
@@ -201,223 +298,309 @@ class Heap {
   }
 }
 
-function edgeMidNodes(ctx: Context, tile: BoardTile): Array<{ node: number; bias: number }> {
-  const out: Array<{ node: number; bias: number }> = [];
-  for (let d = 0; d < 6; d++) {
-    const { mid } = edgeOf(tile.cell, d, ctx.layout.size);
-    const node = ctx.graph.index.get(nodeKey(mid));
-    if (node === undefined) continue;
-    const blocked = ctx.byCell.has(cellKey(addCell(tile.cell, DIRS[d]!)));
-    out.push({ node, bias: blocked ? CLEAR_EDGE_BIAS * ctx.layout.size : 0 });
-  }
-  return out;
-}
+/** Costs in grid steps: a bend costs as much as a few steps; reusing a lane costs most of a step. */
+const BEND = 2.4;
+const REUSE = 0.7;
+const NEAR = 0.35;
+const SOFT_COST = 40;
 
-function shortestPath(ctx: Context, from: BoardTile, to: BoardTile, extra: Box[], used: Map<string, number>): Pt[] | null {
-  const g = ctx.graph;
-  const best = new Array<number>(g.pts.length).fill(Infinity);
-  const prev = new Array<number>(g.pts.length).fill(-1);
+/** Lane use, keyed by cell × 2 + axis (0 horizontal, 1 vertical). */
+type Used = Map<number, number>;
+const laneKey = (state: number): number => (state >> 2) * 2 + (state & 1);
+
+function search(ctx: Context, from: BoardTile, to: BoardTile, used: Used): { pts: Pt[]; over: { start: boolean; end: boolean } } | null {
+  const g = ctx.grid;
+  const starts = portsOf(ctx, from);
+  const ends = portsOf(ctx, to);
+  if (!starts.length || !ends.length) return null;
+  const endsAt = new Map<number, Port[]>();
+  for (const p of ends) endsAt.set(p.cell, [...(endsAt.get(p.cell) ?? []), p]);
+  const n = g.cols * g.rows * 4;
+  const best = new Float64Array(n).fill(Infinity);
+  const prev = new Int32Array(n).fill(-1);
   const heap = new Heap();
-  for (const s of edgeMidNodes(ctx, from)) {
-    if (s.bias < best[s.node]!) { best[s.node] = s.bias; heap.push(s.bias, s.node); }
+  const s = g.step;
+  const ti = (to.x - g.x0) / s;
+  const tj = (to.y - g.y0) / s;
+  const slack = (ctx.layout.drawn + ctx.margin) / s + 1.6;
+  const h = (cell: number): number => Math.max(0, Math.abs((cell % g.cols) - ti) + Math.abs(Math.floor(cell / g.cols) - tj) - slack) * s;
+  const startPort = new Map<number, Port>();
+  for (const p of starts) {
+    const st = p.cell * 4 + p.away;
+    if (p.len < best[st]!) { best[st] = p.len; startPort.set(st, p); heap.push(p.len + h(p.cell), st); }
   }
-  const targets = new Map(edgeMidNodes(ctx, to).map((t) => [t.node, t.bias]));
-  let bestEnd = -1;
-  let bestTotal = Infinity;
+  let found = -1;
+  let foundPort: Port | null = null;
+  let foundCost = Infinity;
   while (heap.size) {
-    const [cost, u] = heap.pop();
-    if (cost > best[u]!) continue;
-    if (cost >= bestTotal) break;
-    const tb = targets.get(u);
-    if (tb !== undefined && cost + tb < bestTotal) { bestTotal = cost + tb; bestEnd = u; }
-    for (const e of g.adj[u]!) {
-      if (extra.length && extra.some((box) => segmentHitsBox(e.a, e.b, box, BOX_MARGIN))) continue;
-      const w = e.w + (used.get(e.key) ?? 0) * REUSE_COST * (e.w / Math.max(e.mult, 1));
+    const [fcost, st] = heap.pop();
+    const cell = st >> 2;
+    const d = st & 3;
+    const cost = best[st]!;
+    if (fcost - h(cell) > cost + 1e-9) continue;
+    if (fcost >= foundCost) break;
+    for (const p of endsAt.get(cell) ?? []) {
+      if (d === p.away) continue;
+      const total = cost + p.len + (d === (p.away + 2) % 4 ? 0 : BEND * s);
+      if (total < foundCost) { foundCost = total; found = st; foundPort = p; }
+    }
+    const ci = cell % g.cols;
+    const cj = Math.floor(cell / g.cols);
+    for (let d2 = 0; d2 < 4; d2++) {
+      if (d2 === (d + 2) % 4) continue;
+      const ni = ci + DX[d2]!;
+      const nj = cj + DY[d2]!;
+      if (ni < 0 || nj < 0 || ni >= g.cols || nj >= g.rows) continue;
+      const nc = nj * g.cols + ni;
+      const b = g.block[nc]!;
+      if (b === HARD) continue;
+      const ns = nc * 4 + d2;
+      let w = s * (1 + (b === SOFT ? SOFT_COST : 0) + (g.near[nc] ? NEAR : 0) + (used.get(laneKey(ns)) ?? 0) * REUSE);
+      if (d2 !== d) w += BEND * s;
       const next = cost + w;
-      if (next < best[e.to]!) { best[e.to] = next; prev[e.to] = u; heap.push(next, e.to); }
+      if (next < best[ns]!) { best[ns] = next; prev[ns] = st; heap.push(next + h(nc), ns); }
     }
   }
-  if (bestEnd < 0) return null;
-  const nodes: number[] = [];
-  for (let n = bestEnd; n >= 0; n = prev[n]!) nodes.push(n);
-  nodes.reverse();
-  for (let i = 1; i < nodes.length; i++) {
-    const key = nodes[i - 1]! < nodes[i]! ? `${nodes[i - 1]}-${nodes[i]}` : `${nodes[i]}-${nodes[i - 1]}`;
-    used.set(key, (used.get(key) ?? 0) + 1);
-  }
-  return nodes.map((n) => g.pts[n]!);
+  if (found < 0 || !foundPort) return null;
+  const chain: number[] = [];
+  for (let st = found; st >= 0; st = prev[st]!) chain.push(st);
+  chain.reverse();
+  for (const st of chain) used.set(laneKey(st), (used.get(laneKey(st)) ?? 0) + 1);
+  const first = startPort.get(chain[0]!)!;
+  return { pts: simplify([first.hit, ...chain.map((st) => centreOf(g, st >> 2)), foundPort.hit]), over: { start: first.over, end: foundPort.over } };
 }
 
-/** Pull the lattice path straight wherever a direct segment clears every tile and box. */
-function pull(ctx: Context, pts: Pt[], extra: Box[]): Pt[] {
-  const boxes = [...ctx.staticBoxes, ...extra];
-  const free = (a: Pt, b: Pt): boolean => {
-    if (boxes.some((box) => segmentHitsBox(a, b, box, BOX_MARGIN))) return false;
-    const n = Math.max(1, Math.ceil(dist(a, b) / 3));
-    for (let i = 0; i <= n; i++) {
-      const p = { x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n };
-      const tile = ctx.byCell.get(cellKey(pixelToAxial(p, ctx.layout.size)));
-      if (tile && pointInPolygon(p, tile.corners)) return false;
+/** Drop repeated and collinear points, leaving only the corners. */
+function simplify(pts: Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (const p of pts) {
+    const last = out[out.length - 1];
+    if (last && dist(last, p) < 0.01) continue;
+    if (out.length >= 2) {
+      const a = out[out.length - 2]!;
+      const b = out[out.length - 1]!;
+      const cross = (b.x - a.x) * (p.y - b.y) - (b.y - a.y) * (p.x - b.x);
+      if (Math.abs(cross) < 1e-6) { out[out.length - 1] = p; continue; }
     }
-    return true;
-  };
-  const out: Pt[] = [pts[0]!];
-  let i = 0;
-  while (i < pts.length - 1) {
-    let j = pts.length - 1;
-    while (j > i + 1 && !free(pts[i]!, pts[j]!)) j--;
-    out.push(pts[j]!);
-    i = j;
+    out.push(p);
   }
   return out;
 }
 
-function round(pts: Pt[]): { d: string; samples: Pt[] } {
-  const f = (n: number): string => n.toFixed(1);
-  if (pts.length === 2) return { d: `M${f(pts[0]!.x)},${f(pts[0]!.y)}L${f(pts[1]!.x)},${f(pts[1]!.y)}`, samples: pts };
-  let d = `M${f(pts[0]!.x)},${f(pts[0]!.y)}`;
-  const samples: Pt[] = [pts[0]!];
+// ── parallel lanes ───────────────────────────────────────────────────────────
+
+/** Arrows that run along the same lane move onto parallel lanes LANE_GAP apart, in id order. */
+function offsetSharedLanes(paths: Array<{ id: string; pts: Pt[] }>): void {
+  type Seg = { path: number; i: number; axis: 0 | 1; at: number; lo: number; hi: number };
+  const lanes = new Map<string, Seg[]>();
+  paths.forEach((p, path) => {
+    // The end stubs stay where they meet their tiles; moving the run next to one only stretches it.
+    for (let i = 1; i < p.pts.length - 2; i++) {
+      const a = p.pts[i]!;
+      const b = p.pts[i + 1]!;
+      let seg: Seg | null = null;
+      if (Math.abs(a.y - b.y) < 0.01) seg = { path, i, axis: 0, at: Math.round(a.y), lo: Math.min(a.x, b.x), hi: Math.max(a.x, b.x) };
+      else if (Math.abs(a.x - b.x) < 0.01) seg = { path, i, axis: 1, at: Math.round(a.x), lo: Math.min(a.y, b.y), hi: Math.max(a.y, b.y) };
+      if (seg) lanes.set(`${seg.axis}:${seg.at}`, [...(lanes.get(`${seg.axis}:${seg.at}`) ?? []), seg]);
+    }
+  });
+  const shifts: Array<{ seg: Seg; by: number }> = [];
+  for (const lane of lanes.values()) {
+    if (lane.length < 2) continue;
+    lane.sort((a, b) => a.lo - b.lo || a.path - b.path);
+    // Runs of overlapping segments share the lane; each run spreads out around the lane's middle.
+    let group: Seg[] = [];
+    let reach = -Infinity;
+    const flush = (): void => {
+      const byPath = [...new Set(group.map((s) => s.path))].sort((a, b) => (paths[a]!.id < paths[b]!.id ? -1 : 1));
+      if (byPath.length > 1) for (const s of group) shifts.push({ seg: s, by: (byPath.indexOf(s.path) - (byPath.length - 1) / 2) * LANE_GAP });
+      group = [];
+      reach = -Infinity;
+    };
+    for (const s of lane) {
+      if (group.length && s.lo >= reach - 0.5) flush();
+      group.push(s);
+      reach = Math.max(reach, s.hi);
+    }
+    flush();
+  }
+  for (const { seg, by } of shifts) {
+    const pts = paths[seg.path]!.pts;
+    for (const k of [seg.i, seg.i + 1]) {
+      const p = pts[k]!;
+      pts[k] = seg.axis === 0 ? { x: p.x, y: p.y + by } : { x: p.x + by, y: p.y };
+    }
+  }
+}
+
+// ── drawing ──────────────────────────────────────────────────────────────────
+
+const fx = (n: number): string => n.toFixed(1);
+
+/** SVG path through the corner points, each corner rounded to `radius` (less on short runs). */
+export function roundedPath(pts: Pt[], radius: number): string {
+  let d = `M${fx(pts[0]!.x)},${fx(pts[0]!.y)}`;
   for (let i = 1; i < pts.length - 1; i++) {
     const a = pts[i - 1]!;
     const v = pts[i]!;
     const b = pts[i + 1]!;
-    const r = Math.min(CORNER_RADIUS, dist(a, v) / 2, dist(v, b) / 2);
-    const p1 = { x: v.x + ((a.x - v.x) / dist(a, v)) * r, y: v.y + ((a.y - v.y) / dist(a, v)) * r };
-    const p2 = { x: v.x + ((b.x - v.x) / dist(b, v)) * r, y: v.y + ((b.y - v.y) / dist(b, v)) * r };
-    d += `L${f(p1.x)},${f(p1.y)}Q${f(v.x)},${f(v.y)} ${f(p2.x)},${f(p2.y)}`;
-    samples.push(p1);
-    for (const t of [0.25, 0.5, 0.75]) {
-      const u = 1 - t;
-      samples.push({ x: u * u * p1.x + 2 * u * t * v.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * v.y + t * t * p2.y });
-    }
-    samples.push(p2);
+    const la = dist(a, v);
+    const lb = dist(v, b);
+    const r = Math.min(radius, la / 2, lb / 2);
+    if (r < 0.5) { d += `L${fx(v.x)},${fx(v.y)}`; continue; }
+    const p1 = { x: v.x + ((a.x - v.x) / la) * r, y: v.y + ((a.y - v.y) / la) * r };
+    const p2 = { x: v.x + ((b.x - v.x) / lb) * r, y: v.y + ((b.y - v.y) / lb) * r };
+    d += `L${fx(p1.x)},${fx(p1.y)}Q${fx(v.x)},${fx(v.y)} ${fx(p2.x)},${fx(p2.y)}`;
   }
   const last = pts[pts.length - 1]!;
-  d += `L${f(last.x)},${f(last.y)}`;
-  samples.push(last);
-  return { d, samples };
+  return `${d}L${fx(last.x)},${fx(last.y)}`;
 }
-
-// ── one arrow ────────────────────────────────────────────────────────────────
 
 const angleOf = (a: Pt, b: Pt): number => Math.atan2(b.y - a.y, b.x - a.x);
 
-function headsFor(type: ArrowType, pts: Pt[]): Head[] {
-  const n = pts.length;
-  const end = { x: pts[n - 1]!.x, y: pts[n - 1]!.y, angle: angleOf(pts[n - 2]!, pts[n - 1]!) };
-  if (type !== 'pairs_with') return [end];
-  return [{ x: pts[0]!.x, y: pts[0]!.y, angle: angleOf(pts[1]!, pts[0]!) }, end];
+/** The polyline with its last run ending under the arrowhead, so no line shows past the tip. */
+function trimEnd(pts: Pt[], by: number): Pt[] {
+  const out = pts.slice();
+  const a = out[out.length - 2]!;
+  const b = out[out.length - 1]!;
+  const len = dist(a, b);
+  const k = Math.min(by, Math.max(0, len - 1)) / (len || 1);
+  out[out.length - 1] = { x: b.x - (b.x - a.x) * k, y: b.y - (b.y - a.y) * k };
+  return out;
 }
 
-function routePath(ctx: Context, arrow: BoardArrow, extra: Box[], used: Map<string, number>): RoutedArrow | null {
-  const a = ctx.byId.get(arrow.from);
-  const b = ctx.byId.get(arrow.to);
-  if (!a || !b || a.id === b.id) return null;
-  const base = { id: arrow.id, type: arrow.type, from: arrow.from, to: arrow.to, dashed: arrow.type === 'free', label: null };
-
-  if (directionBetween(a.cell, b.cell) >= 0) {
-    const d = directionBetween(a.cell, b.cell);
-    const edge = edgeOf(a.cell, d, ctx.layout.size);
-    const chevrons = arrow.type === 'leads_to' ? 1 : arrow.type === 'pairs_with' ? 2 : 0;
-    return {
-      ...base, kind: 'knot', d: '', points: [edge.mid], heads: [],
-      knot: { x: edge.mid.x, y: edge.mid.y, angle: angleOf(a, b), chevrons, edge: [edge.a, edge.b] }
-    };
-  }
-
-  const lattice = shortestPath(ctx, a, b, extra, used);
-  if (!lattice || lattice.length < 2) return null;
-  const pts = pull(ctx, lattice, extra);
-  const { d, samples } = round(pts);
-  return { ...base, kind: 'path', d, points: samples, heads: headsFor(arrow.type, pts), knot: null };
+/** A straight fallback when no lane exists: edge to edge between the two tiles. */
+function straight(a: BoardTile, b: BoardTile): Pt[] {
+  const len = dist(a, b) || 1;
+  const ux = (b.x - a.x) / len;
+  const uy = (b.y - a.y) / len;
+  const out = rayHit(a, ux, uy, a.corners, Infinity);
+  const back = rayHit(b, -ux, -uy, b.corners, Infinity);
+  return [out?.hit ?? { x: a.x, y: a.y }, back?.hit ?? { x: b.x, y: b.y }];
 }
 
 // ── labels ───────────────────────────────────────────────────────────────────
 
-const labelBox = (l: PlacedLabel): Box => ({ x: l.x, y: l.y, w: l.w, h: l.h });
-const overlaps = (a: Box, b: Box, m = 0): boolean => Math.abs(a.x - b.x) * 2 < a.w + b.w + m && Math.abs(a.y - b.y) * 2 < a.h + b.h + m;
+export function labelSize(arrow: Pick<BoardArrow, 'type' | 'label'>): { type: string; text: string; typeW: number; w: number; h: number } {
+  const type = TYPE_CAPS[arrow.type];
+  const text = arrow.label?.trim() ?? '';
+  const typeW = textWidth(type, LABEL_TYPE_FONT, 800);
+  const w = Math.ceil(typeW + (text ? LABEL_DIVIDER + textWidth(text, LABEL_TEXT_FONT, 500) : 0) + LABEL_PAD * 2);
+  return { type, text, typeW, w, h: LABEL_H };
+}
 
-function chipFor(ctx: Context, r: RoutedArrow, text: string): Chip {
-  const w = Math.ceil(textWidth(text, 12, 500) + 18);
-  let at: (t: number) => Pt;
+/** On the longest straight run that leaves the pill clear of tiles, titles, other pills and (if possible) other arrows. */
+function placeLabel(ctx: Context, arrow: BoardArrow, r: RoutedArrow, placed: Box[], routed: RoutedArrow[]): PlacedLabel {
+  const size = labelSize(arrow);
+  const { tiles, labels } = ctx.layout;
+  const clear = (b: Box, strict: boolean | null): boolean => {
+    if (strict !== null && tiles.some((t) => overlaps(b, t.box) && rectHitsPolygon({ ...b, w: b.w + 6, h: b.h + 6 }, t.corners))) return false;
+    if (labels.some((l) => overlaps(b, l, 6))) return false;
+    if (placed.some((p) => overlaps(b, p, 4))) return false;
+    if (strict && routed.some((o) => o.id !== r.id && o.kind === 'path' && pathHitsBox(o.points, b, 2))) return false;
+    return true;
+  };
+  const candidates: Pt[] = [];
   if (r.knot) {
-    const k = r.knot;
-    const e = k.edge;
-    const len = dist(e[0], e[1]) || 1;
-    const ux = (e[1].x - e[0].x) / len;
-    const uy = (e[1].y - e[0].y) / len;
-    // Slide along the shared edge, out of the cluster on whichever side is emptier.
-    const a = ctx.byId.get(r.from)!;
-    const cluster = ctx.layout.clusters.find((c) => c.key === a.cluster);
-    const away = cluster ? (k.x - cluster.x) * ux + (k.y - cluster.y) * uy : 1;
-    const s = away >= 0 ? 1 : -1;
-    at = (t) => ({ x: k.x + ux * s * (16 + 70 * t), y: k.y + uy * s * (16 + 70 * t) });
+    const [e0, e1] = r.knot.edge;
+    const len = dist(e0, e1) || 1;
+    const ux = (e1.x - e0.x) / len;
+    const uy = (e1.y - e0.y) / len;
+    for (const step of [0.9, 1.3, 1.8, 2.4, 3, 3.6]) for (const k of [1, -1]) candidates.push({ x: r.knot.x + ux * k * ctx.layout.size * step, y: r.knot.y + uy * k * ctx.layout.size * step });
   } else {
-    at = (t) => pointAlong(r.points, t);
+    const runs = r.points.slice(1).map((b, i) => ({ a: r.points[i]!, b, len: dist(r.points[i]!, b) }));
+    runs.sort((x, y) => y.len - x.len);
+    for (const run of runs) for (const t of [0.5, 0.35, 0.65, 0.2, 0.8]) candidates.push({ x: run.a.x + (run.b.x - run.a.x) * t, y: run.a.y + (run.b.y - run.a.y) * t });
   }
-  return { id: r.id, label: text, w, h: CHIP_H, x: 0, y: 0, missing: false, at };
-}
-
-/** Last resort for chips that still overlap another label: step outwards until clear. */
-function nudgeClear(chip: Chip, obstacles: Box[], placed: Box[]): void {
-  const clear = (b: Box): boolean => !obstacles.some((o) => overlaps(b, o, 6)) && !placed.some((o) => overlaps(b, o, 4));
-  const here: Box = { x: chip.x, y: chip.y, w: chip.w, h: chip.h };
-  if (clear(here)) return;
-  for (let step = 1; step <= 60; step++) {
-    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-      const cand = { ...here, x: here.x + dx * step * 6, y: here.y + dy * step * 5 };
-      if (clear(cand)) { chip.x = cand.x; chip.y = cand.y; return; }
-    }
-  }
-}
-
-function placeLabels(ctx: Context, routed: RoutedArrow[], texts: Map<string, string>): void {
-  const obstacles: Box[] = [...ctx.layout.tiles.map((t) => t.box), ...ctx.layout.labels];
-  const chips = routed.filter((r) => texts.has(r.id)).map((r) => chipFor(ctx, r, texts.get(r.id)!));
-  placeChips(chips, obstacles);
-  const placed: Box[] = [];
-  for (const chip of chips) {
-    nudgeClear(chip, obstacles, placed);
-    placed.push({ x: chip.x, y: chip.y, w: chip.w, h: chip.h });
-  }
-  for (const r of routed) {
-    const chip = chips.find((c) => c.id === r.id);
-    r.label = chip ? { text: chip.label, x: chip.x, y: chip.y, w: chip.w, h: chip.h, anchor: chip.at(0.5) } : null;
-  }
+  const box = (p: Pt): Box => ({ x: p.x, y: p.y, w: size.w, h: size.h });
+  const at = candidates.find((p) => clear(box(p), true)) ?? candidates.find((p) => clear(box(p), false)) ?? candidates.find((p) => clear(box(p), null)) ?? candidates[0] ?? { x: 0, y: 0 };
+  // A knot's label sits off along its edge; the anchor is the knot, so the view can draw a leader.
+  return { ...size, x: at.x, y: at.y, anchor: r.knot ? { x: r.knot.x, y: r.knot.y } : at };
 }
 
 // ── all arrows ───────────────────────────────────────────────────────────────
 
-/** Route every arrow. Output is sorted by id, so input order never changes the picture. */
-export function routeArrows(layout: BoardLayout, arrows: BoardArrow[]): RoutedArrow[] {
-  const ctx = makeContext(layout);
-  const sorted = [...arrows].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
-  const texts = new Map<string, string>();
-  for (const a of sorted) {
-    const text = a.label?.trim();
-    if (text) texts.set(a.id, text);
-  }
-  const used = new Map<string, number>();
-  const routed: RoutedArrow[] = [];
-  const arrowOf = new Map<string, BoardArrow>();
-  for (const a of sorted) {
-    const r = routePath(ctx, a, [], used);
-    if (r) { routed.push(r); arrowOf.set(a.id, a); }
-  }
-
-  for (let pass = 0; pass < PASSES; pass++) {
-    placeLabels(ctx, routed, texts);
-    let changed = false;
-    routed.forEach((r, i) => {
-      if (r.kind === 'knot') return;
-      const others = routed.filter((o) => o.id !== r.id && o.label).map((o) => labelBox(o.label!));
-      if (!others.some((box) => pathHitsBox(r.points, box))) return;
-      const again = routePath(ctx, arrowOf.get(r.id)!, others, used);
-      if (again) { routed[i] = again; changed = true; }
-    });
-    if (!changed) break;
-  }
-  placeLabels(ctx, routed, texts);
-  return routed;
+export interface RouteOptions {
+  /** How far from a tile's edge lanes keep. Defaults to 0.3 of the grid size. */
+  margin?: number;
 }
 
+/** The pair of placements to join: when a tile sits in several clusters, the nearest two. */
+function pairFor(ctx: Context, arrow: BoardArrow): [BoardTile, BoardTile] | null {
+  let best: [BoardTile, BoardTile] | null = null;
+  let bestD = Infinity;
+  for (const a of ctx.byId.get(arrow.from) ?? []) for (const b of ctx.byId.get(arrow.to) ?? []) {
+    const d = dist(a, b);
+    if (a.key !== b.key && d < bestD) { bestD = d; best = [a, b]; }
+  }
+  return best;
+}
+
+const touching = (a: BoardTile, b: BoardTile): boolean => a.cluster === b.cluster && directionBetween(a.cell, b.cell) >= 0;
+const byId = <T extends { id: string }>(x: T, y: T): number => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
+
+/** Route every arrow. Output is sorted by id, so input order never changes the picture. */
+export function routeArrows(layout: BoardLayout, arrows: BoardArrow[], options: RouteOptions = {}): RoutedArrow[] {
+  const margin = options.margin ?? layout.size * 0.3;
+  const placements = new Map<string, BoardTile[]>();
+  for (const t of layout.tiles) placements.set(t.id, [...(placements.get(t.id) ?? []), t]);
+  const ctx: Context = { layout, grid: buildGrid(layout, margin), margin, byId: placements, ports: new Map() };
+  const source = new Map<string, BoardArrow>();
+  const used: Used = new Map();
+  const routed: RoutedArrow[] = [];
+  const paths: Array<{ id: string; pts: Pt[] }> = [];
+  // Shorter arrows first, so the long ones go round them rather than the other way about.
+  const pairs = [...arrows].sort(byId)
+    .map((a) => ({ a, pair: a.from === a.to ? null : pairFor(ctx, a) }))
+    .filter((x): x is { a: BoardArrow; pair: [BoardTile, BoardTile] } => Boolean(x.pair))
+    .sort((x, y) => dist(x.pair[0], x.pair[1]) - dist(y.pair[0], y.pair[1]) || byId(x.a, y.a));
+  for (const { a, pair: [ta, tb] } of pairs) {
+    if (source.has(a.id)) continue;
+    source.set(a.id, a);
+    const base = { id: a.id, type: a.type, from: a.from, to: a.to, fromKey: ta.key, toKey: tb.key, dashed: a.type === 'free', label: null };
+    if (touching(ta, tb)) {
+      // edgeOf works on the cluster's own grid; shift it to where the cluster's origin sits.
+      const edge = edgeOf(ta.cell, directionBetween(ta.cell, tb.cell), layout.size);
+      const ox = ta.x - layout.size * 1.5 * ta.cell.q;
+      const oy = ta.y - layout.size * SQRT3 * (ta.cell.r + ta.cell.q / 2);
+      const sh = (p: Pt): Pt => ({ x: p.x + ox, y: p.y + oy });
+      const mid = sh(edge.mid);
+      const chevrons = a.type === 'leads_to' ? 1 : a.type === 'pairs_with' ? 2 : 0;
+      routed.push({ ...base, kind: 'knot', d: '', points: [mid], start: null, over: { start: false, end: false }, heads: [], knot: { x: mid.x, y: mid.y, angle: angleOf(ta, tb), chevrons, edge: [sh(edge.a), sh(edge.b)] } });
+      continue;
+    }
+    const found = search(ctx, ta, tb, used);
+    const pts = found?.pts ?? straight(ta, tb);
+    paths.push({ id: a.id, pts });
+    routed.push({ ...base, kind: 'path', d: '', points: pts, start: null, over: found?.over ?? { start: true, end: true }, heads: [], knot: null });
+  }
+  offsetSharedLanes(paths);
+  const radius = layout.size * 0.25;
+  const pathOf = new Map(paths.map((p) => [p.id, p.pts]));
+  for (const r of routed) {
+    if (r.kind !== 'path') continue;
+    const pts = pathOf.get(r.id)!;
+    r.points = pts;
+    const n = pts.length;
+    const end: Head = { x: pts[n - 1]!.x, y: pts[n - 1]!.y, angle: angleOf(pts[n - 2]!, pts[n - 1]!) };
+    let line = trimEnd(pts, HEAD_LENGTH * 0.6);
+    if (r.type === 'pairs_with') {
+      r.heads = [{ x: pts[0]!.x, y: pts[0]!.y, angle: angleOf(pts[1]!, pts[0]!) }, end];
+      line = trimEnd(line.slice().reverse(), HEAD_LENGTH * 0.6).reverse();
+    } else {
+      r.heads = [end];
+      r.start = pts[0]!;
+    }
+    r.d = roundedPath(line, radius);
+  }
+  routed.sort(byId);
+  const placed: Box[] = [];
+  for (const r of routed) {
+    const a = source.get(r.id)!;
+    // A knot's chevrons already say its type, so it takes a label only when it has words.
+    if (a.quiet || (r.kind === 'knot' && !a.label?.trim())) continue;
+    r.label = placeLabel(ctx, a, r, placed, routed);
+    placed.push(r.label);
+  }
+  return routed;
+}
