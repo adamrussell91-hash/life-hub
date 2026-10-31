@@ -11,6 +11,11 @@ import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
+import { nextStepBank, type BankPanel } from '@/blocks/next-step-bank';
+import type { NextStepJobs } from '@/blocks/next-step-run';
+import { loadFeedbackCodes, type FeedbackCode } from '@/blocks/feedback-codes';
+import { mountChipPicker } from '@/skills/chip-picker';
+import type { NextStepBank } from '@/quiz/core';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { createFormatField, withFormat } from '@/blocks/formats/registry';
 import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
@@ -115,6 +120,8 @@ export type BlockEditorContext = {
   unitLessons?: Array<{ id: string; title: string; href: string }>;
   /** Curriculum network for a unit map: lines, lessons with stops, and how to save them. */
   network?: UnitNetworkEditorContext;
+  /** The lesson builder's Make next steps: writing boxes fill their banks through it. */
+  nextSteps?: NextStepJobs;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -1664,7 +1671,8 @@ export function createTableEditor(
 export function createQuestionSetEditor(
   block: Extract<Block, { block_type: 'question_set' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>,
-  getLatest: () => Extract<Block, { block_type: 'question_set' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'question_set' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   type ResponseSpace = 'none' | 'short' | 'medium' | 'long' | 'extended';
   type QuestionDraft = {
@@ -1678,6 +1686,8 @@ export function createQuestionSetEditor(
     model_answer?: string;
     model_check?: 'reveal' | 'confidence';
     checklist?: Array<{ id: string; label: string }>;
+    skills?: string[];
+    next_steps?: NextStepBank;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1702,8 +1712,23 @@ export function createQuestionSetEditor(
     logic: q.logic,
     model_answer: q.model_answer,
     model_check: q.model_check,
-    checklist: q.checklist ? q.checklist.map((item) => ({ ...item })) : undefined
+    checklist: q.checklist ? q.checklist.map((item) => ({ ...item })) : undefined,
+    skills: q.skills ? [...q.skills] : undefined,
+    next_steps: q.next_steps ? structuredClone(q.next_steps) : undefined
   }));
+  // The code library, for each question's next-steps bank; loaded once for the set.
+  let codeLibrary: FeedbackCode[] | null = null;
+  const banks = new Map<string, BankPanel>();
+  void loadFeedbackCodes().then(
+    (codes) => {
+      codeLibrary = codes;
+      for (const [id, bank] of banks) {
+        const q = questions.find((x) => x.id === id);
+        if (q) bank.update(q, codes);
+      }
+    },
+    () => undefined
+  );
 
   const emitChange = () => {
     const latest = getLatest();
@@ -1727,7 +1752,10 @@ export function createQuestionSetEditor(
           ...(q.kind === 'short_answer' && q.model_answer?.trim() && q.model_check === 'confidence' ? { model_check: 'confidence' as const } : {}),
           ...(q.checklist?.some((item) => item.label.trim())
             ? { checklist: q.checklist.filter((item) => item.label.trim()).slice(0, 12) }
-            : {})
+            : {}),
+          // Skills and the bank belong to written answers only.
+          ...(q.kind === 'short_answer' && q.skills?.length ? { skills: q.skills.slice(0, 4) } : {}),
+          ...(q.kind === 'short_answer' && q.skills?.length && q.next_steps && Object.keys(q.next_steps).length ? { next_steps: q.next_steps } : {})
         }))
       }
     });
@@ -1759,7 +1787,29 @@ export function createQuestionSetEditor(
       const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => {
         ctx.update({ ...ctx.current, prompt: value });
         if (!ctx.current.level) level.setValue(guessQuestionLevel(value));
+        bank.update(ctx.current);
       }, 'textarea', 2);
+
+      // Skills this box practises, and the next steps students are served from them.
+      const bank = nextStepBank(question, codeLibrary, (next_steps) => ctx.update({ ...ctx.current, next_steps }), {
+        target: { block_id: block.id, index: ctx.index },
+        jobs: context.nextSteps
+      });
+      banks.set(question.id, bank);
+      const skillsField = document.createElement('div');
+      skillsField.className = 'block-editor__question-skills nst-field';
+      const skillsLabel = document.createElement('span');
+      skillsLabel.className = 'nst-field__label';
+      skillsLabel.textContent = 'Skills this box practises';
+      skillsField.append(
+        skillsLabel,
+        mountChipPicker(question.skills ?? [], (skills) => {
+          ctx.update({ ...ctx.current, skills: skills.length ? skills : undefined });
+          bank.update(ctx.current);
+        })
+      );
+      skillsField.hidden = question.kind !== 'short_answer';
+      bank.el.classList.toggle('nst-bank--off', question.kind !== 'short_answer');
 
       // The 4 levels format's band; untouched questions follow their opening words.
       const level = createChoice({
@@ -1860,6 +1910,8 @@ export function createQuestionSetEditor(
           responseSpace.el.hidden = nextKind !== 'short_answer';
           modelAnswer.hidden = nextKind !== 'short_answer';
           modelCheck.el.hidden = nextKind !== 'short_answer';
+          skillsField.hidden = nextKind !== 'short_answer';
+          bank.el.classList.toggle('nst-bank--off', nextKind !== 'short_answer');
           if (nextKind === 'short_answer') responseSpace.setValue('medium');
         }
       });
@@ -1878,7 +1930,7 @@ export function createQuestionSetEditor(
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
       settings.append(level.el, kind.el, responseSpace.el, logic.el);
-      return fragmentOf(prompt, settings, options, modelAnswer, modelCheck.el, checklist);
+      return fragmentOf(prompt, settings, options, modelAnswer, modelCheck.el, checklist, skillsField, bank.el);
     }
   });
   list.el.classList.add('block-editor__questions');
@@ -3349,9 +3401,9 @@ function createBlockEditorFields(
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
         : undefined));
     case 'quiz_question':
-      return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
+      return createQuizQuestionEditor(block, onChange, context.getLessonBlocks, context.nextSteps);
     case 'question_set':
-      return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
+      return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>, context);
     case 'timeline':
       return createTimelineEditor(block, onChange, latest as () => Extract<Block, { block_type: 'timeline' }>);
     case 'card_stack':

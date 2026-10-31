@@ -4,6 +4,7 @@ import { QUIZ_KIND_INFO, checkQuestion, parseGapPassage, type QuizQuestion } fro
 import { peekCurriculum } from '@/app/curriculum-state';
 import { outcomeLabels } from '@/markbook/parse';
 import { mountQuestionBuilder } from '@/quiz/builder';
+import type { NextStepJobs } from '@/blocks/next-step-run';
 import { el, formatMarks } from '@/quiz/dom';
 import { lessonImages } from '@/quiz/images';
 import '@/quiz/quiz.css';
@@ -16,7 +17,7 @@ import '@/quiz/quiz.css';
 
 type QuizBlock = Extract<Block, { block_type: 'quiz_question' }>;
 
-export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlock) => void, getLessonBlocks?: () => Block[]): HTMLElement {
+export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlock) => void, getLessonBlocks?: () => Block[], nextSteps?: NextStepJobs): HTMLElement {
   let current = block;
   const builder = mountQuestionBuilder({
     question: { ...block.content.question, id: block.id },
@@ -24,6 +25,7 @@ export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlo
     allowImageUrl: true,
     outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []),
     images: lessonImages(getLessonBlocks?.() ?? []),
+    nextSteps: { jobs: nextSteps },
     onChange: (question) => {
       current = { ...current, content: { ...current.content, question } };
       onChange(current);

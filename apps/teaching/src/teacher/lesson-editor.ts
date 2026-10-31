@@ -77,6 +77,9 @@ import {
 } from '@/teacher/save-publish';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
+import { costText, estimateNextStepJob, runNextStepJob, type FillDone, type NextStepJobs } from '@/blocks/next-step-run';
+import { nextStepTargets } from '@/blocks/next-step-bank';
+import { loadFeedbackCodes } from '@/blocks/feedback-codes';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 
 export interface LessonEditorHandle {
@@ -628,6 +631,51 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     });
 
+    // Next steps in writing boxes: the job reads the saved draft and writes the banks back to it.
+    const nextStepJobs: NextStepJobs = {
+      lessonId: lesson.id,
+      flush: async () => {
+        await saveController?.flush();
+        if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes first.');
+      },
+      reload: async (done) => {
+        await saveController?.flush();
+        applyRestoredLesson(await apiGet<Lesson>(`/api/lessons/${lesson.id}`));
+        const flagged = done.flagged?.length ?? 0;
+        showHubToast(`${done.response ?? 'Next steps made.'}${flagged ? ` ${flagged} ${flagged === 1 ? 'line keeps' : 'lines keep'} the ladder wording: check ${flagged === 1 ? 'it' : 'them'}.` : ''}`);
+      }
+    };
+
+    /** Make next steps for all boxes: every tagged box whose bank is empty or stale, in one job. */
+    async function makeAllNextSteps(): Promise<void> {
+      try {
+        await nextStepJobs.flush();
+        const targets = nextStepTargets(lesson.blocks, await loadFeedbackCodes());
+        if (!targets.length) {
+          showHubToast('Every box with skills already has its next steps.');
+          return;
+        }
+        const body = { kind: 'next_steps_fill' as const, lesson_id: lesson.id, targets };
+        const estimate = await estimateNextStepJob(body);
+        if (!estimate.codes) {
+          showHubToast('Give a feedback code one of these skills and a ladder first.');
+          return;
+        }
+        const ok = await askConfirmCard({
+          eyebrow: 'Next steps',
+          title: `Make next steps for ${estimate.boxes} ${estimate.boxes === 1 ? 'box' : 'boxes'}?`,
+          supporting: `${estimate.lines} lines, ${costText(estimate)}. Lines you edited stay as they are.`,
+          confirmLabel: 'Make them',
+          discardLabel: 'Cancel'
+        });
+        if (!ok) return;
+        showHubToast('Writing next steps…');
+        await nextStepJobs.reload(await runNextStepJob<FillDone>(body));
+      } catch (error) {
+        showHubToast(error instanceof Error ? error.message : 'The next steps could not be made. Try again.', { tone: 'danger' });
+      }
+    }
+
     page = mountLessonPage(pageHost, {
       lesson,
       media: mediaList,
@@ -678,6 +726,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       },
       onPrint: () => openPrintLesson(lesson),
       flushDraft: () => saveController?.flush() ?? Promise.resolve(),
+      nextSteps: nextStepJobs,
       onAnnStarted: () => {
         setChatShelved(false);
         void aiPanel?.followOpenJob();
@@ -1031,6 +1080,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           className: 'context-bar__alchemy-lab',
           onSelect: () => {
             annReview?.focusBar();
+          }
+        },
+        {
+          label: 'Make next steps for all boxes',
+          className: 'context-bar__next-steps',
+          onSelect: () => {
+            void makeAllNextSteps();
           }
         },
         {
