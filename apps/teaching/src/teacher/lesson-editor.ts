@@ -268,6 +268,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.dot_points) lesson.dot_points = next.dot_points;
       if (next.plan_covered) lesson.plan_covered = next.plan_covered;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
+      if (next.end_questions) lesson.end_questions = next.end_questions;
       if (next.quiz) {
         lesson.quiz = next.quiz;
       } else {

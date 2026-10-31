@@ -1,0 +1,40 @@
+/* Lesson footer: previous, finish tick, next; the finish check and end-of-lesson questions above it. Tokens only. */
+.lf { display: grid; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.lf__row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.lf__link { display: grid; gap: 2px; min-width: 0; padding: var(--space-2); border-radius: var(--radius-sm); color: var(--ink); text-decoration: none; }
+.lf__link:hover, .lf__link:focus-visible { background: var(--paper); }
+.lf__link--next { text-align: right; }
+.lf__dir { font-size: var(--text-xs); color: var(--muted); }
+.lf__title { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.lf__tick { width: 52px; height: 52px; display: grid; place-items: center; padding: 0; border: 2px solid var(--wave); border-radius: var(--radius-full); background: var(--paper); color: var(--wave); cursor: pointer; }
+.lf__tick svg { width: 24px; height: 24px; }
+.lf__tick[aria-pressed='true'] { background: var(--success); border-color: var(--success); color: #fff; }
+.lf__tick:focus-visible { outline: 3px solid var(--wave); outline-offset: 3px; }
+.lf__status { margin: 0; min-height: 1.4em; text-align: center; font-weight: 600; color: var(--success); }
+.lf__panel { display: grid; gap: var(--space-3); max-width: 34rem; width: 100%; justify-self: center; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); }
+.lf__panel[hidden], .lf__error[hidden] { display: none; }
+.lf__heading { margin: 0; font-size: var(--text-lg); }
+.lf__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.lf__ok::before { content: '✓ '; color: var(--success); }
+.lf__warn { color: var(--ink); }
+.lf__warn::before { content: '! '; color: var(--warning); font-weight: 700; }
+.lf__note { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.lf__error { margin: 0; color: var(--danger); }
+.lf__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.lf__actions .btn { min-height: 44px; }
+.lf__initials { min-height: 44px; width: min(100%, 14rem); font-size: 16px; text-transform: uppercase; }
+.lf__dots { display: flex; gap: 6px; }
+.lf__dots i { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--line); }
+.lf__dots i.is-on { background: var(--wave); }
+.lf__question { margin: 0; padding: 0; border: 0; display: grid; gap: var(--space-2); }
+.lf__prompt { padding: 0; font-weight: 600; }
+.lf__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.lf__chip { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-full); background: transparent; cursor: pointer; }
+.lf__chip input { position: absolute; opacity: 0; pointer-events: none; }
+.lf__chip:has(input:focus-visible) { outline: 3px solid var(--wave); outline-offset: 2px; }
+.lf__chip:has(input:checked) { background: var(--wave); border-color: var(--wave); color: #fff; }
+.lf__unclear { width: 100%; font: inherit; font-size: 16px; }
+@media (max-width: 480px) {
+  .lf__row { gap: var(--space-2); }
+  .lf__title { font-size: var(--text-sm); }
+}

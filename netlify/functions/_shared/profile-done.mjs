@@ -54,6 +54,21 @@ export async function recordDone(store, classId, studentId, lessonId, via) {
   else if (held?.via === 'teacher' && !held.was) await store.setJSON(key, { ...held, was: record });
 }
 
+/**
+ * Student: take back their own tick. A teacher's mark stays; a tick kept under
+ * a teacher's override goes, so clearing the override doesn't bring it back.
+ */
+export async function undoTick(store, classId, studentId, lessonId) {
+  if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
+  const key = doneKey(classId, studentId, lessonId);
+  const held = await read(store, key);
+  if (held?.via === 'tick') await deleteKey(store, key);
+  else if (held?.via === 'teacher' && held.was) {
+    const { was: _was, ...rest } = held;
+    await store.setJSON(key, rest);
+  }
+}
+
 /** Teacher: mark a lesson complete or partial for a student, or clear their mark ('clear'). */
 export async function markDone(store, classId, studentId, lessonId, state) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
