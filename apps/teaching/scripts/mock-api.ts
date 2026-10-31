@@ -101,6 +101,7 @@ import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
 import { createLessonRecord } from '../../../netlify/functions/lessons.mjs';
 import { createFeedbackCodesHandler } from '../../../netlify/functions/feedback-codes.mjs';
 import { DEFAULT_FEEDBACK_CODES } from '../../../netlify/functions/_shared/feedback-codes.mjs';
+import { bankSource } from '../src/progress/wording';
 import { createClassPiecesHandler } from '../../../netlify/functions/class-pieces.mjs';
 import { createToMarkHandler } from '../../../netlify/functions/to-mark.mjs';
 import { createPublishedProfileHandler } from '../../../netlify/functions/published-profile.mjs';
@@ -737,12 +738,36 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     ];
     const ids = pieces.map((_, i) => ({ column: `column00${i + 1}`, block: `block_p${i + 1}` }));
     const shared = { type: 'block', variant: 'medium', visibility: 'student_teacher', layout: {}, print: {}, settings: {}, created_at: stamp, updated_at: stamp, schema_version: 1 };
+    // Next steps walk: one skill-tagged question with a bank (TS and AR, invented lines), one untagged.
+    const nextPrompt = 'How does the poet use the road to show the speaker’s isolation?';
+    const ladderOf = (id: string) => (DEFAULT_FEEDBACK_CODES as Array<{ id: string; ladder?: string[] }>).find((c) => c.id === id)?.ladder;
+    const bankEntry = (id: string, lines: string[]) => ({ lines, edited: [false, false, false, false, false], source: bankSource(nextPrompt, ['arguing.thesis'], ladderOf(id)) });
+    const nextQ = {
+      id: 'q1', kind: 'short_answer', prompt: nextPrompt, skills: ['arguing.thesis'],
+      next_steps: {
+        comp_ts: bankEntry('comp_ts', [
+          'Start with one sentence that says what the road shows about the speaker.',
+          'Name the feeling the road creates, then say how the poet makes us feel it.',
+          'Open with a claim about the speaker’s isolation that a reader could argue with.',
+          'Open with a concept, such as distance or silence, that the road carries through the poem.',
+          'Open with a tension: the road connects places as the speaker drifts apart. Let the paragraph resolve it.'
+        ]),
+        comp_ar: bankEntry('comp_ar', [
+          'After each point about the road, add one sentence on what it says about the speaker.',
+          'Choose the road detail that shows the most isolation and spend the most words on it.',
+          'Use the word “isolation” in each link sentence, so the thread back to the question stays clear.',
+          'Show how each road detail takes your answer about the speaker one step further.',
+          'Say which road detail shows the speaker’s isolation most fully, and why.'
+        ])
+      }
+    };
     const lesson = {
       id: lessonId, type: 'lesson', title: 'Paragraphs on The Long Road', slug: 'paragraphs_on_the_long_road', unit_id: unit.id,
       sequence: unit.lesson_ids.length + 1, pedagogical_mode: 'lesson',
       blocks: [
         { ...shared, id: 'block_pp_h', block_type: 'heading', variant: 'page', content: { text: 'Paragraphs on The Long Road' } },
-        ...pieces.map((p, i) => ({ ...shared, id: ids[i]!.block, block_type: 'question_set', content: { title: p.title, questions: [{ id: 'q1', kind: 'short_answer', prompt: `Write your analytical paragraph: ${p.title}.` }] } }))
+        ...pieces.map((p, i) => ({ ...shared, id: ids[i]!.block, block_type: 'question_set', content: { title: p.title, questions: [{ id: 'q1', kind: 'short_answer', prompt: `Write your analytical paragraph: ${p.title}.` }] } })),
+        { ...shared, id: 'block_next', block_type: 'question_set', content: { title: 'Next steps practice', questions: [nextQ, { id: 'q2', kind: 'short_answer', prompt: 'List two other images of travel in the poem.' }] } }
       ],
       status: 'active', created_at: stamp, updated_at: stamp, schema_version: 1, tags: [], syllabus_outcomes: [], outcome_ids: []
     };
@@ -750,6 +775,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     store.setJSON(publishedLessonKey(lessonId), toPublishedLesson(lesson as unknown as Lesson, stamp));
     store.setJSON(unitKey(unit.id), { ...(store.getJSON<Record<string, unknown>>(unitKey(unit.id)) ?? unit), lesson_ids: [...unit.lesson_ids, lessonId] });
     seedIds.lessons.push(lessonId);
+    // On the class schedule, so the student lesson page opens at /s/classes/{class}/lessons/{lesson}.
+    store.setJSON(scheduledLessonKey('sched_progress_para'), {
+      id: 'sched_progress_para', type: 'scheduled_lesson', class_id: classId, lesson_id: lessonId, unit_id: unit.id,
+      date: '2026-10-30', schedule_order: 1, delivery_status: 'planned', created_at: stamp, updated_at: stamp, schema_version: 1
+    });
+    seedIds.scheduled_lessons.push('sched_progress_para');
 
     for (const [id, short] of [['EA12-1', 'Analysis'], ['EA12-2', 'Evidence']] as const) {
       const o = store.getJSON<Record<string, unknown>>(outcomeKey(id));
@@ -813,7 +844,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     // The sixth piece: three students have handed in and are waiting for feedback.
     for (const [sid, at] of [['st_ava', '2026-10-27T01:10:00.000Z'], ['st_noah', '2026-10-20T03:00:00.000Z'], ['st_ella', '2026-10-28T02:40:00.000Z']] as const) {
-      store.setJSON(`work_handins/${lessonId}/${ids[5]!.block}/${sid}`, { class_id: classId, student_id: sid, text: { answers: { q1: pieces[5]!.text } }, handed_in_at: at });
+      // Ava took her TS step on this piece: her own pick shows when it is marked.
+      const pick = sid === 'st_ava' ? { 'step.0': { pick: JSON.stringify({ code_id: 'comp_ts', line: 'Open with a claim about the speaker’s isolation that a reader could argue with.', start: 0, end: pieces[5]!.text.indexOf('.') + 1 }) } } : {};
+      store.setJSON(`work_handins/${lessonId}/${ids[5]!.block}/${sid}`, { class_id: classId, student_id: sid, text: { answers: { q1: pieces[5]!.text }, ...pick }, handed_in_at: at });
     }
     store.setJSON(`markbook/${classId}`, { columns, marks, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] });
   }
