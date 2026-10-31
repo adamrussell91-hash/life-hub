@@ -1,4 +1,5 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
+import { mountRailCollapse } from '../../../../packages/design-kit/js/hub-rail-collapse.js';
 import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
 import { railIconFor, refreshIcon, RAIL_ICON_PATHS } from '@/shell/icons';
 
@@ -127,6 +128,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
   canvasWrap.append(pageHeader, canvas);
   layout.append(rail, canvasWrap);
   root.append(createSkipLink('hub-main'), layout);
+  mountRailCollapse();
 
   return refs;
 }

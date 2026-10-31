@@ -85,7 +85,7 @@ html[data-hub="life"] .glass-panel {
 
 .hub-layout {
   display: grid;
-  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--rail-shown) minmax(0, 1fr);
   min-height: 100dvh;
 }
 
