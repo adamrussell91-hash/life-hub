@@ -1,4 +1,5 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
+import { mountRailCollapse } from '../../../../packages/design-kit/js/hub-rail-collapse.js';
 import { withAppBase } from '@/app/base-path';
 import { createSkipLink } from '@/app/failure';
 import { registerHubUtilities } from '@/teacher/hub-utilities';
@@ -98,6 +99,7 @@ export function renderTeacherShell(
 
   layout.append(rail, main);
   root.append(createSkipLink('teacher-main'), layout);
+  mountRailCollapse();
   // Phone chrome must mount even when curriculum load fails (rail stays empty).
   syncTeachingMobileChrome(root, 'home');
 
