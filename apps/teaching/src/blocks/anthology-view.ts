@@ -45,20 +45,33 @@ function itemMatches(item: AnthologyItem, query: string): boolean {
   return hay.toLowerCase().includes(query.toLowerCase());
 }
 
-/** Run `mount` once `host` is on the page, and tear it down again once it leaves. */
-function mountWhileConnected(host: HTMLElement, mount: () => () => void): void {
+/** How long a block that left the page is watched for coming back before it is let go. */
+const REATTACH_WAIT_MS = 60_000;
+
+/**
+ * Run `mount` once `host` is on the page, tear it down when it leaves, and run it again if it
+ * comes back (a re-render or a folded section moves the block rather than rebuilding it).
+ */
+export function mountWhileConnected(host: HTMLElement, mount: () => () => void): void {
   let tries = 0;
+  let stop: (() => void) | null = null;
+  let letGo = 0;
+  const watch = new MutationObserver(() => {
+    if (host.isConnected && !stop) {
+      window.clearTimeout(letGo);
+      stop = mount();
+    } else if (!host.isConnected && stop) {
+      stop();
+      stop = null;
+      letGo = window.setTimeout(() => watch.disconnect(), REATTACH_WAIT_MS);
+    }
+  });
   const start = () => {
     if (!host.isConnected) {
       if (tries++ < 600) requestAnimationFrame(start);
       return;
     }
-    const stop = mount();
-    const watch = new MutationObserver(() => {
-      if (host.isConnected) return;
-      watch.disconnect();
-      stop();
-    });
+    stop = mount();
     watch.observe(document.body, { childList: true, subtree: true });
   };
   requestAnimationFrame(start);
@@ -232,31 +245,51 @@ export function buildAnthologyView(
   frame.className = 'block-anthology__map graph-wrap';
   const stage = document.createElement('div');
   stage.className = 'block-anthology__stage graph-stage';
-  frame.append(stage);
+  // The chosen note's card floats on the map, just under its dot (the map centres the dot it opens).
+  const pop = document.createElement('div');
+  pop.className = 'block-anthology__pop';
+  pop.hidden = true;
+  const closePop = () => {
+    pop.hidden = true;
+    pop.replaceChildren();
+  };
+  const showPop = (item: AnthologyItem | undefined) => {
+    if (!item) {
+      closePop();
+      return;
+    }
+    const card = noteCard(item, titles.get(item.block_id) ?? item.lesson_title, options.mode);
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'block-anthology__pop-close';
+    close.setAttribute('aria-label', 'Close this note');
+    close.textContent = '×';
+    close.addEventListener('click', closePop);
+    card.prepend(close);
+    pop.replaceChildren(card);
+    pop.hidden = false;
+    pop.scrollTop = 0;
+  };
+  frame.append(stage, pop);
 
-  const cardHost = document.createElement('div');
-  cardHost.className = 'block-anthology__selected';
   const hint = document.createElement('p');
   hint.className = 'block-anthology__hint';
   hint.textContent = 'Click a dot to read its note. Drag to move around; scroll or pinch to zoom.';
-  cardHost.append(hint);
 
-  root.append(bar, frame, cardHost);
+  root.append(bar, frame, hint);
 
   if (canDraw()) {
+    let generation = 0;
     mountWhileConnected(stage, () => {
+      const mine = ++generation;
+      closePop();
       void import('../../../knowledge/src/archive/forceGraph').then(({ mountForceGraph }) => {
-        if (!stage.isConnected) return;
+        if (mine !== generation || !stage.isConnected) return;
         graph = mountForceGraph(
           stage,
           buildAnthologyGraph(options.data, grouping),
           {
-            onNoteSelect: (note) => {
-              const item = note ? byId.get(note.pageId) : undefined;
-              cardHost.replaceChildren(
-                item ? noteCard(item, titles.get(item.block_id) ?? item.lesson_title, options.mode) : hint
-              );
-            }
+            onNoteSelect: (note) => showPop(note ? byId.get(note.pageId) : undefined)
           },
           {
             variant: 'showAll',
@@ -272,6 +305,7 @@ export function buildAnthologyView(
         );
       });
       return () => {
+        generation++;
         graph?.();
         graph = null;
       };
