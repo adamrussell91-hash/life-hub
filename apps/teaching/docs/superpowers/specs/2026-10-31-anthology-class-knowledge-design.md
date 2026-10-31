@@ -48,6 +48,14 @@ On send, a clean item appears on the map at once. An item that the shared text f
 
 On the Class tab, a student card also shows the teacher the initials and a time, plus **Hide** and **Delete**. Waiting (flagged) and hidden items stay off the map; the teacher sees them in a "Waiting or hidden" list under the map, with **Show** and **Delete**. Students never see initials.
 
+### In lessons
+
+The Anthology block can also go in any lesson of the unit, not just the unit plan. Every copy shows the same class map for that unit: the unit's tagged notes plus the class's additions, read from the same store. A lesson loads the unit's notes after the page opens, so the block shows "Loading the class map…" first.
+
+- Student lesson: the unit's notes come from the public unit feed. Opens on Class.
+- Teacher lesson editor: notes are gathered the same way the unit page gathers them. Opens on Teacher.
+- Display (Focus view) on the class screen uses the student view, so the screen never shows initials.
+
 ## Data
 
 A new store, keyed by unit, kept apart from lesson drafts. Students can only add to it.
@@ -63,7 +71,7 @@ anthology-knowledge/{unit}/moderation/{id}   { status: shown | hidden }  teacher
 
 ### Endpoints
 
-- `GET /api/published-anthology-knowledge/{unit}`: public; shown items without initials. The unit must exist and its plan must contain an anthology block that students can see.
+- `GET /api/published-anthology-knowledge/{unit}`: public; shown items without initials. The unit must exist, with an anthology block students can see in its plan or in one of its published lessons.
 - `POST /api/published-anthology-knowledge/{unit}`: public; adds one item. Validation as above.
 - Teacher (signed in): list all items with initials and status; set moderation; delete.
 

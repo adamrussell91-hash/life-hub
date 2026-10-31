@@ -1157,6 +1157,24 @@ git commit -m "Anthology map: Teacher | Class switch, Add to the class map, teac
 
 ---
 
+### Task 4b: The Anthology block in lessons
+
+**Files:** modify `apps/teaching/src/teacher/lesson-canvas/drop.ts`, `apps/teaching/src/blocks/render.ts`, `apps/teaching/src/student/lesson-view.ts`, `apps/teaching/src/teacher/lesson-canvas/mount-page.ts`, `apps/teaching/src/teacher/lesson-display.ts`, `apps/teaching/src/teacher/sections/units.ts`, `netlify/functions/_shared/anthology-knowledge.mjs`; create `apps/teaching/src/blocks/anthology-load.ts`
+
+- [ ] **Step 1: Allow it in lessons.** In `drop.ts`, `PAGE_ONLY` becomes `new Set(['collection'])`, and the anthology branch of `rejectReason` goes. Update any drop test that expects the old refusal.
+- [ ] **Step 2: Lazy data in `render.ts`.** Add `loadAnthology?: () => Promise<{ data: AnthologyData; knowledge?: KnowledgeApi }>` to `RenderContext`. In `renderAnthologyBlock`, when `ctx.anthology` is missing and `ctx.loadAnthology` is set, return a wrapped holder (`<div class="block-anthology"><p class="block-anthology__empty block-empty">Loading the class map…</p></div>`). When the promise resolves, replace the holder with `buildAnthologyView(block, { data, mode, title, knowledge })`. On failure, show "The class map didn't load. Refresh to try again."
+- [ ] **Step 3: Loaders in `anthology-load.ts`.**
+  - `studentUnitAnthology(unitId)`: memoised `apiGet<PublishedUnit>('/api/published/units/{id}')`, giving `{ data: unit.anthology ?? { items: [], texts: [] }, knowledge: studentKnowledgeApi(unitId) }`.
+  - `teacherUnitAnthology(unitId)`: `getCurriculum()`, finds the unit's `lesson_ids`, then runs the same snapshot loop as `refreshAnthology` in `units.ts`. Move that loop into an exported `gatherTeacherAnthology(lessonIds, curriculumLessons)` and call it from both places. Gives `{ data, knowledge: teacherKnowledgeApi(unitId) }`.
+- [ ] **Step 4: Pass the loaders.**
+  - Student `lesson-view.ts`: `loadAnthology: () => studentUnitAnthology(lesson.unit_id)`.
+  - Teacher `mount-page.ts` `renderPreview`: `loadAnthology: () => teacherUnitAnthology(lesson.unit_id)`.
+  - `lesson-display.ts`: the student loader (the screen shows no initials).
+- [ ] **Step 5: Server accepts lesson copies.** In `anthology-knowledge.mjs`, `liveUnit` passes when the unit plan has a visible anthology block **or** any of the unit's published lessons does. Read the published lessons once and share them with `allowedTags`. Add a test: a unit whose plan has no map but whose published lesson does accepts additions.
+- [ ] **Step 6: Run** `cd apps/teaching && npx vitest run tests/unit/anthology-graph.test.ts tests/unit/render-blocks.test.ts` plus the drop tests, and `node --test tests/unit/anthology-knowledge.test.js`. Then commit: "Anthology block in lessons: the unit's class map, loaded on open".
+
+---
+
 ### Task 5: Local mock routes and a browser walk
 
 **Files:** modify `apps/teaching/scripts/mock-api.ts`
@@ -1192,7 +1210,8 @@ In `handleQuiz`'s handler chooser (around line 3906), add before the final fallb
   3. Add one with a flagged word. It doesn't appear on the map; "Waiting or hidden (1)" shows below, and Show puts it on the map.
   4. Student page `/s/units/{id}`: opens on Class with rings, the card shows no initials or buttons, and the Add form works.
   5. Texts grouping shows a "Class knowledge" hub.
-  6. Repeat 2 and 4 at 390px: the form fits and scrolls inside the map.
+  6. Drop the Anthology block into a lesson: it shows Loading, then the same class map; the student lesson opens on Class and an addition there shows on the unit page too.
+  7. Repeat 2 and 4 at 390px: the form fits and scrolls inside the map.
 
 - [ ] **Step 4: Commit**
 
