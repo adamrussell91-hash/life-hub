@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWalkthrus, privateWalkthruPath, refreshWalkthrus } from '../../netlify/functions/_shared/walkthrus-text.mjs';
+import { WALKTHRUS_MAX_AGE_MS, loadWalkthrus, privateWalkthruPath, refreshWalkthrus } from '../../netlify/functions/_shared/walkthrus-text.mjs';
 import { createWalkthrusTextHandler } from '../../netlify/functions/walkthrus-text.mjs';
 
 // Filler only. The real text lives in the private data repo.
@@ -62,4 +62,17 @@ test('the endpoint is teacher only, never cached, and refreshes on request', asy
   const refresh = await make(true)(new Request('https://example.test/api/walkthrus-text', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'refresh' }) }));
   assert.equal(refresh.status, 200);
   assert.equal((await make(true)(new Request('https://example.test/api/walkthrus-text', { method: 'POST', body: JSON.stringify({ action: 'nope' }) }))).status, 400);
+});
+
+test('a copy older than the max age is fetched again, and kept if the repo is unreachable', async () => {
+  const store = storeFixture();
+  const { calls, impl } = fakeFetch();
+  await loadWalkthrus(store, { env, fetchImpl: impl });
+  const before = calls.length;
+  const later = Date.now() + WALKTHRUS_MAX_AGE_MS + 1000;
+  await loadWalkthrus(store, { env, fetchImpl: impl, now: later });
+  assert.ok(calls.length > before);
+  const down = async () => { throw new Error('offline'); };
+  const text = await loadWalkthrus(store, { env, fetchImpl: down, now: later + WALKTHRUS_MAX_AGE_MS * 2 });
+  assert.equal(text.sets.length, 1);
 });

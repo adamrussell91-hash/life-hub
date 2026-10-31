@@ -43,6 +43,8 @@ test('first load copies five pictures, later loads use the copy, a missing step 
   await loadPictures(store, 'w1-cold-calling', { env, fetchImpl: impl });
   assert.equal(calls.length, before);
   await assert.rejects(loadPictures(store, '../../secrets', { env, fetchImpl: impl }), { status: 400 });
+  await loadPictures(store, 'w1-cold-calling', { env, fetchImpl: impl, now: Date.now() + 7 * 60 * 60 * 1000 });
+  assert.ok(calls.length > before, 'a stale copy is fetched again');
 });
 
 test('the pictures endpoint is teacher only and never cached', async () => {

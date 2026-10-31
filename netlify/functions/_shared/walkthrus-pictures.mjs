@@ -10,6 +10,7 @@
 import { techniqueById } from '../../../packages/walkthrus/catalogue.mjs';
 import { readPrivateFileBytes } from './private-data-file.mjs';
 import { reject } from './question-drop.mjs';
+import { WALKTHRUS_MAX_AGE_MS } from './walkthrus-text.mjs';
 
 const KEY = (id) => `walkthrus_pictures/v1/${id}`;
 const MAX_SVG = 200_000;
@@ -48,8 +49,11 @@ export async function readPrivatePictures(id, deps = {}) {
 export async function loadPictures(store, rawId, deps = {}) {
   const id = checkId(rawId);
   const stored = await store.get(KEY(id), { type: 'json', consistency: 'strong' });
-  if (stored && Array.isArray(stored.steps) && stored.steps.length === 5) return stored;
-  return refreshPictures(store, id, deps);
+  if (!stored || !Array.isArray(stored.steps) || stored.steps.length !== 5) return refreshPictures(store, id, deps);
+  const age = (deps.now ?? Date.now()) - Date.parse(stored.fetched_at ?? '');
+  if (age <= WALKTHRUS_MAX_AGE_MS) return stored;
+  // A redrawn picture reaches the app once the copy is stale; the old copy stands in if the repo can't be reached.
+  return refreshPictures(store, id, deps).catch(() => stored);
 }
 
 export async function refreshPictures(store, rawId, deps = {}) {
