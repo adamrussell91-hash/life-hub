@@ -65,7 +65,9 @@ export function renderPlanningPrompts(): HTMLElement | null {
  * names the source as a framework chapter, not a WalkThru. `add` returns false if the lens is gone.
  */
 export function renderFrameworkLenses(add: (lensId: string) => boolean): HTMLElement | null {
-  if (!FRAMEWORK_LENSES.length) return null;
+  // Willingham lives in Deep understandings (deep/plan-view.ts).
+  const lenses = FRAMEWORK_LENSES.filter((lens) => lens.id !== 'fw_willingham');
+  if (!lenses.length) return null;
   const wrap = document.createElement('details');
   wrap.className = 'tk-wt-plan';
   const head = document.createElement('summary');
@@ -76,7 +78,7 @@ export function renderFrameworkLenses(add: (lensId: string) => boolean): HTMLEle
   const status = document.createElement('p');
   status.className = 'muted';
   status.setAttribute('role', 'status');
-  for (const lens of FRAMEWORK_LENSES) {
+  for (const lens of lenses) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn btn--secondary';

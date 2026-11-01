@@ -148,7 +148,9 @@ const base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z.array(z.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z.array(z.string().regex(SkillRefPattern, 'Pick a skill from the list.')).max(8).optional()
+  skills: z.array(z.string().regex(SkillRefPattern, 'Pick a skill from the list.')).max(8).optional(),
+  /** Knowledge pieces this question checks (deep understandings), for the unit's tracking. */
+  pieces: z.array(z.string().regex(/^kp_[a-z0-9]{4,16}$/)).max(6).optional()
 };
 
 export const QuizQuestionSchema = z
@@ -545,6 +547,7 @@ export type QuestionKey = {
   explanation?: string;
   outcomes?: string[];
   skills?: string[];
+  pieces?: string[];
   /** Public option id → technique catalogue id, for technique questions. */
   techniques?: Record<string, string>;
   /** The AI may mark answers that aren't an exact match. Resolved from the question's switch at publish. */
@@ -633,6 +636,7 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {}),
     ...(q.outcomes?.length ? { outcomes: [...q.outcomes] } : {}),
     ...(q.skills?.length ? { skills: [...q.skills] } : {}),
+    ...(q.pieces?.length ? { pieces: [...q.pieces] } : {}),
     ...(aiMarkOn(q) ? { ai: true as const } : {})
   };
 

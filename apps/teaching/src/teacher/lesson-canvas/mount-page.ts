@@ -34,6 +34,8 @@ import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
 import { mountEndQuestions } from '@/teacher/end-questions';
 import type { Block } from '@/schemas/block';
+import { onUnitDeep, unitDeep } from '@/deep/context';
+import { deepBlockLine, deepMenuItems } from '@/deep/block-menu';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
@@ -435,8 +437,12 @@ export function mountBlockCanvas(
     blocks = replaceBlockInTree(blocks, updated);
     options.onChange(blocks);
     refreshPreview(updated.id);
+    if (canEdit) syncDeepLine(rowFor(updated.id), updated);
     refreshCalloutReferences(root, blocks, 'teacher');
   }
+
+  const rowFor = (blockId: string): HTMLElement | null =>
+    root.querySelector<HTMLElement>(`.lesson-page__block[data-block-id="${CSS.escape(blockId)}"]`);
 
   function refreshPreview(blockId: string): void {
     const holder = root.querySelector<HTMLElement>(
@@ -446,6 +452,26 @@ export function mountBlockCanvas(
     const block = findBlockById(blocks, blockId);
     if (block) holder.replaceChildren(preview(block));
   }
+
+  function syncDeepLine(row: HTMLElement | null, block: Block): void {
+    if (!row) return;
+    const text = deepBlockLine(block, unitDeep());
+    let line = row.querySelector<HTMLElement>(':scope > .du-block-line');
+    if (!text) { line?.remove(); return; }
+    if (!line) {
+      line = Object.assign(document.createElement('p'), { className: 'du-block-line' });
+      row.append(line);
+    }
+    line.textContent = text;
+  }
+
+  const stopDeepLines = onUnitDeep(() => {
+    if (!canEdit) return;
+    for (const row of root.querySelectorAll<HTMLElement>('.lesson-page__block[data-block-id]')) {
+      const block = findBlockById(blocks, row.dataset.blockId ?? '');
+      if (block) syncDeepLine(row, block);
+    }
+  });
 
   function latestBlock(id: string, fallback: Block): () => Block {
     return () => findBlockById(blocks, id) ?? fallback;
@@ -747,6 +773,7 @@ export function mountBlockCanvas(
                 onSelect: () => options.onSaveComposition?.(block.id)
               }]
             : []),
+          ...deepMenuItems(latestBlock(block.id, block), unitDeep(), (next) => onBlockChange(next)).map((item) => ({ ...item, icon: HUB_LIST_ICONS.check })),
           'separator',
           {
             label: 'Delete block',
@@ -924,7 +951,10 @@ export function mountBlockCanvas(
       } else {
         row.append(preview(block));
       }
-      if (canEdit) options.decorateRow?.(row, block);
+      if (canEdit) {
+        syncDeepLine(row, block);
+        options.decorateRow?.(row, block);
+      }
       return row;
     };
 
@@ -1026,6 +1056,7 @@ export function mountBlockCanvas(
       }
     },
     dispose() {
+      stopDeepLines();
       clearDnd();
       clearMenus();
       root.remove();

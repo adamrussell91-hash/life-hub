@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
+import { DEEP_LIMITS, DeepUnderstandingDraftSchema } from '../deep/schema';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 
@@ -18,6 +19,8 @@ export const UnitSchema = z.object({
   cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional(),
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
+  /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
+  deep_understandings: z.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
   kind: z.enum(['program']).optional(),
   source: SourceSchema.optional()

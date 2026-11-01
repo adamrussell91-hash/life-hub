@@ -280,7 +280,7 @@ async function loadQuiz(store, lessonId) {
 }
 
 /**
- * The tags a published quiz's answer keys declare: skills and catalogue techniques.
+ * The tags a published quiz's answer keys declare: skills, knowledge pieces and catalogue techniques.
  * The student profile measures its bars against these, not only what has been marked.
  * An unpublished quiz declares none.
  */
@@ -295,6 +295,7 @@ export async function quizDeclaredTags(store, lessonId) {
   const tags = new Set();
   for (const { key } of Object.values(record.questions ?? {})) {
     for (const skill of key.skills ?? []) tags.add(`skill:${skill}`);
+    for (const piece of key.pieces ?? []) tags.add(`kp:${piece}`);
     for (const technique of Object.values(key.techniques ?? {})) tags.add(`tech:${technique}`);
   }
   return [...tags];

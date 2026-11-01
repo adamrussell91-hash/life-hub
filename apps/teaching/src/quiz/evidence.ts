@@ -66,7 +66,8 @@ export function answerEvidence(input: AnswerInput): EvidenceItem[] {
   const { question, key } = input;
   const base = [
     ...(key.outcomes?.length ? key.outcomes : input.fallbackOutcomes ?? []).map((o) => `out:${o}`),
-    ...(key.skills ?? []).map((s) => `skill:${s}`)
+    ...(key.skills ?? []).map((s) => `skill:${s}`),
+    ...(key.pieces ?? []).map((p) => `kp:${p}`)
   ];
   const codes: Why[] = (input.codes ?? []).map((id) => ({ type: 'code', id }));
   const share = input.awarded === null ? null : key.marks > 0 ? Math.min(1, Math.max(0, input.awarded / key.marks)) : null;

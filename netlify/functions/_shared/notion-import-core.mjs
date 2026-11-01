@@ -1424,7 +1424,9 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z10.array(z10.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z10.array(z10.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
+  skills: z10.array(z10.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional(),
+  /** Knowledge pieces this question checks (deep understandings), for the unit's tracking. */
+  pieces: z10.array(z10.string().regex(/^kp_[a-z0-9]{4,16}$/)).max(6).optional()
 };
 var QuizQuestionSchema = z10.discriminatedUnion("kind", [
   z10.object({ ...base, kind: z10.literal("multiple_choice"), options: z10.array(QuizChoiceSchema).min(2).max(6), correct: z10.array(Id).length(1) }),
@@ -4727,28 +4729,60 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/schemas/unit.ts
+import { z as z18 } from "zod";
+
+// apps/teaching/src/deep/schema.ts
 import { z as z17 } from "zod";
-var UnitSchema = z17.object({
+var DEEP_LIMITS = { perUnit: 4, pieces: 24, claim: 400, why: 300, piece: 200, fill: 400 };
+var TIERS = ["essential", "strong", "sophisticated"];
+var DuIdSchema = z17.string().regex(/^du_[a-z0-9]{4,16}$/);
+var PieceIdSchema = z17.string().regex(/^kp_[a-z0-9]{4,16}$/);
+var ConceptBulletSchema = z17.string().regex(/^[A-Z]{2,5}\d{1,2}$/);
+var KnowledgePieceSchema = z17.object({
+  id: PieceIdSchema,
+  text: z17.string().trim().min(1).max(DEEP_LIMITS.piece),
+  tier: z17.enum(TIERS)
+});
+var DeepUnderstandingSchema = z17.object({
+  id: DuIdSchema,
+  claim: z17.string().trim().max(DEEP_LIMITS.claim),
+  why: z17.string().trim().max(DEEP_LIMITS.why).default(""),
+  dot_points: z17.array(DotPointRefSchema).min(1).max(8),
+  concept_bullets: z17.array(ConceptBulletSchema).min(1).max(8),
+  pieces: z17.array(KnowledgePieceSchema).max(DEEP_LIMITS.pieces).default([]),
+  /** Pieces owned by another deep understanding in this unit. */
+  shared_piece_ids: z17.array(PieceIdSchema).max(DEEP_LIMITS.pieces).default([]),
+  steps: z17.array(z17.object({ step: z17.enum(["2a", "2b", "3", "4"]), fill: z17.string().trim().max(DEEP_LIMITS.fill) })).max(4).default([])
+});
+var DeepUnderstandingDraftSchema = DeepUnderstandingSchema.extend({
+  dot_points: z17.array(DotPointRefSchema).max(8),
+  concept_bullets: z17.array(ConceptBulletSchema).max(8)
+});
+
+// apps/teaching/src/schemas/unit.ts
+var UnitSchema = z18.object({
   ...CommonFields,
   ...TrashFields,
-  type: z17.literal("unit"),
-  year_id: z17.string().min(1),
-  subject_id: z17.string().min(1),
-  lesson_ids: z17.array(z17.string().min(1)),
-  primary_term: z17.number().int().positive().optional(),
-  start_date: z17.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z17.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  description: z17.string().optional(),
+  type: z18.literal("unit"),
+  year_id: z18.string().min(1),
+  subject_id: z18.string().min(1),
+  lesson_ids: z18.array(z18.string().min(1)),
+  primary_term: z18.number().int().positive().optional(),
+  start_date: z18.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z18.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z18.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z17.array(BlockSchema).optional(),
-  outcome_ids: z17.array(z17.string().min(1)).max(24).optional(),
+  blocks: z18.array(BlockSchema).optional(),
+  outcome_ids: z18.array(z18.string().min(1)).max(24).optional(),
+  /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
+  deep_understandings: z18.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
-  kind: z17.enum(["program"]).optional(),
+  kind: z18.enum(["program"]).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/class.ts
-import { z as z18 } from "zod";
+import { z as z19 } from "zod";
 
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
@@ -4793,74 +4827,74 @@ function validateTimetable(input) {
 }
 
 // apps/teaching/src/schemas/class.ts
-var ClassTimetableSchema = z18.unknown().transform((value, ctx) => {
+var ClassTimetableSchema = z19.unknown().transform((value, ctx) => {
   try {
     return validateTimetable(value);
   } catch (error) {
-    ctx.addIssue({ code: z18.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
-    return z18.NEVER;
+    ctx.addIssue({ code: z19.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
+    return z19.NEVER;
   }
 });
-var ClassHomepageSchema = z18.object({
-  announcements: z18.array(BlockSchema),
-  resources: z18.array(BlockSchema),
-  custom: z18.array(BlockSchema)
+var ClassHomepageSchema = z19.object({
+  announcements: z19.array(BlockSchema),
+  resources: z19.array(BlockSchema),
+  custom: z19.array(BlockSchema)
 });
-var ClassStudentSchema = z18.object({
-  name: z18.string().min(1).max(80),
-  skip_picker: z18.boolean().default(false),
+var ClassStudentSchema = z19.object({
+  name: z19.string().min(1).max(80),
+  skip_picker: z19.boolean().default(false),
   /** Never changes once saved, so renames keep a student's quiz results. */
-  id: z18.string().regex(STUDENT_ID_PATTERN).optional(),
+  id: z19.string().regex(STUDENT_ID_PATTERN).optional(),
   /** What the student types to take a quiz. Unique within the class. */
-  initials: z18.string().regex(INITIALS_PATTERN).optional()
+  initials: z19.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
-var ClassSchema = z18.object({
+var ClassSchema = z19.object({
   ...CommonFields,
   ...TrashFields,
-  type: z18.literal("class"),
-  code: z18.string().min(1),
-  display_name: z18.string().min(1).optional(),
-  academic_year: z18.number().int(),
-  year_id: z18.string().min(1),
-  subject_id: z18.string().min(1),
-  active_unit_ids: z18.array(z18.string().min(1)),
-  current_unit_id: z18.string().min(1).optional(),
-  current_scheduled_lesson_id: z18.string().min(1).optional(),
-  meeting_days: z18.array(z18.number().int().min(1).max(7)).optional(),
+  type: z19.literal("class"),
+  code: z19.string().min(1),
+  display_name: z19.string().min(1).optional(),
+  academic_year: z19.number().int(),
+  year_id: z19.string().min(1),
+  subject_id: z19.string().min(1),
+  active_unit_ids: z19.array(z19.string().min(1)),
+  current_unit_id: z19.string().min(1).optional(),
+  current_scheduled_lesson_id: z19.string().min(1).optional(),
+  meeting_days: z19.array(z19.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z18.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  students: z19.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/subject.ts
-import { z as z19 } from "zod";
-var SubjectSchema = z19.object({
+import { z as z20 } from "zod";
+var SubjectSchema = z20.object({
   ...CommonFields,
-  type: z19.literal("subject"),
-  display_title: z19.string().min(1),
-  scope_id: z19.string().min(1).optional(),
-  unit_ids: z19.array(z19.string().min(1)),
-  outcome_ids: z19.array(z19.string().min(1)),
-  class_ids: z19.array(z19.string().min(1)),
+  type: z20.literal("subject"),
+  display_title: z20.string().min(1),
+  scope_id: z20.string().min(1).optional(),
+  unit_ids: z20.array(z20.string().min(1)),
+  outcome_ids: z20.array(z20.string().min(1)),
+  class_ids: z20.array(z20.string().min(1)),
   /** Curriculum network lines, in map column order: trains, metro, light rail. */
-  network_lines: z19.array(NetworkLineSchema).max(24).optional(),
+  network_lines: z20.array(NetworkLineSchema).max(24).optional(),
   /** Drag offsets on the year network, keyed by unit id. */
   network_nudges: NetworkNudgesSchema.optional()
 });
 
 // apps/teaching/src/schemas/document.ts
-import { z as z20 } from "zod";
-var DocumentKindSchema = z20.enum(["syllabus"]);
-var DocumentSchema = z20.object({
+import { z as z21 } from "zod";
+var DocumentKindSchema = z21.enum(["syllabus"]);
+var DocumentSchema = z21.object({
   ...CommonFields,
   ...TrashFields,
-  type: z20.literal("document"),
+  type: z21.literal("document"),
   kind: DocumentKindSchema,
-  subject_id: z20.string().min(1),
-  blocks: z20.array(BlockSchema),
+  subject_id: z21.string().min(1),
+  blocks: z21.array(BlockSchema),
   cover: CoverSchema.optional(),
   source: SourceSchema.optional()
 });

@@ -121,6 +121,7 @@ import { createPublishedSprintHandler } from '../../../netlify/functions/publish
 import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
 import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-practice.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
+import { createClassDeepHandler } from '../../../netlify/functions/class-deep.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
 import { createClassProfileHandler } from '../../../netlify/functions/class-profile.mjs';
@@ -2221,17 +2222,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasLessonIds = record.lesson_ids !== undefined;
     const hasCover = record.cover !== undefined;
     const hasOutcomeIds = record.outcome_ids !== undefined;
+    const hasDeep = record.deep_understandings !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds) {
+    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds && !hasDeep) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide title, description, blocks, lesson_ids, cover, outcome_ids, and/or status'
+        'Provide title, description, blocks, lesson_ids, cover, outcome_ids, deep_understandings, and/or status'
       );
     }
 
@@ -2320,6 +2322,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
     }
     if (outcome_ids !== undefined) merged.outcome_ids = outcome_ids;
+    if (hasDeep) merged.deep_understandings = record.deep_understandings;
 
     if (hasStatus) {
       try {
@@ -3996,6 +3999,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createClassProfileHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)
+        : /^\/api\/classes\/[^/]+\/deep$/.test(path)
+      ? createClassDeepHandler(deps)
         : /^\/api\/classes\/[^/]+\/pieces$/.test(path)
       ? createClassPiecesHandler(deps)
         : path === '/api/to-mark'
@@ -4097,6 +4102,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/profile$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
+      /^\/api\/classes\/[^/]+\/deep$/.test(path) ||
       /^\/api\/classes\/[^/]+\/pieces$/.test(path) ||
       path === '/api/to-mark' ||
       /^\/api\/published\/profile\/[^/]+$/.test(path) ||

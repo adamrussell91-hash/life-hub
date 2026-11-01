@@ -58,6 +58,9 @@ import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
 import { settleConceptLines, settleSkillLines, unitNetworkContext } from '@/teacher/network-context';
 import { loadAlignment } from '@/alignment/api';
+import { lessonWeeks } from '@/deep/derive';
+import { mountDeepSection } from '@/deep/plan-view';
+import { unitScope } from '@/deep/scope';
 import { loadSkills } from '@/skills/api';
 import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
@@ -618,6 +621,31 @@ export function renderUnitPage(
       })
     : null;
 
+  const deepHost = document.createElement('section');
+  deepHost.className = 'unit-page__deep glass-panel';
+  deepHost.dataset.unitSection = 'deep';
+  void (async () => {
+    const [deepLessons, alignment] = await Promise.all([
+      Promise.all(unit.lesson_ids.map((id) => apiGet<Lesson>(`/api/lessons/${id}`).catch(() => null))).then((rows) =>
+        rows.filter((l): l is Lesson => !!l)
+      ),
+      loadAlignment().catch(() => null)
+    ]);
+    const unitRows = (curriculum.scheduled_lessons ?? []).filter((r) => r.unit_id === unit.id);
+    mountDeepSection(deepHost, {
+      unit,
+      lessons: deepLessons,
+      weeks: lessonWeeks(unit.lesson_ids, unitRows),
+      scope: unitScope(deepLessons, alignment),
+      save: (deep) => patchUnit(unit.id, { deep_understandings: deep }),
+      classes: curriculum.classes
+        .filter((c) => c.current_unit_id === unit.id || c.active_unit_ids.includes(unit.id))
+        .map((c) => ({ id: c.id, label: c.display_name || c.code })),
+      scheduled: unitRows,
+      onOpenLesson: (id) => navigate(`/lessons/${id}`)
+    });
+  })();
+
   planSection.append(planHeading);
   const planningPrompts = renderPlanningPrompts();
   if (planningPrompts) planSection.append(planningPrompts);
@@ -794,7 +822,7 @@ export function renderUnitPage(
     lessonsSection.append(list);
   }
 
-  root.append(coverHost, stripHost, planSection, tagsHost, lessonsSection);
+  root.append(coverHost, stripHost, deepHost, planSection, tagsHost, lessonsSection);
   canvas.append(root);
 
   return {

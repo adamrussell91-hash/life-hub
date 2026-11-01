@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep understandings mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.12);
+  --pastel-blue: #dceafa; --sage: #dfe9e1; --sage-ink: #3d6b4a; --green: #4f9a63;
+  --peach: #f8e1cf; --peach-ink: #8a5420; --amber: #e2a23b; --gold: #f6ecc4; --gold-ink: #7a6216;
+  --lilac: #e7e2f5; --lilac-ink: #5a4a8c;
+  --r-sm: .875rem; --r-md: 1.25rem;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font: inherit; font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.note { max-width: 1300px; margin: 14px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.stage { max-width: 1300px; margin: 0 auto; padding: 16px; display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 760px; min-width: 0; }
+.desk .screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 860px; overflow-y: auto; background: var(--paper); border-radius: 36px; border: 10px solid #1d2633; box-shadow: 0 10px 30px rgba(19,35,58,.18); }
+.page { padding: 24px 28px 40px; }
+.phone .page { padding: 18px 16px 32px; }
+h2.pt { margin: 0; font-size: 24px; color: var(--navy); }
+.sub { margin: 2px 0 16px; color: var(--muted); font-size: 13px; }
+h3.sec { margin: 26px 0 4px; font-size: 17px; color: var(--navy); }
+.sec-sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+
+/* Deep understanding cards */
+.dus { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.du { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer; display: grid; gap: 8px; align-content: start; }
+.du.on { border: 2px solid var(--wave); padding: 13px 15px; }
+.du .n { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--wave); }
+.du q { quotes: none; font-family: 'Source Serif 4', Georgia, serif; font-size: 16px; line-height: 1.45; color: var(--navy); }
+.pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 8px; }
+.p-con { background: var(--lilac); color: var(--lilac-ink); }
+.p-dp { background: var(--pastel-blue); color: var(--navy); }
+.du .meta { font-size: 12px; color: var(--muted); }
+.warn { font-size: 12px; font-weight: 600; color: var(--peach-ink); background: var(--peach); border-radius: 8px; padding: 4px 8px; }
+.add { border: 1.5px dashed rgba(23,55,94,.25); background: transparent; color: var(--wave); font: inherit; font-weight: 600; border-radius: var(--r-md); min-height: 120px; }
+
+/* Backwards map grid */
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; }
+table.map { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 760px; width: 100%; }
+.map th, .map td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--line); }
+.map th { font-weight: 600; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.map th.lsn { writing-mode: horizontal-tb; }
+.map td.rowh, .map th.rowh { text-align: left; position: sticky; left: 0; background: #fff; padding-left: 12px; font-weight: 600; color: var(--navy); white-space: nowrap; min-width: 120px; }
+.st { display: inline-grid; place-items: center; min-width: 26px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 11px; padding: 0 4px; }
+.s-k { background: var(--gold); color: var(--gold-ink); }
+.s-2 { background: var(--pastel-blue); color: var(--navy); }
+.s-3 { background: #b9cfeb; color: var(--navy); }
+.s-4 { background: var(--wave); color: #fff; }
+.s-5 { background: var(--navy); color: #fff; }
+.s-r { background: var(--sage); color: var(--sage-ink); }
+.s-gap { background: var(--peach); color: var(--peach-ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.legend span { display: inline-flex; gap: 5px; align-items: center; }
+
+/* Expanded DU: pieces + ladder */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 14px; margin-top: 12px; }
+.phone .split, .narrow .split { grid-template-columns: 1fr; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; }
+.panel h4 { margin: 0 0 8px; font-size: 14px; color: var(--navy); }
+.tier { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.t-e { color: var(--sage-ink); } .t-s { color: var(--wave); } .t-x { color: var(--lilac-ink); }
+.piece { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+.piece small { color: var(--muted); white-space: nowrap; }
+.rule { margin-top: 10px; font-size: 12px; color: var(--muted); background: var(--paper); border-radius: 8px; padding: 6px 8px; }
+.ladder { display: grid; gap: 8px; }
+.step { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; display: grid; gap: 4px; }
+.step.marker { border-style: dashed; background: var(--paper); }
+.step .hd { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.step .hd b { color: var(--navy); font-size: 14px; }
+.step .where { font-size: 12px; font-weight: 600; color: var(--wave); }
+.step .gen { font-size: 12px; color: var(--muted); }
+.step .fill { font-family: 'Source Serif 4', Georgia, serif; font-size: 14px; border-left: 2px solid var(--l2, #8fb1dc); padding-left: 8px; }
+.step .tc { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--ink); background: #fff; }
+.chip.ck { border-color: rgba(79,154,99,.4); color: var(--sage-ink); }
+
+/* Monitoring */
+.lad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.phone .lad { grid-template-columns: 1fr; }
+.col { background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px; min-height: 120px; }
+.col.marker { background: var(--paper); border-style: dashed; }
+.col h5 { margin: 0 0 2px; font-size: 13px; color: var(--navy); }
+.col .cs { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.toks { display: flex; flex-wrap: wrap; gap: 6px; }
+.tok { position: relative; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--pastel-blue); color: var(--navy); border: 2px solid var(--wave); cursor: pointer; }
+.tok.one { border-style: dashed; }
+.tok.old { opacity: .5; }
+.tok .b { position: absolute; top: -5px; right: -7px; min-width: 16px; height: 16px; border-radius: 999px; background: #fff; border: 1.5px dashed var(--navy); color: var(--navy); font-size: 9px; line-height: 13px; text-align: center; padding: 0 3px; }
+.tok.sel { outline: 3px solid var(--amber); outline-offset: 2px; }
+.groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.phone .groups { grid-template-columns: 1fr; }
+.grp { border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; }
+.grp b { display: block; margin-bottom: 4px; }
+.g-mem { background: #fbf0dc; color: #6b4a12; }
+.g-use { background: var(--pastel-blue); color: var(--navy); }
+.grp .do { margin-top: 6px; font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+table.kg { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 720px; width: 100%; }
+.kg th, .kg td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: center; }
+.kg th { font-size: 10px; color: var(--muted); font-weight: 600; max-width: 70px; line-height: 1.2; vertical-align: bottom; }
+.kg th.te { color: var(--sage-ink); } .kg th.ts { color: var(--wave); } .kg th.tx { color: var(--lilac-ink); }
+.kg td.rowh, .kg th.rowh { text-align: left; position: sticky; left: 0; background: #fff; padding-left: 12px; font-weight: 700; color: var(--navy); }
+.kg tr.sel td { background: #fffaf0; }
+.bar { position: relative; width: 140px; height: 10px; border-radius: 999px; background: #eef1f5; overflow: visible; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--wave); }
+.bar u { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--navy); }
+.bar .z { position: absolute; top: 0; bottom: 0; border-left: 1px dashed rgba(23,55,94,.25); }
+.c { display: inline-block; width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; background: #fff; border: 1.5px solid #cfd6e0; }
+.c.half { background: linear-gradient(90deg, var(--green) 50%, #fff 50%); border-color: var(--green); }
+.c.full { background: var(--green); border-color: var(--green); }
+.c.amb { background: var(--amber); border-color: var(--amber); }
+.c.fade { opacity: .35; }
+.c.used { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--navy); }
+.c.notused { box-shadow: 0 0 0 2px #fff; outline: 2px dashed var(--navy); outline-offset: 2px; }
+.c.na { background: transparent; border: 1px dotted #cfd6e0; }
+.keys { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin: 10px 0 0; align-items: center; }
+.keys span { display: inline-flex; gap: 6px; align-items: center; }
+.stu { margin-top: 12px; }
+.stu .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.stu .nm { font-weight: 700; color: var(--navy); font-size: 16px; }
+.hidden { display: none !important; }
+
+/* Rationale */
+.why-list { display: grid; gap: 12px; }
+.wy { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px; }
+.wy .num { grid-row: span 4; width: 40px; height: 40px; border-radius: 12px; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 16px; }
+.wy q { quotes: none; font-family: 'Source Serif 4', Georgia, serif; font-size: 17px; line-height: 1.45; color: var(--navy); }
+.wy .because { font-size: 13px; color: var(--ink); }
+.wy .because b { color: var(--muted); font-weight: 600; }
+.links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+.phone .links { grid-template-columns: 1fr; }
+.lk h6 { margin: 0 0 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.lk p { margin: 0 0 6px; font-size: 12.5px; line-height: 1.4; }
+.lk .code { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 0 6px; margin-right: 4px; }
+.lk .none { color: var(--muted); font-style: italic; }
+.wy .stat { font-size: 12px; font-weight: 600; color: var(--wave); margin-top: 4px; }
+.say { margin-top: 12px; background: var(--paper); border: 1px dashed rgba(23,55,94,.25); border-radius: var(--r-sm); padding: 12px 14px; font-size: 13.5px; line-height: 1.55; }
+.say .hd { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.say button { font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--wave); border-radius: 999px; padding: 3px 10px; cursor: pointer; text-transform: none; letter-spacing: 0; }
+.dutabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+.dutabs button { font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 6px 12px; cursor: pointer; max-width: 100%; text-align: left; }
+.dutabs button.on { background: var(--navy); color: #fff; }
+
+/* Track */
+.track { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 18px 16px 14px; }
+.tr-ends { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.tr-row { position: relative; display: grid; grid-template-columns: 1fr 1fr .55fr 1fr 1fr; }
+.tr-row::before { content: ""; position: absolute; left: 10%; right: 10%; top: 13px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, #c9d9ee, #8fb1dc 40%, #376fb7 70%, #17375e); }
+.stn { position: relative; display: grid; justify-items: center; align-content: start; gap: 6px; padding: 0 4px; }
+.stn .pt { width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 4px solid var(--navy); z-index: 1; }
+.stn.mk .pt { width: 18px; height: 18px; margin-top: 7px; border: 2px dashed var(--wave); }
+.stn .nm { font-size: 12.5px; font-weight: 700; color: var(--navy); text-align: center; line-height: 1.25; min-height: 2.5em; display: grid; align-items: center; }
+.phone .stn .nm { min-height: 0; }
+.stn .ct { font-size: 11px; color: var(--muted); text-align: center; }
+.stn .pile { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; max-width: 132px; margin-top: 4px; }
+.stn.mk .nm { font-weight: 600; color: var(--muted); font-size: 11.5px; }
+.phone .tr-row { grid-template-columns: 1fr; gap: 14px; padding-left: 8px; }
+.phone .tr-row::before { left: 23px; right: auto; top: 10px; bottom: 10px; width: 6px; height: auto; background: linear-gradient(180deg, #c9d9ee, #8fb1dc 40%, #376fb7 70%, #17375e); }
+.phone .stn { grid-template-columns: 32px 1fr; justify-items: start; align-items: start; column-gap: 12px; }
+.phone .stn .pt { grid-row: span 3; }
+.phone .stn.mk .pt { margin-left: 7px; }
+.phone .stn .nm, .phone .stn .ct { text-align: left; }
+.phone .stn .pile { justify-content: flex-start; max-width: none; }
+.phone .tr-ends { display: none; }
+
+/* Lanes */
+.dist { display: flex; height: 30px; border-radius: 10px; overflow: hidden; font-size: 11.5px; margin-bottom: 10px; }
+.dist span { display: flex; align-items: center; gap: 4px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.filt { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.filt .fl { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.filt button { font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.filt button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.lanes { display: grid; gap: 8px; }
+.lane { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; }
+.phone .lane { grid-template-columns: 1fr; }
+.lane.mk { background: var(--paper); border-style: dashed; padding: 6px 12px; }
+.ln { display: flex; gap: 10px; align-items: flex-start; }
+.ln b { display: block; color: var(--navy); font-size: 13.5px; }
+.ln small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.lnum { flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.lnum.mkn { border: 1.5px dashed var(--wave); background: #fff; width: 26px; height: 18px; margin-top: 2px; }
+.sts { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px 3px 10px; background: #fff; font-size: 12px; cursor: pointer; }
+.sc b { color: var(--navy); font-size: 12.5px; }
+.sc.dim { opacity: .25; }
+.sc.sel { border-color: var(--amber); box-shadow: 0 0 0 2px #fbe3b6; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--green); background: #fff; }
+.pips i.on { background: var(--green); }
+.tag { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
+.t-old { background: #eceef2; color: #4d5868; }
+.t-nu { background: var(--pastel-blue); color: var(--navy); }
+
+.eye { display: inline-block; position: relative; vertical-align: -2px; }
+.eye summary { list-style: none; cursor: pointer; color: var(--wave); display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; }
+.eye summary::-webkit-details-marker { display: none; }
+.eye summary:hover, .eye[open] summary { background: var(--pastel-blue); }
+.eye .pop { position: absolute; z-index: 10; left: 0; top: 26px; width: 290px; max-width: 80vw; background: var(--navy); color: #fff; font-size: 12.5px; font-weight: 400; line-height: 1.45; padding: 10px 12px; border-radius: 10px; box-shadow: 0 8px 24px rgba(19,35,58,.25); text-transform: none; letter-spacing: 0; }
+.det { grid-column: 1 / -1; background: #fffaf0; border: 1.5px solid var(--amber); border-radius: var(--r-sm); padding: 12px 14px; margin-top: -2px; }
+.det-hd { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
+.det-hd b { font-size: 16px; color: var(--navy); }
+.det-hd span { font-size: 12px; color: var(--muted); }
+.det-hd .x { margin-left: auto; font: inherit; font-size: 12px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.det-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.phone .det-grid { grid-template-columns: 1fr; }
+.det h6 { margin: 0 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.det p { margin: 0 0 6px; font-size: 13px; line-height: 1.4; }
+.det small { color: var(--muted); }
+.det .muted { color: var(--muted); font-size: 12px; }
+.next .acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.next button { font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--wave); color: var(--wave); background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.next button:first-child { background: var(--wave); color: #fff; }
+
+.ed { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }
+.phone .ed { grid-template-columns: 1fr; }
+@media (max-width: 1180px) { .desk .ed { grid-template-columns: 1fr; } .desk .ed-side { order: -1; position: static; } }
+.phone .ed-side { order: -1; }
+.eds { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 12px; display: grid; gap: 8px; }
+.eds h4 { margin: 0; font-size: 15px; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.edn { width: 24px; height: 24px; border-radius: 8px; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 12px; }
+.eds textarea, .eds input, .eds select { font: inherit; font-size: 13.5px; border: 1px solid rgba(23,55,94,.2); border-radius: 8px; padding: 7px 9px; background: #fff; color: var(--ink); width: 100%; min-width: 0; }
+.eds textarea { font-family: 'Source Serif 4', Georgia, serif; font-size: 15.5px; color: var(--navy); resize: vertical; }
+.eds input.serif { font-family: 'Source Serif 4', Georgia, serif; font-size: 14px; }
+.lbl { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.cks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; font-weight: 600; }
+.ck-ok { color: var(--sage-ink); } .ck-no { color: var(--peach-ink); }
+.lk2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+.phone .lk2 { grid-template-columns: 1fr; }
+.lk2 h6 { margin: 0 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pk { display: grid; gap: 4px; margin-bottom: 6px; }
+.opt { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.35; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.opt input { width: auto; margin-top: 2px; }
+.opt.on { background: var(--pastel-blue); border-color: rgba(55,111,183,.35); }
+.opt b { color: var(--navy); }
+.prow { display: grid; grid-template-columns: auto minmax(120px, 160px) 1fr; grid-template-areas: "seg les itm" "txt txt txt"; gap: 6px 8px; align-items: center; font-size: 12.5px; border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+.prow > .seg { grid-area: seg; } .prow > input { grid-area: txt; } .prow > select { grid-area: les; } .prow > span:last-child { grid-area: itm; }
+.prow.hd { display: none; }
+.phone .prow { grid-template-columns: auto 1fr; grid-template-areas: "seg seg" "les itm" "txt txt"; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg i { font-style: normal; font-size: 11px; font-weight: 600; padding: 3px 7px; color: var(--muted); cursor: pointer; }
+.seg i.on.tE { background: var(--sage); color: var(--sage-ink); } .seg i.on.tS { background: var(--pastel-blue); color: var(--navy); } .seg i.on.tX { background: var(--lilac); color: var(--lilac-ink); }
+.lnk { color: var(--wave); font-weight: 600; cursor: pointer; }
+.wr { font: inherit; font-size: 12px; font-weight: 600; border: 1px dashed var(--peach-ink); color: var(--peach-ink); background: var(--peach); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.reuse { font: inherit; font-size: 12.5px; font-weight: 600; border: 1px dashed rgba(23,55,94,.3); color: var(--wave); background: transparent; border-radius: 8px; padding: 6px; cursor: pointer; }
+.srow { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.sn { width: 32px; height: 32px; border-radius: 10px; background: var(--pastel-blue); color: var(--navy); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.sb { display: grid; gap: 6px; }
+.sh { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.sh b { color: var(--navy); font-size: 14px; }
+.sh select { width: auto; }
+.sb .gen { font-size: 12px; color: var(--muted); }
+.chip.sug { border-style: dashed; color: var(--wave); cursor: pointer; font: inherit; font-size: 11px; }
+.evd { font-size: 12px; font-weight: 600; }
+.ready { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.ready li::before { display: inline-block; width: 18px; font-weight: 700; }
+.ready li.y::before { content: "\2713"; color: var(--sage-ink); }
+.ready li.n::before { content: "\25CB"; color: var(--peach-ink); }
+.ready small { display: block; margin-left: 18px; color: var(--peach-ink); font-size: 11.5px; }
+.ed-side { position: sticky; top: 70px; }
+
+.from { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.where2, .evd2 { grid-area: les / les / itm / itm; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; }
+.prow { grid-template-columns: auto 1fr !important; grid-template-areas: "seg les" "txt txt" !important; }
+.prow > .where2 { grid-area: les; }
+.wl { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.lchip { font-size: 11px; font-weight: 600; background: var(--gold); color: var(--gold-ink); border-radius: 6px; padding: 1px 6px; }
+.lchip.t { background: var(--sage); color: var(--sage-ink); }
+.lchip.on { background: var(--navy); color: #fff; }
+.cnt { font-size: 11px; color: var(--muted); }
+.lfind { font: inherit; font-size: 11px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--wave); border-radius: 999px; padding: 1px 8px; cursor: pointer; }
+.lfind.on { border-color: var(--wave); box-shadow: 0 0 0 2px var(--pastel-blue); }
+.finder { border: 1.5px solid var(--wave); border-radius: var(--r-sm); background: #fff; padding: 10px; display: grid; gap: 8px; box-shadow: 0 8px 24px rgba(19,35,58,.12); }
+.fi-hd { display: flex; gap: 8px; align-items: center; } .fi-hd input { flex: 1; }
+.fi-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.fi-list { display: grid; gap: 2px; max-height: 210px; overflow: auto; }
+.fi-wk { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 6px 0 2px; }
+.fi-row { display: flex; gap: 8px; align-items: center; font-size: 12.5px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.fi-row input { width: auto !important; }
+.fi-row.on { background: var(--pastel-blue); }
+.fi-row b { color: var(--navy); min-width: 28px; }
+.fi-ft { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 11.5px; }
+.done { font: inherit; font-size: 12px; font-weight: 600; background: var(--wave); color: #fff; border: 0; border-radius: 999px; padding: 4px 12px; }
+.task { display: inline-flex; flex-direction: column; background: var(--pastel-blue); color: var(--navy); font-weight: 600; border-radius: 8px; padding: 3px 8px; font-size: 12.5px; }
+.task small { font-weight: 400; color: var(--muted); font-size: 11px; }
+
+#phonePage .ed-side, #phonePage .ed-side .panel { position: static !important; }
+#phonePage .prow { grid-template-columns: 1fr !important; grid-template-areas: "seg" "txt" "les" !important; }
+.empty { color: var(--muted); font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Deep understandings · unit page</h1>
+  <button data-view="plan" aria-pressed="true">Plan</button>
+  <button data-view="watch" aria-pressed="false">Monitoring</button>
+  <button data-view="edit" aria-pressed="false">Make one</button>
+</div>
+<p class="note">Mockup for discussion. Students are invented (initials only); deep understandings are drafts. Click a deep understanding card to switch which one is open; click a token in Monitoring to see that student's row.</p>
+
+<div class="stage">
+  <div class="desk"><p class="label">Desktop · teacher</p><div class="screen"><div class="page" id="deskPage"></div></div></div>
+  <div class="phone"><p class="label">Phone · 390px</p><div class="screen"><div class="page" id="phonePage"></div></div></div>
+</div>
+
+<script>
+const LESSONS = ['L1 Context', 'L2 Remedy', 'L3 Finn', "L4 Let's Talk", 'L5 El Diablo', 'L6 Seminar', 'L7 End of Days', 'L8 Compare', 'L9 Blacktracker', 'L10 Unseen', 'L11 Addendum', 'Task'];
+
+const DUS = [
+  {
+    claim: "Watson borrows the coloniser's own stories and turns them so the system becomes the monster. Turning a familiar frame against the values it usually carries is how a composer challenges them.",
+    concepts: ['REP2 challenge or reshape values', 'CODE2 subvert value systems'], dps: ['U4 Connecting, affirming, challenging', 'R2 Affirm or challenge'],
+    why: 'It is the move the whole collection makes, and spotting a borrowed frame is what an unseen text rewards.',
+    links: { c: [['REP2', 'Representation', 'representation reinforces, challenges or may attempt to reshape values and ways of thinking'], ['CODE2', 'Code and convention', 'codes and conventions are used to promote, reflect or subvert value systems']], u: [['U4', 'Language used for making connections, questioning, affirming, challenging and speculating about texts']], r: [['R2', 'Compose creative and critical texts that affirm or challenge ideas, values and perspectives represented in a range of texts']] },
+    status: '6 of 21 at Compare or beyond · 6 not yet past Step 1',
+    map: { 0: 'k', 4: 'k2', 6: '3', 7: '4', 9: '5', 11: 't', 2: 'r', 5: 'r', 8: 'r', 10: 'r' },
+    pieces: {
+      e: [['Gothic conventions: haunting, monster, decay, the uncanny', 'L1'], ['Aboriginal Gothic flips settler Gothic: the coloniser is the monster', 'L1'], ['A songline is a map and memory system for Country', 'L5'], ['"devil\'s rope": barbed wire and fencing off Country', 'L5']],
+      s: [['El Camino del Diablo: a real colonial death road', 'L5'], ["Dante's Malebolge: pits for the corrupt", 'L5'], ['Faust: selling the soul for power', 'L5'], ['End of Days takes its frame from biblical apocalypse', 'L7']],
+      x: [['Settler Gothic made Aboriginal people the threat in the bush', 'L1'], ['The Kadaitcha Sung as an earlier Aboriginal Gothic novel', 'L6']]
+    }
+  },
+  {
+    claim: "Watson's “you” puts the reader in the middle lane, so we can't watch from a safe distance. How a composer addresses the reader decides whether we observe or are implicated.",
+    concepts: ['POV1 point of view'], dps: ['U2 Perspectives and human experiences', 'R1 Sustained interpretations'],
+    why: 'Students describe what the poems show; this moves them to what the poems make the reader do.',
+    links: { c: [['POV1', 'Point of view', 'point of view gives us a position from which to judge events']], u: [['U2', 'The language, forms and features of texts that shape a range of perspectives, personal and public worlds, and diverse human experiences']], r: [['R1', 'Develop creative, informed and sustained interpretations of texts, supported by close textual analysis']] },
+    status: 'Steps 2 to 4 placed · no Unseen yet',
+    map: { 3: 'k2', 4: '3', 5: '4', 11: 't', 7: 'r' },
+    gap: 'No Step 4 (unseen) before the task.'
+  },
+  {
+    claim: "Watson packs several meanings into one word, like horns or shoulder, so the everyday and the systemic sit together. Compression makes the reader do the connecting.",
+    concepts: ['CODE1 manipulating codes'], dps: ['U3 Aesthetic qualities', 'U5 Evaluative language'],
+    why: 'Close analysis at word level is where the class is weakest, and Watson rewards it more than any set text.',
+    links: { c: [['CODE1', 'Code and convention', 'deliberate manipulation of and experimentation with codes and conventions can stimulate and express complex thinking']], u: [['U3', 'The aesthetic qualities of texts and the power of language to express personal ideas and experiences'], ['U5', 'The evaluative language and metalanguage used to make informed judgements about texts and express personal perspectives']], r: [] },
+    status: 'Step 2 placed · no Compare, 2 pieces',
+    map: { 1: 'k', 4: '2', 8: '3', 11: 't' },
+    gap: 'No Step 3 (compare) before the task. Only 2 knowledge pieces.'
+  }
+];
+
+const STEPS = [
+  { b: '1 · Know the pieces', gen: 'Recalls the facts the principle rests on, on two separate days.', fill: null, where: 'L1, L5, L7 + retrieval L3, L6, L9, L11', teach: ['Knowledge organiser', 'Retrieval starter (auto-picked)'], check: ['Quiz items tagged to each piece'] },
+  { b: '2A · Explain it in one text', gen: 'Explains how the principle works in one text, with evidence, but only in the text where they learned it.', fill: 'In El Diablo Highway, the devil is the road the settlers built.', where: 'L5 El Diablo', teach: ['Model the paragraph', 'Annotation thread'], check: ['One analytical paragraph'] },
+  { b: '2B · Explain it in a second text', gen: 'Explains the same move in a second text, taught on its own terms. This shows breadth; the link between the two texts comes at Step 3.', fill: 'End of Days: the biblical apocalypse turned back on the colonisers.', where: 'L7 End of Days', teach: ['Teach the second text on its own terms', 'Same paragraph frame as 2A'], check: ['One analytical paragraph on the second text'] },
+  { b: '3 · Compare when prompted', gen: 'Asked to compare, names the shared move and uses both texts as evidence.', fill: 'Both take a Western story about judgement and point it back at the society that told it.', where: 'L8 Compare', teach: ['Two-column compare', 'Near miss: example and counterexample sleeve', 'Name it without either title', 'Bridge: “this is like…”'], check: ['Compare paragraph: Surface / Connected / Deep', 'Open question before prompting'] },
+  { b: '4 · Spot and use it unprompted', gen: 'Meets a text nobody pointed it at, and spots or uses the move without a cue.', fill: 'An unseen poem rewrites a national anthem to challenge what it celebrates.', where: 'L10 Unseen · Task', teach: ['Held-back unseen text', 'Deep sort of 5 extracts', 'Write it: borrow a frame to challenge'], check: ['Unseen short response (unprompted, then hint)', 'Assessment question needs it'] }
+];
+
+const STUDENTS = ['AK','BM','CT','DL','EP','FR','GS','HW','IJ','JN','KO','LV','MC','NB','OD','PH','QA','RS','SY','TF','UZ'];
+// level: 1 pieces, 2 one text, 4 compare, 5 unseen ; ev: evidence count ; old: stale ; nu: known-not-used count
+const TOKENS = {
+  AK:{l:4,ev:2}, BM:{l:2,ev:2,nu:2}, CT:{l:1,ev:1}, DL:{l:2,ev:1}, EP:{l:5,ev:1}, FR:{l:3,ev:2,nu:3}, GS:{l:1,ev:2},
+  HW:{l:4,ev:1}, IJ:{l:3,ev:2}, JN:{l:1,ev:1,old:true}, KO:{l:4,ev:2,nu:1}, LV:{l:2,ev:2}, MC:{l:2,ev:1,nu:2}, NB:{l:1,ev:2},
+  OD:{l:4,ev:2}, PH:{l:3,ev:2}, QA:{l:1,ev:1}, RS:{l:3,ev:2,nu:1}, SY:{l:5,ev:2}, TF:{l:2,ev:1}, UZ:{l:1,ev:2}
+};
+const PIECES = [...DUS[0].pieces.e.map(p=>['te',p[0]]), ...DUS[0].pieces.s.map(p=>['ts',p[0]]), ...DUS[0].pieces.x.map(p=>['tx',p[0]])];
+const SHORT = ['Gothic conventions','Aboriginal Gothic flip','Songline','Devil\'s rope','El Camino','Malebolge','Faust','End of Days frame','Settler Gothic','Kadaitcha Sung'];
+function seeded(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))>>>0; return ()=>{ h=(h*1103515245+12345)>>>0; return (h>>>8)/16777216; }; }
+const STATE = {};
+for (const s of STUDENTS) {
+  const r = seeded(s); const t = TOKENS[s];
+  STATE[s] = PIECES.map((p, i) => {
+    if (i >= 8 && t.l < 4) return { f: r() < .3 ? 'half' : 'na' };
+    if (i === 7 && t.l === 1 && r() < .5) return { f: 'na' };
+    const x = r();
+    let f = x < .12 ? 'amb' : x < .3 ? 'half' : 'full';
+    if (t.l === 1 && i < 4 && x < .35) f = x < .2 ? 'amb' : 'half';
+    const fade = f === 'full' && r() < .15;
+    let ring = '';
+    if (f === 'full' && i < 6) ring = r() < .3 ? 'used' : (t.nu && r() < .6 ? 'notused' : '');
+    return { f, fade, ring };
+  });
+  if (TOKENS[s].l >= 2) {
+    const st = STATE[s];
+    for (let i = 0; i < 4; i++) if (st[i].f !== 'full' && st[i].f !== 'half') st[i].f = 'full';
+    for (let i = 0; i < 8 && pct(s).p < .8; i++) if (st[i].f !== 'full') { st[i].f = 'full'; }
+  }
+}
+function pct(s){ const st = STATE[s].slice(0,8); const got = st.reduce((n,c)=>n+(c.f==='full'?1:c.f==='half'?.5:0),0); const ess = STATE[s].slice(0,4).every(c=>c.f==='full'||c.f==='half'); return { p: got/8, ess }; }
+
+// Highest placed stop per deep understanding: DU2 has no Unseen yet, DU3 only reaches Step 2.
+const REACH = [5, 4, 3];
+const LEVELS = {};
+for (const s of STUDENTS) {
+  const r = seeded(s + 'x');
+  const a = TOKENS[s].l;
+  const b = Math.min(4, Math.max(1, a + (r() < .4 ? -1 : r() < .7 ? 0 : 1)));
+  const c = r() < .45 ? 1 : r() < .8 ? 2 : 3;
+  LEVELS[s] = [a, b, c];
+}
+LEVELS.EP = [5, 2, 1]; LEVELS.SY = [5, 4, 3];
+const LABEL = { 1: '1', 2: '2A', 3: '2B', 4: '3', 5: '4' };
+function mini(l, reach) {
+  const stops = [1, 2, 3, 4, 5];
+  return `<span style="display:inline-flex;align-items:center;gap:0">${stops.map((st, i) => {
+    const placed = st <= reach;
+    const on = st <= l;
+    const dot = `<span style="width:12px;height:12px;border-radius:50%;display:inline-block;${!placed ? 'background:repeating-linear-gradient(45deg,#e4e7ec 0 2px,#fff 2px 4px);border:1px dashed #b9c1cd' : on ? 'background:var(--navy);border:1px solid var(--navy)' : 'background:#fff;border:1.5px solid #b9c1cd'}"></span>`;
+    const line = i < 4 ? `<span style="width:14px;height:3px;display:inline-block;background:${stops[i + 1] <= l ? 'var(--navy)' : '#dfe3ea'}"></span>` : '';
+    return dot + line;
+  }).join('')}</span>`;
+}
+
+const EYE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor"/></svg>';
+function eye(text) { return `<details class="eye"><summary aria-label="More information">${EYE}</summary><div class="pop">${text}</div></details>`; }
+const FILT_HELP = {
+  all: 'Everyone on this deep understanding, by the step they have evidence for.',
+  one: 'One piece of evidence can be a fluke. Give these students a second chance to show the step before you plan around it.',
+  old: 'Their last evidence for this step is over 3 weeks old. It may not have stuck: a quick re-check tells you whether they still hold it.',
+  nu: 'They got these pieces right in quizzes but left them out of writing that needed them. That’s an integration gap, not a memory gap: model the move, then give them a re-do.'
+};
+const TASKS = { 1: [['Retrieval starter', 'L6', '30 Oct']], 2: [['El Diablo analytical paragraph', 'L5', '28 Oct'], ['Seminar short answer', 'L6', '30 Oct']], 3: [['End of Days paragraph', 'L7', '3 Nov'], ['El Diablo analytical paragraph', 'L5', '28 Oct']], 4: [['Compare paragraph', 'L8', '5 Nov'], ['End of Days paragraph', 'L7', '3 Nov']], 5: [['Unseen short response', 'L10', '10 Nov'], ['Compare paragraph', 'L8', '5 Nov']] };
+function detail(s, l, name) {
+  const t = TOKENS[s];
+  const tasks = TASKS[l].slice(0, t.ev);
+  const notUsed = STATE[s].map((c, i) => ({ c, i })).filter(x => x.c.ring === 'notused').map(x => SHORT[x.i]);
+  while (notUsed.length < (t.nu || 0)) notUsed.push(['Songline', 'Devil’s rope', 'Malebolge'][notUsed.length]);
+  const nu = notUsed.slice(0, t.nu || 0);
+  let h = `<div class="det"><div class="det-hd"><b>${s}</b><span>Step ${LABEL[l]} · ${name} · deep understanding 1</span><button class="x" data-s="">Close</button></div><div class="det-grid">`;
+  h += `<div><h6>Evidence for this step</h6>${tasks.map(k => `<p><span class="pips"><i class="on"></i></span> ${k[0]} <small>${k[1]} · ${k[2]}</small></p>`).join('')}${t.ev < 2 ? '<p class="muted">One more piece needed to confirm.</p>' : ''}${t.old ? '<p class="muted">Last evidence 4 weeks ago.</p>' : ''}</div>`;
+  if (nu.length) {
+    h += `<div><h6>Known, not used ${eye('Each of these is green in their quizzes, and the task named here needed it. The writing didn’t use it.')}</h6>${nu.map((p, i) => `<p><span class="tag t-nu">${p}</span> left out of <b>${(TASKS[Math.max(2, l)] || TASKS[2])[i % 2][0]}</b> <small>${(TASKS[Math.max(2, l)] || TASKS[2])[i % 2][1]}</small></p>`).join('')}</div>`;
+    h += `<div class="next"><h6>Next move</h6><p>Model one paragraph that brings in <b>${nu[0]}</b> to back the claim, then ask ${s} to redo their paragraph using it.</p><div class="acts"><button>Send as a next step</button><button>Set a redo</button><button>Add to a regroup</button></div></div>`;
+  } else {
+    h += `<div class="next"><h6>Next move</h6><p>${t.ev < 2 ? 'Give a second chance to show this step: the next paragraph task counts.' : 'Ready for the next step when the lesson comes.'}</p></div>`;
+  }
+  return h + `</div></div>`;
+}
+
+
+function editor(narrow) {
+  const ok = (t) => `<span class="ck-ok">✓ ${t}</span>`;
+  const no = (t) => `<span class="ck-no">○ ${t}</span>`;
+  let h = `<h2 class="pt">New deep understanding</h2><p class="sub">Texts and human experiences · 46 lessons · saves as you go</p>`;
+  h += `<div class="ed"><div class="ed-main">`;
+  h += `<section class="eds"><h4><span class="edn">1</span>The claim ${eye('Write the one sentence a top response would argue. Name what the composer does and what it does to meaning, in words that would still make sense about a text you haven’t taught. A theme (“colonisation”) is a topic, not a claim.')}</h4><textarea rows="3">${DUS[0].claim}</textarea><div class="cks">${ok('Written as a claim, not a theme')}${ok('Names a move that carries beyond this text')}</div>`;
+  h += `<label class="lbl">Why this one ${eye('One line you could say to a head teacher or a parent: why this understanding, for this class, in this unit.')}</label><input value="${DUS[0].why}"></section>`;
+  h += `<section class="eds"><h4><span class="edn">2</span>Link it to the syllabus ${eye('Only this unit’s dot points, and only the concept bullets the syllabus links to them. Need something else? Add the dot point on the unit’s Syllabus card first and it appears here.')}</h4><div class="lk2"><div><h6>This unit’s dot points</h6><div class="pk">${[['U2','Perspectives and human experiences',0],['U3','Aesthetic qualities, power of language',0],['U4','Connecting, affirming, challenging',1],['U5','Evaluative language, metalanguage',0],['R1','Sustained interpretations',0],['R2','Affirm or challenge',1]].map(([c,t,on])=>`<label class="opt ${on?'on':''}"><input type="checkbox" ${on?'checked':''}><span><b>${c}</b> ${t}</span></label>`).join('')}</div></div>`;
+  h += `<div><h6>Concept bullets linked to them</h6><div class="pk">${[['REP2','representation reinforces, challenges or may attempt to reshape values and ways of thinking',1,'U2'],['CODE2','codes and conventions are used to promote, reflect or subvert value systems',1,'U4'],['ARG4','arguments, in different forms, modes and media, convince in different ways',0,'U4'],['POV1','point of view gives us a position from which to judge events',0,'U2'],['STY4','style is both aesthetic and dynamic, playing on the ways convention, subversion and experiment interact',0,'U3']].map(([c,t,on,from])=>`<label class="opt ${on?'on':''}"><input type="checkbox" ${on?'checked':''}><span><b>${c}</b> ${t} <small class="from">via ${from}</small></span></label>`).join('')}</div></div></div><div class="cks">${ok('2 dot points (1 Understanding, 1 Responding)')}${ok('2 concept bullets')}</div></section>`;
+  const rows = [['E','Gothic conventions: haunting, monster, decay, the uncanny','L1','L3, L6, L9',3],['E','Aboriginal Gothic flips settler Gothic: the coloniser is the monster','L1, L2','L3, L6, L11',4],['E','A songline is a map and memory system for Country','L5','L6, L9',3],['E','“devil’s rope”: barbed wire and fencing off Country','L5','L6',2],['S','El Camino del Diablo: a real colonial death road','L5','L9',2],['S','Dante’s Malebolge: pits for the corrupt','L5, L6','L11',2],['S','Faust: selling the soul for power','L5','L9',2],['S','End of Days takes its frame from biblical apocalypse','','',0],['X','Settler Gothic made Aboriginal people the threat in the bush','L1','L6',2],['X','The Kadaitcha Sung as an earlier Aboriginal Gothic novel','L6','',0]];
+  h += `<section class="eds"><h4><span class="edn">3</span>Knowledge pieces ${eye('The concrete facts this understanding rests on. Essential: the principle can’t stand without it. Strong: what most of the class should hold. Sophisticated: what extension students bring into their writing. Where a piece is taught and tested fills in from tags: tag a block in a lesson and it shows as taught, write a quiz item for it and it shows as tested.')}</h4>`;
+  rows.forEach(([t,txt,taught,tested,n],i)=>{
+    h += `<div class="prow"><span class="seg">${['E','S','X'].map(k=>`<i class="${k===t?'on t'+k:''}">${k==='E'?'Essential':k==='S'?'Strong':'Soph.'}</i>`).join('')}</span><input value="${txt.replace(/"/g,'&quot;')}"><div class="where2"><span class="wl">Taught</span>${taught?taught.split(', ').map(x=>`<span class="lchip">${x}</span>`).join(''):''}<button class="lfind ${i===7?'on':''}">${taught?'+':'Tag where it’s taught'}</button><span class="wl" style="margin-left:8px">Tested</span>${tested?tested.split(', ').map(x=>`<span class="lchip t">${x}</span>`).join('')+`<span class="cnt">${n} items</span>`:`<button class="wr">Write items</button>`}</div></div>`;
+    if (i === 7) h += finder();
+  });
+  h += `<div class="prow add2"><span class="seg"><i class="on tS">Strong</i></span><input placeholder="Add a knowledge piece…"></div>`;
+  h += `<div class="prow" style="grid-template-columns:1fr;grid-template-areas:none"><button class="reuse">+ Use a piece from deep understanding 2 or 3</button></div>`;
+  h += `<div class="cks">${ok('8 Essential + Strong (aim 8 to 12)')}${ok('Every Essential piece taught and tested')}${no('End of Days frame: not tagged or tested yet')}</div></section>`;
+  const sl = [['1','Know the pieces','','Tracked through each piece’s quiz items'],['2A','Explain it in one text','In El Diablo Highway, the devil is the road the settlers built.',['El Diablo analytical paragraph','L5 · Wk 2']],['2B','Explain it in a second text','End of Days: the biblical apocalypse turned back on the colonisers.',['End of Days paragraph','L19 · Wk 5']],['3','Compare when prompted','Both take a Western story about judgement and point it back at the society that told it.',null],['4','Spot and use it unprompted','',null]];
+  h += `<section class="eds"><h4><span class="edn">4</span>Place the steps ${eye('Each step is placed by the task that counts as evidence. Pick the task and its lesson comes with it, so there’s no lesson list to scroll. Write what a student at this step would say about this unit.')}</h4>`;
+  sl.forEach(([n,name,fill,task])=>{
+    h += `<div class="srow"><div class="sn">${n}</div><div class="sb"><div class="sh"><b>${name}</b></div>${n==='1'?`<div class="gen">${task}</div>`:`<input class="serif" placeholder="What a student at this step would say about this unit…" value="${fill.replace(/"/g,'&quot;')}">`}${n==='1'?'':task?`<div class="evd2"><span class="wl">Evidence</span><span class="task">${task[0]}<small>${task[1]}</small></span><button class="lfind">Change</button></div>`:`<div class="evd2"><span class="wl">Evidence</span><button class="wr">Find the task that counts…</button></div>`}<div class="tc"><span class="chip">${['Retrieval starters','Model the paragraph · Annotation thread','Same paragraph frame as 2A','Two-column compare · Example and counterexample sleeve','Deep sort · Held-back unseen text'][['1','2A','2B','3','4'].indexOf(n)]}</span><button class="chip sug">+ suggestions</button></div></div></div>`;
+  });
+  h += `<div class="cks">${ok('Steps 1, 2A and 2B have evidence')}${no('Steps 3 and 4 need an evidence task')}</div></section>`;
+  h += `</div><aside class="ed-side"><div class="panel"><h4>Ready to teach?</h4><ul class="ready"><li class="y">Claim</li><li class="y">Why this one</li><li class="y">Dot point + concept bullet</li><li class="y">8 knowledge pieces</li><li class="n">Every piece taught and tested <small>End of Days frame</small></li><li class="n">Evidence task for every step <small>Steps 3 and 4</small></li></ul><p class="muted" style="font-size:12px;margin:8px 0 0">It shows on the plan straight away. Gaps show as peach warnings until they’re filled.</p></div></aside></div>`;
+  return h;
+}
+function finder() {
+  const weeks = [['Week 5', [['L18','Seminar: Let’s Talk and El Diablo',0],['L19','End of Days: first reading',1],['L20','End of Days: annotation',1],['L21','Retrieval and paragraph practice',0]]],['Week 6', [['L22','Compare workshop',0],['L23','Blacktracker',0]]]];
+  return `<div class="finder"><div class="fi-hd"><input value="end of" aria-label="Search lessons"><span class="muted">2 picked</span></div><div class="fi-chips"><span class="lchip on">L19 ×</span><span class="lchip on">L20 ×</span></div><div class="fi-list">${weeks.map(([w,ls])=>`<div class="fi-wk">${w}</div>${ls.map(([n,t,on])=>`<label class="fi-row ${on?'on':''}"><input type="checkbox" ${on?'checked':''}><b>${n}</b> ${t}</label>`).join('')}`).join('')}</div><div class="fi-ft"><span class="muted">Search 46 lessons by number, name or week · tick as many as you need</span><button class="done">Done</button></div></div>`;
+}
+
+let open = 0, view = 'plan', sel = 'BM', filt = 'all', order = 'ev';
+function stageCell(v){
+  if (!v) return '';
+  const parts = v.split('');
+  return parts.map(c => c==='k'?'<span class="st s-k">K</span>':c==='2'?'<span class="st s-2">2A</span>':c==='3'?'<span class="st s-3">2B</span>':c==='4'?'<span class="st s-4">3</span>':c==='5'?'<span class="st s-5">4</span>':c==='r'?'<span class="st s-r">R</span>':c==='t'?'<span class="st s-5">T</span>':'').join(' ');
+}
+function plan(narrow){
+  const d = DUS[open];
+  let h = `<h2 class="pt">Texts and human experiences</h2><p class="sub">Unit plan · Year 12 Advanced · 46 lessons over 11 weeks</p>`;
+  h += `<h3 class="sec">Deep understandings</h3><p class="sec-sub">3 or 4 claims the unit is built to deliver. Each needs at least one concept bullet and one syllabus dot point.</p><div class="dus">`;
+  DUS.forEach((u,i)=>{ h += `<div class="du ${i===open?'on':''}" data-du="${i}"><span class="n">Deep understanding ${i+1} of 3</span><q>${u.claim}</q><span class="meta"><b>Why:</b> ${u.why}</span><div class="pills">${u.concepts.map(c=>`<span class="pill p-con">${c}</span>`).join('')}${u.dps.map(c=>`<span class="pill p-dp">${c}</span>`).join('')}</div>${u.gap?`<span class="warn">${u.gap}</span>`:`<span class="meta">All 5 steps placed · 10 pieces</span>`}</div>`; });
+  h += `<button class="add" data-view="edit">+ Deep understanding</button></div>`;
+  h += `<h3 class="sec">Across the lessons</h3><p class="sec-sub">By week, so 40 to 50 lessons still fit. Click a week to see its lessons. Gaps show in peach.</p><div class="scroll"><table class="map"><thead><tr><th class="rowh"></th>${LESSONS.map((l,j)=>`<th>${j<11?`Wk ${j+1}<br><small style="font-weight:400">${[4,5,4,5,4,5,4,4,5,4,2][j]} lessons</small>`:'Task'}</th>`).join('')}</tr></thead><tbody>`;
+  DUS.forEach((u,i)=>{ h += `<tr><td class="rowh">DU ${i+1}</td>${LESSONS.map((_,j)=>{ let v = stageCell(u.map[j]); if(i===1&&j===9) v='<span class="st s-gap">4?</span>'; if(i===2&&j===10) v='<span class="st s-gap">3?</span>'; return `<td>${v}</td>`; }).join('')}</tr>`; });
+  h += `</tbody></table></div><div class="legend"><span><i class="st s-k">K</i> knowledge pieces introduced</span><span><i class="st s-2">2A</i> one text</span><span><i class="st s-3">2B</i> second text</span><span><i class="st s-4">3</i> compare</span><span><i class="st s-5">4</i> unseen</span><span><i class="st s-r">R</i> retrieval</span><span><i class="st s-5">T</i> task</span></div>`;
+  h += `<h3 class="sec">Deep understanding ${open+1}: shallow to deep</h3><p class="sec-sub">The template steps are the same for every unit; the serif lines are this unit's fill-in.</p>`;
+  if (open !== 0) { h += `<div class="panel">Open deep understanding 1 to see a filled-in example.</div>`; return h; }
+  h += `<div class="split"><div class="panel"><h4>Knowledge pieces</h4>`;
+  const tiers = [['e','Essential','t-e'],['s','Strong','t-s'],['x','Sophisticated','t-x']];
+  for (const [k,name,cls] of tiers) { h += `<div class="tier ${cls}">${name}</div>`; d.pieces[k].forEach(p=>{ h += `<div class="piece"><span>${p[0]}</span><small>${p[1]} · 3 items</small></div>`; }); }
+  h += `<div class="rule">Leaving Step 1: every Essential piece secure, and 80% of Essential + Strong introduced so far. Sophisticated pieces don't count towards it.</div></div><div class="ladder">`;
+  STEPS.forEach(s=>{ h += `<div class="step ${s.marker?'marker':''}"><div class="hd"><b>${s.b}</b><span class="where">${s.where}</span></div><div class="gen">${s.gen}</div>${s.fill?`<div class="fill">${s.fill}</div>`:''}<div class="tc">${s.teach.map(t=>`<span class="chip">${t}</span>`).join('')}${s.check.map(t=>`<span class="chip ck">✓ ${t}</span>`).join('')}</div></div>`; });
+  h += `</div></div>`;
+  return h;
+}
+function watch(narrow){
+  let h = `<h2 class="pt">Texts and human experiences</h2><p class="sub">Monitoring · Year 12 Advanced · 21 students</p>`;
+  h += `<h3 class="sec">What this unit is built to deliver</h3><p class="sec-sub">The three deep understandings, why each was chosen, and the syllabus they come from.</p><div class="why-list">`;
+  DUS.forEach((u,i)=>{
+    const lk = (title, rows, cls) => `<div class="lk"><h6>${title}</h6>${rows.length ? rows.map(r=>`<p><span class="code ${cls}">${r[0]}</span>${r.length===3?`<b>${r[1]}.</b> ${r[2]}`:r[1]}</p>`).join('') : '<p class="none">None linked</p>'}</div>`;
+    h += `<div class="wy"><span class="num">${i+1}</span><q>${u.claim}</q><div class="because"><b>Why this one:</b> ${u.why}</div><div class="links">${lk('Concepts', u.links.c, 'p-con')}${lk('Understanding', u.links.u, 'p-dp')}${lk('Responding', u.links.r, 'p-dp')}</div><div class="stat">${u.status}</div></div>`;
+  });
+  h += `</div><div style="margin-top:8px"><button class="chip" style="cursor:pointer;font-weight:600;color:var(--wave)">Copy as a summary paragraph</button></div>`;
+  h += `<h3 class="sec">All three at once ${eye('Willingham: flexibility is per principle. A student can be deep on one understanding and still inflexible on another, so each is tracked on its own. A big gap between columns tells you where to target, and that student can often lead the stronger one.')}</h3><p class="sec-sub">Each student has a separate position on each deep understanding. Steps not placed in the unit yet are shown hatched: nobody can reach them.</p><div class="scroll"><table class="kg all"><thead><tr><th class="rowh">Student</th>${DUS.map((u,i)=>`<th style="max-width:none">${i+1} · ${['Turning the frame','The reader implicated','Compression'][i]}</th>`).join('')}<th style="max-width:none">Look at</th></tr></thead><tbody>`;
+  for (const s of STUDENTS) {
+    const lv = LEVELS[s];
+    const spread = Math.max(...lv) - Math.min(...lv) >= 3;
+    h += `<tr class="${s===sel?'sel':''}"><td class="rowh">${s}</td>${lv.map((l,i)=>`<td>${mini(l, REACH[i])}</td>`).join('')}<td style="font-size:11px;color:var(--peach-ink);font-weight:600;text-align:left;min-width:110px">${spread?`Ahead on ${lv.indexOf(Math.max(...lv))+1}<br>behind on ${lv.indexOf(Math.min(...lv))+1}`:''}</td></tr>`;
+  }
+  h += `</tbody></table></div><div class="keys"><span>${mini(2,5)} at Step 2A</span><span>${mini(1,3)} Steps 3 and 4 not placed yet</span></div>`;
+  h += `<h3 class="sec">Where each student is</h3><div class="dutabs">${DUS.map((u,i)=>`<button class="${i===0?'on':''}">${i+1} · ${['Turning the frame','The reader implicated','Compression'][i]}</button>`).join('')}</div>`;
+  const stns = [
+    [1,'Know the pieces','Recalls the knowledge pieces on two separate days', 'These students are still building the facts the principle rests on. They don’t need more explanation of the principle yet. Put them in a retrieval group set on their amber and half-green pieces, and re-check in a week.'],
+    [2,'Explain in one text','Explains the move in El Diablo, with evidence', 'They can see the move in the text where they learned it. Their knowledge is real but stuck to El Diablo, which is normal at this point. The next move is teaching the second text, not pushing them to generalise yet.'],
+    [3,'Explain in a second text','Explains the same move in End of Days', 'They can explain the move in two texts, but separately. Studying two texts apart does little for transfer on its own, so these students are ready for the compare lesson: both texts side by side, naming what’s shared.'],
+    [4,'Compare when prompted','Names the shared move across two texts', 'They can name the shared move when asked. The next step is doing it without being asked. Give them a deep sort or an unseen extract with no hint, and note whether they needed one.'],
+    [5,'Spot and use unprompted','Finds or uses it in an unseen text', 'Deep on this understanding. Stretch them with far transfer: a different mode (film, speech), or ask them to write a short piece that borrows a frame to challenge something. They can also lead the compare discussion.']
+  ];
+  const counts = stns.map(([l])=>STUDENTS.filter(s=>TOKENS[s].l===l).length);
+  const shades = ['#c9d9ee','#a9c4e6','#8fb1dc','#376fb7','#17375e'];
+  h += `<div class="dist">${stns.map(([l,name],i)=>`<span style="flex:${counts[i]};background:${shades[i]};color:${i>2?'#fff':'var(--navy)'}"><b>${LABEL[l]}</b>&nbsp;· ${counts[i]}</span>`).join('')}</div>`;
+  h += `<div class="filt"><span class="fl">Show</span>${[['all','Everyone'],['one','Only 1 piece of evidence'],['old','Last evidence 3+ weeks ago'],['nu','Knows pieces, doesn’t use them']].map(([k,t])=>`<button data-f="${k}" class="${filt===k?'on':''}">${t}</button>`).join('')}${eye(FILT_HELP[filt])}<span class="fl" style="margin-left:auto">Sort</span>${[['ev','Evidence'],['name','Name']].map(([k,t])=>`<button data-o="${k}" class="${order===k?'on':''}">${t}</button>`).join('')}</div>`;
+  h += `<div class="lanes">`;
+  stns.forEach(([l,name,what,help],i)=>{
+    let who = STUDENTS.filter(s=>TOKENS[s].l===l);
+    who.sort(order==='name' ? (a,b)=>a.localeCompare(b) : (a,b)=>TOKENS[b].ev-TOKENS[a].ev || a.localeCompare(b));
+    h += `<div class="lane"><div class="ln"><span class="lnum" style="background:${shades[i]};color:${i>2?'#fff':'var(--navy)'}">${LABEL[l]}</span><div><b>${name} ${eye(help)}</b><small>${what}</small></div></div><div class="sts">${who.length?who.map(s=>{ const t=TOKENS[s]; const hit = filt==='all' || (filt==='one'&&t.ev===1) || (filt==='old'&&t.old) || (filt==='nu'&&t.nu); return `<span class="sc ${hit?'':'dim'} ${s===sel?'sel':''}" data-s="${s}"><b>${s}</b><span class="pips" title="${t.ev} of 2 pieces of evidence"><i class="${t.ev>=1?'on':''}"></i><i class="${t.ev>=2?'on':''}"></i></span>${t.old?'<span class="tag t-old">4 wk</span>':''}${t.nu?`<span class="tag t-nu">${t.nu} not used</span>`:''}</span>`; }).join(''):'<span class="empty">Nobody yet</span>'}</div></div>`;
+    if (who.includes(sel)) h += detail(sel, l, name);
+  });
+  h += `</div><div class="keys"><span><span class="pips"><i class="on"></i><i class="on"></i></span> 2 pieces of evidence for this step</span><span><span class="pips"><i class="on"></i><i></i></span> 1 piece</span><span><span class="tag t-old">4 wk</span> weeks since their last evidence</span><span><span class="tag t-nu">2 not used</span> knowledge pieces they know but left out of writing</span><span>Click a student to see why</span></div>`;
+  h += `<div class="groups"><div class="grp g-mem"><b>Doesn't remember it · 6 students</b>Amber pieces: mostly Aboriginal Gothic flip and Songline.<div class="do">Make a retrieval group set</div></div><div class="grp g-use"><b>Knows it, doesn't use it · 6 students</b>Green but not used where the writing needed it.<div class="do">Plan a writing lesson · send next steps</div></div></div>`;
+  h += `<h3 class="sec">Knowledge pieces</h3><p class="sec-sub">Bar: share of Essential + Strong pieces secure, with the 80% line. Circles: one per piece.</p><div class="scroll"><table class="kg"><thead><tr><th class="rowh">Student</th><th>Step 1 bar</th>${SHORT.map((n,i)=>`<th class="${PIECES[i][0]}">${n}</th>`).join('')}</tr></thead><tbody>`;
+  for (const s of STUDENTS) {
+    const {p, ess} = pct(s);
+    h += `<tr class="${s===sel?'sel':''}"><td class="rowh">${s}</td><td><div class="bar"><i style="width:${Math.round(p*100)}%;background:${p>=.8&&ess?'var(--green)':'var(--wave)'}"></i><span class="z" style="left:50%"></span><u style="left:80%"></u></div></td>${STATE[s].map(c=>`<td><span class="c ${c.f} ${c.fade?'fade':''} ${c.f==='amb'?'':c.ring}"></span></td>`).join('')}</tr>`;
+  }
+  h += `</tbody></table></div><div class="keys"><span><span class="c"></span> not yet</span><span><span class="c half"></span> right once</span><span><span class="c full"></span> right on two days</span><span><span class="c amb"></span> memory jog</span><span><span class="c full fade"></span> due for retrieval</span><span><span class="c full used"></span> used in writing</span><span><span class="c full notused"></span> expected, not used</span><span><span class="c na"></span> not taught yet</span></div>`;
+  return h;
+}
+function render(){
+  for (const [id, narrow] of [['deskPage', false], ['phonePage', true]]) {
+    document.getElementById(id).innerHTML = view === 'plan' ? plan(narrow) : view === 'edit' ? editor(narrow) : watch(narrow);
+  }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; document.querySelectorAll('[data-view]').forEach(x=>x.setAttribute('aria-pressed', String(x===b))); render(); return; }
+  const f = e.target.closest('[data-f]'); if (f) { filt = f.dataset.f; render(); return; }
+  const o = e.target.closest('[data-o]'); if (o) { order = o.dataset.o; render(); return; }
+  const d = e.target.closest('[data-du]'); if (d) { open = +d.dataset.du; render(); return; }
+  const t = e.target.closest('[data-s]'); if (t) { sel = t.dataset.s === sel ? '' : t.dataset.s; render(); }
+});
+render();
+</script>
+</body>
+</html>

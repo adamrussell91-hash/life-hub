@@ -126,15 +126,15 @@ const TOOLKIT_TEACHER_FIELD_TYPES = new Set([
   'analogy_chains'
 ]);
 
-/** WalkThru notes, jots and a block's chosen WalkThru are teacher-only wherever they sit; students never get the field. */
+/** WalkThru notes, jots, a block's chosen WalkThru and its deep understanding tags are teacher-only wherever they sit; students never get the field. */
 function stripWalkthruField(block) {
   let out = block;
   if (out?.content && Object.prototype.hasOwnProperty.call(out.content, 'walkthru')) {
     const { walkthru: _walkthru, ...content } = out.content;
     out = { ...out, content };
   }
-  if (out?.settings && Object.prototype.hasOwnProperty.call(out.settings, 'walkthru')) {
-    const { walkthru: _chosen, ...settings } = out.settings;
+  if (out?.settings && ['walkthru', 'deep_taught', 'deep_step', 'deep_targets'].some((key) => Object.prototype.hasOwnProperty.call(out.settings, key))) {
+    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, ...settings } = out.settings;
     out = { ...out, settings };
   }
   return out;
