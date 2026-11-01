@@ -25,9 +25,11 @@
  * Tasks Hub vitest runs only the tests the change can reach (vitest
  * `--changed`, which follows imports). A Teaching-only PR runs none of them,
  * so the slow Grove world tests stay out of PRs that never touch the Grove.
- * Anything named grove, Tasks fixtures or config, or this gate itself, runs
- * the whole suite, because tests read those files without importing them.
- * Teaching Hub vitest works the same way with its own triggers.
+ * Anything named grove, Tasks fixtures or config, package CSS, or this gate
+ * itself, runs the whole suite, because tests read those files without
+ * importing them; a package file tests import runs only the tests that reach
+ * it. Teaching Hub vitest works the same way with its own triggers. The
+ * trigger lists live in scripts/lib/vitest-scope.mjs.
  *
  * Agent checklist (Project store): docs/mandatory-pre-pr-check.md
  * Principle: never weaken Pages / hide failures to go green.
@@ -37,6 +39,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  TASKS_FULL_SUITE_TRIGGERS,
+  TEACHING_FULL_SUITE_TRIGGERS,
+  fullSuiteTrigger
+} from './lib/vitest-scope.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
@@ -196,29 +203,8 @@ function changeBase() {
   return ref ? git(['rev-parse', '--verify', `${ref}^{commit}`]) : null;
 }
 
-// Tests read these with fs or vite config rather than imports, so vitest's
-// import graph cannot see them. Touching one runs the whole suite.
-const FULL_SUITE_TRIGGERS = [
-  /grove/i,
-  /^apps\/tasks\/(fixtures|tests\/helpers)\//,
-  /^apps\/tasks\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
-  /^packages\//,
-  /^scripts\/pre-pr-check\.mjs$/,
-  /^\.github\/workflows\//
-];
-
-// Teaching tests read these with fs or vite config (the text baseline, the
-// storage shim, seed fixtures), so vitest's import graph cannot see them.
-const TEACHING_FULL_SUITE_TRIGGERS = [
-  /^apps\/teaching\/(fixtures|tests\/setup|tests\/unit\/__baselines__)\//,
-  /^apps\/teaching\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
-  /^packages\//,
-  /^scripts\/pre-pr-check\.mjs$/,
-  /^\.github\/workflows\//
-];
-
 /** Vitest args for this change: all tests, or only those it can reach. */
-function vitestArgs(triggers = FULL_SUITE_TRIGGERS) {
+function vitestArgs(triggers = TASKS_FULL_SUITE_TRIGGERS) {
   if (forceFull) return { args: ['run'], why: '--full' };
   const base = changeBase();
   if (!base) return { args: ['run'], why: 'no base commit to compare against' };
@@ -226,7 +212,7 @@ function vitestArgs(triggers = FULL_SUITE_TRIGGERS) {
   const untracked = git(['ls-files', '--others', '--exclude-standard']);
   if (committed === null || untracked === null) return { args: ['run'], why: 'git diff failed' };
   const changed = `${committed}\n${untracked}`.split('\n').filter(Boolean);
-  const trigger = changed.find((file) => triggers.some((re) => re.test(file)));
+  const trigger = fullSuiteTrigger(changed, triggers);
   if (trigger) return { args: ['run'], why: `${trigger} changed` };
   return {
     args: ['run', '--changed', base, '--passWithNoTests'],
