@@ -531,3 +531,4 @@ body.spractice-open { overflow: hidden; }
 .sprint-brief-part__line b { color: var(--muted); font-weight: 400; font-size: 14px; }
 @media (max-width: 600px) { .sprint-brief-part__line { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 .sp-parts { border-radius: 12px; }
+.smap-unpublished { flex-basis: 100%; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--pastel-gold, #ffe08a); color: var(--pastel-gold-ink, #5a4300); }

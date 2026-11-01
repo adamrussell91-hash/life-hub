@@ -85,7 +85,7 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     const msg = el('p', 'sprint-submit__err');
     // Start from the phase's current deadline (after any class extension), so a nudge is one tap.
     const current = () => {
-      const base = o.getLesson().sprint?.phases.find((x) => x.key === phase.value);
+      const base = (summary!.phases ?? o.getLesson().sprint?.phases)?.find((x) => x.key === phase.value);
       const over = (summary!.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class?.[phase.value];
       date.value = over?.due_date ?? base?.due_date ?? '';
       time.value = over?.due_time ?? (base?.due_time || '15:00');
@@ -119,7 +119,9 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
   function paint(): void {
     if (!summary) return;
     const s = summary;
-    const sprint = o.getLesson().sprint;
+    const draft = o.getLesson().sprint;
+    // Dates come from the last publish, which is what students run on; the Kit draft fills in for older servers.
+    const sprint = draft && { ...draft, phases: s.phases ?? draft.phases };
     head.replaceChildren(
       el('h2', '', 'Progress map'),
       button('Extend a deadline', 'secondary', extendForm),
@@ -127,6 +129,9 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       button('Run pitches', 'primary', () => openPitchView({ api: o.api, getLesson: o.getLesson, summary: s, onClose: () => void refresh() }))
     );
     notice.replaceChildren();
+    if (draft && s.phases && draft.phases.some((p) => { const pub = s.phases!.find((x) => x.key === p.key); return !pub || pub.due_date !== p.due_date || pub.due_time !== p.due_time || pub.where !== p.where; })) {
+      notice.append(el('p', 'smap-unpublished', 'You’ve changed phases or deadlines in the Kit. Publish the lesson to send them to students; the map shows the dates students have now.'));
+    }
     // Groups that can't move on until the teacher chooses: easy to miss once the class has moved past Understand.
     const waits = s.groups.filter((g) => g.awaiting);
     if (waits.length) {
