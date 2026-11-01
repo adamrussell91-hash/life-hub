@@ -61,6 +61,8 @@ export type SprintStatus = {
   /** Prototype: every part, who is doing it and what they have saved so far. */
   group_parts?: Array<{ part_id: string; part: string; who: string; me: boolean; text: string; link: string; files: Array<{ id: string; name: string }>; in: boolean; started: boolean }> | null;
   pitch?: { kind: 'file' | 'link'; name: string; file: string | null; link: string } | null;
+  /** The cover poster the projector shows while the group pitches. */
+  cover?: { file: string; name: string } | null;
   spotlight?: { text: string; label: string } | null;
   round?: { group_id: string; group_name: string; sent: boolean } | null;
   received?: { levels: Record<string, [number, number, number]>; lines: Array<{ worked: string; next: string; about: string }> } | null;
@@ -82,7 +84,7 @@ export type SprintClient = {
   assign(partId: string, keys: string[]): Promise<SprintStatus>;
   /** Pick the group's assembler by member key, or null to clear. */
   setAssembler(key: string | null): Promise<SprintStatus>;
-  pitch(source: { file_id: string } | { link: string }): Promise<SprintStatus>;
+  pitch(source: { file_id: string } | { link: string } | { cover_file_id: string }): Promise<SprintStatus>;
   feedback(groupId: string, entry: FeedbackEntry): Promise<SprintStatus>;
   /** The group's agreed audience. */
   audience(who: string, why: string): Promise<SprintStatus>;
@@ -172,6 +174,7 @@ export type GroupBoard = {
   reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[]; duels?: Duel[]; ranked?: string[] }>;
   parts: Array<Part & { by: string[] }>;
   pitch: { kind: 'file' | 'link'; file?: string; link?: string; name?: string; by: string } | null;
+  cover?: { file: string; name: string } | null;
   assembler?: string | null;
   subs: { prototype: BoardSub[]; test: BoardSub[] };
   round: { status: 'open' | 'closed' | 'released'; entries: Array<{ student_id: string; name: string; levels: Record<string, Level>; worked: string; next: string; about: string; flagged: boolean; status: string }> } | null;

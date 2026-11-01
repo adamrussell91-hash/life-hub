@@ -17,7 +17,7 @@ describe('pitch view', () => {
     const view = document.querySelector('.spitch')!;
     expect(view.querySelector('.spitch__who')?.textContent).toContain('Group Kestrel');
     expect(view.querySelector('.spitch__timer')?.textContent).toBe('2:00');
-    expect(view.querySelector('a.spitch__link')?.getAttribute('href')).toBe('https://example.com/deck');
+    expect(view.querySelector('a.spitch__file')?.getAttribute('href')).toBe('https://example.com/deck');
     close();
     expect(document.querySelector('.spitch')).toBeNull();
   });
@@ -30,6 +30,33 @@ describe('pitch view', () => {
     await flush();
     expect(api.round).toHaveBeenCalledWith('g1', 'open');
     expect(document.querySelector('.spitch__count')?.textContent).toBe('Feedback open · 1 of 2 in');
+    close();
+  });
+
+  it('shows the cover poster, never the pitch file, and downloads the file instead', async () => {
+    const files = { ...board(null), group: { id: 'g1', name: 'Group 7' }, pitch: { kind: 'file', file: 'f1', name: 'deck.pptx', by: 'Ann Bell' }, cover: { file: 'c1', name: 'poster.png' } };
+    const groups = { ...summary, groups: [{ id: 'g1', name: 'Group 7', students: [] }] } as unknown as SprintSummary;
+    const fileUrl = vi.fn(async (id: string) => `blob:${id}`);
+    const api = { run: vi.fn(async () => groups), board: vi.fn(async () => files), round: vi.fn(), fileUrl } as unknown as SprintTeacherApi;
+    const close = openPitchView({ api, getLesson: () => ({ sprint: { criteria: [] } }) as unknown as Lesson, summary: groups, onClose: vi.fn() });
+    await flush();
+    expect(document.querySelector('.spitch__who span')?.textContent).toBe('Group 7');
+    expect(document.querySelector<HTMLImageElement>('.spitch__cover')?.src).toBe('blob:c1');
+    expect(fileUrl).not.toHaveBeenCalledWith('f1');
+    expect(document.querySelector('.spitch iframe')).toBeNull();
+    const download = [...document.querySelectorAll('.spitch button')].find((b) => b.textContent === 'Download pitch file') as HTMLButtonElement;
+    download.click();
+    await flush();
+    expect(fileUrl).toHaveBeenCalledWith('f1');
+    close();
+  });
+
+  it('says so when a group has no cover poster', async () => {
+    const api = { run: vi.fn(async () => summary), board: vi.fn(async () => board(null)), round: vi.fn(), fileUrl: vi.fn() } as unknown as SprintTeacherApi;
+    const close = openPitchView({ api, getLesson: () => ({ sprint: { criteria: [] } }) as unknown as Lesson, summary, onClose: vi.fn() });
+    await flush();
+    expect(document.querySelector('.spitch__none')?.textContent).toBe('No cover poster');
+    expect(document.querySelector('.spitch__cover')).toBeNull();
     close();
   });
 });

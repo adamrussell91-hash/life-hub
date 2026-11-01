@@ -45,3 +45,16 @@ test('a payload may only name the student’s own files', async () => {
   const pitched = await act(store, 1, 'pitch', { file_id: up.id });
   assert.equal(pitched.pitch.name, 'panel.pdf');
 });
+
+test('the finished prototype may be a slide deck; the cover poster must be a picture', async () => {
+  const store = await atPrototype();
+  const deck = await uploadSprintFile(store, 'sp1', form(1, 'prototype', new File(['x'], 'deck.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })));
+  await assert.rejects(uploadSprintFile(store, 'sp1', form(1, 'sketch', new File(['x'], 'deck.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }))), { code: /bad_type|not_open/ });
+  await assert.rejects(act(store, 1, 'pitch', { cover_file_id: deck.id }), { code: 'bad_type' });
+  const poster = await uploadSprintFile(store, 'sp1', form(1, 'prototype', new File(['x'], 'poster.png', { type: 'image/png' })));
+  const pitched = await act(store, 1, 'pitch', { file_id: deck.id });
+  const covered = await act(store, 1, 'pitch', { cover_file_id: poster.id });
+  assert.equal(pitched.pitch.name, 'deck.pptx');
+  assert.deepEqual(covered.cover, { file: poster.id, name: 'poster.png' });
+  assert.equal(covered.pitch.name, 'deck.pptx');
+});

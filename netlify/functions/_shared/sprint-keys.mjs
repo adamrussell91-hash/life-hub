@@ -29,5 +29,5 @@ export const sprintKeys = (lesson) => ({
   stage: `sprint/${lesson}/stage`
 });
 
-export const emptyGroup = () => ({ in: {}, question: null, chosen: null, awaiting: null, votes_closed_at: null, parts: [], claims: {}, pitch: null, audience: null, ask_added: [], ask_picked: [], ask_sent: [], answers: {}, assembler: null });
+export const emptyGroup = () => ({ in: {}, question: null, chosen: null, awaiting: null, votes_closed_at: null, parts: [], claims: {}, pitch: null, cover: null, audience: null, ask_added: [], ask_picked: [], ask_sent: [], answers: {}, assembler: null });
 export const emptyLock = () => ({ ended: {}, lock: null });

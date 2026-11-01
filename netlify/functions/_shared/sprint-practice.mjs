@@ -105,7 +105,7 @@ export async function sprintPracticeAction(store, lessonId, body) {
   if (op === 'student') {
     const s = AS[body.as];
     if (!s) reject(400, 'bad_student', 'Pick Student 1 or Student 2.');
-    if (body.body?.action === 'pitch' && body.body?.file_id) reject(409, 'practice', 'Uploads are off in a practice run. Use a link.');
+    if (body.body?.action === 'pitch' && (body.body?.file_id || body.body?.cover_file_id)) reject(409, 'practice', 'Uploads are off in a practice run. Use a link.');
     return scoped(setup, now, asStudent(s), () => sprintAction(store, pid, body.body ?? {}));
   }
   if (op === 'teacher') return scoped(setup, now, null, () => sprintTeacherAction(store, pid, body.body ?? {}));

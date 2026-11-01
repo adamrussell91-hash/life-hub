@@ -7,9 +7,10 @@ const POLL_MS = 4000;
 const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
 
 /**
- * The pitch on the projector: one group at a time, its pitch file, a
+ * The pitch on the projector: one group at a time, its cover poster, a
  * 2-minute timer (a prompt, never a cut-off) and the feedback round. The
- * class gives feedback on their own devices while it is open.
+ * pitch file itself downloads to open in its own app. The class gives
+ * feedback on their own devices while it is open.
  */
 export function openPitchView(o: { api: SprintTeacherApi; getLesson: () => Lesson; summary: SprintSummary; onClose(): void }): () => void {
   const groups = o.summary.groups;
@@ -28,6 +29,7 @@ export function openPitchView(o: { api: SprintTeacherApi; getLesson: () => Lesso
   const foot = el('div', 'spitch__foot');
   const count = el('span', 'spitch__count');
   const order = el('div', 'spitch__order');
+  const fileSlot = el('span', 'spitch__fileslot');
   bar.append(who, timer);
   view.append(bar, stage, foot, order);
   document.body.append(view);
@@ -40,35 +42,41 @@ export function openPitchView(o: { api: SprintTeacherApi; getLesson: () => Lesso
 
   async function show(): Promise<void> {
     const g = groups[at]!;
-    who.replaceChildren(el('span', '', `Group ${g.name}`), el('small', '', `Pitch ${at + 1} of ${groups.length}`));
-    stage.replaceChildren(el('p', '', 'Opening the pitch file…'));
+    who.replaceChildren(el('span', '', /^group\b/i.test(g.name) ? g.name : `Group ${g.name}`), el('small', '', `Pitch ${at + 1} of ${groups.length}`));
+    stage.replaceChildren();
+    fileSlot.replaceChildren();
     started = 0;
     timer.textContent = clock(PITCH_MS);
+    timer.classList.remove('spitch__timer--up');
     await o.api.run(g.id);
     const b = await o.api.board(g.id);
-    stage.replaceChildren();
     if (objectUrl && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(objectUrl);
     objectUrl = '';
-    if (!b.pitch) stage.append(el('p', '', 'This group hasn’t set a pitch file. They can present without one.'));
-    else if (b.pitch.kind === 'link' && b.pitch.link) {
-      const a = el('a', 'spitch__link', 'Open the group’s link');
+    if (b.cover?.file) {
+      objectUrl = await o.api.fileUrl(b.cover.file);
+      const img = el('img', 'spitch__cover');
+      img.src = objectUrl;
+      img.alt = `${g.name}’s cover poster`;
+      stage.append(img);
+    } else stage.append(el('p', 'spitch__none', 'No cover poster'));
+    // The pitch file opens in its own app (slides, PDF) on the teacher's machine, never on this screen.
+    if (b.pitch?.kind === 'link' && b.pitch.link) {
+      const a = el('a', 'btn btn--secondary spitch__file', 'Open their link');
       a.href = b.pitch.link;
       a.target = '_blank';
       a.rel = 'noopener';
-      stage.append(a);
-    } else if (b.pitch.file) {
-      objectUrl = await o.api.fileUrl(b.pitch.file);
-      if ((b.pitch.name ?? '').toLowerCase().endsWith('.pdf')) {
-        const frame = el('iframe', 'spitch__file');
-        frame.src = objectUrl;
-        frame.title = 'Pitch file';
-        stage.append(frame);
-      } else {
-        const img = el('img', 'spitch__file');
-        img.src = objectUrl;
-        img.alt = 'The group’s pitch file';
-        stage.append(img);
-      }
+      fileSlot.append(a);
+    } else if (b.pitch?.file) {
+      const file = b.pitch.file;
+      const name = b.pitch.name ?? 'pitch file';
+      fileSlot.append(button('Download pitch file', 'secondary', async () => {
+        const url = await o.api.fileUrl(file);
+        const a = el('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        window.setTimeout(() => { if (typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url); }, 10_000);
+      }));
     }
     showCount(b);
     paintOrder();
@@ -94,6 +102,7 @@ export function openPitchView(o: { api: SprintTeacherApi; getLesson: () => Lesso
 
   foot.append(
     count,
+    fileSlot,
     button('Start timer', 'secondary', () => { started = Date.now(); }),
     roundButton('open', 'Open feedback', 'primary'),
     roundButton('close', 'Close feedback', 'secondary'),
