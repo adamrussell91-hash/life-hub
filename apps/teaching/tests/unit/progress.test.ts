@@ -3,7 +3,7 @@ import { cellFor, withMark, type ProgressLesson } from '@/markbook/progress';
 import { renderBook, renderBookPhone } from '@/markbook/book';
 
 const core: ProgressLesson = { id: 'l1', title: 'Poem', role: 'core', assessment: false, date: '2026-10-01' };
-const base = { lesson: core, record: undefined, quizSubmitted: false, quizStarted: false, took: false, today: '2026-10-05' };
+const base = { lesson: core, record: undefined, quizSubmitted: false, quizStarted: false, took: false, forStudent: true, today: '2026-10-05' };
 
 describe('cellFor', () => {
   it('a tick or a submitted quiz is complete, and never late', () => {
@@ -20,11 +20,15 @@ describe('cellFor', () => {
     expect(cellFor({ ...base, lesson: { ...core, date: undefined }, today: '2027-01-01' }).late).toBe(false);
     expect(cellFor({ ...base, quizStarted: true, today: '2026-10-20' })).toEqual({ state: 'partial', late: true });
   });
-  it('a side lesson not taken is a grey box, and never late', () => {
+  it('a side lesson is set for every student, like a core one', () => {
     const side = { ...core, role: 'support' as const };
-    expect(cellFor({ ...base, lesson: side, today: '2027-01-01' })).toEqual({ state: 'na', late: false });
-    expect(cellFor({ ...base, lesson: side, took: true, today: '2027-01-01' })).toEqual({ state: 'open', late: true });
+    expect(cellFor({ ...base, lesson: side, today: '2027-01-01' })).toEqual({ state: 'open', late: true });
     expect(cellFor({ ...base, lesson: side, record: { at: 'x', via: 'tick' } }).state).toBe('complete');
+  });
+  it('a lesson not set for the student (a tutorial outside their group) is a grey box, and never late', () => {
+    expect(cellFor({ ...base, forStudent: false, today: '2027-01-01' })).toEqual({ state: 'na', late: false });
+    expect(cellFor({ ...base, forStudent: false, took: true, today: '2027-01-01' })).toEqual({ state: 'open', late: true });
+    expect(cellFor({ ...base, forStudent: false, record: { at: 'x', via: 'tick' } }).state).toBe('complete');
   });
   it('an assessment is complete only when the teacher marks it; handed in is waiting', () => {
     const a = { ...core, assessment: true };
@@ -64,12 +68,14 @@ describe('renderBook', () => {
 
   it('draws a lesson box per student, ticks on press and undoes a tick of yours on the next', () => {
     const onMark = vi.fn();
-    const root = draw(book({ s1: { l1: { at: 'x', via: 'tick' }, l2: { at: 'x', via: 'teacher' } } }), [core, { ...core, id: 'l2', title: 'Extra', role: 'extension' }], onMark);
+    const root = draw(book({ s1: { l1: { at: 'x', via: 'tick' }, l2: { at: 'x', via: 'teacher' } } }), [core, { ...core, id: 'l2', title: 'Extra', role: 'extension' }, { ...core, id: 'l3', title: 'Tutorial', students: ['s1'] }], onMark);
     const cell = (s: string, l: string) => root.querySelector<HTMLButtonElement>(`[data-student="${s}"][data-lesson="${l}"]`)!;
     expect(cell('s1', 'l1').dataset.state).toBe('complete');
     expect(cell('s2', 'l1').dataset.state).toBe('open');
     expect(cell('s2', 'l1').dataset.late).toBe('true');
-    expect(cell('s2', 'l2').dataset.state).toBe('na');
+    expect(cell('s2', 'l2').dataset.state).toBe('open');
+    expect(cell('s1', 'l3').dataset.state).toBe('open');
+    expect(cell('s2', 'l3').dataset.state).toBe('na');
     expect(cell('s2', 'l1').getAttribute('aria-label')).toContain('overdue');
     expect(cell('s1', 'l2').dataset.override).toBe('true');
     cell('s2', 'l1').click();
@@ -87,6 +93,16 @@ describe('renderBook', () => {
     expect(marks.map((b) => b.dataset.result)).toEqual(['done', 'waiting']);
     expect([...root.querySelectorAll('thead .mb-col__title, thead .mb-progress__title')].map((n) => n.textContent)).toEqual(['Poem', 'Test']);
     expect([...root.querySelectorAll('.mb-progress__unit')].map((n) => n.textContent)).toEqual(['Poetry', 'Novel']);
+  });
+
+  it('greys a tutorial exit check for students outside its groups', () => {
+    const q = quiz({ scores: { s1: { attempt_id: 'a', submitted_at: '2026-10-03', score: 15, max: 20, pending: 0, rows: [] } }, groups: { s1: 'Mix-ups' } });
+    const root = draw(book({}, [q]), [{ ...core, id: 'l2', title: 'Test' }]);
+    const rows = root.querySelectorAll('tbody tr');
+    expect(rows[0]!.querySelector('.mb-book__marked')).not.toBeNull();
+    expect(rows[1]!.querySelector('.mb-book__marked')).toBeNull();
+    expect(rows[1]!.querySelector('.mb-progress__btn--na')!.getAttribute('aria-label')).toBe('Tom Tills, Test: not for this student');
+    expect(root.querySelector('thead .mb-book__kind')!.textContent).toBe('Tutorial');
   });
 
   it('pins Done (core lessons so far) and Overall on the right', () => {
@@ -157,6 +173,13 @@ describe('unitProgressLessons', () => {
       ] as never
     );
     expect(out.map((l) => l.id)).toEqual(['p2', 'n2', 'p1', 'p3', 'n1']);
+  });
+
+  it('a tutorial is for the students in its groups, and for nobody in another class', () => {
+    const tut = { id: 't', title: 'T', pedagogical_mode: 'tutorial', tutorial: { class_id: 'c1', groups: [{ students: ['s1', 's2'] }, { students: ['s2', 's3'] }] } };
+    expect(unitProgressLessons([{ lesson_ids: ['t'] }] as never, [tut], [], 'c1')[0]!.students).toEqual(['s1', 's2', 's3']);
+    expect(unitProgressLessons([{ lesson_ids: ['t'] }] as never, [tut], [], 'c2')[0]!.students).toEqual([]);
+    expect(unitProgressLessons([{ lesson_ids: ['t'] }] as never, [{ ...tut, tutorial: undefined }], [], 'c1')[0]!.students).toEqual([]);
   });
 
   it('runs across every active unit in order, each lesson once, tagged with its unit', () => {

@@ -378,7 +378,8 @@ export function renderClassPage(
     progressLessons: unitProgressLessons(
       activeUnits,
       curriculum.lessons,
-      curriculum.scheduled_lessons.filter((entry) => entry.class_id === cls.id)
+      curriculum.scheduled_lessons.filter((entry) => entry.class_id === cls.id),
+      cls.id
     )
   }));
 

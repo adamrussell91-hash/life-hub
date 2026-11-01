@@ -58,6 +58,10 @@ export function toCurriculumLessonSummary(
     ...(lesson.skip_rule ? { skip_rule: lesson.skip_rule } : {}),
     ...(lesson.branch_from ? { branch_from: lesson.branch_from } : {}),
     ...(lesson.pre_unit ? { pre_unit: true } : {}),
-    ...(lesson.dot_points && lesson.dot_points.length > 0 ? { dot_points: lesson.dot_points } : {})
+    ...(lesson.dot_points && lesson.dot_points.length > 0 ? { dot_points: lesson.dot_points } : {}),
+    // A tutorial's class and who is in each group, so the markbook greys it for everyone else.
+    ...(lesson.pedagogical_mode === 'tutorial' && lesson.tutorial
+      ? { tutorial: { class_id: lesson.tutorial.class_id, groups: lesson.tutorial.groups.map((g) => ({ students: [...g.students] })) } }
+      : {})
   };
 }

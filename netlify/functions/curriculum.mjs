@@ -65,8 +65,16 @@ function lessonSummary(lesson, publishedIds) {
     ...(typeof lesson.skip_rule === 'string' && lesson.skip_rule.trim() ? { skip_rule: lesson.skip_rule.trim().slice(0, 80) } : {}),
     ...(typeof lesson.branch_from === 'string' && lesson.branch_from ? { branch_from: lesson.branch_from } : {}),
     ...(lesson.pre_unit === true ? { pre_unit: true } : {}),
-    ...(Array.isArray(lesson.dot_points) && lesson.dot_points.length ? { dot_points: lesson.dot_points } : {})
+    ...(Array.isArray(lesson.dot_points) && lesson.dot_points.length ? { dot_points: lesson.dot_points } : {}),
+    ...(tutorialWho(lesson) ? { tutorial: tutorialWho(lesson) } : {})
   };
+}
+
+/** A tutorial's class and who is in each group, so the markbook greys it for everyone else. */
+function tutorialWho(lesson) {
+  const t = lesson.pedagogical_mode === 'tutorial' ? lesson.tutorial : null;
+  if (!t || typeof t.class_id !== 'string' || !Array.isArray(t.groups)) return null;
+  return { class_id: t.class_id, groups: t.groups.map((g) => ({ students: Array.isArray(g?.students) ? g.students.filter((s) => typeof s === 'string') : [] })) };
 }
 
 export async function buildCurriculum(store) {
