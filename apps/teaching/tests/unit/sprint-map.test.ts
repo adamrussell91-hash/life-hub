@@ -30,6 +30,20 @@ describe('progress map', () => {
     expect(m.root.querySelector('.dot--late')?.getAttribute('title')).toBe('Cy Dale: in late');
   });
 
+  it('warns when the Kit has deadlines students don’t have yet, and shows the published dates', async () => {
+    const draft = lesson.sprint!.phases;
+    const published = draft.map((p) => ({ key: p.key, where: p.where, due_date: p.due_date, due_time: p.due_time, ends_at: p.ends_at }));
+    const same = { ...api(), summary: vi.fn(async () => ({ ...summary(), phases: published })) } as unknown as SprintTeacherApi;
+    const m1 = mountSprintMap({ getLesson: () => lesson, api: same, emitLesson: vi.fn() });
+    await m1.refresh();
+    expect(m1.root.querySelector('.smap-unpublished')).toBeNull();
+    const older = published.map((p, i) => (i === 0 ? { ...p, due_date: '2020-01-01' } : p));
+    const moved = { ...api(), summary: vi.fn(async () => ({ ...summary(), phases: older })) } as unknown as SprintTeacherApi;
+    const m2 = mountSprintMap({ getLesson: () => lesson, api: moved, emitLesson: vi.fn() });
+    await m2.refresh();
+    expect(m2.root.querySelector('.smap-unpublished')?.textContent).toContain('Publish the lesson');
+  });
+
   it('lists groups waiting on the teacher at the top, and opens that group’s board', async () => {
     const a = api();
     const m = mountSprintMap({ getLesson: () => lesson, api: a, emitLesson: vi.fn() });

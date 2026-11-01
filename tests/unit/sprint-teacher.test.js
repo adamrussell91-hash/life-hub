@@ -1,7 +1,7 @@
 // tests/unit/sprint-teacher.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sprintAction, sprintTeacherAction, setSprintClock } from '../../netlify/functions/_shared/sprint.mjs';
+import { sprintAction, sprintTeacherAction, setSprintClock, storeSprintConfig } from '../../netlify/functions/_shared/sprint.mjs';
 import { draftLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { sprintKeys } from '../../netlify/functions/_shared/sprint-keys.mjs';
 import { storeFor, who, INITIALS, CONFIG } from './helpers/sprint-store.js';
@@ -46,6 +46,31 @@ test('extend moves a deadline for one group only', async () => {
   assert.deepEqual(s.groups.find((g) => g.id === 'g1').open, ['understand']);
   assert.deepEqual(s.groups.find((g) => g.id === 'g2').open, ['understand', 'sketch']);
   await assert.rejects(teach(store, 'extend', { scope: 'group', id: 'g9', phase: 'understand', due_date: '2026-11-05' }), { code: 'not_found' });
+});
+
+test('republishing a new Kit date drops that phase’s extensions and keeps the rest', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  await teach(store, 'extend', { scope: 'class', phase: 'understand', due_date: '2026-11-03', due_time: '15:00' });
+  await teach(store, 'extend', { scope: 'group', id: 'g1', phase: 'understand', due_date: '2026-11-03', due_time: '16:00' });
+  await teach(store, 'extend', { scope: 'student', id: 'st_ann', phase: 'decide', due_date: '2026-11-07', due_time: '15:00' });
+  const next = CONFIG();
+  next.phases[0] = { ...next.phases[0], due_date: '2026-11-03', due_time: '09:00' };
+  await storeSprintConfig(store, 'sp1', next);
+  const extend = store.data.get(sprintKeys('sp1').extend);
+  assert.deepEqual(extend.class, {});
+  assert.deepEqual(extend.group, {});
+  assert.deepEqual(extend.student, { st_ann: { decide: { due_date: '2026-11-07', due_time: '15:00' } } });
+  const s = await teach(store, 'summary');
+  assert.deepEqual(s.phases[0], { key: 'understand', where: 'class', due_date: '2026-11-03', due_time: '09:00', ends_at: '' });
+});
+
+test('republishing the same dates leaves extensions alone', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  await teach(store, 'extend', { scope: 'class', phase: 'understand', due_date: '2026-11-03', due_time: '15:00' });
+  await storeSprintConfig(store, 'sp1', CONFIG());
+  assert.deepEqual(store.data.get(sprintKeys('sp1').extend).class, { understand: { due_date: '2026-11-03', due_time: '15:00' } });
 });
 
 test('confirm sets the group question or idea and clears the wait', async () => {

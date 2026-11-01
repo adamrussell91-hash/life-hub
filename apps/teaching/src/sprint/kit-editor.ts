@@ -275,7 +275,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addR.disabled = cur.requirements.length >= SPRINT_LIMITS.requirements;
     req.append(addR, el('p', 'kit-why', 'U Understand · S Sketch · D Decide · P Prototype · T Test'));
 
-    const phases = card('Phases and deadlines', 'You set when each phase closes. Each phase opens when the one above it closes. Click a bar to edit it.', 'phases');
+    const phases = card('Phases and deadlines', 'You set when each phase closes. Each phase opens when the one above it closes. Click a bar to edit it. Students get new dates when you publish, and a new date here replaces any extension you gave that phase on the map.', 'phases');
     phases.append(renderPhaseGantt(phaseSpans(cur.phases, cur.lock_hours), { onPick: (key) => { picked = picked === key ? null : key; paint(); }, picked }));
     const pi = cur.phases.findIndex((p) => p.key === picked);
     if (pi >= 0) phases.append(phaseEditor(cur.phases[pi]!, pi));

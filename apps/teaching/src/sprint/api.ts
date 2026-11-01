@@ -152,6 +152,8 @@ export type SprintSummary = {
   ended: Partial<Record<SprintPhaseKey, { at: string; present: string[] }>>;
   lock: { phase: SprintPhaseKey; until: string; unlocked: string[] } | null;
   extend: Record<string, unknown>;
+  /** The published deadlines, before extensions: what students run on until the next publish. */
+  phases?: Array<{ key: SprintPhaseKey; where: 'class' | 'home'; due_date: string; due_time: string; ends_at: string }>;
   running: string | null;
   spotlight: { text: string; label: string } | null;
 };
