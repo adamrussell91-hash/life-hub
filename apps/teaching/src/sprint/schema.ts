@@ -259,7 +259,9 @@ export type PhasePayload = {
 export const PartSchema = z.object({
   id: SprintIdSchema,
   text: z.string().trim().min(1).max(80),
-  shows: text(200).default(''),
+  shows: text(400).default(''),
+  /** Optional notes on how the part gets made: tools, steps, what is borrowed. */
+  how: text(400).default(''),
   criterion: z.string().max(40).default('')
 });
 export type Part = z.infer<typeof PartSchema>;

@@ -28,7 +28,8 @@ describe('decide form', () => {
 
   it('shows two ideas at a time, a winner and what it is stronger in, then the next pair', () => {
     const f = mountDecide(ctx(base()));
-    expect(f.el.querySelector('.sd-purpose')?.textContent).toContain('starred your strongest idea');
+    expect(f.el.querySelector('.coach__do')?.textContent).toContain('starred your strongest idea');
+    expect(f.el.querySelector('.su-step__where')?.textContent).toBe('Decide · Step 1 of 2');
     expect(f.el.querySelectorAll('.sdd-idea')).toHaveLength(2);
     expect(f.el.querySelector('.sdd-progress__text')?.textContent).toBe('Match-up 1 of 3');
     expect(next(f).disabled).toBe(true);
@@ -108,7 +109,9 @@ describe('decide: parts', () => {
     const c = ctx(status);
     (c.client as unknown as { assign: unknown }).assign = vi.fn(async () => status);
     const f = mountDecide(c);
-    expect(f.el.querySelector('.sd-status')?.textContent).toBe('1 part has no one yet. Still without a part: AB.');
+    expect(f.el.querySelector('.sd-status')?.textContent).toBe('Still to do: someone for “Panel text” and a part for you.');
+    expect(f.el.querySelector('.sd-needs')?.textContent).toBe('AB (you) still needs a part.');
+    expect(f.el.querySelectorAll('.coach__do')[1]?.textContent).toBe('Split “Baker” into parts and give each part to someone.');
     const chip = [...f.el.querySelectorAll<HTMLButtonElement>('.sd-who .sprint-chip')].find((b) => b.textContent === 'AB (you)')!;
     chip.click();
     expect((c.client as unknown as { assign: ReturnType<typeof vi.fn> }).assign).toHaveBeenCalledWith('p1', ['m1']);
@@ -120,7 +123,41 @@ describe('decide: parts', () => {
   });
 });
 
+describe('decide: how we’ll make it', () => {
+  it('saves a part’s how, with the group’s tools as chips that add to it', async () => {
+    const status = base({
+      votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' }, results: { ranking: [], best_at: [], unanimous: false },
+      members: [{ key: 'm1', initials: 'AB', me: true }],
+      brief: { problem: null, audience: null, answers: [], limits: { can_known: [{ text: 'Canva', count: 2 }, { text: 'the library', count: 1 }] } },
+      parts: [{ id: 'p1', text: 'Panel text', shows: 'The morning', how: '', criterion: 'c1', claimed: 1, mine: true, assigned: ['m1'] }]
+    });
+    const c = ctx(status);
+    const f = mountDecide(c);
+    expect([...f.el.querySelectorAll('.sd-tool')].map((b) => b.textContent)).toEqual(['Canva', 'the library']);
+    (f.el.querySelector('.sd-tool') as HTMLButtonElement).click();
+    const how = [...f.el.querySelectorAll<HTMLTextAreaElement>('.sprint-part textarea')][1]!;
+    expect(how.value).toBe('Canva');
+    expect([...f.el.querySelectorAll('.sd-tick.is-done')]).toHaveLength(1);
+    [...f.el.querySelectorAll<HTMLButtonElement>('.sd-actions button')].find((b) => b.textContent === 'Save parts')!.click();
+    await Promise.resolve();
+    expect(c.client.parts).toHaveBeenCalledWith([expect.objectContaining({ id: 'p1', how: 'Canva' })]);
+  });
+});
+
 describe('prototype form', () => {
+  it('shows every part the student owns, with what it must show and how they’ll make it', () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [
+      { id: 'p1', text: 'Panel text', shows: 'The baker’s morning', how: 'Write it in Docs', criterion: 'c1', claimed: 1, mine: true },
+      { id: 'p2', text: 'Artefacts', shows: 'Three objects', how: '', criterion: 'c2', claimed: 1, mine: true },
+      { id: 'p3', text: 'Map', shows: 'The streets', how: '', criterion: 'c2', claimed: 1, mine: false }
+    ] });
+    const f = mountPrototype(ctx(s, 'prototype'));
+    expect(f.el.querySelector('h2')?.textContent).toBe('Your parts');
+    expect([...f.el.querySelectorAll('.sprint-mypart__name')].map((h) => h.textContent)).toEqual(['Panel text', 'Artefacts']);
+    expect(f.el.querySelector('.sprint-brief-part')?.textContent).toContain('Write it in Docs');
+    expect(f.el.querySelector('.sprint-brief-part')?.textContent).not.toContain('The streets');
+  });
+
   it('shows the part brief, upload, pitch file and the self-check', () => {
     const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [{ id: 'p1', text: 'Panel text', shows: 'The baker’s morning', criterion: 'c1', claimed: 1, mine: true }] });
     const f = mountPrototype(ctx(s, 'prototype'));
@@ -157,7 +194,8 @@ describe('assembler', () => {
     const c = ctx(status);
     (c.client as unknown as { setAssembler: unknown }).setAssembler = vi.fn(async () => status);
     const f = mountDecide(c);
-    expect(f.el.querySelector('.sd-status')?.textContent).toBe('No assembler yet.');
+    expect(f.el.querySelector('.sd-status')?.textContent).toBe('Still to do: who puts it together.');
+    expect(f.el.querySelector('.sd-assembler')?.textContent).toContain('They still do their own part.');
     [...f.el.querySelectorAll<HTMLButtonElement>('.sd-assembler .sprint-chip')].find((b) => b.textContent === 'CD')!.click();
     expect((c.client as unknown as { setAssembler: ReturnType<typeof vi.fn> }).setAssembler).toHaveBeenCalledWith('m2');
     f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
