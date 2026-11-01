@@ -60,7 +60,21 @@ export function doneText(view: MarkbookView, studentId: string, lessons: readonl
   return `${due.filter((l) => lessonCell(view, studentId, l, today).state === 'complete').length}/${due.length}`;
 }
 
-const lessonTag = (l: ProgressLesson): string => (l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension');
+const lessonTag = (l: ProgressLesson): string =>
+  l.students ? 'Tutorial' : l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
+
+/** A tutorial's exit check is only for the students in its groups. */
+const notForStudent = (c: AnyColumn, studentId: string): boolean => c.kind === 'quiz' && Boolean(c.groups) && !c.groups![studentId] && !c.scores[studentId];
+
+/** The grey box for a student a column isn't set for, matching the lesson boxes. */
+function naBox(student: RosterStudent, title: string): HTMLElement {
+  const box = el('span', 'mb-progress__btn mb-progress__btn--na');
+  const words = `${student.name}, ${title}: not for this student`;
+  box.setAttribute('role', 'img');
+  box.setAttribute('aria-label', words);
+  box.title = words;
+  return box;
+}
 
 function markedMeta(c: AnyColumn): string {
   const max = c.kind === 'quiz' ? c.questions.reduce((n, q) => n + q.marks, 0) : 0;
@@ -91,7 +105,7 @@ function markedHeader(c: AnyColumn, actions: MarkbookActions): HTMLTableCellElem
     title.addEventListener('click', () => (c.kind === 'quiz' ? actions.openHeatmap(c.lesson_id) : actions.editColumn(c.id)));
   }
   title.dataset.col = c.id;
-  label.append(el('span', 'mb-col__kind mb-book__kind', KIND_LABEL[c.kind]), title, el('span', 'mb-progress__meta', markedMeta(c)));
+  label.append(el('span', 'mb-col__kind mb-book__kind', c.kind === 'quiz' && c.groups ? 'Tutorial' : KIND_LABEL[c.kind]), title, el('span', 'mb-progress__meta', markedMeta(c)));
   th.append(label);
   // A task linked to a lesson block opens the marking screen, with how many handed-in pieces still wait.
   const mark = c.kind === 'assessment' && c.piece ? actions.markLink?.(c.id) : undefined;
@@ -207,8 +221,9 @@ export function renderBook(o: BookOptions): HTMLElement {
     name.append(studentHead(o.view, s, o.actions.openStudent));
     tr.append(name);
     for (const c of columns) {
-      const td = el('td', c.kind === 'lesson' ? 'mb-progress__cell' : 'mb-progress__cell mb-book__marked');
-      td.append(c.kind === 'lesson' ? lessonButton(o.view, s, c.lesson, o.today, o.onMark) : cellFor(o.view, c.column, s, o.actions, o.today, { quizScore: true }));
+      const na = c.kind === 'marked' && notForStudent(c.column, s.id);
+      const td = el('td', c.kind === 'lesson' || na ? 'mb-progress__cell' : 'mb-progress__cell mb-book__marked');
+      td.append(c.kind === 'lesson' ? lessonButton(o.view, s, c.lesson, o.today, o.onMark) : na ? naBox(s, c.column.title) : cellFor(o.view, c.column, s, o.actions, o.today, { quizScore: true }));
       tr.append(td);
     }
     tr.append(el('td', 'mb-book__pin mb-book__pin--done', doneText(o.view, s.id, o.lessons, o.today)), el('td', 'mb-book__pin mb-book__pin--overall', overallText(overallFor(o.view.markbook, s.id))));
@@ -272,15 +287,16 @@ export function renderBookPhone(o: BookOptions & { index: number; move: (index: 
       unit = c.unit;
       list.append(el('p', 'mb-book__unit', unit));
     }
-    const row = el('div', c.kind === 'marked' ? 'mb-phone__row mb-book__marked' : 'mb-phone__row');
+    const na = c.kind === 'marked' && notForStudent(c.column, s.id);
+    const row = el('div', c.kind === 'marked' && !na ? 'mb-phone__row mb-book__marked' : 'mb-phone__row');
     const label = el('div', 'mb-phone__label');
     if (c.kind === 'lesson') {
       label.append(el('span', undefined, c.lesson.title), el('small', undefined, [lessonTag(c.lesson), c.lesson.date ? formatDay(c.lesson.date) : ''].filter(Boolean).join(' · ')));
       row.append(label, lessonButton(o.view, s, c.lesson, o.today, o.onMark));
     } else {
       const col = c.column;
-      label.append(el('span', undefined, col.title), el('small', undefined, `${KIND_LABEL[col.kind]} · ${formatDay(dateOf(col))}`));
-      row.append(label, cellFor(o.view, col, s, o.actions, o.today, { clearHint: false, quizScore: true }));
+      label.append(el('span', undefined, col.title), el('small', undefined, `${col.kind === 'quiz' && col.groups ? 'Tutorial' : KIND_LABEL[col.kind]} · ${formatDay(dateOf(col))}`));
+      row.append(label, na ? naBox(s, col.title) : cellFor(o.view, col, s, o.actions, o.today, { clearHint: false, quizScore: true }));
       if ((col.kind === 'handin' || col.kind === 'check') && !s.removed && markOf(o.view.markbook, col.id, s.id) !== undefined) {
         const clear = el('button', 'mb-phone__clear', 'Clear');
         clear.type = 'button';

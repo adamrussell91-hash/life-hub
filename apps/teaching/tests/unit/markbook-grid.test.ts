@@ -32,9 +32,11 @@ describe('Marks & progress quiz cells', () => {
 
   it('grey the cells of students outside a tutorial’s groups, and mark who has only started', () => {
     const blank = { st_ann: score };
-    const [ann, cy] = cells(column({ scores: blank, groups: { st_ann: 'Re-tells the plot' } }));
-    expect(ann!.classList.contains('mb-cell--na')).toBe(false);
-    expect(cy!.classList.contains('mb-cell--na')).toBe(true);
+    const root = renderGrid(view(column({ scores: blank, groups: { st_ann: 'Re-tells the plot' } })), students, actions, '2026-10-23');
+    const [annRow, cyRow] = root.querySelectorAll('tbody tr');
+    expect(annRow!.querySelector('.mb-cell--quiz')).not.toBeNull();
+    expect(cyRow!.querySelector('.mb-cell--quiz')).toBeNull();
+    expect(cyRow!.querySelector('.mb-progress__btn--na')).not.toBeNull();
     const [, started] = cells(column({ scores: blank, started: ['st_cy'] }));
     expect(started!.textContent).toBe('Started');
     expect(started!.classList.contains('mb-cell--na')).toBe(false);

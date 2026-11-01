@@ -8,7 +8,8 @@ export type { DoneRecord };
 /**
  * Lesson progress for the markbook's Marks & progress view: which lessons of the class's active units
  * each student has done. A tick is complete, a half circle is partial, a grey box is not for that
- * student, and a red dot means it is still not complete a week after its set date.
+ * student, and a red dot means it is still not complete a week after its set date. Every lesson in
+ * the unit is for every student, side lessons too; only a tutorial is for just the students in its groups.
  */
 
 /** A lesson is late this many days after its set date. */
@@ -24,7 +25,11 @@ export type ProgressLesson = {
   date?: string;
   /** The unit it belongs to, for the band above the columns. */
   unit?: string;
+  /** A tutorial: only the students in its groups. Missing means every student. */
+  students?: string[];
 };
+
+type TutorialGroups = { class_id: string; groups: ReadonlyArray<{ students: readonly string[] }> };
 
 /**
  * The units' lessons, each once, with each lesson's earliest set date for the class, in date order.
@@ -32,8 +37,10 @@ export type ProgressLesson = {
  */
 export function unitProgressLessons(
   units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & { title?: string }>,
-  lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string }>,
-  scheduled: readonly (Pick<ScheduledLesson, 'lesson_id' | 'date'> & { delivery_status?: ScheduledLesson['delivery_status'] })[]
+  lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string; tutorial?: TutorialGroups | null }>,
+  scheduled: readonly (Pick<ScheduledLesson, 'lesson_id' | 'date'> & { delivery_status?: ScheduledLesson['delivery_status'] })[],
+  /** The class, so a tutorial set for another class is for nobody here. */
+  classId?: string
 ): ProgressLesson[] {
   const byId = new Map(lessons.map((l) => [l.id, l] as const));
   const out: ProgressLesson[] = [];
@@ -50,10 +57,16 @@ export function unitProgressLessons(
       role: lesson.route_role ?? 'core',
       assessment: lesson.pedagogical_mode === 'assessment',
       ...(dates[0] ? { date: dates[0] } : {}),
-      ...(unit.title ? { unit: unit.title } : {})
+      ...(unit.title ? { unit: unit.title } : {}),
+      ...(lesson.pedagogical_mode === 'tutorial' ? { students: tutorialStudents(lesson.tutorial, classId) } : {})
     });
   }
   return out.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0));
+}
+
+function tutorialStudents(tutorial: TutorialGroups | null | undefined, classId: string | undefined): string[] {
+  if (!tutorial || (classId && tutorial.class_id !== classId)) return [];
+  return [...new Set(tutorial.groups.flatMap((g) => g.students))];
 }
 
 export type CellState = 'complete' | 'partial' | 'na' | 'open';
@@ -72,13 +85,15 @@ export type CellInput = {
   /** Handed in with nothing left to mark. */
   quizMarked?: boolean;
   quizStarted: boolean;
-  /** The teacher ticked this side lesson as taken for the student. */
+  /** The teacher ticked this lesson as taken for the student. */
   took: boolean;
+  /** The lesson is set for this student: every lesson is, except a tutorial they aren't grouped in. */
+  forStudent: boolean;
   today: string;
 };
 
 export function cellFor(input: CellInput): Cell {
-  const { lesson, record, quizSubmitted, quizStarted, took, today } = input;
+  const { lesson, record, quizSubmitted, quizStarted, took, forStudent, today } = input;
   const teacherDone = (record?.via === 'teacher' && !record.partial) || Boolean(input.quizMarked);
   const studentDone = Boolean(record && !record.partial && record.via !== 'teacher') || quizSubmitted;
   let state: CellState;
@@ -88,7 +103,7 @@ export function cellFor(input: CellInput): Cell {
   } else if (teacherDone || studentDone) state = 'complete';
   else if (record?.partial || quizStarted) state = 'partial';
   else state = 'open';
-  if (state === 'open' && lesson.role !== 'core' && !took) return { state: 'na', late: false };
+  if (state === 'open' && !forStudent && !took) return { state: 'na', late: false };
   const late = state !== 'complete' && Boolean(lesson.date) && addDays(lesson.date!.slice(0, 10), LATE_AFTER_DAYS) < today;
   return { state, late };
 }
@@ -137,6 +152,7 @@ export function lessonCell(view: MarkbookView, studentId: string, lesson: Progre
     // Written work saved in the lesson counts as under way, like a quiz go not handed in.
     quizStarted: Boolean(quiz?.started?.includes(studentId)) || Boolean(view.work?.find((w) => w.lesson_id === lesson.id)?.students[studentId]),
     took: (view.markbook.took?.[studentId] ?? []).includes(lesson.id),
+    forStudent: !lesson.students || lesson.students.includes(studentId),
     today
   });
 }
