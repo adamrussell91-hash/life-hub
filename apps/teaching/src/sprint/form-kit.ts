@@ -27,6 +27,8 @@ export type FormContext = {
    * starts from it, so nothing typed is lost.
    */
   drafts?: Partial<PhasePayload>;
+  /** The step each phase was on, so a rebuilt form opens where the student was, not at step 1. */
+  steps?: Partial<Record<SprintPhaseKey, number>>;
 };
 /** `update` takes a polled status without a rebuild (a form that shows live group state). */
 export type PhaseForm = { el: HTMLElement; dispose(): void; update?(next: SprintStatus): void };
@@ -126,7 +128,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     if (busy || !ctx.editable) return;
     busy = true;
     // An autosave keeps a submit's message in view; a new submit clears it.
-    if (kind === 'submit') { err.textContent = ''; go.textContent = 'Submitting…'; go.disabled = true; }
+    if (kind === 'submit') { window.clearTimeout(timer); timer = 0; err.textContent = ''; go.textContent = 'Submitting…'; go.disabled = true; }
     try {
       const next = kind === 'save' ? await ctx.client.save(phase, payload()) : await ctx.client.submit(phase, payload());
       note.textContent = kind === 'submit' ? '' : submitted ? 'Changes saved.' : 'Saved as a draft.';
@@ -178,9 +180,9 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
  * Show a phase's step cards one at a time, like Understand's slides: a numbered
  * rail and Back / Next. Does nothing when the Kit sets steps down the page, or
  * there is only one step. Call after the cards are in `root`; `start` is the
- * step shown first.
+ * step shown first, and `onStep` hears each move.
  */
-export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined, start = 0): void {
+export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined, start = 0, onStep?: (at: number) => void): void {
   const cards = [...root.children].filter((c): c is HTMLElement => c.classList.contains('su-step'));
   if (layout === 'vertical' || cards.length < 2) return;
   let at = Math.max(0, Math.min(cards.length - 1, start));
@@ -195,6 +197,7 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
   function go(i: number): void {
     at = Math.max(0, Math.min(cards.length - 1, i));
     seen.add(at);
+    onStep?.(at);
     paint();
   }
   function paint(): void {

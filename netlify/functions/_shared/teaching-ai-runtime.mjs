@@ -359,10 +359,14 @@ var DecidePayloadSchema = z7.object({
   opened: z7.array(z7.string().max(40)).max(40).default([]),
   stretch: text(300).default("")
 });
-var PrototypePayloadSchema = z7.object({
+var PrototypeBuildSchema = z7.object({
   text: text(4e3).default(""),
   link: z7.string().trim().max(500).regex(/^(https:\/\/\S+)?$/, "Links start with https://").default(""),
-  files: z7.array(z7.string().max(40)).max(SPRINT_LIMITS.files).default([]),
+  files: z7.array(z7.string().max(40)).max(SPRINT_LIMITS.files).default([])
+});
+var PrototypePayloadSchema = PrototypeBuildSchema.extend({
+  /** A student with two or more parts builds each one here, by part id; one part uses the fields above. */
+  builds: z7.record(z7.string().max(40), PrototypeBuildSchema).refine((b) => Object.keys(b).length <= SPRINT_LIMITS.parts, "Too many parts.").default({}),
   requirements: Wheres,
   self: z7.record(z7.string().max(40), LevelSchema).default({}),
   self_why: z7.record(z7.string().max(40), text(300)).default({}),

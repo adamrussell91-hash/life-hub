@@ -65,6 +65,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   let disposed = false;
   const opened = new Set<SprintPhaseKey>();
   const drafts: Partial<PhasePayload> = {};
+  const steps: Partial<Record<SprintPhaseKey, number>> = {};
 
   const shell = el('div', 'sprint');
   const hero = el('div', 'sprint__hero');
@@ -225,7 +226,8 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       valueCheck: valueCheckFor(move?.value),
       support: sprint.support,
       onStatus: (next) => apply(next),
-      drafts
+      drafts,
+      steps
     };
     const make = PHASE_FORMS[key];
     form = make ? make(ctx) : { el: el('p', 'sprint-note', 'This phase opens soon.'), dispose() {} };

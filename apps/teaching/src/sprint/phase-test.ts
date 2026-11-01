@@ -44,7 +44,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
     { pick: '.sprint-received', title: 'What your group got', guide: LATER_GUIDE.feedback },
     { pick: '.sprint-field, select.qz-input, .sprint-value', title: 'Think about what to change', guide: LATER_GUIDE.reflect }
   ], 'Test');
-  slidify(root, ctx.sprint.understand?.layout);
+  slidify(root, ctx.sprint.understand?.layout, ctx.steps?.test ?? 0, (i) => { if (ctx.steps) ctx.steps.test = i; });
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }

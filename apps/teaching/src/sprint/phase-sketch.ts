@@ -279,7 +279,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   paintCard();
   paintStrongCheck();
   dev.append(strongest, strongCheck);
-  slidify(root, ctx.sprint.understand?.layout);
+  slidify(root, ctx.sprint.understand?.layout, ctx.steps?.sketch ?? 0, (i) => { if (ctx.steps) ctx.steps.sketch = i; });
   root.append(bar.el);
   return { el: root, dispose: () => { window.clearInterval(tick); bar.dispose(); } };
 }
