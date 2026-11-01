@@ -108,6 +108,7 @@ import { outcomeLabels } from '@/markbook/parse';
 import { peekCurriculum } from '@/app/curriculum-state';
 import { loadAlignment } from '@/alignment/api';
 import { dotPointOutcomes } from '@/evidence/syllabus';
+import type { NextStepJobs } from '@/blocks/next-step-run';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -186,6 +187,8 @@ export type MountLessonPageOptions = {
   onToggleFullPage?: () => void;
   /** Saves pending edits before a page tool starts Ann, who reads the saved draft. */
   flushDraft?: () => Promise<void>;
+  /** Make next steps for writing boxes: the job writes the draft, then the builder reloads it. */
+  nextSteps?: NextStepJobs;
   /** A page tool started an Ann job: open the chat on it. */
   onAnnStarted?: () => void;
   /**
@@ -1566,7 +1569,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     blocks: lesson.blocks,
     media,
-    editorContext: { lessonId: lesson.id, pageTypes: pageBlockTypes(LESSON_BLOCK_GROUPS) },
+    editorContext: { lessonId: lesson.id, pageTypes: pageBlockTypes(LESSON_BLOCK_GROUPS), ...(options.nextSteps ? { nextSteps: options.nextSteps } : {}) },
     onChange: (blocks) => {
       emitLesson({ ...lesson, blocks });
     },

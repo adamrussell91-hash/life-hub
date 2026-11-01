@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
-import { runLessonAiJob } from './teaching-ai-runtime.mjs';
+import { runLessonAiJob, runNextStepsFill, runLaddersDraft, applyFilledBoxes, NEXT_STEP_JOB_KINDS } from './teaching-ai-runtime.mjs';
+import { readFeedbackCodes } from './feedback-codes.mjs';
+import { readStoredSkills } from './skills-continuum.mjs';
 import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs';
 import { TOOLS as ALCHEMY_TOOLS } from './alchemy-agent.mjs';
 import { refreshNoteIndex, searchNotes, noteFilters, readNoteText, readAttachmentText } from './alchemy-notes-index.mjs';
@@ -63,7 +65,8 @@ export function createAnthropicComplete({ apiKey, client, signal } = {}) {
       model: request.model,
       max_tokens: request.max_tokens,
       system: request.system,
-      tools: request.tools.map(tool => (tool.type ? tool : { ...tool, eager_input_streaming: true })),
+      // Structured jobs (next steps) send no tools.
+      ...(request.tools.length ? { tools: request.tools.map(tool => (tool.type ? tool : { ...tool, eager_input_streaming: true })) } : {}),
       messages: request.messages,
       output_config: { effort: request.effort },
       // Caches the conversation tail too; the system breakpoints cover the prefix.
@@ -232,5 +235,90 @@ export async function runStoredLessonJob({
     at: nowIso()
   });
 
+  return finish(patch);
+}
+
+export const NEXT_STEP_KINDS = new Set(NEXT_STEP_JOB_KINDS);
+/** Structured next-step jobs are one or two short calls. */
+export const NEXT_STEP_JOB_DEADLINE_MS = 4 * 60 * 1000;
+
+/**
+ * Runs a queued next-step job (next-step-jobs.ts). `next_steps_fill` writes the
+ * banks into the draft lesson, re-read after the model call so the teacher's
+ * edits in between are kept; `ladders_draft` writes nothing and leaves its
+ * drafts on the job for the codes editor. Both log their cost.
+ */
+export async function runStoredNextStepJob({
+  store,
+  jobId,
+  env = process.env,
+  complete,
+  deadlineMs = NEXT_STEP_JOB_DEADLINE_MS,
+  nowIso = () => new Date().toISOString()
+}) {
+  const job = await getJSON(store, aiJobKey(jobId));
+  if (!job || job.status !== 'working' || !NEXT_STEP_KINDS.has(job.kind)) return job;
+  const finish = patch => patchWorkingJob(store, jobId, { ...patch, phase: undefined }, nowIso);
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!complete && !apiKey) return finish({ status: 'error', error: 'Teaching AI is not configured: ANTHROPIC_API_KEY is missing on the server.' });
+
+  const [codes, continuum] = await Promise.all([readFeedbackCodes(store), readStoredSkills(store).catch(() => null)]);
+  const lesson = job.kind === 'next_steps_fill' ? await getJSON(store, draftLessonKey(job.lesson_id)) : null;
+  if (job.kind === 'next_steps_fill' && !lesson) return finish({ status: 'error', error: 'Lesson not found.' });
+
+  await patchWorkingJob(store, jobId, { phase: 'writing' }, nowIso);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  const common = {
+    complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }),
+    models: teachingModels(env),
+    signal: controller.signal
+  };
+  let result;
+  try {
+    result = job.kind === 'next_steps_fill'
+      ? await runNextStepsFill({ ...common, lesson, targets: job.targets ?? [], codes, continuum })
+      : await runLaddersDraft({ ...common, codes, continuum });
+  } catch (error) {
+    result = { status: 'error', error: error instanceof Error ? error.message : 'The AI job failed.', usage: [], cost_usd: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let patch;
+  if (result.status !== 'done') {
+    patch = { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd };
+  } else if (job.kind === 'next_steps_fill') {
+    // The draft as it is now, so a teacher's edits while the model worked are kept.
+    const fresh = await getJSON(store, draftLessonKey(job.lesson_id), { consistency: 'strong' });
+    const { lesson: next, applied, skipped } = applyFilledBoxes(fresh ?? lesson, result.boxes);
+    if (applied) await setJSON(store, draftLessonKey(job.lesson_id), { ...next, updated_at: nowIso() });
+    patch = {
+      status: 'done',
+      response: applied ? `Next steps made for ${applied} box${applied === 1 ? '' : 'es'}.` : 'Nothing was saved: the boxes changed while the steps were being written.',
+      filled: result.boxes.map(b => ({ block_id: b.block_id, index: b.index, codes: Object.keys(b.next_steps) })),
+      applied,
+      skipped,
+      flagged: result.flagged,
+      usage: result.usage,
+      cost_usd: result.cost_usd
+    };
+  } else {
+    patch = { status: 'done', response: `Ladders drafted for ${result.codes.length} code${result.codes.length === 1 ? '' : 's'}.`, ladders: result.codes, usage: result.usage, cost_usd: result.cost_usd };
+  }
+
+  await appendUsageLog(store, {
+    job_id: jobId,
+    lesson_id: job.lesson_id ?? null,
+    agent: null,
+    action: job.kind,
+    protocol_id: null,
+    status: patch.status,
+    turns: result.usage?.length ?? 0,
+    failed_checks: (result.flagged ?? []).length,
+    cost_usd: result.cost_usd,
+    usage: result.usage,
+    at: nowIso()
+  });
   return finish(patch);
 }

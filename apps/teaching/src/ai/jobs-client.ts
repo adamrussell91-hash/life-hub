@@ -52,6 +52,22 @@ export async function startAiJob(
   return readOkData<StartAiJobResult>(response);
 }
 
+/** A structured job (next steps) or its `dry_run` estimate: the body goes as sent, the reply is that job's own shape. */
+export async function postAiJob<T>(
+  body: Record<string, unknown>,
+  options?: { baseUrl?: string; signal?: AbortSignal }
+): Promise<T> {
+  const baseUrl = getApiBaseUrl(options?.baseUrl);
+  const response = await fetch(`${baseUrl}/api/ai/jobs`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal
+  });
+  return readOkData<T>(response);
+}
+
 export async function pollAiJob(
   id: string,
   options?: { baseUrl?: string; signal?: AbortSignal }

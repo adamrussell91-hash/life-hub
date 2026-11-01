@@ -12,6 +12,7 @@
  * the saved library (Blobs), never in this public repo.
  */
 import { isProblemType } from '../../../packages/walkthrus/problem-types.mjs';
+import { LADDER_MAX, RUNG_ORDER, SKILL_REF } from './next-steps.mjs';
 
 export const CODES_KEY = 'feedback_codes/library';
 export const CODE_COLOURS = ['blue', 'sage', 'peach', 'gold', 'lilac'];
@@ -32,22 +33,57 @@ const c = (id, code, label, group, criterion, colour, descriptor, extra = {}) =>
   ...extra
 });
 
+/**
+ * Placeholder ladders: one step per placement rung (below → excellent), the
+ * step toward the rung above. Generic stand-ins; the saved library holds the real ones.
+ */
+const LADDERS = {
+  comp_ts: { skill: 'arguing.thesis', ladder: [
+    'Open with one sentence that answers the question in your own words.',
+    'Name the idea your whole answer will argue in the first sentence.',
+    'Make your opening claim one a reader could argue with.',
+    'Shape your opening claim so it sets up the steps of your argument.',
+    'Open with a claim that weighs the question and adds a fresh angle.'
+  ] },
+  comp_ar: { skill: 'arguing.thesis', ladder: [
+    'Use a key word from the question in each point you make.',
+    'Link each point back to the question in its last sentence.',
+    'Show how each point moves your answer to the question forward.',
+    'Choose the points that answer this question most sharply.',
+    'Weigh which points matter most to the question and say why.'
+  ] },
+  comp_ad: { skill: 'reading.inference', ladder: [
+    'Add one sentence that explains what your quote shows.',
+    'Explain what a key word in your quote suggests.',
+    'Unpack two layers of meaning in your evidence.',
+    'Connect the detail you unpack to the bigger idea of the text.',
+    'Weigh two readings of the detail and argue for the stronger one.'
+  ] },
+  comp_e: { skill: 'arguing.evidence', ladder: [
+    'Add a short quote from the text that backs up your point.',
+    'Choose a quote of a few words that fits your point exactly.',
+    'Blend a short quote into your own sentence.',
+    'Use evidence from different parts of the text for one idea.',
+    'Pick the evidence that best proves your claim and say why it is strongest.'
+  ] }
+};
+
 export const DEFAULT_FEEDBACK_CODES = [
-  c('comp_ts', 'TS', 'Topic sentence', 'composition', 1, 'lilac', 'Open with a clear concept that answers the question in specific terms, not a restatement of it.'),
-  c('comp_ar', 'AR', 'Analysis – relevance', 'composition', 1, 'lilac', 'Answer this question directly. Correct but unrelated points do not earn marks.'),
-  c('comp_as', 'AS', 'Analysis – specific', 'composition', 1, 'lilac', 'Turn the generic key terms into something specific to your argument instead of repeating them.'),
+  c('comp_ts', 'TS', 'Topic sentence', 'composition', 1, 'lilac', 'Open with a clear concept that answers the question in specific terms and in your own words.'),
+  c('comp_ar', 'AR', 'Analysis – relevance', 'composition', 1, 'lilac', 'Answer this question directly. Tie each point back to the words of the question.'),
+  c('comp_as', 'AS', 'Analysis – specific', 'composition', 1, 'lilac', 'Turn the generic key terms into something specific to your argument.'),
   c('comp_ad', 'AD', 'Analysis – depth', 'composition', 1, 'lilac', 'Unpack the detail of this point and connect it back to the question.'),
-  c('comp_sd', 'SD', 'Structure – development', 'composition', 1, 'lilac', 'Build the idea forward instead of circling back to an earlier point.'),
+  c('comp_sd', 'SD', 'Structure – development', 'composition', 1, 'lilac', 'Build the idea forward so each point adds something new.'),
   c('comp_e', 'E', 'Evidence', 'composition', 2, 'blue', 'Use evidence that is relevant, accurate, concise and varied.'),
   c('comp_t', 'T', 'Techniques', 'composition', 2, 'blue', 'Name a specific technique and explain its effect. Draw on a range, including form features.'),
-  c('comp_ac', 'AC', 'Analysis – coherence', 'composition', 2, 'blue', 'This is retelling the text. Give your own analysis in your own words.'),
+  c('comp_ac', 'AC', 'Analysis – coherence', 'composition', 2, 'blue', 'Move from what happens to what it means. Give your own analysis in your own words.'),
   c('comp_sb', 'SB', 'Structure – balance', 'composition', 2, 'blue', 'Balance your analysis across both texts.'),
   c('comp_si', 'SI', 'Structure – integration', 'composition', 2, 'blue', 'Bring the texts together with comparative and evaluative language.'),
   c('comp_s', 'S', 'Structure', 'composition', 3, 'gold', 'Shape the response: a clear opening concept, then the units of analysis.'),
-  c('comp_ex', 'EX', 'Expression', 'composition', 3, 'gold', 'Choose precise, high-quality language that carries the argument without getting in its way.'),
+  c('comp_ex', 'EX', 'Expression', 'composition', 3, 'gold', 'Choose precise, high-quality language that carries the argument clearly and lets it move.'),
   c('comp_l', 'L', 'Length', 'composition', 3, 'gold', 'Strike the balance between detail and being succinct.'),
   c('viva_pp', 'PP', 'Pre-prepared', 'viva', 1, 'lilac', 'This sounds prepared for a different question. Respond to the one asked.'),
-  c('viva_x', 'X', 'Accuracy', 'viva', 2, 'blue', 'Check this detail about the text. It is not quite right.'),
+  c('viva_x', 'X', 'Accuracy', 'viva', 2, 'blue', 'Check this detail against the text and say it precisely.'),
   c('viva_np', 'NP', 'Needed prompting', 'viva', 3, 'gold', 'This needed a prompt to get there. Aim to get there on your own.'),
   c('speak_fw', 'FW', 'Filler word', 'speaking', null, 'peach', 'Filler word. Try a short silent pause instead.', { key: '1' }),
   c('speak_pf', 'PF', 'Pace – too fast', 'speaking', null, 'peach', 'You sped up here. Slow down so the idea lands.', { key: '2' }),
@@ -56,8 +92,8 @@ export const DEFAULT_FEEDBACK_CODES = [
   c('speak_vo', 'VO', 'Volume', 'speaking', null, 'peach', 'Project your voice so every word carries.', { key: '5' }),
   c('speak_fl', 'FL', 'Fluency', 'speaking', null, 'peach', 'You lost the thread here. Glance at your next dot point and carry on.', { key: '6' }),
   c('speak_to', 'TO', 'Tone', 'speaking', null, 'peach', 'Vary your tone and stress the key words.', { key: '7', strength_descriptor: 'Great emphasis on the key words.' }),
-  c('speak_tm', 'TM', 'Timing', 'speaking', null, 'peach', 'Use the full time: not too short, not over.', { key: '8' })
-];
+  c('speak_tm', 'TM', 'Timing', 'speaking', null, 'peach', 'Use the full time and finish right on it.', { key: '8' })
+].map((code) => (LADDERS[code.id] ? { ...code, ...LADDERS[code.id] } : code));
 
 export class FeedbackCodesError extends Error {
   constructor(message) {
@@ -79,6 +115,13 @@ function cleanResource(raw) {
   const start = Math.floor(Number(raw.start));
   if (raw.kind === 'video' && Number.isFinite(start) && start > 0) out.start = Math.min(start, 24 * 3600);
   return out;
+}
+
+/** One step per placement rung, each trimmed and short; anything else drops the ladder. */
+function cleanLadder(raw) {
+  if (!Array.isArray(raw) || raw.length !== RUNG_ORDER.length) return null;
+  const lines = raw.map((line) => (typeof line === 'string' ? line.trim() : ''));
+  return lines.every((line) => line && line.length <= LADDER_MAX) ? lines : null;
 }
 
 /** Validates a library sent by the teacher. Ids stay stable so old feedback still finds its code. */
@@ -121,6 +164,10 @@ export function cleanFeedbackCodes(input) {
     if (isProblemType(row?.problem_type)) out.problem_type = row.problem_type;
     const resource = cleanResource(row?.resource);
     if (resource) out.resource = resource;
+    // Optional: the continuum skill (strand.sub) the code works on, and its next step at each rung.
+    if (typeof row?.skill === 'string' && SKILL_REF.test(row.skill)) out.skill = row.skill;
+    const ladder = cleanLadder(row?.ladder);
+    if (ladder) out.ladder = ladder;
     if (row?.hidden === true) out.hidden = true;
     return out;
   });

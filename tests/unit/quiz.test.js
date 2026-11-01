@@ -868,6 +868,26 @@ test('writing check: typing logs are kept for written answers, summed at hand-in
   assert.equal([...store.data.keys()].some((k) => k.startsWith('quiz/quiz1/writing/')), false, 'deleting the attempt deletes its log');
 });
 
+test('next step: a pick saves with its written answer, is checked, and lands on the hand-in', async () => {
+  const store = baseStore({ quizBlocks: [qBlock('qa', sa), qBlock('qe', essay)] });
+  await publishQuiz(store);
+  const me = { token: token(33) };
+  await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  const text = 'The ending is tragic. The lovers die.';
+  const pick = { code_id: 'comp_ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 21 };
+  // Past the end of the answer, or on a short answer: dropped, and the answer still saves.
+  await quizAction(store, 'quiz1', { ...me, action: 'save', responses: { qe: { text }, qa: { text: 'Juliet' } }, steps: { qe: { ...pick, end: 99 }, qa: pick } });
+  let back = await quizAction(store, 'quiz1', { ...me, action: 'status' });
+  assert.equal(back.current.saved.responses.qe.text, text);
+  assert.equal(back.current.saved.steps, undefined);
+  await quizAction(store, 'quiz1', { ...me, action: 'save', responses: { qe: { text } }, steps: { qe: { ...pick, extra: 'x' } } });
+  back = await quizAction(store, 'quiz1', { ...me, action: 'status' });
+  assert.deepEqual(back.current.saved.steps, { qe: pick }, 'a new browser gets the pick back');
+  await quizAction(store, 'quiz1', { ...me, action: 'submit', responses: {} });
+  const result = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
+  assert.deepEqual(result.steps, { qe: pick });
+});
+
 test('writing check: off keeps no logs', async () => {
   const store = baseStore({ quizSettings: { writing_check: 'off' }, quizBlocks: [qBlock('qe', essay)] });
   await publishQuiz(store);

@@ -7,6 +7,7 @@ import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
 import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
+import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
@@ -191,6 +192,8 @@ function renderPublishedLesson(
   const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
   const inlineQuiz = !isQuiz && !!lesson.quiz;
   const quizClassId = extras?.cls?.id ?? extras?.quizClassId;
+  // Each writing box's next step: the student's codes and rungs, asked for once per lesson load.
+  const stepFor = quizClassId ? stepsLoader(quizClassId, lesson.lesson_id) : undefined;
   // Questions inside sections or columns are answered where they sit; the quiz box at the end keeps the hand-in.
   const quizSlots = inlineQuiz && hasNestedQuizQuestion(lesson.blocks) ? new Map<string, HTMLElement>() : null;
   const quizSlot = quizSlots
@@ -204,7 +207,7 @@ function renderPublishedLesson(
   for (const block of lesson.blocks) {
     if ((isQuiz || (inlineQuiz && !quizSlots)) && block.block_type === 'quiz_question') {
       if (inlineQuiz && !quizPlaced) {
-        blocks.append(mountStudentQuiz(lesson, { classId: quizClassId }));
+        blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor }));
         quizPlaced = true;
       }
       continue;
@@ -218,6 +221,7 @@ function renderPublishedLesson(
         pageBlocks: lesson.blocks,
         attachedOutcomes: publishedOutcomes,
         openNoteId,
+        ...(stepFor ? { stepFor } : {}),
         loadAnthology: () => studentUnitAnthology(lesson.unit_id),
         ...(quizSlot ? { quizSlot } : {})
       })
@@ -228,9 +232,9 @@ function renderPublishedLesson(
     blocks: lesson.blocks,
     feedbackOff: lesson.feedback_off === true
   });
-  if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, ...(quizSlots ? { slots: quizSlots } : {}) }));
+  if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor, ...(quizSlots ? { slots: quizSlots } : {}) }));
   content.append(blocks);
-  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: quizClassId }));
+  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor }));
   revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {

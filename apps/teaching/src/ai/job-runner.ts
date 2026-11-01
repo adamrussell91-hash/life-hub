@@ -33,7 +33,9 @@ const MECHANICAL_ACTIONS = new Set([
   'change_reading_level',
   'summarise',
   'write_alt_text',
-  'generate_answers'
+  'generate_answers',
+  // Next steps in writing boxes: a ladder rewritten for one question (next-step-jobs.ts).
+  'next_steps_fill'
 ]);
 
 /** Free-typed requests that are conversions, e.g. "turn this glossary into flashcards". */
@@ -179,6 +181,10 @@ export function estimateCostUsd(model: string, usage: ModelUsage | undefined): n
   const searches = (usage.server_tool_use?.web_search_requests ?? 0) * WEB_SEARCH_USD;
   return Math.round((tokens + searches) * 1_000_000) / 1_000_000;
 }
+
+/** For the A$ estimates shown before a teacher runs a job. Rough; the usage log holds what was spent. */
+export const USD_TO_AUD = 1.55;
+export const usdToAud = (usd: number): number => Math.round(usd * USD_TO_AUD * 10_000) / 10_000;
 
 const PROPOSAL_TOOLS = new Set<string>(AI_TOOLS.map((tool) => tool.name));
 
@@ -536,3 +542,6 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
 
   return fail(failedProposals > 0 ? lastProblem : 'The agent took too many steps. Try a narrower request.');
 }
+
+// Next-step jobs ride in the same server bundle (teaching-ai-runtime.mjs).
+export * from '@/ai/next-step-jobs';

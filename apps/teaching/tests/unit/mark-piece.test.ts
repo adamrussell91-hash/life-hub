@@ -28,4 +28,31 @@ describe('mark piece', () => {
     expect(save).toHaveBeenCalledWith({ tags: [expect.objectContaining({ code_id: 'ts', part: 'answers', field: 'q1', start: 0, end: 34, positive: false })], comment: 'Sharp evidence.', steps: { c1: 'building' } });
     expect(view.querySelector('[data-action="return"]')!.textContent).toBe('Return to Ava');
   });
+
+  it('shows the student’s own pick as a dashed layer under the teacher’s highlights', () => {
+    const text = data.text.answers!.q1!;
+    const withPick: MarkPieceData = {
+      ...data,
+      text: { ...data.text, 'step.0': { pick: '{"code_id":"ts"}' } },
+      steps: [{ part: 'answers', field: 'q1', pick: { code_id: 'ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 34 } }],
+      feedback: { tags: [{ code_id: 'ts', positive: false, part: 'answers', field: 'q1', start: 0, end: 11 }], comment: '', status: 'draft' }
+    };
+    const view = markPieceView(withPick, { save: vi.fn(), returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });
+    expect(view.querySelector('.mk-step-head')!.textContent).toBe('Their next step · TSOpen with a claim a reader could argue with.');
+    expect(view.querySelector('.mk-pick-caption')!.textContent).toBe('AN’s own TS pick.');
+    const runs = [...view.querySelectorAll<HTMLElement>('.nst-pick-run')];
+    expect(runs.map((r) => r.textContent).join('')).toBe(text.slice(0, 34));
+    // The teacher's TS keeps its highlight; the rest of the pick is dashed only, and not a tag to tap.
+    expect(runs[0]!.classList.contains('pa-run--mark')).toBe(true);
+    expect(runs.at(-1)!.classList.contains('pa-run--mark')).toBe(false);
+    expect(view.querySelector('.mk-sheets')!.textContent).not.toContain('code_id');
+  });
+
+  it('draws nothing for a skipped pick', () => {
+    const skipped: MarkPieceData = { ...data, steps: [{ part: 'answers', field: 'q1', pick: { code_id: 'ts', line: 'Open with a claim.', skipped: true } }] };
+    const view = markPieceView(skipped, { save: vi.fn(), returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });
+    expect(view.querySelector('.mk-step-head')).toBeNull();
+    expect(view.querySelector('.nst-pick-run')).toBeNull();
+    expect(view.querySelector('.mk-pick-caption')).toBeNull();
+  });
 });

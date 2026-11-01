@@ -434,6 +434,7 @@
     "○ quiz_question.question.options.3.text filler"
   ],
   "every-block/every_question_set/student": [
+    "Done",
     "Your response",
     "question_set.questions.0.prompt filler"
   ],

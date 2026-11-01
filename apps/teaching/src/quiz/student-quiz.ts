@@ -2,7 +2,8 @@ import { apiPost, ApiClientError } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { hasAnswer, QUIZ_KIND_INFO, WRITTEN_KINDS, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse, type WritingLog } from '@/quiz/core';
-import { mountQuestionPlayer, seededShuffle } from '@/quiz/player';
+import { mountQuestionPlayer, seededShuffle, type PlayerOptions } from '@/quiz/player';
+import { stepsLoader, type StepFor, type StepPick } from '@/student/next-step';
 import type { WritingWatch } from '@/quiz/writing-watch';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import './quiz.css';
@@ -34,7 +35,7 @@ type Current = {
   started_at: string;
   deadline: string | null;
   hints: Record<string, string>;
-  saved?: { responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; writing?: Record<string, WritingLog>; at?: string };
+  saved?: { responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; writing?: Record<string, WritingLog>; steps?: Record<string, StepPick>; at?: string };
   answers: Record<string, { response: QuizResponse | null; mark: MarkResult; key: QuestionKey | null }>;
 };
 type Status = {
@@ -62,6 +63,8 @@ type Draft = {
   spent: Record<string, number>;
   /** How each written answer was typed (writing.ts). */
   writing?: Record<string, WritingLog>;
+  /** Next-step picks on written answers, by question id; null clears one on the server. */
+  steps?: Record<string, StepPick | null>;
 };
 type LiveView = {
   session: string;
@@ -87,7 +90,7 @@ const FEEDBACK_TEXT = {
  * the teacher placed it in the lesson. The quiz box itself then keeps the
  * start, the hand-in and the marks; it is still one go, one hand-in.
  */
-export type StudentQuizOptions = { classId?: string; pickClass?: boolean; slots?: Map<string, HTMLElement> };
+export type StudentQuizOptions = { classId?: string; pickClass?: boolean; slots?: Map<string, HTMLElement>; /** The lesson's next steps for this class; the quiz asks itself when it picks the class. */ stepFor?: StepFor };
 
 /** What the lesson footer needs from a quiz on the page: how far the open go has got, and a way to hand it in. */
 export type LessonQuizHandle = {
@@ -126,10 +129,12 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   // Initials are claimed per class, so the class keeps its own token for this device.
   let classToken: string | null = null;
   let classFields: Record<string, string> = {};
+  let stepFor: StepFor | null = options.stepFor ?? null;
   const useClass = (id: string | undefined) => {
     classId = id;
     classToken = id ? deviceToken(`class:${id}`) : null;
     classFields = id ? { class_id: id, ...(classToken ? { class_token: classToken } : {}) } : {};
+    if (!options.stepFor) stepFor = id ? stepsLoader(id, lessonId) : null;
   };
   useClass(classId);
   let autoPick = true;
@@ -197,6 +202,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     const fromServer = (d: Draft): Draft => {
       for (const [id, response] of Object.entries(current.saved?.responses ?? {})) if (byId.has(id) && !hasAnswer(d.responses[id])) d.responses[id] = response;
       for (const [id, value] of Object.entries(current.saved?.confidence ?? {})) if (byId.has(id) && !d.confidence[id]) d.confidence[id] = value;
+      for (const [id, pick] of Object.entries(current.saved?.steps ?? {})) {
+        if (!byId.has(id) || d.steps?.[id] !== undefined) continue;
+        d.steps = { ...(d.steps ?? {}), [id]: pick };
+      }
       for (const [id, log] of Object.entries(current.saved?.writing ?? {})) {
         if (!byId.has(id)) continue;
         d.writing ??= {};
@@ -242,6 +251,20 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     };
   }
 
+  /** A written question's next step and Done. The pick goes with the next save, beside the answer it points into. */
+  function stepOptions(d: Draft, q: PublicQuestion): PlayerOptions['step'] {
+    if (!WRITTEN_KINDS.includes(q.kind)) return undefined;
+    const item = 'next_steps' in q ? { skills: q.skills, next_steps: q.next_steps } : {};
+    return {
+      step: stepFor ? stepFor(item, q.id) : null,
+      pick: d.steps?.[q.id] ?? null,
+      onPick: (pick) => {
+        d.steps = { ...(d.steps ?? {}), [q.id]: pick };
+        saveDraft();
+      }
+    };
+  }
+
   /** Marks a written answer's log as changed, after typing in it. */
   function typed(d: Draft, id: string): void {
     if (d.writing?.[id]) writingDirty.add(id);
@@ -274,14 +297,14 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     saving = true;
     saveState = 'saving';
     paintSaveChips();
-    const sent = JSON.stringify([draft.responses, draft.confidence]);
+    const sent = JSON.stringify([draft.responses, draft.confidence, draft.steps ?? null]);
     const logs = draft.writing ?? {};
     const writing = Object.fromEntries([...writingDirty].filter((id) => logs[id]).map((id) => [id, logs[id]]));
     writingDirty.clear();
     try {
-      await apiPost(endpoint, { action: 'save', ...(token ? { token } : {}), ...classFields, responses: draft.responses, confidence: draft.confidence, ...(Object.keys(writing).length ? { writing } : {}) });
+      await apiPost(endpoint, { action: 'save', ...(token ? { token } : {}), ...classFields, responses: draft.responses, confidence: draft.confidence, ...(Object.keys(writing).length ? { writing } : {}), ...(draft.steps ? { steps: draft.steps } : {}) });
       lastSavedAt = Date.now();
-      if (draft && JSON.stringify([draft.responses, draft.confidence]) === sent) dirty = false;
+      if (draft && JSON.stringify([draft.responses, draft.confidence, draft.steps ?? null]) === sent) dirty = false;
       saveState = 'saved';
     } catch (error) {
       // The attempt may have ended (handed in elsewhere, or closed): nothing to keep saving.
@@ -542,6 +565,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       seed: `${token ?? ''}:${current.n}`,
       result: checked ? { mark: checked.mark, key: checked.key } : null,
       writing: writingWatch(d, q),
+      step: stepOptions(d, q),
       onChange: (response) => {
         d.responses[id] = response;
         typed(d, id);
@@ -747,6 +771,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
         seed: `${token ?? ''}:${current.n}`,
         result: checked ? { mark: checked.mark, key: checked.key } : null,
         writing: writingWatch(d, q),
+        step: stepOptions(d, q),
         onChange: (response) => {
           d.responses[id] = response;
           typed(d, id);
@@ -867,7 +892,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     window.clearTimeout(saveTimer);
     const n = status.current.n;
     const d = draft ?? loadDraft(status.current);
-    const res = await call('submit', { responses: d.responses, confidence: d.confidence, ...(d.writing ? { writing: d.writing } : {}) });
+    const res = await call('submit', { responses: d.responses, confidence: d.confidence, ...(d.writing ? { writing: d.writing } : {}), ...(d.steps ? { steps: d.steps } : {}) });
     submitting = false;
     // Handed in only when the server's own list says so; anything else keeps the answers and says so.
     const confirmed = res?.results.find((r) => r.n === n);

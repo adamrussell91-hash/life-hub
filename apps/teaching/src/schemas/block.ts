@@ -6,7 +6,7 @@ import { DiscernQualifierSchema } from './discern';
 import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
 import { TutorialGroupIdSchema } from '../tutorial/schema';
 import { SprintPhaseKeySchema } from '../sprint/schema';
-import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
+import { NextStepBankSchema, QuizQuestionDraftSchema, QuizQuestionKindSchema, SkillRefPattern } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
   AnalogyTypesContentSchema,
@@ -529,6 +529,10 @@ export const TableBlockSchema = z.object({
   ...blockTimestamps
 });
 
+/** Next-step banks are defined beside the quiz written kinds (quiz/core is zod-only) and shared here. */
+export { NextStepBankSchema, NextStepEntrySchema } from '../quiz/core';
+export type { NextStepBank, NextStepEntry } from '../quiz/core';
+
 export const QuestionItemSchema = z.object({
   id: z.string().min(1),
   prompt: z.string(),
@@ -544,7 +548,11 @@ export const QuestionItemSchema = z.object({
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z.enum(['reveal', 'confidence']).optional(),
   /** Success criteria the student ticks off against their answer. */
-  checklist: z.array(z.object({ id: z.string().min(1), label: z.string() })).max(12).optional()
+  checklist: z.array(z.object({ id: z.string().min(1), label: z.string() })).max(12).optional(),
+  /** Skills-continuum sub-strands (`strand.sub`) this box practises; they pick the student's next step. */
+  skills: z.array(z.string().regex(SkillRefPattern)).max(4).optional(),
+  /** The box's next steps, one entry per linked feedback code. */
+  next_steps: NextStepBankSchema.optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({

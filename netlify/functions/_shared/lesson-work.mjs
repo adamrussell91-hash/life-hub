@@ -6,7 +6,10 @@
  *   work/{lesson}/{owner}   { blocks: { [block]: { [part]: { [field]: text } } }, at, class_id, student_id }
  *
  * `part` names the piece of the block the page keeps (answers, format.*,
- * lens.*, kaplan.*); each save replaces that one part. Students are known the
+ * lens.*, kaplan.*, step.N); each save replaces that one part. A `step.N`
+ * part is question N's next-step pick, one JSON field `pick`:
+ * `{ code_id, line, start, end }` (the sentence the student tapped) or
+ * `{ code_id, line, skipped: true }`. Hand-in freezes it with the answers. Students are known the
  * way the quiz knows them (class initials); `owner` is the same hash. A class
  * with no list records nothing, since nobody can be told apart. No model is
  * called here.
@@ -17,9 +20,11 @@ import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject, walkBlocks } from './question-drop.mjs';
 import { readBook } from './markbook.mjs';
+import { cleanStepPick } from './next-steps.mjs';
 
-export const WORK_LIMITS = { blocks: 60, parts: 6, fields: 60, field: 80, text: 4000 };
-const PART = /^(answers|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
+export const WORK_LIMITS = { blocks: 60, parts: 6, steps: 60, fields: 60, field: 80, text: 4000 };
+const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
+const STEP_PART = /^step\.(\d{1,3})$/;
 const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 const workPrefix = (lesson) => `work/${lesson}/`;
@@ -27,6 +32,32 @@ const workKey = (lesson, owner) => `work/${lesson}/${owner}`;
 export const handinKey = (lesson, block, student) => `work_handins/${lesson}/${block}/${student}`;
 export const pieceId = (lesson, block) => `w:${lesson}:${block}`;
 export const workOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
+
+/** A block's written parts without its step picks, which are JSON for the marking page, never text to read. */
+export function writingParts(parts) {
+  return Object.fromEntries(Object.entries(parts ?? {}).filter(([part]) => !STEP_PART.test(part)));
+}
+
+/**
+ * The step picks in a question set's hand-in, each against the answer it sits
+ * in: `[{ part: 'answers', field: question id, pick }]`. A pick that no
+ * longer fits its answer is left out.
+ */
+export function stepPicks(parts, block) {
+  const questions = Array.isArray(block?.content?.questions) ? block.content.questions : [];
+  const out = [];
+  for (const [part, fields] of Object.entries(parts ?? {})) {
+    const index = STEP_PART.exec(part)?.[1];
+    const question = index === undefined ? null : questions[Number(index)];
+    if (!question || typeof question.id !== 'string') continue;
+    let raw = null;
+    try { raw = JSON.parse(fields?.pick); } catch { continue; }
+    const answer = parts.answers?.[question.id];
+    const pick = cleanStepPick(raw, typeof answer === 'string' ? answer : '', WORK_LIMITS.text);
+    if (pick) out.push({ part: 'answers', field: question.id, pick });
+  }
+  return out;
+}
 
 /** Blocks in this lesson that the class's Markbook links to an assessment column. */
 async function handinBlocks(store, classId, lessonId) {
@@ -57,6 +88,24 @@ function cleanFields(fields) {
     if (text.trim()) out[name] = text;
   }
   return out;
+}
+
+/**
+ * A next-step pick for question `index` of a block, checked against the answer
+ * it points into (when that is saved). Returns the fields to keep, or refuses.
+ */
+function cleanStepFields(block, index, fields, answers) {
+  const question = Array.isArray(block?.content?.questions) ? block.content.questions[index] : null;
+  if (!question || typeof question.id !== 'string') reject(400, 'bad_part', 'That answer can’t be saved.');
+  const keys = Object.keys(fields);
+  // An empty part clears the pick, as with any other part.
+  if (!keys.length) return {};
+  let raw = null;
+  try { raw = keys.length === 1 && typeof fields.pick === 'string' ? JSON.parse(fields.pick) : null; } catch { raw = null; }
+  const answer = typeof answers?.[question.id] === 'string' ? answers[question.id] : null;
+  const pick = cleanStepPick(raw, answer, WORK_LIMITS.text);
+  if (!pick) reject(400, 'bad_step', 'That step can’t be saved.');
+  return { pick: JSON.stringify(pick) };
 }
 
 export async function workAction(store, lessonId, body) {
@@ -96,19 +145,23 @@ export async function workAction(store, lessonId, body) {
 
   if (typeof body.block_id !== 'string' || !blocks.has(body.block_id)) reject(400, 'bad_block', 'That part of the lesson has changed. Reload the page.');
   if (typeof body.part !== 'string' || !PART.test(body.part)) reject(400, 'bad_part', 'That answer can’t be saved.');
-  const fields = cleanFields(body.fields);
+  let fields = cleanFields(body.fields);
   if (!fields) reject(400, 'bad_request', 'That answer can’t be saved.');
 
   const key = workKey(lessonId, workOwner(roster.cls.id, student.id));
   const kept = (await read(store, key)) ?? {};
   const saved = kept.blocks && typeof kept.blocks === 'object' ? { ...kept.blocks } : {};
   const parts = { ...(saved[body.block_id] ?? {}) };
+  const stepIndex = STEP_PART.exec(body.part)?.[1];
+  if (stepIndex !== undefined) fields = cleanStepFields(blocks.get(body.block_id), Number(stepIndex), fields, parts.answers);
   if (Object.keys(fields).length) parts[body.part] = fields;
   else delete parts[body.part];
   if (!Object.keys(parts).length) delete saved[body.block_id];
   else {
     if (!(body.block_id in saved) && Object.keys(saved).length >= WORK_LIMITS.blocks) reject(400, 'too_many', 'This lesson has as much saved as it can hold.');
-    if (Object.keys(parts).length > WORK_LIMITS.parts) reject(400, 'too_many', 'That answer can’t be saved.');
+    // Step picks, one per question, are counted apart from the writing parts.
+    const stepParts = Object.keys(parts).filter((p) => STEP_PART.test(p)).length;
+    if (Object.keys(parts).length - stepParts > WORK_LIMITS.parts || stepParts > WORK_LIMITS.steps) reject(400, 'too_many', 'That answer can’t be saved.');
     saved[body.block_id] = parts;
   }
   const at = new Date().toISOString();
@@ -142,8 +195,11 @@ export async function classWork(store, lessonId, classId, studentIds) {
   for (const [studentId, row] of rows) {
     // A record stamped for someone else, or with nothing in it, is skipped.
     if (!row?.blocks || row.class_id !== classId || row.student_id !== studentId || !Object.keys(row.blocks).length) continue;
-    students[studentId] = { at: row.at, blocks: row.blocks };
-    for (const id of Object.keys(row.blocks)) used.add(id);
+    // Step picks stay out: the markbook reads and counts writing.
+    const blocks = Object.fromEntries(Object.entries(row.blocks).map(([id, parts]) => [id, writingParts(parts)]).filter(([, parts]) => Object.keys(parts).length));
+    if (!Object.keys(blocks).length) continue;
+    students[studentId] = { at: row.at, blocks };
+    for (const id of Object.keys(blocks)) used.add(id);
   }
   if (!Object.keys(students).length) return null;
   const lesson = await read(store, publishedLessonKey(lessonId));
