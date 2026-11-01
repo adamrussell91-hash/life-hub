@@ -176,6 +176,11 @@ test('the group picks an assembler in Decide; in Prototype everyone sees every p
   v = await act(store, 2, 'status');
   assert.deepEqual(v.group_parts.map((r) => [r.part, r.who, r.started, r.in]), [['Panel text', 'AB', true, false], ['Artefact list', 'CD', false, false]]);
   assert.equal(v.group_parts[0].text, 'The baker’s morning, in 80 words.');
+  // A student with two parts builds each one; neither build is copied to the other.
+  await act(store, 1, 'assign', { part_id: 'p2', keys: [ann] });
+  await act(store, 1, 'submit', { phase: 'prototype', payload: { builds: { p1: { text: 'The panel.' }, p2: { text: 'The list.' } } } });
+  v = await act(store, 2, 'status');
+  assert.deepEqual(v.group_parts.filter((r) => r.who === 'AB').map((r) => [r.part, r.text, r.in]), [['Panel text', 'The panel.', true], ['Artefact list', 'The list.', true]]);
   await assert.rejects(act(store, 1, 'pitch', { link: 'https://example.com/finished' }), { code: 'not_assembler' });
   v = await act(store, 2, 'pitch', { link: 'https://example.com/finished' });
   assert.equal(v.pitch.link, 'https://example.com/finished');

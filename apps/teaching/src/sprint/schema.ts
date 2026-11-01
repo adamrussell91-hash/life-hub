@@ -226,15 +226,29 @@ export const DecidePayloadSchema = z.object({
   opened: z.array(z.string().max(40)).max(40).default([]),
   stretch: text(300).default('')
 });
-export const PrototypePayloadSchema = z.object({
+const PrototypeBuildSchema = z.object({
   text: text(4000).default(''),
   link: z.string().trim().max(500).regex(/^(https:\/\/\S+)?$/, 'Links start with https://').default(''),
-  files: z.array(z.string().max(40)).max(SPRINT_LIMITS.files).default([]),
+  files: z.array(z.string().max(40)).max(SPRINT_LIMITS.files).default([])
+});
+export type PrototypeBuild = z.infer<typeof PrototypeBuildSchema>;
+export const PrototypePayloadSchema = PrototypeBuildSchema.extend({
+  /** A student with two or more parts builds each one here, by part id; one part uses the fields above. */
+  builds: z.record(z.string().max(40), PrototypeBuildSchema).refine((b) => Object.keys(b).length <= SPRINT_LIMITS.parts, 'Too many parts.').default({}),
   requirements: Wheres,
   self: z.record(z.string().max(40), LevelSchema).default({}),
   self_why: z.record(z.string().max(40), text(300)).default({}),
   value_answer: text(300).default('')
 });
+
+/** One part's build: its own entry when the student built parts separately, else the single build (older work and one-part students). */
+export function partBuild(p: Partial<z.infer<typeof PrototypePayloadSchema>>, partId: string): PrototypeBuild {
+  const own = p.builds?.[partId];
+  if (own) return own;
+  if (p.builds && Object.keys(p.builds).length) return { text: '', link: '', files: [] };
+  return { text: p.text ?? '', link: p.link ?? '', files: p.files ?? [] };
+}
+export const builtSomething = (b: PrototypeBuild): boolean => !!(b.text.trim() || b.link || b.files.length);
 export const TestPayloadSchema = z.object({
   reflection: z.array(text(1000)).max(2).default([]),
   quote: text(300).default(''),

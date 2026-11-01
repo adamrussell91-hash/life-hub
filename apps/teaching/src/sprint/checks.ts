@@ -1,5 +1,6 @@
 import type { Duel, FeedbackEntry, Part, PhasePayload, SprintCriterion, SprintRequirement, UnderstandStep } from './schema';
 import { pairKey, pairsOf } from './rules';
+import { builtSomething, partBuild } from './schema';
 
 /**
  * "Check before you submit": short, kind nudges that say what to add.
@@ -78,10 +79,13 @@ export function prototypeProblems(
   p: PhasePayload['prototype'],
   criteria: readonly Pick<SprintCriterion, 'id' | 'text'>[],
   requirements: readonly SprintRequirement[],
-  valueCheck = true
+  valueCheck = true,
+  myParts: readonly { id: string; text: string }[] = []
 ): string[] {
   const out: string[] = [];
-  if (!p.text.trim() && !p.files.length && !p.link) out.push('Add your part: write it, upload a file or add a link.');
+  if (myParts.length > 1) {
+    for (const part of myParts) if (!builtSomething(partBuild(p, part.id))) out.push(`Build “${part.text}”: write it, upload a file or add a link.`);
+  } else if (!builtSomething(p)) out.push('Add your part: write it, upload a file or add a link.');
   for (const r of requirements.filter((x) => x.phases.includes('prototype'))) if (!p.requirements[r.id]?.trim()) out.push(`Say where your part meets "${r.text}".`);
   for (const c of criteria) if (!p.self[c.id] || !fullSentence(p.self_why[c.id])) out.push(`${crit(c)}: pick Starting, Showing or Strong and say why.`);
   if (valueCheck && !fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');
