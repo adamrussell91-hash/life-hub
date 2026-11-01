@@ -9,13 +9,16 @@ type Ask = (block: Block, deep: DeepUnderstanding[]) => Promise<DeepSheetResult 
 const PLACED: PlacedStep[] = ['2a', '2b', '3', '4'];
 
 /** The block menu's "Deep understanding…" item: what this block teaches, whether it's a step's evidence task, and its target pieces. */
-export function deepMenuItems(block: Block, deep: DeepUnderstanding[], onChange: (next: Block) => void, deps: { ask?: Ask } = {}) {
+export function deepMenuItems(block: Block | (() => Block), deep: DeepUnderstanding[], onChange: (next: Block) => void, deps: { ask?: Ask } = {}) {
   if (!deep.length) return [];
   const ask = deps.ask ?? askDeepSheet;
+  // A getter keeps the sheet on the block's latest tags: the menu outlives edits made through it.
+  const current = (): Block => (typeof block === 'function' ? block() : block);
   return [{
     label: 'Deep understanding…',
     dataset: { blockAction: 'deep' },
     onSelect: async () => {
+      const block = current();
       const result = await ask(block, deep);
       if (!result) return;
       onChange(withTargetPieces(withEvidenceStep(withPiecesTaught(block, result.taught), result.step), result.targets));

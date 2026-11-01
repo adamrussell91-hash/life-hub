@@ -240,14 +240,15 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
     tab: 'plan' as Tab,
     openId: null as string | null
   };
+  // Empty piece rows stay in the editor only: a piece needs text to be saved, planned or tracked.
+  const written = (): DeepUnderstanding[] => state.deep.map((d) => ({ ...d, pieces: d.pieces.filter((p) => p.text.trim()) }));
   let timer: ReturnType<typeof setTimeout> | undefined;
   const status = h('p', 'du-sub');
   status.setAttribute('role', 'status');
 
   const flush = async (): Promise<void> => {
     try {
-      // Empty piece rows stay in the editor but are not sent: a piece needs text to be valid.
-      await options.save(state.deep.map((d) => ({ ...d, pieces: d.pieces.filter((p) => p.text.trim()) })));
+      await options.save(written());
       status.textContent = 'Saved.';
     } catch {
       status.textContent = 'Could not save. Your changes are still on this page; try again.';
@@ -336,7 +337,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
     }
     body.replaceChildren();
     if (tab === 'plan') {
-      mountDeepPlan(body, { deep: state.deep, lessons: like(), weeks: state.weeks, scope: options.scope, onOpen: openMake, onNew: newOne });
+      mountDeepPlan(body, { deep: written(), lessons: like(), weeks: state.weeks, scope: options.scope, onOpen: openMake, onNew: newOne });
     } else if (tab === 'make') {
       const du = state.deep.find((d) => d.id === state.openId) ?? state.deep[0];
       if (!du) { newOne(); return; }
@@ -355,7 +356,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
         onClose: () => show('plan')
       });
     } else {
-      mountDeepMonitor(body, { unit: options.unit, deep: state.deep, lessons: like(), classes: options.classes ?? [], scheduled: options.scheduled ?? [] });
+      mountDeepMonitor(body, { unit: options.unit, deep: written(), lessons: like(), classes: options.classes ?? [], scheduled: options.scheduled ?? [] });
     }
   }
   show('plan');

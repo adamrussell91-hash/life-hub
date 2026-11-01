@@ -88,8 +88,8 @@ table.du-map, table.du-kg { border-collapse: separate; border-spacing: 0; font-s
 
 /* editor */
 .du-ed { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
-@media (max-width: 1180px) { .du-ed { grid-template-columns: minmax(0, 1fr); } .du-ed__side { order: -1; position: static; } }
 .du-ed__side { position: sticky; top: 70px; }
+@media (max-width: 1180px) { .du-ed { grid-template-columns: minmax(0, 1fr); } .du-ed__side { order: -1; position: static; } }
 .du-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .du-bar .du-title { margin: 0; }
 .du-eds { background: #fff; border: 1px solid var(--du-line); border-radius: 1.25rem; padding: 14px 16px; margin-bottom: 12px; display: grid; gap: 8px; min-width: 0; }
