@@ -28,7 +28,10 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { deleteProjectNow, showCompleteConfirm } from '@/views/card-actions';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
-import { createProjectsHive, type ProjectsHive } from '@/views/projects-hive';
+import { loadRunwaySessions, mountProjectsRunway, resetRunwayStateForTests } from '@/views/projects-runway';
+import { keyAtOffset, type RunwaySessionSource } from '@/domain/projects-runway';
+import { parseHubPrefs, termsCoveringRange } from '@/domain/hub-prefs';
+import type { SchoolTerm } from '@/domain/school-time';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
@@ -70,8 +73,8 @@ let groupBy: ProjectsGroupBy = 'status';
 let roadmapZoom: RoadmapZoom = 'month';
 let lifecycleFilter: ProjectLifecycle | 'all' = 'all';
 let jobFilter: ProjectJob | 'all' = 'all';
-/** Projects lands on the hive; the kanban board is the secondary view. */
-let projectsView: 'hive' | 'board' = 'hive';
+/** Projects lands on the runway; the kanban board is the secondary view. */
+let projectsView: 'runway' | 'board' = 'runway';
 let tensionDismissed = false;
 
 const CLOCK_ICON =
@@ -507,12 +510,18 @@ function renderQuickAddProject(goals: Goal[], onCreated: (project: Project) => v
   return plus.root;
 }
 
-/** The filtered, grouped projects both the hive and the board show. */
+/** Search + job filters, shared by the runway and the board. */
+function matchesToolbar(project: Project): boolean {
+  if (!matchesProjectQuery(project, projectQuery)) return false;
+  if (jobFilter !== 'all' && projectJob(project) !== jobFilter) return false;
+  return true;
+}
+
+/** The filtered, grouped projects the board shows. */
 function visibleGroups(ctx: PulseContext): PulseGroup[] {
   const visible = cardsForBoard(ctx).filter((card) => {
-    if (!matchesProjectQuery(card.project, projectQuery)) return false;
+    if (!matchesToolbar(card.project)) return false;
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) return false;
-    if (jobFilter !== 'all' && projectJob(card.project) !== jobFilter) return false;
     return true;
   });
   return groupPulseCards(visible, groupBy, ctx.goals, ctx.now);
@@ -744,13 +753,29 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   const mergeTargets = projects.filter((project) => project.status !== 'stalled');
 
   const reload = () => void renderProjectsView(canvas);
-  const hive: ProjectsHive = createProjectsHive();
+  // Bars grow in on this page load's first paint only — not on every search keystroke.
+  let firstRunwayPaint = true;
+  let sessionsPromise: Promise<RunwaySessionSource[]> | null = null;
+  const loadSessions = () => (sessionsPromise ??= loadRunwaySessions());
+  let termsPromise: Promise<SchoolTerm[]> | null = null;
+  const loadTerms = () =>
+    (termsPromise ??= tasksApi
+      .getHubPrefs()
+      .then((raw) => termsCoveringRange(parseHubPrefs(raw), { start: keyAtOffset(now, 0), end: keyAtOffset(now, 400) }))
+      .catch(() => [] as SchoolTerm[]));
+
+  /** After a runway write: stall ids and pulse cards follow the new data. */
+  function refreshDerived(): void {
+    ctx.stallCandidates = findStallCandidates(ctx.projects, ctx.tasks, ctx.now);
+    ctx.stallIds = new Set(ctx.stallCandidates.map((item) => item.project.id));
+    ctx.cards = ctx.projects.map((project) => buildProjectPulseCard(project, ctx.tasks, ctx.stallIds, ctx.now));
+  }
 
   function selectLifecycle(id: ProjectLifecycle | 'all'): void {
     lifecycleFilter = id;
     paint();
     requestAnimationFrame(() => {
-      canvas.querySelector(projectsView === 'hive' ? '#projects-hive' : '#projects-board')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      canvas.querySelector(projectsView === 'runway' ? '#projects-runway' : '#projects-board')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
 
@@ -780,7 +805,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     ctx.stallIds.delete(projectId);
     ctx.stallCandidates = ctx.stallCandidates.filter((item) => item.project.id !== projectId);
     removeProjectNodes(canvas, projectId);
-    if (projectsView === 'hive') paint();
+    if (projectsView === 'runway') paint();
     else refreshPulse();
   }
 
@@ -887,11 +912,11 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
         }
       })
     );
-    const viewPills = createHubPills<'hive' | 'board'>({
+    const viewPills = createHubPills<'runway' | 'board'>({
       label: 'View',
       role: 'tablist',
       items: [
-        { id: 'hive', label: 'Hive' },
+        { id: 'runway', label: 'Runway' },
         { id: 'board', label: 'Board' }
       ],
       value: projectsView,
@@ -901,33 +926,48 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       }
     });
     viewPills.classList.add('projects-view-toggle');
-    toolbar.append(viewPills, filters.root, groupByRow, renderQuickAddProject(ctx.goals, acceptProject));
+    toolbar.append(viewPills, filters.root);
+    // Group-by only shapes the board; the runway groups by what each project needs.
+    if (projectsView === 'board') toolbar.append(groupByRow);
+    toolbar.append(renderQuickAddProject(ctx.goals, acceptProject));
     canvas.append(toolbar);
-    // Forecast goes first: "is anything about to slip" is the thing to
-    // check before browsing the board itself.
-    canvas.append(renderForecast(forecastItems, mergeTargets, stallConfirmHost, reload));
-    // No separate "active projects, limit not set" meter here — the mix
-    // chart below already covers "how many running, is that sustainable"
-    // with an actual per-status breakdown, which made this card pure
-    // duplicate chrome on this page specifically (still used as-is on
-    // Goals, which has no equivalent chart).
-    if (projectsView === 'hive') {
-      hive.update({ groups: visibleGroups(ctx), tasks: ctx.tasks, now: ctx.now, emptyMessage: emptyBoardMessage() });
-      canvas.append(hive.el);
-    } else {
-      canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
-    }
 
-    // One bento: mix + timeline as a paired top row; Due for review spans
-    // the full width underneath with the same tile gap (not a floating island).
-    const pulse = el('div', 'projects-pulse');
-    pulse.append(
-      renderStatusChart(nextMix, nextRunning, selectLifecycle),
-      mountRoadmap()
-    );
-    const retroCard = renderRetro(retro, reload);
-    if (retroCard) pulse.append(retroCard);
-    canvas.append(pulse);
+    if (projectsView === 'runway') {
+      // The runway replaces the forecast, mix ring and timeline: one axis, every project on it.
+      canvas.append(
+        mountProjectsRunway({
+          data: ctx,
+          profile: planningProfile,
+          filter: matchesToolbar,
+          confirmHost: closureConfirmHost,
+          onReload: reload,
+          onDataChanged: refreshDerived,
+          grow: firstRunwayPaint,
+          loadSessions,
+          loadTerms,
+          badge: (project) => (projectJob(project) === 'halt_board' ? haltBadge() : null)
+        })
+      );
+      firstRunwayPaint = false;
+      const retroCard = renderRetro(retro, reload);
+      if (retroCard) canvas.append(retroCard);
+    } else {
+      // Forecast goes first: "is anything about to slip" is the thing to
+      // check before browsing the board itself.
+      canvas.append(renderForecast(forecastItems, mergeTargets, stallConfirmHost, reload));
+      canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
+
+      // One bento: mix + timeline as a paired top row; Due for review spans
+      // the full width underneath with the same tile gap (not a floating island).
+      const pulse = el('div', 'projects-pulse');
+      pulse.append(
+        renderStatusChart(nextMix, nextRunning, selectLifecycle),
+        mountRoadmap()
+      );
+      const retroCard = renderRetro(retro, reload);
+      if (retroCard) pulse.append(retroCard);
+      canvas.append(pulse);
+    }
 
     if (reviews.length) {
       canvas.append(el('h2', 'section-title', 'Review log'));
@@ -1088,6 +1128,7 @@ export function resetProjectsViewStateForTests(): void {
   roadmapZoom = 'month';
   lifecycleFilter = 'all';
   jobFilter = 'all';
-  projectsView = 'hive';
+  projectsView = 'runway';
   tensionDismissed = false;
+  resetRunwayStateForTests();
 }
