@@ -265,8 +265,8 @@ Example:
 {
 "year": "Year 12",
 "subject": "English Advanced",
-"unit": "Artist of the Floating World",
-"lesson_title": "Memory, Identity and Ono",
+"unit": "The Lantern Keeper",
+"lesson_title": "Memory, Identity and Hale",
 "selected_block": {}
 }
 This is preferable to generating a long prose explanation of application state.

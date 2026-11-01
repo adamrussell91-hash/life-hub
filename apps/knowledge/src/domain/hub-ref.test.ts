@@ -3,29 +3,29 @@ import { hrefForHubRef, parseHubRef } from "./hub-ref";
 
 describe("parseHubRef", () => {
   it("keeps a bare Knowledge page id", () => {
-    expect(parseHubRef("page_aotfw")).toEqual({ hub: "knowledge", kind: "page", id: "page_aotfw" });
+    expect(parseHubRef("page_lkeep")).toEqual({ hub: "knowledge", kind: "page", id: "page_lkeep" });
   });
 
   it("parses Teaching unit and Tasks project refs", () => {
-    expect(parseHubRef("teaching:unit:unit_aotfw")).toEqual({
+    expect(parseHubRef("teaching:unit:unit_lkeep")).toEqual({
       hub: "teaching",
       kind: "unit",
-      id: "unit_aotfw",
+      id: "unit_lkeep",
     });
-    expect(parseHubRef("tasks:project:proj_aotfw")).toEqual({
+    expect(parseHubRef("tasks:project:proj_lkeep")).toEqual({
       hub: "tasks",
       kind: "project",
-      id: "proj_aotfw",
+      id: "proj_lkeep",
     });
   });
 
   it("parses Life decision refs", () => {
-    expect(parseHubRef("life:decision:aotfw-sources")).toEqual({
+    expect(parseHubRef("life:decision:lkeep-sources")).toEqual({
       hub: "life",
       kind: "decision",
-      id: "aotfw-sources",
+      id: "lkeep-sources",
     });
-    expect(hrefForHubRef({ hub: "life", kind: "decision", id: "aotfw-sources" })).toBe(
+    expect(hrefForHubRef({ hub: "life", kind: "decision", id: "lkeep-sources" })).toBe(
       "/#central-node",
     );
   });
@@ -67,20 +67,20 @@ describe("parseHubRef", () => {
   // mounted under its own path, never a separate subdomain — these hrefs
   // must stay relative to match entity-resolvers.mjs's own resolution.
   it("builds outbound Teaching, Tasks, and Professional hrefs as relative umbrella paths", () => {
-    expect(hrefForHubRef({ hub: "teaching", kind: "unit", id: "unit_aotfw" })).toBe(
-      "/teaching/units/unit_aotfw",
+    expect(hrefForHubRef({ hub: "teaching", kind: "unit", id: "unit_lkeep" })).toBe(
+      "/teaching/units/unit_lkeep",
     );
     expect(hrefForHubRef({ hub: "teaching", kind: "lesson", id: "lesson_1" })).toBe(
       "/teaching/lessons/lesson_1",
     );
-    expect(hrefForHubRef({ hub: "tasks", kind: "project", id: "proj_aotfw" })).toBe(
-      "/tasks/#/project/proj_aotfw",
+    expect(hrefForHubRef({ hub: "tasks", kind: "project", id: "proj_lkeep" })).toBe(
+      "/tasks/#/project/proj_lkeep",
     );
     expect(hrefForHubRef({ hub: "tasks", kind: "program", id: "program_1" })).toBe(
       "/tasks/#/program/program_1",
     );
-    expect(hrefForHubRef({ hub: "knowledge", kind: "page", id: "page_aotfw" })).toBe(
-      "/knowledge/#page/page_aotfw",
+    expect(hrefForHubRef({ hub: "knowledge", kind: "page", id: "page_lkeep" })).toBe(
+      "/knowledge/#page/page_lkeep",
     );
     expect(hrefForHubRef({ hub: "professional", kind: "event", id: "event_1" })).toBe(
       "/professional/#/event/event_1",

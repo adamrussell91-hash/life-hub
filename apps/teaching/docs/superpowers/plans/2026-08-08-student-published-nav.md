@@ -47,11 +47,11 @@ Add to `tests/unit/router.test.ts` inside `describe('router match')`:
 
 ```ts
   it('matches public student unit view', () => {
-    expect(match('/s/units/unit_aotfw')).toEqual({
+    expect(match('/s/units/unit_lkeep')).toEqual({
       name: 'student-unit',
-      params: { unitId: 'unit_aotfw' },
+      params: { unitId: 'unit_lkeep' },
       requiresAuth: false,
-      path: '/s/units/unit_aotfw'
+      path: '/s/units/unit_lkeep'
     });
   });
 ```
@@ -126,11 +126,11 @@ import {
 describe('PublishedUnitSchema', () => {
   it('parses a unit with published lesson summaries', () => {
     const unit = PublishedUnitSchema.parse({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP',
       lessons: [
-        { lesson_id: 'lesson_aotfw_008', title: 'Memory' },
-        { lesson_id: 'lesson_aotfw_001', title: 'Intro' }
+        { lesson_id: 'lesson_lkeep_008', title: 'Memory' },
+        { lesson_id: 'lesson_lkeep_001', title: 'Intro' }
       ]
     });
     expect(unit.lessons).toHaveLength(2);
@@ -280,22 +280,22 @@ describe('GET /api/published/units/:id', () => {
   });
 
   it('is public and returns only published lessons for that unit, in lesson_ids order', async () => {
-    fakeStore.seed(unitKey('unit_aotfw'), {
-      id: 'unit_aotfw',
+    fakeStore.seed(unitKey('unit_lkeep'), {
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'AOTFW Unit',
-      slug: 'aotfw',
+      title: 'LKEEP Unit',
+      slug: 'lkeep',
       status: 'active',
       year_id: 'year_12',
       subject_id: 'subject_english',
-      lesson_ids: ['lesson_aotfw_001', 'lesson_aotfw_008'],
+      lesson_ids: ['lesson_lkeep_001', 'lesson_lkeep_008'],
       ...timestamps,
       schema_version: 1
     });
-    fakeStore.seed(publishedLessonKey('lesson_aotfw_008'), {
-      lesson_id: 'lesson_aotfw_008',
+    fakeStore.seed(publishedLessonKey('lesson_lkeep_008'), {
+      lesson_id: 'lesson_lkeep_008',
       title: 'Memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       blocks: [],
       published_at: '2026-02-01T12:00:00.000Z',
       schema_version: 1
@@ -308,41 +308,41 @@ describe('GET /api/published/units/:id', () => {
       published_at: '2026-02-01T12:00:00.000Z',
       schema_version: 1
     });
-    fakeStore.seed(draftLessonKey('lesson_aotfw_001'), {
-      id: 'lesson_aotfw_001',
+    fakeStore.seed(draftLessonKey('lesson_lkeep_001'), {
+      id: 'lesson_lkeep_001',
       title: 'Draft only — must not appear',
-      unit_id: 'unit_aotfw'
+      unit_id: 'unit_lkeep'
     });
 
     const response = await publishedUnitHandler(
-      request('/api/published/units/unit_aotfw'),
-      { params: { id: 'unit_aotfw' } }
+      request('/api/published/units/unit_lkeep'),
+      { params: { id: 'unit_lkeep' } }
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.data.unit_id).toBe('unit_aotfw');
-    expect(body.data.title).toBe('AOTFW Unit');
+    expect(body.data.unit_id).toBe('unit_lkeep');
+    expect(body.data.title).toBe('LKEEP Unit');
     expect(body.data.lessons).toEqual([
-      { lesson_id: 'lesson_aotfw_008', title: 'Memory' }
+      { lesson_id: 'lesson_lkeep_008', title: 'Memory' }
     ]);
   });
 
   it('returns empty lessons array when unit exists but nothing is published', async () => {
-    fakeStore.seed(unitKey('unit_aotfw'), {
-      id: 'unit_aotfw',
+    fakeStore.seed(unitKey('unit_lkeep'), {
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'AOTFW Unit',
-      slug: 'aotfw',
+      title: 'LKEEP Unit',
+      slug: 'lkeep',
       status: 'active',
       year_id: 'year_12',
       subject_id: 'subject_english',
-      lesson_ids: ['lesson_aotfw_001'],
+      lesson_ids: ['lesson_lkeep_001'],
       ...timestamps,
       schema_version: 1
     });
     const response = await publishedUnitHandler(
-      request('/api/published/units/unit_aotfw'),
-      { params: { id: 'unit_aotfw' } }
+      request('/api/published/units/unit_lkeep'),
+      { params: { id: 'unit_lkeep' } }
     );
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -490,10 +490,10 @@ git commit -m "feat: add public published-unit API"
 
 - [ ] **Step 1: Write failing integration tests**
 
-`tests/integration/publish-flow.test.ts` already uses `LESSON_ID = 'lesson_aotfw_008'` and seed data whose unit is `unit_aotfw`. Add:
+`tests/integration/publish-flow.test.ts` already uses `LESSON_ID = 'lesson_lkeep_008'` and seed data whose unit is `unit_lkeep`. Add:
 
 ```ts
-const UNIT_ID = 'unit_aotfw';
+const UNIT_ID = 'unit_lkeep';
 
   it('published unit endpoint lists the lesson after publish', async () => {
     const api = freshApi();
@@ -530,7 +530,7 @@ const UNIT_ID = 'unit_aotfw';
     ).toBe(true);
     expect(
       unitBody.data.lessons.some(
-        (l: { lesson_id: string }) => l.lesson_id === 'lesson_aotfw_001'
+        (l: { lesson_id: string }) => l.lesson_id === 'lesson_lkeep_001'
       )
     ).toBe(false);
   });
@@ -680,9 +680,9 @@ describe('mountStudentLessonView', () => {
 
   it('renders Back to unit linking to /s/units/{unit_id}', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      lesson_id: 'lesson_aotfw_008',
+      lesson_id: 'lesson_lkeep_008',
       title: 'Memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       blocks: [],
       published_at: '2026-02-01T12:00:00.000Z',
       schema_version: 1
@@ -690,7 +690,7 @@ describe('mountStudentLessonView', () => {
 
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       const link = root.querySelector(
@@ -698,7 +698,7 @@ describe('mountStudentLessonView', () => {
       ) as HTMLAnchorElement | null;
       expect(link).toBeTruthy();
       expect(link?.textContent).toBe('Back to unit');
-      expect(link?.getAttribute('href')).toBe('/s/units/unit_aotfw');
+      expect(link?.getAttribute('href')).toBe('/s/units/unit_lkeep');
     });
   });
 
@@ -847,36 +847,36 @@ describe('mountStudentUnitView', () => {
 
   it('renders unit title and published lesson links', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW Unit',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP Unit',
       lessons: [
-        { lesson_id: 'lesson_aotfw_008', title: 'Memory' },
-        { lesson_id: 'lesson_aotfw_001', title: 'Intro' }
+        { lesson_id: 'lesson_lkeep_008', title: 'Memory' },
+        { lesson_id: 'lesson_lkeep_001', title: 'Intro' }
       ]
     });
 
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentUnitView({ root, unitId: 'unit_aotfw' });
+    mountStudentUnitView({ root, unitId: 'unit_lkeep' });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('AOTFW Unit');
+      expect(root.textContent).toContain('LKEEP Unit');
       const links = [...root.querySelectorAll('a.student-unit__lesson-link')];
       expect(links).toHaveLength(2);
-      expect(links[0].getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');
+      expect(links[0].getAttribute('href')).toBe('/s/lessons/lesson_lkeep_008');
       expect(links[0].textContent).toContain('Memory');
     });
   });
 
   it('shows empty copy when no published lessons', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW Unit',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP Unit',
       lessons: []
     });
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentUnitView({ root, unitId: 'unit_aotfw' });
+    mountStudentUnitView({ root, unitId: 'unit_lkeep' });
 
     await vi.waitFor(() => {
       expect(root.textContent).toContain(

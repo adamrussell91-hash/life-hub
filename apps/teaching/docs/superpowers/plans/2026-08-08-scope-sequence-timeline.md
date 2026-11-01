@@ -66,9 +66,9 @@ const base = {
   ],
   timeline_items: [
     {
-      id: 'ti_unit_aotfw',
+      id: 'ti_unit_lkeep',
       kind: 'unit' as const,
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       start_week: 12,
       end_week: 18,
       order: 1
@@ -212,7 +212,7 @@ export function scopeSequenceKey(id: string): string {
 
 - [ ] **Step 2: Seed object** in `fixtures/seed.json`
 
-Add top-level `"scope_sequences": [ { ... } ]` matching Task 1 `base` (id `scope_y12_engadv_2026`, subject already has `scope_id`). Place AoTFW in Term 2 weeks 12–18; sample note at week 19.
+Add top-level `"scope_sequences": [ { ... } ]` matching Task 1 `base` (id `scope_y12_engadv_2026`, subject already has `scope_id`). Place LKeep in Term 2 weeks 12–18; sample note at week 19.
 
 - [ ] **Step 3: mock-store**
 

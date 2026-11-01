@@ -74,39 +74,39 @@ describe('api client', () => {
 
   it('apiPut sends JSON body', async () => {
     fetchMock.mockResolvedValue(
-      mockFetchJson({ ok: true, data: { id: 'lesson_aotfw_008', title: 'Updated' } })
+      mockFetchJson({ ok: true, data: { id: 'lesson_lkeep_008', title: 'Updated' } })
     );
 
     const data = await apiPut<{ id: string; title: string }>(
-      '/api/lessons/lesson_aotfw_008',
-      { id: 'lesson_aotfw_008', title: 'Updated' }
+      '/api/lessons/lesson_lkeep_008',
+      { id: 'lesson_lkeep_008', title: 'Updated' }
     );
 
     expect(data.title).toBe('Updated');
-    expect(fetchMock).toHaveBeenCalledWith('/api/lessons/lesson_aotfw_008', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/lessons/lesson_lkeep_008', {
       method: 'PUT',
       credentials: 'include',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ id: 'lesson_aotfw_008', title: 'Updated' }),
+      body: JSON.stringify({ id: 'lesson_lkeep_008', title: 'Updated' }),
       signal: undefined
     });
   });
 
   it('apiPatch sends JSON body', async () => {
     fetchMock.mockResolvedValue(
-      mockFetchJson({ ok: true, data: { id: 'lesson_aotfw_008', title: 'Patched' } })
+      mockFetchJson({ ok: true, data: { id: 'lesson_lkeep_008', title: 'Patched' } })
     );
 
     const data = await apiPatch<{ id: string; title: string }>(
-      '/api/lessons/lesson_aotfw_008',
+      '/api/lessons/lesson_lkeep_008',
       { title: 'Patched' }
     );
 
     expect(data.title).toBe('Patched');
-    expect(fetchMock).toHaveBeenCalledWith('/api/lessons/lesson_aotfw_008', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/lessons/lesson_lkeep_008', {
       method: 'PATCH',
       credentials: 'include',
       headers: {
@@ -180,7 +180,7 @@ describe('api client', () => {
     );
 
     try {
-      await apiPut('/api/lessons/lesson_aotfw_008', {});
+      await apiPut('/api/lessons/lesson_lkeep_008', {});
       expect.fail('expected ApiClientError');
     } catch (error) {
       expect(error).toBeInstanceOf(ApiClientError);

@@ -40,8 +40,8 @@ function curriculumFixture(): CurriculumResponse {
       {
         id: 'u1',
         type: 'unit',
-        title: 'Artist of the Floating World',
-        slug: 'aotfw',
+        title: 'The Lantern Keeper',
+        slug: 'lkeep',
         year_id: 'y12',
         subject_id: 'eng',
         lesson_ids: ['l1'],
@@ -111,7 +111,7 @@ function curriculumFixture(): CurriculumResponse {
       {
         id: 'm1',
         type: 'media',
-        title: 'Floating World slides',
+        title: 'Lantern Keeper slides',
         slug: 'fw-slides',
         provider: 'external',
         media_type: 'pdf',
@@ -142,12 +142,12 @@ describe('searchCurriculumTitles', () => {
   });
 
   it('matches unit title and builds full hierarchy', () => {
-    const hits = searchCurriculumTitles(curriculumFixture(), 'floating', []);
+    const hits = searchCurriculumTitles(curriculumFixture(), 'lantern', []);
     const unit = hits.find((h) => h.type === 'unit' && h.id === 'u1');
     expect(unit).toBeTruthy();
     expect(unit?.hierarchy).toMatch(/Year 12/i);
     expect(unit?.hierarchy).toMatch(/English/i);
-    expect(unit?.hierarchy).toMatch(/Floating World/i);
+    expect(unit?.hierarchy).toMatch(/Lantern Keeper/i);
     expect(unit?.href).toBe('/units/u1');
   });
 
@@ -189,17 +189,17 @@ describe('searchCurriculumTitles', () => {
     expect(unit).toBeTruthy();
     expect(unit?.match).toBe('hierarchy');
     expect(unit?.hierarchy).toMatch(/English/i);
-    expect(unit?.title).toBe('Artist of the Floating World');
+    expect(unit?.title).toBe('The Lantern Keeper');
   });
 
   it('prefers title match over hierarchy when both would match', () => {
-    const hits = searchCurriculumTitles(curriculumFixture(), 'floating', []);
+    const hits = searchCurriculumTitles(curriculumFixture(), 'lantern', []);
     const unit = hits.find((h) => h.type === 'unit' && h.id === 'u1');
     expect(unit?.match).toBe('title');
 
     const lesson = hits.find((h) => h.type === 'lesson' && h.id === 'l1');
     expect(lesson?.match).toBe('hierarchy');
-    expect(lesson?.hierarchy).toMatch(/Floating World/i);
+    expect(lesson?.hierarchy).toMatch(/Lantern Keeper/i);
   });
 });
 

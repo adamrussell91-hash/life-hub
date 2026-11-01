@@ -44,7 +44,7 @@ describe('new block schemas', () => {
         ...baseBlock,
         id: 't1',
         block_type: 'table',
-        content: { headers: ['Term', 'Meaning'], rows: [['Ukiyo', 'Floating world']] }
+        content: { headers: ['Term', 'Meaning'], rows: [['Ebb', 'The falling tide']] }
       }).block_type
     ).toBe('table');
 
@@ -84,11 +84,11 @@ describe('new block renderers', () => {
     const block = {
       ...baseBlock,
       block_type: 'quote' as const,
-      content: { quote: 'Stillness.', attribution: 'Ono' }
+      content: { quote: 'Stillness.', attribution: 'Hale' }
     };
     const el = renderQuoteBlock(block, 'student');
     expect(el.querySelector('blockquote')?.textContent).toBe('Stillness.');
-    expect(el.querySelector('figcaption')?.textContent).toContain('Ono');
+    expect(el.querySelector('figcaption')?.textContent).toContain('Hale');
   });
 
   it('renderDividerBlock produces hr', () => {

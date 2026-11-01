@@ -13,8 +13,8 @@ const seedFixture = JSON.parse(
 ) as SeedData;
 
 const PASSPHRASE = 'teaching-hub-local';
-const LESSON_ID = 'lesson_aotfw_001';
-const UNIT_ID = 'unit_aotfw';
+const LESSON_ID = 'lesson_lkeep_001';
+const UNIT_ID = 'unit_lkeep';
 const CLASS_ID = 'class_2026_12engadv1';
 
 function freshSeed(): SeedData {

@@ -11,14 +11,14 @@ describe('sectionFromRoute', () => {
     expect(sectionFromRoute(match('/scope-sequences')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/scope-sequences/subject_y12_engadv')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/units')!)).toBe('units');
-    expect(sectionFromRoute(match('/units/unit_aotfw')!)).toBe('units');
+    expect(sectionFromRoute(match('/units/unit_lkeep')!)).toBe('units');
     expect(sectionFromRoute(match('/lessons')!)).toBe('lessons');
-    expect(sectionFromRoute(match('/lessons/lesson_aotfw_008')!)).toBe('lessons');
+    expect(sectionFromRoute(match('/lessons/lesson_lkeep_008')!)).toBe('lessons');
     expect(sectionFromRoute(match('/resources')!)).toBe('resources');
   });
 
   it('returns null for non-teacher workspace routes', () => {
     expect(sectionFromRoute(match('/sign-in')!)).toBeNull();
-    expect(sectionFromRoute(match('/s/lessons/lesson_aotfw_008')!)).toBeNull();
+    expect(sectionFromRoute(match('/s/lessons/lesson_lkeep_008')!)).toBeNull();
   });
 });

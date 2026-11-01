@@ -15,7 +15,7 @@ const PASSPHRASE = 'teaching-hub-local';
 const YEAR_ID = 'year_12';
 const SUBJECT_ID = 'subject_y12_engadv';
 const SUBJECT_STD_ID = 'subject_y12_engstd';
-const UNIT_ID = 'unit_aotfw';
+const UNIT_ID = 'unit_lkeep';
 
 function freshSeed(): SeedData {
   return JSON.parse(JSON.stringify(seedFixture)) as SeedData;
@@ -162,7 +162,7 @@ describe('POST create endpoints (mock)', () => {
     const cookie = await signIn(api);
     const res = await api.request('POST', '/api/lessons', {
       cookie,
-      body: { title: 'Follow-up', unit_id: UNIT_ID, pedagogical_mode: 'quiz', after_lesson_id: 'lesson_aotfw_001', quiz: { confidence: true } }
+      body: { title: 'Follow-up', unit_id: UNIT_ID, pedagogical_mode: 'quiz', after_lesson_id: 'lesson_lkeep_001', quiz: { confidence: true } }
     });
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -170,7 +170,7 @@ describe('POST create endpoints (mock)', () => {
     expect(body.data.quiz).toEqual({ confidence: true });
     const curriculum = await (await api.request('GET', '/api/curriculum', { cookie })).json();
     const unit = curriculum.data.units.find((row: Unit) => row.id === UNIT_ID);
-    expect(unit.lesson_ids.slice(0, 3)).toEqual(['lesson_aotfw_001', body.data.id, 'lesson_aotfw_002']);
+    expect(unit.lesson_ids.slice(0, 3)).toEqual(['lesson_lkeep_001', body.data.id, 'lesson_lkeep_002']);
   });
 
   it('POST /api/lessons rejects a bad mode and a missing unit', async () => {
@@ -337,7 +337,7 @@ describe('POST create endpoints (mock)', () => {
     const api = freshApi();
     const cookie = await signIn(api);
 
-    const existingId = 'lesson_aotfw_001';
+    const existingId = 'lesson_lkeep_001';
     const getRes = await api.request('GET', `/api/lessons/${existingId}`, { cookie });
     expect(getRes.status).toBe(200);
 

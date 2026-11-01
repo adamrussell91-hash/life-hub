@@ -50,10 +50,10 @@ Examples:
 "id": "subject_y12_engadv"
 }
 {
-"id": "unit_aotfw"
+"id": "unit_lkeep"
 }
 {
-"id": "lesson_aotfw_008"
+"id": "lesson_lkeep_008"
 }
 {
 "id": "class_2026_12engadv1"
@@ -65,7 +65,7 @@ Random UUID values are not required for ordinary content unless collision risk o
 Relationships use IDs.
 Example:
 {
-"unit_id": "unit_aotfw"
+"unit_id": "unit_lkeep"
 }
 rather than embedding the entire Unit object inside a Lesson.
 This keeps content small and prevents multiple conflicting versions.
@@ -113,9 +113,9 @@ The logical distinction matters more than the physical location.
 Most major objects should use a shared metadata structure.
 Recommended common fields:
 {
-"id": "unit_aotfw",
+"id": "unit_lkeep",
 "type": "unit",
-"title": "Artist of the Floating World",
+"title": "The Lantern Keeper",
 "slug": "artist_of_the_floating_world",
 "status": "active",
 "created_at": "timestamp",
@@ -193,7 +193,7 @@ Example:
 "year_id": "year_12",
 "scope_id": "scope_y12_engadv_2026",
 "unit_ids": [
-"unit_aotfw"
+"unit_lkeep"
 ],
 "outcome_ids": [],
 "class_ids": [
@@ -240,8 +240,8 @@ Both views read the same stored data.
 A timeline item connects a Unit to an annual teaching period.
 Example:
 {
-"id": "timeline_aotfw_2026",
-"unit_id": "unit_aotfw",
+"id": "timeline_lkeep_2026",
+"unit_id": "unit_lkeep",
 "term_start": 2,
 "term_end": 2,
 "start_date": "date",
@@ -265,7 +265,7 @@ Example:
 "academic_year": 2026,
 "subject_id": "subject_y12_engadv",
 "unit_ids": [
-"unit_aotfw"
+"unit_lkeep"
 ],
 "status": "active",
 "schema_version": 1
@@ -278,9 +278,9 @@ They organise content rather than owning substantial content themselves.
 A Unit is reusable.
 Example:
 {
-"id": "unit_aotfw",
+"id": "unit_lkeep",
 "type": "unit",
-"title": "Artist of the Floating World",
+"title": "The Lantern Keeper",
 "slug": "artist_of_the_floating_world",
 "year_id": "year_12",
 "subject_id": "subject_y12_engadv",
@@ -289,9 +289,9 @@ Example:
 "duration_weeks": 7,
 "outcome_ids": [],
 "lesson_ids": [
-"lesson_aotfw_001",
-"lesson_aotfw_002",
-"lesson_aotfw_003"
+"lesson_lkeep_001",
+"lesson_lkeep_002",
+"lesson_lkeep_003"
 ],
 "resource_ids": [],
 "block_ids": [],
@@ -313,9 +313,9 @@ A simple ordered array works for the initial implementation.
 Example:
 {
 "lesson_ids": [
-"lesson_aotfw_001",
-"lesson_aotfw_002",
-"lesson_aotfw_003"
+"lesson_lkeep_001",
+"lesson_lkeep_002",
+"lesson_lkeep_003"
 ]
 }
 Array position defines default sequence.
@@ -331,11 +331,11 @@ The application should detect inconsistent sequence data and repair or flag it.
 Lesson is the central reusable teaching content object.
 Example:
 {
-"id": "lesson_aotfw_008",
+"id": "lesson_lkeep_008",
 "type": "lesson",
-"title": "Memory, Identity and Ono",
+"title": "Memory, Identity and Hale",
 "slug": "memory_identity_and_ono",
-"unit_id": "unit_aotfw",
+"unit_id": "unit_lkeep",
 "sequence": 8,
 "suggested_duration_minutes": 50,
 "outcome_ids": [],
@@ -422,7 +422,7 @@ A Version Record might contain:
 {
 "id": "version_l008_017",
 "type": "lesson_version",
-"lesson_id": "lesson_aotfw_008",
+"lesson_id": "lesson_lkeep_008",
 "revision": 17,
 "created_at": "timestamp",
 "reason": "save",
@@ -451,10 +451,10 @@ Example:
 "year_id": "year_12",
 "subject_id": "subject_y12_engadv",
 "active_unit_ids": [
-"unit_aotfw"
+"unit_lkeep"
 ],
 "scheduled_lesson_ids": [],
-"current_unit_id": "unit_aotfw",
+"current_unit_id": "unit_lkeep",
 "current_scheduled_lesson_id": "",
 "homepage_block_ids": [],
 "status": "active",
@@ -469,11 +469,11 @@ The Class code must remain unique within the relevant academic year.
 A Scheduled Lesson connects a reusable Lesson with a Class and date.
 Example:
 {
-"id": "scheduled_2026_12engadv1_aotfw_008",
+"id": "scheduled_2026_12engadv1_lkeep_008",
 "type": "scheduled_lesson",
 "class_id": "class_2026_12engadv1",
-"lesson_id": "lesson_aotfw_008",
-"unit_id": "unit_aotfw",
+"lesson_id": "lesson_lkeep_008",
+"unit_id": "unit_lkeep",
 "date": "date",
 "schedule_order": 32,
 "duration_minutes": 50,
@@ -511,8 +511,8 @@ Example:
 "id": "override_12engadv1_l008",
 "type": "lesson_override",
 "class_id": "class_2026_12engadv1",
-"scheduled_lesson_id": "scheduled_2026_12engadv1_aotfw_008",
-"source_lesson_id": "lesson_aotfw_008",
+"scheduled_lesson_id": "scheduled_2026_12engadv1_lkeep_008",
+"source_lesson_id": "lesson_lkeep_008",
 "block_changes": [],
 "created_at": "timestamp",
 "updated_at": "timestamp"
@@ -621,7 +621,7 @@ Example image content:
 Example question content:
 {
 "content": {
-"prompt": "How does Ishiguro represent memory?",
+"prompt": "How does Calder represent memory?",
 "response_type": "short_response",
 "answer": "",
 "teacher_guidance": ""
@@ -785,14 +785,14 @@ Files and media should remain external to Lesson JSON.
 Google Drive is the preferred first media provider.
 Example:
 {
-"id": "media_aotfw_extract",
+"id": "media_lkeep_extract",
 "type": "media",
 "provider": "google_drive",
 "provider_file_id": "drive_file_reference",
-"file_name": "Ono Extract.pdf",
+"file_name": "Hale Extract.pdf",
 "media_type": "pdf",
 "mime_type": "application/pdf",
-"title": "Ono Extract",
+"title": "Hale Extract",
 "preview_url": "",
 "download_url": "",
 "thumbnail_url": "",
@@ -914,7 +914,7 @@ Example:
 {
 "id": "redirect_001",
 "type": "redirect",
-"object_id": "lesson_aotfw_008",
+"object_id": "lesson_lkeep_008",
 "old_slug": "ono_and_memory",
 "current_slug": "memory_identity_and_ono",
 "created_at": "timestamp"
@@ -966,7 +966,7 @@ Previous and next navigation should follow the Class schedule rather than assumi
 
 A Class may store:
 {
-"current_scheduled_lesson_id": "scheduled_2026_12engadv1_aotfw_008"
+"current_scheduled_lesson_id": "scheduled_2026_12engadv1_lkeep_008"
 }
 The system may suggest the current Lesson from schedule dates.
 The stored value remains explicitly controllable by the teacher.
@@ -978,7 +978,7 @@ Student interactions without login should use browser local storage.
 Student state must never enter the core teacher data model unless a later feature explicitly requires collection.
 Example local state:
 {
-"lesson_id": "lesson_aotfw_008",
+"lesson_id": "lesson_lkeep_008",
 "revealed_answers": [],
 "flashcard_index": 4,
 "checklist_state": {}
@@ -1059,10 +1059,10 @@ Blob keys should preserve enough hierarchy for debugging and prefix listing.
 Example conceptual keys:
 years/year_12
 subjects/subject_y12_engadv
-units/unit_aotfw
-lessons/lesson_aotfw_008
+units/unit_lkeep
+lessons/lesson_lkeep_008
 classes/class_2026_12engadv1
-schedules/scheduled_2026_12engadv1_aotfw_008
+schedules/scheduled_2026_12engadv1_lkeep_008
 The storage hierarchy does not define object relationships.
 IDs inside the data remain authoritative.
 
@@ -1239,7 +1239,7 @@ English Advanced
 
 Scope and Sequence 2026
 
-Artist of the Floating World
+The Lantern Keeper
 
 Lesson 001
 
@@ -1255,7 +1255,7 @@ references Year 12
 
 references English Advanced
 
-references Artist of the Floating World
+references The Lantern Keeper
 
 Scheduled Lesson
 

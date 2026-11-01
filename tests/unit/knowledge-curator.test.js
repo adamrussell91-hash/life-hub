@@ -24,12 +24,12 @@ const pending = [{
 test('approveProposal keeps Teaching and Tasks refs already on a note', () => {
   const result = approveProposal(
     pending,
-    { id: 'a', connected: ['teaching:unit:unit_aotfw'] },
-    { id: 'b', connected: ['tasks:project:proj_aotfw'] },
+    { id: 'a', connected: ['teaching:unit:unit_lkeep'] },
+    { id: 'b', connected: ['tasks:project:proj_lkeep'] },
     'a||b'
   );
-  assert.deepEqual(result.pageA.connected, ['teaching:unit:unit_aotfw', 'b']);
-  assert.deepEqual(result.pageB.connected, ['tasks:project:proj_aotfw', 'a']);
+  assert.deepEqual(result.pageA.connected, ['teaching:unit:unit_lkeep', 'b']);
+  assert.deepEqual(result.pageB.connected, ['tasks:project:proj_lkeep', 'a']);
 });
 
 test('approveProposal links both notes and drops the proposal', () => {

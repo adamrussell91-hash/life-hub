@@ -21,7 +21,7 @@ const sampleClass: Class = {
   academic_year: 2026,
   year_id: 'year_12',
   subject_id: 'subject_engadv',
-  active_unit_ids: ['unit_aotfw'],
+  active_unit_ids: ['unit_lkeep'],
   status: 'active',
   created_at: ISO,
   updated_at: ISO,

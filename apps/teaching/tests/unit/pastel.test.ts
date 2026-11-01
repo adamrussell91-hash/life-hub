@@ -3,12 +3,12 @@ import { PASTEL_TINTS, pastelFromId } from '@/design/pastel';
 
 describe('pastelFromId', () => {
   it('returns a tint from the closed set', () => {
-    const tint = pastelFromId('unit_aotfw');
+    const tint = pastelFromId('unit_lkeep');
     expect(PASTEL_TINTS).toContain(tint);
   });
 
   it('is stable for the same id', () => {
-    expect(pastelFromId('unit_aotfw')).toBe(pastelFromId('unit_aotfw'));
+    expect(pastelFromId('unit_lkeep')).toBe(pastelFromId('unit_lkeep'));
   });
 
   it('spreads different ids across the set', () => {

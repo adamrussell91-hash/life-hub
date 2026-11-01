@@ -34,17 +34,17 @@ describe('entity-card-expand', () => {
     card.className = 'home-class-tile';
     const title = document.createElement('p');
     title.className = 'home-class-tile__title';
-    title.textContent = 'Artist of the Floating World';
+    title.textContent = 'The Lantern Keeper';
     card.append(title);
     document.body.append(card);
 
     openEntityCardExpand(
       {
         kind: 'unit',
-        id: 'unit_aotfw',
-        title: 'Artist of the Floating World',
+        id: 'unit_lkeep',
+        title: 'The Lantern Keeper',
         media: [],
-        fullPagePath: '/units/unit_aotfw'
+        fullPagePath: '/units/unit_lkeep'
       },
       {},
       { trigger: card }
@@ -59,11 +59,11 @@ describe('entity-card-expand', () => {
   it('opens an expanded panel with a full-page action', async () => {
     openEntityCardExpand({
       kind: 'unit',
-      id: 'unit_aotfw',
-      title: 'Artist of the Floating World',
+      id: 'unit_lkeep',
+      title: 'The Lantern Keeper',
       eyebrow: 'English Advanced',
       media: [],
-      fullPagePath: '/units/unit_aotfw',
+      fullPagePath: '/units/unit_lkeep',
       metaText: 'Year 12 · English Advanced'
     });
 
@@ -71,13 +71,13 @@ describe('entity-card-expand', () => {
     expect(dialog).toBeTruthy();
     expect(document.querySelector('.entity-card-expand__title-input')).toBeNull();
     expect(document.querySelector('.entity-card-expand__title')?.textContent).toBe(
-      'Artist of the Floating World'
+      'The Lantern Keeper'
     );
     expect(document.querySelector('.entity-card-expand__meta')?.textContent).toContain('Year 12');
 
     document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
     await vi.waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+      expect(navigate).toHaveBeenCalledWith('/units/unit_lkeep');
     });
     expect(document.querySelector('.entity-card-expand')).toBeNull();
   });
@@ -114,15 +114,15 @@ describe('entity-card-expand', () => {
   it('keeps expanded card titles read only', () => {
     openEntityCardExpand({
       kind: 'unit',
-      id: 'unit_aotfw',
-      title: 'Artist of the Floating World',
+      id: 'unit_lkeep',
+      title: 'The Lantern Keeper',
       media: [],
-      fullPagePath: '/units/unit_aotfw'
+      fullPagePath: '/units/unit_lkeep'
     });
 
     expect(document.querySelector('.entity-card-expand__title-input')).toBeNull();
     expect(document.querySelector('.entity-card-expand__title')?.textContent).toBe(
-      'Artist of the Floating World'
+      'The Lantern Keeper'
     );
   });
 
@@ -132,7 +132,7 @@ describe('entity-card-expand', () => {
       id: 'lesson_001',
       title: 'Introduction',
       slug: 'introduction',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       blocks: [],

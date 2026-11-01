@@ -72,9 +72,9 @@ describe("PageSchema", () => {
     expect(
       PageSchema.parse({
         ...validPage,
-        connected: ["page_b", "teaching:unit:unit_aotfw", "tasks:project:proj_aotfw"],
+        connected: ["page_b", "teaching:unit:unit_lkeep", "tasks:project:proj_lkeep"],
       }).connected,
-    ).toEqual(["page_b", "teaching:unit:unit_aotfw", "tasks:project:proj_aotfw"]);
+    ).toEqual(["page_b", "teaching:unit:unit_lkeep", "tasks:project:proj_lkeep"]);
   });
 
   it("accepts a hub page without Notion fields", () => {

@@ -608,7 +608,7 @@ it('clears only the cover and preserves homepage content', async () => {
 
 - [ ] **Step 2: Add unit API preservation test**
 
-Create `tests/unit/unit-api.test.ts` with the fixture/API setup from `class-api.test.ts`, `UNIT_ID = 'unit_aotfw'`, and this valid block:
+Create `tests/unit/unit-api.test.ts` with the fixture/API setup from `class-api.test.ts`, `UNIT_ID = 'unit_lkeep'`, and this valid block:
 
 ```ts
 const validHeadingBlock = {

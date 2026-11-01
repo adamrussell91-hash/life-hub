@@ -98,8 +98,8 @@ Storage key: `scheduled_lessons/{id}`.
 
 ### Seed
 
-- One Class (e.g. code `12ENGADV1`, Year 12 English Advanced, `unit_aotfw` active)  
-- Scheduled lessons across the week of **`2026-08-12`** (anchor), linking existing AOTFW lessons  
+- One Class (e.g. code `12ENGADV1`, Year 12 English Advanced, `unit_lkeep` active)  
+- Scheduled lessons across the week of **`2026-08-12`** (anchor), linking existing LKEEP lessons  
 - Set `current_unit_id` / `current_scheduled_lesson_id` sensibly for the Class page  
 - `schedule_anchor_date: '2026-08-12'` remains on curriculum response  
 - Remove `home_schedule` from `fixtures/seed.json` and stop writing `meta/home_schedule`

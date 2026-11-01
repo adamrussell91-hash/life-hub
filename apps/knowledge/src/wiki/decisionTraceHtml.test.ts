@@ -16,8 +16,8 @@ describe("decisionTraceHtml", () => {
   it("renders a same-decision timeline", () => {
     const html = decisionTraceHtml([
       {
-        title: "AOTFW sources",
-        decisionId: "aotfw-sources",
+        title: "LKEEP sources",
+        decisionId: "lkeep-sources",
         steps: [
           { dateKey: "2026-08-01", chosen: "Start the unit" },
           { dateKey: "2026-09-06", chosen: "Keep the unit linked" },
@@ -25,7 +25,7 @@ describe("decisionTraceHtml", () => {
       },
     ]);
     expect(html).toContain("How this changed");
-    expect(html).toContain("AOTFW sources");
+    expect(html).toContain("LKEEP sources");
     expect(html).toContain("Start the unit");
     expect(html).toContain("Keep the unit linked");
   });

@@ -42,7 +42,7 @@ describe('outcomes library', () => {
   it('patches unit outcome_ids', async () => {
     const api = freshApi();
     const cookie = await signIn(api);
-    const res = await api.request('PATCH', '/api/units/unit_aotfw', {
+    const res = await api.request('PATCH', '/api/units/unit_lkeep', {
       cookie,
       body: { outcome_ids: ['EA12-6'] }
     });
@@ -58,7 +58,7 @@ describe('outcomes library', () => {
       cookie,
       body: {
         subject_id: 'subject_y12_engadv',
-        code: 'AOTFW-CR',
+        code: 'LKEEP-CR',
         title: 'Close reading',
         description: 'Annotate a passage for voice and guilt.'
       }
@@ -66,7 +66,7 @@ describe('outcomes library', () => {
     expect(res.status).toBe(201);
     const created = await res.json();
     expect(created.data.source).toBe('custom');
-    expect(created.data.code).toBe('AOTFW-CR');
+    expect(created.data.code).toBe('LKEEP-CR');
 
     const curriculum = await (
       await api.request('GET', '/api/curriculum', { cookie })
@@ -89,7 +89,7 @@ describe('outcomes library', () => {
     expect((await add(' eav-12-04 ')).status).toBe(409);
     const extra = (await (await add('EAV-12-09')).json()).data;
 
-    const unit = await api.request('PATCH', '/api/units/unit_aotfw', { cookie, body: { outcome_ids: ['EA12-6', extra.id] } });
+    const unit = await api.request('PATCH', '/api/units/unit_lkeep', { cookie, body: { outcome_ids: ['EA12-6', extra.id] } });
     expect(unit.status).toBe(200);
 
     const patched = await api.request('PATCH', `/api/outcomes/${keep.id}`, {
@@ -106,7 +106,7 @@ describe('outcomes library', () => {
     expect(merged.status).toBe(200);
 
     const curriculum = (await (await api.request('GET', '/api/curriculum', { cookie })).json()).data;
-    const unitRow = curriculum.units.find((row: { id: string }) => row.id === 'unit_aotfw');
+    const unitRow = curriculum.units.find((row: { id: string }) => row.id === 'unit_lkeep');
     expect(unitRow.outcome_ids).toEqual(['EA12-6', keep.id]);
     expect(curriculum.outcomes.some((row: { id: string }) => row.id === extra.id)).toBe(false);
 

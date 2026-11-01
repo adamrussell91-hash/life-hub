@@ -13,7 +13,7 @@ const seedFixture = JSON.parse(
 ) as SeedData;
 
 const PASSPHRASE = 'teaching-hub-local';
-const TARGET_ID = 'scheduled_aotfw_007';
+const TARGET_ID = 'scheduled_lkeep_007';
 const PATH = `/api/scheduled-lessons/${TARGET_ID}`;
 
 function freshSeed(): SeedData {
@@ -100,14 +100,14 @@ describe('PATCH /api/scheduled-lessons/:id (mock)', () => {
     const scheduledLessons = curriculum.data.scheduled_lessons as ScheduledLesson[];
     const byId = new Map(scheduledLessons.map((row) => [row.id, row] as const));
     expect(byId.get(TARGET_ID)?.schedule_order).toBe(1);
-    expect(byId.get('scheduled_aotfw_006')?.schedule_order).toBe(2);
+    expect(byId.get('scheduled_lkeep_006')?.schedule_order).toBe(2);
   });
 
   it('no-ops at the top end with 200', async () => {
     const api = freshApi();
     const cookie = await signIn(api);
 
-    const res = await api.request('PATCH', '/api/scheduled-lessons/scheduled_aotfw_006', {
+    const res = await api.request('PATCH', '/api/scheduled-lessons/scheduled_lkeep_006', {
       cookie,
       body: { direction: 'up' }
     });

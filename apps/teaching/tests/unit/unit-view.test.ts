@@ -26,36 +26,36 @@ describe('mountStudentUnitView', () => {
 
   it('renders unit title and published lesson links', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW Unit',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP Unit',
       lessons: [
-        { lesson_id: 'lesson_aotfw_008', title: 'Memory' },
-        { lesson_id: 'lesson_aotfw_001', title: 'Intro' }
+        { lesson_id: 'lesson_lkeep_008', title: 'Memory' },
+        { lesson_id: 'lesson_lkeep_001', title: 'Intro' }
       ]
     });
 
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentUnitView({ root, unitId: 'unit_aotfw' });
+    mountStudentUnitView({ root, unitId: 'unit_lkeep' });
 
     await vi.waitFor(() => {
-      expect(root.querySelector('.student-hero__title')?.textContent).toBe('AOTFW Unit');
+      expect(root.querySelector('.student-hero__title')?.textContent).toBe('LKEEP Unit');
       const links = [...root.querySelectorAll('a.student-unit__lesson-link')];
       expect(links).toHaveLength(2);
-      expect(links[0].getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_008');
+      expect(links[0].getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_lkeep_008');
       expect(links[0].textContent).toContain('Memory');
     });
   });
 
   it('shows empty copy when no published lessons', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW Unit',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP Unit',
       lessons: []
     });
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentUnitView({ root, unitId: 'unit_aotfw' });
+    mountStudentUnitView({ root, unitId: 'unit_lkeep' });
 
     await vi.waitFor(() => {
       expect(root.textContent).toContain(

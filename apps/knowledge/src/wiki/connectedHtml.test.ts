@@ -17,28 +17,28 @@ describe("connectedLinksHtml", () => {
 
   it("renders Teaching units and Tasks projects as outbound hub links", () => {
     const html = connectedLinksHtml(
-      { connected: ["page_aotfw", "teaching:unit:unit_aotfw", "tasks:project:proj_aotfw"] },
-      [{ id: "page_aotfw", title: "Artist of the Floating World — sources" }],
+      { connected: ["page_lkeep", "teaching:unit:unit_lkeep", "tasks:project:proj_lkeep"] },
+      [{ id: "page_lkeep", title: "The Lantern Keeper — sources" }],
     );
-    expect(html).toContain("data-open-page=\"page_aotfw\"");
-    expect(html).toContain("Artist of the Floating World — sources");
+    expect(html).toContain("data-open-page=\"page_lkeep\"");
+    expect(html).toContain("The Lantern Keeper — sources");
     // Umbrella-relative: every hub shares the life-hub.adam-russell.com origin.
-    expect(html).toContain("href=\"/teaching/units/unit_aotfw\"");
-    expect(html).toContain("Teaching unit unit_aotfw");
-    expect(html).toContain("href=\"/tasks/#/project/proj_aotfw\"");
-    expect(html).toContain("Tasks project proj_aotfw");
-    expect(html).not.toContain("data-open-page=\"teaching:unit:unit_aotfw\"");
-    expect(html).not.toContain("data-open-page=\"tasks:project:proj_aotfw\"");
+    expect(html).toContain("href=\"/teaching/units/unit_lkeep\"");
+    expect(html).toContain("Teaching unit unit_lkeep");
+    expect(html).toContain("href=\"/tasks/#/project/proj_lkeep\"");
+    expect(html).toContain("Tasks project proj_lkeep");
+    expect(html).not.toContain("data-open-page=\"teaching:unit:unit_lkeep\"");
+    expect(html).not.toContain("data-open-page=\"tasks:project:proj_lkeep\"");
   });
 
   it("renders Life decision refs as outbound Central Node links", () => {
     const html = connectedLinksHtml(
-      { connected: ["life:decision:aotfw-sources"] },
+      { connected: ["life:decision:lkeep-sources"] },
       [],
     );
     expect(html).toContain("href=\"/#central-node\"");
-    expect(html).toContain("Decision aotfw-sources");
-    expect(html).not.toContain("data-open-page=\"life:decision:aotfw-sources\"");
+    expect(html).toContain("Decision lkeep-sources");
+    expect(html).not.toContain("data-open-page=\"life:decision:lkeep-sources\"");
   });
 
   it("shows an unavailable state when dual-read relationships failed", () => {

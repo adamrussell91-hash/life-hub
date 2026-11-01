@@ -40,7 +40,7 @@ const curriculum: CurriculumResponse = {
       created_at: ISO,
       updated_at: ISO,
       schema_version: 1,
-      unit_ids: ['unit_aotfw'],
+      unit_ids: ['unit_lkeep'],
       outcome_ids: [],
       class_ids: ['class_2026_12engadv1']
     }
@@ -57,7 +57,7 @@ const curriculum: CurriculumResponse = {
       academic_year: 2026,
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
-      active_unit_ids: ['unit_aotfw'],
+      active_unit_ids: ['unit_lkeep'],
       status: 'active',
       created_at: ISO,
       updated_at: ISO,
@@ -66,11 +66,11 @@ const curriculum: CurriculumResponse = {
   ],
   scheduled_lessons: [
     {
-      id: 'scheduled_aotfw_008',
+      id: 'scheduled_lkeep_008',
       type: 'scheduled_lesson',
       class_id: 'class_2026_12engadv1',
-      unit_id: 'unit_aotfw',
-      lesson_id: 'lesson_aotfw_008',
+      unit_id: 'unit_lkeep',
+      lesson_id: 'lesson_lkeep_008',
       date: '2026-08-12',
       schedule_order: 1,
       delivery_status: 'current',
@@ -79,11 +79,11 @@ const curriculum: CurriculumResponse = {
       schema_version: 1
     },
     {
-      id: 'scheduled_aotfw_001',
+      id: 'scheduled_lkeep_001',
       type: 'scheduled_lesson',
       class_id: 'class_2026_12engadv1',
-      unit_id: 'unit_aotfw',
-      lesson_id: 'lesson_aotfw_001',
+      unit_id: 'unit_lkeep',
+      lesson_id: 'lesson_lkeep_001',
       date: '2026-08-13',
       schedule_order: 2,
       delivery_status: 'planned',
@@ -96,10 +96,10 @@ const curriculum: CurriculumResponse = {
   media: [],
   lessons: [
     {
-      id: 'lesson_aotfw_008',
+      id: 'lesson_lkeep_008',
       title: 'Memory',
       slug: 'memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 8,
       status: 'active',
       published: true,
@@ -107,10 +107,10 @@ const curriculum: CurriculumResponse = {
       published_at: '2026-02-01T12:00:00.000Z'
     },
     {
-      id: 'lesson_aotfw_001',
+      id: 'lesson_lkeep_001',
       title: 'Intro',
       slug: 'intro',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false,
@@ -222,11 +222,11 @@ describe('teacher home dashboard', () => {
 
     // A lesson with a date but no period rides the all-day row, not a made-up 9 am block.
     await vi.waitFor(() => {
-      const row = canvas.querySelector<HTMLElement>('.cal-due.is-allday[data-id="scheduled_aotfw_008"]');
+      const row = canvas.querySelector<HTMLElement>('.cal-due.is-allday[data-id="scheduled_lkeep_008"]');
       expect(row).not.toBeNull();
       expect(row?.textContent).toContain('Memory');
     });
-    expect(canvas.querySelector('.cal-chip[data-lesson-id="lesson_aotfw_008"]')).toBeNull();
+    expect(canvas.querySelector('.cal-chip[data-lesson-id="lesson_lkeep_008"]')).toBeNull();
   });
 
   it('expands class tiles from the dashboard before opening the class page', async () => {
@@ -263,10 +263,10 @@ describe('teacher home dashboard', () => {
       lessons: [
         ...curriculum.lessons,
         {
-          id: 'lesson_aotfw_deleted',
-          title: 'Introduction to An Artist of the Floating World',
+          id: 'lesson_lkeep_deleted',
+          title: 'Introduction to The Lantern Keeper',
           slug: 'intro-deleted',
-          unit_id: 'unit_aotfw',
+          unit_id: 'unit_lkeep',
           sequence: 1,
           status: 'trashed',
           published: false,
@@ -282,7 +282,7 @@ describe('teacher home dashboard', () => {
     });
     expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
     expect(canvas.querySelector('.calendar-compose')).toBeNull();
-    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
+    expect(canvas.textContent).not.toContain('Introduction to The Lantern Keeper');
   });
 
   it('calendar add opens timetable scheduling for blank calendar lessons', async () => {

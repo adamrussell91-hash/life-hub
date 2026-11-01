@@ -51,7 +51,7 @@ Seed data: one realistic path (recommended: Year 12 English Advanced → one Uni
 ### Principles
 
 - One source of truth per reusable object; relationships by ID.
-- Immutable human-readable IDs (e.g. `subject_y12_engadv`, `lesson_aotfw_008`).
+- Immutable human-readable IDs (e.g. `subject_y12_engadv`, `lesson_lkeep_008`).
 - Draft content separate from published student content.
 - JSON is the canonical format; Zod validates on write and (where useful) on read.
 
@@ -83,9 +83,9 @@ One Blob store with prefixed keys for the slice (split into multiple stores late
 
 - `years/year_12`
 - `subjects/subject_y12_engadv`
-- `units/unit_aotfw`
-- `lessons/lesson_aotfw_008` (draft)
-- `published/lessons/lesson_aotfw_008` (published snapshot)
+- `units/unit_lkeep`
+- `lessons/lesson_lkeep_008` (draft)
+- `published/lessons/lesson_lkeep_008` (published snapshot)
 
 ## Components / modules
 
@@ -111,7 +111,7 @@ One Blob store with prefixed keys for the slice (split into multiple stores late
 
 ### Student URL (slice)
 
-Public route: `/s/lessons/:lessonId` where `:lessonId` is the permanent lesson ID (e.g. `lesson_aotfw_008`). Slug may be shown in the page title but is not required for resolution. Redirect records deferred.
+Public route: `/s/lessons/:lessonId` where `:lessonId` is the permanent lesson ID (e.g. `lesson_lkeep_008`). Slug may be shown in the page title but is not required for resolution. Redirect records deferred.
 
 ## Error handling
 

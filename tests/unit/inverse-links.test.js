@@ -9,14 +9,14 @@ import {
 
 const entries = [
   {
-    id: 'page_aotfw',
-    title: 'Artist of the Floating World — sources',
-    connected: ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'life:decision:aotfw-sources']
+    id: 'page_lkeep',
+    title: 'The Lantern Keeper — sources',
+    connected: ['teaching:unit:unit_lkeep', 'tasks:project:proj_lkeep', 'life:decision:lkeep-sources']
   },
   {
-    id: 'page_aotfw_notes',
-    title: 'AOTFW teaching notes',
-    connected: ['page_aotfw', 'knowledge:page:page_aotfw']
+    id: 'page_lkeep_notes',
+    title: 'LKEEP teaching notes',
+    connected: ['page_lkeep', 'knowledge:page:page_lkeep']
   },
   {
     id: 'page_training_pulse',
@@ -26,21 +26,21 @@ const entries = [
 ];
 
 test('collectInverseLinks lists Knowledge pages that point at the target', () => {
-  assert.deepEqual(collectInverseLinks(entries, 'page_aotfw'), [
-    { id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }
+  assert.deepEqual(collectInverseLinks(entries, 'page_lkeep'), [
+    { id: 'page_lkeep_notes', title: 'LKEEP teaching notes' }
   ]);
 });
 
 test('collectInverseLinks does not treat outbound connected as inbound', () => {
   assert.deepEqual(collectInverseLinks(entries, 'page_training_pulse'), []);
-  assert.deepEqual(collectInverseLinks(entries, 'page_aotfw_notes'), []);
+  assert.deepEqual(collectInverseLinks(entries, 'page_lkeep_notes'), []);
 });
 
 test('collectDecisionBacklinks groups Knowledge pages that point at a Life decision', () => {
   assert.deepEqual(collectDecisionBacklinks(entries), [
     {
-      target: 'life:decision:aotfw-sources',
-      sources: [{ id: 'page_aotfw', title: 'Artist of the Floating World — sources' }]
+      target: 'life:decision:lkeep-sources',
+      sources: [{ id: 'page_lkeep', title: 'The Lantern Keeper — sources' }]
     }
   ]);
 });
@@ -55,10 +55,10 @@ test('normalizeInverseLinks is fail-visible when the archive cannot be read', ()
 
 test('defaultLoadInverseLinks does not invent inbound links when page hydration misses', async () => {
   const loaded = await defaultLoadInverseLinks({
-    page: { id: 'page_aotfw' },
+    page: { id: 'page_lkeep' },
     listPages: async () => [
-      { id: 'page_aotfw', title: 'Artist of the Floating World — sources' },
-      { id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }
+      { id: 'page_lkeep', title: 'The Lantern Keeper — sources' },
+      { id: 'page_lkeep_notes', title: 'LKEEP teaching notes' }
     ],
     env: {},
     fetchImpl: async () => {
@@ -72,12 +72,12 @@ test('defaultLoadInverseLinks does not invent inbound links when page hydration 
 
 test('defaultLoadInverseLinks uses connected on the list when present', async () => {
   const loaded = await defaultLoadInverseLinks({
-    page: { id: 'page_aotfw' },
+    page: { id: 'page_lkeep' },
     listPages: async () => entries
   });
   assert.equal(loaded.status, 'ready');
-  assert.deepEqual(loaded.links, [{ id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }]);
-  assert.equal(loaded.groups[0].target, 'life:decision:aotfw-sources');
+  assert.deepEqual(loaded.links, [{ id: 'page_lkeep_notes', title: 'LKEEP teaching notes' }]);
+  assert.equal(loaded.groups[0].target, 'life:decision:lkeep-sources');
 });
 
 test('defaultLoadInverseLinks uses backfilled connected on a large archive without fetching pages', async () => {
@@ -98,19 +98,19 @@ test('defaultLoadInverseLinks uses backfilled connected on a large archive witho
   assert.deepEqual(loaded.links, [{ id: 'page_ethics', title: 'Ethics' }]);
 });
 
-test('defaultLoadInverseLinks hydrates page_aotfw on a large archive without connected rows', async () => {
+test('defaultLoadInverseLinks hydrates page_lkeep on a large archive without connected rows', async () => {
   const listed = Array.from({ length: 25 }, (_, i) => ({
     id: `note-${i + 1}`,
     title: `Note ${i + 1}`
   }));
-  listed[0] = { id: 'page_aotfw', title: 'Artist of the Floating World — sources' };
+  listed[0] = { id: 'page_lkeep', title: 'The Lantern Keeper — sources' };
   const urls = [];
   const loaded = await defaultLoadInverseLinks({
     env: { GITHUB_TOKEN: 'token' },
     listPages: async () => listed,
     fetchImpl: async url => {
       urls.push(String(url));
-      assert.match(String(url), /pages\/page_aotfw\.json/);
+      assert.match(String(url), /pages\/page_lkeep\.json/);
       return {
         ok: true,
         status: 200,
@@ -118,22 +118,22 @@ test('defaultLoadInverseLinks hydrates page_aotfw on a large archive without con
           sha: 'a'.repeat(40),
           encoding: 'base64',
           content: Buffer.from(JSON.stringify({
-            id: 'page_aotfw',
-            title: 'Artist of the Floating World — sources',
-            connected: ['life:decision:aotfw-sources']
+            id: 'page_lkeep',
+            title: 'The Lantern Keeper — sources',
+            connected: ['life:decision:lkeep-sources']
           })).toString('base64')
         })
       };
     }
   });
   assert.equal(loaded.status, 'ready');
-  assert.equal(loaded.groups[0].target, 'life:decision:aotfw-sources');
+  assert.equal(loaded.groups[0].target, 'life:decision:lkeep-sources');
   assert.equal(urls.length, 1);
 });
 
 test('defaultLoadInverseLinks is unavailable when the list fails', async () => {
   const loaded = await defaultLoadInverseLinks({
-    page: { id: 'page_aotfw' },
+    page: { id: 'page_lkeep' },
     listPages: async () => {
       throw new Error('manifest down');
     }

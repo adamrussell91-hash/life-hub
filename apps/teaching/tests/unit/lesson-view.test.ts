@@ -24,9 +24,9 @@ const CLASS_ID = 'class_2026_12engadv1';
 
 function publishedLesson() {
   return {
-    lesson_id: 'lesson_aotfw_008',
+    lesson_id: 'lesson_lkeep_008',
     title: 'Memory',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     blocks: [] as Array<Record<string, unknown>>,
     published_at: '2026-02-01T12:00:00.000Z',
     schema_version: 1
@@ -66,7 +66,7 @@ function publishedClass() {
         id: 's1',
         date: '2026-08-11',
         schedule_order: 1,
-        lesson_id: 'lesson_aotfw_007',
+        lesson_id: 'lesson_lkeep_007',
         title: 'Earlier',
         published: true
       },
@@ -74,7 +74,7 @@ function publishedClass() {
         id: 's2',
         date: '2026-08-12',
         schedule_order: 2,
-        lesson_id: 'lesson_aotfw_008',
+        lesson_id: 'lesson_lkeep_008',
         title: 'Memory',
         published: true
       },
@@ -82,7 +82,7 @@ function publishedClass() {
         id: 's3',
         date: '2026-08-13',
         schedule_order: 3,
-        lesson_id: 'lesson_aotfw_009',
+        lesson_id: 'lesson_lkeep_009',
         title: 'Later',
         published: true
       }
@@ -105,9 +105,9 @@ describe('mountStudentLessonView', () => {
 
   it('does not expose unit navigation from a direct student lesson', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      lesson_id: 'lesson_aotfw_008',
+      lesson_id: 'lesson_lkeep_008',
       title: 'Memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       blocks: [],
       published_at: '2026-02-01T12:00:00.000Z',
       schema_version: 1
@@ -115,7 +115,7 @@ describe('mountStudentLessonView', () => {
 
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       const link = root.querySelector(
@@ -146,7 +146,7 @@ describe('mountStudentLessonView', () => {
     vi.mocked(apiGet).mockResolvedValue(publishedLesson());
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       expect(root.textContent).toContain('Memory');
@@ -157,7 +157,7 @@ describe('mountStudentLessonView', () => {
   });
 
   it('class-scoped mount keeps class and neighbor navigation without a unit link', async () => {
-    vi.stubGlobal('location', new URL('https://class.adam-russell.com/s/lessons/lesson_aotfw_008'));
+    vi.stubGlobal('location', new URL('https://class.adam-russell.com/s/lessons/lesson_lkeep_008'));
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) return publishedClass();
       if (path.includes('/published/lessons/')) return publishedLesson();
@@ -168,7 +168,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -184,15 +184,15 @@ describe('mountStudentLessonView', () => {
     const prev = root.querySelector('a.lf__link--prev') as HTMLAnchorElement;
     const next = root.querySelector('a.lf__link--next') as HTMLAnchorElement;
     expect(prev.getAttribute('href')).toBe(
-      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
+      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_lkeep_007`
     );
     expect(next.getAttribute('href')).toBe(
-      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_009`
+      `https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_lkeep_009`
     );
 
     prev.click();
     expect(navigate).toHaveBeenCalledWith(
-      `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
+      `/s/classes/${CLASS_ID}/lessons/lesson_lkeep_007`
     );
   });
 
@@ -209,7 +209,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -228,7 +228,7 @@ describe('mountStudentLessonView', () => {
               id: 's2',
               date: '2026-08-12',
               schedule_order: 2,
-              lesson_id: 'lesson_aotfw_008',
+              lesson_id: 'lesson_lkeep_008',
               title: 'Memory',
               published: false
             }
@@ -243,7 +243,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -265,7 +265,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -287,7 +287,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -309,7 +309,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -329,7 +329,7 @@ describe('mountStudentLessonView', () => {
     document.body.append(root);
     mountStudentLessonView({
       root,
-      lessonId: 'lesson_aotfw_008',
+      lessonId: 'lesson_lkeep_008',
       classId: CLASS_ID
     });
 
@@ -349,7 +349,7 @@ describe('mountStudentLessonView', () => {
     vi.mocked(apiGet).mockResolvedValue(publishedLessonWithLead());
     const root = document.createElement('div');
     document.body.append(root);
-    mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       expect(root.querySelector('.lesson-hero__title')?.textContent).toBe('Memory');
@@ -395,7 +395,7 @@ describe('mountStudentLessonView', () => {
     vi.mocked(apiGet).mockResolvedValue({ ...lesson, pedagogical_mode: 'lecture' });
     const root = document.createElement('div');
     document.body.append(root);
-    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       expect(root.querySelector('.lecture .lecture-title .lesson-hero__title')?.textContent).toBe('Memory');
@@ -413,7 +413,7 @@ describe('mountStudentLessonView', () => {
     vi.mocked(apiGet).mockResolvedValue({ ...lesson, pedagogical_mode: 'tutorial' });
     const root = document.createElement('div');
     document.body.append(root);
-    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     // Opened without a class, so there is no one to fetch a group tab for.
     await vi.waitFor(() => {
@@ -436,7 +436,7 @@ describe('mountStudentLessonView', () => {
     vi.mocked(apiGet).mockResolvedValue({ ...lesson, blocks: [lead, sidePath] });
     const root = document.createElement('div');
     document.body.append(root);
-    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
     await vi.waitFor(() => {
       expect(root.textContent).toContain('Lead copy here');

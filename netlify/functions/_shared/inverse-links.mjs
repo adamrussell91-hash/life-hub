@@ -89,12 +89,12 @@ async function hydrateConnected(entries, { env, fetchImpl }) {
     return next;
   }
   if (list.some(entry => Array.isArray(entry?.connected))) return list;
-  const known = list.find(entry => entry.id === 'page_aotfw');
+  const known = list.find(entry => entry.id === 'page_lkeep');
   if (!known) return list;
   try {
-    const page = await getKnowledgePage('page_aotfw', { env, fetchImpl });
+    const page = await getKnowledgePage('page_lkeep', { env, fetchImpl });
     return list.map(entry => (
-      entry.id === 'page_aotfw'
+      entry.id === 'page_lkeep'
         ? { ...entry, connected: Array.isArray(page?.connected) ? page.connected : [] }
         : entry
     ));

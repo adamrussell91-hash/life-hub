@@ -62,9 +62,9 @@ test('enrichKnowledgePage keeps the stored token and expands live_body', () => {
 
 test('enrichKnowledgePage marks decision traces unavailable without inventing a history', () => {
   const page = enrichKnowledgePage({
-    id: 'page_aotfw',
+    id: 'page_lkeep',
     body: 'Static',
-    connected: ['life:decision:aotfw-sources']
+    connected: ['life:decision:lkeep-sources']
   }, { traces: [], tracesStatus: 'unavailable' });
   assert.equal(page.decision_traces, undefined);
   assert.equal(page.decision_traces_status, 'unavailable');
@@ -72,13 +72,13 @@ test('enrichKnowledgePage marks decision traces unavailable without inventing a 
 
 test('enrichKnowledgePage attaches inverse links and URL watches without inventing them', () => {
   const page = enrichKnowledgePage({
-    id: 'page_aotfw',
+    id: 'page_lkeep',
     body: 'See https://example.com/policy'
   }, {
-    inverseLinks: [{ id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }],
+    inverseLinks: [{ id: 'page_lkeep_notes', title: 'LKEEP teaching notes' }],
     urlWatches: [{ url: 'https://example.com/policy', status: 'unchanged' }]
   });
-  assert.equal(page.inverse_links[0].id, 'page_aotfw_notes');
+  assert.equal(page.inverse_links[0].id, 'page_lkeep_notes');
   assert.equal(page.url_watches[0].status, 'unchanged');
   assert.equal(page.inverse_links_status, undefined);
   assert.equal(page.url_watches_status, undefined);
@@ -86,7 +86,7 @@ test('enrichKnowledgePage attaches inverse links and URL watches without inventi
 
 test('enrichKnowledgePage is fail-visible when inverse or URL watch loaders miss', () => {
   const page = enrichKnowledgePage({
-    id: 'page_aotfw',
+    id: 'page_lkeep',
     body: 'See https://example.com/policy'
   }, {
     inverseStatus: 'unavailable',
@@ -196,7 +196,7 @@ test('defaultLoadDecisionTraces is ready and empty when the governance file is m
   const loaded = await defaultLoadDecisionTraces({
     env: LIFE_ENV,
     fetchImpl,
-    page: { connected: ['life:decision:aotfw-sources'] }
+    page: { connected: ['life:decision:lkeep-sources'] }
   });
   assert.deepEqual(loaded, { traces: [], status: 'ready' });
 });
@@ -205,16 +205,16 @@ test('defaultLoadDecisionTraces groups the connected Life decision', async () =>
   let log = appendGovernanceEntry(emptyGovernanceLog(), {
     dateKey: '2026-09-01',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
     chosen: 'Keep the unit linked',
     body: 'Identity lives on the Knowledge page.'
   });
   log = appendGovernanceEntry(log, {
     dateKey: '2026-08-01',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
     chosen: 'Start the unit',
     body: 'First take.'
   });
@@ -225,10 +225,10 @@ test('defaultLoadDecisionTraces groups the connected Life decision', async () =>
   const loaded = await defaultLoadDecisionTraces({
     env: LIFE_ENV,
     fetchImpl,
-    page: { connected: ['life:decision:aotfw-sources'] }
+    page: { connected: ['life:decision:lkeep-sources'] }
   });
   assert.equal(loaded.status, 'ready');
-  assert.equal(loaded.traces[0].decisionId, 'aotfw-sources');
+  assert.equal(loaded.traces[0].decisionId, 'lkeep-sources');
   assert.deepEqual(loaded.traces[0].steps.map(step => step.chosen), [
     'Start the unit',
     'Keep the unit linked'
@@ -244,7 +244,7 @@ test('default loaders are fail-visible when Life GitHub env is missing', async (
     fetchImpl: async () => {
       throw new Error('GitHub must not be called');
     },
-    page: { connected: ['life:decision:aotfw-sources'] }
+    page: { connected: ['life:decision:lkeep-sources'] }
   });
   assert.equal(compare.ok, false);
   assert.deepEqual(traces, { traces: [], status: 'unavailable' });
@@ -255,8 +255,8 @@ test('loadLifeRepo shares one tree with both default loaders', async () => {
   const log = appendGovernanceEntry(emptyGovernanceLog(), {
     dateKey: '2026-09-01',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
     body: 'Keep the unit linked.'
   });
   const { calls, fetchImpl } = memoryLifeGithub({
@@ -276,7 +276,7 @@ test('loadLifeRepo shares one tree with both default loaders', async () => {
     defaultLoadDecisionTraces({
       env: LIFE_ENV,
       fetchImpl,
-      page: { connected: ['life:decision:aotfw-sources'] },
+      page: { connected: ['life:decision:lkeep-sources'] },
       lifeRepo
     })
   ]);

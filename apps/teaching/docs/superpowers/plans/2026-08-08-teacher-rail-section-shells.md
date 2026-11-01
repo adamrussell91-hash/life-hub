@@ -102,11 +102,11 @@ In `tests/unit/router.test.ts`, update the unknown-paths case and add section ma
   });
 
   it('matches teacher section detail routes', () => {
-    expect(match('/units/unit_aotfw')).toEqual({
+    expect(match('/units/unit_lkeep')).toEqual({
       name: 'teacher-unit',
-      params: { unitId: 'unit_aotfw' },
+      params: { unitId: 'unit_lkeep' },
       requiresAuth: true,
-      path: '/units/unit_aotfw'
+      path: '/units/unit_lkeep'
     });
     expect(match('/scope-sequences/subject_y12_engadv')).toEqual({
       name: 'teacher-scope-sequence',
@@ -118,11 +118,11 @@ In `tests/unit/router.test.ts`, update the unknown-paths case and add section ma
 
   it('does not treat list paths as lesson editor', () => {
     expect(match('/lessons')?.name).toBe('teacher-lessons');
-    expect(match('/lessons/lesson_aotfw_008')?.name).toBe('teacher-lesson');
+    expect(match('/lessons/lesson_lkeep_008')?.name).toBe('teacher-lesson');
   });
 ```
 
-Also extend the auth-required cases array to include `/classes`, `/lessons`, `/units/unit_aotfw`.
+Also extend the auth-required cases array to include `/classes`, `/lessons`, `/units/unit_lkeep`.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -256,15 +256,15 @@ describe('sectionFromRoute', () => {
     expect(sectionFromRoute(match('/scope-sequences')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/scope-sequences/subject_y12_engadv')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/units')!)).toBe('units');
-    expect(sectionFromRoute(match('/units/unit_aotfw')!)).toBe('units');
+    expect(sectionFromRoute(match('/units/unit_lkeep')!)).toBe('units');
     expect(sectionFromRoute(match('/lessons')!)).toBe('lessons');
-    expect(sectionFromRoute(match('/lessons/lesson_aotfw_008')!)).toBe('lessons');
+    expect(sectionFromRoute(match('/lessons/lesson_lkeep_008')!)).toBe('lessons');
     expect(sectionFromRoute(match('/resources')!)).toBe('resources');
   });
 
   it('returns null for non-teacher workspace routes', () => {
     expect(sectionFromRoute(match('/sign-in')!)).toBeNull();
-    expect(sectionFromRoute(match('/s/lessons/lesson_aotfw_008')!)).toBeNull();
+    expect(sectionFromRoute(match('/s/lessons/lesson_lkeep_008')!)).toBeNull();
   });
 });
 ```
@@ -504,9 +504,9 @@ const curriculum: CurriculumResponse = {
   subjects: [],
   units: [
     {
-      id: 'unit_aotfw',
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'Artist of the Floating World',
+      title: 'The Lantern Keeper',
       slug: 'artist_of_the_floating_world',
       status: 'active',
       created_at: ISO,
@@ -522,7 +522,7 @@ const curriculum: CurriculumResponse = {
       id: 'lesson_001',
       title: 'Introduction',
       slug: 'introduction',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false
@@ -982,7 +982,7 @@ EOF
 
 Curriculum with one unit, two lessons (sequences 1 and 2), matching year/subject titles for meta. Assert:
 
-- Index lists unit title; meta includes subject or year label; Open → `/units/unit_aotfw`
+- Index lists unit title; meta includes subject or year label; Open → `/units/unit_lkeep`
 - Stub lists only that unit’s lessons in sequence; Open lesson → `/lessons/...`
 - Unknown `unitId` → not found
 

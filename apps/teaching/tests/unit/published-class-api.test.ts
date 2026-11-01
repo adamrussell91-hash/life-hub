@@ -59,19 +59,19 @@ describe('GET /api/published/classes/:id (mock)', () => {
     });
 
     expect(body.data.current_unit).toEqual({
-      id: 'unit_aotfw',
-      title: 'Artist of the Floating World',
+      id: 'unit_lkeep',
+      title: 'The Lantern Keeper',
       lessons: []
     });
 
     expect(body.data.current_lesson).toEqual({
-      id: 'scheduled_aotfw_008',
-      title: 'Memory, Identity and Ono',
-      lesson_id: 'lesson_aotfw_008'
+      id: 'scheduled_lkeep_008',
+      title: 'Memory, Identity and Hale',
+      lesson_id: 'lesson_lkeep_008'
     });
 
     expect(body.data.active_units).toEqual([
-      { id: 'unit_aotfw', title: 'Artist of the Floating World' }
+      { id: 'unit_lkeep', title: 'The Lantern Keeper' }
     ]);
 
     expect(body.data.schedule).toHaveLength(5);
@@ -79,9 +79,9 @@ describe('GET /api/published/classes/:id (mock)', () => {
       1, 2, 3, 4, 5
     ]);
     expect(body.data.schedule[2]).toMatchObject({
-      id: 'scheduled_aotfw_008',
-      lesson_id: 'lesson_aotfw_008',
-      title: 'Memory, Identity and Ono',
+      id: 'scheduled_lkeep_008',
+      lesson_id: 'lesson_lkeep_008',
+      title: 'Memory, Identity and Hale',
       published: false
     });
   });
@@ -93,7 +93,7 @@ describe('GET /api/published/classes/:id (mock)', () => {
     });
     const cookie = authRes.headers.get('set-cookie') as string;
 
-    const publishRes = await api.request('POST', '/api/lessons/lesson_aotfw_003/publish', {
+    const publishRes = await api.request('POST', '/api/lessons/lesson_lkeep_003/publish', {
       cookie
     });
     expect(publishRes.status).toBe(200);
@@ -103,7 +103,7 @@ describe('GET /api/published/classes/:id (mock)', () => {
     const body = await res.json();
     expect(body.data.current_unit.lessons).toEqual([
       {
-        id: 'lesson_aotfw_003',
+        id: 'lesson_lkeep_003',
         title: 'Narrative Structure and Unreliable Memory'
       }
     ]);
@@ -116,7 +116,7 @@ describe('GET /api/published/classes/:id (mock)', () => {
     });
     const cookie = authRes.headers.get('set-cookie') as string;
 
-    const publishRes = await api.request('POST', '/api/lessons/lesson_aotfw_008/publish', {
+    const publishRes = await api.request('POST', '/api/lessons/lesson_lkeep_008/publish', {
       cookie
     });
     expect(publishRes.status).toBe(200);
@@ -125,7 +125,7 @@ describe('GET /api/published/classes/:id (mock)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     const current = body.data.schedule.find(
-      (row: { lesson_id: string }) => row.lesson_id === 'lesson_aotfw_008'
+      (row: { lesson_id: string }) => row.lesson_id === 'lesson_lkeep_008'
     );
     expect(current.published).toBe(true);
   });
@@ -165,6 +165,6 @@ describe('GET /api/published/classes/:id (mock)', () => {
 
 describe('published lesson key helper', () => {
   it('builds published lesson key', () => {
-    expect(publishedLessonKey('lesson_aotfw_008')).toBe('published/lessons/lesson_aotfw_008');
+    expect(publishedLessonKey('lesson_lkeep_008')).toBe('published/lessons/lesson_lkeep_008');
   });
 });

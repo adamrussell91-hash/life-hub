@@ -12,8 +12,8 @@ const seedFixture = JSON.parse(
 ) as SeedData;
 
 const PASSPHRASE = 'teaching-hub-local';
-const LESSON_ID = 'lesson_aotfw_008';
-const UNIT_ID = 'unit_aotfw';
+const LESSON_ID = 'lesson_lkeep_008';
+const UNIT_ID = 'unit_lkeep';
 
 function freshApi() {
   return createMockApi({

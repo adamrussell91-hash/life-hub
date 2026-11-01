@@ -68,9 +68,9 @@ describe('ClassSchema', () => {
       academic_year: 2026,
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
-      active_unit_ids: ['unit_aotfw'],
-      current_unit_id: 'unit_aotfw',
-      current_scheduled_lesson_id: 'scheduled_aotfw_008',
+      active_unit_ids: ['unit_lkeep'],
+      current_unit_id: 'unit_lkeep',
+      current_scheduled_lesson_id: 'scheduled_lkeep_008',
       status: 'active',
       created_at: ISO,
       updated_at: ISO,
@@ -102,11 +102,11 @@ describe('ClassSchema', () => {
 describe('ScheduledLessonSchema', () => {
   it('parses a scheduled lesson', () => {
     const row = ScheduledLessonSchema.parse({
-      id: 'scheduled_aotfw_008',
+      id: 'scheduled_lkeep_008',
       type: 'scheduled_lesson',
       class_id: 'class_2026_12engadv1',
-      lesson_id: 'lesson_aotfw_008',
-      unit_id: 'unit_aotfw',
+      lesson_id: 'lesson_lkeep_008',
+      unit_id: 'unit_lkeep',
       date: '2026-08-12',
       schedule_order: 3,
       delivery_status: 'planned',
@@ -228,8 +228,8 @@ Replace `homeScheduleKey` test with:
 ```ts
   it('builds class and scheduled lesson keys', () => {
     expect(classKey('class_2026_12engadv1')).toBe('classes/class_2026_12engadv1');
-    expect(scheduledLessonKey('scheduled_aotfw_008')).toBe(
-      'scheduled_lessons/scheduled_aotfw_008'
+    expect(scheduledLessonKey('scheduled_lkeep_008')).toBe(
+      'scheduled_lessons/scheduled_lkeep_008'
     );
   });
 ```
@@ -266,9 +266,9 @@ export function scheduledLessonKey(id: string): string {
   "academic_year": 2026,
   "year_id": "year_12",
   "subject_id": "subject_y12_engadv",
-  "active_unit_ids": ["unit_aotfw"],
-  "current_unit_id": "unit_aotfw",
-  "current_scheduled_lesson_id": "scheduled_aotfw_008",
+  "active_unit_ids": ["unit_lkeep"],
+  "current_unit_id": "unit_lkeep",
+  "current_scheduled_lesson_id": "scheduled_lkeep_008",
   "status": "active",
   "created_at": "2026-01-01T00:00:00.000Z",
   "updated_at": "2026-01-01T00:00:00.000Z",
@@ -280,13 +280,13 @@ export function scheduledLessonKey(id: string): string {
 
 | id | lesson_id | date | schedule_order |
 |----|-----------|------|----------------|
-| scheduled_aotfw_006 | lesson_aotfw_006 | 2026-08-10 | 1 |
-| scheduled_aotfw_007 | lesson_aotfw_007 | 2026-08-11 | 2 |
-| scheduled_aotfw_008 | lesson_aotfw_008 | 2026-08-12 | 3 |
-| scheduled_aotfw_001 | lesson_aotfw_001 | 2026-08-13 | 4 |
-| scheduled_aotfw_002 | lesson_aotfw_002 | 2026-08-14 | 5 |
+| scheduled_lkeep_006 | lesson_lkeep_006 | 2026-08-10 | 1 |
+| scheduled_lkeep_007 | lesson_lkeep_007 | 2026-08-11 | 2 |
+| scheduled_lkeep_008 | lesson_lkeep_008 | 2026-08-12 | 3 |
+| scheduled_lkeep_001 | lesson_lkeep_001 | 2026-08-13 | 4 |
+| scheduled_lkeep_002 | lesson_lkeep_002 | 2026-08-14 | 5 |
 
-All: `class_id: class_2026_12engadv1`, `unit_id: unit_aotfw`, `delivery_status: planned` (008 may be `current`).
+All: `class_id: class_2026_12engadv1`, `unit_id: unit_lkeep`, `delivery_status: planned` (008 may be `current`).
 
 5. Optionally set subject `class_ids: ["class_2026_12engadv1"]` on English Advanced.
 

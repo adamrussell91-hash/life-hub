@@ -59,7 +59,7 @@ describe('closure loop', () => {
   });
 
   it('does not mark a standard project ready_to_close on past end with no tasks', () => {
-    const emptyPast = seed.projects.find((p) => p.id === 'proj_aotfw')!;
+    const emptyPast = seed.projects.find((p) => p.id === 'proj_lkeep')!;
     const variance = computeProjectVariance(emptyPast, [], new Date('2026-09-26T12:00:00'));
     expect(variance.end_passed).toBe(true);
     expect(variance.open_task_count).toBe(0);

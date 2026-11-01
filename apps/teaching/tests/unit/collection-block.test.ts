@@ -93,11 +93,11 @@ describe('createBlock collection menus', () => {
 
 describe('PublishableLessonSchema collection rules', () => {
   const validLesson = {
-    id: 'lesson_aotfw_008',
+    id: 'lesson_lkeep_008',
     type: 'lesson' as const,
-    title: 'Memory, Identity and Ono',
+    title: 'Memory, Identity and Hale',
     slug: 'memory_identity_and_ono',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 8,
     blocks: [
       {

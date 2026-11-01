@@ -37,7 +37,7 @@ const engAdv: Subject = {
   updated_at: ISO,
   schema_version: 1,
   scope_id: 'scope_y12_engadv_2026',
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_lkeep'],
   outcome_ids: [],
   class_ids: []
 };
@@ -53,9 +53,9 @@ const engStd: Subject = {
 };
 
 const unit: Unit = {
-  id: 'unit_aotfw',
+  id: 'unit_lkeep',
   type: 'unit',
-  title: 'Artist of the Floating World',
+  title: 'The Lantern Keeper',
   slug: 'artist_of_the_floating_world',
   status: 'active',
   created_at: ISO,
@@ -86,9 +86,9 @@ const scope: ScopeSequence = {
   ],
   timeline_items: [
     {
-      id: 'ti_unit_aotfw',
+      id: 'ti_unit_lkeep',
       kind: 'unit',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       start_week: 12,
       end_week: 18,
       order: 1
@@ -139,7 +139,7 @@ describe('scope & sequences', () => {
 
     const bar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="unit"]');
     expect(bar).not.toBeNull();
-    expect(bar!.getAttribute('href')).toContain('/units/unit_aotfw');
+    expect(bar!.getAttribute('href')).toContain('/units/unit_lkeep');
     expect(bar!.dataset.tint).toBe(pastelFromId(bar!.dataset.unitId!));
 
     const noteBar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="note"]');
@@ -159,7 +159,7 @@ describe('scope & sequences', () => {
     canvas
       .querySelector<HTMLAnchorElement>('[data-scope-bar-kind="unit"]')!
       .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    expect(navigate).toHaveBeenCalledWith('/units/unit_lkeep');
   });
 
   it('runs the timeline axis on past December when a unit spills into next year', () => {
@@ -199,10 +199,10 @@ describe('scope & sequences', () => {
   it('selects and scrolls to a unit when selectedUnitId is provided', () => {
     const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv', {
-      selectedUnitId: 'unit_aotfw'
+      selectedUnitId: 'unit_lkeep'
     });
     const selected = canvas.querySelector('.scope-timeline__item--selected');
-    expect(selected?.getAttribute('data-item-id')).toBe('ti_unit_aotfw');
+    expect(selected?.getAttribute('data-item-id')).toBe('ti_unit_lkeep');
     expect(scrollTo).toHaveBeenCalled();
     scrollTo.mockRestore();
   });

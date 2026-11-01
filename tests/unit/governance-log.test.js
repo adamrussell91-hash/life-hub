@@ -311,18 +311,18 @@ test('format and parse keep a decision id and About hub-refs', () => {
   const log = appendGovernanceEntry(emptyGovernanceLog(), {
     dateKey: '2026-09-01',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
-    about: ['teaching:unit:unit_aotfw', 'knowledge:page:page_aotfw', 'life:decision:aotfw-sources'],
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
+    about: ['teaching:unit:unit_lkeep', 'knowledge:page:page_lkeep', 'life:decision:lkeep-sources'],
     chosen: 'Keep the unit linked',
     body: 'Identity lives on the Knowledge page.'
   });
   const [entry] = parseGovernanceEntries(log);
-  assert.equal(entry.decisionId, 'aotfw-sources');
+  assert.equal(entry.decisionId, 'lkeep-sources');
   assert.deepEqual(entry.about, [
-    'teaching:unit:unit_aotfw',
-    'page_aotfw',
-    'life:decision:aotfw-sources'
+    'teaching:unit:unit_lkeep',
+    'page_lkeep',
+    'life:decision:lkeep-sources'
   ]);
 });
 
@@ -333,7 +333,7 @@ test('decisionTraces groups by decision id ahead of title', () => {
     entryType: 'Major Decision',
     title: 'Later wording',
     decisionId: 'med-load',
-    about: ['teaching:unit:unit_aotfw'],
+    about: ['teaching:unit:unit_lkeep'],
     chosen: 'Drop one elective',
     body: 'Later take.'
   });
@@ -342,7 +342,7 @@ test('decisionTraces groups by decision id ahead of title', () => {
     entryType: 'Major Decision',
     title: 'First wording',
     decisionId: 'med-load',
-    about: ['tasks:project:proj_aotfw'],
+    about: ['tasks:project:proj_lkeep'],
     chosen: 'Take both units',
     body: 'First take.'
   });
@@ -353,8 +353,8 @@ test('decisionTraces groups by decision id ahead of title', () => {
     'Take both units',
     'Drop one elective'
   ]);
-  assert.ok(traces[0].about.includes('teaching:unit:unit_aotfw'));
-  assert.ok(traces[0].about.includes('tasks:project:proj_aotfw'));
+  assert.ok(traces[0].about.includes('teaching:unit:unit_lkeep'));
+  assert.ok(traces[0].about.includes('tasks:project:proj_lkeep'));
 });
 
 test('tracesForRef finds a thread by hub-ref or decision id', () => {
@@ -362,27 +362,27 @@ test('tracesForRef finds a thread by hub-ref or decision id', () => {
   log = appendGovernanceEntry(log, {
     dateKey: '2026-09-06',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
-    about: ['teaching:unit:unit_aotfw', 'page_aotfw'],
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
+    about: ['teaching:unit:unit_lkeep', 'page_lkeep'],
     chosen: 'Keep the unit linked',
     body: 'Later.'
   });
   log = appendGovernanceEntry(log, {
     dateKey: '2026-08-01',
     entryType: 'Major Decision',
-    title: 'AOTFW sources',
-    decisionId: 'aotfw-sources',
-    about: ['teaching:unit:unit_aotfw'],
+    title: 'LKEEP sources',
+    decisionId: 'lkeep-sources',
+    about: ['teaching:unit:unit_lkeep'],
     chosen: 'Start the unit',
     body: 'First.'
   });
   const entries = parseGovernanceEntries(log);
-  const byUnit = tracesForRef(entries, 'teaching:unit:unit_aotfw');
+  const byUnit = tracesForRef(entries, 'teaching:unit:unit_lkeep');
   assert.equal(byUnit.length, 1);
   assert.equal(byUnit[0].steps.length, 2);
-  const byDecision = tracesForRef(entries, 'life:decision:aotfw-sources');
-  assert.equal(byDecision[0].decisionId, 'aotfw-sources');
+  const byDecision = tracesForRef(entries, 'life:decision:lkeep-sources');
+  assert.equal(byDecision[0].decisionId, 'lkeep-sources');
   assert.equal(tracesForRef(entries, 'tasks:project:missing').length, 0);
 });
 

@@ -62,7 +62,7 @@ This document specifies **item 1 only**.
 ├─────────────────────────────┤
 │ ▸ Year 12                   │  ← existing curriculum tree
 │   ▸ English Advanced        │
-│     ▸ Artist of the Floating World
+│     ▸ The Lantern Keeper
 │       Lesson 08 …           │
 └─────────────────────────────┘
 ```

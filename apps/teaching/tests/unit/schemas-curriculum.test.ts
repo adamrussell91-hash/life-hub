@@ -25,7 +25,7 @@ describe('curriculum schemas', () => {
       title: 'English Advanced',
       display_title: 'English Advanced',
       slug: 'english_advanced',
-      unit_ids: ['unit_aotfw'],
+      unit_ids: ['unit_lkeep'],
       outcome_ids: [],
       class_ids: [],
       status: 'active',
@@ -86,13 +86,13 @@ describe('curriculum schemas', () => {
 
   it('parses unit with year_id, subject_id, and lesson_ids', () => {
     const unit = UnitSchema.parse({
-      id: 'unit_aotfw',
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'Artist of the Floating World',
+      title: 'The Lantern Keeper',
       slug: 'artist_of_the_floating_world',
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
-      lesson_ids: ['lesson_aotfw_001', 'lesson_aotfw_002', 'lesson_aotfw_003'],
+      lesson_ids: ['lesson_lkeep_001', 'lesson_lkeep_002', 'lesson_lkeep_003'],
       status: 'active',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
@@ -111,7 +111,7 @@ describe('curriculum schemas', () => {
       display_title: 'Year 12 English Advanced',
       slug: 'english_advanced',
       scope_id: 'scope_y12_engadv_2026',
-      unit_ids: ['unit_aotfw'],
+      unit_ids: ['unit_lkeep'],
       outcome_ids: [],
       class_ids: [],
       status: 'active',
@@ -124,21 +124,21 @@ describe('curriculum schemas', () => {
 
   it('accepts optional description and primary_term on unit', () => {
     const unit = UnitSchema.parse({
-      id: 'unit_aotfw',
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'Artist of the Floating World',
+      title: 'The Lantern Keeper',
       slug: 'artist_of_the_floating_world',
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
       primary_term: 2,
-      description: 'A study of Ishiguro',
-      lesson_ids: ['lesson_aotfw_001'],
+      description: 'A study of Calder',
+      lesson_ids: ['lesson_lkeep_001'],
       status: 'active',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
       schema_version: 1
     });
     expect(unit.primary_term).toBe(2);
-    expect(unit.description).toBe('A study of Ishiguro');
+    expect(unit.description).toBe('A study of Calder');
   });
 });

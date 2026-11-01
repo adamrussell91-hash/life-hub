@@ -19,8 +19,8 @@ function row(id: string, title: string, excerpt: string, unit_id = 'u1'): Lesson
 describe('near-duplicate lessons', () => {
   it('pairs lessons with highly overlapping titles and excerpts', () => {
     const pairs = findNearDuplicates([
-      row('a', 'Introduction to Ono', 'Guilt and memory in an artist of the floating world'),
-      row('b', 'Intro to Ono', 'Guilt and memory in an artist of the floating world'),
+      row('a', 'Introduction to Hale', 'Guilt and memory in an the lantern keeper'),
+      row('b', 'Intro to Hale', 'Guilt and memory in an the lantern keeper'),
       row('c', 'Hamlet essay', 'Revenge tragedy and delay in Elsinore')
     ]);
     expect(pairs).toHaveLength(1);
