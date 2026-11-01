@@ -460,3 +460,6 @@ body.spractice-open { overflow: hidden; }
   .sdd-pair { grid-template-columns: minmax(0, 1fr); }
   .sdd-vs { justify-self: center; }
 }
+.sdd-wait { margin-top: 6px; padding: 10px 14px; border-radius: 12px; background: var(--pastel-lilac, #ece6fb); color: var(--pastel-lilac-ink, #3b2a7a); display: grid; gap: 4px; }
+.sdd-wait h4, .sdd-wait p { margin: 0; }
+.sdd-wait__count { font-weight: 700; }

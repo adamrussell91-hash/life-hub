@@ -469,7 +469,9 @@ async function studentView(store, lessonId, config, who, group) {
     chosen: chosenIdea ? { id: chosenIdea.id, title: chosenIdea.title, idea: chosenIdea.idea } : null,
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
     parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid), assigned: list(state.claims[p.id]).map((x) => memberKey(lessonId, x)) })),
-    members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid })),
+    // `done`: finished their Decide head-to-heads, so the group can see who it is waiting on.
+    members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid, done: list(state.voted).includes(x) })),
+    decider: config.decider === 'top_vote' ? 'top_vote' : 'teacher',
     assemble: !!config.assemble,
     assembler: state.assembler && group.students.includes(state.assembler) ? { key: memberKey(lessonId, state.assembler), initials: initials.get(state.assembler) ?? '–', me: state.assembler === sid } : null,
     group_parts: open.includes('prototype') ? await groupParts(store, lessonId, config, group, state, initials, sid) : null,
@@ -841,6 +843,8 @@ async function teacherBoard(store, lessonId, groupId) {
   return {
     group: { id: g.id, name: g.name },
     awaiting: state.awaiting ?? null,
+    // Who has finished Decide's head-to-heads and who is still going.
+    voted: { done: g.students.filter((x) => list(state.voted).includes(x)).map(name), waiting: g.students.filter((x) => !list(state.voted).includes(x)).map(name) },
     question: state.question ?? null,
     chosen: state.chosen ?? null,
     notes,

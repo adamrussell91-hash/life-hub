@@ -177,3 +177,11 @@ test('the group picks an assembler in Decide; in Prototype everyone sees every p
   v = await act(store, 2, 'pitch', { link: 'https://example.com/finished' });
   assert.equal(v.pitch.link, 'https://example.com/finished');
 });
+
+test('members say who has finished their head-to-heads', async () => {
+  const store = await atDecide({ ...CONFIG(), decider: 'teacher' });
+  const s = await act(store, 1, 'status');
+  assert.equal(s.decider, 'teacher');
+  const v = await act(store, 1, 'save', { phase: 'decide', payload: duelsFor(s, 'Baker') });
+  assert.deepEqual(v.members.map((m) => [m.initials, m.done]), [['AB', true], ['CD', false]]);
+});

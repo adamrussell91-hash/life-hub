@@ -30,14 +30,14 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   root.append(purpose(voting, pool.length));
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? duelProblems(state.duels, ids) : []),
-    ...(!s.chosen ? ['Your picks are saved. Submit once your group’s idea is chosen and every part has someone.'] : []),
+    ...(!s.chosen ? ['Nothing to submit yet. Your picks save as you go. Once your group’s idea is chosen, a step to plan the parts opens here; submit after that.'] : []),
     ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
     ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
   ]);
 
   if (voting) {
     const ranking = el('div', 'sdd-rank');
-    const paintRanking = () => ranking.replaceChildren(...myRanking(state.duels, pool, label, ctx));
+    const paintRanking = () => ranking.replaceChildren(...myRanking(state.duels, pool, label, ctx), waiting(s, duelsDone(state.duels, ids)));
     root.append(duelArena(ctx, state, pool, label, () => { paintRanking(); bar.changed(); }));
     paintRanking();
     root.append(ranking);
@@ -233,7 +233,32 @@ function myRanking(duels: Duel[], pool: GalleryIdea[], label: Map<string, string
     li.append(body);
     list.append(li);
   });
-  return [list, el('p', 'sprint-note', 'When everyone in your group has finished, the idea with the most wins across the group is the one you build. If you all have the same 1st, that’s your winner. You can go back and change a match-up until then.')];
+  return [list, el('p', 'sprint-note', 'You can go back and change a match-up until everyone has finished.')];
+}
+
+/**
+ * What the group is waiting on before its idea is chosen, and what comes
+ * next: who is still doing their match-ups, then who settles the idea, then
+ * the parts step.
+ */
+function waiting(s: SprintStatus, meDone: boolean): HTMLElement {
+  const box = el('section', 'sdd-wait');
+  box.append(el('h4', '', 'What happens next'));
+  if (s.awaiting?.kind === 'question') {
+    box.append(el('p', '', 'Your teacher still has to confirm your group’s problem. Your picks are saved, and nothing else is needed from you for now.'));
+    return box;
+  }
+  const members = s.members ?? [];
+  const done = members.filter((m) => (m.me ? meDone : m.done));
+  const still = members.filter((m) => !(m.me ? meDone : m.done));
+  if (members.length) box.append(el('p', 'sdd-wait__count', still.length
+    ? `${done.length} of ${members.length} in your group have finished. Still going: ${still.map((m) => (m.me ? `${m.initials} (you)` : m.initials)).join(', ')}.`
+    : 'Everyone in your group has finished.'));
+  box.append(el('p', '', s.decider === 'top_vote'
+    ? 'When everyone has finished, the idea with the most wins across your group is chosen. If you all have the same 1st, that’s your winner.'
+    : 'When everyone has finished, your teacher confirms the idea with the most wins across your group.'));
+  box.append(el('p', '', 'Then a new step opens on this page: list the parts of the prototype and give each part to someone by their initials.'));
+  return box;
 }
 
 /** After voting: the group's idea, its top three, and which idea was strongest in each criterion. */

@@ -52,7 +52,8 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     root.append(q);
 
     const g = el('div', 'sboard__part');
-    g.append(el('h3', '', 'Gallery'), el('p', 'sprint-note', b.chosen ? 'The idea is chosen.' : b.awaiting?.kind === 'idea' ? 'Voting has closed. Choose the idea.' : 'Votes are open.'));
+    g.append(el('h3', '', 'Gallery'), el('p', 'sprint-note', b.chosen ? 'The idea is chosen.' : b.awaiting?.kind === 'idea' ? 'Voting has closed. Choose the idea.' : b.awaiting?.kind === 'question' ? 'Decide waits until you confirm the group’s problem in Understand.' : 'Head-to-heads are open. To move the group on without waiting, pick an idea.'));
+    if (!b.chosen && b.voted) g.append(el('p', 'sprint-note', `Finished their match-ups: ${b.voted.done.join(', ') || 'no one yet'}. Still going: ${b.voted.waiting.join(', ') || 'no one'}.`));
     for (const set of b.gallery) {
       g.append(el('p', 'kit-label', set.name));
       for (const i of set.ideas) {
