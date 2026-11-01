@@ -82,10 +82,23 @@ export function prototypeProblems(
   valueCheck = true,
   myParts: readonly { id: string; text: string }[] = []
 ): string[] {
+  return [...prototypeBuildProblems(p, myParts), ...prototypeRateProblems(p, criteria, requirements, valueCheck)];
+}
+
+/** Prototype's Build step: every part has something in it. */
+export function prototypeBuildProblems(p: PhasePayload['prototype'], myParts: readonly { id: string; text: string }[] = []): string[] {
+  if (myParts.length > 1) return myParts.filter((part) => !builtSomething(partBuild(p, part.id))).map((part) => `Build “${part.text}”: write it, upload a file or add a link.`);
+  return builtSomething(p) ? [] : ['Add your part: write it, upload a file or add a link.'];
+}
+
+/** Prototype's Rate step: requirements, the criteria and the check question. */
+export function prototypeRateProblems(
+  p: PhasePayload['prototype'],
+  criteria: readonly Pick<SprintCriterion, 'id' | 'text'>[],
+  requirements: readonly SprintRequirement[],
+  valueCheck = true
+): string[] {
   const out: string[] = [];
-  if (myParts.length > 1) {
-    for (const part of myParts) if (!builtSomething(partBuild(p, part.id))) out.push(`Build “${part.text}”: write it, upload a file or add a link.`);
-  } else if (!builtSomething(p)) out.push('Add your part: write it, upload a file or add a link.');
   for (const r of requirements.filter((x) => x.phases.includes('prototype'))) if (!p.requirements[r.id]?.trim()) out.push(`Say where your part meets "${r.text}".`);
   for (const c of criteria) if (!p.self[c.id] || !fullSentence(p.self_why[c.id])) out.push(`${crit(c)}: pick Starting, Showing or Strong and say why.`);
   if (valueCheck && !fullSentence(p.value_answer)) out.push('Answer the check question in a full sentence.');

@@ -178,6 +178,20 @@ describe('prototype form', () => {
     expect((c.drafts as { prototype?: { builds: Record<string, { text: string }> } }).prototype?.builds.p1?.text).toBe('The baker at dawn.');
   });
 
+  it('the checks sit under the step where each is done, with a button that opens it', () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [{ id: 'p1', text: 'Panel text', shows: 'The morning', criterion: 'c1', claimed: 1, mine: true }] });
+    const f = mountPrototype(ctx(s, 'prototype'));
+    document.body.append(f.el);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    const heads = [...f.el.querySelectorAll('.sprint-checks__head strong')].map((h) => h.textContent);
+    expect(heads).toEqual(['Step 2 · Build it', 'Step 4 · Rate your part']);
+    const go = [...f.el.querySelectorAll<HTMLButtonElement>('.sprint-checks__head button')].find((b) => b.textContent === 'Go to step 4')!;
+    go.click();
+    const cards = [...f.el.querySelectorAll<HTMLElement>('.su-step')];
+    expect(cards.map((c) => c.hidden)).toEqual([true, true, true, false]);
+    f.el.remove();
+  });
+
   it('a groupmate’s save updates the parts list in place and keeps the step', () => {
     const row = (inn: boolean) => ({ part_id: 'p1', part: 'Panel text', who: 'CD', me: false, text: 'Dawn.', link: '', files: [], in: inn, started: true });
     const a = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, group_parts: [row(false)] });

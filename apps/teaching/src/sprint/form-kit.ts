@@ -30,6 +30,9 @@ export type FormContext = {
   /** The step each phase was on, so a rebuilt form opens where the student was, not at step 1. */
   steps?: Partial<Record<SprintPhaseKey, number>>;
 };
+/** A check, and optionally where its fix is: a selector inside the form, so the list can name the step and go there. */
+export type Problem = string | { text: string; at: string };
+
 /** `update` takes a polled status without a rebuild (a form that shows live group state). */
 export type PhaseForm = { el: HTMLElement; dispose(): void; update?(next: SprintStatus): void };
 
@@ -102,7 +105,7 @@ export function valueCheckField(ctx: FormContext, value: string, onInput: (v: st
  * checks. Class work is saved to the server, so ending the class part
  * submits what is there.
  */
-export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, payload: () => PhasePayload[P], problems: () => string[]): { el: HTMLElement; changed(): void; dispose(): void } {
+export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, payload: () => PhasePayload[P], problems: () => Problem[]): { el: HTMLElement; changed(): void; dispose(): void } {
   const bar = el('div', 'sprint-submit');
   const list = el('ul', 'sprint-checks');
   const note = el('p', 'sprint-submit__note');
@@ -148,7 +151,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   };
   const check = () => {
     const p = problems();
-    list.replaceChildren(...p.map((t) => el('li', '', t)));
+    list.replaceChildren(...checkList(bar.closest<HTMLElement>('.sprint-form') ?? bar.parentElement, p));
     return p;
   };
   const go = button('Check and submit', 'primary', () => {
@@ -174,6 +177,41 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
       void ctx.client.save(phase, payload()).catch(() => {});
     }
   };
+}
+
+/**
+ * The checks as list items. Checks that say where they are go under their
+ * step ("Step 4 · Rate your part") with a button that opens that step.
+ */
+function checkList(form: HTMLElement | null, problems: Problem[]): HTMLElement[] {
+  const cards = form ? [...form.querySelectorAll<HTMLElement>('.su-step')] : [];
+  const out: HTMLElement[] = [];
+  let lastCard: HTMLElement | null = null;
+  let lastList = el('ul');
+  for (const p of problems) {
+    const text = typeof p === 'string' ? p : p.text;
+    const card = typeof p === 'string' ? null : (form?.querySelector(p.at)?.closest<HTMLElement>('.su-step') ?? null);
+    const n = card ? cards.indexOf(card) + 1 : 0;
+    if (!card || !n) { lastCard = null; out.push(el('li', '', text)); continue; }
+    if (lastCard !== card) {
+      const li = el('li', 'sprint-checks__step');
+      const head = el('div', 'sprint-checks__head');
+      head.append(el('strong', '', `Step ${n} · ${card.querySelector('h3')?.textContent ?? ''}`), button(`Go to step ${n}`, 'ghost', () => openStep(form!, card, n)));
+      lastCard = card;
+      lastList = el('ul');
+      li.append(head, lastList);
+      out.push(li);
+    }
+    lastList.append(el('li', '', text));
+  }
+  return out;
+}
+
+/** Open a step card: its rail dot when the steps are slides, else scroll to it. */
+function openStep(form: HTMLElement, card: HTMLElement, n: number): void {
+  const dot = form.querySelector<HTMLButtonElement>(`.su-rail__dot[aria-label^="Step ${n}:"]`);
+  if (dot) dot.click();
+  (dot ?? card).scrollIntoView?.({ block: 'start', behavior: 'smooth' });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { button, el } from '@/quiz/dom';
-import { prototypeProblems } from './checks';
+import { prototypeBuildProblems, prototypeRateProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
 import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
 import { LEVEL_LABELS, builtSomething, type Level, type PhasePayload, type PrototypeBuild } from './schema';
@@ -31,7 +31,10 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
     brief.append(card);
   }
   root.append(brief);
-  const bar = submitBar(ctx, 'prototype', () => state, () => prototypeProblems(state, ctx.sprint.criteria, ctx.sprint.requirements, !!ctx.valueCheck, myParts));
+  const bar = submitBar(ctx, 'prototype', () => state, () => [
+    ...prototypeBuildProblems(state, myParts).map((text) => ({ text, at: '.sprint-build' })),
+    ...prototypeRateProblems(state, ctx.sprint.criteria, ctx.sprint.requirements, !!ctx.valueCheck).map((text) => ({ text, at: '.sprint-self' }))
+  ]);
   const err = el('p', 'sprint-submit__err');
   // Two or more parts: each is built and submitted on its own, so nothing is copied across parts.
   if (myParts.length > 1) {
