@@ -146,9 +146,11 @@ async function loadDirectory(): Promise<DirectoryPersonRow[]> {
 export async function renderMeetingPage(
   canvas: HTMLElement,
   id: string,
-  options: { isCurrent: () => boolean; onTitleReady: (title: string) => void }
+  options: { isCurrent: () => boolean; onTitleReady: (title: string) => void; meeting?: MeetingRecord }
 ): Promise<void> {
   if (!options.isCurrent()) return;
+  // A record just saved wins over a read that may not have caught up; the read adds task links.
+  const { meeting: saved, ...routeOptions } = options;
   showViewLoading(canvas, 'Loading…');
   const meetingRef = `professional:meeting:${id}`;
   let record: MeetingRecord;
@@ -158,7 +160,7 @@ export async function renderMeetingPage(
   let ledger: LedgerItem[];
   try {
     const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult, loadedSelf] = await Promise.all([
-      getMeeting(id),
+      getMeeting(id).then((result) => (saved ? { meeting: { ...result.meeting, ...saved } } : result)),
       loadAttendees(meetingRef),
       loadDirectory(),
       listLedgerForSources([meetingRef]),
@@ -172,13 +174,13 @@ export async function renderMeetingPage(
     ledger = ledgerResult.items;
   } catch (err) {
     if (!options.isCurrent()) return;
-    renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, options));
+    renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, routeOptions));
     return;
   }
   if (!options.isCurrent()) return;
   options.onTitleReady(record.title);
 
-  const reload = () => renderMeetingPage(canvas, id, options);
+  const reload = () => renderMeetingPage(canvas, id, { ...routeOptions, meeting: record });
   let people = attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name }));
   let manual = false;
   let phase: CommPhase = 'after';
@@ -1078,7 +1080,8 @@ function organisationPicker(
   attendee: Attendee,
   onPick: (attendee: Attendee, organisationRef: string) => Promise<void>
 ): { toggle: HTMLButtonElement; panel: HTMLElement } {
-  const toggle = el('button', 'quiet-link room__job-toggle', 'Here for…') as HTMLButtonElement;
+  const current = person.organisationChoices.find((org) => org.ref === person.organisationRef);
+  const toggle = el('button', 'quiet-link room__job-toggle', current ? `Here for ${current.display_name}` : 'Here for…') as HTMLButtonElement;
   toggle.type = 'button';
   toggle.dataset.part = 'room-job-toggle';
   toggle.setAttribute('aria-expanded', 'false');

@@ -36,6 +36,8 @@ import {
 } from './professional-entity-links.mjs';
 
 const LIST_BATCH_SIZE = 10;
+// One meeting read just after a save must see that save, or an edit writes the old record back.
+const STRONG = { consistency: 'strong' };
 
 function validationError(code, message) {
   return Object.assign(new Error(message), { status: 400, code });
@@ -95,7 +97,7 @@ export function createMeetingRepository(deps = {}) {
 
   async function getMeeting(id) {
     if (!isValidMeetingId(id)) throw notFound();
-    const record = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
+    const record = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!record) throw notFound();
     const journal = await loadOpenJournalForMeeting(id);
     return projectMeeting(record, simplifyIncomplete(journal));
@@ -292,7 +294,7 @@ export function createMeetingRepository(deps = {}) {
   async function updateMeeting(id, patchInput) {
     assertNoAccessFields(patchInput);
     const patch = validateMeetingFieldUpdate(patchInput);
-    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
+    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!existing) throw notFound();
     const updated = { ...existing, ...patch, updated_at: now() };
     await setJSON(professionalStore, meetingKey(id), updated);
@@ -302,7 +304,7 @@ export function createMeetingRepository(deps = {}) {
   }
 
   async function transitionState(id, nextState) {
-    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
+    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!existing) throw notFound();
     assertMeetingStateTransition(existing.state, nextState);
     const updated = { ...existing, state: nextState, updated_at: now() };
@@ -314,7 +316,7 @@ export function createMeetingRepository(deps = {}) {
   async function rescheduleMeeting(id, input) {
     assertNoAccessFields(input);
     const validated = validateMeetingRescheduleInput(input);
-    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
+    const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!existing) throw notFound();
     assertMeetingStateTransition(existing.state, 'rescheduled');
     const changedAt = now();
@@ -341,7 +343,7 @@ export function createMeetingRepository(deps = {}) {
 
   async function retryLinks(id) {
     if (!isValidMeetingId(id)) throw notFound();
-    const record = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
+    const record = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!record) throw notFound();
     const journal = await loadOpenJournalForMeeting(id);
     if (!journal || journal.status === 'committed') {

@@ -123,6 +123,23 @@
   color: var(--pastel-sage-ink);
 }
 
+/* Name, role, warmth and remove share a line; "Here for" sits on its own line under them. */
+.room__person:has(.room__job-toggle)::after {
+  content: '';
+  order: 1;
+  flex-basis: 100%;
+  height: 0;
+}
+
+.room__job-toggle {
+  order: 2;
+  margin-left: calc(1.5rem + var(--space-2));
+  max-width: calc(100% - 1.5rem - var(--space-2));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .room__job {
   padding: var(--space-1) 0 var(--space-2) calc(1.5rem + var(--space-2));
 }
