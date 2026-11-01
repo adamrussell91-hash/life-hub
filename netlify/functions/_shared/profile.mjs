@@ -8,6 +8,7 @@
  * from profile-feedback.mjs, from returned work only.
  */
 import { isSafeId } from './class-examples.mjs';
+import { isDeletedRecord } from './record-liveness.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
@@ -19,16 +20,22 @@ import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
-/** The class's current unit, lessons in unit order with their route role. */
+/**
+ * The class's current unit, lessons in unit order with their route role. A trashed unit is
+ * skipped for the next one the class has, even while the class still names it.
+ */
 async function unitLessons(store, cls) {
-  const unitId = cls.current_unit_id || (cls.active_unit_ids ?? [])[0];
-  const unit = isSafeId(unitId) ? await read(store, unitKey(unitId)) : null;
+  let unit = null;
+  for (const unitId of [cls.current_unit_id, ...(cls.active_unit_ids ?? [])]) {
+    const found = isSafeId(unitId) ? await read(store, unitKey(unitId)) : null;
+    if (found && !isDeletedRecord(found)) { unit = found; break; }
+  }
   const lessons = [];
   for (const id of unit?.lesson_ids ?? []) {
     if (!isSafeId(id)) continue;
     const [lesson, published] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
-    // Students only ever see lessons that are published.
-    if (lesson && published && lesson.title && !lesson.deleted_at) lessons.push(lesson);
+    // Students only ever see lessons that are published and not trashed.
+    if (lesson && published && lesson.title && !isDeletedRecord(lesson)) lessons.push(lesson);
   }
   return { unit, lessons };
 }

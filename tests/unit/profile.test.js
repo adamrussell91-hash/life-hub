@@ -76,6 +76,18 @@ test('next is the first core lesson not yet done', async () => {
   assert.equal((await profileAction(s, 'class1', { class_token: token(1) })).map.next, 'l2');
 });
 
+test('a trashed current unit and trashed lessons never reach the map', async () => {
+  const s = storeFixture([
+    ['classes/class1', { ...cls([{ name: 'Bob Brown' }]), active_unit_ids: ['unit1', 'unit2'] }],
+    ['units/unit1', { id: 'unit1', title: 'Old demo', status: 'trashed', lesson_ids: ['old1'] }],
+    ['units/unit2', { id: 'unit2', title: 'Poetry', lesson_ids: ['l1', 'l2'] }],
+    lesson('old1', 'Dead lesson'), lesson('l1', 'One'), lesson('l2', 'Gone', { status: 'trashed' })
+  ]);
+  await claimInitials(s, await loadRoster(s, 'class1'), token(1), 'BB');
+  const out = await profileAction(s, 'class1', { action: 'status', class_token: token(1) });
+  assert.deepEqual(out.map.lessons.map((l) => l.id), ['l1']);
+});
+
 test('the payload never carries scores, bands, counts or another student', async () => {
   const s = await fixture();
   const out = JSON.stringify(await profileAction(s, 'class1', { action: 'status', class_token: token(1) }));
