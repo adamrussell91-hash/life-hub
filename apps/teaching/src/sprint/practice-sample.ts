@@ -1,5 +1,6 @@
 import type { SprintClient, SprintStatus } from './api';
 import type { Part, PhasePayload, PublicSprint, SprintPhaseKey } from './schema';
+import { pairsOf } from './rules';
 
 /**
  * Practice runs only: a sample answer for one phase that passes that phase's
@@ -77,18 +78,11 @@ async function samplePayload(
       if (free && me && !parts.some((p) => p.mine)) status = await client.assign(free.id, [...(free.assigned ?? []), me.key].slice(-((status.members?.length ?? 0) > parts.length ? 2 : 1)));
       if (status.assemble && !status.assembler && me) status = await client.setAssembler(me.key);
     }
-    const sets = status.gallery ?? [];
-    const ideas = sets.flatMap((s) => s.ideas);
-    const idea = ideas[0]?.id ?? '';
-    const dots = ideas.flatMap((i) => (['idea', 'answers', 'evidence'] as const).filter((p) => i[p]?.trim()).map((part) => ({ idea: i.id, part, note: '' }))).slice(0, status.dots ?? 0);
+    // Sample classmates rank the ideas in pool order: the first idea beats the rest, and so on.
+    const ids = (status.pool ?? []).map((i) => i.id);
+    const duels = pairsOf(ids).map(([a, b]) => ({ a, b, winner: a, stronger: criteria.slice(0, 1), why: '' }));
     return {
-      payload: {
-        votes: idea ? Object.fromEntries(criteria.map((c) => [c, idea])) : {},
-        reasons: Object.fromEntries(criteria.map((c) => [c, 'This idea meets the criterion most clearly.'])),
-        opened: sets.map((s) => s.id),
-        stretch: '',
-        dots
-      },
+      payload: { duels, votes: {}, reasons: {}, opened: [], stretch: '', dots: [] },
       status
     };
   }

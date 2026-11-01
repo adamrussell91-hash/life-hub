@@ -1,4 +1,5 @@
-import type { FeedbackEntry, Part, PhasePayload, SprintCriterion, SprintRequirement, UnderstandStep } from './schema';
+import type { Duel, FeedbackEntry, Part, PhasePayload, SprintCriterion, SprintRequirement, UnderstandStep } from './schema';
+import { pairKey, pairsOf } from './rules';
 
 /**
  * "Check before you submit": short, kind nudges that say what to add.
@@ -58,17 +59,14 @@ export function sketchProblems(
   return out;
 }
 
-export function voteProblems(
-  p: Pick<PhasePayload['decide'], 'votes' | 'reasons' | 'opened'>,
-  criteria: readonly Pick<SprintCriterion, 'id' | 'text'>[],
-  sets: readonly string[]
-): string[] {
+/** Every pair has a winner and at least one "stronger in" criterion. */
+export function duelProblems(duels: readonly Duel[], ideas: readonly string[]): string[] {
   const out: string[] = [];
-  if (sets.some((s) => !p.opened.includes(s))) out.push('Open every set of ideas before you vote.');
-  for (const c of criteria) {
-    if (!p.votes[c.id]) out.push(`Give ${crit(c)} to one idea.`);
-    else if (!fullSentence(p.reasons[c.id])) out.push(`${crit(c)}: say why in a full sentence.`);
-  }
+  const pairs = pairsOf(ideas);
+  const left = pairs.filter(([a, b]) => !duels.some((d) => pairKey(d.a, d.b) === pairKey(a, b) && (d.winner === d.a || d.winner === d.b))).length;
+  if (left) out.push(`Pick a winner in every match-up. ${left} of ${pairs.length} still to do.`);
+  const bare = duels.filter((d) => d.winner && !d.stronger.length).length;
+  if (bare) out.push(`Say what the winner is stronger in for ${bare === 1 ? 'one match-up' : `${bare} match-ups`}.`);
   return out;
 }
 

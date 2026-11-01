@@ -1,6 +1,6 @@
 // apps/teaching/tests/unit/sprint-checks.test.ts
 import { describe, it, expect } from 'vitest';
-import { fullSentence, sketchProblems, voteProblems, partsProblems, prototypeProblems, feedbackProblems, reflectionProblems } from '@/sprint/checks';
+import { fullSentence, sketchProblems, duelProblems, partsProblems, prototypeProblems, feedbackProblems, reflectionProblems } from '@/sprint/checks';
 
 const card = (over = {}) => ({
   id: 'k1', title: 'What the ash kept', idea: 'What if the panel showed five objects?', answers: 'Ordinary objects make the town feel close to us.',
@@ -35,11 +35,12 @@ describe('sprint checks', () => {
     expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1), strongest: '' }, { ideas: 1, requirements: reqs })).toEqual([]);
   });
 
-  it('checks votes: every set opened, a vote and a reason per criterion', () => {
-    const crit = [{ id: 'c1', text: 'Uses sources' }];
-    expect(voteProblems({ votes: { c1: 'A' }, reasons: { c1: 'It names the loaf and the graffiti.' }, opened: ['s1', 's2'] }, crit, ['s1', 's2'])).toEqual([]);
-    expect(voteProblems({ votes: {}, reasons: {}, opened: ['s1'] }, crit, ['s1', 's2'])).toEqual(['Open every set of ideas before you vote.', 'Give "Uses sources" to one idea.']);
-    expect(voteProblems({ votes: { c1: 'A' }, reasons: { c1: 'best' }, opened: ['s1', 's2'] }, crit, ['s1', 's2'])).toEqual(['"Uses sources": say why in a full sentence.']);
+  it('checks head-to-heads: a winner in every pair, and what it is stronger in', () => {
+    const ids = ['A', 'B', 'C'];
+    const d = (a: string, b: string, stronger = ['c1']) => ({ a, b, winner: a, stronger, why: '' });
+    expect(duelProblems([d('A', 'B'), d('C', 'A'), d('B', 'C')], ids)).toEqual([]);
+    expect(duelProblems([d('A', 'B')], ids)).toEqual(['Pick a winner in every match-up. 2 of 3 still to do.']);
+    expect(duelProblems([d('A', 'B', []), d('A', 'C'), d('B', 'C', [])], ids)).toEqual(['Say what the winner is stronger in for 2 match-ups.']);
   });
 
   it('checks parts link to a criterion', () => {

@@ -1,7 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import { deviceToken } from '@/quiz/dom';
-import type { Dot, FeedbackEntry, IdeaPart, Level, LimitBox, Part, PhasePayload, SprintPhaseKey } from './schema';
+import type { Dot, Duel, FeedbackEntry, Level, LimitBox, Part, PhasePayload, SprintPhaseKey } from './schema';
 
 // ---------------------------------------------------------------- student
 
@@ -11,6 +11,11 @@ export type PhaseRow = {
 };
 export type GalleryIdea = { id: string; index?: number; title: string; idea: string; answers: string; evidence: string; file: string | null; strongest: boolean };
 export type GallerySet = { id: string; ideas: GalleryIdea[] };
+export type DecideResults = {
+  ranking: Array<{ id: string; title: string }>;
+  best_at: Array<{ criterion: string; ideas: Array<{ id: string; title: string; idea: string }> }>;
+  unanimous: boolean;
+};
 export type HeatLevel = 0 | 1 | 2 | 3;
 export type Stacked = { text: string; count: number };
 /** The group's shared Understand space. */
@@ -35,6 +40,10 @@ export type SprintStatus = {
   notes?: Array<{ id: string; text: string; mine: boolean }>;
   question?: { text: string } | null;
   gallery?: GallerySet[] | null;
+  /** Decide's head-to-heads: each member's strongest idea, no names. */
+  pool?: GalleryIdea[] | null;
+  /** After voting closes: the group's top three by wins, the idea strongest in each criterion, and whether everyone's 1st agreed. */
+  results?: DecideResults | null;
   heat?: Record<string, Record<string, HeatLevel>> | null;
   votes_closed?: boolean;
   chosen?: { id: string; title: string; idea: string } | null;
@@ -49,11 +58,6 @@ export type SprintStatus = {
   assembler?: { key: string; initials: string; me: boolean } | null;
   /** Prototype: every part, who is doing it and what they have saved so far. */
   group_parts?: Array<{ part_id: string; part: string; who: string; me: boolean; text: string; link: string; files: Array<{ id: string; name: string }>; in: boolean; started: boolean }> | null;
-  /** Stand-out dots each student places in Decide; 0 means none. */
-  dots?: number;
-  /** After voting closes: dots per part of each idea, and the most-dotted parts of ideas not chosen. */
-  dot_counts?: Record<string, Record<IdeaPart, number>> | null;
-  borrow?: Array<{ idea_id: string; title: string; part: IdeaPart; text: string; count: number; notes: string[] }> | null;
   pitch?: { kind: 'file' | 'link'; name: string; file: string | null; link: string } | null;
   spotlight?: { text: string; label: string } | null;
   round?: { group_id: string; group_name: string; sent: boolean } | null;
@@ -160,7 +164,7 @@ export type GroupBoard = {
   gallery: Array<{ id: string; name: string; student_id: string; ideas: GalleryIdea[] }>;
   totals: Record<string, number>;
   heat: Record<string, Record<string, HeatLevel>>;
-  reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[] }>;
+  reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[]; duels?: Duel[]; ranked?: string[] }>;
   parts: Array<Part & { by: string[] }>;
   pitch: { kind: 'file' | 'link'; file?: string; link?: string; name?: string; by: string } | null;
   assembler?: string | null;

@@ -13,7 +13,7 @@ import { QuizError, deviceHash, read, reject } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
 import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema, UnderstandSettingsSchema, LIMIT_BOXES } from './sprint-schema.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
-import { openPhases, lockState, isFrozen, isLate, tally, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
+import { openPhases, lockState, isFrozen, isLate, tally, duelTally, rankIdeas, duelsDone, pairKey, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
 import { sprintKeys, emptyGroup, emptyLock } from './sprint-keys.mjs';
 
 export { QuizError as SprintError };
@@ -242,34 +242,47 @@ function stack(texts) {
 const questionId = (lessonId, text) => short(`${lessonId}:q:${norm(text)}`);
 /** A group member as other members see them: a key that names no one, and their initials. */
 const memberKey = (lessonId, student) => short(`${lessonId}:member:${student}`);
-/** Stand-out dots each student places in Decide (sprints published before dots have none). */
-const dotsOf = (config) => (Number.isInteger(config.dots) ? config.dots : 0);
-const IDEA_PART_TEXT = { idea: 'idea', answers: 'answers', evidence: 'evidence' };
+/** What goes head to head in Decide: each member's strongest idea (their first card if none is starred). */
+const poolOf = (gallery) => gallery.map((set) => set.ideas.find((i) => i.strongest) ?? set.ideas[0]).filter(Boolean);
 
 /**
- * After voting closes: how many stand-out dots each part of each idea got,
- * and the most-dotted parts of the ideas that weren't chosen, to borrow.
+ * Decide's tally: head-to-head wins, and for each idea how often it was
+ * "stronger in" each criterion. Ballots from sprints run before head-to-heads
+ * count one vote per criterion, as they always did.
  */
-async function dotResults(store, lessonId, config, group, gallery, chosenId) {
-  const subs = await groupSubs(store, lessonId, config, group, 'decide');
-  const ideas = new Map(gallery.flatMap((set) => set.ideas).map((i) => [i.id, i]));
+function decideTally(subs, config, gallery) {
+  const pool = poolOf(gallery).map((i) => i.id);
+  const all = gallery.flatMap((s) => s.ideas.map((i) => i.id));
+  const duels = subs.map(({ sub }) => list(sub?.payload?.duels)).filter((d) => d.length);
+  const legacy = subs.filter(({ sub }) => !list(sub?.payload?.duels).length).map(({ sub }) => sub?.payload?.votes ?? {});
+  const a = duelTally(duels, config.criteria, pool);
+  const b = tally(legacy, config.criteria, all);
   const counts = {};
-  const notes = {};
-  for (const { sub } of subs) for (const d of list(sub?.payload?.dots)) {
-    if (!ideas.has(d.idea) || !IDEA_PART_TEXT[d.part]) continue;
-    counts[d.idea] = { idea: 0, answers: 0, evidence: 0, ...(counts[d.idea] ?? {}) };
-    counts[d.idea][d.part] += 1;
-    if (d.note?.trim()) (notes[`${d.idea}:${d.part}`] ??= []).push(d.note.trim());
+  const totals = {};
+  for (const id of all) {
+    counts[id] = Object.fromEntries(config.criteria.map((c) => [c, (a.counts[id]?.[c] ?? 0) + (b.counts[id]?.[c] ?? 0)]));
+    totals[id] = (a.totals[id] ?? 0) + (b.totals[id] ?? 0);
   }
-  const borrow = Object.entries(counts)
-    .filter(([id]) => id !== chosenId)
-    .flatMap(([id, parts]) => Object.entries(parts).filter(([, n]) => n > 0).map(([part, n]) => {
-      const idea = ideas.get(id);
-      return { idea_id: id, title: idea.title, part, text: idea[part] ?? '', count: n, notes: notes[`${id}:${part}`] ?? [] };
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  return { counts, borrow };
+  const best = Math.max(0, ...Object.values(totals));
+  const leaders = Object.keys(totals).filter((id) => totals[id] === best);
+  const tie = best > 0 && leaders.length > 1;
+  // Each student's own 1st, so the group can see when everyone agreed.
+  const firsts = duels.map((d) => rankIdeas(d, pool)[0]);
+  return { counts, totals, top: best > 0 && !tie ? leaders[0] : null, tie, firsts, pool };
+}
+
+/** After voting closes: the group's top three by wins, and which idea was strongest in each criterion. */
+function decideResults(t, config, gallery) {
+  const ideas = new Map(gallery.flatMap((s) => s.ideas).map((i) => [i.id, i]));
+  const ranking = Object.entries(t.totals).filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]).slice(0, 3)
+    .map(([id]) => ({ id, title: ideas.get(id)?.title ?? '' }));
+  const bestAt = config.criteria.map((c) => {
+    const most = Math.max(0, ...Object.values(t.counts).map((row) => row[c] ?? 0));
+    const top = most ? Object.keys(t.counts).filter((id) => t.counts[id][c] === most) : [];
+    return { criterion: c, ideas: top.map((id) => ({ id, title: ideas.get(id)?.title ?? '', idea: ideas.get(id)?.idea ?? '' })) };
+  }).filter((x) => x.ideas.length);
+  const unanimous = !!t.top && t.firsts.length > 1 && t.firsts.every((f) => f === t.top);
+  return { ranking, best_at: bestAt, unanimous };
 }
 
 /**
@@ -338,7 +351,7 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
     const gallery = await groupGallery(store, lessonId, config, group, closedAt);
     const ideas = gallery.flatMap((set) => set.ideas.map((i) => i.id));
     const subs = await groupSubs(store, lessonId, config, group, 'decide');
-    const t = tally(subs.map(({ sub }) => sub?.payload?.votes ?? {}), config.criteria, ideas);
+    const t = decideTally(subs, config, gallery);
     next = { ...next, votes_closed_at: closedAt };
     if (config.decider === 'top_vote' && t.top) next.chosen = t.top;
     else next.awaiting = { kind: 'idea', tie: t.tie, empty: ideas.length === 0 };
@@ -435,14 +448,12 @@ async function studentView(store, lessonId, config, who, group) {
   const notes = (await groupNotes(store, lessonId, config, group)).map((n) => ({ id: n.id, text: n.text, mine: n.student === sid }));
   const shared = await groupUnderstand(store, lessonId, config, group, state);
   const gallery = open.includes('decide') ? (await groupGallery(store, lessonId, config, group, state.votes_closed_at)).map(({ id, ideas }) => ({ id, ideas })) : null;
-  let heat = null;
+  let results = null;
   if (state.votes_closed_at && gallery) {
     const subs = await groupSubs(store, lessonId, config, group, 'decide');
-    const t = tally(subs.map(({ sub }) => sub?.payload?.votes ?? {}), config.criteria, gallery.flatMap((s) => s.ideas.map((i) => i.id)));
-    heat = heatLevels(t.counts, config.criteria);
+    results = decideResults(decideTally(subs, config, gallery), config, gallery);
   }
   const chosenIdea = state.chosen && gallery ? gallery.flatMap((s) => s.ideas).find((i) => i.id === state.chosen) ?? null : null;
-  const dotView = state.votes_closed_at && gallery && dotsOf(config) ? await dotResults(store, lessonId, config, group, gallery, state.chosen) : null;
   const view = {
     identity: { need: null, initials: who.student.initials },
     group: { id: group.id, name: group.name, size: group.students.length, mates: group.students.filter((s) => s !== sid).map((s) => initials.get(s) ?? '–') },
@@ -452,7 +463,8 @@ async function studentView(store, lessonId, config, who, group) {
     notes,
     question: state.question ? { text: state.question.text } : null,
     gallery,
-    heat,
+    pool: gallery ? poolOf(gallery) : null,
+    results,
     votes_closed: !!state.votes_closed_at,
     chosen: chosenIdea ? { id: chosenIdea.id, title: chosenIdea.title, idea: chosenIdea.idea } : null,
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
@@ -461,11 +473,8 @@ async function studentView(store, lessonId, config, who, group) {
     assemble: !!config.assemble,
     assembler: state.assembler && group.students.includes(state.assembler) ? { key: memberKey(lessonId, state.assembler), initials: initials.get(state.assembler) ?? '–', me: state.assembler === sid } : null,
     group_parts: open.includes('prototype') ? await groupParts(store, lessonId, config, group, state, initials, sid) : null,
-    dots: dotsOf(config),
     pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null,
     understand_group: shared,
-    dot_counts: dotView?.counts ?? null,
-    borrow: dotView?.borrow ?? null,
     // What the group takes from Understand into the later phases.
     brief: {
       problem: state.question?.text ?? null,
@@ -487,10 +496,7 @@ async function submitProblem(store, lessonId, config, group, sid, phase, payload
   }
   if (phase === 'sketch' && !payload.cards.length) return ['need_ideas', 'Write at least one idea first.'];
   if (phase === 'decide') {
-    if (!config.criteria.every((c) => payload.votes[c])) return ['need_votes', 'Give every criterion to one idea.'];
-    // Fewer parts to dot than dots (a tiny gallery) needs only as many as there are.
-    const dottable = (view.gallery ?? []).flatMap((set) => set.ideas).reduce((n, i) => n + Object.keys(IDEA_PART_TEXT).filter((k) => (i[k] ?? '').trim()).length, 0);
-    if (dotsOf(config) && payload.dots.length < Math.min(dotsOf(config), dottable)) return ['need_dots', `Place all ${dotsOf(config)} stand-out dots.`];
+    if (!view.votes_closed && !duelsDone(payload.duels, (view.pool ?? []).map((i) => i.id))) return ['need_duels', 'Pick a winner in every match-up.'];
     if (!view.parts.some((p) => p.mine)) return ['need_part', 'Your group hasn’t given you a part yet.'];
     if (config.assemble && !view.assembler) return ['need_assembler', 'Pick who puts the prototype together.'];
   }
@@ -543,6 +549,7 @@ export async function sprintAction(store, lessonId, body) {
       const before = prev?.payload?.votes ?? {};
       if (!config.criteria.every((c) => (before[c] ?? '') === (payload.votes[c] ?? ''))) reject(409, 'votes_closed', 'Voting has closed for your group.');
       payload.dots = list(prev?.payload?.dots);
+      payload.duels = list(prev?.payload?.duels);
     }
     const now = clock();
     const next = { ...(prev ?? {}), payload, saved_at: iso(now) };
@@ -562,7 +569,7 @@ export async function sprintAction(store, lessonId, body) {
       state.in = { ...state.in, [phase]: [...list(state.in[phase]), sid] };
       changed = true;
     }
-    if (phase === 'decide' && config.criteria.every((c) => payload.votes[c]) && !list(state.voted).includes(sid)) {
+    if (phase === 'decide' && duelsDone(payload.duels, (view.pool ?? []).map((i) => i.id)) && !list(state.voted).includes(sid)) {
       state.voted = [...list(state.voted), sid];
       changed = true;
     }
@@ -654,7 +661,7 @@ async function roundAction(store, lessonId, config, action, body) {
     await store.setJSON(k.round(g.id), { ...round, entries: { ...round.entries, [body.student_id]: { ...e, status: body.status } } });
   }
 }
-/** Votes name a known criterion and an idea in this group's gallery; opened lists only real set ids. */
+/** Votes and head-to-heads name known criteria and ideas in this group's gallery; opened lists only real set ids. */
 function checkVotes(view, config, payload) {
   const ideas = new Set((view.gallery ?? []).flatMap((s) => s.ideas.map((i) => i.id)));
   const sets = new Set((view.gallery ?? []).map((s) => s.id));
@@ -662,7 +669,14 @@ function checkVotes(view, config, payload) {
     if (!config.criteria.includes(c) || !ideas.has(idea)) reject(400, 'bad_vote', 'That idea has changed. Reload the page.');
   }
   payload.opened = payload.opened.filter((id) => sets.has(id));
-  payload.dots = payload.dots.filter((d) => ideas.has(d.idea)).slice(0, dotsOf(config));
+  payload.dots = [];
+  const pool = new Set((view.pool ?? []).map((i) => i.id));
+  const seen = new Map();
+  for (const d of payload.duels) {
+    if (!pool.has(d.a) || !pool.has(d.b) || d.a === d.b || (d.winner && d.winner !== d.a && d.winner !== d.b)) reject(400, 'bad_vote', 'That idea has changed. Reload the page.');
+    seen.set(pairKey(d.a, d.b), { ...d, stronger: [...new Set(d.stronger.filter((c) => config.criteria.includes(c)))] });
+  }
+  payload.duels = [...seen.values()];
 }
 
 /** The group's shared Understand space: the agreed audience, questions added, picked and sent to the teacher. */
@@ -817,12 +831,12 @@ async function teacherBoard(store, lessonId, groupId) {
   const understand = await groupUnderstand(store, lessonId, config, g, state);
   const gallery = (await groupGallery(store, lessonId, config, g, state.votes_closed_at)).map((set) => ({ id: set.id, name: name(set.student), student_id: set.student, ideas: set.ideas }));
   const decide = await groupSubs(store, lessonId, config, g, 'decide');
-  const t = tally(decide.map(({ sub }) => sub?.payload?.votes ?? {}), config.criteria, gallery.flatMap((s) => s.ideas.map((i) => i.id)));
+  const t = decideTally(decide, config, gallery);
   const subs = {};
   for (const key of ['prototype', 'test']) {
     subs[key] = (await groupSubs(store, lessonId, config, g, key)).map(({ student, sub }) => ({ student_id: student, name: name(student), sub }));
   }
-  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {}, dots: list(sub?.payload?.dots) }));
+  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {}, dots: list(sub?.payload?.dots), duels: list(sub?.payload?.duels), ranked: list(sub?.payload?.duels).length ? rankIdeas(list(sub.payload.duels), t.pool) : [] }));
   const round = (await read(store, k.round(g.id))) ?? null;
   return {
     group: { id: g.id, name: g.name },

@@ -8,11 +8,11 @@ import { newSprintSettings } from '@/sprint/defaults';
 import { publicSprint } from '@/sprint/model';
 
 const sprint = publicSprint({ ...newSprintSettings('c'), criteria: [{ id: 'c1', text: 'Uses sources' }, { id: 'c2', text: 'Why it matters' }] });
-const idea = (id: string, title: string) => ({ id, title, idea: `What if ${title}?`, answers: 'a', evidence: 'e', file: null, strongest: false });
+const idea = (id: string, title: string) => ({ id, title, idea: `What if ${title}?`, answers: 'a', evidence: 'e', file: null, strongest: true });
 const base = (over: Partial<SprintStatus> = {}): SprintStatus => ({
-  identity: { need: null, initials: 'AB' }, group: { id: 'g1', name: 'K', size: 2, mates: [] }, mine: {},
-  gallery: [{ id: 's1', ideas: [idea('i1', 'Ash'), idea('i2', 'Streets')] }, { id: 's2', ideas: [idea('i3', 'Baker')] }],
-  heat: null, votes_closed: false, chosen: null, parts: [], ...over
+  identity: { need: null, initials: 'AB' }, group: { id: 'g1', name: 'K', size: 3, mates: [] }, mine: {},
+  pool: [idea('i1', 'Ash'), idea('i2', 'Streets'), idea('i3', 'Baker')],
+  votes_closed: false, chosen: null, parts: [], ...over
 });
 const row = (key: 'decide' | 'prototype') => ({ key, open: true, due_date: '', due_time: '', state: 'none' as const, late: false, frozen: false, closed: false, count_in: 0 });
 const ctx = (status: SprintStatus, key: 'decide' | 'prototype' = 'decide'): FormContext => ({
@@ -22,62 +22,68 @@ const ctx = (status: SprintStatus, key: 'decide' | 'prototype' = 'decide'): Form
 });
 
 describe('decide form', () => {
-  it('shows every set at once, then one vote per criterion moves between ideas', () => {
+  const winLeft = (f: { el: HTMLElement }) => f.el.querySelector<HTMLButtonElement>('.sdd-idea .sdd-win')!.click();
+  const chip = (f: { el: HTMLElement }, n = 0) => f.el.querySelectorAll<HTMLButtonElement>('.sdd-why .sprint-vote')[n]!.click();
+  const next = (f: { el: HTMLElement }) => [...f.el.querySelectorAll<HTMLButtonElement>('.sdd-nav button')].at(-1)!;
+
+  it('shows two ideas at a time, a winner and what it is stronger in, then the next pair', () => {
     const f = mountDecide(ctx(base()));
-    expect(f.el.querySelectorAll('.sprint-set')).toHaveLength(2);
-    expect(f.el.querySelector('.sd-purpose')?.textContent).toContain('best bits of the best ideas');
-    const chips = [...f.el.querySelectorAll<HTMLButtonElement>('.sprint-vote')].filter((b) => b.dataset.criterion === 'c1');
-    chips[0]!.click();
-    chips[2]!.click();
-    expect(chips.map((c) => c.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+    expect(f.el.querySelector('.sd-purpose')?.textContent).toContain('starred your strongest idea');
+    expect(f.el.querySelectorAll('.sdd-idea')).toHaveLength(2);
+    expect(f.el.querySelector('.sdd-progress__text')?.textContent).toBe('Match-up 1 of 3');
+    expect(next(f).disabled).toBe(true);
+    winLeft(f);
+    expect(f.el.querySelector('.sdd-idea.is-winner')).not.toBeNull();
+    expect(f.el.querySelector('.sdd-why__ask')?.textContent).toContain('is stronger in');
+    expect(next(f).disabled).toBe(true);
+    chip(f);
+    expect(next(f).disabled).toBe(false);
+    next(f).click();
+    expect(f.el.querySelector('.sdd-progress__text')?.textContent).toBe('Match-up 2 of 3');
+    expect(f.el.querySelectorAll('.sdd-pill.is-done')).toHaveLength(1);
     expect(f.el.textContent).not.toMatch(/Ann|AB/);
-    // The second step lists the ideas again and says which one was picked for each criterion.
-    expect(f.el.querySelectorAll('.sd-review__idea').length).toBeGreaterThan(0);
-    expect(f.el.querySelector('.sd-reason__pick')?.textContent).toContain('You picked');
   });
 
-  it('says votes are saved while the group’s idea is still being chosen', () => {
-    const c = ctx(base({ opened: undefined } as never));
+  it('every pair once gives the student a 1st, 2nd and 3rd', () => {
+    const f = mountDecide(ctx(base()));
+    expect(f.el.querySelector('.sdd-rank')?.textContent).toContain('3 to go');
+    for (let n = 0; n < 3; n++) { winLeft(f); chip(f); if (n < 2) next(f).click(); }
+    const rows = [...f.el.querySelectorAll('.sdd-rank .sdd-podium__row')];
+    expect(rows.map((r) => r.querySelector('.sdd-podium__place')?.textContent)).toEqual(['1st', '2nd', '3rd']);
+    expect(rows[0]!.textContent).toContain('Won 2 of 2');
+    expect(rows[0]!.textContent).toContain('stronger in Uses sources ×2');
+  });
+
+  it('asks for every match-up, then says picks are saved while the group’s idea is still being chosen', () => {
+    const c = ctx(base());
     const f = mountDecide(c);
     f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
-    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your votes are saved.');
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Pick a winner in every match-up. 3 of 3 still to do.');
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your picks are saved.');
     expect(c.client.submit).not.toHaveBeenCalled();
   });
 
-  it('after voting shows the chosen idea, the heat and the parts editor', () => {
-    const f = mountDecide(ctx(base({ votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' }, heat: { i1: { c1: 1, c2: 0 }, i2: { c1: 0, c2: 0 }, i3: { c1: 3, c2: 3 } }, parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false }] })));
-    expect(f.el.querySelector('.sprint-chosen')?.textContent).toContain('Baker');
-    expect(f.el.querySelectorAll('.sprint-heat i[data-level="3"]')).toHaveLength(2);
+  it('after voting shows the chosen idea, the top three, the strongest in each criterion and the parts editor', () => {
+    const f = mountDecide(ctx(base({
+      votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' },
+      results: { ranking: [{ id: 'i3', title: 'Baker' }, { id: 'i1', title: 'Ash' }], best_at: [{ criterion: 'c1', ideas: [{ id: 'i1', title: 'Ash', idea: 'What if Ash?' }] }], unanimous: true },
+      parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false }]
+    })));
+    expect(f.el.querySelector('.sprint-chosen')?.textContent).toContain('Everyone in your group picked this idea 1st.');
+    expect([...f.el.querySelectorAll('.sdd-result .sdd-podium__row')].map((r) => r.textContent)).toEqual(['1stIdea C · Baker', '2ndIdea A · Ash']);
+    expect(f.el.querySelector('.sdd-best')?.textContent).toContain('Uses sources: Idea A · Ash');
     expect([...f.el.querySelectorAll<HTMLInputElement>('.sprint-parts input')].map((i) => i.value)).toContain('Panel text');
-    expect(f.el.textContent).not.toMatch(/\b\d+ votes?\b/);
+    expect(f.el.textContent).not.toMatch(/\b\d+ (votes?|wins?)\b/);
   });
 });
 
-describe('decide: stand-out dots and parts', () => {
-  it('places up to the Kit’s dots on parts of any idea, with an optional note, and checks they are all placed', () => {
-    const c = ctx(base({ dots: 2 }));
-    const f = mountDecide(c);
-    const dots = () => [...f.el.querySelectorAll<HTMLButtonElement>('.sd-dot')];
-    expect(dots()).toHaveLength(9);
-    expect(f.el.querySelector('.sd-counter')?.textContent).toBe('Stand-out dots: 0 of 2 placed.');
-    dots()[0]!.click();
-    dots()[5]!.click();
-    expect(f.el.querySelector('.sd-counter')?.textContent).toBe('Stand-out dots: 2 of 2 placed.');
-    expect(dots()[1]!.disabled).toBe(true);
-    const note = dots()[0]!.parentElement!.querySelector<HTMLInputElement>('.sd-note')!;
-    expect(note.hidden).toBe(false);
-    dots()[5]!.click();
-    expect(dots()[1]!.disabled).toBe(false);
-    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
-    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Place all 2 stand-out dots. You have placed 1.');
-  });
-
-  it('gives a part to someone by their initials, says who still needs a part, and adds a borrowed part', () => {
+describe('decide: parts', () => {
+  it('gives a part to someone by their initials, says who still needs a part, and borrows the strongest bit of another idea', () => {
     const status = base({
       votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' },
+      results: { ranking: [], best_at: [{ criterion: 'c2', ideas: [{ id: 'i1', title: 'Ash', idea: 'What if Ash?' }] }], unanimous: false },
       members: [{ key: 'm1', initials: 'AB', me: true }, { key: 'm2', initials: 'CD', me: false }],
-      parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false, assigned: [] }, { id: 'p2', text: 'Artefacts', shows: '', criterion: 'c2', claimed: 1, mine: false, assigned: ['m2'] }],
-      borrow: [{ idea_id: 'i1', title: 'Ash', part: 'evidence', text: 'Source B', count: 2, notes: ['Strong source'] }]
+      parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false, assigned: [] }, { id: 'p2', text: 'Artefacts', shows: '', criterion: 'c2', claimed: 1, mine: false, assigned: ['m2'] }]
     });
     const c = ctx(status);
     (c.client as unknown as { assign: unknown }).assign = vi.fn(async () => status);
@@ -86,9 +92,11 @@ describe('decide: stand-out dots and parts', () => {
     const chip = [...f.el.querySelectorAll<HTMLButtonElement>('.sd-who .sprint-chip')].find((b) => b.textContent === 'AB (you)')!;
     chip.click();
     expect((c.client as unknown as { assign: ReturnType<typeof vi.fn> }).assign).toHaveBeenCalledWith('p1', ['m1']);
-    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('Ash: Source B ●●');
+    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('Why it matters: “Ash”. What if Ash?');
     [...f.el.querySelectorAll<HTMLButtonElement>('.sd-borrow button')][0]!.click();
     expect([...f.el.querySelectorAll<HTMLInputElement>('.sprint-parts input')].map((i) => i.value)).toContain('From "Ash"');
+    const selects = [...f.el.querySelectorAll<HTMLSelectElement>('.sprint-parts select')];
+    expect(selects.map((x) => x.value)).toEqual(['c1', 'c2', 'c2']);
   });
 });
 

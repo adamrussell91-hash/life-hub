@@ -39,7 +39,7 @@ export function evenGroups(students: ReadonlyArray<{ id: string }>, n: number): 
 const PHASE_SUMMARY: Record<SprintPhaseKey, string> = {
   understand: 'Students work out the problem before designing anything: alone first (spot, audience, dig, say it, limits), then together in their group’s space (vote on the problem, one audience, our limits, questions for you, your answers).',
   sketch: 'Alone, at home: the group brief, inspiration to borrow from, rapid ideas against a timer, then their best ideas starred and developed into cards for the group.',
-  decide: 'In class: the anonymous gallery, stand-out dots on what stands out, a vote per criterion with reasons, then the group writes the parts, gives each one out by initials and picks an assembler.',
+  decide: 'In class: each member’s strongest idea goes head to head, two at a time, with no names. Students pick the winner of each pair and what it is stronger in, and see their own 1st, 2nd and 3rd. The most wins across the group picks the idea; then the group writes the parts, gives each one out by initials and picks an assembler.',
   prototype: 'At home: each student builds their part; everyone sees the group’s parts as they come in; the assembler puts them together and uploads the finished prototype.',
   test: 'In class: each group pitches and the class gives feedback on the criteria. At home: a reflection on what their feedback showed.'
 };
@@ -201,10 +201,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
 
     }
     if (key === 'decide') {
-      const dc = card('Decide settings', 'Who confirms each group’s choice (its problem in Understand and its idea here), and the stand-out dots.', 'settings');
+      const dc = card('Decide settings', 'Who confirms each group’s choice: its problem in Understand, and its idea here. With “Most wins goes through”, the idea with the most head-to-head wins is chosen unless two finish level.', 'settings');
       dc.append(
-        selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
-        selectOf([0, 1, 2, 3, 4, 5].map((n) => [String(n), n ? `${n} stand-out ${n === 1 ? 'dot' : 'dots'} each` : 'No stand-out dots']), String(cur.decide_dots ?? 3), (v) => put((d) => { d.decide_dots = Number(v); }, true), 'Stand-out dots')
+        selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Most wins goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides')
       );
     }
     if (key === 'test') {

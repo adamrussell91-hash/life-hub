@@ -73,7 +73,7 @@ var SprintSettingsSchema = z.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z.number().int().min(0).max(30).default(8),
-  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  /** Stand-out dots from before head-to-heads; kept so older Kits still load, no longer used. */
   decide_dots: z.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
@@ -138,10 +138,19 @@ var SketchPayloadSchema = z.object({
 });
 var IDEA_PARTS = ["idea", "answers", "evidence"];
 var DotSchema = z.object({ idea: z.string().max(40), part: z.enum(IDEA_PARTS), note: text(120).default("") });
+var DuelSchema = z.object({
+  a: z.string().max(40),
+  b: z.string().max(40),
+  winner: z.string().max(40),
+  stronger: z.array(z.string().max(40)).max(SPRINT_LIMITS.criteria).default([]),
+  why: text(160).default("")
+});
 var DecidePayloadSchema = z.object({
-  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  /** Head-to-heads between the group's strongest ideas, every pair once. */
+  duels: z.array(DuelSchema).max(66).default([]),
+  /** Stand-out dots from sprints run before head-to-heads; no longer placed. */
   dots: z.array(DotSchema).max(5).default([]),
-  /** Criterion id → idea id. */
+  /** Criterion id → idea id, from sprints run before head-to-heads. */
   votes: z.record(z.string().max(40), z.string().max(40)).default({}),
   reasons: z.record(z.string().max(40), text(300)).default({}),
   opened: z.array(z.string().max(40)).max(40).default([]),
@@ -253,6 +262,45 @@ function tally(ballots, criteria, ideas) {
   const tie = best > 0 && leaders.length > 1;
   return { counts, totals, top: best > 0 && !tie ? leaders[0] : null, tie };
 }
+function pairsOf(ideas) {
+  const out = [];
+  ideas.forEach((a, i) => ideas.slice(i + 1).forEach((b) => out.push([a, b])));
+  return out;
+}
+var pairKey = (a, b) => a < b ? `${a}|${b}` : `${b}|${a}`;
+function duelsDone(duels, ideas) {
+  const done = new Set(duels.filter((d) => d.winner === d.a || d.winner === d.b).map((d) => pairKey(d.a, d.b)));
+  return pairsOf(ideas).every(([a, b]) => done.has(pairKey(a, b)));
+}
+function duelTally(ballots, criteria, ideas) {
+  const counts = {};
+  const totals = {};
+  for (const idea of ideas) {
+    counts[idea] = Object.fromEntries(criteria.map((c) => [c, 0]));
+    totals[idea] = 0;
+  }
+  for (const duels of ballots) {
+    for (const d of duels) {
+      if (!counts[d.a] || !counts[d.b] || d.winner !== d.a && d.winner !== d.b) continue;
+      totals[d.winner] += 1;
+      for (const c of d.stronger) if (c in counts[d.winner]) counts[d.winner][c] += 1;
+    }
+  }
+  const best = Math.max(0, ...Object.values(totals));
+  const leaders = Object.keys(totals).filter((idea) => totals[idea] === best);
+  const tie = best > 0 && leaders.length > 1;
+  return { counts, totals, top: best > 0 && !tie ? leaders[0] : null, tie };
+}
+function rankIdeas(duels, ideas) {
+  const wins = new Map(ideas.map((i) => [i, 0]));
+  const beat = /* @__PURE__ */ new Set();
+  for (const d of duels) {
+    if (!wins.has(d.a) || !wins.has(d.b) || d.winner !== d.a && d.winner !== d.b) continue;
+    wins.set(d.winner, wins.get(d.winner) + 1);
+    beat.add(`${d.winner}>${d.winner === d.a ? d.b : d.a}`);
+  }
+  return [...ideas].sort((x, y) => wins.get(y) - wins.get(x) || (beat.has(`${x}>${y}`) ? -1 : beat.has(`${y}>${x}`) ? 1 : 0));
+}
 function heatLevels(counts, criteria) {
   const out = {};
   for (const c of criteria) {
@@ -281,6 +329,8 @@ function nextChange(phases, lockRec, now) {
   return events[0] ?? null;
 }
 export {
+  duelTally,
+  duelsDone,
   endsAtEpoch,
   heatLevels,
   isFrozen,
@@ -288,7 +338,10 @@ export {
   lockState,
   nextChange,
   openPhases,
+  pairKey,
+  pairsOf,
   phaseDue,
+  rankIdeas,
   sydneyEpoch,
   tally
 };
