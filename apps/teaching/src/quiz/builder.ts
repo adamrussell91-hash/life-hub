@@ -49,6 +49,8 @@ export type BuilderOptions = {
   /** In a lesson: written answers get a next-steps bank, made through the builder's jobs. */
   nextSteps?: { jobs?: NextStepJobs };
   onChange: (question: QuizQuestion) => void;
+  /** Teacher's Question block: other types in the same list, grouped apart. Picking one hands over to `onPick`. */
+  otherTypes?: { quizLabel: string; label: string; options: Array<{ value: string; label: string }>; onPick: (value: string) => void };
 };
 
 /** Written kinds, whose answer box serves a next step. */
@@ -90,7 +92,30 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     kinds.includes(q.kind) ? q.kind : (kinds[0] as string)
   );
   const kindBlurb = el('p', 'qz-field__hint', QUIZ_KIND_INFO[q.kind].blurb);
+  const other = options.otherTypes;
+  if (other) {
+    // Two groups in one list: this question's kinds, then the other block's types.
+    const quizGroup = el('optgroup');
+    quizGroup.label = other.quizLabel;
+    quizGroup.append(...[...kindSelect.options]);
+    const otherGroup = el('optgroup');
+    otherGroup.label = other.label;
+    for (const o of other.options) {
+      const option = el('option');
+      option.value = o.value;
+      option.textContent = o.label;
+      otherGroup.append(option);
+    }
+    kindSelect.replaceChildren(quizGroup, otherGroup);
+    kindSelect.value = kinds.includes(q.kind) ? q.kind : (kinds[0] as string);
+  }
   kindSelect.addEventListener('change', () => {
+    if (other?.options.some((o) => o.value === kindSelect.value)) {
+      const picked = kindSelect.value;
+      kindSelect.value = q.kind;
+      other.onPick(picked);
+      return;
+    }
     const next = kindSelect.value as QuizQuestionKind;
     const fresh = blankQuestion(next, q.id, q.marks, newId);
     q = { ...fresh, prompt: q.prompt, hint: q.hint, explanation: q.explanation, ...(next === 'label_image' ? {} : q.image ? { image: q.image } : {}) } as QuizQuestion;

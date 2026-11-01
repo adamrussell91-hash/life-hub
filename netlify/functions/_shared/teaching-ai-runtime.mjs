@@ -4393,8 +4393,8 @@ var NEW_BLOCK_LABEL = {
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
   continuum_line: "Continuum line",
-  quiz_question: "Quiz question",
-  question_set: "Written questions",
+  quiz_question: "Question",
+  question_set: "Question",
   flashcards: "Flashcards",
   cloze: "Cloze",
   self_check: "Self check",
@@ -4571,7 +4571,7 @@ var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
     )
   )
 })).filter((group) => group.types.length > 0);
-var LESSON_EXCLUDED = /* @__PURE__ */ new Set(["definition"]);
+var LESSON_EXCLUDED = /* @__PURE__ */ new Set(["definition", "question_set"]);
 var LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(

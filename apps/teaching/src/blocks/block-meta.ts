@@ -38,7 +38,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   curriculum_lines: 'Map the unit as a transit map: strands of learning, lesson stations and the assessment.',
   done: 'Students tap to mark the lesson finished.',
   question_drop: 'Students write their own question for a quiz in this unit. You approve each one before it joins the quiz.',
-  quiz_question: 'Marked for you: choice, gaps, matching, ordering and more. Scores go to the markbook.',
+  quiz_question: 'In the quiz (choice, gaps, matching and more, marked for you) or written work you mark, with thinking formats, a model answer or a checklist.',
   question_set: 'Students answer in writing and hand it in for you to mark. Add a model answer, a confidence rating or a checklist to check against.',
   flashcards: 'Flip cards for vocabulary or quick recall practice.',
   cloze: 'Fill-in-the-blank sentences for guided retrieval.',

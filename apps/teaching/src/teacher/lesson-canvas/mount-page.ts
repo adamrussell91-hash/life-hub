@@ -1,4 +1,5 @@
 import { refreshCalloutReferences } from '@/blocks/callout-reference';
+import { questionForLesson } from '@/blocks/question-type';
 import { isLinkedSection } from '@/blocks/composition-link';
 import { offerTimedUndo } from '../../../design-kit/js/hub-feedback.js';
 import {
@@ -524,7 +525,7 @@ export function mountBlockCanvas(
       return;
     }
 
-    const block = createFromInsertMenu(payload.type as InsertMenuValue, options.idFactory());
+    const block = newBlock(payload.type as InsertMenuValue);
     const redirect = options.rootInsertTarget?.();
     if (redirect) {
       insertNew(block, redirect);
@@ -850,6 +851,11 @@ export function mountBlockCanvas(
   // These read other blocks or the page's outcomes, so they are drawn fresh.
   const PAGE_DEPENDENT = new Set<string>(['discern_confirm', 'outcomes']);
 
+  /** A new Question in a lesson type with no quiz starts as a written question. */
+  function newBlock(type: InsertMenuValue): Block {
+    return questionForLesson(createFromInsertMenu(type, options.idFactory()), options.editorContext?.quizRuns?.() ?? true);
+  }
+
   function preview(block: Block): HTMLElement {
     const kept = previews.get(block.id);
     if (kept && kept.block === block && kept.media === media) return kept.el;
@@ -998,7 +1004,7 @@ export function mountBlockCanvas(
     },
     insertType(type: InsertMenuValue) {
       if (!canEdit) return;
-      const block = createFromInsertMenu(type, options.idFactory());
+      const block = newBlock(type);
       const target = (selectedId ? null : options.rootInsertTarget?.()) ?? insertTargetForSelection(blocks, selectedId);
       insertNew(block, target);
     },
@@ -1596,7 +1602,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     blocks: lesson.blocks,
     media,
-    editorContext: { lessonId: lesson.id, pageTypes: pageBlockTypes(LESSON_BLOCK_GROUPS), ...(options.nextSteps ? { nextSteps: options.nextSteps } : {}) },
+    editorContext: { lessonId: lesson.id, pageTypes: pageBlockTypes(LESSON_BLOCK_GROUPS), quizRuns: () => quizRunsIn(lesson.pedagogical_mode), ...(options.nextSteps ? { nextSteps: options.nextSteps } : {}) },
     onChange: (blocks) => {
       emitLesson({ ...lesson, blocks });
     },

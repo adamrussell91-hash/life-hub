@@ -119,8 +119,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   continuum_line: 'Continuum line',
-  quiz_question: 'Quiz question',
-  question_set: 'Written questions',
+  quiz_question: 'Question',
+  question_set: 'Question',
   flashcards: 'Flashcards',
   cloze: 'Cloze',
   self_check: 'Self check',
@@ -334,8 +334,11 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   )
 })).filter((group) => group.types.length > 0);
 
-/** Lessons put words in the word tray under a text block, so Definition leaves their menu. Old blocks still render. */
-const LESSON_EXCLUDED = new Set(['definition']);
+/**
+ * Lessons put words in the word tray under a text block, so Definition leaves their menu.
+ * Written questions are a type inside Question (question-type.ts). Old blocks still render.
+ */
+const LESSON_EXCLUDED = new Set(['definition', 'question_set']);
 
 export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,

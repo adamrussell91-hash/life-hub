@@ -4,6 +4,7 @@ import { QUIZ_KIND_INFO, checkQuestion, parseGapPassage, type QuizQuestion } fro
 import { peekCurriculum } from '@/app/curriculum-state';
 import { outcomeLabels } from '@/markbook/parse';
 import { mountQuestionBuilder } from '@/quiz/builder';
+import { convertQuestionBlock, QUIZ_GROUP_LABEL, WRITTEN_GROUP_LABEL, writtenTypeOptions } from '@/blocks/question-type';
 import type { NextStepJobs } from '@/blocks/next-step-run';
 import { el, formatMarks } from '@/quiz/dom';
 import { lessonImages } from '@/quiz/images';
@@ -17,7 +18,13 @@ import '@/quiz/quiz.css';
 
 type QuizBlock = Extract<Block, { block_type: 'quiz_question' }>;
 
-export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlock) => void, getLessonBlocks?: () => Block[], nextSteps?: NextStepJobs): HTMLElement {
+export function createQuizQuestionEditor(
+  block: QuizBlock,
+  onChange: (b: QuizBlock) => void,
+  getLessonBlocks?: () => Block[],
+  nextSteps?: NextStepJobs,
+  switchType?: (next: Block) => void
+): HTMLElement {
   let current = block;
   const builder = mountQuestionBuilder({
     question: { ...block.content.question, id: block.id },
@@ -26,6 +33,9 @@ export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlo
     outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []),
     images: lessonImages(getLessonBlocks?.() ?? []),
     nextSteps: { jobs: nextSteps },
+    ...(switchType
+      ? { otherTypes: { quizLabel: QUIZ_GROUP_LABEL, label: WRITTEN_GROUP_LABEL, options: writtenTypeOptions(), onPick: (value: string) => switchType(convertQuestionBlock(current, value)) } }
+      : {}),
     onChange: (question) => {
       current = { ...current, content: { ...current.content, question } };
       onChange(current);
