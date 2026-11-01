@@ -471,7 +471,9 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z9.array(z9.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z9.array(z9.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
+  skills: z9.array(z9.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional(),
+  /** Knowledge pieces this question checks (deep understandings), for the unit's tracking. */
+  pieces: z9.array(z9.string().regex(/^kp_[a-z0-9]{4,16}$/)).max(6).optional()
 };
 var QuizQuestionSchema = z9.discriminatedUnion("kind", [
   z9.object({ ...base, kind: z9.literal("multiple_choice"), options: z9.array(QuizChoiceSchema).min(2).max(6), correct: z9.array(Id).length(1) }),

@@ -2,15 +2,17 @@ import type { Alignment } from '@/alignment/schema';
 import type { LiteraryElementsTable } from '@/blocks/literary-elements';
 import { sydneyDay } from '@/markbook/calc';
 import type { OutcomeLabel } from '@/markbook/types';
+import type { DeepUnderstanding } from '@/deep/schema';
+import { STEP_LABEL, type Step } from '@/deep/schema';
 import { norm } from '@/quiz/core';
 import type { SkillsContinuum } from '@/skills/schema';
 import type { Evidence, InsightPayload, TagKind, Why } from './types';
 
-export type TagContext = { table: LiteraryElementsTable | null; outcomes: readonly OutcomeLabel[]; skills: SkillsContinuum | null; alignment?: Alignment | null };
+export type TagContext = { table: LiteraryElementsTable | null; outcomes: readonly OutcomeLabel[]; skills: SkillsContinuum | null; alignment?: Alignment | null; deep?: readonly DeepUnderstanding[] | null };
 
 export function kindOf(tag: string): TagKind | null {
   const prefix = tag.slice(0, Math.max(0, tag.indexOf(':')));
-  return prefix === 'tech' || prefix === 'fam' || prefix === 'out' || prefix === 'skill' ? prefix : null;
+  return prefix === 'tech' || prefix === 'fam' || prefix === 'out' || prefix === 'skill' || prefix === 'kp' || prefix === 'du' ? prefix : null;
 }
 
 /** Every item in an insight payload, placed with its student, source, day and confidence. */
@@ -73,6 +75,12 @@ export function tagLabel(tag: string, ctx: TagContext): string {
   if (kind === 'skill') {
     const [strand, sub] = value.split('.');
     return ctx.skills?.strands.find((s) => s.strand === strand)?.sub_strands.find((x) => x.id === sub)?.name ?? value;
+  }
+  if (kind === 'kp') return ctx.deep?.flatMap((d) => d.pieces).find((p) => p.id === value)?.text ?? value;
+  if (kind === 'du') {
+    const [duId, step] = value.split(':');
+    const n = (ctx.deep ?? []).findIndex((d) => d.id === duId);
+    return n >= 0 && step ? `DU ${n + 1} · Step ${STEP_LABEL[step as Step] ?? step}` : value;
   }
   return tag;
 }

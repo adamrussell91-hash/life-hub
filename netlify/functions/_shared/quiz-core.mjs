@@ -188,7 +188,9 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z2.array(z2.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z2.array(z2.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
+  skills: z2.array(z2.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional(),
+  /** Knowledge pieces this question checks (deep understandings), for the unit's tracking. */
+  pieces: z2.array(z2.string().regex(/^kp_[a-z0-9]{4,16}$/)).max(6).optional()
 };
 var QuizQuestionSchema = z2.discriminatedUnion("kind", [
   z2.object({ ...base, kind: z2.literal("multiple_choice"), options: z2.array(QuizChoiceSchema).min(2).max(6), correct: z2.array(Id).length(1) }),
@@ -508,7 +510,8 @@ function splitQuestion(q, random = Math.random) {
     ...q.hint?.trim() ? { hint: q.hint.trim() } : {},
     ...q.explanation?.trim() ? { explanation: q.explanation.trim() } : {},
     ...q.outcomes?.length ? { outcomes: [...q.outcomes] } : {},
-    ...q.skills?.length ? { skills: [...q.skills] } : {}
+    ...q.skills?.length ? { skills: [...q.skills] } : {},
+    ...q.pieces?.length ? { pieces: [...q.pieces] } : {}
   };
   switch (q.kind) {
     case "multiple_choice":

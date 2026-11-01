@@ -1,4 +1,5 @@
 import { apiPatch } from '@/api/client';
+import type { DeepUnderstanding } from '@/deep/schema';
 import type { Block, Cover, Unit } from '@/schemas';
 
 export function patchUnit(
@@ -9,6 +10,7 @@ export function patchUnit(
     blocks?: Block[];
     description?: string;
     outcome_ids?: string[];
+    deep_understandings?: DeepUnderstanding[];
   }
 ): Promise<Unit> {
   return apiPatch(`/api/units/${id}`, body);

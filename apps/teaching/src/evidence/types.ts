@@ -2,9 +2,9 @@ import type { EvidenceItem, Why } from '@/quiz/evidence';
 
 export type { EvidenceItem, Why };
 export type Confidence = 1 | 2 | 3 | null;
-export type TagKind = 'tech' | 'fam' | 'out' | 'skill';
-export const TAG_KINDS: TagKind[] = ['tech', 'fam', 'out', 'skill'];
-export const TAG_KIND_LABEL: Record<TagKind, string> = { tech: 'Technique', fam: 'Family', out: 'Outcome', skill: 'Skill' };
+export type TagKind = 'tech' | 'fam' | 'out' | 'skill' | 'kp' | 'du';
+export const TAG_KINDS: TagKind[] = ['tech', 'fam', 'out', 'skill', 'kp', 'du'];
+export const TAG_KIND_LABEL: Record<TagKind, string> = { tech: 'Technique', fam: 'Family', out: 'Outcome', skill: 'Skill', kp: 'Knowledge piece', du: 'Deep understanding' };
 
 /** An evidence item placed: whose, from where, when, how sure. */
 export type Evidence = EvidenceItem & { student: string; source: string; date: string; confidence: Confidence };

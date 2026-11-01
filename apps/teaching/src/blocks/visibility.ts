@@ -1,3 +1,4 @@
+import { DEEP_SETTING_KEYS } from '@/deep/block-tags';
 import { studentTechniqueScan } from '@/blocks/technique-scan';
 import type { Block } from '@/schemas/block';
 
@@ -109,8 +110,8 @@ function stripToolkitTeacherFields(block: Block): Block {
   return { ...block, content } as Block;
 }
 
-/** WalkThru notes, jots and a block's chosen WalkThru are teacher-only wherever they sit; students never get the field. */
-function stripWalkthruField(block: Block): Block {
+/** WalkThru notes, jots, a block's chosen WalkThru and its deep understanding tags are teacher-only wherever they sit; students never get the field. */
+function stripTeacherSettings(block: Block): Block {
   let out = block;
   const content = out.content as Record<string, unknown> | undefined;
   if (content && Object.prototype.hasOwnProperty.call(content, 'walkthru')) {
@@ -118,8 +119,8 @@ function stripWalkthruField(block: Block): Block {
     out = { ...out, content: rest } as Block;
   }
   const settings = (out as { settings?: Record<string, unknown> }).settings;
-  if (settings && Object.prototype.hasOwnProperty.call(settings, 'walkthru')) {
-    const { walkthru: _chosen, ...rest } = settings;
+  if (settings && ['walkthru', ...DEEP_SETTING_KEYS].some((key) => Object.prototype.hasOwnProperty.call(settings, key))) {
+    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, ...rest } = settings;
     out = { ...out, settings: rest } as Block;
   }
   return out;
@@ -133,7 +134,7 @@ function filterBlocksForStudentInner(
     // Teacher notes and Teacher-style callouts are teacher-only whatever visibility a draft carries.
     .filter((block) => !isTeacherOnlyBlock(block))
     .map((block) => studentTechniqueScan(block))
-    .map(stripWalkthruField)
+    .map(stripTeacherSettings)
     .map((block) => {
       // Talking points are the teacher's, in every kind of lesson, not just tutorials.
       if (block.block_type === 'with_teacher') {
