@@ -2,7 +2,7 @@ import { button, el } from '@/quiz/dom';
 import { feedbackProblems, reflectionProblems } from './checks';
 import { FEEDBACK_STARTERS } from './defaults';
 import { LATER_GUIDE } from './guidance';
-import { briefCard, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
 import { LEVEL_LABELS, type FeedbackEntry, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
@@ -15,8 +15,6 @@ export function mountTest(ctx: FormContext): PhaseForm {
   while (state.reflection.length < 2) state.reflection.push('');
   const root = el('div', 'sprint-test');
   root.append(el('h2', '', 'What the test showed'));
-  const brief = briefCard(s, false);
-  if (brief) root.append(brief);
   const got = el('div', 'sprint-received');
   if (!s.received) got.append(el('p', 'sprint-note', 'Your group’s feedback shows here once your teacher releases it.'));
   else {
@@ -45,7 +43,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
   stepify(root, [
     { pick: '.sprint-received', title: 'What your group got', guide: LATER_GUIDE.feedback },
     { pick: '.sprint-field, select.qz-input, .sprint-value', title: 'Think about what to change', guide: LATER_GUIDE.reflect }
-  ]);
+  ], 'Test');
   slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };

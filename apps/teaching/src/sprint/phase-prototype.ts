@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { prototypeProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { briefCard, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, slidify, stepify } from './form-kit';
 import { LEVEL_LABELS, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
@@ -14,19 +14,24 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   const s = ctx.status;
   const mine = draftOf(ctx, 'prototype');
   const state: PhasePayload['prototype'] = { text: mine?.text ?? '', link: mine?.link ?? '', files: [...(mine?.files ?? [])], requirements: { ...(mine?.requirements ?? {}) }, self: { ...(mine?.self ?? {}) }, self_why: { ...(mine?.self_why ?? {}) }, value_answer: mine?.value_answer ?? '' };
-  const myPart = (s.parts ?? []).find((p) => p.mine);
+  const myParts = (s.parts ?? []).filter((p) => p.mine);
   const root = el('div', 'sprint-prototype');
-  root.append(el('h2', '', myPart ? `Your part: ${myPart.text}` : 'Your part'));
-  const groupBrief = briefCard(s, false);
-  if (groupBrief) root.append(groupBrief);
+  root.append(el('h2', '', myParts.length === 1 ? `Your part: ${myParts[0]!.text}` : myParts.length ? 'Your parts' : 'Your part'));
   const brief = el('div', 'sprint-brief-part');
-  const line = (k: string, v: string) => { const p = el('p', 'sprint-brief-part__line'); p.append(el('b', '', k), v); return p; };
-  brief.append(line('Group idea', s.chosen?.title ?? 'Not chosen yet'), line('It must show', myPart?.shows || 'Your group gives out parts in Decide.'));
-  const serves = ctx.sprint.criteria.find((c) => c.id === myPart?.criterion);
-  if (serves) brief.append(line('It serves', serves.text));
+  const line = (into: HTMLElement, k: string, v: string) => { const p = el('p', 'sprint-brief-part__line'); p.append(el('b', '', k), el('span', '', v)); into.append(p); };
+  if (!myParts.length) line(brief, 'Your part', 'Your group gives out parts in Decide. Ask them which part is yours.');
+  for (const part of myParts) {
+    const card = el('section', 'sprint-mypart');
+    if (myParts.length > 1) card.append(el('h4', 'sprint-mypart__name', part.text));
+    line(card, 'It must show', part.shows || 'Your group hasn’t said yet. Check with them.');
+    if (part.how) line(card, 'How we’ll make it', part.how);
+    const serves = ctx.sprint.criteria.find((c) => c.id === part.criterion);
+    if (serves) line(card, 'Criterion', serves.text);
+    brief.append(card);
+  }
   root.append(brief);
   const bar = submitBar(ctx, 'prototype', () => state, () => prototypeProblems(state, ctx.sprint.criteria, ctx.sprint.requirements, !!ctx.valueCheck));
-  root.append(frameField({ label: 'Write your part here, or upload it below', value: state.text, max: 4000, rows: 8, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.text = v; bar.changed(); } }));
+  root.append(frameField({ label: myParts.length > 1 ? 'Write your parts here, or upload them below' : 'Write your part here, or upload it below', value: state.text, max: 4000, rows: 8, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.text = v; bar.changed(); } }));
 
   const files = el('div', 'sprint-files');
   const fileList = el('ul');
@@ -63,7 +68,7 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   root.append(s.assemble ? finishedPrototype(ctx) : pitchFromMine(ctx, state, err));
 
   const self = el('div', 'sprint-self');
-  self.append(el('h3', '', 'Check your part against the criteria'));
+  self.append(el('h3', '', myParts.length > 1 ? 'Check your parts against the criteria' : 'Check your part against the criteria'));
   for (const c of ctx.sprint.criteria) {
     self.append(el('p', 'sprint-field__label', c.text));
     const levels = el('div', 'sprint-levels');
@@ -89,11 +94,11 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   if (value) self.append(value);
   root.append(self);
   stepify(root, [
-    { pick: '.sprint-brief-part', title: 'What your part must do', guide: LATER_GUIDE.part },
+    { pick: '.sprint-brief-part', title: myParts.length > 1 ? 'What your parts must do' : 'What your part must do', guide: LATER_GUIDE.part },
     { pick: '.sprint-field, .sprint-files', title: 'Build it', guide: LATER_GUIDE.build },
     { pick: '.sp-parts, .sprint-pitch', title: 'Bring the parts together', guide: LATER_GUIDE.share },
-    { pick: '.sprint-self', title: 'Rate your part', guide: LATER_GUIDE.check }
-  ]);
+    { pick: '.sprint-self', title: myParts.length > 1 ? 'Rate your parts' : 'Rate your part', guide: LATER_GUIDE.check }
+  ], 'Prototype');
   slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
@@ -188,4 +193,4 @@ function finishedPrototype(ctx: FormContext): HTMLElement {
   return box;
 }
 
-export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).find((p) => p.mine)?.id ?? '', s.pitch?.file ?? s.pitch?.link ?? '', s.assembler?.key ?? '', (s.group_parts ?? []).map((r) => `${r.part_id}:${r.who}:${r.in ? 1 : r.started ? 0 : '-'}:${r.files.length}:${r.link ? 1 : 0}`).join(',')].join('|');
+export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).filter((p) => p.mine).map((p) => p.id).join('+'), s.pitch?.file ?? s.pitch?.link ?? '', s.assembler?.key ?? '', (s.group_parts ?? []).map((r) => `${r.part_id}:${r.who}:${r.in ? 1 : r.started ? 0 : '-'}:${r.files.length}:${r.link ? 1 : 0}`).join(',')].join('|');

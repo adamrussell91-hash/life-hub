@@ -3,7 +3,7 @@ import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
 import { SKETCH_GUIDE } from './guidance';
 import { SKETCH_CHECKS } from './guidance';
-import { briefCard, coach, slidify, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { coach, slidify, draftOf, frameField, stepHead, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
@@ -34,16 +34,11 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-sketch');
   root.append(el('h2', '', 'Sketch your ideas'));
   if (ctx.sprint.phases[1]!.instruction) root.append(el('p', '', ctx.sprint.phases[1]!.instruction));
-  const brief = briefCard(ctx.status, true);
-  if (brief) root.append(brief);
   const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements, valueCheck: !!ctx.valueCheck }));
   const change = () => bar.changed();
   const step = (n: number, key: keyof typeof SKETCH_GUIDE, title: string, note: string) => {
     const box = el('section', 'su-step su-step--alone');
-    const head = el('div', 'su-step__head');
-    head.append(el('span', 'su-step__num', String(n)), el('h3', '', title), el('span', 'su-step__icon', SKETCH_GUIDE[key].icon));
-    head.lastElementChild!.setAttribute('aria-hidden', 'true');
-    box.append(head, coach(SKETCH_GUIDE[key]));
+    box.append(...stepHead(`Sketch · Step ${n} of 4`, title), coach(SKETCH_GUIDE[key]));
     if (note) box.append(el('p', 'sprint-note', note));
     root.append(box);
     return box;
@@ -154,7 +149,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
     if (!state.rapid.length) pickList.append(el('p', 'sprint-note', 'Your rapid ideas show here to star.'));
     for (const t of state.rapid) {
       const on = state.cards.some((c) => c.seed && same(c.seed, t));
-      const b = el('button', 'sprint-chip sprint-star', `${on ? '★' : '☆'} ${t}`);
+      const b = el('button', 'sprint-chip sprint-star', `${t}${on ? ' · starred' : ''}`);
       b.type = 'button';
       b.disabled = off || (!on && count >= ideas);
       b.setAttribute('aria-pressed', String(on));

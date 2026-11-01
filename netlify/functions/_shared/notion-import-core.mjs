@@ -1321,7 +1321,9 @@ var TestPayloadSchema = z8.object({
 var PartSchema = z8.object({
   id: SprintIdSchema,
   text: z8.string().trim().min(1).max(80),
-  shows: text(200).default(""),
+  shows: text(400).default(""),
+  /** Optional notes on how the part gets made: tools, steps, what is borrowed. */
+  how: text(400).default(""),
   criterion: z8.string().max(40).default("")
 });
 var PartsSchema = z8.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, "Each part needs its own id.");
@@ -4210,8 +4212,8 @@ var KIND_LABEL = {
   rich_text: "Text",
   html: "HTML",
   html_app: "Interactive app",
-  question_set: "Question set",
-  question_drop: "Question drop",
+  question_set: "Written questions",
+  question_drop: "Students write questions",
   done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",

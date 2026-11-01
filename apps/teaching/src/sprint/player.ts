@@ -11,6 +11,7 @@ import { buildRail } from './rail';
 import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
 import { fillPhaseSample } from './practice-sample';
+import { createGroupSheet } from './group-sheet';
 import type { SprintClient, SprintStatus } from './api';
 import './sprint.css';
 
@@ -108,6 +109,9 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     return f;
   }
 
+  // The group sheet: what the class was set and what the group has decided, at the top of every phase.
+  const sheet = createGroupSheet({ sprint, challenge: parts.brief, lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology, storeKey: `sprint-sheet:${lesson.lesson_id}` });
+
   // Built once, so a poll doesn't fold it or reload what's inside it.
   const wholeGuides = parts.guides && (parts.guides.content.blocks as Block[]).length ? el('details', 'sprint-guides sprint-guides--whole') : null;
   if (wholeGuides) {
@@ -127,33 +131,9 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     intent.hidden = !intent.textContent;
     const steps = buildRail(s.phases ?? [], key, (k) => sprint.phases.find((x) => x.key === k)?.where, (k) => { chosen = k; paint(); }, (p) => (p.due_date ? `Closes ${new Date(`${p.due_date}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })}` : ''));
-    const brief = el('section', 'sprint-brief');
-    brief.append(el('div', 'sprint-brief__kind', 'The challenge'));
-    for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
-    top.append(steps, cd, group, intent, brief);
+    sheet.update(s, key);
+    top.append(steps, cd, group, intent, sheet.el);
     if (wholeGuides) top.append(wholeGuides);
-  }
-
-  /** What this phase must include and the optional push: always in view, above the work. */
-  function asksBlock(key: SprintPhaseKey): HTMLElement {
-    const wrap = el('div', 'sprint-asks');
-    const reqs = sprint.requirements.filter((r) => r.phases.includes(key));
-    if (reqs.length) {
-      const box = el('section', 'sprint-ask sprint-ask--must');
-      box.append(el('div', 'sprint-ask__kind', 'Must include'));
-      const ul = el('ul');
-      for (const r of reqs) ul.append(el('li', '', r.text));
-      box.append(ul);
-      wrap.append(box);
-    }
-    const stretch = sprint.phases.find((p) => p.key === key)?.stretch;
-    if (stretch) {
-      const box = el('section', 'sprint-ask sprint-ask--stretch');
-      box.append(el('div', 'sprint-ask__kind', '★ Stretch (optional)'), el('p', '', stretch));
-      wrap.append(box);
-    }
-    wrap.hidden = !wrap.children.length;
-    return wrap;
   }
 
   function guidesPanel(key: SprintPhaseKey): HTMLElement {
@@ -265,7 +245,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       fill.classList.add('sprint-practice-fill');
       work.append(fill);
     }
-    work.append(asksBlock(key), form.el);
+    work.append(form.el);
     layout.append(work, guidesPanel(key));
     body.replaceChildren(layout);
   }

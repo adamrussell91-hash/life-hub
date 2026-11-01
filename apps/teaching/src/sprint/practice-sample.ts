@@ -69,8 +69,8 @@ async function samplePayload(
   if (key === 'decide') {
     if (status.chosen) {
       if (!(status.parts ?? []).length) {
-        const parts: Part[] = criteria.slice(0, 2).map((c, i) => ({ id: `part${i + 1}`, text: `Part ${i + 1}`, shows: `What part ${i + 1} shows.`, criterion: c }));
-        status = await client.parts(parts.length ? parts : [{ id: 'part1', text: 'Part 1', shows: '', criterion: '' }]);
+        const parts: Part[] = criteria.slice(0, 2).map((c, i) => ({ id: `part${i + 1}`, text: `Part ${i + 1}`, shows: `What part ${i + 1} shows.`, how: '', criterion: c }));
+        status = await client.parts(parts.length ? parts : [{ id: 'part1', text: 'Part 1', shows: '', how: '', criterion: '' }]);
       }
       const parts = status.parts ?? [];
       const me = status.members?.find((m) => m.me);
