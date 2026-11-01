@@ -6,6 +6,7 @@ import {
   fryLengthBudget,
   parseDictionaryResult,
   parseFryResult,
+  parseQuestionFirstResult,
   richTextToPlain,
   runTextToolJob,
   startTextToolJob,
@@ -14,6 +15,7 @@ import {
   wordAppearsIn
 } from '../../netlify/functions/_shared/text-tools.mjs';
 import { buildFryExplainerSystem } from '../../netlify/functions/_shared/fry-explainer-prompt.mjs';
+import { QUESTION_FIRST_SYSTEM } from '../../netlify/functions/_shared/question-first-prompt.mjs';
 import { createTextToolsHandler } from '../../netlify/functions/teaching-text-tools.mjs';
 import { createTextToolsRunHandler } from '../../netlify/functions/teaching-text-tools-run.mjs';
 import { createPublishedWordHelpHandler } from '../../netlify/functions/published-word-help.mjs';
@@ -119,6 +121,54 @@ test('the Fry rewrite keeps roughly the source length', () => {
   assert.match(messages[0].content, /It is 400 words\. Aim for about 400 words and stay between 340 and 500\./);
   assert.match(system, /Keep roughly the length of the source block/);
   assert.match(system, /Never cut the push/);
+});
+
+test('parseQuestionFirstResult keeps three clean hooks in a fixed order', () => {
+  const raw = [
+    '<question>Where does a tree get its mass from?</question>',
+    '<hook type="dilemma">\n<p>Two <b>answers</b>.</p>\n</hook>',
+    '<hook type="contradiction"><p class="x" onclick="y()">A tree weighs a tonne.</p><h2>Odd</h2><p>The soil barely <em>moves</em>.</p></hook>',
+    '<hook type="prediction">Pick one before you read on.</hook>',
+    '<hook type="summary"><p>Not a type.</p></hook>',
+    '<hook type="contradiction"><p>Duplicate.</p></hook>'
+  ].join('\n');
+  assert.deepEqual(parseQuestionFirstResult(raw), {
+    question: 'Where does a tree get its mass from?',
+    hooks: [
+      { type: 'contradiction', html: '<p>A tree weighs a tonne.</p>Odd<p>The soil barely <em>moves</em>.</p>' },
+      { type: 'prediction', html: '<p>Pick one before you read on.</p>' },
+      { type: 'dilemma', html: '<p>Two answers.</p>' }
+    ]
+  });
+  assert.throws(() => parseQuestionFirstResult('<question>Q</question><hook type="prediction"> </hook>'), /came back empty/);
+  assert.throws(() => parseQuestionFirstResult('Sorry.'), /came back empty/);
+});
+
+test('Question first asks for hooks only and never a rewrite of the block', () => {
+  const { system, messages } = buildTextToolRequest('question_first', richTextToPlain(LONG_PROSE));
+  assert.equal(system, QUESTION_FIRST_SYSTEM);
+  assert.match(messages[0].content, /<block>\nWriters choose/);
+  for (const marker of ['Their text stays exactly as it is', '### Contradiction', '### Prediction', '### Dilemma', '<question>', '<hook type="dilemma">']) {
+    assert.ok(system.includes(marker), marker);
+  }
+  assert.match(textToolInputError('question_first', 'Too short to hook.'), /not enough/);
+  assert.equal(textToolInputError('question_first', richTextToPlain(LONG_PROSE)), null);
+});
+
+test('Question first runs as a teacher job and is cached apart from Fry', async () => {
+  const store = memoryStore();
+  const env = { ANTHROPIC_API_KEY: 'test' };
+  const text = richTextToPlain(LONG_PROSE);
+  assert.notEqual(textToolKey('question_first', text, env), textToolKey('fry', text, env));
+  const started = await startTextToolJob({ store, env, tool: 'question_first', text });
+  const done = await runTextToolJob({
+    store,
+    env,
+    key: started.key,
+    completeMessage: async () => '<question>Who disappears?</question><hook type="prediction"><p>Which sentence hides the doer?</p></hook>'
+  });
+  assert.equal(done.status, 'done');
+  assert.deepEqual(done.result, { question: 'Who disappears?', hooks: [{ type: 'prediction', html: '<p>Which sentence hides the doer?</p>' }] });
 });
 
 test('textToolInputError refuses empty, oversized and too-short Fry input', () => {

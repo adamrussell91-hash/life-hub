@@ -1,7 +1,7 @@
 /**
  * Operator-only text tools on a rich text block (see _shared/text-tools.mjs).
  *
- *   POST /api/text-tools        { tool: 'dictionary' | 'fry' | 'techniques', html }  start or reuse a job
+ *   POST /api/text-tools        { tool: 'dictionary' | 'fry' | 'question_first' | 'techniques', html }  start or reuse a job
  *   GET  /api/text-tools/:key                                          poll it
  *
  * Both answer `{ key, status: 'working' | 'done' | 'error', result?, error? }`.
@@ -51,7 +51,7 @@ export function createTextToolsHandler(deps = {}) {
     const body = await request.json().catch(() => null);
     const tool = body?.tool;
     if (!isTextTool(tool)) {
-      return withCors(errorResponse(400, 'validation_error', 'tool must be dictionary, fry or techniques', false), request, env);
+      return withCors(errorResponse(400, 'validation_error', 'tool must be dictionary, fry, question_first or techniques', false), request, env);
     }
     const text = richTextToPlain(typeof body?.html === 'string' ? body.html : '');
     const inputError = textToolInputError(tool, text);

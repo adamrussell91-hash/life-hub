@@ -4,6 +4,9 @@
  *   dictionary  Finds the challenging words in a block and writes a short
  *               dictionary card for each (teacher and students).
  *   fry         Rewrites a block as a Fry explainer (teacher only).
+ *   question_first  Writes three short hooks (contradiction, prediction,
+ *               dilemma) to go above a block. The block itself is never
+ *               rewritten (teacher only, see question-first-prompt.mjs).
  *   techniques  Finds the Periodic Table techniques a passage uses, for the
  *               teacher to approve (see technique-scan.mjs).
  *   hinge_backup  Drafts a parallel hinge question when the class comes in
@@ -22,6 +25,7 @@
 import { createHash } from 'node:crypto';
 import { completeMessage as defaultCompleteMessage } from './anthropic-client.mjs';
 import { buildFryExplainerSystem } from './fry-explainer-prompt.mjs';
+import { QUESTION_FIRST_HOOK_TYPES, QUESTION_FIRST_SYSTEM } from './question-first-prompt.mjs';
 import { HINGE_BACKUP_SYSTEM, parseHingeBackupResult } from './hinge-backup.mjs';
 import { buildMorphemicRequest, parseMorphemicResult, saveMatrixResult } from './morphemic-matrix.mjs';
 import {
@@ -35,7 +39,7 @@ import { TextToolError } from './text-tool-error.mjs';
 
 export { TextToolError };
 
-export const TEXT_TOOLS = ['dictionary', 'fry', 'techniques'];
+export const TEXT_TOOLS = ['dictionary', 'fry', 'question_first', 'techniques'];
 export const TEXT_TOOL_PREFIX = 'text_tools/';
 /** Bump when a prompt changes so old cached results are not served. */
 export const TEXT_TOOL_VERSION = 4;
@@ -49,6 +53,7 @@ export const TEXT_TOOL_ERROR_COOLDOWN_MS = 60_000;
 const DEFAULT_MODELS = {
   dictionary: 'claude-haiku-4-5',
   fry: 'claude-sonnet-5',
+  question_first: 'claude-sonnet-5',
   techniques: 'gpt-4o',
   hinge_backup: 'claude-sonnet-5-5',
   morphemic: 'claude-sonnet-5-5'
@@ -56,11 +61,12 @@ const DEFAULT_MODELS = {
 const MODEL_ENV = {
   dictionary: 'TEXT_TOOLS_DICTIONARY_MODEL',
   fry: 'TEXT_TOOLS_FRY_MODEL',
+  question_first: 'TEXT_TOOLS_QUESTION_FIRST_MODEL',
   techniques: 'TEXT_TOOLS_TECHNIQUES_MODEL',
   hinge_backup: 'TEXT_TOOLS_HINGE_BACKUP_MODEL',
   morphemic: 'TEXT_TOOLS_MORPHEMIC_MODEL'
 };
-const MAX_TOKENS = { dictionary: 4096, fry: 4096, hinge_backup: 1500, morphemic: 12_000 };
+const MAX_TOKENS = { dictionary: 4096, fry: 4096, question_first: 2048, hinge_backup: 1500, morphemic: 12_000 };
 /**
  * Request options beyond the client's default (thinking disabled), which
  * Sonnet 5.5 rejects with a 400. The hinge back-up keeps thinking off the
@@ -128,6 +134,9 @@ export function textToolInputError(tool, text) {
   }
   if (tool === 'fry' && countWords(text) < 25) {
     return 'There is not enough here to build an explainer from. Write the key ideas first, at least a few sentences.';
+  }
+  if (tool === 'question_first' && countWords(text) < 15) {
+    return 'There is not enough here to write a hook for. Write the explanation first, then add the question above it.';
   }
   return null;
 }
@@ -305,6 +314,39 @@ export function parseFryResult(raw) {
   return { html };
 }
 
+// ------------------------------------------------------------ question first
+
+const HOOK_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em']);
+
+function cleanHookHtml(html) {
+  return sanitizeRichTextHtml(String(html ?? ''))
+    .replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (tag, name) => {
+      const lower = name.toLowerCase();
+      if (!HOOK_ALLOWED_TAGS.has(lower)) return '';
+      return tag.startsWith('</') ? `</${lower}>` : lower === 'br' ? '<br>' : `<${lower}>`;
+    })
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/>\s+</g, '><')
+    .trim();
+}
+
+/** `{ question, hooks: [{ type, html }] }`, hooks in contradiction, prediction, dilemma order. */
+export function parseQuestionFirstResult(raw) {
+  const text = String(raw ?? '');
+  const question = richTextToPlain(text.match(/<question>([\s\S]*?)<\/question>/i)?.[1] ?? '').replace(/\s+/g, ' ');
+  const found = new Map();
+  for (const match of text.matchAll(/<hook\s+type=["']?([a-z]+)["']?\s*>([\s\S]*?)<\/hook>/gi)) {
+    const type = match[1].toLowerCase();
+    if (!QUESTION_FIRST_HOOK_TYPES.includes(type) || found.has(type)) continue;
+    let html = cleanHookHtml(match[2]);
+    if (html && !/^<p>/.test(html)) html = `<p>${html}</p>`;
+    if (richTextToPlain(html)) found.set(type, html);
+  }
+  const hooks = QUESTION_FIRST_HOOK_TYPES.filter((type) => found.has(type)).map((type) => ({ type, html: found.get(type) }));
+  if (!hooks.length) throw new TextToolError('The hooks came back empty. Try again.');
+  return { question, hooks };
+}
+
 // ----------------------------------------------------------------------- run
 
 export function countWords(text) {
@@ -340,6 +382,12 @@ export function buildTextToolRequest(tool, text) {
         role: 'user',
         content: `Here is the text block to rewrite. It is ${budget.words} words. Aim for about ${budget.words} words and stay between ${budget.min} and ${budget.max}.\n\n<block>\n${text}\n</block>`
       }]
+    };
+  }
+  if (tool === 'question_first') {
+    return {
+      system: QUESTION_FIRST_SYSTEM,
+      messages: [{ role: 'user', content: `Here is the teacher's text block. Write the three hooks that go above it.\n\n<block>\n${text}\n</block>` }]
     };
   }
   return {
@@ -403,7 +451,11 @@ export async function runTextToolJob({
         result = { matrix, dropped: parsed.dropped };
       } else {
         result =
-          job.tool === 'fry' ? parseFryResult(raw) : job.tool === 'hinge_backup' ? parseHingeBackupResult(raw) : parseDictionaryResult(raw, job.text);
+          job.tool === 'fry'
+            ? parseFryResult(raw)
+            : job.tool === 'question_first'
+              ? parseQuestionFirstResult(raw)
+              : job.tool === 'hinge_backup' ? parseHingeBackupResult(raw) : parseDictionaryResult(raw, job.text);
       }
       next = { ...job, status: 'done', result };
     } catch (error) {

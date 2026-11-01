@@ -268,7 +268,7 @@ test('teacher technique scan runs through /api/text-tools end to end', async () 
 
   const unknown = await handler(req('POST', '/api/text-tools', { tool: 'spells', html }), {});
   assert.equal(unknown.status, 400);
-  assert.match((await unknown.json()).error.message, /dictionary, fry or techniques/);
+  assert.match((await unknown.json()).error.message, /dictionary, fry, question_first or techniques/);
 });
 
 test('students only ever receive the approved techniques', () => {
