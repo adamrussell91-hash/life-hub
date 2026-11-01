@@ -177,8 +177,8 @@ export function studentHead(view: MarkbookView, student: RosterStudent, onOpen?:
   }
   name.title = student.name;
   wrap.append(el('span', 'mb-student__initials', student.initials), name);
+  // No trend line here: it cost a column of width and said little. Patterns keeps one per group.
   const series = quizSeries(view, student.id);
-  if (series.length >= 2) wrap.append(sparkline(series));
   if (isDropping(series)) wrap.append(flag('Dropping', 'The last three quizzes are 15 or more points below the ones before.'));
   if (isConfidentlyWrong(view, student.id)) wrap.append(flag('Confident and wrong', 'Often sure of answers that scored zero.'));
   return wrap;

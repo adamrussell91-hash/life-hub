@@ -232,7 +232,23 @@ export function renderBook(o: BookOptions): HTMLElement {
   table.append(body);
   wrap.append(table);
   root.append(wrap);
+  fitToScreen(wrap);
   return root;
+}
+
+/**
+ * The box is as tall as the screen less whatever sits below it on the page, so scrolled to
+ * the end the whole box, header included, is in view with nothing wasted under it.
+ */
+function fitToScreen(wrap: HTMLElement): void {
+  const measure = (): void => {
+    if (!wrap.isConnected) return window.removeEventListener('resize', measure);
+    const page = wrap.closest('.teacher-layout__canvas') ?? document.body;
+    const below = Math.max(0, page.getBoundingClientRect().bottom - wrap.getBoundingClientRect().bottom);
+    wrap.style.setProperty('--mb-below', `${Math.round(below)}px`);
+  };
+  requestAnimationFrame(measure);
+  window.addEventListener('resize', measure);
 }
 
 /** Phone width: one student, every lesson and marked column as a list by unit. */
