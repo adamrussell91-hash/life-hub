@@ -74,6 +74,15 @@ describe('decide form', () => {
     expect(held.el.querySelector('.sdd-wait')!.textContent).toContain('still has to confirm your group’s problem');
   });
 
+  it('after voting, while the teacher confirms, shows the parts step locked with what opens it', () => {
+    const f = mountDecide(ctx(base({ votes_closed: true, chosen: null, awaiting: { kind: 'idea' }, results: { ranking: [{ id: 'i2', title: 'Streets' }], best_at: [], unanimous: false } })));
+    expect(f.el.querySelector('.sdd-result h2')?.textContent).toBe('Waiting for your teacher to confirm your group’s idea');
+    expect(f.el.querySelector('.sd-locked')?.textContent).toContain('opens as soon as your teacher confirms');
+    expect(f.el.querySelectorAll('.su-step')).toHaveLength(2);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your teacher is confirming your group’s idea');
+  });
+
   it('after voting shows the chosen idea, the top three, the strongest in each criterion and the parts editor', () => {
     const f = mountDecide(ctx(base({
       votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' },

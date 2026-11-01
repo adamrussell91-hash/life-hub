@@ -30,7 +30,9 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   root.append(purpose(voting, pool.length));
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? duelProblems(state.duels, ids) : []),
-    ...(!s.chosen ? ['Nothing to submit yet. Your picks save as you go. Once your group’s idea is chosen, a step to plan the parts opens here; submit after that.'] : []),
+    ...(!s.chosen ? [voting
+      ? 'Nothing to submit yet. Your picks save as you go. Once your group’s idea is chosen, a step to plan the parts opens here; submit after that.'
+      : 'Nothing to submit yet. Your teacher is confirming your group’s idea; then plan the parts in step 2 and submit.'] : []),
     ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
     ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
   ]);
@@ -45,6 +47,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     root.append(groupResult(s, label, ctx));
   }
   if (s.chosen) root.append(partsEditor(ctx));
+  else if (!voting) root.append(partsLocked());
   if (!voting) stepify(root, [
     { pick: '.sdd-result', title: 'See what your group picked', guide: LATER_GUIDE.result },
     { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
@@ -265,7 +268,7 @@ function waiting(s: SprintStatus, meDone: boolean): HTMLElement {
 function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormContext): HTMLElement {
   const box = el('section', 'sdd-result');
   const r = s.results;
-  box.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Your teacher is choosing'));
+  box.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Waiting for your teacher to confirm your group’s idea'));
   if (s.chosen) {
     const chosen = el('div', 'sprint-chosen');
     chosen.append(el('strong', '', s.chosen.title), el('p', '', s.chosen.idea));
@@ -292,6 +295,13 @@ function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormConte
     }
     box.append(best);
   }
+  return box;
+}
+
+/** Before the idea is confirmed: the parts step is there, and says what opens it. */
+function partsLocked(): HTMLElement {
+  const box = el('div', 'sprint-parts');
+  box.append(el('h3', '', 'Parts of the prototype'), el('p', 'sprint-note sd-locked', 'This opens as soon as your teacher confirms your group’s idea. Then you list what the prototype needs and give each part to someone by their initials.'));
   return box;
 }
 
