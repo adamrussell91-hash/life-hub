@@ -33,6 +33,8 @@ import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
 import { mountEndQuestions } from '@/teacher/end-questions';
 import type { Block } from '@/schemas/block';
+import { unitDeep } from '@/deep/context';
+import { deepBlockLine, deepMenuItems } from '@/deep/block-menu';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
@@ -746,6 +748,7 @@ export function mountBlockCanvas(
                 onSelect: () => options.onSaveComposition?.(block.id)
               }]
             : []),
+          ...deepMenuItems(block, unitDeep(), (next) => onBlockChange(next)).map((item) => ({ ...item, icon: HUB_LIST_ICONS.check })),
           'separator',
           {
             label: 'Delete block',
@@ -905,7 +908,11 @@ export function mountBlockCanvas(
       } else {
         row.append(preview(block));
       }
-      if (canEdit) options.decorateRow?.(row, block);
+      if (canEdit) {
+        const line = deepBlockLine(block, unitDeep());
+        if (line) row.append(Object.assign(document.createElement('p'), { className: 'du-block-line', textContent: line }));
+        options.decorateRow?.(row, block);
+      }
       return row;
     };
 

@@ -22,6 +22,8 @@ import type { NextStepJobs } from '@/blocks/next-step-run';
 import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
+import { unitDeep } from '@/deep/context';
+import '@/deep/block-menu.css';
 import './quiz.css';
 
 /**
@@ -1079,7 +1081,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     extrasHost.append(row);
 
     const more = el('details', 'qz-more');
-    more.open = !!(q.hint || q.explanation || q.outcomes?.length || q.skills?.length || (q.image && q.kind !== 'label_image'));
+    more.open = !!(q.hint || q.explanation || q.outcomes?.length || q.skills?.length || q.pieces?.length || (q.image && q.kind !== 'label_image'));
     const offersOutcomes = !student && !!options.outcomes?.length;
     more.append(el('summary', 'qz-more__summary', offersOutcomes ? 'Hint, explanation, outcomes and picture (optional)' : 'Hint, explanation and picture (optional)'));
     const hint = textInput(q.hint ?? '', QUIZ_LIMITS.hint, 'A nudge, not the answer.');
@@ -1143,6 +1145,25 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       } else {
         more.append(field);
       }
+    }
+    const deep = unitDeep();
+    if (!student && deep.length) {
+      const box = el('div', 'du-q-pieces');
+      for (const [n, du] of deep.entries()) {
+        for (const piece of du.pieces) {
+          const label = el('label');
+          const input = Object.assign(document.createElement('input'), { type: 'checkbox', value: piece.id, checked: !!q.pieces?.includes(piece.id) });
+          input.addEventListener('change', () => {
+            const next = [...box.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value).slice(0, 6);
+            if (next.length) q.pieces = next;
+            else delete q.pieces;
+            emit();
+          });
+          label.append(input, ` DU ${n + 1} · ${piece.text}`);
+          box.append(label);
+        }
+      }
+      more.append(labelled('Knowledge pieces this checks', box, 'Counts towards each student’s circles on the unit’s deep understandings. Republish for changes to count.'));
     }
     if (q.kind !== 'label_image' && ((options.images?.length ?? 0) > 0 || options.allowImageUrl)) {
       const pictureHost = el('div', 'qz-field');

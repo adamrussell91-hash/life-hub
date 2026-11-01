@@ -68,6 +68,7 @@ import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { openNameModal } from '@/teacher/create/name-modal';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
+import { setUnitDeep } from '@/deep/context';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import {
   hasUnpublishedChanges,
@@ -875,6 +876,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         mediaList = curriculum.media;
         page?.update(lesson, mediaList);
         const unit = curriculum.units.find((row) => row.id === lesson.unit_id);
+        setUnitDeep(unit?.deep_understandings);
         const klass = curriculum.classes.find(
           (row) =>
             row.current_unit_id === lesson.unit_id || row.active_unit_ids.includes(lesson.unit_id)
@@ -1186,6 +1188,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     },
     dispose() {
       disposed = true;
+      setUnitDeep([]);
       exitFullPageMode?.();
       exitFullPageMode = null;
       removeChromeKeys?.();

@@ -1,0 +1,33 @@
+.du-sheet {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--ink);
+  overflow: auto;
+}
+.du-sheet::backdrop { background: rgb(0 0 0 / 0.35); }
+.du-sheet__form { display: grid; gap: var(--space-4); padding: var(--space-4); }
+.du-sheet__part { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.du-sheet__part[hidden] { display: none; }
+.du-sheet__title { padding: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--marine); }
+.du-sheet__group { display: grid; gap: var(--space-1); }
+.du-sheet__heading { margin: 0; font-size: var(--text-xs); color: var(--muted); }
+.du-sheet__pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.du-sheet__pill {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--line); border-radius: 999px;
+  font-size: var(--text-sm); cursor: pointer; max-width: 100%;
+}
+.du-sheet__pill input { position: absolute; opacity: 0; pointer-events: none; }
+.du-sheet__pill:has(input:checked) { border-color: var(--marine); background: color-mix(in srgb, var(--marine) 12%, var(--paper)); font-weight: var(--weight-semibold); }
+.du-sheet__pill:has(input:focus-visible) { outline: 2px solid var(--marine); outline-offset: 2px; }
+.du-sheet__tier { font-size: var(--text-xs); color: var(--muted); }
+.du-sheet__actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+.du-block-line { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--muted); }
+.du-q-pieces { display: grid; gap: var(--space-1); }
+.du-q-pieces label { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--text-sm); min-height: 32px; }
