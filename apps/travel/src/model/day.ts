@@ -280,19 +280,22 @@ export function buildTodo(trip: Trip, today: IsoDate): TodoRow[] {
     rows.push({
       when_label: formatWhenLabel(item.date),
       title: item.title,
-      detail: 'Still to book',
+      detail: trip.cities.find((c) => c.id === item.city_id)?.name ?? 'To book',
       city_id: item.city_id,
       date: item.date
     });
   }
 
   rows.push(...noBedRanges(trip));
+  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
+  // Cancellation deadlines are the most urgent, so they lead the list.
+  const deadlines: TodoRow[] = [];
   const cancellations = trip.items.filter(
     (item): item is StayItem => item.kind === 'stay' && Boolean(item.cancel_until) && item.cancel_until! >= today
   );
   for (const stay of cancellations) {
-    rows.push({
+    deadlines.push({
       when_label: formatWhenLabel(stay.cancel_until!),
       title: stay.title,
       detail: `Free cancellation ends ${formatWhenLabel(stay.cancel_until!)}`,
@@ -301,7 +304,7 @@ export function buildTodo(trip: Trip, today: IsoDate): TodoRow[] {
     });
   }
 
-  return rows;
+  return [...deadlines, ...rows];
 }
 
 function noBedRanges(trip: Trip): TodoRow[] {
@@ -312,6 +315,12 @@ function noBedRanges(trip: Trip): TodoRow[] {
   for (const item of trip.items) {
     if (item.kind !== 'stay') continue;
     for (const night of nightsBetween(item.date, item.check_out_date)) covered.add(night);
+  }
+  // An overnight flight or train is that night's bed.
+  for (const item of trip.items) {
+    if (item.kind !== 'flight' && item.kind !== 'train') continue;
+    if (!item.arrive_date) continue;
+    for (const night of nightsBetween(item.date, item.arrive_date)) covered.add(night);
   }
   const uncovered = nights.filter((n) => n !== lastNight && !covered.has(n));
   const ranges: { start: IsoDate; end: IsoDate; cityId: string }[] = [];
@@ -324,13 +333,18 @@ function noBedRanges(trip: Trip): TodoRow[] {
       ranges.push({ start: night, end: night, cityId });
     }
   }
-  return ranges.map((r) => ({
-    when_label: r.start === r.end ? formatWhenLabel(r.start) : `${dayNum(r.start)}–${dayNum(r.end)} ${monthLabel(r.end)}`,
-    title: 'No bed',
-    detail: 'No bed',
-    city_id: r.cityId,
-    date: r.start
-  }));
+  return ranges.map((r) => {
+    const count = nightsBetween(r.start, addDaysIso(r.end, 1)).length;
+    const cityName = trip.cities.find((c) => c.id === r.cityId)?.name;
+    const nightsText = `${count} ${count === 1 ? 'night' : 'nights'} with nothing booked`;
+    return {
+      when_label: r.start === r.end ? formatWhenLabel(r.start) : rangeLabel(r.start, r.end),
+      title: 'No bed',
+      detail: cityName ? `${cityName} · ${nightsText}` : nightsText,
+      city_id: r.cityId,
+      date: r.start
+    };
+  });
 }
 
 function cityForDate(trip: Trip, date: IsoDate): string {
@@ -359,7 +373,13 @@ function dayNum(date: IsoDate): string {
 
 function monthLabel(date: IsoDate): string {
   const d = new Date(date + 'T00:00:00Z');
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
+}
+
+/** "10–12 Dec", or "27 Dec – 8 Jan" across a month end. */
+function rangeLabel(start: IsoDate, end: IsoDate): string {
+  if (start.slice(0, 7) === end.slice(0, 7)) return `${dayNum(start)}–${dayNum(end)} ${monthLabel(end)}`;
+  return `${dayNum(start)} ${monthLabel(start)} – ${dayNum(end)} ${monthLabel(end)}`;
 }
 
 function formatWhenLabel(date: IsoDate): string {

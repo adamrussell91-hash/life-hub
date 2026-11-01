@@ -3,7 +3,9 @@
 // pack is private; tests/unit/get-things-done-copy.test.js checks against it where it exists.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copiedRun, shinglesOf, shippedStrings } from '../../scripts/book-pack/copy-check.mjs';
 import { importSection } from '../../scripts/book-pack/import.mjs';
@@ -77,8 +79,11 @@ test('importer: the generated module builds through the real factories', async (
   for (const e of Object.values(pack.entries)) e.id = e.id.replace(/^zz_/, 'gt_');
   pack.entries = Object.fromEntries(Object.values(pack.entries).map((e) => [e.id, e]));
   pack.entries.gt_alpha.pairsWell = ['gt_beta'];
-  const { source } = importSection({ ...pack, book: { ...pack.book, prefix: 'gt' } }, 'first', { familiesPath: './index.mjs' });
-  const file = fileURLToPath(new URL('../../packages/decision-book/families/__import-test.mjs', import.meta.url));
+  // Written outside the repo, so the run leaves no change behind for the pre-PR gate to see.
+  const familiesPath = new URL('../../packages/decision-book/families/index.mjs', import.meta.url).href;
+  const { source } = importSection({ ...pack, book: { ...pack.book, prefix: 'gt' } }, 'first', { familiesPath });
+  const dir = mkdtempSync(join(tmpdir(), 'book-pack-import-'));
+  const file = join(dir, 'import-test.mjs');
   writeFileSync(file, source);
   try {
     const mod = await import(`${file}?t=${Date.now()}`);
@@ -87,7 +92,7 @@ test('importer: the generated module builds through the real factories', async (
     assert.deepEqual(mod.FIRST.gt_beta.chart.stages.map((s) => s.id), ['one', 'two']);
     assert.equal(mod.FIRST.gt_alpha.steps[1].title, 'Act');
   } finally {
-    rmSync(file);
+    rmSync(dir, { recursive: true });
   }
 });
 
