@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
-import { runLessonAiJob, runNextStepsFill, runLaddersDraft, applyFilledBoxes, NEXT_STEP_JOB_KINDS } from './teaching-ai-runtime.mjs';
+import { runLessonAiJob, runNextStepsFill, runLaddersDraft, applyFilledBoxes, NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, runAnswerMarking, markingSummary, usdToAud } from './teaching-ai-runtime.mjs';
+import { QuizError, applyAiMarks, gatherAiMarking } from './quiz.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs';
@@ -316,6 +317,92 @@ export async function runStoredNextStepJob({
     status: patch.status,
     turns: result.usage?.length ?? 0,
     failed_checks: (result.flagged ?? []).length,
+    cost_usd: result.cost_usd,
+    usage: result.usage,
+    at: nowIso()
+  });
+  return finish(patch);
+}
+
+export { ANSWER_MARK_JOB_KIND };
+/** A class's written answers go in calls of 12 on the standard lane; inside the panel's 10-minute wait. */
+export const ANSWER_MARK_JOB_DEADLINE_MS = 8 * 60 * 1000;
+
+/**
+ * Runs a queued AI marking job (answer-marking-jobs.ts). The waiting answers
+ * are gathered again here, so a teacher mark made since the press is
+ * skipped. Only answer text and opaque ids reach the model; the marks are
+ * written to each attempt's ai-marks record and the cost is logged.
+ */
+export async function runStoredAnswerMarkingJob({
+  store,
+  jobId,
+  env = process.env,
+  complete,
+  deadlineMs = ANSWER_MARK_JOB_DEADLINE_MS,
+  nowIso = () => new Date().toISOString()
+}) {
+  const job = await getJSON(store, aiJobKey(jobId));
+  if (!job || job.status !== 'working' || job.kind !== ANSWER_MARK_JOB_KIND || !job.lesson_id) return job;
+  const finish = patch => patchWorkingJob(store, jobId, { ...patch, phase: undefined }, nowIso);
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!complete && !apiKey) return finish({ status: 'error', error: 'Teaching AI is not configured: ANTHROPIC_API_KEY is missing on the server.' });
+
+  let gathered;
+  try {
+    gathered = await gatherAiMarking(store, job.lesson_id);
+  } catch (error) {
+    if (error instanceof QuizError) return finish({ status: 'error', error: 'Publish this quiz first.' });
+    throw error;
+  }
+  if (!gathered.answers.length) return finish({ status: 'done', response: 'Nothing was waiting for the AI.', marked: 0, unsure: 0, waiting: 0, usage: [], cost_usd: 0 });
+
+  await patchWorkingJob(store, jobId, { phase: 'writing' }, nowIso);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  let result;
+  try {
+    result = await runAnswerMarking({
+      complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }),
+      questions: gathered.questions,
+      answers: gathered.answers,
+      models: teachingModels(env),
+      signal: controller.signal
+    });
+  } catch (error) {
+    result = { status: 'error', error: error instanceof Error ? error.message : 'The AI job failed.', marks: [], waiting: 0, usage: [], cost_usd: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let patch;
+  if (result.status !== 'done') {
+    patch = { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd };
+  } else {
+    const { written } = await applyAiMarks(store, job.lesson_id, gathered.refs, result.marks, { job: jobId, at: nowIso() });
+    const marked = result.marks.filter(m => m.marks !== null).length;
+    patch = {
+      status: 'done',
+      response: markingSummary(result.marks, result.waiting),
+      marked,
+      unsure: result.marks.length - marked,
+      waiting: result.waiting,
+      written,
+      usage: result.usage,
+      cost_usd: result.cost_usd,
+      cost_aud: usdToAud(result.cost_usd)
+    };
+  }
+
+  await appendUsageLog(store, {
+    job_id: jobId,
+    lesson_id: job.lesson_id,
+    agent: null,
+    action: ANSWER_MARK_JOB_KIND,
+    protocol_id: null,
+    status: patch.status,
+    turns: result.usage?.length ?? 0,
+    failed_checks: result.waiting ?? 0,
     cost_usd: result.cost_usd,
     usage: result.usage,
     at: nowIso()

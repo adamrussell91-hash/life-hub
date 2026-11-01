@@ -69,6 +69,16 @@ describe('anthology map', () => {
     expect(new Set(colours).size).toBe(colours.length);
   });
 
+  it('an empty anthology tells the teacher how to fill it, and students only that it is empty', () => {
+    const block = createBlock('anthology', 'anth_1');
+    if (block.block_type !== 'anthology') throw new Error('expected anthology');
+    const none: AnthologyData = { ...data, items: [] };
+    expect(buildAnthologyView(block, { data: none, mode: 'teacher' }).textContent).toContain('Tick Add to unit anthology');
+    const student = buildAnthologyView(block, { data: none, mode: 'student' }).textContent ?? '';
+    expect(student).toContain('Nothing collected here yet.');
+    expect(student).not.toContain('Tick');
+  });
+
   it('prints a list by theme instead of the map', () => {
     const block = createBlock('anthology', 'anth_1');
     if (block.block_type !== 'anthology') throw new Error('expected anthology');

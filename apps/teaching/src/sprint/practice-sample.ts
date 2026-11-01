@@ -95,7 +95,8 @@ async function samplePayload(
         requirements: wheres('prototype', 'In the opening of my part.'),
         self: Object.fromEntries(criteria.map((c) => [c, 2 as const])),
         self_why: Object.fromEntries(criteria.map((c) => [c, 'My part shows this in its opening.'])),
-        value_answer: 'Another view would ask for more evidence here.'
+        value_answer: 'Another view would ask for more evidence here.',
+        builds: Object.fromEntries((status.parts ?? []).filter((p) => p.mine).map((p) => [p.id, { text: `${name} built this sample of ${p.text}.`, link: '', files: [] }]))
       },
       status
     };

@@ -2,7 +2,9 @@ import { apiPost } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import {
+  AI_MARK_KINDS,
   QUIZ_KIND_INFO,
+  QUIZ_LIMITS,
   blankQuestion,
   norm,
   resolveQuizSettings,
@@ -21,7 +23,9 @@ import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
-import { button, checkbox, el, errorText, formatMarks, labelled, plural, practiceChip, select } from '@/quiz/dom';
+import { button, checkbox, el, errorText, formatMarks, labelled, plural, practiceChip, select, textArea } from '@/quiz/dom';
+import { aiMarkDoneLine, aiMarkLabel, estimateAiMarking, runAiMarking, type AnswerMarkEstimate } from '@/quiz/ai-mark-run';
+import { findBlockById } from '@/blocks/find-block';
 import { groupSetSection, renderGroupSetPicker, type PickerOptions } from '@/quiz/group-set-picker';
 import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
 import { codeLabel, loadInsightContext, type InsightContext } from '@/evidence/context';
@@ -50,6 +54,8 @@ export type QuizPanelOptions = {
   onSettings: (settings: QuizSettings) => void;
   onAddBlocks: (blocks: Block[]) => void;
   onRemoveBlock: (blockId: string) => void;
+  /** Replaces one block in the draft, for Add to accepted answers. */
+  onUpdateBlock?: (block: Block) => void;
   idFactory: () => string;
   /** Loads a class's saved groups and suggested group moves, for Personalise. */
   loadGroups?: PickerOptions['load'];
@@ -88,6 +94,12 @@ type Row = {
   writing?: WritingSummary & { log?: WritingLog };
   /** A written answer's next-step pick: the student's own, shown apart from the teacher's codes. */
   step?: StepPick;
+  /** Which mark counts: the teacher's, the AI's or the automatic one. Null while waiting. */
+  by?: 'teacher' | 'ai' | 'auto' | null;
+  /** The AI's mark, for the teacher only. Marks are null when it wasn't sure. */
+  ai?: { marks: number | null; suggested?: number; reason: string; feedback?: string };
+  /** The teacher's comment for the student. */
+  comment?: string;
 };
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
@@ -105,7 +117,7 @@ type QuestionStats = {
   confidence: Record<'1' | '2' | '3', [number, number]>;
   picks: Record<string, number>;
 };
-type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[]; sets?: Array<{ id: string; name: string; questions: number }> };
+type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[]; sets?: Array<{ id: string; name: string; questions: number }>; ai_waiting?: number };
 type Tab = 'tray' | 'settings' | 'results' | 'live';
 
 const TAB_KEY = 'quiz-panel:tab';
@@ -143,6 +155,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let classes: Array<{ id: string; title: string }> | null = null;
   let insightClass: string | null = null;
   let ctx: InsightContext | null = null;
+  /** AI marking: the dry run for the answers now waiting (keyed so a poll doesn't ask again), and the run's line. */
+  const aiMark: { key: string; estimate: AnswerMarkEstimate | null; running: boolean; line: string; tone: 'info' | 'error' } = { key: '', estimate: null, running: false, line: '', tone: 'info' };
 
   const post = <T>(body: Record<string, unknown>) => apiPost<T>(endpoint, body);
   const showError = (error: unknown) => {
@@ -341,7 +355,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(bar);
     if (!submissions.length) {
       wrap.append(
-        el('p', 'qz-note block-secondary', 'No questions yet. Add a Question drop block to this week’s lessons and choose this quiz as where it feeds into.')
+        el('p', 'qz-note block-secondary', 'No questions yet. Add a Students write questions block to this week’s lessons and choose this quiz as where it feeds into.')
       );
       return wrap;
     }
@@ -581,7 +595,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     closes.type = 'datetime-local';
     closes.value = raw.closes_at ? toLocalInput(raw.closes_at) : '';
     closes.addEventListener('change', () => save({ closes_at: closes.value ? new Date(closes.value).toISOString() : undefined }));
-    grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Question drop blocks.'));
+    grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Students write questions blocks.'));
     const siblings = insight?.siblings ?? [];
     const current = raw.compare_with ?? '';
     const compareOptions = [{ value: '', label: 'None' }, ...siblings.map((x) => ({ value: x.lesson_id, label: x.title }))];
@@ -649,6 +663,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     }
     const r = results;
     const total = r.attempts.length;
+    const strip = aiMarkStrip(r);
+    if (strip) wrap.append(strip);
     const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
     const release =
       r.feedback === 'released'
@@ -685,6 +701,64 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     }
     wrap.append(studentsView(r, names, null));
     return wrap;
+  }
+
+  /**
+   * The AI mark button, while handed-in answers wait for the AI: its label
+   * comes from a dry run (no model call), asked once for each count waiting.
+   * Then a status line while the job runs, and its summary when done.
+   */
+  function aiMarkStrip(r: Extract<Results, { published: true }>): HTMLElement | null {
+    const waiting = r.ai_waiting ?? 0;
+    if (!waiting && !aiMark.running && !aiMark.line) return null;
+    const strip = el('div', 'qz-ai-strip');
+    if (aiMark.running) {
+      strip.append(el('p', 'qz-note', aiMark.line));
+      return strip;
+    }
+    if (waiting) {
+      const key = `${r.version}:${waiting}`;
+      if (aiMark.key !== key) {
+        aiMark.key = key;
+        aiMark.estimate = null;
+        void estimateAiMarking(lessonId).then(
+          (estimate) => {
+            if (aiMark.key !== key) return;
+            aiMark.estimate = estimate;
+            if (tab === 'results' && !openAttempt) paint();
+          },
+          (error: unknown) => {
+            if (aiMark.key === key) aiMark.key = '';
+            showError(error);
+          }
+        );
+      }
+      const estimate = aiMark.estimate;
+      const go = button(estimate ? aiMarkLabel(estimate) : `AI mark ${plural(waiting, 'answer')} · working out the cost…`, 'secondary', async function () {
+        if (!estimate?.answers) return;
+        aiMark.running = true;
+        aiMark.line = `Marking ${plural(estimate.answers, 'answer')}…`;
+        aiMark.tone = 'info';
+        paint();
+        try {
+          aiMark.line = aiMarkDoneLine(await runAiMarking(lessonId));
+        } catch (error) {
+          aiMark.line = errorText(error);
+          aiMark.tone = 'error';
+        }
+        aiMark.running = false;
+        aiMark.key = '';
+        painted = '';
+        await refresh();
+      });
+      go.disabled = !estimate?.answers;
+      strip.append(go, el('span', 'qz-note block-secondary', 'Marks typed answers that aren’t an exact match. You can change any mark.'));
+    }
+    if (aiMark.line) {
+      const line = el('p', `qz-note${aiMark.tone === 'error' ? ' qz-note--error' : ''}`, aiMark.line);
+      strip.append(line);
+    }
+    return strip;
   }
 
   /** Every hand-in, lowest or latest first, with a square per question when the class insight has the marks. */
@@ -955,21 +1029,37 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           () => undefined
         );
       }
+      // The AI's mark, while it is the one that counts or it wasn't sure. A teacher mark replaces both.
+      const aiUnsure = r.by !== 'teacher' && !!r.ai && r.ai.marks === null;
+      if (r.by === 'ai' && r.ai) item.append(aiNote('AI marked', r.ai.reason));
+      else if (aiUnsure && r.ai) item.append(aiNote('AI wasn’t sure', r.ai.reason));
       const markRow = el('div', 'qz-mark');
       const input = el('input', 'qz-input qz-input--marks');
       input.type = 'number';
       input.min = '0';
       input.max = String(r.mark.max);
       input.step = '0.5';
-      input.value = r.awarded === null ? '' : String(r.awarded);
+      input.value = r.awarded === null ? (aiUnsure && typeof r.ai?.suggested === 'number' ? String(r.ai.suggested) : '') : String(r.awarded);
       input.placeholder = '–';
-      const save = button(r.awarded === null ? 'Mark' : 'Change mark', r.awarded === null ? 'primary' : 'ghost', async function () {
+      // Typed answers take a comment; a long answer the AI marked starts from its feedback.
+      const comment = (AI_MARK_KINDS as readonly string[]).includes(r.key.kind)
+        ? textArea(r.comment ?? (r.by !== 'teacher' ? r.ai?.feedback ?? '' : ''), QUIZ_LIMITS.note, 2, 'What they did well and one next step.')
+        : null;
+      const fromAi = r.by === 'ai' || aiUnsure;
+      const save = button(fromAi ? 'Save' : r.awarded === null ? 'Mark' : 'Change mark', r.awarded === null || fromAi ? 'primary' : 'ghost', async function () {
         const score = input.value.trim() === '' ? null : Number(input.value);
         this.disabled = true;
         try {
           // Codes are read when the post goes out, so a chip changed just before still counts.
           const res = await inOrder(() =>
-            post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score, codes: score === null || score >= r.mark.max ? [] : (r.codes ?? []) })
+            post<{ attempt: AttemptDetail }>({
+              action: 'mark',
+              attempt_id: a.id,
+              question_id: r.id,
+              score,
+              codes: score === null || score >= r.mark.max ? [] : (r.codes ?? []),
+              ...(comment ? { comment: comment.value } : {})
+            })
           );
           wrap.replaceWith(attemptView(res.attempt));
         } catch (error) {
@@ -977,8 +1067,11 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           this.disabled = false;
         }
       });
+      if (comment) item.append(labelled('Comment for the student (optional)', comment, 'Students see it once results are released.'));
       markRow.append(labelled(`Marks out of ${formatMarks(r.mark.max)}`, input), save);
       item.append(markRow);
+      const accept = acceptButton(r, answerText);
+      if (accept) item.append(accept);
       // Saving the current mark with codes turns an automatic mark into a teacher mark of the same value.
       const awarded = r.awarded;
       const codes = ctx?.codes ?? [];
@@ -1036,6 +1129,40 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       wrap.append(item);
     });
     return wrap;
+  }
+
+  /** The AI's note on a row: a tag and its reason, for the teacher only. */
+  function aiNote(tag: string, reason: string): HTMLElement {
+    const p = el('p', 'qz-ai-note');
+    p.append(el('span', 'qz-ai-note__tag', tag), document.createTextNode(` ${reason}`));
+    return p;
+  }
+
+  /**
+   * Add to accepted answers, once the teacher has given a short answer full
+   * marks that isn't one of its accepted answers. It goes into the draft
+   * question, so new attempts get it once the lesson is republished.
+   */
+  function acceptButton(r: Row, text: string): HTMLElement | null {
+    const answer = r.key.answer;
+    if (!options.onUpdateBlock || r.key.kind !== 'short_answer' || answer.type !== 'text' || r.by !== 'teacher') return null;
+    if (r.awarded === null || r.awarded < r.mark.max || !text.trim()) return null;
+    if (answer.accepted.some((x) => norm(x, answer.case_sensitive) === norm(text, answer.case_sensitive))) return null;
+    const host = el('div', 'qz-accept');
+    const say = (line: string) => host.replaceChildren(el('p', 'qz-note block-secondary', line));
+    host.append(
+      button('Add to accepted answers', 'ghost', () => {
+        const block = findBlockById(options.getLesson().blocks, r.id);
+        const q = block?.block_type === 'quiz_question' ? (block.content as { question?: QuizQuestion }).question : null;
+        if (!block || q?.kind !== 'short_answer') return say('This question isn’t in the lesson any more.');
+        if (q.accepted.some((x) => norm(x, !!q.case_sensitive) === norm(text, !!q.case_sensitive))) return say('It’s already an accepted answer. New attempts get it once you republish.');
+        if (q.accepted.length >= 10) return say('This question has 10 accepted answers already. Remove one in the lesson to add this.');
+        const question = { ...q, accepted: [...q.accepted, text.trim().slice(0, QUIZ_LIMITS.answer)] };
+        options.onUpdateBlock!({ ...block, content: { ...block.content, question }, updated_at: new Date().toISOString() } as Block);
+        say('Added. New attempts get it once you republish.');
+      })
+    );
+    return host;
   }
 
   /* ── Live ── */

@@ -1,7 +1,7 @@
 // apps/teaching/tests/unit/sprint-forms-mid.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { mountDecide } from '@/sprint/phase-decide';
-import { mountPrototype } from '@/sprint/phase-prototype';
+import { mountPrototype, prototypeSignature } from '@/sprint/phase-prototype';
 import type { FormContext } from '@/sprint/form-kit';
 import type { SprintStatus } from '@/sprint/api';
 import { newSprintSettings } from '@/sprint/defaults';
@@ -156,6 +156,50 @@ describe('prototype form', () => {
     expect([...f.el.querySelectorAll('.sprint-mypart__name')].map((h) => h.textContent)).toEqual(['Panel text', 'Artefacts']);
     expect(f.el.querySelector('.sprint-brief-part')?.textContent).toContain('Write it in Docs');
     expect(f.el.querySelector('.sprint-brief-part')?.textContent).not.toContain('The streets');
+  });
+
+  it('a student with two parts builds each in its own box, and the checks ask for both', () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [
+      { id: 'p1', text: 'Panel text', shows: 'The morning', criterion: 'c1', claimed: 1, mine: true },
+      { id: 'p2', text: 'Artefacts', shows: 'Three objects', criterion: 'c2', claimed: 1, mine: true }
+    ] });
+    const c = { ...ctx(s, 'prototype'), drafts: {} };
+    const f = mountPrototype(c);
+    expect([...f.el.querySelectorAll('.sprint-brief-part__line b')].map((b) => b.textContent)).toContain('Your part');
+    expect([...f.el.querySelectorAll('.sprint-build__title')].map((h) => h.textContent)).toEqual(['Part 1 of 2: Panel text', 'Part 2 of 2: Artefacts']);
+    expect(f.el.textContent).toContain('Build your 2 parts');
+    const area = f.el.querySelector<HTMLTextAreaElement>('.sprint-build textarea')!;
+    area.value = 'The baker at dawn.';
+    area.dispatchEvent(new Event('input'));
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    const checks = f.el.querySelector('.sprint-checks')?.textContent ?? '';
+    expect(checks).toContain('Build “Artefacts”');
+    expect(checks).not.toContain('Build “Panel text”');
+    expect((c.drafts as { prototype?: { builds: Record<string, { text: string }> } }).prototype?.builds.p1?.text).toBe('The baker at dawn.');
+  });
+
+  it('the checks sit under the step where each is done, with a button that opens it', () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [{ id: 'p1', text: 'Panel text', shows: 'The morning', criterion: 'c1', claimed: 1, mine: true }] });
+    const f = mountPrototype(ctx(s, 'prototype'));
+    document.body.append(f.el);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    const heads = [...f.el.querySelectorAll('.sprint-checks__head strong')].map((h) => h.textContent);
+    expect(heads).toEqual(['Step 2 · Build it', 'Step 4 · Rate your part']);
+    const go = [...f.el.querySelectorAll<HTMLButtonElement>('.sprint-checks__head button')].find((b) => b.textContent === 'Go to step 4')!;
+    go.click();
+    const cards = [...f.el.querySelectorAll<HTMLElement>('.su-step')];
+    expect(cards.map((c) => c.hidden)).toEqual([true, true, true, false]);
+    f.el.remove();
+  });
+
+  it('a groupmate’s save updates the parts list in place and keeps the step', () => {
+    const row = (inn: boolean) => ({ part_id: 'p1', part: 'Panel text', who: 'CD', me: false, text: 'Dawn.', link: '', files: [], in: inn, started: true });
+    const a = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, group_parts: [row(false)] });
+    const b = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, group_parts: [row(true)] });
+    expect(prototypeSignature(a)).toBe(prototypeSignature(b));
+    const f = mountPrototype(ctx(a, 'prototype'));
+    f.update!(b);
+    expect(f.el.querySelector('.sp-parts summary')?.textContent).toBe('Your group’s parts · 1 of 1 in');
   });
 
   it('shows the part brief, upload, pitch file and the self-check', () => {

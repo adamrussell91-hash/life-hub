@@ -2590,7 +2590,21 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
   [data-alchemy-assistant] .lesson-page__block:has(> .block[data-block-type='heading']) {
     padding-right: calc(2.75rem + var(--space-8));
   }
-  .lesson-page__blocks {
+.block-editor .hub-filter[hidden] {
+  display: none;
+}
+
+.lesson-page__footer-note {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+.lesson-page__blocks {
     padding-left: 0;
   }
 

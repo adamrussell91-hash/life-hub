@@ -1,5 +1,6 @@
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
+import type { studentUnitAnthology } from '@/blocks/anthology-load';
 import { el } from '@/quiz/dom';
 import type { SprintStatus } from './api';
 import type { LimitBox, PublicSprint, SprintPhaseKey } from './schema';
@@ -27,6 +28,8 @@ export type GroupSheetOptions = {
   challenge: Block[];
   lessonId?: string;
   pageBlocks?: Block[];
+  /** Lets an Anthology block in the challenge read the unit's published notes. */
+  loadAnthology?: () => ReturnType<typeof studentUnitAnthology>;
   /** Where the fold state is kept between visits. */
   storeKey?: string;
 };
@@ -66,7 +69,7 @@ export function createGroupSheet(opts: GroupSheetOptions): { el: HTMLElement; up
   // The teacher's brief is rendered once; repaints move the same nodes.
   const blocks = opts.challenge.filter((b, i) => !(i === 0 && opts.challenge.length > 1 && isLabelHeading(b)));
   const challenge = el('div', 'sprint-sheet__challenge');
-  for (const b of blocks) challenge.append(renderBlock(b, 'student', { lessonId: opts.lessonId, pageBlocks: opts.pageBlocks ?? opts.challenge }));
+  for (const b of blocks) challenge.append(renderBlock(b, 'student', { lessonId: opts.lessonId, pageBlocks: opts.pageBlocks ?? opts.challenge, loadAnthology: opts.loadAnthology }));
   let expertOpen = false;
   let sig = '';
 

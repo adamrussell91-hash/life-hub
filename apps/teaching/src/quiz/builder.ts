@@ -1,6 +1,7 @@
 import {
   QUIZ_KIND_INFO,
   QUIZ_LIMITS,
+  aiMarkOn,
   blankQuestion,
   checkQuestion,
   locateQuote,
@@ -51,6 +52,8 @@ export type BuilderOptions = {
   /** In a lesson: written answers get a next-steps bank, made through the builder's jobs. */
   nextSteps?: { jobs?: NextStepJobs };
   onChange: (question: QuizQuestion) => void;
+  /** Teacher's Question block: other types in the same list, grouped apart. Picking one hands over to `onPick`. */
+  otherTypes?: { quizLabel: string; label: string; options: Array<{ value: string; label: string }>; onPick: (value: string) => void };
 };
 
 /** Written kinds, whose answer box serves a next step. */
@@ -92,7 +95,30 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     kinds.includes(q.kind) ? q.kind : (kinds[0] as string)
   );
   const kindBlurb = el('p', 'qz-field__hint', QUIZ_KIND_INFO[q.kind].blurb);
+  const other = options.otherTypes;
+  if (other) {
+    // Two groups in one list: this question's kinds, then the other block's types.
+    const quizGroup = el('optgroup');
+    quizGroup.label = other.quizLabel;
+    quizGroup.append(...[...kindSelect.options]);
+    const otherGroup = el('optgroup');
+    otherGroup.label = other.label;
+    for (const o of other.options) {
+      const option = el('option');
+      option.value = o.value;
+      option.textContent = o.label;
+      otherGroup.append(option);
+    }
+    kindSelect.replaceChildren(quizGroup, otherGroup);
+    kindSelect.value = kinds.includes(q.kind) ? q.kind : (kinds[0] as string);
+  }
   kindSelect.addEventListener('change', () => {
+    if (other?.options.some((o) => o.value === kindSelect.value)) {
+      const picked = kindSelect.value;
+      kindSelect.value = q.kind;
+      other.onPick(picked);
+      return;
+    }
     const next = kindSelect.value as QuizQuestionKind;
     const fresh = blankQuestion(next, q.id, q.marks, newId);
     q = { ...fresh, prompt: q.prompt, hint: q.hint, explanation: q.explanation, ...(next === 'label_image' ? {} : q.image ? { image: q.image } : {}) } as QuizQuestion;
@@ -387,14 +413,33 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       );
     }
     if (!student) {
+      const looking = textArea(question.looking_for ?? '', QUIZ_LIMITS.note, 2, 'e.g. Any answer that names the speaker’s grief.');
+      looking.addEventListener('input', () => {
+        question.looking_for = looking.value || undefined;
+        emit();
+      });
       wrap.append(
         checkbox('Capitals must match', !!question.case_sensitive, (checked) => {
           question.case_sensitive = checked || undefined;
           emit();
-        })
+        }),
+        aiSwitch(question),
+        labelled('Looking for (optional)', looking, 'What a right answer says, so the AI can mark wordings that aren’t on the list.')
       );
     }
     return wrap;
+  }
+
+  /**
+   * "AI can mark this": on by default for short answers and gaps, off for
+   * written answers. Only a change from the default is saved.
+   */
+  function aiSwitch(question: { kind: QuizQuestionKind; ai_mark?: boolean }): HTMLElement {
+    const byDefault = question.kind === 'short_answer' || question.kind === 'fill_gap';
+    return checkbox('AI can mark this', aiMarkOn(question), (checked) => {
+      question.ai_mark = checked === byDefault ? undefined : checked;
+      emit();
+    });
   }
 
   /**
@@ -506,6 +551,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         emit();
       })
     );
+    if (!student) wrap.append(aiSwitch(question));
     paintChips();
     return wrap;
   }
@@ -1027,6 +1073,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       labelled('Model answer', model),
       labelled('How to mark it', guide)
     );
+    if (!student) wrap.append(aiSwitch(question));
     return wrap;
   }
 

@@ -240,7 +240,8 @@ type Complete = (request: ModelRequest) => Promise<ModelReply>;
 
 type RunCommon = { complete: Complete; models?: Partial<Record<ModelTier, string>>; signal?: AbortSignal };
 
-function textOf(reply: ModelReply): string {
+/** The text blocks of a reply, joined. */
+export function textOf(reply: ModelReply): string {
   return (Array.isArray(reply.content) ? reply.content : [])
     .filter((b): b is { type: 'text'; text: string } => b.type === 'text' && typeof (b as { text?: unknown }).text === 'string')
     .map((b) => b.text)
@@ -248,7 +249,7 @@ function textOf(reply: ModelReply): string {
     .trim();
 }
 
-function usageOf(reply: ModelReply, model: string): TurnUsage {
+export function usageOf(reply: ModelReply, model: string): TurnUsage {
   const servedBy = reply.model ?? model;
   return {
     model: servedBy,
@@ -261,7 +262,7 @@ function usageOf(reply: ModelReply, model: string): TurnUsage {
   };
 }
 
-const totalCost = (usage: TurnUsage[]): number => Math.round(usage.reduce((sum, u) => sum + u.cost_usd, 0) * 1_000_000) / 1_000_000;
+export const totalCost = (usage: TurnUsage[]): number => Math.round(usage.reduce((sum, u) => sum + u.cost_usd, 0) * 1_000_000) / 1_000_000;
 
 async function ask(run: RunCommon, tier: ModelTier, system: string, user: string, maxTokens: number): Promise<{ text: string; usage: TurnUsage; stop?: string | null }> {
   const model = { ...TEACHING_AI_MODELS, ...run.models }[tier];
