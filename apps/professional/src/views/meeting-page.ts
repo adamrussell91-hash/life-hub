@@ -3,10 +3,12 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, listMeetings, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
+  createTask,
   createUniversalLink,
   suppressUniversalLink,
   listUniversalLinksForEntity
 } from '@/api/universal-links';
+import { fetchMinutesFile, uploadMinutesFile } from '@/api/meeting-minutes-file';
 import { fetchPeopleDirectory, fetchPersonLedger, type DirectoryPersonRow } from '@/api/people-directory';
 import { createLedgerItem, listLedgerForSources, patchLedger } from '@/api/ledger';
 import { ApiClientError } from '@/api/client';
@@ -17,6 +19,8 @@ import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
+import { keepMinutesDecisions, saveMinutesReview } from '@/lib/meeting-minutes';
+import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
@@ -28,6 +32,7 @@ import {
   clareBrief,
   clareDrafts,
   clareHandwriting,
+  clareMinutes,
   clareProposeNext,
   clarePurposeCheck,
   clareSummary,
@@ -517,6 +522,7 @@ export async function renderMeetingPage(
     // Keep the live notes editor. Disposing it on recycle/autosave left the
     // remounted block as a preview with no contenteditable surface.
     if (notesCardEl?.parentElement === main) notesCardEl.remove();
+    if (minutesCardEl?.parentElement === main) minutesCardEl.remove();
     main.replaceChildren();
     if (next === 'before') paintBefore();
     else if (next === 'during') paintDuring();
@@ -539,7 +545,7 @@ export async function renderMeetingPage(
       editable: true,
       onSave: async (blocks) => {
         const found = extractDecisions(blocks as Array<{ block_type: string; content?: unknown }>);
-        const decisions = found.map((decision, index) => ({ id: `d_${index + 1}`, ...decision }));
+        const decisions = keepMinutesDecisions(record.decisions ?? [], found);
         record = (await updateMeeting(id, { blocks, decisions })).meeting;
         await syncPromises(blocks);
         paintActions();
@@ -560,6 +566,57 @@ export async function renderMeetingPage(
       notesCardEl.querySelector('.meeting-page__hint')!.textContent = hint;
     }
     return notesCardEl;
+  }
+
+  // One Minutes card kept across phase repaints, like the notes card.
+  let minutesCardEl: HTMLElement | null = null;
+  function agendaHeadings(): string[] {
+    return (blockPage?.current() ?? record.blocks ?? [])
+      .filter((block) => (block as { block_type?: string }).block_type === 'heading')
+      .map((block) => String((block as { content?: { text?: string } }).content?.text ?? '').trim())
+      .filter(Boolean);
+  }
+  function minutesCard(): HTMLElement {
+    if (minutesCardEl) return minutesCardEl;
+    minutesCardEl = mountMinutesCard({
+      record: () => record,
+      attendees: () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name, role: attendee.role })),
+      onSaved: (next) => { record = next; paintActions(); },
+      deps: {
+        read: (minutes) => clareMinutes({ ...clareContext(), agenda_headings: agendaHeadings() }, minutes),
+        save: (input) => saveMinutesReview({
+          ...input,
+          record,
+          meetingRef,
+          attendees: attendees.map((attendee) => ({ ref: attendee.ref, role: attendee.role }))
+        }, {
+          uploadFile: uploadMinutesFile,
+          createLedgerItem: async (body) => {
+            const out = await createLedgerItem(body);
+            if (out.created) ledger.push(out.item);
+            return out;
+          },
+          makeActionTask: async (item, sourceRef) => {
+            const linked = await makeActionTask(item, sourceRef);
+            ledger = ledger.map((entry) => (entry.id === linked.id ? linked : entry));
+            return linked;
+          },
+          createLooseTask: async (title, sourceRef) => {
+            const task = await createTask({ title });
+            await createUniversalLink({ source_ref: `tasks:task:${task.id}`, target_ref: sourceRef, relationship_type: 'tagged_with' });
+          },
+          saveMeeting: async (patch) => (await updateMeeting(id, patch)).meeting
+        }),
+        openFile: async (fileKey) => {
+          const file = await fetchMinutesFile(fileKey);
+          const bytes = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
+          const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+          window.open(url, '_blank', 'noopener');
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        }
+      }
+    });
+    return minutesCardEl;
   }
 
   const actions = el('section', 'card');
@@ -653,14 +710,14 @@ export async function renderMeetingPage(
     main.append(briefCard(), openPromisesCard(), notesCard(
       'Agenda and notes',
       'Each agenda item is a heading. Add what you want to raise under it.'
-    ));
+    ), minutesCard());
   }
 
   function paintDuring(): void {
     main.append(liveStrip(), notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
-    ), guidesHost, actions, mentions);
+    ), minutesCard(), guidesHost, actions, mentions);
     void paintGuides();
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
@@ -668,7 +725,7 @@ export async function renderMeetingPage(
 
   function paintAfter(): void {
     if (record.purpose) main.append(purposeCheckCard());
-    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), guidesHost, mentions);
+    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), minutesCard(), guidesHost, mentions);
     void paintGuides();
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);

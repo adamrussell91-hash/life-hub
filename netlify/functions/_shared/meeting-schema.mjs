@@ -15,6 +15,9 @@ const READABLE_MEETING_VERSIONS = new Set([1, 2]);
 export const PURPOSE_MAX_LENGTH = 500;
 export const DECISIONS_MAX = 50;
 export const GUIDE_RUNS_MAX = 20;
+export const MINUTES_SECTIONS_MAX = 40;
+const MINUTES_FILE_KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.pdf$/;
+const DECISION_SOURCES = new Set(['minutes']);
 
 export const MEETING_STATES = new Set([
   'scheduled',
@@ -97,11 +100,13 @@ export function validateDecisions(value) {
     if (!decision || typeof decision.id !== 'string' || typeof decision.text !== 'string' || !decision.text.trim()) {
       throw validationError('invalid_decisions', 'decisions need id and text.');
     }
-    return {
+    const out = {
       id: decision.id,
       text: decision.text.trim().slice(0, 500),
       agenda_heading: typeof decision.agenda_heading === 'string' ? decision.agenda_heading.trim().slice(0, 200) : null
     };
+    if (DECISION_SOURCES.has(decision.source)) out.source = decision.source;
+    return out;
   });
 }
 
@@ -179,6 +184,31 @@ export function validateCoachingSheets(value) {
   });
 }
 
+/** Official minutes for this meeting: the text by agenda item, where the PDF sits, what was saved from it. */
+export function validateMinutes(value) {
+  if (value === null) return null;
+  const fail = (why) => validationError('invalid_minutes', `minutes: ${why}`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw fail('an object or null.');
+  if (!Array.isArray(value.sections) || value.sections.length > MINUTES_SECTIONS_MAX) {
+    throw fail(`sections must be an array of at most ${MINUTES_SECTIONS_MAX}.`);
+  }
+  const sections = value.sections.map((section) => ({
+    heading: shortText(section?.heading, 200),
+    text: shortText(section?.text, 6000)
+  })).filter((section) => section.text);
+  const fileKey = value.file_key ?? null;
+  if (fileKey !== null && (typeof fileKey !== 'string' || !MINUTES_FILE_KEY_RE.test(fileKey))) throw fail('file_key is not a minutes file.');
+  if (value.source !== 'page' && value.source !== 'chat') throw fail('source must be page or chat.');
+  if (typeof value.added_at !== 'string' || !Number.isFinite(Date.parse(value.added_at))) throw fail('added_at must be a timestamp.');
+  const counts = {};
+  for (const key of ['tasks', 'promises', 'decisions']) {
+    const n = value.saved_counts?.[key];
+    if (!Number.isInteger(n) || n < 0 || n > 200) throw fail('saved_counts need whole numbers.');
+    counts[key] = n;
+  }
+  return { sections, file_key: fileKey, source: value.source, added_at: value.added_at, saved_counts: counts };
+}
+
 function assertTimeOrder(start, end) {
   if (Date.parse(end) < Date.parse(start)) {
     throw validationError('invalid_time_range', 'scheduled_end cannot precede scheduled_start.');
@@ -203,7 +233,8 @@ const STORED_KEYS = new Set([
   'blocks',
   'decisions',
   'guide_runs',
-  'coaching_sheets'
+  'coaching_sheets',
+  'minutes'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -272,7 +303,8 @@ export function parseMeetingRecord(raw) {
     blocks: Array.isArray(raw.blocks) ? raw.blocks : [],
     decisions: Array.isArray(raw.decisions) ? raw.decisions : [],
     guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : [],
-    coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : []
+    coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : [],
+    minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null
   };
 }
 
@@ -323,7 +355,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -352,6 +384,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.decisions !== undefined) patch.decisions = validateDecisions(input.decisions);
   if (input.guide_runs !== undefined) patch.guide_runs = validateGuideRuns(input.guide_runs);
   if (input.coaching_sheets !== undefined) patch.coaching_sheets = validateCoachingSheets(input.coaching_sheets);
+  if (input.minutes !== undefined) patch.minutes = validateMinutes(input.minutes);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -423,7 +456,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     blocks: record.blocks ?? [],
     decisions: record.decisions ?? [],
     guide_runs: record.guide_runs ?? [],
-    coaching_sheets: record.coaching_sheets ?? []
+    coaching_sheets: record.coaching_sheets ?? [],
+    minutes: record.minutes ?? null
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

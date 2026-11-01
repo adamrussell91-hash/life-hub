@@ -35,9 +35,27 @@ export const clareTaskTitle = (context: { title: string; notes: string }) => cal
 export const clareProposeNext = (context: ClareContext) =>
   call<{ date: string; time: string; duration_min: number; reason: string; ghost_id: string; queued: boolean }>('propose_next', { context });
 
-export async function clareHandwriting(file: File): Promise<{ text: string }> {
+export async function fileBase64(file: Blob): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return call<{ text: string }>('handwriting', { image: { media_type: file.type, data: btoa(binary) } });
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
 }
+
+export async function clareHandwriting(file: File): Promise<{ text: string }> {
+  return call<{ text: string }>('handwriting', { image: { media_type: file.type, data: await fileBase64(file) } });
+}
+
+export type ClareMinutesReview = {
+  sections: Array<{ heading: string; text: string }>;
+  mine: Array<{ text: string; due: string | null }>;
+  others: Array<{ text: string; person_ref: string; person_name: string; due: string | null }>;
+  unmatched: Array<{ text: string; who_text: string; due: string | null }>;
+  decisions: Array<{ text: string; agenda_heading: string | null }>;
+  differences: Array<{ text: string }>;
+};
+
+export const clareMinutes = (
+  context: ClareContext & { agenda_headings: string[] },
+  minutes: { pdf: { media_type: 'application/pdf'; data: string } } | { text: string }
+) => call<ClareMinutesReview>('minutes', { context, minutes });

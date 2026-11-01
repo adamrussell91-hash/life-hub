@@ -371,12 +371,22 @@ export interface MeetingRecord {
   decisions?: MeetingDecision[];
   guide_runs?: GuideRun[];
   coaching_sheets?: CoachingSheet[];
+  minutes?: MeetingMinutes | null;
 }
 
 export interface MeetingDecision {
   id: string;
   text: string;
   agenda_heading: string | null;
+  source?: 'minutes';
+}
+
+export interface MeetingMinutes {
+  sections: Array<{ heading: string; text: string }>;
+  file_key: string | null;
+  source: 'page' | 'chat';
+  added_at: string;
+  saved_counts: { tasks: number; promises: number; decisions: number };
 }
 
 export type EventOccurrenceState = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
