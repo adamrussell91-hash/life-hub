@@ -192,11 +192,12 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const key = current(s);
     paintTop(s, key);
     const r = s.round;
-    const roundKey = r && !s.lock ? `${r.group_id}:${r.sent ? 1 : 0}` : '';
+    // The pitch card shows over the lock screen: pitches run in class, after the class part has ended.
+    const roundKey = r ? `${r.group_id}:${r.sent ? 1 : 0}` : '';
     if (roundKey !== cardKey) {
       cardKey = roundKey;
       cardHost.replaceChildren();
-      if (r && !s.lock && CARDS.feedback) {
+      if (r && CARDS.feedback) {
         const row = s.phases!.find((p) => p.key === 'test')!;
         cardHost.append(CARDS.feedback({ status: s, sprint, blocks, row, editable: true, client: client!, frames: [], valueCheck: null, support: sprint.support, onStatus: (next) => apply(next) }, r));
       }
