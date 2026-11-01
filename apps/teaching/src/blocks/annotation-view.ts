@@ -60,6 +60,14 @@ import {
 } from '@/blocks/voice-note-player';
 import { renderElementCard, type TechniqueCardPoemSpot } from '@/blocks/technique-card';
 import { renderAnnotationCode } from '@/blocks/annotation-code-field';
+import {
+  buildTechniqueTile,
+  buildTileCard,
+  paintTileColour,
+  readTilesPref,
+  writeTilesPref,
+  type TileTechnique
+} from '@/blocks/annotation-technique-tiles';
 import type {
   AnnotationAttachment,
   AnnotationBlock,
@@ -825,6 +833,9 @@ function buildInteractiveView(
   let colourByFamily = false;
   /** The reader's own choice; null leaves it to the automatic rule. */
   let familyOverride: boolean | null = null;
+  /** Technique tiles: the reader's switch, and the tile card open under its line. */
+  let tilesOn = readTilesPref();
+  let tileOpenId: string | null = null;
 
   const threadIntro = document.createElement('p');
   threadIntro.className = 'block-annotation__threads-intro';
@@ -1170,6 +1181,27 @@ function buildInteractiveView(
     familyKey.hidden = families.size === 0;
     if (familyKey.hidden) return;
 
+    const tilesToggle = document.createElement('button');
+    tilesToggle.type = 'button';
+    tilesToggle.className = 'block-annotation__tiles-toggle';
+    tilesToggle.setAttribute('aria-pressed', tilesOn ? 'true' : 'false');
+    tilesToggle.textContent = tilesOn ? '✓ Technique tiles' : 'Technique tiles';
+    tilesToggle.title = tilesOn
+      ? 'Go back to plain marks'
+      : 'Show each technique as a bold tile on the poem; tap one to open its card under the line';
+    tilesToggle.addEventListener('click', () => {
+      tilesOn = !tilesOn;
+      writeTilesPref(tilesOn);
+      tileOpenId = null;
+      if (root.querySelector('.block-annotation__anchor.is-open')) {
+        closeAnnotationPanel(root);
+      }
+      state = { ...state, openAnnotationId: null };
+      activeNoteId = null;
+      paint();
+    });
+    familyKey.append(tilesToggle);
+
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'block-annotation__family-toggle';
@@ -1208,6 +1240,56 @@ function buildInteractiveView(
       note.textContent = 'Untagged notes keep their layer colour.';
       familyKey.append(note);
     }
+  }
+
+  /** The technique a mark shows as a tile, when tiles are on and it is tagged. */
+  function tileFor(item: PlacedAnnotation): TileTechnique | undefined {
+    if (!tilesOn || !table || !item.annotation.technique?.id) return undefined;
+    if (item.resolved.granularity === 'stanza') return undefined;
+    if ((item.annotation.also_anchors?.length ?? 0) > 0) return undefined;
+    const technique = lookupTechnique(table, item.annotation.technique.id);
+    if (!technique) return undefined;
+    return { technique, family: familyOfTechnique(table, technique) };
+  }
+
+  function toggleTile(id: string): void {
+    tileOpenId = tileOpenId === id ? null : id;
+    if (root.querySelector('.block-annotation__anchor.is-open')) closeAnnotationPanel(root);
+    state = { ...state, openAnnotationId: null };
+    activeNoteId = null;
+    paint();
+    const target = tileOpenId
+      ? root.querySelector<HTMLElement>(`[data-tile-card-for="${CSS.escape(tileOpenId)}"]`)
+      : root.querySelector<HTMLElement>(`[data-tile-for="${CSS.escape(id)}"]`);
+    if (tileOpenId) target?.scrollIntoView?.({ block: 'nearest' });
+    else target?.focus();
+  }
+
+  function tileCardFor(item: PlacedAnnotation, tile: TileTechnique): HTMLElement {
+    const ann = item.annotation;
+    const note = document.createElement('div');
+    note.className = 'block-annotation__tile-card-note';
+    if (ann.code) note.append(renderAnnotationCode(ann.code));
+    const body = document.createElement('div');
+    body.className = 'block-annotation__body';
+    body.innerHTML = sanitizeRichTextHtml(ann.body.html);
+    note.append(body);
+    const attachments = renderAttachmentList(ann.body.attachments);
+    if (attachments) note.append(attachments);
+    const fullCard = renderElementCard(tile.technique, table!, {
+      poemSpots: poemSpots(root, content.annotations, ann.id),
+      onOpenNote: (id) => {
+        root.querySelector<HTMLElement>(`button[data-annotation-id="${CSS.escape(id)}"]`)?.click();
+      }
+    });
+    return buildTileCard({
+      annotationId: ann.id,
+      tile,
+      quote: (ann.anchor.quote?.exact ?? '').trim(),
+      note,
+      fullCard,
+      onClose: () => toggleTile(ann.id)
+    });
   }
 
   function paint(): void {
@@ -1362,6 +1444,16 @@ function buildInteractiveView(
     colourByFamily = familyOverride ?? wantsFamilyColours(shown);
     const placed = recolourByFamily(shown);
     fillFamilyKey(placed);
+    const tiles = new Map<string, TileTechnique>();
+    for (const item of placed) {
+      const tile = tileFor(item);
+      if (tile) tiles.set(item.annotation.id, tile);
+    }
+    root.classList.toggle('block-annotation--tiles', tiles.size > 0);
+    if (tileOpenId && !tiles.has(tileOpenId)) tileOpenId = null;
+    const openTileItem = tileOpenId
+      ? placed.find((item) => item.annotation.id === tileOpenId)
+      : undefined;
     const byLine = new Map<string, LineMark[]>();
     const lineBars = new Map<string, PlacedAnnotation[]>();
     const stanzaBars = new Map<string, PlacedAnnotation[]>();
@@ -1418,6 +1510,11 @@ function buildInteractiveView(
       ) {
         enterFocus(item.annotation.id);
         paint();
+        return;
+      }
+      if (tiles.has(item.annotation.id)) {
+        // Tiles on: the card opens under the line, not in the side window.
+        toggleTile(item.annotation.id);
         return;
       }
       if (activeNoteId === item.annotation.id) {
@@ -1576,6 +1673,31 @@ function buildInteractiveView(
         }
       }
 
+      // Tiles go in after thread highlighting, which counts characters in the line.
+      for (const mark of marks) {
+        const id = mark.placed.annotation.id;
+        const tile = tiles.get(id);
+        if (!tile) continue;
+        const pieces = textEl.querySelectorAll<HTMLElement>(
+          `.block-annotation__anchor[data-annotation-id="${CSS.escape(id)}"]`
+        );
+        if (pieces.length === 0) continue;
+        pieces.forEach((piece) => {
+          piece.classList.add('block-annotation__anchor--tiled');
+          piece.classList.toggle('is-tile-open', tileOpenId === id);
+          paintTileColour(piece, tile.family);
+        });
+        pieces[pieces.length - 1]!.after(
+          buildTechniqueTile(id, tile, tileOpenId === id, () => toggleTile(id))
+        );
+      }
+      for (const item of barsHere) {
+        const tile = tiles.get(item.annotation.id);
+        if (!tile) continue;
+        const id = item.annotation.id;
+        textEl.append(buildTechniqueTile(id, tile, tileOpenId === id, () => toggleTile(id)));
+      }
+
       const lineMarkers = markersByLine.get(`${stanzaId}:${lineId}`) ?? [];
       if (lineMarkers.length > 0) {
         const markerRow = document.createElement('span');
@@ -1621,6 +1743,10 @@ function buildInteractiveView(
 
       for (const line of stanza.lines) {
         linesCol.append(paintLineRow(line, stanza.id), ...(stopNotesByLine.get(line.id) ?? []));
+        if (openTileItem && openTileItem.resolved.lineId === line.id) {
+          const tile = tiles.get(openTileItem.annotation.id);
+          if (tile) linesCol.append(tileCardFor(openTileItem, tile));
+        }
       }
 
       stanzaEl.append(linesCol);
@@ -1668,6 +1794,8 @@ function buildInteractiveView(
             : item.resolved.granularity === 'word'
               ? 'word'
               : 'phrase';
+        // A tile carries the technique on the poem: no ink, no margin label.
+        if (tiles.has(item.annotation.id) && kind !== 'line') return;
         const isThread = (item.annotation.also_anchors?.length ?? 0) > 0;
         const first = inkMarks.every((mark) => mark.annotationId !== item.annotation.id);
         inkMarks.push({
@@ -1675,7 +1803,10 @@ function buildInteractiveView(
           kind,
           colour: item.layer?.colour ?? 'wave',
           el: btn,
-          label: first && !isThread && kind !== 'stanza' ? marginLabel(item.annotation) : undefined,
+          label:
+            first && !isThread && kind !== 'stanza' && !tiles.has(item.annotation.id)
+              ? marginLabel(item.annotation)
+              : undefined,
           onOpen: () => btn.click()
         });
       });
@@ -1686,7 +1817,7 @@ function buildInteractiveView(
         `[data-annotation-id="${state.openAnnotationId}"]`
       );
       const ann = content.annotations.find((a) => a.id === state.openAnnotationId);
-      if (openBtn && ann && readerNeeded(ann)) {
+      if (openBtn && ann && !tiles.has(ann.id) && readerNeeded(ann)) {
         openAnnotation(
           root,
           ann,

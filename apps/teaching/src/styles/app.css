@@ -13659,7 +13659,8 @@ body.is-lesson-builder-full-page .hub-utilities {
   display: none;
 }
 
-.block-annotation__family-toggle {
+.block-annotation__family-toggle,
+.block-annotation__tiles-toggle {
   min-height: 2.25rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--line);
@@ -13671,7 +13672,8 @@ body.is-lesson-builder-full-page .hub-utilities {
   cursor: pointer;
 }
 
-.block-annotation__family-toggle[aria-pressed='true'] {
+.block-annotation__family-toggle[aria-pressed='true'],
+.block-annotation__tiles-toggle[aria-pressed='true'] {
   border-color: var(--ink, #1b1c22);
   font-weight: 600;
 }
@@ -13703,8 +13705,206 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 
 @media (max-width: 720px) {
-  .block-annotation__family-toggle {
+  .block-annotation__family-toggle,
+  .block-annotation__tiles-toggle {
     min-height: 2.75rem;
+  }
+}
+
+/* Technique tiles: a reader's switch. Tagged phrases take their family colour
+   and wear a bold tile; the card opens under the line. */
+.block-annotation--tiles .block-annotation__anchor.block-annotation__anchor--tiled {
+  --tile-c: var(--wave);
+  --tile-strong: color-mix(in srgb, var(--tile-c) 62%, #14121c);
+  padding: 0 0.1em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--tile-c) 16%, transparent);
+  box-shadow: inset 0 -3px 0 var(--tile-c);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.block-annotation--tiles .block-annotation__anchor.block-annotation__anchor--tiled.is-tile-open {
+  background: var(--tile-strong);
+  box-shadow: none;
+  color: #fff;
+}
+
+.block-annotation__tile {
+  --tile-c: var(--wave);
+  --tile-strong: color-mix(in srgb, var(--tile-c) 62%, #14121c);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin: 0 0.3rem 0 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border: 0;
+  border-radius: 5px;
+  background: var(--tile-strong);
+  color: #fff;
+  font-family: var(--font-ui);
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+  cursor: pointer;
+}
+
+.block-annotation__tile:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--wave));
+  outline-offset: 2px;
+}
+
+.block-annotation__tile[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--tile-strong);
+}
+
+.block-annotation__tile-sym {
+  font-size: 0.86em;
+  font-weight: 800;
+}
+
+.block-annotation__tile-name {
+  font-size: 0.72em;
+  font-weight: 500;
+}
+
+.block-annotation__tile-card {
+  --tile-c: var(--wave);
+  --tile-strong: color-mix(in srgb, var(--tile-c) 62%, #14121c);
+  margin: var(--space-2) 0 var(--space-3);
+  border: 2px solid var(--tile-strong);
+  border-radius: var(--radius-md, 0.75rem);
+  background: var(--paper);
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+.block-annotation__tile-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--tile-strong);
+  color: #fff;
+}
+
+.block-annotation__tile-card-sym {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--tile-strong);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.block-annotation__tile-card-name {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.block-annotation__tile-card-family {
+  margin: 0.2rem 0 0;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.block-annotation__tile-card-close {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-annotation__tile-card-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--tile-c) 8%, var(--paper));
+}
+
+.block-annotation__tile-card-quote {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-style: italic;
+}
+
+.block-annotation__tile-card-label {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.block-annotation__tile-card-here .block-annotation__body {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.block-annotation__tile-card-what p {
+  margin: 0;
+}
+
+.block-annotation__tile-card-effect {
+  margin-top: 0.25rem !important;
+  color: var(--muted);
+}
+
+.block-annotation__tile-card-more {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+
+.block-annotation__tile-card-more > summary {
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.block-annotation__tile-card-more > .block-annotation__element {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  /* Inline in the poem: the site-wide 44px button floor would stretch the line. */
+  .block-annotation--tiles .block-annotation__tile {
+    min-height: 1.9rem;
+    align-items: center;
+  }
+
+  .block-annotation--tiles .block-annotation__anchor.block-annotation__anchor--tiled {
+    min-height: 0;
+  }
+
+  .block-annotation__tile-card-close,
+  .block-annotation__tile-card-more > summary {
+    min-height: 2.75rem;
+  }
+
+  .block-annotation__tile-card-sym {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.1rem;
+  }
+
+  .block-annotation__tile-card-name {
+    font-size: 1.25rem;
   }
 }
 
