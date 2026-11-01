@@ -1,6 +1,7 @@
 // apps/teaching/tests/unit/sprint-player.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { mountSprintPlayer } from '@/sprint/player';
+import '@/sprint/forms';
 import type { SprintClient, SprintStatus } from '@/sprint/api';
 import { newSprintSettings, newSprintBlocks } from '@/sprint/defaults';
 import { publicSprint } from '@/sprint/model';
@@ -63,6 +64,15 @@ describe('sprint player', () => {
     await flush();
     expect(host.querySelector('.sprint-lock h2')?.textContent).toBe('Your class work is in');
     expect(host.querySelector('.sprint-form')).toBeNull();
+  });
+
+  it('shows the pitch feedback card over the lock screen, since pitches run after the class part ends', async () => {
+    const host = document.createElement('div');
+    const round = { group_id: 'g7', group_name: 'Group 7', sent: false };
+    mountSprintPlayer(host, { lesson, classId: 'class1', client: client(status({ lock: { until: '2030-11-01T05:00:00.000Z' }, round })), renderHero: () => {} });
+    await flush();
+    expect(host.querySelector('.sprint-lock')).not.toBeNull();
+    expect(host.querySelector('.sprint-card h2')?.textContent).toBe('Group 7');
   });
 
   it('shows the spotlight banner with no name', async () => {

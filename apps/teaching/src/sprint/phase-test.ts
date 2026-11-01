@@ -52,8 +52,9 @@ export function mountTest(ctx: FormContext): PhaseForm {
 /** The card that pops up while another group pitches: a level per criterion and two short lines. */
 export function mountFeedbackCard(ctx: FormContext, round: NonNullable<SprintStatus['round']>): HTMLElement {
   const card = el('section', 'sprint-card');
-  card.setAttribute('aria-label', `Feedback for Group ${round.group_name}`);
-  card.append(el('div', 'sprint-note', 'Feedback for'), el('h2', '', `Group ${round.group_name}`), el('p', 'sprint-note', 'Your name stays hidden from the group.'));
+  const name = /^group\b/i.test(round.group_name) ? round.group_name : `Group ${round.group_name}`;
+  card.setAttribute('aria-label', `Feedback for ${name}`);
+  card.append(el('div', 'sprint-note', 'Feedback for'), el('h2', '', name), el('p', 'sprint-note', 'Your name stays hidden from the group.'));
   if (round.sent) { card.append(el('p', '', 'Sent. Thank you.')); return card; }
   const entry: FeedbackEntry = { levels: {}, worked: '', next: '', about: '' };
   for (const c of ctx.sprint.criteria) {

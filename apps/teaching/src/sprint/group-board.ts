@@ -20,7 +20,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
 
   function paint(b: GroupBoard): void {
     root.replaceChildren();
-    root.append(el('h2', '', `Group ${b.group.name}`));
+    root.append(el('h2', '', /^group\b/i.test(b.group.name) ? b.group.name : `Group ${b.group.name}`));
 
     const q = el('div', 'sboard__part');
     q.append(el('h3', '', 'Understand'), el('p', 'sprint-note', b.question ? `Group problem: ${b.question.text}` : b.awaiting?.kind === 'question' ? 'Waiting for you to choose the problem.' : 'The problem is chosen when Understand closes.'));
