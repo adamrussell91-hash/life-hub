@@ -209,6 +209,23 @@ export function validateMinutes(value) {
   return { sections, file_key: fileKey, source: value.source, added_at: value.added_at, saved_counts: counts };
 }
 
+export const MINUTES_PENDING_NOTE_MAX = 300;
+
+/** Minutes PDF filed from chat, waiting for Adam to review on the meeting page. */
+export function validateMinutesPending(value) {
+  if (value === null) return null;
+  const fail = (why) => validationError('invalid_minutes_pending', `minutes_pending: ${why}`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw fail('an object or null.');
+  if (typeof value.file_key !== 'string' || !MINUTES_FILE_KEY_RE.test(value.file_key)) throw fail('file_key is not a minutes file.');
+  if (!isIsoTimestamp(value.added_at)) throw fail('added_at must be a timestamp.');
+  if (value.source !== 'chat') throw fail('source must be chat.');
+  const rawNote = value.note ?? null;
+  if (rawNote !== null && typeof rawNote !== 'string') throw fail('note must be a string or null.');
+  const note = rawNote === null ? null : rawNote.trim();
+  if (note && note.length > MINUTES_PENDING_NOTE_MAX) throw fail(`note must be at most ${MINUTES_PENDING_NOTE_MAX} characters.`);
+  return { file_key: value.file_key, added_at: value.added_at, source: 'chat', note: note || null };
+}
+
 function assertTimeOrder(start, end) {
   if (Date.parse(end) < Date.parse(start)) {
     throw validationError('invalid_time_range', 'scheduled_end cannot precede scheduled_start.');
@@ -234,7 +251,8 @@ const STORED_KEYS = new Set([
   'decisions',
   'guide_runs',
   'coaching_sheets',
-  'minutes'
+  'minutes',
+  'minutes_pending'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -304,7 +322,8 @@ export function parseMeetingRecord(raw) {
     decisions: Array.isArray(raw.decisions) ? raw.decisions : [],
     guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : [],
     coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : [],
-    minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null
+    minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null,
+    minutes_pending: raw.minutes_pending && typeof raw.minutes_pending === 'object' && !Array.isArray(raw.minutes_pending) ? raw.minutes_pending : null
   };
 }
 
@@ -355,7 +374,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -385,6 +404,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.guide_runs !== undefined) patch.guide_runs = validateGuideRuns(input.guide_runs);
   if (input.coaching_sheets !== undefined) patch.coaching_sheets = validateCoachingSheets(input.coaching_sheets);
   if (input.minutes !== undefined) patch.minutes = validateMinutes(input.minutes);
+  if (input.minutes_pending !== undefined) patch.minutes_pending = validateMinutesPending(input.minutes_pending);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -457,7 +477,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     decisions: record.decisions ?? [],
     guide_runs: record.guide_runs ?? [],
     coaching_sheets: record.coaching_sheets ?? [],
-    minutes: record.minutes ?? null
+    minutes: record.minutes ?? null,
+    minutes_pending: record.minutes_pending ?? null
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

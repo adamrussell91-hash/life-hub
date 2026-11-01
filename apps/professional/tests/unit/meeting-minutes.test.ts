@@ -71,6 +71,27 @@ describe('saveMinutesReview', () => {
     expect(d.uploadFile).not.toHaveBeenCalled();
     expect((d.saveMeeting.mock.calls[0][0] as { minutes: { file_key: string } }).minutes.file_key).toBe('meeting-minutes/old.pdf');
   });
+
+  it('uses a pending file key over the old file, and always clears minutes_pending', async () => {
+    const d = deps();
+    const withFile = { ...record, minutes: { file_key: 'meeting-minutes/old.pdf' } } as unknown as MeetingRecord;
+    const pendingKey = `meeting-minutes/${MEETING_ID}/1762000000000.pdf`;
+    await saveMinutesReview({ record: withFile, meetingRef: 'm', attendees: [], pdfData: null, fileKey: pendingKey,
+      sections: [{ heading: '', text: 'T' }], mine: [], others: [], decisions: [] }, d);
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    const patch = d.saveMeeting.mock.calls[0][0] as { minutes: { file_key: string }; minutes_pending: unknown };
+    expect(patch.minutes.file_key).toBe(pendingKey);
+    expect(patch).toHaveProperty('minutes_pending', null);
+  });
+
+  it('a new upload wins over a pending file key', async () => {
+    const d = deps();
+    await saveMinutesReview({ record, meetingRef: 'm', attendees: [], pdfData: 'JVBER', fileKey: 'meeting-minutes/pending.pdf',
+      sections: [], mine: [], others: [], decisions: [] }, d);
+    const patch = d.saveMeeting.mock.calls[0][0] as { minutes: { file_key: string }; minutes_pending: unknown };
+    expect(patch.minutes.file_key).toBe(`meeting-minutes/${MEETING_ID}/1762000000000.pdf`);
+    expect(patch).toHaveProperty('minutes_pending', null);
+  });
 });
 
 it('savedLine reads naturally and the size cap is 4 MB', () => {

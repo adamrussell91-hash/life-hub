@@ -20,6 +20,9 @@
  */
 export const MAX_CHAT_IMAGE_BYTES = 1_250_000;
 
+/** Largest PDF the composer sends to the model (raw bytes, ~4MB as base64). */
+export const MAX_CHAT_PDF_BYTES = 3_000_000;
+
 /** Hard ceiling for /api/chat JSON bodies (Netlify-safe under ~6MB). */
 export const MAX_CHAT_BODY_BYTES = 5 * 1024 * 1024;
 
@@ -117,6 +120,17 @@ export function buildUserContent(message, attachments = []) {
         continue;
       }
     }
+    if (item.kind === 'file' && item.dataUrl) {
+      const match = /^data:application\/pdf;base64,(.+)$/s.exec(item.dataUrl);
+      if (match) {
+        delivered.push(item);
+        mediaBlocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: match[1] }
+        });
+        continue;
+      }
+    }
     if (item.textExcerpt) {
       delivered.push(item);
       mediaBlocks.push({
@@ -196,7 +210,7 @@ export async function prepareChatImage(file) {
 }
 
 /**
- * Read a browser File into a HubChatAttachment (base64 data URL for images).
+ * Read a browser File into a HubChatAttachment (base64 data URL for images and PDFs).
  * @param {File} file
  * @param {{ prepareImage?: (file: File) => Promise<File> }} [opts]
  * @returns {Promise<HubChatAttachment>}
@@ -219,6 +233,11 @@ export async function fileToChatAttachment(file, opts = {}) {
     name: working.name || file.name || 'file'
   };
   if (kind === 'image' && working.size <= MAX_CHAT_IMAGE_BYTES) {
+    out.dataUrl = await readAsDataUrl(working);
+  } else if (kind === 'file' && out.mime === 'application/pdf') {
+    if (working.size > MAX_CHAT_PDF_BYTES) {
+      throw new Error('That PDF is over 3 MB. Paste the part you need instead.');
+    }
     out.dataUrl = await readAsDataUrl(working);
   } else if (working.size <= 200_000 && working.type.startsWith('text/')) {
     out.textExcerpt = await working.text();

@@ -372,6 +372,15 @@ export interface MeetingRecord {
   guide_runs?: GuideRun[];
   coaching_sheets?: CoachingSheet[];
   minutes?: MeetingMinutes | null;
+  /** Minutes Clare filed from chat, waiting for Adam to review or dismiss. */
+  minutes_pending?: MeetingMinutesPending | null;
+}
+
+export interface MeetingMinutesPending {
+  file_key: string;
+  added_at: string;
+  source: 'chat';
+  note: string | null;
 }
 
 export interface MeetingDecision {
