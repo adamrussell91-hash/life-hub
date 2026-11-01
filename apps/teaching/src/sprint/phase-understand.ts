@@ -28,6 +28,8 @@ const cleanWord = (w: string) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, 
  * (Vote, one audience, our limits, questions for the expert, the answers).
  * The Kit picks the steps and whether they show as slides or down the page.
  */
+
+const UNDERSTAND_CHECK_STEPS: Array<[string, UnderstandStep]> = [['Spot:', 'spot'], ['Audience:', 'audience'], ['Dig:', 'dig'], ['Say it:', 'say'], ['Limits:', 'limits'], ['Vote:', 'vote']];
 export function mountUnderstand(ctx: FormContext): PhaseForm {
   const settings = ctx.sprint.understand ?? defaultUnderstand();
   const steps = settings.steps;
@@ -51,7 +53,11 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-understand');
   root.append(el('h2', '', 'Understand the problem'));
   if (ctx.sprint.phases[0]!.instruction) root.append(el('p', '', ctx.sprint.phases[0]!.instruction));
-  const bar = submitBar(ctx, 'understand', () => state, () => understandProblems(state, steps, (status.notes ?? []).length));
+  const bar = submitBar(ctx, 'understand', () => state, () => understandProblems(state, steps, (status.notes ?? []).length).map((text) => {
+    // Each check starts with its step's name ("Spot:", "Say it:"), so it can point there.
+    const k = UNDERSTAND_CHECK_STEPS.find(([prefix]) => text.startsWith(prefix))?.[1];
+    return k ? { text, at: `[data-step="${k}"] .su-step__where` } : text;
+  }));
   const changed = () => { bar.changed(); if (slides) paintRail(); };
   const err = el('p', 'sprint-submit__err');
   err.setAttribute('role', 'alert');
