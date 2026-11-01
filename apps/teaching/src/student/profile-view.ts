@@ -246,17 +246,16 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     root.append(el('h1', 'pm-title', 'Your progress'), renderInitials(options));
     return root;
   }
-  if (options.teacher) root.append(el('h1', 'pm-title', options.teacher.name), el('p', 'pm-who', 'Their progress page, as they see it.'));
+  if (options.teacher) root.append(el('h1', 'pm-title', options.teacher.name));
   else {
     root.append(el('h1', 'pm-title', 'Your progress'));
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
   }
   const map = renderMap(payload.map, options.classId);
   if (!payload.pieces?.length) {
-    const empty = options.teacher
-      ? 'Their progress fills in once you return their first piece of work.'
-      : 'Your progress appears here once your teacher returns your first piece of work.';
-    root.append(el('p', 'pm-empty', empty), map);
+    // The teacher knows nothing is returned yet; only the student needs telling.
+    if (!options.teacher) root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'));
+    root.append(map);
     return root;
   }
   const progress = el('div', 'pg-panel');

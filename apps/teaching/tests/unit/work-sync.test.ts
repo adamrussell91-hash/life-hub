@@ -131,6 +131,16 @@ describe('mountWorkSync', () => {
     sync.dispose();
   });
 
+  it('leaves the asking to a sprint, case study, tutorial or lecture player on the page', async () => {
+    const server = fakeServer('initials');
+    const page = host();
+    page.querySelector('.lesson-blocks')!.append(Object.assign(document.createElement('div'), { className: 'sprint' }));
+    const sync = mountWorkSync(page, { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 0 });
+    await settle();
+    expect(page.querySelector<HTMLElement>('.ws-bar')!.hidden).toBe(true);
+    sync.dispose();
+  });
+
   it('keeps work on the device and says so when the send fails, then tries again', async () => {
     vi.useFakeTimers();
     const server = fakeServer('ready');

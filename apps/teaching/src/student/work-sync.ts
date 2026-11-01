@@ -12,7 +12,8 @@ import './work-sync.css';
  * next change, or the next visit, sends it again.
  *
  * The class's initials claim says whose work it is, the same claim the quiz
- * uses. A device without one is asked once, at the top of the lesson.
+ * uses. A device without one is asked once, at the top of the lesson, unless
+ * the lesson's player (sprint, case study, tutorial, lecture) asks itself.
  */
 
 type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string };
@@ -27,6 +28,9 @@ export type WorkSyncHandle = {
   /** Sends everything, then hands in every marked block with writing. True when all went through. */
   handInAll(): Promise<boolean>;
 };
+
+/** Players that ask for the same class initials themselves; one box on the page is enough. */
+const OWN_CLAIM = '.sprint, .cs, .tut, .lecture';
 
 /** The parts of a block's saved state that hold writing. Must match lesson-work.mjs. */
 const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
@@ -156,6 +160,8 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   }
 
   function showInitials(): void {
+    // The player's own claim binds the same device; the next send looks again and finds it.
+    if (host.querySelector(OWN_CLAIM)) return;
     const input = el('input', 'ws-bar__initials');
     input.type = 'text';
     input.maxLength = 6;
