@@ -841,7 +841,18 @@ export function mountBlockCanvas(
     return chrome;
   }
 
+  /**
+   * `render()` runs on every insert and selection. Rebuilding every preview each
+   * time made blocks that load (Anthology, images, charts) blank and refill, so
+   * the whole lesson flashed. A block whose object hasn't changed keeps its preview.
+   */
+  const previews = new Map<string, { block: Block; media: Media[]; el: HTMLElement }>();
+  // These read other blocks or the page's outcomes, so they are drawn fresh.
+  const PAGE_DEPENDENT = new Set<string>(['discern_confirm', 'outcomes']);
+
   function preview(block: Block): HTMLElement {
+    const kept = previews.get(block.id);
+    if (kept && kept.block === block && kept.media === media) return kept.el;
     const el = options.renderPreview?.(block) ?? renderBlock(block, 'teacher', { pageBlocks: blocks });
     if (block.block_type === 'tabs') {
       el.querySelectorAll('[role="tab"]').forEach((btn, index) => {
@@ -849,6 +860,8 @@ export function mountBlockCanvas(
       });
       applyRememberedTabsPanel(el, block.id);
     }
+    if (PAGE_DEPENDENT.has(block.block_type)) previews.delete(block.id);
+    else previews.set(block.id, { block, media, el });
     return el;
   }
 
@@ -960,6 +973,9 @@ export function mountBlockCanvas(
 
     list.append(createGap(blocks.length));
     root.append(list);
+    for (const [id, kept] of previews) if (!kept.el.isConnected) previews.delete(id);
+    // A kept preview's callout links were drawn against the old page.
+    refreshCalloutReferences(root, blocks, 'teacher');
 
     if (pendingReveal) {
       const target = pendingReveal;
@@ -1155,6 +1171,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncTutorialPanel();
     syncSprintPanel();
     syncCasePanel();
+    syncFooterNote();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1501,7 +1518,17 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }
 
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, canvasHost);
+  // Students end every lesson on the footer (lesson-footer.ts), so no block is needed for it.
+  const footerNote = document.createElement('p');
+  footerNote.className = 'lesson-page__footer-note';
+  function syncFooterNote(): void {
+    footerNote.textContent =
+      resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz'
+        ? 'Students see Previous and Next under the quiz. Handing it in marks it done.'
+        : 'Students see Previous, a tick to finish, and Next under every lesson.';
+  }
+  syncFooterNote();
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, canvasHost, footerNote);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({

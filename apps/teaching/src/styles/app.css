@@ -10118,7 +10118,17 @@ body.is-lesson-builder-full-page .hub-utilities {
   }
 
   /* The grip and delete join the header strip, so the list needs no left lane. */
-  .lesson-page__blocks {
+  .lesson-page__footer-note {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+.lesson-page__blocks {
     padding-left: 0;
   }
 

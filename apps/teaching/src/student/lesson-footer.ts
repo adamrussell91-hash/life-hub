@@ -26,6 +26,8 @@ export type LessonFooterOptions = {
   classId: string;
   prev?: FooterLink | null;
   next?: FooterLink | null;
+  /** False on a quiz: handing it in marks it done, so there's no tick, just previous and next. */
+  finish?: boolean;
   /** The written-work sync on this page, if any. */
   work?: () => WorkSyncHandle | null;
   /** Test seams. */
@@ -74,7 +76,8 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   tick.setAttribute('aria-controls', panel.id);
   const status = el('p', 'lf__status');
   status.setAttribute('role', 'status');
-  row.append(link(options.prev, 'prev'), tick, link(options.next, 'next'));
+  const finish = options.finish !== false;
+  row.append(link(options.prev, 'prev'), finish ? tick : el('span', 'lf__gap'), link(options.next, 'next'));
   root.append(panel, row, status);
 
   function paintTick(): void {
@@ -297,7 +300,7 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   });
 
   paintTick();
-  void Promise.resolve()
+  if (finish) void Promise.resolve()
     .then(() => calls.profile('status', { lesson_id: lessonId, quick: true }))
     .then(
     (reply) => {
