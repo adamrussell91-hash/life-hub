@@ -201,10 +201,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
 
     }
     if (key === 'decide') {
-      const dc = card('Decide settings', 'Who confirms each group’s choice: its problem in Understand, and its idea here. With “Most wins goes through”, the idea with the most head-to-head wins is chosen unless two finish level.', 'settings');
-      dc.append(
-        selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Most wins goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides')
-      );
+      card('Decide settings', `The idea with the most head-to-head wins ${cur.decider === 'top_vote' ? 'is chosen unless two finish level; a tie comes to you' : 'is shown to you, and you approve the group’s idea'}. Change who chooses on the Kit tab, under Settings.`, 'settings');
     }
     if (key === 'test') {
       const refl = card('Reflection', 'Two prompts students answer at home after the pitch. Marking it is optional: press Mark reflections on a group’s board if you want it in your markbook.', 'reflection');
@@ -230,8 +227,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
 
     if (view !== 'kit') { paintPhase(view, cur); return; }
 
-    const settings = card('Settings', 'How much scaffolding shows, and the class lock. Each phase’s own settings are on its tab.', 'settings');
+    const settings = card('Settings', 'Who chooses each group’s problem and idea, how much scaffolding shows, and the class lock. Each phase’s own settings are on its tab.', 'settings');
     settings.append(
+      selectOf([['top_vote', 'Students choose by vote: the most-starred problem and the idea with the most wins go through (ties come to you)'], ['teacher', 'I approve each group’s problem and idea (suits junior classes)']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }, true), 'Who chooses'),
       selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );

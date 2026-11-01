@@ -54,7 +54,7 @@ export const UNDERSTAND_GUIDE: Record<UnderstandStep, Guide> = {
   },
   vote: {
     icon: '🗳️',
-    doThis: 'Read every statement, then star the one your group should solve.',
+    doThis: 'Read every statement, then star the one your group should solve. Your stars show which problem your group most wants to solve.',
     why: 'Your group solves one problem together, so you need to agree which one.',
     example: ['Pick the one that is clearest and most worth solving, even if it is not yours.'],
     stuck: ['Which one could you explain to a stranger in a sentence?', 'Which one is about a cause, not just a symptom?']

@@ -35,7 +35,7 @@ const WHERE: Record<SprintPhaseKey, 'class' | 'home'> = { understand: 'class', s
 export function newSprintSettings(classId: string): SprintSettings {
   return {
     class_id: classId,
-    decider: 'teacher',
+    decider: 'top_vote',
     support: 'standard',
     lock_hours: 2,
     criteria: [],
