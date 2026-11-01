@@ -56,13 +56,20 @@ table.du-map, table.du-kg { border-collapse: separate; border-spacing: 0; font-s
 .du-map th, .du-map td, .du-kg th, .du-kg td { padding: 6px 6px; text-align: center; border-bottom: 1px solid var(--du-line); }
 .du-map th, .du-kg th { font-weight: 600; color: var(--du-muted); font-size: 11px; line-height: 1.2; vertical-align: bottom; }
 .du-map td.rowh, .du-map th.rowh, .du-kg td.rowh, .du-kg th.rowh { text-align: left; position: sticky; left: 0; background: #fff; padding-left: 12px; font-weight: 700; color: var(--du-navy); white-space: nowrap; z-index: 1; }
-.du-kg th { max-width: 90px; }
+.du-kg th { min-width: 120px; max-width: 190px; }
+.du-kg th.rowh { min-width: 0; }
+.du-map td.rowh { white-space: normal; min-width: 220px; max-width: min(360px, 48vw); line-height: 1.35; font-weight: 600; }
 .du-kg th.te { color: var(--du-sage-ink); } .du-kg th.ts { color: var(--du-wave); } .du-kg th.tx { color: var(--du-lilac-ink); }
 .du-kg tr.sel td { background: #fffaf0; }
 .du-st { display: inline-grid; place-items: center; min-width: 26px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 11px; padding: 0 4px; background: var(--du-blue); color: var(--du-navy); }
 .du-st.k { background: var(--du-gold); color: var(--du-gold-ink); }
 .du-st.s { background: var(--du-wave); color: #fff; }
 .du-st.gap { background: var(--du-peach); color: var(--du-peach-ink); }
+.du-dutabs button { max-width: min(440px, 100%); line-height: 1.35; }
+.du-key { align-items: center; margin: 0 0 12px; }
+.du-key > span { display: inline-flex; align-items: center; gap: 5px; }
+.du-key .du-c.used, .du-key .du-c.notused { margin: 0 4px; }
+.du-three.du-three--key { width: 20px; height: 20px; border-radius: 6px; display: inline-grid; place-items: center; font-size: 12px; cursor: default; }
 .du-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--du-muted); margin: 8px 0 0; }
 
 /* expanded card */
@@ -98,7 +105,9 @@ table.du-map, table.du-kg { border-collapse: separate; border-spacing: 0; font-s
 .du-edn { width: 24px; height: 24px; border-radius: 8px; background: var(--du-navy); color: #fff; display: grid; place-items: center; font-size: 12px; }
 .du-eds textarea, .du-eds input:not([type="checkbox"]), .du-picker input, .du-finder input:not([type="checkbox"]) { font: inherit; font-size: 13.5px; border: 1px solid rgba(23, 55, 94, .2); border-radius: 8px; padding: 7px 9px; background: #fff; color: var(--du-ink); width: 100%; min-width: 0; }
 .du-eds textarea { font-family: 'Source Serif 4', Georgia, serif; font-size: 15.5px; color: var(--du-navy); resize: vertical; }
-.du-eds input.serif { font-family: 'Source Serif 4', Georgia, serif; font-size: 14px; }
+.du-eds input.serif, .du-eds textarea.du-grow.serif { font-family: 'Source Serif 4', Georgia, serif; font-size: 14px; }
+.du-eds textarea.du-grow { resize: none; overflow: hidden; line-height: 1.4; field-sizing: content; }
+.du-eds textarea.du-grow:not(.serif) { font-family: inherit; font-size: 13.5px; color: var(--du-ink); }
 .du-lbl { font-size: 12px; font-weight: 600; color: var(--du-muted); display: flex; align-items: center; gap: 4px; }
 .du-cks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; font-weight: 600; }
 .du-ck-ok { color: var(--du-sage-ink); } .du-ck-no { color: var(--du-peach-ink); }
@@ -172,8 +181,8 @@ table.du-map, table.du-kg { border-collapse: separate; border-spacing: 0; font-s
 .du-sc b { color: var(--du-navy); font-size: 12.5px; }
 .du-sc.sel { border-color: var(--du-amber); box-shadow: 0 0 0 2px #fbe3b6; }
 .du-pips { display: inline-flex; gap: 3px; }
-.du-pips i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--du-green); background: #fff; }
-.du-pips i.on { background: var(--du-green); }
+.du-pips i { min-width: 19px; height: 15px; padding: 0 2px; border-radius: 4px; border: 1.5px solid var(--du-green); background: #fff; color: var(--du-green); font-style: normal; font-size: 9px; font-weight: 700; line-height: 12px; text-align: center; }
+.du-pips i.on { background: var(--du-green); color: #fff; }
 .du-tag { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
 .du-tag.old { background: #eceef2; color: #4d5868; } .du-tag.nu { background: var(--du-blue); color: var(--du-navy); }
 .du-det { background: #fffaf0; border: 1.5px solid var(--du-amber); border-radius: .875rem; padding: 12px 14px; margin-top: 10px; }

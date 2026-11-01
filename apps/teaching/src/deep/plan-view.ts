@@ -124,7 +124,7 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
         else if (cols.length) put(cols[last] ?? null, `${STEP_LABEL[step]}?`, 'gap');
       }
       const tr = h('tr');
-      tr.append(h('td', 'rowh', `${i + 1}. ${(du.claim || 'No claim yet').split(/[.,;:]/)[0]!.slice(0, 42)}`));
+      tr.append(h('td', 'rowh', `${i + 1}. ${du.claim || 'No claim yet'}`));
       for (const c of cols) {
         const td = h('td');
         for (const x of cell.get(c) ?? []) td.append(h('span', `du-st ${x.cls}`, x.text), document.createTextNode(' '));
@@ -343,7 +343,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
       if (!du) { newOne(); return; }
       state.openId = du.id;
       const picks = h('div', 'du-dutabs');
-      state.deep.forEach((d, i) => picks.append(button(`${i + 1}. ${(d.claim || 'New').slice(0, 30)}`, d.id === du.id ? 'on' : '', () => openMake(d.id))));
+      state.deep.forEach((d, i) => picks.append(button(`${i + 1}. ${d.claim || 'New'}`, d.id === du.id ? 'on' : '', () => openMake(d.id))));
       if (state.deep.length < DEEP_LIMITS.perUnit) picks.append(button('+ New', '', newOne));
       const mount = h('div');
       body.append(picks, mount);

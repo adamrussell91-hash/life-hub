@@ -33,6 +33,18 @@ export function button(label: string, cls = '', onClick?: () => void): HTMLButto
   return b;
 }
 
+/** A one-line text box that wraps and grows so the whole text shows. Enter does not add a new line. */
+export function lineBox(cls = ''): HTMLTextAreaElement {
+  const ta = h('textarea', `du-grow${cls ? ` ${cls}` : ''}`);
+  ta.rows = 1;
+  const fit = (): void => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight + 2}px`; };
+  ta.addEventListener('input', fit);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  let width = 0;
+  new ResizeObserver(([entry]) => { const w = entry?.contentRect.width ?? 0; if (w && w !== width) { width = w; fit(); } }).observe(ta);
+  return ta;
+}
+
 /** An "i" info icon that opens a short note (not an eye). */
 export function info(text: string): HTMLElement {
   const d = h('details', 'du-info');
@@ -151,7 +163,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     ta.addEventListener('input', () => { commit({ ...du, claim: ta.value }); refreshLive(); });
     const guide = h('p', 'du-sub', 'A good claim names a move that carries beyond this text, so students can use it on texts they have not seen.');
     const whyLabel = h('label', 'du-lbl', 'Why this one');
-    const why = h('input');
+    const why = lineBox();
     why.value = du.why;
     why.maxLength = DEEP_LIMITS.why;
     why.addEventListener('input', () => commit({ ...du, why: why.value }));
@@ -265,7 +277,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
       b.disabled = !own;
       seg.append(b);
     }
-    const text = h('input', 'serif');
+    const text = lineBox('serif');
     text.value = piece.text;
     text.maxLength = DEEP_LIMITS.piece;
     text.placeholder = 'One fact or idea, in a sentence';
@@ -385,7 +397,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
       const body = h('div', 'du-sb');
       const hd = h('div', 'du-sh');
       hd.append(h('b', '', STEP_NAME[step]));
-      const fill = h('input', 'serif');
+      const fill = lineBox('serif');
       fill.value = du.steps.find((x) => x.step === step)?.fill ?? '';
       fill.maxLength = DEEP_LIMITS.fill;
       fill.placeholder = 'What students do here for this claim';
