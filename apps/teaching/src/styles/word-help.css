@@ -487,6 +487,115 @@
 }
 
 
+/* ---- Explainer template menu ------------------------------------------ */
+
+.text-tools-btn__caret {
+  margin-inline-start: calc(var(--space-1) * -0.5);
+  opacity: 0.7;
+}
+
+.text-tools-menu {
+  position: fixed;
+  z-index: 40;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: var(--space-1);
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.text-tools-menu__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.text-tools-menu__item:hover,
+.text-tools-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+  outline: none;
+}
+
+.text-tools-menu__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.text-tools-menu__blurb {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+@media print {
+  .text-tools-menu {
+    display: none !important;
+  }
+}
+
+/* ---- Question first hook choice ---------------------------------------- */
+
+.text-tools-review__question {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.text-tools-hooks {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.text-tools-hook {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.text-tools-hook:has(.text-tools-hook__radio:checked) {
+  border-color: var(--navy);
+  background: color-mix(in srgb, var(--navy) 5%, transparent);
+}
+
+.text-tools-hook__radio {
+  margin: 0.2em 0 0;
+}
+
+.text-tools-hook__type {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.text-tools-hook__preview {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.text-tools-hook__preview > :first-child {
+  margin-top: 0;
+}
+
+.text-tools-hook__preview > :last-child {
+  margin-bottom: 0;
+}
+
 /* ---- Fry review dialog ------------------------------------------------- */
 
 .text-tools-review {

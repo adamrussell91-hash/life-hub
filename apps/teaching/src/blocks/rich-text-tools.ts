@@ -5,15 +5,19 @@
  *                    words lit on the published block without waiting. In a
  *                    lesson, words the teacher pins (or types in with Add
  *                    word) sit in the word tray's strip under the text.
- *   Fry explainer    Rewrites the block as a Fry explainer. Teacher only. The
- *                    rewrite waits in a preview until the teacher replaces the
- *                    text, and the replace can be undone.
+ *   Explainer        A menu of explainer templates. Teacher only.
+ *                    Fry explainer rewrites the block as a Fry explainer.
+ *                    Question first writes three hooks (contradiction,
+ *                    prediction, dilemma) and puts the chosen one above the
+ *                    text, which stays exactly as written. Both wait in a
+ *                    preview until the teacher accepts, and both can be undone.
  *   Technique scan   Finds the Periodic Table techniques in the text. The
  *                    teacher ticks which ones students may get, saved on
  *                    `settings.technique_scan`; the classroom tools' technique
  *                    spinner only lands on those.
  */
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
+import { autoUpdateHubFloating, positionHubFloating } from '../../design-kit/js/hub-floating.js';
 import type { Block } from '@/schemas/block';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import {
@@ -22,7 +26,14 @@ import {
   wordsPresentIn,
   type WordHelpEntry
 } from '@/blocks/word-help';
-import { rewriteAsFryExplainer, scanTechniquesAsTeacher, scanWordsAsTeacher } from '@/blocks/text-tools-client';
+import {
+  rewriteAsFryExplainer,
+  scanTechniquesAsTeacher,
+  scanWordsAsTeacher,
+  writeQuestionFirst,
+  type QuestionFirstHookType,
+  type QuestionFirstResult
+} from '@/blocks/text-tools-client';
 import { matrixStatus as defaultMatrixStatus, normaliseMatrixWord, type MatrixStatus } from '@/blocks/morphemic-client';
 import { loadLiteraryElements } from '@/blocks/literary-elements';
 import { approveTechniques, createTechniqueScan, quoteAppearsIn, readTechniqueScan } from '@/blocks/technique-scan';
@@ -48,6 +59,23 @@ function plainText(html: string): string {
   return scratch.textContent ?? '';
 }
 
+const CARET_ICON =
+  '<svg class="text-tools-btn__caret" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+export type ExplainerTemplate = 'fry' | 'question_first';
+
+/** The explainer menu, in order. */
+export const EXPLAINER_TEMPLATES: { id: ExplainerTemplate; label: string; blurb: string }[] = [
+  { id: 'fry', label: 'Fry explainer', blurb: 'Rewrites the whole block as a run of puzzles.' },
+  { id: 'question_first', label: 'Question first', blurb: 'Adds a hook above your text. Your text stays as written.' }
+];
+
+const HOOK_LABELS: Record<QuestionFirstHookType, string> = {
+  contradiction: 'Contradiction',
+  prediction: 'Prediction',
+  dilemma: 'Dilemma'
+};
+
 function toolButton(icon: string, label: string, title: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
@@ -63,20 +91,25 @@ export function createRichTextTools(options: {
   onChange: (block: RichTextBlock) => void;
   scan?: typeof scanWordsAsTeacher;
   rewrite?: typeof rewriteAsFryExplainer;
+  questionFirst?: typeof writeQuestionFirst;
   scanTechniques?: typeof scanTechniquesAsTeacher;
   /** Where a pinned word's morphemic matrix stands; asking starts its build. */
   matrixStatus?: (word: string) => Promise<MatrixStatus>;
 }): { buttons: HTMLButtonElement[]; status: HTMLElement; strip: HTMLElement } {
   const scan = options.scan ?? scanWordsAsTeacher;
   const rewrite = options.rewrite ?? rewriteAsFryExplainer;
+  const questionFirst = options.questionFirst ?? writeQuestionFirst;
   const scanTechniques = options.scanTechniques ?? scanTechniquesAsTeacher;
   const askMatrix = options.matrixStatus ?? defaultMatrixStatus;
   const { tiptap } = options;
 
   const dictionary = toolButton(DICTIONARY_ICON, 'Dictionary scan', 'Highlight challenging words with dictionary cards for students');
   dictionary.dataset.tool = 'dictionary';
-  const fry = toolButton(FRY_ICON, 'Fry explainer', 'Rewrite this block as a Fry explainer (teacher only)');
-  fry.dataset.tool = 'fry';
+  const explainer = toolButton(FRY_ICON, 'Explainer', 'Explainer templates: Fry explainer or Question first (teacher only)');
+  explainer.insertAdjacentHTML('beforeend', CARET_ICON);
+  explainer.dataset.tool = 'explainer';
+  explainer.setAttribute('aria-haspopup', 'menu');
+  explainer.setAttribute('aria-expanded', 'false');
   const technique = toolButton(TECHNIQUE_ICON, 'Technique scan', 'Find the literary techniques in this text for the technique spinner');
   technique.dataset.tool = 'techniques';
 
@@ -104,7 +137,7 @@ export function createRichTextTools(options: {
   function setBusy(on: boolean): void {
     busy = on;
     dictionary.disabled = on;
-    fry.disabled = on;
+    explainer.disabled = on;
     technique.disabled = on;
     tiptap.host.classList.toggle('word-help-scanning', on);
   }
@@ -372,8 +405,14 @@ export function createRichTextTools(options: {
     }
   });
 
-  fry.addEventListener('click', async (event) => {
-    event.preventDefault();
+  function afterReplace(): void {
+    paintStrip();
+    if (readWordHelp(options.getLatest()).length) {
+      say('Text replaced. Run Dictionary scan again to light the new words.');
+    }
+  }
+
+  async function runFry(): Promise<void> {
     if (busy) return;
     const before = tiptap.getHtml();
     setBusy(true);
@@ -384,10 +423,7 @@ export function createRichTextTools(options: {
       openFryReview(result, before, () => {
         const previous = tiptap.getHtml();
         tiptap.setHtml(result.html, true);
-        paintStrip();
-        if (readWordHelp(options.getLatest()).length) {
-          say('Text replaced. Run Dictionary scan again to light the new words.');
-        }
+        afterReplace();
         offerTimedUndo({
           message: 'Replaced with a Fry explainer.',
           onUndo: () => {
@@ -402,6 +438,46 @@ export function createRichTextTools(options: {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function runQuestionFirst(): Promise<void> {
+    if (busy) return;
+    const before = tiptap.getHtml();
+    setBusy(true);
+    say('Writing three hooks for the top of this block…');
+    try {
+      const result = await questionFirst(before);
+      say('');
+      openQuestionFirstReview(result, (hookHtml) => {
+        const previous = tiptap.getHtml();
+        tiptap.setHtml(`${hookHtml}${previous}`, true);
+        paintStrip();
+        offerTimedUndo({
+          message: 'Hook added above the text.',
+          onUndo: () => {
+            tiptap.setHtml(previous, true);
+            paintStrip();
+            say('');
+          }
+        });
+      });
+    } catch (error) {
+      say(error instanceof Error && error.message ? error.message : 'The hooks did not finish. Try again.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  explainer.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (busy) return;
+    if (explainer.getAttribute('aria-expanded') === 'true') {
+      closeExplainerMenu();
+      return;
+    }
+    openExplainerMenu(explainer, (template) => {
+      void (template === 'fry' ? runFry() : runQuestionFirst());
+    });
   });
 
   technique.addEventListener('click', async (event) => {
@@ -426,7 +502,7 @@ export function createRichTextTools(options: {
 
   paintStrip();
   void paintTechniqueStrip();
-  return { buttons: [dictionary, fry, technique], status, strip };
+  return { buttons: [dictionary, explainer, technique], status, strip };
 }
 
 function wordCount(html: string): number {
@@ -476,6 +552,179 @@ export function openFryReview(
   dismiss.textContent = 'Discard';
   dismiss.addEventListener('click', close);
   actions.append(dismiss);
+  dialog.addEventListener('cancel', () => dialog.remove());
+
+  dialog.append(heading, body, actions);
+  document.body.append(dialog);
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+  return dialog;
+}
+
+// ------------------------------------------------------------ explainer menu
+
+let openMenu: { menu: HTMLElement; anchor: HTMLElement; stop: () => void } | null = null;
+
+export function closeExplainerMenu(): void {
+  if (!openMenu) return;
+  const { menu, anchor, stop } = openMenu;
+  openMenu = null;
+  stop();
+  menu.remove();
+  anchor.setAttribute('aria-expanded', 'false');
+}
+
+/** The template menu under the Explainer button. Picking an item closes it. */
+export function openExplainerMenu(anchor: HTMLElement, onPick: (template: ExplainerTemplate) => void): HTMLElement {
+  closeExplainerMenu();
+  const menu = document.createElement('div');
+  menu.className = 'text-tools-menu';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'Explainer templates');
+
+  const items = EXPLAINER_TEMPLATES.map((template) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'text-tools-menu__item';
+    item.setAttribute('role', 'menuitem');
+    item.dataset.template = template.id;
+    const label = document.createElement('span');
+    label.className = 'text-tools-menu__label';
+    label.textContent = template.label;
+    const blurb = document.createElement('span');
+    blurb.className = 'text-tools-menu__blurb';
+    blurb.textContent = template.blurb;
+    item.append(label, blurb);
+    item.addEventListener('click', () => {
+      closeExplainerMenu();
+      anchor.focus();
+      onPick(template.id);
+    });
+    return item;
+  });
+  menu.append(...items);
+
+  const onPointer = (event: PointerEvent) => {
+    const target = event.target;
+    if (!(target instanceof Node) || menu.contains(target) || anchor.contains(target)) return;
+    closeExplainerMenu();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      closeExplainerMenu();
+      anchor.focus();
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    items[(at + step + items.length) % items.length]?.focus();
+  };
+
+  document.body.append(menu);
+  const floating = { placement: 'bottom-start' as const, offset: 6, padding: 12 };
+  void positionHubFloating(anchor, menu, floating);
+  const stopFloating = autoUpdateHubFloating(anchor, menu, floating);
+  document.addEventListener('pointerdown', onPointer, true);
+  document.addEventListener('keydown', onKey);
+  openMenu = {
+    menu,
+    anchor,
+    stop: () => {
+      stopFloating?.();
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey);
+    }
+  };
+  anchor.setAttribute('aria-expanded', 'true');
+  items[0]?.focus();
+  return menu;
+}
+
+// ------------------------------------------------------ question first review
+
+/** Pick one of the hooks. Nothing changes until Add above text. */
+export function openQuestionFirstReview(result: QuestionFirstResult, onAdd: (hookHtml: string) => void): HTMLDialogElement {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'text-tools-review text-tools-review--hooks';
+  dialog.setAttribute('aria-label', 'Question first');
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'Question first';
+  const body = document.createElement('div');
+  body.className = 'text-tools-review__body';
+
+  if (result.question) {
+    const question = document.createElement('p');
+    question.className = 'text-tools-review__question';
+    const lead = document.createElement('strong');
+    lead.textContent = 'Your text answers: ';
+    question.append(lead, result.question);
+    body.append(question);
+  }
+
+  const length = document.createElement('p');
+  length.className = 'text-tools-review__length';
+
+  const group = document.createElement('div');
+  group.className = 'text-tools-hooks';
+  group.setAttribute('role', 'radiogroup');
+  group.setAttribute('aria-label', 'Choose a hook');
+  const name = `question-first-${Math.random().toString(36).slice(2, 8)}`;
+  let chosen = result.hooks[0];
+
+  const paintLength = () => {
+    length.textContent = `Adds ${wordCount(chosen.html)} words above your text. Your text stays as written.`;
+  };
+
+  result.hooks.forEach((hook, index) => {
+    const option = document.createElement('label');
+    option.className = 'text-tools-hook';
+    option.dataset.hook = hook.type;
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = name;
+    radio.value = hook.type;
+    radio.checked = index === 0;
+    radio.className = 'text-tools-hook__radio';
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      chosen = hook;
+      paintLength();
+    });
+    const type = document.createElement('span');
+    type.className = 'text-tools-hook__type';
+    type.textContent = HOOK_LABELS[hook.type];
+    const preview = document.createElement('div');
+    preview.className = 'block-rich-text text-tools-hook__preview';
+    preview.innerHTML = sanitizeRichTextHtml(hook.html);
+    option.append(radio, type, preview);
+    group.append(option);
+  });
+  paintLength();
+  body.append(length, group);
+
+  const actions = document.createElement('div');
+  actions.className = 'text-tools-review__actions';
+  const close = () => {
+    dialog.close?.();
+    dialog.remove();
+  };
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'btn btn--primary';
+  add.textContent = 'Add above text';
+  add.addEventListener('click', () => {
+    close();
+    onAdd(chosen.html);
+  });
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'btn btn--ghost';
+  dismiss.textContent = 'Discard';
+  dismiss.addEventListener('click', close);
+  actions.append(add, dismiss);
   dialog.addEventListener('cancel', () => dialog.remove());
 
   dialog.append(heading, body, actions);

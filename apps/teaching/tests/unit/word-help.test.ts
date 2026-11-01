@@ -10,7 +10,7 @@ import {
 } from '@/blocks/word-help';
 import { createStudentWordHelpBar } from '@/blocks/word-help-bar';
 import { pollTextToolJob } from '@/blocks/text-tools-client';
-import { createRichTextTools, openFryReview } from '@/blocks/rich-text-tools';
+import { closeExplainerMenu, createRichTextTools, openFryReview, openQuestionFirstReview } from '@/blocks/rich-text-tools';
 import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 
@@ -217,11 +217,32 @@ describe('teacher text tools', () => {
     return { tiptap, onChange, getLatest: () => latest };
   }
 
+  function pickTemplate(button: HTMLButtonElement, template: 'fry' | 'question_first') {
+    document.body.append(button);
+    button.click();
+    const item = document.querySelector<HTMLButtonElement>(`.text-tools-menu [data-template="${template}"]`);
+    if (!item) throw new Error('menu did not open');
+    item.click();
+  }
+
+  function waitForDialog(selector: string) {
+    return vi.waitFor(() => {
+      const found = document.querySelector(selector);
+      if (!found) throw new Error('no dialog yet');
+      return found;
+    });
+  }
+
+  afterEach(() => {
+    closeExplainerMenu();
+    document.querySelectorAll('.text-tools-review, .text-tools-btn').forEach((el) => el.remove());
+  });
+
   it('Dictionary scan saves cards on the block settings and lists them', async () => {
     const ctx = setup('<p>The ephemeral glow.</p>');
     const tools = createRichTextTools({ ...ctx, scan: async () => [entry('ephemeral')] });
     document.body.append(tools.status, tools.strip);
-    expect(tools.buttons.map((b) => b.textContent)).toEqual(['Dictionary scan', 'Fry explainer', 'Technique scan']);
+    expect(tools.buttons.map((b) => b.textContent)).toEqual(['Dictionary scan', 'Explainer', 'Technique scan']);
     expect(tools.strip.hidden).toBe(false);
     expect(tools.strip.textContent).toContain('+ Add word');
 
@@ -248,7 +269,7 @@ describe('teacher text tools', () => {
   it('Fry explainer waits for Replace, then swaps the text with undo', async () => {
     const ctx = setup('<p>Old text about voice.</p>');
     const tools = createRichTextTools({ ...ctx, rewrite: async () => ({ html: '<p>Just do it.</p>' }) });
-    tools.buttons[1].click();
+    pickTemplate(tools.buttons[1], 'fry');
     const dialog = await vi.waitFor(() => {
       const found = document.querySelector('.text-tools-review');
       if (!found) throw new Error('no dialog yet');
@@ -262,6 +283,76 @@ describe('teacher text tools', () => {
     const undo = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo');
     undo?.click();
     expect(ctx.tiptap.setHtml).toHaveBeenLastCalledWith('<p>Old text about voice.</p>', true);
+  });
+
+  it('the Explainer button opens a menu of templates and closes it again', () => {
+    const ctx = setup('<p>Text</p>');
+    const tools = createRichTextTools(ctx);
+    const button = tools.buttons[1];
+    document.body.append(button);
+    expect(button.getAttribute('aria-haspopup')).toBe('menu');
+    button.click();
+    const menu = document.querySelector('.text-tools-menu')!;
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect([...menu.querySelectorAll('.text-tools-menu__label')].map((el) => el.textContent)).toEqual(['Fry explainer', 'Question first']);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('.text-tools-menu')).toBeNull();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('Question first adds the chosen hook above the text, which stays as written, with undo', async () => {
+    const ctx = setup('<p>Old text about voice.</p>');
+    const questionFirst = vi.fn(async () => ({
+      question: 'Why do scientists hide the doer?',
+      hooks: [
+        { type: 'contradiction' as const, html: '<p>Scientists are told to be clear.</p>' },
+        { type: 'prediction' as const, html: '<p>Which sentence sounds more certain?</p>' },
+        { type: 'dilemma' as const, html: '<p>Name the doer, or name the result?</p>' }
+      ]
+    }));
+    const tools = createRichTextTools({ ...ctx, questionFirst });
+    pickTemplate(tools.buttons[1], 'question_first');
+    const dialog = await waitForDialog('.text-tools-review--hooks');
+    expect(questionFirst).toHaveBeenCalledWith('<p>Old text about voice.</p>');
+    expect(ctx.tiptap.setHtml).not.toHaveBeenCalled();
+    expect(dialog.querySelector('.text-tools-review__question')?.textContent).toBe('Your text answers: Why do scientists hide the doer?');
+    expect([...dialog.querySelectorAll('.text-tools-hook__type')].map((el) => el.textContent)).toEqual(['Contradiction', 'Prediction', 'Dilemma']);
+    expect(dialog.querySelector('.text-tools-review__length')?.textContent).toBe('Adds 6 words above your text. Your text stays as written.');
+
+    const prediction = dialog.querySelector<HTMLInputElement>('input[value="prediction"]')!;
+    prediction.checked = true;
+    prediction.dispatchEvent(new Event('change'));
+    expect(dialog.querySelector('.text-tools-review__length')?.textContent).toBe('Adds 5 words above your text. Your text stays as written.');
+    [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Add above text')!.click();
+    expect(ctx.tiptap.setHtml).toHaveBeenCalledWith('<p>Which sentence sounds more certain?</p><p>Old text about voice.</p>', true);
+
+    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo')?.click();
+    expect(ctx.tiptap.setHtml).toHaveBeenLastCalledWith('<p>Old text about voice.</p>', true);
+  });
+
+  it('a failed Question first shows the server message and changes nothing', async () => {
+    const ctx = setup('<p>Short.</p>');
+    const tools = createRichTextTools({
+      ...ctx,
+      questionFirst: async () => {
+        throw new Error('There is not enough here to write a hook for.');
+      }
+    });
+    pickTemplate(tools.buttons[1], 'question_first');
+    await vi.waitFor(() => expect(tools.status.textContent).toBe('There is not enough here to write a hook for.'));
+    expect(ctx.tiptap.setHtml).not.toHaveBeenCalled();
+    expect(document.querySelector('.text-tools-review')).toBeNull();
+  });
+
+  it('the Question first preview offers Add and Discard and Discard changes nothing', () => {
+    const onAdd = vi.fn();
+    const dialog = openQuestionFirstReview({ question: '', hooks: [{ type: 'dilemma', html: '<p>Wall or beach?</p>' }] }, onAdd);
+    expect(dialog.querySelector('h2')?.textContent).toBe('Question first');
+    expect(dialog.querySelector('.text-tools-review__question')).toBeNull();
+    expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Add above text', 'Discard']);
+    [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Discard')!.click();
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(document.querySelector('.text-tools-review')).toBeNull();
   });
 
   it('the Fry preview always offers Replace and Discard, never a refusal', () => {

@@ -7,9 +7,16 @@ import type { LiteraryElementsTable } from '@/blocks/literary-elements';
 import { normaliseTechniqueFindings, type TechniqueFinding } from '@/blocks/technique-scan';
 import { normaliseWordHelp, type WordHelpEntry } from '@/blocks/word-help';
 
-export type TextTool = 'dictionary' | 'fry' | 'techniques';
+export type TextTool = 'dictionary' | 'fry' | 'question_first' | 'techniques';
 
 export type FryResult = { html: string };
+
+export type QuestionFirstHookType = 'contradiction' | 'prediction' | 'dilemma';
+export type QuestionFirstHook = { type: QuestionFirstHookType; html: string };
+/** The question the block answers, and up to one hook of each type to put above it. */
+export type QuestionFirstResult = { question: string; hooks: QuestionFirstHook[] };
+
+const HOOK_TYPES: QuestionFirstHookType[] = ['contradiction', 'prediction', 'dilemma'];
 
 type JobView = {
   key: string;
@@ -65,6 +72,25 @@ export async function rewriteAsFryExplainer(html: string, options?: PollOptions)
   )) as Partial<FryResult> | undefined;
   if (typeof result?.html === 'string' && result.html) return { html: result.html };
   throw new Error('The explainer came back empty. Try again.');
+}
+
+/** Teacher only: write three hooks to go above a block. The block itself is not rewritten. */
+export async function writeQuestionFirst(html: string, options?: PollOptions): Promise<QuestionFirstResult> {
+  const result = (await pollTextToolJob(
+    () => apiPost<JobView>('/api/text-tools', { tool: 'question_first', html }, { signal: options?.signal }),
+    (key) => apiGet<JobView>(`/api/text-tools/${encodeURIComponent(key)}`, { signal: options?.signal }),
+    { timeoutMs: 180_000, intervalMs: 2000, ...options }
+  )) as { question?: unknown; hooks?: unknown } | undefined;
+  const hooks = (Array.isArray(result?.hooks) ? result.hooks : [])
+    .filter((hook): hook is QuestionFirstHook =>
+      Boolean(hook) &&
+      HOOK_TYPES.includes((hook as QuestionFirstHook).type) &&
+      typeof (hook as QuestionFirstHook).html === 'string' &&
+      Boolean((hook as QuestionFirstHook).html)
+    )
+    .map(({ type, html: hookHtml }) => ({ type, html: hookHtml }));
+  if (!hooks.length) throw new Error('The hooks came back empty. Try again.');
+  return { question: typeof result?.question === 'string' ? result.question : '', hooks };
 }
 
 /**
