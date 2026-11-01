@@ -59,8 +59,28 @@ describe('decide form', () => {
     const f = mountDecide(c);
     f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
     expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Pick a winner in every match-up. 3 of 3 still to do.');
-    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your picks are saved.');
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Nothing to submit yet.');
     expect(c.client.submit).not.toHaveBeenCalled();
+  });
+
+  it('says who the group is still waiting on and what comes next', () => {
+    const f = mountDecide(ctx(base({ decider: 'teacher', members: [{ key: 'm1', initials: 'AB', me: true, done: false }, { key: 'm2', initials: 'CD', me: false, done: true }, { key: 'm3', initials: 'EF', me: false, done: false }] })));
+    for (let n = 0; n < 3; n++) { winLeft(f); chip(f); if (n < 2) next(f).click(); }
+    const wait = f.el.querySelector('.sdd-wait')!.textContent!;
+    expect(wait).toContain('2 of 3 in your group have finished. Still going: EF.');
+    expect(wait).toContain('your teacher confirms the idea');
+    expect(wait).toContain('give each part to someone by their initials');
+    const held = mountDecide(ctx(base({ awaiting: { kind: 'question' } })));
+    expect(held.el.querySelector('.sdd-wait')!.textContent).toContain('still has to confirm your group’s problem');
+  });
+
+  it('after voting, while the teacher confirms, shows the parts step locked with what opens it', () => {
+    const f = mountDecide(ctx(base({ votes_closed: true, chosen: null, awaiting: { kind: 'idea' }, results: { ranking: [{ id: 'i2', title: 'Streets' }], best_at: [], unanimous: false } })));
+    expect(f.el.querySelector('.sdd-result h2')?.textContent).toBe('Waiting for your teacher to confirm your group’s idea');
+    expect(f.el.querySelector('.sd-locked')?.textContent).toContain('opens as soon as your teacher confirms');
+    expect(f.el.querySelectorAll('.su-step')).toHaveLength(2);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your teacher is confirming your group’s idea');
   });
 
   it('after voting shows the chosen idea, the top three, the strongest in each criterion and the parts editor', () => {

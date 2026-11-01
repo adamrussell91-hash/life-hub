@@ -177,3 +177,42 @@ test('the group picks an assembler in Decide; in Prototype everyone sees every p
   v = await act(store, 2, 'pitch', { link: 'https://example.com/finished' });
   assert.equal(v.pitch.link, 'https://example.com/finished');
 });
+
+test('members say who has finished their head-to-heads', async () => {
+  const store = await atDecide({ ...CONFIG(), decider: 'teacher' });
+  const s = await act(store, 1, 'status');
+  assert.equal(s.decider, 'teacher');
+  const v = await act(store, 1, 'save', { phase: 'decide', payload: duelsFor(s, 'Baker') });
+  assert.deepEqual(v.members.map((m) => [m.initials, m.done]), [['AB', true], ['CD', false]]);
+});
+
+test('switching to students choose settles groups already waiting on the teacher with a clear winner', async () => {
+  const store = await atDecide({ ...CONFIG(), decider: 'teacher' });
+  const s1 = await act(store, 1, 'status');
+  assert.deepEqual(s1.awaiting, { kind: 'question' });
+  const { sprintKeys } = await import('../../netlify/functions/_shared/sprint-keys.mjs');
+  const key = sprintKeys('sp1').config;
+  store.data.set(key, { ...store.data.get(key), decider: 'top_vote' });
+  const s2 = await act(store, 1, 'status');
+  assert.ok(s2.question?.text);
+  assert.equal(s2.awaiting, null);
+  for (const n of [1, 2]) await act(store, n, 'save', { phase: 'decide', payload: duelsFor(s2, 'Baker') });
+  const s3 = await act(store, 1, 'status');
+  assert.equal(s3.chosen.title, 'Baker');
+});
+
+test('a group waiting on the teacher for its idea goes through once the teacher switches to students choose', async () => {
+  const store = await atDecide();
+  const { sprintKeys } = await import('../../netlify/functions/_shared/sprint-keys.mjs');
+  const key = sprintKeys('sp1').config;
+  const s = await act(store, 1, 'status');
+  store.data.set(key, { ...store.data.get(key), decider: 'teacher' });
+  for (const n of [1, 2]) await act(store, n, 'save', { phase: 'decide', payload: duelsFor(s, 'Baker') });
+  const waiting = await act(store, 1, 'status');
+  assert.deepEqual(waiting.awaiting, { kind: 'idea' });
+  assert.equal(waiting.chosen, null);
+  store.data.set(key, { ...store.data.get(key), decider: 'top_vote' });
+  const after = await act(store, 1, 'status');
+  assert.equal(after.chosen.title, 'Baker');
+  assert.equal(after.awaiting, null);
+});

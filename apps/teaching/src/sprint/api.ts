@@ -51,7 +51,9 @@ export type SprintStatus = {
   /** `assigned`: member keys on this part. */
   parts?: Array<Part & { claimed: number; mine: boolean; assigned?: string[] }>;
   /** The group, for the part picker: keys that name no one, and initials. */
-  members?: Array<{ key: string; initials: string; me: boolean }>;
+  members?: Array<{ key: string; initials: string; me: boolean; done?: boolean }>;
+  /** Who settles the group's idea once everyone has finished. */
+  decider?: 'top_vote' | 'teacher';
   /** True when the group picks an assembler (sprints published from late October 2026). */
   assemble?: boolean;
   /** Who puts the prototype together and uploads it. */
@@ -157,6 +159,7 @@ export type BoardSub = { student_id: string; name: string; sub: { payload: Recor
 export type GroupBoard = {
   group: { id: string; name: string };
   awaiting: MapGroup['awaiting'];
+  voted?: { done: string[]; waiting: string[] };
   question: { id: string; text: string } | null;
   chosen: string | null;
   notes: Array<{ id: string; text: string; name: string; student_id: string; index: number; field?: string }>;

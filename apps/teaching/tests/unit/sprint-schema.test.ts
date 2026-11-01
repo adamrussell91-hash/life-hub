@@ -17,7 +17,7 @@ export const settings = () => ({
 describe('sprint schema', () => {
   it('fills defaults: teacher decides, standard support, 2 hour lock', () => {
     const s = SprintSettingsSchema.parse(settings());
-    expect(s.decider).toBe('teacher');
+    expect(s.decider).toBe('top_vote');
     expect(s.support).toBe('standard');
     expect(s.lock_hours).toBe(2);
     expect(s.requirements).toEqual([]);

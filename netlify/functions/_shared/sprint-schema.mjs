@@ -81,7 +81,8 @@ var LIMIT_BOXES = ["can_known", "cant_known", "can_unknown", "cant_unknown"];
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z.object({
   class_id: z.string().min(1).max(64),
-  decider: z.enum(["top_vote", "teacher"]).default("teacher"),
+  /** Who settles each group's problem and idea: the students' votes (ties come to the teacher), or the teacher approves each. */
+  decider: z.enum(["top_vote", "teacher"]).default("top_vote"),
   support: z.enum(["guided", "standard", "open"]).default("standard"),
   lock_hours: z.number().int().min(0).max(24).default(2),
   criteria: z.array(SprintCriterionSchema).max(SPRINT_LIMITS.criteria).default([]),

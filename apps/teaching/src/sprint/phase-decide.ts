@@ -30,14 +30,16 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   root.append(purpose(voting, pool.length));
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? duelProblems(state.duels, ids) : []),
-    ...(!s.chosen ? ['Your picks are saved. Submit once your group’s idea is chosen and every part has someone.'] : []),
+    ...(!s.chosen ? [voting
+      ? 'Nothing to submit yet. Your picks save as you go. Once your group’s idea is chosen, a step to plan the parts opens here; submit after that.'
+      : 'Nothing to submit yet. Your teacher is confirming your group’s idea; then plan the parts in step 2 and submit.'] : []),
     ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
     ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
   ]);
 
   if (voting) {
     const ranking = el('div', 'sdd-rank');
-    const paintRanking = () => ranking.replaceChildren(...myRanking(state.duels, pool, label, ctx));
+    const paintRanking = () => ranking.replaceChildren(...myRanking(state.duels, pool, label, ctx), waiting(s, duelsDone(state.duels, ids)));
     root.append(duelArena(ctx, state, pool, label, () => { paintRanking(); bar.changed(); }));
     paintRanking();
     root.append(ranking);
@@ -45,6 +47,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     root.append(groupResult(s, label, ctx));
   }
   if (s.chosen) root.append(partsEditor(ctx));
+  else if (!voting) root.append(partsLocked());
   if (!voting) stepify(root, [
     { pick: '.sdd-result', title: 'See what your group picked', guide: LATER_GUIDE.result },
     { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
@@ -233,14 +236,39 @@ function myRanking(duels: Duel[], pool: GalleryIdea[], label: Map<string, string
     li.append(body);
     list.append(li);
   });
-  return [list, el('p', 'sprint-note', 'When everyone in your group has finished, the idea with the most wins across the group is the one you build. If you all have the same 1st, that’s your winner. You can go back and change a match-up until then.')];
+  return [list, el('p', 'sprint-note', 'You can go back and change a match-up until everyone has finished.')];
+}
+
+/**
+ * What the group is waiting on before its idea is chosen, and what comes
+ * next: who is still doing their match-ups, then who settles the idea, then
+ * the parts step.
+ */
+function waiting(s: SprintStatus, meDone: boolean): HTMLElement {
+  const box = el('section', 'sdd-wait');
+  box.append(el('h4', '', 'What happens next'));
+  if (s.awaiting?.kind === 'question') {
+    box.append(el('p', '', 'Your teacher still has to confirm your group’s problem. Your picks are saved, and nothing else is needed from you for now.'));
+    return box;
+  }
+  const members = s.members ?? [];
+  const done = members.filter((m) => (m.me ? meDone : m.done));
+  const still = members.filter((m) => !(m.me ? meDone : m.done));
+  if (members.length) box.append(el('p', 'sdd-wait__count', still.length
+    ? `${done.length} of ${members.length} in your group have finished. Still going: ${still.map((m) => (m.me ? `${m.initials} (you)` : m.initials)).join(', ')}.`
+    : 'Everyone in your group has finished.'));
+  box.append(el('p', '', s.decider === 'top_vote'
+    ? 'When everyone has finished, the idea with the most wins across your group is chosen. If you all have the same 1st, that’s your winner.'
+    : 'When everyone has finished, your teacher confirms the idea with the most wins across your group.'));
+  box.append(el('p', '', 'Then a new step opens on this page: list the parts of the prototype and give each part to someone by their initials.'));
+  return box;
 }
 
 /** After voting: the group's idea, its top three, and which idea was strongest in each criterion. */
 function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormContext): HTMLElement {
   const box = el('section', 'sdd-result');
   const r = s.results;
-  box.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Your teacher is choosing'));
+  box.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Waiting for your teacher to confirm your group’s idea'));
   if (s.chosen) {
     const chosen = el('div', 'sprint-chosen');
     chosen.append(el('strong', '', s.chosen.title), el('p', '', s.chosen.idea));
@@ -267,6 +295,13 @@ function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormConte
     }
     box.append(best);
   }
+  return box;
+}
+
+/** Before the idea is confirmed: the parts step is there, and says what opens it. */
+function partsLocked(): HTMLElement {
+  const box = el('div', 'sprint-parts');
+  box.append(el('h3', '', 'Parts of the prototype'), el('p', 'sprint-note sd-locked', 'This opens as soon as your teacher confirms your group’s idea. Then you list what the prototype needs and give each part to someone by their initials.'));
   return box;
 }
 

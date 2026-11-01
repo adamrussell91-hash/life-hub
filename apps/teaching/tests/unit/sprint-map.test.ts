@@ -30,6 +30,18 @@ describe('progress map', () => {
     expect(m.root.querySelector('.dot--late')?.getAttribute('title')).toBe('Cy Dale: in late');
   });
 
+  it('lists groups waiting on the teacher at the top, and opens that group’s board', async () => {
+    const a = api();
+    const m = mountSprintMap({ getLesson: () => lesson, api: a, emitLesson: vi.fn() });
+    await m.refresh();
+    const waits = m.root.querySelector('.smap-waits')!;
+    expect(waits.textContent).toContain('Waiting on you');
+    expect(waits.textContent).toContain('Kestrel: choose the group’s idea');
+    expect(waits.textContent).not.toContain('Heron');
+    waits.querySelector<HTMLButtonElement>('button')!.click();
+    expect(a.board).toHaveBeenCalledWith('g1');
+  });
+
   it('End class part says who will be marked absent before it ends', async () => {
     const a = api();
     const m = mountSprintMap({ getLesson: () => lesson, api: a, emitLesson: vi.fn() });

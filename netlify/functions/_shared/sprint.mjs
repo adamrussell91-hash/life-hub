@@ -356,6 +356,19 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
     if (config.decider === 'top_vote' && t.top) next.chosen = t.top;
     else next.awaiting = { kind: 'idea', tie: t.tie, empty: ideas.length === 0 };
   }
+  // A teacher who switches to "students choose" and republishes: groups already waiting on a clear winner go through now.
+  if (config.decider === 'top_vote' && next.awaiting?.kind === 'question' && !next.question) {
+    const notes = await groupNotes(store, lessonId, config, group);
+    const subs = await groupSubs(store, lessonId, config, group, 'understand');
+    const t = tally(subs.map(({ sub }) => ({ star: sub?.payload?.star ?? '' })), ['star'], notes.map((n) => n.id));
+    const top = notes.find((n) => n.id === t.top);
+    if (top) next = { ...next, question: { id: top.id, text: top.text }, awaiting: null };
+  }
+  if (config.decider === 'top_vote' && next.awaiting?.kind === 'idea' && !next.chosen && next.votes_closed_at) {
+    const gallery = await groupGallery(store, lessonId, config, group, next.votes_closed_at);
+    const t = decideTally(await groupSubs(store, lessonId, config, group, 'decide'), config, gallery);
+    if (t.top) next = { ...next, chosen: t.top, awaiting: null };
+  }
   if (next !== state) await store.setJSON(k.group(group.id), next);
   return next;
 }
@@ -469,7 +482,9 @@ async function studentView(store, lessonId, config, who, group) {
     chosen: chosenIdea ? { id: chosenIdea.id, title: chosenIdea.title, idea: chosenIdea.idea } : null,
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
     parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid), assigned: list(state.claims[p.id]).map((x) => memberKey(lessonId, x)) })),
-    members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid })),
+    // `done`: finished their Decide head-to-heads, so the group can see who it is waiting on.
+    members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid, done: list(state.voted).includes(x) })),
+    decider: config.decider === 'top_vote' ? 'top_vote' : 'teacher',
     assemble: !!config.assemble,
     assembler: state.assembler && group.students.includes(state.assembler) ? { key: memberKey(lessonId, state.assembler), initials: initials.get(state.assembler) ?? '–', me: state.assembler === sid } : null,
     group_parts: open.includes('prototype') ? await groupParts(store, lessonId, config, group, state, initials, sid) : null,
@@ -841,6 +856,8 @@ async function teacherBoard(store, lessonId, groupId) {
   return {
     group: { id: g.id, name: g.name },
     awaiting: state.awaiting ?? null,
+    // Who has finished Decide's head-to-heads and who is still going.
+    voted: { done: g.students.filter((x) => list(state.voted).includes(x)).map(name), waiting: g.students.filter((x) => !list(state.voted).includes(x)).map(name) },
     question: state.question ?? null,
     chosen: state.chosen ?? null,
     notes,
