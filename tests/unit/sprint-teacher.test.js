@@ -107,3 +107,15 @@ test('move takes a student to another group in the config and the draft', async 
   assert.deepEqual(store.data.get(sprintKeys('sp1').config).groups.map((g) => g.students), [['st_cy'], ['st_ed', 'st_gus', 'st_ann']]);
   assert.deepEqual(store.data.get(draftLessonKey('sp1')).sprint.groups.map((g) => g.students), [['st_cy'], ['st_ed', 'st_gus', 'st_ann']]);
 });
+
+test('a student taken off the class list leaves their group: no dash on the map, no wait on them', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const config = CONFIG();
+  config.groups[0].students.push('st_gone');
+  const store = storeFor(config);
+  const s = await teach(store, 'summary');
+  assert.deepEqual(s.groups[0].students.map((x) => x.initials), ['AB', INITIALS[2]]);
+  const me = await act(store, 1, 'claim', { initials: INITIALS[1] });
+  assert.equal(me.group.size, 2);
+  assert.ok(!me.group.mates.includes('–'));
+});

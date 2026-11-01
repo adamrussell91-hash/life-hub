@@ -127,7 +127,14 @@ async function loadSprint(store, lessonId) {
   if (lesson.pedagogical_mode !== 'design_sprint') reject(409, 'not_sprint', 'This lesson isn’t a design sprint.');
   const config = await read(store, sprintKeys(lessonId).config);
   if (!config) reject(409, 'not_published', 'Publish the sprint again.');
-  return { lesson, config };
+  return { lesson, config: await onRoster(store, config) };
+}
+
+/** Students taken off the class list leave their groups, so a group never waits on someone who isn't there. */
+async function onRoster(store, config) {
+  const ids = new Set(list((await rosterOf(store, config.class_id))?.students).map((s) => s.id));
+  if (!ids.size) return config;
+  return { ...config, groups: config.groups.map((g) => ({ ...g, students: g.students.filter((id) => ids.has(id)) })) };
 }
 
 /** A phase's dates after any extension: student beats group beats class. */
