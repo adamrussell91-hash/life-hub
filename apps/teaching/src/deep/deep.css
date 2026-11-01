@@ -12,8 +12,9 @@
   line-height: 1.5;
 }
 .du-root *, .du-root *::before, .du-root *::after { box-sizing: border-box; }
-.unit-page__deep { min-width: 0; max-width: 100%; }
-.du-root button { font: inherit; }
+.unit-page__deep { min-width: 0; max-width: 100%; padding: var(--space-4) var(--space-5) var(--space-5); }
+/* :where keeps this at element weight so .du-tab and friends still set their own size. */
+:where(.du-root) button { font: inherit; }
 .du-title { margin: 0 0 10px; font-size: 20px; color: var(--du-navy); display: flex; align-items: center; gap: 6px; }
 .du-sec { margin: 22px 0 6px; font-size: 17px; color: var(--du-navy); }
 .du-sub { margin: 2px 0 8px; color: var(--du-muted); font-size: 13px; }
