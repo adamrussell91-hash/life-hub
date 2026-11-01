@@ -11,12 +11,14 @@ import type { GalleryIdea, GroupBoard, SprintTeacherApi } from './api';
  * mark and the pitch feedback with hold-and-release. Spotlight puts one
  * answer up for the class with no name.
  */
-export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; groupId: string; getLesson: () => Lesson; emitLesson: (next: Lesson) => void; onChanged(): void; practice?: boolean }): { refresh(): Promise<void>; dispose(): void } {
+export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; groupId: string; getLesson: () => Lesson; emitLesson: (next: Lesson) => void; onChanged(): void; practice?: boolean; markNow?: boolean }): { refresh(): Promise<void>; dispose(): void } {
   const root = el('section', 'sboard');
   host.replaceChildren(root);
   let disposed = false;
   const act = async (p: Promise<unknown>) => { try { await p; o.onChanged(); await refresh(); } catch (e) { root.append(el('p', 'sprint-submit__err', e instanceof Error ? e.message : 'That didn’t work.')); } };
   const crit = () => o.getLesson().sprint?.criteria ?? [];
+  // Opened from a Mark pill: go straight to the reflections, once.
+  let markNow = !!o.markNow;
 
   function paint(b: GroupBoard): void {
     root.replaceChildren();
@@ -116,10 +118,11 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const markHost = el('div');
     const inTest = b.subs.test.filter((x) => x.sub?.submitted_at).length;
     if (o.practice) mark.append(el('p', 'kit-why', 'Marking is off in a practice run, so nothing reaches your markbook.'));
-    else mark.append(
-      button(`Mark reflections (${inTest} in)`, 'secondary', () => mountMarking(markHost, { kind: 'reflection', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson })),
-      markHost
-    );
+    else {
+      const startMarking = () => mountMarking(markHost, { kind: 'reflection', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson });
+      mark.append(button(`Mark reflections (${inTest} in)`, 'secondary', startMarking), markHost);
+      if (markNow) { markNow = false; startMarking(); requestAnimationFrame(() => mark.scrollIntoView({ behavior: 'smooth', block: 'start' })); }
+    }
     root.append(mark);
 
     if (b.round) {

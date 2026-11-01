@@ -543,3 +543,22 @@ body.spractice-open { overflow: hidden; }
 @media (max-width: 600px) { .sprint-brief-part__line { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 .sp-parts { border-radius: 12px; }
 .smap-unpublished { flex-basis: 100%; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--pastel-gold, #ffe08a); color: var(--pastel-gold-ink, #5a4300); }
+
+/* Test: what the group got back from the pitch. */
+.sprint-received { display: grid; gap: 14px; }
+.sprint-tally { display: grid; gap: 10px; }
+.sprint-tally__key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.sprint-tally__key span { display: inline-flex; align-items: center; gap: 6px; }
+.sprint-tally__key i { width: 12px; height: 12px; border-radius: 3px; }
+.sprint-tally__row { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; align-items: center; gap: 12px; }
+.sprint-tally__bar { display: flex; gap: 3px; min-height: 28px; align-items: stretch; }
+.sprint-tally__bar i { min-width: 28px; border-radius: 6px; font-size: 13px; font-style: normal; font-weight: 700; line-height: 28px; text-align: center; color: var(--navy); }
+.sprint-tally i[data-level="1"] { background: #c3d7ef; }
+.sprint-tally i[data-level="2"] { background: #7fa4d3; color: #fff; }
+.sprint-tally i[data-level="3"] { background: var(--navy); color: #fff; }
+.sprint-said { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.sprint-said__card { display: grid; gap: 4px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); }
+.sprint-said__card p { margin: 0 0 6px; }
+.sprint-said__tag { font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--pastel-sage-ink); }
+.sprint-said__tag--next { color: var(--pastel-gold-ink); }
+@media (max-width: 560px) { .sprint-tally__row { grid-template-columns: 1fr; gap: 4px; } }

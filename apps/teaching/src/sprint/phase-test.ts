@@ -18,13 +18,41 @@ export function mountTest(ctx: FormContext): PhaseForm {
   const got = el('div', 'sprint-received');
   if (!s.received) got.append(el('p', 'sprint-note', 'Your group’s feedback shows here once your teacher releases it.'));
   else {
+    const n = s.received.lines.length;
+    got.append(el('p', 'sprint-note', n ? `${n} ${n === 1 ? 'classmate' : 'classmates'} gave your group feedback. Names stay hidden.` : 'No written feedback came in this time.'));
+    const tally = el('div', 'sprint-tally');
+    const key = el('div', 'sprint-tally__key');
+    LEVEL_LABELS.forEach((l, i) => { const k = el('span'); k.append(el('i', '', ''), l); k.firstElementChild!.setAttribute('data-level', String(i + 1)); key.append(k); });
+    tally.append(key);
     for (const c of ctx.sprint.criteria) {
       const counts = s.received.levels[c.id] ?? [0, 0, 0];
-      got.append(el('p', '', `${c.text}: ${LEVEL_LABELS.map((l, i) => `${l} ${counts[i]}`).join(' · ')}`));
+      const total = counts[0] + counts[1] + counts[2];
+      const row = el('div', 'sprint-tally__row');
+      const bar = el('div', 'sprint-tally__bar');
+      bar.setAttribute('aria-label', `${c.text}: ${LEVEL_LABELS.map((l, i) => `${l} ${counts[i]}`).join(', ')}`);
+      counts.forEach((k, i) => {
+        if (!k) return;
+        const seg = el('i', '', String(k));
+        seg.dataset.level = String(i + 1);
+        seg.style.flexGrow = String(k);
+        seg.title = `${LEVEL_LABELS[i]}: ${k}`;
+        bar.append(seg);
+      });
+      if (!total) bar.append(el('span', 'sprint-note', 'No levels yet'));
+      row.append(el('b', '', c.text), bar);
+      tally.append(row);
     }
-    const ul = el('ul');
-    for (const line of s.received.lines) ul.append(el('li', '', `${line.worked} ${line.next}`));
-    got.append(ul);
+    got.append(tally);
+    if (n) {
+      const cards = el('div', 'sprint-said');
+      for (const line of s.received.lines) {
+        const card = el('article', 'sprint-said__card');
+        if (line.worked) card.append(el('span', 'sprint-said__tag', 'What worked'), el('p', '', line.worked));
+        if (line.next) card.append(el('span', 'sprint-said__tag sprint-said__tag--next', 'Try next'), el('p', '', line.next));
+        cards.append(card);
+      }
+      got.append(cards);
+    }
   }
   root.append(got);
   const bar = submitBar(ctx, 'test', () => state, () => reflectionProblems(state, !!ctx.valueCheck));
