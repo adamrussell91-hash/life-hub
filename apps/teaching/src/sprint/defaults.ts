@@ -28,7 +28,17 @@ export const DEFAULT_REFLECTION_CRITERION = 'Explains what the test showed and w
 export const DEFAULT_REFLECTION_PROMPTS = ['What did the feedback show your idea does well?', 'What would you change next, and why?'];
 
 export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It solves our problem for the audience because…', evidence: 'The evidence it uses is…' };
-export const FEEDBACK_STARTERS = { worked: 'It works because…', next: 'Try…' };
+/** Pitch feedback: a one-line hint and sentence beginnings a student can tap in. */
+export const FEEDBACK_STARTERS = {
+  worked: {
+    hint: 'Name one part, then say why it works.',
+    frames: ['The strongest part is', 'Your audience would get it straight away because', 'This meets the criteria well when']
+  },
+  next: {
+    hint: 'Name one change, then say what it would do.',
+    frames: ['To make it even stronger, you could', 'Your audience might also want', 'Next, try adding']
+  }
+};
 
 const WHERE: Record<SprintPhaseKey, 'class' | 'home'> = { understand: 'class', sketch: 'home', decide: 'class', prototype: 'home', test: 'class' };
 

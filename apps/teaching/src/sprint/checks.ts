@@ -110,7 +110,6 @@ export function feedbackProblems(f: FeedbackEntry, criteria: readonly Pick<Sprin
   for (const c of criteria) if (!f.levels[c.id]) out.push(`Pick a level for ${crit(c)}.`);
   if (!fullSentence(f.worked)) out.push('Say what worked in a full sentence.');
   if (!fullSentence(f.next)) out.push('Give one thing to try next in a full sentence.');
-  if (!f.about) out.push('Pick the criterion your comments are about.');
   return out;
 }
 
