@@ -603,6 +603,7 @@ export function renderUnitPage(
 
   const subject = curriculum.subjects.find((entry) => entry.id === unit.subject_id);
   const stripHost = document.createElement('div');
+  stripHost.className = 'unit-page__outcomes';
   const outcomeStrip = subject
     ? mountOutcomeStrip(stripHost, {
         catalog: curriculum.outcomes ?? [],

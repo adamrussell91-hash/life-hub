@@ -3911,6 +3911,18 @@ a:hover {
   gap: var(--space-3);
 }
 
+.unit-page__outcomes {
+  margin-top: calc(var(--space-3) - var(--space-6));
+}
+
+.unit-page__outcomes .outcome-strip {
+  margin: 0;
+}
+
+.unit-page__outcomes:empty {
+  display: none;
+}
+
 .unit-page__cover,
 .class-page__banner,
 .lesson-page__cover {
