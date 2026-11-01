@@ -74,8 +74,25 @@ export function sprintPublishProblems(draft) {
   return out;
 }
 
+/**
+ * Stores the published rules. A phase whose Kit deadline changed since the last
+ * publish drops its map extensions, so the new Kit date is the one students get.
+ */
 export async function storeSprintConfig(store, lessonId, config) {
-  await store.setJSON(sprintKeys(lessonId).config, config);
+  const k = sprintKeys(lessonId);
+  const before = await read(store, k.config);
+  await store.setJSON(k.config, config);
+  const moved = PHASES.filter((key) => {
+    const was = before?.phases?.find((p) => p.key === key);
+    const now = config.phases.find((p) => p.key === key);
+    return was && now && (was.due_date !== now.due_date || was.due_time !== now.due_time);
+  });
+  if (!moved.length) return;
+  const extend = await read(store, k.extend);
+  if (!extend) return;
+  const drop = (rec) => Object.fromEntries(Object.entries(rec ?? {}).filter(([key]) => !moved.includes(key)));
+  const each = (byId) => Object.fromEntries(Object.entries(byId ?? {}).map(([id, rec]) => [id, drop(rec)]).filter(([, rec]) => Object.keys(rec).length));
+  await store.setJSON(k.extend, { class: drop(extend.class), group: each(extend.group), student: each(extend.student) });
 }
 
 // ---------------------------------------------------------------------------
@@ -833,7 +850,7 @@ async function teacherSummary(store, lessonId) {
   const classParts = Object.fromEntries(config.phases.filter((p) => p.where === 'class').map((p) => [p.key, lockRec.ended[p.key] ? 'ended' : 'open']));
   const lock = lockRec.lock && Date.parse(lockRec.lock.until) > now ? lockRec.lock : null;
   const stage = (await read(store, k.stage)) ?? {};
-  return { groups, class_parts: classParts, ended: lockRec.ended, lock, extend, running: stage.running ?? null, spotlight: stage.spotlight ?? null };
+  return { groups, class_parts: classParts, ended: lockRec.ended, lock, extend, phases: config.phases.map((p) => ({ key: p.key, where: p.where, due_date: p.due_date, due_time: p.due_time, ends_at: p.ends_at ?? '' })), running: stage.running ?? null, spotlight: stage.spotlight ?? null };
 }
 
 async function teacherBoard(store, lessonId, groupId) {

@@ -465,3 +465,4 @@ body.spractice-open { overflow: hidden; }
 .sdd-wait__count { font-weight: 700; }
 .smap-waits { flex-basis: 100%; display: grid; gap: 6px; justify-items: start; padding: 10px 14px; border-radius: 12px; background: var(--pastel-gold, #ffe08a); color: var(--pastel-gold-ink, #5a4300); }
 .smap-waits .btn { white-space: normal; text-align: left; }
+.smap-unpublished { flex-basis: 100%; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--pastel-gold, #ffe08a); color: var(--pastel-gold-ink, #5a4300); }
