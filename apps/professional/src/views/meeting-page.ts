@@ -615,7 +615,9 @@ export async function renderMeetingPage(
           const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
           window.open(url, '_blank', 'noopener');
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
-        }
+        },
+        fetchPdf: async (key) => (await fetchMinutesFile(key)).data,
+        dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting
       }
     });
     return minutesCardEl;

@@ -13,6 +13,13 @@ export const config = { path: '/api/meetings/minutes-file' };
 const PDF_MAX_CHARS = 5_400_000;
 const KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.pdf$/;
 
+/** Write a minutes PDF (base64) for a meeting and return its file key. */
+export async function saveMinutesPdf(store, meetingId, base64, now = Date.now) {
+  const key = `meeting-minutes/${meetingId}/${now()}.pdf`;
+  await store.set(key, Buffer.from(base64, 'base64'), { metadata: { meeting_id: meetingId, media_type: 'application/pdf' } });
+  return key;
+}
+
 export async function handleMinutesFile(request, { store, now = Date.now }) {
   if (request.method === 'GET') {
     const key = new URL(request.url).searchParams.get('key') ?? '';
@@ -30,9 +37,7 @@ export async function handleMinutesFile(request, { store, now = Date.now }) {
       return errorResponse(400, 'invalid_file', 'Minutes must be a PDF.', false);
     }
     if (data.length > PDF_MAX_CHARS) return errorResponse(413, 'too_large', 'Minutes PDFs must be under 4 MB.', false);
-    const key = `meeting-minutes/${meetingId}/${now()}.pdf`;
-    await store.set(key, Buffer.from(data, 'base64'), { metadata: { meeting_id: meetingId, media_type: mediaType } });
-    return okResponse(201, { file_key: key });
+    return okResponse(201, { file_key: await saveMinutesPdf(store, meetingId, data, now) });
   }
   return methodNotAllowed('GET, POST, OPTIONS');
 }

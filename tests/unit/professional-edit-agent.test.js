@@ -77,12 +77,13 @@ test('Clare, Hammond and Ann get the Professional edit tools and communication p
     const ids = capabilityIdsForAgent(slug);
     for (const id of [
       'professional.search',
+      'professional.file-minutes',
       'professional.propose-meeting-update',
       'professional.propose-event-update',
       'professional.propose-communication'
     ]) assert.ok(ids.includes(id), `${slug} ${id}`);
     const names = buildAgentTools({ slug }).map(tool => tool.name);
-    for (const name of ['search_professional', 'propose_meeting_update', 'propose_event_update', 'propose_communication']) {
+    for (const name of ['search_professional', 'file_minutes', 'propose_meeting_update', 'propose_event_update', 'propose_communication']) {
       assert.ok(names.includes(name), `${slug} ${name}`);
     }
     assert.equal(isPathAllowedForAgent(slug, 'professional:communication:new-x', { mode: 'write' }), true, slug);

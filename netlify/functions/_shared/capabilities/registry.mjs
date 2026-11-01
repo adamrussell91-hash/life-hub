@@ -36,6 +36,7 @@ import {
   proposeEventUpdateSchema,
   proposeCommunicationSchema
 } from '../professional-edit-agent.mjs';
+import { fileMinutesSchema } from '../minutes-chat.mjs';
 import { checkCalendarsSchema } from '../agent-calendar-merge.mjs';
 import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
 import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
@@ -398,6 +399,7 @@ export function buildAgentTools({
   if (has('professional.propose-meeting')) tools.push(proposeMeetingSchema());
   if (has('professional.propose-event')) tools.push(proposeEventSchema());
   if (has('professional.search')) tools.push(searchProfessionalSchema());
+  if (has('professional.file-minutes')) tools.push(fileMinutesSchema());
   if (has('professional.propose-meeting-update')) tools.push(proposeMeetingUpdateSchema());
   if (has('professional.propose-event-update')) tools.push(proposeEventUpdateSchema());
   if (has('professional.propose-communication')) tools.push(proposeCommunicationSchema());

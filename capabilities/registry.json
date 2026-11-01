@@ -866,6 +866,19 @@
       ],
       "tool_name": "search_professional"
     },
+    "professional.file-minutes": {
+      "file": "professional/file-minutes.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "file_minutes"
+    },
     "professional.propose-meeting-update": {
       "file": "professional/propose-meeting-update.json",
       "agents": [

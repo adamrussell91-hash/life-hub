@@ -50,7 +50,7 @@ export type MinutesSaveDeps = {
   createLedgerItem: (body: { person_ref: string; direction: 'you_owe' | 'they_owe'; text: string; comm_ref: string; due?: string | null }) => Promise<{ item: LedgerItem; created: boolean }>;
   makeActionTask: (item: LedgerItem, sourceRef: string) => Promise<LedgerItem>;
   createLooseTask: (title: string, sourceRef: string) => Promise<void>;
-  saveMeeting: (patch: { minutes: MeetingMinutes; decisions: MeetingDecision[] }) => Promise<MeetingRecord>;
+  saveMeeting: (patch: { minutes: MeetingMinutes; decisions: MeetingDecision[]; minutes_pending: null }) => Promise<MeetingRecord>;
   now?: () => Date;
 };
 
@@ -59,6 +59,8 @@ export type MinutesSaveInput = {
   meetingRef: string;
   attendees: Array<{ ref: string; role: string | null }>;
   pdfData: string | null;
+  /** A minutes PDF already stored (e.g. filed from chat). Used when there is no new upload. */
+  fileKey?: string | null;
   sections: MeetingMinutes['sections'];
   mine: Array<{ text: string; due: string | null }>;
   others: Array<{ text: string; person_ref: string; due: string | null }>;
@@ -68,7 +70,9 @@ export type MinutesSaveInput = {
 /** Save what Adam ticked. Ledger create is idempotent, so a replaced set of minutes never doubles up. */
 export async function saveMinutesReview(input: MinutesSaveInput, deps: MinutesSaveDeps): Promise<{ record: MeetingRecord; counts: MeetingMinutes['saved_counts'] }> {
   const { record, meetingRef } = input;
-  const fileKey = input.pdfData ? (await deps.uploadFile(record.id, input.pdfData)).file_key : record.minutes?.file_key ?? null;
+  const fileKey = input.pdfData
+    ? (await deps.uploadFile(record.id, input.pdfData)).file_key
+    : input.fileKey ?? record.minutes?.file_key ?? null;
   const counts = { tasks: 0, promises: 0, decisions: 0 };
   const owedTo = ownerForMine(input.attendees);
   for (const action of input.mine) {
@@ -95,5 +99,5 @@ export async function saveMinutesReview(input: MinutesSaveInput, deps: MinutesSa
     added_at: (deps.now?.() ?? new Date()).toISOString(),
     saved_counts: counts
   };
-  return { record: await deps.saveMeeting({ minutes, decisions: merged.decisions }), counts };
+  return { record: await deps.saveMeeting({ minutes, decisions: merged.decisions, minutes_pending: null }), counts };
 }

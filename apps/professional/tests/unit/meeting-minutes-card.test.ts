@@ -14,21 +14,27 @@ const review = {
 };
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function setup(minutes: MeetingRecord['minutes'] = null) {
-  const record = { id: MEETING_ID, decisions: [], minutes } as unknown as MeetingRecord;
+const PENDING_KEY = `meeting-minutes/${MEETING_ID}/1762000000000.pdf`;
+const pending = { file_key: PENDING_KEY, added_at: '2026-10-31T23:00:00.000Z', source: 'chat' as const, note: 'From the faculty email.' };
+
+function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: MeetingRecord['minutes_pending'] = null) {
+  const record = { id: MEETING_ID, decisions: [], minutes, minutes_pending: minutesPending } as unknown as MeetingRecord;
   const deps: MinutesCardDeps = {
     read: vi.fn(async () => review),
     save: vi.fn(async (input) => ({ record: { ...record, minutes: { sections: input.sections, file_key: null, source: 'page', added_at: 'x', saved_counts: { tasks: 1, promises: 2, decisions: 1 } } } as MeetingRecord, counts: { tasks: 1, promises: 2, decisions: 1 } })),
-    openFile: vi.fn(async () => undefined)
+    openFile: vi.fn(async () => undefined),
+    fetchPdf: vi.fn(async () => 'JVBERi0xLjQK'),
+    dismissPending: vi.fn(async () => ({ ...record, minutes_pending: null }) as MeetingRecord)
   };
+  const onSaved = vi.fn();
   const card = mountMinutesCard({
     record: () => record,
     attendees: () => [{ ref: 'shared:person:p1', name: 'Priya Nandakumar', role: 'chair' }, { ref: 'shared:person:p2', name: 'Tom Lister', role: null }],
-    onSaved: vi.fn(),
+    onSaved,
     deps
   });
   document.body.replaceChildren(card);
-  return { card, deps };
+  return { card, deps, onSaved };
 }
 
 describe('Minutes card', () => {
@@ -79,5 +85,76 @@ describe('Minutes card', () => {
     await flush();
     expect(card.textContent).toContain('Clare couldn’t read these minutes.');
     expect(card.querySelector('[data-part="minutes-retry"]')).not.toBeNull();
+  });
+
+  describe('minutes from chat', () => {
+    it('shows the pending box with its date and note above the empty card', () => {
+      const { card } = setup(null, pending);
+      const box = card.querySelector('[data-part="minutes-pending"]') as HTMLElement;
+      expect(box).not.toBeNull();
+      expect(box.textContent).toMatch(/^Minutes from chat · added \S/);
+      expect(box.textContent).not.toContain('2026-10-31T');
+      expect(box.textContent).toContain('From the faculty email.');
+      expect(card.querySelector('.meeting-minutes__body')?.firstElementChild).toBe(box);
+      expect(card.querySelector('[data-part="minutes-add"]')).not.toBeNull();
+      expect(card.querySelector('[data-part="minutes-pending-review"]')?.className).toContain('btn--primary');
+      expect(card.querySelector('[data-part="minutes-pending-dismiss"]')?.className).toContain('btn--ghost');
+    });
+
+    it('shows the pending box above saved minutes too, and leaves out a missing note', () => {
+      const { card } = setup(
+        { sections: [{ heading: 'Assessment', text: 'Exams move.' }], file_key: null, source: 'page', added_at: '2026-10-30T02:00:00.000Z', saved_counts: { tasks: 0, promises: 0, decisions: 0 } },
+        { ...pending, note: null }
+      );
+      const box = card.querySelector('[data-part="minutes-pending"]') as HTMLElement;
+      expect(card.querySelector('.meeting-minutes__body')?.firstElementChild).toBe(box);
+      expect(box.querySelector('.meeting-minutes__pending-note')).toBeNull();
+      expect(card.querySelector('[data-part="minutes-replace"]')).not.toBeNull();
+    });
+
+    it('shows no pending box when nothing is pending', () => {
+      const { card } = setup();
+      expect(card.querySelector('[data-part="minutes-pending"]')).toBeNull();
+    });
+
+    it('Review fetches the PDF, opens the review, and saves with the pending file key', async () => {
+      const { card, deps } = setup(null, pending);
+      (card.querySelector('[data-part="minutes-pending-review"]') as HTMLButtonElement).click();
+      await flush();
+      expect(deps.fetchPdf).toHaveBeenCalledWith(PENDING_KEY);
+      expect(deps.read).toHaveBeenCalledWith({ pdf: { media_type: 'application/pdf', data: 'JVBERi0xLjQK' } });
+      expect(card.querySelector('[data-group="mine"]')).not.toBeNull();
+      (card.querySelector('[data-part="minutes-save"]') as HTMLButtonElement).click();
+      await flush();
+      const input = (deps.save as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(input.pdfData).toBeNull();
+      expect(input.fileKey).toBe(PENDING_KEY);
+      await flush();
+      expect(card.textContent).toContain('Added 1 task, 2 promises and 1 decision.');
+      expect(card.querySelector('[data-part="minutes-pending"]')).toBeNull();
+    });
+
+    it('shows Try again when the PDF cannot be fetched', async () => {
+      const { card, deps } = setup(null, pending);
+      (deps.fetchPdf as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('HTTP 404'));
+      (card.querySelector('[data-part="minutes-pending-review"]') as HTMLButtonElement).click();
+      await flush();
+      expect(deps.read).not.toHaveBeenCalled();
+      expect(card.textContent).toContain('Clare couldn’t read these minutes.');
+      (card.querySelector('[data-part="minutes-retry"]') as HTMLButtonElement).click();
+      await flush();
+      expect(deps.fetchPdf).toHaveBeenCalledTimes(2);
+      expect(deps.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('Dismiss clears the pending minutes and hides the box', async () => {
+      const { card, deps, onSaved } = setup(null, pending);
+      (card.querySelector('[data-part="minutes-pending-dismiss"]') as HTMLButtonElement).click();
+      await flush();
+      expect(deps.dismissPending).toHaveBeenCalledTimes(1);
+      expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ minutes_pending: null }));
+      expect(card.querySelector('[data-part="minutes-pending"]')).toBeNull();
+      expect(card.querySelector('[data-part="minutes-add"]')).not.toBeNull();
+    });
   });
 });

@@ -383,6 +383,7 @@ import {
   buildEventUpdateProposal,
   buildCommunicationProposal
 } from './_shared/professional-edit-agent.mjs';
+import { runFileMinutes } from './_shared/minutes-chat.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import {
   buildApplicationProposal,
@@ -432,7 +433,7 @@ const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 // Phone photos ship as base64 data URLs (≈4/3 of raw). Cap under Netlify's ~6MB
 // function payload while fitting up to three MAX_CHAT_IMAGE_BYTES images.
 const MAX_ATTACHMENT_WIRE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES * 4 / 3) + 256;
-const MAX_BODY_BYTES = Math.min(
+export const MAX_BODY_BYTES = Math.min(
   MAX_CHAT_BODY_BYTES,
   48 * 1024 + 3 * MAX_ATTACHMENT_WIRE_BYTES
 );
@@ -2298,6 +2299,18 @@ export function createChatHandler({
                   return JSON.stringify(await runSearchProfessional(event.input ?? {}, {
                     store: await getProfessionalStore(env),
                     env
+                  }));
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'professional_unavailable' });
+                }
+              }
+              if (event.name === 'file_minutes') {
+                send({ type: 'status', text: 'Filing the minutes…' });
+                try {
+                  return JSON.stringify(await runFileMinutes(event.input ?? {}, {
+                    store: await getProfessionalStore(env),
+                    env,
+                    attachments: parsed.attachments
                   }));
                 } catch {
                   return JSON.stringify({ ok: false, error: 'professional_unavailable' });

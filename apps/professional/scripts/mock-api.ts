@@ -284,6 +284,19 @@ export function createMockApi() {
       { ...meeting }
     ])
   );
+  // Minutes card: one seeded meeting has minutes Clare filed from chat, so the pending box can be walked.
+  {
+    const pendingId = 'meeting_00000000-0000-4000-8000-000000000011';
+    const pendingMeeting = meetings.get(pendingId);
+    if (pendingMeeting) {
+      pendingMeeting.minutes_pending = {
+        file_key: `meeting-minutes/${pendingId}/1762000000000.pdf`,
+        added_at: '2026-10-31T23:00:00.000Z',
+        source: 'chat',
+        note: 'From the faculty email. Two actions for you.'
+      };
+    }
+  }
   const events = new Map<string, Record<string, unknown>>(
     ((seedData as { events?: Record<string, unknown>[] }).events ?? []).map((event) => [
       String(event.id),
@@ -2323,6 +2336,7 @@ export function createMockApi() {
         guide_runs: [] as unknown[],
         coaching_sheets: [] as unknown[],
         minutes: null as unknown,
+        minutes_pending: null as unknown,
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -2354,7 +2368,7 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();

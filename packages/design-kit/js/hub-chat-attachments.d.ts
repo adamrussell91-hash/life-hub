@@ -8,6 +8,8 @@ export type HubChatAttachment = {
 };
 
 export const MAX_CHAT_IMAGE_BYTES: number;
+export const MAX_CHAT_PDF_BYTES: number;
+export const MAX_CHAT_BODY_BYTES: number;
 
 export function parseChatAttachment(raw: unknown): HubChatAttachment | null;
 export function normalizeChatAttachments(list: unknown): HubChatAttachment[];

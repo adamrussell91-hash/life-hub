@@ -100,6 +100,8 @@ vi.mock('@/components/block-page', () => ({
 import { renderMeetingPage } from '@/views/meeting-page';
 import { mountBlockPage } from '@/components/block-page';
 import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
+import { fetchMinutesFile } from '@/api/meeting-minutes-file';
+import { clareMinutes } from '@/api/clare-comms';
 import { createUniversalLink, suppressUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 
 describe('meeting page', () => {
@@ -248,6 +250,29 @@ describe('meeting page', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(canvas.querySelector('[data-part="minutes"]')).toBe(card);
     }
+  });
+
+  it('minutes from chat: Review reads the stored PDF with Clare', async () => {
+    const key = `meeting-minutes/${MEETING_ID}/1762000000000.pdf`;
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, minutes_pending: { file_key: key, added_at: '2026-09-24T07:00:00.000Z', source: 'chat', note: null } } } as never);
+    vi.mocked(fetchMinutesFile).mockResolvedValueOnce({ media_type: 'application/pdf', data: 'JVBER' } as never);
+    vi.mocked(clareMinutes).mockRejectedValueOnce(new Error('stop here'));
+    const canvas = await render();
+    const card = () => canvas.querySelector('[data-part="minutes"]')!;
+    card().querySelector<HTMLButtonElement>('[data-part="minutes-pending-review"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMinutesFile).toHaveBeenCalledWith(key);
+    expect(vi.mocked(clareMinutes).mock.calls[0][1]).toEqual({ pdf: { media_type: 'application/pdf', data: 'JVBER' } });
+    expect(card().textContent).toContain('Clare couldn’t read these minutes.');
+  });
+
+  it('minutes from chat: Dismiss patches minutes_pending to null', async () => {
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, minutes_pending: { file_key: 'meeting-minutes/k.pdf', added_at: '2026-09-24T07:00:00.000Z', source: 'chat', note: null } } } as never);
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-part="minutes-pending-dismiss"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(updateMeeting).toHaveBeenCalledWith(MEETING_ID, { minutes_pending: null });
+    expect(canvas.querySelector('[data-part="minutes-pending"]')).toBeNull();
   });
 
   it('the three phases show different work: brief + open promises / live strip / wrap-up', async () => {

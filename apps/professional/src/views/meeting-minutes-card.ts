@@ -9,7 +9,13 @@ export type MinutesCardDeps = {
   read: (minutes: { pdf: { media_type: 'application/pdf'; data: string } } | { text: string }) => Promise<ClareMinutesReview>;
   save: (input: Omit<MinutesSaveInput, 'record' | 'meetingRef' | 'attendees'>) => Promise<{ record: MeetingRecord; counts: MeetingMinutes['saved_counts'] }>;
   openFile: (fileKey: string) => Promise<void>;
+  /** Base64 of a stored minutes PDF. */
+  fetchPdf: (fileKey: string) => Promise<string>;
+  /** Clears minutes_pending on the meeting. */
+  dismissPending: () => Promise<MeetingRecord>;
 };
+
+type ReadInput = Parameters<MinutesCardDeps['read']>[0];
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -38,6 +44,52 @@ export function mountMinutesCard(options: {
   card.dataset.part = 'minutes';
   const body = el('div', 'meeting-minutes__body');
   card.append(el('h3', undefined, 'Minutes'), body);
+  // Set once the pending minutes are reviewed and saved, or dismissed.
+  let pendingCleared = false;
+
+  function pendingBox(): HTMLElement | null {
+    const pending = pendingCleared ? null : options.record().minutes_pending ?? null;
+    if (!pending) return null;
+    const box = el('div', 'meeting-minutes__pending');
+    box.dataset.part = 'minutes-pending';
+    box.append(el('p', 'meeting-minutes__pending-title', `Minutes from chat · added ${formatDisplayDate(pending.added_at)}`));
+    if (pending.note) box.append(el('p', 'muted meeting-minutes__pending-note', pending.note));
+    const review = button('Review them', 'minutes-pending-review', 'btn--primary');
+    review.addEventListener('click', () => {
+      const fileKey = pending.file_key;
+      void runRead(async () => ({ pdf: { media_type: 'application/pdf', data: await options.deps.fetchPdf(fileKey) } }), null, fileKey);
+    });
+    const dismiss = button('Dismiss', 'minutes-pending-dismiss', 'btn--ghost');
+    dismiss.addEventListener('click', async () => {
+      dismiss.disabled = true;
+      review.disabled = true;
+      try {
+        const record = await options.deps.dismissPending();
+        pendingCleared = true;
+        options.onSaved(record);
+        paintFor(record);
+      } catch (err) {
+        dismiss.disabled = false;
+        review.disabled = false;
+        box.querySelector('.meeting-minutes__note')?.remove();
+        box.append(el('p', 'muted meeting-minutes__note', err instanceof Error ? err.message : 'Could not dismiss. Try again.'));
+      }
+    });
+    const row = el('div', 'clare-row');
+    row.append(review, dismiss);
+    box.append(row);
+    return box;
+  }
+
+  function withPending(): void {
+    const box = pendingBox();
+    if (box) body.prepend(box);
+  }
+
+  function paintFor(record: MeetingRecord): void {
+    if (record.minutes) paintSaved(record.minutes, null);
+    else paintEmpty(false);
+  }
 
   function paintEmpty(withCancel: boolean): void {
     const file = el('input') as HTMLInputElement;
@@ -57,7 +109,7 @@ export function mountMinutesCard(options: {
     pasteToggle.addEventListener('click', () => { paste.hidden = !paste.hidden; if (!paste.hidden) area.focus(); });
     readText.addEventListener('click', () => {
       const text = area.value.trim();
-      if (text) void runRead({ text }, null);
+      if (text) void runRead(async () => ({ text }), null, null);
     });
     file.addEventListener('change', async () => {
       const picked = file.files?.[0];
@@ -65,7 +117,7 @@ export function mountMinutesCard(options: {
       if (picked.type !== 'application/pdf') return note('That isn’t a PDF. Paste the text instead.');
       if (picked.size > PDF_MAX_BYTES) return note('That PDF is over 4 MB. Paste the part you need instead.');
       const data = await fileBase64(picked);
-      void runRead({ pdf: { media_type: 'application/pdf', data } }, data);
+      void runRead(async () => ({ pdf: { media_type: 'application/pdf', data } }), data, null);
     });
     const row = el('div', 'clare-row');
     row.append(add, pasteToggle);
@@ -76,6 +128,7 @@ export function mountMinutesCard(options: {
     }
     const hint = el('p', 'muted meeting-page__hint', 'Official minutes for this meeting. Clare finds your actions, other people’s, and the decisions.');
     body.replaceChildren(hint, row, paste, file);
+    withPending();
   }
 
   function note(message: string): void {
@@ -83,17 +136,17 @@ export function mountMinutesCard(options: {
     body.append(el('p', 'muted meeting-minutes__note', message));
   }
 
-  async function runRead(minutes: Parameters<MinutesCardDeps['read']>[0], pdfData: string | null): Promise<void> {
+  async function runRead(load: () => Promise<ReadInput>, pdfData: string | null, fileKey: string | null): Promise<void> {
     body.replaceChildren(el('p', 'muted', 'Clare is reading the minutes…'));
     try {
-      paintReview(await options.deps.read(minutes), pdfData);
+      paintReview(await options.deps.read(await load()), pdfData, fileKey);
     } catch (err) {
       body.replaceChildren(
         el('p', 'muted', 'Clare couldn’t read these minutes.'),
         el('p', 'muted meeting-minutes__note', err instanceof Error ? err.message : '')
       );
       const retry = button('Try again', 'minutes-retry');
-      retry.addEventListener('click', () => void runRead(minutes, pdfData));
+      retry.addEventListener('click', () => void runRead(load, pdfData, fileKey));
       body.append(retry);
     }
   }
@@ -117,7 +170,7 @@ export function mountMinutesCard(options: {
     return boxes;
   }
 
-  function paintReview(review: ClareMinutesReview, pdfData: string | null): void {
+  function paintReview(review: ClareMinutesReview, pdfData: string | null, fileKey: string | null): void {
     body.replaceChildren();
     const mine = tickGroup('mine', 'For you', review.mine, (item) => `${item.text}${due(item.due)}`);
     const others = tickGroup('others', 'For others', review.others, (item) => `${item.person_name}: ${item.text}${due(item.due)}`);
@@ -158,11 +211,13 @@ export function mountMinutesCard(options: {
       try {
         const { record, counts } = await options.deps.save({
           pdfData,
+          fileKey,
           sections: review.sections,
           mine: ticked(mine).map(({ text, due: d }) => ({ text, due: d })),
           others: [...ticked(others).map(({ text, person_ref, due: d }) => ({ text, person_ref, due: d })), ...picked],
           decisions: ticked(decisions)
         });
+        pendingCleared = true;
         options.onSaved(record);
         paintSaved(record.minutes!, savedLine(counts));
       } catch (err) {
@@ -192,6 +247,7 @@ export function mountMinutesCard(options: {
     replace.addEventListener('click', () => paintEmpty(true));
     row.append(replace);
     body.append(row);
+    withPending();
   }
 
   const existing = options.record().minutes;
