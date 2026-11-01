@@ -59,7 +59,7 @@ describe('sprint checks', () => {
   it('checks feedback and the reflection', () => {
     const crit = [{ id: 'c1', text: 'Uses sources' }];
     expect(feedbackProblems({ levels: { c1: 3 }, worked: 'The graffiti made it feel real.', next: 'Try naming the source on the panel.', about: 'c1' }, crit)).toEqual([]);
-    expect(feedbackProblems({ levels: {}, worked: '', next: '', about: '' }, crit)).toEqual(['Pick a level for "Uses sources".', 'Say what worked in a full sentence.', 'Give one thing to try next in a full sentence.', 'Pick the criterion your comments are about.']);
+    expect(feedbackProblems({ levels: {}, worked: '', next: '', about: '' }, crit)).toEqual(['Pick a level for "Uses sources".', 'Say what worked in a full sentence.', 'Give one thing to try next in a full sentence.']);
     expect(reflectionProblems({ reflection: ['The panel names its sources clearly.', 'We would add a map so visitors see where.'], quote: 'Try naming the source', change_criterion: 'c1', value_answer: 'It matters because visitors need to see where.' })).toEqual([]);
     expect(reflectionProblems({ reflection: [], quote: '', change_criterion: '', value_answer: '' })).toHaveLength(4);
   });

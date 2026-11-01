@@ -73,15 +73,9 @@ export function mountFeedbackCard(ctx: FormContext, round: NonNullable<SprintSta
     card.append(levels);
   }
   card.append(
-    frameField({ label: 'What worked', value: '', max: 300, rows: 2, starter: FEEDBACK_STARTERS.worked, support: ctx.support, disabled: false, onInput: (v) => { entry.worked = v; } }),
-    frameField({ label: 'One thing to try next', value: '', max: 300, rows: 2, starter: FEEDBACK_STARTERS.next, support: ctx.support, disabled: false, onInput: (v) => { entry.next = v; } })
+    frameField({ label: 'What worked', value: '', max: 300, rows: 2, starter: FEEDBACK_STARTERS.worked.hint, frames: FEEDBACK_STARTERS.worked.frames, support: ctx.support, disabled: false, onInput: (v) => { entry.worked = v; } }),
+    frameField({ label: 'One thing to try next', value: '', max: 300, rows: 2, starter: FEEDBACK_STARTERS.next.hint, frames: FEEDBACK_STARTERS.next.frames, support: ctx.support, disabled: false, onInput: (v) => { entry.next = v; } })
   );
-  const about = el('select', 'qz-input');
-  about.setAttribute('aria-label', 'Your comments are about');
-  about.append(el('option', '', 'Your comments are about…'));
-  (about.firstChild as HTMLOptionElement).value = '';
-  for (const c of ctx.sprint.criteria) { const o = el('option', '', c.text); o.value = c.id; about.append(o); }
-  about.addEventListener('change', () => { entry.about = about.value; });
   const checks = el('ul', 'sprint-checks');
   const err = el('p', 'sprint-submit__err');
   const send = button('Send feedback', 'primary', async () => {
@@ -91,7 +85,7 @@ export function mountFeedbackCard(ctx: FormContext, round: NonNullable<SprintSta
     send.disabled = true;
     try { ctx.onStatus(await ctx.client.feedback(round.group_id, entry)); } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t send.'; send.disabled = false; }
   });
-  card.append(about, checks, send, err);
+  card.append(checks, send, err);
   return card;
 }
 
