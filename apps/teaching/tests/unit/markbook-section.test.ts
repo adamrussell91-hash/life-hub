@@ -64,13 +64,6 @@ function fakeApi(view: MarkbookView): MarkbookApi & { calls: unknown[][] } {
       current = { ...current, markbook: { ...current.markbook, marks: { ...current.markbook.marks, [columnId]: marks } } };
       return current.markbook;
     }),
-    setFocus: vi.fn(async (_c, studentId, pinned, dismissed) => {
-      const focus = { ...(current.markbook.focus ?? {}) };
-      if (!pinned.length && !dismissed.length) delete focus[studentId];
-      else focus[studentId] = { pinned, dismissed };
-      current = { ...current, markbook: { ...current.markbook, focus } };
-      return current.markbook;
-    }),
     setTook: vi.fn(async (_c, studentId, lessonIds) => {
       const took = { ...(current.markbook.took ?? {}) };
       if (!lessonIds.length) delete took[studentId];
@@ -552,75 +545,14 @@ describe('markbook section', () => {
     host.remove();
   });
 
-  it('opens the student panel from a name in the grid', async () => {
+  it('opens the student’s own progress page from a name in the grid', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
     const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
-    name.focus();
-    await vi.waitFor(() => {
-      name.click();
-      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
-    });
-    const sheet = document.querySelector<HTMLElement>('.mb-sheet--student')!;
-    expect(sheet.querySelector('.mb-panel__student')?.textContent).toBe('BB · Bob Brown');
-    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
-    expect(document.querySelector('.mb-sheet--student')).toBeNull();
-    expect(document.activeElement).toBe(name);
+    name.click();
+    expect(window.location.pathname).toBe(withAppBase('/classes/class1/students/s1'));
+    expect(document.querySelector('.mb-overlay')).toBeNull();
+    window.history.replaceState(null, '', '/');
     host.remove();
-  });
-
-  it('returns focus to the student’s redrawn name when the panel closes', async () => {
-    const { host } = await mount(view({ markbook: book({ focus: { s1: { pinned: [], dismissed: ['out:o2'] } } }), quizzes: [outcomeQuiz()] }));
-    const bob = () => [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
-    const first = bob();
-    expect(first.dataset.student).toBe('s1');
-    first.focus();
-    await vi.waitFor(() => {
-      first.click();
-      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
-    });
-    const sheet = document.querySelector<HTMLElement>('.mb-sheet--student')!;
-    // Saving pins redraws the grid behind the panel, replacing the name button.
-    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
-    expect(first.isConnected).toBe(false);
-    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
-    expect(document.activeElement).toBe(bob());
-    expect(bob()).not.toBe(first);
-    host.remove();
-  });
-
-  it('opens a new panel when the old overlay was removed without closing', async () => {
-    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-    const name = () => [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
-    await vi.waitFor(() => {
-      name().click();
-      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
-    });
-    document.querySelector('.mb-sheet--student')!.closest('.mb-overlay')!.remove();
-    expect(document.querySelector('.mb-sheet--student')).toBeNull();
-    name().click();
-    expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
-    document.querySelector<HTMLButtonElement>('.mb-sheet--student .mb-sheet__close')!.click();
-    host.remove();
-  });
-
-  it('opens a student pressed before the tag names load, once they arrive', async () => {
-    let arrive!: (v: unknown) => void;
-    const original = insightContext.load;
-    insightContext.load = () => new Promise((resolve) => (arrive = resolve));
-    try {
-      const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-      const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
-      name.click();
-      expect(document.querySelector('.mb-sheet--student')).toBeNull();
-      expect(host.querySelector('.mb__status')?.textContent).toBe('Loading…');
-      arrive({ table: null, skills: null, codes: [], outcomes: [] });
-      await vi.waitFor(() => expect(document.querySelector('.mb-sheet--student')).not.toBeNull());
-      expect(host.querySelector('.mb__status')?.textContent).toBe('');
-      document.querySelector<HTMLButtonElement>('.mb-sheet--student .mb-sheet__close')!.click();
-      host.remove();
-    } finally {
-      insightContext.load = original;
-    }
   });
 
   it('says so when the tag names fail to load, instead of loading forever', async () => {
@@ -630,7 +562,7 @@ describe('markbook section', () => {
     };
     try {
       const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-      const message = 'Couldn’t load the tag names, so Next steps, Detail and student panels can’t open. Reload to try again.';
+      const message = 'Couldn’t load the tag names, so Next steps and Detail can’t open. Reload to try again.';
       await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe(message));
       host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
       expect(host.querySelector('.mb__body')?.textContent).toBe(message);
@@ -639,37 +571,6 @@ describe('markbook section', () => {
     } finally {
       insightContext.load = original;
     }
-  });
-
-  it('saves focus pins through the queue, and rolls them back when the save fails', async () => {
-    const focused = book({ focus: { s1: { pinned: [], dismissed: ['out:o2'] } } });
-    const { host, api } = await mount(view({ markbook: focused, quizzes: [outcomeQuiz()] }));
-    const openBob = async (): Promise<HTMLElement> => {
-      const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
-      await vi.waitFor(() => {
-        name.click();
-        expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
-      });
-      return document.querySelector<HTMLElement>('.mb-sheet--student')!;
-    };
-    let sheet = await openBob();
-    (api.setFocus as Mock).mockRejectedValueOnce(new Error('Server said no'));
-    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
-    await vi.waitFor(() => expect(api.setFocus).toHaveBeenCalledWith('class1', 's1', [], []));
-    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Server said no'));
-    // The open panel shows the rolled-back pins without being reopened.
-    await vi.waitFor(() => expect(sheet.querySelector('[data-focus="show-dismissed"]')?.textContent).toBe('Show 1 dismissed'));
-    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
-    sheet = await openBob();
-    // Rolled back: the dismissed tag is still there.
-    expect(sheet.querySelector('[data-focus="show-dismissed"]')?.textContent).toBe('Show 1 dismissed');
-    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
-    await vi.waitFor(() => expect(api.setFocus).toHaveBeenCalledTimes(2));
-    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
-    sheet = await openBob();
-    expect(sheet.querySelector('[data-focus="show-dismissed"]')).toBeNull();
-    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
-    host.remove();
   });
 
   it('opens the heatmap from a quiz column title, and Escape returns focus to it', async () => {

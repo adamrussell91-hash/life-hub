@@ -101,16 +101,24 @@ async function profileFor(store, roster, student) {
   return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) } };
 }
 
-/** Teacher: every student's done records; marking one complete, partial or clearing it. */
+/**
+ * Teacher: every student's done records; marking one complete, partial or clearing it; and one
+ * student's progress page exactly as they see it (`progress`, `returned`, `piece`). The teacher's
+ * reads never mark a piece seen.
+ */
 export async function teacherProfileAction(store, classId, body) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
-  if (!['list', 'remove', 'mark'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (action !== 'list') {
     if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id) || !roster.students.some((s) => s.id === body.student_id)) {
       reject(400, 'bad_request', 'Unknown student.');
     }
+    const student = roster.students.find((s) => s.id === body.student_id);
+    if (action === 'progress') return { need: null, name: student.name, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
+    if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
+    if (action === 'piece') return pieceFor(store, roster, student, body.item);
     const state = action === 'remove' ? 'clear' : body.state;
     if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
     if (action === 'remove') await removeDone(store, classId, body.student_id, body.lesson_id);
