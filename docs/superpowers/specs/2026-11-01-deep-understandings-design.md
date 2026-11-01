@@ -58,11 +58,20 @@ New evidence tag kinds alongside `dp:`, `skill:`, `tech:`, `out:`, `fam:` in `ap
   concept_bullets: string[], // min 1, e.g. 'REP2'
   pieces: { id: string, text: string, tier: 'essential' | 'strong' | 'sophisticated' }[],
   shared_piece_ids: string[],          // pieces owned by another deep understanding in this unit
-  steps: { step: '2a' | '2b' | '3' | '4', fill: string }[],
-  // Steps the teacher has passed a student on, keyed by student. Step 1 is computed, never stored.
-  student_steps: Record<string, { step: '2a' | '2b' | '3' | '4', at: string }>
+  steps: { step: '2a' | '2b' | '3' | '4', fill: string }[]
 }
 ```
+
+Student progress lives per class, not on the unit (a unit can run in several classes). A class record `deep/{class}/{unit}` holds:
+
+```ts
+{
+  steps: Record<studentId, Record<duId, { step: '2a' | '2b' | '3' | '4', at: string, hint?: boolean }>>, // Step 1 is computed, never stored
+  writing: Record<blockId, Record<studentId, { used: string[], missed: string[], at: string }>>        // piece ids
+}
+```
+
+Weeks on the plan grid come from the class's scheduled dates for each lesson (earliest across classes teaching the unit); undated lessons sit in "Not dated yet".
 
 Taught, tested and evidence placements are not stored here; they are derived from tags on lessons.
 
