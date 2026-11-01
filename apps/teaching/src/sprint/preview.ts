@@ -8,6 +8,8 @@ import { mountSketch } from './phase-sketch';
 import { mountDecide } from './phase-decide';
 import { mountPrototype } from './phase-prototype';
 import { mountTest } from './phase-test';
+import { createGroupSheet } from './group-sheet';
+import { sprintParts } from './model';
 
 /**
  * What a student sees in one phase, with made-up answers from a sample group,
@@ -16,7 +18,7 @@ import { mountTest } from './phase-test';
 const FORMS: Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm> = { understand: mountUnderstand, sketch: mountSketch, decide: mountDecide, prototype: mountPrototype, test: mountTest };
 
 const row = (key: SprintPhaseKey) => ({ key, open: true, due_date: '', due_time: '', state: 'none' as const, late: false, frozen: false, closed: false, count_in: 1 });
-const brief = { problem: 'Our audience needs a clear way in, because the real problem sits under the brief.', audience: { who: 'The people the brief names', why: 'They need it to work for them.' }, answers: [{ question: 'What does a strong one look like?', answer: 'Your answer to the group shows here.' }] };
+const brief = { limits: { can_known: [{ text: 'What we make', count: 3 }, { text: 'Class time', count: 2 }], cant_known: [{ text: 'The deadline', count: 3 }] }, problem: 'Our audience needs a clear way in, because the real problem sits under the brief.', audience: { who: 'The people the brief names', why: 'They need it to work for them.' }, answers: [{ question: 'What does a strong one look like?', answer: 'Your answer to the group shows here.' }] };
 const idea = (id: string, title: string, text: string) => ({ id, title, idea: text, answers: 'It solves the problem for the audience because it meets them where they are.', evidence: 'It uses what the class has studied.', file: null, strongest: false });
 const members = [{ key: 'm1', initials: 'You', me: true }, { key: 'm2', initials: 'CD', me: false }, { key: 'm3', initials: 'EF', me: false }];
 
@@ -39,8 +41,8 @@ export function sampleStatus(key: SprintPhaseKey, sprint: PublicSprint): SprintS
   };
   if (key === 'prototype') return {
     ...base,
-    chosen: { id: 'i1', title: 'The group’s chosen idea', idea: 'x' },
-    parts: [{ id: 'p1', text: 'Your part', shows: 'What your part must show', criterion: sprint.criteria[0]?.id ?? '', claimed: 1, mine: true, assigned: ['m1'] }, { id: 'p2', text: 'A teammate’s part', shows: '', criterion: '', claimed: 1, mine: false, assigned: ['m2'] }],
+    chosen: { id: 'i1', title: 'The group’s chosen idea', idea: 'What the group decided to build.' },
+    parts: [{ id: 'p1', text: 'Your part', shows: 'What your part must show', how: 'How your group said it would be made', criterion: sprint.criteria[0]?.id ?? '', claimed: 1, mine: true, assigned: ['m1'] }, { id: 'p2', text: 'A teammate’s part', shows: '', how: '', criterion: '', claimed: 1, mine: false, assigned: ['m2'] }],
     assemble: true, assembler: { key: 'm2', initials: 'CD', me: false },
     group_parts: [
       { part_id: 'p1', part: 'Your part', who: 'You', me: true, text: 'What you have written so far.', link: '', files: [], in: false, started: true },
@@ -61,9 +63,12 @@ export function phasePreview(key: SprintPhaseKey, sprint: PublicSprint, blocks: 
     frames: [], valueCheck: null, support: sprint.support, onStatus() {}, drafts: {}
   });
   const frame = el('div', 'sprint kit-preview__frame');
+  // The same group sheet students see at the top of the phase, filled from the sample group.
+  const sheet = createGroupSheet({ sprint, challenge: sprintParts(blocks).brief, pageBlocks: blocks });
+  sheet.update(status, key);
   const work = el('section', 'sprint-form');
   work.append(form.el);
-  frame.append(work);
+  frame.append(sheet.el, work);
   box.append(frame);
   return { el: box, dispose: form.dispose };
 }

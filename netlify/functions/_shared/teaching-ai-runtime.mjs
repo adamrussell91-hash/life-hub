@@ -377,7 +377,9 @@ var TestPayloadSchema = z7.object({
 var PartSchema = z7.object({
   id: SprintIdSchema,
   text: z7.string().trim().min(1).max(80),
-  shows: text(200).default(""),
+  shows: text(400).default(""),
+  /** Optional notes on how the part gets made: tools, steps, what is borrowed. */
+  how: text(400).default(""),
   criterion: z7.string().max(40).default("")
 });
 var PartsSchema = z7.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, "Each part needs its own id.");

@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { duelProblems, partsProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { briefCard, draftOf, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { duelsDone, pairKey, pairsOf, rankIdeas } from './rules';
 import type { Duel, Part, PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
@@ -24,10 +24,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const ids = pool.map((i) => i.id);
   const label = new Map(pool.map((i, n) => [i.id, `Idea ${LETTERS[n] ?? n + 1}`]));
   const root = el('div', 'sprint-decide');
-  const brief = briefCard(s, false);
-  if (brief) root.append(brief);
   const voting = !s.votes_closed;
-  root.append(purpose(voting, pool.length));
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? duelProblems(state.duels, ids) : []),
     ...(!s.chosen ? [voting
@@ -49,26 +46,22 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   if (s.chosen) root.append(partsEditor(ctx));
   else if (!voting) root.append(partsLocked());
   if (!voting) stepify(root, [
-    { pick: '.sdd-result', title: 'See what your group picked', guide: LATER_GUIDE.result },
-    { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
-  ]);
+    { pick: '.sdd-result', title: s.chosen ? 'See what your group picked' : 'Your group’s idea is being confirmed', guide: LATER_GUIDE.result },
+    { pick: '.sprint-parts', title: 'Plan how you’ll build your idea', guide: LATER_GUIDE.parts, lead: s.chosen ? planLead(s.chosen.title, !!s.assemble) : 'This opens once your teacher confirms your group’s idea.' }
+  ], 'Decide');
   if (voting) stepify(root, [
-    { pick: '.sdd-arena', title: 'Pick the winner, two ideas at a time', guide: LATER_GUIDE.read },
+    { pick: '.sdd-arena', title: 'Pick the winner, two ideas at a time', guide: LATER_GUIDE.read, lead: `Your group picks one idea to build. In Sketch, each of you starred your strongest idea; those ${pool.length} ideas are here with no names. Tap the one in each pair that better solves your group’s problem for your audience.` },
     { pick: '.sdd-rank', title: 'Your 1st, 2nd and 3rd', guide: LATER_GUIDE.reasons }
-  ]);
-  slidify(root, ctx.sprint.understand?.layout);
+  ], 'Decide');
+  // Once the idea is chosen, the plan is the work: open on it (the result is one step back).
+  slidify(root, ctx.sprint.understand?.layout, !voting && s.chosen ? 1 : 0);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }
 
-/** The point of Decide, said once at the top. */
-function purpose(voting: boolean, ideas: number): HTMLElement {
-  const box = el('section', 'sd-purpose');
-  box.append(el('div', 'sd-purpose__kind', 'What this step is for'));
-  box.append(el('p', '', voting
-    ? `Your group picks one idea to build. In Sketch, each of you starred your strongest idea: those ${ideas} ideas are here, with no names. You see them two at a time and pick the one that better solves your group’s problem for your audience. Your picks give you a 1st, 2nd and 3rd. Once everyone is done, the idea with the most wins across your group is the one you build.`
-    : 'Your group’s idea is chosen. Now you plan the prototype: list its parts, borrow the best bits of the other ideas and give every part to someone.'));
-  return box;
+/** The plan step's one line, naming the group's idea. */
+function planLead(title: string, assemble: boolean): string {
+  return `Split “${title}” into parts and give each part to someone${assemble ? ', then choose who puts it all together' : ''}.`;
 }
 
 /** A small seeded shuffle, so each student meets the pairs in their own order and keeps it on reload. */
@@ -301,43 +294,83 @@ function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormConte
 /** Before the idea is confirmed: the parts step is there, and says what opens it. */
 function partsLocked(): HTMLElement {
   const box = el('div', 'sprint-parts');
-  box.append(el('h3', '', 'Parts of the prototype'), el('p', 'sprint-note sd-locked', 'This opens as soon as your teacher confirms your group’s idea. Then you list what the prototype needs and give each part to someone by their initials.'));
+  box.append(el('p', 'sprint-note sd-locked', 'This opens as soon as your teacher confirms your group’s idea. Then you list what the prototype needs and give each part to someone by their initials.'));
   return box;
 }
 
+/** One numbered task in the plan step, with a tick that fills in once it is done. */
+function task(n: number, title: string, note: string): { el: HTMLElement; done(on: boolean): void } {
+  const box = el('section', 'sd-task');
+  const h = el('h4', 'sd-task__title');
+  const tick = el('span', 'sd-tick', String(n));
+  tick.setAttribute('aria-hidden', 'true');
+  const state = el('span', 'sd-sr', '');
+  h.append(tick, el('span', '', title), state);
+  box.append(h);
+  if (note) box.append(el('p', 'sd-task__note', note));
+  return {
+    el: box,
+    done(on) {
+      tick.classList.toggle('is-done', on);
+      tick.textContent = on ? '✓' : String(n);
+      state.textContent = on ? ' (done)' : '';
+    }
+  };
+}
+
+/** "AB", "AB and CD", "AB, CD and EF". */
+const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+
 /**
- * The parts list any member can edit, and who does each part, picked by
- * initials. Decide is done when every part has someone and everyone has a part.
+ * Plan how the group builds its idea, in three tasks: the parts and who does
+ * each (any member can edit; people are picked by initials), an optional
+ * borrow from the other ideas, and who puts it together. Decide is done when
+ * every part has someone, everyone has a part and, where the sprint asks for
+ * one, the group has an assembler.
  */
 function partsEditor(ctx: FormContext): HTMLElement {
+  const s = ctx.status;
   const box = el('div', 'sprint-parts');
-  box.append(el('h3', '', 'Parts of the prototype'), el('p', 'sprint-note', 'List what the prototype needs, what each part must show and the criterion it serves. Save, then give every part to someone by their initials.'));
-  const parts: Part[] = (ctx.status.parts ?? []).map(({ claimed: _c, mine: _m, assigned: _a, ...p }) => p);
-  const members = ctx.status.members ?? [];
+  const parts: Part[] = (s.parts ?? []).map(({ claimed: _c, mine: _m, assigned: _a, ...p }) => ({ ...p, how: p.how ?? '' }));
+  const members = s.members ?? [];
   const cap = members.length > parts.length ? 2 : 1;
-  const list = el('div');
+  const tools = [...new Set((s.brief?.limits?.can_known ?? []).map((c) => c.text.trim()).filter(Boolean))];
+  const live = s.parts ?? [];
   const err = el('p', 'sprint-submit__err');
   err.setAttribute('role', 'alert');
-  const save = async () => {
+  let dirty = false;
+  const saveNote = el('span', 'sprint-note sd-saved', '');
+  const touched = () => { dirty = true; saveNote.textContent = 'Not saved yet.'; };
+  const save = async (): Promise<boolean> => {
     const problems = partsProblems(parts);
-    if (problems.length) { err.textContent = problems[0]!; return; }
-    try { ctx.onStatus(await ctx.client.parts(parts)); } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t save.'; }
+    if (problems.length) { err.textContent = problems[0]!; return false; }
+    try { const next = await ctx.client.parts(parts); dirty = false; ctx.onStatus(next); return true; } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t save.'; return false; }
   };
   const assign = async (partId: string, keys: string[]) => {
+    // Picking people saves any typed changes first, so they aren't lost when the plan repaints.
+    if (dirty && !(await save())) return;
     try { ctx.onStatus(await ctx.client.assign(partId, keys)); } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t work.'; }
   };
-  const newPart = (text: string, shows = ''): Part => ({ id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, text: text.slice(0, 80) || 'New part', shows: shows.slice(0, 200), criterion: '' });
+  const newPart = (text: string, shows = ''): Part => ({ id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, text: text.slice(0, 80) || 'New part', shows: shows.slice(0, 400), how: '', criterion: '' });
+  const label = (text: string, area: HTMLElement, extra?: string) => {
+    const l = el('label', 'sd-part__field');
+    const top = el('span', 'sd-part__label', text);
+    if (extra) top.append(el('span', 'sd-part__opt', ` ${extra}`));
+    l.append(top, area);
+    return l;
+  };
+
+  // 1. The parts and who does each.
+  const t1 = task(1, 'List the parts and who does each', 'Everyone needs at least one part, and someone can take two. Say what each part must show and which criterion it serves.');
+  const list = el('div', 'sd-parts');
   const paint = () => {
     list.replaceChildren(...parts.map((p, i) => {
-      const r = el('div', 'sprint-part');
-      const name = el('input', 'qz-input');
-      name.value = p.text; name.maxLength = 80; name.setAttribute('aria-label', 'Part');
+      const card = el('div', 'sprint-part');
+      const top = el('div', 'sd-part__top');
+      const name = el('input', 'qz-input sd-part__name');
+      name.value = p.text; name.maxLength = 80; name.placeholder = 'Part name'; name.setAttribute('aria-label', 'Part name');
       name.disabled = !ctx.editable;
-      name.addEventListener('input', () => { p.text = name.value; });
-      const shows = el('input', 'qz-input');
-      shows.value = p.shows; shows.maxLength = 200; shows.placeholder = 'What it must show'; shows.setAttribute('aria-label', 'What it must show');
-      shows.disabled = !ctx.editable;
-      shows.addEventListener('input', () => { p.shows = shows.value; });
+      name.addEventListener('input', () => { p.text = name.value; touched(); });
       const crit = el('select', 'qz-input');
       crit.setAttribute('aria-label', 'Criterion it serves');
       crit.disabled = !ctx.editable;
@@ -345,78 +378,126 @@ function partsEditor(ctx: FormContext): HTMLElement {
       (crit.firstChild as HTMLOptionElement).value = '';
       for (const c of ctx.sprint.criteria) { const o = el('option', '', c.text); o.value = c.id; crit.append(o); }
       crit.value = p.criterion;
-      crit.addEventListener('change', () => { p.criterion = crit.value; });
-      const live = (ctx.status.parts ?? []).find((x) => x.id === p.id);
+      crit.addEventListener('change', () => { p.criterion = crit.value; touched(); });
+      top.append(name, crit);
+      const shows = el('textarea', 'qz-input');
+      shows.rows = 3; shows.value = p.shows; shows.maxLength = 400; shows.placeholder = 'What someone will see or hear in this part';
+      shows.disabled = !ctx.editable;
+      shows.addEventListener('input', () => { p.shows = shows.value; touched(); });
+      const how = el('textarea', 'qz-input');
+      how.rows = 2; how.value = p.how; how.maxLength = 400; how.placeholder = 'Tools, steps, what you’ll borrow';
+      how.disabled = !ctx.editable;
+      how.addEventListener('input', () => { p.how = how.value; touched(); });
+      const howField = label('How we’ll make it', how, 'optional');
+      if (tools.length && ctx.editable) {
+        const row = el('div', 'sd-tools');
+        row.append(el('span', 'sd-tools__label', 'Tools you have'));
+        for (const t of tools) {
+          const chip = el('button', 'sprint-chip sd-tool', t);
+          chip.type = 'button';
+          chip.addEventListener('click', () => {
+            const was = how.value.trim();
+            how.value = `${was}${was ? (/[.,;:]$/.test(was) ? ' ' : ', ') : ''}${t}`.slice(0, 400);
+            p.how = how.value;
+            touched();
+          });
+          row.append(chip);
+        }
+        row.append(el('span', 'sd-tools__hint', 'Tap one to add it'));
+        howField.append(row);
+      }
+      const foot = el('div', 'sd-part__foot');
+      foot.append(el('span', 'sd-part__label', 'Who'));
+      const now = live.find((x) => x.id === p.id);
       const who = el('div', 'sd-who');
       who.setAttribute('role', 'group');
       who.setAttribute('aria-label', `Who does "${p.text}"`);
-      if (!live) who.append(el('span', 'sprint-note', 'Save parts to give this one to someone.'));
+      if (!now) who.append(el('span', 'sprint-note', 'Save the parts to give this one to someone.'));
       else for (const m of members) {
-        const on = (live.assigned ?? []).includes(m.key);
+        const on = (now.assigned ?? []).includes(m.key);
         const chip = el('button', 'sprint-chip', m.me ? `${m.initials} (you)` : m.initials);
         chip.type = 'button';
         chip.setAttribute('aria-pressed', String(on));
         chip.disabled = !ctx.editable;
         chip.addEventListener('click', () => {
-          const now = live.assigned ?? [];
-          const next = on ? now.filter((k) => k !== m.key) : cap === 1 ? [m.key] : [...now, m.key].slice(-cap);
+          const had = now.assigned ?? [];
+          const next = on ? had.filter((k) => k !== m.key) : cap === 1 ? [m.key] : [...had, m.key].slice(-cap);
           void assign(p.id, next);
         });
         who.append(chip);
       }
-      const remove = button('Remove', 'ghost', () => { parts.splice(i, 1); paint(); });
+      const remove = button('Remove', 'ghost', () => { parts.splice(i, 1); touched(); paint(); });
       remove.disabled = !ctx.editable;
-      r.append(name, shows, crit, who, remove);
-      return r;
+      remove.classList.add('sd-part__remove');
+      foot.append(who, remove);
+      card.append(top, label('It must show', shows), howField, foot);
+      return card;
     }));
   };
   paint();
-  const add = button('+ Part', 'ghost', () => { parts.push(newPart('New part')); paint(); });
-  const saveBtn = button('Save parts', 'secondary', () => void save());
+  const unplaced = members.filter((m) => !live.some((p) => (p.assigned ?? []).includes(m.key)));
+  const empty = live.filter((p) => !(p.assigned ?? []).length);
+  const needs = el('p', 'sd-needs', !live.length ? 'No parts saved yet.' : unplaced.length ? `${andList(unplaced.map((m) => (m.me ? `${m.initials} (you)` : m.initials)))} still ${unplaced.length === 1 ? 'needs' : 'need'} a part.` : 'Everyone has a part.');
+  const add = button('+ Part', 'secondary', () => { parts.push(newPart('New part')); touched(); paint(); });
+  const saveBtn = button('Save parts', 'primary', () => void save());
   add.disabled = saveBtn.disabled = !ctx.editable;
-  box.append(list, add, saveBtn);
-  const best = (ctx.status.results?.best_at ?? []).flatMap((b) => b.ideas.filter((i) => i.id !== ctx.status.chosen?.id).map((i) => ({ ...i, criterion: b.criterion })));
+  const actions = el('div', 'sd-actions');
+  actions.append(add, saveBtn, saveNote);
+  t1.el.append(list, needs, actions);
+  t1.done(live.length > 0 && !empty.length && !unplaced.length);
+  box.append(t1.el);
+
+  // 2. Borrow a good bit (optional).
+  const best = (s.results?.best_at ?? []).flatMap((b) => b.ideas.filter((i) => i.id !== s.chosen?.id).map((i) => ({ ...i, criterion: b.criterion })));
   if (best.length) {
     const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
-    const b = el('div', 'sd-borrow');
-    b.append(el('h4', '', 'Worth borrowing'), el('p', 'sprint-note', 'Other ideas your group found strongest in a criterion. Add the best bit as a part of your idea.'));
+    const t2 = task(2, 'Borrow a good bit (optional)', 'Your group rated these other ideas strongest for a criterion. Add the best bit as a part of your idea.');
+    t2.el.classList.add('sd-borrow');
     for (const x of best) {
-      const row = el('div', 'kit-row');
-      row.append(el('span', '', `${crit.get(x.criterion) ?? ''}: “${x.title}”. ${x.idea}`));
-      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criterion }); paint(); });
+      const row = el('div', 'sd-borrow__row');
+      const text = el('span', '');
+      text.append(el('b', '', `${crit.get(x.criterion) ?? ''}:`), ` “${x.title}”. ${x.idea}`);
+      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criterion }); touched(); paint(); });
       go.disabled = !ctx.editable;
-      row.append(go);
-      b.append(row);
+      row.append(text, go);
+      t2.el.append(row);
     }
-    box.append(b);
+    t2.done(live.some((p) => p.text.startsWith('From "')));
+    box.append(t2.el);
   }
-  if (ctx.status.assemble) {
-    const a = el('div', 'sd-assembler');
-    a.append(el('h4', '', 'Who puts it together?'), el('p', 'sprint-note', 'The assembler collects everyone’s parts in Prototype, puts them together and uploads the finished prototype for the pitch. They still do their own part.'));
+
+  // 3. Who puts it together.
+  if (s.assemble) {
+    const t3 = task(best.length ? 3 : 2, 'Choose who puts it together', 'One person collects everyone’s parts in Prototype and uploads the finished prototype for the pitch. They still do their own part.');
+    t3.el.classList.add('sd-assembler');
     const who = el('div', 'sd-who');
     who.setAttribute('role', 'group');
-    who.setAttribute('aria-label', 'Assembler');
+    who.setAttribute('aria-label', 'Who puts it together');
     for (const m of members) {
-      const on = ctx.status.assembler?.key === m.key;
+      const on = s.assembler?.key === m.key;
       const chip = el('button', 'sprint-chip', m.me ? `${m.initials} (you)` : m.initials);
       chip.type = 'button';
       chip.setAttribute('aria-pressed', String(on));
       chip.disabled = !ctx.editable;
       chip.addEventListener('click', async () => {
+        if (dirty && !(await save())) return;
         try { ctx.onStatus(await ctx.client.setAssembler(on ? null : m.key)); } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t work.'; }
       });
       who.append(chip);
     }
-    a.append(who);
-    box.append(a);
+    t3.el.append(who);
+    t3.done(!!s.assembler);
+    box.append(t3.el);
   }
-  const all = (ctx.status.parts ?? []);
-  const unplaced = members.filter((m) => !all.some((p) => (p.assigned ?? []).includes(m.key)));
-  const empty = all.filter((p) => !(p.assigned ?? []).length);
-  const noAssembler = !!ctx.status.assemble && !ctx.status.assembler;
-  box.append(el('p', 'sprint-note sd-status', !all.length ? 'No parts saved yet.' : empty.length || unplaced.length || noAssembler
-    ? [empty.length ? `${empty.length} ${empty.length === 1 ? 'part has' : 'parts have'} no one yet.` : '', unplaced.length ? `Still without a part: ${unplaced.map((m) => m.initials).join(', ')}.` : '', noAssembler ? 'No assembler yet.' : ''].filter(Boolean).join(' ')
-    : `Every part has someone and everyone has a part.${ctx.status.assembler ? ` ${ctx.status.assembler.initials} puts it together.` : ''}`), err);
+
+  // What is left before the plan can go in.
+  const todo = [
+    ...(!live.length ? ['save your parts'] : []),
+    ...empty.map((p) => `someone for “${p.text}”`),
+    ...unplaced.map((m) => `a part for ${m.me ? 'you' : m.initials}`),
+    ...(s.assemble && !s.assembler ? ['who puts it together'] : [])
+  ];
+  box.append(el('p', 'sd-status', todo.length ? `Still to do: ${andList(todo)}.` : `Ready to submit: every part has someone and everyone has a part.${s.assembler ? ` ${s.assembler.me ? 'You put' : `${s.assembler.initials} puts`} it together.` : ''}`), err);
   return box;
 }
 

@@ -134,12 +134,15 @@ test('Sketch keeps the inspiration and rapid ideas private; only the starred car
   assert.ok(!gallery.includes('A private rough idea') && !gallery.includes('museum audio guide'));
 });
 
-test('parts are given to group members by their initials: one part each, one person a part unless there are more people than parts', async () => {
+test('parts are given to group members by their initials: one person a part unless there are more people than parts, and someone can take two parts', async () => {
   const store = await atDecide();
   const s = await act(store, 1, 'status');
   const ballot = duelsFor(s, 'Baker');
   for (const n of [1, 2]) await act(store, n, 'save', { phase: 'decide', payload: ballot });
-  let v = await act(store, 1, 'parts', { parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1' }, { id: 'p2', text: 'Artefact list', shows: '', criterion: 'c2' }] });
+  let v = await act(store, 1, 'parts', { parts: [{ id: 'p1', text: 'Panel text', shows: '', how: 'Draw it in Canva.', criterion: 'c1' }, { id: 'p2', text: 'Artefact list', shows: '', criterion: 'c2' }] });
+  assert.deepEqual(v.parts.map((p) => p.how), ['Draw it in Canva.', '']);
+  assert.equal((await act(store, 2, 'status')).parts[0].how, 'Draw it in Canva.');
+  await assert.rejects(act(store, 1, 'parts', { parts: [{ id: 'p1', text: 'Panel text', how: 'x'.repeat(401), criterion: 'c1' }] }), { code: 'bad_parts' });
   assert.deepEqual(v.members.map((m) => [m.initials, m.me]), [['AB', true], ['CD', false]]);
   assert.ok(!JSON.stringify(v.members).includes('st_'));
   const [ann, cy] = v.members.map((m) => m.key);
@@ -150,7 +153,7 @@ test('parts are given to group members by their initials: one part each, one per
   v = await act(store, 2, 'assign', { part_id: 'p2', keys: [ann] });
   assert.deepEqual(v.parts.map((p) => [p.id, p.assigned, p.mine]), [['p1', [cy], true], ['p2', [ann], false]]);
   v = await act(store, 2, 'assign', { part_id: 'p2', keys: [cy] });
-  assert.deepEqual(v.parts.map((p) => p.assigned), [[], [cy]]);
+  assert.deepEqual(v.parts.map((p) => p.assigned), [[cy], [cy]]);
   const sent = await act(store, 2, 'submit', { phase: 'decide', payload: ballot });
   assert.equal(sent.phases[2].state, 'in');
 });
