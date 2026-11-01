@@ -128,7 +128,7 @@ export const SprintSettingsSchema = z.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z.number().int().min(0).max(30).default(8),
-  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  /** Stand-out dots from before head-to-heads; kept so older Kits still load, no longer used. */
   decide_dots: z.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
@@ -205,10 +205,21 @@ export const IDEA_PARTS = ['idea', 'answers', 'evidence'] as const;
 export type IdeaPart = (typeof IDEA_PARTS)[number];
 export const DotSchema = z.object({ idea: z.string().max(40), part: z.enum(IDEA_PARTS), note: text(120).default('') });
 export type Dot = z.infer<typeof DotSchema>;
+/** One head-to-head: two ideas, the one the student thinks wins, and the criteria it is stronger in. */
+export const DuelSchema = z.object({
+  a: z.string().max(40),
+  b: z.string().max(40),
+  winner: z.string().max(40),
+  stronger: z.array(z.string().max(40)).max(SPRINT_LIMITS.criteria).default([]),
+  why: text(160).default('')
+});
+export type Duel = z.infer<typeof DuelSchema>;
 export const DecidePayloadSchema = z.object({
-  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  /** Head-to-heads between the group's strongest ideas, every pair once. */
+  duels: z.array(DuelSchema).max(66).default([]),
+  /** Stand-out dots from sprints run before head-to-heads; no longer placed. */
   dots: z.array(DotSchema).max(5).default([]),
-  /** Criterion id → idea id. */
+  /** Criterion id → idea id, from sprints run before head-to-heads. */
   votes: z.record(z.string().max(40), z.string().max(40)).default({}),
   reasons: z.record(z.string().max(40), text(300)).default({}),
   opened: z.array(z.string().max(40)).max(40).default([]),

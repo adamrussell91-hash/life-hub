@@ -1,241 +1,271 @@
 import { button, el } from '@/quiz/dom';
-import { partsProblems, voteProblems } from './checks';
+import { duelProblems, partsProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { briefCard, draftOf, frameField, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
-import { IDEA_PARTS, type IdeaPart, type Part, type PhasePayload } from './schema';
+import { briefCard, draftOf, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { duelsDone, pairKey, pairsOf, rankIdeas } from './rules';
+import type { Duel, Part, PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const PLACE = ['1st', '2nd', '3rd'];
 
 /**
- * Decide: open every set of ideas (no names, ever), place stand-out dots on
- * the parts that stand out, give each criterion to one idea with a reason,
- * then, once the group's idea is chosen, write the parts list and give each
- * part to someone by their initials.
+ * Decide: the group's strongest ideas (one per member, no names) go head to
+ * head, two at a time. For each pair the student picks the one that better
+ * solves the problem for the audience and taps what it is stronger in. Their
+ * wins give them a 1st, 2nd and 3rd; the group's wins give the group's idea.
+ * Then the group writes the parts list and gives each part to someone.
  */
 export function mountDecide(ctx: FormContext): PhaseForm {
   const s = ctx.status;
   const mine = draftOf(ctx, 'decide');
-  const state: PhasePayload['decide'] = { votes: { ...(mine?.votes ?? {}) }, reasons: { ...(mine?.reasons ?? {}) }, opened: [...(mine?.opened ?? [])], stretch: mine?.stretch ?? '', dots: (mine?.dots ?? []).map((d) => ({ ...d })) };
-  const dots = s.dots ?? 0;
-  const sets = s.gallery ?? [];
+  const state: PhasePayload['decide'] = { duels: (mine?.duels ?? []).map((d) => ({ ...d, stronger: [...d.stronger] })), votes: { ...(mine?.votes ?? {}) }, reasons: { ...(mine?.reasons ?? {}) }, opened: [...(mine?.opened ?? [])], stretch: mine?.stretch ?? '', dots: [] };
+  const pool = s.pool ?? [];
+  const ids = pool.map((i) => i.id);
+  const label = new Map(pool.map((i, n) => [i.id, `Idea ${LETTERS[n] ?? n + 1}`]));
   const root = el('div', 'sprint-decide');
   const brief = briefCard(s, false);
   if (brief) root.append(brief);
   const voting = !s.votes_closed;
-  root.append(purpose(voting));
-  const dottable = sets.flatMap((x) => x.ideas).reduce((n, i) => n + IDEA_PARTS.filter((k) => i[k]?.trim()).length, 0);
+  root.append(purpose(voting, pool.length));
   const bar = submitBar(ctx, 'decide', () => state, () => [
-    ...(voting && dots && state.dots.length < Math.min(dots, dottable) ? [`Place all ${dots} stand-out dots. You have placed ${state.dots.length}.`] : []),
-    ...(voting ? voteProblems(state, ctx.sprint.criteria, sets.map((x) => x.id)) : []),
-    ...(!s.chosen ? ['Your votes are saved. Submit once your group’s idea is chosen and every part has someone.'] : []),
+    ...(voting ? duelProblems(state.duels, ids) : []),
+    ...(!s.chosen ? ['Your picks are saved. Submit once your group’s idea is chosen and every part has someone.'] : []),
     ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
     ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
   ]);
-  const dotCounter = el('p', 'sd-counter');
-  const paintCounter = () => { dotCounter.textContent = `Stand-out dots: ${state.dots.length} of ${dots} placed.`; };
-  paintCounter();
-  let repaintReview = () => {};
-  const dotChanged = () => {
-    paintCounter();
-    repaintReview();
-    root.querySelectorAll<HTMLButtonElement>('.sd-dot').forEach((b) => {
-      const on = b.getAttribute('aria-pressed') === 'true';
-      b.disabled = !ctx.editable || (!on && state.dots.length >= dots);
-    });
-    bar.changed();
-  };
-  let letter = 0;
-  const label = new Map<string, string>();
-  for (const set of sets) for (const i of set.ideas) label.set(i.id, `Idea ${LETTERS[letter++] ?? letter}`);
 
   if (voting) {
-    if (dots) {
-      const legend = el('div', 'sd-legend');
-      legend.append(
-        el('p', '', `Two things to do as you read each idea:`),
-        el('p', 'sd-legend__row', `● Stands out: tap the ● beside a part you think is clever. You have ${dots} to place. Your group can borrow a part even from an idea it doesn’t pick.`),
-        el('p', 'sd-legend__row', 'Does it best: under each idea, tap the criteria that idea does best.')
-      );
-      root.append(dotCounter, legend);
-    } else root.append(el('p', 'sprint-note sd-legend', 'Read each idea. Under it, tap the criteria it does best.'));
-    // Every set is on show: nothing hides behind a fold, so reading them all is how you vote.
-    for (const set of sets) if (!state.opened.includes(set.id)) state.opened.push(set.id);
-    const gallery = el('div', 'sprint-sets');
-    sets.forEach((set, n) => {
-      const d = el('section', 'sprint-set');
-      if (sets.length > 1) d.append(el('h4', 'sprint-set__title', `Set ${n + 1} · ${set.ideas.length} ${set.ideas.length === 1 ? 'idea' : 'ideas'}`));
-      const grid = el('div', 'sprint-gallery');
-      for (const i of set.ideas) grid.append(ideaCard(i, label.get(i.id)!, ctx, state, root, dotChanged));
-      d.append(grid);
-      gallery.append(d);
-    });
-    root.append(gallery);
-    const reasons = el('div', 'sprint-reasons');
-    const review = el('div', 'sd-review');
-    const paintReview = () => {
-      review.replaceChildren(el('p', 'sprint-note', 'The ideas again, so you can look back as you write. ● is a part you marked as standing out.'));
-      for (const set of sets) for (const i of set.ideas) {
-        const box = el('article', 'sd-review__idea');
-        box.append(el('strong', '', `${label.get(i.id)} · ${i.title}`));
-        const best = ctx.sprint.criteria.filter((c) => state.votes[c.id] === i.id).map((c) => c.text);
-        if (best.length) box.append(el('p', 'sd-review__best', `You picked it for: ${best.join(', ')}`));
-        for (const part of IDEA_PARTS) {
-          const text = i[part]?.trim();
-          if (!text) continue;
-          const marked = state.dots.some((d) => d.idea === i.id && d.part === part);
-          const line = el('p', 'sd-review__part');
-          line.append(el('b', '', `${marked ? '● ' : ''}${PART_LABEL[part]}: `), text);
-          box.append(line);
-        }
-        review.append(box);
-      }
-    };
-    paintReview();
-    reasons.append(review);
-    const picks: Array<() => void> = [];
-    for (const c of ctx.sprint.criteria) {
-      const block = el('div', 'sd-reason');
-      const pick = el('p', 'sd-reason__pick');
-      const paintPick = () => {
-        const id = state.votes[c.id];
-        const idea = sets.flatMap((x) => x.ideas).find((x) => x.id === id);
-        pick.textContent = idea ? `You picked ${label.get(idea.id)} · ${idea.title} for “${c.text}”.` : `Go back a step and tap “${c.text}” under the idea that does it best.`;
-        pick.classList.toggle('is-empty', !idea);
-      };
-      paintPick();
-      picks.push(paintPick);
-      block.append(pick, frameField({ label: `${c.text}: it does this best because…`, value: state.reasons[c.id] ?? '', max: 300, rows: 2, frames: ctx.frames.slice(-1), support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reasons[c.id] = v; bar.changed(); } }));
-      reasons.append(block);
-    }
-    repaintReview = () => { paintReview(); picks.forEach((f) => f()); };
-    root.append(reasons);
+    const ranking = el('div', 'sdd-rank');
+    const paintRanking = () => ranking.replaceChildren(...myRanking(state.duels, pool, label, ctx));
+    root.append(duelArena(ctx, state, pool, label, () => { paintRanking(); bar.changed(); }));
+    paintRanking();
+    root.append(ranking);
   } else {
-    root.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Your teacher is choosing'));
-    if (s.chosen) {
-      const chosen = el('div', 'sprint-chosen');
-      chosen.append(el('strong', '', s.chosen.title), el('p', '', s.chosen.idea));
-      root.append(chosen);
-    }
-    if (s.heat) root.append(heatTable(sets, label, s.heat, ctx));
-    if (s.dot_counts && Object.keys(s.dot_counts).length) root.append(standOuts(sets, label, s.dot_counts));
+    root.append(groupResult(s, label, ctx));
   }
   if (s.chosen) root.append(partsEditor(ctx));
   if (!voting) stepify(root, [
-    { pick: '.sprint-chosen, .sprint-heat-table', title: 'See what your group picked', guide: LATER_GUIDE.result },
+    { pick: '.sdd-result', title: 'See what your group picked', guide: LATER_GUIDE.result },
     { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
   ]);
   if (voting) stepify(root, [
-    { pick: '.sd-counter, .sd-legend, .sprint-sets', title: 'Read the ideas, mark what stands out, pick the best', guide: LATER_GUIDE.read },
-    { pick: '.sprint-reasons', title: 'Explain each pick', guide: LATER_GUIDE.reasons }
+    { pick: '.sdd-arena', title: 'Pick the winner, two ideas at a time', guide: LATER_GUIDE.read },
+    { pick: '.sdd-rank', title: 'Your 1st, 2nd and 3rd', guide: LATER_GUIDE.reasons }
   ]);
   slidify(root, ctx.sprint.understand?.layout);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }
 
-const PART_LABEL: Record<IdeaPart, string> = { idea: 'The idea', answers: 'How it solves the problem', evidence: 'The evidence' };
-
 /** The point of Decide, said once at the top. */
-function purpose(voting: boolean): HTMLElement {
+function purpose(voting: boolean, ideas: number): HTMLElement {
   const box = el('section', 'sd-purpose');
   box.append(el('div', 'sd-purpose__kind', 'What this step is for'));
   box.append(el('p', '', voting
-    ? 'Here you pick and choose the best bits of the best ideas, to answer the challenge for the audience your group chose. Keep your tools and limits in mind: they are in your group brief above.'
+    ? `Your group picks one idea to build. In Sketch, each of you starred your strongest idea: those ${ideas} ideas are here, with no names. You see them two at a time and pick the one that better solves your group’s problem for your audience. Your picks give you a 1st, 2nd and 3rd. Once everyone is done, the idea with the most wins across your group is the one you build.`
     : 'Your group’s idea is chosen. Now you plan the prototype: list its parts, borrow the best bits of the other ideas and give every part to someone.'));
   return box;
 }
 
-function ideaCard(i: GalleryIdea, name: string, ctx: FormContext, state: PhasePayload['decide'], root: HTMLElement, changed: () => void): HTMLElement {
-  const card = el('article', 'sprint-idea');
-  card.append(el('span', 'sprint-idea__tag', name), el('strong', '', i.title));
-  const dots = ctx.status.dots ?? 0;
-  for (const part of IDEA_PARTS) {
-    const text = i[part];
-    if (!text?.trim()) continue;
-    const row = el('div', 'sd-part');
-    row.append(el('p', part === 'idea' ? '' : 'sprint-note', text));
-    if (dots) {
-      const at = () => state.dots.findIndex((d) => d.idea === i.id && d.part === part);
-      const dot = el('button', 'sd-dot');
-      dot.append(el('span', 'sd-dot__mark', '●'), el('span', 'sd-dot__text', ' Stands out'));
-      dot.type = 'button';
-      dot.setAttribute('aria-label', `Stand-out dot: ${PART_LABEL[part]}, ${name}`);
-      dot.setAttribute('aria-pressed', String(at() >= 0));
-      dot.disabled = !ctx.editable || (at() < 0 && state.dots.length >= dots);
-      const note = el('input', 'qz-input sd-note');
-      note.maxLength = 120;
-      note.placeholder = 'Borrow this because… (optional)';
-      note.setAttribute('aria-label', `Why ${PART_LABEL[part].toLowerCase()} stands out`);
-      note.hidden = at() < 0;
-      note.value = at() >= 0 ? state.dots[at()]!.note : '';
-      note.disabled = !ctx.editable;
-      note.addEventListener('input', () => { const n = at(); if (n >= 0) { state.dots[n]!.note = note.value; changed(); } });
-      dot.addEventListener('click', () => {
-        const n = at();
-        if (n >= 0) state.dots.splice(n, 1);
-        else if (state.dots.length < dots) state.dots.push({ idea: i.id, part, note: '' });
-        dot.setAttribute('aria-pressed', String(at() >= 0));
-        note.hidden = at() < 0;
-        if (at() < 0) note.value = '';
-        changed();
-      });
-      row.append(dot, note);
-    }
-    card.append(row);
-  }
-  if (i.file) {
-    const open = button('Open the picture or PDF', 'ghost', async () => window.open(await ctx.client.fileUrl(i.file!), '_blank', 'noopener'));
-    card.append(open);
-  }
-  card.append(el('p', 'sprint-note sd-best', 'This idea does best at:'));
-  const chips = el('div', 'sprint-votes');
-  for (const c of ctx.sprint.criteria) {
-    const chip = el('button', 'sprint-chip sprint-vote', c.text);
-    chip.type = 'button';
-    chip.dataset.criterion = c.id;
-    chip.dataset.idea = i.id;
-    chip.disabled = !ctx.editable;
-    chip.setAttribute('aria-pressed', String(state.votes[c.id] === i.id));
-    chip.addEventListener('click', () => {
-      state.votes[c.id] = i.id;
-      root.querySelectorAll<HTMLButtonElement>(`.sprint-vote[data-criterion="${c.id}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.idea === i.id)));
-      changed();
-    });
-    chips.append(chip);
-  }
-  card.append(chips);
-  return card;
+/** A small seeded shuffle, so each student meets the pairs in their own order and keeps it on reload. */
+function seeded(seed: string): () => number {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
 }
 
-/** Which ideas did best on which criterion: shades, never numbers. */
-function heatTable(sets: SprintStatus['gallery'] & object, label: Map<string, string>, heat: NonNullable<SprintStatus['heat']>, ctx: FormContext): HTMLElement {
-  const box = el('div', 'sprint-heat-table');
-  const short = (t: string) => t.split(/[:.]/)[0]!.trim().slice(0, 14);
-  box.append(el('p', 'sprint-note', 'Darker means more of your group picked that idea for that criterion.'));
-  for (const set of sets) for (const i of set.ideas) {
-    const r = el('div', 'sprint-heat-row');
-    const cells = el('span', 'sprint-heat');
-    for (const c of ctx.sprint.criteria) {
-      const cell = el('i', '', short(c.text));
-      cell.dataset.level = String(heat[i.id]?.[c.id] ?? 0);
-      cell.title = c.text;
-      cells.append(cell);
-    }
-    r.append(el('span', '', `${label.get(i.id)}: ${i.title}`), cells);
-    box.append(r);
+function matchups(ids: string[], seed: string): Array<[string, string]> {
+  const rnd = seeded(seed);
+  const pairs = pairsOf(ids).map(([a, b]) => (rnd() < 0.5 ? [a, b] : [b, a]) as [string, string]);
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j]!, pairs[i]!];
   }
+  return pairs;
+}
+
+/** The head-to-heads: one pair on screen, a winner, what it is stronger in, then the next pair. */
+function duelArena(ctx: FormContext, state: PhasePayload['decide'], pool: GalleryIdea[], label: Map<string, string>, changed: () => void): HTMLElement {
+  const box = el('section', 'sdd-arena');
+  const ids = pool.map((i) => i.id);
+  const byId = new Map(pool.map((i) => [i.id, i]));
+  if (ids.length < 2) {
+    box.append(el('p', 'sprint-note', ids.length ? 'Only one idea came in from Sketch, so there is nothing to compare. Your group builds this one.' : 'No ideas have come in from Sketch yet. They show here once your group submits Sketch.'));
+    return box;
+  }
+  const me = (ctx.status.members ?? []).find((m) => m.me)?.key ?? '';
+  const pairs = matchups(ids, `${me}:${ids.join(',')}`);
+  const find = (a: string, b: string) => state.duels.find((d) => pairKey(d.a, d.b) === pairKey(a, b));
+  const decided = (d: Duel | undefined) => !!d && (d.winner === d.a || d.winner === d.b) && d.stronger.length > 0;
+  let at = Math.max(0, pairs.findIndex(([a, b]) => !decided(find(a, b))));
+  if (pairs.every(([a, b]) => decided(find(a, b)))) at = pairs.length - 1;
+
+  const progress = el('div', 'sdd-progress');
+  const stage = el('div', 'sdd-stage');
+  box.append(progress, stage);
+
+  const paint = () => {
+    const [a, b] = pairs[at]!;
+    let d = find(a, b);
+    progress.replaceChildren(el('span', 'sdd-progress__text', `Match-up ${at + 1} of ${pairs.length}`));
+    const pills = el('div', 'sdd-progress__pills');
+    pairs.forEach(([x, y], n) => {
+      const pill = el('button', 'sdd-pill');
+      pill.type = 'button';
+      pill.setAttribute('aria-label', `Match-up ${n + 1}: ${label.get(x)} v ${label.get(y)}${decided(find(x, y)) ? ', done' : ''}`);
+      if (n === at) pill.setAttribute('aria-current', 'step');
+      pill.classList.toggle('is-done', decided(find(x, y)));
+      pill.addEventListener('click', () => { at = n; paint(); });
+      pills.append(pill);
+    });
+    progress.append(pills);
+
+    const pair = el('div', 'sdd-pair');
+    const card = (id: string) => {
+      const i = byId.get(id)!;
+      const c = el('article', 'sdd-idea');
+      const won = d?.winner === id;
+      c.classList.toggle('is-winner', won);
+      c.classList.toggle('is-loser', !!d?.winner && !won);
+      c.append(el('span', 'sprint-idea__tag', label.get(id)!), el('strong', 'sdd-idea__title', i.title));
+      const part = (name: string, text: string | undefined) => { if (!text?.trim()) return; const p = el('p', 'sdd-idea__part'); p.append(el('b', '', name), ' ', text); c.append(p); };
+      part('The idea:', i.idea);
+      part('How it solves the problem:', i.answers);
+      part('The evidence:', i.evidence);
+      if (i.file) c.append(button('Open the picture or PDF', 'ghost', async () => window.open(await ctx.client.fileUrl(i.file!), '_blank', 'noopener')));
+      const pick = el('button', 'sdd-win', won ? '✓ This one wins' : 'This one wins');
+      pick.type = 'button';
+      pick.setAttribute('aria-pressed', String(won));
+      pick.disabled = !ctx.editable;
+      pick.addEventListener('click', () => {
+        if (!d) { d = { a, b, winner: id, stronger: [], why: '' }; state.duels.push(d); }
+        else if (d.winner !== id) { d.winner = id; d.stronger = []; }
+        changed();
+        paint();
+      });
+      c.append(pick);
+      return c;
+    };
+    pair.append(card(a), el('span', 'sdd-vs', 'v'), card(b));
+    stage.replaceChildren(pair);
+
+    const why = el('div', 'sdd-why');
+    if (d?.winner) {
+      why.append(el('p', 'sdd-why__ask', `${label.get(d.winner)} is stronger in… (tap one or more)`));
+      const chips = el('div', 'sprint-votes');
+      for (const c of ctx.sprint.criteria) {
+        const chip = el('button', 'sprint-chip sprint-vote', c.text);
+        chip.type = 'button';
+        chip.disabled = !ctx.editable;
+        chip.setAttribute('aria-pressed', String(d.stronger.includes(c.id)));
+        chip.addEventListener('click', () => {
+          d!.stronger = d!.stronger.includes(c.id) ? d!.stronger.filter((x) => x !== c.id) : [...d!.stronger, c.id];
+          changed();
+          paint();
+        });
+        chips.append(chip);
+      }
+      const note = el('input', 'qz-input sdd-why__note');
+      note.maxLength = 160;
+      note.placeholder = 'Anything else? (optional)';
+      note.setAttribute('aria-label', 'Why it wins (optional)');
+      note.value = d.why;
+      note.disabled = !ctx.editable;
+      note.addEventListener('input', () => { d!.why = note.value; changed(); });
+      why.append(chips, note);
+    } else why.append(el('p', 'sprint-note', 'Which one better solves your group’s problem for your audience? Tap “This one wins” on it.'));
+    const nav = el('div', 'sdd-nav');
+    const back = button('← Back', 'ghost', () => { at -= 1; paint(); });
+    back.disabled = at === 0;
+    const last = at === pairs.length - 1;
+    const left = pairs.filter(([x, y]) => !decided(find(x, y))).length;
+    const next = button(last ? (left ? `${left} match-up${left === 1 ? '' : 's'} still to do` : 'All done: see your ranking') : 'Next match-up →', 'primary', () => {
+      if (!last) { at += 1; paint(); return; }
+      const open = pairs.findIndex(([x, y]) => !decided(find(x, y)));
+      if (open >= 0) { at = open; paint(); }
+      else showRanking(box);
+    });
+    next.disabled = !last && !decided(d);
+    nav.append(back, next);
+    why.append(nav);
+    stage.append(why);
+  };
+  paint();
   return box;
 }
 
-/** After voting: where the group's stand-out dots landed. */
-function standOuts(sets: NonNullable<SprintStatus['gallery']>, label: Map<string, string>, counts: NonNullable<SprintStatus['dot_counts']>): HTMLElement {
-  const box = el('div', 'sprint-heat-table');
-  for (const set of sets) for (const i of set.ideas) {
-    const c = counts[i.id];
-    if (!c) continue;
-    const bits = IDEA_PARTS.filter((p) => c[p]).map((p) => `${PART_LABEL[p]} ${'●'.repeat(c[p])}`);
-    box.append(el('p', '', `${label.get(i.id)}: ${i.title} · ${bits.join(' · ')}`));
+/** Bring the ranking step into view, turning the slide to it when steps show one at a time. */
+function showRanking(from: HTMLElement): void {
+  const root = from.closest('.sprint-decide');
+  const step = root?.querySelector('.sdd-rank')?.closest<HTMLElement>('.su-step');
+  if (!root || !step) return;
+  if (step.hidden) root.querySelectorAll<HTMLButtonElement>('.su-rail__dot')[[...root.querySelectorAll(':scope > .su-step')].indexOf(step)]?.click();
+  step.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** The student's own 1st, 2nd and 3rd from their head-to-heads, with what each idea won on. */
+function myRanking(duels: Duel[], pool: GalleryIdea[], label: Map<string, string>, ctx: FormContext): HTMLElement[] {
+  const ids = pool.map((i) => i.id);
+  if (ids.length < 2) return [el('p', 'sprint-note', 'Nothing to rank: your group has one idea.')];
+  if (!duelsDone(duels, ids)) {
+    const left = pairsOf(ids).length - new Set(duels.filter((d) => d.winner).map((d) => pairKey(d.a, d.b))).size;
+    return [el('p', 'sprint-note', `Your ranking shows here once you have picked a winner in every match-up. ${left} to go.`)];
+  }
+  const order = rankIdeas(duels, ids);
+  const byId = new Map(pool.map((i) => [i.id, i]));
+  const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
+  const list = el('ol', 'sdd-podium');
+  order.forEach((id, n) => {
+    const wins = duels.filter((d) => d.winner === id);
+    const li = el('li', `sdd-podium__row${n < 3 ? ' is-top' : ''}`);
+    li.append(el('span', 'sdd-podium__place', PLACE[n] ?? `${n + 1}th`));
+    const body = el('div');
+    body.append(el('strong', '', `${label.get(id)} · ${byId.get(id)!.title}`));
+    const tally = new Map<string, number>();
+    for (const d of wins) for (const c of d.stronger) tally.set(c, (tally.get(c) ?? 0) + 1);
+    const strong = [...tally].sort((x, y) => y[1] - x[1]).map(([c, k]) => `${crit.get(c) ?? c}${k > 1 ? ` ×${k}` : ''}`);
+    body.append(el('p', 'sprint-note', `Won ${wins.length} of ${ids.length - 1}${strong.length ? ` · stronger in ${strong.join(', ')}` : ''}`));
+    li.append(body);
+    list.append(li);
+  });
+  return [list, el('p', 'sprint-note', 'When everyone in your group has finished, the idea with the most wins across the group is the one you build. If you all have the same 1st, that’s your winner. You can go back and change a match-up until then.')];
+}
+
+/** After voting: the group's idea, its top three, and which idea was strongest in each criterion. */
+function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormContext): HTMLElement {
+  const box = el('section', 'sdd-result');
+  const r = s.results;
+  box.append(el('h2', '', s.chosen ? 'Your group’s idea' : 'Your teacher is choosing'));
+  if (s.chosen) {
+    const chosen = el('div', 'sprint-chosen');
+    chosen.append(el('strong', '', s.chosen.title), el('p', '', s.chosen.idea));
+    if (r?.unanimous) chosen.append(el('p', 'sdd-result__agree', 'Everyone in your group picked this idea 1st.'));
+    box.append(chosen);
+  } else if (r?.ranking.length) box.append(el('p', 'sprint-note', 'Two ideas finished level on wins, so your teacher picks between them.'));
+  if (r?.ranking.length) {
+    const top = el('ol', 'sdd-podium');
+    r.ranking.forEach((x, n) => {
+      const li = el('li', 'sdd-podium__row is-top');
+      li.append(el('span', 'sdd-podium__place', PLACE[n] ?? ''), el('strong', '', `${label.get(x.id) ?? 'Idea'} · ${x.title}`));
+      top.append(li);
+    });
+    box.append(el('h3', '', 'Your group’s top three'), top);
+  }
+  if (r?.best_at.length) {
+    const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
+    const best = el('div', 'sdd-best');
+    best.append(el('h3', '', 'Strongest in each criterion'), el('p', 'sprint-note', 'Your group’s idea can borrow the best bits of the others. Add them as parts below.'));
+    for (const b of r.best_at) {
+      const p = el('p', 'sdd-best__row');
+      p.append(el('b', '', `${crit.get(b.criterion) ?? b.criterion}:`), ` ${b.ideas.map((i) => `${label.get(i.id) ?? 'Idea'} · ${i.title}`).join(' and ')}`);
+      best.append(p);
+    }
+    box.append(best);
   }
   return box;
 }
@@ -278,7 +308,8 @@ function partsEditor(ctx: FormContext): HTMLElement {
       crit.disabled = !ctx.editable;
       crit.append(el('option', '', 'Criterion it serves'));
       (crit.firstChild as HTMLOptionElement).value = '';
-      for (const c of ctx.sprint.criteria) { const o = el('option', '', c.text); o.value = c.id; o.selected = p.criterion === c.id; crit.append(o); }
+      for (const c of ctx.sprint.criteria) { const o = el('option', '', c.text); o.value = c.id; crit.append(o); }
+      crit.value = p.criterion;
       crit.addEventListener('change', () => { p.criterion = crit.value; });
       const live = (ctx.status.parts ?? []).find((x) => x.id === p.id);
       const who = el('div', 'sd-who');
@@ -309,14 +340,15 @@ function partsEditor(ctx: FormContext): HTMLElement {
   const saveBtn = button('Save parts', 'secondary', () => void save());
   add.disabled = saveBtn.disabled = !ctx.editable;
   box.append(list, add, saveBtn);
-  const borrow = ctx.status.borrow ?? [];
-  if (borrow.length) {
+  const best = (ctx.status.results?.best_at ?? []).flatMap((b) => b.ideas.filter((i) => i.id !== ctx.status.chosen?.id).map((i) => ({ ...i, criterion: b.criterion })));
+  if (best.length) {
+    const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
     const b = el('div', 'sd-borrow');
-    b.append(el('h4', '', 'Worth borrowing'), el('p', 'sprint-note', 'The most-dotted parts of ideas your group didn’t choose. Add one as a part.'));
-    for (const x of borrow) {
+    b.append(el('h4', '', 'Worth borrowing'), el('p', 'sprint-note', 'Other ideas your group found strongest in a criterion. Add the best bit as a part of your idea.'));
+    for (const x of best) {
       const row = el('div', 'kit-row');
-      row.append(el('span', '', `${x.title}: ${x.text} ${'●'.repeat(x.count)}${x.notes.length ? ` · ${x.notes.join(' · ')}` : ''}`));
-      const go = button('Add as a part', 'ghost', () => { parts.push(newPart(`From "${x.title}"`, x.text)); paint(); });
+      row.append(el('span', '', `${crit.get(x.criterion) ?? ''}: “${x.title}”. ${x.idea}`));
+      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criterion }); paint(); });
       go.disabled = !ctx.editable;
       row.append(go);
       b.append(row);
@@ -354,4 +386,4 @@ function partsEditor(ctx: FormContext): HTMLElement {
 }
 
 export const decideSignature = (s: SprintStatus) =>
-  [(s.gallery ?? []).map((x) => x.id).join(','), s.votes_closed ? 1 : 0, s.chosen?.id ?? '', (s.parts ?? []).map((p) => `${p.id}:${(p.assigned ?? []).join('+')}:${p.mine ? 1 : 0}`).join(','), (s.borrow ?? []).length, s.assembler?.key ?? ''].join('|');
+  [(s.pool ?? []).map((x) => x.id).join(','), s.votes_closed ? 1 : 0, s.chosen?.id ?? '', (s.parts ?? []).map((p) => `${p.id}:${(p.assigned ?? []).join('+')}:${p.mine ? 1 : 0}`).join(','), (s.results?.best_at ?? []).length, s.assembler?.key ?? ''].join('|');

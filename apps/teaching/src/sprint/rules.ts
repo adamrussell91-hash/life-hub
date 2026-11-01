@@ -121,6 +121,57 @@ export function tally(ballots: ReadonlyArray<Record<string, string>>, criteria: 
   return { counts, totals, top: best > 0 && !tie ? leaders[0]! : null, tie };
 }
 
+/** Every pair of ideas once, as [a, b] in the order given. */
+export function pairsOf(ideas: readonly string[]): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  ideas.forEach((a, i) => ideas.slice(i + 1).forEach((b) => out.push([a, b])));
+  return out;
+}
+
+export const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+/** True once every pair of ideas has a winner. */
+export function duelsDone(duels: ReadonlyArray<{ a: string; b: string; winner: string }>, ideas: readonly string[]): boolean {
+  const done = new Set(duels.filter((d) => d.winner === d.a || d.winner === d.b).map((d) => pairKey(d.a, d.b)));
+  return pairsOf(ideas).every(([a, b]) => done.has(pairKey(a, b)));
+}
+
+/**
+ * Head-to-heads as a tally: a win is one point to the winner, and each
+ * criterion it was "stronger in" counts toward that criterion.
+ */
+export function duelTally(ballots: ReadonlyArray<ReadonlyArray<{ a: string; b: string; winner: string; stronger: readonly string[] }>>, criteria: readonly string[], ideas: readonly string[]): Tally {
+  const counts: Record<string, Record<string, number>> = {};
+  const totals: Record<string, number> = {};
+  for (const idea of ideas) {
+    counts[idea] = Object.fromEntries(criteria.map((c) => [c, 0]));
+    totals[idea] = 0;
+  }
+  for (const duels of ballots) {
+    for (const d of duels) {
+      if (!counts[d.a] || !counts[d.b] || (d.winner !== d.a && d.winner !== d.b)) continue;
+      totals[d.winner]! += 1;
+      for (const c of d.stronger) if (c in counts[d.winner]!) counts[d.winner]![c]! += 1;
+    }
+  }
+  const best = Math.max(0, ...Object.values(totals));
+  const leaders = Object.keys(totals).filter((idea) => totals[idea] === best);
+  const tie = best > 0 && leaders.length > 1;
+  return { counts, totals, top: best > 0 && !tie ? leaders[0]! : null, tie };
+}
+
+/** One student's order from their head-to-heads: most wins first; level ideas go by who won between them. */
+export function rankIdeas(duels: ReadonlyArray<{ a: string; b: string; winner: string }>, ideas: readonly string[]): string[] {
+  const wins = new Map(ideas.map((i) => [i, 0]));
+  const beat = new Set<string>();
+  for (const d of duels) {
+    if (!wins.has(d.a) || !wins.has(d.b) || (d.winner !== d.a && d.winner !== d.b)) continue;
+    wins.set(d.winner, wins.get(d.winner)! + 1);
+    beat.add(`${d.winner}>${d.winner === d.a ? d.b : d.a}`);
+  }
+  return [...ideas].sort((x, y) => wins.get(y)! - wins.get(x)! || (beat.has(`${x}>${y}`) ? -1 : beat.has(`${y}>${x}`) ? 1 : 0));
+}
+
 /** 0 for no votes; otherwise 1–3 against the most any idea got on that criterion. */
 export function heatLevels(counts: Tally['counts'], criteria: readonly string[]): Record<string, Record<string, 0 | 1 | 2 | 3>> {
   const out: Record<string, Record<string, 0 | 1 | 2 | 3>> = {};

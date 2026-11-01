@@ -34,9 +34,8 @@ export function sampleStatus(key: SprintPhaseKey, sprint: PublicSprint): SprintS
   };
   if (key === 'decide') return {
     ...base,
-    dots: sprint.decide_dots ?? 3,
-    gallery: [{ id: 's1', ideas: [idea('i1', 'Idea from one set', 'The first idea a student put forward.'), idea('i2', 'Their second idea', 'Another way to solve it.')] }, { id: 's2', ideas: [idea('i3', 'Idea from another set', 'A third student’s idea.')] }],
-    heat: null, votes_closed: false, chosen: null, parts: []
+    pool: [idea('i1', 'One student’s strongest idea', 'The idea they starred in Sketch.'), idea('i2', 'Another student’s strongest idea', 'Another way to solve it.'), idea('i3', 'A third student’s strongest idea', 'A third way to solve it.')],
+    votes_closed: false, chosen: null, parts: []
   };
   if (key === 'prototype') return {
     ...base,

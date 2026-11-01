@@ -272,7 +272,7 @@ var SprintSettingsSchema = z7.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z7.number().int().min(0).max(30).default(8),
-  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  /** Stand-out dots from before head-to-heads; kept so older Kits still load, no longer used. */
   decide_dots: z7.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z7.object({ prototype: z7.string().optional(), reflection: z7.string().optional() }).default({})
@@ -337,10 +337,19 @@ var SketchPayloadSchema = z7.object({
 });
 var IDEA_PARTS = ["idea", "answers", "evidence"];
 var DotSchema = z7.object({ idea: z7.string().max(40), part: z7.enum(IDEA_PARTS), note: text(120).default("") });
+var DuelSchema = z7.object({
+  a: z7.string().max(40),
+  b: z7.string().max(40),
+  winner: z7.string().max(40),
+  stronger: z7.array(z7.string().max(40)).max(SPRINT_LIMITS.criteria).default([]),
+  why: text(160).default("")
+});
 var DecidePayloadSchema = z7.object({
-  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  /** Head-to-heads between the group's strongest ideas, every pair once. */
+  duels: z7.array(DuelSchema).max(66).default([]),
+  /** Stand-out dots from sprints run before head-to-heads; no longer placed. */
   dots: z7.array(DotSchema).max(5).default([]),
-  /** Criterion id → idea id. */
+  /** Criterion id → idea id, from sprints run before head-to-heads. */
   votes: z7.record(z7.string().max(40), z7.string().max(40)).default({}),
   reasons: z7.record(z7.string().max(40), text(300)).default({}),
   opened: z7.array(z7.string().max(40)).max(40).default([]),

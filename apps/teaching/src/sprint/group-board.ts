@@ -59,7 +59,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
         const r = el('div', `kit-row${b.chosen === i.id ? ' sboard__chosen' : ''}`);
         const heat = el('span', 'sprint-heat');
         for (const c of crit()) { const cell = el('i'); cell.dataset.level = String(b.heat[i.id]?.[c.id] ?? 0); cell.title = c.text; heat.append(cell); }
-        r.append(el('span', '', `${i.title}${i.strongest ? ' (their strongest)' : ''} · ${b.totals[i.id] ?? 0} ${(b.totals[i.id] ?? 0) === 1 ? 'vote' : 'votes'}`), heat);
+        r.append(el('span', '', `${i.title}${i.strongest ? ' (their strongest)' : ''} · ${b.totals[i.id] ?? 0} ${(b.totals[i.id] ?? 0) === 1 ? 'win' : 'wins'}`), heat);
         if (typeof i.index === 'number') r.append(button('Spotlight', 'ghost', () => void act(o.api.spotlight(set.student_id, 'sketch', `cards.${i.index}.idea`))));
         if (b.awaiting?.kind === 'idea' || (!b.chosen && b.awaiting === null)) r.append(button(b.awaiting?.kind === 'idea' ? 'Choose this idea' : 'Pick this idea', 'secondary', () => void act(o.api.confirm(b.group.id, 'idea', i.id))));
         g.append(r);
@@ -67,6 +67,14 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     }
     root.append(g);
 
+    const titleOf = new Map(b.gallery.flatMap((set) => set.ideas.map((i) => [i.id, i.title])));
+    if (b.reasons.some((r) => r.ranked?.length)) {
+      const rk = el('div', 'sboard__part');
+      rk.append(el('h3', '', 'Each student’s ranking'), el('p', 'sprint-note', 'From their head-to-heads, 1st first. Wins are the totals above.'));
+      for (const r of b.reasons) if (r.ranked?.length) rk.append(el('p', '', `${r.name}: ${r.ranked.slice(0, 3).map((id, n) => `${n + 1}. ${titleOf.get(id) ?? 'an idea'}`).join(' · ')}`));
+      for (const r of b.reasons) for (const d of r.duels ?? []) if (d.why?.trim()) rk.append(el('p', 'sprint-note', `${r.name} on “${titleOf.get(d.winner) ?? 'an idea'}” over “${titleOf.get(d.winner === d.a ? d.b : d.a) ?? 'an idea'}”: ${d.why}`));
+      root.append(rk);
+    }
     if (b.reasons.some((r) => Object.keys(r.reasons).length || r.dots?.length)) {
       const rs = el('div', 'sboard__part');
       rs.append(el('h3', '', 'Vote reasons'));

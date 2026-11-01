@@ -122,24 +122,24 @@ export const SKETCH_GUIDE: Record<'inspiration' | 'rapid' | 'pick' | 'develop', 
 
 export const LATER_GUIDE = {
   read: {
-    icon: '👀',
-    doThis: 'Read every idea. Tap ● Stands out on the parts you would borrow, then tap the criteria each idea does best.',
-    why: 'Reading all the ideas, not just the first few, is how you find the best one. Dots mark good parts, even in ideas you won’t pick.',
-    example: ['Idea B’s evidence is clever, so it gets a ● Stands out. Idea C does “Speed” best, so you tap “Speed” under Idea C.'],
-    stuck: ['Open one set at a time and read slowly.', 'Ask: would this actually fix the problem we chose?']
+    icon: '🥊',
+    doThis: 'Read both ideas. Tap “This one wins” on the one that better solves your group’s problem for your audience, then tap what it is stronger in.',
+    why: 'Comparing two at a time is easier than judging everything at once, and every idea meets every other idea once.',
+    example: ['Idea A is a phone app, Idea C is a poster. The app reaches more of your audience, so it wins, and it is stronger in “Creativity”.'],
+    stuck: ['Read the problem and audience in your group brief again.', 'Ask: which one would the audience actually use?', 'Both good? Pick the one you would rather build.']
   },
   reasons: {
-    icon: '⚖️',
-    doThis: 'For each criterion, say why the idea you picked does it best. The ideas are listed above the boxes to look back at.',
-    why: 'A reason turns a gut feeling into an argument your group can discuss.',
-    example: ['Speed: Idea B does this best because students collect lunch without queuing.'],
-    stuck: ['Use the sentence starter.', 'One idea can win more than one criterion.', 'Not picked yet? Go back a step and tap the criterion under an idea.']
+    icon: '🏆',
+    doThis: 'Look at your 1st, 2nd and 3rd. Change a match-up if the order doesn’t look right to you.',
+    why: 'Your ranking adds to everyone else’s. The idea with the most wins across the group is the one you build.',
+    example: ['1st: Idea C, won 3 of 3, stronger in Creativity ×2.'],
+    stuck: ['Go back to step 1 and tap a dot to reopen any match-up.', 'Still some to do? Your ranking shows once every match-up has a winner.']
   },
   result: {
     icon: '📊',
-    doThis: 'See which idea your group picked, how the votes fell and which parts stood out.',
-    why: 'The pattern shows what your group valued and which parts are worth borrowing.',
-    example: ['A dark square means many people chose that idea for that criterion.'],
+    doThis: 'See which idea your group picked, the top three and which idea was strongest in each criterion.',
+    why: 'The strongest bits of the other ideas are worth borrowing into the one you build.',
+    example: ['Creativity: Idea B · a comic strip. Add its best bit as a part.'],
     stuck: ['Your teacher confirms the idea. It shows here once they have.']
   },
   parts: {
