@@ -543,5 +543,6 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
   return fail(failedProposals > 0 ? lastProblem : 'The agent took too many steps. Try a narrower request.');
 }
 
-// Next-step jobs ride in the same server bundle (teaching-ai-runtime.mjs).
+// Next-step and answer-marking jobs ride in the same server bundle (teaching-ai-runtime.mjs).
 export * from '@/ai/next-step-jobs';
+export * from '@/ai/answer-marking-jobs';

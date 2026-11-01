@@ -1368,6 +1368,8 @@ var QUIZ_LIMITS = {
   hint: 500,
   explanation: 1e3,
   passage: 4e3,
+  /** A short answer's "Looking for" note, and a teacher's comment on a marked answer. */
+  note: 1e3,
   answer: 200,
   model: 3e3,
   response: 6e3,
@@ -1428,9 +1430,12 @@ var QuizQuestionSchema = z10.discriminatedUnion("kind", [
     ...base,
     kind: z10.literal("short_answer"),
     accepted: z10.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
-    case_sensitive: z10.boolean().optional()
+    case_sensitive: z10.boolean().optional(),
+    /** What a right answer says, for the AI marker. Optional. */
+    looking_for: OptionalText(QUIZ_LIMITS.note),
+    ai_mark: z10.boolean().optional()
   }),
-  z10.object({ ...base, kind: z10.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z10.boolean().optional() }),
+  z10.object({ ...base, kind: z10.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z10.boolean().optional(), ai_mark: z10.boolean().optional() }),
   z10.object({ ...base, kind: z10.literal("odd_one_out"), options: z10.array(QuizChoiceSchema).min(3).max(6), correct: z10.array(Id).length(1) }),
   z10.object({ ...base, kind: z10.literal("matching"), pairs: z10.array(QuizPairSchema).min(2).max(8) }),
   z10.object({ ...base, kind: z10.literal("ordering"), items: z10.array(QuizChoiceSchema).min(3).max(8) }),
@@ -1474,7 +1479,8 @@ var QuizQuestionSchema = z10.discriminatedUnion("kind", [
     kind: z10.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z10.boolean().optional()
   }),
   z10.object({
     ...base,
@@ -1483,7 +1489,8 @@ var QuizQuestionSchema = z10.discriminatedUnion("kind", [
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z10.boolean().optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
