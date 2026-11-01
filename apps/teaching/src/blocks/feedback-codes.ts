@@ -35,6 +35,10 @@ export type FeedbackCode = {
   /** Optional See how link a student can open from their next steps. */
   resource?: { kind: 'link' | 'video'; url: string; title?: string; start?: number };
   hidden?: boolean;
+  /** Optional. The continuum skill (`strand.sub`) the code works on; it links the code to writing boxes. */
+  skill?: string;
+  /** Optional, with a skill: the next step at each placement rung, below → excellent (progress/wording.ts RUNG_ORDER). */
+  ladder?: string[];
 };
 
 export const FEEDBACK_CODES_ENDPOINT = '/api/feedback-codes';

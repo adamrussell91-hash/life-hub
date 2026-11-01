@@ -91,7 +91,8 @@ export function codeGrid(pieces, library) {
   });
 }
 
-function ranked(pieces, library, positive) {
+/** Codes on 2+ of their last 5 applicable pieces, most hits first, then most recent. */
+export function ranked(pieces, library, positive) {
   const codes = byId(library);
   const out = [];
   for (const row of codeGrid(pieces, library).filter((r) => r.positive === positive)) {

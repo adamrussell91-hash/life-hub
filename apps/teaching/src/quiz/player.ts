@@ -11,6 +11,7 @@ import {
 import { el, formatMarks, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
 import { watchWriting, type WritingWatch } from '@/quiz/writing-watch';
+import { mountNextStep, type MountNextStepOptions } from '@/student/next-step';
 import './quiz.css';
 
 /**
@@ -38,6 +39,8 @@ export type PlayerOptions = {
   board?: boolean;
   /** Written answers only: record how the answer is typed, and maybe block paste. */
   writing?: WritingWatch;
+  /** Written answers only, while they can be changed: the student's next step and Done. */
+  step?: Omit<MountNextStepOptions, 'input'>;
 };
 
 type Choice = { id: string; text: string };
@@ -259,6 +262,7 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
       const note = options.writing && !locked ? watchWriting(input, options.writing) : null;
       input.addEventListener('input', () => emit({ text: input.value }));
       body.append(input);
+      if (options.step && !locked) mountNextStep({ input, ...options.step });
       if (note) body.append(note);
       if (key?.answer.type === 'manual' && key.answer.model_answer) {
         const model = el('details', 'qz-model');

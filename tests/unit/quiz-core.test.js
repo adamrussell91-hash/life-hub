@@ -222,3 +222,15 @@ test('quiz settings accept follow-up fields and keep them out of student setting
   assert.deepEqual(parsed.for_students, ['stu1']);
   assert.equal(parsed.compare_with, 'lesson_b');
 });
+
+test('written questions carry their skills and next-step bank to students', () => {
+  const bank = { comp_ts: { lines: ['a', 'b', 'c', 'd', 'e'], edited: [false, true, false, false, false], source: 'x1' } };
+  const q = QuizQuestionSchema.parse({ id: 'w1', kind: 'extended_response', prompt: 'Why does the town change?', marks: 4, skills: ['arguing.thesis'], next_steps: bank });
+  assert.deepEqual(q.next_steps, bank);
+  const { question, key } = splitQuestion(q, seeded());
+  assert.deepEqual(question.skills, ['arguing.thesis']);
+  assert.deepEqual(question.next_steps, bank);
+  assert.equal(key.next_steps, undefined);
+  assert.equal(splitQuestion({ ...q, next_steps: undefined }, seeded()).question.skills, undefined);
+  assert.equal(QuizQuestionSchema.safeParse({ ...q, next_steps: { comp_ts: { ...bank.comp_ts, lines: ['a'] } } }).success, false);
+});

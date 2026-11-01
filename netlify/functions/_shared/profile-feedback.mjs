@@ -8,11 +8,12 @@ import { readFeedbackCodes } from './feedback-codes.mjs';
 import { read, reject } from './question-drop.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { piecePrefix, pieceKey } from './piece-feedback.mjs';
-import { handinKey } from './lesson-work.mjs';
+import { handinKey, writingParts } from './lesson-work.mjs';
 import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload } from './teaching-feedback.mjs';
 import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
-import { targetKeys, targetRow, codeGrid, nextSteps, CHART_MAX } from './progress-patterns.mjs';
+import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from './progress-patterns.mjs';
+import { stepsBySkill } from './next-steps.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
@@ -118,6 +119,20 @@ export async function progressFor(store, roster, student) {
   };
 }
 
+/**
+ * What a writing box needs to pick this student's next step: per skill, their
+ * latest placed rung and their top repeating growth code linked to that skill.
+ * The client picks the bank line; rungs and codes are never shown.
+ */
+export async function stepsFor(store, classId, studentId) {
+  const pieces = await studentPieces(store, classId, studentId);
+  const library = await readFeedbackCodes(store);
+  const rungs = {};
+  for (const key of targetKeys(pieces)) if (key.startsWith('skill:')) rungs[key.slice(6)] = targetRow(pieces, key).now;
+  const codes = new Map(library.map((c) => [c.id, c]));
+  return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs) };
+}
+
 export async function returnedFor(store, roster, student) {
   const pieces = await studentPieces(store, roster.cls.id, student.id);
   const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))] } }));
@@ -151,7 +166,7 @@ export async function pieceFor(store, roster, student, item) {
   const handin = row.kind === 'written' ? await read(store, handinKey(row.lesson_id, row.block_id, student.id)) : null;
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
-    text: handin?.text ?? null,
+    text: handin?.text ? writingParts(handin.text) : null,
     tags: (row.tags ?? []).map((t) => { const c = codes.get(t.code_id); return { part: t.part, field: t.field, start: t.start, end: t.end, positive: t.positive, code: c?.code, label: c?.label, colour: c?.colour, action: t.positive ? c?.strength_descriptor || c?.descriptor : c?.descriptor, ...(t.note ? { note: t.note } : {}), ...(c?.resource ? { resource: c.resource } : {}) }; }),
     criteria: (column?.criteria ?? []).map((c) => {
       const step = placesFor({ criteria: [c] }, mark)[c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`] ?? null;

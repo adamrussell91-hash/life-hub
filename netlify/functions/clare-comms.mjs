@@ -3,7 +3,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { completeJson } from './_shared/clare-comms-model.mjs';
 import {
-  checkPurpose, generateBrief, generateDrafts, generateSummary, readHandwriting, suggestNextSession, suggestTaskTitle
+  checkPurpose, generateBrief, generateDrafts, generateSummary, readHandwriting, readMinutes, suggestNextSession, suggestTaskTitle
 } from './_shared/clare-comms.mjs';
 import { calendarGhostFromToolInput } from './calendar-ghosts.mjs';
 import { enqueueCalendarGhost } from './_shared/calendar-ghost-queue.mjs';
@@ -47,6 +47,7 @@ export function createClareCommsHandler(deps = {}) {
           case 'summary': return withCors(okResponse(200, await generateSummary(ctx, { complete })), request, env);
           case 'drafts': return withCors(okResponse(200, await generateDrafts(ctx, { complete })), request, env);
           case 'handwriting': return withCors(okResponse(200, await readHandwriting(body.image, { complete })), request, env);
+          case 'minutes': return withCors(okResponse(200, await readMinutes(ctx, body.minutes, { complete })), request, env);
           case 'purpose_check': return withCors(okResponse(200, await checkPurpose(ctx, { complete })), request, env);
           case 'task_title': return withCors(okResponse(200, await suggestTaskTitle(ctx, { complete })), request, env);
           case 'propose_next': {

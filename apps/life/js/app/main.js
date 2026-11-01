@@ -70,6 +70,7 @@ import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
 import { startHubMotion } from '../../../../packages/design-kit/js/hub-motion.js';
 import { mountMorphingPopovers } from '../../../../packages/design-kit/js/morphing-popover.js';
+import { mountRailCollapse } from '../../../../packages/design-kit/js/hub-rail-collapse.js';
 import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
 import { openHubCommandSearch } from '../../../../packages/design-kit/js/hub-command-search.js';
 import {
@@ -277,6 +278,7 @@ controller = createAppController({
 controller.start();
 startHubMotion(document);
 mountMorphingPopovers(document);
+mountRailCollapse(document);
 
 document.addEventListener('keydown', (event) => {
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;

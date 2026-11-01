@@ -33,6 +33,8 @@ import { renderQuizInsight } from '@/evidence/views/quiz-insight';
 import { attemptStrips, band, newResultsUi } from '@/evidence/views/results';
 import { codeChips } from '@/evidence/code-chips';
 import { navigate } from '@/app/router';
+import { loadFeedbackCodes } from '@/blocks/feedback-codes';
+import { pickedAnswer, type StepPick } from '@/marking/step-pick';
 import './quiz.css';
 
 /**
@@ -84,6 +86,8 @@ type Row = {
   set?: string;
   /** How a written answer was typed, when the writing check was on. */
   writing?: WritingSummary & { log?: WritingLog };
+  /** A written answer's next-step pick: the student's own, shown apart from the teacher's codes. */
+  step?: StepPick;
 };
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
@@ -937,6 +941,20 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       item.append(mountQuestionPlayer({ question: r.question, response: r.response, number: i + 1, result: { mark: r.mark, key: r.key, hinted: r.hinted, awarded: r.awarded } }));
       if (r.confidence) item.append(el('p', 'qz-note block-secondary', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
       if (r.writing) item.append(writingPanel(r.writing, r.writing.log, r.response && 'text' in r.response ? r.response.text : ''));
+      const answerText = r.response && 'text' in r.response ? r.response.text : '';
+      if (r.step && !r.step.skipped && answerText) {
+        const step = r.step;
+        const host = el('div', 'qz-attempt-step');
+        item.append(host);
+        void loadFeedbackCodes().then(
+          (library) => {
+            const code = library.find((c) => c.id === step.code_id);
+            const view = pickedAnswer(answerText, step, code, a.student?.initials ?? null);
+            if (view) host.replaceChildren(view);
+          },
+          () => undefined
+        );
+      }
       const markRow = el('div', 'qz-mark');
       const input = el('input', 'qz-input qz-input--marks');
       input.type = 'number';

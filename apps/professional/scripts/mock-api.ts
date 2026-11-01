@@ -284,6 +284,19 @@ export function createMockApi() {
       { ...meeting }
     ])
   );
+  // Minutes card: one seeded meeting has minutes Clare filed from chat, so the pending box can be walked.
+  {
+    const pendingId = 'meeting_00000000-0000-4000-8000-000000000011';
+    const pendingMeeting = meetings.get(pendingId);
+    if (pendingMeeting) {
+      pendingMeeting.minutes_pending = {
+        file_key: `meeting-minutes/${pendingId}/1762000000000.pdf`,
+        added_at: '2026-10-31T23:00:00.000Z',
+        source: 'chat',
+        note: 'From the faculty email. Two actions for you.'
+      };
+    }
+  }
   const events = new Map<string, Record<string, unknown>>(
     ((seedData as { events?: Record<string, unknown>[] }).events ?? []).map((event) => [
       String(event.id),
@@ -2322,6 +2335,8 @@ export function createMockApi() {
         decisions: [] as unknown[],
         guide_runs: [] as unknown[],
         coaching_sheets: [] as unknown[],
+        minutes: null as unknown,
+        minutes_pending: null as unknown,
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -2353,11 +2368,36 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { meeting } });
+    }
+
+    // Minutes card: synthetic review, never real minutes.
+    if (path === '/api/clare/comms' && method === 'POST' && (body as { action?: string }).action === 'minutes') {
+      const people = ((body as { context?: { people?: Array<{ ref: string; name: string }> } }).context?.people ?? []);
+      return json(200, { ok: true, data: {
+        sections: [
+          { heading: 'Assessment', text: 'Year 10 exams move to Week 8. Draft unit plan to be circulated.' },
+          { heading: 'Excursions', text: 'Museum trip pending budget confirmation.' }
+        ],
+        mine: [{ text: 'Circulate the draft unit plan', due: '2026-11-14' }],
+        others: people[0] ? [{ text: 'Confirm the excursion budget', person_ref: people[0].ref, person_name: people[0].name, due: null }] : [],
+        unmatched: [{ text: 'Follow up with the venue', who_text: 'JT', due: null }],
+        decisions: [{ text: 'Year 10 exams move to Week 8', agenda_heading: 'Assessment' }],
+        differences: [{ text: 'My notes say the trip was approved; the minutes say it is pending.' }]
+      } });
+    }
+
+    if (path === '/api/meetings/minutes-file' && method === 'POST') {
+      const meetingId = (body as { meeting_id?: string }).meeting_id;
+      return json(201, { ok: true, data: { file_key: `meeting-minutes/${meetingId}/${Date.now()}.pdf` } });
+    }
+
+    if (path === '/api/meetings/minutes-file' && method === 'GET') {
+      return json(200, { ok: true, data: { media_type: 'application/pdf', data: Buffer.from('%PDF-1.4\n%mock\n').toString('base64') } });
     }
 
     if (path === '/api/threads' && method === 'GET') {

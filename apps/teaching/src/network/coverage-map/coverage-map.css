@@ -201,3 +201,10 @@
 .cm-tag--next { fill: var(--pm-gold, #c9a227); }
 .cm-tag--next + .cm-tag-text { fill: var(--depth, #0a1536); font-weight: 700; }
 .cm-done-mark { font-size: 12px; font-weight: 700; fill: var(--success, #2f7a4f); }
+
+/* Read at a glance: bigger names and week labels than the teacher's dense map. */
+.cm--progress .cm-name { font-size: 14px; }
+.cm--progress .cm-week { font-size: 12px; font-weight: 600; }
+.cm--progress .cm-group { font-size: 13px; }
+.cm--progress .cm-item { font-size: 12px; }
+.cm--progress .cm__legend { margin-top: var(--space-2, 0.5rem); }

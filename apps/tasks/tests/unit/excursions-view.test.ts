@@ -317,9 +317,9 @@ describe('excursions dashboard', () => {
   });
 
   it('names a catalogue program whose usual month has no trip yet', async () => {
-    // A fixed day before the usual month, so the call shows whatever today's date is.
+    // Pin the clock inside the catalogue year so the September call is live.
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-08-03T12:00:00.000Z'));
+    vi.setSystemTime(new Date('2026-08-15T12:00:00.000Z'));
     const program = {
       id: 'prog_tom',
       name: 'Tournament of Minds',

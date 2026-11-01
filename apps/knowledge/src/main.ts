@@ -4,6 +4,7 @@ import "./style.css";
 import "./protocols/style.css";
 import "../design-kit/entity-links.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
+import { mountRailCollapse } from "../design-kit/js/hub-rail-collapse.js";
 import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
 import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
 import {
@@ -691,6 +692,7 @@ function shell(main: string) {
     <main class="canvas">${main}</main>
   </div>`;
   bindHubAccordion(app);
+  mountRailCollapse();
 
   app.querySelector<HTMLAnchorElement>("[data-home]")!.onclick = event => { event.preventDefault(); goToHome(); };
 

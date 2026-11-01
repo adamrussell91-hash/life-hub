@@ -12,7 +12,7 @@ import type { Evidence } from '@/evidence/types';
 import { openFollowUpPlan } from '@/evidence/follow-up';
 import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
-import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
+import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderBook, renderBookPhone, type BookShow, type PhoneControl } from '@/markbook/book';
 import { httpProgressApi, withMark, type DoneRecord, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
 import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
@@ -20,10 +20,8 @@ import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { newDetailState, renderPatterns } from '@/markbook/patterns-view';
 import { newNextState, renderNextSteps } from '@/markbook/next-view';
-import { openStudentPanel, type StudentPanelHandle } from '@/markbook/student-panel';
 import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/context';
 import { classEvidence } from '@/evidence/class-evidence';
-import { defaultKind } from '@/evidence/patterns';
 import { tagLabel } from '@/evidence/tags';
 import { historyEventsFor, joinWhy, leavesFor, newGroupId } from '@/evidence/groups';
 import { newHistoryState, renderHistory } from '@/markbook/history-view';
@@ -149,14 +147,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const gridState = newSyllabusGridState();
   const detailState = newDetailState();
   const historyState = newHistoryState();
-  /** Names for tags and codes, for Next steps, Detail and the student panel; loaded once, after the markbook. */
+  /** Names for tags and codes, for Next steps and Detail; loaded once, after the markbook. */
   let ctx: InsightContext | null = null;
-  /** Set when the tag names could not be loaded, so those views and the student panel say so. */
+  /** Set when the tag names could not be loaded, so those views say so. */
   let ctxError: string | null = null;
-  /** A student whose name was pressed before the tag names arrived; their panel opens once they do. */
-  let pendingStudent: string | null = null;
-  /** The open student panel, redrawn after each markbook repaint so a rolled-back save shows. */
-  let studentPanel: StudentPanelHandle | null = null;
   let showRemoved = false;
   let showHiddenList = false;
   /** The student on the phone card, by id, so a reload that adds or removes someone keeps the card on them. */
@@ -381,42 +375,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       const path = `/mark/${encodeURIComponent(cls.id)}/${encodeURIComponent(columnId)}`;
       return { href: withAppBase(path), waiting: waitingByColumn.get(columnId) ?? 0, open: () => navigate(path) };
     },
-    openStudent: (studentId) => {
-      const student = view?.students.find((s) => s.id === studentId);
-      // One panel at a time; a panel whose overlay has gone without closing counts as closed.
-      if (studentPanel && !studentPanel.isOpen()) studentPanel = null;
-      if (!view || !student || studentPanel) return;
-      if (!ctx) {
-        // The tag names are still loading: open once they arrive.
-        status.textContent = ctxError ?? 'Loading…';
-        if (!ctxError) pendingStudent = studentId;
-        return;
-      }
-      const context = ctx;
-      const { evidence } = classEvidence(view, context);
-      const pinsNow = () => view?.markbook.focus?.[studentId] ?? { pinned: [], dismissed: [] };
-      studentPanel = openStudentPanel({
-        student,
-        evidence,
-        kind: defaultKind(evidence),
-        label: (tag) => tagLabel(tag, context),
-        codeLabel: (id) => codeLabel(id, context.codes),
-        pins: pinsNow(),
-        pinsNow,
-        history: (view.markbook.history ?? []),
-        loadAnalysis: () => Promise.resolve().then(() => api.analysis(cls.id, studentId)),
-        outcomeName: (key) => analysisName(key),
-        onGroup: (ids, pattern) => void saveHoldingGroup(ids, pattern.key, analysisName(pattern.key), pattern.step),
-        overall: formatPercent(overallFor(view.markbook, studentId).percent),
-        onPins: (next) =>
-          change({ kind: 'focus', studentId, pinned: next.pinned, dismissed: next.dismissed }, () => api.setFocus(cls.id, studentId, next.pinned, next.dismissed)),
-        // Back to this student's name, which a redraw may have replaced, else the heading.
-        returnFocus: () => body.querySelector<HTMLElement>(`.mb-patterns__name[data-student="${CSS.escape(studentId)}"]`) ?? title,
-        onClose: () => {
-          studentPanel = null;
-        }
-      });
-    },
+    // A student's name opens their own progress page, as they see it.
+    openStudent: (studentId) => navigate(`/classes/${encodeURIComponent(cls.id)}/students/${encodeURIComponent(studentId)}`),
     setMark: (columnId, studentId, mark) =>
       change({ kind: 'mark', columnId, studentId, mark }, () => api.setMark(cls.id, columnId, studentId, mark)),
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),
@@ -475,19 +435,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       // The next load tries again; nothing is lost.
       synced = false;
     }
-  }
-
-  /** A readable name for an `out:`, `con:` or `skill:` key. */
-  function analysisName(key: string): string {
-    const rest = key.slice(key.indexOf(':') + 1);
-    return rest.replace(/^skill:/, '').replace(/[-_.]/g, ' ').replace(/^./, (c) => c.toUpperCase());
-  }
-
-  /** Saves the students holding on one target as a group, with the evidence as the why. */
-  async function saveHoldingGroup(students: string[], key: string, name: string, step: string): Promise<void> {
-    const why = `Holding at ${step} on ${name}.`;
-    const group = { id: newGroupId(), name: `${name} · holding at ${step}`.slice(0, 120), tags: [key], members: students.map((s) => ({ student: s, why })) };
-    await writeGroups(() => api.saveGroup(cls.id, group, today()));
   }
 
   async function saveGroup(current: MarkbookView, context: InsightContext, tags: string[], students: string[]): Promise<void> {
@@ -570,7 +517,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const hadFocus = active instanceof HTMLElement && section.contains(active) && active !== title;
     const key = focusKey();
     draw(view, key);
-    if (studentPanel?.isOpen()) studentPanel.refresh();
     if (!hadFocus) return;
     // The focused control went away (Hide, Unhide, an emptied list): fall back to the heading.
     const now = document.activeElement;
@@ -844,17 +790,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
       if (mode !== 'marks') paint();
       void syncGroups();
-      const waiting = pendingStudent;
-      pendingStudent = null;
-      if (waiting) {
-        if (status.textContent === 'Loading…') status.textContent = '';
-        actions.openStudent(waiting);
-      }
     },
     () => {
       if (disposed) return;
-      ctxError = 'Couldn’t load the tag names, so Next steps, Detail and student panels can’t open. Reload to try again.';
-      pendingStudent = null;
+      ctxError = 'Couldn’t load the tag names, so Next steps and Detail can’t open. Reload to try again.';
       status.textContent = ctxError;
       if (mode !== 'marks') paint();
     }
@@ -862,9 +801,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   return () => {
     disposed = true;
     window.clearInterval(live);
-    // Closing releases the overlay's hold on the rest of the page.
-    studentPanel?.close();
-    studentPanel = null;
     if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
     else media?.removeListener?.(onMedia);
   };

@@ -55,6 +55,7 @@ import {
   summariseWriting
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
+import { cleanStepPick } from './next-steps.mjs';
 import { exitUnlocked } from './tutorial-status.mjs';
 import { interleave, isGroupSet, liftGroupSets } from './group-sets.mjs';
 
@@ -616,7 +617,7 @@ export async function quizAction(store, lessonId, body) {
   if (action === 'save') {
     needCurrent();
     const kept = await read(store, k.draft(device, current.n));
-    const saved = mergeDrafts(kept, cleanDraft(attemptRecord, body.responses, body.confidence), body);
+    const saved = withSteps(attemptRecord, mergeDrafts(kept, cleanDraft(attemptRecord, body.responses, body.confidence), body), body.steps);
     const at = new Date(now).toISOString();
     await Promise.all([store.setJSON(k.draft(device, current.n), { ...saved, at }), saveWriting(store, k, device, current.n, attemptRecord, body.writing)]);
     return { saved: true, at, count: Object.keys(saved.responses).length };
@@ -625,7 +626,7 @@ export async function quizAction(store, lessonId, body) {
   if (action === 'submit') {
     needCurrent();
     const draft = await read(store, k.draft(device, current.n));
-    const merged = mergeDrafts(draft, cleanDraft(attemptRecord, body.responses, body.confidence), body);
+    const merged = withSteps(attemptRecord, mergeDrafts(draft, cleanDraft(attemptRecord, body.responses, body.confidence), body), body.steps);
     await saveWriting(store, k, device, current.n, attemptRecord, body.writing);
     await handIn(store, k, lessonId, device, current, attemptRecord, merged, now, pastDeadline || closed);
     attempts = await deviceAttempts(store, k, device, from);
@@ -682,7 +683,7 @@ export async function quizAction(store, lessonId, body) {
           questions: publicQuestions(attemptRecord),
           practice: Object.keys(attemptRecord.practice ?? {}),
           // The student's own typing logs come back, so a new browser carries on the same replay.
-          ...(kept || typing ? { saved: { responses: kept?.responses ?? {}, confidence: kept?.confidence ?? {}, ...(typing ? { writing: typing } : {}), at: kept?.at } } : {}),
+          ...(kept || typing ? { saved: { responses: kept?.responses ?? {}, confidence: kept?.confidence ?? {}, ...(kept?.steps && Object.keys(kept.steps).length ? { steps: kept.steps } : {}), ...(typing ? { writing: typing } : {}), at: kept?.at } } : {}),
           hints: Object.fromEntries(Object.keys(open.hints).filter((id) => entryFor(attemptRecord, id)).map((id) => [id, attemptRecord.questions[id].key.hint ?? ''])),
           answers: Object.fromEntries(
             Object.entries(open.answers)
@@ -716,10 +717,31 @@ function cleanDraft(record, responses, confidence) {
  * sticks, while questions the request leaves out are never lost.
  */
 function mergeDrafts(kept, sent, body = null) {
-  const merged = { responses: { ...(kept?.responses ?? {}), ...sent.responses }, confidence: { ...(kept?.confidence ?? {}), ...sent.confidence } };
+  const merged = { responses: { ...(kept?.responses ?? {}), ...sent.responses }, confidence: { ...(kept?.confidence ?? {}), ...sent.confidence }, steps: { ...(kept?.steps ?? {}) } };
   const named = body?.responses && typeof body.responses === 'object' && !Array.isArray(body.responses) ? Object.keys(body.responses) : [];
   for (const id of named) if (!Object.hasOwn(sent.responses, id)) delete merged.responses[id];
   return merged;
+}
+
+/**
+ * Next-step picks sent with a save or hand-in, by question id: `{ [id]: pick }`,
+ * null clearing one. Kept only on written answers, and only when the pick fits
+ * the answer as it now stands; one that doesn't is dropped so the save still lands.
+ */
+function withSteps(record, draft, sent) {
+  const steps = { ...(draft.steps ?? {}) };
+  if (sent && typeof sent === 'object' && !Array.isArray(sent)) {
+    for (const [id, raw] of Object.entries(sent)) {
+      const entry = entryFor(record, id);
+      if (!entry || !WRITTEN_KINDS.includes(entry.key.kind)) continue;
+      if (raw === null) { delete steps[id]; continue; }
+      const pick = cleanStepPick(raw, draft.responses[id]?.text ?? '');
+      if (pick) steps[id] = pick;
+    }
+  }
+  // A pick whose answer has gone, or shrunk under it, no longer points anywhere.
+  for (const [id, pick] of Object.entries(steps)) if (!pick.skipped && !cleanStepPick(pick, draft.responses[id]?.text ?? '')) delete steps[id];
+  return { ...draft, steps };
 }
 
 /**
@@ -751,9 +773,11 @@ function answersSoFar(current, record, draft) {
 async function handIn(store, k, lessonId, device, current, record, draft, now, overtime, auto = false) {
   const answers = answersSoFar(current, record, draft);
   const writing = await writingSummaries(store, k, device, current.n, record, answers.responses);
+  const steps = Object.fromEntries(Object.entries(draft.steps ?? {}).filter(([id]) => entryFor(record, id)));
   const result = {
     ...answers,
     ...(Object.keys(writing).length ? { writing } : {}),
+    ...(Object.keys(steps).length ? { steps } : {}),
     submitted_at: new Date(now).toISOString(),
     overtime: !!overtime,
     ...(auto ? { auto: true } : {})
@@ -962,7 +986,8 @@ export async function quizTeacherAction(store, lessonId, body) {
         pending: scored.pending,
         practice: scored.practice,
         current: start.version === record.version,
-        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key, ...typed(r.id) }))
+        // A written answer's next-step pick shows on the teacher's marking view; never as a teacher code.
+        rows: scored.rows.map((r) => ({ ...r, question: rec.questions[r.id].question, key: rec.questions[r.id].key, ...typed(r.id), ...(result.steps?.[r.id] ? { step: result.steps[r.id] } : {}) }))
       }
     };
   }

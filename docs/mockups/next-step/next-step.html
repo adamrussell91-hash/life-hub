@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next Step mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.10);
+  --sage: #dfe9e1; --sage-ink: #3d6b4a; --mark: #cfe3d3;
+  --card: #ffffff; --r-sm: .875rem; --r-xs: .375rem;
+  --font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 var(--font); }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font: inherit; font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; min-height: 34px; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.note { max-width: 1180px; margin: 16px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.note b { color: var(--navy); }
+.stage { max-width: 1180px; margin: 0 auto; padding: 16px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 640px; min-width: 0; }
+.desk .screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 760px; overflow-y: auto; background: var(--paper); border-radius: 36px; border: 10px solid #1d2633; box-shadow: 0 10px 30px rgba(19,35,58,.18); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: #fff; }
+.chrome .dot { width: 26px; height: 26px; border-radius: 8px; background: var(--wave); }
+.chrome b { color: var(--navy); font-size: 14px; }
+.chrome span { color: var(--muted); font-size: 13px; margin-left: auto; }
+.page { padding: 24px 28px 40px; max-width: 46rem; margin: 0 auto; }
+.phone .page { padding: 18px 16px 32px; }
+.lesson-h { margin: 0 0 4px; font-size: 24px; color: var(--navy); letter-spacing: -.01em; }
+.lesson-sub { margin: 0 0 22px; color: var(--muted); font-size: 13px; }
+.block { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 18px; margin-bottom: 16px; }
+.phone .block { padding: 14px; }
+.q-kicker { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
+.q { margin: 0 0 10px; font-weight: 600; color: var(--navy); }
+.reading { margin: 0; }
+
+/* Code chips: the same pills as marking and the progress page */
+:root { --lilac: #e7e2f5; --lilac-ink: #5a4a8c; }
+.code { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; border-radius: 6px; padding: 1px 6px; background: var(--lilac); color: var(--lilac-ink); vertical-align: 1px; }
+
+/* The next step: one quiet line, an action, never a level */
+.step { display: flex; gap: 8px; align-items: baseline; margin: 0 0 10px; font-size: 13.5px; color: var(--ink); transition: opacity .25s; }
+.step .k { color: var(--lilac-ink); font-weight: 600; white-space: nowrap; }
+.writing .step { opacity: .7; }
+
+.box { width: 100%; min-height: 130px; border: 1px solid rgba(23,55,94,.2); border-radius: var(--r-xs); padding: 12px; font: inherit; color: var(--ink); background: #fff; resize: vertical; display: block; }
+.box:focus { outline: 2px solid var(--wave); outline-offset: 1px; }
+.foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.wc { font-size: 12px; color: var(--muted); margin-right: auto; }
+.btn { font: inherit; font-size: 14px; font-weight: 600; border-radius: 999px; padding: 8px 16px; min-height: 40px; cursor: pointer; border: 1px solid var(--wave); background: var(--wave); color: #fff; }
+.btn.ghost { background: transparent; color: var(--muted); border-color: transparent; font-weight: 500; }
+
+/* Show me where: the student's own check */
+.check { background: #f3f0fa; border-radius: var(--r-xs); padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; display: flex; gap: 8px; align-items: baseline; }
+.check .sub { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.read { border: 1px solid rgba(23,55,94,.2); border-radius: var(--r-xs); padding: 12px; background: #fff; line-height: 1.8; }
+.s { cursor: pointer; padding: 1px 0; transition: background .15s, box-shadow .15s; }
+.picking .s:hover { background: #f3f0fa; }
+.s.on { background: rgba(231,226,245,.6); box-shadow: inset 0 -2px 0 var(--lilac-ink); }
+.s.on::before { content: "TS"; display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .03em; border-radius: 5px; padding: 0 5px; margin-right: 4px; background: var(--lilac-ink); color: #fff; vertical-align: 1px; line-height: 16px; }
+.done-line { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; color: var(--lilac-ink); margin: 0 0 10px; }
+.done-line svg { width: 14px; height: 14px; align-self: center; }
+
+/* Teacher's marking view */
+.tv-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tv-av { width: 30px; height: 30px; border-radius: 50%; background: #dceafa; color: var(--navy); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.tv-name { font-weight: 600; color: var(--navy); }
+.tv-step { border-left: 3px solid var(--sage-ink); padding: 4px 0 4px 10px; margin: 0 0 10px; font-size: 13px; }
+.tv-step .k { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--sage-ink); }
+.tv-step { border-left-color: var(--lilac-ink); }
+.tv-step .k { color: var(--lilac-ink); }
+.tv-said { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.tv-codes { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--muted); }
+.tv-codes .code { font-size: 12px; padding: 3px 9px; cursor: pointer; }
+.tv-codes .code.blue { background: #dceafa; color: var(--navy); }
+.tv-codes .code.gold { background: #f6ecd2; color: #7a5a14; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Next step in a writing box</h1>
+  <button data-st="start" aria-pressed="true">1 · Before writing</button>
+  <button data-st="writing" aria-pressed="false">2 · Writing</button>
+  <button data-st="show" aria-pressed="false">3 · Show me where</button>
+  <button data-st="done" aria-pressed="false">4 · Done</button>
+  <button data-st="teacher" aria-pressed="false">5 · When you mark</button>
+</div>
+<p class="note" id="note"></p>
+<div class="stage">
+  <div class="desk"><p class="label">Desktop</p><div class="screen" data-frame></div></div>
+  <div class="phone"><p class="label">390px</p><div class="screen" data-frame></div></div>
+</div>
+
+<script>
+const target = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.2" fill="currentColor" stroke="none"/></svg>';
+const tick = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg>';
+const stepText = 'Open with one sentence that says your idea about the question.';
+const sentences = [
+  'The shrinking river shows a town that is slowly forgetting itself.',
+  'Each summer the water is “narrower, browner, quieter”, and the tricolon slows the line down the way the river itself has slowed.',
+  'The poet never names the decline, so the reader has to notice it the way the narrator does, one visit at a time.'
+];
+const para = sentences.join(' ');
+const notes = {
+  start: '<b>1 · Before writing.</b> One quiet line above the box: the code chip they know from your marking, then a single next step worded as something to do here. No level, no count.',
+  writing: '<b>2 · Writing.</b> The line stays put but fades back so it never competes with their writing.',
+  show: '<b>3 · Show me where.</b> After they press Done, the box turns into their paragraph and asks them to tap the sentence where they did it. Try tapping one: it takes a TS highlight, just like your marking. <i>Not this time</i> is a calm way out.',
+  done: '<b>4 · Done.</b> Their chosen sentence keeps its TS highlight and the line becomes a small tick. Nothing else on the page changes.',
+  teacher: '<b>5 · When you mark.</b> Nothing extra to do. Their TS pick is already on the page when you open it, so you can see their attempt at a glance. You code the piece as usual. If TS stops turning up in your marking, it drops off and their next code steps in by itself.'
+};
+let st = 'start', picked = 0;
+const frames = [...document.querySelectorAll('[data-frame]')];
+
+function studentBlock() {
+  if (st === 'start' || st === 'writing') {
+    const val = st === 'writing' ? sentences.slice(0, 2).join(' ') : '';
+    const wc = val ? val.split(/\s+/).length : 0;
+    return `<div class="${st === 'writing' ? 'writing' : ''}">
+      <p class="step"><span class="code">TS</span><span><span class="k">Next step:</span> ${stepText}</span></p>
+      <textarea class="box" placeholder="Write your paragraph here…">${val}</textarea>
+      <div class="foot"><span class="wc">${wc} words</span><button class="btn" data-go="show">Done</button></div></div>`;
+  }
+  const spans = sentences.map((s, i) => `<span class="s${picked === i + 1 ? ' on' : ''}" data-s="${i + 1}">${s}</span>`).join(' ');
+  if (st === 'show') {
+    return `<div class="check"><span class="code">TS</span><span><b>Where did you open with your idea?</b><span class="sub">Tap that sentence.</span></span></div>
+      <div class="read picking">${spans}</div>
+      <div class="foot"><span class="wc">${para.split(/\s+/).length} words</span><button class="btn ghost" data-go="done">Not this time</button><button class="btn" data-go="done" ${picked ? '' : 'disabled style="opacity:.45;cursor:default"'}>Save</button></div>`;
+  }
+  return `<p class="done-line">${tick}<span>You opened with your idea.</span></p>
+    <div class="read">${spans}</div>
+    <div class="foot"><span class="wc">${para.split(/\s+/).length} words · Saved</span></div>`;
+}
+
+function teacherView() {
+  const spans = sentences.map((s, i) => `<span class="s${i === 0 ? ' on' : ''}">${s}</span>`).join(' ');
+  return `<div class="chrome"><span class="dot"></span><b>To mark</b><span>Lesson 4 · Question 2</span></div>
+  <div class="page"><div class="block">
+    <div class="tv-head"><span class="tv-av">JL</span><span class="tv-name">Jo L.</span></div>
+    <div class="tv-step"><span class="k">Their next step · TS</span>${stepText}</div>
+    <div class="read">${spans}</div>
+    <p class="tv-said">Jo’s own TS pick. Code the piece as normal.</p>
+    <div class="tv-codes">Your codes: <span class="code">TS</span><span class="code">AR</span><span class="code blue">E</span><span class="code blue">T</span><span class="code gold">EX</span></div>
+  </div></div>`;
+}
+
+function render() {
+  for (const f of frames) {
+    if (st === 'teacher') { f.innerHTML = teacherView(); continue; }
+    f.innerHTML = `<div class="chrome"><span class="dot"></span><b>Year 11 English</b><span>Jo · JL</span></div>
+      <div class="page"><h2 class="lesson-h">The river as memory</h2><p class="lesson-sub">Lesson 4 · Close reading</p>
+      <div class="block"><p class="reading">The narrator returns to the river every summer, but each time it is narrower, browner, quieter. The poem never says the town is dying. It lets the water say it.</p></div>
+      <div class="block"><p class="q-kicker">Question 2 · Analytical paragraph</p><p class="q">How does the poet use the river to show change in the town?</p>${studentBlock()}</div></div>`;
+    f.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) setSt(b.dataset.go); }));
+    if (st === 'show') f.querySelectorAll('[data-s]').forEach((s) => s.addEventListener('click', () => { picked = Number(s.dataset.s); render(); }));
+  }
+  document.getElementById('note').innerHTML = notes[st];
+}
+function setSt(next) {
+  st = next;
+  if (st === 'done' && !picked) picked = 1;
+  if (st === 'start' || st === 'writing') picked = 0;
+  document.querySelectorAll('[data-st]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.st === st)));
+  render();
+}
+document.querySelectorAll('[data-st]').forEach((b) => b.addEventListener('click', () => setSt(b.dataset.st)));
+render();
+</script>
+</body>
+</html>

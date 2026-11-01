@@ -54,6 +54,8 @@ describe('work-sync helpers', () => {
     expect(parseWorkKey(lesson, answersKey)).toEqual({ blockId: 'qset1', part: 'answers' });
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.format.because_but_so`)).toEqual({ blockId: 'q2', part: 'format.because_but_so' });
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.kaplan.see`)).toEqual({ blockId: 'q2', part: 'kaplan.see' });
+    expect(parseWorkKey(lesson, `${storageKey(lesson, 'qset1')}.step.2`)).toEqual({ blockId: 'qset1', part: 'step.2' });
+    expect(parseWorkKey(lesson, `${storageKey(lesson, 'qset1')}.step.x`)).toBeNull();
     expect(parseWorkKey(lesson, storageKey(lesson, 'cards'))).toBeNull();
     expect(parseWorkKey(lesson, `${storageKey(lesson, 'q2')}.discern`)).toBeNull();
     expect(parseWorkKey('other', answersKey)).toBeNull();
@@ -94,6 +96,21 @@ describe('mountWorkSync', () => {
     expect(server.saves()).toHaveLength(2);
   });
 
+  it('sends a next-step pick after its answer, and never counts it as writing', async () => {
+    vi.useFakeTimers();
+    const stepKey = `${storageKey(lesson, 'qset1')}.step.0`;
+    const server = fakeServer('ready');
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 100 });
+    await vi.runAllTimersAsync();
+    // A pick from earlier is still waiting when the answer under it changes.
+    saveActivityState(stepKey, { pick: '{"code_id":"ts","line":"L","start":0,"end":4}' });
+    saveActivityState(answersKey, { q1: 'Kept. More.' });
+    await vi.runAllTimersAsync();
+    expect(server.saves().map((s) => s.part)).toEqual(['answers', 'step.0']);
+    expect(sync.progress().written).toBe(1);
+    sync.dispose();
+  });
+
   it('asks a new device for initials once, then sends everything waiting', async () => {
     const server = fakeServer('initials');
     const page = host();
@@ -111,6 +128,16 @@ describe('mountWorkSync', () => {
     expect(server.sent.find((s) => s.action === 'claim')?.extra).toEqual({ initials: 'bb' });
     expect(bar.hidden).toBe(true);
     expect(server.saves()).toEqual([{ block_id: 'qset1', part: 'answers', fields: { q1: 'Kept' } }]);
+    sync.dispose();
+  });
+
+  it('leaves the asking to a sprint, case study, tutorial or lecture player on the page', async () => {
+    const server = fakeServer('initials');
+    const page = host();
+    page.querySelector('.lesson-blocks')!.append(Object.assign(document.createElement('div'), { className: 'sprint' }));
+    const sync = mountWorkSync(page, { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 0 });
+    await settle();
+    expect(page.querySelector<HTMLElement>('.ws-bar')!.hidden).toBe(true);
     sync.dispose();
   });
 

@@ -5,6 +5,7 @@
  */
 import { el, button } from '@/quiz/dom';
 import { paper, offsetOf, trimRange, type Mark } from '@/blocks/peer-annotate';
+import { drawPick, pickCaption, pickMark, placedPick, stepHead, type StepPick } from './step-pick';
 import './marking.css';
 
 type Criterion = { id: string; label: string; outcomes: string[]; concepts: string[]; skill?: string };
@@ -14,6 +15,8 @@ export type MarkPieceData = {
   column: { id: string; title: string; criteria: Criterion[] };
   student: { id: string; initials: string; name: string };
   text: Record<string, Record<string, string>>;
+  /** The student's own next-step picks, by the answer each sits in. */
+  steps?: Array<{ part: string; field: string; pick: StepPick }>;
   feedback: { tags: Tag[]; comment: string; status: 'draft' | 'returned' } | null;
   mark: { steps?: Record<string, string> } | null;
   codes: Code[];
@@ -136,10 +139,17 @@ export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElem
   function paint(): void {
     sheets.replaceChildren();
     for (const [part, fields] of Object.entries(d.text)) {
+      // A step pick is JSON for its own layer, never writing to mark.
+      if (part.startsWith('step.')) continue;
       for (const [field, text] of Object.entries(fields)) {
         const mine = tags.filter((t) => t.part === part && t.field === field);
         const marks: Mark[] = mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${codes.get(t.code_id)?.colour ?? 'blue'}-ink)` }));
-        const sheet = paper(text, marks, null);
+        const step = d.steps?.find((s) => s.part === part && s.field === field);
+        const pick = placedPick(step?.pick, text);
+        const pickCode = pick ? codes.get(pick.code_id) : undefined;
+        if (pick) sheets.append(stepHead(pick, pickCode));
+        const sheet = paper(text, pick ? [...marks, pickMark(pick, pickCode)] : marks, null);
+        if (pick) drawPick(sheet, pick, pickCode, marks);
         sheet.addEventListener('mouseup', () => {
           const s = window.getSelection();
           if (!s || s.isCollapsed || !s.anchorNode || !s.focusNode) return;
@@ -159,6 +169,7 @@ export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElem
           if (tag) openMenu(tag);
         });
         sheets.append(sheet);
+        if (pick) sheets.append(pickCaption(d.student.initials, pickCode));
       }
     }
     for (const chip of palette.querySelectorAll<HTMLElement>('.mk-chip')) {

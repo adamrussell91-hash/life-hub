@@ -115,6 +115,25 @@ const QuizPinSchema = z.object({
   label: Text(120)
 });
 
+/**
+ * A writing box's next steps: for each feedback code linked to the box's
+ * skills, one line per placement rung (below → excellent), rewritten for this
+ * question. Teaching text only, no student data, so it publishes with the box.
+ */
+export const NextStepEntrySchema = z.object({
+  lines: z.array(z.string().max(160)).length(5),
+  /** Lines the teacher changed by hand; Regenerate keeps these. */
+  edited: z.array(z.boolean()).length(5),
+  /** Hash of the question, skills and ladder it was built from (bankSource), for the stale note. */
+  source: z.string().max(32)
+});
+export const NextStepBankSchema = z.record(z.string().min(1).max(64), NextStepEntrySchema);
+export type NextStepEntry = z.infer<typeof NextStepEntrySchema>;
+export type NextStepBank = z.infer<typeof NextStepBankSchema>;
+
+/** A continuum sub-strand, `strand.sub`. */
+export const SkillRefPattern = /^[a-z]{3,20}\.[a-z-]{2,40}$/;
+
 const base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
@@ -127,7 +146,7 @@ const base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z.array(z.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z.array(z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, 'Pick a skill from the list.')).max(8).optional()
+  skills: z.array(z.string().regex(SkillRefPattern, 'Pick a skill from the list.')).max(8).optional()
 };
 
 export const QuizQuestionSchema = z
@@ -187,7 +206,8 @@ export const QuizQuestionSchema = z
       ...base,
       kind: z.literal('extended_response'),
       model_answer: OptionalText(QUIZ_LIMITS.model),
-      guide: OptionalText(QUIZ_LIMITS.model)
+      guide: OptionalText(QUIZ_LIMITS.model),
+      next_steps: NextStepBankSchema.optional()
     }),
     z.object({
       ...base,
@@ -195,7 +215,8 @@ export const QuizQuestionSchema = z
       quote: Text(QUIZ_LIMITS.passage),
       technique: OptionalText(120),
       model_answer: OptionalText(QUIZ_LIMITS.model),
-      guide: OptionalText(QUIZ_LIMITS.model)
+      guide: OptionalText(QUIZ_LIMITS.model),
+      next_steps: NextStepBankSchema.optional()
     })
   ])
   .superRefine((q, ctx) => {
@@ -490,8 +511,11 @@ export type PublicQuestion =
   | (PublicBase & { kind: 'find_it'; segments: Choice[]; pick: number })
   | (PublicBase & { kind: 'spot_technique'; passage: string; options: Array<Choice & { uses?: number }>; pick: number })
   | (PublicBase & { kind: 'label_image'; image: QuizImage; pins: Array<{ id: string; x: number; y: number; n: number }>; labels: Choice[] })
-  | (PublicBase & { kind: 'extended_response' })
-  | (PublicBase & { kind: 'explain_effect'; quote: string; technique?: string });
+  | (PublicBase & { kind: 'extended_response' } & WritingSteps)
+  | (PublicBase & { kind: 'explain_effect'; quote: string; technique?: string } & WritingSteps);
+
+/** What a written answer box needs to show its next step: its skills and bank. */
+type WritingSteps = { skills?: string[]; next_steps?: NextStepBank };
 
 /** The answer, in public ids. Marks one response; never sent to students before they answer. */
 export type QuestionKey = {
@@ -555,6 +579,12 @@ function techniquesOf(options: ReadonlyArray<{ id: string; technique_id?: string
   const map: Record<string, string> = {};
   for (const o of options) if (o.technique_id) map[ids.get(o.id) as string] = o.technique_id;
   return Object.keys(map).length ? { techniques: map } : {};
+}
+
+/** A written question's skills and next-step bank travel to students; the client picks the line. */
+function writingSteps(q: { skills?: string[]; next_steps?: NextStepBank }): WritingSteps {
+  if (!q.skills?.length || !q.next_steps || !Object.keys(q.next_steps).length) return {};
+  return { skills: [...q.skills], next_steps: q.next_steps };
 }
 
 /**
@@ -699,12 +729,12 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     }
     case 'extended_response':
       return {
-        question: { ...head, kind: 'extended_response' },
+        question: { ...head, kind: 'extended_response', ...writingSteps(q) },
         key: { ...keyHead, answer: { type: 'manual', model_answer: q.model_answer, guide: q.guide } }
       };
     case 'explain_effect':
       return {
-        question: { ...head, kind: 'explain_effect', quote: q.quote, ...(q.technique ? { technique: q.technique } : {}) },
+        question: { ...head, kind: 'explain_effect', quote: q.quote, ...(q.technique ? { technique: q.technique } : {}), ...writingSteps(q) },
         key: { ...keyHead, answer: { type: 'manual', model_answer: q.model_answer, guide: q.guide } }
       };
   }

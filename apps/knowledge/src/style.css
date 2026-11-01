@@ -2,7 +2,7 @@
 
 .app-shell {
   display: grid;
-  grid-template-columns: var(--rail-width) 1fr;
+  grid-template-columns: var(--rail-shown) minmax(0, 1fr);
   min-height: 100dvh;
 }
 

@@ -173,6 +173,12 @@ describe('router match', () => {
       requiresAuth: true,
       path: '/mark/c1/col1'
     });
+    expect(match('/classes/c1/students/s1')).toEqual({
+      name: 'teacher-student',
+      params: { classId: 'c1', studentId: 's1' },
+      requiresAuth: true,
+      path: '/classes/c1/students/s1'
+    });
     expect(match('/trash')).toEqual({
       name: 'teacher-trash',
       params: {},

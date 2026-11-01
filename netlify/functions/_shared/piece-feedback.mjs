@@ -11,8 +11,9 @@ import { markbookAction, readBook } from './markbook.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { codeApplies } from './progress-patterns.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
-import { read, reject } from './question-drop.mjs';
-import { handinKey, pieceId } from './lesson-work.mjs';
+import { read, reject, walkBlocks } from './question-drop.mjs';
+import { handinKey, pieceId, stepPicks, writingParts } from './lesson-work.mjs';
+import { publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 
 export const pieceKey = (classId, studentId, piece) => `piece_feedback/${classId}/${studentId}/${piece}`;
@@ -89,7 +90,12 @@ export async function piecesAction(store, classId, body) {
       return continuum?.strands.find((s) => s.strand === strandId)?.sub_strands.find((s) => s.id === subId)?.name ?? ref;
     };
     const named = { ...column, criteria: column.criteria.map((c) => (c.skill ? { ...c, skill_name: skillName(c.skill) } : c)) };
-    return { column: named, student: { id: student.id, initials: student.initials, name: student.name }, text: handin.text, handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes) };
+    // The student's own next-step picks, placed on their answers by the lesson's questions.
+    const hasSteps = Object.keys(handin.text ?? {}).some((p) => p.startsWith('step.'));
+    const lesson = hasSteps ? await read(store, publishedLessonKey(lesson_id)) : null;
+    const block = lesson ? [...walkBlocks(lesson.blocks)].find((b) => b.id === block_id) : null;
+    const steps = block ? stepPicks(handin.text, block) : [];
+    return { column: named, student: { id: student.id, initials: student.initials, name: student.name }, text: writingParts(handin.text), ...(steps.length ? { steps } : {}), handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes) };
   }
 
   const now = new Date().toISOString();

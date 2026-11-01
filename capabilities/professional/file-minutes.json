@@ -1,0 +1,16 @@
+{
+  "id": "professional.file-minutes",
+  "tool_name": "file_minutes",
+  "verb": "Meetings",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Put an attached minutes PDF on a meeting's Minutes card for Adam to review.",
+  "surfaces": [
+    "chat"
+  ]
+}

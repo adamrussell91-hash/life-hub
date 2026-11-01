@@ -12,7 +12,8 @@ import './work-sync.css';
  * next change, or the next visit, sends it again.
  *
  * The class's initials claim says whose work it is, the same claim the quiz
- * uses. A device without one is asked once, at the top of the lesson.
+ * uses. A device without one is asked once, at the top of the lesson, unless
+ * the lesson's player (sprint, case study, tutorial, lecture) asks itself.
  */
 
 type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string };
@@ -28,8 +29,11 @@ export type WorkSyncHandle = {
   handInAll(): Promise<boolean>;
 };
 
+/** Players that ask for the same class initials themselves; one box on the page is enough. */
+const OWN_CLAIM = '.sprint, .cs, .tut, .lecture';
+
 /** The parts of a block's saved state that hold writing. Must match lesson-work.mjs. */
-const PART = /^(answers|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
+const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
 /** Saved alongside the writing, but not writing. */
 const SKIP = new Set(['step', 'level', 'done', 'index', 'order', 'flipped', 'revealed', 'rating']);
 const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;
@@ -156,6 +160,8 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   }
 
   function showInitials(): void {
+    // The player's own claim binds the same device; the next send looks again and finds it.
+    if (host.querySelector(OWN_CLAIM)) return;
     const input = el('input', 'ws-bar__initials');
     input.type = 'text';
     input.maxLength = 6;
@@ -214,7 +220,9 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     // The quiz on the page may have claimed initials since: look again, now and then.
     if (state === 'unknown' || (state === 'initials' && Date.now() - lastCheck > retry)) await check();
     if (state !== 'ready') return;
-    for (const [id, item] of [...pending]) {
+    // A next-step pick is checked against the saved answer, so answers go first.
+    const isStep = (part: string) => part.startsWith('step.');
+    for (const [id, item] of [...pending].sort((a, b) => Number(isStep(a[1].part)) - Number(isStep(b[1].part)))) {
       if (disposed) return;
       try {
         await call('save', { block_id: item.blockId, part: item.part, fields: item.fields });
@@ -227,7 +235,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
           await check();
           return;
         }
-        if (['bad_block', 'bad_part', 'bad_request', 'too_many', 'no_list'].includes(code)) {
+        if (['bad_block', 'bad_part', 'bad_step', 'bad_request', 'too_many', 'no_list'].includes(code)) {
           // The server won't keep this one: stop retrying it; the device keeps it.
           pending.delete(id);
           continue;
@@ -264,12 +272,12 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     if (state === 'ready') for (const [key, value] of heldParts(lessonId)) queue(key, value);
   });
 
-  /** Written fields on this device, by block. */
+  /** Written fields on this device, by block. A next-step pick sits beside the writing but isn't any. */
   function writtenByBlock(): Map<string, number> {
     const counts = new Map<string, number>();
     for (const [key, value] of heldParts(lessonId)) {
       const where = parseWorkKey(lessonId, key);
-      if (where) counts.set(where.blockId, (counts.get(where.blockId) ?? 0) + Object.keys(writtenFields(value)).length);
+      if (where && !where.part.startsWith('step.')) counts.set(where.blockId, (counts.get(where.blockId) ?? 0) + Object.keys(writtenFields(value)).length);
     }
     return counts;
   }

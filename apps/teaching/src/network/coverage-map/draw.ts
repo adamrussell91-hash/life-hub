@@ -27,6 +27,10 @@ export type DrawState = {
   nameW: number;
 };
 
+/** The student's map reads at a larger size: taller rows and bigger names. */
+export const PROGRESS_ROW_H = 32;
+const charWidth = (state: Pick<DrawState, 'progress'>) => (state.progress ? 7.8 : 6.6);
+
 type Lane = { x: number; group: MapGroup; items: MapItem[]; collapsed: boolean; id: string };
 
 export const ROW_H = 24;
@@ -57,10 +61,10 @@ export const rowTag = (row: MapRow): string | undefined =>
   row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.lane === 'option' ? 'Optional' : undefined;
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
-/** The widest name column (and so map) that fits `available` pixels, between 120 and 340: wide pages fill with lesson names. */
-export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number): number {
+/** The widest name column (and so map) that fits `available` pixels, between 120 and `max`: wide pages fill with lesson names. */
+export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number, max = 340): number {
   const branches = layoutLanes(map, { collapsed, nameW: 0 }).width - NAME_X - 14;
-  return Math.max(120, Math.min(340, available - NAME_X - 14 - branches));
+  return Math.max(120, Math.min(max, available - NAME_X - 14 - branches));
 }
 
 export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed' | 'nameW'>): { lanes: Lane[]; start: number; width: number } {
@@ -85,12 +89,15 @@ export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed'
 export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: string; width: number; height: number } {
   const { rows } = map;
   const { lanes, start, width } = layoutLanes(map, state);
-  const height = HEAD_H + rows.length * ROW_H + 8;
-  const Y = (i: number) => HEAD_H + i * ROW_H + ROW_H / 2;
   const st = state.student;
   const pr = state.progress ?? null;
+  // With no branches to head, the student's map starts straight at the first lesson.
+  const headH = pr && !lanes.length ? 8 : HEAD_H;
+  const rowH = pr ? PROGRESS_ROW_H : ROW_H;
+  const height = headH + rows.length * rowH + 8;
+  const Y = (i: number) => headH + i * rowH + rowH / 2;
   const lit = (id: string) => pr?.done.has(id) ?? false;
-  const nameChars = Math.floor(state.nameW / 6.6);
+  const nameChars = Math.floor(state.nameW / charWidth(state));
   const out: string[] = [];
   const push = (s: string) => out.push(s);
 
@@ -98,22 +105,22 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
   let band = '';
   let shade = false;
   rows.forEach((row, i) => {
-    const top = HEAD_H + i * ROW_H;
+    const top = headH + i * rowH;
     if (row.band && row.band !== band) {
       band = row.band;
       shade = !shade;
-      push(`<text class="cm-week" x="4" y="${top + 15}">${esc(row.band.replace('Wk ', 'Wk'))}</text>`);
+      push(`<text class="cm-week" x="4" y="${top + rowH / 2 + 4}">${esc(row.band.replace('Wk ', 'Wk'))}</text>`);
     }
-    if (shade) push(`<rect class="cm-band" x="0" y="${top}" width="${width}" height="${ROW_H}"/>`);
-    if (row.lane === 'support') push(`<rect class="cm-tint cm-tint--support" x="34" y="${top + 1}" width="${width - 34}" height="${ROW_H - 2}"/>`);
-    else if (isSideRow(row)) push(`<rect class="cm-tint cm-tint--side" x="34" y="${top + 1}" width="${width - 34}" height="${ROW_H - 2}"/>`);
-    if (state.selected === row.id) push(`<rect class="cm-selected" x="0" y="${top}" width="${width}" height="${ROW_H}"/>`);
+    if (shade) push(`<rect class="cm-band" x="0" y="${top}" width="${width}" height="${rowH}"/>`);
+    if (row.lane === 'support') push(`<rect class="cm-tint cm-tint--support" x="34" y="${top + 1}" width="${width - 34}" height="${rowH - 2}"/>`);
+    else if (isSideRow(row)) push(`<rect class="cm-tint cm-tint--side" x="34" y="${top + 1}" width="${width - 34}" height="${rowH - 2}"/>`);
+    if (state.selected === row.id) push(`<rect class="cm-selected" x="0" y="${top}" width="${width}" height="${rowH}"/>`);
   });
 
-  /* Lane headings for the gutter. */
-  push(`<text class="cm-lane cm-lane--support" x="${X_SUPPORT}" y="${HEAD_H - 8}" text-anchor="middle">sup</text>`);
-  push(`<text class="cm-lane" x="${X_CORE}" y="${HEAD_H - 8}" text-anchor="middle">core</text>`);
-  push(`<text class="cm-lane cm-lane--side" x="${X_SIDE}" y="${HEAD_H - 8}" text-anchor="middle">ext</text>`);
+  /* Lane headings for the gutter. The student's map labels side lessons by their tags instead. */
+  if (!pr) push(`<text class="cm-lane cm-lane--support" x="${X_SUPPORT}" y="${headH - 8}" text-anchor="middle">sup</text>`);
+  if (!pr) push(`<text class="cm-lane" x="${X_CORE}" y="${headH - 8}" text-anchor="middle">core</text>`);
+  if (!pr) push(`<text class="cm-lane cm-lane--side" x="${X_SIDE}" y="${headH - 8}" text-anchor="middle">ext</text>`);
 
   /* Header: group names, item labels, coverage bars or the student's state. */
   for (const group of map.groups) {
@@ -180,7 +187,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       } else push(`<circle class="cm-node cm-st--none" cx="${lane.x}" cy="116" r="6"/>`);
     }
   }
-  push(`<line class="cm-rule" x1="${start}" y1="134" x2="${width - 4}" y2="134"/>`);
+  if (lanes.length) push(`<line class="cm-rule" x1="${start}" y1="134" x2="${width - 4}" y2="134"/>`);
 
   /* Branches. */
   for (const lane of lanes) {
@@ -251,8 +258,8 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const before = [...coreIdx].reverse().find((c) => c < i);
     const after = coreIdx.find((c) => c > j);
     const x = laneX(row);
-    const ya = before !== undefined ? Y(before) : Y(i) - ROW_H / 2;
-    const yb = after !== undefined ? Y(after) : Y(j) + ROW_H / 2;
+    const ya = before !== undefined ? Y(before) : Y(i) - rowH / 2;
+    const yb = after !== undefined ? Y(after) : Y(j) + rowH / 2;
     const xa = before !== undefined ? X_CORE : x;
     const xb = after !== undefined ? X_CORE : x;
     const took = st ? rows.slice(i, j + 1).some((r) => st.took.has(r.id)) : pr ? rows.slice(i, j + 1).some((r) => lit(r.id)) : false;
@@ -272,7 +279,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const here = st !== null && i === st.now;
     const cls = `cm-station${row.lane === 'support' ? ' cm-station--support' : side ? ' cm-station--side' : ''}${state.selected === row.id ? ' cm-station--on' : ''}${st && took && side ? ' cm-station--took' : ''}${here ? ' cm-station--here' : ''}${pr ? `${lit(row.id) ? ' cm-p-done' : ''}${pr.next === row.id ? ' cm-p-next' : ''}` : ''}`;
     push(`<g class="cm-hit cm-row${faded ? ' cm-faded' : ''}" data-row="${esc(row.id)}" role="button" tabindex="0" aria-label="${esc(row.title)}${pr ? (lit(row.id) ? ', done' : pr.next === row.id ? ', next up' : '') : ''}">`);
-    push(`<rect x="34" y="${HEAD_H + i * ROW_H}" width="${start - 40}" height="${ROW_H}" fill="transparent"/>`);
+    push(`<rect x="34" y="${headH + i * rowH}" width="${start - 40}" height="${rowH}" fill="transparent"/>`);
     if (row.kind === 'check') push(`<rect class="${cls}" x="${x - 5}" y="${y - 5}" width="10" height="10" transform="rotate(45 ${x} ${y})"/>`);
     else if (row.kind === 'goal') push(`<rect class="${cls}" x="${x - 6}" y="${y - 6}" width="12" height="12" rx="2"/>`);
     else push(`<circle class="${cls}" cx="${x}" cy="${y}" r="${side ? 4.5 : 5}"/>`);
@@ -286,7 +293,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     if (pr && lit(row.id)) push(`<text class="cm-done-mark" x="${start - 8}" y="${y + 4}" text-anchor="end">✓<title>Done</title></text>`);
     const score = st?.scores.get(row.id);
     // A quiz score sits at the end of the name column; the name gives it room.
-    const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / 6.3) - (score && score.max > 0 ? 5 : 0));
+    const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / charWidth(state)) - (score && score.max > 0 ? 5 : 0));
     push(`<text class="cm-name" x="${tx}" y="${y + 4}">${esc(fit(row.title, room))}</text>`);
     if (score && score.max > 0) {
       const pct = Math.round((score.score / score.max) * 100);

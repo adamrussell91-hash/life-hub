@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { workAction, classWork, WORK_LIMITS } from '../../netlify/functions/_shared/lesson-work.mjs';
+import { workAction, classWork, stepPicks, writingParts, WORK_LIMITS } from '../../netlify/functions/_shared/lesson-work.mjs';
 import { markbookAction } from '../../netlify/functions/_shared/markbook.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
 import { loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
@@ -127,6 +127,41 @@ test('hand in freezes the block text and can be redone until it is returned', as
   assert.equal(store.data.get(key).text.answers.q1, 'Second go.');
   store.data.set(`piece_feedback/class1/${bob.id}/w:lesson1:qset1`, { status: 'returned' });
   await assert.rejects(workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' }), /already been returned/);
+});
+
+test('a next-step pick saves as step.N, is checked, and freezes with the hand-in', async () => {
+  const { store, bob } = await setup();
+  linkColumn(store);
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await save(store, { block_id: 'qset1', part: 'answers', fields: { q2: 'The town grows. It changes.' } });
+  const pick = { code_id: 'comp_ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 15 };
+  await save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify(pick) } });
+  await save(store, { block_id: 'qset1', part: 'step.0', fields: { pick: JSON.stringify({ code_id: 'comp_e', line: 'Add a short quote.', skipped: true, extra: 'dropped' }) } });
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' });
+  const text = store.data.get(`work_handins/lesson1/qset1/${bob.id}`).text;
+  assert.deepEqual(JSON.parse(text['step.1'].pick), pick);
+  assert.deepEqual(JSON.parse(text['step.0'].pick), { code_id: 'comp_e', line: 'Add a short quote.', skipped: true });
+  // Past the end of the answer, backwards, no such question, or not JSON: refused.
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, end: 99 }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, start: 15, end: 15 }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify({ ...pick, line: 'x'.repeat(161) }) } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.5', fields: { pick: JSON.stringify(pick) } }), /can’t be saved/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: 'not json' } }), /step/);
+  await assert.rejects(save(store, { block_id: 'qset1', part: 'step.x', fields: { pick: JSON.stringify(pick) } }), /can’t be saved/);
+});
+
+test('the markbook reads writing only, and the marking page gets each pick on its answer', async () => {
+  const { store, bob } = await setup();
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await save(store, { block_id: 'qset1', part: 'answers', fields: { q2: 'The town grows. It changes.' } });
+  const pick = { code_id: 'comp_ts', line: 'Open with a claim a reader could argue with.', start: 0, end: 15 };
+  await save(store, { block_id: 'qset1', part: 'step.1', fields: { pick: JSON.stringify(pick) } });
+  const work = await classWork(store, 'lesson1', 'class1', [bob.id]);
+  assert.deepEqual(Object.keys(work.students[bob.id].blocks.qset1), ['answers']);
+  const parts = store.data.get([...store.data.keys()].find((k) => k.startsWith('work/lesson1/'))).blocks.qset1;
+  assert.deepEqual(writingParts(parts), { answers: { q2: 'The town grows. It changes.' } });
+  assert.deepEqual(stepPicks(parts, questions), [{ part: 'answers', field: 'q2', pick }]);
+  assert.deepEqual(stepPicks({ ...parts, 'step.0': { pick: 'not json' } }, questions), [{ part: 'answers', field: 'q2', pick }]);
 });
 
 test('hand in is refused for a block this class does not mark', async () => {

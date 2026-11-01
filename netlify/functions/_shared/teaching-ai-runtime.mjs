@@ -441,6 +441,15 @@ var QuizPinSchema = z9.object({
   y: z9.number().min(0).max(1),
   label: Text(120)
 });
+var NextStepEntrySchema = z9.object({
+  lines: z9.array(z9.string().max(160)).length(5),
+  /** Lines the teacher changed by hand; Regenerate keeps these. */
+  edited: z9.array(z9.boolean()).length(5),
+  /** Hash of the question, skills and ladder it was built from (bankSource), for the stale note. */
+  source: z9.string().max(32)
+});
+var NextStepBankSchema = z9.record(z9.string().min(1).max(64), NextStepEntrySchema);
+var SkillRefPattern = /^[a-z]{3,20}\.[a-z-]{2,40}$/;
 var base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
@@ -453,7 +462,7 @@ var base = {
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
   outcomes: z9.array(z9.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z9.array(z9.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
+  skills: z9.array(z9.string().regex(SkillRefPattern, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z9.discriminatedUnion("kind", [
   z9.object({ ...base, kind: z9.literal("multiple_choice"), options: z9.array(QuizChoiceSchema).min(2).max(6), correct: z9.array(Id).length(1) }),
@@ -508,7 +517,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     ...base,
     kind: z9.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   }),
   z9.object({
     ...base,
@@ -516,7 +526,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     quote: Text(QUIZ_LIMITS.passage),
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
-    guide: OptionalText(QUIZ_LIMITS.model)
+    guide: OptionalText(QUIZ_LIMITS.model),
+    next_steps: NextStepBankSchema.optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
@@ -1484,7 +1495,11 @@ var QuestionItemSchema = z11.object({
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z11.enum(["reveal", "confidence"]).optional(),
   /** Success criteria the student ticks off against their answer. */
-  checklist: z11.array(z11.object({ id: z11.string().min(1), label: z11.string() })).max(12).optional()
+  checklist: z11.array(z11.object({ id: z11.string().min(1), label: z11.string() })).max(12).optional(),
+  /** Skills-continuum sub-strands (`strand.sub`) this box practises; they pick the student's next step. */
+  skills: z11.array(z11.string().regex(SkillRefPattern)).max(4).optional(),
+  /** The box's next steps, one entry per linked feedback code. */
+  next_steps: NextStepBankSchema.optional()
 });
 var PeerFeedbackBlockSchema = z11.object({
   id: z11.string().min(1),
@@ -7398,6 +7413,308 @@ function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true
   return issues;
 }
 
+// apps/teaching/src/progress/wording.ts
+var RUNG_ORDER = ["below", "capable", "skilled", "accomplished", "excellent"];
+var LADDER_MAX = 160;
+var BANNED = /\b(not|no longer|without|never|rather than|instead of|don'?t|doesn'?t|isn'?t|lacks?|weak|fails?)\b|^this is\b/i;
+function checkWording(line, max = LADDER_MAX) {
+  const out = [];
+  const t = String(line ?? "").trim().replace(/[’‘]/g, "'");
+  if (!t) out.push("empty");
+  if (t.length > max) out.push("too_long");
+  const hit = t.match(BANNED);
+  if (hit) out.push(`word:${hit[0].toLowerCase()}`);
+  return out;
+}
+function bankSource(question, skills, ladder) {
+  const s2 = JSON.stringify([String(question ?? "").trim(), [...skills ?? []].sort(), ladder ?? null]);
+  let h = 2166136261;
+  for (let i = 0; i < s2.length; i += 1) h = Math.imul(h ^ s2.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
+}
+
+// apps/teaching/src/ai/next-step-jobs.ts
+var NEXT_STEP_JOB_KINDS = ["next_steps_fill", "ladders_draft"];
+var NEXT_STEP_JOB_LANES = { next_steps_fill: "fast", ladders_draft: "standard" };
+var MAX_FILL_TARGETS = 40;
+var WRITTEN_QUIZ_KINDS = /* @__PURE__ */ new Set(["extended_response", "explain_effect"]);
+var RUNG_NAMES = ["Building to Capable", "Capable", "Skilled", "Accomplished", "Excellent"];
+function questionAt(blocks, target) {
+  const block = findBlockById(blocks, target.block_id);
+  if (!block) return null;
+  if (block.block_type === "question_set") {
+    const questions = block.content.questions;
+    return questions?.[target.index] ?? null;
+  }
+  if (block.block_type === "quiz_question" && target.index === 0) {
+    const q = block.content.question;
+    return q && WRITTEN_QUIZ_KINDS.has(q.kind ?? "") ? q : null;
+  }
+  return null;
+}
+var questionText = (q) => [q.prompt ?? "", q.quote ? `Quote: ${q.quote}` : ""].filter(Boolean).join("\n").trim();
+function linkedCodes(skills, codes) {
+  return codes.filter((c) => !c.hidden && c.skill && skills.includes(c.skill) && c.ladder?.length === RUNG_ORDER.length);
+}
+function fillBoxes(lesson, targets, codes) {
+  const out = [];
+  for (const t of targets.slice(0, MAX_FILL_TARGETS)) {
+    const q = questionAt(lesson.blocks, t);
+    const skills = q?.skills ?? [];
+    if (!q || !skills.length) continue;
+    const linked = linkedCodes(skills, codes).filter((c) => !t.code_ids?.length || t.code_ids.includes(c.id));
+    if (!linked.length) continue;
+    out.push({ block_id: t.block_id, index: t.index, question: questionText(q), skills: [...skills], bank: q.next_steps ?? {}, codes: linked });
+  }
+  return out;
+}
+function skillLines(skill2, continuum) {
+  const [strandId, subId] = skill2.split(".");
+  const sub = continuum?.strands.find((s2) => s2.strand === strandId)?.sub_strands.find((s2) => s2.id === subId);
+  if (!sub) return `- ${skill2}`;
+  const rows = RUNG_ORDER.map((_, i) => {
+    const toward = RUNG_ORDER[Math.min(i + 1, RUNG_ORDER.length - 1)];
+    const rung = sub.rungs[toward];
+    return `    ${i + 1}. ${RUNG_NAMES[i]}: aims at "${rung.i_can}" Next move: ${rung.build.next_move}`;
+  });
+  return [`- ${skill2} (${sub.name})`, ...rows].join("\n");
+}
+function codeLines(code) {
+  return [
+    `- ${code.id} (${code.code}, ${code.label}): ${code.descriptor}`,
+    ...(code.ladder ?? []).map((line, i) => `    ${i + 1}. ${RUNG_NAMES[i]}: ${line}`)
+  ].join("\n");
+}
+var WORDING_RULE = `Every line is one sentence of at most 160 characters, an action the student can take in this answer, in plain Australian English. Word it positively and additively: say what to do and what to add. Avoid the words "not", "no longer", "without", "never", "rather than", "instead of", "don't", "doesn't", "isn't", "lacks", "weak" and "fails", and never open with "This is". Never mention a level, rung, mark or score.`;
+var FILL_SYSTEM = [
+  "You write next steps for writing boxes in secondary English lessons. Each box is a question students answer in writing.",
+  "For each feedback code listed under a box, rewrite its five ladder lines for this question. Line 1 is for a student building to Capable, then Capable, Skilled, Accomplished and Excellent.",
+  "The line at a rung is the step toward the rung above; the Excellent line extends further. Keep each line close to the code's ladder line and the skill's next move, and make it name this question's text, task or idea.",
+  WORDING_RULE,
+  'Reply with JSON only, no prose: {"boxes":[{"box":1,"codes":{"<code id>":["line 1","line 2","line 3","line 4","line 5"]}}]}'
+].join("\n\n");
+function fillPrompt(boxes, continuum) {
+  return boxes.map(
+    (b, i) => [`Box ${i + 1}`, `Question: ${b.question}`, "Skills:", ...b.skills.map((s2) => skillLines(s2, continuum)), "Codes:", ...b.codes.map(codeLines)].join("\n")
+  ).join("\n\n");
+}
+function jsonOf(text2) {
+  const start = text2.indexOf("{");
+  const end = text2.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  try {
+    const value2 = JSON.parse(text2.slice(start, end + 1));
+    return value2 && typeof value2 === "object" && !Array.isArray(value2) ? value2 : null;
+  } catch {
+    return null;
+  }
+}
+function readFillReply(text2) {
+  const out = /* @__PURE__ */ new Map();
+  const boxes = jsonOf(text2)?.boxes;
+  for (const row of Array.isArray(boxes) ? boxes : []) {
+    const r = row;
+    if (!Number.isInteger(r.box) || !r.codes || typeof r.codes !== "object") continue;
+    const codes = /* @__PURE__ */ new Map();
+    for (const [id, lines] of Object.entries(r.codes)) if (Array.isArray(lines)) codes.set(id, lines);
+    out.set(r.box, codes);
+  }
+  return out;
+}
+var passes = (line) => typeof line === "string" && checkWording(line).length === 0;
+function failingLines(existing, generated) {
+  return RUNG_ORDER.map((_, i) => i).filter((i) => !existing?.edited[i] && !passes(generated?.[i]));
+}
+function settleEntry(existing, ladder, source, attempts) {
+  const flagged = [];
+  const lines = RUNG_ORDER.map((_, i) => {
+    if (existing?.edited[i]) return existing.lines[i] ?? "";
+    for (const attempt of attempts) {
+      const line = attempt?.[i];
+      if (passes(line)) return line.trim();
+    }
+    flagged.push(i);
+    return ladder[i] ?? "";
+  });
+  return { entry: { lines, edited: RUNG_ORDER.map((_, i) => Boolean(existing?.edited[i])), source }, flagged };
+}
+var FIX_SYSTEM = [
+  "You fix next-step lines for writing boxes in secondary English lessons. Each line below failed the wording rule.",
+  WORDING_RULE,
+  'Rewrite each line so it keeps its meaning and passes. Reply with JSON only: {"fixes":[{"box":1,"code":"<code id>","line":1,"text":"\u2026"}]}'
+].join("\n\n");
+function fixPrompt(fixes, boxes) {
+  return fixes.map((f) => `Box ${f.box}, code ${f.code}, line ${f.line} (${RUNG_NAMES[f.line - 1]}). Question: ${boxes[f.box - 1]?.question ?? ""}
+Line: ${typeof f.current === "string" ? f.current : "(missing)"}
+Problems: ${f.problems.join(", ") || "missing"}`).join("\n\n");
+}
+function readFixReply(text2) {
+  const out = /* @__PURE__ */ new Map();
+  const fixes = jsonOf(text2)?.fixes;
+  for (const row of Array.isArray(fixes) ? fixes : []) {
+    const f = row;
+    if (!Number.isInteger(f.box) || typeof f.code !== "string" || !Number.isInteger(f.line)) continue;
+    const i = f.line - 1;
+    if (i < 0 || i >= RUNG_ORDER.length) continue;
+    const codes = out.get(f.box) ?? /* @__PURE__ */ new Map();
+    const lines = codes.get(f.code) ?? [];
+    lines[i] = f.text;
+    codes.set(f.code, lines);
+    out.set(f.box, codes);
+  }
+  return out;
+}
+var approxTokens = (text2) => Math.ceil(text2.length / 4);
+var OUTPUT_TOKENS_PER_CODE = 5 * 40 + 20;
+function estimateFor(kind, model, input, codes, boxes) {
+  const input_tokens = approxTokens(input);
+  const output_tokens = codes * OUTPUT_TOKENS_PER_CODE + (kind === "ladders_draft" ? codes * 60 : 0) + 50;
+  const cost_usd = estimateCostUsd(model, { input_tokens, output_tokens });
+  return { kind, model, boxes, codes, lines: codes * RUNG_ORDER.length, input_tokens, output_tokens, cost_usd, cost_aud: usdToAud(cost_usd) };
+}
+function textOf(reply) {
+  return (Array.isArray(reply.content) ? reply.content : []).filter((b) => b.type === "text" && typeof b.text === "string").map((b) => b.text).join("").trim();
+}
+function usageOf(reply, model) {
+  const servedBy = reply.model ?? model;
+  return {
+    model: servedBy,
+    input_tokens: reply.usage?.input_tokens ?? 0,
+    output_tokens: reply.usage?.output_tokens ?? 0,
+    cache_read_input_tokens: reply.usage?.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: reply.usage?.cache_creation_input_tokens ?? 0,
+    web_searches: 0,
+    cost_usd: estimateCostUsd(servedBy, reply.usage)
+  };
+}
+var totalCost = (usage) => Math.round(usage.reduce((sum, u) => sum + u.cost_usd, 0) * 1e6) / 1e6;
+async function ask(run, tier, system, user, maxTokens) {
+  const model = { ...TEACHING_AI_MODELS, ...run.models }[tier];
+  const reply = await run.complete({
+    model,
+    tier,
+    effort: tier === "fast" ? "low" : "medium",
+    max_tokens: maxTokens,
+    system: [{ type: "text", text: system }],
+    tools: [],
+    messages: [{ role: "user", content: user }]
+  });
+  return { text: textOf(reply), usage: usageOf(reply, model), stop: reply.stop_reason };
+}
+var maxTokensFor = (codes) => Math.min(32e3, 1e3 + codes * OUTPUT_TOKENS_PER_CODE * 2);
+function estimateNextStepsFill(input) {
+  const boxes = fillBoxes(input.lesson, input.targets, input.codes);
+  const model = { ...TEACHING_AI_MODELS, ...input.models }.fast;
+  const codes = boxes.reduce((n, b) => n + b.codes.length, 0);
+  return estimateFor("next_steps_fill", model, `${FILL_SYSTEM}
+
+${fillPrompt(boxes, input.continuum)}`, codes, boxes.length);
+}
+async function runNextStepsFill(input) {
+  const boxes = fillBoxes(input.lesson, input.targets, input.codes);
+  const usage = [];
+  const fail = (error) => ({ status: "error", error, boxes: [], flagged: [], usage, cost_usd: totalCost(usage) });
+  if (!boxes.length) return fail("No box here has skills linked to a code with a ladder.");
+  const codeCount = boxes.reduce((n, b) => n + b.codes.length, 0);
+  let first;
+  let fixes = /* @__PURE__ */ new Map();
+  try {
+    const reply = await ask(input, "fast", FILL_SYSTEM, fillPrompt(boxes, input.continuum), maxTokensFor(codeCount));
+    usage.push(reply.usage);
+    if (reply.stop === "refusal") return fail("The model declined this request.");
+    first = readFillReply(reply.text);
+    if (!first.size) return fail("The model\u2019s reply could not be read. Try again.");
+    const failing = [];
+    boxes.forEach((b, i) => {
+      for (const c of b.codes) {
+        const generated = first.get(i + 1)?.get(c.id);
+        for (const r of failingLines(b.bank[c.id], generated)) failing.push({ box: i + 1, code: c.id, line: r + 1, current: generated?.[r], problems: checkWording(generated?.[r]) });
+      }
+    });
+    if (failing.length && !input.signal?.aborted) {
+      const retry = await ask(input, "fast", FIX_SYSTEM, fixPrompt(failing, boxes), Math.min(16e3, 500 + failing.length * 80));
+      usage.push(retry.usage);
+      fixes = readFixReply(retry.text);
+    }
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "The model request failed.");
+  }
+  const flagged = [];
+  const filled2 = boxes.map((b, i) => {
+    const next_steps = { ...b.bank };
+    for (const c of b.codes) {
+      const ladder = c.ladder ?? [];
+      const { entry, flagged: rungs } = settleEntry(b.bank[c.id], ladder, bankSource(b.question, b.skills, ladder), [first.get(i + 1)?.get(c.id), fixes.get(i + 1)?.get(c.id)]);
+      next_steps[c.id] = entry;
+      for (const r of rungs) flagged.push({ block_id: b.block_id, index: b.index, code_id: c.id, rung: RUNG_ORDER[r] });
+    }
+    return { block_id: b.block_id, index: b.index, question: b.question, skills: b.skills, next_steps };
+  });
+  return { status: "done", boxes: filled2, flagged, usage, cost_usd: totalCost(usage) };
+}
+var sameSkills = (a, b) => [...a].sort().join("|") === [...b].sort().join("|");
+function applyFilledBoxes(lesson, filled2) {
+  const copy = structuredClone(lesson);
+  let applied = 0;
+  let skipped = 0;
+  for (const f of filled2) {
+    const q = questionAt(copy.blocks, f);
+    if (!q || questionText(q) !== f.question || !sameSkills(q.skills ?? [], f.skills)) {
+      skipped += 1;
+      continue;
+    }
+    q.next_steps = f.next_steps;
+    applied += 1;
+  }
+  return { lesson: copy, applied, skipped };
+}
+var LADDERS_SYSTEM = [
+  "You help a secondary English teacher word their feedback codes. Each code links to one skill on the school's skills continuum.",
+  "For each code, write a ladder of five next steps, one per placement rung: Building to Capable, Capable, Skilled, Accomplished, Excellent. The line at a rung is the step toward the rung above, drawn from the skill's next move; the Excellent line extends further. Lines fit any question.",
+  "Also rewrite the code's descriptor as one or two positive sentences that say what to do (at most 300 characters).",
+  WORDING_RULE,
+  'Reply with JSON only: {"codes":{"<code id>":{"ladder":["line 1","line 2","line 3","line 4","line 5"],"descriptor":"\u2026"}}}'
+].join("\n\n");
+function laddersPrompt(codes, continuum) {
+  return codes.filter((c) => c.skill).map((c) => [`Code ${c.id} (${c.code}, ${c.label})`, `Descriptor: ${c.descriptor}`, ...c.ladder?.length ? [`Current ladder: ${c.ladder.join(" | ")}`] : [], "Skill:", skillLines(c.skill, continuum)].join("\n")).join("\n\n");
+}
+function readLaddersReply(text2, codes) {
+  const rows = jsonOf(text2)?.codes;
+  if (!rows || typeof rows !== "object") return [];
+  const out = [];
+  for (const c of codes) {
+    const row = rows[c.id];
+    if (!c.skill || !row || !Array.isArray(row.ladder) || row.ladder.length !== RUNG_ORDER.length) continue;
+    const ladder = row.ladder.map((l) => typeof l === "string" ? l.trim() : "");
+    const descriptor = typeof row.descriptor === "string" ? row.descriptor.trim() : c.descriptor;
+    out.push({ id: c.id, ladder, descriptor, flags: { ladder: ladder.map((l) => checkWording(l)), descriptor: checkWording(descriptor, 600) } });
+  }
+  return out;
+}
+function estimateLaddersDraft(input) {
+  const model = { ...TEACHING_AI_MODELS, ...input.models }.standard;
+  const count = input.codes.filter((c) => c.skill).length;
+  return estimateFor("ladders_draft", model, `${LADDERS_SYSTEM}
+
+${laddersPrompt(input.codes, input.continuum)}`, count, 0);
+}
+async function runLaddersDraft(input) {
+  const usage = [];
+  const fail = (error) => ({ status: "error", error, codes: [], usage, cost_usd: totalCost(usage) });
+  const linked = input.codes.filter((c) => c.skill && !c.hidden);
+  if (!linked.length) return fail("Give a code a skill first.");
+  try {
+    const reply = await ask(input, "standard", LADDERS_SYSTEM, laddersPrompt(linked, input.continuum), maxTokensFor(linked.length) + linked.length * 120);
+    usage.push(reply.usage);
+    if (reply.stop === "refusal") return fail("The model declined this request.");
+    const codes = readLaddersReply(reply.text, linked);
+    if (!codes.length) return fail("The model\u2019s reply could not be read. Try again.");
+    return { status: "done", codes, usage, cost_usd: totalCost(usage) };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "The model request failed.");
+  }
+}
+
 // apps/teaching/src/ai/job-runner.ts
 var TEACHING_AI_MODELS = {
   fast: "claude-haiku-5-5",
@@ -7409,7 +7726,9 @@ var MECHANICAL_ACTIONS = /* @__PURE__ */ new Set([
   "change_reading_level",
   "summarise",
   "write_alt_text",
-  "generate_answers"
+  "generate_answers",
+  // Next steps in writing boxes: a ladder rewritten for one question (next-step-jobs.ts).
+  "next_steps_fill"
 ]);
 var MECHANICAL_MESSAGE = /\b(flash ?cards?|flip ?cards?|cloze|glossary|vocab(?:ulary)?|alt text|reformat|convert|turn (?:this|these|it|them) into)\b/i;
 function pickLane(job) {
@@ -7440,6 +7759,8 @@ function estimateCostUsd(model, usage) {
   const searches = (usage.server_tool_use?.web_search_requests ?? 0) * WEB_SEARCH_USD;
   return Math.round((tokens + searches) * 1e6) / 1e6;
 }
+var USD_TO_AUD = 1.55;
+var usdToAud = (usd) => Math.round(usd * USD_TO_AUD * 1e4) / 1e4;
 var PROPOSAL_TOOLS = new Set(AI_TOOLS.map((tool2) => tool2.name));
 var PLAN_MARKER = "Plan to confirm";
 var BIG_BUILD = { blocks: 8, quizQuestions: 5 };
@@ -7534,7 +7855,7 @@ function anchorIssues(proposal, lesson) {
 function truncate2(error) {
   return error.length > 2e3 ? `${error.slice(0, 2e3)}\u2026` : error;
 }
-function textOf(content) {
+function textOf2(content) {
   return content.filter((block) => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("").trim();
 }
 function messageOf(input) {
@@ -7544,7 +7865,7 @@ function messageOf(input) {
 function isToolUse(block) {
   return block.type === "tool_use" && typeof block.id === "string";
 }
-function totalCost(usage) {
+function totalCost2(usage) {
   return Math.round(usage.reduce((sum, row) => sum + row.cost_usd, 0) * 1e6) / 1e6;
 }
 async function runLessonAiJob(input) {
@@ -7588,7 +7909,7 @@ async function runLessonAiJob(input) {
   const sight = (value2) => {
     for (const url of linksIn(value2)) sightings.urls.add(url);
   };
-  const fail = (error) => ({ status: "error", error, turns, usage, cost_usd: totalCost(usage), checks });
+  const fail = (error) => ({ status: "error", error, turns, usage, cost_usd: totalCost2(usage), checks });
   while (turns < MAX_TURNS) {
     if (input.signal?.aborted) return fail("The agent ran out of time. Try a smaller request.");
     turns += 1;
@@ -7619,7 +7940,7 @@ async function runLessonAiJob(input) {
     });
     const content = Array.isArray(reply.content) ? reply.content : [];
     for (const block of content) if (block.type.endsWith("tool_result")) sight(block);
-    const text2 = textOf(content);
+    const text2 = textOf2(content);
     if (text2) lastText = text2;
     if (reply.stop_reason === "refusal") return fail("The model declined this request.");
     if (reply.stop_reason === "max_tokens") {
@@ -7640,7 +7961,7 @@ ${note3}`;
     }
     const calls = content.filter(isToolUse);
     if (calls.length === 0) {
-      return { status: "done", response: text2 || lastText, model: servedBy, turns, usage, cost_usd: totalCost(usage), checks };
+      return { status: "done", response: text2 || lastText, model: servedBy, turns, usage, cost_usd: totalCost2(usage), checks };
     }
     let accepted = null;
     let note2 = "";
@@ -7704,7 +8025,7 @@ If the request cannot fit the limits, say so plainly instead.`,
         model: servedBy,
         turns,
         usage,
-        cost_usd: totalCost(usage),
+        cost_usd: totalCost2(usage),
         checks
       };
     }
@@ -7726,15 +8047,40 @@ ${lastProblem}`;
 }
 export {
   BIG_BUILD,
+  FILL_SYSTEM,
+  FIX_SYSTEM,
+  LADDERS_SYSTEM,
+  MAX_FILL_TARGETS,
   MAX_TURNS,
+  NEXT_STEP_JOB_KINDS,
+  NEXT_STEP_JOB_LANES,
   PLAN_MARKER,
   TEACHING_AI_MODELS,
+  USD_TO_AUD,
+  applyFilledBoxes,
+  approxTokens,
   checkProposalCall,
   estimateCostUsd,
+  estimateLaddersDraft,
+  estimateNextStepsFill,
+  failingLines,
+  fillBoxes,
+  fillPrompt,
+  fixPrompt,
   isBigBuild,
+  jsonOf,
+  laddersPrompt,
+  linkedCodes,
   linksIn,
   pickLane,
   planConfirmed,
+  readFillReply,
+  readFixReply,
+  readLaddersReply,
+  runLaddersDraft,
   runLessonAiJob,
+  runNextStepsFill,
+  settleEntry,
+  usdToAud,
   webSearchTool
 };

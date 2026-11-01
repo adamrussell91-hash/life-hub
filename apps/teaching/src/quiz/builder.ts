@@ -15,8 +15,10 @@ import {
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
 import { formatOutcomeCodes, outcomeCodeExample, parseOutcomeCodes } from '@/markbook/parse';
 import { MARKBOOK_LIMITS } from '@/markbook/schema';
-import { loadSkills } from '@/skills/api';
-import { skillSelect } from '@/skills/select';
+import { mountChipPicker } from '@/skills/chip-picker';
+import { loadFeedbackCodes } from '@/blocks/feedback-codes';
+import { nextStepBank, type BankItem, type BankPanel } from '@/blocks/next-step-bank';
+import type { NextStepJobs } from '@/blocks/next-step-run';
 import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
@@ -44,8 +46,13 @@ export type BuilderOptions = {
   audience: 'student' | 'teacher';
   /** Outcome catalogue for the teacher's outcome codes field. Students never get it. */
   outcomes?: OutcomeLabel[];
+  /** In a lesson: written answers get a next-steps bank, made through the builder's jobs. */
+  nextSteps?: { jobs?: NextStepJobs };
   onChange: (question: QuizQuestion) => void;
 };
+
+/** Written kinds, whose answer box serves a next step. */
+const WRITTEN_KINDS = new Set<QuizQuestionKind>(['extended_response', 'explain_effect']);
 
 export type QuestionBuilder = {
   root: HTMLElement;
@@ -1039,8 +1046,13 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
   }
 
   /* ── Marks, hint, explanation, picture ── */
+  /** The written answer's next-steps bank, when it has one. */
+  let bank: BankPanel | null = null;
+  // The prompt and quote feed the bank's Ladder changed check.
+  root.addEventListener('input', () => bank?.update(q as BankItem));
   function paintExtras(): void {
     extrasHost.replaceChildren();
+    bank = null;
     const row = el('div', 'qz-extras-row');
     const marksInput = el('input', 'qz-input qz-input--marks');
     marksInput.type = 'number';
@@ -1105,26 +1117,32 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       more.append(field, note);
     }
     if (!student) {
-      let pick = skillSelect(q.skills?.[0] ?? '', null, 'qz-input qz-skill');
-      const field = labelled('Skill (optional)', pick, 'For insights. Republish for changes to count.');
-      const onPick = (e: Event) => {
-        const value = (e.target as HTMLSelectElement).value;
-        if (value) q.skills = [value];
+      // Skills: several, as chips. A written answer's skills also pick the codes its next steps come from.
+      const written = WRITTEN_KINDS.has(q.kind) && !!options.nextSteps;
+      bank = written
+        ? nextStepBank(q as BankItem, null, (next_steps) => {
+            if (next_steps && Object.keys(next_steps).length) (q as BankItem).next_steps = next_steps;
+            else delete (q as BankItem).next_steps;
+            emit();
+          }, { target: { block_id: q.id, index: 0 }, jobs: options.nextSteps?.jobs })
+        : null;
+      const panel = bank;
+      if (panel) void loadFeedbackCodes().then((codes) => panel.update(q as BankItem, codes), () => undefined);
+      const chips = mountChipPicker(q.skills ?? [], (skills) => {
+        if (skills.length) q.skills = skills;
         else delete q.skills;
+        if (!skills.length) delete (q as BankItem).next_steps;
+        panel?.update(q as BankItem);
         emit();
-      };
-      pick.addEventListener('change', onPick);
-      void loadSkills().then(
-        (skills) => {
-          const next = skillSelect(q.skills?.[0] ?? '', skills, 'qz-input qz-skill');
-          next.id = pick.id;
-          next.addEventListener('change', onPick);
-          pick.replaceWith(next);
-          pick = next;
-        },
-        () => undefined
-      );
-      more.append(field);
+      });
+      const field = labelled(written ? 'Skills this box practises' : 'Skills (optional)', chips, written ? 'Students get one next step on these skills. For insights too. Republish for changes to count.' : 'For insights. Republish for changes to count.');
+      if (panel) {
+        const steps = el('div', 'qz-next-steps');
+        steps.append(field, panel.el);
+        extrasHost.append(steps);
+      } else {
+        more.append(field);
+      }
     }
     if (q.kind !== 'label_image' && ((options.images?.length ?? 0) > 0 || options.allowImageUrl)) {
       const pictureHost = el('div', 'qz-field');

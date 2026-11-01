@@ -27,7 +27,7 @@ Exit 0 required. Do not open/update the PR if the gate is red.
 - Script (command source of truth): `scripts/pre-pr-check.mjs`
 - Agent checklist + failure inventory: Project store `docs/mandatory-pre-pr-check.md`
 - User workflow: Project user store `workflows/life-hub-pre-pr-gate.md`
-- The gate runs root `npm test` and the Tasks Hub vitest tests the change reaches (`vitest run --changed`; anything named grove, Tasks config or workflows runs the full suite; `--full` forces it). Pages runs both full suites in a `test` job beside the deploy, so a slow Grove run no longer blocks the site
+- The gate runs root `npm test` and the Tasks Hub vitest tests the change reaches (`vitest run --changed`; anything named grove, Tasks config, package CSS or workflows runs the full suite, while a package JS file runs only the tests that import it; `--full` forces it). Pages runs both full suites in a `test` job beside the deploy, so a slow Grove run no longer blocks the site
 - Principle: never weaken Pages / skip `npm test` or the Tasks vitest suite / delete rail features to hide failures
 
 Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test`, the Tasks Hub vitest suite and static guards).

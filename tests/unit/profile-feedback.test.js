@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { profileAction } from '../../netlify/functions/_shared/profile.mjs';
+import { profileAction, teacherProfileAction } from '../../netlify/functions/_shared/profile.mjs';
 import { loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -98,4 +98,19 @@ test('a feedback document for this student appears as a Note, opens, and is mark
   await profileAction(store, 'class1', { action: 'seen', item: 'n:doc1', class_token: 'a'.repeat(48) });
   assert.ok(store.data.get('feedback_docs/doc1').seen_at);
   await assert.rejects(profileAction(store, 'class1', { action: 'piece', item: 'n:nothere', class_token: 'a'.repeat(48) }), /isn’t here/);
+});
+
+test('the teacher sees any student’s page as they do, and opening a piece leaves it new', async () => {
+  const { store, ava, noah } = await setup();
+  const mine = await profileAction(store, 'class1', { action: 'progress', ...device });
+  const theirs = await teacherProfileAction(store, 'class1', { action: 'progress', student_id: ava.id });
+  assert.equal(theirs.name, 'Ava Nguyen');
+  assert.deepEqual(theirs.pieces, mine.pieces);
+  assert.deepEqual(theirs.next, mine.next);
+  const list = await teacherProfileAction(store, 'class1', { action: 'returned', student_id: ava.id });
+  assert.deepEqual(list.items.map((i) => i.title), ['Paragraph 2', 'Paragraph 1']);
+  await teacherProfileAction(store, 'class1', { action: 'piece', student_id: ava.id, item: list.items[0].id });
+  assert.equal(store.data.get(`piece_feedback/class1/${ava.id}/w:lesson2:b`).seen_at, undefined);
+  assert.equal((await teacherProfileAction(store, 'class1', { action: 'progress', student_id: noah.id })).pieces.length, 0);
+  await assert.rejects(teacherProfileAction(store, 'class1', { action: 'progress', student_id: 'nobody' }), /Unknown student/);
 });

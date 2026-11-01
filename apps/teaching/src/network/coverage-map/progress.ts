@@ -29,8 +29,15 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 /** The map without the placeholder "Assessment task" row, which isn't a lesson a student can do. */
 export const withoutPlaceholder = (map: CoverageMap): CoverageMap => ({ ...map, rows: map.rows.filter((r) => r.id !== '__terminus') });
 
+/** Only the columns some lesson teaches: an empty column can never light up, so it is just noise to a student. */
+export const taughtOnly = (map: CoverageMap): CoverageMap => {
+  const taught = new Set(map.rows.flatMap((r) => [...r.teaches.keys()]));
+  const groups = map.groups.map((g) => ({ ...g, items: g.items.filter((it) => taught.has(it.id)) })).filter((g) => g.items.length);
+  return { ...map, groups };
+};
+
 export function mountProgressMap(host: HTMLElement, options: ProgressMapOptions): { update(done: ReadonlySet<string>, next: string | null): void } {
-  const map = withoutPlaceholder(options.map);
+  const map = taughtOnly(withoutPlaceholder(options.map));
   let done = options.done;
   let next = options.next;
   const narrow = () => window.matchMedia?.('(max-width: 599px)').matches ?? window.innerWidth < 600;
@@ -48,7 +55,7 @@ export function mountProgressMap(host: HTMLElement, options: ProgressMapOptions)
 
   const paint = (): void => {
     const layer: ProgressLayer = { done, next, faded: options.faded };
-    const nameW = fitNameWidth(map, collapsed, scroller.clientWidth || host.clientWidth || 700);
+    const nameW = fitNameWidth(map, collapsed, scroller.clientWidth || host.clientWidth || 700, 460);
     const drawn = drawCoverageMap(map, { collapsed, selected: null, focus: null, student: null, progress: layer, nameW });
     stage.innerHTML = `<svg class="cm__svg" width="${drawn.width}" height="${drawn.height}" viewBox="0 0 ${drawn.width} ${drawn.height}">${drawn.svg}</svg>`;
   };

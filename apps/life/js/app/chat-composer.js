@@ -59,9 +59,14 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
           if (!attachmentsFitChatBody([...pendingAttachments, next], {
             messageBytes: input?.value?.length || 0
           })) {
+            const isImage = next.kind === 'image';
             lastError = pendingAttachments.length
-              ? 'Those photos together are too large to send. Remove one or use a smaller image.'
-              : `That photo is too large to send (max ~${Math.round(EFFECTIVE_MAX_CHAT_IMAGE_BYTES / 1000)}KB after compress). Try a smaller image.`;
+              ? (isImage
+                ? 'Those photos together are too large to send. Remove one or use a smaller image.'
+                : 'Those files together are too large to send. Remove one and try again.')
+              : (isImage
+                ? `That photo is too large to send (max ~${Math.round(EFFECTIVE_MAX_CHAT_IMAGE_BYTES / 1000)}KB after compress). Try a smaller image.`
+                : 'That file is too large to send. Paste the part you need instead.');
             continue;
           }
           pendingAttachments.push(next);

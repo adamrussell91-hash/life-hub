@@ -13,7 +13,7 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { progressFor, returnedFor, pieceFor, markSeen } from './profile-feedback.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen, stepsFor } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
@@ -36,7 +36,7 @@ async function unitLessons(store, cls) {
 export async function profileAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
@@ -52,6 +52,11 @@ export async function profileAction(store, classId, body) {
   }
   if (action === 'progress') return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
+  // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
+  if (action === 'steps') {
+    if (body.lesson_id !== undefined && !isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    return stepsFor(store, classId, student.id);
+  }
   if (action === 'piece') return pieceFor(store, roster, student, body.item);
   if (action === 'seen') return markSeen(store, roster, student, body.item);
   if (action === 'done') await recordDone(store, classId, student.id, body.lesson_id, 'tick');
@@ -96,16 +101,24 @@ async function profileFor(store, roster, student) {
   return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) } };
 }
 
-/** Teacher: every student's done records; marking one complete, partial or clearing it. */
+/**
+ * Teacher: every student's done records; marking one complete, partial or clearing it; and one
+ * student's progress page exactly as they see it (`progress`, `returned`, `piece`). The teacher's
+ * reads never mark a piece seen.
+ */
 export async function teacherProfileAction(store, classId, body) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
-  if (!['list', 'remove', 'mark'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (action !== 'list') {
     if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id) || !roster.students.some((s) => s.id === body.student_id)) {
       reject(400, 'bad_request', 'Unknown student.');
     }
+    const student = roster.students.find((s) => s.id === body.student_id);
+    if (action === 'progress') return { need: null, name: student.name, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
+    if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
+    if (action === 'piece') return pieceFor(store, roster, student, body.item);
     const state = action === 'remove' ? 'clear' : body.state;
     if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
     if (action === 'remove') await removeDone(store, classId, body.student_id, body.lesson_id);

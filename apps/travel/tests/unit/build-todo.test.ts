@@ -31,16 +31,23 @@ describe('buildTodo (§3 rule 7)', () => {
     expect(rows.find((r) => r.title === 'No bed')).toBeUndefined();
   });
 
-  it('reports a "no bed" range for an uncovered night, excluding the last trip night', () => {
+  it('reports a "no bed" range for an uncovered night, excluding the last trip night and overnight flights', () => {
     const gappy: Trip = {
       ...trip,
       items: trip.items.filter((item) => item.kind !== 'stay')
     };
     const rows = buildTodo(gappy, '2027-02-01');
     const noBedRows = rows.filter((r) => r.title === 'No bed');
-    // Nights are 03-03..03-06 (the trip ends 03-07); all uncovered → one merged range.
+    // Nights are 03-03..03-06 (the trip ends 03-07). 03-03 is the overnight
+    // flight and 03-06 is the last night, so 03-04..03-05 are uncovered → one merged range.
     expect(noBedRows).toHaveLength(1);
-    expect(noBedRows[0]?.date).toBe('2027-03-03');
+    expect(noBedRows[0]?.date).toBe('2027-03-04');
+    expect(noBedRows[0]?.detail).toContain('2 nights with nothing booked');
+  });
+
+  it('puts cancellation deadlines first', () => {
+    const rows = buildTodo(trip, '2027-02-01');
+    expect(rows[0]?.detail).toContain('Free cancellation ends');
   });
 
   it('the row count equals the "still to book" badge count (V4)', () => {

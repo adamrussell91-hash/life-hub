@@ -34,6 +34,8 @@ export interface CurriculumLessonSummary {
   excerpt?: string;
   attachment_count?: number;
   pedagogical_mode?: PedagogicalMode;
+  /** A tutorial's class and the students in each group. */
+  tutorial?: { class_id: string; groups: Array<{ students: string[] }> };
 }
 
 export interface CurriculumResponse {

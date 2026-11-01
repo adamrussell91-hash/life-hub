@@ -15,6 +15,10 @@
   padding: var(--space-5) var(--space-3);
   background: linear-gradient(180deg, var(--depth) 0%, var(--marine) 100%);
   color: var(--on-dark);
+  /* Keep the full width while the shell column shrinks, so the rail slides
+     rather than squashing its labels. */
+  width: var(--rail-width);
+  min-width: var(--rail-width);
 }
 
 .hub-rail a {
@@ -372,6 +376,117 @@ button.hub-rail__section:focus-visible {
   height: 0.875rem;
 }
 
+/* ── Collapse ───────────────────────────────────────────────────────────
+   js/hub-rail-collapse.js toggles html.hub-rail-collapsed. The shell column
+   (or Life's inset) reads --rail-shown and shrinks to the tab's gutter while the rail slides
+   out by its own width, so the rail's edge and the canvas edge move as one.
+   The edge tab is the only control; it is never on the brand. */
+@media (min-width: 721px) {
+  /* Collapsed, the canvas keeps a gutter the width of the edge tab so the
+     tab never sits on page headings. */
+  html.hub-rail-collapsed {
+    --rail-shown: 1.25rem;
+    --rail-tab-left: 0rem;
+  }
+
+  html.hub-rail-collapsed .hub-rail {
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
+
+  html.hub-rail-animate .hub-rail {
+    transition: transform var(--rail-slide), visibility 0s linear 0s;
+  }
+
+  html.hub-rail-animate.hub-rail-collapsed .hub-rail {
+    transition: transform var(--rail-slide), visibility 0s linear 0.28s;
+  }
+
+  html.hub-rail-animate .hub-layout,
+  html.hub-rail-animate .app-shell,
+  html.hub-rail-animate .teacher-layout {
+    transition: grid-template-columns var(--rail-slide);
+  }
+
+  html.hub-rail-animate .page-frame {
+    transition: margin-left var(--rail-slide);
+  }
+}
+
+.hub-rail-collapse {
+  position: fixed;
+  z-index: 40;
+  top: var(--space-5);
+  /* Open: a plain white arrow inside the rail's top-right corner. */
+  left: var(--rail-tab-left, calc(var(--rail-shown) - 2rem));
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--on-dark);
+  opacity: 0.7;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.hub-rail-animate .hub-rail-collapse {
+  transition: left var(--rail-slide), opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.hub-rail-collapse:hover,
+.hub-rail-collapse:focus-visible {
+  opacity: 1;
+  color: var(--on-dark);
+}
+
+.hub-rail-collapse:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.hub-rail-collapse svg {
+  display: block;
+  transition: transform var(--rail-slide);
+}
+
+html:not(.hub-rail-collapsed) .hub-rail-collapse:hover {
+  background: var(--on-dark-hover);
+}
+
+/* Collapsed: the dark tab on the page's left edge. */
+html.hub-rail-collapsed .hub-rail-collapse {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--depth);
+  color: var(--on-dark-muted);
+  opacity: 0.85;
+}
+
+html.hub-rail-collapsed .hub-rail-collapse svg {
+  transform: rotate(180deg);
+}
+
+/* Pages with no rail (sign-in, public student views) hide the tab. */
+body:not(:has(.hub-rail)) .hub-rail-collapse {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.hub-rail-animate .hub-rail,
+  html.hub-rail-animate .hub-layout,
+  html.hub-rail-animate .app-shell,
+  html.hub-rail-animate .teacher-layout,
+  html.hub-rail-animate .page-frame,
+  html.hub-rail-animate .hub-rail-collapse,
+  .hub-rail-collapse svg {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hub-panel,
   .hub-panel-inner,
@@ -384,6 +499,10 @@ button.hub-rail__section:focus-visible {
   /* Phones use the locked bottom bar + More sheet (MOBILE.md). Never restyle
      this rail into a top strip — that breaks cross-hub consistency. */
   .hub-rail {
+    display: none;
+  }
+
+  .hub-rail-collapse {
     display: none;
   }
 }
