@@ -16,7 +16,8 @@ import {
   unresolvedJobForPage
 } from './_shared/knowledge-intake.mjs';
 import { kickLessonJobRun } from './_shared/teaching-ai-job-kick.mjs';
-import { estimateLaddersDraft, estimateNextStepsFill, MAX_FILL_TARGETS, NEXT_STEP_JOB_KINDS } from './_shared/teaching-ai-runtime.mjs';
+import { ANSWER_MARK_JOB_KIND, estimateAnswerMarking, estimateLaddersDraft, estimateNextStepsFill, MAX_FILL_TARGETS, NEXT_STEP_JOB_KINDS } from './_shared/teaching-ai-runtime.mjs';
+import { QuizError, gatherAiMarking } from './_shared/quiz.mjs';
 import { readFeedbackCodes } from './_shared/feedback-codes.mjs';
 import { readStoredSkills } from './_shared/skills-continuum.mjs';
 
@@ -38,10 +39,12 @@ function inboxFrom(jobs) {
 }
 
 const NEXT_STEP_KINDS = new Set(NEXT_STEP_JOB_KINDS);
+/** Structured jobs that run beside a lesson's chat: next steps and AI marking. */
+const SIDE_JOB_KINDS = new Set([...NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND]);
 
-/** A lesson's open chat job. Next-step jobs run beside the chat, so they never hold it up. */
+/** A lesson's open chat job. Next-step and marking jobs run beside the chat, so they never hold it up. */
 export function unresolvedJobForLesson(inbox, lessonId) {
-  return (inbox.jobs ?? []).find(job => job.lesson_id === lessonId && job.status === 'working' && !NEXT_STEP_KINDS.has(job.kind));
+  return (inbox.jobs ?? []).find(job => job.lesson_id === lessonId && job.status === 'working' && !SIDE_JOB_KINDS.has(job.kind));
 }
 
 const BLOCK_ID = /^[A-Za-z0-9_:-]{1,120}$/;
@@ -72,10 +75,7 @@ async function nextStepJob(request, env, store, deps, value) {
     if (!lesson) return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
   }
   const [codes, continuum] = await Promise.all([readFeedbackCodes(store), readStoredSkills(store).catch(() => null)]);
-  const models = {
-    ...(env.TEACHING_AI_FAST_MODEL ? { fast: env.TEACHING_AI_FAST_MODEL } : {}),
-    ...(env.TEACHING_AI_MODEL ? { standard: env.TEACHING_AI_MODEL } : {})
-  };
+  const models = teachingModelsOf(env);
   const estimate = kind === 'next_steps_fill'
     ? estimateNextStepsFill({ lesson, targets, codes, continuum, models })
     : estimateLaddersDraft({ codes, continuum, models });
@@ -118,6 +118,57 @@ async function nextStepJob(request, env, store, deps, value) {
   return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
 }
 
+/**
+ * AI marking for one quiz (`quiz_ai_mark`): every handed-in answer still
+ * waiting for the AI. `dry_run: true` answers with the count and A$ estimate
+ * and starts nothing; the results view shows it on the button. The runner
+ * gathers the answers again when it starts, so marks made in between count.
+ */
+async function answerMarkJob(request, env, store, deps, value) {
+  const lesson_id = typeof value.lesson_id === 'string' ? value.lesson_id : '';
+  if (!lesson_id) return withCors(errorResponse(400, 'validation_error', 'Name the quiz to mark.', false), request, env);
+  let gathered;
+  try {
+    gathered = await gatherAiMarking(store, lesson_id);
+  } catch (error) {
+    if (error instanceof QuizError) return withCors(errorResponse(404, 'not_found', 'Publish this quiz first.', false), request, env);
+    throw error;
+  }
+  const estimate = estimateAnswerMarking({ questions: gathered.questions, answers: gathered.answers, models: teachingModelsOf(env) });
+  if (value.dry_run === true) return withCors(okResponse(200, { estimate }), request, env);
+  if (!estimate.answers) return withCors(errorResponse(400, 'validation_error', 'No answers are waiting for the AI.', false), request, env);
+
+  const inbox = (await getJSON(store, aiJobsInboxKey(), STRONG)) ?? { jobs: [] };
+  const open = (inbox.jobs ?? []).find(job => job.kind === ANSWER_MARK_JOB_KIND && job.status === 'working' && job.lesson_id === lesson_id);
+  const record = open ? await getJSON(store, aiJobKey(open.id), STRONG) : null;
+  if (record?.status === 'working' && !jobIsStale(record, (deps.now ?? Date.now)())) {
+    return withCors(jsonResponse(409, {
+      ok: false,
+      error: { code: 'conflict', message: 'These answers are already being marked', retryable: false, details: { id: record.id, status: record.status } }
+    }), request, env);
+  }
+  const id = newId('ai_job');
+  const job = { id, kind: ANSWER_MARK_JOB_KIND, lesson_id, status: 'working', message: 'AI mark answers', estimate, phase: 'queued', created_at: new Date().toISOString() };
+  await setJSON(store, aiJobKey(id), job);
+  await writeJobInbox(store, job);
+  const kicked = await (deps.kickLessonJobRun ?? kickLessonJobRun)(request, id);
+  if (!kicked) {
+    const failed = { ...job, status: 'error', phase: undefined, error: 'Could not start the AI runner. Try again.' };
+    await setJSON(store, aiJobKey(id), failed);
+    await writeJobInbox(store, failed);
+    return withCors(okResponse(202, { id, status: 'error', estimate }), request, env);
+  }
+  return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
+}
+
+/** Lane models can be overridden per deploy without a code change. */
+function teachingModelsOf(env) {
+  return {
+    ...(env.TEACHING_AI_FAST_MODEL ? { fast: env.TEACHING_AI_FAST_MODEL } : {}),
+    ...(env.TEACHING_AI_MODEL ? { standard: env.TEACHING_AI_MODEL } : {})
+  };
+}
+
 /** Blob reads are eventually consistent by default; the inbox is read-modify-write, so read it strongly. */
 const STRONG = { consistency: 'strong' };
 
@@ -151,6 +202,7 @@ export function createAiJobsHandler(deps = {}) {
     if (parsed.error) return withCors(parsed.error, request, env);
     const kind = typeof parsed.value.kind === 'string' ? parsed.value.kind : '';
     if (NEXT_STEP_KINDS.has(kind)) return nextStepJob(request, env, store, deps, parsed.value);
+    if (kind === ANSWER_MARK_JOB_KIND) return answerMarkJob(request, env, store, deps, parsed.value);
     if (kind === 'knowledge_intake') {
       const page_id = typeof parsed.value.page_id === 'string' ? parsed.value.page_id.trim() : '';
       const agent = typeof parsed.value.agent === 'string' && parsed.value.agent

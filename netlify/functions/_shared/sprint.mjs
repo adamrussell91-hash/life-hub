@@ -11,7 +11,7 @@ import { publishedLessonKey, draftLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, read, reject } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
-import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema, UnderstandSettingsSchema, LIMIT_BOXES } from './sprint-schema.mjs';
+import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, partBuild, builtSomething, PartsSchema, SprintSettingsSchema, UnderstandSettingsSchema, LIMIT_BOXES } from './sprint-schema.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { openPhases, lockState, isFrozen, isLate, tally, duelTally, rankIdeas, duelsDone, pairKey, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
 import { sprintKeys, emptyGroup, emptyLock } from './sprint-keys.mjs';
@@ -398,13 +398,14 @@ async function groupParts(store, lessonId, config, group, state, initials, sid) 
   for (const part of list(state.parts)) {
     for (const student of list(state.claims[part.id]).filter((x) => group.students.includes(x))) {
       const { owner, sub } = subs.get(student) ?? {};
-      const p = sub?.payload ?? {};
+      // Each part shows its own build, so a student with two parts never sees one build copied to both.
+      const b = partBuild(sub?.payload ?? {}, part.id);
       const files = [];
-      for (const id of list(p.files)) {
+      for (const id of list(b.files)) {
         const meta = owner ? await read(store, k.fileMeta(owner, id)) : null;
         if (meta) files.push({ id, name: meta.name });
       }
-      rows.push({ part_id: part.id, part: part.text, who: initials.get(student) ?? '–', me: student === sid, text: p.text ?? '', link: p.link ?? '', files, in: !!sub?.submitted_at, started: !!sub });
+      rows.push({ part_id: part.id, part: part.text, who: initials.get(student) ?? '–', me: student === sid, text: b.text, link: b.link, files, in: (!!sub?.submitted_at || list(state.in?.prototype).includes(student)) && builtSomething(b), started: builtSomething(b) });
     }
   }
   return rows;
@@ -617,7 +618,7 @@ export async function sprintAction(store, lessonId, body) {
 
 /** Files named in a payload must be the student's own. */
 async function checkOwnFiles(store, lessonId, owner, phase, payload) {
-  const ids = phase === 'prototype' ? payload.files : phase === 'sketch' ? payload.cards.map((c) => c.file).filter(Boolean) : [];
+  const ids = phase === 'prototype' ? [...payload.files, ...Object.values(payload.builds ?? {}).flatMap((b) => b.files)] : phase === 'sketch' ? payload.cards.map((c) => c.file).filter(Boolean) : [];
   const k = sprintKeys(lessonId);
   for (const id of ids) {
     const index = await read(store, k.fileOwner(id));

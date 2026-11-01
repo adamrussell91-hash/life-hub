@@ -34,10 +34,15 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-sketch');
   root.append(el('h2', '', 'Sketch your ideas'));
   if (ctx.sprint.phases[1]!.instruction) root.append(el('p', '', ctx.sprint.phases[1]!.instruction));
-  const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements, valueCheck: !!ctx.valueCheck }));
+  const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements, valueCheck: !!ctx.valueCheck }).map((text) => {
+    // Inspiration, Rapid ideas and Pick name their step; everything else is about developing the ideas.
+    const key = text.startsWith('Inspiration:') ? 'inspiration' : text.startsWith('Rapid ideas:') ? 'rapid' : text.startsWith('Pick:') ? 'pick' : 'develop';
+    return { text, at: `[data-step="${key}"] .su-step__where` };
+  }));
   const change = () => bar.changed();
   const step = (n: number, key: keyof typeof SKETCH_GUIDE, title: string, note: string) => {
     const box = el('section', 'su-step su-step--alone');
+    box.dataset.step = key;
     box.append(...stepHead(`Sketch · Step ${n} of 4`, title), coach(SKETCH_GUIDE[key]));
     if (note) box.append(el('p', 'sprint-note', note));
     root.append(box);
@@ -279,7 +284,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   paintCard();
   paintStrongCheck();
   dev.append(strongest, strongCheck);
-  slidify(root, ctx.sprint.understand?.layout);
+  slidify(root, ctx.sprint.understand?.layout, ctx.steps?.sketch ?? 0, (i) => { if (ctx.steps) ctx.steps.sketch = i; });
   root.append(bar.el);
   return { el: root, dispose: () => { window.clearInterval(tick); bar.dispose(); } };
 }

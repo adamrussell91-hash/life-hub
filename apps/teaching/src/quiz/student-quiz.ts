@@ -24,7 +24,7 @@ import './quiz.css';
  */
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
-type ResultRow = { practice?: boolean; id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null };
+type ResultRow = { practice?: boolean; id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null; comment?: string };
 type Result = { practice?: { score: number; max: number; pending: number } | null; n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
 type Current = {
   n: number;
@@ -946,7 +946,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
         const q = row.question;
         const li = el('li');
         if (row.practice) li.append(practiceChip());
-        li.append(mountQuestionPlayer({ question: q, number: i + 1, response: row.response, result: { mark: row.mark, key: row.key, hinted: row.hinted, awarded: row.awarded } }));
+        li.append(mountQuestionPlayer({ question: q, number: i + 1, response: row.response, result: { mark: row.mark, key: row.key, hinted: row.hinted, awarded: row.awarded, comment: row.comment } }));
         list.append(li);
       });
       wrap.append(list);

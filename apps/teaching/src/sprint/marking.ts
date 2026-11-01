@@ -92,6 +92,13 @@ export function mountMarking(host: HTMLElement, o: { kind: MarkKind; board: Grou
       if (p.text) work.append(el('p', '', String(p.text)));
       if (p.link) work.append(button(`Open link: ${String(p.link)}`, 'ghost', () => window.open(String(p.link), '_blank', 'noopener')));
       for (const id of (p.files as string[] | undefined) ?? []) work.append(button('Open their file', 'ghost', async () => window.open(await o.api.fileUrl(id), '_blank', 'noopener')));
+      // A student with two or more parts built each one separately.
+      Object.values((p.builds as Record<string, { text: string; link: string; files: string[] }> | undefined) ?? {}).forEach((b, i, all) => {
+        work.append(el('h4', '', `Part ${i + 1} of ${all.length}`));
+        if (b.text) work.append(el('p', '', b.text));
+        if (b.link) work.append(button(`Open link: ${b.link}`, 'ghost', () => window.open(b.link, '_blank', 'noopener')));
+        for (const id of b.files) work.append(button('Open their file', 'ghost', async () => window.open(await o.api.fileUrl(id), '_blank', 'noopener')));
+      });
     } else {
       for (const r of (p.reflection as string[] | undefined) ?? []) work.append(el('p', '', r));
       if (p.quote) work.append(el('p', 'sprint-note', `Quoted: ${String(p.quote)}`));

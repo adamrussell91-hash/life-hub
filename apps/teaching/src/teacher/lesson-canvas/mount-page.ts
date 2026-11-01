@@ -1236,6 +1236,11 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           const blocks = removeBlockFromTree(lesson.blocks, blockId);
           emitLesson({ ...lesson, blocks });
           canvas.update(blocks, media);
+        },
+        onUpdateBlock: (updated) => {
+          const blocks = replaceBlockInTree(lesson.blocks, updated);
+          emitLesson({ ...lesson, blocks });
+          canvas.update(blocks, media);
         }
       });
       quizHost.append(quizPanel.root);

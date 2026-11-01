@@ -138,6 +138,8 @@ var QUIZ_LIMITS = {
   hint: 500,
   explanation: 1e3,
   passage: 4e3,
+  /** A short answer's "Looking for" note, and a teacher's comment on a marked answer. */
+  note: 1e3,
   answer: 200,
   model: 3e3,
   response: 6e3,
@@ -198,9 +200,12 @@ var QuizQuestionSchema = z2.discriminatedUnion("kind", [
     ...base,
     kind: z2.literal("short_answer"),
     accepted: z2.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
-    case_sensitive: z2.boolean().optional()
+    case_sensitive: z2.boolean().optional(),
+    /** What a right answer says, for the AI marker. Optional. */
+    looking_for: OptionalText(QUIZ_LIMITS.note),
+    ai_mark: z2.boolean().optional()
   }),
-  z2.object({ ...base, kind: z2.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z2.boolean().optional() }),
+  z2.object({ ...base, kind: z2.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z2.boolean().optional(), ai_mark: z2.boolean().optional() }),
   z2.object({ ...base, kind: z2.literal("odd_one_out"), options: z2.array(QuizChoiceSchema).min(3).max(6), correct: z2.array(Id).length(1) }),
   z2.object({ ...base, kind: z2.literal("matching"), pairs: z2.array(QuizPairSchema).min(2).max(8) }),
   z2.object({ ...base, kind: z2.literal("ordering"), items: z2.array(QuizChoiceSchema).min(3).max(8) }),
@@ -244,7 +249,8 @@ var QuizQuestionSchema = z2.discriminatedUnion("kind", [
     kind: z2.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z2.boolean().optional()
   }),
   z2.object({
     ...base,
@@ -253,13 +259,19 @@ var QuizQuestionSchema = z2.discriminatedUnion("kind", [
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z2.boolean().optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
     ctx.addIssue({ code: z2.ZodIssueCode.custom, message });
   }
 });
+var AI_MARK_KINDS = ["short_answer", "fill_gap", "explain_effect", "extended_response"];
+function aiMarkOn(q) {
+  if (!AI_MARK_KINDS.includes(q.kind)) return false;
+  return q.ai_mark ?? (q.kind === "short_answer" || q.kind === "fill_gap");
+}
 var QuizQuestionDraftSchema = z2.custom(
   (value) => !!value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string" && QUIZ_QUESTION_KINDS.includes(value.kind),
   { message: "A quiz question needs an id and a known kind." }
@@ -508,7 +520,8 @@ function splitQuestion(q, random = Math.random) {
     ...q.hint?.trim() ? { hint: q.hint.trim() } : {},
     ...q.explanation?.trim() ? { explanation: q.explanation.trim() } : {},
     ...q.outcomes?.length ? { outcomes: [...q.outcomes] } : {},
-    ...q.skills?.length ? { skills: [...q.skills] } : {}
+    ...q.skills?.length ? { skills: [...q.skills] } : {},
+    ...aiMarkOn(q) ? { ai: true } : {}
   };
   switch (q.kind) {
     case "multiple_choice":
@@ -528,7 +541,7 @@ function splitQuestion(q, random = Math.random) {
     case "short_answer":
       return {
         question: { ...head, kind: "short_answer" },
-        key: { ...keyHead, answer: { type: "text", accepted: q.accepted, case_sensitive: !!q.case_sensitive } }
+        key: { ...keyHead, ...q.looking_for?.trim() ? { looking_for: q.looking_for.trim() } : {}, answer: { type: "text", accepted: q.accepted, case_sensitive: !!q.case_sensitive } }
       };
     case "fill_gap": {
       const gaps = {};
@@ -696,11 +709,12 @@ function markResponse(key, response) {
     case "text": {
       const match = matchText(typeof r.text === "string" ? r.text : "", a.accepted, a.case_sensitive);
       if (match === "exact") return full(true);
+      if (key.ai && hasAnswer(r)) return { score: null, max, correct: null, pending: "ai" };
       if (match === "near") return { score: null, max, correct: null, pending: "near_miss" };
       return full(false);
     }
     case "manual":
-      return hasAnswer(r) ? { score: null, max, correct: null, pending: "manual" } : full(false);
+      return hasAnswer(r) ? { score: null, max, correct: null, pending: key.ai ? "ai" : "manual" } : full(false);
     case "choice": {
       const picked = new Set(strings(r.selected));
       const right = new Set(a.ids);
@@ -719,10 +733,17 @@ function markResponse(key, response) {
       const given = stringMap(r.gaps);
       const parts = {};
       let right = 0;
+      let waiting = false;
       for (const [id, accepted] of Object.entries(a.gaps)) {
-        parts[id] = matchText(given[id] ?? "", accepted) === "exact";
-        if (parts[id]) right++;
+        const exact = matchText(given[id] ?? "", accepted) === "exact";
+        if (!exact && key.ai && (given[id] ?? "").trim()) {
+          waiting = true;
+          continue;
+        }
+        parts[id] = exact;
+        if (exact) right++;
       }
+      if (waiting) return { score: null, max, correct: null, pending: "ai", parts };
       return share(right, Object.keys(a.gaps).length, parts);
     }
     case "map": {
@@ -887,6 +908,7 @@ function checkQuestion(input) {
   return { ok: false, message: messages[field] ?? "Check the question: something is missing or too long." };
 }
 export {
+  AI_MARK_KINDS,
   DEFAULT_QUIZ_SETTINGS,
   DEFAULT_WRITING_CHECK,
   NextStepBankSchema,
@@ -906,6 +928,7 @@ export {
   WRITTEN_KINDS,
   WritingCheckSchema,
   afterHint,
+  aiMarkOn,
   blankQuestion,
   checkQuestion,
   cleanResponse,
