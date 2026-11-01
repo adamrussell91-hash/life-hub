@@ -44,13 +44,13 @@ import { renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
 
 describe('unit-level framework lenses', () => {
-  it('offers one button per framework and adds the chosen lens', () => {
+  it('offers one button per framework (Willingham lives in Deep understandings) and adds the chosen lens', () => {
     const added: string[] = [];
     const host = renderFrameworkLenses((id) => { added.push(id); return true; })!;
     const buttons = [...host.querySelectorAll('button')];
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(4);
     expect(buttons.every((b) => /framework chapter/.test(b.title))).toBe(true);
-    buttons[2]!.click();
+    buttons[1]!.click();
     expect(added).toEqual(['fw_marge']);
     expect(host.textContent).toContain('added at the end of the plan');
   });
