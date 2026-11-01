@@ -69,6 +69,8 @@ import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { createEditorFilter, type HubFilterControl } from '@/blocks/editor-filter';
 import { swapBlock } from '@/blocks/swap-block';
+import { labelled } from '@/quiz/dom';
+import { convertQuestionBlock, QUIZ_GROUP_LABEL, quizTypeOptions, WRITTEN_GROUP_LABEL } from '@/blocks/question-type';
 import { classroomExtras } from '@/blocks/classroom-extras';
 import { isMapsShareLink, parseEmbedInput } from '@/blocks/embed-url';
 import { apiGet } from '@/api/client';
@@ -122,6 +124,8 @@ export type BlockEditorContext = {
   network?: UnitNetworkEditorContext;
   /** The lesson builder's Make next steps: writing boxes fill their banks through it. */
   nextSteps?: NextStepJobs;
+  /** True when this lesson's type runs a quiz, so a written question may turn into a quiz question. */
+  quizRuns?: () => boolean;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -1668,6 +1672,34 @@ export function createTableEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+/** The written question's Question type list: Written work picked, the quiz kinds beside it. */
+function createWrittenTypeField(getLatest: () => Extract<Block, { block_type: 'question_set' }>, swap: (next: Block) => void): HTMLElement {
+  const select = document.createElement('select');
+  select.className = 'block-editor__question-type';
+  const written = document.createElement('option');
+  written.value = 'written';
+  written.textContent = 'Written work (Format below)';
+  const writtenGroup = document.createElement('optgroup');
+  writtenGroup.label = WRITTEN_GROUP_LABEL;
+  writtenGroup.append(written);
+  const quizGroup = document.createElement('optgroup');
+  quizGroup.label = QUIZ_GROUP_LABEL;
+  for (const o of quizTypeOptions()) {
+    const option = document.createElement('option');
+    option.value = o.value;
+    option.textContent = o.label;
+    quizGroup.append(option);
+  }
+  select.append(writtenGroup, quizGroup);
+  select.value = 'written';
+  select.addEventListener('change', () => {
+    if (select.value === 'written') return;
+    swap(convertQuestionBlock(getLatest(), select.value));
+  });
+  // Same field as the quiz question's, so the list reads alike either side.
+  return labelled('Question type', select);
+}
+
 export function createQuestionSetEditor(
   block: Extract<Block, { block_type: 'question_set' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>,
@@ -2001,7 +2033,9 @@ export function createQuestionSetEditor(
     }
   });
 
-  fields.append(...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
+  // One Question block: where the lesson runs a quiz, the type list also offers the quiz kinds.
+  const typeField = context.quizRuns?.() ? createWrittenTypeField(getLatest, (next) => swapBlock(next, onChange as BlockChangeHandler, context)) : null;
+  fields.append(...(typeField ? [typeField] : []), ...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -3401,7 +3435,7 @@ function createBlockEditorFields(
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
         : undefined));
     case 'quiz_question':
-      return createQuizQuestionEditor(block, onChange, context.getLessonBlocks, context.nextSteps);
+      return createQuizQuestionEditor(block, onChange, context.getLessonBlocks, context.nextSteps, (next) => swapBlock(next, onChange, context));
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>, context);
     case 'timeline':

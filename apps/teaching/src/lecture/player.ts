@@ -13,6 +13,8 @@ import './lecture.css';
 
 export type LecturePlayerOptions = {
   lessonId: string;
+  /** The unit's notes, for an Anthology block in a scene. */
+  loadAnthology?: RenderContext['loadAnthology'];
   title: string;
   blocks: Block[];
   /** Null in preview and when opened without a class: nothing is sent. */
@@ -311,7 +313,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     paintDots();
     stage.replaceChildren();
     stage.classList.toggle('lecture-stage--detour', !!detourGate?.sidePath);
-    const ctx: RenderContext = { lessonId, pageBlocks: blocks, lecture: preview ? 'preview' : 'live' };
+    const ctx: RenderContext = { lessonId, pageBlocks: blocks, lecture: preview ? 'preview' : 'live', ...(options.loadAnthology ? { loadAnthology: options.loadAnthology } : {}) };
     if (detourGate?.sidePath) {
       const side = detourGate.sidePath;
       stage.classList.remove('lecture-stage--single-image');

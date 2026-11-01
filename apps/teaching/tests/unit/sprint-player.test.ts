@@ -5,6 +5,10 @@ import type { SprintClient, SprintStatus } from '@/sprint/api';
 import { newSprintSettings, newSprintBlocks } from '@/sprint/defaults';
 import { publicSprint } from '@/sprint/model';
 import type { PublishedLesson } from '@/schemas/published-lesson';
+import { createBlock } from '@/blocks/create-block';
+
+const anthologyLoad = vi.hoisted(() => vi.fn(async () => ({ data: { items: [], texts: [] } })));
+vi.mock('@/blocks/anthology-load', () => ({ studentUnitAnthology: anthologyLoad }));
 
 let n = 0;
 const id = () => `b${++n}`;
@@ -26,6 +30,14 @@ const client = (s: SprintStatus): SprintClient => ({
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('sprint player', () => {
+  it('an Anthology block in the brief loads the unit’s notes instead of showing empty', async () => {
+    const host = document.createElement('div');
+    const withMap = { ...lesson, blocks: [createBlock('anthology', 'anth1'), ...lesson.blocks] } as PublishedLesson;
+    mountSprintPlayer(host, { lesson: withMap, classId: 'class1', client: client(status()), renderHero: () => {} });
+    await flush();
+    expect(anthologyLoad).toHaveBeenCalledWith('u1');
+  });
+
   it('asks for initials first', async () => {
     const host = document.createElement('div');
     mountSprintPlayer(host, { lesson, classId: 'class1', client: client(status({ identity: { need: 'initials', initials: null }, group: null })), renderHero: () => {} });

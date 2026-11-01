@@ -59,14 +59,14 @@ type Options = {
   loadPieceBlocks?: (lessonId: string) => Promise<{ id: string; label: string }[]>;
 };
 
-/** Question-set blocks of a lesson, labelled by title or position, for the column form's block picker. */
+/** Written questions blocks of a lesson, labelled by title or position, for the column form's block picker. */
 async function lessonPieceBlocks(lessonId: string): Promise<{ id: string; label: string }[]> {
   const lesson = await getLesson(lessonId);
   const out: { id: string; label: string }[] = [];
   visitBlocks(lesson.blocks, (block) => {
     if (block.block_type !== 'question_set') return;
     const title = block.content.title?.trim();
-    out.push({ id: block.id, label: title || `Question set ${out.length + 1}` });
+    out.push({ id: block.id, label: title || `Written questions ${out.length + 1}` });
   });
   return out;
 }

@@ -2812,8 +2812,12 @@ function renderBlockContent(
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_drop':
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
-    case 'done':
-      return wrapBlock(renderDone(block, mode, ctx), block, mode);
+    case 'done': {
+      // Retired: the lesson footer's tick does this. Students see nothing, not even an empty block.
+      const wrapped = wrapBlock(renderDone(block, mode), block, mode);
+      if (mode === 'student') wrapped.hidden = true;
+      return wrapped;
+    }
     case 'brainstorm':
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
     case 'hinge_question':

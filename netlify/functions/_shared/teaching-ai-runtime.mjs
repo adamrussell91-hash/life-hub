@@ -4422,13 +4422,13 @@ var NEW_BLOCK_LABEL = {
   accordion: "Accordion",
   table: "Table",
   peer_feedback: "Peer feedback",
-  question_drop: "Question drop",
+  question_drop: "Students write questions",
   done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
   continuum_line: "Continuum line",
-  quiz_question: "Quiz question",
-  question_set: "Question set",
+  quiz_question: "Question",
+  question_set: "Question",
   flashcards: "Flashcards",
   cloze: "Cloze",
   self_check: "Self check",
@@ -4529,7 +4529,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "question_set", "flashcards", "cloze", "note_cue", "faded_example", "with_teacher", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "quiz_question", "question_set", "question_drop", "flashcards", "cloze", "note_cue", "faded_example", "with_teacher", "annotation"]
   },
   {
     label: "Visualisation",
@@ -4552,7 +4552,7 @@ var BLOCK_GROUPS = [
 ];
 var PAGE_ONLY_TYPES = /* @__PURE__ */ new Set(["collection"]);
 var UNIT_ONLY_TYPES = /* @__PURE__ */ new Set(["curriculum_lines"]);
-var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value", "definition", "html"]);
+var RETIRED_BLOCK_TYPES = /* @__PURE__ */ new Set(["toolkit_skill", "toolkit_tool", "toolkit_value", "definition", "html", "done"]);
 var TOOLKIT_GROUP_TYPES = [
   "thinking_intentions",
   "toolkit_skill",
@@ -4605,7 +4605,7 @@ var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
     )
   )
 })).filter((group) => group.types.length > 0);
-var LESSON_EXCLUDED = /* @__PURE__ */ new Set(["definition"]);
+var LESSON_EXCLUDED = /* @__PURE__ */ new Set(["definition", "question_set"]);
 var LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
@@ -6744,8 +6744,8 @@ var KIND_LABEL = {
   rich_text: "Text",
   html: "HTML",
   html_app: "Interactive app",
-  question_set: "Question set",
-  question_drop: "Question drop",
+  question_set: "Written questions",
+  question_drop: "Students write questions",
   done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",

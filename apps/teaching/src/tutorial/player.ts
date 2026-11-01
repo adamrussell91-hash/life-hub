@@ -1,5 +1,6 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { renderBlock } from '@/blocks/render';
 import { isSidePath } from '@/lecture/scenes';
 import { el, readJSON, writeJSON } from '@/quiz/dom';
@@ -64,7 +65,7 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
     for (const block of blocks) {
       // Side paths belong to the lecture player, and With teacher is the teacher's marker.
       if (isSidePath(block) || block.block_type === 'with_teacher') continue;
-      box.append(renderBlock(block, 'student', { lessonId, pageBlocks: blocks }));
+      box.append(renderBlock(block, 'student', { lessonId, pageBlocks: blocks, loadAnthology: () => studentUnitAnthology(lesson.unit_id) }));
     }
     return box;
   }

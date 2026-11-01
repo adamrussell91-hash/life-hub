@@ -1,3 +1,4 @@
+import { questionForLesson } from '@/blocks/question-type';
 import { createBlockEditor, type BlockEditorContext } from '@/blocks/editors';
 import {
   createFromInsertMenu,
@@ -91,7 +92,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     insertBetween: true,
     read: options.read,
     pick: (anchor, done) =>
-      openBlockPicker(anchor, allowedTypes, (value) => done(createFromInsertMenu(value, nextId()))),
+      openBlockPicker(anchor, allowedTypes, (value) => done(questionForLesson(createFromInsertMenu(value, nextId()), options.context?.quizRuns?.() ?? true))),
     duplicate: (block) => cloneBlockWithNewIds(block, nextId),
     onChange: (next) => options.onChange(next),
     renderItem: (block, ctx) =>
@@ -235,7 +236,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     if (!type) return;
     event.preventDefault();
     event.stopPropagation();
-    list.insert(list.items.length, createFromInsertMenu(type, nextId()));
+    list.insert(list.items.length, questionForLesson(createFromInsertMenu(type, nextId()), options.context?.quizRuns?.() ?? true));
   });
 
   return root;
