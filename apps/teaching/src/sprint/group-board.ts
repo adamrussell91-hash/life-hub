@@ -2,7 +2,7 @@ import type { Lesson } from '@/schemas/lesson';
 import { button, el } from '@/quiz/dom';
 import { LEVEL_LABELS } from './schema';
 import { mountMarking } from './marking';
-import type { GroupBoard, SprintTeacherApi } from './api';
+import type { GalleryIdea, GroupBoard, SprintTeacherApi } from './api';
 
 /**
  * One group's board for the teacher: its Understand space (problem statements,
@@ -54,17 +54,30 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const g = el('div', 'sboard__part');
     g.append(el('h3', '', 'Gallery'), el('p', 'sprint-note', b.chosen ? 'The idea is chosen.' : b.awaiting?.kind === 'idea' ? 'Voting has closed. Choose the idea.' : b.awaiting?.kind === 'question' ? 'Decide waits until you confirm the group’s problem in Understand.' : 'Head-to-heads are open. To move the group on without waiting, pick an idea.'));
     if (!b.chosen && b.voted) g.append(el('p', 'sprint-note', `Finished their match-ups: ${b.voted.done.join(', ') || 'no one yet'}. Still going: ${b.voted.waiting.join(', ') || 'no one'}.`));
-    for (const set of b.gallery) {
-      g.append(el('p', 'kit-label', set.name));
-      for (const i of set.ideas) {
-        const r = el('div', `kit-row${b.chosen === i.id ? ' sboard__chosen' : ''}`);
+    // The head-to-heads use each student's starred idea; their other cards stay folded below.
+    const ideaRow = (set: GroupBoard['gallery'][number], i: GalleryIdea, inPool: boolean) => {
+      const r = el('div', `kit-row${b.chosen === i.id ? ' sboard__chosen' : ''}`);
+      const wins = b.totals[i.id] ?? 0;
+      r.append(el('span', '', inPool ? `${i.title} · ${set.name} · ${wins} ${wins === 1 ? 'win' : 'wins'}` : i.title));
+      if (inPool) {
         const heat = el('span', 'sprint-heat');
-        for (const c of crit()) { const cell = el('i'); cell.dataset.level = String(b.heat[i.id]?.[c.id] ?? 0); cell.title = c.text; heat.append(cell); }
-        r.append(el('span', '', `${i.title}${i.strongest ? ' (their strongest)' : ''} · ${b.totals[i.id] ?? 0} ${(b.totals[i.id] ?? 0) === 1 ? 'win' : 'wins'}`), heat);
-        if (typeof i.index === 'number') r.append(button('Spotlight', 'ghost', () => void act(o.api.spotlight(set.student_id, 'sketch', `cards.${i.index}.idea`))));
-        if (b.awaiting?.kind === 'idea' || (!b.chosen && b.awaiting === null)) r.append(button(b.awaiting?.kind === 'idea' ? 'Choose this idea' : 'Pick this idea', 'secondary', () => void act(o.api.confirm(b.group.id, 'idea', i.id))));
-        g.append(r);
+        for (const c of crit()) { const cell = el('i', '', c.text.slice(0, 14)); cell.dataset.level = String(b.heat[i.id]?.[c.id] ?? 0); cell.title = `Stronger in ${c.text}`; heat.append(cell); }
+        r.append(heat);
       }
+      if (typeof i.index === 'number') r.append(button('Spotlight', 'ghost', () => void act(o.api.spotlight(set.student_id, 'sketch', `cards.${i.index}.idea`))));
+      if (b.awaiting?.kind === 'idea' || (!b.chosen && b.awaiting === null)) r.append(button(b.awaiting?.kind === 'idea' ? 'Choose this idea' : 'Pick this idea', 'secondary', () => void act(o.api.confirm(b.group.id, 'idea', i.id))));
+      return r;
+    };
+    const starred = (set: GroupBoard['gallery'][number]) => set.ideas.find((i) => i.strongest) ?? set.ideas[0];
+    const pool = b.gallery.filter((set) => starred(set)).sort((x, y) => (b.totals[starred(y)!.id] ?? 0) - (b.totals[starred(x)!.id] ?? 0));
+    g.append(el('p', 'kit-label', 'In the head-to-heads: each student’s starred idea, most wins first'), el('p', 'sprint-note', 'Shading shows how often students said the winner was stronger in each criterion.'));
+    for (const set of pool) g.append(ideaRow(set, starred(set)!, true));
+    const others = b.gallery.flatMap((set) => set.ideas.filter((i) => i !== starred(set)).map((i) => ({ set, i })));
+    if (others.length) {
+      const more = el('details', 'sboard__more');
+      more.append(el('summary', '', `Their other ideas (${others.length}, not in the head-to-heads)`));
+      for (const { set, i } of others) { const r = ideaRow(set, i, false); r.prepend(el('span', 'kit-label', set.name)); more.append(r); }
+      g.append(more);
     }
     root.append(g);
 
