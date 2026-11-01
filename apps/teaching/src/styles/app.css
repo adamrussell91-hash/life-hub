@@ -10118,7 +10118,22 @@ body.is-lesson-builder-full-page .hub-utilities {
   }
 
   /* The grip and delete join the header strip, so the list needs no left lane. */
-  .lesson-page__blocks {
+  /* The kit's filter pill sets display, which beat [hidden]: the 4 levels pill showed in every format. */
+.block-editor .hub-filter[hidden] {
+  display: none;
+}
+
+.lesson-page__footer-note {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+.lesson-page__blocks {
     padding-left: 0;
   }
 

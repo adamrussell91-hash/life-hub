@@ -54,6 +54,15 @@ describe('lesson footer', () => {
     expect(tick(root).getAttribute('aria-pressed')).toBe('false');
   });
 
+  it('on a quiz shows previous and next with no tick: handing the quiz in marks it done', async () => {
+    const { calls, log } = fakeCalls();
+    const footer = mountLessonFooter({ lessonId: 'lesson1', classId: 'class1', prev: { href: '/s/classes/class1/lessons/l0', title: 'Reading the sources' }, next: null, finish: false, calls });
+    await flush();
+    expect(footer.element.querySelector('.lf__tick')).toBeNull();
+    expect(footer.element.querySelector('a.lf__link--prev')).not.toBeNull();
+    expect(log).toEqual([]);
+  });
+
   it('checks what’s left, hands everything in, asks two questions and the box, then says completed', async () => {
     const { calls, log } = fakeCalls();
     const quiz = fakeQuiz();

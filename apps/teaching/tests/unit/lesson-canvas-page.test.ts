@@ -775,6 +775,30 @@ describe('mountBlockCanvas', () => {
     expect((onChange.mock.calls.at(-1)?.[0] as Block[])[0]?.block_type).toBe('heading');
   });
 
+  it('adding a block keeps the other blocks’ previews, so loading blocks don’t flash', () => {
+    const renderPreview = vi.fn((block: Block) => {
+      const el = document.createElement('div');
+      el.className = 'block';
+      el.dataset.blockId = block.id;
+      return el;
+    });
+    const handle = mountBlockCanvas(host, {
+      blocks: [createBlock('heading', 'h1'), createBlock('anthology', 'a1')],
+      onChange: vi.fn(),
+      idFactory: () => ids.shift() ?? 'new_x',
+      renderPreview
+    });
+    const before = host.querySelector('[data-block-id="a1"] > .lesson-page__preview, .lesson-page__block[data-block-id="a1"] .block');
+    expect(before).not.toBeNull();
+    const drawn = renderPreview.mock.calls.length;
+
+    handle.insertType('rich_text');
+
+    expect(host.querySelector('.lesson-page__block[data-block-id="a1"] .block')).toBe(before);
+    // Only the new block is drawn.
+    expect(renderPreview.mock.calls.slice(drawn).map(([b]) => b.id)).not.toContain('a1');
+  });
+
   it('insertType drops into a selected section instead of the lesson root', () => {
     const onChange = vi.fn();
     const section = createBlock('section', 'sec1');

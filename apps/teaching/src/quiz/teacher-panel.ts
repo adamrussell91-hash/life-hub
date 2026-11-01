@@ -341,7 +341,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(bar);
     if (!submissions.length) {
       wrap.append(
-        el('p', 'qz-note block-secondary', 'No questions yet. Add a Question drop block to this week’s lessons and choose this quiz as where it feeds into.')
+        el('p', 'qz-note block-secondary', 'No questions yet. Add a Students write questions block to this week’s lessons and choose this quiz as where it feeds into.')
       );
       return wrap;
     }
@@ -581,7 +581,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     closes.type = 'datetime-local';
     closes.value = raw.closes_at ? toLocalInput(raw.closes_at) : '';
     closes.addEventListener('change', () => save({ closes_at: closes.value ? new Date(closes.value).toISOString() : undefined }));
-    grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Question drop blocks.'));
+    grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Students write questions blocks.'));
     const siblings = insight?.siblings ?? [];
     const current = raw.compare_with ?? '';
     const compareOptions = [{ value: '', label: 'None' }, ...siblings.map((x) => ({ value: x.lesson_id, label: x.title }))];

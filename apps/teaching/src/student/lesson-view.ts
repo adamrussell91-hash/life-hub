@@ -175,6 +175,7 @@ function renderPublishedLesson(
       lessonId: lesson.lesson_id,
       title: lesson.title,
       blocks: lesson.blocks,
+      loadAnthology: () => studentUnitAnthology(lesson.unit_id),
       client: classId ? lectureClient(lesson.lesson_id, classId) : null,
       renderHero: (hostEl) => {
         renderPublishedLessonHero(hostEl, lesson, extras?.cls);
@@ -303,7 +304,7 @@ export function mountStudentLessonView(
       const cls = extras?.cls;
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
-      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), work: () => work });
+      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work });
       content.append(footer.element);
     }
   };

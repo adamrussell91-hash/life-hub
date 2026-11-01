@@ -114,13 +114,13 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   accordion: 'Accordion',
   table: 'Table',
   peer_feedback: 'Peer feedback',
-  question_drop: 'Question drop',
+  question_drop: 'Students write questions',
   done: 'Done',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   continuum_line: 'Continuum line',
-  quiz_question: 'Quiz question',
-  question_set: 'Question set',
+  quiz_question: 'Question',
+  question_set: 'Question',
   flashcards: 'Flashcards',
   cloze: 'Cloze',
   self_check: 'Self check',
@@ -246,7 +246,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'quiz_question', 'question_set', 'question_drop', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -273,7 +273,7 @@ const PAGE_ONLY_TYPES = new Set(['collection']);
 /** Unit plan pages only: it maps the unit's lessons. */
 const UNIT_ONLY_TYPES = new Set(['curriculum_lines']);
 /** The old toolkit cards: kept for saved lessons, never offered for new ones (they are sleeves now). */
-export const RETIRED_BLOCK_TYPES: ReadonlySet<string> = new Set(['toolkit_skill', 'toolkit_tool', 'toolkit_value', 'definition', 'html']);
+export const RETIRED_BLOCK_TYPES: ReadonlySet<string> = new Set(['toolkit_skill', 'toolkit_tool', 'toolkit_value', 'definition', 'html', 'done']);
 
 const TOOLKIT_GROUP_TYPES = [
   'thinking_intentions',
@@ -334,8 +334,11 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   )
 })).filter((group) => group.types.length > 0);
 
-/** Lessons put words in the word tray under a text block, so Definition leaves their menu. Old blocks still render. */
-const LESSON_EXCLUDED = new Set(['definition']);
+/**
+ * Lessons put words in the word tray under a text block, so Definition leaves their menu.
+ * Written questions are a type inside Question (question-type.ts). Old blocks still render.
+ */
+const LESSON_EXCLUDED = new Set(['definition', 'question_set']);
 
 export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,

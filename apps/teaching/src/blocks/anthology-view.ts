@@ -39,8 +39,10 @@ function noteHref(item: AnthologyItem): string {
   return `${lessonCollectionHref(item.lesson_id)}#note=${encodeURIComponent(item.annotation_id)}`;
 }
 
-function emptyMessage(): string {
-  return 'Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.';
+/** The how-to is the teacher's; students only learn there's nothing here yet. */
+function emptyMessage(mode: AnthologyViewMode): string {
+  if (mode !== 'teacher') return 'Nothing collected here yet.';
+  return 'Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme. Students see notes from published lessons only.';
 }
 
 function canDraw(): boolean {
@@ -367,7 +369,7 @@ export function buildAnthologyView(
   if (items.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'block-anthology__empty block-empty';
-    empty.textContent = emptyMessage();
+    empty.textContent = emptyMessage(options.mode);
     root.append(empty);
     return root;
   }

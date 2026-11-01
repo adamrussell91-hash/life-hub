@@ -1,5 +1,6 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { renderBlock } from '@/blocks/render';
 import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
@@ -53,6 +54,8 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   const now = options.now ?? (() => Date.now());
   const sprint = lesson.sprint as PublicSprint;
   const blocks = lesson.blocks as Block[];
+  // An Anthology block in the brief or a guide reads the unit's published notes.
+  const loadAnthology = () => studentUnitAnthology(lesson.unit_id);
   const parts = sprintParts(blocks);
   let status: SprintStatus | null = null;
   let chosen: SprintPhaseKey | null = null;
@@ -107,13 +110,13 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   }
 
   // The group sheet: what the class was set and what the group has decided, at the top of every phase.
-  const sheet = createGroupSheet({ sprint, challenge: parts.brief, lessonId: lesson.lesson_id, pageBlocks: blocks, storeKey: `sprint-sheet:${lesson.lesson_id}` });
+  const sheet = createGroupSheet({ sprint, challenge: parts.brief, lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology, storeKey: `sprint-sheet:${lesson.lesson_id}` });
 
   // Built once, so a poll doesn't fold it or reload what's inside it.
   const wholeGuides = parts.guides && (parts.guides.content.blocks as Block[]).length ? el('details', 'sprint-guides sprint-guides--whole') : null;
   if (wholeGuides) {
     wholeGuides.append(el('summary', '', 'Guides for the whole sprint'));
-    for (const b of parts.guides!.content.blocks as Block[]) wholeGuides.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+    for (const b of parts.guides!.content.blocks as Block[]) wholeGuides.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
   }
 
   function paintTop(s: SprintStatus, key: SprintPhaseKey): void {
@@ -138,7 +141,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     panel.open = typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 900px)').matches;
     panel.append(el('summary', '', 'Guides for this step'));
     const sec = parts.phases.get(key);
-    for (const b of (sec?.content.blocks as Block[] | undefined) ?? []) panel.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+    for (const b of (sec?.content.blocks as Block[] | undefined) ?? []) panel.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
     if (key === 'sketch' || key === 'decide') {
       const g = sprint.idea_guide;
       const check = el('div', 'sprint-guide');
