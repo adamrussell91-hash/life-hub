@@ -76,7 +76,7 @@ test('knowledge topics prefer book origins, then Knowledge tags, then title alia
   assert.equal(topics.topics[0].name, 'The Lantern Keeper');
   assert.deepEqual(
     topics.topics.map(topic => topic.name).sort(),
-    ['The Lantern Keeper', 'Gifted education', 'High Potential and High Ability Education']
+    ['Gifted education', 'High Potential and High Ability Education', 'The Lantern Keeper']
   );
   assert.ok(topics.topics[0].vals.some(value => value === 1));
 });
