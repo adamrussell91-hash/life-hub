@@ -1247,6 +1247,16 @@ async function latestAttempts(store, k, lessonId, owners) {
   return out;
 }
 
+/**
+ * Knowledge-piece tags are teacher metadata, so an attempt made before a question was tagged still
+ * counts: the current record's pieces replace the attempted version's. Marks never change.
+ */
+export function withCurrentPieces(key, current) {
+  if (!current || current.kind !== key.kind) return key;
+  const { pieces: _old, ...rest } = key;
+  return current.pieces?.length ? { ...rest, pieces: [...current.pieces] } : rest;
+}
+
 async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   const owners = roster ? new Map(roster.students.map((s) => [deviceHash(`student:${cls}:${s.id}`), s.id])) : null;
   const counted = await latestAttempts(store, k, lessonId, owners);
@@ -1273,7 +1283,8 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
       rows: scored.rows.map((r) => {
         const entry = rec.questions[r.id];
         const outcomes = entry.key.outcomes ?? fallback;
-        const items = answerEvidence({ question: entry.question, key: entry.key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback });
+        const key = withCurrentPieces(entry.key, entryFor(record, r.id)?.key);
+        const items = answerEvidence({ question: entry.question, key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback });
         return { id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, codes: r.codes, outcomes, items, ...(hasAnswer(r.response) ? {} : { unanswered: true }), ...(r.set ? { set: r.set } : {}) };
       })
     });

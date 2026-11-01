@@ -689,6 +689,26 @@ test('insight: evidence per answer; a closed, fully marked quiz is saved until s
   assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).closed, false);
 });
 
+test('insight: pieces tagged after an attempt count for it, without changing its marks', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qa: { selected: ['b'] } } });
+  const before = (await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts[0].rows.find((r) => r.id === 'qa');
+  assert.ok(!before.items[0].tags.some((t) => t.startsWith('kp:')));
+
+  const draft = await store.get('lessons/quiz1');
+  draft.blocks = [qBlock('qa', { ...mc, pieces: ['kp_ab12'] }), qBlock('qb', sa)];
+  store.data.set('lessons/quiz1', draft);
+  await publishQuiz(store);
+
+  const after = (await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts[0].rows.find((r) => r.id === 'qa');
+  assert.ok(after.items[0].tags.includes('kp:kp_ab12'), 'the older attempt picks up the new tag');
+  assert.equal(after.awarded, before.awarded);
+  assert.equal(after.items[0].share, before.items[0].share);
+});
+
 test('old numeric teacher marks still read', async () => {
   const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
   await publishQuiz(store);
