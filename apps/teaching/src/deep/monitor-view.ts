@@ -223,7 +223,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     const wh = h('h4', '', 'Where each student is');
     where.append(wh);
     const pills = h('div', 'du-dutabs');
-    options.deep.forEach((d, i) => pills.append(button(`${i + 1}. ${(d.claim || 'New').slice(0, 28)}`, d.id === du.id ? 'on' : '', () => { duId = d.id; selected = null; paint(); })));
+    options.deep.forEach((d, i) => pills.append(button(`${i + 1}. ${d.claim || 'New'}`, d.id === du.id ? 'on' : '', () => { duId = d.id; selected = null; paint(); })));
     where.append(pills, distRow('', m.lanes, loaded.students.length));
     const filt = h('div', 'du-filt');
     filt.append(h('span', 'fl', 'Show'));
@@ -232,7 +232,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     }
     filt.append(h('span', 'fl', 'Sort'));
     filt.append(button('Initials', sort === 'initials' ? 'on' : '', () => { sort = 'initials'; paint(); }), button('Not used', sort === 'notUsed' ? 'on' : '', () => { sort = 'notUsed'; paint(); }));
-    where.append(filt);
+    where.append(filt, pipKey());
     const lanes = h('div', 'du-lanes');
     for (const lane of LANES) {
       if (filter !== 'all' && filter !== lane) continue;
@@ -249,7 +249,8 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
         chip.append(h('b', '', s.initials));
         const pips = h('span', 'du-pips');
         const passedIdx = PLACED.indexOf(loaded.progress.steps[s.id]?.[du.id]?.step ?? ('' as PlacedStep));
-        PLACED.forEach((_, k) => pips.append(h('i', k <= passedIdx ? 'on' : '')));
+        PLACED.forEach((step, k) => pips.append(h('i', k <= passedIdx ? 'on' : '', STEP_LABEL[step])));
+        chip.title = passedIdx < 0 ? `${s.initials}: no step passed yet` : `${s.initials}: passed step ${STEP_LABEL[PLACED[passedIdx]!]}`;
         chip.append(pips);
         if (s.since) chip.append(h('span', 'du-tag old', ageText(s.since, today)));
         if (s.notUsed) chip.append(h('span', 'du-tag nu', `${s.notUsed} not used`));
@@ -286,7 +287,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     const box = h('div', `du-grp g-${cls}`);
     box.append(h('b', '', title));
     if (!rows.length) box.append(h('span', 'du-cnt', 'No one right now.'));
-    for (const r of rows) box.append(h('div', '', `${initialsOf(r.student)}: ${[...new Set(r.pieces)].map((p) => pieceText(p).slice(0, 48)).join('; ')}`));
+    for (const r of rows) box.append(h('div', '', `${initialsOf(r.student)}: ${[...new Set(r.pieces)].map((p) => pieceText(p)).join('; ')}`));
     if (rows.length) box.append(button(doLabel, 'do', () => void regroup(kind, rows.map((r) => r.student), rows.flatMap((r) => r.pieces))));
     return box;
   }
@@ -357,6 +358,53 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     return box;
   }
 
+  /** The step boxes on each name: one per evidence step, filled once passed. */
+  function pipKey(): HTMLElement {
+    const key = h('p', 'du-legend du-key');
+    const sample = h('span', 'du-pips');
+    PLACED.forEach((step, k) => sample.append(h('i', k < 2 ? 'on' : '', STEP_LABEL[step])));
+    const item = h('span');
+    item.append(sample, document.createTextNode(' Boxes on each name are steps 2A, 2B, 3 and 4. Filled = passed (here, 2A and 2B).'));
+    key.append(item);
+    return key;
+  }
+
+  function markKey(): HTMLElement {
+    const key = h('p', 'du-legend du-key');
+    const one = (state: 'used' | 'missed' | 'blank', mark: string, text: string): HTMLElement => {
+      const item = h('span');
+      item.append(h('span', `du-three ${state} du-three--key`, mark), document.createTextNode(` ${text}`));
+      return item;
+    };
+    key.append(
+      h('span', '', 'Tap a box to change it:'),
+      one('used', '✓', 'used the piece in their writing'),
+      one('missed', '–', 'missed it'),
+      one('blank', '', 'not marked yet')
+    );
+    return key;
+  }
+
+  function circleKey(): HTMLElement {
+    const key = h('p', 'du-legend du-key');
+    const one = (cls: string, text: string): HTMLElement => {
+      const item = h('span');
+      item.append(h('span', `du-c ${cls}`), document.createTextNode(` ${text}`));
+      return item;
+    };
+    key.append(
+      one('none', 'Not checked yet'),
+      one('half', 'Right once'),
+      one('full', 'Right on two separate days'),
+      one('amb', 'Latest check wrong'),
+      one('full fade', 'No check in four weeks'),
+      one('none used', 'Used in writing'),
+      one('none notused', 'Expected in writing, not used'),
+      one('na', 'Not taught yet')
+    );
+    return key;
+  }
+
   /** Mark which target pieces each student used in a writing task. */
   function markUse(du: DeepUnderstanding): HTMLElement {
     const sec = h('section', 'du-panel');
@@ -376,7 +424,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
         const table = h('table', 'du-kg');
         const head = h('tr');
         head.append(h('th', 'rowh', ''));
-        for (const id of targets) { const th = h('th', '', pieceText(id).slice(0, 40)); th.title = pieceText(id); head.append(th); }
+        for (const id of targets) { head.append(h('th', '', pieceText(id))); }
         table.append(head);
         for (const s of loaded.students) {
           const tr = h('tr');
@@ -401,6 +449,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
         sec.append(scroll);
       });
     }
+    if (any) hd.after(markKey());
     if (!any) sec.append(h('p', 'du-empty', 'No writing task has target pieces yet. Pick two or three pieces on a task in the lesson editor.'));
     return sec;
   }
@@ -408,13 +457,12 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
   function piecesTable(du: DeepUnderstanding, pieces: KnowledgePiece[], m: ReturnType<typeof buildMonitor>['byDu'] extends Map<string, infer V> ? V : never): HTMLElement {
     const sec = h('section', 'du-panel');
     const hd = h('h4', '', 'Knowledge pieces ');
-    hd.append(info('Half a circle means right once. A full circle means right on two separate days. Amber means the latest check was wrong. A faded circle means no check in four weeks. A ring means used in writing; a dashed ring means expected but not used.'));
-    sec.append(hd);
+    sec.append(hd, circleKey());
     const scroll = h('div', 'du-scroll');
     const table = h('table', 'du-kg');
     const head = h('tr');
     head.append(h('th', 'rowh', ''), h('th', '', 'Step 1'));
-    for (const p of pieces) { const th = h('th', `t${p.tier[0]}`, p.text.slice(0, 36)); th.title = p.text; head.append(th); }
+    for (const p of pieces) { head.append(h('th', `t${p.tier[0]}`, p.text)); }
     table.append(head);
     const intro = introduced();
     const counted = pieces.filter((p) => p.tier !== 'sophisticated' && intro.has(p.id));

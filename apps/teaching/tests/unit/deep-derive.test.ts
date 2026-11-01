@@ -29,6 +29,10 @@ describe('unit scope', () => {
     expect(scope.points.map((p) => p.ref)).toEqual(['area-one:U1', 'area-one:R1']);
     expect(scope.bullets.map((b) => [b.ref, b.via])).toEqual([['ARG1', ['U1']], ['STY1', ['U1']], ['ARG2', ['R1']]]);
   });
+
+  it("keeps only the unit's own concepts when given", () => {
+    expect(unitScope(lessons, alignment, ['ARG']).bullets.map((b) => b.ref)).toEqual(['ARG1', 'ARG2']);
+  });
 });
 
 describe('placements', () => {

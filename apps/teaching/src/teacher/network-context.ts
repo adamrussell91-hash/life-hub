@@ -119,6 +119,17 @@ export function unitLessonLines(unit: Unit, lines: readonly NetworkLine[]): Netw
   return unitLines(lines, unitMapContent(unit)?.concept_lines, unitMapContent(unit)?.skill_lines);
 }
 
+/** The textual concept keys this unit covers: the unit map's metro lines, else its focus area's own few. */
+export function unitConceptKeysFor(curriculum: CurriculumResponse, unit: Unit, doc: Alignment): string[] {
+  const content = unitMapContent(unit);
+  if (content?.concept_lines?.length) {
+    const keys = unitLessonLines(unit, unitNetworkContext(curriculum, unit).lines).flatMap((l) => (l.alignment?.kind === 'concept' ? [l.alignment.key] : []));
+    if (keys.length) return keys;
+  }
+  const area = focusAreaFor(doc, unit.title, content?.focus_area);
+  return area ? unitConceptKeys(doc, area.id) : [];
+}
+
 /**
  * Unit maps with no concepts picked get the focus area's own (see
  * unitConceptKeys), so the map, its lessons and the class site show those

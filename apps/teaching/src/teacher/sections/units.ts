@@ -56,7 +56,7 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
-import { settleConceptLines, settleSkillLines, unitNetworkContext } from '@/teacher/network-context';
+import { settleConceptLines, settleSkillLines, unitConceptKeysFor, unitNetworkContext } from '@/teacher/network-context';
 import { loadAlignment } from '@/alignment/api';
 import { lessonWeeks } from '@/deep/derive';
 import { mountDeepSection } from '@/deep/plan-view';
@@ -637,7 +637,7 @@ export function renderUnitPage(
       unit,
       lessons: deepLessons,
       weeks: lessonWeeks(unit.lesson_ids, unitRows),
-      scope: unitScope(deepLessons, alignment),
+      scope: unitScope(deepLessons, alignment, alignment ? unitConceptKeysFor(curriculum, unit, alignment) : []),
       save: (deep) => patchUnit(unit.id, { deep_understandings: deep }),
       classes: curriculum.classes
         .filter((c) => c.current_unit_id === unit.id || c.active_unit_ids.includes(unit.id))
