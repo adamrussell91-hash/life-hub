@@ -11,7 +11,7 @@ const KNOWLEDGE_TITLE_ALIASES = [
   { name: 'Gifted education', pattern: /gifted|hpge|talent/i },
   { name: 'Classroom culture', pattern: /classroom|culture|belonging|engagement/i },
   { name: 'ADHD / attention', pattern: /adhd|attention|executive/i },
-  { name: 'Module B', pattern: /module b|aotfw|textual|floating world/i },
+  { name: 'Module B', pattern: /module b|textual/i },
   { name: 'Health', pattern: /health|\bibd\b|gut|flare|diet/i }
 ];
 const KNOWLEDGE_TOPIC_CAP = 8;

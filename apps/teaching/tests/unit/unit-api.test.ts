@@ -13,7 +13,7 @@ const seedFixture = JSON.parse(
 ) as SeedData;
 
 const PASSPHRASE = 'teaching-hub-local';
-const UNIT_ID = 'unit_aotfw';
+const UNIT_ID = 'unit_lkeep';
 const PATH = `/api/units/${UNIT_ID}`;
 const ISO = '2026-01-01T00:00:00.000Z';
 

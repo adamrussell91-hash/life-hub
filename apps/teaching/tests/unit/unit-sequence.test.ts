@@ -71,8 +71,8 @@ const units: Unit[] = [
     end_date: '2026-09-20'
   }),
   unit({
-    id: 'unit_aotfw',
-    title: 'Artist of the Floating World',
+    id: 'unit_lkeep',
+    title: 'The Lantern Keeper',
     start_date: '2026-08-10',
     end_date: '2026-09-04'
   }),
@@ -83,7 +83,7 @@ const scheduledLessons: ScheduledLesson[] = [
   scheduled({
     id: 's2',
     lesson_id: 'l2',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     date: '2026-08-12',
     schedule_order: 2,
     delivery_status: 'current'
@@ -91,7 +91,7 @@ const scheduledLessons: ScheduledLesson[] = [
   scheduled({
     id: 's1',
     lesson_id: 'l1',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     date: '2026-08-10',
     schedule_order: 1,
     delivery_status: 'delivered'
@@ -140,7 +140,7 @@ describe('renderUnitSequence', () => {
       units,
       scheduled: scheduledLessons,
       lessonTitles,
-      currentUnitId: overrides?.currentUnitId ?? 'unit_aotfw',
+      currentUnitId: overrides?.currentUnitId ?? 'unit_lkeep',
       classId: CLASS_ID,
       today: overrides?.today ?? '2026-08-20',
       readOnly: overrides?.readOnly,
@@ -157,38 +157,38 @@ describe('renderUnitSequence', () => {
     const details = [...host.querySelectorAll('details')];
     expect(details).toHaveLength(3);
     expect(details.map((el) => el.getAttribute('data-unit-id'))).toEqual([
-      'unit_aotfw',
+      'unit_lkeep',
       'unit_later',
       'unit_empty'
     ]);
   });
 
   it('opens only the current unit on first visit', () => {
-    render({ currentUnitId: 'unit_aotfw' });
+    render({ currentUnitId: 'unit_lkeep' });
 
     const open = host.querySelectorAll('details[open]');
     expect(open).toHaveLength(1);
-    expect(open[0].getAttribute('data-unit-id')).toBe('unit_aotfw');
+    expect(open[0].getAttribute('data-unit-id')).toBe('unit_lkeep');
   });
 
   it('shows title, lesson count, and date range in the summary', () => {
     render();
 
-    const summary = host.querySelector('details[data-unit-id="unit_aotfw"] summary')!;
-    expect(summary.textContent).toContain('Artist of the Floating World');
+    const summary = host.querySelector('details[data-unit-id="unit_lkeep"] summary')!;
+    expect(summary.textContent).toContain('The Lantern Keeper');
     expect(summary.textContent).toContain('2 lessons');
     expect(summary.textContent).toMatch(/10\/08\/26\s*[–-]\s*04\/09\/26/);
 
-    const titleLink = summary.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!;
+    const titleLink = summary.querySelector<HTMLAnchorElement>('a[href="/units/unit_lkeep"]')!;
     expect(titleLink).not.toBeNull();
-    expect(titleLink.textContent).toBe('Artist of the Floating World');
+    expect(titleLink.textContent).toBe('The Lantern Keeper');
   });
 
   it('shows a progress bar from unitDateProgress when a span exists', () => {
     render({ today: '2026-08-20' });
 
     const bar = host.querySelector<HTMLElement>(
-      'details[data-unit-id="unit_aotfw"] .seq__progress-bar'
+      'details[data-unit-id="unit_lkeep"] .seq__progress-bar'
     );
     expect(bar).not.toBeNull();
     expect(bar!.style.width).toMatch(/%$/);
@@ -208,14 +208,14 @@ describe('renderUnitSequence', () => {
     later.dispatchEvent(new Event('toggle'));
 
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-    expect(stored).toEqual(expect.arrayContaining(['unit_aotfw', 'unit_later']));
+    expect(stored).toEqual(expect.arrayContaining(['unit_lkeep', 'unit_later']));
     expect(stored).toHaveLength(2);
   });
 
   it('restores previously open units from storage on re-render', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(['unit_later', 'unit_empty']));
 
-    render({ currentUnitId: 'unit_aotfw' });
+    render({ currentUnitId: 'unit_lkeep' });
 
     const openIds = [...host.querySelectorAll('details[open]')].map((el) =>
       el.getAttribute('data-unit-id')
@@ -228,7 +228,7 @@ describe('renderUnitSequence', () => {
 
     const rows = [
       ...host.querySelectorAll<HTMLAnchorElement>(
-        'details[data-unit-id="unit_aotfw"] a.seq__lesson-link'
+        'details[data-unit-id="unit_lkeep"] a.seq__lesson-link'
       )
     ];
     expect(rows).toHaveLength(2);
@@ -249,7 +249,7 @@ describe('renderUnitSequence', () => {
     render();
 
     const controls = host.querySelector(
-      'details[data-unit-id="unit_aotfw"] .seq__row .seq__controls'
+      'details[data-unit-id="unit_lkeep"] .seq__row .seq__controls'
     )!;
     expect(controls).not.toBeNull();
 
@@ -276,7 +276,7 @@ describe('renderUnitSequence', () => {
     render({ onOverflow });
 
     const row = host.querySelector(
-      'details[data-unit-id="unit_aotfw"] .seq__lessons .seq__row:nth-child(2)'
+      'details[data-unit-id="unit_lkeep"] .seq__lessons .seq__row:nth-child(2)'
     )!;
     const [overflow] = [...row.querySelectorAll('button')];
     overflow.click();
@@ -304,7 +304,7 @@ describe('renderUnitSequence', () => {
     const onNavigate = vi.fn();
     render({ onNavigate });
 
-    const unitLink = host.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!;
+    const unitLink = host.querySelector<HTMLAnchorElement>('a[href="/units/unit_lkeep"]')!;
     const lessonLink = host.querySelector<HTMLAnchorElement>(
       'a.seq__lesson-link[href="/lessons/l1"]'
     )!;
@@ -312,7 +312,7 @@ describe('renderUnitSequence', () => {
     unitLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     lessonLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-    expect(onNavigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    expect(onNavigate).toHaveBeenCalledWith('/units/unit_lkeep');
     expect(onNavigate).toHaveBeenCalledWith('/lessons/l1');
   });
 

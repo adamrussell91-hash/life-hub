@@ -73,7 +73,7 @@ test('lesson and unit template collections list active summaries and hide trash'
     },
     'templates/units/ut_live': {
       id: 'ut_live',
-      title: 'Floating World',
+      title: 'Lantern Keeper',
       status: 'active',
       updated_at: '2026-08-01T00:00:00.000Z'
     }
@@ -97,7 +97,7 @@ test('lesson and unit template collections list active summaries and hide trash'
   );
   assert.equal(units.status, 200);
   assert.deepEqual((await units.json()).data.templates, [
-    { id: 'ut_live', title: 'Floating World', updated_at: '2026-08-01T00:00:00.000Z' }
+    { id: 'ut_live', title: 'Lantern Keeper', updated_at: '2026-08-01T00:00:00.000Z' }
   ]);
 });
 
@@ -113,12 +113,12 @@ test('lesson and unit template collections create and fetch a record', async () 
     request({
       method: 'POST',
       url: 'https://api.adam-russell.com/api/lesson-templates',
-      body: { title: 'Memory, Identity and Ono', blocks: [] }
+      body: { title: 'Memory, Identity and Hale', blocks: [] }
     })
   );
   assert.equal(createdLesson.status, 201);
   const lesson = (await createdLesson.json()).data;
-  assert.equal(lesson.title, 'Memory, Identity and Ono');
+  assert.equal(lesson.title, 'Memory, Identity and Hale');
   assert.equal(lesson.type, 'lesson_template');
   assert.equal(lesson.status, 'active');
 
@@ -132,7 +132,7 @@ test('lesson and unit template collections create and fetch a record', async () 
     request({
       method: 'POST',
       url: 'https://api.adam-russell.com/api/unit-templates',
-      body: { title: 'Artist of the Floating World' }
+      body: { title: 'The Lantern Keeper' }
     })
   );
   assert.equal(createdUnit.status, 201);
@@ -143,5 +143,5 @@ test('lesson and unit template collections create and fetch a record', async () 
     request({ url: `https://api.adam-russell.com/api/unit-templates/${unit.id}` })
   );
   assert.equal(fetchedUnit.status, 200);
-  assert.equal((await fetchedUnit.json()).data.title, 'Artist of the Floating World');
+  assert.equal((await fetchedUnit.json()).data.title, 'The Lantern Keeper');
 });

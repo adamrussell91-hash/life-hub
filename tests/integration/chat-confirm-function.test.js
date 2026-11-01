@@ -1753,12 +1753,12 @@ test('action confirm writes a Tasks project blob and leaves GitHub files alone',
     candidate: {
       capability: 'os.propose-action',
       agent: 'clare',
-      intent: 'open the AOTFW project',
+      intent: 'open the LKEEP project',
       reads: [],
       writes: [{
-        path: 'tasks:project:proj_aotfw',
+        path: 'tasks:project:proj_lkeep',
         mode: 'create',
-        content: JSON.stringify({ name: 'Artist of the Floating World', status: 'active' }),
+        content: JSON.stringify({ name: 'The Lantern Keeper', status: 'active' }),
         diff: 'new project'
       }],
       surfaces: ['governance_log']
@@ -1766,15 +1766,15 @@ test('action confirm writes a Tasks project blob and leaves GitHub files alone',
   }));
   const payload = await response.json();
   assert.equal(response.status, 200);
-  assert.equal(store.data['projects/proj_aotfw'].name, 'Artist of the Floating World');
-  assert.equal(store.data['projects/proj_aotfw'].id, 'proj_aotfw');
-  assert.deepEqual(store.data['projects/_index'], ['proj_aotfw']);
+  assert.equal(store.data['projects/proj_lkeep'].name, 'The Lantern Keeper');
+  assert.equal(store.data['projects/proj_lkeep'].id, 'proj_lkeep');
+  assert.deepEqual(store.data['projects/_index'], ['proj_lkeep']);
   assert.equal(
     calls.filter(call => call.options?.method === 'PUT' && call.url.includes('tasks:project')).length,
     0
   );
   assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md')));
-  assert.equal(payload.data.results[0].path, 'tasks:project:proj_aotfw');
+  assert.equal(payload.data.results[0].path, 'tasks:project:proj_lkeep');
 });
 
 test('action confirm writes a Tasks task blob onto tasks/_index', async () => {

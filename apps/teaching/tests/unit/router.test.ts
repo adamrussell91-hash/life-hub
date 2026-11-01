@@ -42,20 +42,20 @@ describe('router match', () => {
   });
 
   it('matches teacher lesson editor', () => {
-    expect(match('/lessons/lesson_aotfw_008')).toEqual({
+    expect(match('/lessons/lesson_lkeep_008')).toEqual({
       name: 'teacher-lesson',
-      params: { lessonId: 'lesson_aotfw_008' },
+      params: { lessonId: 'lesson_lkeep_008' },
       requiresAuth: true,
-      path: '/lessons/lesson_aotfw_008'
+      path: '/lessons/lesson_lkeep_008'
     });
   });
 
   it('matches public student lesson view', () => {
-    expect(match('/s/lessons/lesson_aotfw_008')).toEqual({
+    expect(match('/s/lessons/lesson_lkeep_008')).toEqual({
       name: 'student-lesson',
-      params: { lessonId: 'lesson_aotfw_008' },
+      params: { lessonId: 'lesson_lkeep_008' },
       requiresAuth: false,
-      path: '/s/lessons/lesson_aotfw_008'
+      path: '/s/lessons/lesson_lkeep_008'
     });
   });
 
@@ -75,11 +75,11 @@ describe('router match', () => {
   });
 
   it('matches public student unit view', () => {
-    expect(match('/s/units/unit_aotfw')).toEqual({
+    expect(match('/s/units/unit_lkeep')).toEqual({
       name: 'student-unit',
-      params: { unitId: 'unit_aotfw' },
+      params: { unitId: 'unit_lkeep' },
       requiresAuth: false,
-      path: '/s/units/unit_aotfw'
+      path: '/s/units/unit_lkeep'
     });
   });
 
@@ -102,20 +102,20 @@ describe('router match', () => {
   });
 
   it('matches public student class-scoped lesson view', () => {
-    expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008')).toEqual({
+    expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_lkeep_008')).toEqual({
       name: 'student-class-lesson',
       params: {
         classId: 'class_2026_12engadv1',
-        lessonId: 'lesson_aotfw_008'
+        lessonId: 'lesson_lkeep_008'
       },
       requiresAuth: false,
-      path: '/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008'
+      path: '/s/classes/class_2026_12engadv1/lessons/lesson_lkeep_008'
     });
   });
 
   it('still matches bare student class and bare lesson', () => {
     expect(match('/s/classes/class_2026_12engadv1')?.name).toBe('student-class');
-    expect(match('/s/lessons/lesson_aotfw_008')?.name).toBe('student-lesson');
+    expect(match('/s/lessons/lesson_lkeep_008')?.name).toBe('student-lesson');
   });
 
   it('matches sign-in gate', () => {
@@ -200,11 +200,11 @@ describe('router match', () => {
   });
 
   it('matches teacher section detail routes', () => {
-    expect(match('/units/unit_aotfw')).toEqual({
+    expect(match('/units/unit_lkeep')).toEqual({
       name: 'teacher-unit',
-      params: { unitId: 'unit_aotfw' },
+      params: { unitId: 'unit_lkeep' },
       requiresAuth: true,
-      path: '/units/unit_aotfw'
+      path: '/units/unit_lkeep'
     });
     expect(match('/scope-sequences/subject_y12_engadv')).toEqual({
       name: 'teacher-scope-sequence',
@@ -225,15 +225,15 @@ describe('router match', () => {
 
   it('does not treat list paths as lesson editor', () => {
     expect(match('/lessons')?.name).toBe('teacher-lessons');
-    expect(match('/lessons/lesson_aotfw_008')?.name).toBe('teacher-lesson');
+    expect(match('/lessons/lesson_lkeep_008')?.name).toBe('teacher-lesson');
   });
 
   it('matches the signed-in Display view for a lesson', () => {
-    expect(match('/lessons/lesson_aotfw_008/display')).toEqual({
+    expect(match('/lessons/lesson_lkeep_008/display')).toEqual({
       name: 'teacher-lesson-display',
-      params: { lessonId: 'lesson_aotfw_008' },
+      params: { lessonId: 'lesson_lkeep_008' },
       requiresAuth: true,
-      path: '/lessons/lesson_aotfw_008/display'
+      path: '/lessons/lesson_lkeep_008/display'
     });
   });
 
@@ -242,12 +242,12 @@ describe('router match', () => {
       ['/', true],
       ['/classes', true],
       ['/lessons', true],
-      ['/lessons/lesson_aotfw_008', true],
-      ['/units/unit_aotfw', true],
-      ['/s/lessons/lesson_aotfw_008', false],
-      ['/s/units/unit_aotfw', false],
+      ['/lessons/lesson_lkeep_008', true],
+      ['/units/unit_lkeep', true],
+      ['/s/lessons/lesson_lkeep_008', false],
+      ['/s/units/unit_lkeep', false],
       ['/s/classes/class_2026_12engadv1', false],
-      ['/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008', false],
+      ['/s/classes/class_2026_12engadv1/lessons/lesson_lkeep_008', false],
       ['/sign-in', false]
     ];
 
@@ -277,14 +277,14 @@ describe('router navigation', () => {
     const stop = start(onRoute);
     onRoute.mockClear();
 
-    navigate('/lessons/lesson_aotfw_008');
+    navigate('/lessons/lesson_lkeep_008');
 
-    expect(pushState).toHaveBeenCalledWith(null, '', '/lessons/lesson_aotfw_008');
+    expect(pushState).toHaveBeenCalledWith(null, '', '/lessons/lesson_lkeep_008');
     expect(onRoute).toHaveBeenCalledWith({
       name: 'teacher-lesson',
-      params: { lessonId: 'lesson_aotfw_008' },
+      params: { lessonId: 'lesson_lkeep_008' },
       requiresAuth: true,
-      path: '/lessons/lesson_aotfw_008'
+      path: '/lessons/lesson_lkeep_008'
     });
 
     stop();

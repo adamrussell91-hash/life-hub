@@ -221,8 +221,8 @@ Example:
 "variant": "medium",
 "content": {
 "quote": "...",
-"attribution": "Kazuo Ishiguro",
-"source": "An Artist of the Floating World",
+"attribution": "Mira Calder",
+"source": "The Lantern Keeper",
 "reference": ""
 }
 }
@@ -850,7 +850,7 @@ Example:
 "content": {
 "source": "lessons",
 "filter": {
-"unit_id": "unit_aotfw"
+"unit_id": "unit_lkeep"
 },
 "sort": "sequence"
 }

@@ -87,7 +87,7 @@ At least two (prefer three) demo Media items, e.g.:
 2. External syllabus/link — `media_type: 'link'` with URL  
 3. Optional image — `media_type: 'image'` with URL  
 
-Use safe public example URLs (or well-known placeholder HTTPS links). Titles suitable for Eng Adv / AoTFW demo.
+Use safe public example URLs (or well-known placeholder HTTPS links). Titles suitable for Eng Adv / LKeep demo.
 
 ## Teacher UI
 

@@ -290,7 +290,7 @@ describe('PublishableLessonSchema media rules', () => {
     title: 'Lesson',
     slug: 'lesson',
     status: 'active' as const,
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',

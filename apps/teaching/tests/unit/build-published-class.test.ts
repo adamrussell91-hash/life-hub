@@ -14,8 +14,8 @@ const baseClass: Class = {
   academic_year: 2026,
   year_id: 'year_12',
   subject_id: 'subject_y12_engadv',
-  active_unit_ids: ['unit_aotfw'],
-  current_unit_id: 'unit_aotfw',
+  active_unit_ids: ['unit_lkeep'],
+  current_unit_id: 'unit_lkeep',
   current_scheduled_lesson_id: 'scheduled_b',
   status: 'active',
   created_at: ISO,
@@ -25,10 +25,10 @@ const baseClass: Class = {
 
 const units: Unit[] = [
   {
-    id: 'unit_aotfw',
+    id: 'unit_lkeep',
     type: 'unit',
-    title: 'Artist of the Floating World',
-    slug: 'aotfw',
+    title: 'The Lantern Keeper',
+    slug: 'lkeep',
     year_id: 'year_12',
     subject_id: 'subject_y12_engadv',
     lesson_ids: ['lesson_a', 'lesson_c', 'lesson_b'],
@@ -44,7 +44,7 @@ const scheduled: ScheduledLesson[] = [
     id: 'scheduled_b',
     type: 'scheduled_lesson',
     class_id: 'class_2026_12engadv1',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     lesson_id: 'lesson_b',
     date: '2026-08-12',
     schedule_order: 2,
@@ -57,7 +57,7 @@ const scheduled: ScheduledLesson[] = [
     id: 'scheduled_a',
     type: 'scheduled_lesson',
     class_id: 'class_2026_12engadv1',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     lesson_id: 'lesson_a',
     date: '2026-08-11',
     schedule_order: 1,
@@ -103,7 +103,7 @@ describe('buildPublishedClass', () => {
     expect(dto.schedule.map((row) => row.id)).toEqual(['scheduled_a', 'scheduled_b']);
     expect(dto.schedule[0]).toMatchObject({
       lesson_id: 'lesson_a',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       title: 'Lesson A',
       published: true
     });
@@ -127,8 +127,8 @@ describe('buildPublishedClass', () => {
     });
 
     expect(dto.current_unit).toEqual({
-      id: 'unit_aotfw',
-      title: 'Artist of the Floating World',
+      id: 'unit_lkeep',
+      title: 'The Lantern Keeper',
       lessons: []
     });
     expect(dto.current_lesson).toEqual({
@@ -137,7 +137,7 @@ describe('buildPublishedClass', () => {
       lesson_id: 'lesson_b'
     });
     expect(dto.active_units).toEqual([
-      { id: 'unit_aotfw', title: 'Artist of the Floating World' }
+      { id: 'unit_lkeep', title: 'The Lantern Keeper' }
     ]);
   });
 

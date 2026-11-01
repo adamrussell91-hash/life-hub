@@ -11,9 +11,9 @@
       "academic_year": 2026,
       "year_id": "year_12",
       "subject_id": "subject_y12_engadv",
-      "active_unit_ids": ["unit_aotfw"],
-      "current_unit_id": "unit_aotfw",
-      "current_scheduled_lesson_id": "scheduled_aotfw_008",
+      "active_unit_ids": ["unit_lkeep"],
+      "current_unit_id": "unit_lkeep",
+      "current_scheduled_lesson_id": "scheduled_lkeep_008",
       "meeting_days": [1, 2, 3, 4, 5],
       "status": "active",
       "created_at": "2026-01-01T00:00:00.000Z",
@@ -23,11 +23,11 @@
   ],
   "scheduled_lessons": [
     {
-      "id": "scheduled_aotfw_006",
+      "id": "scheduled_lkeep_006",
       "type": "scheduled_lesson",
       "class_id": "class_2026_12engadv1",
-      "unit_id": "unit_aotfw",
-      "lesson_id": "lesson_aotfw_006",
+      "unit_id": "unit_lkeep",
+      "lesson_id": "lesson_lkeep_006",
       "date": "2026-08-10",
       "schedule_order": 1,
       "delivery_status": "planned",
@@ -36,11 +36,11 @@
       "schema_version": 1
     },
     {
-      "id": "scheduled_aotfw_007",
+      "id": "scheduled_lkeep_007",
       "type": "scheduled_lesson",
       "class_id": "class_2026_12engadv1",
-      "unit_id": "unit_aotfw",
-      "lesson_id": "lesson_aotfw_007",
+      "unit_id": "unit_lkeep",
+      "lesson_id": "lesson_lkeep_007",
       "date": "2026-08-11",
       "schedule_order": 2,
       "delivery_status": "planned",
@@ -49,11 +49,11 @@
       "schema_version": 1
     },
     {
-      "id": "scheduled_aotfw_008",
+      "id": "scheduled_lkeep_008",
       "type": "scheduled_lesson",
       "class_id": "class_2026_12engadv1",
-      "unit_id": "unit_aotfw",
-      "lesson_id": "lesson_aotfw_008",
+      "unit_id": "unit_lkeep",
+      "lesson_id": "lesson_lkeep_008",
       "date": "2026-08-12",
       "schedule_order": 3,
       "delivery_status": "current",
@@ -62,11 +62,11 @@
       "schema_version": 1
     },
     {
-      "id": "scheduled_aotfw_001",
+      "id": "scheduled_lkeep_001",
       "type": "scheduled_lesson",
       "class_id": "class_2026_12engadv1",
-      "unit_id": "unit_aotfw",
-      "lesson_id": "lesson_aotfw_001",
+      "unit_id": "unit_lkeep",
+      "lesson_id": "lesson_lkeep_001",
       "date": "2026-08-13",
       "schedule_order": 4,
       "delivery_status": "planned",
@@ -75,11 +75,11 @@
       "schema_version": 1
     },
     {
-      "id": "scheduled_aotfw_002",
+      "id": "scheduled_lkeep_002",
       "type": "scheduled_lesson",
       "class_id": "class_2026_12engadv1",
-      "unit_id": "unit_aotfw",
-      "lesson_id": "lesson_aotfw_002",
+      "unit_id": "unit_lkeep",
+      "lesson_id": "lesson_lkeep_002",
       "date": "2026-08-14",
       "schedule_order": 5,
       "delivery_status": "planned",
@@ -110,7 +110,7 @@
       "display_title": "English Advanced",
       "slug": "english_advanced",
       "scope_id": "scope_y12_engadv_2026",
-      "unit_ids": ["unit_aotfw"],
+      "unit_ids": ["unit_lkeep"],
       "outcome_ids": ["EA12-1", "EA12-2", "EA12-3", "EA12-4", "EA12-5", "EA12-6", "EA12-7", "EA12-8", "EA12-9"],
       "class_ids": ["class_2026_12engadv1"],
       "status": "active",
@@ -150,9 +150,9 @@
       ],
       "timeline_items": [
         {
-          "id": "ti_unit_aotfw",
+          "id": "ti_unit_lkeep",
           "kind": "unit",
-          "unit_id": "unit_aotfw",
+          "unit_id": "unit_lkeep",
           "start_week": 12,
           "end_week": 18,
           "order": 1
@@ -175,23 +175,23 @@
   ],
   "units": [
     {
-      "id": "unit_aotfw",
+      "id": "unit_lkeep",
       "type": "unit",
-      "title": "Artist of the Floating World",
+      "title": "The Lantern Keeper",
       "slug": "artist_of_the_floating_world",
       "year_id": "year_12",
       "subject_id": "subject_y12_engadv",
       "primary_term": 2,
-      "description": "A study of Kazuo Ishiguro's An Artist of the Floating World, exploring memory, identity, and post-war Japan.",
+      "description": "A study of Mira Calder's The Lantern Keeper, exploring memory, identity, and a post-war harbour town.",
       "lesson_ids": [
-        "lesson_aotfw_001",
-        "lesson_aotfw_002",
-        "lesson_aotfw_003",
-        "lesson_aotfw_004",
-        "lesson_aotfw_005",
-        "lesson_aotfw_006",
-        "lesson_aotfw_007",
-        "lesson_aotfw_008"
+        "lesson_lkeep_001",
+        "lesson_lkeep_002",
+        "lesson_lkeep_003",
+        "lesson_lkeep_004",
+        "lesson_lkeep_005",
+        "lesson_lkeep_006",
+        "lesson_lkeep_007",
+        "lesson_lkeep_008"
       ],
       "outcome_ids": ["EA12-6", "EA12-7"],
       "status": "active",
@@ -204,7 +204,7 @@
     {
       "id": "media_ono_extract",
       "type": "media",
-      "title": "Ono Extract (PDF)",
+      "title": "Hale Extract (PDF)",
       "slug": "ono_extract",
       "provider": "external",
       "media_type": "pdf",
@@ -402,11 +402,11 @@
   ],
   "lessons": [
     {
-      "id": "lesson_aotfw_001",
+      "id": "lesson_lkeep_001",
       "type": "lesson",
-      "title": "Introduction to An Artist of the Floating World",
-      "slug": "introduction_to_aotfw",
-      "unit_id": "unit_aotfw",
+      "title": "Introduction to The Lantern Keeper",
+      "slug": "introduction_to_lkeep",
+      "unit_id": "unit_lkeep",
       "sequence": 1,
       "blocks": [
         {
@@ -415,7 +415,7 @@
           "block_type": "heading",
           "variant": "page",
           "visibility": "student_teacher",
-          "content": { "text": "Introduction to An Artist of the Floating World" },
+          "content": { "text": "Introduction to The Lantern Keeper" },
           "layout": {},
           "print": {},
           "settings": {},
@@ -430,7 +430,7 @@
           "variant": "medium",
           "visibility": "student_teacher",
           "content": {
-            "html": "<p>Kazuo Ishiguro's <em>An Artist of the Floating World</em> (1986) is set in post-war Japan and narrated by Masuji Ono, a retired painter reflecting on a career entangled with nationalist propaganda. From the outset, the novel invites us to ask how personal memory shapes—and sometimes distorts—our sense of identity.</p>"
+            "html": "<p>Mira Calder's <em>The Lantern Keeper</em> is set in a post-war harbour town and narrated by Tomas Hale, a retired painter reflecting on a career entangled with nationalist propaganda. From the outset, the novel invites us to ask how personal memory shapes—and sometimes distorts—our sense of identity.</p>"
           },
           "layout": {},
           "print": {},
@@ -448,7 +448,7 @@
           "content": {
             "style": "information",
             "title": "Key context",
-            "body": "Japan's defeat in 1945 and the American occupation created social upheaval that reshaped how citizens understood loyalty, guilt, and cultural value."
+            "body": "The town's defeat in the war and the long occupation created social upheaval that reshaped how citizens understood loyalty, guilt, and cultural value."
           },
           "layout": {},
           "print": {},
@@ -467,11 +467,11 @@
       "outcome_ids": ["EA12-8"]
     },
     {
-      "id": "lesson_aotfw_002",
+      "id": "lesson_lkeep_002",
       "type": "lesson",
-      "title": "Post-war Japan and Cultural Change",
+      "title": "The Harbour Town After the War",
       "slug": "postwar_japan_and_cultural_change",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 2,
       "blocks": [
         {
@@ -480,7 +480,7 @@
           "block_type": "heading",
           "variant": "page",
           "visibility": "student_teacher",
-          "content": { "text": "Post-war Japan and Cultural Change" },
+          "content": { "text": "The Harbour Town After the War" },
           "layout": {},
           "print": {},
           "settings": {},
@@ -495,7 +495,7 @@
           "variant": "medium",
           "visibility": "student_teacher",
           "content": {
-            "html": "<p>Ono moves through a city rebuilding itself—new buildings beside bombed ruins, younger generations rejecting the values of their elders. Track how Ishiguro uses setting to mirror Ono's unstable recollection of his own past.</p>"
+            "html": "<p>Hale moves through a city rebuilding itself—new buildings beside bombed ruins, younger generations rejecting the values of their elders. Track how Calder uses setting to mirror Hale's unstable recollection of his own past.</p>"
           },
           "layout": {},
           "print": {},
@@ -513,7 +513,7 @@
           "content": {
             "style": "teacher",
             "title": "Discussion prompt",
-            "body": "Ask students to compare Ono's pride in his daughters' marriages with his evasiveness about his wartime posters. What does this tension suggest about selective memory?"
+            "body": "Ask students to compare Hale's pride in his daughters' marriages with his evasiveness about his wartime posters. What does this tension suggest about selective memory?"
           },
           "layout": {},
           "print": {},
@@ -530,11 +530,11 @@
       "tags": ["module-c", "context"]
     },
     {
-      "id": "lesson_aotfw_003",
+      "id": "lesson_lkeep_003",
       "type": "lesson",
       "title": "Narrative Structure and Unreliable Memory",
       "slug": "narrative_structure_and_unreliable_memory",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 3,
       "blocks": [
         {
@@ -558,7 +558,7 @@
           "variant": "medium",
           "visibility": "teacher_only",
           "content": {
-            "html": "<p>Teacher note: Ono's first-person narration is deliberately inconsistent. Flag passages where he revises earlier claims—students should annotate these as evidence of self-justification rather than factual correction.</p>"
+            "html": "<p>Teacher note: Hale's first-person narration is deliberately inconsistent. Flag passages where he revises earlier claims—students should annotate these as evidence of self-justification rather than factual correction.</p>"
           },
           "layout": {},
           "print": {},
@@ -576,7 +576,7 @@
           "content": {
             "style": "remember",
             "title": "Analytical focus",
-            "body": "When Ono recalls the 'floating world' of pleasure districts, consider whether nostalgia sanitises a culture he helped commodify for nationalist ends."
+            "body": "When Hale recalls the 'old harbour' of pleasure districts, consider whether nostalgia sanitises a culture he helped commodify for nationalist ends."
           },
           "layout": {},
           "print": {},
@@ -592,11 +592,11 @@
       "schema_version": 1
     },
     {
-      "id": "lesson_aotfw_004",
+      "id": "lesson_lkeep_004",
       "type": "lesson",
-      "title": "Masuji Ono: Artist and Patriarch",
-      "slug": "masuji_ono_artist_and_patriarch",
-      "unit_id": "unit_aotfw",
+      "title": "Tomas Hale: Artist and Patriarch",
+      "slug": "tomas_hale_artist_and_patriarch",
+      "unit_id": "unit_lkeep",
       "sequence": 4,
       "blocks": [
         {
@@ -605,7 +605,7 @@
           "block_type": "heading",
           "variant": "page",
           "visibility": "student_teacher",
-          "content": { "text": "Masuji Ono: Artist and Patriarch" },
+          "content": { "text": "Tomas Hale: Artist and Patriarch" },
           "layout": {},
           "print": {},
           "settings": {},
@@ -620,7 +620,7 @@
           "variant": "medium",
           "visibility": "student_teacher",
           "content": {
-            "html": "<p>Ono constructs his identity around two roles: the respected artist who served his nation, and the patriarch securing his daughters' futures. Examine how these roles conflict when his wartime associations threaten Noriko's marriage prospects.</p>"
+            "html": "<p>Hale constructs his identity around two roles: the respected artist who served his nation, and the patriarch securing his daughters' futures. Examine how these roles conflict when his wartime associations threaten Noriko's marriage prospects.</p>"
           },
           "layout": {},
           "print": {},
@@ -636,11 +636,11 @@
       "schema_version": 1
     },
     {
-      "id": "lesson_aotfw_005",
+      "id": "lesson_lkeep_005",
       "type": "lesson",
       "title": "Guilt, Complicity and National Identity",
       "slug": "guilt_complicity_and_national_identity",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 5,
       "blocks": [
         {
@@ -666,7 +666,7 @@
           "content": {
             "style": "important",
             "title": "Module connection",
-            "body": "Link Ishiguro's treatment of complicity to the Module A rubric: how does the text represent individual experience within broader social and historical contexts?"
+            "body": "Link Calder's treatment of complicity to the Module A rubric: how does the text represent individual experience within broader social and historical contexts?"
           },
           "layout": {},
           "print": {},
@@ -682,11 +682,11 @@
       "schema_version": 1
     },
     {
-      "id": "lesson_aotfw_006",
+      "id": "lesson_lkeep_006",
       "type": "lesson",
       "title": "Visual Art as Memory",
       "slug": "visual_art_as_memory",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 6,
       "blocks": [
         {
@@ -710,7 +710,7 @@
           "variant": "medium",
           "visibility": "student_teacher",
           "content": {
-            "html": "<p>Ono's propaganda posters function as physical traces of a past he would rather forget. Consider how Ishiguro uses art—both fine and commercial—to externalise memory and make guilt visible to others.</p>"
+            "html": "<p>Hale's propaganda posters function as physical traces of a past he would rather forget. Consider how Calder uses art—both fine and commercial—to externalise memory and make guilt visible to others.</p>"
           },
           "layout": {},
           "print": {},
@@ -726,11 +726,11 @@
       "schema_version": 1
     },
     {
-      "id": "lesson_aotfw_007",
+      "id": "lesson_lkeep_007",
       "type": "lesson",
       "title": "Preparing for HSC-style Analysis",
       "slug": "preparing_for_hsc_style_analysis",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 7,
       "blocks": [
         {
@@ -756,7 +756,7 @@
           "content": {
             "style": "scaffold",
             "title": "Paragraph scaffold",
-            "body": "Topic sentence linking memory and identity → embedded quotation → analysis of narrative technique → connection to Ishiguro's broader concern with historical responsibility."
+            "body": "Topic sentence linking memory and identity → embedded quotation → analysis of narrative technique → connection to Calder's broader concern with historical responsibility."
           },
           "layout": {},
           "print": {},
@@ -772,11 +772,11 @@
       "schema_version": 1
     },
     {
-      "id": "lesson_aotfw_008",
+      "id": "lesson_lkeep_008",
       "type": "lesson",
-      "title": "Memory, Identity and Ono",
+      "title": "Memory, Identity and Hale",
       "slug": "memory_identity_and_ono",
-      "unit_id": "unit_aotfw",
+      "unit_id": "unit_lkeep",
       "sequence": 8,
       "blocks": [
         {
@@ -785,7 +785,7 @@
           "block_type": "heading",
           "variant": "page",
           "visibility": "student_teacher",
-          "content": { "text": "Memory, Identity and Ono" },
+          "content": { "text": "Memory, Identity and Hale" },
           "layout": {},
           "print": {},
           "settings": {},
@@ -800,7 +800,7 @@
           "variant": "medium",
           "visibility": "student_teacher",
           "content": {
-            "html": "<p>In this lesson we consolidate our reading of <em>An Artist of the Floating World</em> by examining how Masuji Ono's memories of the floating world, his wartime propaganda, and his role as a father combine to form an identity that is continually rewritten. Ishiguro does not present memory as a neutral archive; instead, recollection becomes a form of self-defence.</p><p>As you read, note moments where Ono contradicts his earlier account of the same event. These revisions are not errors—they are the novel's central evidence that identity is constructed through narrative.</p>"
+            "html": "<p>In this lesson we consolidate our reading of <em>The Lantern Keeper</em> by examining how Tomas Hale's memories of the old harbour, his wartime propaganda, and his role as a father combine to form an identity that is continually rewritten. Calder does not present memory as a neutral archive; instead, recollection becomes a form of self-defence.</p><p>As you read, note moments where Hale contradicts his earlier account of the same event. These revisions are not errors—they are the novel's central evidence that identity is constructed through narrative.</p>"
           },
           "layout": {},
           "print": {},
@@ -818,7 +818,7 @@
           "content": {
             "style": "information",
             "title": "Focus question",
-            "body": "How does Ishiguro use Ono's selective memory to explore the relationship between personal identity and national history?"
+            "body": "How does Calder use Hale's selective memory to explore the relationship between personal identity and national history?"
           },
           "layout": {},
           "print": {},
@@ -848,7 +848,7 @@
           "variant": "medium",
           "visibility": "teacher_only",
           "content": {
-            "html": "<p>Teacher note: The garden conversation with Setsuko is the pivot for this lesson. Ono's insistence that his influence was 'small' directly contradicts evidence elsewhere in the text. Guide students to treat his tone—dignified, measured, slightly wounded—as part of the rhetorical strategy of minimisation.</p>"
+            "html": "<p>Teacher note: The garden conversation with Nell is the pivot for this lesson. Hale's insistence that his influence was 'small' directly contradicts evidence elsewhere in the text. Guide students to treat his tone—dignified, measured, slightly wounded—as part of the rhetorical strategy of minimisation.</p>"
           },
           "layout": {},
           "print": {},
@@ -866,7 +866,7 @@
           "content": {
             "style": "teacher",
             "title": "Facilitation notes",
-            "body": "If students defend Ono as 'simply old and confused', push back with textual evidence of strategic omission. Ask: who benefits when a narrator controls the timeline? Connect to Module A: Textual Conversations—how does Ishiguro converse with histories Japan preferred to forget?"
+            "body": "If students defend Hale as 'simply old and confused', push back with textual evidence of strategic omission. Ask: who benefits when a narrator controls the timeline? Connect to Module A: Textual Conversations—how does Calder converse with histories the town preferred to forget?"
           },
           "layout": {},
           "print": {},
@@ -884,7 +884,7 @@
           "content": {
             "style": "extension",
             "title": "Extension",
-            "body": "Compare Ono's self-narration with Stevens in Ishiguro's The Remains of the Day. Both narrators serve power while claiming personal dignity—what does this pairing suggest about Ishiguro's ongoing interest in memory and complicity?"
+            "body": "Compare Hale's self-narration with the miller in Calder's The Quiet Mill. Both narrators serve power while claiming personal dignity—what does this pairing suggest about Calder's ongoing interest in memory and complicity?"
           },
           "layout": {},
           "print": {},

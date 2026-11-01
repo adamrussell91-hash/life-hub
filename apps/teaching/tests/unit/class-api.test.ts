@@ -67,18 +67,18 @@ describe('PATCH /api/classes/:id (mock)', () => {
 
     const res = await api.request('PATCH', PATH, {
       cookie,
-      body: { current_scheduled_lesson_id: 'scheduled_aotfw_007' }
+      body: { current_scheduled_lesson_id: 'scheduled_lkeep_007' }
     });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.data.current_scheduled_lesson_id).toBe('scheduled_aotfw_007');
+    expect(body.data.current_scheduled_lesson_id).toBe('scheduled_lkeep_007');
 
     const curriculum = await (
       await api.request('GET', '/api/curriculum', { cookie })
     ).json();
     const cls = curriculum.data.classes.find((row: Class) => row.id === CLASS_ID);
-    expect(cls.current_scheduled_lesson_id).toBe('scheduled_aotfw_007');
+    expect(cls.current_scheduled_lesson_id).toBe('scheduled_lkeep_007');
   });
 
   it('rejects current_scheduled_lesson_id for a scheduled lesson in another class', async () => {
@@ -87,8 +87,8 @@ describe('PATCH /api/classes/:id (mock)', () => {
       id: 'scheduled_other_class',
       type: 'scheduled_lesson',
       class_id: 'class_other',
-      unit_id: 'unit_aotfw',
-      lesson_id: 'lesson_aotfw_001',
+      unit_id: 'unit_lkeep',
+      lesson_id: 'lesson_lkeep_001',
       date: '2026-08-01',
       schedule_order: 1,
       delivery_status: 'planned',

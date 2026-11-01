@@ -195,13 +195,13 @@ subjects/subject_y12_engadv
 
 scopes/scope_y12_engadv_2026
 
-units/unit_aotfw
+units/unit_lkeep
 
-lessons/lesson_aotfw_008
+lessons/lesson_lkeep_008
 
 classes/class_2026_12engadv1
 
-scheduled_lessons/scheduled_2026_12engadv1_aotfw_008
+scheduled_lessons/scheduled_2026_12engadv1_lkeep_008
 
 outcomes/outcome_example
 
@@ -216,7 +216,7 @@ It must not define application relationships.
 For example:
 A Lesson knows its Unit through:
 {
-"unit_id": "unit_aotfw"
+"unit_id": "unit_lkeep"
 }
 not because its file happens to sit inside a particular storage folder.
 This allows storage organisation to evolve without breaking the information architecture.
@@ -226,11 +226,11 @@ This allows storage organisation to evolve without breaking the information arch
 A Lesson should have one permanent identity record.
 Draft and published content remain separately addressable.
 A preferred conceptual structure is:
-lessons/lesson_aotfw_008/meta
+lessons/lesson_lkeep_008/meta
 
-lessons/lesson_aotfw_008/draft
+lessons/lesson_lkeep_008/draft
 
-lessons/lesson_aotfw_008/published
+lessons/lesson_lkeep_008/published
 Meta stores stable Lesson information.
 Draft stores current teacher content.
 Published stores the current student snapshot.
@@ -240,11 +240,11 @@ This separation reduces the risk of draft content entering public responses.
 
 Lesson metadata may include:
 {
-"id": "lesson_aotfw_008",
+"id": "lesson_lkeep_008",
 "type": "lesson",
-"title": "Memory, Identity and Ono",
+"title": "Memory, Identity and Hale",
 "slug": "memory_identity_and_ono",
-"unit_id": "unit_aotfw",
+"unit_id": "unit_lkeep",
 "sequence": 8,
 "draft_revision": 17,
 "published_revision": 14,
@@ -261,7 +261,7 @@ Large Block payloads do not need duplication inside this metadata record.
 The draft contains the current editable Lesson state.
 Example:
 {
-"lesson_id": "lesson_aotfw_008",
+"lesson_id": "lesson_lkeep_008",
 "revision": 17,
 "blocks": [],
 "outcome_ids": [],
@@ -277,7 +277,7 @@ Student routes must never read this key.
 The published record is a stable student facing snapshot.
 Example:
 {
-"lesson_id": "lesson_aotfw_008",
+"lesson_id": "lesson_lkeep_008",
 "revision": 14,
 "blocks": [],
 "outcome_ids": [],
@@ -401,7 +401,7 @@ Save requests should include the revision the browser believes it is editing.
 Conceptually:
 
 {
-"lesson_id": "lesson_aotfw_008",
+"lesson_id": "lesson_lkeep_008",
 "base_revision": 17,
 "draft": {}
 }
@@ -443,11 +443,11 @@ The minimum recovery guarantee remains ten meaningful recent versions.
 
 Versions should live separately from current draft and published records.
 Conceptual keys:
-versions/lessons/lesson_aotfw_008/revision_017
+versions/lessons/lesson_lkeep_008/revision_017
 
-versions/lessons/lesson_aotfw_008/revision_016
+versions/lessons/lesson_lkeep_008/revision_016
 
-versions/lessons/lesson_aotfw_008/revision_015
+versions/lessons/lesson_lkeep_008/revision_015
 Version records are immutable snapshots.
 
 ## 29. Restore Flow
@@ -616,7 +616,7 @@ If the Scope remains teacher only initially, publication support may remain dorm
 Timeline positioning belongs to Scope planning metadata.
 Example:
 {
-"unit_id": "unit_aotfw",
+"unit_id": "unit_lkeep",
 "start_date": "2026-04-27",
 "end_date": "2026-06-19",
 "term_start": 2,
@@ -630,7 +630,7 @@ It does not rewrite the Unit.
 
 Scheduled Lesson records live independently.
 Conceptual key:
-scheduled_lessons/scheduled_2026_12engadv1_aotfw_008
+scheduled_lessons/scheduled_2026_12engadv1_lkeep_008
 Schedule changes update only the relevant Scheduled Lesson records and Class schedule metadata.
 They do not alter reusable Lesson content.
 
@@ -645,7 +645,7 @@ Where practical, validate the whole requested schedule before committing changes
 
 Class metadata may store:
 {
-"current_scheduled_lesson_id": "scheduled_2026_12engadv1_aotfw_008"
+"current_scheduled_lesson_id": "scheduled_2026_12engadv1_lkeep_008"
 }
 The application may suggest a current Lesson from dates.
 Teacher selected current Lesson remains authoritative.
@@ -689,7 +689,7 @@ Redirect records should live in a dedicated logical store.
 Example:
 {
 "id": "redirect_001",
-"object_id": "lesson_aotfw_008",
+"object_id": "lesson_lkeep_008",
 "old_slug": "ono_and_memory",
 "current_slug": "memory_identity_and_ono",
 "created_at": "timestamp"
@@ -716,8 +716,8 @@ Example conceptual response:
 {
 "lesson": {},
 "unit": {
-"id": "unit_aotfw",
-"title": "Artist of the Floating World",
+"id": "unit_lkeep",
+"title": "The Lantern Keeper",
 "slug": "artist_of_the_floating_world"
 },
 "class": {},
@@ -766,7 +766,7 @@ Published snapshots are particularly suitable for caching because they are immut
 A publication revision identifier should assist cache invalidation.
 Conceptually:
 
-lesson_aotfw_008 revision 14
+lesson_lkeep_008 revision 14
 When revision 15 publishes, public consumers should receive the new revision.
 
 ## 56. Teacher Data Caching
@@ -783,11 +783,11 @@ Google Drive stores the actual file.
 Teaching Day Book stores a Media Reference.
 Example:
 {
-"id": "media_aotfw_extract",
+"id": "media_lkeep_extract",
 "provider": "google_drive",
 "provider_file_id": "drive_file_reference",
 "media_type": "pdf",
-"title": "Ono Extract",
+"title": "Hale Extract",
 "preview_url": "",
 "thumbnail_url": "",
 "sharing": "public_link"
@@ -862,7 +862,7 @@ Lesson Block schemas should not require rewriting when a new provider is added.
 
 Media metadata may live in a dedicated logical Blob store.
 Conceptual key:
-media/media_aotfw_extract
+media/media_lkeep_extract
 This allows several Lessons to reference the same file.
 Updating a title, permission state or thumbnail does not require rewriting every Lesson.
 

@@ -118,7 +118,7 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
           id: 'page_training_pulse',
           title: 'Training pulse',
           body: 'Pulse\n\n{{life:compare_workout_windows}}',
-          connected: ['life:decision:aotfw-sources']
+          connected: ['life:decision:lkeep-sources']
         })).toString('base64')
       });
     },
@@ -131,8 +131,8 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
     }),
     loadDecisionTraces: async () => ([
       {
-        title: 'AOTFW sources',
-        decisionId: 'aotfw-sources',
+        title: 'LKEEP sources',
+        decisionId: 'lkeep-sources',
         steps: [
           { dateKey: '2026-08-01', chosen: 'Start the unit' },
           { dateKey: '2026-09-06', chosen: 'Keep the unit linked' }
@@ -140,7 +140,7 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
       }
     ]),
     loadInverseLinks: async () => ({
-      links: [{ id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }],
+      links: [{ id: 'page_lkeep_notes', title: 'LKEEP teaching notes' }],
       status: 'ready'
     })
   });
@@ -153,9 +153,9 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
   assert.doesNotMatch(page.body, /11 completed workouts/);
   assert.match(page.live_body, /11 completed workouts/);
   assert.doesNotMatch(page.live_body, /\{\{life:compare_workout_windows\}\}/);
-  assert.equal(page.decision_traces[0].decisionId, 'aotfw-sources');
+  assert.equal(page.decision_traces[0].decisionId, 'lkeep-sources');
   assert.equal(page.decision_traces_status, undefined);
-  assert.equal(page.inverse_links[0].id, 'page_aotfw_notes');
+  assert.equal(page.inverse_links[0].id, 'page_lkeep_notes');
 });
 
 test('Knowledge page GET keeps the token and is fail-visible when Life loaders miss', async () => {
@@ -171,7 +171,7 @@ test('Knowledge page GET keeps the token and is fail-visible when Life loaders m
             id: 'page_training_pulse',
             title: 'Training pulse',
             body: 'Pulse\n\n{{life:compare_workout_windows}}',
-            connected: ['life:decision:aotfw-sources']
+            connected: ['life:decision:lkeep-sources']
           })).toString('base64')
         });
       }
@@ -272,16 +272,16 @@ test('Knowledge page save keeps Teaching and Tasks connected refs', async () => 
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      id: 'page_aotfw',
-      title: 'Artist of the Floating World — sources',
-      body: 'Ishiguro',
+      id: 'page_lkeep',
+      title: 'The Lantern Keeper — sources',
+      body: 'Calder',
       area: 'university',
-      connected: ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw']
+      connected: ['teaching:unit:unit_lkeep', 'tasks:project:proj_lkeep']
     })
   }));
   assert.equal(response.status, 200);
   const saved = (await response.json()).data;
-  assert.deepEqual(saved.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw']);
+  assert.deepEqual(saved.connected, ['teaching:unit:unit_lkeep', 'tasks:project:proj_lkeep']);
 });
 
 test('Knowledge page save writes page JSON and upserts the manifest', async () => {
@@ -404,8 +404,8 @@ test('Knowledge backlinks list Life decision inbound sources', async () => {
     now: () => Date.parse('2026-08-01T01:00:00Z'),
     loadInverseLinks: async () => ({
       groups: [{
-        target: 'life:decision:aotfw-sources',
-        sources: [{ id: 'page_aotfw', title: 'Artist of the Floating World — sources' }]
+        target: 'life:decision:lkeep-sources',
+        sources: [{ id: 'page_lkeep', title: 'The Lantern Keeper — sources' }]
       }],
       status: 'ready'
     })
@@ -415,7 +415,7 @@ test('Knowledge backlinks list Life decision inbound sources', async () => {
   );
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.data.groups[0].target, 'life:decision:aotfw-sources');
+  assert.equal(body.data.groups[0].target, 'life:decision:lkeep-sources');
   assert.equal(body.data.status, 'ready');
 });
 

@@ -80,7 +80,7 @@ describe('BlockSchema', () => {
       BlockSchema.parse({
         ...baseBlock,
         block_type: 'quote',
-        content: { quote: 'Stillness.', attribution: 'Ishiguro' }
+        content: { quote: 'Stillness.', attribution: 'Calder' }
       }).block_type
     ).toBe('quote');
 
@@ -201,11 +201,11 @@ describe('BlockSchema', () => {
 
 describe('LessonSchema', () => {
   const draftLesson = {
-    id: 'lesson_aotfw_008',
+    id: 'lesson_lkeep_008',
     type: 'lesson' as const,
-    title: 'Memory, Identity and Ono',
+    title: 'Memory, Identity and Hale',
     slug: 'memory_identity_and_ono',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 8,
     blocks: [
       {
@@ -213,13 +213,13 @@ describe('LessonSchema', () => {
         id: 'block_l008_001',
         block_type: 'heading',
         variant: 'page',
-        content: { text: 'Memory, Identity and Ono' }
+        content: { text: 'Memory, Identity and Hale' }
       },
       {
         ...baseBlock,
         id: 'block_l008_002',
         block_type: 'rich_text',
-        content: { html: '<p>Ono reflects on his past.</p>' }
+        content: { html: '<p>Hale reflects on his past.</p>' }
       }
     ],
     status: 'active' as const,
@@ -258,9 +258,9 @@ describe('LessonSchema', () => {
 describe('PublishedLessonSchema', () => {
   it('parses published snapshot shape', () => {
     const snapshot = PublishedLessonSchema.parse({
-      lesson_id: 'lesson_aotfw_008',
-      title: 'Memory, Identity and Ono',
-      unit_id: 'unit_aotfw',
+      lesson_id: 'lesson_lkeep_008',
+      title: 'Memory, Identity and Hale',
+      unit_id: 'unit_lkeep',
       blocks: [
         {
           ...baseBlock,
@@ -271,18 +271,18 @@ describe('PublishedLessonSchema', () => {
       published_at: '2026-02-01T12:00:00.000Z',
       schema_version: 1
     });
-    expect(snapshot.lesson_id).toBe('lesson_aotfw_008');
+    expect(snapshot.lesson_id).toBe('lesson_lkeep_008');
     expect(snapshot.blocks).toHaveLength(1);
   });
 });
 
 describe('publish helper', () => {
   const validLesson = {
-    id: 'lesson_aotfw_008',
+    id: 'lesson_lkeep_008',
     type: 'lesson' as const,
-    title: 'Memory, Identity and Ono',
+    title: 'Memory, Identity and Hale',
     slug: 'memory_identity_and_ono',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 8,
     blocks: [
       {
@@ -309,8 +309,8 @@ describe('publish helper', () => {
   it('builds published snapshot via toPublishedLesson', () => {
     const lesson = LessonSchema.parse(validLesson);
     const snapshot = toPublishedLesson(lesson, '2026-02-01T12:00:00.000Z');
-    expect(snapshot.lesson_id).toBe('lesson_aotfw_008');
-    expect(snapshot.title).toBe('Memory, Identity and Ono');
+    expect(snapshot.lesson_id).toBe('lesson_lkeep_008');
+    expect(snapshot.title).toBe('Memory, Identity and Hale');
     expect(snapshot.published_at).toBe('2026-02-01T12:00:00.000Z');
     expect(snapshot.blocks).toHaveLength(1);
   });
@@ -323,7 +323,7 @@ describe('PublishableLessonSchema media rules', () => {
     title: 'Lesson',
     slug: 'lesson',
     status: 'active' as const,
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
@@ -535,11 +535,11 @@ describe('PublishableLessonSchema media rules', () => {
 
 describe('PublishableLessonSchema layout rules', () => {
   const validLesson = {
-    id: 'lesson_aotfw_008',
+    id: 'lesson_lkeep_008',
     type: 'lesson' as const,
-    title: 'Memory, Identity and Ono',
+    title: 'Memory, Identity and Hale',
     slug: 'memory_identity_and_ono',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 8,
     blocks: [
       {
@@ -648,7 +648,7 @@ describe('PublishableLessonSchema timeline rules', () => {
     title: 'Lesson',
     slug: 'lesson',
     status: 'active' as const,
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
@@ -788,7 +788,7 @@ describe('PublishableLessonSchema learning activity rules', () => {
     title: 'Lesson',
     slug: 'lesson',
     status: 'active' as const,
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
@@ -1040,7 +1040,7 @@ describe('PublishableLessonSchema visualisation rules', () => {
     title: 'Lesson',
     slug: 'lesson',
     status: 'active' as const,
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',

@@ -37,10 +37,10 @@ test('extractWatchUrls is empty when the body has no external URL', () => {
 });
 
 test('seed pages expose one real external URL for URL watch', () => {
-  const aotfw = knowledgeSeed.find(item => item.id === 'page_aotfw');
+  const lkeep = knowledgeSeed.find(item => item.id === 'page_lkeep');
   const pulse = knowledgeSeed.find(item => item.id === 'page_training_pulse');
-  assert.deepEqual(extractWatchUrls(aotfw.body), [
-    'https://en.wikipedia.org/wiki/An_Artist_of_the_Floating_World'
+  assert.deepEqual(extractWatchUrls(lkeep.body), [
+    'https://example.com/the-lantern-keeper'
   ]);
   assert.deepEqual(extractWatchUrls(pulse.body), [
     'https://www.who.int/news-room/fact-sheets/detail/physical-activity'

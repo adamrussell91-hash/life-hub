@@ -10,12 +10,12 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
 
   await page
     .getByRole('listitem')
-    .filter({ hasText: 'Memory, Identity and Ono' })
+    .filter({ hasText: 'Memory, Identity and Hale' })
     .click();
 
   const titleField = page.getByLabel('Lesson title');
   await expect(titleField).toBeVisible();
-  await titleField.fill('Memory, Identity and Ono');
+  await titleField.fill('Memory, Identity and Hale');
 
   await page.getByRole('button', { name: /^publish$/i }).click();
 
@@ -23,10 +23,10 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
   await expect(page.getByText('Published. Students can now view this lesson at:')).toHaveCount(0);
 
   const student = await context.newPage();
-  await student.goto('/s/lessons/lesson_aotfw_008');
+  await student.goto('/s/lessons/lesson_lkeep_008');
 
   await expect(student.locator('.lesson-hero__title')).toHaveText(
-    'Memory, Identity and Ono'
+    'Memory, Identity and Hale'
   );
   await expect(student.getByText(/teacher only/i)).toHaveCount(0);
 });

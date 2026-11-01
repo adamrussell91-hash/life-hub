@@ -11,7 +11,7 @@ const legacyAdv = {
   slug: 'english_advanced',
   year_id: 'year_12',
   scope_id: 'scope_y12_engadv_2026',
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_lkeep'],
   outcome_ids: ['out_1'],
   class_ids: ['class_2026_12engadv1'],
   status: 'active',
@@ -42,7 +42,7 @@ describe('migrateSubjectRecord', () => {
     expect(result.subject.title).toBe('English Advanced');
     expect(result.subject.display_title).toBe('English Advanced');
     expect(result.subject.scope_id).toBe('scope_y12_engadv_2026');
-    expect(result.subject.unit_ids).toEqual(['unit_aotfw']);
+    expect(result.subject.unit_ids).toEqual(['unit_lkeep']);
     expect(result.subject.outcome_ids).toEqual(['out_1']);
     expect(result.subject.class_ids).toEqual(['class_2026_12engadv1']);
     expect(result.subject).not.toHaveProperty('year_id');

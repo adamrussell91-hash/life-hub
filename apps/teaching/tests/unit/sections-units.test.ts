@@ -86,7 +86,7 @@ const engAdv: Subject = {
   created_at: ISO,
   updated_at: ISO,
   schema_version: 1,
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_lkeep'],
   outcome_ids: [],
   class_ids: []
 };
@@ -107,9 +107,9 @@ const engAdvY11: Subject = {
 };
 
 const unit: Unit = {
-  id: 'unit_aotfw',
+  id: 'unit_lkeep',
   type: 'unit',
-  title: 'Artist of the Floating World',
+  title: 'The Lantern Keeper',
   slug: 'artist_of_the_floating_world',
   status: 'active',
   created_at: ISO,
@@ -118,7 +118,7 @@ const unit: Unit = {
   year_id: 'year_12',
   subject_id: 'subject_y12_engadv',
   lesson_ids: ['lesson_001', 'lesson_002'],
-  cover: { url: 'https://cdn.example.com/aotfw.jpg' }
+  cover: { url: 'https://cdn.example.com/lkeep.jpg' }
 };
 
 const othello: Unit = {
@@ -144,7 +144,7 @@ const curriculum: CurriculumResponse = {
       id: 'lesson_001',
       title: 'Introduction',
       slug: 'introduction',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false,
@@ -154,7 +154,7 @@ const curriculum: CurriculumResponse = {
       id: 'lesson_002',
       title: 'Themes',
       slug: 'themes',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 2,
       status: 'active',
       published: true,
@@ -294,15 +294,15 @@ describe('units', () => {
       /unit/i
     );
 
-    const aotfw = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!;
-    expect(aotfw.querySelector('.units-index__title')?.textContent).toBe(
-      'Artist of the Floating World'
+    const lkeep = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_lkeep"]')!;
+    expect(lkeep.querySelector('.units-index__title')?.textContent).toBe(
+      'The Lantern Keeper'
     );
-    expect(aotfw.querySelector('.units-index__meta')?.textContent).toBe(
+    expect(lkeep.querySelector('.units-index__meta')?.textContent).toBe(
       'Year 12 · English Advanced'
     );
-    expect(aotfw.querySelector<HTMLImageElement>('.entity-cover-tile__media img')?.src).toBe(
-      'https://cdn.example.com/aotfw.jpg'
+    expect(lkeep.querySelector<HTMLImageElement>('.entity-cover-tile__media img')?.src).toBe(
+      'https://cdn.example.com/lkeep.jpg'
     );
 
     const othelloCard = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_othello"]')!;
@@ -355,21 +355,21 @@ describe('units', () => {
 
   it('expands unit tiles before opening the unit page', async () => {
     renderUnitsIndex(canvas, curriculum);
-    canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!.dispatchEvent(
+    canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_lkeep"]')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true })
     );
     expect(document.querySelector('.entity-card-expand')).toBeTruthy();
     document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
     await vi.waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+      expect(navigate).toHaveBeenCalledWith('/units/unit_lkeep');
     });
   });
 
   it('lists unit lessons in sequence and opens the editor', () => {
-    renderUnitStub(canvas, curriculum, 'unit_aotfw');
+    renderUnitStub(canvas, curriculum, 'unit_lkeep');
     expect(canvas.querySelector('.page-header__title')).toBeNull();
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
-      'Artist of the Floating World'
+      'The Lantern Keeper'
     );
     expect(canvas.querySelector('[data-export="unit"]')?.textContent).toMatch(/Export JSON/);
     expect(canvas.querySelector('[data-unit-section="plan"]')).toBeTruthy();
@@ -382,7 +382,7 @@ describe('units', () => {
   });
 
   it('edits the unit plan with the lesson palette canvas', () => {
-    renderUnitStub(canvas, curriculum, 'unit_aotfw');
+    renderUnitStub(canvas, curriculum, 'unit_lkeep');
     const plan = canvas.querySelector('[data-unit-section="plan"]');
     expect(plan?.querySelector('.lesson-palette')).not.toBeNull();
     expect(plan?.querySelector('.lesson-page')).not.toBeNull();
@@ -406,7 +406,7 @@ describe('units', () => {
 
     expect(canvas.querySelector('.entity-page-title__edit')).toBeNull();
     const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
-    expect(input.value).toBe('Artist of the Floating World');
+    expect(input.value).toBe('The Lantern Keeper');
 
     input.value = renamed.title;
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -434,7 +434,7 @@ describe('units', () => {
     expect(canvas.querySelector('.entity-banner__edit')?.textContent).toBe('Change cover');
     expect(canvas.querySelector('.unit-page__cover > .cover-picker')).toBeNull();
     expect(canvas.querySelector<HTMLImageElement>('.entity-banner__image')?.src).toContain(
-      'aotfw.jpg'
+      'lkeep.jpg'
     );
     const plan = canvas.querySelector('.unit-plan-editor');
     expect(plan).not.toBeNull();

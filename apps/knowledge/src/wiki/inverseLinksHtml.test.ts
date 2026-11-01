@@ -9,12 +9,12 @@ describe("inverseLinksHtml", () => {
 
   it("lists inbound Knowledge pages", () => {
     const html = inverseLinksHtml(
-      [{ id: "page_aotfw_notes", title: "AOTFW teaching notes" }],
+      [{ id: "page_lkeep_notes", title: "LKEEP teaching notes" }],
       "ready",
     );
     expect(html).toContain("What points here");
-    expect(html).toContain('data-open-page="page_aotfw_notes"');
-    expect(html).toContain("AOTFW teaching notes");
+    expect(html).toContain('data-open-page="page_lkeep_notes"');
+    expect(html).toContain("LKEEP teaching notes");
   });
 
   it("is fail-visible when the inbound scan cannot run", () => {

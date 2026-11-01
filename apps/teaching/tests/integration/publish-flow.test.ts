@@ -21,8 +21,8 @@ const teacherStripFixture = JSON.parse(
 };
 
 const PASSPHRASE = 'teaching-hub-local';
-const LESSON_ID = 'lesson_aotfw_008';
-const UNIT_ID = 'unit_aotfw';
+const LESSON_ID = 'lesson_lkeep_008';
+const UNIT_ID = 'unit_lkeep';
 
 function freshSeed(): SeedData {
   return JSON.parse(JSON.stringify(seedFixture)) as SeedData;
@@ -58,7 +58,7 @@ describe('publish flow', () => {
     ).length;
     expect(draftTeacherOnlyCount).toBeGreaterThan(0);
 
-    lesson.title = 'Memory, Identity and Ono (Updated)';
+    lesson.title = 'Memory, Identity and Hale (Updated)';
 
     const putRes = await api.request('PUT', `/api/lessons/${LESSON_ID}`, {
       cookie,
@@ -86,7 +86,7 @@ describe('publish flow', () => {
     );
     expect(studentRes.status).toBe(200);
     const studentBody = await studentRes.json();
-    expect(studentBody.data.title).toBe('Memory, Identity and Ono (Updated)');
+    expect(studentBody.data.title).toBe('Memory, Identity and Hale (Updated)');
     expect(studentBody.data.blocks.length).toBeGreaterThan(0);
     expect(studentBody.data.blocks.length).toBeLessThan(lesson.blocks.length);
     for (const block of studentBody.data.blocks) {
@@ -294,7 +294,7 @@ describe('publish flow', () => {
     const api = freshApi();
     const res = await api.request(
       'GET',
-      '/api/published/lessons/lesson_aotfw_001'
+      '/api/published/lessons/lesson_lkeep_001'
     );
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -370,7 +370,7 @@ describe('publish flow', () => {
     ).toBe(true);
     expect(
       unitBody.data.lessons.some(
-        (l: { lesson_id: string }) => l.lesson_id === 'lesson_aotfw_001'
+        (l: { lesson_id: string }) => l.lesson_id === 'lesson_lkeep_001'
       )
     ).toBe(false);
   });

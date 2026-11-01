@@ -11,7 +11,7 @@ describe('lessons library URL state', () => {
   it('round-trips combinable filters and sort', () => {
     const state = {
       ...DEFAULT_LESSONS_STATE,
-      q: 'floating world',
+      q: 'old harbour',
       units: ['unit_a', 'unit_b'],
       subjects: ['subject_eng'],
       modes: ['workshop', 'lab'] as const,

@@ -58,17 +58,17 @@ describe('createImageEditor', () => {
     expect(alt).not.toBeNull();
 
     url!.value =
-      'https://cdn.britannica.com/28/115328-050-4C262676/Kazuo-Ishiguro.jpg';
+      'https://cdn.britannica.com/28/115328-050-4C262676/Kazuo-Calder.jpg';
     url!.dispatchEvent(new Event('input', { bubbles: true }));
 
-    alt!.value = 'Portrait of Kazuo Ishiguro';
+    alt!.value = 'Portrait of Mira Calder';
     alt!.dispatchEvent(new Event('input', { bubbles: true }));
 
     const last = onChange.mock.calls.at(-1)?.[0] as typeof imageBlock;
     expect(last.content.url).toBe(
-      'https://cdn.britannica.com/28/115328-050-4C262676/Kazuo-Ishiguro.jpg'
+      'https://cdn.britannica.com/28/115328-050-4C262676/Kazuo-Calder.jpg'
     );
-    expect(last.content.alt_text).toBe('Portrait of Kazuo Ishiguro');
+    expect(last.content.alt_text).toBe('Portrait of Mira Calder');
   });
 
   it('image editor can apply media library url', () => {

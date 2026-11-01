@@ -40,15 +40,15 @@ const engAdv: Subject = {
   updated_at: ISO,
   schema_version: 1,
   scope_id: 'scope_y12_engadv_2026',
-  unit_ids: ['unit_aotfw', 'unit_hamlet'],
+  unit_ids: ['unit_lkeep', 'unit_hamlet'],
   outcome_ids: [],
   class_ids: []
 };
 
 const unit: Unit = {
-  id: 'unit_aotfw',
+  id: 'unit_lkeep',
   type: 'unit',
-  title: 'Artist of the Floating World',
+  title: 'The Lantern Keeper',
   slug: 'artist_of_the_floating_world',
   status: 'active',
   created_at: ISO,
@@ -107,9 +107,9 @@ const scope: ScopeSequence = {
   ],
   timeline_items: [
     {
-      id: 'ti_unit_aotfw',
+      id: 'ti_unit_lkeep',
       kind: 'unit',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       start_week: 12,
       end_week: 18,
       order: 1
@@ -166,7 +166,7 @@ describe('scope timeline editor', () => {
     expect(terms).toEqual(['TERM 1', 'TERM 2', 'TERM 3', 'TERM 4']);
     const unitItem = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
     expect(unitItem?.querySelector('.scope-gantt__chip')?.textContent).toBe(
-      'Artist of the Floating World'
+      'The Lantern Keeper'
     );
     expect(unitItem?.dataset.tint).toBe(pastelFromId(unitItem!.dataset.unitId!));
     const noteItem = canvas.querySelector('.scope-timeline__item--note');
@@ -187,7 +187,7 @@ describe('scope timeline editor', () => {
     unitItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(unitItem?.classList.contains('scope-timeline__item--selected')).toBe(true);
     expect(canvas.querySelector('.scope-timeline__inspector-title')?.textContent).toBe(
-      'Artist of the Floating World'
+      'The Lantern Keeper'
     );
     expect(canvas.querySelector('.scope-timeline__inspector-weeks')?.textContent).toBe(
       '04/05/26 – 15/06/26'
@@ -203,7 +203,7 @@ describe('scope timeline editor', () => {
     canvas
       .querySelector<HTMLAnchorElement>('.scope-timeline__open-unit')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    expect(navigate).toHaveBeenCalledWith('/units/unit_lkeep');
   });
 
   it('navigates on double-click of a unit item', () => {
@@ -211,7 +211,7 @@ describe('scope timeline editor', () => {
     canvas
       .querySelector<HTMLElement>('.scope-timeline__item--unit')
       ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    expect(navigate).toHaveBeenCalledWith('/units/unit_lkeep');
   });
 
   it('renders not-found for an unknown subject', () => {
@@ -250,7 +250,7 @@ describe('scope timeline editor', () => {
       (el) => el.textContent
     );
     expect(labels).toContain('Hamlet');
-    expect(labels).not.toContain('Artist of the Floating World');
+    expect(labels).not.toContain('The Lantern Keeper');
     expect(labels).not.toContain('Math Unit');
     document.querySelector('.scope-timeline__picker')?.remove();
   });
@@ -302,9 +302,9 @@ describe('scope timeline editor', () => {
       terms: [{ id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 4 }],
       timeline_items: [
         {
-          id: 'ti_unit_aotfw',
+          id: 'ti_unit_lkeep',
           kind: 'unit',
-          unit_id: 'unit_aotfw',
+          unit_id: 'unit_lkeep',
           start_week: 1,
           end_week: 4,
           order: 1
@@ -462,7 +462,7 @@ describe('scope timeline editor', () => {
   it('removes a unit from the timeline via PATCH without deleting the unit blob', async () => {
     const local = makeCurriculum();
     const updated = cloneScope();
-    updated.timeline_items = updated.timeline_items.filter((item) => item.id !== 'ti_unit_aotfw');
+    updated.timeline_items = updated.timeline_items.filter((item) => item.id !== 'ti_unit_lkeep');
     patchScopeSequenceMock.mockResolvedValue(updated);
 
     renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
@@ -475,8 +475,8 @@ describe('scope timeline editor', () => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
     });
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items!.some((item) => item.id === 'ti_unit_aotfw')).toBe(false);
-    expect(local.units.some((entry) => entry.id === 'unit_aotfw')).toBe(true);
+    expect(body.timeline_items!.some((item) => item.id === 'ti_unit_lkeep')).toBe(false);
+    expect(local.units.some((entry) => entry.id === 'unit_lkeep')).toBe(true);
 
     await vi.waitFor(() => {
       expect(canvas.querySelector('.scope-timeline__item--unit')).toBeNull();
@@ -523,7 +523,7 @@ describe('scope timeline editor', () => {
   it('moves a bar via pointer drag and PATCHes weeks plus dates', async () => {
     const local = makeCurriculum();
     const updated = cloneScope();
-    const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_aotfw');
+    const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_lkeep');
     if (unitItem) {
       unitItem.start_week = 14;
       unitItem.end_week = 20;
@@ -546,7 +546,7 @@ describe('scope timeline editor', () => {
     });
 
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
+    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_lkeep')).toMatchObject({
       start_week: 14,
       end_week: 20,
       start_date: '2026-05-18',
@@ -557,7 +557,7 @@ describe('scope timeline editor', () => {
   it('resizes from the end handle and PATCHes', async () => {
     const local = makeCurriculum();
     const updated = cloneScope();
-    const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_aotfw');
+    const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_lkeep');
     if (unitItem) unitItem.end_week = 20;
     patchScopeSequenceMock.mockResolvedValue(updated);
 
@@ -579,7 +579,7 @@ describe('scope timeline editor', () => {
     });
 
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
+    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_lkeep')).toMatchObject({
       start_week: 12,
       end_week: 20
     });
@@ -615,9 +615,9 @@ describe('scope timeline editor', () => {
     const two = cloneScope();
     two.timeline_items = [
       {
-        id: 'ti_unit_aotfw',
+        id: 'ti_unit_lkeep',
         kind: 'unit',
-        unit_id: 'unit_aotfw',
+        unit_id: 'unit_lkeep',
         start_week: 12,
         end_week: 18,
         order: 1
@@ -647,7 +647,7 @@ describe('scope timeline editor', () => {
     canvas.querySelector<HTMLButtonElement>('.scope-timeline__compare-order')?.click();
     const panel = canvas.querySelector('[data-sequence-compare-panel]');
     expect(panel?.textContent).toContain('Compare order');
-    expect(panel?.textContent).toContain('Artist of the Floating World');
+    expect(panel?.textContent).toContain('The Lantern Keeper');
     expect(panel?.textContent).toContain('Hamlet');
     expect(panel?.querySelector('[data-confirm-sequence]')).toBeNull();
     expect(patchScopeSequenceMock).not.toHaveBeenCalled();
@@ -666,9 +666,9 @@ describe('scope timeline editor', () => {
         order: 1
       },
       {
-        id: 'ti_unit_aotfw',
+        id: 'ti_unit_lkeep',
         kind: 'unit',
-        unit_id: 'unit_aotfw',
+        unit_id: 'unit_lkeep',
         start_week: 5,
         end_week: 11,
         order: 2
@@ -700,7 +700,7 @@ describe('scope timeline editor', () => {
       start_week: 1,
       end_week: 4
     });
-    expect(body.timeline_items!.find((item) => item.kind === 'unit' && item.unit_id === 'unit_aotfw')).toMatchObject({
+    expect(body.timeline_items!.find((item) => item.kind === 'unit' && item.unit_id === 'unit_lkeep')).toMatchObject({
       start_week: 5,
       end_week: 11
     });

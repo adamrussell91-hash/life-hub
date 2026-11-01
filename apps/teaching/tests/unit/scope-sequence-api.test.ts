@@ -36,9 +36,9 @@ async function signIn(api: ReturnType<typeof createMockApi>): Promise<string> {
 
 const replacementItems: TimelineItem[] = [
   {
-    id: 'ti_unit_aotfw',
+    id: 'ti_unit_lkeep',
     kind: 'unit',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     start_week: 1,
     end_week: 5,
     order: 1
@@ -117,7 +117,7 @@ describe('PATCH /api/scope-sequences/:id (mock)', () => {
           {
             id: 'ti_a',
             kind: 'unit',
-            unit_id: 'unit_aotfw',
+            unit_id: 'unit_lkeep',
             start_week: 1,
             end_week: 2,
             order: 1
@@ -125,7 +125,7 @@ describe('PATCH /api/scope-sequences/:id (mock)', () => {
           {
             id: 'ti_b',
             kind: 'unit',
-            unit_id: 'unit_aotfw',
+            unit_id: 'unit_lkeep',
             start_week: 3,
             end_week: 4,
             order: 2

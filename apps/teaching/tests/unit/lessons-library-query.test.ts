@@ -34,7 +34,7 @@ function lesson(row: LessonLibraryRow): LessonLibraryRow {
 }
 
 const units = [
-  unit({ id: 'unit_aotfw', title: 'Artist of the Floating World', subject_id: 'subject_eng' }),
+  unit({ id: 'unit_lkeep', title: 'The Lantern Keeper', subject_id: 'subject_eng' }),
   unit({ id: 'unit_hamlet', title: 'Hamlet', subject_id: 'subject_eng' }),
   unit({ id: 'unit_bio', title: 'Cells', subject_id: 'subject_bio', year_id: 'year_11' })
 ];
@@ -42,23 +42,23 @@ const units = [
 const lessons: LessonLibraryRow[] = [
   lesson({
     id: 'l1',
-    title: 'Introduction to Ono',
+    title: 'Introduction to Hale',
     slug: 'intro-ono',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 1,
     status: 'active',
     published: false,
     updated_at: ISO,
     created_at: ISO,
     tags: ['module-c'],
-    excerpt: 'Guilt and complicity in post-war Japan.',
+    excerpt: 'Guilt and complicity in a post-war harbour town.',
     pedagogical_mode: 'lesson'
   }),
   lesson({
     id: 'l2',
-    title: 'Close reading: floating world',
+    title: 'Close reading: lantern keeper',
     slug: 'close-reading',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     sequence: 2,
     status: 'active',
     published: true,
@@ -108,7 +108,7 @@ const curriculum = {
       created_at: ISO,
       updated_at: ISO,
       schema_version: 1,
-      unit_ids: ['unit_aotfw', 'unit_hamlet'],
+      unit_ids: ['unit_lkeep', 'unit_hamlet'],
       outcome_ids: [],
       class_ids: []
     },
@@ -143,10 +143,10 @@ describe('lessons library query', () => {
   });
 
   it('matches partial query against title, unit, tags, and excerpt', () => {
-    expect(searchHaystack(lessons[0]!, 'Artist of the Floating World').includes('floating')).toBe(
+    expect(searchHaystack(lessons[0]!, 'The Lantern Keeper').includes('lantern')).toBe(
       true
     );
-    const byUnit = applyLessonsQuery(curriculum, { ...DEFAULT_LESSONS_STATE, q: 'floating world' });
+    const byUnit = applyLessonsQuery(curriculum, { ...DEFAULT_LESSONS_STATE, q: 'lantern keeper' });
     expect(byUnit.rows.map((r) => r.id).sort()).toEqual(['l1', 'l2']);
     const byExcerpt = applyLessonsQuery(curriculum, { ...DEFAULT_LESSONS_STATE, q: 'complicity' });
     expect(byExcerpt.rows.map((r) => r.id)).toEqual(['l1']);
@@ -155,7 +155,7 @@ describe('lessons library query', () => {
   it('ANDs unit, status, and tag filters and reports counts', () => {
     const result = applyLessonsQuery(curriculum, {
       ...DEFAULT_LESSONS_STATE,
-      units: ['unit_aotfw'],
+      units: ['unit_lkeep'],
       statuses: ['published'],
       tags: ['assessment']
     });
@@ -204,7 +204,7 @@ describe('lessons library query', () => {
           id: 'l5',
           title: 'Untitled import',
           slug: 'untitled-import',
-          unit_id: 'unit_aotfw',
+          unit_id: 'unit_lkeep',
           sequence: 3,
           published: false,
           updated_at: '2026-08-02T00:00:00.000Z',
@@ -230,20 +230,20 @@ describe('lessons library query', () => {
     const result = applyLessonsQuery(curriculum, DEFAULT_LESSONS_STATE);
     const groups = groupLessonsByUnit(result.rows, units);
     expect(groups.map((group) => group.unitId).sort()).toEqual([
-      'unit_aotfw',
+      'unit_lkeep',
       'unit_bio'
     ].sort());
-    const aotfw = groups.find((group) => group.unitId === 'unit_aotfw')!;
-    expect(aotfw.lessons).toHaveLength(2);
-    expect(aotfw.published).toBe(1);
-    expect(aotfw.draft).toBe(1);
+    const lkeep = groups.find((group) => group.unitId === 'unit_lkeep')!;
+    expect(lkeep.lessons).toHaveLength(2);
+    expect(lkeep.published).toBe(1);
+    expect(lkeep.draft).toBe(1);
   });
 
   it('sorts by title A–Z', () => {
     const result = applyLessonsQuery(curriculum, { ...DEFAULT_LESSONS_STATE, sort: 'title_asc' });
     expect(result.rows.map((r) => r.title)).toEqual([
-      'Close reading: floating world',
-      'Introduction to Ono',
+      'Close reading: lantern keeper',
+      'Introduction to Hale',
       'Microscope lab'
     ]);
   });

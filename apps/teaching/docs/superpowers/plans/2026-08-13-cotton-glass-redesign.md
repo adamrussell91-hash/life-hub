@@ -54,12 +54,12 @@ import { PASTEL_TINTS, pastelFromId } from '@/design/pastel';
 
 describe('pastelFromId', () => {
   it('returns a tint from the closed set', () => {
-    const tint = pastelFromId('unit_aotfw');
+    const tint = pastelFromId('unit_lkeep');
     expect(PASTEL_TINTS).toContain(tint);
   });
 
   it('is stable for the same id', () => {
-    expect(pastelFromId('unit_aotfw')).toBe(pastelFromId('unit_aotfw'));
+    expect(pastelFromId('unit_lkeep')).toBe(pastelFromId('unit_lkeep'));
   });
 
   it('spreads different ids across the set', () => {
@@ -427,7 +427,7 @@ expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Teaching 
 expect(canvas.querySelector('.home-today')).not.toBeNull();
 expect(canvas.querySelector('.home-today')?.textContent).toContain('Memory');
 const chip = canvas.querySelector<HTMLAnchorElement>(
-  'a.event-chip[href="/lessons/lesson_aotfw_008"]'
+  'a.event-chip[href="/lessons/lesson_lkeep_008"]'
 );
 expect(chip).not.toBeNull();
 expect(chip?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);

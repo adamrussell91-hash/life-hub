@@ -23,8 +23,8 @@
 ### Netlify Blobs and draft vs published isolation
 
 - One Blob store with prefixed keys; draft and published content use separate key namespaces:
-  - Draft: `lessons/lesson_aotfw_008` (example)
-  - Published snapshot: `published/lessons/lesson_aotfw_008`
+  - Draft: `lessons/lesson_lkeep_008` (example)
+  - Published snapshot: `published/lessons/lesson_lkeep_008`
 - Teacher endpoints read/write draft keys (auth required).
 - Student endpoints return **published snapshots only** — never draft keys.
 - Students never read draft keys.

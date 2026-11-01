@@ -5,13 +5,13 @@
  */
 (function () {
   const MIND = {
-    title: 'Themes in An Artist of the Floating World',
+    title: 'Themes in The Lantern Keeper',
     nodes: [
-      { id: 'm0', label: 'Ono’s unreliable memory', parent_id: null },
+      { id: 'm0', label: 'Hale’s unreliable memory', parent_id: null },
       { id: 'm1', label: 'Guilt and responsibility', parent_id: 'm0' },
       { id: 'm3', label: 'Art and propaganda', parent_id: 'm0' },
       { id: 'm5', label: 'Matsuda’s influence', parent_id: 'm3' },
-      { id: 'm2', label: 'Post-war Japan', parent_id: 'm0' },
+      { id: 'm2', label: 'The post-war town', parent_id: 'm0' },
       { id: 'm6', label: 'The Pleasure District', parent_id: 'm2' },
       { id: 'm4', label: 'Generational conflict', parent_id: 'm0' },
       { id: 'm7', label: 'Noriko’s marriage talks', parent_id: 'm4' },
@@ -21,11 +21,11 @@
   };
 
   const CONCEPT = {
-    title: 'How Ono’s reputation shapes the plot',
+    title: 'How Hale’s reputation shapes the plot',
     nodes: [
       { id: 'c3', label: 'Imperial propaganda', color: 'peach' },
       { id: 'c6', label: 'Self-deception', color: 'lilac' },
-      { id: 'c1', label: 'Ono’s reputation', color: 'blue' },
+      { id: 'c1', label: 'Hale’s reputation', color: 'blue' },
       { id: 'c4', label: 'Kuroda', color: 'sage' },
       { id: 'c2', label: 'Noriko’s marriage', color: 'gold' },
       { id: 'c5', label: 'Saito family', color: 'sage' }

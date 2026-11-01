@@ -460,8 +460,8 @@ function curriculumFixture(): CurriculumResponse {
       {
         id: 'u1',
         type: 'unit',
-        title: 'Artist of the Floating World',
-        slug: 'aotfw',
+        title: 'The Lantern Keeper',
+        slug: 'lkeep',
         year_id: 'y12',
         subject_id: 'eng',
         lesson_ids: ['l1'],
@@ -529,7 +529,7 @@ function curriculumFixture(): CurriculumResponse {
       {
         id: 'm1',
         type: 'media',
-        title: 'Floating World slides',
+        title: 'Lantern Keeper slides',
         slug: 'fw-slides',
         provider: 'external',
         media_type: 'pdf',

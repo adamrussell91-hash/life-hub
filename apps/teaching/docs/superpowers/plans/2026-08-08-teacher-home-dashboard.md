@@ -334,38 +334,38 @@ In `fixtures/seed.json`, add top-level (sibling of `years`):
     {
       "class_id": "class_demo_12engadv_p3",
       "class_title": "12 Eng Adv — Period 3",
-      "lesson_id": "lesson_aotfw_006",
+      "lesson_id": "lesson_lkeep_006",
       "scheduled_date": "2026-08-10"
     },
     {
       "class_id": "class_demo_12engadv_p3",
       "class_title": "12 Eng Adv — Period 3",
-      "lesson_id": "lesson_aotfw_007",
+      "lesson_id": "lesson_lkeep_007",
       "scheduled_date": "2026-08-11"
     },
     {
       "class_id": "class_demo_12engadv_p3",
       "class_title": "12 Eng Adv — Period 3",
-      "lesson_id": "lesson_aotfw_008",
+      "lesson_id": "lesson_lkeep_008",
       "scheduled_date": "2026-08-12"
     },
     {
       "class_id": "class_demo_12engadv_p3",
       "class_title": "12 Eng Adv — Period 3",
-      "lesson_id": "lesson_aotfw_001",
+      "lesson_id": "lesson_lkeep_001",
       "scheduled_date": "2026-08-13"
     },
     {
       "class_id": "class_demo_12engadv_p3",
       "class_title": "12 Eng Adv — Period 3",
-      "lesson_id": "lesson_aotfw_002",
+      "lesson_id": "lesson_lkeep_002",
       "scheduled_date": "2026-08-14"
     }
   ]
 }
 ```
 
-Also set on `lesson_aotfw_008` (draft object):
+Also set on `lesson_lkeep_008` (draft object):
 
 ```json
 "published_at": "2026-02-01T12:00:00.000Z",
@@ -439,7 +439,7 @@ In the existing curriculum describe (or new `it`s), after seeding unit/year/subj
       {
         class_id: 'class_demo',
         class_title: '12 Eng Adv — Period 3',
-        lesson_id: 'lesson_aotfw_008',
+        lesson_id: 'lesson_lkeep_008',
         scheduled_date: '2026-08-12'
       }
     ]
@@ -450,9 +450,9 @@ Assert authenticated curriculum response:
 
 ```ts
     expect(body.data.schedule).toEqual([
-      expect.objectContaining({ lesson_id: 'lesson_aotfw_008', scheduled_date: '2026-08-12' })
+      expect.objectContaining({ lesson_id: 'lesson_lkeep_008', scheduled_date: '2026-08-12' })
     ]);
-    const lesson = body.data.lessons.find((l: { id: string }) => l.id === 'lesson_aotfw_008');
+    const lesson = body.data.lessons.find((l: { id: string }) => l.id === 'lesson_lkeep_008');
     expect(lesson.updated_at).toBeTruthy();
 ```
 
@@ -559,22 +559,22 @@ const curriculum: CurriculumResponse = {
     {
       class_id: 'class_demo',
       class_title: '12 Eng Adv — Period 3',
-      lesson_id: 'lesson_aotfw_008',
+      lesson_id: 'lesson_lkeep_008',
       scheduled_date: '2026-08-12'
     },
     {
       class_id: 'class_demo',
       class_title: '12 Eng Adv — Period 3',
-      lesson_id: 'lesson_aotfw_001',
+      lesson_id: 'lesson_lkeep_001',
       scheduled_date: '2026-08-13'
     }
   ],
   lessons: [
     {
-      id: 'lesson_aotfw_008',
+      id: 'lesson_lkeep_008',
       title: 'Memory',
       slug: 'memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 8,
       status: 'active',
       published: true,
@@ -582,10 +582,10 @@ const curriculum: CurriculumResponse = {
       published_at: '2026-02-01T12:00:00.000Z'
     },
     {
-      id: 'lesson_aotfw_001',
+      id: 'lesson_lkeep_001',
       title: 'Intro',
       slug: 'intro',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false,
@@ -624,9 +624,9 @@ describe('teacher home dashboard', () => {
     const open = canvas.querySelector<HTMLAnchorElement>(
       '[data-home-panel="today"] .home-schedule__open'
     );
-    expect(open?.getAttribute('href')).toBe('/lessons/lesson_aotfw_008');
+    expect(open?.getAttribute('href')).toBe('/lessons/lesson_lkeep_008');
     open?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
+    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_lkeep_008');
   });
 
   it('does not render the old flat all-lessons list', () => {

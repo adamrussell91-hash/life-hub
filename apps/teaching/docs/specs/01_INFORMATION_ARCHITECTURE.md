@@ -24,8 +24,8 @@ Example:
 Year 12
 English Advanced
 Term 1
-Artist of the Floating World
-Lesson 08: Memory, Identity and Ono
+The Lantern Keeper
+Lesson 08: Memory, Identity and Hale
 Year and Subject together establish the main curriculum context.
 Subject names must remain explicit.
 For example:
@@ -121,7 +121,7 @@ A Unit belongs to a Year and Subject.
 Example:
 Year 12
 English Advanced
-Artist of the Floating World
+The Lantern Keeper
 The Unit contains:
 Unit title
 Description
@@ -224,7 +224,7 @@ Class:
 References:
 Year 12
 English Advanced
-Unit: Artist of the Floating World
+Unit: The Lantern Keeper
 Lesson: Memory and Identity
 Date: 12 August 2026
 Another Class may reference the same Unit and Lesson on another date.
@@ -247,7 +247,7 @@ Example:
 Class:
 12ENGADV1 2026
 Lesson:
-Memory, Identity and Ono
+Memory, Identity and Hale
 Scheduled date:
 12 August 2026
 The Lesson itself remains reusable.
@@ -282,7 +282,7 @@ Previous Lesson
 Next Lesson
 The page should also display a clickable breadcrumb.
 Example:
-Year 12 → English Advanced → Artist of the Floating World → Memory, Identity and Ono
+Year 12 → English Advanced → The Lantern Keeper → Memory, Identity and Hale
 The student page must render effectively on:
 Desktop
 Tablet
@@ -374,24 +374,24 @@ Example Class URL:
 
 Example Unit URL:
 ```
-/year 12/english advanced/artist of the floating world/
+/year 12/english advanced/the lantern keeper/
 ```
 
 Example Lesson URL:
 ```
-/year 12/english advanced/artist of the floating world/memory and identity/
+/year 12/english advanced/the lantern keeper/memory and identity/
 ```
 
 Final technical URLs should use web safe slugs.
 Conceptually:
 
 ```
-/year 12/english advanced/artist of the floating world/
+/year 12/english advanced/the lantern keeper/
 ```
 
 becomes:
 ```
-/year12/english advanced/artist of the floating world/
+/year12/english advanced/the lantern keeper/
 ```
 
 The precise route syntax will be defined in the technical specification.
@@ -417,9 +417,9 @@ IDs must never depend solely on display names.
 Example conceptual IDs:
 subject_y12_engadv
 class_2026_12engadv1
-unit_aotfw
-lesson_aotfw_008
-scheduled_2026_08_12_aotfw_008
+unit_lkeep
+lesson_lkeep_008
+scheduled_2026_08_12_lkeep_008
 Human readable IDs are acceptable where uniqueness is enforced.
 The architecture should not depend on random unreadable identifiers where a stable readable ID serves the same purpose.
 Slugs and IDs remain separate concepts.
@@ -567,7 +567,7 @@ Search results should show their context.
 Example:
 Memory and Identity
 Lesson
-Year 12 → English Advanced → Artist of the Floating World
+Year 12 → English Advanced → The Lantern Keeper
 This prevents similarly titled Lessons becoming ambiguous.
 
 ## 26. Student Interaction State
@@ -651,9 +651,9 @@ Year 12 English Advanced 2026
 Term:
 Term 2
 Unit:
-Artist of the Floating World
+The Lantern Keeper
 Lesson:
-Memory, Identity and Ono
+Memory, Identity and Hale
 Unit sequence:
 Lesson 08
 Scheduled Lesson:
@@ -661,9 +661,9 @@ Scheduled Lesson:
 Student Class page:
 12ENGADV1
 Student Unit page:
-Artist of the Floating World
+The Lantern Keeper
 Student Lesson page:
-Memory, Identity and Ono
+Memory, Identity and Hale
 The same Lesson might also appear as:
 Class:
 12ENGADV2 2026
