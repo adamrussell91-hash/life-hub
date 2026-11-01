@@ -868,6 +868,25 @@ test('permanently deleting a lesson purges its snapshot, schedule slots and unit
   assert.deepEqual((await store.get('units/unit-1', { type: 'json' })).lesson_ids, ['lesson-a']);
 });
 
+test('permanently deleting a unit unhooks it from every class', async () => {
+  const store = memoryStore({
+    'units/unit-dead': { id: 'unit-dead', title: 'Dead', status: 'trashed', lesson_ids: [] },
+    'classes/class-1': { id: 'class-1', title: 'One', status: 'active', current_unit_id: 'unit-dead', active_unit_ids: ['unit-dead', 'unit-live'] },
+    'classes/class-2': { id: 'class-2', title: 'Two', status: 'active', current_unit_id: 'unit-live', active_unit_ids: ['unit-live'] }
+  });
+  const response = await createUnitHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  })(request({ method: 'DELETE', url: 'https://api.adam-russell.com/api/units/unit-dead' }));
+  assert.equal(response.status, 200);
+  assert.equal(await store.get('units/unit-dead'), null);
+  const one = await store.get('classes/class-1', { type: 'json' });
+  assert.equal(one.current_unit_id, 'unit-live');
+  assert.deepEqual(one.active_unit_ids, ['unit-live']);
+  assert.equal((await store.get('classes/class-2', { type: 'json' })).current_unit_id, 'unit-live');
+});
+
 test('scheduling refuses a trashed lesson', async () => {
   const store = memoryStore({
     'classes/class-1': { id: 'class-1', title: 'Class', status: 'active' },
