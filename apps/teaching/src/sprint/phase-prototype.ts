@@ -154,8 +154,32 @@ function pitchFromMine(ctx: FormContext, state: PhasePayload['prototype'], err: 
     }
   });
   usePitch.disabled = !ctx.editable;
-  pitch.append(usePitch);
+  pitch.append(usePitch, coverPicker(ctx, err));
   return pitch;
+}
+
+/** One picture the projector shows while the group pitches: a poster for the idea, not the slides. */
+function coverPicker(ctx: FormContext, err: HTMLElement): HTMLElement {
+  const box = el('div', 'sprint-cover');
+  const s = ctx.status;
+  box.append(el('h4', '', 'Cover poster'), el('p', 'sprint-note', s.cover ? `In: ${s.cover.name}` : 'One picture that sums up your idea. It goes up on the screen while you pitch.'));
+  const upload = el('input');
+  upload.type = 'file';
+  upload.accept = 'image/png,image/jpeg,image/webp';
+  upload.disabled = !ctx.editable;
+  upload.setAttribute('aria-label', 'Upload the cover poster');
+  upload.addEventListener('change', async () => {
+    const file = upload.files?.[0];
+    if (!file) return;
+    try {
+      const up = await ctx.client.upload('prototype', file);
+      ctx.onStatus(await ctx.client.pitch({ cover_file_id: up.id }));
+    } catch (e) {
+      err.textContent = e instanceof Error ? e.message : 'That didn’t upload.';
+    }
+  });
+  box.append(upload);
+  return box;
 }
 
 /** Every part of the group's prototype as it comes in: who, what they made, their files and links. Each of your parts is its own row. */
@@ -199,12 +223,12 @@ function finishedPrototype(ctx: FormContext): HTMLElement {
     box.append(el('p', 'sprint-note', set || (s.assembler ? `Waiting for ${s.assembler.initials} to put it together.` : 'Your group hasn’t picked an assembler. Ask your teacher.')));
     return box;
   }
-  box.append(el('p', 'sprint-note', set || 'You’re the assembler. Put everyone’s parts together, then upload the finished prototype or add its link. This is what your group shows at the pitch.'));
+  box.append(el('p', 'sprint-note', set || 'You’re the assembler. Put everyone’s parts together, then upload the finished prototype or add its link. Your teacher opens it for the pitch.'));
   const err = el('p', 'sprint-submit__err');
   err.setAttribute('role', 'alert');
   const upload = el('input');
   upload.type = 'file';
-  upload.accept = 'application/pdf,image/png,image/jpeg,image/webp';
+  upload.accept = 'application/pdf,.pptx,.docx,image/png,image/jpeg,image/webp';
   upload.disabled = !ctx.editable;
   upload.setAttribute('aria-label', 'Upload the finished prototype');
   upload.addEventListener('change', async () => {
@@ -230,9 +254,9 @@ function finishedPrototype(ctx: FormContext): HTMLElement {
     try { ctx.onStatus(await ctx.client.pitch({ link: input.value.trim() })); } catch (x) { err.textContent = x instanceof Error ? x.message : 'That didn’t work.'; }
   });
   link.append(input, go);
-  box.append(upload, link, err);
+  box.append(upload, link, coverPicker(ctx, err), err);
   return box;
 }
 
 /** Only what changes the form's shape. Groupmates' saves reach the parts list through `update`, so polling never resets the step. */
-export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).filter((p) => p.mine).map((p) => p.id).join('+'), s.pitch?.file ?? s.pitch?.link ?? '', s.assembler?.key ?? '', s.group_parts ? 'g' : ''].join('|');
+export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).filter((p) => p.mine).map((p) => p.id).join('+'), s.pitch?.file ?? s.pitch?.link ?? '', s.cover?.file ?? '', s.assembler?.key ?? '', s.group_parts ? 'g' : ''].join('|');

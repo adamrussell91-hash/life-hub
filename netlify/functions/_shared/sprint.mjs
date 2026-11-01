@@ -507,6 +507,7 @@ async function studentView(store, lessonId, config, who, group) {
     assembler: state.assembler && group.students.includes(state.assembler) ? { key: memberKey(lessonId, state.assembler), initials: initials.get(state.assembler) ?? '–', me: state.assembler === sid } : null,
     group_parts: open.includes('prototype') ? await groupParts(store, lessonId, config, group, state, initials, sid) : null,
     pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null,
+    cover: state.cover ? { file: state.cover.file, name: state.cover.name ?? '' } : null,
     understand_group: shared,
     // What the group takes from Understand into the later phases.
     brief: {
@@ -799,7 +800,13 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
   if (action === 'pitch') {
     if (!view.phases.find((p) => p.key === 'prototype')?.open) reject(409, 'not_open', 'Prototype hasn’t opened yet.');
     if (config.assemble && state.assembler && state.assembler !== sid) reject(403, 'not_assembler', `${view.assembler?.initials ?? 'Your assembler'} puts the prototype together and uploads it.`);
-    if (typeof body.link === 'string' && body.link) {
+    if (typeof body.cover_file_id === 'string') {
+      // The cover poster: one picture the projector shows while the group pitches.
+      const meta = await read(store, k.fileMeta(owner, body.cover_file_id));
+      if (!meta) reject(404, 'not_found', 'Upload the cover first.');
+      if (!/^image\//.test(meta.mime ?? '')) reject(400, 'bad_type', 'The cover is a picture (PNG, JPG or WEBP).');
+      state.cover = { file: body.cover_file_id, name: meta.name, by: sid, at: iso(clock()) };
+    } else if (typeof body.link === 'string' && body.link) {
       if (!/^https:\/\/\S{3,490}$/.test(body.link)) reject(400, 'bad_link', 'Links start with https://');
       state.pitch = { kind: 'link', link: body.link, by: sid, at: iso(clock()) };
     } else {
@@ -887,6 +894,7 @@ async function teacherBoard(store, lessonId, groupId) {
     reasons,
     parts: list(state.parts).map((p) => ({ ...p, by: list(state.claims[p.id]).map(name) })),
     pitch: state.pitch ? { ...state.pitch, by: name(state.pitch.by) } : null,
+    cover: state.cover ? { file: state.cover.file, name: state.cover.name ?? '' } : null,
     assembler: state.assembler ? name(state.assembler) : null,
     subs,
     round: round ? { ...round, entries: Object.entries(round.entries ?? {}).map(([student, e]) => ({ student_id: student, name: name(student), ...e })) } : null

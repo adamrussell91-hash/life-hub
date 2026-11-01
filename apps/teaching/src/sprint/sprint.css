@@ -124,9 +124,11 @@
 .spitch__who small { opacity: .7; }
 .spitch__timer { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .spitch__timer--up { color: var(--pastel-gold); }
-.spitch__stage { display: grid; place-items: center; min-height: 0; }
-.spitch__file { width: 100%; height: 100%; border: 0; border-radius: 16px; background: #fff; object-fit: contain; }
-.spitch__link { color: #fff; font-size: 20px; }
+.spitch__stage { position: relative; min-height: 0; }
+.spitch__cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.spitch__none { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; opacity: .5; }
+.spitch__fileslot:empty { display: none; }
+.spitch a.btn { text-decoration: none; }
 .spitch__foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .spitch__count { margin-right: auto; }
 .spitch .btn { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25); }

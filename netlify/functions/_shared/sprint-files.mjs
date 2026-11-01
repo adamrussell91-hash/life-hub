@@ -12,6 +12,8 @@ import { sprintKeys } from './sprint-keys.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 
 export const SPRINT_FILE_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
+/** The finished prototype may also be a slide deck or document; the teacher downloads it to present. */
+export const PITCH_FILE_MIME = new Set(['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
 export const SPRINT_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_FILES = 6;
 
@@ -35,7 +37,7 @@ export async function uploadSprintFile(store, lessonId, form) {
   const file = form.get('file');
   if (phase !== 'sketch' && phase !== 'prototype') reject(400, 'bad_phase', 'Files go with Sketch or Prototype.');
   if (!(file instanceof File)) reject(400, 'no_file', 'Pick a file.');
-  if (!SPRINT_FILE_MIME.has(file.type)) reject(400, 'bad_type', 'Upload a PDF or a picture (PNG, JPG or WEBP).');
+  if (!SPRINT_FILE_MIME.has(file.type) && !(phase === 'prototype' && PITCH_FILE_MIME.has(file.type))) reject(400, 'bad_type', phase === 'prototype' ? 'Upload a PDF, PowerPoint, Word file or a picture (PNG, JPG or WEBP).' : 'Upload a PDF or a picture (PNG, JPG or WEBP).');
   if (file.size > SPRINT_FILE_BYTES) reject(413, 'too_large', 'That file is over 5 MB. Save a smaller copy or add a link.');
   const view = await studentFor(store, lessonId, fields);
   if (view.lock) reject(423, 'locked', 'The sprint is locked for now. It opens again soon.');
