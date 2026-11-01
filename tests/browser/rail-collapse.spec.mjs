@@ -73,7 +73,7 @@ test('every hub rail slides away and back, and the canvas takes the room', async
       const open = await geometry(page);
       assert.equal(open.railWidth, 240, `${hub}: rail keeps 15rem`);
       assert.equal(open.canvasLeft, 240, `${hub}: canvas starts after the rail`);
-      assert.equal(open.tabLeft, 240, `${hub}: tab sits on the rail edge`);
+      assert.equal(open.tabLeft, 208, `${hub}: arrow sits inside the rail`);
       assert.equal(open.expanded, 'true');
       if (shot) await page.screenshot({ path: `${shot}/${hub}-open.png` });
 
