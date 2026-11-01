@@ -1,6 +1,7 @@
 import {
   QUIZ_KIND_INFO,
   QUIZ_LIMITS,
+  aiMarkOn,
   blankQuestion,
   checkQuestion,
   locateQuote,
@@ -385,14 +386,33 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       );
     }
     if (!student) {
+      const looking = textArea(question.looking_for ?? '', QUIZ_LIMITS.note, 2, 'e.g. Any answer that names the speaker’s grief.');
+      looking.addEventListener('input', () => {
+        question.looking_for = looking.value || undefined;
+        emit();
+      });
       wrap.append(
         checkbox('Capitals must match', !!question.case_sensitive, (checked) => {
           question.case_sensitive = checked || undefined;
           emit();
-        })
+        }),
+        aiSwitch(question),
+        labelled('Looking for (optional)', looking, 'What a right answer says, so the AI can mark wordings that aren’t on the list.')
       );
     }
     return wrap;
+  }
+
+  /**
+   * "AI can mark this": on by default for short answers and gaps, off for
+   * written answers. Only a change from the default is saved.
+   */
+  function aiSwitch(question: { kind: QuizQuestionKind; ai_mark?: boolean }): HTMLElement {
+    const byDefault = question.kind === 'short_answer' || question.kind === 'fill_gap';
+    return checkbox('AI can mark this', aiMarkOn(question), (checked) => {
+      question.ai_mark = checked === byDefault ? undefined : checked;
+      emit();
+    });
   }
 
   /**
@@ -504,6 +524,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         emit();
       })
     );
+    if (!student) wrap.append(aiSwitch(question));
     paintChips();
     return wrap;
   }
@@ -1025,6 +1046,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       labelled('Model answer', model),
       labelled('How to mark it', guide)
     );
+    if (!student) wrap.append(aiSwitch(question));
     return wrap;
   }
 
