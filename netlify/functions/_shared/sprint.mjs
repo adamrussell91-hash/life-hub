@@ -356,6 +356,19 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
     if (config.decider === 'top_vote' && t.top) next.chosen = t.top;
     else next.awaiting = { kind: 'idea', tie: t.tie, empty: ideas.length === 0 };
   }
+  // A teacher who switches to "students choose" and republishes: groups already waiting on a clear winner go through now.
+  if (config.decider === 'top_vote' && next.awaiting?.kind === 'question' && !next.question) {
+    const notes = await groupNotes(store, lessonId, config, group);
+    const subs = await groupSubs(store, lessonId, config, group, 'understand');
+    const t = tally(subs.map(({ sub }) => ({ star: sub?.payload?.star ?? '' })), ['star'], notes.map((n) => n.id));
+    const top = notes.find((n) => n.id === t.top);
+    if (top) next = { ...next, question: { id: top.id, text: top.text }, awaiting: null };
+  }
+  if (config.decider === 'top_vote' && next.awaiting?.kind === 'idea' && !next.chosen && next.votes_closed_at) {
+    const gallery = await groupGallery(store, lessonId, config, group, next.votes_closed_at);
+    const t = decideTally(await groupSubs(store, lessonId, config, group, 'decide'), config, gallery);
+    if (t.top) next = { ...next, chosen: t.top, awaiting: null };
+  }
   if (next !== state) await store.setJSON(k.group(group.id), next);
   return next;
 }
