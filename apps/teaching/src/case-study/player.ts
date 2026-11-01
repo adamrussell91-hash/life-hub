@@ -1,5 +1,6 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { renderBlock } from '@/blocks/render';
 import { casePartOf, isCaseBriefSection, isCaseOutcomeSection } from './model';
 import { button, el } from '@/quiz/dom';
@@ -129,7 +130,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   };
   const blockList = (list: Block[]) => {
     const wrap = el('div', 'cs-blocks');
-    for (const b of list) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks }));
+    for (const b of list) wrap.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks, loadAnthology: () => studentUnitAnthology(lesson.unit_id) }));
     return wrap;
   };
 

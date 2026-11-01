@@ -1,5 +1,6 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
+import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { renderBlock } from '@/blocks/render';
 import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
@@ -52,6 +53,8 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   const now = options.now ?? (() => Date.now());
   const sprint = lesson.sprint as PublicSprint;
   const blocks = lesson.blocks as Block[];
+  // An Anthology block in the brief or a guide reads the unit's published notes.
+  const loadAnthology = () => studentUnitAnthology(lesson.unit_id);
   const parts = sprintParts(blocks);
   let status: SprintStatus | null = null;
   let chosen: SprintPhaseKey | null = null;
@@ -109,7 +112,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   const wholeGuides = parts.guides && (parts.guides.content.blocks as Block[]).length ? el('details', 'sprint-guides sprint-guides--whole') : null;
   if (wholeGuides) {
     wholeGuides.append(el('summary', '', 'Guides for the whole sprint'));
-    for (const b of parts.guides!.content.blocks as Block[]) wholeGuides.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+    for (const b of parts.guides!.content.blocks as Block[]) wholeGuides.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
   }
 
   function paintTop(s: SprintStatus, key: SprintPhaseKey): void {
@@ -126,7 +129,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const steps = buildRail(s.phases ?? [], key, (k) => sprint.phases.find((x) => x.key === k)?.where, (k) => { chosen = k; paint(); }, (p) => (p.due_date ? `Closes ${new Date(`${p.due_date}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })}` : ''));
     const brief = el('section', 'sprint-brief');
     brief.append(el('div', 'sprint-brief__kind', 'The challenge'));
-    for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+    for (const b of parts.brief) brief.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
     top.append(steps, cd, group, intent, brief);
     if (wholeGuides) top.append(wholeGuides);
   }
@@ -158,7 +161,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     panel.open = typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 900px)').matches;
     panel.append(el('summary', '', 'Guides for this step'));
     const sec = parts.phases.get(key);
-    for (const b of (sec?.content.blocks as Block[] | undefined) ?? []) panel.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks }));
+    for (const b of (sec?.content.blocks as Block[] | undefined) ?? []) panel.append(renderBlock(b, 'student', { lessonId: lesson.lesson_id, pageBlocks: blocks, loadAnthology }));
     if (key === 'sketch' || key === 'decide') {
       const g = sprint.idea_guide;
       const check = el('div', 'sprint-guide');

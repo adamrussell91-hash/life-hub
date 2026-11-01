@@ -175,6 +175,7 @@ function renderPublishedLesson(
       lessonId: lesson.lesson_id,
       title: lesson.title,
       blocks: lesson.blocks,
+      loadAnthology: () => studentUnitAnthology(lesson.unit_id),
       client: classId ? lectureClient(lesson.lesson_id, classId) : null,
       renderHero: (hostEl) => {
         renderPublishedLessonHero(hostEl, lesson, extras?.cls);

@@ -376,7 +376,7 @@
   ],
   "every-block/every_done/student": [],
   "every-block/every_done/teacher": [
-    "I’ve finished this"
+    "Students finish every lesson with the tick at the foot of the page, so this block shows them nothing. You can delete it."
   ],
   "every-block/every_brainstorm/student": [
     "Brainstorm",
@@ -753,11 +753,11 @@
     "No items."
   ],
   "every-block/every_anthology/student": [
-    "Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.",
+    "Nothing collected here yet.",
     "anthology.title filler"
   ],
   "every-block/every_anthology/teacher": [
-    "Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme.",
+    "Tick Add to unit anthology on a note in any lesson of this unit, and give it a theme. Students see notes from published lessons only.",
     "anthology.title filler"
   ],
   "every-block/every_outcomes/student": [
