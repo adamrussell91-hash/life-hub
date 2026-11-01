@@ -1366,6 +1366,44 @@
   gap: var(--space-2);
 }
 
+/* ── AI marking ────────────────────────────────────────────────────── */
+
+.qz-ai-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.qz-ai-strip .qz-note {
+  margin: 0;
+}
+
+.qz-note--error {
+  color: var(--danger);
+}
+
+.qz-ai-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.qz-ai-note__tag {
+  display: inline-block;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--warning-surface);
+  font-weight: 600;
+}
+
+.qz-result__comment {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  white-space: pre-line;
+}
+
 /* ── Live ──────────────────────────────────────────────────────────── */
 
 .qz-live__bar {

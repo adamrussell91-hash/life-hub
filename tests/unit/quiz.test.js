@@ -19,7 +19,8 @@ const image = { id: 'img1', type: 'block', block_type: 'image', visibility: 'stu
 const qBlock = (id, question) => ({ id, type: 'block', block_type: 'quiz_question', variant: 'medium', visibility: 'student_teacher', content: { question: { id, ...question } }, ...stamp });
 
 const mc = { kind: 'multiple_choice', prompt: 'Which technique?', marks: 2, hint: 'Think comparison.', explanation: 'No like or as.', options: [{ id: 'a', text: 'Simile' }, { id: 'b', text: 'Metaphor' }, { id: 'c', text: 'Rhyme' }], correct: ['b'] };
-const sa = { kind: 'short_answer', prompt: 'Name the speaker.', marks: 1, accepted: ['Romeo'] };
+// AI marking off, so a wrong answer scores 0 at once; the AI marking tests use saAi.
+const sa = { kind: 'short_answer', prompt: 'Name the speaker.', marks: 1, accepted: ['Romeo'], ai_mark: false };
 const essay = { kind: 'extended_response', prompt: 'Explain the ending.', marks: 4, model_answer: 'Tragic.' };
 
 function storeFixture(entries = []) {

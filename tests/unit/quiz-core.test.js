@@ -28,8 +28,9 @@ const samples = {
   multiple_choice: { ...base, id: 'q1', kind: 'multiple_choice', options: [{ id: 'a', text: 'Simile' }, { id: 'b', text: 'Metaphor' }, { id: 'c', text: 'Alliteration' }], correct: ['b'] },
   multi_select: { ...base, id: 'q2', kind: 'multi_select', options: [{ id: 'a', text: 'Red' }, { id: 'b', text: 'Blue' }, { id: 'c', text: 'Cat' }, { id: 'd', text: 'Green' }], correct: ['a', 'b', 'd'], marks: 3 },
   true_false: { ...base, id: 'q3', kind: 'true_false', answer: false },
-  short_answer: { ...base, id: 'q4', kind: 'short_answer', accepted: ['personification'] },
-  fill_gap: { ...base, id: 'q5', kind: 'fill_gap', prompt: '', passage: 'Shall I [[compare]] thee to a summer’s [[day|morning]]?', word_bank: true },
+  // AI marking off here, so these show the automatic marks; the AI marking test turns it on.
+  short_answer: { ...base, id: 'q4', kind: 'short_answer', accepted: ['personification'], ai_mark: false },
+  fill_gap: { ...base, id: 'q5', kind: 'fill_gap', prompt: '', passage: 'Shall I [[compare]] thee to a summer’s [[day|morning]]?', word_bank: true, ai_mark: false },
   odd_one_out: { ...base, id: 'q6', kind: 'odd_one_out', options: [{ id: 'a', text: 'Sonnet' }, { id: 'b', text: 'Haiku' }, { id: 'c', text: 'Novel' }], correct: ['c'] },
   matching: { ...base, id: 'q7', kind: 'matching', pairs: [{ id: 'p1', left: 'Simile', right: 'like or as' }, { id: 'p2', left: 'Metaphor', right: 'is something else' }, { id: 'p3', left: 'Onomatopoeia', right: 'sound word' }] },
   ordering: { ...base, id: 'q8', kind: 'ordering', items: [{ id: 'i1', text: 'Exposition' }, { id: 'i2', text: 'Rising action' }, { id: 'i3', text: 'Climax' }, { id: 'i4', text: 'Resolution' }] },
@@ -233,4 +234,33 @@ test('written questions carry their skills and next-step bank to students', () =
   assert.equal(key.next_steps, undefined);
   assert.equal(splitQuestion({ ...q, next_steps: undefined }, seeded()).question.skills, undefined);
   assert.equal(QuizQuestionSchema.safeParse({ ...q, next_steps: { comp_ts: { ...bank.comp_ts, lines: ['a'] } } }).success, false);
+});
+
+test('AI marking: answers that aren’t an exact match wait for the AI; the key carries the switch and the note', () => {
+  const key = (sample) => splitQuestion(QuizQuestionSchema.parse(sample), seeded());
+  const short = key({ ...samples.short_answer, ai_mark: undefined, looking_for: 'A technique that gives the wind human traits.' });
+  assert.equal(short.key.ai, true, 'on by default for short answers');
+  assert.equal(short.key.looking_for, 'A technique that gives the wind human traits.');
+  assert.ok(!JSON.stringify(short.question).includes('human traits'), 'the note stays off the public question');
+  assert.equal(markResponse(short.key, { text: 'Personification' }).score, 2, 'an exact match marks itself');
+  assert.deepEqual(markResponse(short.key, { text: 'giving it human feelings' }), { score: null, max: 2, correct: null, pending: 'ai' });
+  assert.deepEqual(markResponse(short.key, { text: 'personifcation' }).pending, 'ai', 'a near miss goes to the AI too');
+  assert.equal(markResponse(short.key, { text: '   ' }).score, 0, 'an empty answer is wrong at once');
+
+  const gaps = key({ ...samples.fill_gap, ai_mark: undefined });
+  assert.equal(gaps.key.ai, true);
+  const [g1, g2] = gaps.question.parts.filter(p => p.type === 'gap').map(p => p.id);
+  assert.equal(markResponse(gaps.key, { gaps: { [g1]: 'compare', [g2]: 'day' } }).score, 2);
+  const waiting = markResponse(gaps.key, { gaps: { [g1]: 'compare', [g2]: 'evening' } });
+  assert.equal(waiting.pending, 'ai');
+  assert.deepEqual(waiting.parts, { [g1]: true }, 'the exact gap shows right; the other waits');
+  assert.equal(markResponse(gaps.key, { gaps: { [g1]: 'compare' } }).score, 1, 'an empty gap is wrong, so nothing waits');
+
+  const essay = key(samples.extended_response);
+  assert.equal(essay.key.ai, undefined, 'off by default for written answers');
+  assert.equal(markResponse(essay.key, { text: 'It ends badly.' }).pending, 'manual');
+  const essayOn = key({ ...samples.extended_response, ai_mark: true });
+  assert.equal(markResponse(essayOn.key, { text: 'It ends badly.' }).pending, 'ai');
+  assert.equal(key({ ...samples.short_answer, ai_mark: false }).key.ai, undefined, 'the switch turns it off');
+  assert.equal(key({ ...samples.true_false, ai_mark: true }).key.ai, undefined, 'only typed answers can be AI marked');
 });

@@ -421,6 +421,8 @@ var QUIZ_LIMITS = {
   hint: 500,
   explanation: 1e3,
   passage: 4e3,
+  /** A short answer's "Looking for" note, and a teacher's comment on a marked answer. */
+  note: 1e3,
   answer: 200,
   model: 3e3,
   response: 6e3,
@@ -481,9 +483,12 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     ...base,
     kind: z9.literal("short_answer"),
     accepted: z9.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
-    case_sensitive: z9.boolean().optional()
+    case_sensitive: z9.boolean().optional(),
+    /** What a right answer says, for the AI marker. Optional. */
+    looking_for: OptionalText(QUIZ_LIMITS.note),
+    ai_mark: z9.boolean().optional()
   }),
-  z9.object({ ...base, kind: z9.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z9.boolean().optional() }),
+  z9.object({ ...base, kind: z9.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z9.boolean().optional(), ai_mark: z9.boolean().optional() }),
   z9.object({ ...base, kind: z9.literal("odd_one_out"), options: z9.array(QuizChoiceSchema).min(3).max(6), correct: z9.array(Id).length(1) }),
   z9.object({ ...base, kind: z9.literal("matching"), pairs: z9.array(QuizPairSchema).min(2).max(8) }),
   z9.object({ ...base, kind: z9.literal("ordering"), items: z9.array(QuizChoiceSchema).min(3).max(8) }),
@@ -527,7 +532,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     kind: z9.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z9.boolean().optional()
   }),
   z9.object({
     ...base,
@@ -536,7 +542,8 @@ var QuizQuestionSchema = z9.discriminatedUnion("kind", [
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model),
-    next_steps: NextStepBankSchema.optional()
+    next_steps: NextStepBankSchema.optional(),
+    ai_mark: z9.boolean().optional()
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {

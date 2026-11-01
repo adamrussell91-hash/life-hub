@@ -28,7 +28,7 @@ export type PlayerOptions = {
   response?: QuizResponse | null;
   locked?: boolean;
   /** Present once marked. The key is present when the right answer may be shown. */
-  result?: { mark: MarkResult; key?: QuestionKey | null; hinted?: boolean; awarded?: number | null } | null;
+  result?: { mark: MarkResult; key?: QuestionKey | null; hinted?: boolean; awarded?: number | null; comment?: string } | null;
   /** Shuffle display order of options (not of fixed passages). */
   shuffle?: boolean;
   /** Seed so a reload shows the same shuffle. */
@@ -519,7 +519,8 @@ function resultBar(result: NonNullable<PlayerOptions['result']>, key: QuestionKe
   let text: string;
   if (awarded === null || awarded === undefined) {
     state = 'pending';
-    text = mark.pending === 'near_miss' ? 'Nearly: your teacher will check this one.' : 'Your teacher will mark this one.';
+    text =
+      mark.pending === 'near_miss' ? 'Nearly: your teacher will check this one.' : mark.pending === 'ai' ? 'Your teacher will check this one.' : 'Your teacher will mark this one.';
   } else {
     state = awarded >= mark.max ? 'right' : awarded > 0 ? 'part' : 'wrong';
     text = `${state === 'right' ? 'Right' : state === 'part' ? 'Partly right' : 'Not this time'} · ${formatMarks(awarded)} / ${formatMarks(mark.max)}`;
@@ -528,6 +529,8 @@ function resultBar(result: NonNullable<PlayerOptions['result']>, key: QuestionKe
   bar.dataset.state = state;
   bar.append(el('p', 'qz-result__text', text));
   if (key?.explanation) bar.append(el('p', 'qz-result__why', key.explanation));
+  // The teacher's comment, or the AI's feedback on an answer it marked.
+  if (result.comment?.trim()) bar.append(el('p', 'qz-result__comment', result.comment.trim()));
   return bar;
 }
 

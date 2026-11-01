@@ -7,7 +7,8 @@
  *   quiz/{lesson}/hints/{device}/{n}/{question}      a hint opened (create-only)
  *   quiz/{lesson}/checked/{device}/{n}/{question}    an answer checked in instant mode (create-only)
  *   quiz/{lesson}/results/{device}/{n}               the hand-in (create-only)
- *   quiz/{lesson}/marks/{device}~{n}                 { question id: marks | { marks, codes } } teacher marking
+ *   quiz/{lesson}/marks/{device}~{n}                 { question id: marks | { marks, codes?, comment? } } teacher marking
+ *   quiz/{lesson}/ai-marks/{device}/{n}              { question id: AiMark } written only by the AI marking job
  *   quiz/{lesson}/writing/{device}/{n}               { question id: how a written answer was typed (writing.ts) }
  *   quiz/{lesson}/cleared/{device}                   { from } goes before `from` were cleared by the teacher
  *   quiz/{lesson}/release                            { released } when feedback waits for the teacher
@@ -76,6 +77,7 @@ const keys = (lesson) => ({
   check: (device, n, id) => `quiz/${lesson}/checked/${device}/${n}/${id}`,
   result: (device, n) => `quiz/${lesson}/results/${device}/${n}`,
   marks: (device, n) => `quiz/${lesson}/marks/${device}~${n}`,
+  aiMarks: (device, n) => `quiz/${lesson}/ai-marks/${device}/${n}`,
   draft: (device, n) => `quiz/${lesson}/drafts/${device}/${n}`,
   writing: (device, n) => `quiz/${lesson}/writing/${device}/${n}`,
   cleared: (device) => `quiz/${lesson}/cleared/${device}`,
@@ -345,6 +347,9 @@ async function markInsightChanged(store, lessonId) {
   await markWalkthruDirty(store);
 }
 
+/** A teacher's comment on one answer, as students read it. */
+const COMMENT_MAX = 1000;
+
 /** Feedback-code ids on one answer: unique, at most 8. */
 const cleanCodes = (v) => (Array.isArray(v) ? [...new Set(v.filter((c) => typeof c === 'string' && c.length > 0 && c.length <= 64))].slice(0, 8) : []);
 
@@ -381,21 +386,58 @@ export function narrow(record, studentId) {
   return { ...record, order, practice, questions: Object.fromEntries(order.map((id) => [id, record.questions[id]])) };
 }
 
-/** Marks every question in a handed-in attempt, applying hint costs and any teacher marks. */
-function scoreAttempt(record, result, teacherMarks) {
+const VERDICTS = new Set(['right', 'wrong', 'unsure']);
+
+/** A stored AI mark, checked again on read so a bad blob can never award marks. Null when unusable. */
+function cleanAiMark(raw, max) {
+  if (!raw || typeof raw !== 'object' || typeof raw.reason !== 'string') return null;
+  const marks = typeof raw.marks === 'number' && Number.isFinite(raw.marks) && raw.marks >= 0 && raw.marks <= max ? roundMarks(raw.marks) : null;
+  const gaps = raw.gaps && typeof raw.gaps === 'object' ? Object.fromEntries(Object.entries(raw.gaps).filter(([, v]) => VERDICTS.has(v))) : null;
+  return {
+    marks,
+    ...(VERDICTS.has(raw.verdict) ? { verdict: raw.verdict } : {}),
+    ...(gaps ? { gaps } : {}),
+    ...(typeof raw.suggested === 'number' && raw.suggested >= 0 && raw.suggested <= max ? { suggested: roundMarks(raw.suggested) } : {}),
+    reason: raw.reason,
+    ...(typeof raw.feedback === 'string' && raw.feedback ? { feedback: raw.feedback } : {}),
+    model: typeof raw.model === 'string' ? raw.model : '',
+    at: typeof raw.at === 'string' ? raw.at : ''
+  };
+}
+
+/**
+ * Marks every question in a handed-in attempt, applying hint costs. The
+ * teacher's mark wins, else the AI's mark (answers waiting for it only), else
+ * the automatic mark. An AI mark that is unsure leaves the answer waiting.
+ * Rows say which counted (`by`), and carry the AI's mark and the teacher's
+ * comment for the teacher; student replies pick their own fields.
+ */
+function scoreAttempt(record, result, teacherMarks, aiMarks = null) {
   const hintCost = resolveQuizSettings(record.settings).hint_cost;
   const rows = record.order.map((id) => {
     const entry = record.questions[id];
     const given = result.responses?.[id] ?? null;
-    const mark = result.marks?.[id] ?? markResponse(entry.key, given);
+    let mark = result.marks?.[id] ?? markResponse(entry.key, given);
     const hinted = !!result.hints?.[id];
-    // A teacher mark is a number, or { marks, codes } once feedback codes were picked.
+    // A teacher mark is a number, or { marks, codes?, comment? } once codes or a comment were added.
     const override = teacherMarks?.[id];
     const overrideMarks = typeof override === 'number' ? override : typeof override?.marks === 'number' ? override.marks : null;
+    const ai = mark.pending === 'ai' ? cleanAiMark(aiMarks?.[id], mark.max) : null;
     let awarded = mark.score === null ? null : afterHint(mark.score, mark.max, hinted, hintCost);
-    if (overrideMarks !== null) awarded = Math.max(0, Math.min(mark.max, roundMarks(overrideMarks)));
+    let by = awarded === null ? null : 'auto';
+    if (ai && ai.marks !== null) {
+      awarded = afterHint(ai.marks, mark.max, hinted, hintCost);
+      by = 'ai';
+      // Each gap the AI decided shows right or wrong, like an automatic mark.
+      if (ai.gaps) mark = { ...mark, parts: { ...(mark.parts ?? {}), ...Object.fromEntries(Object.entries(ai.gaps).map(([g, v]) => [g, v === 'right'])) } };
+    }
+    if (overrideMarks !== null) {
+      awarded = Math.max(0, Math.min(mark.max, roundMarks(overrideMarks)));
+      by = 'teacher';
+    }
     const codes = cleanCodes(override?.codes);
-    return { id, mark, awarded, hinted, response: given, confidence: result.confidence?.[id] ?? null, codes };
+    const comment = typeof override?.comment === 'string' && override.comment.trim() ? override.comment : null;
+    return { id, mark, awarded, by, hinted, response: given, confidence: result.confidence?.[id] ?? null, codes, ...(ai ? { ai } : {}), ...(comment ? { comment } : {}) };
   });
   const setOf = (id) => record.practice?.[id] ?? null;
   const shared = rows.filter((r) => !setOf(r.id));
@@ -641,7 +683,8 @@ export async function quizAction(store, lessonId, body) {
   const results = await Promise.all(
     done.map(async (a) => {
       const rec = narrow(await recordFor(store, lessonId, a.version, record), who.student?.id);
-      const scored = scoreAttempt(rec, a.result, await read(store, k.marks(device, a.n)));
+      const [teacherMarks, aiMarks] = await Promise.all([read(store, k.marks(device, a.n)), read(store, k.aiMarks(device, a.n))]);
+      const scored = scoreAttempt(rec, a.result, teacherMarks, aiMarks);
       const base = { n: a.n, submitted_at: a.result.submitted_at, released };
       if (!released) return base;
       return {
@@ -660,7 +703,8 @@ export async function quizAction(store, lessonId, body) {
           awarded: r.awarded,
           hinted: r.hinted,
           response: r.response,
-          key: revealKeys ? shownKey(rec.questions[r.id].key) : null
+          key: revealKeys ? shownKey(rec.questions[r.id].key) : null,
+          ...studentComment(r)
         }))
       };
     })
@@ -694,6 +738,15 @@ export async function quizAction(store, lessonId, body) {
       : null,
     results
   };
+}
+
+/**
+ * What a student reads under a marked answer: the teacher's comment, or else
+ * the AI's feedback on an answer the AI marked. Never the AI's reason.
+ */
+function studentComment(row) {
+  if (row.by === 'teacher') return row.comment ? { comment: row.comment } : {};
+  return row.by === 'ai' && row.ai?.feedback ? { comment: row.ai.feedback } : {};
 }
 
 /** Answers sent with a save or hand-in, cleaned to the question kinds the attempt's key knows. */
@@ -862,7 +915,7 @@ async function clearOwner(store, k, lessonId, device) {
   const goes = await deviceAttempts(store, k, device, from);
   const next = goes.next;
   await store.setJSON(k.cleared(device), { from: next, at: new Date().toISOString() });
-  const prefixes = ['attempts', 'hints', 'checked', 'results', 'writing'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
+  const prefixes = ['attempts', 'hints', 'checked', 'results', 'writing', 'ai-marks'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
   const doomed = (await Promise.all(prefixes.map((prefix) => listBlobKeys(store, prefix)))).flat();
   await mapBounded(doomed, 8, (key) => store.delete(key));
 }
@@ -927,7 +980,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     if (!start || start.deleted || !(await read(store, k.result(device, n)))) reject(404, 'not_found', 'That attempt is gone.');
     await store.setJSON(k.attempt(device, n), { n, deleted: true, deleted_at: new Date().toISOString(), ...(start.class_id ? { class_id: start.class_id } : {}), ...(start.student_id ? { student_id: start.student_id } : {}) });
     const doomed = (await Promise.all([listBlobKeys(store, k.hints(device, n)), listBlobKeys(store, k.checked(device, n))])).flat();
-    await mapBounded([k.result(device, n), k.marks(device, n), k.writing(device, n), ...doomed], 8, (key) => store.delete(key));
+    await mapBounded([k.result(device, n), k.marks(device, n), k.aiMarks(device, n), k.writing(device, n), ...doomed], 8, (key) => store.delete(key));
     await markInsightChanged(store, lessonId);
   }
 
@@ -957,7 +1010,10 @@ export async function quizTeacherAction(store, lessonId, body) {
       const score = Number(body.score);
       if (!Number.isFinite(score) || score < 0 || score > entry.key.marks) reject(400, 'bad_marks', `Give between 0 and ${entry.key.marks} marks.`);
       const codes = cleanCodes(body.codes);
-      next[body.question_id] = codes.length ? { marks: roundMarks(score), codes } : roundMarks(score);
+      // A save that sends no comment (a code chip) keeps the one already there.
+      const kept = typeof existing[body.question_id]?.comment === 'string' ? existing[body.question_id].comment : '';
+      const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, COMMENT_MAX) : kept;
+      next[body.question_id] = codes.length || comment ? { marks: roundMarks(score), ...(codes.length ? { codes } : {}), ...(comment ? { comment } : {}) } : roundMarks(score);
     }
     await store.setJSON(k.marks(device, n), next);
     await markInsightChanged(store, lessonId);
@@ -965,8 +1021,8 @@ export async function quizTeacherAction(store, lessonId, body) {
 
   if (action === 'attempt' || action === 'mark') {
     const { device, n, start, result, rec } = await handedIn();
-    const [marks, logs] = await Promise.all([read(store, k.marks(device, n)), read(store, k.writing(device, n))]);
-    const scored = scoreAttempt(rec, result, marks);
+    const [marks, aiMarks, logs] = await Promise.all([read(store, k.marks(device, n)), read(store, k.aiMarks(device, n)), read(store, k.writing(device, n))]);
+    const scored = scoreAttempt(rec, result, marks, aiMarks);
     const typed = (id) => {
       const summary = result.writing?.[id];
       const log = cleanWritingLog(logs?.[id]);
@@ -997,6 +1053,7 @@ export async function quizTeacherAction(store, lessonId, body) {
   const stats = new Map([...record.order, ...Object.values(record.sets ?? {}).flatMap((s) => s.questions)].map((id) => [id, { answered: 0, total: 0, full: 0, pending: 0, hinted: 0, confidence: { 1: [0, 0], 2: [0, 0], 3: [0, 0] }, picks: {} }]));
   const rows = [];
   const froms = new Map();
+  let aiWaiting = 0;
   for (const key of resultKeys) {
     const [, , , device, nText] = key.split('/');
     const n = Number(nText);
@@ -1005,7 +1062,9 @@ export async function quizTeacherAction(store, lessonId, body) {
     const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, key)]);
     if (!start || !result) continue;
     const rec = narrow(await recordFor(store, lessonId, start.version, record), start.student_id);
-    const scored = scoreAttempt(rec, result, await read(store, k.marks(device, n)));
+    const [teacherMarks, aiMarks] = await Promise.all([read(store, k.marks(device, n)), read(store, k.aiMarks(device, n))]);
+    const scored = scoreAttempt(rec, result, teacherMarks, aiMarks);
+    aiWaiting += scored.rows.filter(waitsForAi).length;
     rows.push({
       id: attemptId(device, n),
       device: device.slice(0, 6),
@@ -1044,9 +1103,112 @@ export async function quizTeacherAction(store, lessonId, body) {
     feedback: settings.feedback,
     released: !!(await read(store, k.release))?.released,
     attempts: rows,
+    // Handed-in answers the AI can mark and hasn't yet: the AI mark button shows when this is above 0.
+    ai_waiting: aiWaiting,
     sets: Object.entries(record.sets ?? {}).map(([id, s]) => ({ id, name: s.name, questions: s.questions.length })),
     questions: record.order.map((id) => ({ id, question: record.questions[id].question, key: record.questions[id].key, ...stats.get(id) }))
   };
+}
+
+/* ── AI marking ────────────────────────────────────────────────────── */
+
+/** A scored row the AI can still mark: waiting for it, with no AI or teacher mark yet. */
+const waitsForAi = (row) => row.mark.pending === 'ai' && row.awarded === null && !row.ai;
+
+/** A question as the AI marker reads it (MarkingQuestion in answer-marking-jobs.ts): teaching text and the key, nothing about students. */
+function markingQuestion(ref, { question, key }) {
+  const a = key.answer;
+  const passage = key.kind === 'fill_gap' && Array.isArray(question.parts)
+    ? question.parts.map((part) => (part.type === 'gap' ? `[gap ${part.id}]` : part.text)).join('')
+    : undefined;
+  return {
+    ref,
+    kind: key.kind,
+    marks: key.marks,
+    prompt: question.prompt ?? '',
+    ...(question.quote ? { quote: question.quote } : {}),
+    ...(question.technique ? { technique: question.technique } : {}),
+    ...(passage !== undefined ? { passage } : {}),
+    ...(a.type === 'text' ? { accepted: [...a.accepted], case_sensitive: !!a.case_sensitive } : {}),
+    ...(a.type === 'gaps' ? { gaps: a.gaps } : {}),
+    ...(key.looking_for ? { looking_for: key.looking_for } : {}),
+    ...(a.type === 'manual' && a.guide ? { guide: a.guide } : {}),
+    ...(a.type === 'manual' && a.model_answer ? { model_answer: a.model_answer } : {})
+  };
+}
+
+/**
+ * Every handed-in answer still waiting for the AI, ready for the marking job.
+ * Answers get opaque ids (a1, a2…) and questions refs (q1…, one per question
+ * and publish version, since a republish gives gaps new ids). `refs` maps each
+ * answer id back to its attempt; it stays on the server. Answers with a
+ * teacher mark or an AI mark are skipped; cleared and deleted goes too.
+ */
+export async function gatherAiMarking(store, lessonId) {
+  const { record, k } = await loadQuiz(store, lessonId);
+  const questions = new Map();
+  const answers = [];
+  const refs = {};
+  const froms = new Map();
+  for (const key of await listBlobKeys(store, `quiz/${lessonId}/results/`)) {
+    const [, , , device, nText] = key.split('/');
+    const n = Number(nText);
+    if (!froms.has(device)) froms.set(device, await clearedFrom(store, k, device));
+    if (n < froms.get(device)) continue;
+    const [start, result, teacherMarks, aiMarks] = await Promise.all([read(store, k.attempt(device, n)), read(store, key), read(store, k.marks(device, n)), read(store, k.aiMarks(device, n))]);
+    if (!start || start.deleted || !result) continue;
+    const rec = narrow(await recordFor(store, lessonId, start.version, record), start.student_id);
+    for (const row of scoreAttempt(rec, result, teacherMarks, aiMarks).rows) {
+      if (!waitsForAi(row) || !hasAnswer(row.response)) continue;
+      const qKey = `${rec.version}:${row.id}`;
+      if (!questions.has(qKey)) questions.set(qKey, markingQuestion(`q${questions.size + 1}`, rec.questions[row.id]));
+      const id = `a${answers.length + 1}`;
+      const { text, gaps } = row.response;
+      answers.push({ id, question: questions.get(qKey).ref, ...(typeof text === 'string' ? { text } : {}), ...(gaps && typeof gaps === 'object' ? { gaps } : {}) });
+      refs[id] = { device, n, question_id: row.id };
+    }
+  }
+  return { questions: [...questions.values()], answers, refs };
+}
+
+/**
+ * Writes the job's marks to each attempt's ai-marks record. A question that
+ * already has an AI mark keeps it; a teacher mark always wins on read, so
+ * the two never race. Returns how many were written.
+ */
+export async function applyAiMarks(store, lessonId, refs, marks, { job, at = new Date().toISOString() } = {}) {
+  const k = keys(lessonId);
+  const byAttempt = new Map();
+  for (const m of marks) {
+    const ref = Object.hasOwn(refs, m.id) ? refs[m.id] : null;
+    if (!ref) continue;
+    const id = attemptId(ref.device, ref.n);
+    if (!byAttempt.has(id)) byAttempt.set(id, { ...ref, marks: [] });
+    byAttempt.get(id).marks.push({ question_id: ref.question_id, mark: m });
+  }
+  let written = 0;
+  await mapBounded([...byAttempt.values()], 8, async ({ device, n, marks: list }) => {
+    const existing = (await read(store, k.aiMarks(device, n))) ?? {};
+    const next = { ...existing };
+    for (const { question_id, mark: m } of list) {
+      if (Object.hasOwn(next, question_id)) continue;
+      next[question_id] = {
+        marks: m.marks,
+        ...(m.verdict ? { verdict: m.verdict } : {}),
+        ...(m.gaps ? { gaps: m.gaps } : {}),
+        ...(typeof m.suggested === 'number' ? { suggested: m.suggested } : {}),
+        reason: m.reason,
+        ...(m.feedback ? { feedback: m.feedback } : {}),
+        model: m.model,
+        at,
+        job: job ?? null
+      };
+      written += 1;
+    }
+    await store.setJSON(k.aiMarks(device, n), next);
+  });
+  if (written) await markInsightChanged(store, lessonId);
+  return { written };
 }
 
 /* ── Markbook ──────────────────────────────────────────────────────── */
@@ -1070,14 +1232,14 @@ async function latestAttempts(store, k, lessonId, owners) {
   const out = [];
   await mapBounded([...handedIn], 8, async ([owner, ns]) => {
     const sorted = [...ns].sort((a, b) => b - a);
-    const readAttempt = (n) => Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n)), read(store, k.marks(owner, n))]);
+    const readAttempt = (n) => Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n)), read(store, k.marks(owner, n)), read(store, k.aiMarks(owner, n))]);
     // Most students were never cleared, so their latest go is read alongside the cleared record.
     const [cleared, latestRead] = await Promise.all([read(store, k.cleared(owner)), readAttempt(sorted[0])]);
     const from = cleared?.from ?? 0;
     for (const n of sorted.filter((x) => x >= from)) {
-      const [start, result, marks] = n === sorted[0] ? latestRead : await readAttempt(n);
+      const [start, result, marks, aiMarks] = n === sorted[0] ? latestRead : await readAttempt(n);
       if (!start || !result) continue;
-      out.push({ owner, n, start, result, marks });
+      out.push({ owner, n, start, result, marks, aiMarks });
       return;
     }
   });
@@ -1092,7 +1254,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   const attempts = [];
   for (const a of counted) {
     const rec = narrow(await recordFor(store, lessonId, a.start.version, record), a.start.student_id);
-    const scored = scoreAttempt(rec, a.result, a.marks);
+    const scored = scoreAttempt(rec, a.result, a.marks, a.aiMarks);
     const student = owners ? owners.get(a.owner) : a.start.student_id ?? a.owner;
     if (!owners) {
       const label = await studentLabel(store, a.start, rosters);
