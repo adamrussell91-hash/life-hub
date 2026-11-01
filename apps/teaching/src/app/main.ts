@@ -33,6 +33,7 @@ import { renderDocumentPage } from '@/teacher/sections/documents';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { mountMarkPage } from '@/marking/mark-page';
+import { mountTeacherStudentProfile } from '@/teacher/student-profile-page';
 import { renderTrashSection } from '@/teacher/sections/trash';
 import { renderFeedbackSection } from '@/teacher/sections/feedback';
 import { fetchContentSearch } from '@/teacher/search/api';
@@ -738,6 +739,17 @@ function renderTeacherMarkRoute(classId: string, columnId: string, token: number
   });
 }
 
+function renderTeacherStudentRoute(classId: string, studentId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'classes', classId, () => {
+    teardownMarkPage();
+    markPageHandle = mountTeacherStudentProfile(refs.canvas, classId, studentId);
+  });
+}
+
 function renderTeacherTrashRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -1042,6 +1054,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'teacher-mark':
       renderTeacherMarkRoute(match.params.classId, match.params.columnId, token);
+      break;
+    case 'teacher-student':
+      renderTeacherStudentRoute(match.params.classId, match.params.studentId, token);
       break;
     case 'teacher-trash':
       renderTeacherTrashRoute(token);

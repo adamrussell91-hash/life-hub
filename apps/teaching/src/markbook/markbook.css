@@ -158,13 +158,6 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-patterns__name:focus-visible { outline: 2px solid var(--marine); outline-offset: 2px; border-radius: var(--radius-sm); }
 .mb-patterns__list { display: grid; gap: var(--space-2); text-align: left; white-space: normal; }
 
-.mb-focus { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
-.mb-focus__item { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: var(--text-sm) / 1.4 var(--font-ui); }
-@media (max-width: 600px) {
-  .mb-overlay:has(> .mb-sheet--student) { padding: 0; }
-  .mb-sheet--student { width: 100%; height: 100%; max-height: none; border-radius: 0; }
-}
-
 /* View switch: Grid, Next steps, Detail, History, Marks. */
 .mb__modes { display: inline-flex; gap: 0; }
 .mb__modes .mb__mode { border-radius: 0; margin-left: -1px; }

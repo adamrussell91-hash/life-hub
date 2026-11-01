@@ -45,6 +45,8 @@ export type RenderProfileOptions = {
   loadReturned?: () => Promise<ReturnedItem[]>;
   loadPiece?: (id: string) => Promise<PiecePayload>;
   markSeen?: (id: string) => void;
+  /** The teacher viewing a student's page: their name heads it and the device line goes. */
+  teacher?: { name: string };
 };
 
 function seeHow(r?: { url: string; title?: string; kind: string; start?: number }): HTMLElement | null {
@@ -244,11 +246,17 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     root.append(el('h1', 'pm-title', 'Your progress'), renderInitials(options));
     return root;
   }
-  root.append(el('h1', 'pm-title', 'Your progress'));
-  if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
+  if (options.teacher) root.append(el('h1', 'pm-title', options.teacher.name), el('p', 'pm-who', 'Their progress page, as they see it.'));
+  else {
+    root.append(el('h1', 'pm-title', 'Your progress'));
+    if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
+  }
   const map = renderMap(payload.map, options.classId);
   if (!payload.pieces?.length) {
-    root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'), map);
+    const empty = options.teacher
+      ? 'Their progress fills in once you return their first piece of work.'
+      : 'Your progress appears here once your teacher returns your first piece of work.';
+    root.append(el('p', 'pm-empty', empty), map);
     return root;
   }
   const progress = el('div', 'pg-panel');

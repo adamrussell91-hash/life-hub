@@ -344,3 +344,26 @@
 .pm-claim__message[hidden] {
   display: none;
 }
+
+/* The teacher's view of a student's page, inside the teacher canvas. */
+.pm-teacher {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.pm-back {
+  justify-self: start;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.pm-back:hover,
+.pm-back:focus-visible {
+  color: var(--navy);
+  text-decoration: underline;
+}

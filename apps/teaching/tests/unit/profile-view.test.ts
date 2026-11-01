@@ -71,6 +71,13 @@ describe('profile map', () => {
     expect(calls).toEqual(['ar']);
     expect(unclaimed.querySelector('.pm-map')).toBeNull();
   });
+  it('heads the teacher’s view with the student’s name and words the empty state for the teacher', () => {
+    const seen = renderProfile(payload as never, { classId: 'class1', teacher: { name: 'Ava Nguyen' } });
+    expect(seen.querySelector('.pm-title')?.textContent).toBe('Ava Nguyen');
+    expect(seen.textContent).not.toContain('on this device');
+    expect(seen.textContent).toContain('once you return their first piece');
+    expect(seen.querySelector('.pm-map')).toBeTruthy();
+  });
   it('says so when the class has no unit yet', () => {
     const empty = renderProfile({ ...payload, map: { lessons: [], next: null, unit: null } } as never, { classId: 'class1' });
     expect(empty.textContent).toContain('will appear here once your teacher sets it up');
