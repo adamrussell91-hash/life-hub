@@ -4,6 +4,7 @@ import type { Task } from '@/schemas/task';
 import { tasksApi } from '@/services/client-api';
 import { closeCardMenu } from '@/views/card-menu';
 import { renderProjectsView, resetProjectsViewStateForTests } from '@/views/projects';
+import { problemSolverApi } from '@/views/problem-solver/api';
 
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
@@ -17,9 +18,25 @@ vi.mock('@/services/client-api', () => ({
     createProject: vi.fn(),
     deleteProject: vi.fn(),
     resolveStalledProject: vi.fn(),
-    updateProject: vi.fn()
+    updateProject: vi.fn(),
+    updateTask: vi.fn(),
+    createTask: vi.fn(),
+    getHubPrefs: vi.fn()
   }
 }));
+
+vi.mock('@/views/problem-solver/api', () => {
+  const tool = () => ({ list: vi.fn().mockResolvedValue([]), create: vi.fn() });
+  return {
+    problemSolverApi: tool(),
+    decisionBookApi: tool(),
+    gearShifterApi: tool(),
+    rulesBookApi: tool(),
+    changeBookApi: tool(),
+    collaborationBookApi: tool(),
+    communicationBookApi: tool()
+  };
+});
 
 function project(partial: Partial<Project> & Pick<Project, 'id' | 'title'>): Project {
   return {
@@ -127,7 +144,7 @@ const tasks: Task[] = [
   })
 ];
 
-/** The kanban is the secondary view now — the hive is where Projects lands. */
+/** The kanban is the secondary view now — the runway is where Projects lands. */
 function openBoard(canvas: HTMLElement): void {
   [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="View"] button')]
     .find((button) => button.textContent === 'Board')
@@ -175,6 +192,7 @@ describe('projects view rebuild', () => {
   it('renders a status mix chart with every live lifecycle count', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const chart = canvas.querySelector('.projects-chart');
     expect(chart).not.toBeNull();
@@ -197,6 +215,7 @@ describe('projects view rebuild', () => {
     vi.mocked(tasksApi.listProjects).mockResolvedValue([legacy]);
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
     expect(canvas.textContent).not.toMatch(/Could not load Projects/);
     expect(canvas.querySelector('.projects-chart')).not.toBeNull();
     expect(canvas.textContent).toContain('Blob without milestones');
@@ -258,6 +277,7 @@ describe('projects view rebuild', () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const planning = [...canvas.querySelectorAll<HTMLButtonElement>('.projects-chart__slice')].find((btn) =>
       btn.textContent?.includes('Planning')
@@ -446,6 +466,7 @@ describe('projects view rebuild', () => {
   it('switches roadmap range without remounting or refetching', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
     const listsBefore = vi.mocked(tasksApi.listProjects).mock.calls.length;
     expect(canvas.querySelector('.projects-pulse')).not.toBeNull();
 
@@ -481,19 +502,17 @@ describe('projects view rebuild', () => {
     });
   });
 
-  it('puts the forecast first, the hive next, and status mix beside the timeline', async () => {
+  it('lands on the runway alone, and keeps forecast, board and the mix bento on Board', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
 
-    const hive = canvas.querySelector('.projects-hive');
-    expect(hive).not.toBeNull();
+    expect(canvas.querySelector('.runway')).not.toBeNull();
     expect(canvas.querySelector('.projects-board')).toBeNull();
-    expect(
-      canvas.querySelector('#project-forecast')!.compareDocumentPosition(hive!) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(
-      hive!.compareDocumentPosition(canvas.querySelector('.projects-pulse')!) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(canvas.querySelector('#project-forecast')).toBeNull();
+    expect(canvas.querySelector('.projects-pulse')).toBeNull();
+    expect(canvas.querySelector('.projects-hive')).toBeNull();
+    // Group-by belongs to the board only.
+    expect(canvas.querySelector('[aria-label="Group by (more)"]')).toBeNull();
 
     openBoard(canvas);
     const forecast = canvas.querySelector('#project-forecast');
@@ -577,6 +596,7 @@ describe('projects view rebuild', () => {
     ]);
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
     const pulse = canvas.querySelector('.projects-pulse');
     const retro = pulse?.querySelector('.projects-retro');
     expect(retro).not.toBeNull();
@@ -587,6 +607,7 @@ describe('projects view rebuild', () => {
   it('changes the timeline range without remounting the page', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
     expect(tasksApi.listProjects).toHaveBeenCalledTimes(1);
     expect(canvas.querySelector('.canvas-status')).toBeNull();
 
@@ -607,6 +628,7 @@ describe('projects view rebuild', () => {
   it('keeps stalled-project outcomes and confirm write in the forecast', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
+    openBoard(canvas);
 
     const forecast = canvas.querySelector('#project-forecast');
     expect(forecast?.textContent).toMatch(/Masters notes/);
@@ -620,53 +642,164 @@ describe('projects view rebuild', () => {
     expect(canvas.querySelector('.stall-confirm .page-header__supporting')?.textContent).toMatch(/Park it/);
   });
 
-  it('lands on the hive: one hexagon per live project, HALT badge only on NSW HALT ones', async () => {
-    vi.mocked(tasksApi.listProjects).mockResolvedValue([
-      ...Object.values(fixtures).filter((item) => item.id !== 'proj_plan'),
-      { ...fixtures.plan, job: 'halt_board' }
-    ]);
-    const canvas = document.createElement('main');
-    document.body.append(canvas);
-    await renderProjectsView(canvas);
+  describe('runway', () => {
+    const offset = (days: number) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + days);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const row = (canvas: HTMLElement, id: string) => canvas.querySelector<HTMLElement>(`.runway-row[data-project-id="${id}"]`);
+    const groupOf = (canvas: HTMLElement, id: string) => row(canvas, id)?.closest<HTMLElement>('.runway-group')?.dataset.group;
 
-    const tile = (id: string) => canvas.querySelector<SVGGElement>(`.hive-tile[data-project-id="${id}"]`);
-    const ids = [...canvas.querySelectorAll<SVGGElement>('.hive-tile')].map((node) => node.dataset.projectId).sort();
-    expect(ids).toEqual(['proj_go', 'proj_idle', 'proj_plan', 'proj_stall']);
-    expect(tile('proj_plan')?.querySelector('.hive-halt')).not.toBeNull();
-    expect(tile('proj_go')?.querySelector('.hive-halt')).toBeNull();
-    expect(tile('proj_plan')?.getAttribute('aria-label')).toMatch(/NSW HALT/);
-    expect(tile('proj_stall')?.classList.contains('hive-tile--stalled')).toBe(true);
-    const clusters = [...canvas.querySelectorAll('.hive-label__title')].map((node) => node.textContent);
-    expect(clusters).toEqual(['On the go', 'Planning', 'Not started', 'Stalled']);
-  });
+    beforeEach(() => {
+      vi.mocked(tasksApi.listProjects).mockResolvedValue([
+        { ...fixtures.go, current_end_date: offset(10) },
+        { ...fixtures.plan, current_end_date: offset(40), job: 'halt_board' },
+        fixtures.idle,
+        fixtures.done,
+        fixtures.stall
+      ]);
+    });
 
-  it('opens a summary with the next action when a hexagon is tapped', async () => {
-    const canvas = document.createElement('main');
-    document.body.append(canvas);
-    await renderProjectsView(canvas);
+    it('groups projects by what they need and writes a plain lede', async () => {
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
 
-    canvas.querySelector<SVGGElement>('.hive-tile[data-project-id="proj_plan"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const panel = canvas.querySelector('.projects-hive__panel')!;
-    expect(panel.querySelector('.projects-hive__panel-title')?.textContent).toBe('MindWorks prep');
-    expect(panel.querySelector('.projects-hive__next-text')?.textContent).toBe('Draft slides');
-    expect(canvas.querySelector('.hive-tile[data-project-id="proj_plan"]')?.getAttribute('aria-pressed')).toBe('true');
-    panel.querySelector<HTMLButtonElement>('.btn--primary')?.click();
-    expect(location.hash).toBe('#/project/proj_plan');
-  });
+      const view = canvas.querySelector('[aria-label="View"] .hub-pills__btn.is-active');
+      expect(view?.textContent).toBe('Runway');
+      expect(groupOf(canvas, 'proj_go')).toBe('in_air');
+      expect(groupOf(canvas, 'proj_plan')).toBe('in_air');
+      expect(groupOf(canvas, 'proj_idle')).toBe('on_ground');
+      expect(groupOf(canvas, 'proj_stall')).toBe('on_ground');
+      // archived_dead is not "landed": only completed projects land.
+      expect(row(canvas, 'proj_done')).toBeNull();
+      expect(canvas.querySelector('.runway-group--needs_you')?.hasAttribute('hidden')).toBe(true);
+      expect(canvas.querySelector('.runway-group--in_air .runway-group__count')?.textContent).toBe('2');
 
-  it('regroups the hive in place, keeping each hexagon so it can slide', async () => {
-    const canvas = document.createElement('main');
-    document.body.append(canvas);
-    await renderProjectsView(canvas);
+      const lede = canvas.querySelector('.runway-lede')?.textContent ?? '';
+      expect(lede).toContain('HSC Tool lands in the next three weeks.');
+      expect(lede).toContain('Two are stuck on the ground.');
+      expect(canvas.querySelector('.runway-lede__name')?.textContent).toBe('HSC Tool');
 
-    const before = canvas.querySelector('.hive-tile[data-project-id="proj_go"]');
-    const pill = [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="Group by (more)"] button')].find(
-      (button) => button.textContent === 'Deadline'
-    );
-    pill?.click();
-    const after = canvas.querySelector<SVGGElement>('.hive-tile[data-project-id="proj_go"]');
-    expect(after).toBe(before);
-    expect(after?.dataset.group).toBe('no_date');
-    expect([...canvas.querySelectorAll('.hive-label__title')].map((node) => node.textContent)).toEqual(['No date']);
+      expect(row(canvas, 'proj_plan')?.querySelector('.halt-badge')).not.toBeNull();
+      expect(row(canvas, 'proj_go')?.querySelector('.halt-badge')).toBeNull();
+      expect(row(canvas, 'proj_plan')?.querySelector('.runway-row__next')?.textContent).toBe('Next: Draft slides');
+      expect(row(canvas, 'proj_plan')?.querySelector('.runway-row__title')?.getAttribute('href')).toBe('#/project/proj_plan');
+      expect(row(canvas, 'proj_go')?.querySelectorAll('.runway-seg')).toHaveLength(1);
+      expect(row(canvas, 'proj_idle')?.querySelector('.runway-ground')).not.toBeNull();
+      expect(canvas.querySelector('.runway-unstick')?.textContent).toBe('Unstick 2');
+      expect(canvas.querySelector('.runway-dial--load .runway-dial__value')?.textContent).toBe('2 of ~3');
+    });
+
+    it('ticks a task from its segment, offers undo and patches only that row', async () => {
+      vi.mocked(tasksApi.updateTask).mockImplementation(async (id, body) => ({ ...tasks.find((t) => t.id === id)!, ...(body as object) }) as Task);
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+      const other = row(canvas, 'proj_go');
+
+      row(canvas, 'proj_plan')!.querySelector<HTMLButtonElement>('.runway-seg')!.click();
+      await vi.waitFor(() => expect(tasksApi.updateTask).toHaveBeenCalledWith('t_plan', expect.objectContaining({ status: 'done' })));
+      expect(row(canvas, 'proj_plan')?.querySelector('.runway-seg')?.classList.contains('is-done')).toBe(true);
+      expect(row(canvas, 'proj_go')).toBe(other);
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Ticked “Draft slides”'));
+      // Every task done: the complete-project confirm is offered, never applied.
+      await vi.waitFor(() => expect(canvas.querySelector('.closure-confirm .confirm-card')).not.toBeNull());
+      expect(tasksApi.closeProject).not.toHaveBeenCalled();
+      expect(groupOf(canvas, 'proj_plan')).toBe('needs_you');
+    });
+
+    it('adds a next action inline as a real task in the project', async () => {
+      vi.mocked(tasksApi.createTask).mockImplementation(async (body) =>
+        task({ id: 't_new', ...(body as Partial<Task>), title: (body as { title: string }).title })
+      );
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+
+      row(canvas, 'proj_idle')!.querySelector<HTMLButtonElement>('.runway-addnext')!.click();
+      const field = row(canvas, 'proj_idle')!.querySelector<HTMLInputElement>('.runway-nextin')!;
+      field.value = 'Sketch the first page';
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await vi.waitFor(() =>
+        expect(tasksApi.createTask).toHaveBeenCalledWith({
+          title: 'Sketch the first page',
+          domain: expect.any(String),
+          parent_project_id: 'proj_idle',
+          kind: 'task',
+          bucket: 'active'
+        })
+      );
+      await vi.waitFor(() => expect(row(canvas, 'proj_idle')?.querySelector('.runway-row__next')?.textContent).toBe('Next: Sketch the first page'));
+    });
+
+    it('sets a finish date from the undated slot with undo', async () => {
+      vi.mocked(tasksApi.updateProject).mockImplementation(async (id, body) => ({ ...fixtures.idle, ...(body as object) }) as Project);
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+
+      row(canvas, 'proj_idle')!.querySelector<HTMLButtonElement>('.runway-ground')!.click();
+      await vi.waitFor(() => expect(tasksApi.updateProject).toHaveBeenCalledWith('proj_idle', { current_end_date: offset(28) }));
+      expect(row(canvas, 'proj_idle')?.querySelector('.runway-flag')).not.toBeNull();
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Blank canvas finishes'));
+    });
+
+    it('opens the recommended tool as a linked session from the door', async () => {
+      vi.mocked(problemSolverApi.create).mockResolvedValue({ id: 's_new' } as Awaited<ReturnType<typeof problemSolverApi.create>>);
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+
+      const door = await vi.waitFor(() => {
+        const found = row(canvas, 'proj_stall')?.querySelector<HTMLButtonElement>('.runway-door');
+        expect(found).toBeTruthy();
+        return found!;
+      });
+      expect(door.textContent).toBe('?Work it through in Problem Solver →');
+      door.click();
+      await vi.waitFor(() => expect(location.hash).toBe('#/problem-solver?id=s_new'));
+      expect(problemSolverApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ links: [{ kind: 'project', id: 'proj_stall' }], kind: 'full', title: 'Masters notes' })
+      );
+    });
+
+    it('steps through stuck projects in the unstick sheet', async () => {
+      vi.mocked(tasksApi.getHubPrefs).mockRejectedValue(new Error('offline'));
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+
+      canvas.querySelector<HTMLButtonElement>('.runway-unstick')!.click();
+      const sheet = await vi.waitFor(() => {
+        const found = document.querySelector<HTMLElement>('.runway-sheet .runway-sheet__title');
+        expect(found).not.toBeNull();
+        return document.querySelector<HTMLElement>('.runway-sheet')!;
+      });
+      expect(sheet.textContent).toContain('Unstick pass · 1 of 2');
+      expect(sheet.querySelector('.runway-sheet__title')?.textContent).toBe('Masters notes');
+      expect(sheet.querySelector('.runway-tool--rec')?.textContent).toContain('Problem Solver');
+      expect(sheet.querySelectorAll('.runway-sheet__shelf .runway-tool')).toHaveLength(7);
+      expect(sheet.textContent).toContain('Bring it back');
+      expect(sheet.textContent).not.toMatch(/Clare/);
+
+      [...sheet.querySelectorAll<HTMLButtonElement>('.btn')].find((b) => b.textContent === 'Skip')!.click();
+      await vi.waitFor(() => expect(sheet.querySelector('.runway-sheet__title')?.textContent).toBe('Blank canvas'));
+      expect(sheet.textContent).toContain('In two weeks');
+      expect(sheet.querySelector('.runway-sheet__apply')?.textContent).toBe('Apply');
+    });
+
+    it('dims rows that do not match the energy filter', async () => {
+      const canvas = document.createElement('main');
+      document.body.append(canvas);
+      await renderProjectsView(canvas);
+      const admin = [...canvas.querySelectorAll<HTMLButtonElement>('.runway-dial--energy .hub-pills__btn')].find((b) => b.textContent === 'Admin')!;
+      admin.click();
+      const dimmed = [...canvas.querySelectorAll<HTMLElement>('.runway-row.is-dim')].map((n) => n.dataset.projectId);
+      const deep = [...canvas.querySelectorAll<HTMLElement>('.runway-row')].filter((n) => n.dataset.energy === 'deep_focus').map((n) => n.dataset.projectId);
+      expect(dimmed).toEqual(deep);
+    });
   });
 });
