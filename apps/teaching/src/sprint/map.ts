@@ -111,9 +111,9 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     confirmHost.replaceChildren(box);
   }
 
-  function openBoard(groupId: string): void {
+  function openBoard(groupId: string, markNow = false): void {
     board?.dispose();
-    board = mountGroupBoard(boardHost, { api: o.api, groupId, getLesson: o.getLesson, emitLesson: o.emitLesson, onChanged: () => void refresh(), practice: o.practice });
+    board = mountGroupBoard(boardHost, { api: o.api, groupId, getLesson: o.getLesson, emitLesson: o.emitLesson, onChanged: () => void refresh(), practice: o.practice, markNow });
   }
 
   function paint(): void {
@@ -196,8 +196,10 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
         }
         const b = badge(g, key);
         if (b) cell.append(el('span', 'pill pill--wait', b));
-        if ((key === 'prototype' || key === 'test') && g.students.some((st) => st.phases[key] === 'in' || st.phases[key] === 'late')) cell.append(el('span', 'pill pill--mark', 'Mark'));
-        const open = () => openBoard(g.id);
+        // Only reflections are marked; the class judges the prototype in Test.
+        const toMark = key === 'test' && g.students.some((st) => st.phases[key] === 'in' || st.phases[key] === 'late');
+        if (toMark) cell.append(el('span', 'pill pill--mark', 'Mark'));
+        const open = () => openBoard(g.id, toMark);
         cell.addEventListener('click', open);
         cell.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
         row.append(cell);

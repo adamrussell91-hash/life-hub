@@ -17,7 +17,7 @@ describe('test phase', () => {
   it('shows the feedback the group received and the two reflection prompts', () => {
     const f = mountTest(ctx());
     expect(f.el.querySelector('.sprint-received')?.textContent).toContain('Try naming the source.');
-    expect(f.el.querySelector('.sprint-received')?.textContent).toContain('Strong 2');
+    expect(f.el.querySelector('.sprint-tally__bar')?.getAttribute('aria-label')).toContain('Strong 2');
     expect(f.el.textContent).toContain('What did the feedback show your idea does well?');
   });
 
