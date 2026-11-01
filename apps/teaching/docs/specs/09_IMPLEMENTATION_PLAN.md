@@ -294,8 +294,8 @@ Implement deterministic ID creation utilities.
 Examples:
 year_12
 subject_y12_engadv
-unit_aotfw
-lesson_aotfw_008
+unit_lkeep
+lesson_lkeep_008
 class_2026_12engadv1
 IDs must be validated for uniqueness.
 Human readable IDs are preferred where practical.

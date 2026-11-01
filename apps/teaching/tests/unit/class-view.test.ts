@@ -44,36 +44,36 @@ function sampleClass(overrides: Partial<PublishedClass> = {}): PublishedClass {
       custom: []
     },
     current_unit: {
-      id: 'unit_aotfw',
-      title: 'Artist of the Floating World',
+      id: 'unit_lkeep',
+      title: 'The Lantern Keeper',
       lessons: []
     },
     current_lesson: {
-      id: 'scheduled_aotfw_008',
-      title: 'Memory, Identity and Ono',
-      lesson_id: 'lesson_aotfw_008'
+      id: 'scheduled_lkeep_008',
+      title: 'Memory, Identity and Hale',
+      lesson_id: 'lesson_lkeep_008'
     },
     schedule: [
       {
-        id: 'scheduled_aotfw_001',
+        id: 'scheduled_lkeep_001',
         date: '2026-08-11',
         schedule_order: 1,
-        lesson_id: 'lesson_aotfw_001',
-        unit_id: 'unit_aotfw',
+        lesson_id: 'lesson_lkeep_001',
+        unit_id: 'unit_lkeep',
         title: 'Intro',
         published: true
       },
       {
-        id: 'scheduled_aotfw_008',
+        id: 'scheduled_lkeep_008',
         date: '2026-08-12',
         schedule_order: 2,
-        lesson_id: 'lesson_aotfw_008',
-        unit_id: 'unit_aotfw',
-        title: 'Memory, Identity and Ono',
+        lesson_id: 'lesson_lkeep_008',
+        unit_id: 'unit_lkeep',
+        title: 'Memory, Identity and Hale',
         published: false
       }
     ],
-    active_units: [{ id: 'unit_aotfw', title: 'Artist of the Floating World' }],
+    active_units: [{ id: 'unit_lkeep', title: 'The Lantern Keeper' }],
     ...overrides
   };
 }
@@ -100,7 +100,7 @@ describe('mountStudentClassView', () => {
         'Year 12 English Advanced'
       );
       expect(root.querySelector('.student-hero__eyebrow')?.textContent).toBe('12ENGADV1');
-      expect(root.textContent).toContain('Artist of the Floating World');
+      expect(root.textContent).toContain('The Lantern Keeper');
       expect(root.textContent).toContain('Welcome back');
     });
 
@@ -113,15 +113,15 @@ describe('mountStudentClassView', () => {
     expect(root.querySelector('[data-class-section="current-lesson"]')).toBeNull();
 
     const unitLink = root.querySelector('a.student-unit-card');
-    expect(unitLink?.getAttribute('href')).toBe('https://class.adam-russell.com/s/units/unit_aotfw');
+    expect(unitLink?.getAttribute('href')).toBe('https://class.adam-russell.com/s/units/unit_lkeep');
 
     const currentOpen = root.querySelector(
-      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
+      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_lkeep_008"]`
     );
     expect(currentOpen).toBeNull();
 
     const publishedOpen = root.querySelector(
-      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001"]`
+      `.student-schedule__link[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_lkeep_001"]`
     );
     expect(publishedOpen).not.toBeNull();
     expect(publishedOpen?.textContent).toContain('Intro');
@@ -140,12 +140,12 @@ describe('mountStudentClassView', () => {
       sampleClass({
         schedule: [
           {
-            id: 'scheduled_aotfw_008',
+            id: 'scheduled_lkeep_008',
             date: '2026-08-12',
             schedule_order: 1,
-            lesson_id: 'lesson_aotfw_008',
-            unit_id: 'unit_aotfw',
-            title: 'Memory, Identity and Ono',
+            lesson_id: 'lesson_lkeep_008',
+            unit_id: 'unit_lkeep',
+            title: 'Memory, Identity and Hale',
             published: true
           }
         ]
@@ -158,7 +158,7 @@ describe('mountStudentClassView', () => {
 
     await vi.waitFor(() => {
       const open = root.querySelector(
-        `a[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
+        `a[href="https://class.adam-russell.com/s/classes/${CLASS_ID}/lessons/lesson_lkeep_008"]`
       );
       expect(open).not.toBeNull();
     });
@@ -188,11 +188,11 @@ describe('mountStudentClassView', () => {
           custom: [collection]
         },
         current_unit: {
-          id: 'unit_aotfw',
-          title: 'Artist of the Floating World',
+          id: 'unit_lkeep',
+          title: 'The Lantern Keeper',
           lessons: [
-            { id: 'lesson_aotfw_001', title: 'Intro' },
-            { id: 'lesson_aotfw_008', title: 'Memory, Identity and Ono' }
+            { id: 'lesson_lkeep_001', title: 'Intro' },
+            { id: 'lesson_lkeep_008', title: 'Memory, Identity and Hale' }
           ]
         }
       })
@@ -206,15 +206,15 @@ describe('mountStudentClassView', () => {
       expect(root.querySelector('[data-homepage-region="custom"]')).toBeTruthy();
       expect(root.textContent).toContain('Unit lessons');
       expect(root.textContent).toContain('Intro');
-      expect(root.textContent).toContain('Memory, Identity and Ono');
+      expect(root.textContent).toContain('Memory, Identity and Hale');
     });
 
     const links = [
       ...root.querySelectorAll('[data-homepage-region="custom"] a.block-collection__link')
     ];
     expect(links).toHaveLength(2);
-    expect(links[0]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_001');
-    expect(links[1]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_aotfw_008');
+    expect(links[0]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_lkeep_001');
+    expect(links[1]?.getAttribute('href')).toBe('https://class.adam-russell.com/s/lessons/lesson_lkeep_008');
   });
 
   it('shows class not found on 404', async () => {

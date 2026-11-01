@@ -77,9 +77,9 @@ Add helpers in `src/storage/keys.ts` (and blobs re-exports) for version keys.
 
 ```json
 {
-  "id": "version_lesson_aotfw_008_017",
+  "id": "version_lesson_lkeep_008_017",
   "type": "lesson_version",
-  "parent_id": "lesson_aotfw_008",
+  "parent_id": "lesson_lkeep_008",
   "kind": "lesson",
   "revision": 17,
   "created_at": "2026-08-11T07:00:00.000Z",

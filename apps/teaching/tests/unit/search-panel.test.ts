@@ -297,8 +297,8 @@ describe('openSearchPanel', () => {
       {
         id: 'u1',
         type: 'unit',
-        title: 'Artist of the Floating World',
-        slug: 'aotfw',
+        title: 'The Lantern Keeper',
+        slug: 'lkeep',
         year_id: 'y12',
         subject_id: 'eng',
         lesson_ids: ['l1'],
@@ -374,8 +374,8 @@ describe('openSearchPanel', () => {
       {
         id: 'u1',
         type: 'unit',
-        title: 'Artist of the Floating World',
-        slug: 'aotfw',
+        title: 'The Lantern Keeper',
+        slug: 'lkeep',
         year_id: 'y12',
         subject_id: 'eng',
         lesson_ids: ['l2'],

@@ -77,7 +77,7 @@ English Advanced
 Scope and Sequence
 Term 1
 Term 2
-Artist of the Floating World
+The Lantern Keeper
 Lesson 01
 Lesson 02
 Lesson 03
@@ -95,7 +95,7 @@ If the teacher has:
 Year 12
 English Advanced
 Term 2
-Artist of the Floating World
+The Lantern Keeper
 expanded, reopening the workspace should preserve this navigation state where practical.
 This is a convenience state rather than core teaching data.
 
@@ -640,8 +640,8 @@ Desktop student view should support a clickable breadcrumb.
 Example:
 Year 12
 English Advanced
-Artist of the Floating World
-Memory, Identity and Ono
+The Lantern Keeper
+Memory, Identity and Hale
 The relevant levels are clickable.
 On smaller screens, the breadcrumb should simplify rather than wrap across several lines.
 
@@ -866,9 +866,9 @@ Templates
 
 Results should show context.
 Example:
-Memory, Identity and Ono
+Memory, Identity and Hale
 Lesson
-Year 12 → English Advanced → Artist of the Floating World
+Year 12 → English Advanced → The Lantern Keeper
 Relevant matching text may appear beneath.
 Search should favour fast navigation rather than becoming a separate content management application.
 

@@ -134,7 +134,7 @@ No public/student Scope endpoint this slice.
 For English Advanced subject:
 
 - One ScopeSequence (`academic_year: 2026`, `week_count: 40`, four terms spanning the year)  
-- At least one unit item (e.g. AoTFW spanning a Term 2 week range)  
+- At least one unit item (e.g. LKeep spanning a Term 2 week range)  
 - At least one sample note  
 - `subject.scope_id` set  
 

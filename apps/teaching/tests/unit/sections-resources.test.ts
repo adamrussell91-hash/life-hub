@@ -39,8 +39,8 @@ const baseMedia: Omit<Media, 'id' | 'title' | 'slug' | 'preview_url' | 'download
 const mediaWithPreview: Media = {
   ...baseMedia,
   id: 'media_ono_extract',
-  title: 'AoTFW Extract',
-  slug: 'aotfw_extract',
+  title: 'LKeep Extract',
+  slug: 'lkeep_extract',
   preview_url: 'https://example.com/ono-extract.pdf'
 };
 
@@ -133,7 +133,7 @@ describe('resources section', () => {
     const titles = [...canvas.querySelectorAll('.lesson-list__title')].map(
       (node) => node.textContent
     );
-    expect(titles).toEqual(['AoTFW Extract', 'Zebra Notes']);
+    expect(titles).toEqual(['LKeep Extract', 'Zebra Notes']);
 
     const openLinks = canvas.querySelectorAll<HTMLAnchorElement>('.lesson-list__open');
     expect(openLinks).toHaveLength(1);
@@ -320,7 +320,7 @@ describe('resource library folders, views and Used in', () => {
     expect(titles()).toEqual([]);
     canvas.querySelector<HTMLButtonElement>('.resources-subfolders__tile')!.click();
     expect(canvas.querySelector('.resources-crumbs')?.textContent).toContain('Texts');
-    expect(titles()).toEqual(['AoTFW Extract']);
+    expect(titles()).toEqual(['LKeep Extract']);
   });
 
   it('lists Used in links to each lesson, and groups by unit with its classes', () => {
@@ -333,7 +333,7 @@ describe('resource library folders, views and Used in', () => {
     const group = canvas.querySelector('.resources-group');
     expect(group?.querySelector('a')?.getAttribute('href')).toBe('/units/unit_poetry');
     expect(group?.textContent).toContain('Taught in 11ENA6');
-    expect(titles()).toEqual(['AoTFW Extract']);
+    expect(titles()).toEqual(['LKeep Extract']);
   });
 
   it('moves a resource to a folder from its options menu', async () => {

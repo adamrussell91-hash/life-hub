@@ -7,11 +7,11 @@ import {
 describe('PublishedUnitSchema', () => {
   it('parses a unit with published lesson summaries', () => {
     const unit = PublishedUnitSchema.parse({
-      unit_id: 'unit_aotfw',
-      title: 'AOTFW',
+      unit_id: 'unit_lkeep',
+      title: 'LKEEP',
       lessons: [
-        { lesson_id: 'lesson_aotfw_008', title: 'Memory' },
-        { lesson_id: 'lesson_aotfw_001', title: 'Intro' }
+        { lesson_id: 'lesson_lkeep_008', title: 'Memory' },
+        { lesson_id: 'lesson_lkeep_001', title: 'Intro' }
       ]
     });
     expect(unit.lessons).toHaveLength(2);

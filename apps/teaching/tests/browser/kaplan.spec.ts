@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('Kaplan stays attached through authoring, publication and removal', async ({ page, context }) => {
-  const id = 'lesson_aotfw_008';
+  const id = 'lesson_lkeep_008';
   const auth = await page.request.post('/api/auth', { data: { passphrase: 'teaching-hub-local' } });
   expect(auth.ok()).toBeTruthy();
   const original = await (await page.request.get(`/api/lessons/${id}`)).json();

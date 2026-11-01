@@ -68,15 +68,15 @@ test('hub load drops empty hubs and cancelled lessons', () => {
 
 test('knowledge topics prefer book origins, then Knowledge tags, then title aliases', () => {
   const topics = buildKnowledgeTopics([
-    { title: 'Unreliable narration', created_at: '2026-07-28', origins: [{ kind: 'book', label: 'An Artist of the Floating World' }] },
+    { title: 'Unreliable narration', created_at: '2026-07-28', origins: [{ kind: 'book', label: 'The Lantern Keeper' }] },
     { title: 'Identification models', created_at: '2026-07-22', tags: ['High Potential and High Ability Education'] },
     { title: 'Gifted education notes', updated_at: '2026-07-21' },
     { title: 'Unrelated shopping list', updated_at: '2026-07-28' }
   ], '2026-07-30');
-  assert.equal(topics.topics[0].name, 'An Artist of the Floating World');
+  assert.equal(topics.topics[0].name, 'The Lantern Keeper');
   assert.deepEqual(
     topics.topics.map(topic => topic.name).sort(),
-    ['An Artist of the Floating World', 'Gifted education', 'High Potential and High Ability Education']
+    ['Gifted education', 'High Potential and High Ability Education', 'The Lantern Keeper']
   );
   assert.ok(topics.topics[0].vals.some(value => value === 1));
 });

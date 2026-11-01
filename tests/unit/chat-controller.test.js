@@ -1221,13 +1221,13 @@ test('confirming a second-opinion choice pins that agent for the next send', asy
         yield {
           type: 'choice',
           title: 'Ask for a second look?',
-          hint: 'Another agent can append to “AOTFW sources”.',
+          hint: 'Another agent can append to “LKEEP sources”.',
           confirmLabel: 'Ask',
           choices: [
-            { id: 'sara', label: 'Ask Sara about AOTFW sources' },
-            { id: 'chadwick', label: 'Ask Chadwick about AOTFW sources' },
-            { id: 'clare', label: 'Ask Clare about AOTFW sources' },
-            { id: 'ann', label: 'Ask Ann about AOTFW sources' }
+            { id: 'sara', label: 'Ask Sara about LKEEP sources' },
+            { id: 'chadwick', label: 'Ask Chadwick about LKEEP sources' },
+            { id: 'clare', label: 'Ask Clare about LKEEP sources' },
+            { id: 'ann', label: 'Ask Ann about LKEEP sources' }
           ]
         };
         yield { type: 'done' };
@@ -1244,7 +1244,7 @@ test('confirming a second-opinion choice pins that agent for the next send', asy
     getDefaultAgentSlug: () => 'hammond'
   });
 
-  await controller.send('Log the AOTFW decision');
+  await controller.send('Log the LKEEP decision');
   assert.equal(sendCalls[0].priorAgentSlug, 'hammond');
 
   const card = findChoiceCard(root);

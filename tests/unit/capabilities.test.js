@@ -1065,19 +1065,19 @@ test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => 
     store: 'github',
     path: 'data/challenges/no-sugar.json'
   });
-  assert.deepEqual(classifyWriteTarget('tasks:project:proj_aotfw'), {
+  assert.deepEqual(classifyWriteTarget('tasks:project:proj_lkeep'), {
     store: 'tasks',
     kind: 'project',
-    id: 'proj_aotfw',
-    key: 'projects/proj_aotfw',
-    path: 'tasks:project:proj_aotfw'
+    id: 'proj_lkeep',
+    key: 'projects/proj_lkeep',
+    path: 'tasks:project:proj_lkeep'
   });
-  assert.deepEqual(classifyWriteTarget('teaching:unit:unit_aotfw'), {
+  assert.deepEqual(classifyWriteTarget('teaching:unit:unit_lkeep'), {
     store: 'teaching',
     kind: 'unit',
-    id: 'unit_aotfw',
-    key: 'units/unit_aotfw',
-    path: 'teaching:unit:unit_aotfw'
+    id: 'unit_lkeep',
+    key: 'units/unit_lkeep',
+    path: 'teaching:unit:unit_lkeep'
   });
   assert.deepEqual(classifyWriteTarget('tasks:task:task_1'), {
     store: 'tasks',
@@ -1090,13 +1090,13 @@ test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => 
 
 test('clare and hammond may write typed blob refs; brisket may write tasks not projects', () => {
   resetCapabilityCaches();
-  assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_lkeep'), true);
   assert.equal(isPathAllowedForAgent('clare', 'tasks:task:task_1'), true);
   assert.equal(isPathAllowedForAgent('clare', 'apps/tasks/config/clare-protocol.md'), true);
-  assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_aotfw'), false);
-  assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
-  assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
-  assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_aotfw'), false);
+  assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_lkeep'), false);
+  assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_lkeep'), true);
+  assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_lkeep'), true);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_lkeep'), false);
   assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_1'), true);
 });
 
@@ -1147,30 +1147,30 @@ test('selectAcceptedWrites omits all when accept is missing and none when empty'
 test('detectStaleWrites compares GitHub shas and blob updated_at', () => {
   const writes = [
     { path: 'data/os/note.md' },
-    { path: 'tasks:project:proj_aotfw' }
+    { path: 'tasks:project:proj_lkeep' }
   ];
   const bases = {
     'data/os/note.md': { sha: 'aaa', missing: false },
-    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+    'tasks:project:proj_lkeep': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
   };
   assert.deepEqual(detectStaleWrites(writes, bases, {
     'data/os/note.md': { sha: 'aaa', missing: false },
-    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+    'tasks:project:proj_lkeep': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
   }), []);
   assert.deepEqual(detectStaleWrites(writes, bases, {
     'data/os/note.md': { sha: 'bbb', missing: false },
-    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+    'tasks:project:proj_lkeep': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
   }), ['data/os/note.md']);
   assert.deepEqual(detectStaleWrites(writes, bases, {
     'data/os/note.md': { sha: 'aaa', missing: false },
-    'tasks:project:proj_aotfw': { updated_at: '2026-09-01T00:00:00.000Z', missing: false }
-  }), ['tasks:project:proj_aotfw']);
+    'tasks:project:proj_lkeep': { updated_at: '2026-09-01T00:00:00.000Z', missing: false }
+  }), ['tasks:project:proj_lkeep']);
 });
 
 test('snapshotGithubBases and snapshotBlobBases record missing vs present', async () => {
   const writes = [
     { path: 'data/os/note.md' },
-    { path: 'tasks:project:proj_aotfw' }
+    { path: 'tasks:project:proj_lkeep' }
   ];
   assert.deepEqual(snapshotGithubBases(writes, [
     { path: 'data/os/note.md', type: 'blob', sha: 'abc' }
@@ -1179,11 +1179,11 @@ test('snapshotGithubBases and snapshotBlobBases record missing vs present', asyn
   });
   const store = {
     async get(key) {
-      return key === 'projects/proj_aotfw' ? { id: 'proj_aotfw', updated_at: '2026-08-15T00:00:00.000Z' } : null;
+      return key === 'projects/proj_lkeep' ? { id: 'proj_lkeep', updated_at: '2026-08-15T00:00:00.000Z' } : null;
     }
   };
   assert.deepEqual(await snapshotBlobBases(writes, { tasks: store }), {
-    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+    'tasks:project:proj_lkeep': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
   });
 });
 
@@ -1199,11 +1199,11 @@ test('executeProposeActionWrites routes tasks project creates onto the blob stor
   };
   const result = await executeProposeActionWrites(null, {
     agent: 'clare',
-    intent: 'open the AOTFW project',
+    intent: 'open the LKEEP project',
     writes: [{
-      path: 'tasks:project:proj_aotfw',
+      path: 'tasks:project:proj_lkeep',
       mode: 'create',
-      content: JSON.stringify({ name: 'Artist of the Floating World', status: 'active' }),
+      content: JSON.stringify({ name: 'The Lantern Keeper', status: 'active' }),
       diff: 'new project'
     }]
   }, {
@@ -1211,10 +1211,10 @@ test('executeProposeActionWrites routes tasks project creates onto the blob stor
     nowIso: () => '2026-09-05T00:00:00.000Z'
   });
   assert.equal(result.ok, true);
-  assert.equal(data['projects/proj_aotfw'].name, 'Artist of the Floating World');
-  assert.equal(data['projects/proj_aotfw'].id, 'proj_aotfw');
-  assert.equal(data['projects/proj_aotfw'].updated_at, '2026-09-05T00:00:00.000Z');
-  assert.deepEqual(data['projects/_index'], ['proj_aotfw']);
+  assert.equal(data['projects/proj_lkeep'].name, 'The Lantern Keeper');
+  assert.equal(data['projects/proj_lkeep'].id, 'proj_lkeep');
+  assert.equal(data['projects/proj_lkeep'].updated_at, '2026-09-05T00:00:00.000Z');
+  assert.deepEqual(data['projects/_index'], ['proj_lkeep']);
 });
 
 test('executeProposeActionWrites routes task creates onto the blob store', async () => {

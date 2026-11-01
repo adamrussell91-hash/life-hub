@@ -299,7 +299,7 @@ describe('curriculum schemas', () => {
       display_title: 'Year 12 English Advanced',
       slug: 'english_advanced',
       year_id: 'year_12',
-      unit_ids: ['unit_aotfw'],
+      unit_ids: ['unit_lkeep'],
       outcome_ids: [],
       class_ids: [],
       status: 'active',
@@ -449,9 +449,9 @@ git commit -m "feat: filter teacher-only blocks and sanitize rich text HTML"
 - [ ] **Step 1: Author seed** with:
   - `year_12`
   - `subject_y12_engadv`, `subject_y12_engstd` (Standard may have empty units)
-  - `unit_aotfw` — Artist of the Floating World
-  - Lessons `lesson_aotfw_001` … `_003` with mixed visibilities and all three block types
-  - At least one `teacher_only` callout in lesson 008-style content (use `lesson_aotfw_008` as primary demo lesson per docs)
+  - `unit_lkeep` — The Lantern Keeper
+  - Lessons `lesson_lkeep_001` … `_003` with mixed visibilities and all three block types
+  - At least one `teacher_only` callout in lesson 008-style content (use `lesson_lkeep_008` as primary demo lesson per docs)
 
 - [ ] **Step 2: Test seed parses; Eng Adv ≠ Eng Std IDs**
 
@@ -472,8 +472,8 @@ git commit -m "test: add Year 12 English Advanced seed fixtures"
 - [ ] **Step 1: Tests for key helpers**
 
 ```ts
-expect(draftLessonKey('lesson_aotfw_008')).toBe('lessons/lesson_aotfw_008');
-expect(publishedLessonKey('lesson_aotfw_008')).toBe('published/lessons/lesson_aotfw_008');
+expect(draftLessonKey('lesson_lkeep_008')).toBe('lessons/lesson_lkeep_008');
+expect(publishedLessonKey('lesson_lkeep_008')).toBe('published/lessons/lesson_lkeep_008');
 ```
 
 - [ ] **Step 2: Implement `MockStore`** — Map of key → JSON string; `get/set/delete`; `loadSeed(seed)`; used by mock API and integration tests. Draft and published keys must remain distinct.
@@ -502,27 +502,27 @@ it('auth → save draft → publish → student sees published only', async () =
   expect(auth.status).toBe(200);
   const cookie = auth.headers.get('set-cookie');
 
-  const draft = await api.request('GET', '/api/lessons/lesson_aotfw_008', { cookie });
+  const draft = await api.request('GET', '/api/lessons/lesson_lkeep_008', { cookie });
   const lesson = await draft.json();
-  lesson.data.title = 'Memory, Identity and Ono';
+  lesson.data.title = 'Memory, Identity and Hale';
   lesson.data.blocks.push({ /* teacher_only callout */ });
 
-  const saved = await api.request('PUT', '/api/lessons/lesson_aotfw_008', { cookie, body: lesson.data });
+  const saved = await api.request('PUT', '/api/lessons/lesson_lkeep_008', { cookie, body: lesson.data });
   expect(saved.status).toBe(200);
 
-  const pub = await api.request('POST', '/api/lessons/lesson_aotfw_008/publish', { cookie });
+  const pub = await api.request('POST', '/api/lessons/lesson_lkeep_008/publish', { cookie });
   expect(pub.status).toBe(200);
 
-  const student = await api.request('GET', '/api/published/lessons/lesson_aotfw_008');
+  const student = await api.request('GET', '/api/published/lessons/lesson_lkeep_008');
   const snap = await student.json();
   expect(snap.data.blocks.every((b: any) => b.visibility === 'student_teacher')).toBe(true);
-  expect(snap.data.title).toBe('Memory, Identity and Ono');
+  expect(snap.data.title).toBe('Memory, Identity and Hale');
 
   // draft-only change after publish should not appear until re-publish
   lesson.data.title = 'DRAFT ONLY TITLE';
-  await api.request('PUT', '/api/lessons/lesson_aotfw_008', { cookie, body: lesson.data });
-  const student2 = await api.request('GET', '/api/published/lessons/lesson_aotfw_008');
-  expect((await student2.json()).data.title).toBe('Memory, Identity and Ono');
+  await api.request('PUT', '/api/lessons/lesson_lkeep_008', { cookie, body: lesson.data });
+  const student2 = await api.request('GET', '/api/published/lessons/lesson_lkeep_008');
+  expect((await student2.json()).data.title).toBe('Memory, Identity and Hale');
 });
 ```
 
@@ -532,7 +532,7 @@ Also test: unauthenticated GET draft → 401; invalid passphrase → 401; publis
 
 - [ ] **Step 3: Implement `createMockApi`** handling all routes in the contract table. Session: HMAC or HMAC-like token with `SESSION_SECRET=local-dev-secret`, httpOnly cookie name `teaching_hub_session`. Local passphrase compare plain equality to `teaching-hub-local` (production uses scrypt hash).
 
-On publish: Zod-parse lesson; require non-empty title; `filterBlocksForStudent` + sanitize each rich_text; write `PublishedLesson` to published key; return `{ student_path: '/s/lessons/lesson_aotfw_008' }`.
+On publish: Zod-parse lesson; require non-empty title; `filterBlocksForStudent` + sanitize each rich_text; write `PublishedLesson` to published key; return `{ student_path: '/s/lessons/lesson_lkeep_008' }`.
 
 - [ ] **Step 4: Wire Vite middleware** so browser `fetch('/api/...')` hits the mock during `npm run dev`.
 
@@ -781,14 +781,14 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
   await page.goto('/sign-in');
   await page.getByLabel('Passphrase').fill('teaching-hub-local');
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.getByRole('link', { name: /Artist of the Floating World/i }).click();
+  await page.getByRole('link', { name: /The Lantern Keeper/i }).click();
   await page.getByRole('link', { name: /lesson/i }).first().click();
-  await page.getByLabel('Lesson title').fill('Memory, Identity and Ono');
+  await page.getByLabel('Lesson title').fill('Memory, Identity and Hale');
   await page.getByRole('button', { name: /publish/i }).click();
   await expect(page.getByText(/published/i)).toBeVisible();
   const student = await context.newPage();
-  await student.goto('/s/lessons/lesson_aotfw_008');
-  await expect(student.getByRole('heading', { name: 'Memory, Identity and Ono' })).toBeVisible();
+  await student.goto('/s/lessons/lesson_lkeep_008');
+  await expect(student.getByRole('heading', { name: 'Memory, Identity and Hale' })).toBeVisible();
   await expect(student.getByText(/teacher only/i)).toHaveCount(0);
 });
 ```

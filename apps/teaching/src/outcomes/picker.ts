@@ -44,7 +44,7 @@ export function openOutcomePicker(options: OutcomePickerOptions): void {
   summary.textContent = 'Add custom…';
   custom.append(summary);
 
-  const code = fieldInput('Code', 'AOTFW-CR');
+  const code = fieldInput('Code', 'LKEEP-CR');
   const customTitle = fieldInput('Title', 'Short label');
   const customGroup = fieldInput('Group', 'Custom');
   const groupList = document.createElement('datalist');

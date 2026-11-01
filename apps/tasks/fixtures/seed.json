@@ -351,15 +351,15 @@
     },
     {
       "schema_version": 1,
-      "id": "proj_aotfw",
-      "title": "Artist of the Floating World",
+      "id": "proj_lkeep",
+      "title": "The Lantern Keeper",
       "description": "Year 12 English Advanced unit \u2014 planning, lessons, and marking.",
       "parent_goal_id": null,
       "tags": [
         "teaching",
         "english"
       ],
-      "arc_summary": "Deliver the AOTFW unit and close Term 2 marking.",
+      "arc_summary": "Deliver the LKEEP unit and close Term 2 marking.",
       "type": "standard",
       "milestones": [],
       "status": "active",

@@ -17,9 +17,9 @@ const curriculum: CurriculumResponse = {
   subjects: [],
   units: [
     {
-      id: 'unit_aotfw',
+      id: 'unit_lkeep',
       type: 'unit',
-      title: 'Artist of the Floating World',
+      title: 'The Lantern Keeper',
       slug: 'artist_of_the_floating_world',
       status: 'active',
       created_at: ISO,
@@ -35,7 +35,7 @@ const curriculum: CurriculumResponse = {
       id: 'lesson_001',
       title: 'Introduction',
       slug: 'introduction',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false,
@@ -94,7 +94,7 @@ describe('lessons index', () => {
     expect(canvas.querySelector('[data-lessons-count]')?.textContent).toMatch(/1 lesson/);
     expect(canvas.querySelector('.status-badge')?.textContent).toBe('Draft');
     expect(canvas.querySelector('.lesson-group__summary')?.textContent).toMatch(
-      /Artist of the Floating World/
+      /The Lantern Keeper/
     );
   });
 
@@ -106,7 +106,7 @@ describe('lessons index', () => {
     const actions = card.querySelector('.list-row-actions');
     expect(lead?.querySelector('.lessons-lib__check')).toBeTruthy();
     expect(info?.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
-    expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Artist of the Floating World/);
+    expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/The Lantern Keeper/);
     expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Draft/);
     expect(actions?.querySelector('.page-options__trigger')?.getAttribute('aria-label')).toMatch(
       /Options for Introduction/

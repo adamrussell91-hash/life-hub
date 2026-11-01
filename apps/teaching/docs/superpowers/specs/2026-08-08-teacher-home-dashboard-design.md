@@ -84,7 +84,7 @@ Context bar / canvas heading: **Home** (not “Lessons”).
 Seed includes:
 
 - One demo class (e.g. “12 Eng Adv — Period 3”)  
-- Several entries linking existing AOTFW lessons across the anchor date and nearby weekdays  
+- Several entries linking existing LKEEP lessons across the anchor date and nearby weekdays  
 - A documented **anchor date** used as “today” for Home and tests  
 
 ### Curriculum lesson summary — extended fields

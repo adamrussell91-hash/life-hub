@@ -14,7 +14,7 @@ const seedFixture = JSON.parse(
 
 const PASSPHRASE = 'teaching-hub-local';
 const CLASS_ID = 'class_2026_12engadv1';
-const UNIT_ID = 'unit_aotfw';
+const UNIT_ID = 'unit_lkeep';
 const PATH = `/api/classes/${CLASS_ID}/schedule-unit`;
 
 function freshSeed(): SeedData {
@@ -66,13 +66,13 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
 
     const created: ScheduledLesson[] = body.data.scheduled_lessons;
     expect(created.map((row) => row.lesson_id)).toEqual([
-      'lesson_aotfw_003',
-      'lesson_aotfw_004',
-      'lesson_aotfw_005'
+      'lesson_lkeep_003',
+      'lesson_lkeep_004',
+      'lesson_lkeep_005'
     ]);
     expect(created.every((row) => row.class_id === CLASS_ID)).toBe(true);
     expect(created.every((row) => row.unit_id === UNIT_ID)).toBe(true);
-    expect(created[0].id).toBe(`scheduled_${CLASS_ID}_lesson_aotfw_003`);
+    expect(created[0].id).toBe(`scheduled_${CLASS_ID}_lesson_lkeep_003`);
 
     const updatedClass: Class = body.data.class;
     expect(updatedClass.meeting_days).toEqual([1, 3, 5]);
@@ -102,7 +102,7 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
       slug: 'tiny',
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
-      lesson_ids: ['lesson_aotfw_001', 'lesson_aotfw_002'],
+      lesson_ids: ['lesson_lkeep_001', 'lesson_lkeep_002'],
       status: 'active',
       created_at: ISO,
       updated_at: ISO,
@@ -115,7 +115,7 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
         type: 'scheduled_lesson',
         class_id: CLASS_ID,
         unit_id: 'unit_tiny',
-        lesson_id: 'lesson_aotfw_001',
+        lesson_id: 'lesson_lkeep_001',
         date: '2026-08-20',
         schedule_order: 10,
         delivery_status: 'planned',
@@ -128,7 +128,7 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
         type: 'scheduled_lesson',
         class_id: CLASS_ID,
         unit_id: 'unit_tiny',
-        lesson_id: 'lesson_aotfw_002',
+        lesson_id: 'lesson_lkeep_002',
         date: '2026-08-21',
         schedule_order: 11,
         delivery_status: 'planned',
@@ -160,7 +160,7 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
       slug: 'wrong-subject',
       year_id: 'year_12',
       subject_id: 'subject_y12_engstd',
-      lesson_ids: ['lesson_aotfw_003'],
+      lesson_ids: ['lesson_lkeep_003'],
       status: 'active',
       created_at: ISO,
       updated_at: ISO,
@@ -219,7 +219,7 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
 
   it('returns 409 when stable scheduled lesson id already exists', async () => {
     const seed = freshSeed();
-    const collisionId = `scheduled_${CLASS_ID}_lesson_aotfw_003`;
+    const collisionId = `scheduled_${CLASS_ID}_lesson_lkeep_003`;
     seed.scheduled_lessons.push({
       id: collisionId,
       type: 'scheduled_lesson',

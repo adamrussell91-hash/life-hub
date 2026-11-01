@@ -16,7 +16,7 @@ const seedFixture = JSON.parse(
 ) as SeedData;
 
 const PASSPHRASE = 'teaching-hub-local';
-const LESSON_ID = 'lesson_aotfw_008';
+const LESSON_ID = 'lesson_lkeep_008';
 
 function freshSeed(): SeedData {
   return JSON.parse(JSON.stringify(seedFixture)) as SeedData;

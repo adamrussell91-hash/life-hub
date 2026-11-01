@@ -93,7 +93,7 @@ describe('project lifecycle mix', () => {
     expect(classifyProjectLifecycle(seed.projects.find((p) => p.id === 'proj_ex_ethics_seed')!, seed.tasks, stallIds, now)).toBe(
       'not_started'
     );
-    expect(classifyProjectLifecycle(seed.projects.find((p) => p.id === 'proj_aotfw')!, seed.tasks, stallIds, now)).toBe(
+    expect(classifyProjectLifecycle(seed.projects.find((p) => p.id === 'proj_lkeep')!, seed.tasks, stallIds, now)).toBe(
       'not_started'
     );
 
@@ -235,8 +235,8 @@ describe('project lifecycle mix', () => {
 
     const emptyPastEnd = buildProjectPulseCard(
       project({
-        id: 'proj_aotfw_empty',
-        title: 'Artist of the Floating World',
+        id: 'proj_lkeep_empty',
+        title: 'The Lantern Keeper',
         type: 'standard',
         baseline_end_date: '2026-07-01',
         current_end_date: '2026-07-15'

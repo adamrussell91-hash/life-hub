@@ -91,7 +91,7 @@ describe('AI block tree + proposals', () => {
   it('parses replace_lesson and applies title cover and blocks', () => {
     const heading = createBlock('heading', 'h1');
     const parsed = parseToolProposal('propose_replace_lesson', {
-      title: 'Artist of the Floating World',
+      title: 'The Lantern Keeper',
       cover: undefined,
       blocks: [heading]
     });
@@ -115,7 +115,7 @@ describe('AI block tree + proposals', () => {
       () => 'block_new_1'
     );
     expect(applied.ok).toBe(true);
-    expect(applied.lesson.title).toBe('Artist of the Floating World');
+    expect(applied.lesson.title).toBe('The Lantern Keeper');
     expect(applied.lesson.blocks).toHaveLength(1);
   });
 

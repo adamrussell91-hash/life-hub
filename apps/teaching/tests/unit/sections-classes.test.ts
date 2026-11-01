@@ -59,15 +59,15 @@ const engAdv: Subject = {
   created_at: ISO,
   updated_at: ISO,
   schema_version: 1,
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_lkeep'],
   outcome_ids: [],
   class_ids: ['class_2026_12engadv1']
 };
 
 const unit: Unit = {
-  id: 'unit_aotfw',
+  id: 'unit_lkeep',
   type: 'unit',
-  title: 'Artist of the Floating World',
+  title: 'The Lantern Keeper',
   slug: 'artist_of_the_floating_world',
   status: 'active',
   created_at: ISO,
@@ -75,7 +75,7 @@ const unit: Unit = {
   schema_version: 1,
   year_id: 'year_12',
   subject_id: 'subject_y12_engadv',
-  lesson_ids: ['lesson_aotfw_008', 'lesson_aotfw_001']
+  lesson_ids: ['lesson_lkeep_008', 'lesson_lkeep_001']
 };
 
 const classRow: Class = {
@@ -87,9 +87,9 @@ const classRow: Class = {
   academic_year: 2026,
   year_id: 'year_12',
   subject_id: 'subject_y12_engadv',
-  active_unit_ids: ['unit_aotfw'],
-  current_unit_id: 'unit_aotfw',
-  current_scheduled_lesson_id: 'scheduled_aotfw_008',
+  active_unit_ids: ['unit_lkeep'],
+  current_unit_id: 'unit_lkeep',
+  current_scheduled_lesson_id: 'scheduled_lkeep_008',
   status: 'active',
   created_at: ISO,
   updated_at: ISO,
@@ -97,11 +97,11 @@ const classRow: Class = {
 };
 
 const scheduledCurrent: ScheduledLesson = {
-  id: 'scheduled_aotfw_008',
+  id: 'scheduled_lkeep_008',
   type: 'scheduled_lesson',
   class_id: 'class_2026_12engadv1',
-  unit_id: 'unit_aotfw',
-  lesson_id: 'lesson_aotfw_008',
+  unit_id: 'unit_lkeep',
+  lesson_id: 'lesson_lkeep_008',
   date: '2026-08-12',
   schedule_order: 3,
   delivery_status: 'current',
@@ -111,11 +111,11 @@ const scheduledCurrent: ScheduledLesson = {
 };
 
 const scheduledPlanned: ScheduledLesson = {
-  id: 'scheduled_aotfw_001',
+  id: 'scheduled_lkeep_001',
   type: 'scheduled_lesson',
   class_id: 'class_2026_12engadv1',
-  unit_id: 'unit_aotfw',
-  lesson_id: 'lesson_aotfw_001',
+  unit_id: 'unit_lkeep',
+  lesson_id: 'lesson_lkeep_001',
   date: '2026-08-13',
   schedule_order: 4,
   delivery_status: 'planned',
@@ -130,20 +130,20 @@ const curriculum: CurriculumResponse = {
   units: [unit],
   lessons: [
     {
-      id: 'lesson_aotfw_008',
+      id: 'lesson_lkeep_008',
       title: 'Memory',
       slug: 'memory',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 8,
       status: 'active',
       published: true,
       updated_at: ISO
     },
     {
-      id: 'lesson_aotfw_001',
+      id: 'lesson_lkeep_001',
       title: 'Intro',
       slug: 'intro',
-      unit_id: 'unit_aotfw',
+      unit_id: 'unit_lkeep',
       sequence: 1,
       status: 'active',
       published: false,
@@ -243,9 +243,9 @@ describe('classes section', () => {
     expect(canvas.querySelector('[data-class-section="unit-progress"]')).toBeNull();
     expect(canvas.querySelector('[data-part="hub-calendar-mount"].class-calendar')).not.toBeNull();
     expect(canvas.querySelector('.unit-sequence')).not.toBeNull();
-    expect(canvas.querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')).not.toBeNull();
+    expect(canvas.querySelector('a.seq__lesson-link[href="/lessons/lesson_lkeep_008"]')).not.toBeNull();
 
-    expect(canvas.textContent).toMatch(/Artist of the Floating World/);
+    expect(canvas.textContent).toMatch(/The Lantern Keeper/);
     expect(canvas.textContent).not.toMatch(/Dates from the schedule/);
     expect(canvas.textContent).not.toMatch(/Up next/i);
 
@@ -264,7 +264,7 @@ describe('classes section', () => {
       'Use Edit homepage above announcements to change resources and custom blocks.'
     );
 
-    const unitLink = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]');
+    const unitLink = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_lkeep"]');
     expect(unitLink).not.toBeNull();
   });
 
@@ -303,11 +303,11 @@ describe('classes section', () => {
   it('opens a lesson from the unit sequence', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
     const link = canvas.querySelector<HTMLAnchorElement>(
-      'a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]'
+      'a.seq__lesson-link[href="/lessons/lesson_lkeep_008"]'
     );
     expect(link).not.toBeNull();
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
+    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_lkeep_008');
   });
 
   it('calls onCreateLesson from calendar add controls', async () => {
@@ -344,7 +344,7 @@ describe('classes section', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
     canvas
-      .querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')
+      .querySelector('a.seq__lesson-link[href="/lessons/lesson_lkeep_008"]')
       ?.parentElement
       ?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')
       ?.click();
@@ -446,14 +446,14 @@ describe('classes section', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
     const plannedRow = canvas.querySelector(
-      'a.seq__lesson-link[href="/lessons/lesson_aotfw_001"]'
+      'a.seq__lesson-link[href="/lessons/lesson_lkeep_001"]'
     )?.parentElement;
     plannedRow?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')?.click();
     document.querySelector<HTMLButtonElement>('[data-schedule-action="set-current"]')?.click();
 
     await vi.waitFor(() => {
       expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
-        current_scheduled_lesson_id: 'scheduled_aotfw_001'
+        current_scheduled_lesson_id: 'scheduled_lkeep_001'
       });
       expect(onScheduleMutated).toHaveBeenCalled();
     });
@@ -464,7 +464,7 @@ describe('classes section', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
     canvas
-      .querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')
+      .querySelector('a.seq__lesson-link[href="/lessons/lesson_lkeep_008"]')
       ?.parentElement
       ?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')
       ?.click();
@@ -475,7 +475,7 @@ describe('classes section', () => {
     input!.dispatchEvent(new Event('change', { bubbles: true }));
 
     await vi.waitFor(() => {
-      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', {
+      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_lkeep_008', {
         date: '2026-08-20'
       });
       expect(onScheduleMutated).toHaveBeenCalled();

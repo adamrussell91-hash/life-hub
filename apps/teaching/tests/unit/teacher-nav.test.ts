@@ -72,7 +72,7 @@ const subjectEngAdv: Subject = {
   created_at: ISO,
   updated_at: ISO,
   schema_version: 1,
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_lkeep'],
   outcome_ids: [],
   class_ids: []
 };
@@ -86,10 +86,10 @@ const subjectEngStd: Subject = {
   unit_ids: []
 };
 
-const unitAotfw: Unit = {
-  id: 'unit_aotfw',
+const unitLkeep: Unit = {
+  id: 'unit_lkeep',
   type: 'unit',
-  title: 'Artist of the Floating World',
+  title: 'The Lantern Keeper',
   slug: 'artist_of_the_floating_world',
   status: 'active',
   created_at: ISO,
@@ -103,10 +103,10 @@ const unitAotfw: Unit = {
 const curriculum: CurriculumResponse = {
   years: [year],
   subjects: [subjectEngAdv, subjectEngStd],
-  units: [unitAotfw],
+  units: [unitLkeep],
   lessons: [
-    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false, updated_at: ISO },
-    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true, updated_at: ISO }
+    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_lkeep', sequence: 1, status: 'active', published: false, updated_at: ISO },
+    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_lkeep', sequence: 2, status: 'active', published: true, updated_at: ISO }
   ],
   classes: [],
   scheduled_lessons: [],
@@ -162,7 +162,7 @@ describe('curriculum nav rendering', () => {
   it('walks all the way down to a lesson leaf that navigates on click', () => {
     memoryStorage.setItem(
       'teaching-hub.nav',
-      JSON.stringify(['year:year_12', 'subject:subject_engadv', 'unit:unit_aotfw'])
+      JSON.stringify(['year:year_12', 'subject:subject_engadv', 'unit:unit_lkeep'])
     );
 
     renderCurriculumNav(container, curriculum);
@@ -217,7 +217,7 @@ const sampleClass: Class = {
   academic_year: 2026,
   year_id: 'year_12',
   subject_id: 'subject_engadv',
-  active_unit_ids: ['unit_aotfw'],
+  active_unit_ids: ['unit_lkeep'],
   status: 'active',
   created_at: ISO,
   updated_at: ISO,

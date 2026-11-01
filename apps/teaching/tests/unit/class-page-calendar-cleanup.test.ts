@@ -39,16 +39,16 @@ function curriculumWithTrashedUnit(): CurriculumResponse {
         created_at: ISO,
         updated_at: ISO,
         schema_version: 1,
-        unit_ids: ['unit_aotfw'],
+        unit_ids: ['unit_lkeep'],
         outcome_ids: [],
         class_ids: ['class_2026_12engadv1']
       }
     ],
     units: [
       {
-        id: 'unit_aotfw',
+        id: 'unit_lkeep',
         type: 'unit',
-        title: 'Artist of the Floating World',
+        title: 'The Lantern Keeper',
         slug: 'artist_of_the_floating_world',
         status: 'trashed',
         previous_status: 'active',
@@ -58,15 +58,15 @@ function curriculumWithTrashedUnit(): CurriculumResponse {
         schema_version: 1,
         year_id: 'year_12',
         subject_id: 'subject_y12_engadv',
-        lesson_ids: ['lesson_aotfw_001']
+        lesson_ids: ['lesson_lkeep_001']
       }
     ],
     lessons: [
       {
-        id: 'lesson_aotfw_001',
-        title: 'Introduction to An Artist of the Floating World',
+        id: 'lesson_lkeep_001',
+        title: 'Introduction to The Lantern Keeper',
         slug: 'intro',
-        unit_id: 'unit_aotfw',
+        unit_id: 'unit_lkeep',
         sequence: 1,
         status: 'active',
         published: true,
@@ -83,9 +83,9 @@ function curriculumWithTrashedUnit(): CurriculumResponse {
         academic_year: 2026,
         year_id: 'year_12',
         subject_id: 'subject_y12_engadv',
-        active_unit_ids: ['unit_aotfw'],
-        current_unit_id: 'unit_aotfw',
-        current_scheduled_lesson_id: 'scheduled_aotfw_001',
+        active_unit_ids: ['unit_lkeep'],
+        current_unit_id: 'unit_lkeep',
+        current_scheduled_lesson_id: 'scheduled_lkeep_001',
         status: 'active',
         created_at: ISO,
         updated_at: ISO,
@@ -94,11 +94,11 @@ function curriculumWithTrashedUnit(): CurriculumResponse {
     ],
     scheduled_lessons: [
       {
-        id: 'scheduled_aotfw_001',
+        id: 'scheduled_lkeep_001',
         type: 'scheduled_lesson',
         class_id: 'class_2026_12engadv1',
-        unit_id: 'unit_aotfw',
-        lesson_id: 'lesson_aotfw_001',
+        unit_id: 'unit_lkeep',
+        lesson_id: 'lesson_lkeep_001',
         date: '2026-09-17',
         start_time: '12:30',
         schedule_order: 1,
@@ -167,8 +167,8 @@ describe('class page calendar cleanup', () => {
   it('does not render a trashed unit, its sequence link, or its scheduled lesson', () => {
     renderClassPage(canvas, curriculumWithTrashedUnit(), 'class_2026_12engadv1');
 
-    expect(canvas.querySelector('a[href="/units/unit_aotfw"]')).toBeNull();
-    expect(canvas.querySelector('a.event-chip[href="/lessons/lesson_aotfw_001"]')).toBeNull();
-    expect(canvas.textContent).not.toContain('Artist of the Floating World');
+    expect(canvas.querySelector('a[href="/units/unit_lkeep"]')).toBeNull();
+    expect(canvas.querySelector('a.event-chip[href="/lessons/lesson_lkeep_001"]')).toBeNull();
+    expect(canvas.textContent).not.toContain('The Lantern Keeper');
   });
 });

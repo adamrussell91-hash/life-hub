@@ -130,13 +130,13 @@ test('validateGovernanceLogAppendInput keeps chosen, reasoning, and revisit', ()
     reasoning: 'Teaching clash',
     revisit: '2026-10-01',
     decision_id: 'med-load',
-    about: ['teaching:unit:unit_aotfw', 'life:decision:med-load']
+    about: ['teaching:unit:unit_lkeep', 'life:decision:med-load']
   });
   assert.equal(entry.chosen, 'Drop one elective');
   assert.equal(entry.reasoning, 'Teaching clash');
   assert.equal(entry.revisit, '2026-10-01');
   assert.equal(entry.decisionId, 'med-load');
-  assert.deepEqual(entry.about, ['teaching:unit:unit_aotfw', 'life:decision:med-load']);
+  assert.deepEqual(entry.about, ['teaching:unit:unit_lkeep', 'life:decision:med-load']);
 });
 
 test('validateGovernanceLogAppendInput keeps optional dateKey when provided', () => {

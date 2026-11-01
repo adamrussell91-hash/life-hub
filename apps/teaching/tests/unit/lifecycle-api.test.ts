@@ -27,8 +27,8 @@ describe('lifecycle-api paths', () => {
   it('formats dependency lists for confirms', () => {
     expect(
       formatDependencyList([
-        { type: 'unit', id: 'unit_1', title: 'AoTFW', detail: 'Unit lists this lesson' }
+        { type: 'unit', id: 'unit_1', title: 'LKeep', detail: 'Unit lists this lesson' }
       ])
-    ).toBe('• AoTFW — Unit lists this lesson');
+    ).toBe('• LKeep — Unit lists this lesson');
   });
 });

@@ -28,14 +28,14 @@ const seed = JSON.parse(
 
 describe('storage key helpers', () => {
   it('builds draft lesson keys', () => {
-    expect(draftLessonKey('lesson_aotfw_008')).toBe(
-      'lessons/lesson_aotfw_008'
+    expect(draftLessonKey('lesson_lkeep_008')).toBe(
+      'lessons/lesson_lkeep_008'
     );
   });
 
   it('builds published lesson keys', () => {
-    expect(publishedLessonKey('lesson_aotfw_008')).toBe(
-      'published/lessons/lesson_aotfw_008'
+    expect(publishedLessonKey('lesson_lkeep_008')).toBe(
+      'published/lessons/lesson_lkeep_008'
     );
   });
 
@@ -44,7 +44,7 @@ describe('storage key helpers', () => {
     expect(subjectKey('subject_y12_engadv')).toBe(
       'subjects/subject_y12_engadv'
     );
-    expect(unitKey('unit_aotfw')).toBe('units/unit_aotfw');
+    expect(unitKey('unit_lkeep')).toBe('units/unit_lkeep');
     expect(scopeSequenceKey('scope_y12_engadv_2026')).toBe(
       'scope_sequences/scope_y12_engadv_2026'
     );
@@ -52,8 +52,8 @@ describe('storage key helpers', () => {
 
   it('builds class and scheduled lesson keys', () => {
     expect(classKey('class_2026_12engadv1')).toBe('classes/class_2026_12engadv1');
-    expect(scheduledLessonKey('scheduled_aotfw_008')).toBe(
-      'scheduled_lessons/scheduled_aotfw_008'
+    expect(scheduledLessonKey('scheduled_lkeep_008')).toBe(
+      'scheduled_lessons/scheduled_lkeep_008'
     );
   });
 
@@ -73,8 +73,8 @@ describe('storage key helpers', () => {
   it('builds AI job and transcript keys', () => {
     expect(aiJobKey('job_1')).toBe('ai_jobs/job_1');
     expect(aiJobsInboxKey()).toBe('ai_jobs/_inbox');
-    expect(aiTranscriptKey('lesson_aotfw_008', 'clementine')).toBe(
-      'ai_transcripts/lesson_aotfw_008/clementine'
+    expect(aiTranscriptKey('lesson_lkeep_008', 'clementine')).toBe(
+      'ai_transcripts/lesson_lkeep_008/clementine'
     );
   });
 });
@@ -115,19 +115,19 @@ describe('MockStore', () => {
       id: 'scope_y12_engadv_2026',
       subject_id: 'subject_y12_engadv'
     });
-    expect(store.getJSON(unitKey('unit_aotfw'))).toMatchObject({
-      id: 'unit_aotfw'
+    expect(store.getJSON(unitKey('unit_lkeep'))).toMatchObject({
+      id: 'unit_lkeep'
     });
-    expect(store.getJSON(draftLessonKey('lesson_aotfw_008'))).toMatchObject({
-      id: 'lesson_aotfw_008'
+    expect(store.getJSON(draftLessonKey('lesson_lkeep_008'))).toMatchObject({
+      id: 'lesson_lkeep_008'
     });
     expect(store.getJSON(classKey('class_2026_12engadv1'))).toMatchObject({
       id: 'class_2026_12engadv1',
       code: '12ENGADV1'
     });
-    expect(store.getJSON(scheduledLessonKey('scheduled_aotfw_008'))).toMatchObject({
-      id: 'scheduled_aotfw_008',
-      lesson_id: 'lesson_aotfw_008'
+    expect(store.getJSON(scheduledLessonKey('scheduled_lkeep_008'))).toMatchObject({
+      id: 'scheduled_lkeep_008',
+      lesson_id: 'lesson_lkeep_008'
     });
     expect(store.getJSON(scheduleAnchorKey())).toEqual({ date: '2026-08-12' });
     expect(store.getJSON(mediaKey('media_ono_extract'))).toMatchObject({
@@ -147,8 +147,8 @@ describe('MockStore', () => {
   it('keeps draft and published lesson keys distinct', () => {
     store.loadSeed(seed);
 
-    const draftKey = draftLessonKey('lesson_aotfw_008');
-    const publishedKey = publishedLessonKey('lesson_aotfw_008');
+    const draftKey = draftLessonKey('lesson_lkeep_008');
+    const publishedKey = publishedLessonKey('lesson_lkeep_008');
 
     expect(store.get(publishedKey)).toBeUndefined();
 

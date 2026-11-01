@@ -112,14 +112,14 @@ describe('seed fixtures', () => {
       )
     );
     expect(adv.id).not.toBe(std.id);
-    expect(adv.unit_ids).toContain('unit_aotfw');
+    expect(adv.unit_ids).toContain('unit_lkeep');
     expect(std.unit_ids).toHaveLength(0);
   });
 
-  it('lesson_aotfw_008 has mixed visibilities and all block types', () => {
+  it('lesson_lkeep_008 has mixed visibilities and all block types', () => {
     const lesson = LessonSchema.parse(
       seed.lessons.find(
-        (l) => (l as { id: string }).id === 'lesson_aotfw_008'
+        (l) => (l as { id: string }).id === 'lesson_lkeep_008'
       )
     );
 

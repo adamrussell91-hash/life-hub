@@ -145,11 +145,11 @@ test('saveKnowledgePage keeps Teaching and Tasks refs on connected', async () =>
   });
   const saved = await saveKnowledgePage(
     {
-      id: 'page_aotfw',
-      title: 'Artist of the Floating World — sources',
-      body: 'Ishiguro',
+      id: 'page_lkeep',
+      title: 'The Lantern Keeper — sources',
+      body: 'Calder',
       area: 'university',
-      connected: ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'knowledge:page:page_aotfw']
+      connected: ['teaching:unit:unit_lkeep', 'tasks:project:proj_lkeep', 'knowledge:page:page_lkeep']
     },
     {
       env: { GITHUB_TOKEN: 'token' },
@@ -157,8 +157,8 @@ test('saveKnowledgePage keeps Teaching and Tasks refs on connected', async () =>
       nowIso: () => '2026-01-15T09:00:00.000Z'
     }
   );
-  assert.deepEqual(saved.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'page_aotfw']);
-  const stored = JSON.parse(files.get('pages/page_aotfw.json').text);
+  assert.deepEqual(saved.connected, ['teaching:unit:unit_lkeep', 'tasks:project:proj_lkeep', 'page_lkeep']);
+  const stored = JSON.parse(files.get('pages/page_lkeep.json').text);
   assert.deepEqual(stored.connected, saved.connected);
   const manifest = JSON.parse(files.get('manifest.json').text);
   assert.deepEqual(manifest[0].connected, saved.connected);
@@ -237,12 +237,12 @@ test('backfillManifestConnected copies nonempty connected from page files onto m
     { id: 'page_empty', title: 'Empty' }
   ];
   const pages = new Map([
-    ['page_ethics', { id: 'page_ethics', connected: ['page_training_pulse', 'teaching:unit:unit_aotfw'] }],
+    ['page_ethics', { id: 'page_ethics', connected: ['page_training_pulse', 'teaching:unit:unit_lkeep'] }],
     ['page_training_pulse', { id: 'page_training_pulse', connected: [] }],
     ['page_empty', { id: 'page_empty' }]
   ]);
   const next = backfillManifestConnected(rows, pages);
-  assert.deepEqual(next[0].connected, ['page_training_pulse', 'teaching:unit:unit_aotfw']);
+  assert.deepEqual(next[0].connected, ['page_training_pulse', 'teaching:unit:unit_lkeep']);
   assert.equal(next[1].connected, undefined);
   assert.equal(next[2].connected, undefined);
   assert.deepEqual(collectInverseLinks(next, 'page_training_pulse'), [

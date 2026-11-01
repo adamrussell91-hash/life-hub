@@ -173,20 +173,20 @@ In `tests/unit/router.test.ts`, add:
 
 ```ts
 it('matches public student class-scoped lesson view', () => {
-  expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008')).toEqual({
+  expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_lkeep_008')).toEqual({
     name: 'student-class-lesson',
     params: {
       classId: 'class_2026_12engadv1',
-      lessonId: 'lesson_aotfw_008'
+      lessonId: 'lesson_lkeep_008'
     },
     requiresAuth: false,
-    path: '/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008'
+    path: '/s/classes/class_2026_12engadv1/lessons/lesson_lkeep_008'
   });
 });
 
 it('still matches bare student class and bare lesson', () => {
   expect(match('/s/classes/class_2026_12engadv1')?.name).toBe('student-class');
-  expect(match('/s/lessons/lesson_aotfw_008')?.name).toBe('student-lesson');
+  expect(match('/s/lessons/lesson_lkeep_008')?.name).toBe('student-lesson');
 });
 ```
 
@@ -307,9 +307,9 @@ const CLASS_ID = 'class_2026_12engadv1';
 
 function publishedLesson() {
   return {
-    lesson_id: 'lesson_aotfw_008',
+    lesson_id: 'lesson_lkeep_008',
     title: 'Memory',
-    unit_id: 'unit_aotfw',
+    unit_id: 'unit_lkeep',
     blocks: [],
     published_at: '2026-02-01T12:00:00.000Z',
     schema_version: 1
@@ -327,7 +327,7 @@ function publishedClass() {
         id: 's1',
         date: '2026-08-11',
         schedule_order: 1,
-        lesson_id: 'lesson_aotfw_007',
+        lesson_id: 'lesson_lkeep_007',
         title: 'Earlier',
         published: true
       },
@@ -335,7 +335,7 @@ function publishedClass() {
         id: 's2',
         date: '2026-08-12',
         schedule_order: 2,
-        lesson_id: 'lesson_aotfw_008',
+        lesson_id: 'lesson_lkeep_008',
         title: 'Memory',
         published: true
       },
@@ -343,7 +343,7 @@ function publishedClass() {
         id: 's3',
         date: '2026-08-13',
         schedule_order: 3,
-        lesson_id: 'lesson_aotfw_009',
+        lesson_id: 'lesson_lkeep_009',
         title: 'Later',
         published: true
       }
@@ -356,7 +356,7 @@ it('bare mount still has only Back to unit and no footer nav', async () => {
   vi.mocked(apiGet).mockResolvedValue(publishedLesson());
   const root = document.createElement('div');
   document.body.append(root);
-  mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+  mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
 
   await vi.waitFor(() => {
     expect(root.querySelector('a.student-surface__back')?.textContent).toBe('Back to unit');
@@ -376,7 +376,7 @@ it('class-scoped mount shows Back to class, Back to unit, and footer neighbors',
   document.body.append(root);
   mountStudentLessonView({
     root,
-    lessonId: 'lesson_aotfw_008',
+    lessonId: 'lesson_lkeep_008',
     classId: CLASS_ID
   });
 
@@ -385,22 +385,22 @@ it('class-scoped mount shows Back to class, Back to unit, and footer neighbors',
       `/s/classes/${CLASS_ID}`
     );
     expect(root.querySelector('a.student-surface__back-unit')?.getAttribute('href')).toBe(
-      '/s/units/unit_aotfw'
+      '/s/units/unit_lkeep'
     );
   });
 
   const prev = root.querySelector('a.student-lesson__nav-prev') as HTMLAnchorElement;
   const next = root.querySelector('a.student-lesson__nav-next') as HTMLAnchorElement;
   expect(prev.getAttribute('href')).toBe(
-    `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
+    `/s/classes/${CLASS_ID}/lessons/lesson_lkeep_007`
   );
   expect(next.getAttribute('href')).toBe(
-    `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_009`
+    `/s/classes/${CLASS_ID}/lessons/lesson_lkeep_009`
   );
 
   prev.click();
   expect(navigate).toHaveBeenCalledWith(
-    `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_007`
+    `/s/classes/${CLASS_ID}/lessons/lesson_lkeep_007`
   );
 });
 
@@ -417,7 +417,7 @@ it('class-scoped shows not found when lesson not on schedule', async () => {
   document.body.append(root);
   mountStudentLessonView({
     root,
-    lessonId: 'lesson_aotfw_008',
+    lessonId: 'lesson_lkeep_008',
     classId: CLASS_ID
   });
 
@@ -436,7 +436,7 @@ it('class-scoped shows not found when schedule row is unpublished', async () => 
             id: 's2',
             date: '2026-08-12',
             schedule_order: 2,
-            lesson_id: 'lesson_aotfw_008',
+            lesson_id: 'lesson_lkeep_008',
             title: 'Memory',
             published: false
           }
@@ -451,7 +451,7 @@ it('class-scoped shows not found when schedule row is unpublished', async () => 
   document.body.append(root);
   mountStudentLessonView({
     root,
-    lessonId: 'lesson_aotfw_008',
+    lessonId: 'lesson_lkeep_008',
     classId: CLASS_ID
   });
 
