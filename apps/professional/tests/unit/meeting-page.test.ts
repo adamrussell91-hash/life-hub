@@ -72,7 +72,13 @@ vi.mock('@/api/clare-comms', () => ({
   clareProposeNext: vi.fn(),
   clarePurposeCheck: vi.fn(async () => ({ met: false, note: 'TeachMeet date was deferred to October.' })),
   clareSummary: vi.fn(async () => ({ summary: 'Board agreed the run sheet.', promises: [], numbers: [] })),
-  clareHandwriting: vi.fn()
+  clareHandwriting: vi.fn(),
+  clareMinutes: vi.fn(),
+  fileBase64: vi.fn(async () => '')
+}));
+vi.mock('@/api/meeting-minutes-file', () => ({
+  uploadMinutesFile: vi.fn(async () => ({ file_key: 'meeting-minutes/x.pdf' })),
+  fetchMinutesFile: vi.fn(async () => ({ media_type: 'application/pdf', data: '' }))
 }));
 let savedBlocks: unknown[] = [];
 let notesDisposeCount = 0;
@@ -216,13 +222,41 @@ describe('meeting page', () => {
     expect(room.textContent).not.toContain('New to you');
   });
 
+  it('saving notes keeps decisions that came from the minutes', async () => {
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, decisions: [
+      { id: 'd_1', text: 'Old notes decision', agenda_heading: null },
+      { id: 'dm_1', text: 'Run sheet signed off', agenda_heading: 'Medal ceremony run sheet', source: 'minutes' }
+    ] } } as never);
+    await render();
+    const onSave = (mountBlockPage as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1].onSave as (blocks: unknown[]) => Promise<void>;
+    await onSave([
+      { id: 'h', block_type: 'heading', content: { text: 'Minutes' } },
+      { id: 'r', block_type: 'rich_text', content: { html: '<p>✓ Minutes accepted</p>' } }
+    ]);
+    expect(vi.mocked(updateMeeting).mock.calls.at(-1)![1].decisions).toEqual([
+      { id: 'd_1', text: 'Minutes accepted', agenda_heading: 'Minutes' },
+      { id: 'dm_1', text: 'Run sheet signed off', agenda_heading: 'Medal ceremony run sheet', source: 'minutes' }
+    ]);
+  });
+
+  it('shows the Minutes card in every phase, kept across repaints', async () => {
+    const canvas = await render();
+    const card = canvas.querySelector('[data-part="minutes"]');
+    expect(card?.querySelector('h3')?.textContent).toBe('Minutes');
+    for (const next of ['before', 'during', 'after']) {
+      canvas.querySelector<HTMLButtonElement>(`[data-set-phase="${next}"]`)!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(canvas.querySelector('[data-part="minutes"]')).toBe(card);
+    }
+  });
+
   it('the three phases show different work: brief + open promises / live strip / wrap-up', async () => {
     const canvas = await render();
     const parts = () => [...canvas.querySelectorAll('.meeting-page__main > [data-part]')].map((node) => node.getAttribute('data-part'));
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="before"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(parts()).toEqual(['clare-brief', 'open-promises', 'notes']);
+    expect(parts()).toEqual(['clare-brief', 'open-promises', 'notes', 'minutes']);
     expect(canvas.querySelector('[data-part="open-promises"]')!.textContent).toContain('Send Rachel the medal list');
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(false);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(true);
@@ -231,11 +265,11 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="clare-brief"]')!.textContent).toContain('Rachel wants the date locked');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
-    expect(parts()).toEqual(['live-strip', 'notes', 'guides', 'actions', 'mentions']);
+    expect(parts()).toEqual(['live-strip', 'notes', 'minutes', 'guides', 'actions', 'mentions']);
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['purpose-check-card', 'wrap-up', 'actions', 'notes', 'guides', 'mentions']);
+    expect(parts()).toEqual(['purpose-check-card', 'wrap-up', 'actions', 'notes', 'minutes', 'guides', 'mentions']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
   });

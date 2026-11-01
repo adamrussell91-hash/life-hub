@@ -48,6 +48,20 @@ function personByName(ctx, name) {
   }) ?? null;
 }
 
+function initialsOf(name) {
+  return name.split(/\s+/).filter(Boolean).map((word) => word[0]).join('').toUpperCase();
+}
+
+/** A name, first name or initials as minutes write them → an attendee, or null. */
+export function whoToPerson(ctx, who) {
+  const byName = personByName(ctx, who);
+  if (byName) return byName;
+  const letters = line(who, 20).replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (letters.length < 2) return null;
+  const hits = (ctx.people ?? []).filter((person) => initialsOf(person.name) === letters);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export async function generateBrief(ctx, { complete }) {
   const reply = await complete({
     system: `${HOUSE}\nTask: a brief Adam reads in the minute before this ${ctx.kind}. Give at most 3 points, most useful first, each with the source it came from. Add owed_line only if Adam owes someone here something.\nShape: {"points":[{"text":string,"source":string}],"owed_line":string|null}`,
@@ -153,4 +167,76 @@ export async function suggestNextSession(ctx, { complete }) {
     throw clareFailed('next session was not a usable slot');
   }
   return { date: reply.date, time: reply.time, duration_min: Math.round(duration), reason: line(reply.reason, 200) };
+}
+
+const MINUTES_PDF_MAX_CHARS = 5_400_000; // 4 MB of PDF once base64'd
+const MINUTES_TEXT_MAX = 60_000;
+
+function invalidMinutes(message) {
+  return Object.assign(new Error(message), { status: 400, code: 'invalid_minutes' });
+}
+
+/**
+ * Read official minutes (a PDF or pasted text) for the meeting in ctx. Writes nothing:
+ * Adam ticks what to keep on the page. Actions for Adam come back as `mine`; actions
+ * for an attendee as `others`; anyone Clare cannot place as `unmatched`.
+ */
+export async function readMinutes(ctx, minutes, { complete }) {
+  const pdf = minutes?.pdf;
+  const text = typeof minutes?.text === 'string' ? minutes.text.trim() : '';
+  let source;
+  if (pdf) {
+    if (pdf.media_type !== 'application/pdf' || typeof pdf.data !== 'string' || !pdf.data || pdf.data.length > MINUTES_PDF_MAX_CHARS) {
+      throw invalidMinutes('Send a PDF under 4 MB, or paste the minutes as text.');
+    }
+    source = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } };
+  } else if (text) {
+    source = { type: 'text', text: `Minutes:\n${text.slice(0, MINUTES_TEXT_MAX)}` };
+  } else {
+    throw invalidMinutes('Add a PDF or paste the minutes.');
+  }
+  const context = JSON.stringify({
+    ...JSON.parse(contextText(ctx)),
+    agenda_headings: (Array.isArray(ctx.agenda_headings) ? ctx.agenda_headings : []).slice(0, 40).map((h) => line(h, 200))
+  });
+  const reply = await complete({
+    system: `${HOUSE}\nTask: these are the official minutes of this meeting, written by someone else. Adam may appear in them as Adam, Mr Russell or AR.\nsections: the minutes split by agenda item, in order, each a heading and its text. Tidy layout only; keep every fact and never change meaning.\nactions: every action item. who is "me" for Adam, otherwise the name or initials exactly as written. due is YYYY-MM-DD only if a date is given; the meeting is ${line(ctx.when, 80)}.\ndecisions: every decision or resolution, with the agenda heading it sits under, using the wording in context.agenda_headings when one matches.\ndifferences: at most 10 places where the minutes and Adam's notes (context.notes) disagree, or where the minutes give Adam an action his notes do not have. One sentence each, in Adam's voice ("My notes say…"). Empty when there are no notes.\nShape: {"sections":[{"heading":string,"text":string}],"actions":[{"who":string,"text":string,"due":string|null}],"decisions":[{"text":string,"agenda_heading":string|null}],"differences":[{"text":string}]}`,
+    content: [source, { type: 'text', text: context }],
+    maxTokens: 4000
+  });
+
+  const sections = (Array.isArray(reply.sections) ? reply.sections : [])
+    .map((section) => ({ heading: line(section?.heading, 200), text: typeof section?.text === 'string' ? section.text.trim().slice(0, 6000) : '' }))
+    .filter((section) => section.text)
+    .slice(0, 40);
+  if (!sections.length) throw clareFailed('no minutes text found');
+
+  const mine = [];
+  const others = [];
+  const unmatched = [];
+  for (const raw of Array.isArray(reply.actions) ? reply.actions.slice(0, 60) : []) {
+    const actionText = line(raw?.text, 300);
+    if (!actionText) continue;
+    const due = isDateKey(raw?.due) ? raw.due : null;
+    const who = line(raw?.who, 120);
+    if (who.toLowerCase() === 'me') {
+      if (mine.length < 30) mine.push({ text: actionText, due });
+      continue;
+    }
+    const person = whoToPerson(ctx, who);
+    if (person) {
+      if (others.length < 30) others.push({ text: actionText, person_ref: person.ref, person_name: person.name, due });
+    } else if (unmatched.length < 30) {
+      unmatched.push({ text: actionText, who_text: who, due });
+    }
+  }
+  const decisions = (Array.isArray(reply.decisions) ? reply.decisions : [])
+    .map((decision) => ({ text: line(decision?.text, 500), agenda_heading: line(decision?.agenda_heading, 200) || null }))
+    .filter((decision) => decision.text)
+    .slice(0, 50);
+  const differences = (Array.isArray(reply.differences) ? reply.differences : [])
+    .map((difference) => ({ text: line(difference?.text, 300) }))
+    .filter((difference) => difference.text)
+    .slice(0, 10);
+  return { sections, mine, others, unmatched, decisions, differences };
 }
