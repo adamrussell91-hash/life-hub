@@ -262,7 +262,8 @@ var defaultUnderstand = () => ({ layout: "slides", steps: allSteps() });
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z7.object({
   class_id: z7.string().min(1).max(64),
-  decider: z7.enum(["top_vote", "teacher"]).default("teacher"),
+  /** Who settles each group's problem and idea: the students' votes (ties come to the teacher), or the teacher approves each. */
+  decider: z7.enum(["top_vote", "teacher"]).default("top_vote"),
   support: z7.enum(["guided", "standard", "open"]).default("standard"),
   lock_hours: z7.number().int().min(0).max(24).default(2),
   criteria: z7.array(SprintCriterionSchema).max(SPRINT_LIMITS.criteria).default([]),

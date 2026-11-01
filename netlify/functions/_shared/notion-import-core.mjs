@@ -1206,7 +1206,8 @@ var defaultUnderstand = () => ({ layout: "slides", steps: allSteps() });
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z8.object({
   class_id: z8.string().min(1).max(64),
-  decider: z8.enum(["top_vote", "teacher"]).default("teacher"),
+  /** Who settles each group's problem and idea: the students' votes (ties come to the teacher), or the teacher approves each. */
+  decider: z8.enum(["top_vote", "teacher"]).default("top_vote"),
   support: z8.enum(["guided", "standard", "open"]).default("standard"),
   lock_hours: z8.number().int().min(0).max(24).default(2),
   criteria: z8.array(SprintCriterionSchema).max(SPRINT_LIMITS.criteria).default([]),
