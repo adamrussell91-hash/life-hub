@@ -80,7 +80,7 @@ test('every hub rail slides away and back, and the canvas takes the room', async
       await page.locator('#hub-rail-collapse').click();
       await page.waitForTimeout(450);
       const shut = await geometry(page);
-      assert.equal(shut.canvasLeft, 0, `${hub}: canvas takes the rail's room`);
+      assert.equal(shut.canvasLeft, 20, `${hub}: canvas takes the rail's room, less the tab's gutter`);
       assert.ok(shut.railRight <= 0, `${hub}: rail slides fully off screen`);
       assert.equal(shut.railVisible, false, `${hub}: hidden rail is out of the tab order`);
       assert.equal(shut.tabLeft, 0, `${hub}: tab waits at the left edge`);

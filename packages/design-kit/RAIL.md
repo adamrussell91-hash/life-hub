@@ -62,7 +62,7 @@ Copy `snippets/rail.html`. Do not invent a parallel aside.
 
 Every hub's rail collapses on desktop. Call `mountRailCollapse()` from `js/hub-rail-collapse.js` once the shell is on the page (safe to call on every render). It mounts one `.hub-rail-collapse` edge tab on `body`, toggles `html.hub-rail-collapsed`, remembers the choice per browser, and binds Ctrl/⌘+\\.
 
-- Shell grids and insets read `--rail-shown`, never `--rail-width`, for the rail's column (`.hub-layout`, Knowledge `.app-shell`, `.teacher-layout`, Life `.page-frame`). It is `--rail-width` open and `0` collapsed.
+- Shell grids and insets read `--rail-shown`, never `--rail-width`, for the rail's column (`.hub-layout`, Knowledge `.app-shell`, `.teacher-layout`, Life `.page-frame`). It is `--rail-width` open and `1.25rem` collapsed (a gutter for the edge tab, so it never sits on page headings).
 - The rail keeps its 15rem and slides out by its own width while the column shrinks, so nothing squashes. Collapsed, it is `visibility: hidden` (out of the tab order).
 - A new shell grid adds its selector to the transition list in `rail.css`.
 - Phones (≤720px) have no rail, so no tab.

@@ -317,12 +317,13 @@ describe('excursions dashboard', () => {
   });
 
   it('names a catalogue program whose usual month has no trip yet', async () => {
-    // The usual month is this month, so the call shows whatever today is.
-    const usualMonth = new Date().toLocaleString('en-AU', { month: 'long' });
+    // Pin the clock inside the catalogue year so the September call is live.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T12:00:00.000Z'));
     const program = {
       id: 'prog_tom',
       name: 'Tournament of Minds',
-      month: usualMonth
+      month: 'September'
     } as Program;
     vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
@@ -341,7 +342,7 @@ describe('excursions dashboard', () => {
     const [call] = usualCalls([program], [], termsForYear(null, Number(today.slice(0, 4))), today);
     const passed = call?.monthPassed ? ', which has passed' : '';
     expect(canvas.textContent).toContain(
-      `Tournament of Minds usually falls in ${usualMonth}${passed}.`
+      `Tournament of Minds usually falls in September${passed}.`
     );
     expect(canvas.textContent).toContain(formatDisplayDate(call!.suggestedDate));
     expect(canvas.querySelectorAll('.excursion-term__ghost')).toHaveLength(call?.monthPassed ? 1 : 0);
