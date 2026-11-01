@@ -127,6 +127,19 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       button('Run pitches', 'primary', () => openPitchView({ api: o.api, getLesson: o.getLesson, summary: s, onClose: () => void refresh() }))
     );
     notice.replaceChildren();
+    // Groups that can't move on until the teacher chooses: easy to miss once the class has moved past Understand.
+    const waits = s.groups.filter((g) => g.awaiting);
+    if (waits.length) {
+      const box = el('div', 'smap-waits');
+      box.append(el('strong', '', 'Waiting on you'));
+      for (const g of waits) {
+        const what = g.awaiting!.kind === 'question'
+          ? `choose the group’s problem. Decide can’t pick an idea until you do.`
+          : 'choose the group’s idea, so they can plan the parts.';
+        box.append(button(`${g.name}: ${what}`, 'secondary', () => openBoard(g.id)));
+      }
+      notice.append(box);
+    }
     if (s.lock) {
       const until = new Date(s.lock.until).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
       const who = el('select', 'qz-input');
