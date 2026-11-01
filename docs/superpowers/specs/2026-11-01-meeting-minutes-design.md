@@ -35,7 +35,7 @@ Replacing minutes (a corrected version) overwrites the stored minutes. Items alr
 
 ## Who is who
 
-The job receives the attendee list with roles, Adam's own directory row, and his initials and usual names read from the private Central Node at runtime. It matches initials and first names to attendees. The server keeps a person only if they are an attendee; anything else comes back as unmatched.
+Adam is never in the attendee list, and Clare's house prompt already names him, so the model returns `who: "me"` for his actions. For everyone else the server matches the name, first name or initials as written to an attendee. The server keeps a person only if they are an attendee; anything else comes back as unmatched.
 
 ## Server job
 
@@ -60,13 +60,13 @@ New Clare comms job `minutes`, next to `summary`, `drafts`, `brief` and `handwri
 
 The server validates before returning: drops empty items, caps each list (30 actions, `DECISIONS_MAX` decisions, 10 differences), checks dates, and moves any `person_ref` that is not an attendee to `unmatched`.
 
-**Limits**: one PDF up to 20 pages or 5 MB. Bigger files get a plain message asking for the relevant part to be pasted. Scanned PDFs without a text layer still work, since Claude reads the pages as images.
+**Limits**: one PDF up to 4 MB (base64 adds a third, and Netlify functions take about 6 MB of body). Bigger files get a plain message asking for the relevant part to be pasted. Scanned PDFs without a text layer still work, since Claude reads the pages as images.
 
 **Failure**: "Clare couldn't read these minutes" plus **Try again**, via the existing `showClareError`.
 
 ## Storage
 
-- **Meeting record**: new optional `minutes` field (meeting schema version 3):
+- **Meeting record**: new optional `minutes` field (no schema version bump, the same way `coaching_sheets` was added):
   `{ sections: [{ heading, text }], file_key: string | null, source: 'page' | 'chat', added_at, saved_counts: { tasks, promises, decisions } }`. Pending (unsaved) review results are not stored on the page route; they live in the card until Save.
 - **PDF**: the private Professional Blobs store under `meeting-minutes/<meeting id>/<added_at>.pdf`, behind the same sign-in as meetings. Never public assets.
 - **Decisions from minutes** carry `source: 'minutes'`. When notes are saved, `extractDecisions` rebuilds only the note-sourced decisions and keeps the minutes ones.
