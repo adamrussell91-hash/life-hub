@@ -221,6 +221,21 @@ describe('class knowledge view', () => {
     ]);
   });
 
+  it("a student's own addition shows at once, even while the server list lags", async () => {
+    const api = fakeApi(false, []);
+    const view = buildAnthologyView(anthology(), { data, mode: 'student', knowledge: api });
+    view.querySelector<HTMLButtonElement>('.block-anthology__add')!.click();
+    const form = view.querySelector<HTMLFormElement>('.block-anthology__add-form')!;
+    api.add = async (draft) => ({ item: { ...knowledge[0]!, title: draft.title }, status: 'shown' });
+    form.querySelector<HTMLInputElement>('[name="title"]')!.value = 'An idea';
+    form.querySelector<HTMLTextAreaElement>('[name="quote"]')!.value = 'An invented line.';
+    form.querySelector<HTMLInputElement>('[name="initials"]')!.value = 'TT2';
+    form.querySelector<HTMLButtonElement>('.block-anthology__tag')!.click();
+    form.requestSubmit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(view.querySelector('.block-anthology__count')?.textContent).toBe('3 notes · 2 texts · 1 from the class');
+  });
+
   it('counts the class additions on the Class tab', async () => {
     const view = buildAnthologyView(anthology(), { data, mode: 'student', knowledge: fakeApi(false) });
     await new Promise((resolve) => setTimeout(resolve, 0));

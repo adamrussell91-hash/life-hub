@@ -14236,16 +14236,21 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-size: var(--text-sm);
 }
 
-.block-anthology__tag {
+button.block-anthology__tag {
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
+  border: 1px solid color-mix(in srgb, var(--navy) 22%, white);
 }
 
-.block-anthology__tag[aria-pressed='true'] {
-  outline: 2px solid currentColor;
-  outline-offset: 1px;
-  font-weight: 600;
+button.block-anthology__tag[aria-pressed='true'] {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: white;
+}
+
+button.block-anthology__tag[aria-pressed='true']::before {
+  content: '✓ ';
 }
 
 .block-anthology__add-error {

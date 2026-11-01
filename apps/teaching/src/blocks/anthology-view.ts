@@ -383,6 +383,7 @@ export function buildAnthologyView(
   let layer: 'teacher' | 'class' = knowledgeApi && !knowledgeApi.teacher ? 'class' : 'teacher';
   let knowledge: KnowledgeItem[] = [];
   const knowledgeById = new Map<string, KnowledgeItem>();
+  const justAdded = new Map<string, KnowledgeItem>();
   let query = '';
   let graph: GraphMount | null = null;
 
@@ -499,6 +500,11 @@ export function buildAnthologyView(
     } catch {
       knowledge = [];
     }
+    // The server's list can lag a fresh add by a few seconds; keep what we just sent until it shows.
+    for (const [id, item] of justAdded) {
+      if (knowledge.some((row) => row.id === id)) justAdded.delete(id);
+      else knowledge = [...knowledge, item];
+    }
     knowledgeById.clear();
     for (const item of knowledge) knowledgeById.set(knowledgeNoteId(item.id), item);
     paintCount();
@@ -545,7 +551,10 @@ export function buildAnthologyView(
       knowledgeForm(
         unitTagChoices(options.data),
         async (draft) => {
-          const { status } = await knowledgeApi.add(draft);
+          const { item, status } = await knowledgeApi.add(draft);
+          if (status === 'shown' || knowledgeApi.teacher) {
+            justAdded.set(item.id, knowledgeApi.teacher ? { ...item, initials: draft.initials, status } : item);
+          }
           await loadKnowledge();
           if (status === 'waiting') return 'Thanks. It will appear once your teacher has checked it.';
           closePop();
