@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { briefText } from './model';
-import { coach, draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { coach, draftOf, frameField, stepHead, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { LIMITS_SCENARIO, LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
 import { LIMIT_BOXES, UNDERSTAND_ALONE, defaultUnderstand, type LimitBox, type PhasePayload, type UnderstandStep } from './schema';
 import type { SprintStatus, UnderstandGroup } from './api';
@@ -61,10 +61,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   const section = (k: UnderstandStep, n: number) => {
     const box = el('section', `su-step su-step--${alone(k) ? 'alone' : 'group'}`);
     box.dataset.step = k;
-    const head = el('div', 'su-step__head');
-    head.append(el('span', 'su-step__num', String(n)), el('h3', '', STEP_TITLES[k]), el('span', 'su-step__icon', UNDERSTAND_GUIDE[k].icon));
-    head.lastElementChild!.setAttribute('aria-hidden', 'true');
-    box.append(head, coach(UNDERSTAND_GUIDE[k]));
+    box.append(...stepHead(`Understand · Step ${n} of ${order.length}${alone(k) ? '' : ' · With your group'}`, STEP_TITLES[k]), coach(UNDERSTAND_GUIDE[k]));
     return box;
   };
 
@@ -133,25 +130,24 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     const wrap = el('div', 'su-matrix');
         wrap.append(
       el('span', 'su-axis su-axis--corner', ''),
-      el('span', 'su-axis su-axis--col', '✅ We can control it'),
-      el('span', 'su-axis su-axis--col', '🚫 We can’t control it')
+      el('span', 'su-axis su-axis--col', 'We can control it'),
+      el('span', 'su-axis su-axis--col', 'We can’t control it')
     );
     const rows: ReadonlyArray<readonly [LimitBox, LimitBox]> = [['can_known', 'cant_known'], ['can_unknown', 'cant_unknown']];
     rows.forEach((pair, r) => {
-      wrap.append(el('span', 'su-axis su-axis--row', r === 0 ? '📘 We know it' : '❔ We don’t know yet'));
+      wrap.append(el('span', 'su-axis su-axis--row', r === 0 ? 'We know it' : 'We don’t know yet'));
       for (const b of pair) {
         const meta = LIMIT_CELLS[b];
         const cell = el('div', `su-box su-box--${b}${b.endsWith('unknown') ? ' su-box--unknown' : ''}`);
         const head = el('div', 'su-box__head');
-        head.append(el('span', 'su-box__icon', meta.icon), el('h4', '', meta.title));
-        head.firstElementChild!.setAttribute('aria-hidden', 'true');
+        head.append(el('h4', '', meta.title));
         const more = el('div', 'su-box__more');
         more.hidden = true;
         more.append(el('p', '', meta.more.what), el('p', '', meta.more.tell), el('strong', '', 'Examples (made-up canteen problem)'));
         const ul = el('ul');
         for (const x of meta.more.examples) ul.append(el('li', '', x));
         more.append(ul);
-        const info = el('button', 'su-box__info', 'ⓘ');
+        const info = el('button', 'sprint-info su-box__info', 'i');
         info.type = 'button';
         info.setAttribute('aria-label', `What does “${meta.title}” mean?`);
         info.setAttribute('aria-expanded', 'false');
@@ -231,7 +227,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     if (!notes.length) { box.append(el('p', 'sprint-note', 'Statements show here as your group writes them.')); return; }
     if (state.star && !notes.some((n) => n.id === state.star)) state.star = '';
     for (const n of notes) {
-      const b = el('button', 'sprint-chip sprint-star su-statement', `${state.star === n.id ? '★' : '☆'} ${n.text}${n.mine ? ' (yours)' : ''}`);
+      const b = el('button', 'sprint-chip sprint-star su-statement', `${n.text}${n.mine ? ' (yours)' : ''}${state.star === n.id ? ' · starred' : ''}`);
       b.type = 'button';
       b.disabled = off;
       b.setAttribute('aria-pressed', String(state.star === n.id));
@@ -305,7 +301,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     const picked = g.questions.filter((q) => q.picked).length;
     box.append(el('p', 'sprint-note', `${picked} of 3 starred. Made from your group’s unknowns.`));
     for (const q of g.questions) {
-      const b = el('button', 'sprint-chip sprint-star', `${q.picked ? '★' : '☆'} ${counted(q.text, q.count)}${q.sent ? ' · sent' : ''}`);
+      const b = el('button', 'sprint-chip sprint-star', `${counted(q.text, q.count)}${q.picked ? ' · starred' : ''}${q.sent ? ' · sent' : ''}`);
       b.type = 'button';
       b.disabled = off || (!q.picked && picked >= 3);
       b.setAttribute('aria-pressed', String(q.picked));

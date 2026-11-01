@@ -760,7 +760,9 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
     state.claims[part.id] = [...others, sid];
   }
   if (action === 'assign') {
-    // The group gives a part to one member, or two when there are more people than parts. Each member has one part.
+    // The group gives a part to one member, or two when there are more people than parts. A member may
+    // take more than one part (a group with more parts than people), so picking someone here leaves
+    // their other parts alone.
     const part = list(state.parts).find((p) => p.id === body.part_id);
     if (!part) reject(404, 'not_found', 'That part has gone. Reload the page.');
     const byKey = new Map(group.students.map((x) => [memberKey(lessonId, x), x]));
@@ -769,7 +771,6 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
     const who = [...new Set(keys.map((key) => byKey.get(key)))];
     const cap = group.students.length > list(state.parts).length ? 2 : 1;
     if (who.length > cap) reject(409, 'too_many', cap === 1 ? 'One person per part.' : 'Two people at most on one part.');
-    state.claims = Object.fromEntries(Object.entries(state.claims).map(([id, ss]) => [id, list(ss).filter((x) => !who.includes(x))]));
     state.claims[part.id] = who;
   }
   if (action === 'assembler') {

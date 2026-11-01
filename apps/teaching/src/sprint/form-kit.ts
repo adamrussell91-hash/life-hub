@@ -2,8 +2,8 @@ import { button, el } from '@/quiz/dom';
 import { libraryValue } from '@/toolkit/library';
 import type { Block } from '@/schemas/block';
 import type { PhaseRow, SprintClient, SprintStatus } from './api';
-import { LIMIT_CELLS, type Guide } from './guidance';
-import { LIMIT_BOXES, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
+import type { Guide } from './guidance';
+import type { PhasePayload, PublicSprint, SprintPhaseKey } from './schema';
 
 /** What every phase form is given. */
 export type FormContext = {
@@ -175,54 +175,16 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
 }
 
 /**
- * The group brief from Understand, kept in view through the later phases: the
- * problem, the audience, the limits grid and the expert's answers. It folds
- * away; `open` says whether it starts unfolded.
- */
-export function briefCard(s: SprintStatus, open = true): HTMLElement | null {
-  const b = s.brief;
-  const problem = b?.problem ?? s.question?.text ?? null;
-  const lim = b?.limits ?? {};
-  const hasLimits = LIMIT_BOXES.some((k) => (lim[k] ?? []).length);
-  if (!problem && !b?.audience && !b?.answers.length && !hasLimits) return null;
-  const card = el('details', 'su-brief');
-  card.open = open;
-  card.append(el('summary', '', 'Our group brief (from Understand)'));
-  const row = (label: string, text: string) => { const p = el('p', 'su-brief__row'); p.append(el('b', '', label), ` ${text}`); return p; };
-  if (problem) card.append(row('Problem', problem));
-  if (b?.audience?.who) card.append(row('Audience', `${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`));
-  if (hasLimits) {
-    card.append(el('p', 'su-brief__sub', 'Our limits'));
-    const grid = el('div', 'su-brief__grid');
-    for (const k of LIMIT_BOXES) {
-      const list = lim[k] ?? [];
-      if (!list.length) continue;
-      const cell = el('div', `su-brief__cell su-brief__cell--${k}`);
-      cell.append(el('b', '', `${LIMIT_CELLS[k].icon} ${LIMIT_CELLS[k].title}`));
-      const ul = el('ul');
-      for (const c of list) ul.append(el('li', '', c.count > 1 ? `${c.text} ×${c.count}` : c.text));
-      cell.append(ul);
-      grid.append(cell);
-    }
-    card.append(grid);
-  }
-  if (b?.answers.length) {
-    card.append(el('p', 'su-brief__sub', 'What the expert said'));
-    for (const a of b.answers) { const d = el('div', 'su-brief__qa'); d.append(el('b', '', a.question), el('span', '', a.answer)); card.append(d); }
-  }
-  return card;
-}
-
-/**
  * Show a phase's step cards one at a time, like Understand's slides: a numbered
  * rail and Back / Next. Does nothing when the Kit sets steps down the page, or
- * there is only one step. Call after the cards are in `root`.
+ * there is only one step. Call after the cards are in `root`; `start` is the
+ * step shown first.
  */
-export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined): void {
+export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined, start = 0): void {
   const cards = [...root.children].filter((c): c is HTMLElement => c.classList.contains('su-step'));
   if (layout === 'vertical' || cards.length < 2) return;
-  let at = 0;
-  const seen = new Set([0]);
+  let at = Math.max(0, Math.min(cards.length - 1, start));
+  const seen = new Set([...Array(at + 1).keys()]);
   const rail = el('ol', 'su-rail');
   rail.setAttribute('aria-label', 'Steps');
   const where = el('span', 'su-nav__where');
@@ -260,47 +222,61 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
 }
 
 /**
- * The coach under a step's heading: what to do in one line, then three
- * folded helpers (why, an example, ways out when stuck), so a student sees
- * one line unless they ask for more.
+ * The coach under a step's heading: what to do in one plain sentence, then
+ * three small text toggles (why, an example, ways out when stuck). One opens
+ * at a time; a student sees one line unless they ask for more. `lead`
+ * replaces the guide's sentence when the step says something more specific.
  */
-export function coach(guide: Guide): HTMLElement {
+export function coach(guide: Guide, lead?: string): HTMLElement {
   const box = el('div', 'coach');
-  const line = el('p', 'coach__do');
-  line.append(el('span', 'coach__tag', 'Do this'), ` ${guide.doThis}`);
+  const line = el('p', 'coach__do', lead || guide.doThis);
   const help = el('div', 'coach__help');
-  const fold = (cls: string, label: string, fill: (into: HTMLElement) => void, open = false) => {
-    const d = el('details', `coach__fold coach__fold--${cls}`);
-    d.open = open;
-    d.append(el('summary', '', label));
-    const inner = el('div', 'coach__body');
-    fill(inner);
-    d.append(inner);
-    help.append(d);
+  const panels = el('div', 'coach__panels');
+  const toggles: Array<{ btn: HTMLButtonElement; body: HTMLElement }> = [];
+  const add = (cls: string, label: string, fill: (into: HTMLElement) => void) => {
+    const body = el('div', `coach__body coach__body--${cls}`);
+    body.id = `coach-${Math.random().toString(36).slice(2, 9)}`;
+    body.hidden = true;
+    fill(body);
+    const btn = el('button', `coach__link coach__link--${cls}`, label);
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', body.id);
+    btn.addEventListener('click', () => {
+      const open = body.hidden;
+      for (const t of toggles) { t.body.hidden = true; t.btn.setAttribute('aria-expanded', 'false'); }
+      body.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    });
+    toggles.push({ btn, body });
+    help.append(btn);
+    panels.append(body);
   };
-  fold('why', '💡 Why this step', (b) => b.append(el('p', '', guide.why)));
-  fold('example', '👀 See an example', (b) => { for (const l of guide.example) b.append(el('p', '', l)); });
-  fold('stuck', '🆘 I’m stuck', (b) => { const ul = el('ul'); for (const l of guide.stuck) ul.append(el('li', '', l)); b.append(ul); });
-  box.append(line, help);
+  add('why', 'Why this step', (b) => b.append(el('p', '', guide.why)));
+  add('example', 'See an example', (b) => { for (const l of guide.example) b.append(el('p', '', l)); });
+  add('stuck', 'I’m stuck', (b) => { const ul = el('ul'); for (const l of guide.stuck) ul.append(el('li', '', l)); b.append(ul); });
+  box.append(line, help, panels);
   return box;
 }
 
+/** A step card's top: a small "Phase · Step n of m" line, then the heading. */
+export function stepHead(where: string, title: string): HTMLElement[] {
+  return [el('div', 'su-step__where', where), el('h3', 'su-step__title', title)];
+}
+
 /**
- * Give an existing form the same numbered step cards as Understand: each step
- * claims the direct children of `root` its selector matches, and they move into
- * a card (number, icon, heading, coach) placed where the first one was.
+ * Give an existing form calm step cards: each step claims the direct children
+ * of `root` its selector matches, and they move into a card (where it sits in
+ * the phase, heading, coach) placed where the first one was. `phase` names
+ * the phase in the card's small top line.
  */
-export function stepify(root: HTMLElement, steps: Array<{ pick: string; title: string; guide: Guide }>): void {
-  steps.forEach((st, i) => {
-    const kids = [...root.children].filter((c) => c.matches(st.pick));
-    if (!kids.length) return;
+export function stepify(root: HTMLElement, steps: Array<{ pick: string; title: string; guide: Guide; lead?: string }>, phase = ''): void {
+  const found = steps.map((st) => ({ st, kids: [...root.children].filter((c) => c.matches(st.pick)) })).filter((x) => x.kids.length);
+  found.forEach(({ st, kids }, i) => {
     const card = el('section', 'su-step su-step--alone');
-    const head = el('div', 'su-step__head');
-    const icon = el('span', 'su-step__icon', st.guide.icon);
-    icon.setAttribute('aria-hidden', 'true');
-    head.append(el('span', 'su-step__num', String(i + 1)), el('h3', '', st.title), icon);
+    const where = `${phase ? `${phase} · ` : ''}Step ${i + 1} of ${found.length}`;
     const body = el('div', 'su-step__body');
-    card.append(head, coach(st.guide), body);
+    card.append(...stepHead(where, st.title), coach(st.guide, st.lead), body);
     root.insertBefore(card, kids[0]!);
     body.append(...kids);
   });
