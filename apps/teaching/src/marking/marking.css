@@ -48,6 +48,7 @@
 .tm-all, .tm-more { font-size: var(--text-sm); font-weight: 600; color: var(--navy); min-height: 44px; display: inline-flex; align-items: center; }
 .tm-task__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .tm-task__who { margin: 2px 0 0; font-size: var(--text-xs, .75rem); color: var(--muted); letter-spacing: .02em; }
+.tm-task__asked { margin: 2px 0 0; font-size: var(--text-sm); color: var(--muted); }
 .tm-kind { font-size: var(--text-xs, .75rem); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); background: var(--shore); color: var(--navy); white-space: nowrap; }
 .tm-kind--quiz { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
 .tm-kind--voice { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }

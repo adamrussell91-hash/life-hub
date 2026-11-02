@@ -25,4 +25,12 @@ describe('to mark', () => {
     expect((view.querySelector('.tm-task__title') as HTMLAnchorElement).getAttribute('href')).toBe('/lessons/l1#block=v1');
     expect(view.querySelector('.tm-more')!.textContent).toBe('See all 2');
   });
+
+  it('lists students asked for a redraft quietly, and keeps a task showing for them', () => {
+    const view = toMarkView([
+      { class_id: 'c1', class_title: '11E1', column_id: 'col1', title: 'Harbour', lesson_id: 'l1', block_id: 'b1', waiting: 0, handed_in: 24, roster: 24, asked: [{ initials: 'SP', asked_at: new Date().toISOString() }] }
+    ] as never);
+    expect(view.textContent).toContain('Harbour');
+    expect(view.querySelector('.tm-task__asked')!.textContent).toContain('Redraft asked: SP');
+  });
 });
