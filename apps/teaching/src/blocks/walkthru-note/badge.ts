@@ -65,6 +65,7 @@ export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string; dis
   if (!entry) return null;
   const details = el('details', 'wts');
   details.dataset.technique = entry.id;
+  details.dataset.set = String(entry.set);
   const summary = el('summary', 'wts__sum');
   summary.title = `${entry.name}: open the steps (only you see this)`;
   summary.append(glyphs.element(entry.id), el('span', 'wts__title', entry.name), el('span', 'wts__meta', '5 steps · only you see this'));

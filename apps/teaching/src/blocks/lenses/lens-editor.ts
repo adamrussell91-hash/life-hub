@@ -11,7 +11,7 @@ import { SLEEVE_LENSES, STEPPED_LENSES, attachedSleeves, attachedSteppedLenses, 
 import { MAX_SLEEVES } from './sleeve-lens';
 import { renderSteppedLenses } from './stepped-view';
 import { LEVEL_LABELS, type LensConfig, type SleeveLens, type SteppedLens } from './types';
-import { CATALOGUE, SERIES, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, SERIES, pageRefOf, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { FIGURE_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { attachedTechniques, withTechnique } from '../walkthru-note/attach';
@@ -280,7 +280,7 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
       const list = document.createElement('div');
       list.className = 'kaplan-lens-choices';
       const picks: Array<[string, HTMLButtonElement]> = items.map((item) => {
-        const pick = choice(item.name, item.id === chosen ? 'On this block now' : `${item.code} | ${item.page}`, walkthruGlyphs.element(item.id), () => {
+        const pick = choice(item.name, item.id === chosen ? 'On this block now' : pageRefOf(item), walkthruGlyphs.element(item.id), () => {
           options.onChange(withTechnique(options.getBlock(), item.id));
           close();
           renderBar();

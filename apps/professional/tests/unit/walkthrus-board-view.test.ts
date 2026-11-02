@@ -64,9 +64,9 @@ const tile = (root: HTMLElement, id: string) => root.querySelector(`[data-tile="
 describe('the board', () => {
   it('draws every technique, a label per cluster and the sets still in the box', async () => {
     const root = await mount();
-    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
-    expect(root.querySelectorAll('.wt-cluster-label').length).toBe(6);
-    expect(root.querySelectorAll('.wt-boxslot').length).toBe(2);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
+    expect(root.querySelectorAll('.wt-cluster-label').length).toBe(12);
+    expect(root.querySelectorAll('.wt-boxslot').length).toBe(1);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('Draw arrow');
     expect(root.querySelector('.wt-panel')!.hasAttribute('hidden')).toBe(true);
   });
@@ -144,7 +144,7 @@ describe('the board', () => {
   it('says which data didn’t load and still draws the board; all three failing offers a retry', async () => {
     api.loadBoard.mockRejectedValue(new Error('x'));
     const root = await mount();
-    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('arrows didn’t load');
     api.loadWalkthruGoals.mockRejectedValue(new Error('x'));
     api.loadWalkthruReps.mockRejectedValue(new Error('x'));
@@ -166,7 +166,7 @@ describe('my board', () => {
     expect(root.querySelectorAll('.wt-tile').length).toBe(0);
     expect((root.querySelector('.wt-empty') as HTMLElement).hidden).toBe(false);
     click(button(root, 'Choose from the whole book'));
-    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
     expect(localStorage.getItem('wt-board-view')).toBe('book');
   });
 
@@ -356,7 +356,7 @@ describe('my board', () => {
 
   it('a link to a technique off the board opens the whole book on it', async () => {
     const root = await mount('w1-cold-calling');
-    expect(root.querySelectorAll('.wt-tile').length).toBe(52);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
     expect(root.querySelector('.wt-panel__title')!.textContent).toBe('Cold calling');
   });
 });

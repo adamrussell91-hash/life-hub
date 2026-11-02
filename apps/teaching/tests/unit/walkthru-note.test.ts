@@ -296,6 +296,7 @@ describe('WalkThru step ticks', () => {
     const lesson = renderTechniqueBadge(block, { lessonId: 'lesson1' })!;
     await open(lesson);
     expect(lesson.querySelectorAll('.tk-wt__tick').length).toBeGreaterThan(0);
+    expect(lesson.dataset.set).toBe('1');
     const display = renderTechniqueBadge(block, { lessonId: 'lesson1', display: true })!;
     await open(display);
     expect(display.querySelector('.tk-wt__tick')).toBeNull();
