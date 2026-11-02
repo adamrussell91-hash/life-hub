@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { profileAction, teacherProfileAction } from '../../netlify/functions/_shared/profile.mjs';
+import { studentPieces } from '../../netlify/functions/_shared/profile-feedback.mjs';
 import { loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -143,4 +144,67 @@ test('the teacher sees any student’s page as they do, and opening a piece leav
   assert.equal(store.data.get(`piece_feedback/class1/${ava.id}/w:lesson2:b`).seen_at, undefined);
   assert.equal((await teacherProfileAction(store, 'class1', { action: 'progress', student_id: noah.id })).pieces.length, 0);
   await assert.rejects(teacherProfileAction(store, 'class1', { action: 'progress', student_id: 'nobody' }), /Unknown student/);
+});
+
+async function redraftFixture() {
+  const { store, ava } = await setup();
+  const key = `piece_feedback/class1/${ava.id}/w:lesson1:b`;
+  const { returned_at, ...was } = store.data.get(key);
+  const book = store.data.get('markbook/class1');
+  book.marks.column001[ava.id].steps = { crit0001: 'secure' };
+  store.data.set('markbook/class1', book);
+  store.data.set(`work_handins/lesson1/b/${ava.id}`, { text: { answers: { q1: 'Second words.' } }, draft: 2, handed_in_at: '2026-10-29T00:00:00Z' });
+  store.data.set(`work_drafts/lesson1/b/${ava.id}/1`, { text: { answers: { q1: 'First words.' } }, tags: was.tags, comment: 'Draft 1 comment', rubric: null, steps: { crit0001: 'building' }, scope: 'whole', returned_at });
+  store.data.set(key, { ...was, tags: [], comment: '', status: 'draft', draft: 2, first: { steps: { crit0001: 'building' }, rubric: null, returned_at }, earlier_tags: [{ code_id: 'ts', positive: false }], sent_scope: 'whole', sent_at: '2026-10-29T00:00:00Z', updated_at: '2026-10-29T00:00:00Z' });
+  return { store, ava, key };
+}
+const ITEM = 'w:lesson1:b';
+const listed = async (store) => (await profileAction(store, 'class1', { action: 'returned', ...device })).items.find((i) => i.id === ITEM);
+const opened = (store) => profileAction(store, 'class1', { action: 'piece', item: ITEM, ...device });
+
+test('a redraft being marked stays listed with its last returned draft, and says it was sent', async () => {
+  const { store, key } = await redraftFixture();
+  assert.equal((await listed(store)).redraft, 'sent');
+  const piece = await opened(store);
+  assert.equal(piece.sent, true);
+  assert.equal(piece.comment, 'Draft 1 comment');
+  assert.equal(piece.text.answers.q1, 'First words.');
+  await profileAction(store, 'class1', { action: 'seen', item: ITEM, ...device });
+  assert.equal(store.data.get(key).seen_at, undefined);
+});
+
+test('a code on an earlier draft still counts in patterns, once', async () => {
+  const { store, ava } = await redraftFixture();
+  const row = (await studentPieces(store, 'class1', ava.id)).find((p) => p.id === ITEM);
+  assert.deepEqual(row.tags, [{ code_id: 'ts', positive: false }]);
+});
+
+test('a finished redraft shows the first step and earlier drafts, and never their marks', async () => {
+  const { store, key } = await redraftFixture();
+  store.data.set(key, { ...store.data.get(key), status: 'returned', returned_at: '2026-10-30T00:00:00Z', comment: 'Well found.' });
+  const piece = await opened(store);
+  assert.equal(piece.comment, 'Well found.');
+  assert.equal(piece.drafts.length, 1);
+  assert.equal(piece.drafts[0].comment, 'Draft 1 comment');
+  assert.equal(piece.criteria[0].first, 'building');
+  assert.equal(piece.criteria[0].step, 'secure');
+  assert.equal('rubric' in piece.drafts[0], false);
+  assert.equal('steps' in piece.drafts[0], false);
+});
+
+test('a piece with an ask says so in the list and carries the scope', async () => {
+  const { store, key } = await redraftFixture();
+  store.data.set(key, { ...store.data.get(key), status: 'returned', returned_at: '2026-10-30T00:00:00Z', redraft: { scope: 'whole', asked_at: '2026-10-30T00:00:00Z' } });
+  assert.equal((await listed(store)).redraft, 'asked');
+  assert.deepEqual((await opened(store)).redraft, { scope: 'whole' });
+});
+
+test('a redraft being marked keeps the step and rubric being worked on out of sight', async () => {
+  const { store, key } = await redraftFixture();
+  store.data.set(key, { ...store.data.get(key), rubric: { skills: {}, pieces: {}, steps: {}, next_step: 'Not back yet.' } });
+  const piece = await opened(store);
+  assert.equal(piece.criteria[0].step, 'building');
+  assert.equal('rubric' in piece, false);
+  const progress = await profileAction(store, 'class1', { action: 'progress', ...device });
+  assert.equal(JSON.stringify(progress).includes('secure"'), false);
 });
