@@ -114,6 +114,24 @@ describe('progress page', () => {
   it('badges Returned work with the unseen count', () => {
     expect(host.querySelector('[data-tab="returned"] .pg-tab__badge')!.textContent).toBe('2');
   });
+  it('opens on Returned work when something is new, for the student only', async () => {
+    const student = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [] });
+    expect(student.querySelector('[data-tab="returned"]')!.getAttribute('aria-selected')).toBe('true');
+    const teacher = renderProfile(rich as never, { classId: 'class1', teacher: { name: 'Ava' }, loadReturned: async () => [] });
+    expect(teacher.querySelector('[data-tab="progress"]')!.getAttribute('aria-selected')).toBe('true');
+    const seen = renderProfile({ ...rich, unseen: 0 } as never, { classId: 'class1' });
+    expect(seen.querySelector('[data-tab="progress"]')!.getAttribute('aria-selected')).toBe('true');
+  });
+  it('gives a student with only a note the Returned work tab, without the code grid', () => {
+    const h = renderProfile({ ...payload, pieces: [], has_returned: true, unseen: 1 } as never, { classId: 'class1', loadReturned: async () => [] });
+    expect(h.querySelector('[data-tab="returned"] .pg-tab__badge')!.textContent).toBe('1');
+    expect(h.querySelector('.pg-codes-sec')).toBeNull();
+  });
+  it('opens a returned note: its own text, cleaned, with no tags or criteria', () => {
+    const view = pieceView({ id: 'n:d1', kind: 'note', title: 'Before your final draft', date: '25 Oct', body_html: '<p>Keep the road image.</p><script>bad()</script>', audio_url: null }, () => {});
+    expect(view.querySelector('.student-feedback__body')!.innerHTML).toBe('<p>Keep the road image.</p>');
+    expect(view.querySelector('audio')).toBeNull();
+  });
   it('loads the returned list when the tab is opened', async () => {
     const opened: string[] = [];
     const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: true, codes: ['ts'] }], loadPiece: async () => { throw new Error('x'); }, markSeen: (id) => opened.push(id) });

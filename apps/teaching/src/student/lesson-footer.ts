@@ -30,6 +30,8 @@ export type LessonFooterOptions = {
   finish?: boolean;
   /** The written-work sync on this page, if any. */
   work?: () => WorkSyncHandle | null;
+  /** Told when the student gives their initials here, so the top bar can show them. */
+  onClaimed?: () => void;
   /** Test seams. */
   calls?: FooterCalls;
   quiz?: () => LessonQuizHandle | null;
@@ -158,6 +160,7 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
         if (initials) {
           await calls.profile('claim', { initials: initials.value });
           need = null;
+          options.onClaimed?.();
         }
         const qz = quiz();
         if (qz && !(await qz.handIn())) throw 'Your quiz didn’t hand in. Your answers are kept: try again.';

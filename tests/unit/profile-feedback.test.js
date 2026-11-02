@@ -118,6 +118,18 @@ test('a feedback document for this student appears as a Note, opens, and is mark
   await assert.rejects(profileAction(store, 'class1', { action: 'piece', item: 'n:nothere', class_token: 'a'.repeat(48) }), /isn’t here/);
 });
 
+test('the token counts new pieces and notes, and asks nothing of an unclaimed device', async () => {
+  const { store, ava } = await setup();
+  const before = await profileAction(store, 'class1', { action: 'token', ...device });
+  assert.deepEqual(before, { need: null, initials: ava.initials, unseen: 2 });
+  store.data.set('feedback_docs/doc1', { id: 'doc1', class_id: 'class1', student_id: ava.id, title: 'Before your final draft', returned_at: '2026-10-09T00:00:00Z' });
+  const prefix = (await profileAction(store, 'class1', { action: 'token', ...device })).unseen;
+  const items = (await profileAction(store, 'class1', { action: 'returned', ...device })).items;
+  await profileAction(store, 'class1', { action: 'seen', item: items.find((i) => i.kind !== 'note').id, ...device });
+  assert.equal((await profileAction(store, 'class1', { action: 'token', ...device })).unseen, prefix - 1);
+  assert.deepEqual(await profileAction(store, 'class1', { action: 'token', class_token: 'b'.repeat(48) }), { need: 'initials' });
+});
+
 test('the teacher sees any student’s page as they do, and opening a piece leaves it new', async () => {
   const { store, ava, noah } = await setup();
   const mine = await profileAction(store, 'class1', { action: 'progress', ...device });

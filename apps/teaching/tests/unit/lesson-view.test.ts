@@ -173,9 +173,9 @@ describe('mountStudentLessonView', () => {
     });
 
     await vi.waitFor(() => {
-      expect(root.querySelector('a.student-surface__back-class')?.getAttribute('href')).toBe(
-        `https://class.adam-russell.com/s/classes/${CLASS_ID}`
-      );
+      expect(root.querySelector('a.lf__link--prev')).not.toBeNull();
+      expect(root.textContent).not.toContain('Back to class');
+      expect(root.querySelector('a.st-token')?.getAttribute('href')).toContain(`/s/classes/${CLASS_ID}/profile?from=`);
       expect(root.querySelector('a.student-surface__back-unit')).toBeNull();
       expect(root.querySelector('a[href*="/s/units/"]')).toBeNull();
       expect(root.textContent).not.toContain('Back to unit');

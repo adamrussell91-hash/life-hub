@@ -3,6 +3,7 @@
  * and one piece opened with the teacher's highlights, comment and where it sits on each criterion.
  */
 import { el } from '@/quiz/dom';
+import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { paper, type Mark } from '@/blocks/peer-annotate';
 import { placeName, STEP_ORDER, RUNG_ORDER } from '@/progress/story-text';
 import { codeChip } from '@/progress/code-grid';
@@ -46,6 +47,8 @@ export type PiecePayload = {
   codes?: FeedbackCode[];
   rungs?: Record<string, string | null>;
 };
+/** A note the teacher wrote and returned: its own document, with no tags or criteria. */
+export type NotePayload = { id: string; kind: 'note'; title: string; date: string; body_html: string; audio_url?: string | null };
 
 const ladderOf = (p: Place | null): Place[] => (p && RUNG_ORDER.includes(p) ? RUNG_ORDER.slice(1) : STEP_ORDER);
 const rank = (p: Place): number => ladderOf(p).indexOf(p);
@@ -95,12 +98,24 @@ function sideBoxes(p: PiecePayload): HTMLElement {
   return side;
 }
 
-export function pieceView(p: PiecePayload, onBack: () => void): HTMLElement {
+export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HTMLElement {
   const root = el('section', 'pg-piece');
-  const back = el('button', 'pg-back', '← Your progress');
+  const back = el('button', 'pg-back', '← Returned work');
   back.type = 'button';
   back.addEventListener('click', onBack);
   root.append(back, el('h2', 'pg-piece__title', p.title), el('p', 'pm-key', `Returned ${p.date}`));
+  if ('body_html' in p) {
+    const body = el('div', 'student-feedback__body');
+    body.innerHTML = sanitizeRichTextHtml(p.body_html);
+    root.append(body);
+    if (p.audio_url) {
+      const audio = el('audio', 'student-feedback__audio');
+      audio.controls = true;
+      audio.src = p.audio_url;
+      root.append(audio);
+    }
+    return root;
+  }
   const takes = p.takes ?? [];
   const focus = focusBox(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs);
   if (focus) root.append(focus);

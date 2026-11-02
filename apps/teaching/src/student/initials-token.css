@@ -1,0 +1,35 @@
+/* The student's initials in the lesson top bar: 44px to tap, a smaller pill to see. */
+.st-token {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  color: var(--navy);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.st-token[hidden] { display: none; }
+.st-token__who {
+  padding: var(--space-1) var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+}
+.st-token__who.is-initials { letter-spacing: 0.04em; }
+.st-token:hover .st-token__who { border-color: var(--navy); }
+.st-token:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; border-radius: var(--radius-full); }
+.st-token__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--space-1);
+  color: var(--paper);
+  background: var(--navy);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+}
