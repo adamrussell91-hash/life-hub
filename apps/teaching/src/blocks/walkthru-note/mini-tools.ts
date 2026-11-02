@@ -84,21 +84,33 @@ export function miniTimer(seconds: number, step: number, state: StripState): HTM
   return wrap;
 }
 
-/** ☺ Pick under a step: a name from the lesson's class, never the same one twice until all have gone. */
+/** First name and surname initial, so a picked name fits the pill beside the tick. */
+function pillName(name: string): string {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  const last = rest.at(-1);
+  return last ? `${first} ${last[0]}.` : first!;
+}
+
+/**
+ * ☺ Pick under a step: a name from the lesson's class, never the same one twice until all have gone.
+ * Each picker keeps its own name; the Say lines use whichever was picked last.
+ */
 export function miniNames(step: number, state: StripState): HTMLElement {
   const wrap = el('div', 'wts-tool wts-tool--names');
   const go = button('wts-tool__go', '☺', 'Pick a name');
-  const out = el('span', 'wts-tool__val', state.name ?? 'Pick');
+  const out = el('span', 'wts-tool__val', 'Pick');
   out.setAttribute('aria-live', 'polite');
   const left = el('span', 'wts-tool__aux');
   wrap.append(go, out, left);
+  let mine: string | null = null;
   const paint = (): void => {
-    out.textContent = state.name ?? 'Pick';
+    if (!out.classList.contains('is-rolling')) out.textContent = mine ? pillName(mine) : 'Pick';
     left.textContent = state.pool && state.picked.length ? `${state.pool.length} left` : '';
-    wrap.title = [state.name, left.textContent, state.classLabel ? `Names from ${state.classLabel}` : ''].filter(Boolean).join(' · ');
+    wrap.title = [mine, left.textContent, state.classLabel ? `Names from ${state.classLabel}` : ''].filter(Boolean).join(' · ');
   };
   wrap.addEventListener('wts-names', paint);
   go.addEventListener('click', async () => {
+    if (out.classList.contains('is-rolling')) return;
     state.goTo(step);
     primeSound();
     if (!state.pool) {
@@ -123,11 +135,12 @@ export function miniNames(step: number, state: StripState): HTMLElement {
     out.classList.add('is-rolling');
     let spins = 0;
     const spin = window.setInterval(() => {
-      out.textContent = source[randomIndex(source.length)]!;
+      out.textContent = pillName(source[randomIndex(source.length)]!);
       if (++spins < 8) return;
       window.clearInterval(spin);
       out.classList.remove('is-rolling');
       const [name] = source.splice(randomIndex(source.length), 1);
+      mine = name!;
       state.name = name!;
       state.picked.push(name!);
       chime(1);
