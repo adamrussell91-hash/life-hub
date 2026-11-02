@@ -17,6 +17,12 @@ import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.
 import { attachedTechniques, suggestedTechnique, withTechnique } from '../walkthru-note/attach';
 
 const walkthruGlyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
+/** The hexagon carries its book, so Book 2 reads blue wherever it's picked. */
+const walkthruHex = (id: string): HTMLSpanElement => {
+  const hex = walkthruGlyphs.element(id);
+  hex.dataset.set = String(techniqueById(id)?.set ?? 1);
+  return hex;
+};
 /** Any block can carry a WalkThru, bar teacher notes (which carry their own). */
 const canHaveWalkthru = (block: Block): boolean => block.block_type !== 'teacher_note';
 
@@ -184,7 +190,7 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
       if (technique) {
         const chip = button(technique.name, () => chooseWalkthru());
         chip.className = 'kaplan-chip wts-chip';
-        chip.prepend(walkthruGlyphs.element(technique.id));
+        chip.prepend(walkthruHex(technique.id));
         chip.setAttribute('aria-label', `Change the ${technique.name} WalkThru (only you see it)`);
         attached.append(chip);
       }
@@ -284,7 +290,7 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
       const list = document.createElement('div');
       list.className = 'kaplan-lens-choices';
       const picks: Array<[string, HTMLButtonElement]> = items.map((item) => {
-        const pick = choice(item.name, item.id === chosen ? 'On this block now' : pageRefOf(item), walkthruGlyphs.element(item.id), () => {
+        const pick = choice(item.name, item.id === chosen ? 'On this block now' : pageRefOf(item), walkthruHex(item.id), () => {
           options.onChange(withTechnique(options.getBlock(), item.id));
           close();
           renderBar();

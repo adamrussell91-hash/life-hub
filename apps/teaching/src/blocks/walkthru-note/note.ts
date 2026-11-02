@@ -237,6 +237,7 @@ export function renderWalkthruSection(content: WalkthruContent, ctx: { lessonId?
   const wrap = el('section', 'tk-wt');
   wrap.dataset.technique = content.id;
   if (entry) {
+    wrap.dataset.set = String(entry.set);
     const series = entry.series ? seriesByKey(entry.series) : null;
     wrap.append(el('p', 'tk-wt__code', `${pageRefOf(entry)}${series ? ` · ${series.name}` : ''}`), el('p', 'tk-wt__name', entry.name));
   } else {

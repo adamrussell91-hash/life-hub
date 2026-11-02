@@ -44,6 +44,7 @@ export function renderPlanningPrompts(): HTMLElement | null {
     const entry = techniqueById(field.technique)!;
     const details = document.createElement('details');
     details.className = 'tk-wt-badge';
+    details.dataset.set = String(entry.set);
     const summary = document.createElement('summary');
     summary.className = 'tk-wt-badge__summary';
     summary.title = `${entry.name}${field.hint ? ` · ${field.hint}` : ''}: open the steps`;
