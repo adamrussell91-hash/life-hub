@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@/alignment/coverage-panel', async (actual) => ({
+  ...(await actual<typeof import('@/alignment/coverage-panel')>()),
+  loadAlignment: () => Promise.reject(new Error('offline'))
+}));
+
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 vi.mock('@/teacher/scope-api', () => ({
   patchScopeSequence: vi.fn()
@@ -489,10 +494,11 @@ describe('scope timeline editor', () => {
     expect(canvas.querySelector('.scope-timeline__add-note')?.className).toMatch(/btn--ghost/);
   });
 
-  it('switches to the curriculum map with per-term add slots', () => {
+  it('switches to the curriculum map with per-term add slots', async () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
     canvas.querySelector<HTMLButtonElement>('[data-scope-tab="map"]')?.click();
-    expect(canvas.querySelectorAll('.scope-map__col')).toHaveLength(4);
+    // No syllabus reaches this test, so the map falls back to its term cards.
+    await vi.waitFor(() => expect(canvas.querySelectorAll('.scope-map__col')).toHaveLength(4));
     expect(canvas.querySelector('.scope-map__add--empty')).toBeTruthy();
     expect(canvas.querySelector('.scope-map__add--mini')).toBeTruthy();
   });

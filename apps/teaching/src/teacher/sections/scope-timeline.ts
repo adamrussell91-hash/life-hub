@@ -2,6 +2,7 @@ import { mountAlignmentView } from '@/alignment/view';
 import { subjectUsesAlignment } from '@/alignment/model';
 import { mountYearNetworkView } from '@/network/year-view';
 import { mountYearCoverageView } from '@/alignment/year-coverage-view';
+import { mountOutcomeClimb } from '@/alignment/outcome-climb-view';
 import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
@@ -1115,6 +1116,27 @@ export function renderScopeTimelineEditor(
   };
 
   const paintMap = (): void => {
+    scrollEl = null;
+    if (!subjectUsesAlignment(subject.title)) {
+      paintMapCards();
+      return;
+    }
+    mountOutcomeClimb(viewHost, {
+      curriculum,
+      subjectId: subject.id,
+      getScope: () => scope,
+      selectedItemId: selectedId,
+      onSelectItem: setSelection,
+      onSave: async (outcome_climb) => {
+        scope = { ...scope, outcome_climb };
+        const saved = await patchScopeSequence(scope.id, { outcome_climb });
+        scope = { ...scope, updated_at: saved.updated_at };
+      },
+      onUnavailable: paintMapCards
+    });
+  };
+
+  const paintMapCards = (): void => {
     scrollEl = null;
     const wrap = document.createElement('div');
     wrap.className = 'scope-map';

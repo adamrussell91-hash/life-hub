@@ -98,7 +98,8 @@ export {
   TimelineItemSchema,
   ScopeSequenceSchema,
   type ScopeSequence,
-  type TimelineItem
+  type TimelineItem,
+  type OutcomeClimbEntry
 } from './scope-sequence';
 export {
   MediaProviderSchema,
