@@ -1,8 +1,8 @@
 import type { Block } from '@/schemas/block';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import { QUIZ_KIND_INFO, checkQuestion, parseGapPassage, type QuizQuestion } from '@/quiz/core';
-import { peekCurriculum } from '@/app/curriculum-state';
-import { outcomeLabels } from '@/markbook/parse';
+import { visitBlocks } from '@/blocks/walk-blocks';
+import { piecesTaught } from '@/deep/block-tags';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { convertQuestionBlock, QUIZ_GROUP_LABEL, WRITTEN_GROUP_LABEL, writtenTypeOptions } from '@/blocks/question-type';
 import type { NextStepJobs } from '@/blocks/next-step-run';
@@ -30,7 +30,18 @@ export function createQuizQuestionEditor(
     question: { ...block.content.question, id: block.id },
     audience: 'teacher',
     allowImageUrl: true,
-    outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []),
+    blockTags: {
+      block: () => current,
+      write: (update) => {
+        current = update(current) as QuizBlock;
+        onChange(current);
+      },
+      taught: () => {
+        const taught = new Set<string>();
+        visitBlocks(getLessonBlocks?.() ?? [], (b) => { for (const id of piecesTaught(b)) taught.add(id); });
+        return taught;
+      }
+    },
     images: lessonImages(getLessonBlocks?.() ?? []),
     nextSteps: { jobs: nextSteps },
     ...(switchType

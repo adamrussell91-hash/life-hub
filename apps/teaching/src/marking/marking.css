@@ -127,3 +127,62 @@
   .tf-bar kbd { display: none; }
   .tf-bar .tf-go { flex: 1; }
 }
+
+/* The marking rubric. Selected is a solid fill and bold; the AI's read is a dashed outline, so neither rests on hue. */
+.rb { container-type: inline-size; display: grid; gap: var(--space-4); min-width: 0; padding: var(--space-3) var(--space-4); background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.rb-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.rb-title { margin: 0; font-size: var(--text-lg); color: var(--navy); }
+.rb-sub { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.rb-keep { min-height: 44px; border: 1.5px dashed var(--pastel-lilac-ink); border-radius: var(--radius-full); padding: 4px 16px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.rb-keep[hidden] { display: none; }
+.rb-note { margin: 0; font-size: var(--text-sm); color: var(--pastel-peach-ink); }
+.rb-note[hidden] { display: none; }
+.rb-group { display: grid; gap: var(--space-3); min-width: 0; }
+.rb-group[hidden] { display: none; }
+.rb-heading { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--navy); }
+.rb-skill { display: grid; gap: 6px; min-width: 0; }
+.rb-skill__name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); overflow-wrap: anywhere; }
+.rb-reach { font-size: var(--text-xs, .75rem); color: var(--muted); }
+.rb-rungs { display: grid; grid-template-columns: 1fr 1fr 1fr 1.25fr 1fr; gap: 4px; }
+@container (max-width: 340px) { .rb-rungs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rb-rung { min-width: 0; min-height: 44px; padding: 4px 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; font-size: .75rem; color: var(--ink); cursor: pointer; }
+.rb-rung.is-ai, .rb-pill.is-ai { border: 2px dashed var(--pastel-lilac-ink); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.rb-rung.is-on { border-color: var(--navy); background: var(--navy); color: #fff; font-weight: 700; }
+.rb-look { margin: 0; font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; }
+.rb-look:empty { display: none; }
+.rb-piece { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rb-piece__text { flex: 1 1 12rem; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.rb-piece__added { display: block; font-size: var(--text-xs, .75rem); color: var(--muted); }
+.rb-pill { min-width: 72px; min-height: 44px; padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--paper); font: inherit; font-size: var(--text-sm); color: var(--ink); cursor: pointer; }
+.rb-pill--used.is-on { border-color: var(--pastel-sage-ink); background: var(--pastel-sage-ink); color: #fff; font-weight: 700; }
+.rb-pill--missed.is-on { border-color: var(--pastel-peach-ink); background: var(--pastel-peach-ink); color: #fff; font-weight: 700; }
+.rb-add { justify-self: start; min-height: 44px; padding: 4px 14px; border: 1px dashed var(--line); border-radius: var(--radius-full); background: transparent; font: inherit; font-size: var(--text-sm); color: var(--navy); cursor: pointer; }
+.rb-add[hidden], .rb-picker[hidden] { display: none; }
+.rb-picker { width: 100%; min-height: 44px; font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: var(--radius-xs); background: var(--paper); color: var(--ink); }
+.rb-step { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border-radius: 10px; background: var(--shore); }
+.rb-check { display: flex; align-items: baseline; gap: var(--space-2); min-height: 44px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; font-size: var(--text-sm); color: var(--ink); text-align: left; cursor: pointer; }
+.rb-check.is-ai { border: 2px dashed var(--pastel-lilac-ink); }
+.rb-check.is-on { font-weight: 600; }
+.rb-check.is-on .rb-check__mark { color: var(--pastel-sage-ink); }
+.rb-check__mark { flex: none; font-weight: 700; }
+.rb-check__text { min-width: 0; overflow-wrap: anywhere; }
+.rb-heard { display: block; font-size: var(--text-xs, .75rem); font-style: italic; font-weight: 400; color: var(--pastel-lilac-ink); }
+.rb-pass { justify-self: start; min-height: 44px; padding: 4px 18px; border: 1px solid var(--navy); border-radius: var(--radius-full); background: var(--paper); font: inherit; font-weight: 600; color: var(--navy); cursor: pointer; }
+.rb-pass[hidden] { display: none; }
+.rb-pass.is-on { border-color: var(--pastel-sage-ink); background: var(--pastel-sage-ink); color: #fff; }
+.rb-step__note { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--pastel-peach-ink); }
+.rb-step__note:empty { display: none; }
+.rb-foot { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.rb-mark { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rb-mark__input { width: 4.5rem; min-height: 44px; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; font-size: 20px; font-weight: 700; color: var(--navy); }
+.rb-mark__input.is-ai { border: 2px dashed var(--pastel-lilac-ink); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.rb-mark__max { font-weight: 600; color: var(--navy); }
+.rb-mark__note { flex: 1 1 10rem; font-size: var(--text-sm); color: var(--muted); }
+.rb-next { width: 100%; box-sizing: border-box; min-height: 64px; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-xs); font: inherit; font-size: 16px; resize: vertical; }
+.rb-tally { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--pastel-sage); color: var(--pastel-sage-ink); font-size: var(--text-sm); font-weight: 600; }
+
+/* A rubric needs more room than the side column gives, so its work goes above it sooner. */
+.mk-cols--rubric { grid-template-columns: minmax(0, 1fr) minmax(0, 27rem); }
+@media (max-width: 1100px) { .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 1100px) { .tf .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } }
+.mk-side .rb { padding: 0; border: 0; background: transparent; }

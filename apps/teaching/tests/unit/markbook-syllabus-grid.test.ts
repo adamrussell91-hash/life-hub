@@ -18,7 +18,7 @@ const alignment = {
       id: 'texts',
       name: 'Texts',
       points: [
-        { id: 'U1', kind: 'U', short: 'Language shapes meaning', text: 'a', outcomes: [{ n: 3, link: 'shared' }], concepts: [{ ref: 'CX1', link: 'shared' }], processes: [] },
+        { id: 'R1', kind: 'R', short: 'Language shapes meaning', text: 'a', outcomes: [{ n: 3, link: 'shared' }], concepts: [{ ref: 'CX1', link: 'shared' }], processes: [] },
         { id: 'R2', kind: 'R', short: 'Compose a response', text: 'b', outcomes: [{ n: 5, link: 'shared' }], concepts: [], processes: [] }
       ]
     }
@@ -31,7 +31,7 @@ const labels = [
 ];
 
 const skills = {
-  strands: [{ strand: 'reading', name: 'Reading', sub_strands: [{ id: 'infer', name: 'Inferring', points: [{ area: 'texts', point: 'U1', link: 'shared' }] }] }]
+  strands: [{ strand: 'reading', name: 'Reading', sub_strands: [{ id: 'infer', name: 'Inferring', points: [{ area: 'texts', point: 'R1', link: 'shared' }] }] }]
 } as unknown as SkillsContinuum;
 
 const ctx: InsightContext = { table: null, skills, codes: [], outcomes: labels, alignment };
@@ -40,21 +40,21 @@ const students: RosterStudent[] = ['a', 'b', 'c', 'd'].map((id, i) => ({ id, nam
 
 const ev = (student: string, tags: string[], share: number, item = 'q1', source = 'quiz:l1'): Evidence => ({ item, tags, share, why: [], student, source, date: '2026-10-01', confidence: null });
 const two = (student: string, tags: string[], share: number): Evidence[] => [ev(student, tags, share, 'q1'), ev(student, tags, share, 'q2')];
-const U1 = 'dp:texts:U1';
-const tagged = (student: string, share: number): Evidence[] => two(student, [U1, 'out:o3', 'skill:reading.infer', 'tech:x'], share);
+const R1 = 'dp:texts:R1';
+const tagged = (student: string, share: number): Evidence[] => two(student, [R1, 'out:o3', 'skill:reading.infer', 'tech:x'], share);
 
 describe('dot point tags', () => {
   it('gives quiz items their lesson’s points, and assessment criteria the points their outcomes reach', () => {
-    expect([...lessonPointMap([{ id: 'l1', dot_points: ['texts:U1', 'texts:U9', 'gone:U1'] }, { id: 'l2' }], alignment)]).toEqual([['l1', [U1]]]);
-    expect(lessonPointMap([{ id: 'l1', dot_points: ['texts:U1'] }], null).size).toBe(0);
+    expect([...lessonPointMap([{ id: 'l1', dot_points: ['texts:R1', 'texts:U9', 'gone:R1'] }, { id: 'l2' }], alignment)]).toEqual([['l1', [R1]]]);
+    expect(lessonPointMap([{ id: 'l1', dot_points: ['texts:R1'] }], null).size).toBe(0);
     const byOutcome = outcomePointMap(alignment, labels);
-    expect(byOutcome.get('out:o3')).toEqual([U1]);
+    expect(byOutcome.get('out:o3')).toEqual([R1]);
     const out = withPointTags(
       [ev('a', ['tech:x'], 1), ev('a', ['out:o5'], 1, 'c1', 'assess:t1'), ev('a', ['tech:x'], 1, 'q1', 'quiz:l2')],
-      lessonPointMap([{ id: 'l1', dot_points: ['texts:U1'] }], alignment),
+      lessonPointMap([{ id: 'l1', dot_points: ['texts:R1'] }], alignment),
       byOutcome
     );
-    expect(out.map((e) => e.tags)).toEqual([['tech:x', U1], ['out:o5', 'dp:texts:R2'], ['tech:x']]);
+    expect(out.map((e) => e.tags)).toEqual([['tech:x', R1], ['out:o5', 'dp:texts:R2'], ['tech:x']]);
   });
 });
 
@@ -76,7 +76,7 @@ describe('syllabus grid rows', () => {
   const rows = syllabusGrid(evidence, alignment, labels, ctx, ['a', 'b', 'c', 'd']);
 
   it('has a row per dot point, with each student’s band and who is behind', () => {
-    expect(rows.map((r) => r.label)).toEqual(['U1 Language shapes meaning', 'R2 Compose a response']);
+    expect(rows.map((r) => r.label)).toEqual(['R1 Language shapes meaning', 'R2 Compose a response']);
     const u1 = rows[0]!;
     expect(['a', 'b', 'c', 'd'].map((s) => u1.line.cells[s]!.band)).toEqual(['weak', 'developing', 'secure', null]);
     expect(u1.weak).toEqual(['a']);
@@ -96,11 +96,18 @@ describe('syllabus grid rows', () => {
     expect(u1.techniques.map((l) => l.tag)).toEqual(['tech:x']);
   });
 
+  it('keeps skills to R rows: a U row opens into its pieces', () => {
+    const uOnly = { ...alignment, focus_areas: [{ ...alignment.focus_areas[0]!, points: [{ ...alignment.focus_areas[0]!.points[0]!, id: 'U1', kind: 'U' }] }] } as unknown as Alignment;
+    const uSkills = { strands: [{ strand: 'reading', name: 'Reading', sub_strands: [{ id: 'infer', name: 'Inferring', points: [{ area: 'texts', point: 'U1', link: 'shared' }] }] }] } as unknown as SkillsContinuum;
+    const marked = ['a', 'b', 'c'].flatMap((s) => tagged(s, 0.7).map((e) => ({ ...e, tags: ['dp:texts:U1', 'skill:reading.infer'] })));
+    expect(syllabusGrid(marked, uOnly, labels, { ...ctx, skills: uSkills, alignment: uOnly }, ['a', 'b', 'c'])[0]!.skills).toEqual([]);
+  });
+
   it('sorts weakest first or in syllabus order, with dot points that have no marks last', () => {
     const two = syllabusGrid([...evidence, ...tagged('a', 0.1).map((e) => ({ ...e, tags: ['dp:texts:R2', 'out:o5'] }))], alignment, labels, ctx, ['a', 'b', 'c']);
-    expect(sortPoints(two, 'weakest').map((r) => r.point.id)).toEqual(['R2', 'U1']);
-    expect(sortPoints(two, 'syllabus').map((r) => r.point.id)).toEqual(['U1', 'R2']);
-    expect(sortPoints(rows, 'weakest').map((r) => r.point.id)).toEqual(['U1', 'R2']);
+    expect(sortPoints(two, 'weakest').map((r) => r.point.id)).toEqual(['R2', 'R1']);
+    expect(sortPoints(two, 'syllabus').map((r) => r.point.id)).toEqual(['R1', 'R2']);
+    expect(sortPoints(rows, 'weakest').map((r) => r.point.id)).toEqual(['R1', 'R2']);
   });
 
   it('gives no rows without an alignment', () => {
@@ -123,7 +130,7 @@ function quiz(shares: Record<string, number>): QuizColumn {
   return { kind: 'quiz', id: 'quiz:l1', lesson_id: 'l1', title: 'Pre-test', unit_id: 'u1', date: '2026-10-01', hidden: false, confidence: false, questions: [], scores };
 }
 const view = (shares: Record<string, number>): MarkbookView => ({ markbook: { columns: [], hidden_quizzes: [], marks: {}, updated_at: '' }, students, quizzes: [quiz(shares)] });
-const viewCtx: InsightContext = { ...ctx, lessonPoints: new Map([['l1', [U1]]]) };
+const viewCtx: InsightContext = { ...ctx, lessonPoints: new Map([['l1', [R1]]]) };
 
 describe('Grid view', () => {
   function mount(narrow = false, extra: Partial<Parameters<typeof renderSyllabusGrid>[4]> = {}) {
@@ -138,7 +145,7 @@ describe('Grid view', () => {
   it('draws dot points down and students across, closed at first', () => {
     const { host } = mount();
     expect([...host.querySelectorAll('.mbg__initials')].map((b) => b.textContent)).toEqual(['A', 'B', 'C', 'D']);
-    expect(host.querySelector('.mbg-row__label')?.textContent).toBe('U1 Language shapes meaning');
+    expect(host.querySelector('.mbg-row__label')?.textContent).toBe('R1 Language shapes meaning');
     expect(host.querySelectorAll('.mbg-row .mbg-cell')).toHaveLength(4);
     expect(host.querySelector('.mbg-line-row')).toBeNull();
     host.remove();
@@ -147,7 +154,7 @@ describe('Grid view', () => {
   it('opens a dot point into its parts, and keeps techniques behind a toggle', () => {
     const { host, state } = mount();
     host.querySelector<HTMLButtonElement>('.mbg-row__toggle')!.click();
-    expect(state.open.has(U1)).toBe(true);
+    expect(state.open.has(R1)).toBe(true);
     expect([...host.querySelectorAll('.mbg-group-row')].map((r) => r.textContent)).toEqual(['Outcomes', 'Skills, on their ladder']);
     expect(host.querySelector('.mbg-concepts')?.textContent).toContain('Context CX1');
     expect(host.querySelector('.mbg-concepts')?.textContent).toContain('no marks of their own');
@@ -166,8 +173,8 @@ describe('Grid view', () => {
     expect(host.querySelector('.mbg-aside__text')?.textContent).toBe('Pull aside: Ann Ash, Bea Bell');
     host.querySelector<HTMLButtonElement>('.mbg-ann')!.click();
     host.querySelector<HTMLButtonElement>('.mbg-tutorial')!.click();
-    expect(followUp).toHaveBeenCalledWith(U1, ['a', 'b'], expect.any(Array));
-    expect(planTutorial).toHaveBeenCalledWith(U1, ['a', 'b'], expect.any(Array));
+    expect(followUp).toHaveBeenCalledWith(R1, ['a', 'b'], expect.any(Array));
+    expect(planTutorial).toHaveBeenCalledWith(R1, ['a', 'b'], expect.any(Array));
     host.remove();
   });
 
@@ -204,7 +211,7 @@ describe('Next steps from dot points', () => {
     expect(moveKind(dpEvidence)).toBe('dp');
     expect(moveKind([ev('a', ['fam:x'], 1)])).toBe('fam');
     const moves = nextMoves(dpEvidence, 'dp');
-    expect(moves.map((m) => [m.kind, m.tag])).toEqual([['reteach', U1]]);
+    expect(moves.map((m) => [m.kind, m.tag])).toEqual([['reteach', R1]]);
   });
 
   it('shows the outcome and skill to work on inside the dot point', () => {
@@ -214,7 +221,7 @@ describe('Next steps from dot points', () => {
       repaint: () => {}
     });
     const card = node.querySelector('.mb-move--reteach')!;
-    expect(card.querySelector('.mb-move__tag')?.textContent).toBe('U1 Language shapes meaning');
+    expect(card.querySelector('.mb-move__tag')?.textContent).toBe('R1 Language shapes meaning');
     expect(card.querySelector('.mb-move__inside')?.textContent).toContain('Outcome to work on: EN12-3');
     expect(card.querySelector('.mb-move__inside')?.textContent).toContain('Skill to build: Inferring');
   });

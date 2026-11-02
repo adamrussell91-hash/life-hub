@@ -1,5 +1,7 @@
 import { AiJobConflictError, pollAiJob, postAiJob } from '@/ai/jobs-client';
 import { runAiMarking } from '@/quiz/ai-mark-run';
+import type { RubricRows } from './rubric-model';
+import type { AiCheck, RubricAiRead } from './rubric-panel';
 
 /**
  * The To mark flow's one "AI read them" button: AI marking for each quiz with
@@ -47,4 +49,19 @@ export async function runAiRead(targets: readonly AiReadTarget[], onDone: (finis
     })
   );
   return failed;
+}
+
+/** What the AI heard in a viva take: its checks run on through the block's steps, in order. */
+export type VoiceAiRead = { checks: AiCheck[]; pieces: Record<string, boolean> };
+
+/** A viva read in the rubric's terms. It has no rungs to give, so `skills` stays empty until a read supplies them. */
+export function voiceReadForRubric(read: VoiceAiRead | null | undefined, rows: Pick<RubricRows, 'steps'>): RubricAiRead | null {
+  if (!read) return null;
+  let at = 0;
+  const steps: Record<string, AiCheck[]> = {};
+  for (const step of rows.steps) {
+    steps[step.key] = read.checks.slice(at, at + step.checks.length);
+    at += step.checks.length;
+  }
+  return { pieces: Object.fromEntries(Object.entries(read.pieces ?? {}).map(([id, used]) => [id, used ? 'used' : 'missed'])), steps };
 }

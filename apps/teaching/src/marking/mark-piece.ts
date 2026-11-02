@@ -6,6 +6,8 @@
 import { el, button } from '@/quiz/dom';
 import { paper, offsetOf, trimRange, type Mark } from '@/blocks/peer-annotate';
 import { drawPick, pickCaption, pickMark, placedPick, stepHead, type StepPick } from './step-pick';
+import type { Rubric } from './rubric-model';
+import { mountRubricPanel, type RubricAiRead, type RubricPanel, type RubricSetup } from './rubric-panel';
 import './marking.css';
 
 type Criterion = { id: string; label: string; outcomes: string[]; concepts: string[]; skill?: string };
@@ -15,19 +17,19 @@ type Tag = { code_id: string; positive: boolean; part: string; field: string; st
 export type SuggestedMarkTag = { code_id: string; part: string; field: string; start: number; end: number; why?: string };
 type ShownTag = Tag & { ai?: boolean; why?: string };
 export type MarkPieceData = {
-  column: { id: string; title: string; criteria: Criterion[] };
+  column: { id: string; title: string; criteria: Criterion[]; piece?: { lesson_id: string; block_id: string } };
   student: { id: string; initials: string; name: string };
   text: Record<string, Record<string, string>>;
   /** The student's own next-step picks, by the answer each sits in. */
   steps?: Array<{ part: string; field: string; pick: StepPick }>;
-  feedback: { tags: Tag[]; comment: string; status: 'draft' | 'returned' } | null;
+  feedback: { tags: Tag[]; comment: string; status: 'draft' | 'returned'; rubric?: Rubric } | null;
   mark: { steps?: Record<string, string> } | null;
   codes: Code[];
   recent_codes: string[][];
   position: { index: number; total: number };
 };
 export type MarkPieceActions = {
-  save: (body: { tags: Tag[]; comment: string; steps: Record<string, string> }) => Promise<unknown>;
+  save: (body: { tags: Tag[]; comment: string; steps: Record<string, string>; rubric?: Rubric | null; today?: string }) => Promise<unknown>;
   returnIt: () => Promise<unknown>;
   takeBack: () => Promise<unknown>;
   move: (by: -1 | 1) => void;
@@ -47,13 +49,31 @@ export function wholeWords(text: string, r: { start: number; end: number } | nul
 }
 
 /** How the To mark flow embeds this screen: its own bar replaces ours, and `aside` tops the side column in place of a rubric. */
-export type MarkPieceOptions = { embedded?: boolean; aside?: HTMLElement; suggested?: SuggestedMarkTag[]; draftComment?: string };
+export type MarkPieceOptions = {
+  embedded?: boolean;
+  aside?: HTMLElement;
+  suggested?: SuggestedMarkTag[];
+  draftComment?: string;
+  /** What this work is tagged with. Left out, or null for untagged work, and the marking has no rubric panel. */
+  rubric?: RubricSetup | null;
+  rubricAi?: RubricAiRead | null;
+  /** A single score for this work, for the panel's Mark row. */
+  rubricMarks?: { max: number; value?: number | null; ai?: number | null };
+};
 
-export function markPieceView(d: MarkPieceData, act: MarkPieceActions): HTMLElement {
-  return openMarkPiece(d, act).el;
+export function markPieceView(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): HTMLElement {
+  return openMarkPiece(d, act, o).el;
 }
 
-export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): { el: HTMLElement; save: () => Promise<void>; finish: () => Promise<void> } {
+export type MarkPieceHandle = {
+  el: HTMLElement;
+  save: () => Promise<void>;
+  /** Saves and returns. False when a step stayed practice: it isn't returned, and the panel says why. */
+  finish: () => Promise<boolean>;
+  rubric: RubricPanel | null;
+};
+
+export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): MarkPieceHandle {
   let tags: ShownTag[] = [...(d.feedback?.tags ?? []), ...(o.suggested ?? []).map((t) => ({ ...t, positive: false, ai: true }))];
   const steps: Record<string, string> = { ...(d.mark?.steps ?? {}) };
   let armed: { id: string; positive: boolean } | null = null;
@@ -112,8 +132,12 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   comment.value = d.feedback?.comment ?? o.draftComment ?? '';
   comment.setAttribute('aria-label', 'Comment the student will see');
 
+  // A criterion on a skill the rubric already has a row for takes its place from that row's rung.
+  const skillRows = new Set((o.rubric?.rows.skills ?? []).map((s) => s.ref));
+  const linked = d.column.criteria.filter((c) => c.skill && skillRows.has(c.skill));
+  const own = d.column.criteria.filter((c) => !linked.includes(c));
   const rubric = el('div', 'mk-rubric');
-  for (const c of d.column.criteria) {
+  for (const c of own) {
     const row = el('div', 'mk-rubric__row');
     row.append(el('b', undefined, c.label), el('small', undefined, c.skill ? `Skill · ${(c as { skill_name?: string }).skill_name ?? c.skill}` : (c as { self?: string }).self ?? [...c.outcomes, ...c.concepts].join(' · ')));
     const btns = el('div', 'mk-rubric__steps');
@@ -129,7 +153,23 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     rubric.append(row);
   }
   if (o.aside) side.append(o.aside);
-  if (d.column.criteria.length) side.append(el('h3', 'mk-side__title', 'Rubric · where this piece sits'), rubric, el('p', 'mk-hint', 'Your step sets where the student sits. The codes don’t.'));
+  let panel: RubricPanel | null = null;
+  if (o.rubric) {
+    const seeded = linked.flatMap((c) => (steps[c.id] ? [[c.skill!, steps[c.id]!] as const] : []));
+    const held = d.feedback?.rubric;
+    const criteria = el('div', 'mk-rubric__host');
+    criteria.append(rubric, el('p', 'mk-hint', 'Your step sets where the student sits. The codes don’t.'));
+    panel = mountRubricPanel(o.rubric, {
+      saved: held || seeded.length ? { skills: { ...Object.fromEntries(seeded), ...(held?.skills ?? {}) } as Rubric['skills'], pieces: held?.pieces ?? {}, steps: held?.steps ?? {}, ...(held?.next_step ? { next_step: held.next_step } : {}) } : null,
+      ...(o.rubricAi ? { ai: o.rubricAi } : {}),
+      ...(o.rubricMarks ? { marks: o.rubricMarks } : {}),
+      tagged: () => tags.filter((t) => !t.ai),
+      ...(own.length ? { criteria: { el: criteria, placed: () => own.filter((c) => steps[c.id]).length } } : {}),
+      ...(o.suggested?.length ? { aiExtra: { waiting: () => tags.some((t) => t.ai), keep: () => { for (const t of tags) { delete t.ai; delete t.why; } paint(); } } } : {}),
+      studentId: d.student.id
+    });
+    side.append(panel.el);
+  } else if (d.column.criteria.length) side.append(el('h3', 'mk-side__title', 'Rubric · where this piece sits'), rubric, el('p', 'mk-hint', 'Your step sets where the student sits. The codes don’t.'));
   const draftNote = el('p', 'mk-hint mk-ai', 'The AI drafted this comment. Change it or clear it before you return.');
   draftNote.hidden = !(o.draftComment && !d.feedback?.comment);
   comment.addEventListener('input', () => { draftNote.hidden = true; });
@@ -231,10 +271,28 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     const flagged = [...counts.keys()].map((id) => [id, run(id)] as const).filter(([, n]) => n >= 3).sort((x, y) => y[1] - x[1])[0];
     warn.textContent = flagged ? `${codes.get(flagged[0])?.code} has come up on ${first(d.student.name)}’s last ${flagged[1]} pieces.` : '';
     retBtn.textContent = status === 'returned' ? 'Take back' : `Return to ${first(d.student.name)}`;
+    panel?.refresh();
   }
 
+  let stayedPractice = false;
   async function save(): Promise<void> {
-    await act.save({ tags: tags.filter((t) => !t.ai).map(({ ai: _ai, why: _why, ...t }) => t), comment: comment.value.trim(), steps });
+    const fields = panel?.saveFields() ?? {};
+    // Criteria sharing a skill with a rubric row follow its rung. Their ladder starts at Capable.
+    if (panel) {
+      const rungs = panel.value()?.skills ?? {};
+      for (const c of linked) {
+        const rung = rungs[c.skill!];
+        if (rung && rung !== 'below') steps[c.id] = rung;
+        else delete steps[c.id];
+      }
+    }
+    try {
+      const reply = await act.save({ tags: tags.filter((t) => !t.ai).map(({ ai: _ai, why: _why, ...t }) => t), comment: comment.value.trim(), steps, ...fields });
+      stayedPractice = panel?.applyReply(reply) ?? false;
+    } catch (error) {
+      panel?.failed();
+      throw error;
+    }
   }
 
   // What's selected right now. It outlives the tap by a moment, since some touch screens clear the selection before the button's click.
@@ -268,7 +326,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
 
   if (o.embedded) root.append(palette);
   else root.append(bar, palette);
-  const cols = el('div', 'mk-cols');
+  const cols = el('div', `mk-cols${panel ? ' mk-cols--rubric' : ''}`);
   const left = el('div');
   left.append(sheets, menu);
   cols.append(left, side);
@@ -277,10 +335,13 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   return {
     el: root,
     save,
+    rubric: panel,
     finish: async () => {
       await save();
+      if (stayedPractice) return false;
       await act.returnIt();
       status = 'returned';
+      return true;
     }
   };
 }

@@ -146,7 +146,8 @@ export function syllabusGrid(evidence: Evidence[], alignment: Alignment | null, 
       const tag = pointTag(area.id, point.id);
       const inside = mine.filter((e) => e.tags.includes(tag));
       const line = lineFor(inside, tag, tagLabel(tag, { ...ctx, alignment }), students, false, area.name);
-      const skillTags = skillTagsFor(ctx.skills, area.id, point.id);
+      // Skills belong to R points; U rows open into their pieces instead.
+      const skillTags = point.id.startsWith('R') ? skillTagsFor(ctx.skills, area.id, point.id) : [];
       // A skill row shows only where marks reach it; an unmarked one would be a row of grey.
       const skills = skillTags
         .filter((t) => inside.some((e) => e.tags.includes(t)))

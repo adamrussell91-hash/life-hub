@@ -414,3 +414,29 @@ thead .mb-book__pin small { display: block; font-weight: var(--weight-regular, 4
 
 .mb-col__mark { display: inline-block; margin-top: 2px; font-size: var(--text-xs, .75rem); font-weight: 600; color: var(--wave); text-decoration: none; }
 .mb-col__mark-count { margin-left: 4px; color: var(--muted); font-weight: 500; }
+
+/* Grid lenses, knowledge-piece circles and the deep understanding lens. */
+.mbg__lens { max-width: 100%; }
+.mbg__lens .ev-switch__pill, .mbg-deep__units .ev-switch__pill { min-height: 44px; }
+.mbg-deep { display: grid; gap: var(--space-3); min-width: 0; max-width: 100%; }
+.mbg-deep__units { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.mbg-deep__stage, .mbg-deep__monitor { min-width: 0; max-width: 100%; }
+.mbg-deep .du-sc, .mbg-deep .du-filt button, .mbg-deep .du-dutabs button, .mbg-deep .du-det button { min-height: 44px; }
+.mbg__scroll { max-width: 100%; }
+.mbg-circle { display: inline-flex; align-items: center; justify-content: center; color: inherit; font-size: inherit; line-height: 1; }
+.mbg-circle .du-c, .mbg-circle__dot { display: inline-flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font-ui); color: #fff; }
+.mbg-circle__dot { width: 18px; height: 18px; border-radius: 50%; margin-right: var(--space-1); }
+.mbg-line-row--piece .mbg__cell { height: 28px; }
+.mbg-piece { display: grid; gap: 2px; padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+.mbg-piece__text { margin: 0; font: var(--text-sm) / 1.35 var(--font-ui); overflow-wrap: anywhere; }
+.mbg-piece__sub { margin: 0; font: var(--text-xs) / 1.3 var(--font-ui); color: var(--muted); }
+.mbg-piece__strip { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: var(--space-1); }
+.mbg-piece__chip { display: inline-flex; align-items: center; gap: 4px; font: var(--text-xs) / 1 var(--font-ui); }
+.mbg-piece__who { font-weight: var(--weight-semibold); }
+.mon-ready { background: #dfe9e1; color: #2f5a3b; }
+.mon-ready-line { margin: 4px 0 0; font-weight: 600; color: var(--du-sage-ink); }
+.mon-skills { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 8px 0; font-size: 13px; }
+.mon-skills__list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+.mon-skills__list li { padding: 2px 8px; border-radius: 999px; background: var(--du-lilac); color: var(--du-lilac-ink); font-weight: 600; }
+.mon-rungs__row { margin: 0 0 4px; font-size: 13px; }
+.mb-next__legend.du-root { font-size: var(--text-xs); line-height: 1.4; }

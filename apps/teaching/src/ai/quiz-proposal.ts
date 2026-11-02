@@ -1,7 +1,7 @@
 import type { AiProposal } from '@/ai/proposals';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { lessonImages } from '@/quiz/images';
-import { checkQuestion, QuizQuestionSchema } from '@/quiz/core';
+import { checkQuestion, QUIZ_KIND_INFO, QuizQuestionSchema } from '@/quiz/core';
 import { pedagogicalModeLabel, quizRunsIn } from '@/curriculum/pedagogical-mode';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
@@ -120,20 +120,28 @@ export function questionGiveaways(question: Record<string, unknown>): string[] {
 }
 
 /** Which tag lists list_question_tags found; a list that came back empty can't be required. */
-export type TagLists = { outcomes: boolean; skills: boolean };
+export type TagLists = { pieces: boolean; skills: boolean };
 
-/** Every question names what it tests, so the markbook and insights track the right thing. */
+/**
+ * Every question reaches something the progress views can follow. An
+ * auto-marked question names one knowledge piece (one right or wrong can't
+ * say which of two was missed); a written one names one skill.
+ */
 export function questionTagIssues(
   label: string,
-  question: { outcomes?: string[]; skills?: string[] },
-  lists: TagLists = { outcomes: true, skills: true }
+  question: { kind?: string; pieces?: string[]; skills?: string[] },
+  lists: TagLists = { pieces: true, skills: true }
 ): string[] {
   const issues: string[] = [];
-  if (lists.outcomes && !question.outcomes?.length) {
-    issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
-  }
-  if (lists.skills && !question.skills?.length) {
-    issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
+  const written = QUIZ_KIND_INFO[question.kind as keyof typeof QUIZ_KIND_INFO]?.manual === true;
+  if (written) {
+    if (lists.skills && !question.skills?.length) {
+      issues.push(`${label}: add skills, the one skill id a student uses to answer (call list_question_tags).`);
+    }
+  } else if (lists.pieces) {
+    const n = question.pieces?.length ?? 0;
+    if (n === 0) issues.push(`${label}: add pieces, the one knowledge piece id this question checks (call list_question_tags; prefer the pieces marked picked).`);
+    else if (n > 1) issues.push(`${label}: name exactly one piece in pieces; one right or wrong answer can't say which of two was missed.`);
   }
   return issues;
 }

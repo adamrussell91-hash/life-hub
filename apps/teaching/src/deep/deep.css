@@ -217,3 +217,9 @@ table.du-map, table.du-kg { border-collapse: separate; border-spacing: 0; font-s
 .du-three { width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid #cfd6e0; background: #fff; cursor: pointer; font-weight: 700; color: var(--du-navy); }
 .du-three.used { background: var(--du-green); border-color: var(--du-green); color: #fff; }
 .du-three.missed { border-style: dashed; border-color: var(--du-navy); }
+
+/* One chain: a piece's U point, and the chain flags */
+.du-upick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.du-upick__select { min-height: 44px; max-width: 100%; min-width: 0; flex: 1 1 14rem; border: 1px solid var(--du-line); border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 12.5px; background: transparent; color: inherit; }
+.du-chain { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.du-chain:empty { display: none; }

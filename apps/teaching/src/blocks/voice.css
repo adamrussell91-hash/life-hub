@@ -954,83 +954,23 @@
   }
 }
 
-/* The pass checklist for a deep understanding step's evidence task. */
-.voice-pass {
+/* The rubric in the marking dock: it scrolls on its own, so the player and codes stay in reach. */
+.voice-rubric {
   border-top: 1px solid var(--line);
   padding-top: var(--space-2);
 }
-.voice-pass__title {
+.voice-rubric__title {
+  padding-block: 12px;
   cursor: pointer;
   font-size: var(--text-sm);
   font-weight: 600;
 }
-.voice-pass__list {
-  display: grid;
-  gap: var(--space-1);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.voice-pass__item {
-  display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
-  font-size: var(--text-sm);
-}
-.voice-pass__live {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-.voice-pass__pieces,
-.voice-pass__step {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-.voice-pass__piece {
-  display: inline-flex;
-  gap: var(--space-1);
-  align-items: center;
-  max-width: 100%;
-  padding: 4px 10px 4px 4px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  font-size: var(--text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-.voice-pass__mark {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
-  font-weight: 700;
-}
-.voice-pass__piece.is-used .voice-pass__mark {
-  background: var(--pastel-sage-ink);
-  border-color: transparent;
-  color: var(--paper);
-}
-.voice-pass__piece.is-missed .voice-pass__mark {
-  border-style: dashed;
-  border-color: var(--ink);
-}
-.voice-pass__now {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.voice-pass__note {
-  margin: 0;
-  font-size: var(--text-sm);
-}
-.voice-pass__note:empty {
-  display: none;
+.voice-rubric .rb {
+  max-height: min(46dvh, 30rem);
+  overflow-y: auto;
+  padding: var(--space-2) 2px;
+  border: 0;
+  background: transparent;
 }
 
 /* On a phone the dock keeps to letters, so most of the screen stays transcript. */
@@ -1044,8 +984,4 @@
   }
 }
 
-.voice-pass__item.is-ai input { outline: 1.5px dashed var(--pastel-lilac-ink); outline-offset: 1px; }
-.voice-pass__heard { display: block; font-size: var(--text-xs, .75rem); font-style: italic; color: var(--pastel-lilac-ink); }
-.voice-pass__piece.is-ai { border-style: dashed; border-color: var(--pastel-lilac-ink); }
-.voice-pass__piece.is-ai .voice-pass__mark { background: var(--pastel-lilac); border-color: var(--pastel-lilac-ink); color: var(--pastel-lilac-ink); }
 .voice-run--heard { background: var(--pastel-lilac) !important; }

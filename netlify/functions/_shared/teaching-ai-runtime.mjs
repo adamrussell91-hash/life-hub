@@ -422,6 +422,23 @@ var QUIZ_QUESTION_KINDS = [
   "explain_effect"
 ];
 var QuizQuestionKindSchema = z9.enum(QUIZ_QUESTION_KINDS);
+var QUIZ_KIND_INFO = {
+  multiple_choice: { label: "Multiple choice", blurb: "Pick the one right answer.", tier: 1, manual: false },
+  multi_select: { label: "Multi-select", blurb: "Pick every answer that applies.", tier: 1, manual: false },
+  true_false: { label: "True or false", blurb: "Is the statement true or false?", tier: 1, manual: false },
+  short_answer: { label: "Short answer", blurb: "Type a word or a short phrase.", tier: 1, manual: false },
+  fill_gap: { label: "Fill the gap", blurb: "Fill the missing words in a sentence or quote.", tier: 1, manual: false },
+  odd_one_out: { label: "Odd one out", blurb: "Spot the one that doesn\u2019t belong.", tier: 1, manual: false },
+  matching: { label: "Matching pairs", blurb: "Match each item to its partner.", tier: 2, manual: false },
+  ordering: { label: "Put in order", blurb: "Put the items in the right order.", tier: 2, manual: false },
+  categorise: { label: "Sort into groups", blurb: "Sort each item into its group.", tier: 2, manual: false },
+  quote_technique: { label: "Quote \u2192 technique", blurb: "Name the technique in a quote.", tier: 2, manual: false },
+  find_it: { label: "Find it in the text", blurb: "Tap the line that answers the question.", tier: 2, manual: false },
+  spot_technique: { label: "Spot the technique", blurb: "Select the words in a passage, then name the technique.", tier: 2, manual: false },
+  label_image: { label: "Label the image", blurb: "Match each label to its pin on the image.", tier: 2, manual: false },
+  extended_response: { label: "Extended response", blurb: "Write a paragraph. Your teacher marks it.", tier: 3, manual: true },
+  explain_effect: { label: "Explain the effect", blurb: "Explain the effect of a technique. Your teacher marks it.", tier: 3, manual: true }
+};
 var QUIZ_LIMITS = {
   prompt: 1e3,
   option: 300,
@@ -5821,10 +5838,11 @@ A question is good when the students who learnt the lesson get it right and the 
 6. Use the lessons' own examples, texts and wording for recall, and fresh but similar material (another line from the same poem, a new everyday example) for application, so students apply the idea and do not just recognise a sentence.
 
 ### Tag every question
-The markbook and the insight views track what each question tests, so every quiz_question carries its own tags in question.outcomes and question.skills. Call list_question_tags once for the lists.
-- outcomes: the one or two outcome ids (the id field, e.g. "EA12-2") the question actually tests. Choose from what the question asks a student to do, not from the lesson's dot points: a quiz that mixes ideas has different outcomes on different questions. Never copy the same outcomes onto every question.
-- skills: exactly one skill id from the list (e.g. "reading.inference"), the skill the student uses to answer. Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference; weighing readings or context belongs to the matching skill in the list. A recall-only question still gets the nearest skill. If a question tests nothing on either list, rewrite it or cut it.
-- Tag after you finish each question, from its final wording, and re-check the tags if you change the question.
+The progress views follow what each question checks, so every quiz_question carries one tag. Call list_question_tags once for the lists.
+- An auto-marked question (everything except extended_response and explain_effect) names exactly one knowledge piece in question.pieces, the id of the piece a student must know to answer it. One right or wrong answer cannot say which of two pieces was missed. Pieces the teacher picked for this lesson are marked picked: use those first. Different questions check different pieces; never copy the same piece onto every question. If list_question_tags returns no pieces, leave pieces out.
+- A written question (extended_response, explain_effect) names one skill in question.skills, the skill id from the list that the student uses to answer (e.g. "reading.inference"). Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference. Skills the teacher picked for this lesson are marked picked.
+- Do not write outcomes. They follow from the piece or skill.
+- Tag after you finish each question, from its final wording, and re-check the tag if you change the question.
 
 ### Every kind
 - One idea per question. The stem asks a clear question that a student who knows the content could answer with the options covered.
@@ -5888,7 +5906,7 @@ The markbook and the insight views track what each question tests, so every quiz
 - Cover test: hide the options. Could a student who learnt the lesson answer? If not, the stem is unclear.
 - Test-wise test: read only the options. Can you spot the key by length, tone, absolutes, a stem echo or common sense? If so, rewrite.
 - Lesson test: point to the lesson and dot point it checks. If you cannot, cut it.
-- Tag test: its outcomes and skill match what a student does to answer it, and not simply the quiz's overall topic.
+- Tag test: its piece (or, for a written question, its skill) matches what a student does to answer it, and not simply the quiz's overall topic.
 - Then check the quiz as a whole: every key idea covered in proportion to how it was taught, a spread from recall to application, kinds varied, and no question giving away another's answer.`;
 
 // apps/teaching/src/ai/block-recipes.ts
@@ -6024,7 +6042,7 @@ function buildAiStaticPrompt(input) {
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
     `- Finish the job. Work to the teacher's goal, not the literal request. When something is unclear or missing (an outcome's wording, which lesson, which kind of question, how many, where it goes), find it with your tools (list_lessons, read_lesson, list_question_tags, notes, web_search), or choose the best-supported option, build on it and say which you chose in one line. Ask a question only when two readings would produce genuinely different builds and nothing you can read settles it. Never hand a gap back as a to-do ("check the wording", "delete the examples if you want", "tell me which code you meant"), never list nearest options instead of picking one, and never present a tool you have as a limit (web research is available when the lesson and notes do not cover it).`,
-    "- Do the whole task. If the build needs a closing task, a missing outcome or skill tag, a better question kind or a fix to something you notice in the same blocks, include it. Check your own proposal against the quiz-writing rules before you send it and fix what fails; the teacher should not be the one finding weak items. Your note says what you built, what you assumed and what you sourced, briefly, with no checklist for the teacher.",
+    "- Do the whole task. If the build needs a closing task, a missing piece or skill tag, a better question kind or a fix to something you notice in the same blocks, include it. Check your own proposal against the quiz-writing rules before you send it and fix what fails; the teacher should not be the one finding weak items. Your note says what you built, what you assumed and what you sourced, briefly, with no checklist for the teacher.",
     '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply with a short plan (no proposal and no web or notes research yet; do read the lessons it builds on with list_lessons and read_lesson, so the plan is grounded in what was taught) headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you; the lessons you read, named, with the key ideas and dot points the questions will test; their notes; web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Settle every open detail yourself in the plan and state it as your choice; ask only the confirm-or-change question. Then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
     "",
     BLOCK_BUILD_RECIPES,
@@ -7434,13 +7452,17 @@ function questionGiveaways(question) {
   }
   return issues;
 }
-function questionTagIssues(label, question, lists = { outcomes: true, skills: true }) {
+function questionTagIssues(label, question, lists = { pieces: true, skills: true }) {
   const issues = [];
-  if (lists.outcomes && !question.outcomes?.length) {
-    issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
-  }
-  if (lists.skills && !question.skills?.length) {
-    issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
+  const written = QUIZ_KIND_INFO[question.kind]?.manual === true;
+  if (written) {
+    if (lists.skills && !question.skills?.length) {
+      issues.push(`${label}: add skills, the one skill id a student uses to answer (call list_question_tags).`);
+    }
+  } else if (lists.pieces) {
+    const n = question.pieces?.length ?? 0;
+    if (n === 0) issues.push(`${label}: add pieces, the one knowledge piece id this question checks (call list_question_tags; prefer the pieces marked picked).`);
+    else if (n > 1) issues.push(`${label}: name exactly one piece in pieces; one right or wrong answer can't say which of two was missed.`);
   }
   return issues;
 }
@@ -8407,7 +8429,7 @@ If the request cannot fit the limits, say so plainly instead.`,
         if (!isError) sight(value2);
         if (call.name === "list_question_tags" && !isError) {
           const lists = value2;
-          sightings.tagLists = { outcomes: Boolean(lists.outcomes?.length), skills: Boolean(lists.skills?.length) };
+          sightings.tagLists = { pieces: Boolean(lists.pieces?.length), skills: Boolean(lists.skills?.length) };
         }
         results.push({
           type: "tool_result",

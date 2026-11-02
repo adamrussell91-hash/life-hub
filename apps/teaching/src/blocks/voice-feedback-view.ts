@@ -13,6 +13,7 @@ import { alignTagWords, buildPaper, commonestFiller, transcriptWords, wordAt } f
 import { audioUrl, type MineState, type VoiceTag } from '@/blocks/voice-client';
 import { clock } from '@/blocks/voice-pacing';
 import type { VoiceWord } from '@/blocks/voice-transcript';
+import { returnedRubric } from '@/student/returned-rubric';
 
 /**
  * What a student reads once the teacher returns their Voice submission: what
@@ -99,8 +100,11 @@ export function renderVoiceFeedback(state: Returned, options: { title?: string; 
   const sheet = buildPaper(words, points);
 
   root.append(el('p', 'voice-feedback__title', options.title ?? 'Feedback from your teacher'));
-  const focus = options.focus === false ? null : focusBox(tags, codes);
+  // A next step the teacher chose stands alone, with no second one worked out from the codes.
+  const focus = options.focus === false || state.rubric?.next_step ? null : focusBox(tags, codes);
   if (focus) root.append(focus);
+  const rubric = returnedRubric(state.rubric);
+  if (rubric) root.append(rubric);
   if (tags.length) root.append(summaryList(tags, codes, words));
   if (state.comment?.trim()) root.append(el('p', 'voice-feedback__comment', state.comment));
 

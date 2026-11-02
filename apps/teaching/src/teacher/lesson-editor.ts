@@ -69,6 +69,7 @@ import { openNameModal } from '@/teacher/create/name-modal';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { setUnitDeep } from '@/deep/context';
+import { untaggedLine, untaggedQuestions } from '@/quiz/untagged';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import {
   hasUnpublishedChanges,
@@ -203,6 +204,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     publishPanel.className = 'lesson-editor__publish-panel';
     publishPanel.hidden = true;
 
+    // Before a publish: questions that reach no piece and no skill. A note only; it never stops the publish.
+    const tagNote = document.createElement('div');
+    tagNote.className = 'lesson-editor__tag-note';
+    tagNote.hidden = true;
+
     const pageHost = document.createElement('div');
 
     // Connections stay out of the way until the lesson has one; "Add
@@ -227,7 +233,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     const annBarHost = document.createElement('div');
     annBarHost.className = 'lesson-builder__ann';
-    pageCol.append(publishPanel, tagsHost, annBarHost, pageHost, compositionStatus);
+    pageCol.append(publishPanel, tagNote, tagsHost, annBarHost, pageHost, compositionStatus);
     chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
     builder.insertAdjacentHTML('beforeend', fullPageExitHtml(false));
@@ -934,6 +940,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }).dispose;
     }
 
+    function showUntaggedNote(): void {
+      const found = untaggedQuestions(lesson.blocks);
+      const line = untaggedLine(found, (lesson.dot_points?.length ?? 0) > 0);
+      tagNote.replaceChildren();
+      tagNote.hidden = !line;
+      if (!line || !found.untagged[0]) return;
+      const first = found.untagged[0];
+      const jump = document.createElement('button');
+      jump.type = 'button';
+      jump.className = 'btn btn--ghost lesson-editor__publish-jump';
+      jump.textContent = line;
+      jump.addEventListener('click', () => page?.revealPublishBlock(first, [first]));
+      tagNote.append(jump);
+    }
+
     function showPublishIssues(apiIssues: string[]): void {
       const local = listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' });
       const errorIds = local.map((issue) => issue.blockId);
@@ -1034,6 +1055,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           label: 'Publish',
           className: 'context-bar__publish',
           onSelect: () => {
+            showUntaggedNote();
             void savePublishHandle?.publish();
           }
         },

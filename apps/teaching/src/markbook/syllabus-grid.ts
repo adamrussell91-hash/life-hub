@@ -6,6 +6,9 @@ import { RUNG_IDS } from '@/skills/schema';
 import { RUNG_LETTER, RUNG_NAME, sortPoints, syllabusGrid, type GridCell, type GridLine, type PointRow, type PointSort } from '@/evidence/syllabus-grid';
 import type { Evidence } from '@/evidence/types';
 import type { MarkbookView, RosterStudent } from './types';
+import type { KnowledgePiece } from '@/deep/schema';
+import { circleClass, circleText, pieceCircles, type PieceGroup } from './point-pieces';
+import '@/deep/deep.css';
 
 /**
  * The Grid: syllabus dot points down the side, students across. A dot point
@@ -14,14 +17,20 @@ import type { MarkbookView, RosterStudent } from './types';
  */
 
 /** Kept by the markbook between redraws. */
-export type SyllabusGridState = { sort: PointSort; open: Set<string>; techniques: boolean; showEmpty: boolean };
-export const newSyllabusGridState = (): SyllabusGridState => ({ sort: 'weakest', open: new Set(), techniques: false, showEmpty: false });
+/** Two lenses on the one progress view: dot points down the side, or the deep understanding lanes. */
+export type ProgressLens = 'point' | 'du';
+export type SyllabusGridState = { lens: ProgressLens; sort: PointSort; open: Set<string>; techniques: boolean; showEmpty: boolean };
+export const newSyllabusGridState = (lens: ProgressLens = 'point'): SyllabusGridState => ({ lens, sort: 'weakest', open: new Set(), techniques: false, showEmpty: false });
 
 export type SyllabusGridActions = {
   openStudent: (studentId: string) => void;
   followUp?: (tag: string, students: string[], evidence: Evidence[]) => void;
   planTutorial?: (tag: string, students: string[], evidence: Evidence[]) => void;
   repaint: () => void;
+  /** The pieces to open under each dot point, and today's date for their circles. Without it rows open as before. */
+  pieces?: { byPoint: ReadonlyMap<string, KnowledgePiece[]>; loose: PieceGroup[]; today: string };
+  /** The By deep understanding lens: one pane kept between redraws. Told when the lens opens. */
+  deepPane?: () => HTMLElement;
 };
 
 const BAND_TEXT = { weak: 'not yet', developing: 'developing', secure: 'secure' } as const;
@@ -43,6 +52,15 @@ function cellFor(line: GridLine, student: RosterStudent): HTMLElement {
   span.setAttribute('role', 'img');
   span.setAttribute('aria-label', `${student.name}: ${cell ? cellText(cell, line.ladder) : 'no marks'}`);
   return span;
+}
+
+function circleCell(piece: KnowledgePiece, student: RosterStudent, c: ReturnType<typeof pieceCircles>[string]): HTMLElement {
+  const wrap = el('span', 'mbg-circle du-root');
+  const dot = el('span', circleClass(c), c.amber ? '!' : '');
+  dot.setAttribute('role', 'img');
+  dot.setAttribute('aria-label', `${student.name}, ${piece.text}: ${circleText(c)}`);
+  wrap.append(dot);
+  return wrap;
 }
 
 function classText(line: GridLine): string {
@@ -68,9 +86,27 @@ function legend(): HTMLElement {
       ['mbg-cell--r-below', 'building towards Capable'],
       ...RUNG_IDS.map((r): [string, string] => [`mbg-cell--r-${r}`, `${RUNG_LETTER[r]} ${RUNG_NAME[r]}`]),
       ['mbg-cell--none', 'no marks']
-    ])
+    ]),
+    circles()
   );
   return wrap;
+}
+
+/** The circle key: shape and a mark carry each state, colour only backs them. */
+function circles(): HTMLElement {
+  const p = el('p', 'mb-next__legend du-root');
+  p.append(el('span', 'mbg__legend-label', 'Knowledge pieces'));
+  const one = (cls: string, text: string, mark = ''): void => {
+    const k = el('span', 'mb-next__key');
+    k.append(el('span', `${cls} mbg-circle__dot`, mark), document.createTextNode(text));
+    p.append(k);
+  };
+  one('du-c', 'not checked yet');
+  one('du-c half', 'right once');
+  one('du-c full', 'right on two separate days');
+  one('du-c amb', 'latest check wrong', '!');
+  one('du-c full fade', 'no check in four weeks');
+  return p;
 }
 
 function pills<T extends string>(label: string, options: Array<[T, string]>, current: T, onPick: (value: T) => void): HTMLElement {
@@ -176,6 +212,27 @@ export function renderSyllabusGrid(
 ): HTMLElement {
   const root = el('div', 'mbg');
   const listed = students.filter((s) => !s.removed);
+  const lensBar = el('div', 'ev-switch mbg__lens');
+  lensBar.setAttribute('role', 'group');
+  lensBar.setAttribute('aria-label', 'Progress lens');
+  for (const [value, text] of [['point', 'By dot point'], ['du', 'By deep understanding']] as const) {
+    const b = el('button', 'ev-switch__pill', text);
+    b.type = 'button';
+    b.dataset.lens = value;
+    b.setAttribute('aria-pressed', String(state.lens === value));
+    b.addEventListener('click', () => {
+      if (state.lens === value) return;
+      state.lens = value;
+      actions.repaint();
+      root.ownerDocument.querySelector<HTMLElement>(`.mbg [data-lens="${value}"]`)?.focus();
+    });
+    lensBar.append(b);
+  }
+  root.append(lensBar);
+  if (state.lens === 'du') {
+    root.append(actions.deepPane ? actions.deepPane() : el('p', 'mb__empty', 'Deep understandings are not available here.'));
+    return root;
+  }
   const { evidence } = classEvidence(view, ctx);
   const rows = syllabusGrid(evidence, ctx.alignment ?? null, ctx.outcomes, ctx, listed.map((s) => s.id));
   if (!rows.length) {
@@ -203,20 +260,41 @@ export function renderSyllabusGrid(
   bar.append(tech);
   root.append(bar, legend());
 
-  const toggle = (row: PointRow): void => {
-    if (state.open.has(row.tag)) state.open.delete(row.tag);
-    else state.open.add(row.tag);
+  const toggle = (key: string): void => {
+    if (state.open.has(key)) state.open.delete(key);
+    else state.open.add(key);
     actions.repaint();
-    root.ownerDocument.querySelector<HTMLElement>(`.mbg-row__toggle[data-tag="${CSS.escape(row.tag)}"]`)?.focus();
+    root.ownerDocument.querySelector<HTMLElement>(`.mbg-row__toggle[data-tag="${CSS.escape(key)}"]`)?.focus();
   };
-  const toggleButton = (row: PointRow): HTMLButtonElement => {
+  const toggleFor = (key: string, label: string, area: string): HTMLButtonElement => {
     const b = el('button', 'mbg-row__toggle');
     b.type = 'button';
-    b.dataset.tag = row.tag;
-    b.setAttribute('aria-expanded', String(state.open.has(row.tag)));
-    b.append(el('span', 'mbg-row__label', row.label), el('span', 'mbg-row__area', row.areaName));
-    b.addEventListener('click', () => toggle(row));
+    b.dataset.tag = key;
+    b.setAttribute('aria-expanded', String(state.open.has(key)));
+    b.append(el('span', 'mbg-row__label', label), el('span', 'mbg-row__area', area));
+    b.addEventListener('click', () => toggle(key));
     return b;
+  };
+  const toggleButton = (row: PointRow): HTMLButtonElement => toggleFor(row.tag, row.label, row.areaName);
+  const evidenceOfPieces = evidence.filter((e) => e.tags.some((t) => t.startsWith('kp:')));
+  const circlesFor = (piece: KnowledgePiece): ReturnType<typeof pieceCircles> =>
+    pieceCircles(evidenceOfPieces, listed.map((s) => s.id), piece, actions.pieces?.today ?? '');
+  const fullOf = (circ: ReturnType<typeof pieceCircles>): number => Object.values(circ).filter((c) => c.fill === 'full').length;
+
+  const looseKey = (g: PieceGroup): string => `loose:${g.area}`;
+  /** A piece on the phone: its words, then every student's circle with their initials. */
+  const pieceCard = (piece: KnowledgePiece): HTMLElement => {
+    const circ = circlesFor(piece);
+    const box = el('div', 'mbg-piece');
+    box.append(el('p', 'mbg-piece__text', piece.text), el('p', 'mbg-piece__sub', `${piece.tier}, ${fullOf(circ)} of ${listed.length} secure`));
+    const strip = el('div', 'mbg-piece__strip');
+    for (const s of listed) {
+      const chip = el('span', 'mbg-piece__chip');
+      chip.append(el('span', 'mbg-piece__who', s.initials), circleCell(piece, s, circ[s.id]!));
+      strip.append(chip);
+    }
+    box.append(strip);
+    return box;
   };
 
   const shown = state.showEmpty ? [...marked, ...empty] : marked;
@@ -243,10 +321,20 @@ export function renderSyllabusGrid(
             card.append(item);
           }
         }
+        const pieces = actions.pieces?.byPoint.get(row.tag) ?? [];
+        if (pieces.length) card.append(el('h5', 'mbg-group', 'Knowledge pieces'), ...pieces.map((p) => pieceCard(p)));
         const concepts = conceptsBlock(row);
         if (concepts) card.append(concepts);
         card.append(pullAside(row, students, evidence, actions));
       }
+      list.append(card);
+    }
+    for (const group of actions.pieces?.loose ?? []) {
+      const key = looseKey(group);
+      const open = state.open.has(key);
+      const card = el('section', `mbg-card${open ? ' is-open' : ''}`);
+      card.append(toggleFor(key, 'No dot point yet', group.areaName));
+      if (open) card.append(...group.pieces.map((p) => pieceCard(p)));
       list.append(card);
     }
     root.append(list);
@@ -284,6 +372,29 @@ export function renderSyllabusGrid(
       }
       return tr;
     };
+    const pieceRow = (piece: KnowledgePiece): HTMLElement => {
+      const circ = circlesFor(piece);
+      const tr = el('tr', 'mbg-line-row mbg-line-row--piece');
+      const th = el('th', 'mbg-line__head');
+      th.scope = 'row';
+      const name = el('span', 'mbg-line__name');
+      name.append(el('span', 'mbg-line__label', piece.text), el('span', 'mbg-line__sub', piece.tier));
+      th.append(name);
+      tr.append(th, el('td', 'mbg__class', `${fullOf(circ)} of ${listed.length}`));
+      for (const s of listed) {
+        const td = el('td', 'mbg__cell');
+        td.append(circleCell(piece, s, circ[s.id]!));
+        tr.append(td);
+      }
+      return tr;
+    };
+    const pieceGroup = (title: string, pieces: KnowledgePiece[]): HTMLElement[] => {
+      const gh = el('tr', 'mbg-group-row');
+      const cell = el('th', undefined, title);
+      cell.colSpan = span;
+      gh.append(cell);
+      return [gh, ...pieces.map(pieceRow)];
+    };
     for (const row of shown) {
       const open = state.open.has(row.tag);
       const tr = el('tr', `mbg-row${open ? ' is-open' : ''}${row.line.mean === null ? ' is-empty' : ''}`);
@@ -306,6 +417,8 @@ export function renderSyllabusGrid(
         body.append(gh);
         for (const line of g.lines) body.append(lineRow(line, line.ladder ? 'skill' : g.title === 'Techniques' ? 'tech' : 'out'));
       }
+      const pieces = actions.pieces?.byPoint.get(row.tag) ?? [];
+      if (pieces.length) body.append(...pieceGroup('Knowledge pieces', pieces));
       const extras = el('tr', 'mbg-extras-row');
       const td = el('td');
       td.colSpan = span;
@@ -314,6 +427,20 @@ export function renderSyllabusGrid(
       td.append(pullAside(row, students, evidence, actions));
       extras.append(td);
       body.append(extras);
+    }
+    // Pieces with no dot point yet, kept at the end so they are not lost.
+    for (const group of actions.pieces?.loose ?? []) {
+      const key = looseKey(group);
+      const open = state.open.has(key);
+      const tr = el('tr', `mbg-row mbg-row--loose${open ? ' is-open' : ''}`);
+      const th = el('th', 'mbg-row__head');
+      th.scope = 'row';
+      th.append(toggleFor(key, 'No dot point yet', group.areaName));
+      const cell = el('td', 'mbg__class', `${group.pieces.length} piece${group.pieces.length === 1 ? '' : 's'}`);
+      cell.colSpan = listed.length + 1;
+      tr.append(th, cell);
+      body.append(tr);
+      if (open) body.append(...group.pieces.map(pieceRow));
     }
     table.append(head, body);
     wrap.append(table);

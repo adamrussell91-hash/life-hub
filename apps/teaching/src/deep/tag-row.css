@@ -1,0 +1,20 @@
+/* "What does this check?": the tagging row under a question and in the block sheet. Tokens only. */
+.tg { display: grid; gap: var(--space-4, 16px); margin-top: var(--space-3, 12px); padding: var(--space-4, 16px); border: 1px solid var(--line); border-radius: var(--radius-md, 14px); background: var(--paper); min-width: 0; }
+.tg-title { margin: 0; font-size: var(--text-md, 1.0625rem); color: var(--navy); }
+.tg-part { display: grid; gap: 6px; min-width: 0; }
+.tg-part__title { margin: 0; font-size: var(--text-sm); color: var(--navy); }
+.tg-hint { margin: 0; font-size: var(--text-xs); color: var(--muted); }
+.tg-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.tg-chip { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; padding: 4px 14px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); color: var(--ink); font: inherit; font-size: var(--text-sm); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.tg-chip--on { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 600; }
+.tg-chip--add { border-style: dashed; color: var(--navy); background: transparent; }
+.tg-chip:disabled { opacity: .45; cursor: default; }
+.tg-chip:focus-visible, .tg-checks__box:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.tg-chips--list { padding-top: 6px; border-top: 1px dashed var(--line); }
+.tg-groups { display: grid; gap: var(--space-2, 8px); padding-top: var(--space-2, 8px); border-top: 1px dashed var(--line); }
+.tg-group { display: grid; gap: 4px; min-width: 0; }
+.tg-group__title { margin: 0; font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); overflow-wrap: anywhere; }
+.tg-checks { display: grid; gap: 4px; }
+.tg-checks__label { font-size: var(--text-xs); font-weight: 600; color: var(--muted); }
+.tg-checks__box { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-xs, 8px); font: inherit; font-size: var(--text-sm); resize: vertical; }
+.tg-rubric { margin: 0; padding: 10px 12px; border-radius: var(--radius-xs, 10px); background: color-mix(in srgb, var(--pastel-sage, #dfe9e1) 70%, var(--paper)); color: var(--pastel-sage-ink, var(--ink)); font-size: var(--text-sm); }

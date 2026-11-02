@@ -14,16 +14,16 @@ import {
   type QuizQuestionOf
 } from '@/quiz/core';
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
-import { formatOutcomeCodes, outcomeCodeExample, parseOutcomeCodes } from '@/markbook/parse';
-import { MARKBOOK_LIMITS } from '@/markbook/schema';
-import { mountChipPicker } from '@/skills/chip-picker';
+import { RUBRIC_LIMITS } from '@/marking/rubric-model';
+import { mountTagRow, type TagRowValue } from '@/deep/tag-row';
+import { evidenceSteps, targetPieces, withEvidenceSteps, withTargetPieces } from '@/deep/block-tags';
+import type { Block } from '@/schemas/block';
 import { loadFeedbackCodes } from '@/blocks/feedback-codes';
 import { nextStepBank, type BankItem, type BankPanel } from '@/blocks/next-step-bank';
 import type { NextStepJobs } from '@/blocks/next-step-run';
-import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
-import { unitDeep } from '@/deep/context';
+import { lessonPicks, onUnitDeep, unitDeep } from '@/deep/context';
 import '@/deep/block-menu.css';
 import './quiz.css';
 
@@ -47,8 +47,16 @@ export type BuilderOptions = {
   allowImageUrl?: boolean;
   /** Who is writing, for wording. */
   audience: 'student' | 'teacher';
-  /** Outcome catalogue for the teacher's outcome codes field. Students never get it. */
-  outcomes?: OutcomeLabel[];
+  /**
+   * Where the question sits in a block: its DU steps and a written task's expected pieces live in the
+   * block's settings, not in the question. Teachers only; without it those parts are left out.
+   */
+  blockTags?: {
+    block(): Block;
+    write(update: (block: Block) => Block): void;
+    /** Pieces already taught, so they sit ahead of untaught ones. */
+    taught?(): ReadonlySet<string>;
+  };
   /** In a lesson: written answers get a next-steps bank, made through the builder's jobs. */
   nextSteps?: { jobs?: NextStepJobs };
   onChange: (question: QuizQuestion) => void;
@@ -1099,6 +1107,56 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
   let bank: BankPanel | null = null;
   // The prompt and quote feed the bank's Ladder changed check.
   root.addEventListener('input', () => bank?.update(q as BankItem));
+  /** "What does this check?": visible under the question. Pieces on auto-marked kinds go on the question; written work keeps its expected pieces and DU steps on the block. */
+  function paintTags(host: HTMLElement): void {
+    const deep = unitDeep();
+    const written = QUIZ_KIND_INFO[q.kind]?.manual === true;
+    const tags = options.blockTags;
+    const piecesPart = written ? (tags ? 'several' : false) : 'one';
+    const read = (): TagRowValue => ({
+      steps: tags ? evidenceSteps(tags.block()) : [],
+      skills: written ? [...(q.skills ?? [])] : [],
+      pieces: written ? (tags ? targetPieces(tags.block()) : []) : [...(q.pieces ?? [])]
+    });
+    const row = mountTagRow({
+      value: read(),
+      deep,
+      parts: { steps: !!tags, skills: written, pieces: piecesPart },
+      picks: lessonPicks(),
+      taught: tags?.taught?.(),
+      rubric: written,
+      skillMax: Math.min(3, RUBRIC_LIMITS.skills),
+      onChange: (next) => {
+        if (written) {
+          if (next.skills.length) q.skills = next.skills;
+          else {
+            delete q.skills;
+            delete (q as BankItem).next_steps;
+          }
+          bank?.update(q as BankItem);
+        } else if (next.pieces.length) q.pieces = next.pieces;
+        else delete q.pieces;
+        tags?.write((b) => {
+          const withSteps = withEvidenceSteps(b, next.steps);
+          return written ? withTargetPieces(withSteps, next.pieces) : withSteps;
+        });
+        emit();
+      }
+    });
+    host.replaceChildren(row.root);
+    // The unit's plan arrives after the lesson's blocks render: lay the row out again then.
+    if (!stopDeep) {
+      stopDeep = onUnitDeep(() => {
+        if (!host.isConnected) {
+          stopDeep?.();
+          return;
+        }
+        paintTags(host);
+      });
+    }
+  }
+  let stopDeep: (() => void) | null = null;
+
   function paintExtras(): void {
     extrasHost.replaceChildren();
     bank = null;
@@ -1127,10 +1185,15 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     marksInput.disabled = marks.min === marks.max;
     extrasHost.append(row);
 
+    if (!student) {
+      const tagsHost = el('div', 'qz-tags');
+      extrasHost.append(tagsHost);
+      paintTags(tagsHost);
+    }
+
     const more = el('details', 'qz-more');
-    more.open = !!(q.hint || q.explanation || q.outcomes?.length || q.skills?.length || q.pieces?.length || (q.image && q.kind !== 'label_image'));
-    const offersOutcomes = !student && !!options.outcomes?.length;
-    more.append(el('summary', 'qz-more__summary', offersOutcomes ? 'Hint, explanation, outcomes and picture (optional)' : 'Hint, explanation and picture (optional)'));
+    more.open = !!(q.hint || q.explanation || (q.image && q.kind !== 'label_image'));
+    more.append(el('summary', 'qz-more__summary', 'Hint, explanation and picture (optional)'));
     const hint = textInput(q.hint ?? '', QUIZ_LIMITS.hint, 'A nudge, not the answer.');
     hint.addEventListener('input', () => {
       q.hint = hint.value || undefined;
@@ -1142,31 +1205,8 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       emit();
     });
     more.append(labelled('Hint', hint, 'Students can open it during the quiz. It costs some of the marks.'), labelled('Why this is the answer', why));
-    if (offersOutcomes && options.outcomes) {
-      const labels = options.outcomes;
-      const codes = textInput(formatOutcomeCodes(q.outcomes ?? [], labels), 200, outcomeCodeExample(labels));
-      codes.classList.add('qz-outcomes');
-      const note = el('p', 'qz-note qz-outcomes__unknown');
-      note.id = uid('qz-outcomes-note');
-      note.setAttribute('aria-live', 'polite');
-      const field = labelled('Outcomes (optional)', codes, 'For the markbook. Leave empty to use the lesson’s outcomes. Republish for changes to count.');
-      const hintEl = field.querySelector<HTMLElement>('.qz-field__hint');
-      if (hintEl) hintEl.id = uid('qz-outcomes-hint');
-      codes.setAttribute('aria-describedby', [hintEl?.id, note.id].filter(Boolean).join(' '));
-      codes.addEventListener('input', () => {
-        const parsed = parseOutcomeCodes(codes.value, labels);
-        if (parsed.ids.length) q.outcomes = parsed.ids.slice(0, MARKBOOK_LIMITS.outcomes);
-        else delete q.outcomes;
-        const lines: string[] = [];
-        if (parsed.unknown.length) lines.push(`Not an outcome code: ${parsed.unknown.join(', ')}`);
-        if (parsed.ids.length > MARKBOOK_LIMITS.outcomes) lines.push(`Only the first ${MARKBOOK_LIMITS.outcomes} outcomes are kept.`);
-        note.textContent = lines.join('. ');
-        emit();
-      });
-      more.append(field, note);
-    }
     if (!student) {
-      // Skills: several, as chips. A written answer's skills also pick the codes its next steps come from.
+      // Written answers: a next-steps bank off the skills chosen in the row above.
       const written = WRITTEN_KINDS.has(q.kind) && !!options.nextSteps;
       bank = written
         ? nextStepBank(q as BankItem, null, (next_steps) => {
@@ -1176,41 +1216,12 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
           }, { target: { block_id: q.id, index: 0 }, jobs: options.nextSteps?.jobs })
         : null;
       const panel = bank;
-      if (panel) void loadFeedbackCodes().then((codes) => panel.update(q as BankItem, codes), () => undefined);
-      const chips = mountChipPicker(q.skills ?? [], (skills) => {
-        if (skills.length) q.skills = skills;
-        else delete q.skills;
-        if (!skills.length) delete (q as BankItem).next_steps;
-        panel?.update(q as BankItem);
-        emit();
-      });
-      const field = labelled(written ? 'Skills this box practises' : 'Skills (optional)', chips, written ? 'Students get one next step on these skills. For insights too. Republish for changes to count.' : 'For insights. Republish for changes to count.');
       if (panel) {
+        void loadFeedbackCodes().then((codes) => panel.update(q as BankItem, codes), () => undefined);
         const steps = el('div', 'qz-next-steps');
-        steps.append(field, panel.el);
+        steps.append(panel.el);
         extrasHost.append(steps);
-      } else {
-        more.append(field);
       }
-    }
-    const deep = unitDeep();
-    if (!student && deep.length) {
-      const box = el('div', 'du-q-pieces');
-      for (const [n, du] of deep.entries()) {
-        for (const piece of du.pieces) {
-          const label = el('label');
-          const input = Object.assign(document.createElement('input'), { type: 'checkbox', value: piece.id, checked: !!q.pieces?.includes(piece.id) });
-          input.addEventListener('change', () => {
-            const next = [...box.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value).slice(0, 6);
-            if (next.length) q.pieces = next;
-            else delete q.pieces;
-            emit();
-          });
-          label.append(input, ` DU ${n + 1} · ${piece.text}`);
-          box.append(label);
-        }
-      }
-      more.append(labelled('Knowledge pieces this checks', box, 'Counts towards each student’s circles on the unit’s deep understandings. Republish for changes to count.'));
     }
     if (q.kind !== 'label_image' && ((options.images?.length ?? 0) > 0 || options.allowImageUrl)) {
       const pictureHost = el('div', 'qz-field');

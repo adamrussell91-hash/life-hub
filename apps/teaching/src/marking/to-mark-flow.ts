@@ -8,7 +8,8 @@ import { mountVoiceTake } from '@/blocks/voice-teacher';
 import { httpMarkbookApi } from '@/markbook/api';
 import { LEVEL_LABELS } from '@/sprint/schema';
 import { markId } from '@/sprint/marking';
-import { openMarkPiece, type MarkPieceData } from './mark-piece';
+import { openMarkPiece, type MarkPieceActions, type MarkPieceData } from './mark-piece';
+import { loadRubricSetup } from './rubric-setup';
 import { runAiRead, type AiReadTarget } from './ai-read';
 import { FLOW_LABEL, aiReadCount, flowItems, isStacked, type FlowItem, type FlowKind, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
 import { loadQueue, type ToMarkTask } from './to-mark-view';
@@ -52,20 +53,31 @@ async function voiceCard(item: FlowItem, onGone: () => void): Promise<Card> {
   const prompt = block.content.prompt?.trim();
   if (prompt) box.append(el('p', 'tf-prompt', prompt));
   box.append(take.el);
-  return { el: box, drop: true, leave: () => take.close(), finish: async () => { await take.finish(); take.close(); return true; } };
+  return {
+    el: box,
+    drop: true,
+    leave: () => take.close(),
+    finish: async () => {
+      const returned = await take.finish();
+      if (returned) take.close();
+      return returned;
+    }
+  };
 }
 
 async function pieceCard(item: FlowItem): Promise<Card> {
   const { task, row } = item;
   const call = <T>(body: Record<string, unknown>) => apiPost<T>(`/api/classes/${encodeURIComponent(task.class_id)}/pieces`, { column_id: task.column_id, student_id: row!.student_id, ...body });
   const data = await call<Omit<MarkPieceData, 'position'>>({ action: 'load' });
+  const where = data.column.piece;
+  const rubric = where ? await loadRubricSetup({ lessonId: where.lesson_id, blockId: where.block_id, who: { classId: task.class_id, studentId: row!.student_id! } }) : null;
   const view = openMarkPiece({ ...data, position: { index: 0, total: 1 } }, {
     save: (body) => call({ action: 'save', ...body }),
     returnIt: () => call({ action: 'return' }),
     takeBack: () => call({ action: 'take_back' }),
     move: () => undefined
-  }, { embedded: true });
-  return { el: view.el, leave: () => void view.save(), finish: async () => { await view.finish(); return true; } };
+  }, { embedded: true, rubric });
+  return { el: view.el, leave: () => void view.save(), finish: () => view.finish() };
 }
 
 /** The offsets of what the AI quoted, for a code it suggests on the student's words. */
@@ -87,7 +99,10 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   const piece = `q:${task.lesson_id}:${question.id}`;
   const text = answerText(answer.response);
   const parts = { answer: { text } };
-  const loaded = await flowPost<Loaded>({ action: 'answer_load', class_id: task.class_id, student_id: answer.student_id, piece });
+  const [loaded, rubric] = await Promise.all([
+    flowPost<Loaded>({ action: 'answer_load', class_id: task.class_id, student_id: answer.student_id, piece }),
+    loadRubricSetup({ lessonId: task.lesson_id, questionId: question.id, who: { classId: task.class_id, studentId: answer.student_id } })
+  ]);
 
   // The mark. The AI's is dashed, and Return keeps it unless another is pressed.
   let mark: number | null = answer.by === 'teacher' ? answer.awarded : null;
@@ -107,13 +122,14 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
     ticks.append(el('span', 'tf-note', `out of ${question.marks}`));
   };
   paintTicks();
-  aside.append(el('h3', 'mk-side__title', 'Mark'), ticks);
-  if (answer.ai) aside.append(el('p', 'mk-ai', `AI suggests ${fromAi ?? 'no mark'}: ${answer.ai.reason} Return keeps it unless you press another.`));
+  // A tagged question's mark sits in its rubric, suggested from the rungs.
+  if (!rubric) aside.append(el('h3', 'mk-side__title', 'Mark'), ticks);
+  if (answer.ai) aside.append(el('p', 'mk-ai', `AI suggests ${fromAi ?? 'no mark'}: ${answer.ai.reason} Return keeps it unless you ${rubric ? 'change it' : 'press another'}.`));
   if (question.guide) aside.append(el('p', 'tf-note', `How to mark it: ${question.guide}`));
   if (question.model_answer) aside.append(el('p', 'tf-note', `Model answer: ${question.model_answer}`));
 
   const { line, show } = errorLine();
-  let sent: { tags: unknown[]; comment: string } = { tags: [], comment: '' };
+  let sent: Parameters<MarkPieceActions['save']>[0] = { tags: [], comment: '', steps: {} };
   const view = openMarkPiece(
     {
       column: noColumn(task.title),
@@ -134,6 +150,8 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
     {
       embedded: true,
       aside,
+      rubric,
+      rubricMarks: { max: question.marks, value: mark, ai: fromAi },
       suggested: loaded.feedback ? [] : suggestedOn(text, 'answer', 'text', answer.ai?.tags),
       ...(answer.ai?.feedback && !answer.comment ? { draftComment: answer.ai.feedback } : answer.comment ? { draftComment: answer.comment } : {})
     }
@@ -143,12 +161,19 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   return {
     el: box,
     finish: async () => {
-      const score = mark ?? fromAi;
+      const score = (view.rubric ? view.rubric.mark() : mark) ?? fromAi;
       if (score === null) { show('Pick a mark first.'); return false; }
       await view.save();
       await quizPost(task.lesson_id, { action: 'mark', attempt_id: answer.attempt_id, question_id: question.id, score, comment: sent.comment });
-      await flowPost({ action: 'answer_save', class_id: task.class_id, student_id: answer.student_id, piece, lesson_id: task.lesson_id, title: task.title, text: parts, tags: sent.tags, comment: sent.comment });
-      return true;
+      const fields = sent.rubric !== undefined ? { rubric: sent.rubric, attempt_id: answer.attempt_id, ...(sent.today ? { today: sent.today } : {}) } : {};
+      try {
+        const reply = await flowPost({ action: 'answer_save', class_id: task.class_id, student_id: answer.student_id, piece, lesson_id: task.lesson_id, title: task.title, text: parts, tags: sent.tags, comment: sent.comment, ...fields });
+        // A step that stayed practice holds the flow here once, so the teacher reads why.
+        return !view.rubric?.applyReply(reply);
+      } catch (error) {
+        view.rubric?.failed();
+        throw error;
+      }
     }
   };
 }
@@ -268,7 +293,7 @@ async function sprintCard(item: FlowItem): Promise<Card> {
     },
     { embedded: true }
   );
-  return { el: view.el, finish: async () => { await view.finish(); return true; } };
+  return { el: view.el, finish: () => view.finish() };
 }
 
 function handupCard(item: FlowItem): Card {

@@ -15,7 +15,11 @@ import { navigate } from '@/app/router';
 import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderBook, renderBookPhone, type BookShow, type PhoneControl } from '@/markbook/book';
 import { httpProgressApi, withMark, type DoneRecord, type ProgressApi, type ProgressLesson } from '@/markbook/progress';
-import { newSyllabusGridState, renderSyllabusGrid } from '@/markbook/syllabus-grid';
+import { newSyllabusGridState, renderSyllabusGrid, type ProgressLens } from '@/markbook/syllabus-grid';
+import { createDeepLens, type DeepLensOptions } from '@/markbook/deep-lens';
+import { piecesByPoint } from '@/markbook/point-pieces';
+import type { Unit } from '@/schemas';
+import type { ScheduledLesson } from '@/schemas/scheduled-lesson';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { newDetailState, renderPatterns } from '@/markbook/patterns-view';
@@ -57,6 +61,15 @@ type Options = {
   pieceLessons?: { id: string; title: string }[];
   /** Test seam. The blocks of a lesson that students can hand in through. */
   loadPieceBlocks?: (lessonId: string) => Promise<{ id: string; label: string }[]>;
+  /** The class's active units, for knowledge pieces under dot points and the By deep understanding lens. */
+  deepUnits?: Unit[];
+  currentUnitId?: string;
+  scheduled?: ScheduledLesson[];
+  /** The Grid lens it opens on, and the unit the deep understanding lens prefers. */
+  lens?: ProgressLens;
+  lensUnitId?: string;
+  /** Test seams for the deep understanding lens. */
+  deepLens?: Pick<DeepLensOptions, 'loadLessons' | 'mount'>;
 };
 
 /** Written questions blocks of a lesson, labelled by title or position, for the column form's block picker. */
@@ -144,7 +157,16 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let bookShow: BookShow = 'all';
   /** Sort orders and open rows, kept across redraws. */
   const nextState = newNextState();
-  const gridState = newSyllabusGridState();
+  const gridState = newSyllabusGridState(options.lens);
+  const deepLens = createDeepLens({
+    classId: cls.id,
+    classLabel: cls.display_name || cls.code,
+    units: options.deepUnits ?? [],
+    currentUnitId: options.currentUnitId,
+    scheduled: options.scheduled ?? [],
+    unitId: options.lensUnitId,
+    ...options.deepLens
+  });
   const detailState = newDetailState();
   const historyState = newHistoryState();
   /** Names for tags and codes, for Next steps and Detail; loaded once, after the markbook. */
@@ -550,7 +572,14 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
               openStudent: actions.openStudent,
               followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
               planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
-              repaint: paint
+              repaint: paint,
+              pieces: options.deepUnits?.length
+                ? { ...piecesByPoint(options.deepUnits.flatMap((u) => u.deep_understandings ?? []), context.alignment ?? null), today: today() }
+                : undefined,
+              deepPane: () => {
+                deepLens.open();
+                return deepLens.pane;
+              }
             },
             narrow()
           )
@@ -800,6 +829,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   );
   return () => {
     disposed = true;
+    deepLens.destroy();
     window.clearInterval(live);
     if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
     else media?.removeListener?.(onMedia);
