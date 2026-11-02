@@ -1,16 +1,22 @@
 /**
  * Teaching › Feedback — minimal private feedback docs (4f).
  */
-import { apiGet, apiPost, ApiClientError } from '@/api/client';
+import { apiDelete, apiGet, apiPost, ApiClientError } from '@/api/client';
 import { studentSiteOrigin } from '@/app/class-site';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { renderPageHeader } from '@/teacher/page-header';
 import { fetchCurriculum } from '@/teacher/nav';
+import { uploadMediaFile } from '@/teacher/media-api';
+import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import { audioUrl } from '@/blocks/voice-client';
 
 type FeedbackDoc = {
   id: string;
   title: string;
   body_html: string;
+  audio_url?: string | null;
+  audio_delete_after?: string | null;
+  audio_deleted?: boolean;
   student_label: string | null;
   class_id?: string | null;
   student_id?: string | null;
@@ -83,10 +89,67 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
   });
   studentPick.addEventListener('change', syncButton);
 
+  // A recording made here goes with the next note saved.
+  const voiceBox = document.createElement('div');
+  voiceBox.className = 'feedback-page__voice';
+  const voiceTake = document.createElement('div');
+  voiceTake.className = 'feedback-page__take';
+  voiceTake.hidden = true;
+  let recordingId: string | null = null;
+  let takeUrl: string | null = null;
+  let uploadError = false;
+  const clearTake = (): void => {
+    recordingId = null;
+    if (takeUrl) URL.revokeObjectURL(takeUrl);
+    takeUrl = null;
+    voiceTake.replaceChildren();
+    voiceTake.hidden = true;
+    recorder.el.hidden = false;
+  };
+  const showTake = (file: File): void => {
+    takeUrl = URL.createObjectURL(file);
+    const player = document.createElement('audio');
+    player.controls = true;
+    player.src = takeUrl;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn--ghost';
+    remove.textContent = 'Remove recording';
+    remove.addEventListener('click', () => {
+      const id = recordingId;
+      clearTake();
+      if (id) void apiDelete(`/api/media/${encodeURIComponent(id)}`).catch(() => undefined);
+    });
+    const hint = document.createElement('p');
+    hint.className = 'block-editor__hint';
+    hint.textContent = 'This recording goes with the next note you save. Students can play it for 28 days.';
+    voiceTake.replaceChildren(player, remove, hint);
+    voiceTake.hidden = false;
+    recorder.el.hidden = true;
+  };
+  const recorder = createAudioRecordButton({
+    fileTitle: () => 'Note recording',
+    uploaded: () => !uploadError,
+    upload: async (file) => {
+      uploadError = false;
+      status.textContent = 'Saving the recording…';
+      try {
+        const media = await uploadMediaFile(file, { title: 'Note recording' });
+        recordingId = media.id;
+        status.textContent = '';
+        showTake(file);
+      } catch (error) {
+        uploadError = true;
+        status.textContent = error instanceof ApiClientError ? error.message : 'Could not save the recording.';
+      }
+    }
+  });
+  voiceBox.append(recorder.el, voiceTake);
+
   const list = document.createElement('div');
   list.className = 'feedback-page__list';
 
-  root.append(forBox, actions, status, list);
+  root.append(forBox, voiceBox, actions, status, list);
   canvas.append(root);
 
   let disposed = false;
@@ -124,6 +187,21 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
 
       const row = document.createElement('div');
       row.className = 'feedback-page__card-actions';
+      const sound = document.createElement('div');
+      if (item.audio_url) {
+        const player = document.createElement('audio');
+        player.controls = true;
+        player.preload = 'none';
+        player.src = audioUrl(item.audio_url);
+        sound.append(player);
+      }
+      if (item.audio_url || item.audio_deleted) {
+        const until = item.audio_delete_after ? new Date(item.audio_delete_after).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '';
+        const line = document.createElement('p');
+        line.className = 'block-editor__hint';
+        line.textContent = item.audio_deleted ? 'The recording has gone after its 28 days.' : `Recording kept until ${until}.`;
+        sound.append(line);
+      }
 
       const linkBtn = document.createElement('button');
       linkBtn.type = 'button';
@@ -166,7 +244,7 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
       });
 
       row.append(linkBtn, revokeBtn);
-      card.append(title, meta, row);
+      card.append(title, meta, sound, row);
       list.append(card);
     }
   }
@@ -192,8 +270,10 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
           title,
           student_label: student || undefined,
           ...(studentPick.value ? { class_id: classPick.value, student_id: studentPick.value } : {}),
+          ...(recordingId ? { audio_media_id: recordingId } : {}),
           body_html: body ? `<p>${body.replace(/</g, '&lt;')}</p>` : ''
         });
+        clearTake();
         status.textContent = studentPick.value ? `Returned to ${firstName()}.` : 'Feedback saved.';
         await refresh();
       } catch (error) {
@@ -208,6 +288,8 @@ export function renderFeedbackSection(canvas: HTMLElement): { dispose: () => voi
   return {
     dispose: () => {
       disposed = true;
+      recorder.dispose();
+      if (takeUrl) URL.revokeObjectURL(takeUrl);
       root.remove();
     }
   };
