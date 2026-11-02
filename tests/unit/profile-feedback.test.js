@@ -87,6 +87,19 @@ test('a returned viva set shows up as one piece with its confirmed tags', async 
   assert.deepEqual(viva.codes, ['ts'], 'only the confirmed tag counts');
 });
 
+test('opening a returned viva shows its confirmed tags with what the student said, the comment and the lesson link', async () => {
+  const { store, ava } = await setup();
+  const words = ['the', 'river', 'is', 'like', 'a', 'road'].map((word, i) => ({ word, start: i, end: i + 1 }));
+  store.data.set('voice_submissions/lessonV/blk1/s1', { status: 'returned', class_id: 'class1', student_id: ava.id, transcript: { text: 'x', words }, comment: 'Slow down at the start.', tags: [{ code_id: 'ts', positive: false, confirmed: true, w: [1, 3], note: 'Name the device.' }, { code_id: 'ts', positive: false, confirmed: false, w: [0, 0] }], returned_at: '2026-10-20T00:00:00Z' });
+  store.data.set(`piece_feedback/class1/${ava.id}/v:lessonV`, { kind: 'viva', title: 'Viva practice', lesson_id: 'lessonV', column_id: null, tags: [], comment: '', status: 'returned', returned_at: '2026-10-20T00:00:00Z', updated_at: 'x' });
+  const out = await profileAction(store, 'class1', { action: 'piece', item: 'v:lessonV', ...device });
+  assert.equal(out.tags.length, 1, 'only the confirmed tag');
+  assert.equal(out.tags[0].quote, 'river is like');
+  assert.equal(out.tags[0].note, 'Name the device.');
+  assert.equal(out.comment, 'Slow down at the start.');
+  assert.equal(out.lesson_href, '/s/classes/class1/lessons/lessonV');
+});
+
 test('a feedback document for this student appears as a Note, opens, and is marked seen', async () => {
   const { store, ava } = await setup();
   store.data.set('feedback_docs/doc1', { id: 'doc1', title: 'Before your final draft', body_html: '<p>Hi</p>', class_id: 'class1', student_id: ava.id, returned_at: '2026-10-25T00:00:00Z', created_at: 'x', updated_at: 'x', token_hash: 'SECRET' });

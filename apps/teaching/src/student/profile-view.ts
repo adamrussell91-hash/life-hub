@@ -128,7 +128,7 @@ function renderLearning(p: ProfilePayload): HTMLElement {
   sec.append(el('h2', 'pm-map__title', 'Where your learning is'), el('p', 'pm-key', 'Each column is one piece your teacher marked, oldest to newest. The taller the column, the higher the step.'));
   const list = el('div', 'pg-learning__list');
   list.append(...renderTargetRows('Outcomes', p.outcomes ?? [], p), ...renderTargetRows('Concepts', p.concepts ?? [], p));
-  sec.append(list);
+  sec.append(list.childElementCount ? list : el('p', 'pm-empty', 'This fills in once your teacher marks a piece against an outcome or concept.'));
   return sec;
 }
 
