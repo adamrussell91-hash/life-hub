@@ -104,7 +104,8 @@ export function pieceView(p: PiecePayload, onBack: () => void): HTMLElement {
       item.append(...explain(tag));
       list.append(item);
     }
-    left.append(list);
+    if (p.tags.length) left.append(list);
+    else left.append(el('p', 'pm-empty', p.comment ? 'Your teacher left a comment on this one.' : 'Your teacher has marked this. There are no notes on it yet.'));
     if (p.lesson_href) {
       const a = el('a', 'pg-seehow', 'Listen and read in the lesson');
       a.href = p.lesson_href;
