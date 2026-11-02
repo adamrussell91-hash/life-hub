@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TeacherNoteBlockContentSchema } from '@/schemas/toolkit';
 import { filterBlocksForStudent } from '@/blocks/visibility';
-import { attachedTechniques, withTechnique } from '@/blocks/walkthru-note/attach';
+import { attachedTechniques, suggestedTechnique, withTechnique } from '@/blocks/walkthru-note/attach';
 import { blockQuestion } from '@/blocks/walkthru-note/badge';
 import type { Block } from '@/schemas/block';
 
@@ -390,5 +390,20 @@ describe('WalkThru strip under a block', () => {
     expect(card.querySelector('.wts__name.is-empty')).not.toBeNull();
     (cells[3]!.querySelector('.wts__panel') as HTMLButtonElement).click();
     expect(card.querySelector('.wts__book--open')!.textContent).toContain('Filler text 4');
+  });
+});
+
+describe('suggestedTechnique', () => {
+  const voice = (oracy?: string) => ({ block_type: 'audio', content: { url: '', mode: 'viva', ...(oracy ? { oracy } : {}) } }) as unknown as Block;
+  it('offers the technique behind each oracy type, and leaves the block unchanged', () => {
+    expect(suggestedTechnique(voice('speech'))).toBe('w2-oracy-public-speaking');
+    expect(suggestedTechnique(voice('debate'))).toBe('w1-oracy-debating');
+    expect(suggestedTechnique(voice('presentation'))).toBe('w2-oracy-presentations');
+    expect(suggestedTechnique(voice('recite'))).toBe('w2-oracy-recitation-and-performance');
+    expect(attachedTechniques(voice('speech') as never)).toEqual([]);
+  });
+  it('offers nothing for plain Voice blocks or other blocks', () => {
+    expect(suggestedTechnique(voice())).toBeNull();
+    expect(suggestedTechnique({ block_type: 'quiz', content: {} } as unknown as Block)).toBeNull();
   });
 });

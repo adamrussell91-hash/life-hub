@@ -34,7 +34,7 @@ describe('framework lenses', () => {
 
 describe('unit planning prompts', () => {
   it('every field points at a real technique', () => {
-    expect(PLANNING_FIELDS.length).toBe(10);
+    expect(PLANNING_FIELDS.length).toBe(15);
     for (const field of PLANNING_FIELDS) expect(techniqueById(field.technique)).toBeTruthy();
   });
 });

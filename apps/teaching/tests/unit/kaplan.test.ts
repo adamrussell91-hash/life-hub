@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { attachedTechniques } from '@/blocks/walkthru-note/attach';
 import { kaplanFocusText, kaplanSteps, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier } from '@/blocks/kaplan';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema, type Block } from '@/schemas/block';
@@ -123,6 +124,16 @@ describe('guided authoring', () => {
     click(editor, 'Add lens');
     expect(block.qualifiers).toEqual([qualifier]);
     expect(editor.querySelector('.kaplan-chip svg')).toBeTruthy();
+  });
+  it('offers a Voice oracy type its technique first, attaching it only when picked', () => {
+    let block = { id: 'v1', type: 'block', block_type: 'audio', content: { url: '', mode: 'viva', oracy: 'speech', prompt: 'A rule' } } as unknown as Block;
+    const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
+    document.body.append(editor);
+    click(editor, 'Add WalkThru…');
+    expect(editor.querySelector('.kaplan-lens-group')!.textContent).toBe('For this type of Voice block');
+    expect(attachedTechniques(block)).toEqual([]);
+    editor.querySelector<HTMLButtonElement>('.kaplan-lens-choice')!.click();
+    expect(attachedTechniques(block)).toEqual(['w2-oracy-public-speaking']);
   });
   it('reviews one instruction at a time, saves a custom hint and allows its removal', () => {
     let block: Block = withKaplanQualifier(questionBlock(), qualifier);

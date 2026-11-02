@@ -14,12 +14,17 @@ export const PLANNING_FIELDS: ReadonlyArray<{ label: string; technique: string; 
   { label: 'Anticipated misconceptions', technique: 'w1-head-on-misconceptions' },
   { label: 'Vocabulary to teach on purpose', technique: 'w1-deliberate-vocabulary-development' },
   { label: 'Reading plan', technique: 'w1-plan-for-reading' },
+  { label: 'Complex texts: what to pre-teach', technique: 'w2-pre-reading-instructions-for-complex-texts' },
   { label: 'Knowledge organiser', technique: 'w1-using-a-knowledge-organiser' },
   { label: 'Core and hinterland', technique: 'w1-deliver-core-signpost-hinterland' },
   { label: 'Small-step sequence', technique: 'w1-sequence-concepts-in-small-steps' },
   { label: 'Tiered questions', technique: 'w1-tiered-questions-and-problems' },
   { label: 'Homework as guided study', technique: 'w1-homework-as-guided-study' },
-  { label: 'Enquiry projects', technique: 'w1-enquiry-projects' }
+  { label: 'Enquiry projects', technique: 'w1-enquiry-projects' },
+  { label: 'Mode B set pieces', technique: 'w2-mode-a-mode-b' },
+  { label: 'Exemplars to show', technique: 'w2-exemplars' },
+  { label: 'Pitching to the top', technique: 'w2-teach-to-the-top' },
+  { label: 'SEND goals and supports', technique: 'w2-send-aim-high-plan-support' }
 ];
 
 const glyphs = createGlyphSet({ svgs: SYMBOL_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });

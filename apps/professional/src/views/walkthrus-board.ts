@@ -1,5 +1,5 @@
 import { FIGURE_SVGS } from '../../../../packages/walkthrus/glyphs';
-import { CATALOGUE, SERIES, pageRefOf, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, SERIES, pageRefOf, pointedToBy, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import { SETS } from '../../../../packages/walkthrus/sets.mjs';
 import { checkOneActive, isLiveWalkthruGoal, normalizeWalkthru, pieceFor } from '../../../../packages/walkthrus/goal.mjs';
 import { countsAsRep, hasLapsed } from '../../../../packages/walkthrus/reps.mjs';
@@ -336,9 +336,14 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     const entry = techniqueById(id);
     if (!entry) return [];
     const kept = new Set(state.arrows.map((a) => `${a.from}|${a.to}`));
-    return (entry.see_also as string[])
+    const out = (entry.see_also as string[])
       .filter((to) => !kept.has(`${id}|${to}`) && layout.tiles.some((t) => t.id === to))
       .map((to) => ({ id: `book:${id}:${to}`, from: id, to, type: 'leads_to' as const, quiet: true }));
+    // The book's links read backwards too, unless the two already point at each other.
+    const back = (pointedToBy(id) as string[])
+      .filter((from) => !entry.see_also.includes(from) && !kept.has(`${from}|${id}`) && layout.tiles.some((t) => t.id === from))
+      .map((from) => ({ id: `book:${from}:${id}`, from, to: id, type: 'leads_to' as const, quiet: true }));
+    return [...out, ...back];
   }
 
   // ── painting ──

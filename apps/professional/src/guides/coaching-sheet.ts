@@ -27,7 +27,7 @@ export interface CoachingPanelOptions {
   newId?: () => string;
 }
 
-const techniques = (CATALOGUE as unknown as Array<{ id: string; kind: string; series: string; name: string }>).filter((e) => e.kind === 'technique');
+const techniques = (CATALOGUE as unknown as Array<{ id: string; kind: string; set: number; series: string; name: string }>).filter((e) => e.kind === 'technique');
 
 export function decisionLabel(decision: CoachingSheet['decision']): string {
   return decision === 'keep' ? 'Keep working on this' : decision === 'move_on' ? 'Move to a new technique' : 'Open';
@@ -107,7 +107,7 @@ export function openCoachingPanel(doc: Document, options: CoachingPanelOptions):
     for (const series of SERIES as unknown as Array<{ key: string; name: string }>) {
       const group = el('optgroup');
       group.label = series.name;
-      for (const t of techniques.filter((x) => x.series === series.key)) group.append(Object.assign(el('option'), { value: t.id, textContent: t.name }));
+      for (const t of techniques.filter((x) => x.series === series.key)) group.append(Object.assign(el('option'), { value: t.id, textContent: t.set > 1 ? `${t.name} · Book ${t.set}` : t.name }));
       if (group.children.length) technique.append(group);
     }
     const start = button('Start the sheet', 'btn btn--primary', 'coaching-start');

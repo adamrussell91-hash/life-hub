@@ -1,5 +1,5 @@
 import { STAGES, normalizeWalkthru, evidenceGain, openCycle } from '../../../../packages/walkthrus/goal.mjs';
-import { pageRefOf, seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
+import { pageRefOf, pointedToBy, seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import type { WalkthruGoal, WalkthruRep, WalkthruText, WalkthruTechniqueText } from '@/api/walkthrus';
 import { summarise } from '../../../../packages/walkthrus/reps.mjs';
 import { isFusionId } from '../../../../packages/walkthrus/tiles.mjs';
@@ -345,13 +345,25 @@ export function renderPanel(host: HTMLElement, model: PanelModel, actions: Panel
   }
   body.append(actionsRow, proofSection(model));
 
-  if (entry.see_also.length) {
+  // A framework chapter has no steps to open, so only techniques become links.
+  const pointsTo = (entry.see_also as string[]).filter((id) => techniqueById(id)?.kind === 'technique');
+  if (pointsTo.length) {
     const also = el('div', 'wt-panel__also');
     also.append(el('h3', 'wt-panel__h', 'The book also points to'));
-    for (const id of entry.see_also as string[]) {
-      const other = techniqueById(id);
-      if (!other) continue;
-      const chip = el('button', 'wt-chip', other.name);
+    for (const id of pointsTo) {
+      const chip = el('button', 'wt-chip', techniqueById(id)?.name ?? id);
+      chip.type = 'button';
+      chip.addEventListener('click', () => actions.onSelect(id));
+      also.append(chip);
+    }
+    body.append(also);
+  }
+  const pointers = pointedToBy(entry.id) as string[];
+  if (pointers.length) {
+    const also = el('div', 'wt-panel__also');
+    also.append(el('h3', 'wt-panel__h', 'These point here'));
+    for (const id of pointers) {
+      const chip = el('button', 'wt-chip', techniqueById(id)?.name ?? id);
       chip.type = 'button';
       chip.addEventListener('click', () => actions.onSelect(id));
       also.append(chip);

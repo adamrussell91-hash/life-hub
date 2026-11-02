@@ -165,5 +165,7 @@ export const techniqueById = (id) => CATALOGUE.find((e) => e.id === id) ?? null;
 export const isTechniqueId = (id) => typeof id === 'string' && CATALOGUE.some((e) => e.id === id && e.kind === 'technique');
 export const techniquesOf = (setId) => CATALOGUE.filter((e) => e.set === setId && e.kind === 'technique');
 export const frameworksOf = (setId) => CATALOGUE.filter((e) => e.set === setId && e.kind === 'framework');
+/** The techniques whose own see_also names this one: the book's links, read backwards. */
+export const pointedToBy = (id) => TECHNIQUES.filter((e) => e.see_also.includes(id)).map((e) => e.id);
 /** How a page reference reads away from the board: page numbers repeat between books, so later books say which. */
 export const pageRefOf = (e) => `${e.set > 1 ? `Book ${e.set} · ` : ''}${e.code} | ${e.page}`;
