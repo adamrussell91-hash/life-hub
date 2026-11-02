@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aiReadCount, flowItems, type QuizLoad } from '@/marking/to-mark-items';
+import { aiReadCount, flowItems, flowLabel, type QuizLoad } from '@/marking/to-mark-items';
 import type { ToMarkTask } from '@/marking/to-mark-view';
 
 const base = { class_id: 'c1', class_title: '8 English', lesson_id: 'l1', roster: 2 };
@@ -25,5 +25,13 @@ describe('the To mark flow items', () => {
 
   it('counts only what the AI has not read yet', () => {
     expect(aiReadCount(tasks, quizzes)).toBe(4);
+  });
+});
+
+describe('flowLabel', () => {
+  it('names a redraft and how much of it to look at', () => {
+    expect(flowLabel({ kind: 'writing', row: { initials: 'AN' } })).toBe('Writing');
+    expect(flowLabel({ kind: 'writing', row: { initials: 'AN', draft: 2, sent_scope: 'whole' } })).toBe('Redraft 2');
+    expect(flowLabel({ kind: 'writing', row: { initials: 'AN', draft: 3, sent_scope: { part: 'answers', field: 'q1', start: 0, end: 4 } } }, true)).toBe('Redraft 3, one section');
   });
 });

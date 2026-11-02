@@ -201,6 +201,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       if (c) earlier.append(el('p', 'mk-hint', `${c.code} ${c.label}`));
     }
     if (lastDraft.comment) earlier.append(el('p', 'mk-earlier__comment', lastDraft.comment));
+    else if (!lastDraft.tags.length) earlier.append(el('p', 'mk-hint', 'No codes or comment.'));
     side.prepend(earlier);
   }
   const askHint = el('p', 'mk-hint');

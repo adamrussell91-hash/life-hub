@@ -68,7 +68,7 @@ async function pieceItems(store, classId, book, base) {
       href: `/mark/${encodeURIComponent(classId)}/${encodeURIComponent(column.id)}`,
       waiting: waiting.length, handed_in: handed.length,
       who: waiting.map((s) => (s.initials && s.draft > 1 ? `${s.initials} · Redraft ${s.draft}, ${s.sent_scope === 'whole' ? 'whole piece' : 'one section'}` : s.initials)).filter(Boolean),
-      rows: waiting.map((s) => ({ student_id: s.id, initials: s.initials, ...(s.draft > 1 ? { draft: s.draft } : {}) })),
+      rows: waiting.map((s) => ({ student_id: s.id, initials: s.initials, ...(s.draft > 1 ? { draft: s.draft, sent_scope: s.sent_scope } : {}) })),
       ...(asked.length ? { asked: asked.map((s) => ({ initials: s.initials, asked_at: s.asked_at })) } : {}),
       oldest_at: oldest(waiting.map((s) => s.handed_in_at))
     });

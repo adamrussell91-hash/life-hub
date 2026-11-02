@@ -95,6 +95,8 @@ test('a section ask snaps to whole words and refuses a range off the text', asyn
   await saved(store, ava);
   const out = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 8, end: 12 } } });
   assert.deepEqual(out.feedback.redraft.scope, { part: 'answers', field: 'q1', start: 7, end: 15 });
+  const stop = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 26, end: 33 } } });
+  assert.deepEqual(stop.feedback.redraft.scope, { part: 'answers', field: 'q1', start: 26, end: 34 }, 'takes the full stop with the word');
   await assert.rejects(
     piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 5, end: 9000 } } }),
     /section/

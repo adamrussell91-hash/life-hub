@@ -39,7 +39,7 @@ const KIND_LABEL: Record<ToMarkKind, string> = {
 };
 
 const days = (iso: string) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86400000));
-const ageText = (iso: string) => {
+export const ageText = (iso: string) => {
   const d = days(iso);
   return d === 0 ? 'today' : d === 1 ? '1 day' : `${d} days`;
 };

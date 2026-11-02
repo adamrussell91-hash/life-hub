@@ -81,6 +81,6 @@ test('the queue labels a redraft, carries its draft on the row, and lists who wa
 
   const { tasks: [task] } = await toMarkQueue(store, { now: () => Date.parse('2026-11-05T00:00:00Z') });
   assert.deepEqual(task.who, ['AN · Redraft 2, one section']);
-  assert.deepEqual(task.rows, [{ student_id: ava.id, initials: 'AN', draft: 2 }]);
+  assert.deepEqual(task.rows, [{ student_id: ava.id, initials: 'AN', draft: 2, sent_scope: { part: 'answers', field: 'q1', start: 0, end: 7 } }]);
   assert.deepEqual(task.asked, [{ initials: 'NP', asked_at: '2026-11-01T00:00:00Z' }]);
 });

@@ -82,6 +82,9 @@ export function cleanScope(raw, text) {
   if (typeof body !== 'string' || !(start >= 0) || !(end > start) || end > body.length) reject(400, 'bad_section', 'That section can’t be used. Select it again.');
   while (start > 0 && WORD.test(body[start - 1])) start -= 1;
   while (end < body.length && WORD.test(body[end])) end += 1;
+  // Quote marks and a full stop belong with the words, so none is left stranded outside the box.
+  while (start > 0 && /[“‘"(\[]/u.test(body[start - 1])) start -= 1;
+  while (end < body.length && /[”’".,;:!?)\]]/u.test(body[end])) end += 1;
   return { part: raw.part, field: raw.field, start, end };
 }
 
