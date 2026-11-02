@@ -1,33 +1,34 @@
 // packages/walkthrus/problem-types.mjs
 // The six problem types a pattern can show, the series each belongs to, and a short ranked
-// list of technique ids per type. Ids only; see catalogue.mjs.
+// list of technique ids per type. The first id is the suggestion, the rest are its alternatives.
+// Ids only; see catalogue.mjs.
 
-const id = (name) => `w1-${name}`;
+const ranked = (...ids) => Object.freeze(ids);
 
 export const PROBLEM_TYPES = Object.freeze({
   recall: Object.freeze({
     label: 'Recall', series: 'PR',
-    ranked: Object.freeze(['quizzing', 'weekly-and-monthly-review', 'elaborative-interrogation', 'using-a-knowledge-organiser', 'peer-supported-retrieval'].map(id))
+    ranked: ranked('w1-quizzing', 'w1-weekly-and-monthly-review', 'w2-flash-cards', 'w1-elaborative-interrogation', 'w1-using-a-knowledge-organiser', 'w2-dual-coding-mapping', 'w1-peer-supported-retrieval')
   }),
   fluency: Object.freeze({
     label: 'Fluency', series: 'PR',
-    ranked: Object.freeze(['building-fluency', 'rehearsal-and-performance', 'guided-practice', 'independent-practice'].map(id))
+    ranked: ranked('w1-building-fluency', 'w1-rehearsal-and-performance', 'w2-practise-explaining', 'w1-guided-practice', 'w1-independent-practice')
   }),
   recognising: Object.freeze({
     label: 'Recognising what the question asks', series: 'EM',
-    ranked: Object.freeze(['process-questions', 'metacognitive-talk', 'live-modelling', 'set-the-standards'].map(id))
+    ranked: ranked('w1-process-questions', 'w2-a-ladder-of-difficulty', 'w1-metacognitive-talk', 'w1-live-modelling', 'w2-compare-contrast-and-categorise', 'w1-set-the-standards')
   }),
   dexterity: Object.freeze({
     label: 'Dexterity with procedures', series: 'EM',
-    ranked: Object.freeze(['worked-examples-and-backward-fading', 'live-modelling', 'scaffolding', 'guided-practice'].map(id))
+    ranked: ranked('w1-worked-examples-and-backward-fading', 'w1-live-modelling', 'w1-scaffolding', 'w2-spot-your-mistakes', 'w1-guided-practice', 'w2-thresholds-and-pathways')
   }),
   sophistication: Object.freeze({
     label: 'Sophistication of responses', series: 'EM',
-    ranked: Object.freeze(['set-the-standards', 'say-it-again-better', 'feedback-that-moves-forward', 'independent-practice'].map(id))
+    ranked: ranked('w1-set-the-standards', 'w2-exemplars', 'w1-say-it-again-better', 'w2-redrafting', 'w1-feedback-that-moves-forward', 'w2-success-criteria', 'w1-independent-practice')
   }),
   time: Object.freeze({
     label: 'Working under time', series: 'PR',
-    ranked: Object.freeze(['building-fluency', 'rehearsal-and-performance', 'independent-practice'].map(id))
+    ranked: ranked('w1-building-fluency', 'w1-rehearsal-and-performance', 'w2-the-face-it-revision-model', 'w1-independent-practice')
   })
 });
 

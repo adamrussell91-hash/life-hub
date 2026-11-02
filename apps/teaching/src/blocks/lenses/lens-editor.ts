@@ -14,7 +14,7 @@ import { LEVEL_LABELS, type LensConfig, type SleeveLens, type SteppedLens } from
 import { CATALOGUE, SERIES, pageRefOf, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { FIGURE_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
-import { attachedTechniques, withTechnique } from '../walkthru-note/attach';
+import { attachedTechniques, suggestedTechnique, withTechnique } from '../walkthru-note/attach';
 
 const walkthruGlyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
 /** Any block can carry a WalkThru, bar teacher notes (which carry their own). */
@@ -271,12 +271,16 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     search.setAttribute('aria-label', 'Find a technique');
     panel.append(caption, search);
     const lists: Array<{ heading: HTMLElement; list: HTMLElement; picks: Array<[string, HTMLButtonElement]> }> = [];
-    for (const series of SERIES) {
-      const items = CATALOGUE.filter((e) => e.kind === 'technique' && e.series === series.key);
+    const suggested = suggestedTechnique(options.getBlock());
+    const groups = [
+      { name: 'For this type of Voice block', items: CATALOGUE.filter((e) => e.id === suggested) },
+      ...SERIES.map((series) => ({ name: series.name, items: CATALOGUE.filter((e) => e.kind === 'technique' && e.series === series.key) }))
+    ];
+    for (const { name, items } of groups) {
       if (!items.length) continue;
       const heading = document.createElement('h4');
       heading.className = 'kaplan-lens-group';
-      heading.textContent = series.name;
+      heading.textContent = name;
       const list = document.createElement('div');
       list.className = 'kaplan-lens-choices';
       const picks: Array<[string, HTMLButtonElement]> = items.map((item) => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { CATALOGUE, CATALOGUE_IDS, SERIES, pageRefOf, techniquesOf, frameworksOf, isTechniqueId } from '../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, CATALOGUE_IDS, SERIES, pageRefOf, pointedToBy, techniquesOf, frameworksOf, isTechniqueId } from '../../packages/walkthrus/catalogue.mjs';
 import { SETS, setById } from '../../packages/walkthrus/sets.mjs';
 import { PROBLEM_TYPES, PROBLEM_TYPE_IDS, rankedFor } from '../../packages/walkthrus/problem-types.mjs';
 import { createGlyphSet, placeholderGlyph } from '../../packages/design-kit/js/glyph-set.js';
@@ -47,8 +47,18 @@ test('problem types rank real technique ids, and sit in a real series', () => {
     assert.ok(seriesKeys.has(PROBLEM_TYPES[type].series), type);
     assert.ok(rankedFor(type).length >= 3, type);
     for (const id of rankedFor(type)) assert.ok(isTechniqueId(id), `${type} → ${id}`);
+    assert.equal(new Set(rankedFor(type)).size, rankedFor(type).length, type);
+    assert.match(rankedFor(type)[0], /^w1-/, `${type} keeps its first suggestion`);
+    assert.ok(rankedFor(type).some((id) => id.startsWith('w2-')), `${type} offers Book 2`);
   }
   assert.deepEqual(rankedFor('nope'), []);
+});
+
+test('pointedToBy reads the book links backwards, across books', () => {
+  assert.ok(pointedToBy('w1-cold-calling').includes('w2-no-opt-out'));
+  assert.ok(techniquesOf(2).find((e) => e.id === 'w2-no-opt-out').see_also.includes('w1-cold-calling'));
+  assert.ok(pointedToBy('w1-cold-calling').every(isTechniqueId));
+  assert.deepEqual(pointedToBy('nope'), []);
 });
 
 test('every catalogue entry has a glyph or gets a placeholder', () => {
