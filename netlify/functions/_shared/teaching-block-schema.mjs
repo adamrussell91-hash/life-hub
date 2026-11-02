@@ -1369,6 +1369,8 @@ var AudioBlockSchema = z11.object({
    * The Voice block. `listen` plays a clip (the original audio block); `respond`
    * and `viva` have students record a spoken answer and submit their best take.
    * Viva adds dot points the timer walks through. `url` is only used by listen.
+   * `oracy` layers a type over those modes: speech, debate and presentation run
+   * as viva, recite as respond with `recite_text` in place of a required prompt.
    */
   content: z11.object({
     url: z11.string(),
@@ -1378,7 +1380,11 @@ var AudioBlockSchema = z11.object({
     time_limit_s: z11.number().int().min(30).max(300).optional(),
     student_chooses_time: z11.boolean().optional(),
     scaffold: z11.array(z11.object({ label: z11.string().max(80), weight: z11.number().min(0.5).max(3).default(1) })).max(8).optional(),
-    code_groups: z11.array(z11.enum(["composition", "viva", "speaking"])).optional()
+    code_groups: z11.array(z11.enum(["composition", "viva", "speaking"])).optional(),
+    oracy: z11.enum(["speech", "debate", "presentation", "recite"]).optional(),
+    side: z11.enum(["proposing", "opposing"]).optional(),
+    stems: z11.array(z11.string().max(120)).max(12).optional(),
+    recite_text: z11.string().max(8e3).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

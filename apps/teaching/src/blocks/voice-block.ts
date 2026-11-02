@@ -5,6 +5,7 @@ import { taskCard } from '@/blocks/peer-feedback-task';
 import { mountVoiceStudent, speakingSeconds } from '@/blocks/voice-student';
 import { mountVoiceTeacher } from '@/blocks/voice-teacher';
 import { durationLabel } from '@/blocks/voice-pacing';
+import { ORACY_LABELS } from '@/blocks/voice-oracy';
 import '@/blocks/peer-feedback.css';
 import '@/blocks/peer-annotate.css';
 import '@/blocks/voice.css';
@@ -19,15 +20,16 @@ type VoiceBlock = Extract<Block, { block_type: 'audio' }>;
 
 export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const isViva = block.content.mode === 'viva';
+  const oracy = block.content.oracy;
   const root = el('section', 'voice-block peer-feedback');
   root.dataset.blockId = block.id;
   const head = el('header', 'pf-head');
-  head.append(el('h3', 'pf-eyebrow block-eyebrow', isViva ? 'Viva practice' : 'Spoken response'));
+  head.append(el('h3', 'pf-eyebrow block-eyebrow', oracy ? ORACY_LABELS[oracy] : isViva ? 'Viva practice' : 'Spoken response'));
   const prompt = block.content.prompt?.trim();
-  head.append(taskCard(prompt || 'Record a spoken answer.'));
+  head.append(taskCard(prompt || (oracy === 'recite' ? 'Recite this from memory.' : 'Record a spoken answer.')));
   const seconds = speakingSeconds(block, { points: [] });
   const facts = [
-    block.content.student_chooses_time ? 'You choose 60 s, 90 s or 2 min' : seconds ? `Speak for ${durationLabel(seconds)}` : null,
+    block.content.student_chooses_time ? 'You choose 60 s, 90 s or 2 min' : seconds ? (oracy === 'recite' && !block.content.time_limit_s ? `Up to ${durationLabel(seconds)}` : `Speak for ${durationLabel(seconds)}`) : null,
     isViva ? 'Plan your dot points first' : null
   ].filter(Boolean);
   if (facts.length) head.append(el('p', 'voice-facts block-secondary', facts.join(' · ')));
@@ -35,6 +37,11 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
 
   if (mode === 'print') {
     const sheet = el('div', 'pf-print');
+    if (oracy === 'recite') {
+      sheet.append(el('p', 'voice-recite__part-text', block.content.recite_text ?? ''));
+      root.append(sheet);
+      return root;
+    }
     sheet.append(el('p', 'pf-print__label', isViva ? 'Your dot points' : 'Notes'), el('div', 'pf-print__lines'));
     root.append(sheet);
     return root;

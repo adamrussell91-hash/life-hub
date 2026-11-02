@@ -81,6 +81,21 @@ test('a student submits one take; parts are joined, audio stored, queued for Whi
   await assert.rejects(submit(store), (e) => e instanceof VoiceError && e.code === 'already_submitted');
 });
 
+test('a Debate take keeps its side: the block’s if the teacher set one, otherwise the student’s, and nothing elsewhere', async () => {
+  const debate = { ...block, content: { ...block.content, oracy: 'debate' } };
+  const side = async (b, extra) => {
+    const store = memoryStore(lessonSeed(b));
+    await submit(store, TOKEN, extra);
+    const key = [...store.data.keys()].find((k) => k.includes('/submissions/') || k.includes('submission'));
+    return store.data.get(key)?.side;
+  };
+  assert.equal(await side(debate, { side: 'opposing' }), 'opposing');
+  assert.equal(await side({ ...debate, content: { ...debate.content, side: 'proposing' } }, { side: 'opposing' }), 'proposing');
+  assert.equal(await side(debate, {}), undefined);
+  assert.equal(await side(block, { side: 'opposing' }), undefined);
+  await assert.rejects(side(debate, { side: 'neither' }), (e) => e instanceof VoiceError && e.code === 'bad_side');
+});
+
 test('students cannot submit to an unpublished block, over time, or with another device’s parts', async () => {
   await assert.rejects(submit(memoryStore([['lessons/lesson1', { blocks: [block] }]])), (e) => e.code === 'not_published');
   const listen = { ...block, content: { url: 'https://x.test/a.mp3', mode: 'listen' } };

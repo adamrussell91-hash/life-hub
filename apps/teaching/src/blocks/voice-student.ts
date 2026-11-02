@@ -5,6 +5,8 @@ import { keepTake, takeStore, type VoiceTake } from '@/blocks/voice-takes';
 import { audioUrl, cleanInitials, fetchMine, rememberInitials, submitTake, voiceDevice, type MineState } from '@/blocks/voice-client';
 import { DEFAULT_VIVA_SECONDS, STUDENT_TIME_CHOICES } from '@/blocks/voice-block-editor';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
+import { SIDE_LABELS } from '@/blocks/voice-oracy';
+import { mountRecitePractice, reciteTextFold, type ReciteProgress } from '@/blocks/voice-recite';
 
 /**
  * The student side of a Voice block: prep dot points (viva), a 3-2-1
@@ -13,11 +15,14 @@ import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
  */
 
 type VoiceBlock = Extract<Block, { block_type: 'audio' }>;
-type Plan = { points: string[]; seconds?: number };
+type Side = NonNullable<VoiceBlock['content']['side']>;
+type Plan = { points: string[]; seconds?: number; side?: Side; recite?: ReciteProgress };
 
 const COUNTDOWN = [3, 2, 1];
 const WARN_BEFORE_S = 10;
 const BITRATE = 32_000;
+/** The server keeps takes of up to five minutes, so a Recite with no limit stops there. */
+const RECITE_MAX_SECONDS = 300;
 
 function pickMime(): string | undefined {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -34,11 +39,13 @@ export function speakingSeconds(block: VoiceBlock, plan: Plan): number | null {
   const c = block.content;
   if (c.student_chooses_time) return STUDENT_TIME_CHOICES.includes(plan.seconds ?? 0) ? plan.seconds! : STUDENT_TIME_CHOICES[1]!;
   if (c.time_limit_s) return c.time_limit_s;
+  if (c.oracy === 'recite') return RECITE_MAX_SECONDS;
   return c.mode === 'viva' ? DEFAULT_VIVA_SECONDS : null;
 }
 
 export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElement {
   const isViva = block.content.mode === 'viva';
+  const oracy = block.content.oracy;
   const scope = `${lessonId}:${block.id}`;
   const planKey = `voice:${scope}:plan`;
   const scaffold = block.content.scaffold ?? [];
@@ -65,13 +72,50 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
   const savePlan = () => writeJSON(planKey, plan);
 
   const weights = () => plan.points.map((_, i) => scaffold[i]?.weight ?? 1);
+  const side = (): Side | undefined => block.content.side ?? plan.side;
+
+  function sideRow(): HTMLElement {
+    const wrap = el('div', 'pf-field');
+    if (block.content.side) {
+      wrap.append(el('span', 'voice-take__chip voice-side', `You are ${SIDE_LABELS[block.content.side].toLowerCase()}`));
+      return wrap;
+    }
+    wrap.append(el('span', 'pf-field__label', 'Your side'));
+    const group = el('div', 'pa-mode');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Your side');
+    for (const option of Object.keys(SIDE_LABELS) as Side[]) {
+      const b = button(SIDE_LABELS[option], 'ghost', () => {
+        plan.side = option;
+        savePlan();
+        clearError();
+        paint();
+      });
+      b.className = 'pa-mode__option';
+      b.setAttribute('aria-pressed', String(plan.side === option));
+      group.append(b);
+    }
+    wrap.append(group);
+    return wrap;
+  }
+
+  function stemChips(): HTMLElement | null {
+    const stems = block.content.stems ?? [];
+    if (!stems.length || (oracy !== 'speech' && oracy !== 'debate')) return null;
+    const wrap = el('div', 'pf-field');
+    wrap.append(el('span', 'pf-field__label', oracy === 'debate' ? 'Phrases to try' : 'Techniques to try'));
+    const list = el('ul', 'voice-stems');
+    for (const stem of stems) list.append(el('li', 'voice-take__chip', stem));
+    wrap.append(list);
+    return wrap;
+  }
 
   /* ── Practice: plan + takes ───────────────────────────────────────── */
 
   function planEditor(): HTMLElement {
     const box = el('section', 'voice-plan');
     box.append(el('h4', 'voice-plan__title', 'Your dot points'));
-    box.append(el('p', 'pf-field__hint block-secondary', 'Short prompts, not a script. The timer moves you through them while you speak.'));
+    box.append(el('p', 'pf-field__hint block-secondary', oracy === 'presentation' ? 'One point per slide. Present from your own slides.' : 'Short prompts, not a script. The timer moves you through them while you speak.'));
     const list = el('ol', 'voice-plan__points');
     plan.points.forEach((text, i) => {
       const item = el('li', 'voice-plan__point');
@@ -163,7 +207,32 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
 
   function practiceView(): HTMLElement {
     const view = el('div', 'voice-practice');
+    if (oracy === 'recite' && !plan.recite?.ready) {
+      view.append(
+        mountRecitePractice(block.content.recite_text, plan.recite, (progress) => {
+          plan.recite = progress;
+          savePlan();
+          if (progress.ready) paint();
+        })
+      );
+      return view;
+    }
+    if (oracy === 'debate') view.append(sideRow());
     if (isViva) view.append(planEditor());
+    const stems = stemChips();
+    if (stems) view.append(stems);
+    if (oracy === 'recite') {
+      const again = el('div', 'voice-recite__again');
+      again.append(
+        reciteTextFold(block.content.recite_text),
+        button('Practise again', 'secondary', () => {
+          plan.recite = { round: 0, step: 0 };
+          savePlan();
+          paint();
+        })
+      );
+      view.append(again);
+    }
     const chooser = timeChooser();
     if (chooser) view.append(chooser);
     const seconds = speakingSeconds(block, plan);
@@ -225,6 +294,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
           duration_s: take.duration_s,
           initials: typed,
           points: take.points,
+          ...(oracy === 'debate' ? { side: side() } : {}),
           onProgress: (sent, total) => {
             if (total > 1) status.textContent = `Sending… ${sent} of ${total}`;
           }
@@ -248,6 +318,10 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
 
   async function beginRecording(): Promise<void> {
     clearError();
+    if (oracy === 'debate' && !side()) {
+      showError('Pick your side first.');
+      return;
+    }
     const mime = pickMime();
     if (!mime || !navigator.mediaDevices?.getUserMedia) {
       showError('Recording works in Chrome or Safari. Open this page there.');

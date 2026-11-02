@@ -2,6 +2,7 @@ import type { Block } from '@/schemas/block';
 import { button, el } from '@/blocks/peer-feedback-ui';
 import { mountFeedbackCodesEditor } from '@/blocks/feedback-codes-editor';
 import { GROUP_LABELS, type FeedbackCodeGroup } from '@/blocks/feedback-codes';
+import { applyVoicePick, reciteParts, voicePick, SIDE_LABELS, VOICE_PICKS } from '@/blocks/voice-oracy';
 import '@/blocks/peer-feedback.css';
 import '@/blocks/peer-annotate.css';
 import '@/blocks/voice.css';
@@ -15,18 +16,13 @@ type VoiceBlock = Extract<Block, { block_type: 'audio' }>;
 type VoiceMode = NonNullable<VoiceBlock['content']['mode']>;
 type Content = VoiceBlock['content'];
 
-const MODES: Array<{ mode: VoiceMode; label: string; hint: string }> = [
-  { mode: 'listen', label: 'Listen', hint: 'Students play a clip you upload or record.' },
-  { mode: 'respond', label: 'Respond', hint: 'Students record a spoken answer and send you their best take.' },
-  { mode: 'viva', label: 'Viva', hint: 'Students prep dot points; the timer walks them through each point while they record.' }
-];
-
 /** Time choices in seconds; 0 = no limit (respond only), -1 = students choose. */
 const TIMES: Array<{ value: number; label: string }> = [
   { value: 60, label: '60 s' },
   { value: 90, label: '90 s' },
   { value: 120, label: '2 min' },
   { value: 180, label: '3 min' },
+  { value: 300, label: '5 min' },
   { value: -1, label: 'Students choose' }
 ];
 export const STUDENT_TIME_CHOICES = [60, 90, 120];
@@ -54,16 +50,17 @@ function pillGroup<T>(label: string, options: Array<{ value: T; label: string }>
   return wrap;
 }
 
-export function createVoiceModePicker(getLatest: () => VoiceBlock, onPick: (mode: VoiceMode) => void): HTMLElement {
+export function createVoiceModePicker(getLatest: () => VoiceBlock, onPick: (block: VoiceBlock) => void): HTMLElement {
   const host = el('div', 'voice-editor__modes');
   const paint = () => {
-    const current = voiceMode(getLatest());
-    const picker = pillGroup('What students do', MODES.map((m) => ({ value: m.mode, label: m.label })), (m) => m === current, (m) => {
-      if (m === voiceMode(getLatest())) return;
-      onPick(m);
+    const current = voicePick(getLatest().content);
+    const picker = pillGroup('What students do', VOICE_PICKS.map((p) => ({ value: p.id, label: p.label })), (id) => id === current, (id) => {
+      const latest = getLatest();
+      if (id === voicePick(latest.content)) return;
+      onPick({ ...latest, content: applyVoicePick(latest.content, id) });
       paint();
     });
-    picker.append(el('p', 'pf-field__hint block-secondary', MODES.find((m) => m.mode === current)?.hint ?? ''));
+    picker.append(el('p', 'pf-field__hint block-secondary', VOICE_PICKS.find((p) => p.id === current)?.hint ?? ''));
     host.replaceChildren(picker);
   };
   paint();
@@ -93,6 +90,13 @@ export function createVoiceTaskFields(
   question.placeholder = 'e.g. How does the composer represent the human experience of isolation?';
   question.addEventListener('input', () => update({ prompt: question.value }));
   questionWrap.append(questionLabel, question);
+
+  const QUESTION_FIELD: Partial<Record<NonNullable<Content['oracy']>, { label: string; placeholder: string }>> = {
+    speech: { label: 'Speech topic', placeholder: 'e.g. The one rule I would change at this school' },
+    debate: { label: 'Motion', placeholder: 'e.g. Cities should ban cars from their centres' },
+    presentation: { label: 'Presentation topic', placeholder: 'e.g. How a volcano forms' },
+    recite: { label: 'Instruction (optional)', placeholder: 'e.g. Recite this with attention to its rhythm' }
+  };
 
   const codes = el('details', 'voice-editor__codes');
   codes.append(el('summary', 'voice-editor__codes-summary', 'Edit feedback codes'));
@@ -151,9 +155,60 @@ export function createVoiceTaskFields(
     return wrap;
   }
 
+  function sideField(content: Content): HTMLElement {
+    const options: Array<{ value: Content['side']; label: string }> = [
+      { value: undefined, label: 'Students pick' },
+      { value: 'proposing', label: SIDE_LABELS.proposing },
+      { value: 'opposing', label: SIDE_LABELS.opposing }
+    ];
+    return pillGroup('Side', options, (v) => v === content.side, (v) => update({ side: v }, true));
+  }
+
+  function stemsField(content: Content): HTMLElement {
+    const wrap = el('div', 'pf-field');
+    const label = el('label', 'pf-field__label', content.oracy === 'debate' ? 'Phrases to try' : 'Techniques to try');
+    label.htmlFor = `voice-stems-${getLatest().id}`;
+    const box = el('textarea', 'pa-input');
+    box.id = label.htmlFor;
+    box.rows = 4;
+    box.value = (content.stems ?? []).join('\n');
+    box.addEventListener('input', () => {
+      const stems = box.value.split('\n').map((line) => line.trim().slice(0, 120)).filter(Boolean).slice(0, 12);
+      update({ stems });
+    });
+    wrap.append(label, box, el('p', 'pf-field__hint block-secondary', 'One per line, up to 12. Students see these as prompts under their dot points.'));
+    return wrap;
+  }
+
+  function reciteField(content: Content): HTMLElement {
+    const wrap = el('div', 'pf-field');
+    const label = el('label', 'pf-field__label', 'Text to recite');
+    label.htmlFor = `voice-recite-${getLatest().id}`;
+    const box = el('textarea', 'pa-input voice-editor__recite');
+    box.id = label.htmlFor;
+    box.rows = 8;
+    box.maxLength = 8000;
+    box.value = content.recite_text ?? '';
+    const count = el('p', 'pf-field__hint block-secondary');
+    const paintCount = () => {
+      const parts = reciteParts(box.value).length;
+      count.textContent = `A blank line starts a new part. ${parts} part${parts === 1 ? '' : 's'} found.`;
+    };
+    box.addEventListener('input', () => {
+      update({ recite_text: box.value });
+      paintCount();
+    });
+    paintCount();
+    wrap.append(label, box, count);
+    return wrap;
+  }
+
   function paint(): void {
     const content = getLatest().content;
     if (document.activeElement !== question) question.value = content.prompt ?? '';
+    const field = content.oracy ? QUESTION_FIELD[content.oracy] : undefined;
+    questionLabel.textContent = field?.label ?? 'Question';
+    question.placeholder = field?.placeholder ?? 'e.g. How does the composer represent the human experience of isolation?';
     const mode = content.mode ?? 'listen';
     const timeValue = content.student_chooses_time ? -1 : (content.time_limit_s ?? (mode === 'viva' ? DEFAULT_VIVA_SECONDS : 0));
     const times = mode === 'respond' ? [{ value: 0, label: 'No limit' }, ...TIMES] : TIMES;
@@ -163,6 +218,7 @@ export function createVoiceTaskFields(
     });
     time.append(el('p', 'pf-field__hint block-secondary', 'Students choose from 60 s, 90 s or 2 min. Recording stops at the limit.'));
     (time.lastElementChild as HTMLElement).hidden = timeValue !== -1;
+    if (content.oracy === 'recite' && timeValue === 0) time.append(el('p', 'pf-field__hint block-secondary', 'Recording stops at 5 min, the longest take the block keeps.'));
 
     const shown = content.code_groups ?? GROUPS;
     const groups = pillGroup('Codes on your marking strip', GROUPS.map((g) => ({ value: g, label: GROUP_LABELS[g] })), (g) => shown.includes(g), (g) => {
@@ -170,7 +226,15 @@ export function createVoiceTaskFields(
       update({ code_groups: next.length === GROUPS.length ? undefined : next.length ? next : shown }, true);
     });
 
-    dynamic.replaceChildren(time, ...(mode === 'viva' ? [scaffoldEditor(content)] : []), groups);
+    dynamic.replaceChildren(
+      ...(content.oracy === 'recite' ? [reciteField(content)] : []),
+      ...(content.oracy === 'debate' ? [sideField(content)] : []),
+      time,
+      ...(mode === 'viva' ? [scaffoldEditor(content)] : []),
+      ...(content.oracy === 'speech' || content.oracy === 'debate' ? [stemsField(content)] : []),
+      ...(content.oracy === 'presentation' ? [el('p', 'pf-field__hint block-secondary', 'Slides stay in the student’s own tool. You mark from the audio and transcript.')] : []),
+      groups
+    );
   }
 
   return { el: root, refresh: paint };

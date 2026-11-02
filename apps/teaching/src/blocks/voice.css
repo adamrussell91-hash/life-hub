@@ -9,6 +9,11 @@
   min-width: 0;
 }
 
+.voice-editor[hidden],
+.voice-editor__listen[hidden] {
+  display: none;
+}
+
 .voice-editor__question {
   resize: vertical;
 }
@@ -224,6 +229,100 @@
   color: var(--ink);
   background: var(--cotton);
   border-radius: var(--radius-full);
+}
+
+.voice-stems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.voice-side {
+  justify-self: start;
+  width: fit-content;
+  font-weight: var(--weight-semibold);
+}
+
+/* ── Recite ────────────────────────────────────────────────────────── */
+
+.voice-recite,
+.voice-recite__again {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.voice-recite > button {
+  justify-self: start;
+}
+
+.voice-recite__again {
+  justify-items: start;
+}
+
+.voice-recite__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.voice-recite__step {
+  padding-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--line);
+}
+
+.voice-recite__step[aria-current='step'] {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.voice-recite__text,
+.voice-recite__covered {
+  display: grid;
+  gap: var(--space-3);
+  min-height: 5rem;
+  padding: var(--space-3) var(--space-4);
+  background: var(--cotton);
+  border-radius: var(--radius-md);
+}
+
+.voice-recite__part-text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.voice-recite__covered {
+  align-content: center;
+  margin: 0;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.voice-recite__fold {
+  width: 100%;
+  min-width: 0;
+}
+
+.voice-recite__fold-summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.voice-recite__fold[open] > .voice-recite__fold-summary {
+  margin-bottom: var(--space-2);
 }
 
 .voice-take__audio {
