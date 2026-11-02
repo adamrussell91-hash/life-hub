@@ -83,8 +83,18 @@ function looksFor(column, key, now) {
   return line ? `${stepName(next)} looks like: ${line}` : null;
 }
 
+/** How many returned pieces and notes this student hasn't opened, for every lesson page: reads the rows only, no markbook. */
+export async function unseenFor(store, roster, student) {
+  const classId = roster.cls.id;
+  const rows = await mapBounded(await listBlobKeys(store, piecePrefix(classId, student.id)), 8, (k) => read(store, k));
+  const notes = await studentNotes(store, classId, student.id);
+  return rows.filter((r) => r?.status === 'returned' && r.kind !== 'assessment' && !r.seen_at).length + notes.filter((d) => !d.seen_at).length;
+}
+
 export async function progressFor(store, roster, student) {
   const all = await studentPieces(store, roster.cls.id, student.id);
+  const notes = await studentNotes(store, roster.cls.id, student.id);
+  const backToRead = all.filter((p) => p.kind !== 'assessment');
   const pieces = all.slice(-CHART_MAX);
   const library = await readFeedbackCodes(store);
   const codes = new Map(library.map((c) => [c.id, c]));
@@ -121,7 +131,9 @@ export async function progressFor(store, roster, student) {
   return {
     pieces: pieces.map((p) => ({ id: p.id, label: p.short || p.title, date: day(p.at), kind: p.kind })),
     outcomes, concepts, skills, codes: grid, next,
-    unseen: all.filter((p) => p.kind !== 'assessment' && !p.seen_at).length
+    unseen: backToRead.filter((p) => !p.seen_at).length + notes.filter((d) => !d.seen_at).length,
+    // A note isn't a piece, so a student with only notes has no pieces but still has something to open.
+    has_returned: backToRead.length + notes.length > 0
   };
 }
 

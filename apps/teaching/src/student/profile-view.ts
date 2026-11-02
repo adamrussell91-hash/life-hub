@@ -8,6 +8,7 @@
 import { apiPost } from '@/api/client';
 import { button, deviceToken, el, errorText } from '@/quiz/dom';
 import { ensureNoIndex } from '@/student/feedback-view';
+import { lessonToReturnTo } from '@/student/initials-token';
 import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor, STUDENT_BRAND } from '@/student/shell';
 import { buildCoverageMap, type CoverageMapInput } from '@/network/coverage-map/model';
 import { mountProgressMap } from '@/network/coverage-map/progress';
@@ -17,7 +18,7 @@ import { skillPath } from '@/progress/skill-path';
 import { codeGrid, codeChip } from '@/progress/code-grid';
 import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
-import { pieceView, returnedList, type PiecePayload } from '@/student/returned-view';
+import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -43,7 +44,7 @@ export type RenderProfileOptions = {
   message?: string;
   /** The Returned work tab's calls; without them the tab shows an empty list. */
   loadReturned?: () => Promise<ReturnedItem[]>;
-  loadPiece?: (id: string) => Promise<PiecePayload>;
+  loadPiece?: (id: string) => Promise<PiecePayload | NotePayload>;
   markSeen?: (id: string) => void;
   /** The teacher viewing a student's page: their name heads it and the device line goes. */
   teacher?: { name: string };
@@ -179,7 +180,7 @@ function renderInitials(options: RenderProfileOptions): HTMLElement {
   return card;
 }
 
-function tabs(unseen: number, panels: { progress: HTMLElement; returned: HTMLElement }, onReturned: () => void): HTMLElement {
+function tabs(unseen: number, start: 'progress' | 'returned', panels: { progress: HTMLElement; returned: HTMLElement }, onReturned: () => void): HTMLElement {
   const bar = el('div', 'pg-tabs');
   bar.setAttribute('role', 'tablist');
   const make = (id: 'progress' | 'returned', label: string, badge = 0): HTMLButtonElement => {
@@ -206,7 +207,7 @@ function tabs(unseen: number, panels: { progress: HTMLElement; returned: HTMLEle
   a.addEventListener('click', () => select('progress'));
   b.addEventListener('click', () => select('returned'));
   bar.append(a, b);
-  select('progress');
+  select(start);
   return bar;
 }
 
@@ -252,7 +253,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
   }
   const map = renderMap(payload.map, options.classId);
-  if (!payload.pieces?.length) {
+  if (!payload.pieces?.length && !payload.has_returned) {
     // The teacher knows nothing is returned yet; only the student needs telling.
     if (!options.teacher) root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'));
     root.append(map);
@@ -263,15 +264,19 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   progress.append(renderNext(payload), renderLearning(payload));
   const skills = renderSkills(payload);
   if (skills) progress.append(skills);
-  const codes = el('section', 'pg-codes-sec');
-  codes.append(el('h2', 'pm-map__title', 'What your feedback keeps saying'), codeGrid(payload.codes ?? [], payload.pieces));
-  progress.append(codes, map);
+  if (payload.pieces?.length) {
+    const codes = el('section', 'pg-codes-sec');
+    codes.append(el('h2', 'pm-map__title', 'What your feedback keeps saying'), codeGrid(payload.codes ?? [], payload.pieces));
+    progress.append(codes);
+  }
+  progress.append(map);
   const returned = el('div', 'pg-panel');
   returned.setAttribute('role', 'tabpanel');
   let loaded = false;
   const load = returnedPanel(returned, options);
   root.append(
-    tabs(payload.unseen ?? 0, { progress, returned }, () => {
+    // A student with new feedback lands on it; a teacher looking in starts on the overview.
+    tabs(payload.unseen ?? 0, payload.unseen && !options.teacher ? 'returned' : 'progress', { progress, returned }, () => {
       if (loaded) return;
       loaded = true;
       load();
@@ -293,7 +298,8 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   root.replaceChildren();
   const { surface, header, content } = createStudentShell('student-surface__content--profile');
   root.append(surface);
-  renderStudentChrome(header, { brand: STUDENT_BRAND, links: [{ href: `/s/classes/${classId}`, label: 'Back to class' }] });
+  const lesson = lessonToReturnTo(window.location.search);
+  renderStudentChrome(header, { brand: STUDENT_BRAND, links: lesson ? [{ href: lesson, label: 'Back to lesson' }] : [] });
   renderStudentStatus(content, 'Loading your progress…');
 
   const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen', extra: Record<string, unknown> = {}): Promise<T> =>
@@ -315,7 +321,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
             );
         },
         loadReturned: () => call<{ items: ReturnedItem[] }>('returned').then((r) => r.items),
-        loadPiece: (id) => call<PiecePayload>('piece', { item: id }),
+        loadPiece: (id) => call<PiecePayload | NotePayload>('piece', { item: id }),
         markSeen: (id) => void call('seen', { item: id }).catch(() => undefined)
       })
     );

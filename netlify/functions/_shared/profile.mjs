@@ -14,7 +14,7 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { progressFor, returnedFor, pieceFor, markSeen, stepsFor } from './profile-feedback.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 
@@ -43,7 +43,7 @@ async function unitLessons(store, cls) {
 export async function profileAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
@@ -52,6 +52,8 @@ export async function profileAction(store, classId, body) {
     if (action === 'done' || action === 'undone') reject(403, 'need_initials', 'Type your initials first.');
     return { need: 'initials' };
   }
+  // The initials token on every lesson page.
+  if (action === 'token') return { need: null, initials: student.initials, unseen: await unseenFor(store, roster, student) };
   // The lesson footer: whether this student's own tick (or a teacher's complete mark) is on, nothing else.
   if (action === 'status' && body.quick === true && typeof body.lesson_id === 'string') {
     const record = (await listDone(store, classId, student.id))[body.lesson_id];
