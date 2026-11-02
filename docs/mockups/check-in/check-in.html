@@ -61,8 +61,8 @@
   .top .sp { margin-left: auto; display: flex; gap: 2px; }
   .more { font: inherit; font-size: 18px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 8px; border-radius: 10px; letter-spacing: 1px; }
   .more--open { background: var(--line); color: var(--ink); }
-  .dots { display: flex; gap: 6px; padding: 14px 18px 0; align-items: center; }
-  .dots button { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; display: inline-flex; gap: 5px; align-items: center; }
+  .dots { display: flex; flex-wrap: wrap; gap: 4px; padding: 14px 18px 0; align-items: center; }
+  .dots button { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; display: inline-flex; gap: 4px; align-items: center; }
   .dots button i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
   .dots button.seen i { background: var(--sage-2); }
   .dots button.now { border-color: var(--sage-1); color: var(--ink); font-weight: 600; background: var(--sage-tint); }
@@ -121,13 +121,81 @@
   .tl i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
   .tl span { color: var(--muted); font-size: 13px; }
 
+  /* Icons: one line weight, round caps, currentColor. */
+  .ico { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+  .ico--lg { width: 22px; height: 22px; }
+  .kicker { display: inline-flex; gap: 6px; align-items: center; }
+  .dots button .ico { width: 13px; height: 13px; color: var(--muted); }
+  .dots button.seen .ico { color: var(--sage-2); }
+  .dots button.now .ico { color: var(--sage-1); }
+  .top .mark { width: 26px; height: 26px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; }
+  .opt { width: 172px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 8px; justify-items: start; }
+  .opt--pick { border-color: var(--sage-1); box-shadow: 0 0 0 2px var(--sage-tint); }
+  .opt b { font-size: 14px; }
+  .opt span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .opt .emblem { width: 56px; height: 56px; }
+  .set { display: flex; flex-wrap: wrap; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; color: var(--sage-1); }
+  .set div { display: grid; justify-items: center; gap: 6px; font-size: 12px; color: var(--muted); width: 64px; text-align: center; }
+  .set .ico { width: 24px; height: 24px; color: var(--sage-1); }
+  .set .dusk { color: var(--dusk-1); }
+
   @media (max-width: 720px) { .meeting { grid-template-columns: 1fr; } .panel { border-left: none; border-top: 1px solid var(--line); } }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M5 5h14v10h-8l-4 3.5V15H5z"/><path d="M10 9.5h4"/></symbol>
+    <symbol id="i-safety" viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5c0 4.3-2.9 7.6-7 9.2-4.1-1.6-7-4.9-7-9.2v-5z"/></symbol>
+    <symbol id="i-listen" viewBox="0 0 24 24"><path d="M7.5 10a4.5 4.5 0 0 1 9 0c0 3.2-3.2 3.6-3.2 6.6a2.6 2.6 0 0 1-5.1.6"/><path d="M10.3 10.2a1.7 1.7 0 0 1 3.4 0"/></symbol>
+    <symbol id="i-hope" viewBox="0 0 24 24"><path d="M3.5 17.5h17"/><path d="M7 17.5a5 5 0 0 1 10 0"/><path d="M12 7v2.2M5.6 10.4l1.5 1.5M18.4 10.4l-1.5 1.5"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="8" cy="8.5" r="2.6"/><circle cx="16" cy="8.5" r="2.6"/><path d="M3.5 18.5a4.5 4.5 0 0 1 9 0M11.5 18.5a4.5 4.5 0 0 1 9 0"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24"><path d="M6.5 4v16"/><path d="M6.5 12h7a4 4 0 0 0 4-4V5.5"/><path d="M15 7.5l2.5-2.5L20 7.5"/></symbol>
+    <symbol id="i-handover" viewBox="0 0 24 24"><path d="M4 12h11"/><path d="M11.5 8l4 4-4 4"/><path d="M19.5 5v14"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="11" width="13" height="9" rx="2"/><path d="M8.5 11V8.2a3.5 3.5 0 0 1 7 0V11"/></symbol>
+    <!-- Emblem: a bridge. "You are the bridge to care." Two banks, one span. -->
+    <symbol id="e-bridge" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M14 22.3V30M22 18V30M30 22.3V30" stroke="#8fae9c" stroke-width="2" stroke-linecap="round"/><path d="M7 30C12 14 32 14 37 30" fill="none" stroke="#5f7f6e" stroke-width="3" stroke-linecap="round"/><path d="M5.5 30h33" stroke="#1b2230" stroke-width="2.4" stroke-linecap="round"/><path d="M12 35.5c2-1.3 4-1.3 6 0s4 1.3 6 0 4-1.3 6 0" fill="none" stroke="#8fae9c" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
 <div class="sheet">
   <h1>Check-in guide · mockup</h1>
   <p>A second guide on the Meeting Guides shelf, for when a wellbeing conversation comes up with a student. Invented student; every line of step wording here is <span class="ph">PLACEHOLDER</span> — the real text loads at runtime from the private data repo and is never stored on a record. Nothing on screen says “crisis”; there is no red.</p>
+
+  <div class="label">0 · Emblem and icons</div>
+  <div class="opts">
+    <div class="opt opt--pick">
+      <svg class="emblem"><use href="#e-bridge"/></svg>
+      <b>Bridge · recommended</b>
+      <span>From your notes: you are the bridge to care. Two banks, one span. Reads as nothing to a student.</span>
+    </div>
+    <div class="opt">
+      <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M9 13h16v10h-9l-4 3.5V23H9z" fill="none" stroke="#5f7f6e" stroke-width="2.2" stroke-linejoin="round"/><path d="M28 18h7v10h-3v3l-4-3h-7v-2" fill="#5f7f6e" stroke="#5f7f6e" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      <b>Two voices</b>
+      <span>A conversation: one open bubble, one filled. Clear, but generic.</span>
+    </div>
+    <div class="opt">
+      <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M9 22c0 7 6 11 13 11s13-4 13-11" fill="none" stroke="#5f7f6e" stroke-width="2.6" stroke-linecap="round"/><path d="M14 22c2 3 5 4.5 8 4.5s6-1.5 8-4.5" fill="none" stroke="#8fae9c" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="15" r="4" fill="#1b2230"/></svg>
+      <b>Held</b>
+      <span>A small figure in cupped hands. Warm, but more obviously “care”.</span>
+    </div>
+    <div class="opt">
+      <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M22 34V20" stroke="#5f7f6e" stroke-width="2.4" stroke-linecap="round"/><path d="M22 23c-7 0-10-4-10-9 6 0 10 3 10 9zM22 20c0-6 4-9 10-9 0 5-3 9-10 9z" fill="#8fae9c" stroke="#5f7f6e" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <b>Sprout</b>
+      <span>Growth and recovery. Gentle, but could be any wellbeing thing.</span>
+    </div>
+  </div>
+  <p class="cap" style="max-width:72ch">Step icons, one line weight, sage for the main path and dusk blue for side cards:</p>
+  <div class="set">
+    <div><svg class="ico"><use href="#i-open"/></svg>Open</div>
+    <div><svg class="ico"><use href="#i-safety"/></svg>Safety</div>
+    <div><svg class="ico"><use href="#i-listen"/></svg>Listen</div>
+    <div><svg class="ico"><use href="#i-hope"/></svg>Hope</div>
+    <div><svg class="ico"><use href="#i-help"/></svg>Help</div>
+    <div class="dusk"><svg class="ico dusk"><use href="#i-side"/></svg>Side card</div>
+    <div><svg class="ico"><use href="#i-handover"/></svg>Handover</div>
+    <div><svg class="ico"><use href="#i-lock"/></svg>Locked</div>
+  </div>
 
   <!-- 1. Shelf -->
   <div class="label">1 · The shelf, during a meeting (desktop)</div>
@@ -153,7 +221,7 @@
           <div><b>Motivation</b><span>Why they do it, across the continuum · 6 min</span></div>
         </div>
         <div class="shelf-card">
-          <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M12 24c3-6 7-6 10 0s7 6 10 0" fill="none" stroke="#5f7f6e" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="15" r="2.2" fill="#5f7f6e"/></svg>
+          <svg class="emblem"><use href="#e-bridge"/></svg>
           <div><b>Check-in</b><span>Steps for a supportive conversation</span></div>
         </div>
       </aside>
@@ -167,11 +235,11 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
-        <div class="dots"><button class="now"><i></i>Open</button><button><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="top"><svg class="emblem mark"><use href="#e-bridge"/></svg><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="now"><svg class="ico"><use href="#i-open"/></svg>Open</button><button><svg class="ico"><use href="#i-safety"/></svg>Safety</button><button><svg class="ico"><use href="#i-listen"/></svg>Listen</button><button><svg class="ico"><use href="#i-hope"/></svg>Hope</button><button><svg class="ico"><use href="#i-help"/></svg>Help</button></div>
         <div class="body">
           <div class="stepcard">
-            <div class="kicker">Open</div>
+            <div class="kicker"><svg class="ico"><use href="#i-open"/></svg>Open</div>
             <div class="ask">Ask if it’s okay to talk, then say where privacy ends.</div>
             <div class="hint">In your own words. <span class="ph">PLACEHOLDER</span></div>
             <div class="sub">You might say</div>
@@ -186,11 +254,11 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
-        <div class="dots"><button class="seen"><i></i>Open</button><button class="now"><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="top"><svg class="emblem mark"><use href="#e-bridge"/></svg><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><svg class="ico"><use href="#i-open"/></svg>Open</button><button class="now"><svg class="ico"><use href="#i-safety"/></svg>Safety</button><button><svg class="ico"><use href="#i-listen"/></svg>Listen</button><button><svg class="ico"><use href="#i-hope"/></svg>Hope</button><button><svg class="ico"><use href="#i-help"/></svg>Help</button></div>
         <div class="body">
           <div class="stepcard">
-            <div class="kicker">Safety</div>
+            <div class="kicker"><svg class="ico"><use href="#i-safety"/></svg>Safety</div>
             <div class="ask">Check in about safety, directly and calmly.</div>
             <div class="hint"><span class="ph">PLACEHOLDER</span> prompts and what to listen for load here.</div>
             <div class="sub">Where you are now</div>
@@ -206,11 +274,11 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
-        <div class="dots"><button class="seen"><i></i>Open</button><button class="seen"><i></i>Safety</button><button class="seen"><i></i>Listen</button><button class="seen"><i></i>Hope</button><button class="now"><i></i>Help</button></div>
+        <div class="top"><svg class="emblem mark"><use href="#e-bridge"/></svg><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><svg class="ico"><use href="#i-open"/></svg>Open</button><button class="seen"><svg class="ico"><use href="#i-safety"/></svg>Safety</button><button class="seen"><svg class="ico"><use href="#i-listen"/></svg>Listen</button><button class="seen"><svg class="ico"><use href="#i-hope"/></svg>Hope</button><button class="now"><svg class="ico"><use href="#i-help"/></svg>Help</button></div>
         <div class="body">
           <div class="stepcard">
-            <div class="kicker">Help and supports</div>
+            <div class="kicker"><svg class="ico"><use href="#i-help"/></svg>Help and supports</div>
             <div class="ask">Agree on who else can help.</div>
             <div class="hint"><span class="ph">PLACEHOLDER</span></div>
             <div class="sub">Professional</div>
@@ -231,7 +299,7 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">What’s going on?</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="top"><svg class="ico ico--lg" style="color:var(--dusk-1)"><use href="#i-side"/></svg><span class="title">What’s going on?</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
         <div class="body">
           <div class="hint">Open one if it fits. Back returns you to Safety.</div>
           <div class="pick">
@@ -249,10 +317,10 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Someone is hurting them</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="top"><svg class="ico ico--lg" style="color:var(--dusk-1)"><use href="#i-side"/></svg><span class="title">Someone is hurting them</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
         <div class="body">
           <div class="sidecard">
-            <div class="kicker">Side card</div>
+            <div class="kicker"><svg class="ico"><use href="#i-side"/></svg>Side card</div>
             <div class="ask">Listen, don’t probe, and don’t promise secrecy.</div>
             <div class="hint"><span class="ph">PLACEHOLDER</span> steps load here.</div>
             <ul class="say" style="margin-top:12px"><li><span class="ph">PLACEHOLDER</span> step one</li><li><span class="ph">PLACEHOLDER</span> step two</li><li><span class="ph">PLACEHOLDER</span> step three</li></ul>
@@ -266,11 +334,11 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more more--open">⋯</button><button class="btn btn--quiet">✕</button></span></div>
-        <div class="dots"><button class="seen"><i></i>Open</button><button class="now"><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="top"><svg class="emblem mark"><use href="#e-bridge"/></svg><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more more--open">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><svg class="ico"><use href="#i-open"/></svg>Open</button><button class="now"><svg class="ico"><use href="#i-safety"/></svg>Safety</button><button><svg class="ico"><use href="#i-listen"/></svg>Listen</button><button><svg class="ico"><use href="#i-hope"/></svg>Hope</button><button><svg class="ico"><use href="#i-help"/></svg>Help</button></div>
         <div class="body">
           <div class="stepcard" style="opacity:.5">
-            <div class="kicker">Safety</div>
+            <div class="kicker"><svg class="ico"><use href="#i-safety"/></svg>Safety</div>
             <div class="ask">Check in about safety, directly and calmly.</div>
           </div>
         </div>
@@ -291,7 +359,7 @@
 
     <div>
       <div class="frame frame--phone">
-        <div class="top"><span class="title">Handover</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="top"><svg class="ico ico--lg" style="color:var(--sage-1)"><use href="#i-handover"/></svg><span class="title">Handover</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
         <div class="body">
           <div class="field"><label>Safety</label><div class="box">No concern now</div></div>
           <div class="field"><label>Side cards opened</label><div class="box">None</div></div>
@@ -299,7 +367,7 @@
           <div class="field"><label>Agreed help</label><div class="chips"><span class="tick tick--on">School counsellor</span><span class="tick tick--on">Family</span><span class="tick tick--on">Sleep routine</span></div></div>
           <div class="field"><label>Handed over to</label><div class="box">Wellbeing lead, 1:15pm</div></div>
           <div class="field"><label>Follow-ups → tasks</label><div class="chips"><span class="tick tick--on">Tell wellbeing lead</span><span class="tick">Check in next week</span></div></div>
-          <div class="lock">🔒 Saved encrypted, apart from the meeting. Not sent to Clare, search or Notion.</div>
+          <div class="lock"><svg class="ico"><use href="#i-lock"/></svg>Saved encrypted, apart from the meeting. Not sent to Clare, search or Notion.</div>
           <div class="nav"><button class="btn btn--quiet">Back</button><button class="btn btn--primary">Save</button></div>
         </div>
       </div>
@@ -312,8 +380,8 @@
         <div class="body">
           <div class="crumbs">Guides</div>
           <div class="closed">
-            <svg class="emblem" viewBox="0 0 44 44" style="width:36px;height:36px"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M12 24c3-6 7-6 10 0s7 6 10 0" fill="none" stroke="#5f7f6e" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="15" r="2.2" fill="#5f7f6e"/></svg>
-            <div><b>Check-in</b><span>12:52pm · locked</span></div>
+            <svg class="emblem" style="width:36px;height:36px"><use href="#e-bridge"/></svg>
+            <div><b>Check-in</b><span><svg class="ico" style="width:13px;height:13px"><use href="#i-lock"/></svg> 12:52pm · locked</span></div>
             <button class="btn">Open</button>
           </div>
           <div class="crumbs" style="margin-top:22px">Riley T. · timeline</div>
