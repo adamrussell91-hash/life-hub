@@ -3,6 +3,7 @@ import { subjectUsesAlignment } from '@/alignment/model';
 import { mountYearNetworkView } from '@/network/year-view';
 import { mountYearCoverageView } from '@/alignment/year-coverage-view';
 import { mountOutcomeClimb } from '@/alignment/outcome-climb-view';
+import { mountKnowledgePlan } from '@/knowledge/plan-view';
 import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
@@ -236,7 +237,7 @@ export function renderScopeTimelineEditor(
 
   let scope: ScopeSequence = initial;
   let selectedId: string | null = null;
-  let tab: 'timeline' | 'map' | 'network' | 'alignment' = 'timeline';
+  let tab: 'timeline' | 'knowledge' | 'map' | 'network' | 'alignment' = 'timeline';
   let zoom = readZoom();
   let saving = false;
   let suppressClick = false;
@@ -323,6 +324,12 @@ export function renderScopeTimelineEditor(
   timelineTab.dataset.scopeTab = 'timeline';
   timelineTab.textContent = 'Timeline';
 
+  const knowledgeTab = document.createElement('button');
+  knowledgeTab.type = 'button';
+  knowledgeTab.className = 'hub-pills__btn scope-timeline__tab';
+  knowledgeTab.dataset.scopeTab = 'knowledge';
+  knowledgeTab.textContent = 'Knowledge plan';
+
   const mapTab = document.createElement('button');
   mapTab.type = 'button';
   mapTab.className = 'hub-pills__btn scope-timeline__tab';
@@ -342,7 +349,7 @@ export function renderScopeTimelineEditor(
   alignmentTab.dataset.scopeTab = 'alignment';
   alignmentTab.textContent = 'Alignment';
 
-  tabs.append(timelineTab, mapTab, networkTab);
+  tabs.append(timelineTab, knowledgeTab, mapTab, networkTab);
   if (subjectUsesAlignment(subject.title)) tabs.append(alignmentTab);
 
   const toolbar = document.createElement('div');
@@ -1115,6 +1122,25 @@ export function renderScopeTimelineEditor(
     });
   };
 
+  const paintKnowledge = (): void => {
+    scrollEl = null;
+    mountKnowledgePlan(viewHost, {
+      getScope: () => scope,
+      units: curriculum.units.filter((unit) => unit.subject_id === subject.id && !unit.trashed_at),
+      onSave: async (knowledge_plan) => {
+        scope = { ...scope, knowledge_plan };
+        mergeScopeIntoCurriculum(curriculum, scope);
+        const saved = await patchScopeSequence(scope.id, { knowledge_plan });
+        scope = { ...scope, updated_at: saved.updated_at };
+      },
+      onGoTimeline: () => {
+        tab = 'timeline';
+        paintView();
+        setSelection(selectedId);
+      }
+    });
+  };
+
   const paintMap = (): void => {
     scrollEl = null;
     if (!subjectUsesAlignment(subject.title)) {
@@ -1233,6 +1259,8 @@ export function renderScopeTimelineEditor(
     const unitCount = scope.timeline_items.filter((entry) => entry.kind === 'unit').length;
     meta.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.academic_year}`;
     timelineTab.classList.toggle('scope-timeline__tab--active', tab === 'timeline');
+    knowledgeTab.classList.toggle('scope-timeline__tab--active', tab === 'knowledge');
+    knowledgeTab.classList.toggle('is-active', tab === 'knowledge');
     mapTab.classList.toggle('scope-timeline__tab--active', tab === 'map');
     timelineTab.classList.toggle('is-active', tab === 'timeline');
     mapTab.classList.toggle('is-active', tab === 'map');
@@ -1241,13 +1269,14 @@ export function renderScopeTimelineEditor(
     alignmentTab.classList.toggle('scope-timeline__tab--active', tab === 'alignment');
     alignmentTab.classList.toggle('is-active', tab === 'alignment');
     controls.hidden = tab !== 'timeline';
-    actions.style.display = tab === 'network' || tab === 'alignment' ? 'none' : '';
+    actions.style.display = tab === 'network' || tab === 'alignment' || tab === 'knowledge' ? 'none' : '';
     zoomMonth.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'month');
     zoomYear.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'year');
     zoomMonth.setAttribute('aria-pressed', zoom === 'month' ? 'true' : 'false');
     zoomYear.setAttribute('aria-pressed', zoom === 'year' ? 'true' : 'false');
     if (tab === 'timeline') paintTimeline();
     else if (tab === 'map') paintMap();
+    else if (tab === 'knowledge') paintKnowledge();
     else if (tab === 'alignment') {
       scrollEl = null;
       mountAlignmentView(viewHost);
@@ -1369,6 +1398,11 @@ export function renderScopeTimelineEditor(
     tab = 'map';
     paintView();
     setSelection(selectedId);
+  });
+  knowledgeTab.addEventListener('click', () => {
+    if (tab === 'knowledge') return;
+    tab = 'knowledge';
+    paintView();
   });
   networkTab.addEventListener('click', () => {
     if (tab === 'network') return;

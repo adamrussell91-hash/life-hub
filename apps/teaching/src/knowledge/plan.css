@@ -1,0 +1,218 @@
+/* Scope & Sequence → Knowledge plan: the year as a written plan, in teaching order. */
+.kplan {
+  --kplan-gold: #c79a3a;
+  --kplan-rust: #a4502a;
+  --kplan-cols: 158px minmax(148px, 1fr) minmax(152px, 1fr) minmax(200px, 1.35fr) minmax(104px, 0.7fr) minmax(148px, 1fr) minmax(124px, 0.8fr) minmax(138px, 0.9fr);
+  position: relative;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.kplan ul { list-style: none; margin: 0; padding: 0; }
+
+/* The year's end, written first */
+.kplan-target { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 6px 18px; padding: 20px 18px 16px; color: #fff; background: linear-gradient(112deg, #10253f 0%, #17375e 52%, #27507f 100%); border-bottom: 3px solid var(--kplan-gold); }
+.kplan-lab { padding-top: 5px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #e2c27c; }
+.kplan-say { max-width: 92ch; font-size: 21px; line-height: 1.34; font-weight: 550; letter-spacing: -0.005em; }
+.kplan-say--empty { font-weight: 450; color: #b9cde4; }
+.kplan .kplan-say-field { font-size: 19px; font-weight: 550; line-height: 1.34; color: #fff; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.35); }
+.kplan .kplan-say-field::placeholder { color: #b9cde4; }
+.kplan-strip { grid-column: 2; display: flex; gap: 3px; margin-top: 12px; min-width: 0; }
+.kplan-seg { min-width: 0; border: 0; border-radius: 2px; padding: 6px 9px; text-align: left; font-family: var(--font-ui); font-size: 12px; line-height: 1.25; color: #dbe6f3; background: rgba(255, 255, 255, 0.11); cursor: pointer; transition: background-color 0.25s, color 0.25s; }
+.kplan-seg b { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #b9cde4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.25s; }
+.kplan-seg__short { display: none !important; }
+.kplan-seg span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 550; }
+.kplan-seg:hover { background: rgba(255, 255, 255, 0.2); }
+.kplan-seg:focus-visible { outline: 2px solid #e2c27c; outline-offset: 1px; }
+.kplan-seg.is-lit { background: var(--kplan-gold); color: #1b1405; }
+.kplan-seg.is-lit b { color: #3d2e0a; }
+
+.kplan-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; min-height: 50px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.kplan-bar[hidden] { display: none; }
+.kplan-readout { flex: 1 1 340px; min-width: 0; font-size: 13px; color: var(--muted); }
+.kplan-readout b { font-weight: 600; color: var(--ink, #13233a); }
+.kplan-warn { font-weight: 600; color: var(--kplan-rust); }
+.kplan-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kplan-status { font-size: 12.5px; color: var(--muted); }
+.kplan-mode { display: inline-flex; padding: 2px; border-radius: 6px; background: var(--shore); }
+.kplan-mode__btn { min-height: 30px; border: 0; border-radius: 5px; padding: 3px 12px; background: none; font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.kplan-mode__btn.is-on { background: #fff; color: var(--navy); box-shadow: 0 1px 2px rgba(19, 35, 58, 0.18); }
+.kplan-mode__btn:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+
+.kplan-scroll { overflow-x: auto; }
+.kplan-grid { position: relative; min-width: 1172px; }
+.kplan-row { display: grid; grid-template-columns: var(--kplan-cols); border-bottom: 1px solid var(--line); transition: opacity 0.35s; }
+.kplan-row > * { min-width: 0; padding: 12px 10px 14px; border-right: 1px solid var(--line); }
+.kplan-row > *:last-child { border-right: 0; }
+.kplan-first { position: sticky; left: 0; z-index: 2; background: #fff; }
+.kplan-flabel { display: none; }
+
+/* Column heads wear their section's colour */
+.kplan-groups { border-bottom: 0; }
+.kplan-groups > div { padding: 7px 12px 0; border-right: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.kplan-heads { border-bottom: 1px solid rgba(23, 55, 94, 0.28); }
+.kplan-heads > div { padding: 1px 12px 8px; border-right: 0; font-size: 13px; font-weight: 650; }
+.kplan-groups .kplan-first, .kplan-heads .kplan-first { background: var(--shore); color: var(--navy); }
+.kplan-span2 { grid-column: span 2; }
+.kplan-step { margin-right: 4px; opacity: 0.75; }
+.kplan-row.kplan-groups > .kplan-c-start, .kplan-row.kplan-heads > .kplan-c-start { background: #ebe3d0; color: #6d5d3c; }
+.kplan-row.kplan-groups > .kplan-c-concept, .kplan-row.kplan-heads > .kplan-c-concept { background: var(--navy); color: #fff; }
+.kplan-row.kplan-groups > .kplan-c-content, .kplan-row.kplan-heads > .kplan-c-content, .kplan-row.kplan-heads > .kplan-c-words { background: #dfe8f2; color: var(--navy); }
+.kplan-row.kplan-groups > .kplan-c-skills, .kplan-row.kplan-heads > .kplan-c-skills { background: #cfe0cc; color: #2f5539; }
+.kplan-row.kplan-groups > .kplan-c-eval, .kplan-row.kplan-heads > .kplan-c-eval { background: #efd9a4; color: #6b4f10; }
+.kplan-row.kplan-groups > .kplan-c-next, .kplan-row.kplan-heads > .kplan-c-next { background: #d5d9e3; color: #424860; }
+
+/* Each planning section has its own material */
+.kplan-c-start { background: #f6f1e6; }
+.kplan-c-concept { background: #17375e linear-gradient(165deg, #17375e 0%, #24508a 100%); border-right-color: #17375e !important; }
+.kplan-c-content, .kplan-c-words { background: #fff; }
+.kplan-c-skills { background: #e8f0e6; }
+.kplan-c-eval { background: #f8edd3; }
+.kplan-c-next { background: #eceef3; }
+.kplan-big { font-size: 15.5px; line-height: 1.34; font-weight: 600; color: #fff; }
+.kplan-w-row > .kplan-c-concept { background: #dfe8f2; border-right-color: #dfe8f2 !important; }
+.kplan-w-q { font-size: 13px; line-height: 1.35; font-weight: 600; color: var(--navy); }
+.kplan-eval-card { padding: 7px 9px; border: 1px solid #d6b56c; border-top: 3px solid #a67c1e; border-radius: 3px; background: #fffaf0; box-shadow: 0 1px 0 rgba(107, 79, 16, 0.18), 0 3px 8px -4px rgba(107, 79, 16, 0.35); font-size: 13px; line-height: 1.35; font-weight: 600; color: #5b4310; }
+.kplan-w-row .kplan-eval-card { padding: 4px 7px; border-top-width: 1px; font-weight: 500; }
+.kplan-next { position: relative; padding-left: 15px; font-size: 12.5px; line-height: 1.35; color: #424860; }
+.kplan-next + .kplan-next { margin-top: 3px; }
+.kplan-next::before { content: "→"; position: absolute; left: 0; font-weight: 700; }
+.kplan-next b { font-weight: 650; color: var(--navy); }
+
+/* The unit column: a spine runs down the year */
+.kplan-unit { padding-left: 34px !important; }
+.kplan-unit::before { content: ""; position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background: rgba(23, 55, 94, 0.25); }
+.kplan-unit::after { content: ""; position: absolute; left: 12px; top: 17px; width: 10px; height: 10px; background: var(--navy); transition: transform 0.2s, background-color 0.2s; }
+.kplan-u-row:hover .kplan-unit::after, .kplan-u-row.is-lit .kplan-unit::after { transform: scale(1.35); background: var(--kplan-gold); }
+.kplan-u-term { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.kplan-u-name { display: block; width: 100%; margin: 1px 0 3px; border: 0; padding: 0; background: none; text-align: left; font-family: var(--font-ui); font-size: 15px; line-height: 1.25; font-weight: 650; color: var(--navy); cursor: pointer; }
+.kplan-u-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.kplan-u-open { margin-top: 8px; border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; background: #fff; font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--navy); cursor: pointer; }
+.kplan-u-open:hover { border-color: var(--navy); }
+
+/* Pieces of knowledge */
+.kplan-items { display: grid; gap: 3px; }
+.kplan-li { display: flex; align-items: flex-start; gap: 3px; min-width: 0; }
+.kplan-item { display: block; flex: 1 1 auto; min-width: 0; margin-left: -5px; border: 1px solid transparent; border-radius: 4px; padding: 3px 5px; background: none; text-align: left; font-family: var(--font-ui); font-size: 13px; line-height: 1.35; color: inherit; transition: opacity 0.15s, background-color 0.15s; }
+button.kplan-item { cursor: pointer; }
+button.kplan-item:hover { background: var(--shore); }
+.kplan-item small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+.kplan-c-start .kplan-item { font-size: 12.5px; color: #4d4638; }
+.kplan-c-start .kplan-item small { font-weight: 600; color: #8a7a58; }
+.kplan-c-content .kplan-item { position: relative; padding-left: 16px; font-weight: 500; }
+.kplan-c-content .kplan-item::before { content: ""; position: absolute; left: 5px; top: 9px; width: 5px; height: 5px; background: var(--navy); }
+.kplan-c-skills .kplan-item { margin-left: 0; border-left: 3px solid #5c8a68; border-radius: 0 4px 4px 0; padding-left: 8px; font-weight: 500; color: #24412c; }
+.kplan-c-skills button.kplan-item:hover { background: #d9e6d6; }
+.kplan-words { display: flex; flex-wrap: wrap; gap: 4px; }
+.kplan-word { display: inline-flex; align-items: center; gap: 2px; border: 1px solid rgba(55, 111, 183, 0.45); border-radius: 3px; padding: 0 5px; background: #eef3f9; font-size: 12px; line-height: 1.5; font-weight: 500; color: #24518c; }
+.is-tracing .kplan-item { opacity: 0.32; }
+.is-tracing .kplan-item.is-src { opacity: 1; background: var(--wave); color: #fff; box-shadow: 0 0 0 2px rgba(199, 154, 58, 0.75); }
+.is-tracing .kplan-item.is-src::before { background: #fff; }
+.is-tracing .kplan-item.is-use { opacity: 1; border-color: var(--kplan-gold); background: #eef3f9; }
+.is-tracing .kplan-gap { opacity: 0.32; }
+
+/* Assumed knowledge with no good home */
+.kplan-gap { flex: 1 1 auto; min-width: 0; border-left: 2px solid var(--kplan-rust); border-radius: 0 4px 4px 0; padding: 4px 7px 6px; background: #fbf0e9; font-size: 12.5px; line-height: 1.35; }
+.kplan-gap small { display: block; margin: 1px 0 4px; font-size: 11.5px; font-weight: 600; color: var(--kplan-rust); }
+.kplan-fix { border: 1px solid var(--kplan-rust); border-radius: 4px; padding: 2px 7px; background: #fff; font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--kplan-rust); cursor: pointer; }
+.kplan-fix:hover { background: var(--kplan-rust); color: #fff; }
+
+/* Weeks open beneath a unit, on the same columns */
+.kplan-w-row > * { padding-top: 9px; padding-bottom: 10px; }
+.kplan-w-row .kplan-first { background: #fcfcfa; }
+.kplan-w-row .kplan-unit::after { left: 14px; top: 14px; width: 6px; height: 6px; background: var(--muted); }
+.kplan-w-name { font-size: 13px; font-weight: 650; color: var(--navy); }
+.kplan-no-weeks, .kplan-add-weeks { padding: 9px 16px 10px 34px; border-bottom: 1px solid rgba(23, 55, 94, 0.28); font-size: 12.5px; color: var(--muted); }
+
+/* Editing */
+.kplan-field { display: block; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; background: rgba(255, 255, 255, 0.92); font-family: var(--font-ui); font-size: 13px; line-height: 1.35; color: var(--ink, #13233a); resize: none; overflow: hidden; }
+.kplan-field:focus { outline: 2px solid var(--wave); outline-offset: 0; }
+.kplan-field::placeholder { color: var(--muted); }
+.kplan-field--word { margin-top: 5px; }
+.kplan-leads { margin-top: 6px; }
+.kplan-add { display: inline-block; margin-top: 5px; border: 0; padding: 2px 0; background: none; font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--wave); cursor: pointer; }
+.kplan-c-skills .kplan-add { color: #3f6b4a; }
+.kplan-c-start .kplan-add { color: #6d5d3c; }
+.kplan-x { flex: 0 0 auto; min-width: 20px; min-height: 20px; border: 0; border-radius: 3px; padding: 0 3px; background: none; font-size: 14px; line-height: 1; color: var(--muted); cursor: pointer; }
+.kplan-x:hover { background: rgba(19, 35, 58, 0.1); color: var(--kplan-rust); }
+.kplan-w-row .kplan-first { display: flex; align-items: flex-start; gap: 3px; }
+.kplan-suggest { display: grid; gap: 3px; margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.kplan-suggest__label { font-size: 11px; font-weight: 700; color: var(--muted); }
+.kplan-suggest__piece { border: 0; border-radius: 3px; padding: 2px 4px; background: #eef3f9; text-align: left; font-family: var(--font-ui); font-size: 12px; line-height: 1.3; color: #24518c; cursor: pointer; }
+.kplan-suggest__piece:hover { background: #dfe8f2; }
+.kplan-toggles { display: flex; flex-wrap: wrap; gap: 3px; }
+.kplan-toggle { border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; background: rgba(255, 255, 255, 0.75); text-align: left; font-family: var(--font-ui); font-size: 12px; line-height: 1.3; color: var(--muted); cursor: pointer; }
+.kplan-toggle.is-on { border-color: var(--navy); background: var(--navy); color: #fff; }
+.kplan-empty { padding: 28px 18px; color: var(--muted); }
+.kplan-empty p { margin: 0 0 10px; }
+.kplan-note { margin: 0; padding: 11px 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.kplan-note:empty { display: none; }
+.kplan-quiet { color: var(--muted); }
+
+/* Choosing what a unit relies on */
+.kplan-picker { width: min(520px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 48px)); border: 1px solid var(--line); border-radius: 8px; padding: 16px; font-family: var(--font-ui); font-size: 14px; }
+.kplan-picker[open] { display: flex; flex-direction: column; gap: 10px; }
+.kplan-picker::backdrop { background: rgba(19, 35, 58, 0.45); }
+.kplan-picker__title { margin: 0; font-size: 16px; font-weight: 650; color: var(--navy); }
+.kplan-picker__body { display: grid; gap: 3px; min-height: 0; overflow-y: auto; }
+.kplan-picker__unit { margin: 8px 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.kplan-picker__item { min-height: 36px; border: 1px solid var(--line); border-radius: 4px; padding: 6px 9px; background: #fff; text-align: left; font-family: var(--font-ui); font-size: 13px; line-height: 1.35; color: var(--navy); cursor: pointer; }
+.kplan-picker__item:hover { border-color: var(--navy); background: var(--shore); }
+.kplan-picker__empty { margin: 0; color: var(--muted); font-size: 13px; }
+.kplan-picker__typed { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.kplan-picker__cancel { align-self: flex-end; border: 0; padding: 4px 0; background: none; font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+
+/* The year arrives from the top down */
+@keyframes kplan-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes kplan-spine { from { transform: scaleY(0); } }
+@keyframes kplan-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.is-arriving .kplan-u-row { animation: kplan-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i) * 110ms + 80ms); }
+.is-arriving .kplan-u-row .kplan-unit::before { transform-origin: top; animation: kplan-spine 0.5s linear both; animation-delay: calc(var(--i) * 110ms + 80ms); }
+.kplan-w-row.is-fresh { animation: kplan-rise 0.28s ease-out both; animation-delay: calc(var(--i) * 45ms); }
+
+/* The thread is drawn between pieces */
+.kplan-thread { position: absolute; left: 0; top: 0; z-index: 1; overflow: visible; pointer-events: none; }
+.kplan-thread__halo { fill: none; stroke: #fff; stroke-width: 5; opacity: 0.85; stroke-linejoin: round; stroke-dasharray: 1; animation: kplan-draw 0.7s ease-out both; animation-delay: var(--d, 0s); }
+.kplan-thread__line { fill: none; stroke: var(--kplan-gold); stroke-width: 2.25; stroke-linejoin: round; stroke-dasharray: 1; animation: kplan-draw 0.7s ease-out both; animation-delay: var(--d, 0s); }
+.kplan-thread circle { fill: var(--kplan-gold); stroke: #fff; stroke-width: 1.5; animation: kplan-rise 0.2s both; animation-delay: var(--d, 0s); }
+
+/* Play the year */
+.is-playing .kplan-u-row:not(.is-lit), .is-playing .kplan-w-row { opacity: 0.24; }
+
+@media (max-width: 760px) {
+  .kplan-target { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+  .kplan-say { font-size: 17px; }
+  .kplan .kplan-say-field { font-size: 16px; }
+  .kplan-strip { grid-column: 1; }
+  .kplan-seg { padding: 6px 7px; }
+  .kplan-seg span, .kplan-seg__long { display: none !important; }
+  .kplan-seg__short { display: block !important; }
+  .kplan-grid { min-width: 0; }
+  .kplan-thread { display: none; }
+  .kplan-row { display: block; padding-bottom: 8px; }
+  .kplan-row.kplan-groups, .kplan-row.kplan-heads { display: none; }
+  .kplan-row > * { border-right: 0; padding: 7px 16px; }
+  .kplan-first { position: relative; }
+  .kplan-unit { padding: 13px 16px 8px 34px !important; background: #eef3f9 !important; }
+  .kplan-unit::before { display: none; }
+  .kplan-unit::after { top: 21px; }
+  .kplan-w-row .kplan-unit { background: #fff !important; }
+  .kplan-flabel { display: block; margin-bottom: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .kplan-c-concept .kplan-flabel { color: #b9cde4; }
+  .kplan-w-row .kplan-c-concept .kplan-flabel { color: var(--navy); }
+  .kplan-c-next { min-height: 0; }
+  button.kplan-item { min-height: 30px; }
+  .kplan-field { font-size: 16px; }
+  .kplan-x { min-width: 32px; min-height: 32px; }
+  .kplan-add { min-height: 32px; }
+  .kplan-picker__typed { grid-template-columns: 1fr 1fr; }
+  .kplan-picker__typed .kplan-field { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kplan *, .kplan *::before, .kplan *::after { transition: none !important; animation: none !important; }
+}
