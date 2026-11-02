@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redrafting mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.12);
+  --pastel-blue: #dceafa; --sage: #dfe9e1; --sage-ink: #3d6b4a;
+  --peach: #f8e1cf; --peach-ink: #8a5420; --gold: #f6ecc4; --gold-ink: #7a6216;
+  --r-sm: .875rem; --r-md: 1.25rem;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.55 Inter, ui-sans-serif, system-ui, sans-serif; }
+button { font: inherit; }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.note { max-width: 1240px; margin: 14px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.stage { max-width: 1240px; margin: 0 auto; padding: 16px; display: none; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.stage.on { display: flex; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 680px; min-width: 0; }
+.screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 820px; overflow-y: auto; border-radius: 36px; border: 10px solid #1d2633; }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: #fff; }
+.chrome .dot { width: 26px; height: 26px; border-radius: 8px; background: var(--wave); }
+.chrome b { color: var(--navy); font-size: 14px; }
+.chrome span { color: var(--muted); font-size: 13px; margin-left: auto; }
+.tchrome { background: var(--navy); } .tchrome b { color: #fff; } .tchrome span { color: rgba(255,255,255,.75); } .tchrome .dot { background: #fff; }
+.page { padding: 22px 26px 34px; }
+.phone .page { padding: 18px 16px 30px; }
+h2.pt { margin: 0; font-size: 24px; color: var(--navy); letter-spacing: -.01em; }
+.who { margin: 2px 0 14px; color: var(--muted); font-size: 13px; }
+.split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, 1fr); gap: 18px; align-items: start; }
+.phone .split { grid-template-columns: minmax(0, 1fr); }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; }
+.panel + .panel { margin-top: 12px; }
+.h { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--navy); }
+.prompt { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.writing { margin: 0; line-height: 1.75; }
+.tag { border-bottom: 2px solid var(--wave); background: var(--pastel-blue); padding: 1px 2px; border-radius: 3px; }
+.tag.good { border-color: var(--sage-ink); background: var(--sage); }
+.code { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; border-radius: 6px; padding: 1px 6px; background: var(--pastel-blue); color: var(--navy); }
+.code.good { background: var(--sage); color: var(--sage-ink); }
+.picked { background: var(--gold); box-shadow: 0 0 0 2px var(--gold-ink); border-radius: 4px; padding: 1px 2px; }
+.picked.off { background: none; box-shadow: none; padding: 0; }
+.line { display: flex; gap: 8px; align-items: baseline; margin: 6px 0; font-size: 13px; }
+.btn { border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.choice { display: flex; gap: 8px; margin: 8px 0; font-size: 14px; align-items: flex-start; cursor: pointer; }
+.choice input { margin-top: 4px; }
+.small { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+.rubric { display: grid; gap: 4px; }
+.steps { display: flex; gap: 4px; flex-wrap: wrap; }
+.steps b { font-size: 12px; font-weight: 600; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; color: var(--muted); background: #fff; }
+.steps b.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.steps b.was { background: var(--pastel-blue); color: var(--navy); }
+textarea { width: 100%; min-height: 96px; font: inherit; line-height: 1.6; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; background: #fff; color: var(--ink); }
+.ask { background: var(--gold); color: var(--gold-ink); border-radius: var(--r-sm); padding: 10px 14px; font-weight: 600; font-size: 14px; margin-bottom: 12px; }
+.locked { color: var(--muted); }
+.editbox { margin: 10px 0; }
+.pills { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pill.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+ins { background: var(--sage); color: var(--sage-ink); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+del { color: var(--peach-ink); background: var(--peach); border-radius: 3px; padding: 0 2px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; background: var(--gold); color: var(--gold-ink); border-radius: 6px; padding: 1px 7px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+.row:first-of-type { border-top: 0; }
+.row b { color: var(--navy); }
+.row small { display: block; color: var(--muted); font-size: 12.5px; }
+.flowstrip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; margin: 0 0 14px; color: var(--muted); }
+.flowstrip b { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--navy); font-weight: 600; }
+@media (max-width: 760px) { .split { grid-template-columns: minmax(0, 1fr); } .page { padding: 18px 16px 30px; } .phone { flex-basis: 100%; } .phone .screen { width: 100%; height: auto; border-radius: 12px; border: 0; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Redrafting</h1>
+  <button data-go="mark" aria-pressed="true">1 You ask</button>
+  <button data-go="write" aria-pressed="false">2 Student rewrites</button>
+  <button data-go="queue" aria-pressed="false">3 To mark</button>
+  <button data-go="back" aria-pressed="false">4 It comes back</button>
+  <button data-go="done" aria-pressed="false">5 Finished piece</button>
+</div>
+<p class="note">Invented student, task and codes. Screen 1: switch between the section and whole-piece choices.</p>
+
+<section class="stage on" id="mark">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · the marking page you already have, with one new choice at the end</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>Mark · Harbour paragraph</b><span>3 of 24 · ← →</span></div>
+    <div class="page">
+      <h2 class="pt">Mina Okafor</h2><p class="who">Draft 1 · handed in Tuesday</p>
+      <div class="split">
+        <div>
+          <div class="panel">
+            <p class="prompt">How does the writer make the harbour feel threatening?</p>
+            <p class="writing">The writer makes the harbour feel threatening. <span class="tag good">The cranes "lean over the water like herons"</span>, which gives the machines a watchful stillness. <span class="picked">This is effective because it creates a good image and makes the reader feel scared of the place.</span> The final line returns to the water, showing the danger has stayed.</p>
+            <p class="small">The gold sentence is the section you dragged across for this redraft.</p>
+          </div>
+          <div class="panel">
+            <p class="h">Codes on this piece</p>
+            <div class="line"><span class="code good">QU</span> Quotation woven into the sentence</div>
+            <div class="line"><span class="code">EX</span> Name what the image does to the reader's thinking</div>
+          </div>
+        </div>
+        <div>
+          <div class="panel rubric">
+            <p class="h">Analysis</p>
+            <div class="steps"><b>Starting</b><b class="on">Building</b><b>Secure</b><b>Extending</b></div>
+          </div>
+          <div class="panel">
+            <p class="h">Comment for Mina</p>
+            <textarea aria-label="Comment">Your quotation sits neatly inside the sentence. Now show me which word makes the cranes feel watchful, and what that word does.</textarea>
+          </div>
+          <div class="panel">
+            <p class="h">When you return it</p>
+            <label class="choice"><input type="radio" name="next" value="none"> Return, finished</label>
+            <label class="choice"><input type="radio" name="next" value="section" checked> Return for a redraft: this section</label>
+            <label class="choice"><input type="radio" name="next" value="whole"> Return for a redraft: the whole piece</label>
+            <p class="small" id="next-note">Mina rewrites the gold sentence. The rest stays visible and locked.</p>
+            <div class="btns"><button class="btn primary" id="next-go">Return for a redraft</button><button class="btn">Save</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="stage" id="write">
+  <div class="desk"><p class="label">Student · desktop · Returned work</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Harbour paragraph</b><span>Mina O</span></div>
+    <div class="page">
+      <div class="ask">Your teacher asked for a redraft of one section.</div>
+      <div class="split">
+        <div class="panel">
+          <p class="prompt">How does the writer make the harbour feel threatening?</p>
+          <p class="writing locked">The writer makes the harbour feel threatening. The cranes "lean over the water like herons", which gives the machines a watchful stillness.</p>
+          <div class="editbox"><textarea aria-label="Your redraft">The word "lean" makes the cranes seem to be waiting, so the reader starts to feel watched</textarea><p class="small">Saved a moment ago</p></div>
+          <p class="writing locked">The final line returns to the water, showing the danger has stayed.</p>
+          <div class="btns"><button class="btn primary">Send my redraft</button></div>
+        </div>
+        <div>
+          <div class="panel"><p class="h">Your teacher's comment</p><p class="writing" style="line-height:1.55;font-size:14px">Your quotation sits neatly inside the sentence. Now show me which word makes the cranes feel watchful, and what that word does.</p></div>
+          <div class="panel"><p class="h">Your codes</p><div class="line"><span class="code">EX</span> Name what the image does to the reader's thinking</div><div class="line"><span class="code good">QU</span> Quotation woven into the sentence</div></div>
+          <div class="panel"><p class="h">Draft 1</p><p class="small" style="margin:0">Open your first version with its highlights.</p></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="phone"><p class="label">Phone · 390px</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Harbour paragraph</b></div>
+    <div class="page">
+      <div class="ask">Your teacher asked for a redraft of one section.</div>
+      <div class="panel"><p class="h">Your teacher's comment</p><p class="writing" style="line-height:1.55;font-size:14px">Your quotation sits neatly inside the sentence. Now show me which word makes the cranes feel watchful, and what that word does.</p><div class="line"><span class="code">EX</span> Name what the image does to the reader's thinking</div></div>
+      <div class="panel">
+        <p class="writing locked">The writer makes the harbour feel threatening. The cranes "lean over the water like herons", which gives the machines a watchful stillness.</p>
+        <div class="editbox"><textarea aria-label="Your redraft on a phone">The word "lean" makes the cranes seem to be waiting, so the reader starts to feel watched</textarea></div>
+        <p class="writing locked">The final line returns to the water, showing the danger has stayed.</p>
+        <div class="btns"><button class="btn primary">Send my redraft</button></div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="stage" id="queue">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · To mark · redrafts sit with their task, and waiting students are listed quietly</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>To mark</b><span>3 waiting</span></div>
+    <div class="page">
+      <div class="panel">
+        <p class="h">Harbour paragraph · Year 11 English</p>
+        <div class="row"><div><b>Mina O</b> <span class="badge">Redraft 2</span><small>Sent today · one section</small></div><button class="btn primary">Open</button></div>
+        <div class="row"><div><b>Theo R</b> <span class="badge">Redraft 2</span><small>Sent yesterday · whole piece</small></div><button class="btn">Open</button></div>
+        <div class="row"><div><b>Jun L</b><small>Handed in Monday · first draft</small></div><button class="btn">Open</button></div>
+        <p class="small">Redraft asked, still with the student: Sasha P (2 days), Ana V (today).</p>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="stage" id="back">
+  <div class="desk" style="flex-basis:100%"><p class="label">Teacher · the redraft opens on what changed, with your earlier feedback beside it</p><div class="screen">
+    <div class="chrome tchrome"><div class="dot"></div><b>Mark · Harbour paragraph</b><span>1 of 2 redrafts · ← →</span></div>
+    <div class="page">
+      <h2 class="pt">Mina Okafor</h2><p class="who">Draft 2 · one section · sent today</p>
+      <div class="split">
+        <div class="panel">
+          <div class="pills"><button class="pill on">Changes</button><button class="pill">Draft 2</button><button class="pill">Draft 1</button></div>
+          <p class="writing">The writer makes the harbour feel threatening. The cranes "lean over the water like herons", which gives the machines a watchful stillness. <del>This is effective because it creates a good image and makes the reader feel scared of the place.</del> <ins>The word "lean" makes the cranes seem to be waiting, so the reader starts to feel watched.</ins> The final line returns to the water, showing the danger has stayed.</p>
+          <p class="small">Add codes on Draft 2 if it needs them. Nothing has to be coded.</p>
+        </div>
+        <div>
+          <div class="panel"><p class="h">What you said on Draft 1</p><div class="line"><span class="code">EX</span> Name what the image does to the reader's thinking</div><p class="writing" style="line-height:1.5;font-size:13.5px">Now show me which word makes the cranes feel watchful, and what that word does.</p></div>
+          <div class="panel rubric"><p class="h">Analysis</p><div class="steps"><b>Starting</b><b class="was">Building</b><b class="on">Secure</b><b>Extending</b></div><p class="small">Pale blue is where Draft 1 sat. Leave it, or press a new step.</p></div>
+          <div class="panel"><p class="h">Comment (optional)</p><textarea style="min-height:64px" aria-label="Comment on redraft">"Waiting" is the word that does it. Well found.</textarea>
+            <div class="btns"><button class="btn primary">Return, finished</button><button class="btn">Ask for another redraft</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="stage" id="done">
+  <div class="desk"><p class="label">Student · Returned work · finished piece</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Harbour paragraph</b><span>Mina O</span></div>
+    <div class="page">
+      <div class="pills"><button class="pill on">Draft 2</button><button class="pill">Draft 1</button></div>
+      <div class="split">
+        <div class="panel"><p class="writing">The writer makes the harbour feel threatening. The cranes "lean over the water like herons", which gives the machines a watchful stillness. <span class="tag good">The word "lean" makes the cranes seem to be waiting, so the reader starts to feel watched.</span> The final line returns to the water, showing the danger has stayed.</p></div>
+        <div>
+          <div class="panel"><p class="h">Your teacher's comment</p><p class="writing" style="line-height:1.5;font-size:14px">"Waiting" is the word that does it. Well found.</p></div>
+          <div class="panel"><p class="h">Where this piece sits</p><div class="line"><b>Analysis</b></div><p class="writing" style="font-size:14px;line-height:1.5">Building, then <b>Secure</b> after redraft</p></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="phone"><p class="label">Phone · 390px</p><div class="screen">
+    <div class="chrome"><div class="dot"></div><b>Harbour paragraph</b></div>
+    <div class="page">
+      <div class="pills"><button class="pill on">Draft 2</button><button class="pill">Draft 1</button></div>
+      <div class="panel"><p class="writing">The writer makes the harbour feel threatening. The cranes "lean over the water like herons", which gives the machines a watchful stillness. <span class="tag good">The word "lean" makes the cranes seem to be waiting, so the reader starts to feel watched.</span> The final line returns to the water, showing the danger has stayed.</p></div>
+      <div class="panel"><p class="h">Your teacher's comment</p><p class="writing" style="line-height:1.5;font-size:14px">"Waiting" is the word that does it. Well found.</p></div>
+      <div class="panel"><p class="h">Where this piece sits</p><p class="writing" style="font-size:14px;line-height:1.5"><b>Analysis:</b> Building, then <b>Secure</b> after redraft</p></div>
+    </div>
+  </div></div>
+</section>
+
+<script>
+document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === b.dataset.go));
+  document.querySelectorAll('[data-go]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  scrollTo(0, 0);
+}));
+const notes = {
+  none: ['This piece is done, as it is today.', 'Return to Mina'],
+  section: ['Mina rewrites the gold sentence. The rest stays visible and locked.', 'Return for a redraft'],
+  whole: ['Mina can change every part of the answer.', 'Return for a redraft']
+};
+document.querySelectorAll('input[name="next"]').forEach((r) => r.addEventListener('change', () => {
+  const [note, go] = notes[r.value];
+  document.getElementById('next-note').textContent = note;
+  document.getElementById('next-go').textContent = go;
+  document.querySelector('.picked')?.classList.toggle('off', r.value !== 'section');
+}));
+</script>
+</body>
+</html>
