@@ -31,6 +31,12 @@ const MAJORS: NavEntry[] = [
 
 const SECTIONS: NavEntry[] = [
   {
+    id: 'to-mark',
+    label: 'To mark',
+    path: '/to-mark',
+    glyph: ['M4 13l3-8h10l3 8v6H4zM4 13h5l1 2h4l1-2h5']
+  },
+  {
     id: 'classes',
     label: 'Classes',
     path: '/classes',

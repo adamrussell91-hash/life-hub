@@ -66,7 +66,7 @@ async function scheduledRows(store, classId) {
  * Every lesson a student can answer for this class (see classesForLesson):
  * the active units, the current unit, and lessons on the class calendar from any unit.
  */
-async function classLessonIds(store, roster) {
+export async function classLessonIds(store, roster) {
   const cls = roster.cls;
   const unitIds = [...new Set([...(cls.active_unit_ids ?? []), ...(cls.current_unit_id ? [cls.current_unit_id] : [])])].filter(isSafeId);
   const [units, rows] = await Promise.all([mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId))), scheduledRows(store, cls.id)]);
