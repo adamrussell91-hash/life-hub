@@ -14,6 +14,7 @@ import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
 import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from './progress-patterns.mjs';
 import { stepsBySkill } from './next-steps.mjs';
+import { mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
@@ -43,14 +44,6 @@ async function vivaTakes(store, lessonId, studentId) {
 /** The confirmed tags on a student's returned viva takes in one lesson. */
 async function vivaTags(store, lessonId, studentId) {
   return (await vivaTakes(store, lessonId, studentId)).flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })));
-}
-
-/** What the student said where a viva tag sits, from the transcript's words. */
-function vivaQuote(take, tag) {
-  const words = take.transcript?.words ?? take.transcript?.segments?.flatMap((s) => s.words ?? []) ?? [];
-  const [a, b] = tag.w ?? [];
-  if (!words.length || !Number.isInteger(a)) return '';
-  return words.slice(a, (b ?? a) + 1).map((w) => w.word).join(' ').slice(0, 300);
 }
 
 /** Every returned piece for one student, oldest first. */
@@ -137,11 +130,17 @@ export async function progressFor(store, roster, student) {
  * latest placed rung and their top repeating growth code linked to that skill.
  * The client picks the bank line; rungs and codes are never shown.
  */
+/** The student's latest rung on each skill their pieces have placed. */
+function rungsFrom(pieces) {
+  const rungs = {};
+  for (const key of targetKeys(pieces)) if (key.startsWith('skill:')) rungs[key.slice(6)] = targetRow(pieces, key).now;
+  return rungs;
+}
+
 export async function stepsFor(store, classId, studentId) {
   const pieces = await studentPieces(store, classId, studentId);
   const library = await readFeedbackCodes(store);
-  const rungs = {};
-  for (const key of targetKeys(pieces)) if (key.startsWith('skill:')) rungs[key.slice(6)] = targetRow(pieces, key).now;
+  const rungs = rungsFrom(pieces);
   const codes = new Map(library.map((c) => [c.id, c]));
   return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs) };
 }
@@ -175,23 +174,22 @@ export async function pieceFor(store, roster, student, item) {
   const { book } = await readBook(store, roster.cls.id);
   const column = book.columns.find((c) => c.id === row.column_id);
   const mark = column ? book.marks?.[column.id]?.[student.id] : null;
-  const earlier = (await studentPieces(store, roster.cls.id, student.id)).filter((p) => p.at < row.returned_at && p.kind === row.kind).at(-1);
+  const history = await studentPieces(store, roster.cls.id, student.id);
+  const earlier = history.filter((p) => p.at < row.returned_at && p.kind === row.kind).at(-1);
   const handin = row.kind === 'written' ? await read(store, handinKey(row.lesson_id, row.block_id, student.id)) : null;
-  const explain = (t, c) => ({ positive: t.positive, code: c?.code ?? t.code, label: c?.label ?? t.label, colour: c?.colour, action: t.positive ? c?.strength_descriptor || c?.descriptor : c?.descriptor, ...(t.note ? { note: t.note } : {}), ...(c?.resource ? { resource: c.resource } : {}) });
-  // A viva's tags and comment sit on its takes; the piece row only says it came back.
+  const explain = (t, c) => ({ code_id: t.code_id, positive: t.positive, code: c?.code ?? t.code, label: c?.label ?? t.label, colour: c?.colour, action: t.positive ? c?.strength_descriptor || c?.descriptor : c?.descriptor, ...(t.note ? { note: t.note } : {}), ...(c?.resource ? { resource: c.resource } : {}) });
+  // A viva's tags and comment sit on its takes: each one goes out as the lesson's feedback view reads it.
   const takes = row.kind === 'viva' ? await vivaTakes(store, row.lesson_id, student.id) : [];
-  const tags = row.kind === 'viva'
-    ? takes.flatMap((take) => (take.tags ?? []).filter((t) => t.confirmed !== false).map((t) => {
-        const quote = vivaQuote(take, t);
-        return { part: '', field: '', start: 0, end: 0, ...explain(t, codes.get(t.code_id)), ...(quote ? { quote } : {}) };
-      }))
-    : (row.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) }));
-  const comment = row.comment || takes.map((t) => t.comment?.trim()).filter(Boolean).join('\n\n');
+  takes.sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at)));
+  const tags = (row.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) }));
+  const used = new Set([...tags, ...takes.flatMap((t) => t.tags ?? [])].map((t) => t.code_id));
   return {
-    id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: comment ?? '',
+    id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
     text: handin?.text ? writingParts(handin.text) : null,
     tags,
-    ...(row.kind === 'viva' && row.lesson_id ? { lesson_href: `/s/classes/${roster.cls.id}/lessons/${row.lesson_id}` } : {}),
+    ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
+    codes: library.filter((c) => used.has(c.id)),
+    rungs: rungsFrom(history),
     criteria: (column?.criteria ?? []).map((c) => {
       const step = placesFor({ criteria: [c] }, mark)[c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`] ?? null;
       const prevKey = c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`;

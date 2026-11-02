@@ -320,6 +320,14 @@ export async function getVoiceSubmission(store, lesson, block, id) {
   return { ...record, classes };
 }
 
+/** How many words the transcript holds, wherever Whisper put them: top level, in segments, or only as text. */
+export function transcriptWordCount(transcript) {
+  const top = transcript?.words?.length ?? 0;
+  const inSegments = (transcript?.segments ?? []).reduce((sum, s) => sum + (s.words?.length || String(s.text ?? '').trim().split(/\s+/).filter(Boolean).length), 0);
+  const inText = String(transcript?.text ?? '').trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(top, inSegments, inText);
+}
+
 function cleanTags(raw, wordCount) {
   if (!Array.isArray(raw)) reject(400, 'bad_tags', 'Send a list of tags.');
   if (raw.length > MAX_TAGS) reject(400, 'too_many_tags', `Keep it to ${MAX_TAGS} tags.`);
@@ -350,7 +358,7 @@ function cleanTags(raw, wordCount) {
 export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}) {
   const record = await readSubmission(store, lesson, block, id);
   const next = { ...record };
-  if (body.tags !== undefined) next.tags = cleanTags(body.tags, record.transcript?.words?.length ?? 0);
+  if (body.tags !== undefined) next.tags = cleanTags(body.tags, transcriptWordCount(record.transcript));
   if (body.comment !== undefined) next.comment = String(body.comment ?? '').slice(0, MAX_COMMENT);
   if (body.initials !== undefined) next.initials = cleanInitials(body.initials);
   if (body.student_id !== undefined) {

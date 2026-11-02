@@ -5,18 +5,19 @@ import {
   codeInk,
   codeText,
   descriptorFor,
+  focusStep,
   summariseByCriterion,
   type FeedbackCode
 } from '@/blocks/feedback-codes';
-import { buildPaper, commonestFiller, pointIndexAt, transcriptWords } from '@/blocks/voice-marking';
+import { alignTagWords, buildPaper, commonestFiller, transcriptWords, wordAt } from '@/blocks/voice-marking';
 import { audioUrl, type MineState, type VoiceTag } from '@/blocks/voice-client';
 import { clock } from '@/blocks/voice-pacing';
 import type { VoiceWord } from '@/blocks/voice-transcript';
 
 /**
- * What a student reads once the teacher returns their Voice submission. Built
- * from the peer feedback "notes on the text" view so it looks and works the
- * same: a summary, the transcript with coloured marks, and a card per mark.
+ * What a student reads once the teacher returns their Voice submission: what
+ * the teacher had while marking, minus the controls. One focus, the summary,
+ * the comment, the recording, then the transcript beside every tag in order.
  */
 
 type Returned = Extract<MineState, { submitted: true }>;
@@ -71,22 +72,41 @@ export function summaryList(tags: readonly VoiceTag[], codes: readonly FeedbackC
   return list;
 }
 
-export function renderVoiceFeedback(state: Returned): HTMLElement {
-  const root = el('div', 'pa-get voice-feedback');
+/** One line on what to work on next: the code chip, then one step. Nothing for all-strength work. */
+export function focusBox(
+  tags: ReadonlyArray<{ code_id: string; positive: boolean }>,
+  codes: readonly FeedbackCode[],
+  rungs?: Record<string, string | null | undefined>
+): HTMLElement | null {
+  const focus = focusStep(tags, codes, rungs);
+  if (!focus) return null;
+  const box = el('section', 'voice-focus');
+  const chip = el('span', 'fc-chip', codeText(focus.code, false));
+  chip.style.setProperty('--fc-ink', codeInk(focus.code.colour));
+  const line = el('p', 'voice-focus__line');
+  line.append(chip, el('span', undefined, focus.line));
+  box.append(el('h3', 'voice-focus__title', 'What to focus on next'), line);
+  return box;
+}
+
+export function renderVoiceFeedback(state: Returned, options: { title?: string; focus?: boolean } = {}): HTMLElement {
+  const root = el('div', 'voice-feedback');
   const codes = state.codes ?? [];
   const byId = new Map(codes.map((c) => [c.id, c]));
-  const tags = state.tags ?? [];
   const points = state.points ?? [];
   const { words } = transcriptWords(state.transcript, state.duration_s);
+  const tags = alignTagWords(state.tags ?? [], words);
   const sheet = buildPaper(words, points);
 
-  root.append(el('p', 'voice-feedback__title', 'Feedback from your teacher'));
+  root.append(el('p', 'voice-feedback__title', options.title ?? 'Feedback from your teacher'));
+  const focus = options.focus === false ? null : focusBox(tags, codes);
+  if (focus) root.append(focus);
   if (tags.length) root.append(summaryList(tags, codes, words));
   if (state.comment?.trim()) root.append(el('p', 'voice-feedback__comment', state.comment));
 
   let player: HTMLAudioElement | null = null;
   if (state.audio_url) {
-    player = el('audio', 'voice-take__audio');
+    player = el('audio', 'voice-take__audio voice-feedback__audio');
     player.controls = true;
     player.preload = 'metadata';
     player.src = audioUrl(state.audio_url);
@@ -95,78 +115,104 @@ export function renderVoiceFeedback(state: Returned): HTMLElement {
     root.append(el('p', 'voice-feedback__gone block-secondary', 'Audio removed after 4 weeks. Transcript and feedback kept.'));
   }
 
-  if (!words.length) {
-    root.append(el('p', 'block-secondary', 'Play the recording to hear it.'));
-    return root;
-  }
-
   const span = (tag: VoiceTag) => ({
     start: sheet.ranges[tag.w[0]]?.start ?? 0,
     end: sheet.ranges[Math.min(tag.w[1], sheet.ranges.length - 1)]?.end ?? 0
   });
   const marks: Mark[] = tags.map((tag, i) => ({ ...span(tag), layer: i, colour: tagColour(tag, byId) }));
-  const paperHost = el('div', 'pa-paper-host pa-paper-host--read voice-feedback__paper');
-  const hint = el('p', 'pa-hint', 'Tap a highlighted part to read the note.');
-  const cards = el('div', 'pa-cards');
-  cards.setAttribute('aria-live', 'polite');
-  root.append(paperHost, hint, cards);
-  let open: number | null = null;
+  const paperHost = el('div', 'pa-paper-host pa-paper-host--read voice-mark__paper');
+  const notes = el('ol', 'voice-notes');
+  notes.setAttribute('aria-label', 'Tags in order');
+  let selected: string | null = null;
 
-  function card(tag: VoiceTag): HTMLElement {
+  const listen = (t: number): void => {
+    if (!player) return;
+    player.currentTime = Math.max(0, t);
+    void player.play();
+  };
+
+  function noteRow(tag: VoiceTag): HTMLElement {
     const code = byId.get(tag.code_id);
-    const box = el('article', 'pa-card voice-card');
-    box.style.setProperty('--pa-mark', tagColour(tag, byId));
-    const head = el('p', 'pa-card__head');
-    head.append(tagChip(tag, byId), code?.label ?? tag.label ?? 'Comment');
-    const point = pointIndexAt(points, tag.t);
-    if (point >= 0) head.append(el('span', 'block-secondary', ` · point ${point + 1}`));
+    const row = el('li', 'voice-note');
+    row.dataset.tag = tag.id;
+    if (tag.id === selected) row.classList.add('voice-note--selected');
+    const head = el('div', 'voice-note__head');
+    head.append(tagChip(tag, byId));
+    if (player) {
+      const jump = button(clock(tag.t), 'ghost', () => listen(tag.t - PLAY_LEAD_S));
+      jump.className = 'voice-note__time';
+      jump.setAttribute('aria-label', `Listen from ${clock(Math.max(0, tag.t - PLAY_LEAD_S))}`);
+      head.append(jump);
+    } else {
+      head.append(el('span', 'voice-note__time', clock(tag.t)));
+    }
     const quote = words
       .slice(tag.w[0], tag.w[1] + 1)
       .map((w) => w.w)
       .join(' ');
-    box.append(head, el('p', 'pa-card__quote', `“${quote.length > 120 ? `${quote.slice(0, 117)}…` : quote}”`));
-    if (code) box.append(el('p', 'pa-card__comment', descriptorFor(code, tag.positive)));
-    if (tag.note) box.append(el('p', 'voice-card__note', tag.note));
-    if (player) {
-      const audio = player;
-      box.append(
-        button(`Play from ${clock(Math.max(0, tag.t - PLAY_LEAD_S))}`, 'ghost', () => {
-          audio.currentTime = Math.max(0, tag.t - PLAY_LEAD_S);
-          void audio.play();
-        })
-      );
+    if (quote) head.append(el('span', 'voice-note__quote', `“${quote}”`));
+    row.append(head);
+    if (code) row.append(el('p', 'voice-note__descriptor block-secondary', descriptorFor(code, tag.positive)));
+    if (tag.note) row.append(el('p', 'voice-note__text', tag.note));
+    if (code?.resource) {
+      const link = el('a', 'voice-note__link', 'See how →');
+      link.href = code.resource.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      row.append(link);
     }
-    return box;
+    row.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('button, a')) return;
+      selected = tag.id;
+      paint();
+    });
+    return row;
   }
 
   function paint(): void {
-    paperHost.replaceChildren(paper(sheet.text, marks, null));
-    paperHost.querySelectorAll<HTMLElement>('.pa-run--mark').forEach((run) => {
-      run.tabIndex = 0;
-      run.setAttribute('role', 'button');
-      run.setAttribute('aria-label', `Read the note on “${run.textContent ?? ''}”`);
-      if (open !== null && Number(run.dataset.start) <= open && Number(run.dataset.end) > open) run.classList.add('pa-run--open');
-    });
-    cards.replaceChildren();
-    hint.hidden = open !== null || tags.length === 0;
-    if (open === null) return;
+    const sheetEl = paper(sheet.text, marks, null);
     tags.forEach((tag, i) => {
-      if (marks[i]!.start <= open! && marks[i]!.end > open!) cards.append(card(tag));
+      if (tag.id !== selected) return;
+      sheetEl.querySelectorAll<HTMLElement>('.pa-run--mark').forEach((run) => {
+        if (Number(run.dataset.start) >= marks[i]!.start && Number(run.dataset.end) <= marks[i]!.end) run.classList.add('pa-run--open');
+      });
+    });
+    paperHost.replaceChildren(sheetEl);
+    notes.replaceChildren(...tags.map(noteRow));
+  }
+
+  paperHost.addEventListener('click', (e) => {
+    const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run');
+    if (!run) return;
+    const at = Number(run.dataset.start);
+    const index = sheet.ranges.findIndex((r) => r.end > at);
+    const hit = tags.filter((t) => t.w[0] <= index && t.w[1] >= index).at(-1);
+    if (hit) {
+      selected = hit.id;
+      paint();
+      notes.querySelector<HTMLElement>(`[data-tag="${hit.id}"]`)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }
+    if (player && words[index]) player.currentTime = words[index]!.start;
+  });
+
+  if (player) {
+    const audio = player;
+    audio.addEventListener('timeupdate', () => {
+      paperHost.querySelectorAll('.voice-word--now').forEach((n) => n.classList.remove('voice-word--now'));
+      const now = audio.paused ? -1 : wordAt(words, audio.currentTime);
+      if (now >= 0) paperHost.querySelector<HTMLElement>(`.pa-run[data-start="${sheet.ranges[now]!.start}"]`)?.classList.add('voice-word--now');
     });
   }
 
-  const choose = (run: HTMLElement | null) => {
-    if (!run) return;
-    open = Number(run.dataset.start);
-    paint();
-    cards.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-  };
-  paperHost.addEventListener('click', (e) => choose((e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark')));
-  paperHost.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault();
-    choose((e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark'));
-  });
+  const work = el('div', 'voice-feedback__work');
+  if (words.length) work.append(paperHost);
+  else if (player) work.append(el('p', 'block-secondary', 'Play the recording to hear it.'));
+  if (tags.length) {
+    const side = el('div', 'voice-feedback__notes');
+    side.append(el('p', 'voice-mark__notes-title', `${tags.length} tag${tags.length === 1 ? '' : 's'}`), notes);
+    work.append(side);
+  }
+  root.append(work);
   paint();
   return root;
 }

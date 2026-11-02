@@ -20,12 +20,13 @@ import {
   pointIndexAt,
   tapTarget,
   transcriptWords,
+  alignTagWords,
   wordAt,
   type Paper
 } from '@/blocks/voice-marking';
 import { audioUrl, type VoiceTag, type WhisperTranscript } from '@/blocks/voice-client';
 import { clock } from '@/blocks/voice-pacing';
-import { summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
+import { focusBox, summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
 import type { VoiceWord } from '@/blocks/voice-transcript';
 import { mountVoiceDeep } from '@/blocks/voice-deep';
 
@@ -219,7 +220,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     const byId = new Map(library.map((c) => [c.id, c]));
     const { words, timing } = transcriptWords(record.transcript, record.duration_s);
     const sheet: Paper = buildPaper(words, record.points);
-    let tags: MarkTag[] = [...record.tags].sort((a, b) => a.t - b.t);
+    let tags: MarkTag[] = alignTagWords(record.tags, words).sort((a, b) => a.t - b.t);
     let comment = record.comment ?? '';
     let selected: string | null = null;
     let typed = '';
@@ -803,6 +804,8 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
 
     function paintSummary(): void {
       const children: HTMLElement[] = [el('p', 'voice-mark__summary-title', 'What the student will see at the top')];
+      const focus = focusBox(confirmed(), library);
+      if (focus) children.push(focus);
       if (confirmed().length) children.push(summaryList(confirmed(), library, words));
       const facts: string[] = [];
       const limit = block.content.time_limit_s;

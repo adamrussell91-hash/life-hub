@@ -62,6 +62,19 @@ export function wordAt(words: readonly VoiceWord[], t: number): number {
   return best;
 }
 
+/**
+ * Tags once saved with every word clamped to the first one. Their time still
+ * says where they belong, so a first-word tag timed later moves back to it.
+ */
+export function alignTagWords<T extends { t: number; w: [number, number] }>(tags: readonly T[], words: readonly VoiceWord[]): T[] {
+  if (words.length < 2) return [...tags];
+  return tags.map((tag) => {
+    if (tag.w[0] !== 0 || tag.w[1] !== 0 || tag.t <= words[0]!.end) return tag;
+    const word = wordAt(words, tag.t);
+    return { ...tag, w: [word, word] };
+  });
+}
+
 export const DEFAULT_REACTION_S = 1;
 
 /** Where a tap at media time `t` lands: `reaction` seconds earlier, snapped to a word. */
