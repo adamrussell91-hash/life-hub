@@ -518,15 +518,35 @@ export function buildRecordSlug(record) {
   return `${label}-${time}`;
 }
 
+const NUMERIC_STRING = /^[+-]?(?:\d+\.?\d*|\.\d+)$/;
+
+// The confirm card's edit form sends every input back as text, so a macro the
+// model left blank arrives as "" and a typed one as "4". Drop blanks and parse
+// plain numeric strings for schema number fields; anything else ("about 3")
+// still reaches validation and is rejected.
+function coerceNumberFields(type, fields) {
+  const props = DOMAIN_PROPERTIES[type];
+  let out = null;
+  for (const [key, value] of Object.entries(fields)) {
+    if (props[key]?.type !== 'number' || typeof value !== 'string') continue;
+    out ??= { ...fields };
+    const trimmed = value.trim();
+    if (trimmed === '') delete out[key];
+    else if (NUMERIC_STRING.test(trimmed)) out[key] = Number(trimmed);
+  }
+  return out ?? fields;
+}
+
 export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return { valid: false, errors: ['log_entry payload must be an object'] };
   }
-  const { type, date, time, fields, notes } = candidate;
+  const { type, date, time, notes } = candidate;
   if (!RECORD_TYPES.includes(type)) return { valid: false, errors: [`Unknown record type: ${type}`] };
-  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+  if (!candidate.fields || typeof candidate.fields !== 'object' || Array.isArray(candidate.fields)) {
     return { valid: false, errors: ['fields must be an object'] };
   }
+  const fields = coerceNumberFields(type, candidate.fields);
   if (notes != null && typeof notes !== 'string') {
     return { valid: false, errors: ['notes must be a string'] };
   }

@@ -1272,6 +1272,10 @@ function collectEdits(record, inputs) {
       edited[key] = Number.isFinite(parsed) ? parsed : original;
     } else if (typeof original === 'boolean') {
       edited[key] = input.value === 'true';
+    } else if (original == null && input.value.trim() === '') {
+      // A blank field the model left empty stays empty; sending "" failed
+      // number validation ("saturated_fat_g must be a finite number").
+      edited[key] = original;
     } else {
       edited[key] = input.value;
     }
