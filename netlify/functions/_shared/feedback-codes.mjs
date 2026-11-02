@@ -73,7 +73,7 @@ const LADDERS = {
     'Bend your best material so it answers this exact question.',
     'Weigh the question aloud, then argue the answer you reach.'
   ] },
-  viva_x: { ladder: [
+  viva_x: { skill: 'arguing.evidence', ladder: [
     'Check one quote and one detail against the text before you speak.',
     'Name the poem and the exact detail for each point you make.',
     'Back each point with a short quote you can say from memory.',
@@ -253,8 +253,12 @@ export function cleanFeedbackCodes(input) {
 export async function readFeedbackCodes(store) {
   const saved = await store.get(CODES_KEY, { type: 'json', consistency: 'strong' });
   if (!Array.isArray(saved?.codes) || !saved.codes.length) return DEFAULT_FEEDBACK_CODES;
-  // A saved code without a ladder of its own still gets a next step.
-  return saved.codes.map((code) => (code.ladder || !LADDERS[code.id] ? code : { ...code, ladder: LADDERS[code.id].ladder }));
+  // A saved code without a ladder of its own still gets a next step; a viva code also gets its default skill link.
+  return saved.codes.map((code) => {
+    const fallback = LADDERS[code.id];
+    if (code.ladder || !fallback) return code;
+    return { ...code, ladder: fallback.ladder, ...(code.group === 'viva' && !code.skill && fallback.skill ? { skill: fallback.skill } : {}) };
+  });
 }
 
 export async function writeFeedbackCodes(store, input) {

@@ -35,17 +35,19 @@ export function bankSource(question, skills, ladder) {
 }
 
 /**
- * For each skill, the student's top growth code linked to it and their rung.
- * `rankedGrowth` rows are already ordered most hits first, most recent first.
+ * For each skill, the student's growth codes linked to it, top first, and
+ * their rung. A box takes the first one its bank covers, so a code new to a
+ * skill leaves existing banks working. `rankedGrowth` rows are already ordered
+ * most hits first, most recent first.
  */
 export function stepsBySkill(rankedGrowth, codesById, rungs) {
   const skills = {};
-  for (const [skill, rung] of Object.entries(rungs)) skills[skill] = { rung, code: null };
+  for (const [skill, rung] of Object.entries(rungs)) skills[skill] = { rung, codes: [] };
   for (const r of rankedGrowth) {
     const c = codesById.get(r.code_id);
     if (!c?.skill) continue;
-    const s = (skills[c.skill] ??= { rung: null, code: null });
-    if (!s.code) s.code = { id: c.id, code: c.code, colour: c.colour, hits: r.hit };
+    const s = (skills[c.skill] ??= { rung: null, codes: [] });
+    s.codes.push({ id: c.id, code: c.code, colour: c.colour, hits: r.hit });
   }
   return skills;
 }
