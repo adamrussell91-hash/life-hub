@@ -845,6 +845,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         });
       }
     }
+    // A returned viva for Ava, its tags saved on the first word as old marking did.
+    {
+      const said = 'The poem argues that the river keeps its name under the bridge, um, and the road rules show who gets to move through the city. So the speaker uses a law to expose a wrong.';
+      const list = said.split(' ').map((word, i) => ({ word, start: i * 0.4, end: i * 0.4 + 0.35 }));
+      const tag = (id: string, code_id: string, code: string, label: string, t: number, note?: string) => ({ id, code_id, code, label, positive: false, t, w: [0, 0], source: 'tap', confirmed: true, ...(note ? { note } : {}) });
+      store.setJSON('voice_submissions/lesson_viva_demo/block_viva/sub_ava', {
+        id: 'sub_ava', class_id: classId, student_id: 'st_ava', initials: 'AN', device_hash: 'abcdef012345', status: 'returned', transcript_status: 'done',
+        submitted_at: '2026-10-28T00:00:00.000Z', returned_at: '2026-10-29T00:00:00.000Z', duration_s: 14, audio_delete_after: '2026-11-25T00:00:00.000Z',
+        prompt: 'How does the poem use the road?', points: [{ label: 'Concept', t: 0 }, { label: 'Technique', t: 6 }],
+        transcript: { text: said, segments: [{ text: said, start: 0, end: 14, words: list }] },
+        comment: 'A good start. Try to have one good point you really nail.',
+        tags: [
+          tag('t1', 'speak_to', 'TO', 'Tone', 0),
+          tag('t2', 'viva_x', 'X', 'Accuracy', 3.4, 'Be specific here'),
+          tag('t3', 'speak_fw', 'FW', 'Filler word', 4.9),
+          tag('t4', 'viva_x', 'X', 'Accuracy', 7.2, 'How?'),
+          tag('t5', 'speak_pf', 'PF', 'Pace – too fast', 9.1),
+          tag('t6', 'viva_x', 'X', 'Accuracy', 12)
+        ]
+      });
+      store.setJSON(`piece_feedback/${classId}/st_ava/v:lesson_viva_demo`, { kind: 'viva', title: 'Viva practice', lesson_id: 'lesson_viva_demo', column_id: null, tags: [], comment: '', status: 'returned', returned_at: '2026-10-29T00:00:00.000Z', updated_at: '2026-10-29T00:00:00.000Z' });
+    }
+
     // The sixth piece: three students have handed in and are waiting for feedback.
     for (const [sid, at] of [['st_ava', '2026-10-27T01:10:00.000Z'], ['st_noah', '2026-10-20T03:00:00.000Z'], ['st_ella', '2026-10-28T02:40:00.000Z']] as const) {
       // Ava took her TS step on this piece: her own pick shows when it is marked.

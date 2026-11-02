@@ -75,8 +75,8 @@ test('steps returns each skill’s rung and its linked repeating code', async ()
   assert.deepEqual(out, {
     need: null,
     skills: {
-      'arguing.thesis': { rung: 'skilled', code: { id: 'ts', code: 'TS', colour: 'lilac', hits: 2 } },
-      'reading.inference': { rung: 'accomplished', code: null }
+      'arguing.thesis': { rung: 'skilled', codes: [{ id: 'ts', code: 'TS', colour: 'lilac', hits: 2 }] },
+      'reading.inference': { rung: 'accomplished', codes: [] }
     }
   });
   await assert.rejects(profileAction(store, 'class1', { action: 'steps', lesson_id: '../x', ...device }), (e) => e.status === 400);

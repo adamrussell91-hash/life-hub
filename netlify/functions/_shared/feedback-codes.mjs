@@ -35,7 +35,7 @@ const c = (id, code, label, group, criterion, colour, descriptor, extra = {}) =>
 
 /**
  * Placeholder ladders: one step per placement rung (below → excellent), the
- * step toward the rung above. Generic stand-ins; the saved library holds the real ones.
+ * step toward the rung above. Generic stand-ins; a ladder saved on a code wins.
  */
 const LADDERS = {
   comp_ts: { skill: 'arguing.thesis', ladder: [
@@ -65,6 +65,83 @@ const LADDERS = {
     'Blend a short quote into your own sentence.',
     'Use evidence from different parts of the text for one idea.',
     'Pick the evidence that best proves your claim and say why it is strongest.'
+  ] },
+  viva_pp: { ladder: [
+    'Say the key words of the question in your first sentence.',
+    'Open by answering the question in your own words.',
+    'Link each point back to the words of the question as you go.',
+    'Bend your best material so it answers this exact question.',
+    'Weigh the question aloud, then argue the answer you reach.'
+  ] },
+  viva_x: { skill: 'arguing.evidence', ladder: [
+    'Check one quote and one detail against the text before you speak.',
+    'Name the poem and the exact detail for each point you make.',
+    'Back each point with a short quote you can say from memory.',
+    'Name the technique in your quote and the effect it creates.',
+    'Choose the detail that proves your point most sharply and say why.'
+  ] },
+  viva_np: { ladder: [
+    'Practise your first sentence aloud until it comes easily.',
+    'Plan what you will say after each dot point before you record.',
+    'Give yourself a next move for each point: quote, technique, effect.',
+    'Follow your own idea one step further each time you make a point.',
+    'Raise and answer the follow-up question yourself.'
+  ] },
+  speak_fw: { ladder: [
+    'Take one silent breath at the start of each new point.',
+    'Pause silently where you would reach for a filler word.',
+    'Finish each sentence, pause, then start the next idea.',
+    'Use your pauses to choose the exact word you want next.',
+    'Let every pause sound chosen, right before your key words.'
+  ] },
+  speak_pf: { ladder: [
+    'Speak your first sentence slowly, then keep that speed.',
+    'Slow down whenever you say a quote or a technique.',
+    'Pause for a beat at the end of each point.',
+    'Slow down on your key idea so it lands.',
+    'Change your speed on purpose to mark what matters most.'
+  ] },
+  speak_ps: { ladder: [
+    'Practise your point aloud until the words come easily.',
+    'Keep moving from one point to the next with a linking word.',
+    'Pick up speed through your set-up and slow for your key idea.',
+    'Trim your set-up so your best idea arrives sooner.',
+    'Change your speed on purpose to keep the listener with you.'
+  ] },
+  speak_pa: { ladder: [
+    'Pause for one breath at the end of each point.',
+    'Pause just before you say your quote.',
+    'Pause just after your key idea so it can sink in.',
+    'Use a longer pause to mark the turn in your argument.',
+    'Place your pauses so they shape the whole argument.'
+  ] },
+  speak_vo: { ladder: [
+    'Record your first sentence again a little louder.',
+    'Speak to someone at the back of the room.',
+    'Keep your voice strong through to the end of each sentence.',
+    'Lift your volume on your key words.',
+    'Use changes in volume to mark what matters most.'
+  ] },
+  speak_fl: { ladder: [
+    'Glance at your next dot point, then carry on.',
+    'Plan one linking phrase to move between your points.',
+    'Practise moving between points until the links come easily.',
+    'Connect each point to the last in your own words as you go.',
+    'Let each point grow out of the one before it.'
+  ] },
+  speak_to: { ladder: [
+    'Choose one key word in each point and stress it.',
+    'Lift your voice on the quote, then settle for your explanation.',
+    'Match your tone to the idea you are arguing.',
+    'Let your tone show which idea matters most.',
+    'Shape your tone across the answer so it builds to your main idea.'
+  ] },
+  speak_tm: { ladder: [
+    'Time one run aloud and note where you finish.',
+    'Set a time for each point and practise to it.',
+    'Give your strongest point the most time.',
+    'Add detail or trim it so you finish right on time.',
+    'Plan your ending so your last words land right on time.'
   ] }
 };
 
@@ -175,7 +252,13 @@ export function cleanFeedbackCodes(input) {
 
 export async function readFeedbackCodes(store) {
   const saved = await store.get(CODES_KEY, { type: 'json', consistency: 'strong' });
-  return Array.isArray(saved?.codes) && saved.codes.length ? saved.codes : DEFAULT_FEEDBACK_CODES;
+  if (!Array.isArray(saved?.codes) || !saved.codes.length) return DEFAULT_FEEDBACK_CODES;
+  // A saved code without a ladder of its own still gets a next step; a viva code also gets its default skill link.
+  return saved.codes.map((code) => {
+    const fallback = LADDERS[code.id];
+    if (code.ladder || !fallback) return code;
+    return { ...code, ladder: fallback.ladder, ...(code.group === 'viva' && !code.skill && fallback.skill ? { skill: fallback.skill } : {}) };
+  });
 }
 
 export async function writeFeedbackCodes(store, input) {

@@ -87,17 +87,22 @@ test('a returned viva set shows up as one piece with its confirmed tags', async 
   assert.deepEqual(viva.codes, ['ts'], 'only the confirmed tag counts');
 });
 
-test('opening a returned viva shows its confirmed tags with what the student said, the comment and the lesson link', async () => {
+test('opening a returned viva sends each take as the lesson shows it, with the codes for its focus', async () => {
   const { store, ava } = await setup();
   const words = ['the', 'river', 'is', 'like', 'a', 'road'].map((word, i) => ({ word, start: i, end: i + 1 }));
-  store.data.set('voice_submissions/lessonV/blk1/s1', { status: 'returned', class_id: 'class1', student_id: ava.id, transcript: { text: 'x', words }, comment: 'Slow down at the start.', tags: [{ code_id: 'ts', positive: false, confirmed: true, w: [1, 3], note: 'Name the device.' }, { code_id: 'ts', positive: false, confirmed: false, w: [0, 0] }], returned_at: '2026-10-20T00:00:00Z' });
+  store.data.set('voice_submissions/lessonV/blk1/s1', { status: 'returned', class_id: 'class1', student_id: ava.id, submitted_at: '2026-10-19T00:00:00Z', duration_s: 6, audio_key: 'a'.repeat(36), prompt: 'Why the road?', transcript: { text: 'x', words }, comment: 'Slow down at the start.', tags: [{ code_id: 'ts', positive: false, confirmed: true, t: 1, w: [1, 3], note: 'Name the device.' }, { code_id: 'ts', positive: false, confirmed: false, w: [0, 0] }], returned_at: '2026-10-20T00:00:00Z' });
   store.data.set(`piece_feedback/class1/${ava.id}/v:lessonV`, { kind: 'viva', title: 'Viva practice', lesson_id: 'lessonV', column_id: null, tags: [], comment: '', status: 'returned', returned_at: '2026-10-20T00:00:00Z', updated_at: 'x' });
   const out = await profileAction(store, 'class1', { action: 'piece', item: 'v:lessonV', ...device });
-  assert.equal(out.tags.length, 1, 'only the confirmed tag');
-  assert.equal(out.tags[0].quote, 'river is like');
-  assert.equal(out.tags[0].note, 'Name the device.');
-  assert.equal(out.comment, 'Slow down at the start.');
-  assert.equal(out.lesson_href, '/s/classes/class1/lessons/lessonV');
+  assert.equal(out.takes.length, 1);
+  const take = out.takes[0];
+  assert.equal(take.tags.length, 1, 'only the confirmed tag');
+  assert.deepEqual(take.tags[0].w, [1, 3]);
+  assert.equal(take.tags[0].note, 'Name the device.');
+  assert.equal(take.comment, 'Slow down at the start.');
+  assert.equal(take.prompt, 'Why the road?');
+  assert.ok(take.audio_url.includes('a'.repeat(36)));
+  assert.equal(take.transcript.words.length, 6);
+  assert.deepEqual(out.codes.map((c) => c.id), ['ts']);
 });
 
 test('a feedback document for this student appears as a Note, opens, and is marked seen', async () => {

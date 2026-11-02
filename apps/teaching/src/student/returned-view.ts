@@ -6,6 +6,10 @@ import { el } from '@/quiz/dom';
 import { paper, type Mark } from '@/blocks/peer-annotate';
 import { placeName, STEP_ORDER, RUNG_ORDER } from '@/progress/story-text';
 import { codeChip } from '@/progress/code-grid';
+import { focusBox, renderVoiceFeedback } from '@/blocks/voice-feedback-view';
+import '@/blocks/voice.css';
+import type { FeedbackCode } from '@/blocks/feedback-codes';
+import type { MineState } from '@/blocks/voice-client';
 import type { Place, ReturnedItem } from '@/progress/types';
 
 const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', answer: 'Answer', note: 'Note' };
@@ -30,14 +34,17 @@ export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew:
 }
 
 type Resource = { url: string; kind: string; title?: string; start?: number };
-export type PieceTag = { part: string; field: string; start: number; end: number; positive: boolean; code: string; label: string; colour: string; action: string; note?: string; quote?: string; resource?: Resource };
+export type PieceTag = { code_id: string; part: string; field: string; start: number; end: number; positive: boolean; code: string; label: string; colour: string; action: string; note?: string; quote?: string; resource?: Resource };
 export type PiecePayload = {
   id: string; kind: string; title: string; date: string; comment: string;
   text: Record<string, Record<string, string>> | null;
   tags: PieceTag[];
   criteria: { label: string; step: Place | null; was: Place | null }[];
-  /** Where a viva's recording and transcript live, when the server has one. */
-  lesson_href?: string;
+  /** A viva's takes, each as the lesson's feedback view reads it. */
+  takes?: Extract<MineState, { submitted: true }>[];
+  /** The codes this piece used, and the student's rung on each skill, for its one focus. */
+  codes?: FeedbackCode[];
+  rungs?: Record<string, string | null>;
 };
 
 const ladderOf = (p: Place | null): Place[] => (p && RUNG_ORDER.includes(p) ? RUNG_ORDER.slice(1) : STEP_ORDER);
@@ -66,12 +73,42 @@ function explain(tag: PieceTag): HTMLElement[] {
   return out;
 }
 
+function sideBoxes(p: PiecePayload): HTMLElement {
+  const side = el('div', 'pg-piece__side');
+  if (p.comment) {
+    const c = el('div', 'pg-box');
+    c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', p.comment));
+    side.append(c);
+  }
+  if (p.criteria.length) {
+    const c = el('div', 'pg-box');
+    c.append(el('h3', 'pg-box__title', 'Where this piece sits'));
+    for (const cr of p.criteria) {
+      // Only a rise gets words; a step lower than last time says nothing.
+      const delta = !cr.was || !cr.step ? '' : cr.was === cr.step ? 'same as last time' : rank(cr.was) < rank(cr.step) ? `up from ${placeName(cr.was)}` : '';
+      const head = el('div', 'pg-box__row');
+      head.append(el('b', undefined, cr.label), el('span', 'pg-box__delta', delta));
+      c.append(head, ladder(cr.step, cr.was));
+    }
+    side.append(c);
+  }
+  return side;
+}
+
 export function pieceView(p: PiecePayload, onBack: () => void): HTMLElement {
   const root = el('section', 'pg-piece');
   const back = el('button', 'pg-back', '← Your progress');
   back.type = 'button';
   back.addEventListener('click', onBack);
   root.append(back, el('h2', 'pg-piece__title', p.title), el('p', 'pm-key', `Returned ${p.date}`));
+  const takes = p.takes ?? [];
+  const focus = focusBox(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs);
+  if (focus) root.append(focus);
+  if (takes.length) {
+    takes.forEach((take, i) => root.append(renderVoiceFeedback(take, { focus: false, title: take.prompt?.trim() || `Take ${i + 1}` })));
+    root.append(sideBoxes(p));
+    return root;
+  }
   const cols = el('div', 'pg-piece__cols');
   const left = el('div');
   const pop = el('div', 'pg-pop');
@@ -96,7 +133,7 @@ export function pieceView(p: PiecePayload, onBack: () => void): HTMLElement {
     }
     left.append(pop, el('p', 'pg-hint', 'Tap a highlight to see what it means.'));
   } else {
-    // A viva has no typed text: each confirmed tag is a line of its own.
+    // A note has no typed text: each tag is a line of its own.
     const list = el('ul', 'pg-viva');
     for (const tag of p.tags) {
       const item = el('li', 'pg-box');
@@ -106,31 +143,8 @@ export function pieceView(p: PiecePayload, onBack: () => void): HTMLElement {
     }
     if (p.tags.length) left.append(list);
     else left.append(el('p', 'pm-empty', p.comment ? 'Your teacher left a comment on this one.' : 'Your teacher has marked this. There are no notes on it yet.'));
-    if (p.lesson_href) {
-      const a = el('a', 'pg-seehow', 'Listen and read in the lesson');
-      a.href = p.lesson_href;
-      left.append(a);
-    }
   }
-  const side = el('div', 'pg-piece__side');
-  if (p.comment) {
-    const c = el('div', 'pg-box');
-    c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', p.comment));
-    side.append(c);
-  }
-  if (p.criteria.length) {
-    const c = el('div', 'pg-box');
-    c.append(el('h3', 'pg-box__title', 'Where this piece sits'));
-    for (const cr of p.criteria) {
-      // Only a rise gets words; a step lower than last time says nothing.
-      const delta = !cr.was || !cr.step ? '' : cr.was === cr.step ? 'same as last time' : rank(cr.was) < rank(cr.step) ? `up from ${placeName(cr.was)}` : '';
-      const head = el('div', 'pg-box__row');
-      head.append(el('b', undefined, cr.label), el('span', 'pg-box__delta', delta));
-      c.append(head, ladder(cr.step, cr.was));
-    }
-    side.append(c);
-  }
-  cols.append(left, side);
+  cols.append(left, sideBoxes(p));
   root.append(cols);
   return root;
 }

@@ -238,6 +238,7 @@
 
 .pg-box__comment {
   margin: 0;
+  white-space: pre-line;
   line-height: 1.6;
 }
 

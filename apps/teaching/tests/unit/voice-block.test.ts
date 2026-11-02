@@ -10,6 +10,8 @@ import { clock, livePoint, paceSlots, pointProgress, slotAt } from '@/blocks/voi
 import { buildPaper, commonestFiller, fillerSuggestions, pointIndexAt, tapTarget, wordAt } from '@/blocks/voice-marking';
 import { keepTake, memoryTakes, MAX_TAKES } from '@/blocks/voice-takes';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
+import { alignTagWords } from '@/blocks/voice-marking';
+import { focusStep, type FeedbackCode } from '@/blocks/feedback-codes';
 import { mountVoiceTeacher } from '@/blocks/voice-teacher';
 import { primeFeedbackCodes, type FeedbackCode } from '@/blocks/feedback-codes';
 import { speakingSeconds } from '@/blocks/voice-student';
@@ -113,7 +115,7 @@ describe('block settings', () => {
 });
 
 describe('student feedback view', () => {
-  it('shows the summary, marks on the transcript, and a card per mark', () => {
+  it('shows the summary, marks on the transcript, and every tag beside it', () => {
     const view = renderVoiceFeedback({
       submitted: true,
       initials: 'JS',
@@ -143,10 +145,33 @@ describe('student feedback view', () => {
     expect(view.textContent).toContain('Audio removed after 4 weeks');
     const marks = view.querySelectorAll<HTMLElement>('.pa-run--mark');
     expect(marks.length).toBeGreaterThan(0);
+    const rows = view.querySelectorAll('.voice-notes .voice-note');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]!.textContent).toContain('Great opening concept.');
+    expect(rows[1]!.textContent).toContain('Clear concept');
+    expect(rows[1]!.textContent).toContain('the poem uses metaphor');
     marks[marks.length - 1]!.click();
-    expect(view.querySelector('.pa-cards')?.textContent).toContain('Great opening concept.');
-    expect(view.querySelector('.pa-cards')?.textContent).toContain('Clear concept');
+    expect(view.querySelector('.voice-note--selected')?.textContent).toContain('Clear concept');
+    expect(view.querySelector('.voice-focus__line')?.textContent).toContain('Filler word.');
     view.remove();
+  });
+
+  it('moves tags saved on the first word back to the word their time points at', () => {
+    const words = ['one', 'two', 'three'].map((w, i) => ({ w, start: i, end: i + 0.9 }));
+    const tags = [{ t: 0.2, w: [0, 0] as [number, number] }, { t: 2.1, w: [0, 0] as [number, number] }, { t: 1.1, w: [1, 2] as [number, number] }];
+    expect(alignTagWords(tags, words).map((t) => t.w)).toEqual([[0, 0], [2, 2], [1, 2]]);
+  });
+
+  it('picks the most-tagged growth code for the focus, at the student\u2019s rung on its skill', () => {
+    const library = [
+      { id: 'x', code: 'X', label: 'Accuracy', group: 'viva', criterion: 2, colour: 'blue', descriptor: 'Check it.', skill: 'a.b', ladder: ['l0', 'l1', 'l2', 'l3', 'l4'] },
+      { id: 'fw', code: 'FW', label: 'Filler', group: 'speaking', criterion: null, colour: 'peach', descriptor: 'Pause.' }
+    ] as FeedbackCode[];
+    const tag = (code_id: string, positive = false) => ({ code_id, positive });
+    expect(focusStep([tag('x'), tag('fw'), tag('fw')], library)).toMatchObject({ code: { id: 'fw' }, line: 'Pause.' });
+    expect(focusStep([tag('x'), tag('fw')], library)).toMatchObject({ code: { id: 'x' }, line: 'l1' });
+    expect(focusStep([tag('x')], library, { 'a.b': 'accomplished' })?.line).toBe('l3');
+    expect(focusStep([tag('x', true)], library)).toBeNull();
   });
 });
 

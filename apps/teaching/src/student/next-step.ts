@@ -16,7 +16,7 @@ import '@/styles/next-step.css';
 
 export type StepCode = { id: string; code: string; colour: string; hits: number };
 /** The `steps` profile reply, by `strand.sub`. */
-export type StepSkills = Record<string, { rung: string | null; code: StepCode | null }>;
+export type StepSkills = Record<string, { rung: string | null; codes: StepCode[] }>;
 export type NextStep = { code_id: string; code: string; colour: string; line: string };
 export type StepPick = { code_id: string; line: string; start: number; end: number } | { code_id: string; line: string; skipped: true };
 /** What a writing box carries for its step. */
@@ -27,8 +27,8 @@ export type StepFor = (item: StepItem, key: string) => Promise<NextStep | null>;
 const COLOURS = new Set(['blue', 'sage', 'peach', 'gold', 'lilac']);
 
 /**
- * The box's step: of its skills with a repeating code that the box's bank
- * covers, the code with most hits (the first on a tie), at the student's rung.
+ * The box's step: of its skills' repeating codes that the box's bank covers,
+ * the code with most hits (the first on a tie), at the student's rung.
  * No rung on that skill yet gives the Capable line.
  */
 export function chooseStep(item: StepItem, skills: StepSkills | null): NextStep | null {
@@ -36,11 +36,12 @@ export function chooseStep(item: StepItem, skills: StepSkills | null): NextStep 
   let best: { code: StepCode; line: string } | null = null;
   for (const skill of item.skills) {
     const s = skills[skill];
-    const bank = s?.code ? item.next_steps[s.code.id] : undefined;
-    if (!s?.code || !bank) continue;
-    const line = (bank.lines[rungIndex(s.rung)] ?? '').trim();
-    if (!line) continue;
-    if (!best || s.code.hits > best.code.hits) best = { code: s.code, line };
+    for (const code of s?.codes ?? []) {
+      const line = (item.next_steps[code.id]?.lines[rungIndex(s!.rung)] ?? '').trim();
+      if (!line) continue;
+      if (!best || code.hits > best.code.hits) best = { code, line };
+      break;
+    }
   }
   if (!best) return null;
   return { code_id: best.code.id, code: best.code.code, colour: COLOURS.has(best.code.colour) ? best.code.colour : 'blue', line: best.line };

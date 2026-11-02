@@ -1,5 +1,6 @@
 import { apiGet } from '@/api/client';
 import type { CodeColour } from '@/blocks/peer-annotate';
+import { rungIndex } from '@/progress/wording';
 
 /**
  * The teacher's marking shorthand (TS, E, AR, FW …): one library shared by
@@ -113,6 +114,27 @@ export function descriptorFor(code: FeedbackCode, positive: boolean): string {
 }
 
 export type TaggedCode = { code_id: string; positive: boolean };
+
+/**
+ * The one thing to work on next: the growth code tagged most on this work, a
+ * content code over a speaking code on a tie, at the student's rung on its
+ * skill (no rung yet gives the Capable line). A code with no ladder gives its
+ * descriptor. Strengths never count, and all-strength work has no focus.
+ */
+export function focusStep(
+  tags: readonly TaggedCode[],
+  codes: readonly FeedbackCode[],
+  rungs: Record<string, string | null | undefined> = {}
+): { code: FeedbackCode; line: string } | null {
+  const counts = new Map<string, number>();
+  for (const tag of tags) if (!tag.positive) counts.set(tag.code_id, (counts.get(tag.code_id) ?? 0) + 1);
+  const code = codes
+    .filter((c) => counts.has(c.id))
+    .sort((a, b) => counts.get(b.id)! - counts.get(a.id)! || Number(Boolean(b.criterion)) - Number(Boolean(a.criterion)))[0];
+  if (!code) return null;
+  const line = code.ladder?.[rungIndex(code.skill ? rungs[code.skill] : null)]?.trim();
+  return { code, line: line || code.descriptor };
+}
 
 export type SummaryLine = { heading: string; items: Array<{ code: FeedbackCode; text: string; count: number; positive: boolean }> };
 
