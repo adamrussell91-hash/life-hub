@@ -109,6 +109,8 @@ jobs:
           GROVE_ASSET_KEY: ${{ secrets.GROVE_ASSET_KEY }}
       - run: npm run build
         env:
+          # The Tasks build bundles the pdf.js 6 worker and needs more than 2 GB.
+          NODE_OPTIONS: --max-old-space-size=4096
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_PICKER_API_KEY: ${{ secrets.VITE_GOOGLE_PICKER_API_KEY }}
           VITE_GOOGLE_APP_ID: ${{ secrets.VITE_GOOGLE_APP_ID }}

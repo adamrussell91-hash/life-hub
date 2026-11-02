@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { getJSON, mediaFileKey, mediaKey, setJSON, slugify } from './teaching-blobs.mjs';
 import { ALLOWED_MEDIA_MIME, mediaTypeFromMime } from '../media-upload.mjs';
+import { safeFetch } from './safe-fetch.mjs';
 
 /**
  * Server-side imports only. The browser upload route keeps its 10 MB cap.
@@ -68,7 +69,7 @@ async function readCapped(res, maxBytes) {
 /**
  * @returns {Promise<{ok:true,url?:string,text?:string,media_id?:string}|{ok:false,reason:'too_big'|'type'|'failed',message:string}>}
  */
-export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, now, maxBytes = IMPORT_MAX_BYTES, signal }) {
+export async function rehostMedia(store, mediaRef, { fetchImpl, lookupImpl, origin, now, maxBytes = IMPORT_MAX_BYTES, signal }) {
   const id = importMediaId(mediaRef.ref, mediaRef.url);
   const fileUrl = new URL(`/api/media/${id}/file`, origin).href;
   if (mediaRef.purpose !== 'html' && (await getJSON(store, mediaKey(id)))) {
@@ -76,7 +77,12 @@ export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, 
   }
   let res;
   try {
-    res = await fetchImpl(mediaRef.url, signal ? { signal } : undefined);
+    // Page authors can point a file block at any URL, so each hop is SSRF-checked.
+    const fetched = await safeFetch(mediaRef.url, { fetchImpl, lookupImpl, ...(signal ? { signal } : {}) });
+    if (!fetched.ok) {
+      return { ok: false, reason: 'failed', message: `Could not download ${mediaRef.name}: that address is not allowed.` };
+    }
+    res = fetched.response;
   } catch (error) {
     return { ok: false, reason: 'failed', message: `Could not download ${mediaRef.name}: ${error.message}` };
   }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from '@/schemas/patch';
 import { BlockSchema } from '@/schemas/block';
 import { CoverSchema } from '@/schemas/cover';
 import { IsoDateSchema } from '@/schemas/common';
@@ -92,7 +93,7 @@ export const ProposeReorderBlocksSchema = z.object({
  * (parts, options and objections go as complete arrays). The class and flow are the teacher's.
  */
 export const ProposeUpdateCaseSchema = z.object({
-  case: CaseSettingsSchema.omit({ class_id: true, flow: true }).partial().refine((patch) => Object.keys(patch).length > 0, 'Send at least one setting')
+  case: patchOf(CaseSettingsSchema.omit({ class_id: true, flow: true })).refine((patch) => Object.keys(patch).length > 0, 'Send at least one setting')
 });
 
 /** Every id in a case (parts, documents, options) is unique, so the player and board can tell them apart. */

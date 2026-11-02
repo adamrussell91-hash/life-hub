@@ -29,8 +29,9 @@ const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null
 export function isSafeSvg(svg) {
   if (typeof svg !== 'string' || !svg.length || svg.length > MAX_DRAWING_SVG) return false;
   if (!/^\s*<svg[\s>]/i.test(svg)) return false;
-  if (/<\s*(script|image|foreignObject|iframe|object|embed|style|use|a)[\s>/]/i.test(svg)) return false;
-  if (/\son[a-z]+\s*=/i.test(svg)) return false;
+  if (/<\s*(script|image|foreignObject|iframe|frame|object|embed|style|use|a|img|math|meta|link|base|form|input|button|textarea|audio|video|source|template|noscript)[\s>/]/i.test(svg)) return false;
+  // `/` and quotes also separate attributes in HTML (`<circle/onclick=…>`), not only whitespace.
+  if (/[^a-z0-9_:.-]on[a-z]+\s*=/i.test(svg)) return false;
   if (/href\s*=|javascript:|url\s*\(/i.test(svg)) return false;
   return true;
 }

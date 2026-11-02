@@ -15,6 +15,8 @@ import {
 } from '@/model/day';
 import { canMarkSafe, formatSafeTime, safeByItemId } from '@/lib/safe-mark';
 import { I } from '@/lib/icons';
+import { escapeHtml, pick } from '@/lib/html';
+import { splitGuideText } from '@/lib/guide-text';
 
 export interface DayListOptions {
   isPublic?: boolean;
@@ -37,7 +39,7 @@ type PublicSafeFields = { safe_at?: string; safe_photo_id?: string };
 
 function guideIconHtml(icon: string): string {
   const map: Record<string, string> = { phone: I.phone, transport: I.train, money: I.money, weather: I.temp, paperwork: I.doc };
-  return map[icon] ?? I.doc;
+  return pick(map, icon, I.doc);
 }
 
 function tagFor(item: Item): { cls: string; label: string } | null {
@@ -76,7 +78,7 @@ function appendSafeMark(
     const time = formatSafeTime(safe.at, tz);
     const badge = document.createElement('span');
     badge.className = 'safe-mark is-safe';
-    badge.innerHTML = `<span class="safe-mark__tick">${I.check}</span><span>${time}</span>`;
+    badge.innerHTML = `<span class="safe-mark__tick">${I.check}</span><span>${escapeHtml(time)}</span>`;
     badge.title = `Marked safe at ${time}`;
     badge.setAttribute('aria-label', `Safe at ${time}`);
     meta.append(badge);
@@ -217,7 +219,7 @@ function renderCard(
       price.textContent = formatAud(item.cost);
       tagsWrap.append(price);
     }
-    if (item.link && !options.isPublic) {
+    if (item.link && /^https:\/\//i.test(item.link) && !options.isPublic) {
       const openLink = document.createElement('a');
       openLink.href = item.link;
       openLink.target = '_blank';
@@ -336,12 +338,12 @@ function renderHopRow(hop: Hop): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'go';
   const icon = document.createElement('span');
-  icon.innerHTML = (I as Record<string, string>)[hop.mode] ?? I.walk;
+  icon.innerHTML = pick(I as Record<string, string>, hop.mode, I.walk);
   const text = document.createElement('span');
   const bits = [
-    `<b>${hop.minutes} min</b>`,
-    hop.note,
-    hop.cost ? `<span class="price">${formatAud(hop.cost)}</span>` : null
+    `<b>${escapeHtml(hop.minutes)} min</b>`,
+    hop.note ? escapeHtml(hop.note) : null,
+    hop.cost ? `<span class="price">${escapeHtml(formatAud(hop.cost))}</span>` : null
   ].filter(Boolean);
   text.innerHTML = bits.join(' · ');
   wrap.append(icon, text);
@@ -389,7 +391,15 @@ export function renderDayList(
       const dt = document.createElement('dt');
       dt.innerHTML = guideIconHtml(row.icon);
       const dd = document.createElement('dd');
-      dd.innerHTML = row.text;
+      // Stored as `<b>Label.</b> detail`; rebuild it from text so stored markup never runs.
+      const { label, detail } = splitGuideText(row.text);
+      if (label) {
+        const b = document.createElement('b');
+        b.textContent = `${label}.`;
+        dd.append(b, detail ? ` ${detail}` : '');
+      } else {
+        dd.textContent = detail;
+      }
       dl.append(dt, dd);
     }
     guide.append(summary, dl);
@@ -447,7 +457,7 @@ export function renderDayList(
         if (dateInZone(instant, trip.home_tz) !== item.date) nextDay = ' (next day)';
       }
       const left = document.createElement('span');
-      left.innerHTML = `${item.title} · <b>${localLabel} ${whereName}</b>${homeLabel ? ` · ${homeLabel} ${homeName}${nextDay}` : ''}`;
+      left.innerHTML = `${escapeHtml(item.title)} · <b>${escapeHtml(localLabel)} ${escapeHtml(whereName)}</b>${homeLabel ? ` · ${escapeHtml(homeLabel)} ${escapeHtml(homeName)}${nextDay}` : ''}`;
       const follower = document.createElement('span');
       follower.style.marginLeft = 'auto';
       follower.textContent = trip.followers_label;

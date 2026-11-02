@@ -34,7 +34,9 @@ export async function openPdf(bytes: Uint8Array): Promise<PdfDeck> {
   const lib = await pdfjs();
   let doc: Awaited<ReturnType<PdfJs['getDocument']>['promise']>;
   try {
-    doc = await lib.getDocument({ data: bytes }).promise;
+    // Defence in depth for teacher-supplied files: pdf.js 6 has no eval path
+    // (`isEvalSupported` went with it), and XFA forms stay off.
+    doc = await lib.getDocument({ data: bytes, enableXfa: false }).promise;
   } catch {
     throw new Error('That PDF won’t open. Export it again from PowerPoint (File › Export › PDF).');
   }
@@ -57,7 +59,8 @@ export async function openPdf(bytes: Uint8Array): Promise<PdfDeck> {
       return canvas;
     },
     destroy() {
-      void doc.destroy();
+      // pdf.js 6 removed PDFDocumentProxy.destroy(); the loading task owns teardown.
+      void doc.loadingTask.destroy();
     }
   };
 }

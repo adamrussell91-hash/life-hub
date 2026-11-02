@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { runAlchemist, alchemistSecret } from './_shared/knowledge-alchemist.mjs';
 import {
   errorResponse,
@@ -35,7 +36,7 @@ export function createLessonAlchemistHandler(deps = {}) {
     }
     const expected = alchemistSecret(env);
     const provided = request.headers.get('x-alchemist-secret') ?? '';
-    if (!expected || provided !== expected) {
+    if (!expected || !secretsMatch(provided, expected)) {
       return withAlchemistCors(errorResponse(401, 'unauthenticated', 'Unauthorized', false), request, env);
     }
     const parsed = await readJsonObject(request);
@@ -70,3 +71,10 @@ export function createLessonAlchemistHandler(deps = {}) {
 }
 
 export default createLessonAlchemistHandler();
+
+/** Constant-time compare. Hashing first gives equal-length buffers whatever was sent. */
+export function secretsMatch(provided, expected) {
+  const a = createHash('sha256').update(String(provided ?? ''), 'utf8').digest();
+  const b = createHash('sha256').update(String(expected ?? ''), 'utf8').digest();
+  return timingSafeEqual(a, b);
+}

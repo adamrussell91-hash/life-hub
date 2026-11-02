@@ -209,7 +209,8 @@ export async function openHubPdfViewer(opts) {
     } catch {
       /* ignore */
     }
-    pdfDoc?.destroy?.();
+    // pdf.js 6 removed PDFDocumentProxy.destroy(); the loading task owns teardown.
+    void pdfDoc?.loadingTask?.destroy?.();
     overlay.remove();
     doc.body.classList.remove('hub-pdf-viewer-open');
     opts.onClose?.();
@@ -237,7 +238,9 @@ export async function openHubPdfViewer(opts) {
   });
 
   try {
-    const loading = getDocument({ url: opts.src, withCredentials: true });
+    // Defence in depth for untrusted PDFs. pdf.js 6 has no eval path left
+    // (`isEvalSupported` was removed with it), so keep XFA forms off too.
+    const loading = getDocument({ url: opts.src, withCredentials: true, enableXfa: false });
     pdfDoc = await loading.promise;
     await renderPage(pageNumber);
   } catch (error) {

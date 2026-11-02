@@ -21,7 +21,14 @@ async function browserAssetText() {
 
 test('Home shell exposes landmarks and named rendering regions', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
-  const htmlWithoutFonts = html.replace(/https:\/\/fonts\.(googleapis|gstatic)\.com[^"'\s]*/g, '');
+  // The Content-Security-Policy meta names allowed origins; it loads nothing itself.
+  const cspPattern = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"[^>]*>/;
+  const csp = html.match(cspPattern)?.[1] ?? '';
+  assert.match(csp, /(^|; )script-src 'self'[^;]*/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-(inline|eval)'/);
+  const htmlWithoutFonts = html
+    .replace(cspPattern, '')
+    .replace(/https:\/\/fonts\.(googleapis|gstatic)\.com[^"'\s]*/g, '');
 
   for (const fragment of [
     '<header',

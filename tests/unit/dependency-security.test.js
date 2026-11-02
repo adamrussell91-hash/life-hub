@@ -58,7 +58,7 @@ test('runtime YAML parser is pinned to the patched js-yaml release', async () =>
     new URL('../../node_modules/js-yaml/package.json', import.meta.url),
     'utf8'
   ));
-  assert.equal(packageMetadata.version, '4.3.0');
+  assert.equal(packageMetadata.version, '4.3.2');
 });
 
 test('hostile YAML merge keys cannot alter result prototypes or inherited properties', () => {
@@ -99,7 +99,9 @@ test('repeated hostile merge aliases hit the work limit before quadratic travers
 
   assert.throws(
     () => load(`source: &source {${keys}}\ntarget: {<<: [${aliases}]}\n`),
-    error => error.name === 'YAMLException' && /merge keys exceeded maxTotalMergeKeys/.test(error.message)
+    // 4.3.2 caps the merge sequence itself, before the merge-key budget is spent.
+    error => error.name === 'YAMLException'
+      && /merge keys exceeded maxTotalMergeKeys|abnormal merge sequence size/.test(error.message)
   );
   assert.ok(performance.now() - started < 500, 'duplicate aliases must be rejected before quadratic work');
 });

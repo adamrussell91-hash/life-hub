@@ -8,6 +8,8 @@
  *
  * `device` is a hash of a class-scoped token (deviceHash), never the token.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { CLASS_PREFIX, classKey, deleteKey, draftLessonKey, SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
@@ -18,8 +20,45 @@ import { assignInitials, normaliseInitials, STUDENT_ID_PATTERN } from './student
 const keys = (classId) => ({
   student: (id) => `class-claims/${classId}/students/${id}`,
   students: `class-claims/${classId}/students/`,
-  device: (device) => `class-claims/${classId}/devices/${device}`
+  device: (device) => `class-claims/${classId}/devices/${device}`,
+  ipDay: (day, ip) => `class-claims/${classId}/ip-day/${day}/${ip}`
 });
+
+/**
+ * New claims from one network address, per class, per (UTC) day. A whole class often
+ * shares one school address, so the cap sits above any real class list: it stops one
+ * address from cycling fresh device tokens through a class again and again (for
+ * example re-squatting initials after the teacher releases them), not a first sweep.
+ * A teacher join code would close that; it would change the student flow.
+ */
+export const CLAIMS_PER_IP_PER_CLASS_PER_DAY = 40;
+
+const requestScope = new AsyncLocalStorage();
+
+/** Run a student request with its client address in scope, so claimInitials can cap it. */
+export function withClaimRequest({ ip } = {}, fn) {
+  return requestScope.run({ ip: typeof ip === 'string' ? ip.trim() : '' }, fn);
+}
+
+/** Netlify's client address for a request: context.ip, else the edge header. */
+export function clientIpOf(request, context = {}) {
+  const fromContext = typeof context?.ip === 'string' ? context.ip : '';
+  return fromContext || request?.headers?.get?.('x-nf-client-connection-ip') || '';
+}
+
+const ipKey = (ip) => createHash('sha256').update(`class-claims-ip:${ip}`).digest('hex').slice(0, 24);
+
+async function countClaimFromIp(store, classId, nowIso) {
+  const ip = requestScope.getStore()?.ip;
+  if (!ip) return; // No address known (tests, internal calls): nothing to count against.
+  const key = keys(classId).ipDay(nowIso.slice(0, 10), ipKey(ip));
+  const held = await read(store, key);
+  const count = Number(held?.count) || 0;
+  if (count >= CLAIMS_PER_IP_PER_CLASS_PER_DAY) {
+    reject(429, 'too_many_claims', 'Too many initials have been claimed from here today. See your teacher.');
+  }
+  await store.setJSON(key, { count: count + 1, updated_at: nowIso });
+}
 
 /** The class and its list with ids and initials filled in. Null when the class is gone. */
 export async function loadRoster(store, classId) {
@@ -72,6 +111,7 @@ export async function claimInitials(store, roster, token, typed) {
   const k = keys(roster.cls.id);
   const device = deviceHash(token);
   const claimed_at = new Date().toISOString();
+  await countClaimFromIp(store, roster.cls.id, claimed_at);
   const written = await store.setJSON(k.student(student.id), { device, claimed_at }, { onlyIfNew: true });
   if (written?.modified === false) {
     const held = await read(store, k.student(student.id));

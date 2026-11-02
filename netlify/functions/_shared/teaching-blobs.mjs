@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { dedupeRecords, isIndexKey, listBlobKeys } from './blobs-list.mjs';
 
 export const TEACHING_CONTENT_STORE = 'teaching-hub-content';
@@ -155,8 +156,10 @@ export function slugify(title) {
   );
 }
 
+// Ids double as capability URLs on public routes (e.g. /api/media/:id/file), so the
+// suffix is 64 bits from the CSPRNG, not Math.random. The time prefix keeps them sortable.
 export function newId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}_${Date.now().toString(36)}_${randomBytes(8).toString('hex')}`;
 }
 
 export async function listJSON(store, prefix, options = {}) {

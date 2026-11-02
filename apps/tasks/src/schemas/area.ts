@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 export const AreaSchema = z.object({
@@ -25,4 +26,4 @@ export const AreaCreateSchema = AreaSchema.omit({
   title: z.string().min(1)
 });
 
-export const AreaUpdateSchema = AreaCreateSchema.partial();
+export const AreaUpdateSchema = patchOf(AreaCreateSchema);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 /** Hard deadline ≠ planned work. A work block is when work is planned. */
@@ -58,4 +59,4 @@ export const WorkBlockCreateSchema = WorkBlockSchema.omit({
   duration_minutes: z.number().int().positive()
 });
 
-export const WorkBlockUpdateSchema = WorkBlockCreateSchema.partial();
+export const WorkBlockUpdateSchema = patchOf(WorkBlockCreateSchema);

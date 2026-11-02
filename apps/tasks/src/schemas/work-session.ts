@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 import { WorkBlockDepthSchema } from './work-block';
 
@@ -57,4 +58,4 @@ export const WorkSessionCreateSchema = WorkSessionSchema.omit({
   started_at: z.string().min(1)
 });
 
-export const WorkSessionUpdateSchema = WorkSessionCreateSchema.partial();
+export const WorkSessionUpdateSchema = patchOf(WorkSessionCreateSchema);

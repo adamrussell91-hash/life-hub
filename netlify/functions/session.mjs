@@ -2,6 +2,9 @@ import {
   createSessionToken,
   serializeExpiredSessionCookie,
   serializeSessionCookie,
+  sessionAuthAt,
+  sessionEndsAt,
+  sessionEpochOf,
   shouldRefreshSession,
   verifySessionToken
 } from './_shared/auth-security.mjs';
@@ -37,7 +40,7 @@ export function createSessionHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withCors(misconfiguredResponse(), request, env);
     }
@@ -49,10 +52,15 @@ export function createSessionHandler({
 
     const currentTime = now();
     const headers = {};
-    let expiresAt = new Date(session.payload.exp).toISOString();
+    let expiresAt = new Date(sessionEndsAt(session.payload)).toISOString();
     if (shouldRefreshSession(session.payload, currentTime)) {
       try {
-        const refreshed = createToken({ now: currentTime }, umbrellaSessionSecret(env));
+        // Same epoch, same first sign-in: refresh never outlives SESSION_MAX_LIFETIME_MS.
+        const refreshed = createToken({
+          now: currentTime,
+          epoch: sessionEpochOf(session.payload),
+          authAt: sessionAuthAt(session.payload)
+        }, umbrellaSessionSecret(env));
         headers['set-cookie'] = serializeCookie(refreshed.token);
         expiresAt = refreshed.expiresAt;
       } catch {

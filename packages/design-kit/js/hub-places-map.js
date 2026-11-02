@@ -244,7 +244,7 @@ function escapeHtml(text) {
 }
 
 async function defaultLoadMapLibre() {
-  const mod = await import('https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.mjs');
+  const mod = await import('https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.mjs');
   return mod.default || mod;
 }
 
@@ -254,6 +254,6 @@ function ensureMapCss() {
   const link = document.createElement('link');
   link.id = 'hub-maplibre-css';
   link.rel = 'stylesheet';
-  link.href = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.css';
+  link.href = 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css';
   document.head.append(link);
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 export const PROGRAM_TYPES = [
@@ -254,7 +255,7 @@ export const ProgramCreateSchema = ProgramObject.omit({
   name: z.string().trim().min(1)
 });
 
-export const ProgramUpdateSchema = ProgramCreateSchema.partial();
+export const ProgramUpdateSchema = patchOf(ProgramCreateSchema);
 
 export type Program = z.infer<typeof ProgramSchema>;
 export type ProgramCreate = z.infer<typeof ProgramCreateSchema>;

@@ -1,5 +1,8 @@
 import type { City, GuideIcon, Trip } from '@/types';
 import { patchTrip } from '@/api/travel';
+import { joinGuideText, splitGuideText } from '@/lib/guide-text';
+
+export { joinGuideText, splitGuideText };
 import { createHubList } from '../../design-kit/js/hub-list.js';
 
 export interface ArrivalGuideSheetOptions {
@@ -192,41 +195,6 @@ function defaultRows(): { icon: GuideIcon; text: string }[] {
     { icon: 'transport', text: '' },
     { icon: 'money', text: '' }
   ];
-}
-
-export function splitGuideText(html: string): { label: string; detail: string } {
-  const m = String(html || '').match(/^<b>(.*?)<\/b>\s*(.*)$/is);
-  if (m) {
-    return {
-      label: decodeEntities(m[1]!).replace(/\.$/, '').trim(),
-      detail: decodeEntities(m[2]!).trim()
-    };
-  }
-  return { label: '', detail: decodeEntities(String(html || '').replace(/<[^>]+>/g, '')).trim() };
-}
-
-export function joinGuideText(label: string, detail: string): string {
-  const l = label.trim();
-  const d = detail.trim();
-  if (l && d) return `<b>${escapeHtml(l)}.</b> ${escapeHtml(d)}`;
-  if (l) return `<b>${escapeHtml(l)}.</b>`;
-  return escapeHtml(d);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&');
 }
 
 function field(labelText: string, control: HTMLElement, full = false): HTMLElement {

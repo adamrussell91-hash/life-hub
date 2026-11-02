@@ -32,7 +32,7 @@ export const TkTeacherNoteSchema = z.object({
 });
 
 /** Teacher's own notes. The empty key is the block's notes; other keys are older per-class notes. */
-export const TkJotsSchema = z.record(z.string()).default({});
+export const TkJotsSchema = z.record(z.string(), z.string()).default({});
 
 export const TkItemListSchema = z.array(z.string().min(1)).default([]);
 
@@ -50,7 +50,7 @@ export const ToolkitSkillContentSchema = z.object({
   reveals: z.array(TkRevealSchema).max(6).default([]),
   links: z
     .object({ tools: TkItemListSchema, values: TkItemListSchema })
-    .default({ tools: [], values: [] }),
+    .prefault({ tools: [], values: [] }),
   show_links: z.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -82,7 +82,7 @@ export const ToolkitToolContentSchema = z.object({
   sentence: z.string().default(''),
   steps: z.array(TkStepSchema).max(8).default([]),
   /** Fork frame: the worked example filled into the slots on reveal. */
-  worked: ForkSlotsSchema.default({}),
+  worked: ForkSlotsSchema.prefault({}),
   worked_note: z.string().default(''),
   converters: z
     .array(z.object({ id: z.string().min(1), closed: z.string(), open: z.string() }))
@@ -103,7 +103,7 @@ export const ToolkitToolContentSchema = z.object({
   reveals: z.array(TkRevealSchema).max(6).default([]),
   links: z
     .object({ skills: TkItemListSchema, tools: TkItemListSchema })
-    .default({ skills: [], tools: [] }),
+    .prefault({ skills: [], tools: [] }),
   show_links: z.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -123,7 +123,7 @@ export const ToolkitValueContentSchema = z.object({
     .max(8)
     .default([]),
   instruction: z.string().default(''),
-  model: z.object({ label: z.string(), body: z.string() }).default({ label: '', body: '' }),
+  model: z.object({ label: z.string(), body: z.string() }).prefault({ label: '', body: '' }),
   discussion: z.string().default(''),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -192,7 +192,7 @@ export const ConceptFeaturesContentSchema = z.object({
     )
     .max(8)
     .default([]),
-  analogy: z.object({ stem: z.string(), example: z.string() }).default({ stem: '', example: '' }),
+  analogy: z.object({ stem: z.string(), example: z.string() }).prefault({ stem: '', example: '' }),
   game: z
     .object({
       kind: ConceptGameKindSchema,
@@ -203,7 +203,7 @@ export const ConceptFeaturesContentSchema = z.object({
         .array(z.object({ id: z.string().min(1), text: z.string(), prompt: z.string() }))
         .max(16)
     })
-    .default({ kind: 'kind_sort', left: '', middle: '?', right: '', cards: [] }),
+    .prefault({ kind: 'kind_sort', left: '', middle: '?', right: '', cards: [] }),
   criteria: z.array(z.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { LifeWallFieldSchema } from './life-wall';
 import { schemaVersion } from './task';
 import { PageBlockSchema } from './page-block';
@@ -221,4 +222,4 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   title: z.string().min(1)
 });
 
-export const ProjectUpdateSchema = ProjectCreateSchema.partial();
+export const ProjectUpdateSchema = patchOf(ProjectCreateSchema);

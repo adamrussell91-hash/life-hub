@@ -126,7 +126,7 @@ export const SprintSettingsSchema = z.object({
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5).refine(phasesInOrder, 'Phases must be in order: Understand, Sketch, Decide, Prototype, Test.'),
   groups: z.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z.number().int().min(0).max(30).default(8),
   /** Stand-out dots from before head-to-heads; kept so older Kits still load, no longer used. */
@@ -146,7 +146,7 @@ export const PublicSprintSchema = z.object({
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   sketch_timer: z.number().int().min(0).max(30).default(8),
   decide_dots: z.number().int().min(0).max(5).default(3)
 });
@@ -166,12 +166,12 @@ export const UnderstandPayloadSchema = z.object({
   stretch: text(300).default(''),
   /** Words from the brief that stand out. */
   spot: z.array(text(40)).max(30).default([]),
-  audience: z.object({ who: text(200).default(''), why: text(300).default('') }).default({ who: '', why: '' }),
+  audience: z.object({ who: text(200).default(''), why: text(300).default('') }).prefault({ who: '', why: '' }),
   /** The surface problem, then each "why is that a problem?". */
   dig: z.array(text(300)).max(6).default([]),
   /** The problem in their own words. */
   say: text(400).default(''),
-  limits: z.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
+  limits: z.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).prefault({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 export const SketchCardSchema = z.object({
   id: SprintIdSchema,

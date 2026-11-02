@@ -2,7 +2,7 @@
  * Life → Property page. Builds a static shell once (controls keep focus while
  * sliders drag), then `update()` repaints the figures and charts from the engine.
  */
-import { formatDisplayDate } from '../../../../packages/design-kit/js/format-display-date.js';
+import { formatDisplayDate as formatDisplayDateText } from '../../../../packages/design-kit/js/format-display-date.js';
 import { mountChartInfo } from '../../../../packages/design-kit/js/hub-chart-info.js';
 import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
 import { buildMoneyFlow, spaceLabels } from './chart-kit/money-flow.js';
@@ -51,6 +51,13 @@ export function shortMoney(value) {
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
   if (abs >= 1e3) return `${sign}$${Math.round(abs / 1e3)}k`;
   return `${sign}$${Math.round(abs)}`;
+}
+
+/** formatDisplayDate passes unparseable strings through, and stored or imported
+ * dates land in innerHTML here, so this module only ever gets the escaped form.
+ * A real date has no characters that escaping changes. */
+function formatDisplayDate(value) {
+  return escapeHtml(formatDisplayDateText(value));
 }
 
 function escapeHtml(value) {
@@ -792,7 +799,7 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     const value = getPath(record, path);
     if (type === 'cost') {
       const cost = value ?? null;
-      return `<div class="prop-field prop-field--cost"><label for="prop-${id}">${label}</label><input type="text" inputmode="decimal" id="prop-${id}" name="${path}" value="${cost ? cost.amount : ''}" placeholder="Yearly amount" autocomplete="off">
+      return `<div class="prop-field prop-field--cost"><label for="prop-${id}">${label}</label><input type="text" inputmode="decimal" id="prop-${id}" name="${path}" value="${cost ? escapeHtml(cost.amount) : ''}" placeholder="Yearly amount" autocomplete="off">
         <label class="prop-check" for="prop-${id}-est"><input type="checkbox" id="prop-${id}-est" name="${path}.estimate" ${cost?.estimate ? 'checked' : ''}><span>Estimate</span></label></div>`;
     }
     let shown = value ?? '';
@@ -1047,13 +1054,13 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     barLabel(corrected, 130, 'is-wave');
 
     const marks = { done: '✓', partial: '~', missing: '!', info: '?' };
-    q('checklist').innerHTML = summary.checklist.map(item => `<li><span class="prop-ck prop-ck--${item.status}" aria-label="${item.status}">${marks[item.status]}</span><div><b>${escapeHtml(item.label)}</b><span>${escapeHtml(item.detail)}</span></div><span class="prop-amt${item.status === 'done' ? '' : ' is-ghost'}">${item.amount === null ? (item.status === 'info' ? 'Auto' : 'Missing') : `${item.estimate ? '≈ ' : ''}${money(item.amount)}`}</span></li>`).join('');
+    q('checklist').innerHTML = summary.checklist.map(item => `<li><span class="prop-ck prop-ck--${escapeHtml(item.status)}" aria-label="${escapeHtml(item.status)}">${escapeHtml(marks[item.status] ?? '')}</span><div><b>${escapeHtml(item.label)}</b><span>${escapeHtml(item.detail)}</span></div><span class="prop-amt${item.status === 'done' ? '' : ' is-ghost'}">${item.amount === null ? (item.status === 'info' ? 'Auto' : 'Missing') : `${item.estimate ? '≈ ' : ''}${money(item.amount)}`}</span></li>`).join('');
 
     const next = state.nextStepDismissed ? null : nextStep(summary);
     q('next-step').innerHTML = next ? `<div class="confirm-card" role="group" aria-label="${escapeHtml(next.title)}">
         <div class="confirm-card__head"><p class="confirm-card__title">${escapeHtml(next.title)}</p><span class="confirm-card__meta">Next step</span></div>
         <p class="confirm-card__body">${escapeHtml(next.body)}</p>
-        <div class="prop-cc-foot"><button class="btn btn--ghost" type="button" data-prop="next-dismiss">Not now</button><button class="btn btn--primary" type="button" data-prop-open="${next.open}" data-prop-kind="${next.kind ?? ''}" data-prop-date="${next.date ?? ''}">${escapeHtml(next.action)}</button></div>
+        <div class="prop-cc-foot"><button class="btn btn--ghost" type="button" data-prop="next-dismiss">Not now</button><button class="btn btn--primary" type="button" data-prop-open="${escapeHtml(next.open)}" data-prop-kind="${escapeHtml(next.kind ?? '')}" data-prop-date="${escapeHtml(next.date ?? '')}">${escapeHtml(next.action)}</button></div>
       </div>` : '';
   }
 
@@ -1152,11 +1159,11 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
       box.innerHTML = `<p class="prop-kicker">Expected statement</p><div class="prop-stmt__head"><span class="prop-stmt__no">${formatDisplayDate(row.date)}</span><span class="prop-pill prop-pill--stale">Not recorded</span></div>
         <p class="prop-sub">Your statements usually arrive on these days of the month. This one should be in the agent's portal.</p>
         <dl><div><dt>Expected rent</dt><dd>≈ ${money(row.gross, 2)}</dd></div><div><dt>Expected fees</dt><dd>≈ ${money(row.deductions, 2)}</dd></div></dl>
-        <div class="prop-stmt__actions"><button class="btn btn--primary" type="button" data-prop="upload">Add the PDF</button><button class="btn btn--ghost" type="button" data-prop-open="record" data-prop-kind="statement" data-prop-date="${row.date}">Type it in</button></div>`;
+        <div class="prop-stmt__actions"><button class="btn btn--primary" type="button" data-prop="upload">Add the PDF</button><button class="btn btn--ghost" type="button" data-prop-open="record" data-prop-kind="statement" data-prop-date="${escapeHtml(row.date)}">Type it in</button></div>`;
       return;
     }
     const period = row.periodFrom && row.periodTo ? `Rent ${formatDisplayDate(row.periodFrom)} to ${formatDisplayDate(row.periodTo)}` : 'Rent statement';
-    box.innerHTML = `<p class="prop-kicker">Statement ${formatDisplayDate(row.date)}</p><div class="prop-stmt__head"><span class="prop-stmt__no">#${row.number}</span><span class="prop-pill prop-pill--ok">Recorded</span></div>
+    box.innerHTML = `<p class="prop-kicker">Statement ${formatDisplayDate(row.date)}</p><div class="prop-stmt__head"><span class="prop-stmt__no">#${escapeHtml(row.number)}</span><span class="prop-pill prop-pill--ok">Recorded</span></div>
       <p class="prop-sub">${period}</p>
       <dl><div><dt>Gross rent</dt><dd>${money(row.gross, 2)}</dd></div><div><dt>Agent kept</dt><dd>${money(-row.deductions, 2)}</dd></div><div><dt>Reached you</dt><dd>${money(row.net, 2)}</dd></div></dl>
       ${row.note ? `<p class="prop-stmt__note">${escapeHtml(row.note)}</p>` : ''}`;
@@ -1436,7 +1443,7 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
       ? recent.map(entry => {
         const { title, amount } = describeEntry(entry);
         const confirming = state.removing === entry.id;
-        return `<li><div><b>${escapeHtml(title)}</b><span>${KIND_LABELS[entry.kind]} · ${formatDisplayDate(entry.date)}</span></div><span class="prop-recent__amt">${amount}</span><button type="button" class="prop-remove${confirming ? ' is-confirm' : ''}" data-prop-remove="${escapeHtml(entry.id)}" aria-label="${confirming ? 'Confirm remove' : 'Remove'} ${escapeHtml(title)}">${confirming ? 'Remove?' : '×'}</button></li>`;
+        return `<li><div><b>${escapeHtml(title)}</b><span>${escapeHtml(KIND_LABELS[entry.kind] ?? entry.kind)} · ${formatDisplayDate(entry.date)}</span></div><span class="prop-recent__amt">${amount}</span><button type="button" class="prop-remove${confirming ? ' is-confirm' : ''}" data-prop-remove="${escapeHtml(entry.id)}" aria-label="${confirming ? 'Confirm remove' : 'Remove'} ${escapeHtml(title)}">${confirming ? 'Remove?' : '×'}</button></li>`;
       }).join('')
       : '<li class="prop-recent__empty">Nothing recorded yet. Tap Record to add the first one.</li>';
   }

@@ -77,3 +77,22 @@ describe("renderChatMarkdown", () => {
     expect(html).not.toContain(mistypedQuarters);
   });
 });
+
+describe("renderChatMarkdown link safety", () => {
+  const payload = "#page/x%22%3E%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E";
+
+  it("does not render an encoded #page/ attribute breakout from a model reply", () => {
+    const html = renderChatMarkdown(`Read [this](${payload}) next.`);
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("note-link");
+    expect(html).toContain('<span class="md-link">this</span>');
+  });
+
+  it("escapes a hostile note title used as a bare-id label", () => {
+    const html = renderChatMarkdown(`See (${dmgt}).`, [
+      { pageId: dmgt, title: `<img src=x onerror=alert(1)> x](${payload}` },
+    ]);
+    expect(html).not.toContain("<img");
+    expect(html).not.toMatch(/data-open-page="[^"]*[<>]/);
+  });
+});

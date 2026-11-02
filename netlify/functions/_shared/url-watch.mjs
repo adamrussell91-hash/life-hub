@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { decodeBlob } from './decode-blob.mjs';
 import { createGitHubClient } from './github-client.mjs';
+import { safeFetch } from './safe-fetch.mjs';
 
 export const URL_WATCHES_PATH = 'data/knowledge/url-watches.json';
 export const URL_WATCH_STATUSES = new Set(['changed', 'unchanged', 'unavailable']);
@@ -85,13 +86,24 @@ function previousByUrl(store) {
 export async function checkWatchedUrl({
   url,
   previous = null,
-  fetchImpl = fetch,
+  fetchImpl,
+  lookupImpl,
   firecrawlKey = ''
 } = {}) {
   const headers = { 'user-agent': 'life-hub-url-watch' };
   if (previous?.etag) headers['if-none-match'] = previous.etag;
+  // Watched URLs come from page bodies (typed, imported or pasted), so the fetch is
+  // SSRF-checked per hop. A blocked URL is simply unavailable: no Firecrawl fallback.
+  const unavailable = () => ({
+    url,
+    status: 'unavailable',
+    etag: previous?.etag ?? null,
+    fingerprint: previous?.fingerprint ?? null
+  });
   try {
-    const response = await fetchImpl(url, { method: 'GET', headers, redirect: 'follow' });
+    const fetched = await safeFetch(url, { method: 'GET', headers, fetchImpl, lookupImpl });
+    if (!fetched.ok) return unavailable();
+    const response = fetched.response;
     if (response.status === 304) {
       return {
         url,

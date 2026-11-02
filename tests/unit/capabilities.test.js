@@ -4,6 +4,7 @@ import {
   buildAgentTools,
   capabilityIdsForAgent,
   isPathAllowedForAgent,
+  isSafeAgentSlug,
   loadAllowlist,
   loadCapability,
   listNamedShortcuts,
@@ -1311,4 +1312,25 @@ test('decisionFieldsFromAction records chosen, reasoning, and revisit', () => {
   assert.match(partial.chosen, /Accepted `keep\.md`/);
   assert.match(partial.chosen, /rejected `skip\.md`/);
   assert.equal(partial.reasoning, 'two writes');
+});
+
+test('loadAllowlist only reads slugs made of lower-case letters, digits and hyphens', () => {
+  resetCapabilityCaches();
+  assert.ok(loadAllowlist('clare'));
+  for (const slug of ['../registry', '../allowlists/clare', 'clare/../clare', 'Clare', 'clare.json', '', null, 'a'.repeat(65)]) {
+    assert.equal(loadAllowlist(slug), null, String(slug));
+  }
+  assert.equal(isSafeAgentSlug('hammond'), true);
+  assert.equal(isSafeAgentSlug('x/y'), false);
+});
+
+test('matchGlob treats only * and ** as wildcards; ? and other regex characters match themselves', () => {
+  assert.equal(matchGlob('data/a?.json', 'data/ab.json'), false);
+  assert.equal(matchGlob('data/a?.json', 'data/a?.json'), true);
+  assert.equal(matchGlob('data/(x)+[y]/*.md', 'data/(x)+[y]/note.md'), true);
+  assert.equal(matchGlob('data/(x)+[y]/*.md', 'data/xx[y]/note.md'), false);
+  assert.equal(matchGlob('data/*.json', 'data/a.json'), true);
+  assert.equal(matchGlob('data/*.json', 'data/a/b.json'), false);
+  assert.equal(matchGlob('data/**/x-*.md', 'data/a/b/x-1.md'), true);
+  assert.equal(matchGlob('data/a.json', 'data/aXjson'), false);
 });

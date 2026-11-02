@@ -449,6 +449,17 @@ describe('chart-svg', () => {
     });
     expect(svg).toMatch(/var\(--danger\)/);
   });
+
+  it('ignores an unknown series colour instead of writing it into the SVG', () => {
+    const svg = buildChartSvg({
+      chart_type: 'line',
+      series: [
+        { id: 's1', name: 'S', color: 'x)" onload="alert(1)' as never, points: [{ x: 'A', y: 1 }, { x: 'B', y: 2 }] }
+      ]
+    });
+    expect(svg).not.toContain('onload');
+    expect(svg).toMatch(/var\(--[a-z-]+\)/);
+  });
 });
 
 describe('chart readability', () => {

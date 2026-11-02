@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { LifeWallFieldSchema } from './life-wall';
 import { schemaVersion } from './task';
 
@@ -70,7 +71,7 @@ export const GoalSchema = z.object({
   status: GoalStatusSchema.default('active'),
   sphere: GoalSphereSchema.default('life'),
   structure: GoalStructureSchema.default('woop'),
-  frame: GoalFrameSchema.default({}),
+  frame: GoalFrameSchema.prefault({}),
   lead_measure: z.object({ label: z.string(), per_week: z.number().int().min(1) }).nullable().default(null),
   /** Manual "+1" taps per Monday key, added to the automatic count. */
   week_log: z.record(z.string(), z.object({ manual: z.number().int().min(0) })).default({}),
@@ -131,13 +132,13 @@ export function normalizeGoal(raw: Goal): Goal {
   };
 }
 
-export const GoalCreateSchema = GoalSchema.omit({
-  schema_version: true,
-  id: true,
-  created_at: true,
-  updated_at: true
-})
-  .partial()
-  .extend({ title: z.string().min(1) });
+export const GoalCreateSchema = patchOf(
+  GoalSchema.omit({
+    schema_version: true,
+    id: true,
+    created_at: true,
+    updated_at: true
+  })
+).extend({ title: z.string().min(1) });
 
-export const GoalUpdateSchema = GoalCreateSchema.partial();
+export const GoalUpdateSchema = patchOf(GoalCreateSchema);

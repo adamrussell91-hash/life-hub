@@ -26,6 +26,7 @@ import {
   verticalBranchPath
 } from '../../../life/js/app/chart-kit/transit-lines.js';
 import { el } from '@/views/hub-kit';
+import { escapeHtml } from '@/domain/escape-html';
 import { drawIn, popIn, svgEl, token } from '@/views/graph-svg';
 import { backlogHrefFromGraph } from '@/shell/shell';
 
@@ -865,7 +866,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
       pill.dataset.status = line.service.status;
       pill.dataset.projectId = line.project.id;
       pill.title = line.service.reason;
-      pill.innerHTML = `<i></i><b>${line.project.title}</b>${line.service.label}`;
+      pill.innerHTML = `<i></i><b>${escapeHtml(line.project.title)}</b>${escapeHtml(line.service.label)}`;
       pill.onclick = () => {
         input.onFocusProject(line.project.id);
         stage.querySelector(`[data-project-id="${CSS.escape(line.project.id)}"]`)?.scrollIntoView({
@@ -892,7 +893,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
       row.classList.toggle('is-dim', Boolean(input.focusedProjectId && input.focusedProjectId !== line.project.id));
       const header = row.querySelector<HTMLButtonElement>('.graph-line__header') ?? el('button', 'graph-line__header');
       header.type = 'button';
-      header.innerHTML = `<span class="graph-line__name"><i class="graph-line__chip" style="background:${line.colour}"></i>${line.project.title}</span><span class="graph-line__metrics">${metaHtml(line)}</span>`;
+      header.innerHTML = `<span class="graph-line__name"><i class="graph-line__chip" style="background:${escapeHtml(line.colour)}"></i>${escapeHtml(line.project.title)}</span><span class="graph-line__metrics">${metaHtml(line)}</span>`;
       header.onclick = () =>
         input.onFocusProject(input.focusedProjectId === line.project.id ? null : line.project.id);
       if (!header.isConnected) row.append(header);
@@ -919,7 +920,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
         const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
         dismiss.type = 'button';
         dismiss.addEventListener('click', () => input.onDismissInsight?.(alert.id));
-        card.innerHTML = `<div class="graph-clare-alert__avatar" aria-hidden="true">C</div><div class="graph-clare-alert__txt"><b>${alert.headline.replace(/^.*?(The delay|HPGE|.*is |.*has )/, (m) => (m.includes('delay') || m.includes('still') || m.includes('suspended') ? '' : ''))}</b> <span>${alert.detail}</span></div>`;
+        card.innerHTML = `<div class="graph-clare-alert__avatar" aria-hidden="true">C</div><div class="graph-clare-alert__txt"><b></b> <span>${escapeHtml(alert.detail)}</span></div>`;
         const head = card.querySelector('b');
         if (head) {
           head.textContent =

@@ -15,6 +15,7 @@ import {
   photoMetaKey
 } from './_shared/travel-blobs.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import { MAX_PHOTO_BYTES } from './_shared/knowledge-r2.mjs';
 import {
   errorResponse as httpError,
@@ -96,6 +97,10 @@ async function readPhotoMeta(store, photoId) {
   }
 }
 
+// Both paths are per-viewer: the owner path is session-gated and the follower path
+// depends on a share token that can be turned off, so no shared (CDN) caching.
+const PHOTO_CACHE = 'private, max-age=86400';
+
 async function loadPhotoResponse(store, photoId, expectedTripId) {
   const meta = await readPhotoMeta(store, photoId);
   if (!meta || (expectedTripId && meta.trip_id !== expectedTripId)) return null;
@@ -109,7 +114,9 @@ async function loadPhotoResponse(store, photoId, expectedTripId) {
     status: 200,
     headers: {
       'content-type': contentType,
-      'cache-control': 'public, max-age=86400'
+      'cache-control': PHOTO_CACHE,
+      vary: 'cookie',
+      'x-content-type-options': 'nosniff'
     }
   });
 }
@@ -157,7 +164,18 @@ export function createTravelPhotoGetHandler(deps = {}) {
       const { map } = await repo.getShareTokens();
       const hash = createHash('sha256').update(token).digest('hex');
       const row = map[hash];
-      if (!row?.trip_id) {
+      // Only a trip link opens trip photos (journal links have their own scoped media
+      // route), and only while the trip is live. Old trip rows have no `kind`.
+      if (!row?.trip_id || (row.kind && row.kind !== 'trip')) {
+        return httpError(404, 'not_found', 'This link has been turned off.', false, { 'cache-control': 'no-store' });
+      }
+      let trip = null;
+      try {
+        ({ trip } = await repo.getTrip(row.trip_id));
+      } catch {
+        trip = null;
+      }
+      if (!trip || isDeletedRecord(trip)) {
         return httpError(404, 'not_found', 'This link has been turned off.', false, { 'cache-control': 'no-store' });
       }
       const response = await loadPhotoResponse(store, photoId, row.trip_id);
@@ -167,7 +185,7 @@ export function createTravelPhotoGetHandler(deps = {}) {
     if (!isConfigured(env)) return withPrivate(misconfiguredResponse());
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivate(misconfiguredResponse());
     }

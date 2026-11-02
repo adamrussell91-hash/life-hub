@@ -641,7 +641,7 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
     '---',
     '## 🔴 Current Constraints & Priorities',
     '### Medical Status',
-    '- Entocort course completed. Now ceased.',
+    '- Budesonide course completed. Now ceased.',
     '### Upcoming Appointments',
     '- **7 Jul 2026 (11:00 AM):** Pat Example, Dietitian.',
     '- **TBC:** Dr Morgan Example (Allergist, penicillin challenge)',
@@ -649,17 +649,17 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
     '- **20 Sep 2026:** Future keep.',
     '---',
     "## ⚡ Today's Status (Tuesday 8 September 2026)",
-    '**Health:** Entocort taper active (Week 7, 6mg).',
+    '**Health:** Budesonide taper active (Week 4, 3mg).',
     '---',
     '## 📅 This Week (7 – 13 September 2026)',
-    'Mon 7 Sep: 1,578 kcal, 139.5g P, 33.3g F.',
+    'Mon 7 Sep: 1,800 kcal, 120g P, 50g F.',
     '- Key: keep this.',
     '---',
     '## 📊 This Month (September 2026)',
     '- **TBC:** Dr Morgan Example (Allergist, penicillin challenge)',
     '---',
     '## 📈 Long-Term Trends & Patterns',
-    '- Entocort Day 38, Week 6 of 8. Taper to 6mg begins ~3 Apr.',
+    '- Budesonide Day 20, Week 3 of 6. Taper to 3mg begins ~1 May.',
     '- Protein feast-or-famine persists.',
     '---',
     '## 🤝 Cross-Agent Coordination',
@@ -678,10 +678,10 @@ test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, pa
   assert.match(next, /Dr Rowan Pike/);
   assert.doesNotMatch(next, /30 Jul session completed/);
   assert.match(next, /8 Sep AC quiet today/);
-  assert.doesNotMatch(next, /1,578 kcal/);
+  assert.doesNotMatch(next, /1,800 kcal/);
   assert.match(next, /Key: keep this/);
-  assert.doesNotMatch(next, /Entocort Day 38/);
-  assert.doesNotMatch(next, /Entocort taper active/);
+  assert.doesNotMatch(next, /Budesonide Day 20/);
+  assert.doesNotMatch(next, /Budesonide taper active/);
   assert.match(next, /Protein feast-or-famine persists/);
   assert.doesNotMatch(next, /\*\*30 Jul:\*\*/);
   assert.match(next, /\*\*8 Sep:\*\*/);

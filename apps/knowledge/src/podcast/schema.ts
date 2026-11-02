@@ -54,8 +54,8 @@ export const PodcastEpisodeSchema = z.object({
       tags: z.array(z.string()).optional(),
     })
     .optional(),
-  modeDial: z.record(z.string()).default({}),
-  dials: PodcastDialsSchema.default({}),
+  modeDial: z.record(z.string(), z.string()).default({}),
+  dials: PodcastDialsSchema.prefault({}),
   sourcePageIds: z.array(z.string()),
   turns: z.array(PodcastTurnSchema),
   memory: z.string().default(""),
@@ -88,7 +88,7 @@ export const PodcastSeriesSchema = z.object({
     })
     .optional(),
   cadence: z.enum(["weekly", "monthly", "half-yearly", "yearly"]),
-  dials: PodcastDialsSchema.default({}),
+  dials: PodcastDialsSchema.prefault({}),
   showTitle: z.string().min(1),
   openingRitual: z.string().min(1),
   vibe: z.string().min(1),

@@ -22,7 +22,7 @@ export const DiscernQualifierSchema = z.object({
     preset: DiscernScalePresetSchema.default('agree'),
     /** Scale points or choices. Empty scale points fall back to the preset. */
     options: z.array(z.string().trim().max(60)).max(5).default([])
-  }).default({}),
+  }).prefault({}),
   /** Teacher overrides for the five step prompts; an empty string keeps the default. */
   prompts: z.array(z.string().max(1200)).length(5).optional(),
   /** "Their choice" only: students also plot how settled the character is across key moments. */

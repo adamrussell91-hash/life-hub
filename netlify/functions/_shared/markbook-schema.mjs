@@ -85,7 +85,7 @@ var MarkbookSchema = z.object({
 });
 var firstIssue = (error) => {
   const issue = error.issues[0];
-  if (issue?.code === "invalid_union_discriminator") return "Pick a column type.";
+  if (issue?.code === "invalid_union" && "discriminator" in issue) return "Pick a column type.";
   return issue?.message ?? "Check this column.";
 };
 function checkColumn(value) {

@@ -6,7 +6,7 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { createKnowledgeCuratorHandler } from '../../netlify/functions/knowledge-curator.mjs';
 import { createKnowledgePodcastHandler } from '../../netlify/functions/knowledge-podcast.mjs';
 import { createKnowledgeTidyHandler } from '../../netlify/functions/knowledge-tidy.mjs';
-import { createLessonAlchemistHandler } from '../../netlify/functions/lesson-alchemist.mjs';
+import { createLessonAlchemistHandler, secretsMatch } from '../../netlify/functions/lesson-alchemist.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -251,6 +251,23 @@ test('Lesson alchemist stays secret-gated and returns raw Teaching JSON', async 
     }
   ));
   assert.equal(denied.status, 401);
+
+  for (const wrong of ['alchem-secreT', 'alchem-secre', 'alchem-secretx', 'x']) {
+    const response = await createLessonAlchemistHandler({ env, cwd })(new Request(
+      'https://api.adam-russell.com/api/lesson-alchemist',
+      {
+        method: 'POST',
+        headers: { origin: 'https://teaching-hub.adam-russell.com', 'content-type': 'application/json', 'x-alchemist-secret': wrong },
+        body: JSON.stringify({ lessonText: 'working memory' })
+      }
+    ));
+    assert.equal(response.status, 401, wrong);
+  }
+  assert.equal(secretsMatch('alchem-secret', 'alchem-secret'), true);
+  assert.equal(secretsMatch('', 'alchem-secret'), false);
+  const source = await readFile(new URL('../../netlify/functions/lesson-alchemist.mjs', import.meta.url), 'utf8');
+  assert.match(source, /timingSafeEqual/);
+  assert.doesNotMatch(source, /provided !== expected/);
 
   const handler = createLessonAlchemistHandler({
     env,

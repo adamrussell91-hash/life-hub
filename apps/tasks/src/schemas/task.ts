@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { sanitizeApstFocus } from '@/domain/apst';
 import { LifeWallFieldSchema } from './life-wall';
 import { PageBlockSchema } from './page-block';
@@ -218,4 +219,4 @@ export const TaskCreateSchema = TaskSchema.omit({
   domain: TaskDomainSchema
 });
 
-export const TaskUpdateSchema = TaskCreateSchema.partial();
+export const TaskUpdateSchema = patchOf(TaskCreateSchema);

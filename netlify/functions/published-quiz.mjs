@@ -1,4 +1,5 @@
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { clientIpOf, withClaimRequest } from './_shared/class-claims.mjs';
 import { quizAction, QuizError } from './_shared/quiz.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
 export const config = { path: '/api/published/quiz/:id', rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 900, windowSize: 60 } };
@@ -21,7 +22,7 @@ export function createPublishedQuizHandler(deps = {}) {
       const text = await request.text();
       if (text.length > MAX_BODY) throw new QuizError(413, 'too_large', 'Your answers are too long to send.');
       body = JSON.parse(text);
-      const result = await quizAction(store, match?.[1], body);
+      const result = await withClaimRequest({ ip: clientIpOf(request, context) }, () => quizAction(store, match?.[1], body));
       logQuizAction(match?.[1], body, 200, 'ok');
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {

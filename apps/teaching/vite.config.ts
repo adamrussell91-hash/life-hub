@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -35,7 +35,12 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   plugins: [mockApiPlugin()],
   build: { outDir: 'dist', emptyOutDir: true },
-  server: { port: 5173 },
+  // Vite 7.3 applies server.fs to ?raw/?url/?worker imports too. Shared glyphs live in
+  // the repo's packages/, and pdf.js comes from the root install.
+  server: {
+    port: 5173,
+    fs: { allow: [searchForWorkspaceRoot(__dirname), path.resolve(__dirname, '../../packages'), path.resolve(__dirname, '../../node_modules')] }
+  },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'happy-dom',

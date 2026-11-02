@@ -26,6 +26,7 @@ import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
 import { formatCountdown, formatLongRange, formatShortRange, formatWeekdayDate } from '@/lib/date-label';
 import { I } from '@/lib/icons';
+import { escapeHtml } from '@/lib/html';
 import { atlasRoute, journalRoute } from '@/app/router';
 import { getAtlas } from '@/api/travel-atlas';
 import { tripBadgeLabel } from '@/atlas/atlas-model';
@@ -161,7 +162,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     const li = document.createElement('li');
     const link = document.createElement('a');
     link.href = `#/trip/${encodeURIComponent(tripId)}/${encodeURIComponent(row.city_id)}/${row.date}`;
-    link.innerHTML = `<span class="w">${row.when_label}</span><b>${row.title}</b><span class="d">${row.detail}</span>`;
+    link.innerHTML = `<span class="w">${escapeHtml(row.when_label)}</span><b>${escapeHtml(row.title)}</b><span class="d">${escapeHtml(row.detail)}</span>`;
     li.append(link);
     ul.append(li);
   }
@@ -189,7 +190,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       chip.type = 'button';
       chip.className = 'chip';
       if (city.id === selectedCityId) chip.classList.add('is-on');
-      chip.innerHTML = `<b>${city.name}${hasTodo ? '<i class="todo-dot" title="Something to book"></i>' : ''}</b><span class="num">${formatShortRange(city.start_date, city.end_date)}</span>`;
+      chip.innerHTML = `<b>${escapeHtml(city.name)}${hasTodo ? '<i class="todo-dot" title="Something to book"></i>' : ''}</b><span class="num">${escapeHtml(formatShortRange(city.start_date, city.end_date))}</span>`;
       chip.addEventListener('click', () => selectCity(city.id));
       chips.append(chip);
     }

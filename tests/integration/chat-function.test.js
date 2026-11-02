@@ -4915,3 +4915,38 @@ test('W2: add_workout_notes through chat.mjs proposes the existing completed fil
   assert.match(proposal.notes, /Added after finish/);
   assert.match(proposal.notes, /avg HR 142, 410 kcal/);
 });
+
+test('Clare fetches a query-string URL only when Adam typed it or web_search returned it this turn', async () => {
+  const SEARCH_URL = 'https://venue.example.org/hours?branch=north';
+  const TYPED_URL = 'https://shop.example.org/item?id=42';
+  const results = {};
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    loadHubAgentContext: async () => '',
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        yield { type: 'sources', heading: 'Sources', sources: [{ title: 'Hours', url: SEARCH_URL }] };
+        for (const [key, url] of [
+          ['search', SEARCH_URL],
+          ['typed', TYPED_URL],
+          ['built', 'https://collector.example.org/c?d=private+summary']
+        ]) {
+          results[key] = JSON.parse(await args.executeTools({ id: `call_${key}`, name: 'fetch_url', input: { url } }));
+        }
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: `Clare, is this still in stock? ${TYPED_URL}`,
+    priorAgentSlug: 'clare'
+  })));
+
+  // Allowed URLs pass the policy and reach the (test-guarded) network, which refuses them.
+  assert.equal(results.search.error, 'fetch_failed');
+  assert.equal(results.typed.error, 'fetch_failed');
+  assert.equal(results.built.error, 'url_query_not_allowed');
+});
