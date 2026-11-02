@@ -209,6 +209,53 @@ describe('hand in', () => {
   });
 });
 
+describe('mountWorkSync: a block with a redraft out', () => {
+  const lessonWith = (id: string): { root: HTMLElement; block: HTMLElement } => {
+    const root = host();
+    const block = Object.assign(document.createElement('div'), { className: 'block' });
+    block.dataset.blockId = id;
+    root.append(block);
+    return { root, block };
+  };
+
+  it('points an asked student at Returned work, with no Hand in button', async () => {
+    const { root, block } = lessonWith('qset1');
+    const call: WorkCall = async () => ({ need: null, initials: 'BB', handin_blocks: ['qset1'], redrafts: { qset1: 'asked' } });
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call, delayMs: 5 });
+    await settle();
+    expect(block.querySelector('.ws-handin__note')!.textContent).toBe('Your teacher asked for a redraft. Open it in Returned work');
+    expect(block.querySelector('.ws-handin a')!.getAttribute('href')).toContain('/s/classes/class1/profile');
+    expect(block.querySelector('button')).toBeNull();
+    handle.dispose();
+  });
+
+  it('says a sent redraft is with the teacher', async () => {
+    const { root, block } = lessonWith('qset1');
+    const call: WorkCall = async () => ({ need: null, initials: 'BB', handin_blocks: ['qset1'], redrafts: { qset1: 'with_teacher' } });
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call, delayMs: 5 });
+    await settle();
+    expect(block.querySelector('.ws-handin__note')!.textContent).toBe('Your redraft is with your teacher.');
+    expect(block.querySelector('.ws-handin a')).toBeNull();
+    expect(block.querySelector('button')).toBeNull();
+    handle.dispose();
+  });
+
+  it('the footer neither counts nor hands in a block with a redraft out', async () => {
+    localStorage.setItem(answersKey, JSON.stringify({ q1: 'One' }));
+    const sent: string[] = [];
+    const call: WorkCall = async (action) => {
+      sent.push(action);
+      return { need: null, initials: 'BB', handin_blocks: ['qset1'], redrafts: { qset1: 'asked' } };
+    };
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call, delayMs: 0 });
+    await settle();
+    expect(sync.progress()).toEqual({ written: 1, toHandIn: 0 });
+    expect(await sync.handInAll()).toBe(true);
+    expect(sent).not.toContain('handin');
+    sync.dispose();
+  });
+});
+
 describe('mountWorkSync: the lesson footer’s handle', () => {
   it('counts what’s written, then sends it all and hands in the marked blocks with writing', async () => {
     localStorage.setItem(answersKey, JSON.stringify({ q1: 'One', q2: 'Two' }));

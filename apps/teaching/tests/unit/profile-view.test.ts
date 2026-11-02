@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderProfile } from '@/student/profile-view';
 import { pieceView, returnedList } from '@/student/returned-view';
 
@@ -151,6 +151,31 @@ describe('progress page', () => {
 });
 
 describe('returned work', () => {
+  const asked = { id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', comment: '', text: { answers: { q1: 'Words.' } }, tags: [], criteria: [], redraft: { scope: 'whole' as const } };
+  const openFirst = async (options: Partial<Parameters<typeof renderProfile>[1]>): Promise<HTMLElement> => {
+    const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: false, codes: [], redraft: 'asked' }], loadPiece: async () => asked, ...options });
+    (h.querySelector('[data-tab="returned"]') as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    (h.querySelector('.pg-returned__card') as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    return h;
+  };
+  it('a student can rewrite an asked piece, and it reopens once sent', async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const redraft = vi.fn(() => ({ load: async () => ({ scope: 'whole' as const, text: asked.text, prompts: {}, working: {} }), save: async () => ({}), send }));
+    const loadPiece = vi.fn().mockResolvedValueOnce(asked).mockResolvedValue({ ...asked, redraft: undefined, sent: true });
+    const h = await openFirst({ redraft, loadPiece });
+    expect(redraft).toHaveBeenCalledWith('w:l1:b');
+    (h.querySelector('.pg-redraft [data-action="send"]') as HTMLElement).click();
+    await vi.waitFor(() => expect(h.querySelector('.pg-ask')!.textContent).toBe('Sent. Your teacher has it.'));
+    expect(send).toHaveBeenCalled();
+    expect(h.querySelector('.pg-redraft')).toBeNull();
+  });
+  it('a teacher looking in sees the ask with no box to write in', async () => {
+    const h = await openFirst({ teacher: { name: 'Ava' } });
+    expect(h.querySelector('.pg-ask')!.textContent).toBe('Your teacher asked for a redraft of this piece.');
+    expect(h.querySelector('.pg-redraft')).toBeNull();
+  });
   it('opens an item on click', () => {
     const opened: string[] = [];
     const list = returnedList([{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: true, codes: [] }], (id) => opened.push(id));
