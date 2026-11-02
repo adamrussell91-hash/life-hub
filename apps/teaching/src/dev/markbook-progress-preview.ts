@@ -61,14 +61,15 @@ const view = {
   quizzes: [quiz('1', day(1))]
 };
 
-const ok = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+const ok = (body: unknown): Response => new Response(JSON.stringify({ ok: true, data: body }), { status: 200, headers: { 'content-type': 'application/json' } });
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href).pathname;
   if (!path.startsWith('/api/')) return realFetch(input, init);
-  if (path === '/api/syllabus-alignment') return ok(alignment);
+  if (path === '/api/syllabus-alignment') return ok({ alignment });
   if (path === '/api/skills-continuum') return ok({ continuum });
   if (path === '/api/feedback-codes') return ok({ codes: [] });
+  if (path === '/api/to-mark') return ok({ tasks: [] });
   if (path === '/api/lessons/lesson_demo') return ok(lesson);
   if (path === `/api/classes/${CLASS}/deep`) return ok({ steps: { st_1: { du_demo01: { step: '2a', at: '2026-10-05' } } }, writing: {} });
   if (path === `/api/classes/${CLASS}/markbook`) return ok(view);

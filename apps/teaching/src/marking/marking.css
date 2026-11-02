@@ -183,6 +183,9 @@
 
 /* A rubric needs more room than the side column gives, so its work goes above it sooner. */
 .mk-cols--rubric { grid-template-columns: minmax(0, 1fr) minmax(0, 27rem); }
-@media (max-width: 1100px) { .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } }
-@container (max-width: 1100px) { .tf .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } }
+/* The work stays in view while a long rubric scrolls past it. */
+.mk-cols--rubric > :first-child { position: sticky; top: 0; max-height: calc(100dvh - var(--tf-top, 88px) - 2rem); overflow-y: auto; }
+.tf-card:empty { display: none; }
+@media (max-width: 1100px) { .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } .mk-cols--rubric > :first-child { position: static; max-height: none; } }
+@container (max-width: 1100px) { .tf .mk-cols--rubric { grid-template-columns: minmax(0, 1fr); } .tf .mk-cols--rubric > :first-child { position: static; max-height: none; } }
 .mk-side .rb { padding: 0; border: 0; background: transparent; }

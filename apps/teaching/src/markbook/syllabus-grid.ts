@@ -446,7 +446,7 @@ export function renderSyllabusGrid(
     wrap.append(table);
     root.append(wrap);
   }
-  if (!marked.length) root.append(el('p', 'mb__empty', 'No marks reach a dot point yet. Add dot points to a quiz’s lesson, or outcomes to a task’s criteria.'));
+  if (!marked.length) root.append(el('p', 'mb__empty', 'No marks reach a dot point yet. Tag a question with a piece or a skill, or add dot points to its lesson.'));
   if (empty.length) {
     const more = el('button', 'btn btn--ghost mb-next__more', state.showEmpty ? 'Hide dot points with no marks' : `Show ${empty.length} dot point${empty.length === 1 ? '' : 's'} with no marks`);
     more.type = 'button';
