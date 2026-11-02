@@ -1,6 +1,6 @@
 import { wireStudentAnchor } from '@/student/shell';
 import type { CoverageMap } from './model';
-import { drawCoverageMap, fitNameWidth, type ProgressLayer } from './draw';
+import { drawCoverageMap, fitNameWidth, progressNameWidth, PROGRESS_LANE_W, type ProgressLayer } from './draw';
 import './coverage-map.css';
 
 /**
@@ -17,6 +17,14 @@ export type ProgressMapOptions = {
   /** Side lessons not assigned to the student. */
   faded: ReadonlySet<string>;
   next: string | null;
+};
+
+/** Measures names in the map's own type (14px semibold), so the name column fits them exactly. */
+const measureName = (): ((text: string) => number) | undefined => {
+  const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext?.('2d') : null;
+  if (!ctx) return undefined;
+  ctx.font = `600 14px ${getComputedStyle(document.body).fontFamily || 'sans-serif'}`;
+  return (text) => ctx.measureText(text).width;
 };
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
@@ -53,10 +61,13 @@ export function mountProgressMap(host: HTMLElement, options: ProgressMapOptions)
   root.append(scroller, legend);
   host.append(root);
 
+  const measure = measureName();
   const paint = (): void => {
     const layer: ProgressLayer = { done, next, faded: options.faded };
-    const nameW = fitNameWidth(map, collapsed, scroller.clientWidth || host.clientWidth || 700, 460);
-    const drawn = drawCoverageMap(map, { collapsed, selected: null, focus: null, student: null, progress: layer, nameW });
+    // Names take only the room they need, so the columns sit beside them instead of across a gap.
+    const available = scroller.clientWidth || host.clientWidth || 700;
+    const nameW = Math.min(progressNameWidth(map, measure), fitNameWidth(map, collapsed, available, 460, PROGRESS_LANE_W));
+    const drawn = drawCoverageMap(map, { collapsed, selected: null, focus: null, student: null, progress: layer, nameW, laneW: PROGRESS_LANE_W });
     stage.innerHTML = `<svg class="cm__svg" width="${drawn.width}" height="${drawn.height}" viewBox="0 0 ${drawn.width} ${drawn.height}">${drawn.svg}</svg>`;
   };
 
