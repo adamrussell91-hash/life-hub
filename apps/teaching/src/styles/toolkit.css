@@ -2735,12 +2735,17 @@ button.tk-qdot {
 .wts__pic.is-empty { border: 1.5px dashed rgba(0, 0, 0, 0.35); border-radius: 6px; }
 .wts__label { font-size: var(--text-xs); line-height: 1.25; font-weight: 700; }
 .wts__label b { display: inline-grid; place-items: center; width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; border-radius: 50%; background: #111; color: #ffd400; font-size: 0.7rem; }
+.wts__foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; min-height: 1.85rem; }
+.wts__foot .wts-tool { flex: 1; min-width: 0; }
+/* The tick keeps its 44px target but only takes up the circle's width, flush with the right edge. */
+.wts__foot .tk-wt__tick { margin: -0.5rem -0.6rem -0.5rem -0.4rem; }
 .wts-tool { display: flex; align-items: center; gap: 0.25rem; height: 1.85rem; padding: 0.15rem; border: 1.5px solid #111; border-radius: 999px; background: #fff; }
 .wts-tool__go { all: unset; flex: none; display: grid; place-items: center; width: 1.45rem; height: 1.45rem; border-radius: 50%; background: #111; color: #ffd400; font-size: 0.7rem; cursor: pointer; }
 /* Block buttons get a 44px floor; these small round ones size themselves (the pill is the touch target). */
 .wts .wts-tool .wts-tool__go, .wts .wts-tool .wts-tool__aux { min-height: 0; min-width: 0; }
 /* Touch screens: a bigger pill and button, still round. */
 @media (pointer: coarse) {
+  .wts__foot { min-height: 2.75rem; }
   .wts-tool { height: 2.75rem; padding: 0.2rem; }
   .wts .wts-tool .wts-tool__go { width: 2.3rem; height: 2.3rem; font-size: 0.85rem; }
   .wts .wts-tool .wts-tool__aux { padding: 0.5rem 0.4rem; }
@@ -2756,6 +2761,7 @@ span.wts-tool__aux { cursor: default; }
 .wts__card p { margin: 0.25rem 0; }
 .wts__step { font-weight: 800; font-size: var(--text-base); }
 .wts__time { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; background: #ffd400; font-size: var(--text-xs); font-weight: 700; }
+.wts__cues { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1.25rem; }
 .wts__h { margin: 0.6rem 0 0.15rem !important; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .wts__do { margin: 0; padding-left: 1.1rem; }
 .wts__do li { margin: 0.1rem 0; }
@@ -2773,9 +2779,13 @@ span.wts-tool__aux { cursor: default; }
 .wts-pick__search { width: 100%; margin: 0.25rem 0 0.5rem; }
 /* A narrow block (a phone, a column, a squeezed page) swipes through the steps, the next one peeking in. */
 .wts__body { container-type: inline-size; }
-@container (max-width: 620px) {
+@container (max-width: 780px) {
   .wts__strip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 0.25rem; padding: 0.25rem 0.25rem 0.5rem; }
-  .wts__cell { flex: 0 0 min(58%, 13rem); scroll-snap-align: start; }
+  .wts__cell { flex: 0 0 min(72%, 13rem); scroll-snap-align: start; }
+}
+/* The picked name needs the room more than the count, which stays in the tooltip. */
+@container (max-width: 1000px) {
+  .wts__foot span.wts-tool__aux { display: none; }
 }
 @media (max-width: 640px) { .wts__meta { display: none; } }
 /* Display: a WalkThru step timer started on the teacher's page. */

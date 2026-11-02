@@ -95,7 +95,7 @@ export function miniNames(step: number, state: StripState): HTMLElement {
   const paint = (): void => {
     out.textContent = state.name ?? 'Pick';
     left.textContent = state.pool && state.picked.length ? `${state.pool.length} left` : '';
-    wrap.title = state.classLabel ? `Names from ${state.classLabel}` : '';
+    wrap.title = [state.name, left.textContent, state.classLabel ? `Names from ${state.classLabel}` : ''].filter(Boolean).join(' · ');
   };
   wrap.addEventListener('wts-names', paint);
   go.addEventListener('click', async () => {
