@@ -318,7 +318,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
       for (const code of inGroup) {
         const b = button('', 'ghost', () => undefined);
         b.className = 'voice-strip__code';
-        b.title = `${code.label}${code.key ? ` (key ${code.key})` : ''}${code.descriptor ? `: ${code.descriptor}` : '.'} Shift-click for a strength.`;
+        b.title = `${code.descriptor || code.label} Shift-click for a strength.`;
         b.addEventListener('click', (e) => {
           addTag(code, e.shiftKey);
           b.blur();
@@ -326,6 +326,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
         b.style.setProperty('--fc-ink', `var(--pastel-${code.colour}-ink)`);
         if (code.key) b.append(el('kbd', 'voice-strip__key', code.key));
         b.append(el('span', 'voice-strip__letters', code.code));
+        if (code.label) b.append(el('span', 'voice-strip__name', code.label));
         row.append(b);
       }
       strip.append(row);

@@ -658,6 +658,11 @@
   opacity: 0.7;
 }
 
+.voice-strip__name {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+
 .voice-strip__typing {
   min-height: 1.5em;
   font-size: var(--text-sm);
