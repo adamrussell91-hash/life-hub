@@ -296,6 +296,22 @@ test('scope sequence create links the subject and accepts a timeline patch', asy
   ));
   assert.equal(patched.status, 200);
   assert.equal(patched.body.data.timeline_items[0].unit_id, 'unit_1');
+  const climb = await read(await createScopeSequenceHandler(deps)(
+    request(`https://api.adam-russell.com/api/scope-sequences/${created.body.data.id}`, {
+      method: 'PATCH',
+      body: { outcome_climb: [{ outcome: 1, unit_id: 'unit_1', level: 'skilled', demand: ' Compare two texts ' }] }
+    })
+  ));
+  assert.equal(climb.status, 200);
+  assert.deepEqual(climb.body.data.outcome_climb, [{ outcome: 1, unit_id: 'unit_1', level: 'skilled', demand: 'Compare two texts' }]);
+  assert.equal(climb.body.data.timeline_items[0].unit_id, 'unit_1');
+  const badClimb = await read(await createScopeSequenceHandler(deps)(
+    request(`https://api.adam-russell.com/api/scope-sequences/${created.body.data.id}`, {
+      method: 'PATCH',
+      body: { outcome_climb: [{ outcome: 1, unit_id: 'unit_1', level: 'legendary' }] }
+    })
+  ));
+  assert.equal(badClimb.status, 400);
 });
 
 test('scope sequence delete removes it and unlinks the subject', async () => {

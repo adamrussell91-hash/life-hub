@@ -9,9 +9,13 @@ import {
   deleteKey
 } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
+import { listBlobKeys } from './blobs-list.mjs';
+import { AUDIO_RETENTION_DAYS, audioPath, dueStamp, voiceKeys } from './voice-submissions.mjs';
 
 export const FEEDBACK_DOC_PREFIX = 'feedback_docs/';
 export const FEEDBACK_TOKEN_PREFIX = 'feedback_tokens/';
+/** feedback_audio_due/{yyyymmddhhmm}/{doc id}: when a note's recording goes. */
+export const FEEDBACK_AUDIO_DUE_PREFIX = 'feedback_audio_due/';
 
 export function feedbackDocKey(id) {
   return `${FEEDBACK_DOC_PREFIX}${id}`;
@@ -37,6 +41,9 @@ export function toTeacherFeedbackDoc(doc) {
     title: doc.title,
     body_html: doc.body_html ?? '',
     audio_media_id: doc.audio_media_id ?? null,
+    audio_url: doc.audio_key ? audioPath(doc.audio_key) : null,
+    audio_delete_after: doc.audio_key ? doc.audio_delete_after ?? null : null,
+    audio_deleted: Boolean(doc.audio_deleted_at),
     student_label: doc.student_label ?? null,
     class_id: doc.class_id ?? null,
     student_id: doc.student_id ?? null,
@@ -88,6 +95,22 @@ async function attachedStudent(store, input) {
   return { class_id: roster.cls.id, student_id: input.student_id };
 }
 
+/**
+ * A note's recording goes in with the Voice block's audio: an unguessable key, played with byte
+ * ranges (Safari needs them), gone after the same 28 days. The upload is removed from Media.
+ */
+async function takeRecording(store, mediaId, nowIso) {
+  const meta = await getJSON(store, mediaKey(mediaId));
+  const file = meta?.status === 'active' && String(meta.mime_type ?? '').startsWith('audio/')
+    ? await store.getWithMetadata(mediaFileKey(mediaId), { type: 'arrayBuffer' })
+    : null;
+  if (!file?.data) throw Object.assign(new Error('That recording couldn’t be found. Record it again.'), { status: 400, code: 'no_recording' });
+  const audio_key = randomBytes(18).toString('hex');
+  await store.set(voiceKeys.audio(audio_key), file.data, { metadata: { contentType: meta.mime_type } });
+  const audio_delete_after = new Date(Date.parse(nowIso) + AUDIO_RETENTION_DAYS * 86400_000).toISOString();
+  return { audio_key, audio_delete_after };
+}
+
 export async function createFeedbackDoc(store, input, deps = {}) {
   const now = deps.nowIso ? deps.nowIso() : new Date().toISOString();
   const attached = await attachedStudent(store, input);
@@ -102,12 +125,14 @@ export async function createFeedbackDoc(store, input, deps = {}) {
     typeof input?.audio_media_id === 'string' && input.audio_media_id.trim()
       ? input.audio_media_id.trim()
       : null;
+  const recording = audio_media_id ? await takeRecording(store, audio_media_id, now) : {};
   const doc = {
     id,
     type: 'feedback_doc',
     title,
     body_html,
-    audio_media_id,
+    audio_media_id: null,
+    ...recording,
     student_label,
     token_hash: null,
     expires_at: null,
@@ -118,6 +143,11 @@ export async function createFeedbackDoc(store, input, deps = {}) {
     updated_at: now
   };
   await setJSON(store, feedbackDocKey(id), doc);
+  if (recording.audio_key) {
+    await setJSON(store, `${FEEDBACK_AUDIO_DUE_PREFIX}${dueStamp(recording.audio_delete_after)}/${id}`, {});
+    await deleteKey(store, mediaFileKey(audio_media_id)).catch(() => undefined);
+    await deleteKey(store, mediaKey(audio_media_id)).catch(() => undefined);
+  }
   return toTeacherFeedbackDoc(doc);
 }
 
@@ -215,4 +245,25 @@ export async function readFeedbackAudioBytes(store, doc) {
     (typeof result.metadata?.contentType === 'string' ? result.metadata.contentType : null) ||
     'application/octet-stream';
   return { bytes: result.data, contentType };
+}
+
+/** Deletes note recordings whose 28 days are up. The note's text stays. */
+export async function sweepFeedbackAudio({ store, now = Date.now(), limit = 500 } = {}) {
+  if (!store) return { deleted: [] };
+  const stampNow = dueStamp(new Date(now).toISOString());
+  const keys = (await listBlobKeys(store, FEEDBACK_AUDIO_DUE_PREFIX)).sort();
+  const deleted = [];
+  for (const dueKey of keys) {
+    if (deleted.length >= limit) break;
+    const [, stamp, id] = dueKey.split('/');
+    if (stamp > stampNow) break;
+    const doc = await getJSON(store, feedbackDocKey(id));
+    if (doc?.audio_key) {
+      await store.delete(voiceKeys.audio(doc.audio_key)).catch(() => undefined);
+      await setJSON(store, feedbackDocKey(id), { ...doc, audio_key: null, audio_deleted_at: new Date(now).toISOString() });
+    }
+    await store.delete(dueKey);
+    deleted.push(id);
+  }
+  return { deleted };
 }

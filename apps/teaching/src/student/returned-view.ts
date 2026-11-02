@@ -4,6 +4,7 @@
  */
 import { el } from '@/quiz/dom';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { audioUrl } from '@/blocks/voice-client';
 import { paper, type Mark } from '@/blocks/peer-annotate';
 import { placeName, STEP_ORDER, RUNG_ORDER } from '@/progress/story-text';
 import { codeChip } from '@/progress/code-grid';
@@ -51,7 +52,7 @@ export type PiecePayload = {
   rubric?: ReturnedRubric;
 };
 /** A note the teacher wrote and returned: its own document, with no tags or criteria. */
-export type NotePayload = { id: string; kind: 'note'; title: string; date: string; body_html: string; audio_url?: string | null };
+export type NotePayload = { id: string; kind: 'note'; title: string; date: string; body_html: string; audio_url?: string | null; audio_deleted?: boolean };
 
 const ladderOf = (p: Place | null): Place[] => (p && RUNG_ORDER.includes(p) ? RUNG_ORDER.slice(1) : STEP_ORDER);
 const rank = (p: Place): number => ladderOf(p).indexOf(p);
@@ -116,9 +117,10 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HT
     if (p.audio_url) {
       const audio = el('audio', 'student-feedback__audio');
       audio.controls = true;
-      audio.src = p.audio_url;
+      audio.src = audioUrl(p.audio_url);
       root.append(audio);
     }
+    if (p.audio_deleted) root.append(el('p', 'pm-key', 'Recordings are kept for 28 days, so this one has gone. The written note stays here.'));
     return root;
   }
   const takes = p.takes ?? [];

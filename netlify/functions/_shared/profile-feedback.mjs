@@ -14,7 +14,7 @@ import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
 import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from './progress-patterns.mjs';
 import { stepsBySkill } from './next-steps.mjs';
-import { mineView } from './voice-submissions.mjs';
+import { audioPath, mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { rubricPlaces } from './rubric-model.mjs';
 import { rubricForStudent } from './rubric.mjs';
@@ -183,7 +183,7 @@ export async function pieceFor(store, roster, student, item) {
   if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     const doc = await ownNote(store, roster, student, item);
-    return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: null, ...toPublishedFeedbackPayload(doc, null) };
+    return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: doc.audio_key ? audioPath(doc.audio_key) : null, audio_deleted: Boolean(doc.audio_deleted_at), ...toPublishedFeedbackPayload(doc, null) };
   }
   const row = await read(store, pieceKey(roster.cls.id, student.id, item));
   if (row?.status !== 'returned') reject(404, 'not_found', 'That piece isn’t back yet.');

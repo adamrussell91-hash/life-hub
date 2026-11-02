@@ -132,6 +132,14 @@ describe('progress page', () => {
     expect(view.querySelector('.student-feedback__body')!.innerHTML).toBe('<p>Keep the road image.</p>');
     expect(view.querySelector('audio')).toBeNull();
   });
+  it('plays a note\'s recording, and says when its 28 days are up', () => {
+    const note = { id: 'n:d1', kind: 'note' as const, title: 'Draft', date: '25 Oct', body_html: '<p>Hi</p>' };
+    const playing = pieceView({ ...note, audio_url: '/api/published/voice-audio/abc' }, () => {});
+    expect(playing.querySelector('audio')!.getAttribute('src')).toContain('/api/published/voice-audio/abc');
+    const gone = pieceView({ ...note, audio_url: null, audio_deleted: true }, () => {});
+    expect(gone.querySelector('audio')).toBeNull();
+    expect(gone.textContent).toContain('kept for 28 days');
+  });
   it('loads the returned list when the tab is opened', async () => {
     const opened: string[] = [];
     const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: true, codes: ['ts'] }], loadPiece: async () => { throw new Error('x'); }, markSeen: (id) => opened.push(id) });

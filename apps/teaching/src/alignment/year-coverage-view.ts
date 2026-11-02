@@ -22,7 +22,7 @@ function mapFocusArea(unit: Unit): string | undefined {
 }
 
 /** The subject's units in scope order, each lesson with its dot points. */
-function yearUnits(curriculum: CurriculumResponse, subjectId: string): YearUnit[] {
+export function yearUnits(curriculum: CurriculumResponse, subjectId: string): YearUnit[] {
   const lessons = new Map(curriculum.lessons.map((l) => [l.id, l]));
   const units = new Map(curriculum.units.map((u) => [u.id, u]));
   return yearNetworkUnits(curriculum, subjectId).map((u) => {

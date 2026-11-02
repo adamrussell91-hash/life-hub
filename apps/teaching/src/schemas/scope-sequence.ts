@@ -51,6 +51,14 @@ export const TimelineItemSchema = z
   .discriminatedUnion('kind', [TimelineUnitItemBaseSchema, TimelineNoteItemBaseSchema])
   .refine(weekRangeRefine, { message: 'end_week must be >= start_week' });
 
+/** One visit of an outcome to a unit: the level it aims for and what students now do. */
+export const OutcomeClimbEntrySchema = z.object({
+  outcome: z.number().int().min(1).max(12),
+  unit_id: z.string().min(1),
+  level: z.enum(['capable', 'skilled', 'accomplished', 'excellent']).optional(),
+  demand: z.string().trim().max(200).optional()
+});
+
 export const ScopeSequenceSchema = z.object({
   ...CommonFields,
   type: z.literal('scope_sequence'),
@@ -59,8 +67,10 @@ export const ScopeSequenceSchema = z.object({
   week_count: z.number().int().positive(),
   terms: z.array(ScopeTermSchema),
   timeline_items: z.array(TimelineItemSchema),
-  outcome_ids: z.array(z.string().min(1)).max(24).optional()
+  outcome_ids: z.array(z.string().min(1)).max(24).optional(),
+  outcome_climb: z.array(OutcomeClimbEntrySchema).max(300).optional()
 });
 
 export type ScopeSequence = z.infer<typeof ScopeSequenceSchema>;
 export type TimelineItem = z.infer<typeof TimelineItemSchema>;
+export type OutcomeClimbEntry = z.infer<typeof OutcomeClimbEntrySchema>;

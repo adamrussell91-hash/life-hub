@@ -17,6 +17,7 @@ import {
   resolveFeedbackByToken,
   toPublishedFeedbackPayload
 } from './_shared/teaching-feedback.mjs';
+import { audioPath } from './_shared/voice-submissions.mjs';
 
 export const config = {
   path: [
@@ -73,9 +74,11 @@ export function createPublishedFeedbackHandler(deps = {}) {
       );
     }
 
-    const audio_url = doc.audio_media_id
-      ? `/api/published/feedback/${encodeURIComponent(token)}/audio`
-      : undefined;
+    const audio_url = doc.audio_key
+      ? audioPath(doc.audio_key)
+      : doc.audio_media_id
+        ? `/api/published/feedback/${encodeURIComponent(token)}/audio`
+        : undefined;
     return withCors(
       okResponse(200, toPublishedFeedbackPayload(doc, audio_url)),
       request,

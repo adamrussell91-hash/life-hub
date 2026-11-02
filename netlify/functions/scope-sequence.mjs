@@ -13,6 +13,27 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/scope-sequences/:id' };
 
+const CLIMB_LEVELS = new Set(['capable', 'skilled', 'accomplished', 'excellent']);
+
+function parseOutcomeClimb(entries) {
+  if (!Array.isArray(entries) || entries.length > 300) return { error: 'outcome_climb is invalid' };
+  const outcome_climb = [];
+  for (const raw of entries) {
+    const validLevel = raw?.level === undefined || CLIMB_LEVELS.has(raw.level);
+    const validDemand = raw?.demand === undefined || (typeof raw.demand === 'string' && raw.demand.trim().length <= 200);
+    if (!Number.isInteger(raw?.outcome) || raw.outcome < 1 || raw.outcome > 12 || typeof raw.unit_id !== 'string' || !raw.unit_id || !validLevel || !validDemand) {
+      return { error: 'outcome_climb is invalid' };
+    }
+    outcome_climb.push({
+      outcome: raw.outcome,
+      unit_id: raw.unit_id,
+      ...(raw.level ? { level: raw.level } : {}),
+      ...(raw.demand?.trim() ? { demand: raw.demand.trim() } : {})
+    });
+  }
+  return { outcome_climb };
+}
+
 function parseTimelineItems(items, weekCount) {
   if (!Array.isArray(items)) {
     return { error: 'timeline_items must be an array' };
@@ -72,9 +93,10 @@ export function createScopeSequenceHandler(deps = {}) {
     if (parsed.error) return withCors(parsed.error, request, env);
     const hasTimeline = parsed.value.timeline_items !== undefined;
     const hasOutcomes = parsed.value.outcome_ids !== undefined;
-    if (!hasTimeline && !hasOutcomes) {
+    const hasClimb = parsed.value.outcome_climb !== undefined;
+    if (!hasTimeline && !hasOutcomes && !hasClimb) {
       return withCors(
-        errorResponse(400, 'validation_error', 'Provide timeline_items and/or outcome_ids', false),
+        errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids and/or outcome_climb', false),
         request,
         env
       );
@@ -112,10 +134,19 @@ export function createScopeSequenceHandler(deps = {}) {
       }
       outcome_ids = parsed.value.outcome_ids;
     }
+    let outcome_climb = existing.outcome_climb;
+    if (hasClimb) {
+      const parsedClimb = parseOutcomeClimb(parsed.value.outcome_climb);
+      if (parsedClimb.error) {
+        return withCors(errorResponse(400, 'validation_error', parsedClimb.error, false), request, env);
+      }
+      outcome_climb = parsedClimb.outcome_climb;
+    }
     const next = {
       ...existing,
       timeline_items,
       ...(outcome_ids !== undefined ? { outcome_ids } : {}),
+      ...(outcome_climb !== undefined ? { outcome_climb } : {}),
       updated_at: new Date().toISOString()
     };
     await setJSON(store, scopeSequenceKey(id), next);

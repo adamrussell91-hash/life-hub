@@ -8,6 +8,7 @@ import {
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { loadKnowledgePrompt } from './knowledge-prompts.mjs';
 import { processVoiceTranscriptions, sweepVoiceAudio } from './voice-submissions.mjs';
+import { sweepFeedbackAudio } from './teaching-feedback.mjs';
 import { tidyPageDirect } from './knowledge-tidy.mjs';
 import {
   aiJobKey,
@@ -302,9 +303,11 @@ export async function runScheduledJobsTick(deps = {}) {
     if (store) {
       const voice = await processVoiceTranscriptions({ store, env, fetchImpl: deps.fetchImpl, knowledgeFetch: deps.knowledgeFetch, limit: 20 });
       const swept = await sweepVoiceAudio({ store, now: nowMs });
+      const notes = await sweepFeedbackAudio({ store, now: nowMs });
       result.voice_submissions = {
         transcribed: voice.results.filter((r) => r.done).map((r) => r.id),
-        audio_deleted: swept.deleted
+        audio_deleted: swept.deleted,
+        note_audio_deleted: notes.deleted
       };
     }
   } catch {

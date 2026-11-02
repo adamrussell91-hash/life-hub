@@ -40,6 +40,11 @@ export function createPublishedLessonHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Lesson is not published', false), request, env);
     }
 
+    // The initials token on a plain lesson link asks for this on its own, so the lesson's load never waits on it.
+    if (new URL(request.url).searchParams.get('classes') === '1') {
+      return withCors(okResponse(200, { classes: await classesForLesson(store, id) }), request, env);
+    }
+
     const ids = attachedOutcomeIds({
       outcome_ids: Array.isArray(snapshot.outcome_ids)
         ? snapshot.outcome_ids.filter(row => typeof row === 'string')
