@@ -133,8 +133,8 @@ function stripWalkthruField(block) {
     const { walkthru: _walkthru, ...content } = out.content;
     out = { ...out, content };
   }
-  if (out?.settings && ['walkthru', 'deep_taught', 'deep_step', 'deep_targets'].some((key) => Object.prototype.hasOwnProperty.call(out.settings, key))) {
-    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, ...settings } = out.settings;
+  if (out?.settings && ['walkthru', 'deep_taught', 'deep_step', 'deep_targets', 'deep_checks'].some((key) => Object.prototype.hasOwnProperty.call(out.settings, key))) {
+    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, deep_checks: _checks, ...settings } = out.settings;
     out = { ...out, settings };
   }
   return out;

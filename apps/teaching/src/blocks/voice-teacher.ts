@@ -27,6 +27,8 @@ import { audioUrl, type VoiceTag, type WhisperTranscript } from '@/blocks/voice-
 import { clock } from '@/blocks/voice-pacing';
 import { summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
 import type { VoiceWord } from '@/blocks/voice-transcript';
+import { evidenceStepOf, passChecks } from '@/deep/block-tags';
+import { STEP_LABEL } from '@/deep/schema';
 
 /**
  * The teacher side of a Voice block: the submissions inbox and the one-tap
@@ -212,6 +214,30 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     void loadInbox();
   }
 
+  /** What a pass sounds like, when this question is a deep understanding step's evidence. Ticks are a marking aid; they aren't saved. */
+  function passList(): HTMLElement | null {
+    const step = evidenceStepOf(block);
+    const checks = passChecks(block);
+    if (!step || !checks.length) return null;
+    const box = el('details', 'voice-pass');
+    box.open = !window.matchMedia?.('(max-width: 560px)').matches;
+    box.append(el('summary', 'voice-pass__title', `To pass Step ${STEP_LABEL[step.step]}, listen for`));
+    const list = el('ul', 'voice-pass__list');
+    for (const check of checks) {
+      const item = el('li');
+      const label = el('label', 'voice-pass__item');
+      const tick = el('input');
+      tick.type = 'checkbox';
+      // Hand focus back at once, so number and letter keys keep tagging.
+      tick.addEventListener('change', () => tick.blur());
+      label.append(tick, el('span', undefined, check));
+      item.append(label);
+      list.append(item);
+    }
+    box.append(list);
+    return box;
+  }
+
   function markingScreen(record: Submission, library: FeedbackCode[]): () => void {
     const groups: FeedbackCodeGroup[] = block.content.code_groups ?? ['composition', 'viva', 'speaking'];
     const codes = library.filter((c) => !c.hidden && groups.includes(c.group));
@@ -351,6 +377,8 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     // Player and codes stick together, so the codes stay in reach while the transcript scrolls.
     const dock = el('div', 'voice-mark__dock');
     dock.append(player, strip);
+    const pass = passList();
+    if (pass) dock.append(pass);
     if (typeof ResizeObserver === 'function') {
       new ResizeObserver(() => screen.style.setProperty('--voice-dock-h', `${dock.offsetHeight}px`)).observe(dock);
     }

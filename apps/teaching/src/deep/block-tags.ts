@@ -7,13 +7,15 @@ import type { PlacedStep } from './schema';
  *   deep_taught   pieces this block teaches
  *   deep_step     the step this block is the evidence task for
  *   deep_targets  pieces a writing task expects students to use (2–3)
+ *   deep_checks   what a pass sounds like, shown while marking the evidence task
  */
 
 type Settings = Record<string, unknown>;
 const PIECE = /^kp_[a-z0-9]{4,16}$/;
 const DU = /^du_[a-z0-9]{4,16}$/;
 const PLACED = new Set(['2a', '2b', '3', '4']);
-export const DEEP_SETTING_KEYS = ['deep_taught', 'deep_step', 'deep_targets'] as const;
+export const DEEP_SETTING_KEYS = ['deep_taught', 'deep_step', 'deep_targets', 'deep_checks'] as const;
+export const PASS_CHECKS = { max: 6, length: 200 } as const;
 
 const settingsOf = (block: Pick<Block, 'settings'>): Settings => ((block.settings ?? {}) as Settings);
 const pieceList = (v: unknown): string[] => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && PIECE.test(x)))] : []);
@@ -35,3 +37,9 @@ export function evidenceStepOf(block: Pick<Block, 'settings'>): EvidenceStep | n
   return v && typeof v.du === 'string' && DU.test(v.du) && typeof v.step === 'string' && PLACED.has(v.step) ? { du: v.du, step: v.step as PlacedStep } : null;
 }
 export const withEvidenceStep = <T extends Block>(block: T, value: EvidenceStep | null): T => withSetting(block, 'deep_step', value);
+
+/** The pass checklist: trimmed, non-empty lines, capped. */
+const checkList = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => x.trim().slice(0, PASS_CHECKS.length)).filter(Boolean).slice(0, PASS_CHECKS.max) : [];
+export const passChecks = (block: Pick<Block, 'settings'>): string[] => checkList(settingsOf(block).deep_checks);
+export const withPassChecks = <T extends Block>(block: T, lines: string[]): T => withSetting(block, 'deep_checks', checkList(lines));
