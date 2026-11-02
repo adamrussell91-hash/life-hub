@@ -1,9 +1,9 @@
 import type { Block } from '@/schemas/block';
-import { evidenceStepOf, piecesTaught, targetPieces, withEvidenceStep, withPiecesTaught, withTargetPieces, type EvidenceStep } from './block-tags';
+import { evidenceStepOf, passChecks, PASS_CHECKS, piecesTaught, targetPieces, withEvidenceStep, withPassChecks, withPiecesTaught, withTargetPieces, type EvidenceStep } from './block-tags';
 import { STEP_LABEL, type DeepUnderstanding, type PlacedStep } from './schema';
 import './block-menu.css';
 
-export type DeepSheetResult = { taught: string[]; step: EvidenceStep | null; targets: string[] };
+export type DeepSheetResult = { taught: string[]; step: EvidenceStep | null; targets: string[]; checks: string[] };
 type Ask = (block: Block, deep: DeepUnderstanding[]) => Promise<DeepSheetResult | null>;
 
 const PLACED: PlacedStep[] = ['2a', '2b', '3', '4'];
@@ -21,7 +21,7 @@ export function deepMenuItems(block: Block | (() => Block), deep: DeepUnderstand
       const block = current();
       const result = await ask(block, deep);
       if (!result) return;
-      onChange(withTargetPieces(withEvidenceStep(withPiecesTaught(block, result.taught), result.step), result.targets));
+      onChange(withPassChecks(withTargetPieces(withEvidenceStep(withPiecesTaught(block, result.taught), result.step), result.targets), result.checks));
     }
   }];
 }
@@ -113,13 +113,23 @@ export function askDeepSheet(block: Block, deep: DeepUnderstanding[]): Promise<D
     }
     lookFor.append(lookRow);
 
+    // 4. What a pass sounds like (only with a step): shown beside the work while marking.
+    const passPart = el('fieldset', 'du-sheet__part');
+    passPart.append(el('legend', 'du-sheet__title', 'To pass, listen or look for (one per line)'));
+    const passBox = el('textarea', 'pf-field__input du-sheet__checks');
+    passBox.rows = 4;
+    passBox.maxLength = PASS_CHECKS.max * (PASS_CHECKS.length + 1);
+    passBox.value = passChecks(block).join('\n');
+    passBox.setAttribute('aria-label', 'Pass checklist, one line each');
+    passPart.append(passBox);
+
     const chosenStep = (): EvidenceStep | null => {
       const v = stepInputs.find((i) => i.checked)?.value;
       if (!v) return null;
       const [duId, s] = v.split('|');
       return { du: duId!, step: s as PlacedStep };
     };
-    const syncLookFor = (): void => { lookFor.hidden = !chosenStep(); };
+    const syncLookFor = (): void => { lookFor.hidden = passPart.hidden = !chosenStep(); };
     for (const i of stepInputs) i.addEventListener('change', syncLookFor);
     for (const i of lookInputs) {
       i.addEventListener('change', () => {
@@ -132,7 +142,7 @@ export function askDeepSheet(block: Block, deep: DeepUnderstanding[]): Promise<D
     const save = Object.assign(el('button', 'btn btn--primary', 'Save'), { type: 'button' });
     const cancel = Object.assign(el('button', 'btn', 'Cancel'), { type: 'button' });
     actions.append(cancel, save);
-    form.append(teaches, evidence, lookFor, actions);
+    form.append(teaches, evidence, lookFor, passPart, actions);
     dialog.append(form);
 
     let result: DeepSheetResult | null = null;
@@ -141,7 +151,8 @@ export function askDeepSheet(block: Block, deep: DeepUnderstanding[]): Promise<D
       result = {
         taught: taughtInputs.filter((i) => i.checked).map((i) => i.value),
         step: s,
-        targets: s ? lookInputs.filter((i) => i.checked).map((i) => i.value) : []
+        targets: s ? lookInputs.filter((i) => i.checked).map((i) => i.value) : [],
+        checks: s ? passBox.value.split('\n') : []
       };
       dialog.close();
     });

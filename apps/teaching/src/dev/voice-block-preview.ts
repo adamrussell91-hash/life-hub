@@ -137,6 +137,10 @@ const block = BlockSchema.parse({
     time_limit_s: 30,
     scaffold: [{ label: 'Concept', weight: 1 }, { label: 'Evidence and technique', weight: 2 }, { label: 'Link back', weight: 1 }]
   },
+  settings: {
+    deep_step: { du: 'du_demo01', step: '3' },
+    deep_checks: ['Names two texts by title', 'Names the move both texts make', 'Says what each text does differently with it']
+  },
   created_at: '2026-10-21T00:00:00.000Z',
   updated_at: '2026-10-21T00:00:00.000Z',
   schema_version: 1

@@ -21,7 +21,7 @@ describe('tagging from the lesson', () => {
   });
   it('the sheet’s apply writes taught pieces', async () => {
     const onChange = vi.fn();
-    const items = deepMenuItems(block, [du], onChange, { ask: async () => ({ taught: ['kp_aa11bb'], step: null, targets: [] }) });
+    const items = deepMenuItems(block, [du], onChange, { ask: async () => ({ taught: ['kp_aa11bb'], step: null, targets: [], checks: [] }) });
     await items[0]!.onSelect();
     expect(piecesTaught(onChange.mock.calls[0]![0])).toEqual(['kp_aa11bb']);
   });

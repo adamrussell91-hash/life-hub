@@ -120,7 +120,7 @@ function stripTeacherSettings(block: Block): Block {
   }
   const settings = (out as { settings?: Record<string, unknown> }).settings;
   if (settings && ['walkthru', ...DEEP_SETTING_KEYS].some((key) => Object.prototype.hasOwnProperty.call(settings, key))) {
-    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, ...rest } = settings;
+    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, deep_checks: _checks, ...rest } = settings;
     out = { ...out, settings: rest } as Block;
   }
   return out;
