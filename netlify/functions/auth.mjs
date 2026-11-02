@@ -4,6 +4,12 @@ import {
   verifyPassphrase
 } from './_shared/auth-security.mjs';
 import {
+  checkLoginAllowed,
+  clearLoginFailures,
+  loadSessionEpoch,
+  recordLoginFailure
+} from './_shared/auth-state.mjs';
+import {
   errorResponse,
   guardRequestOrigin,
   isConfigured,
@@ -32,7 +38,15 @@ export function createAuthHandler({
   createSessionToken: createToken = createSessionToken,
   serializeSessionCookie: serializeCookie = serializeSessionCookie,
   now = Date.now,
-  randomBytes
+  randomBytes,
+  // Global failed-login backoff shared by /api/auth and /api/knowledge/auth-login
+  // (both build this handler). Policy: LOGIN_THROTTLE in _shared/auth-state.mjs.
+  loginThrottle = {
+    check: checkLoginAllowed,
+    fail: recordLoginFailure,
+    succeed: clearLoginFailures
+  },
+  loadSessionEpoch: loadEpoch = loadSessionEpoch
 } = {}) {
   return async function authHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -47,6 +61,9 @@ export function createAuthHandler({
     const parsed = await parseBody(request);
     if (parsed.error) return withCors(parsed.error, request, env);
 
+    const gate = await loginThrottle.check({ now: now() });
+    if (!gate.allowed) return withCors(lockedOut(gate.retryAfterMs), request, env);
+
     let accepted = false;
     try {
       accepted = await verify(parsed.passphrase, env[UMBRELLA_PASSPHRASE_HASH_ENV]);
@@ -54,11 +71,24 @@ export function createAuthHandler({
       accepted = false;
     }
     if (!accepted) {
+      const state = await loginThrottle.fail({ now: now() });
+      const lockedUntil = Number(state?.locked_until);
+      if (Number.isFinite(lockedUntil) && lockedUntil > now()) {
+        return withCors(lockedOut(lockedUntil - now()), request, env);
+      }
       return withCors(errorResponse(401, 'invalid_credentials', 'That passphrase was not accepted.', true), request, env);
+    }
+    await loginThrottle.succeed({ now: now() });
+
+    let epoch;
+    try {
+      epoch = await loadEpoch({ now: now() });
+    } catch {
+      return withCors(misconfiguredResponse(), request, env);
     }
 
     try {
-      const session = createToken({ now: now(), ...(randomBytes ? { randomBytes } : {}) }, env[UMBRELLA_SESSION_SECRET_ENV]);
+      const session = createToken({ now: now(), epoch, ...(randomBytes ? { randomBytes } : {}) }, env[UMBRELLA_SESSION_SECRET_ENV]);
       return withCors(jsonResponse(200, {
         ok: true,
         data: { authenticated: true, expiresAt: session.expiresAt }
@@ -67,6 +97,17 @@ export function createAuthHandler({
       return withCors(misconfiguredResponse(), request, env);
     }
   };
+}
+
+function lockedOut(retryAfterMs) {
+  const seconds = Math.max(1, Math.ceil(Number(retryAfterMs) / 1000) || 1);
+  return errorResponse(
+    429,
+    'sign_in_locked',
+    `Too many wrong passphrases. Sign-in is paused for ${seconds < 60 ? `${seconds} seconds` : `${Math.ceil(seconds / 60)} minutes`}.`,
+    true,
+    { 'retry-after': String(seconds) }
+  );
 }
 
 function isJsonRequest(request) {

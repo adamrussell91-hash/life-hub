@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { groveAnimalCatalogue } from '../../scripts/lib/grove-animal-catalogue.mjs';
@@ -76,7 +76,12 @@ export default defineConfig({
       input: { main: path.resolve(__dirname, 'index.html'), grove: path.resolve(__dirname, 'grove.html'), groveWorldPreview: path.resolve(__dirname, 'grove-world-preview.html'), line: path.resolve(__dirname, 'line.html') }
     }
   },
-  server: { port: 5175 },
+  // Vite 7.3 applies server.fs to ?raw/?url/?worker imports too. Shared glyphs live in
+  // the repo's packages/, and pdf.js comes from the root install.
+  server: {
+    port: 5175,
+    fs: { allow: [searchForWorkspaceRoot(__dirname), path.resolve(__dirname, '../../packages'), path.resolve(__dirname, '../../node_modules')] }
+  },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'happy-dom'

@@ -122,7 +122,8 @@ export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
 
 const firstIssue = (error: z.ZodError): string => {
   const issue = error.issues[0];
-  if (issue?.code === 'invalid_union_discriminator') return 'Pick a column type.';
+  // zod 4 reports an unknown discriminator as invalid_union with the discriminator named.
+  if (issue?.code === 'invalid_union' && 'discriminator' in issue) return 'Pick a column type.';
   return issue?.message ?? 'Check this column.';
 };
 

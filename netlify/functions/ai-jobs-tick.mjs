@@ -38,7 +38,7 @@ export function createAiJobsTickHandler(deps = {}) {
     if (!isConfigured(env)) return misconfiguredResponse();
     let session;
     try {
-      session = (deps.verifySessionToken ?? verifySessionToken)(
+      session = await (deps.verifySessionToken ?? verifySessionToken)(
         readUmbrellaSessionCookie(request),
         umbrellaSessionSecret(env),
         (deps.now ?? Date.now)()

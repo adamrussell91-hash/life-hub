@@ -1,4 +1,5 @@
 /** Public page for a published personal line: `class.adam-russell.com/line#<code>` (`line.html#<code>` in dev). No sign-in, no hub chrome. */
+import '../../../../packages/zod-jitless.js';
 import { apiGet } from '@/api/client';
 import type { LineSnapshot } from '@/personal-line/model';
 import { mountPersonalLine } from '@/personal-line/render';

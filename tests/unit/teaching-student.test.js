@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { newId } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import {
   filterBlocksForStudent,
   sanitizeBlocksDeep,
@@ -189,11 +190,19 @@ test('public Teaching handlers call isPublicStudentApi and never the session coo
   assert.match(gate, /isPublicStudentApi/);
   assert.doesNotMatch(gate, /readUmbrellaSessionCookie|verifySessionToken|LIFE_HUB_PASSPHRASE/);
 
-  for (const name of ['published-lesson', 'published-unit', 'published-class', 'media-file', 'html-app-ai']) {
+  for (const name of ['published-lesson', 'published-unit', 'published-class', 'html-app-ai']) {
     const source = await readFile(new URL(`../../netlify/functions/${name}.mjs`, import.meta.url), 'utf8');
     assert.match(source, /createPublicStudentHandler/, name);
     assert.doesNotMatch(source, /readUmbrellaSessionCookie/, name);
   }
+  // media-file is public too, but serves only media a live student page uses. The
+  // owner's session may widen that to the whole library (library previews); it is read
+  // in one helper and never gates what a student can already see.
+  const media = await readFile(new URL('../../netlify/functions/media-file.mjs', import.meta.url), 'utf8');
+  assert.match(media, /createPublicStudentHandler/);
+  assert.equal(media.match(/readUmbrellaSessionCookie\(/g)?.length, 1);
+  assert.match(media, /async function hasOwnerSession\(/);
+  assert.match(media, /!owner && !\(await isPubliclyReferenced\(/);
 });
 
 test('filterBlocksForStudent strips Thinking Toolkit teacher notes and class notes (shared fixture)', () => {
@@ -221,4 +230,10 @@ test('filterBlocksForStudent drops a lecture scene script, keeping its narration
   const [top, chapter] = filterBlocksForStudent([heading, section]);
   assert.deepEqual(top.content, { text: 'Scene', narration: heading.content.narration });
   assert.equal(chapter.content.blocks[0].content.script, undefined);
+});
+
+test('new Teaching ids carry 64 random bits from the CSPRNG', () => {
+  const ids = new Set(Array.from({ length: 200 }, () => newId('media')));
+  assert.equal(ids.size, 200);
+  for (const id of ids) assert.match(id, /^media_[a-z0-9]+_[0-9a-f]{16}$/);
 });

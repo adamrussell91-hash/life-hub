@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 /** HH:mm window. Not a calendar event — a capacity constraint. */
@@ -26,7 +27,7 @@ export const PlanningProfileSchema = z.object({
   schema_version: schemaVersion,
   id: z.literal('default'),
   active_project_limit: z.number().int().positive().nullable().default(null),
-  work_windows: WeekdayWindowsSchema.default({
+  work_windows: WeekdayWindowsSchema.prefault({
     mon: [],
     tue: [],
     wed: [],
@@ -35,7 +36,7 @@ export const PlanningProfileSchema = z.object({
     sat: [],
     sun: []
   }),
-  protected_windows: WeekdayWindowsSchema.default({
+  protected_windows: WeekdayWindowsSchema.prefault({
     mon: [],
     tue: [],
     wed: [],
@@ -49,13 +50,13 @@ export const PlanningProfileSchema = z.object({
       target_blocks_per_week: z.number().int().nonnegative().nullable().default(null),
       min_block_minutes: z.number().int().positive().default(90)
     })
-    .default({ target_blocks_per_week: null, min_block_minutes: 90 }),
+    .prefault({ target_blocks_per_week: null, min_block_minutes: 90 }),
   shutdown_preference: z
     .object({
       preferred_time: z.string().nullable().default(null),
       require_tomorrow_block: z.boolean().default(false)
     })
-    .default({ preferred_time: null, require_tomorrow_block: false }),
+    .prefault({ preferred_time: null, require_tomorrow_block: false }),
   runway_buffer_minutes: z.number().int().nonnegative().nullable().default(null),
   updated_at: z.string().nullable().default(null)
 });
@@ -76,7 +77,7 @@ export const DEFAULT_PLANNING_PROFILE: PlanningProfile = {
   updated_at: null
 };
 
-export const PlanningProfileUpdateSchema = PlanningProfileSchema.partial().omit({
+export const PlanningProfileUpdateSchema = patchOf(PlanningProfileSchema).omit({
   schema_version: true,
   id: true
 });

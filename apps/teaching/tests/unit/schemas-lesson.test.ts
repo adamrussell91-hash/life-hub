@@ -1145,7 +1145,12 @@ describe('PublishableLessonSchema visualisation rules', () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.message.includes('finite y'))).toBe(true);
+      // zod 4's z.number() rejects Infinity itself, before the publish rule runs.
+      expect(
+        result.error.issues.some(
+          (i) => i.message.includes('finite y') || (i.code === 'invalid_type' && i.path.at(-1) === 'y')
+        )
+      ).toBe(true);
     }
   });
 

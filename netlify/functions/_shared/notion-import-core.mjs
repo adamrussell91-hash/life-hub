@@ -1062,7 +1062,7 @@ var DiscernQualifierSchema = z5.object({
     preset: DiscernScalePresetSchema.default("agree"),
     /** Scale points or choices. Empty scale points fall back to the preset. */
     options: z5.array(z5.string().trim().max(60)).max(5).default([])
-  }).default({}),
+  }).prefault({}),
   /** Teacher overrides for the five step prompts; an empty string keeps the default. */
   prompts: z5.array(z5.string().max(1200)).length(5).optional(),
   /** "Their choice" only: students also plot how settled the character is across key moments. */
@@ -1076,7 +1076,7 @@ var DiscernQualifierSchema = z5.object({
 import { z as z6 } from "zod";
 var LensAttachmentSchema = z6.object({
   id: z6.string().min(1).max(60),
-  config: z6.record(z6.unknown())
+  config: z6.record(z6.string(), z6.unknown())
 });
 var LensAttachmentsSchema = z6.array(LensAttachmentSchema).max(6).superRefine((items, ctx) => {
   if (new Set(items.map((item) => item.id)).size !== items.length) {
@@ -1092,8 +1092,8 @@ var WindowsMirrorsConfigSchema = z6.object({
   student_level: z6.boolean().default(true),
   mode: z6.enum(["notes", "discussion"]).default("notes"),
   /** Teacher overrides keyed `${level}.${stepId}`; empty keeps the default. */
-  prompts: z6.record(StepTextSchema).optional(),
-  supports: z6.record(StepTextSchema.nullable()).optional(),
+  prompts: z6.record(z6.string(), StepTextSchema).optional(),
+  supports: z6.record(z6.string(), StepTextSchema.nullable()).optional(),
   examples: z6.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 var SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
@@ -1104,8 +1104,8 @@ var ReasoningConfigSchema = z6.object({
   level: LensLevelSchema.default("core"),
   student_level: z6.boolean().default(true),
   mode: z6.enum(["notes", "discussion"]).default("notes"),
-  prompts: z6.record(StepTextSchema).optional(),
-  supports: z6.record(StepTextSchema.nullable()).optional(),
+  prompts: z6.record(z6.string(), StepTextSchema).optional(),
+  supports: z6.record(z6.string(), StepTextSchema.nullable()).optional(),
   examples: z6.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 var SleeveLevelSchema = z6.enum(["support", "extend"]);
@@ -1217,7 +1217,7 @@ var SprintSettingsSchema = z8.object({
   idea_guide: IdeaGuideSchema,
   phases: z8.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z8.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z8.number().int().min(0).max(30).default(8),
   /** Stand-out dots from before head-to-heads; kept so older Kits still load, no longer used. */
@@ -1234,7 +1234,7 @@ var PublicSprintSchema = z8.object({
   requirements: z8.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
   phases: z8.array(SprintPhaseSchema).length(5),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   sketch_timer: z8.number().int().min(0).max(30).default(8),
   decide_dots: z8.number().int().min(0).max(5).default(3)
 });
@@ -1249,12 +1249,12 @@ var UnderstandPayloadSchema = z8.object({
   stretch: text(300).default(""),
   /** Words from the brief that stand out. */
   spot: z8.array(text(40)).max(30).default([]),
-  audience: z8.object({ who: text(200).default(""), why: text(300).default("") }).default({ who: "", why: "" }),
+  audience: z8.object({ who: text(200).default(""), why: text(300).default("") }).prefault({ who: "", why: "" }),
   /** The surface problem, then each "why is that a problem?". */
   dig: z8.array(text(300)).max(6).default([]),
   /** The problem in their own words. */
   say: text(400).default(""),
-  limits: z8.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
+  limits: z8.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).prefault({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 var SketchCardSchema = z8.object({
   id: SprintIdSchema,
@@ -1706,7 +1706,7 @@ var TkTeacherNoteSchema = z11.object({
   /** True once the teacher edits the note; Thinking move then stops rebuilding it. */
   edited: z11.boolean().default(false)
 });
-var TkJotsSchema = z11.record(z11.string()).default({});
+var TkJotsSchema = z11.record(z11.string(), z11.string()).default({});
 var TkItemListSchema = z11.array(z11.string().min(1)).default([]);
 var ToolkitSkillContentSchema = z11.object({
   item: z11.string().min(1),
@@ -1720,7 +1720,7 @@ var ToolkitSkillContentSchema = z11.object({
   show_test: z11.boolean().default(true),
   checks: z11.array(z11.string()).max(8).default([]),
   reveals: z11.array(TkRevealSchema).max(6).default([]),
-  links: z11.object({ tools: TkItemListSchema, values: TkItemListSchema }).default({ tools: [], values: [] }),
+  links: z11.object({ tools: TkItemListSchema, values: TkItemListSchema }).prefault({ tools: [], values: [] }),
   show_links: z11.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -1748,7 +1748,7 @@ var ToolkitToolContentSchema = z11.object({
   sentence: z11.string().default(""),
   steps: z11.array(TkStepSchema).max(8).default([]),
   /** Fork frame: the worked example filled into the slots on reveal. */
-  worked: ForkSlotsSchema.default({}),
+  worked: ForkSlotsSchema.prefault({}),
   worked_note: z11.string().default(""),
   converters: z11.array(z11.object({ id: z11.string().min(1), closed: z11.string(), open: z11.string() })).max(10).default([]),
   statements: z11.array(
@@ -1761,7 +1761,7 @@ var ToolkitToolContentSchema = z11.object({
   ).max(10).default([]),
   pair_level: PairLevelSchema.default("none"),
   reveals: z11.array(TkRevealSchema).max(6).default([]),
-  links: z11.object({ skills: TkItemListSchema, tools: TkItemListSchema }).default({ skills: [], tools: [] }),
+  links: z11.object({ skills: TkItemListSchema, tools: TkItemListSchema }).prefault({ skills: [], tools: [] }),
   show_links: z11.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -1777,7 +1777,7 @@ var ToolkitValueContentSchema = z11.object({
   options: z11.array(z11.object({ id: z11.string().min(1), text: z11.string() })).max(8).default([]),
   probes: z11.array(z11.object({ id: z11.string().min(1), question: z11.string(), asks: z11.string() })).max(8).default([]),
   instruction: z11.string().default(""),
-  model: z11.object({ label: z11.string(), body: z11.string() }).default({ label: "", body: "" }),
+  model: z11.object({ label: z11.string(), body: z11.string() }).prefault({ label: "", body: "" }),
   discussion: z11.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -1831,14 +1831,14 @@ var ConceptFeaturesContentSchema = z11.object({
       common: z11.boolean()
     })
   ).max(8).default([]),
-  analogy: z11.object({ stem: z11.string(), example: z11.string() }).default({ stem: "", example: "" }),
+  analogy: z11.object({ stem: z11.string(), example: z11.string() }).prefault({ stem: "", example: "" }),
   game: z11.object({
     kind: ConceptGameKindSchema,
     left: z11.string(),
     middle: z11.string(),
     right: z11.string(),
     cards: z11.array(z11.object({ id: z11.string().min(1), text: z11.string(), prompt: z11.string() })).max(16)
-  }).default({ kind: "kind_sort", left: "", middle: "?", right: "", cards: [] }),
+  }).prefault({ kind: "kind_sort", left: "", middle: "?", right: "", cards: [] }),
   criteria: z11.array(z11.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
@@ -2063,9 +2063,9 @@ var blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
   lenses: LensAttachmentsSchema.optional(),
-  layout: z12.record(z12.unknown()).default({}),
-  print: z12.record(z12.unknown()).default({}),
-  settings: z12.record(z12.unknown()).default({})
+  layout: z12.record(z12.string(), z12.unknown()).default({}),
+  print: z12.record(z12.string(), z12.unknown()).default({}),
+  settings: z12.record(z12.string(), z12.unknown()).default({})
 };
 var RichTextBlockSchema = z12.object({
   id: z12.string().min(1),
@@ -2274,7 +2274,7 @@ var DividerBlockSchema = z12.object({
     tools: z12.boolean().default(true),
     /** Timers saved with the lesson, ready when it opens. */
     timer_stack: z12.array(TimerSegmentSchema).max(8).default([])
-  }).default({}),
+  }).prefault({}),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -2288,7 +2288,7 @@ var ClassroomToolsBlockSchema = z12.object({
     timer_stack: z12.array(TimerSegmentSchema).max(8).default([]),
     /** Tool to show open when the page loads. Falls back if the viewer cannot use it. */
     start_tool: ClassroomToolIdSchema.optional()
-  }).default({}),
+  }).prefault({}),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -2458,12 +2458,12 @@ var ContinuumLineBlockSchema = z12.object({
       text: z12.string().max(2e3).default(""),
       url: z12.string().max(2e3).default(""),
       alt_text: z12.string().max(500).default("")
-    }).default({ kind: "text", text: "", url: "", alt_text: "" }),
+    }).prefault({ kind: "text", text: "", url: "", alt_text: "" }),
     scale: z12.object({
       left: z12.string().max(40).default("Implied"),
       right: z12.string().max(40).default("Not implied"),
       stops: z12.array(z12.string().max(40)).max(3).default([])
-    }).default({ left: "Implied", right: "Not implied", stops: [] }),
+    }).prefault({ left: "Implied", right: "Not implied", stops: [] }),
     statements: z12.array(ContinuumStatementSchema).max(10).default([]),
     pace: z12.enum(["teacher", "student", "self"]).default("teacher"),
     replace: z12.boolean().default(true)
@@ -2564,7 +2564,7 @@ var CurriculumLinesV1ContentSchema = z12.object({
   strands: z12.array(CurriculumLinesStrandSchema).min(1).max(8),
   stations: z12.array(CurriculumLinesStationSchema).max(160).default([]),
   checkpoints: z12.array(CurriculumLinesCheckpointSchema).max(20).default([]),
-  terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
+  terminus: CurriculumLinesTerminusSchema.prefault({ label: "Assessment task" })
 });
 var NetworkLineModeSchema = z12.enum(["train", "metro", "light_rail"]);
 var LineAlignmentSchema = z12.discriminatedUnion("kind", [
@@ -2629,7 +2629,7 @@ var CurriculumLinesV2ContentSchema = z12.object({
   concept_lines: z12.array(z12.string().min(1).max(64)).max(4).optional(),
   /** The light rail lines (skills strands) this unit shows; unset shows every one. The year network always shows them all. */
   skill_lines: z12.array(z12.string().min(1).max(64)).max(4).optional(),
-  terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
+  terminus: CurriculumLinesTerminusSchema.prefault({ label: "Assessment task" })
 });
 var CurriculumLinesBlockSchema = z12.object({
   id: z12.string().min(1),
@@ -3319,7 +3319,7 @@ var AnnotationBlockObjectSchema = z12.object({
     annotations: z12.array(AnnotationItemSchema).default([]),
     voice_tracks: z12.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
-    settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
+    settings: AnnotationBlockSettingsSchema.prefault({ show_markers: true })
   }),
   ...blockLayout,
   ...blockTimestamps

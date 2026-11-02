@@ -1,10 +1,27 @@
+import { verifySessionToken } from './_shared/auth-security.mjs';
 import {
   errorResponse,
+  isConfigured,
   methodNotAllowed,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
+import { isIndexKey, listBlobKeys } from './_shared/blobs-list.mjs';
+import { referencedMediaIds } from './_shared/media-usage.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
-import { mediaFileKey, mediaKey, readPublishedId } from './_shared/teaching-blobs.mjs';
+import { isDeletedRecord } from './_shared/record-liveness.mjs';
+import {
+  CLASS_PREFIX,
+  draftLessonKey,
+  getJSON,
+  listJSON,
+  mediaFileKey,
+  mediaKey,
+  PUBLISHED_LESSON_PREFIX,
+  readPublishedId,
+  UNIT_PREFIX
+} from './_shared/teaching-blobs.mjs';
 
 export const config = { path: '/api/media/:id/file' };
 
@@ -30,7 +47,65 @@ export function parseByteRange(header, size) {
   return { start, end };
 }
 
+const PUBLIC_SET_TTL_MS = 60_000;
+const PUBLIC_SET_RECHECK_MS = 5_000;
+const publicSets = new WeakMap(); // store → { ids, at }
+
+/**
+ * Media ids a student page can show: referenced by a live published lesson snapshot
+ * (the draft not trashed), or by a live unit or class, whose public pages
+ * (/api/published/units|classes/:id) render their content. Everything else in the
+ * teacher's library stays private, whatever its id.
+ */
+export async function loadPublicMediaIds(store) {
+  const snapshots = await listJSON(store, PUBLISHED_LESSON_PREFIX);
+  const live = [];
+  for (const snapshot of snapshots) {
+    const lessonId = snapshot?.lesson_id ?? snapshot?.id;
+    if (!lessonId) continue;
+    const draft = await getJSON(store, draftLessonKey(lessonId));
+    if (draft && !isDeletedRecord(draft)) live.push(snapshot);
+  }
+  const [units, classes] = await Promise.all([
+    topLevelRecords(store, UNIT_PREFIX),
+    topLevelRecords(store, CLASS_PREFIX)
+  ]);
+  return referencedMediaIds([...live, ...units, ...classes]);
+}
+
+/** `units/{id}` and `classes/{id}` only, never their sub-documents. */
+async function topLevelRecords(store, prefix) {
+  const keys = (await listBlobKeys(store, prefix))
+    .filter(key => !isIndexKey(key) && !key.slice(prefix.length).includes('/'));
+  return Promise.all(keys.map(key => getJSON(store, key)));
+}
+
+async function isPubliclyReferenced(store, id, now, load = loadPublicMediaIds) {
+  const cached = publicSets.get(store);
+  if (cached && now - cached.at < PUBLIC_SET_TTL_MS) {
+    if (cached.ids.has(id)) return true;
+    // Just published? Rebuild at most every few seconds.
+    if (now - cached.at < PUBLIC_SET_RECHECK_MS) return false;
+  }
+  const ids = await load(store);
+  publicSets.set(store, { ids, at: now });
+  return ids.has(id);
+}
+
+async function hasOwnerSession(request, env, verify, now) {
+  const cookie = readUmbrellaSessionCookie(request);
+  if (!cookie || !isConfigured(env)) return false;
+  try {
+    return Boolean((await verify(cookie, umbrellaSessionSecret(env), now))?.valid);
+  } catch {
+    return false;
+  }
+}
+
 export function createMediaFileHandler(deps = {}) {
+  const verify = deps.verifySessionToken ?? verifySessionToken;
+  const clock = deps.now ?? Date.now;
+  const loadPublic = deps.loadPublicMediaIds ?? loadPublicMediaIds;
   return createPublicStudentHandler(async (request, context) => {
     const { env, store } = context;
     if (request.method !== 'GET') {
@@ -44,6 +119,12 @@ export function createMediaFileHandler(deps = {}) {
 
     const raw = await store.get(mediaKey(id), { type: 'json' });
     if (!raw || raw.status !== 'active') {
+      return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
+    }
+    // The owner's signed-in browser sees the whole library; anyone else only media a
+    // student page actually uses. Same 404 either way, so ids cannot be probed.
+    const owner = await hasOwnerSession(request, env, verify, clock());
+    if (!owner && !(await isPubliclyReferenced(store, id, clock(), loadPublic))) {
       return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
     }
 

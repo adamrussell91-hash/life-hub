@@ -39,6 +39,18 @@ function memoryStore(entries = {}) {
   };
 }
 
+// A live published lesson whose blocks embed each media id, so the public file route serves it.
+function publishedUsing(...ids) {
+  return {
+    'lessons/lesson-media': { id: 'lesson-media', title: 'Media lesson' },
+    'published/lessons/lesson-media': {
+      lesson_id: 'lesson-media',
+      title: 'Media lesson',
+      blocks: ids.map((id, i) => ({ id: `b${i}`, block_type: 'image', content: { url: `https://api.adam-russell.com/api/media/${id}/file` } }))
+    }
+  };
+}
+
 function jsonRequest(url, { method = 'GET', headers = {}, body } = {}) {
   return new Request(url, {
     method,
@@ -246,11 +258,12 @@ test('published unit is 404 once the unit is trashed', async () => {
   assert.equal(response.status, 404);
 });
 
-test('media file is public for active media and 404 when archived', async () => {
+test('media file is public for active media a published lesson uses and 404 when archived', async () => {
   const bytes = new Uint8Array([1, 2, 3]).buffer;
   const handler = createMediaFileHandler({
     env,
     getContentStore: async () => memoryStore({
+      ...publishedUsing('file-1', 'file-2'),
       'media/file-1': { id: 'file-1', status: 'active', mime_type: 'image/png' },
       'media_files/file-1': { data: bytes, metadata: { contentType: 'image/png' } },
       'media/file-2': { id: 'file-2', status: 'archived', mime_type: 'image/png' }
@@ -269,6 +282,7 @@ test('media file streams large video blobs with the stored content type', async 
   const stream = new Response(new Uint8Array([1, 2, 3, 4])).body;
   const requested = [];
   const store = memoryStore({
+    ...publishedUsing('vid-1'),
     'media/vid-1': { id: 'vid-1', status: 'active', mime_type: 'video/mp4' },
     'media_files/vid-1': { data: stream, metadata: { contentType: 'video/mp4' } }
   });
@@ -287,6 +301,7 @@ test('media file serves byte ranges so Safari can play and seek audio', async ()
   const handler = createMediaFileHandler({
     env,
     getContentStore: async () => memoryStore({
+      ...publishedUsing('voice-1'),
       'media/voice-1': { id: 'voice-1', status: 'active', mime_type: 'audio/webm' },
       'media_files/voice-1': { data: bytes, metadata: { contentType: 'audio/webm' } }
     })
@@ -381,12 +396,49 @@ test('media file responses are nosniff', async () => {
   const handler = createMediaFileHandler({
     env,
     getContentStore: async () => memoryStore({
+      ...publishedUsing('f'),
       'media/f': { id: 'f', status: 'active', mime_type: 'image/png' },
       'media_files/f': { data: new Uint8Array([1]).buffer, metadata: {} }
     })
   });
   const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/f/file'));
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('media file hides library items no live student page uses, except from the owner session', async () => {
+  const bytes = new Uint8Array([7]).buffer;
+  const entries = {
+    'media/private-1': { id: 'private-1', status: 'active', mime_type: 'application/pdf' },
+    'media_files/private-1': { data: bytes, metadata: {} },
+    'media/trashed-1': { id: 'trashed-1', status: 'active', mime_type: 'image/png' },
+    'media_files/trashed-1': { data: bytes, metadata: {} },
+    'lessons/gone': { id: 'gone', title: 'Gone', status: 'trashed' },
+    'published/lessons/gone': { lesson_id: 'gone', title: 'Gone', blocks: [{ media_id: 'trashed-1' }] },
+    'media/unit-1': { id: 'unit-1', status: 'active', mime_type: 'image/png' },
+    'media_files/unit-1': { data: bytes, metadata: {} },
+    'units/u1': { id: 'u1', title: 'Unit', cover: '/api/media/unit-1/file' }
+  };
+  let sessionChecks = 0;
+  const handler = createMediaFileHandler({
+    env,
+    getContentStore: async () => memoryStore(entries),
+    verifySessionToken: async token => {
+      sessionChecks += 1;
+      return token === 'owner-token' ? { valid: true, payload: {} } : { valid: false, reason: 'malformed' };
+    }
+  });
+  const url = id => `https://api.adam-russell.com/api/media/${id}/file`;
+
+  assert.equal((await handler(jsonRequest(url('private-1')))).status, 404);
+  assert.equal((await handler(jsonRequest(url('trashed-1')))).status, 404);
+  assert.equal((await handler(jsonRequest(url('unit-1')))).status, 200);
+  assert.equal(sessionChecks, 0, 'no cookie, no session check');
+
+  const forged = await handler(jsonRequest(url('private-1'), { headers: { cookie: 'life_hub_session=forged' } }));
+  assert.equal(forged.status, 404);
+  const owner = await handler(jsonRequest(url('private-1'), { headers: { cookie: 'life_hub_session=owner-token' } }));
+  assert.equal(owner.status, 200);
+  assert.equal(owner.headers.get('cache-control'), 'private, max-age=86400');
 });
 
 test('published unit carries the subject lines and published lessons\' line stops only', async () => {

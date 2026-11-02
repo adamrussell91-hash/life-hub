@@ -4,6 +4,8 @@
  * machine readable price: JSON-LD Product offers, price meta tags, and Shopify's
  * product JSON. Anything else returns null rather than guessing from page text.
  */
+import { safeFetch } from './safe-fetch.mjs';
+
 const MAX_BODY_CHARS = 1_500_000;
 export const PAGE_TIMEOUT_MS = 7000;
 const USER_AGENT = 'Mozilla/5.0 (compatible; LifeHubWatchRadar/1; +https://life-hub.adam-russell.com)';
@@ -74,11 +76,13 @@ export function priceFromShopifyJson(product, currency) {
 }
 
 async function fetchText(url, fetchImpl, accept) {
-  const response = await fetchImpl(url, {
+  const fetched = await safeFetch(url, {
     headers: { 'user-agent': USER_AGENT, accept, 'accept-language': 'en-AU,en;q=0.8' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(PAGE_TIMEOUT_MS)
+    signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+    fetchImpl
   });
+  if (!fetched.ok) throw Object.assign(new Error(`Blocked URL (${fetched.error})`), { code: 'blocked_url' });
+  const response = fetched.response;
   if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { code: 'http_error' });
   return (await response.text()).slice(0, MAX_BODY_CHARS);
 }

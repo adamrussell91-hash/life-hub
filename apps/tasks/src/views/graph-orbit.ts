@@ -19,6 +19,7 @@ import {
 } from '../../../life/js/app/chart-kit/orbit-radar.js';
 import { backlogHrefFromGraph } from '@/shell/shell';
 import { el } from '@/views/hub-kit';
+import { escapeHtml } from '@/domain/escape-html';
 import { svgEl, token } from '@/views/graph-svg';
 
 export type OrbitMount = {
@@ -278,7 +279,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     const d = b.days;
     const when = d < 0 ? `${Math.abs(d)} days overdue` : d === 0 ? 'due today' : `due in ${d} days`;
     const meta = domainMeta(b.domain);
-    tip.innerHTML = `<b>${b.task.title}</b><span>${meta.label} · ${when}</span>`;
+    tip.innerHTML = `<b>${escapeHtml(b.task.title)}</b><span>${escapeHtml(meta.label)} · ${escapeHtml(when)}</span>`;
     const box = svg.getBoundingClientRect();
     const sc = box.width / ORBIT.size;
     const x = Number(b.circle.getAttribute('cx')) * sc;
@@ -302,7 +303,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       const row = el('div', '');
       row.dataset.part = 'load-row';
       const count = wk[d.id] ?? 0;
-      row.innerHTML = `<span>${d.label}</span><div class="bar"><i style="width:${(count / max) * 100}%;background:${d.color ?? domainMeta(d.id).colour}"></i></div><span class="n">${count}</span>`;
+      row.innerHTML = `<span>${escapeHtml(d.label)}</span><div class="bar"><i style="width:${(count / max) * 100}%;background:${escapeHtml(d.color ?? domainMeta(d.id).colour)}"></i></div><span class="n">${count}</span>`;
       load.append(row);
     }
     notes.replaceChildren();
@@ -311,7 +312,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     if (collisionInsight && hits[0]) {
       const note = el('div', '');
       note.dataset.part = 'clare-note';
-      note.innerHTML = `<div class="note__head"><span class="graph-clare-alert__avatar">C</span>${collisionInsight.headline}</div><p>${collisionInsight.detail} <span>${hits[0].tasks.map((t) => t.title).join(', ')}</span></p>`;
+      note.innerHTML = `<div class="note__head"><span class="graph-clare-alert__avatar">C</span>${escapeHtml(collisionInsight.headline)}</div><p>${escapeHtml(collisionInsight.detail)} <span>${escapeHtml(hits[0].tasks.map((t) => t.title).join(', '))}</span></p>`;
       const row = el('div', 'row');
       const suggest = el('button', 'btn btn--primary', 'Suggest a move');
       suggest.type = 'button';
@@ -327,11 +328,11 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     if (overdue.length) {
       const note = el('div', 'is-danger');
       note.dataset.part = 'clare-note';
-      note.innerHTML = `<div class="note__head"><span class="graph-clare-alert__avatar">C</span>${overdue.length} overdue</div><p>Spinning at the centre. <span>${overdue.map((b) => b.task.title).join(', ')}</span></p>`;
+      note.innerHTML = `<div class="note__head"><span class="graph-clare-alert__avatar">C</span>${overdue.length} overdue</div><p>Spinning at the centre. <span>${escapeHtml(overdue.map((b) => b.task.title).join(', '))}</span></p>`;
       notes.append(note);
     }
     legend.innerHTML =
-      list.map((d) => `<span><i style="background:${d.color ?? domainMeta(d.id).colour}"></i>${d.label}</span>`).join('') +
+      list.map((d) => `<span><i style="background:${escapeHtml(d.color ?? domainMeta(d.id).colour)}"></i>${escapeHtml(d.label)}</span>`).join('') +
       `<span><i style="background:${token('--danger', '#9b2c2c')}"></i>Closing in</span><span>Size = effort</span>`;
     const undated = input.tasks.filter((t) => !t.due_date && t.status !== 'done' && t.status !== 'dead');
     foot.innerHTML = undated.length

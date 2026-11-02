@@ -6,6 +6,7 @@ import { I } from '@/lib/icons';
 import { zoomable } from '@/lib/zoomable';
 import { formatWeekdayDate } from '@/lib/date-label';
 import { isOvernightTicket } from '@/model/day';
+import { escapeHtml } from '@/lib/html';
 
 const VIEW_W = 1000;
 const VIEW_H = 540;
@@ -37,9 +38,6 @@ function routeStops(trip: Trip): RoutePoint[] {
   const home = HOME_POINTS[trip.home_tz];
   return home ? [{ id: 'home', ...home, isHome: true }, ...ordered] : ordered;
 }
-
-const escapeHtml = (text: string): string =>
-  text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One leg per consecutive pair of route stops, in trip order. Tickets are
  * filed under their arrival city (`city_id === arrive_city_id`), so the

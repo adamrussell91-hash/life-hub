@@ -140,9 +140,9 @@ const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
   lenses: LensAttachmentsSchema.optional(),
-  layout: z.record(z.unknown()).default({}),
-  print: z.record(z.unknown()).default({}),
-  settings: z.record(z.unknown()).default({})
+  layout: z.record(z.string(), z.unknown()).default({}),
+  print: z.record(z.string(), z.unknown()).default({}),
+  settings: z.record(z.string(), z.unknown()).default({})
 };
 
 export const RichTextBlockSchema = z.object({
@@ -382,7 +382,8 @@ export const DividerBlockSchema = z.object({
       /** Timers saved with the lesson, ready when it opens. */
       timer_stack: z.array(TimerSegmentSchema).max(8).default([])
     })
-    .default({}),
+    // zod 4: prefault parses `{}`, so the inner defaults still fill in (3.x `.default`).
+    .prefault({}),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -400,7 +401,7 @@ export const ClassroomToolsBlockSchema = z.object({
       /** Tool to show open when the page loads. Falls back if the viewer cannot use it. */
       start_tool: ClassroomToolIdSchema.optional()
     })
-    .default({}),
+    .prefault({}),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -588,12 +589,12 @@ export const ContinuumLineBlockSchema = z.object({
       text: z.string().max(2000).default(''),
       url: z.string().max(2000).default(''),
       alt_text: z.string().max(500).default('')
-    }).default({ kind: 'text', text: '', url: '', alt_text: '' }),
+    }).prefault({ kind: 'text', text: '', url: '', alt_text: '' }),
     scale: z.object({
       left: z.string().max(40).default('Implied'),
       right: z.string().max(40).default('Not implied'),
       stops: z.array(z.string().max(40)).max(3).default([])
-    }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
+    }).prefault({ left: 'Implied', right: 'Not implied', stops: [] }),
     statements: z.array(ContinuumStatementSchema).max(10).default([]),
     pace: z.enum(['teacher', 'student', 'self']).default('teacher'),
     replace: z.boolean().default(true)
@@ -700,7 +701,7 @@ export const CurriculumLinesV1ContentSchema = z.object({
   strands: z.array(CurriculumLinesStrandSchema).min(1).max(8),
   stations: z.array(CurriculumLinesStationSchema).max(160).default([]),
   checkpoints: z.array(CurriculumLinesCheckpointSchema).max(20).default([]),
-  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+  terminus: CurriculumLinesTerminusSchema.prefault({ label: 'Assessment task' })
 });
 
 /**
@@ -788,7 +789,7 @@ export const CurriculumLinesV2ContentSchema = z.object({
   concept_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
   /** The light rail lines (skills strands) this unit shows; unset shows every one. The year network always shows them all. */
   skill_lines: z.array(z.string().min(1).max(64)).max(4).optional(),
-  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+  terminus: CurriculumLinesTerminusSchema.prefault({ label: 'Assessment task' })
 });
 export const CurriculumLinesBlockSchema = z.object({
   id: z.string().min(1), type: z.literal('block'),
@@ -1593,7 +1594,7 @@ export const AnnotationBlockObjectSchema = z.object({
     annotations: z.array(AnnotationItemSchema).default([]),
     voice_tracks: z.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
-    settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
+    settings: AnnotationBlockSettingsSchema.prefault({ show_markers: true })
   }),
   ...blockLayout,
   ...blockTimestamps

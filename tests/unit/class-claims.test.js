@@ -1,6 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { claimFor, claimInitials, classClaimsAction, listClaims, loadRoster, releaseClaim } from '../../netlify/functions/_shared/class-claims.mjs';
+import { CLAIMS_PER_IP_PER_CLASS_PER_DAY, claimFor, claimInitials, classClaimsAction, clientIpOf, listClaims, loadRoster, releaseClaim, withClaimRequest } from '../../netlify/functions/_shared/class-claims.mjs';
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -65,4 +66,33 @@ test('teacher actions list and release, and refuse a missing class or unknown ac
   assert.deepEqual(after.claims, {});
   await assert.rejects(classClaimsAction(s, 'nope', { action: 'list' }), /Class not found/);
   await assert.rejects(classClaimsAction(s, 'class1', { action: 'wipe' }), /Unknown action/);
+});
+
+test('one network address can make only so many new claims in a class per day', async () => {
+  const s = store();
+  const roster = await loadRoster(s, 'class1');
+  const ip = '198.51.100.23';
+  // Squat with a fresh device token, get released, squat again: the address runs out for the day.
+  for (let i = 0; i < CLAIMS_PER_IP_PER_CLASS_PER_DAY; i += 1) {
+    const held = await withClaimRequest({ ip }, () => claimInitials(s, roster, randomBytes(24).toString('hex'), 'BB'));
+    await releaseClaim(s, 'class1', held.id);
+  }
+  await assert.rejects(
+    withClaimRequest({ ip }, () => claimInitials(s, roster, token(3), 'TT')),
+    /Too many initials have been claimed from here today/
+  );
+  // Another address (another class, or a later day) is unaffected, and so is a device that already holds a claim.
+  assert.equal((await withClaimRequest({ ip: '198.51.100.99' }, () => claimInitials(s, roster, token(4), 'TT'))).initials, 'TT');
+  assert.equal((await withClaimRequest({ ip }, () => claimInitials(s, roster, token(4), 'TT'))).initials, 'TT');
+  // The counter keys hash the address and never show up as claims.
+  const keys = [...s.data.keys()].filter(k => k.includes('/ip-day/'));
+  assert.ok(keys.length === 2 && keys.every(k => !k.includes(ip)));
+  assert.deepEqual(Object.keys(await listClaims(s, 'class1')).length, 1);
+});
+
+test('the client address comes from the Netlify context, then the edge header', () => {
+  const request = new Request('https://api.example/x', { headers: { 'x-nf-client-connection-ip': '198.51.100.7' } });
+  assert.equal(clientIpOf(request, { ip: '198.51.100.8' }), '198.51.100.8');
+  assert.equal(clientIpOf(request, {}), '198.51.100.7');
+  assert.equal(clientIpOf(new Request('https://api.example/x'), {}), '');
 });

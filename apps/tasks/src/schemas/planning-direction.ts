@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 /**
@@ -26,7 +27,7 @@ export const DEFAULT_PLANNING_DIRECTION: PlanningDirection = {
   updated_at: null
 };
 
-export const PlanningDirectionUpdateSchema = PlanningDirectionSchema.partial().omit({
+export const PlanningDirectionUpdateSchema = patchOf(PlanningDirectionSchema).omit({
   schema_version: true,
   id: true
 });

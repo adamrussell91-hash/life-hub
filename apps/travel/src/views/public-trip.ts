@@ -45,7 +45,9 @@ export async function renderPublicTrip(root: HTMLElement, token: string): Promis
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip';
-    chip.innerHTML = `<b>${city.name}</b>`;
+    const name = document.createElement('b');
+    name.textContent = city.name;
+    chip.append(name);
     chip.addEventListener('click', () => showCity(city.id));
     chips.append(chip);
   }

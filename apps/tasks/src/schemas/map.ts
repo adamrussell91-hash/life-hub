@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchOf } from './patch';
 import { schemaVersion } from './task';
 
 export const LineStrokeSchema = z.enum(['solid', 'dotted']);
@@ -168,7 +169,7 @@ export const TransitMapCreateSchema = TransitMapSchema.omit({
   title: z.string().min(1)
 });
 
-export const TransitMapUpdateSchema = TransitMapCreateSchema.partial();
+export const TransitMapUpdateSchema = patchOf(TransitMapCreateSchema);
 
 export type LineStroke = z.infer<typeof LineStrokeSchema>;
 export type YearTrack = z.infer<typeof YearTrackSchema>;

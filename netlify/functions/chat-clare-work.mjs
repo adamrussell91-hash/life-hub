@@ -46,7 +46,7 @@ export function createChatClareWorkHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }

@@ -1,11 +1,16 @@
-import { pageHashForId, pageIdFromHash } from "../routing/pageHash";
+import { isSafePageId, pageHashForId, pageIdFromHash } from "../routing/pageHash";
 
 const ARCHIVE_HREF = /^(page_(?:notion|hub)_[^)\s]+|#page\/[^)\s]+)$/i;
 
+/**
+ * `label` is already-escaped inline HTML. `target` comes from escaped text, so a
+ * `#page/` hash is URL-decoded here and must be re-validated before it reaches an
+ * attribute: `%22` / `%3C` decode to raw `"` / `<`.
+ */
 function noteAnchor(label: string, target: string): string {
   const pageId = target.startsWith("#page/") ? pageIdFromHash(target) : target;
-  if (!pageId) return `<span class="md-link">${label}</span>`;
-  return `<a class="note-link" href="${pageHashForId(pageId)}" data-open-page="${pageId}">${label}</a>`;
+  if (!isSafePageId(pageId)) return `<span class="md-link">${label}</span>`;
+  return `<a class="note-link" href="${escape(pageHashForId(pageId))}" data-open-page="${escape(pageId)}">${label}</a>`;
 }
 
 /** Lightweight Markdown → HTML for Notion-export note bodies. */

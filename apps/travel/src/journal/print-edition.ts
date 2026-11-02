@@ -156,7 +156,7 @@ function renderMomentBlock(
     );
     for (const item of liveMedia) {
       const src = escapeHtml(journalPrintImageSrc(tripId, item));
-      parts.push(`<img src="${src}" alt="" width="${item.width}" height="${item.height}" />`);
+      parts.push(`<img src="${src}" alt="" width="${escapeHtml(String(item.width))}" height="${escapeHtml(String(item.height))}" />`);
     }
     parts.push('</div>');
   }

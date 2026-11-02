@@ -1,4 +1,5 @@
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { clientIpOf, withClaimRequest } from './_shared/class-claims.mjs';
 import { profileAction } from './_shared/profile.mjs';
 import { QuizError } from './_shared/question-drop.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
@@ -16,7 +17,8 @@ export function createPublishedProfileHandler(deps = {}) {
     try {
       const text = await request.text();
       if (text.length > MAX_BODY) throw new QuizError(413, 'too_large', 'That request is too large.');
-      const result = await profileAction(store, match?.[1], JSON.parse(text));
+      const parsedBody = JSON.parse(text);
+      const result = await withClaimRequest({ ip: clientIpOf(request, context) }, () => profileAction(store, match?.[1], parsedBody));
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
       if (e instanceof QuizError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);

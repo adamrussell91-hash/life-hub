@@ -272,7 +272,7 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm, loadWorkflowState } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, urlsInText, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm, loadWorkflowState } from './_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
 import { loadTimedLifeEventsFromTree, LifeEventSourceUnavailableError } from './_shared/life-schedule-events.mjs';
 import {
@@ -551,7 +551,7 @@ export function createChatHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }
@@ -2225,6 +2225,9 @@ export function createChatHandler({
         };
 
         const turnUsage = createTurnUsage();
+        // Clare's outbound tools fetch a URL with a query string only when that exact
+        // URL is in Adam's own message this turn or a web_search result this turn.
+        const turnFetchUrls = new Set(urlsInText(parsed.message));
         try {
           const emit = event => {
             if (event.type === 'record_proposal' || event.type === 'record_saved') {
@@ -3537,6 +3540,7 @@ export function createChatHandler({
                   events: hubLifeEvents,
                   calendarMerge,
                   protocol: clareProtocol,
+                  allowedUrls: turnFetchUrls,
                   now: nowInstant,
                   energy: stated.energy,
                   capacity_minutes: stated.capacity_minutes,
@@ -3635,6 +3639,11 @@ export function createChatHandler({
             hasVisualEvidence: visualCtx.hasVisualEvidence
           })) {
             addUsage(turnUsage, event);
+            if (event.type === 'sources' && Array.isArray(event.sources)) {
+              for (const source of event.sources) {
+                if (typeof source?.url === 'string' && source.url) turnFetchUrls.add(source.url);
+              }
+            }
             if (event.type === 'tool_call' && event.name === 'add_workout_notes') {
               try {
                 await proposeWorkoutNotesAmend({
@@ -4186,7 +4195,7 @@ export function createChatStartHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }

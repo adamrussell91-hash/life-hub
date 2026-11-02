@@ -18,7 +18,7 @@ import {
 } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
-import { listNamedShortcuts } from './_shared/capabilities/registry.mjs';
+import { isSafeAgentSlug, listNamedShortcuts, loadAllowlist } from './_shared/capabilities/registry.mjs';
 import { executeShortcut } from './_shared/capabilities/shortcuts.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
@@ -50,7 +50,7 @@ export function createShortcutsHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }
@@ -110,6 +110,9 @@ export function createShortcutsHandler({
       const agentSlug = typeof body?.agent_slug === 'string' && body.agent_slug.trim()
         ? body.agent_slug.trim()
         : OPERATOR_SLUG;
+      if (!isSafeAgentSlug(agentSlug) || !loadAllowlist(agentSlug)) {
+        return errorResponse(400, 'invalid_input', 'agent_slug is not a known agent.', false, PRIVATE_CACHE);
+      }
       const result = await executeShortcut('os_run_promoted_shortcut', { proposed_id: proposedId }, ctxFor(agentSlug));
       if (result.kind === 'error') {
         return errorResponse(400, 'shortcut_failed', result.error || 'Shortcut could not run.', false, PRIVATE_CACHE);

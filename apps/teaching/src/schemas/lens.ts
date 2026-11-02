@@ -8,7 +8,7 @@ import { z } from 'zod';
  */
 export const LensAttachmentSchema = z.object({
   id: z.string().min(1).max(60),
-  config: z.record(z.unknown())
+  config: z.record(z.string(), z.unknown())
 });
 export const LensAttachmentsSchema = z.array(LensAttachmentSchema).max(6).superRefine((items, ctx) => {
   if (new Set(items.map((item) => item.id)).size !== items.length) {
@@ -27,8 +27,8 @@ export const WindowsMirrorsConfigSchema = z.object({
   student_level: z.boolean().default(true),
   mode: z.enum(['notes', 'discussion']).default('notes'),
   /** Teacher overrides keyed `${level}.${stepId}`; empty keeps the default. */
-  prompts: z.record(StepTextSchema).optional(),
-  supports: z.record(StepTextSchema.nullable()).optional(),
+  prompts: z.record(z.string(), StepTextSchema).optional(),
+  supports: z.record(z.string(), StepTextSchema.nullable()).optional(),
   examples: z.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 
@@ -47,8 +47,8 @@ export const ReasoningConfigSchema = z.object({
   level: LensLevelSchema.default('core'),
   student_level: z.boolean().default(true),
   mode: z.enum(['notes', 'discussion']).default('notes'),
-  prompts: z.record(StepTextSchema).optional(),
-  supports: z.record(StepTextSchema.nullable()).optional(),
+  prompts: z.record(z.string(), StepTextSchema).optional(),
+  supports: z.record(z.string(), StepTextSchema.nullable()).optional(),
   examples: z.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 

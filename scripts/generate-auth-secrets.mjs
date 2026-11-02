@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { createPassphraseHash } from '../netlify/functions/_shared/auth-security.mjs';
+import { createPassphraseHash, SCRYPT_COST } from '../netlify/functions/_shared/auth-security.mjs';
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main();
@@ -25,7 +25,8 @@ async function main() {
   } else {
     const passphraseBuffer = Buffer.from(first, 'utf8');
     try {
-      const passphraseHash = await createPassphraseHash(passphraseBuffer);
+      // scrypt N = 2^17 (SCRYPT_COST). Older N = 2^14 hashes still verify.
+      const passphraseHash = await createPassphraseHash(passphraseBuffer, { cost: SCRYPT_COST });
       const sessionSecret = randomBytes(32).toString('base64url');
       console.log(`LIFE_HUB_PASSPHRASE_HASH=${passphraseHash}`);
       console.log(`SESSION_SECRET=${sessionSecret}`);

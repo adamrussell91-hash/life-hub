@@ -136,3 +136,16 @@ test('POST /api/shortcuts runs a promoted draft into a Confirm proposal', async 
   assert.match(payload.data.proposal.intent, /morning/i);
   assert.equal(payload.data.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
 });
+
+test('POST /api/shortcuts refuses an agent_slug that is not a known agent name', async () => {
+  const handler = createShortcutsHandler({
+    env: validEnv,
+    fetchImpl: githubFetch(),
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  for (const agent_slug of ['../registry', '../../package', 'Brisket', 'brisket.json', 'nobody-here']) {
+    const response = await handler(request('POST', { proposed_id: 'track.morning-weigh-in', agent_slug }));
+    assert.equal(response.status, 400, agent_slug);
+    assert.equal((await response.json()).error.code, 'invalid_input', agent_slug);
+  }
+});

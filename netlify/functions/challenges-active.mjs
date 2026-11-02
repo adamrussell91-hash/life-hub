@@ -51,7 +51,7 @@ export function createChallengesActiveHandler({
 
     let session;
     try {
-      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), Date.now());
+      session = await verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), Date.now());
     } catch {
       return withCors(misconfiguredResponse(), request, env);
     }

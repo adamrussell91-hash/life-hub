@@ -3,6 +3,7 @@
  * The same forest as the Grove page, opened on the current week, with that week's animals out.
  * Home frames it in a link to the full forest, so this page takes no input.
  */
+import '../../../../packages/zod-jitless.js';
 import '../../design-kit/tokens.css';
 import './embed.css';
 import { toHubDateKey } from '@/domain/queries';

@@ -34,6 +34,28 @@ export function buildMediaUsage({ media = [], lessons = [], units = [], classes 
     if (!row[field].includes(ownerId)) row[field].push(ownerId);
   };
 
+  const scan = createMediaScanner(idByUrl);
+
+  const owners = [
+    [lessons, 'lesson_ids'],
+    [units, 'unit_ids'],
+    [classes, 'class_ids']
+  ];
+  for (const [rows, field] of owners) {
+    for (const row of rows) {
+      if (!row?.id || isDeletedRecord(row)) continue;
+      scan(row, mediaId => record(mediaId, field, row.id));
+    }
+  }
+  return usage;
+}
+
+/**
+ * A scanner that calls `hit(mediaId)` for every media reference inside a record:
+ * a `media_id` field, a `/api/media/:id/file` link, or (with `idByUrl`) a known
+ * preview / download URL.
+ */
+export function createMediaScanner(idByUrl = new Map()) {
   const matchString = (value, hit) => {
     const trimmed = value.trim();
     const exact = idByUrl.get(trimmed);
@@ -65,17 +87,19 @@ export function buildMediaUsage({ media = [], lessons = [], units = [], classes 
       scan(child, hit, depth + 1);
     }
   };
+  return scan;
+}
 
-  const owners = [
-    [lessons, 'lesson_ids'],
-    [units, 'unit_ids'],
-    [classes, 'class_ids']
-  ];
-  for (const [rows, field] of owners) {
-    for (const row of rows) {
-      if (!row?.id || isDeletedRecord(row)) continue;
-      scan(row, mediaId => record(mediaId, field, row.id));
-    }
+/**
+ * Every media id the given records reference (by media_id or file route).
+ * Deleted records are skipped. Used by the public media route.
+ */
+export function referencedMediaIds(rows = []) {
+  const ids = new Set();
+  const scan = createMediaScanner();
+  for (const row of rows) {
+    if (!row || isDeletedRecord(row)) continue;
+    scan(row, id => ids.add(id));
   }
-  return usage;
+  return ids;
 }

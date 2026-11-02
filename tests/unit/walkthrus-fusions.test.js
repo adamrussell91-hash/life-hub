@@ -58,7 +58,7 @@ test('drawings keep only safe SVG', () => {
   const ok = normalizeFusions([fusion({ drawing: { status: 'drawn', scene: SCENE_EXAMPLES[A], svg, note: 'more room', at: '2026-10-31T02:00:00.000Z' } })])[0];
   assert.equal(ok.drawing.status, 'drawn');
   assert.equal(ok.drawing.svg, svg);
-  for (const bad of ['<svg><script>x</script></svg>', '<svg onload="x()"></svg>', '<svg><a href="https://x.test">x</a></svg>', '<svg><image href="x.png"/></svg>', '<div></div>', `<svg>${'x'.repeat(41000)}</svg>`]) {
+  for (const bad of ['<svg><script>x</script></svg>', '<svg onload="x()"></svg>', '<svg><a href="https://x.test">x</a></svg>', '<svg><image href="x.png"/></svg>', '<svg><circle/onclick="x()"/></svg>', '<svg><g\'onmouseover=x()></g></svg>', '<svg><desc><img/src/onerror=x()></desc></svg>', '<div></div>', `<svg>${'x'.repeat(41000)}</svg>`]) {
     assert.equal(isSafeSvg(bad), false, bad.slice(0, 30));
     assert.equal(normalizeFusions([fusion({ drawing: { status: 'drawn', svg: bad } })])[0].drawing.status, 'none');
   }

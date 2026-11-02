@@ -65,7 +65,7 @@ export const KindsJobSchema = z.object({
   total: z.number().optional(),
   finished: z.number().optional(),
   applied: z.number().optional(),
-  byKind: z.record(z.number()).optional(),
+  byKind: z.record(z.string(), z.number()).optional(),
   guessed: z.number().optional(),
   downgraded: z.number().optional(),
   unreadable: z.number().optional(),

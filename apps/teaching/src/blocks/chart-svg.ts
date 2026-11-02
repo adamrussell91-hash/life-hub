@@ -49,8 +49,9 @@ function formatTick(value: number, step: number): string {
 }
 
 function seriesFill(series: { color?: ChartSeriesColor }, index: number): string {
-  const token =
-    series.color ?? CHART_SERIES_COLOR_OPTIONS[index % CHART_SERIES_COLOR_OPTIONS.length]!.id;
+  // `color` is stored block content and lands in an SVG attribute: only a known token is used.
+  const known = CHART_SERIES_COLOR_OPTIONS.find((option) => option.id === series.color);
+  const token = known?.id ?? CHART_SERIES_COLOR_OPTIONS[index % CHART_SERIES_COLOR_OPTIONS.length]!.id;
   return `var(--${token})`;
 }
 

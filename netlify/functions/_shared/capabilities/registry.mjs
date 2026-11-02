@@ -106,7 +106,16 @@ export function loadCapability(id) {
   return def;
 }
 
+const AGENT_SLUG_RE = /^[a-z0-9-]+$/;
+
+/** True for a slug that can name an allowlist file: lower-case letters, digits, hyphens. */
+export function isSafeAgentSlug(slug) {
+  return typeof slug === 'string' && slug.length > 0 && slug.length <= 64 && AGENT_SLUG_RE.test(slug);
+}
+
 export function loadAllowlist(slug) {
+  // The slug becomes a file name; anything else (../, /, .) never reaches the filesystem.
+  if (!isSafeAgentSlug(slug)) return null;
   if (cachedAllowlists.has(slug)) return cachedAllowlists.get(slug);
   const path = join(CAPABILITIES_ROOT, 'allowlists', `${slug}.json`);
   if (!existsSync(path)) {
@@ -207,11 +216,15 @@ export function matchGlob(pattern, path) {
     return path === prefix || path.startsWith(`${prefix}/`);
   }
   if (pattern.includes('*')) {
+    // Only `*` (one segment) and `**` (any depth) are wildcards; every other
+    // character, `?` included, matches itself.
     const escaped = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*\*/g, '<<<DS>>>')
-      .replace(/\*/g, '[^/]*')
-      .replace(/<<<DS>>>/g, '.*');
+      .split('**')
+      .map(part => part
+        .split('*')
+        .map(literal => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*'))
+      .join('.*');
     return new RegExp(`^${escaped}$`).test(path);
   }
   return false;

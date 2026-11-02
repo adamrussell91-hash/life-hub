@@ -12,3 +12,12 @@ globalThis.fetch = async function testFetch(input, init) {
   }
   return nativeFetch(input, init);
 };
+
+// netlify/functions/_shared/safe-fetch.mjs resolves names and opens its own
+// pinned sockets in production. Under test it uses these instead: every name
+// resolves to one fixed public address (no real DNS), and requests go through
+// the guarded fetch above, so an un-mocked outbound call still fails loudly.
+// Tests that exercise the address checks pass their own lookupImpl.
+globalThis[Symbol.for("life-hub.test-network")] = {
+  lookup: async () => [{ address: "93.184.215.14", family: 4 }],
+};
