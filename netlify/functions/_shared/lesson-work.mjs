@@ -24,12 +24,14 @@ import { cleanStepPick } from './next-steps.mjs';
 
 export const WORK_LIMITS = { blocks: 60, parts: 6, steps: 60, fields: 60, field: 80, text: 4000 };
 const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
-const STEP_PART = /^step\.(\d{1,3})$/;
+export const STEP_PART = /^step\.(\d{1,3})$/;
 const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 const workPrefix = (lesson) => `work/${lesson}/`;
 const workKey = (lesson, owner) => `work/${lesson}/${owner}`;
 export const handinKey = (lesson, block, student) => `work_handins/${lesson}/${block}/${student}`;
+export const draftKey = (lesson, block, student, n) => `work_drafts/${lesson}/${block}/${student}/${n}`;
+export const redraftKey = (lesson, block, student) => `work_redraft/${lesson}/${block}/${student}`;
 export const pieceId = (lesson, block) => `w:${lesson}:${block}`;
 export const workOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
 
@@ -108,6 +110,17 @@ function cleanStepFields(block, index, fields, answers) {
   return { pick: JSON.stringify(pick) };
 }
 
+/** Marked blocks with a redraft out: 'asked' while the student rewrites, 'with_teacher' once it's sent. */
+async function redraftStates(store, classId, studentId, lessonId, marked) {
+  const states = {};
+  for (const id of marked) {
+    const row = await read(store, `piece_feedback/${classId}/${studentId}/${pieceId(lessonId, id)}`);
+    if (row?.redraft) states[id] = 'asked';
+    else if (row?.draft > 1 && row.status !== 'returned') states[id] = 'with_teacher';
+  }
+  return states;
+}
+
 export async function workAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
@@ -129,12 +142,16 @@ export async function workAction(store, lessonId, body) {
   }
   const identity = { need: null, initials: student.initials };
   const marked = await handinBlocks(store, roster.cls.id, lessonId);
-  if (action === 'status' || action === 'claim') return { ...identity, ...(marked.length ? { handin_blocks: marked } : {}) };
+  if (action === 'status' || action === 'claim') {
+    const redrafts = marked.length ? await redraftStates(store, roster.cls.id, student.id, lessonId, marked) : {};
+    return { ...identity, ...(marked.length ? { handin_blocks: marked } : {}), ...(Object.keys(redrafts).length ? { redrafts } : {}) };
+  }
 
   if (action === 'handin') {
     if (typeof body.block_id !== 'string' || !marked.includes(body.block_id)) reject(400, 'not_marked', 'This part of the lesson isn’t set to be handed in.');
     const feedback = await read(store, `piece_feedback/${roster.cls.id}/${student.id}/${pieceId(lessonId, body.block_id)}`);
     if (feedback?.status === 'returned') reject(409, 'returned', 'This has already been returned. Ask your teacher to take it back first.');
+    if (feedback?.draft > 1) reject(409, 'with_teacher', 'Your redraft is with your teacher.');
     const kept = await read(store, workKey(lessonId, workOwner(roster.cls.id, student.id)));
     const text = kept?.blocks?.[body.block_id];
     if (!text || !Object.keys(text).length) reject(400, 'empty', 'Write something before you hand it in.');
@@ -170,7 +187,7 @@ export async function workAction(store, lessonId, body) {
 }
 
 /** What the teacher needs to read a block's fields: its title, and question prompts by id. */
-function blockLabels(block) {
+export function blockLabels(block) {
   const c = block.content ?? {};
   const title = typeof c.title === 'string' && c.title.trim() ? c.title.trim() : '';
   const prompts = {};

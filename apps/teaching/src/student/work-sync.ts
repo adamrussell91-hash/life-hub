@@ -1,6 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { setActivityListener, storageKey } from '@/blocks/learning-activity';
 import { button, deviceToken, el, errorText, labelled } from '@/quiz/dom';
+import { studentAnchor } from '@/student/shell';
 import './work-sync.css';
 
 /**
@@ -16,7 +17,7 @@ import './work-sync.css';
  * the lesson's player (sprint, case study, tutorial, lecture) asks itself.
  */
 
-type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string };
+type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string; redrafts?: Record<string, 'asked' | 'with_teacher'> };
 export type WorkCall = (action: 'status' | 'claim' | 'save' | 'handin', extra?: Record<string, unknown>) => Promise<Reply>;
 export type WorkSyncOptions = { lessonId: string; classId: string; /** Replaces the network in tests. */ call?: WorkCall; delayMs?: number; retryMs?: number };
 export type WorkSyncHandle = {
@@ -115,10 +116,13 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
 
   /** Blocks the class's Markbook marks, as the server last said. */
   let marked: string[] = [];
+  /** Marked blocks with a redraft out. They're rewritten on the progress page, so nothing hands in from here. */
+  let redrafts: NonNullable<Reply['redrafts']> = {};
 
   /** A Hand in bar under each block the class's Markbook marks. */
-  function showHandIn(blockIds: string[] | undefined): void {
+  function showHandIn(blockIds: string[] | undefined, states?: Reply['redrafts']): void {
     marked = blockIds ?? [];
+    redrafts = states ?? {};
     for (const id of blockIds ?? []) {
       const block = [...host.querySelectorAll<HTMLElement>('[data-block-id]')].find((b) => b.dataset.blockId === id);
       if (!block || block.querySelector(':scope > .ws-handin')) continue;
@@ -127,6 +131,13 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   }
 
   function handInBar(blockId: string): HTMLElement {
+    if (redrafts[blockId]) {
+      const handin = el('div', 'ws-handin');
+      const note = el('p', 'ws-handin__note', redrafts[blockId] === 'asked' ? 'Your teacher asked for a redraft. ' : 'Your redraft is with your teacher.');
+      if (redrafts[blockId] === 'asked') note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work'));
+      handin.append(note);
+      return handin;
+    }
     const handin = el('div', 'ws-handin');
     const note = el('p', 'ws-handin__note', 'Your teacher marks this one. Hand it in when it’s ready.');
     note.setAttribute('role', 'status');
@@ -177,7 +188,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
         (reply) => {
           state = 'ready';
           bar.hidden = true;
-          showHandIn(reply.handin_blocks);
+          showHandIn(reply.handin_blocks, reply.redrafts);
           for (const [key, value] of heldParts(lessonId)) queue(key, value);
           void flush();
         },
@@ -208,7 +219,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       } else {
         state = 'ready';
         bar.hidden = true;
-        showHandIn(reply.handin_blocks);
+        showHandIn(reply.handin_blocks, reply.redrafts);
       }
     } catch (error) {
       // A lesson or class the server doesn't know can't take work; a dropped connection tries again later.
@@ -286,7 +297,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     flush,
     progress() {
       const counts = writtenByBlock();
-      return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => (counts.get(id) ?? 0) > 0).length };
+      return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => !redrafts[id] && (counts.get(id) ?? 0) > 0).length };
     },
     async handInAll() {
       // Initials may have just been claimed by the footer or the quiz: look again before giving up.
@@ -296,7 +307,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       if (pending.size) return false;
       const counts = writtenByBlock();
       let ok = true;
-      for (const id of marked) {
+      for (const id of marked.filter((m) => !redrafts[m])) {
         if (!(counts.get(id) ?? 0)) continue;
         try {
           await call('handin', { block_id: id });

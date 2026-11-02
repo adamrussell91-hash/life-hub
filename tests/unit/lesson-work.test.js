@@ -169,3 +169,17 @@ test('hand in is refused for a block this class does not mark', async () => {
   await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
   await assert.rejects(workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' }), /isn’t set to be handed in/);
 });
+
+test('hand in is refused while a redraft is out, and status says why', async () => {
+  const { store, bob } = await setup();
+  linkColumn(store);
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await save(store, { block_id: 'qset1', part: 'answers', fields: { q1: 'First go.' } });
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' });
+  const key = `piece_feedback/class1/${bob.id}/w:lesson1:qset1`;
+  store.data.set(key, { status: 'draft', draft: 2 });
+  await assert.rejects(workAction(store, 'lesson1', { ...bobDevice, action: 'handin', block_id: 'qset1' }), /with your teacher/);
+  assert.deepEqual((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).redrafts, { qset1: 'with_teacher' });
+  store.data.set(key, { status: 'returned', redraft: { scope: 'whole' } });
+  assert.deepEqual((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).redrafts, { qset1: 'asked' });
+});

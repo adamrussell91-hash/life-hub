@@ -11,8 +11,8 @@ import { markId } from '@/sprint/marking';
 import { openMarkPiece, type MarkPieceActions, type MarkPieceData } from './mark-piece';
 import { loadRubricSetup } from './rubric-setup';
 import { runAiRead, type AiReadTarget } from './ai-read';
-import { FLOW_LABEL, aiReadCount, flowItems, isStacked, type FlowItem, type FlowKind, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
-import { loadQueue, type ToMarkTask } from './to-mark-view';
+import { FLOW_LABEL, aiReadCount, flowItems, flowLabel, isStacked, type FlowItem, type FlowKind, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
+import { ageText, loadQueue, type ToMarkTask } from './to-mark-view';
 import './marking.css';
 
 /**
@@ -73,10 +73,10 @@ async function pieceCard(item: FlowItem): Promise<Card> {
   const rubric = where ? await loadRubricSetup({ lessonId: where.lesson_id, blockId: where.block_id, who: { classId: task.class_id, studentId: row!.student_id! } }) : null;
   const view = openMarkPiece({ ...data, position: { index: 0, total: 1 } }, {
     save: (body) => call({ action: 'save', ...body }),
-    returnIt: () => call({ action: 'return' }),
+    returnIt: (ask) => call({ action: 'return', ...ask }),
     takeBack: () => call({ action: 'take_back' }),
     move: () => undefined
-  }, { embedded: true, rubric });
+  }, { embedded: true, rubric, redraft: true });
   return { el: view.el, leave: () => void view.save(), finish: () => view.finish() };
 }
 
@@ -528,12 +528,15 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
         const isDone = done.has(i.key);
         const b = el('button', `tf-item${i === current() ? ' is-on' : ''}${isDone ? ' is-done' : ''}`);
         b.type = 'button';
-        b.append(el('span', 'tf-who', isDone ? '✓' : i.who), el('span', `tm-kind tm-kind--${i.task.kind ?? 'piece'}`, FLOW_LABEL[i.kind]));
+        b.append(el('span', 'tf-who', isDone ? '✓' : i.who), el('span', `tm-kind tm-kind--${i.task.kind ?? 'piece'}`, flowLabel(i)));
         if (!isDone && (i.row?.ai_read || i.answer?.ai || i.question?.answers.some((a) => a.ai))) b.append(el('span', 'tf-item__ai', 'AI read'));
         b.addEventListener('click', () => goTo(items.indexOf(i)));
         g.append(b);
       }
       queue.append(g);
+    }
+    for (const t of data.tasks) {
+      if (t.asked?.length) queue.append(el('p', 'tf-note', `${t.title}: redraft asked, still with ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
     }
   }
 
@@ -552,7 +555,7 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
     go.hidden = done.has(item.key);
     go.replaceChildren(document.createTextNode(item.kind === 'quiz' && item.question && isStacked(item.question.kind) ? 'Save marks and next' : `${VERB[item.kind]} and next`), el('kbd', undefined, '⌘↵'));
     const headLine = el('div', 'tf-work__head');
-    headLine.append(el('span', `tm-kind tm-kind--${item.task.kind ?? 'piece'}`, FLOW_LABEL[item.kind]));
+    headLine.append(el('span', `tm-kind tm-kind--${item.task.kind ?? 'piece'}`, flowLabel(item, true)));
     headLine.append(el('h2', 'tf-work__who', item.question && isStacked(item.question.kind) ? item.task.title : item.who));
     headLine.append(el('span', 'tf-crumb', `${item.task.class_title} · ${item.group}`));
     work.append(headLine);

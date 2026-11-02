@@ -7,8 +7,8 @@ import { readBook } from './markbook.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { read, reject } from './question-drop.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
-import { piecePrefix, pieceKey } from './piece-feedback.mjs';
-import { handinKey, writingParts } from './lesson-work.mjs';
+import { piecePrefix, pieceKey, readDrafts, unionTags } from './piece-feedback.mjs';
+import { draftKey, handinKey, writingParts } from './lesson-work.mjs';
 import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload } from './teaching-feedback.mjs';
 import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
@@ -49,21 +49,38 @@ const vivaTags = (takes) => takes.flatMap((r) => (r.tags ?? []).filter((t) => t.
 /** The rungs on returned viva takes: a later take on a skill replaces an earlier one. */
 const vivaPlaces = (takes) => Object.assign({}, ...[...takes].sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at))).map((t) => rubricPlaces(t.rubric)));
 
+/**
+ * The returned state of a piece as its student sees it. A redraft with the
+ * teacher shows the last draft that came back, with that draft's placements,
+ * not the ones being marked now. A piece never returned shows nothing.
+ */
+async function shownRow(store, row, studentId) {
+  if (row?.status === 'returned') return row;
+  if (!(row?.draft > 1)) return null;
+  const last = await read(store, draftKey(row.lesson_id, row.block_id, studentId, row.draft - 1));
+  if (!last) return null;
+  return { ...row, tags: last.tags ?? [], comment: last.comment ?? '', rubric: last.rubric ?? undefined, shown_steps: last.steps ?? {}, returned_at: last.returned_at, seen_at: last.seen_at ?? last.returned_at, text: writingParts(last.text), sent: true };
+}
+
+/** The Markbook mark as the shown row should read it. */
+const shownMark = (mark, row) => (row.sent ? { ...mark, steps: row.shown_steps } : mark);
+
 /** Every returned piece for one student, oldest first. */
 export async function studentPieces(store, classId, studentId) {
   const { book } = await readBook(store, classId);
   const columns = new Map(book.columns.map((c) => [c.id, c]));
   const pieces = [];
   const keys = await listBlobKeys(store, piecePrefix(classId, studentId));
-  for (const [key, row] of await mapBounded(keys, 8, async (k) => [k, await read(store, k)])) {
-    if (row?.status !== 'returned') continue;
+  for (const [key, stored] of await mapBounded(keys, 8, async (k) => [k, await read(store, k)])) {
+    const row = await shownRow(store, stored, studentId);
+    if (!row) continue;
     const id = key.slice(piecePrefix(classId, studentId).length);
     const column = columns.get(row.column_id);
     const takes = row.kind === 'viva' ? await vivaTakes(store, row.lesson_id, studentId) : [];
-    const tags = row.kind === 'viva' ? vivaTags(takes) : (row.tags ?? []).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) }));
+    const tags = row.kind === 'viva' ? vivaTags(takes) : unionTags(stored);
     // A rung tapped on a rubric says where the student sits on that skill.
-    const places = { ...(column ? placesFor(column, book.marks?.[column.id]?.[studentId]) : {}), ...rubricPlaces(row.rubric), ...vivaPlaces(takes) };
-    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '' });
+    const places = { ...(column ? placesFor(column, shownMark(book.marks?.[column.id]?.[studentId], row)) : {}), ...rubricPlaces(row.rubric), ...vivaPlaces(takes) };
+    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '', redraft: stored.redraft ? 'asked' : row.sent ? 'sent' : null });
   }
   for (const column of book.columns.filter((c) => c.kind === 'assessment' && !c.piece)) {
     const mark = book.marks?.[column.id]?.[studentId];
@@ -165,7 +182,7 @@ export async function stepsFor(store, classId, studentId) {
 
 export async function returnedFor(store, roster, student) {
   const pieces = await studentPieces(store, roster.cls.id, student.id);
-  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))] } }));
+  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))], ...(p.redraft ? { redraft: p.redraft } : {}) } }));
   for (const doc of await studentNotes(store, roster.cls.id, student.id)) {
     rows.push({ at: doc.returned_at, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), new: !doc.seen_at, codes: [] } });
   }
@@ -185,13 +202,14 @@ export async function pieceFor(store, roster, student, item) {
     const doc = await ownNote(store, roster, student, item);
     return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: doc.audio_key ? audioPath(doc.audio_key) : null, audio_deleted: Boolean(doc.audio_deleted_at), ...toPublishedFeedbackPayload(doc, null) };
   }
-  const row = await read(store, pieceKey(roster.cls.id, student.id, item));
-  if (row?.status !== 'returned') reject(404, 'not_found', 'That piece isn’t back yet.');
+  const stored = await read(store, pieceKey(roster.cls.id, student.id, item));
+  const row = await shownRow(store, stored, student.id);
+  if (!row) reject(404, 'not_found', 'That piece isn’t back yet.');
   const library = await readFeedbackCodes(store);
   const codes = new Map(library.map((c) => [c.id, c]));
   const { book } = await readBook(store, roster.cls.id);
   const column = book.columns.find((c) => c.id === row.column_id);
-  const mark = column ? book.marks?.[column.id]?.[student.id] : null;
+  const mark = column ? shownMark(book.marks?.[column.id]?.[student.id], row) : null;
   const history = await studentPieces(store, roster.cls.id, student.id);
   const earlier = history.filter((p) => p.at < row.returned_at && p.kind === row.kind).at(-1);
   const handin = row.kind === 'written' ? await read(store, handinKey(row.lesson_id, row.block_id, student.id)) : null;
@@ -200,19 +218,26 @@ export async function pieceFor(store, roster, student, item) {
   const takes = row.kind === 'viva' ? await vivaTakes(store, row.lesson_id, student.id) : [];
   takes.sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at)));
   const tags = (row.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) }));
+  const shownDraft = row.sent ? stored.draft - 1 : stored?.draft ?? 1;
+  const drafts = shownDraft > 1 ? await readDrafts(store, row.lesson_id, row.block_id, student.id, shownDraft) : [];
   const used = new Set([...tags, ...takes.flatMap((t) => t.tags ?? [])].map((t) => t.code_id));
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
     text: row.text ?? (handin?.text ? writingParts(handin.text) : null),
     tags,
+    draft: shownDraft,
+    drafts: drafts.map((d) => ({ n: d.n, text: d.text, comment: d.comment ?? '', date: day(d.returned_at), tags: (d.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) })) })),
+    ...(row.sent ? { sent: true } : {}),
+    ...(stored?.redraft ? { redraft: { scope: stored.redraft.scope } } : {}),
     ...(row.rubric ? { rubric: await rubricForStudent(store, row.rubric, row.lesson_id) } : {}),
     ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
     codes: library.filter((c) => used.has(c.id)),
     rungs: rungsFrom(history),
     criteria: (column?.criteria ?? []).map((c) => {
-      const step = placesFor({ criteria: [c] }, mark)[c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`] ?? null;
-      const prevKey = c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`;
-      return { label: c.label, step, was: earlier?.places?.[prevKey] ?? null };
+      const placeKey = c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`;
+      const step = placesFor({ criteria: [c] }, mark)[placeKey] ?? null;
+      const first = stored?.first ? placesFor({ criteria: [c] }, { steps: stored.first.steps })[placeKey] ?? null : null;
+      return { label: c.label, step, was: earlier?.places?.[placeKey] ?? null, ...(first ? { first } : {}) };
     })
   };
 }
@@ -225,7 +250,10 @@ export async function markSeen(store, roster, student, item) {
   }
   const key = pieceKey(roster.cls.id, student.id, item);
   const row = await read(store, key);
-  if (row?.status !== 'returned') reject(404, 'not_found', 'That piece isn’t back yet.');
+  if (row?.status !== 'returned') {
+    if (row?.draft > 1) return { ok: true };
+    reject(404, 'not_found', 'That piece isn’t back yet.');
+  }
   if (!row.seen_at) await store.setJSON(key, { ...row, seen_at: new Date().toISOString() });
   return { ok: true };
 }

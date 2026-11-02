@@ -26,7 +26,7 @@ export type QuizAnswer = {
 export type QuizQuestion = { id: string; kind: string; marks: number; prompt: string; quote?: string; guide?: string; model_answer?: string; answers: QuizAnswer[] };
 export type QuizLoad = { lesson_id: string; title: string; questions: QuizQuestion[] };
 
-export type FlowRow = { student_id?: string; initials: string; id?: string; ai_read?: boolean; has_transcript?: boolean; source?: 'lecture' | 'tutorial'; text?: string; scene_label?: string };
+export type FlowRow = { student_id?: string; initials: string; id?: string; ai_read?: boolean; has_transcript?: boolean; source?: 'lecture' | 'tutorial'; text?: string; scene_label?: string; draft?: number; sent_scope?: unknown };
 
 export type FlowItem = {
   key: string;
@@ -58,6 +58,13 @@ function quizItems(task: ToMarkTask, load: QuizLoad | undefined): FlowItem[] {
     }
   }
   return out;
+}
+
+/** The queue's label for a piece: a redraft says so, and how much of it to look at. */
+export function flowLabel(item: Pick<FlowItem, 'kind' | 'row'>, full = false): string {
+  const draft = item.row?.draft ?? 1;
+  if (draft < 2) return FLOW_LABEL[item.kind];
+  return full ? `Redraft ${draft}, ${item.row?.sent_scope === 'whole' ? 'whole piece' : 'one section'}` : `Redraft ${draft}`;
 }
 
 export function flowItems(tasks: readonly ToMarkTask[], quizzes: ReadonlyMap<string, QuizLoad>): FlowItem[] {
