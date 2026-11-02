@@ -13,8 +13,19 @@ export interface GuidePanelOptions {
   onSave: (run: GuideRun) => Promise<void>;
   /** Editing a saved run opens straight on the mix. */
   edit?: { guide: GuideDefinition; run: GuideRun };
+  /** Step-by-step guides with their own panel (Check-in). Picking one hands over to that panel. */
+  protocols?: ShelfProtocol[];
   now?: () => string;
   newId?: () => string;
+}
+
+export interface ShelfProtocol {
+  id: string;
+  name: string;
+  line: string;
+  /** Static SVG markup (a constant, never user text). */
+  emblem: string;
+  start: () => void;
 }
 
 const TAP_LABELS = ['Not at all', 'A bit', 'Quite a lot', 'Very much'];
@@ -125,6 +136,25 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
         } else {
           pickWho();
         }
+      });
+      body.append(card);
+    }
+    for (const p of options.protocols ?? []) {
+      const card = button('', 'guide-shelf-card');
+      card.dataset.guide = p.id;
+      card.disabled = !options.about.length;
+      const emblem = el('span', 'guide-emblem');
+      emblem.innerHTML = p.emblem; // a constant, never user text
+      const words = el('div');
+      words.append(el('b', undefined, p.name), el('span', undefined, p.line));
+      card.append(emblem, words);
+      card.addEventListener('click', () => {
+        // Hand over without moving focus back to the opener in between.
+        closed = true;
+        panel.remove();
+        doc.removeEventListener('keydown', onKey);
+        doc.defaultView?.removeEventListener('hashchange', close);
+        p.start();
       });
       body.append(card);
     }

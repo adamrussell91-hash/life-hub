@@ -71,6 +71,8 @@ import { renderPersonTimeline } from '@/components/person-timeline';
 import { listMeetings } from '@/api/meetings';
 import { placeRuns, runsFor, type PlacedRun } from '@/guides/runs';
 import { guideTimelinePoints, renderMotivationStrip } from '@/components/motivation-strip';
+import { listPersonCheckIns } from '@/guides/check-in/api';
+import { checkInTimelinePoints } from '@/guides/check-in/model';
 import { metLineFrom, renderPersonHeader } from '@/components/person-header';
 import { fetchObservations } from '@/api/observations';
 import { renderRolesEditor } from '@/components/person-roles-editor';
@@ -858,6 +860,7 @@ export async function renderPeoplePage(
       let ledgerRes: LedgerResponse | null = null;
       let rememberRes: {facts:RememberFact[];count:number} = {facts:[],count:0};
       let allPlaced: PlacedRun[] = [];
+      let checkInPoints: ReturnType<typeof checkInTimelinePoints> = [];
       const ready = new Set<string>();
       function paint(changed: string): void {
         if (!current()) return;
@@ -1109,7 +1112,7 @@ export async function renderPeoplePage(
         if (timelineHost && (changed === 'overview' || changed === 'guides') && ready.has('overview')) {
           renderPersonTimeline(
             timelineHost,
-            buildPersonTimeline(rolesFromOverview(overview), [...model.arcPoints, ...guideTimelinePoints(mine)]),
+            buildPersonTimeline(rolesFromOverview(overview), [...model.arcPoints, ...guideTimelinePoints(mine), ...checkInPoints]),
             (orgRef, orgName) => crestFor(orgRef, orgName)
           );
         }
@@ -1164,6 +1167,8 @@ export async function renderPeoplePage(
         ledgerRead.then(value => { ledgerRes = value; paint('ledger'); }),
         rememberRead.then(value => { rememberRes = value; paint('remember'); }),
         guidesRead.then(value => { allPlaced = value; paint('guides'); }),
+        // Who and when only: a marker that points at the meeting, nothing from inside the check-in.
+        listPersonCheckIns(ref, personModels.get(id)?.displayName ?? '').then(list => { checkInPoints = checkInTimelinePoints(list); paint('guides'); }).catch(() => undefined),
         ledgerRead.then(async () => {
           if (!current()) return;
           await reloadToday(current);
