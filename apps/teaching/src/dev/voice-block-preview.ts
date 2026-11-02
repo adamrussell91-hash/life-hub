@@ -50,17 +50,32 @@ if (new URLSearchParams(location.search).has('seed')) {
     id: 'vs_demo', initials: 'JS', device_hash: 'a1b2c3', submitted_at: now.toISOString(),
     audio_delete_after: new Date(now.getTime() + 28 * 86400_000).toISOString(), duration_s: 120, status: 'new',
     transcript_status: 'done', points: [], prompt: 'How does the composer represent isolation?', tags: [], comment: '', audio_url: '', audio_deleted: false,
+    classes: [{ id: 'class_demo', title: '12ENX', students: [{ id: 'st_js', initials: 'JS', name: 'Jo Sample' }, { id: 'st_rk', initials: 'RK', name: 'Riley Kent' }] }],
+    class_id: 'class_demo', student_id: 'st_js',
     transcript: { text: long, segments: [{ text: long, start: 0, end: 120, words: words.map((word, i) => ({ word, start: (i * 120) / words.length, end: ((i + 0.8) * 120) / words.length })) }] }
   };
 }
 
 let lastBlob: Blob | null = null;
+const deep: { steps: Record<string, Record<string, { step: string; at: string }>>; writing: Record<string, Record<string, { used: string[]; missed: string[]; at: string }>> } = {
+  steps: { st_js: { du_demo01: { step: '2b', at: '2026-10-30' } } },
+  writing: {}
+};
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
   const path = url.pathname;
   const method = (init?.method ?? 'GET').toUpperCase();
   if (path === '/api/feedback-codes') return ok({ codes });
+  // Deep understanding progress for the marking panel: Jo has passed 2B, so Step 3 is next.
+  if (path === '/api/lessons/lesson_demo') return ok({ id: 'lesson_demo', unit_id: 'unit_demo' });
+  if (path === '/api/units/unit_demo') return ok({ id: 'unit_demo', deep_understandings: [{ id: 'du_demo01', claim: 'Form acts out identity', pieces: [{ id: 'kp_demo01', text: 'Form can act out the experience', tier: 'essential' }, { id: 'kp_demo02', text: 'A haibun joins prose to a haiku', tier: 'essential' }] }] });
+  if (path === '/api/classes/class_demo/deep') {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    if (body.action === 'set_step') deep.steps[body.student_id] = body.step ? { [body.du_id]: { step: body.step, at: '2026-11-02' } } : {};
+    if (body.action === 'set_writing') deep.writing[body.block_id] = { ...(deep.writing[body.block_id] ?? {}), [body.student_id]: { used: body.used, missed: body.missed, at: '2026-11-02' } };
+    return ok(deep);
+  }
   if (path.endsWith('/part')) {
     lastBlob = (init?.body as FormData).get('file') as Blob;
     return ok({ index: 0 });
@@ -139,6 +154,7 @@ const block = BlockSchema.parse({
   },
   settings: {
     deep_step: { du: 'du_demo01', step: '3' },
+    deep_targets: ['kp_demo01', 'kp_demo02'],
     deep_checks: ['Names two texts by title', 'Names the move both texts make', 'Says what each text does differently with it']
   },
   created_at: '2026-10-21T00:00:00.000Z',
