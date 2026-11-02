@@ -2494,8 +2494,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const record = body as Record<string, unknown>;
     const hasTimeline = record.timeline_items !== undefined;
     const hasOutcomes = record.outcome_ids !== undefined;
-    if (!hasTimeline && !hasOutcomes) {
-      return errorResponse(400, 'validation_error', 'Provide timeline_items and/or outcome_ids');
+    const hasClimb = record.outcome_climb !== undefined;
+    if (!hasTimeline && !hasOutcomes && !hasClimb) {
+      return errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids and/or outcome_climb');
     }
 
     const rawScope = store.getJSON(scopeSequenceKey(scopeId));
@@ -2578,6 +2579,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ...scopeParsed.data,
       timeline_items,
       ...(outcome_ids !== undefined ? { outcome_ids } : {}),
+      ...(hasClimb ? { outcome_climb: record.outcome_climb } : {}),
       updated_at: nowIso
     };
 
