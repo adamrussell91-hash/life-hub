@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check-in Guide</title>
+<style>
+  /* Check-in guide mockup. Same paper and ink as the Meeting Guides set; its own quiet pair:
+     sage for the steps, a soft dusk blue for the side cards. No red anywhere, on purpose.
+     All step wording here is placeholder; the real text loads from the private data repo. */
+  :root {
+    --paper: #f7f4ec; --card: #fffdf8; --ink: #1b2230; --muted: #6b7380; --line: rgba(27, 34, 48, 0.12);
+    --sage-1: #5f7f6e; --sage-2: #8fae9c; --sage-tint: #e6eee8;
+    --dusk-1: #4d6283; --dusk-tint: #e5e9f1;
+    --teal-3: #1f6f66; --teal-2: #3d9c8f; --clay-2: #e08a5c;
+    --font: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e6dd; font-family: var(--font); color: var(--ink); font-size: 15px; }
+  .sheet { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  .sheet > h1 { font-size: 22px; margin: 0 0 4px; }
+  .sheet > p { color: var(--muted); margin: 0 0 24px; max-width: 72ch; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 36px 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .row > div { max-width: 100%; min-width: 0; }
+  .frame { background: var(--paper); border-radius: 18px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 24px rgba(27,34,48,.08); overflow: hidden; position: relative; }
+  .frame--phone { width: 390px; max-width: 100%; min-height: 720px; display: flex; flex-direction: column; }
+  .cap { font-size: 13px; color: var(--muted); margin: 8px 4px 0; max-width: 390px; line-height: 1.45; }
+  .ph { background: #fff7d6; border-radius: 4px; padding: 0 3px; font-size: 11px; color: #7a6a1f; font-weight: 600; letter-spacing: .03em; }
+
+  .btn { font: inherit; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .btn--primary { background: var(--sage-1); color: #fff; border-color: var(--sage-1); font-weight: 600; }
+  .btn--quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-top: 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .chip { font-size: 13px; border-radius: 999px; padding: 4px 10px 4px 4px; background: var(--card); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+  .av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; background: #7a5cc0; }
+
+  /* Meeting page */
+  .meeting { display: grid; grid-template-columns: 1fr 420px; min-height: 640px; width: 1180px; max-width: 100%; }
+  .meeting__main { padding: 24px 28px; }
+  .crumbs { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .meeting h2 { font-size: 26px; margin: 6px 0 14px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; }
+  .strip .live { font-size: 13px; font-weight: 600; color: var(--teal-3); margin-right: auto; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal-2); }
+  .notes p { margin: 6px 0; color: #333a45; line-height: 1.5; }
+
+  .panel { background: var(--paper); border-left: 1px solid var(--line); padding: 18px 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .panel__head { display: flex; justify-content: space-between; align-items: center; }
+  .about { font-size: 13px; color: var(--muted); }
+  .shelf-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .shelf-card b { display: block; font-size: 15px; }
+  .shelf-card span { font-size: 13px; color: var(--muted); }
+  .emblem { width: 44px; height: 44px; flex: none; }
+
+  /* Protocol panel (phone frames) */
+  .top { display: flex; align-items: center; gap: 10px; padding: 16px 18px 0; }
+  .top .title { font-weight: 700; font-size: 15px; }
+  .top .who { font-size: 13px; color: var(--muted); }
+  .top .sp { margin-left: auto; display: flex; gap: 2px; }
+  .more { font: inherit; font-size: 18px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 8px; border-radius: 10px; letter-spacing: 1px; }
+  .more--open { background: var(--line); color: var(--ink); }
+  .dots { display: flex; gap: 6px; padding: 14px 18px 0; align-items: center; }
+  .dots button { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; display: inline-flex; gap: 5px; align-items: center; }
+  .dots button i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dots button.seen i { background: var(--sage-2); }
+  .dots button.now { border-color: var(--sage-1); color: var(--ink); font-weight: 600; background: var(--sage-tint); }
+  .dots button.now i { background: var(--sage-1); }
+  .body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .stepcard { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--sage-1); }
+  .ask { font-size: 19px; font-weight: 650; line-height: 1.3; margin: 8px 0 4px; }
+  .hint { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .sub { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+  .say { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .say li { font-size: 14px; background: var(--sage-tint); border-radius: 10px; padding: 8px 10px; line-height: 1.4; }
+  .listen li { font-style: italic; background: #f1efe8; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice { font: inherit; font-size: 14px; padding: 12px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); text-align: center; color: var(--ink); }
+  .choice--on { border-color: var(--sage-1); background: var(--sage-tint); font-weight: 650; }
+  .choice--dusk.choice--on { border-color: var(--dusk-1); background: var(--dusk-tint); }
+  .line { display: flex; gap: 8px; align-items: center; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: var(--muted); }
+  .line--filled { border-style: solid; color: var(--ink); }
+  .link { font-size: 13px; color: var(--dusk-1); font-weight: 600; background: none; border: none; padding: 0; font-family: inherit; text-align: left; }
+  .nav { display: flex; justify-content: space-between; margin-top: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tick { font: inherit; font-size: 13px; border-radius: 999px; padding: 6px 11px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .tick--on { background: var(--sage-tint); border-color: var(--sage-1); font-weight: 600; }
+  .tick--on::before { content: "✓ "; color: var(--sage-1); }
+
+  /* Side-card picker */
+  .pick { display: grid; gap: 8px; }
+  .pick button { font: inherit; font-size: 15px; text-align: left; border-radius: 14px; border: 1px solid var(--line); background: var(--card); padding: 12px 14px; color: var(--ink); display: flex; justify-content: space-between; align-items: center; }
+  .pick button span { font-size: 12px; color: var(--muted); }
+  .sidecard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--dusk-1); border-radius: 14px 18px 18px 14px; padding: 16px 18px; }
+  .sidecard .kicker { color: var(--dusk-1); }
+  .flag { font-size: 13px; background: var(--dusk-tint); border-radius: 10px; padding: 8px 10px; color: var(--dusk-1); font-weight: 600; margin-top: 12px; }
+
+  /* Quiet safety sheet */
+  .scrim { position: absolute; inset: 0; background: rgba(27,34,48,.18); }
+  .quiet { position: absolute; top: 52px; right: 14px; width: 260px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(27,34,48,.16); padding: 12px 14px; font-size: 13px; }
+  .quiet h5 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .quiet ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.4; color: #333a45; }
+  .quiet .ppl { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 4px; color: var(--muted); }
+  .quiet .ppl b { color: var(--ink); font-weight: 600; }
+
+  /* Handover */
+  .field { display: grid; gap: 4px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .field .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 14px; min-height: 38px; }
+  .lock { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--muted); background: #f1efe8; border-radius: 10px; padding: 8px 10px; line-height: 1.4; }
+
+  /* Saved, closed card */
+  .closed { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin-top: 10px; }
+  .closed b { display: block; font-size: 15px; }
+  .closed span { font-size: 13px; color: var(--muted); }
+  .closed .btn { margin-left: auto; }
+  .timeline { display: grid; gap: 8px; margin-top: 10px; }
+  .tl { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .tl i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
+  .tl span { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 720px) { .meeting { grid-template-columns: 1fr; } .panel { border-left: none; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Check-in guide · mockup</h1>
+  <p>A second guide on the Meeting Guides shelf, for when a wellbeing conversation comes up with a student. Invented student; every line of step wording here is <span class="ph">PLACEHOLDER</span> — the real text loads at runtime from the private data repo and is never stored on a record. Nothing on screen says “crisis”; there is no red.</p>
+
+  <!-- 1. Shelf -->
+  <div class="label">1 · The shelf, during a meeting (desktop)</div>
+  <div class="row"><div>
+    <div class="frame meeting">
+      <div class="meeting__main">
+        <div class="crumbs">Meetings · Student check-in</div>
+        <h2>Catch-up with Riley</h2>
+        <div class="strip">
+          <span class="live"><span class="dot"></span>Live · 12:40</span>
+          <button class="btn">✎ Read a photo</button>
+          <button class="btn">◐ Guides</button>
+          <button class="btn btn--quiet">End</button>
+        </div>
+        <div class="card"><h3>In the room</h3><span class="chip"><span class="av">RT</span>Riley T. · Year 9</span></div>
+        <div class="card notes"><h3>Notes</h3><p>Talked about the assessment timeline.</p><p>Said things have been hard lately.</p></div>
+      </div>
+      <aside class="panel">
+        <div class="panel__head"><b>Guides</b><button class="btn btn--quiet">✕</button></div>
+        <div class="about">About <b>Riley T.</b></div>
+        <div class="shelf-card">
+          <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#dcefeb"/><circle cx="13" cy="22" r="5" fill="none" stroke="#b4532a" stroke-width="2.5"/><line x1="18" y1="22" x2="26" y2="22" stroke="#1b2230" stroke-width="2"/><circle cx="31" cy="22" r="5" fill="#1f6f66"/></svg>
+          <div><b>Motivation</b><span>Why they do it, across the continuum · 6 min</span></div>
+        </div>
+        <div class="shelf-card">
+          <svg class="emblem" viewBox="0 0 44 44"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M12 24c3-6 7-6 10 0s7 6 10 0" fill="none" stroke="#5f7f6e" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="15" r="2.2" fill="#5f7f6e"/></svg>
+          <div><b>Check-in</b><span>Steps for a supportive conversation</span></div>
+        </div>
+      </aside>
+    </div>
+    <p class="cap">The name is deliberately plain. If the student glances at the screen they see “Check-in”, not a crisis tool.</p>
+  </div></div>
+
+  <!-- 2. Steps -->
+  <div class="label">2 · The live run (phone, 390px)</div>
+  <div class="row">
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="now"><i></i>Open</button><button><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="body">
+          <div class="stepcard">
+            <div class="kicker">Open</div>
+            <div class="ask">Ask if it’s okay to talk, then say where privacy ends.</div>
+            <div class="hint">In your own words. <span class="ph">PLACEHOLDER</span></div>
+            <div class="sub">You might say</div>
+            <ul class="say"><li>“Is it okay if I ask how things have been?”</li><li>“What you tell me stays with me, unless I’m worried about your safety.”</li></ul>
+          </div>
+          <div class="line">+ A short factual line (optional)</div>
+          <div class="nav"><span></span><button class="btn btn--primary">Next · Safety</button></div>
+        </div>
+      </div>
+      <p class="cap">One card at a time. The step pills are tappable: conversations don’t run in order, so you can jump.</p>
+    </div>
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><i></i>Open</button><button class="now"><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="body">
+          <div class="stepcard">
+            <div class="kicker">Safety</div>
+            <div class="ask">Check in about safety, directly and calmly.</div>
+            <div class="hint"><span class="ph">PLACEHOLDER</span> prompts and what to listen for load here.</div>
+            <div class="sub">Where you are now</div>
+            <div class="two"><button class="choice choice--on">No concern now</button><button class="choice choice--dusk">Some concern</button></div>
+          </div>
+          <button class="link">What’s going on? →</button>
+          <div class="line line--filled">Says sleep has been poor for two weeks.</div>
+          <div class="nav"><button class="btn btn--quiet">Back</button><button class="btn btn--primary">Next · Listen</button></div>
+        </div>
+      </div>
+      <p class="cap">Two quiet choices, no traffic lights. “Some concern” opens the picker below.</p>
+    </div>
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><i></i>Open</button><button class="seen"><i></i>Safety</button><button class="seen"><i></i>Listen</button><button class="seen"><i></i>Hope</button><button class="now"><i></i>Help</button></div>
+        <div class="body">
+          <div class="stepcard">
+            <div class="kicker">Help and supports</div>
+            <div class="ask">Agree on who else can help.</div>
+            <div class="hint"><span class="ph">PLACEHOLDER</span></div>
+            <div class="sub">Professional</div>
+            <div class="chips"><button class="tick tick--on">School counsellor</button><button class="tick">GP</button><button class="tick">Youth service</button><button class="tick">Helpline</button></div>
+            <div class="sub">People and self-help</div>
+            <div class="chips"><button class="tick tick--on">Family</button><button class="tick">Trusted adult at school</button><button class="tick">Friend</button><button class="tick tick--on">Sleep routine</button><button class="tick">Movement</button></div>
+          </div>
+          <div class="nav"><button class="btn btn--quiet">Back</button><button class="btn btn--primary">Finish · Handover</button></div>
+        </div>
+      </div>
+      <p class="cap">Tick chips, no typing mid-conversation. Ticks carry into the handover record.</p>
+    </div>
+  </div>
+
+  <!-- 3. Side cards and quiet sheet -->
+  <div class="label">3 · Side cards and the quiet safety sheet</div>
+  <div class="row">
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">What’s going on?</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="body">
+          <div class="hint">Open one if it fits. Back returns you to Safety.</div>
+          <div class="pick">
+            <button>Thoughts of not wanting to be here <span>→</span></button>
+            <button>Hurting themselves <span>→</span></button>
+            <button>Panic <span>→</span></button>
+            <button>Someone is hurting them <span>→</span></button>
+            <button>Alcohol or drugs <span>→</span></button>
+          </div>
+          <div class="nav"><button class="btn btn--quiet">← Back to Safety</button><span></span></div>
+        </div>
+      </div>
+      <p class="cap">Soft labels a student could see without alarm. The card list itself comes from the private file.</p>
+    </div>
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Someone is hurting them</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="body">
+          <div class="sidecard">
+            <div class="kicker">Side card</div>
+            <div class="ask">Listen, don’t probe, and don’t promise secrecy.</div>
+            <div class="hint"><span class="ph">PLACEHOLDER</span> steps load here.</div>
+            <ul class="say" style="margin-top:12px"><li><span class="ph">PLACEHOLDER</span> step one</li><li><span class="ph">PLACEHOLDER</span> step two</li><li><span class="ph">PLACEHOLDER</span> step three</li></ul>
+            <div class="flag">This may need a mandatory report. It will be on the handover.</div>
+          </div>
+          <div class="nav"><button class="btn btn--quiet">← Back to Safety</button><span></span></div>
+        </div>
+      </div>
+      <p class="cap">Dusk-blue edge marks a side card. Opening one adds it to the handover automatically.</p>
+    </div>
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Check-in</span><span class="who">· Riley T.</span><span class="sp"><button class="more more--open">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="dots"><button class="seen"><i></i>Open</button><button class="now"><i></i>Safety</button><button><i></i>Listen</button><button><i></i>Hope</button><button><i></i>Help</button></div>
+        <div class="body">
+          <div class="stepcard" style="opacity:.5">
+            <div class="kicker">Safety</div>
+            <div class="ask">Check in about safety, directly and calmly.</div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="quiet">
+          <h5>If they’re not safe right now</h5>
+          <ol><li>Stay with them.</li><li>Call 000.</li><li>Follow the school procedure. <span class="ph">PLACEHOLDER</span></li></ol>
+          <div class="ppl"><div><b>Wellbeing lead</b> · ext. 000</div><div><b>Deputy</b> · ext. 000</div></div>
+        </div>
+      </div>
+      <p class="cap">Behind the muted “⋯”. Small type, plain ink, no red, no icon. Escape or a tap outside closes it. Contacts come from the private file.</p>
+    </div>
+  </div>
+
+  <!-- 4. Handover and saved -->
+  <div class="label">4 · Handover record, then what’s left on the meeting (preview of section 2)</div>
+  <div class="row">
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Handover</span><span class="who">· Riley T.</span><span class="sp"><button class="more">⋯</button><button class="btn btn--quiet">✕</button></span></div>
+        <div class="body">
+          <div class="field"><label>Safety</label><div class="box">No concern now</div></div>
+          <div class="field"><label>Side cards opened</label><div class="box">None</div></div>
+          <div class="field"><label>What was said (facts only)</label><div class="box">Sleep poor for two weeks. Worried about assessments.</div></div>
+          <div class="field"><label>Agreed help</label><div class="chips"><span class="tick tick--on">School counsellor</span><span class="tick tick--on">Family</span><span class="tick tick--on">Sleep routine</span></div></div>
+          <div class="field"><label>Handed over to</label><div class="box">Wellbeing lead, 1:15pm</div></div>
+          <div class="field"><label>Follow-ups → tasks</label><div class="chips"><span class="tick tick--on">Tell wellbeing lead</span><span class="tick">Check in next week</span></div></div>
+          <div class="lock">🔒 Saved encrypted, apart from the meeting. Not sent to Clare, search or Notion.</div>
+          <div class="nav"><button class="btn btn--quiet">Back</button><button class="btn btn--primary">Save</button></div>
+        </div>
+      </div>
+      <p class="cap">Pre-filled from the run. Finish it after the student has gone.</p>
+    </div>
+
+    <div>
+      <div class="frame frame--phone">
+        <div class="top"><span class="title">Meeting · Catch-up with Riley</span></div>
+        <div class="body">
+          <div class="crumbs">Guides</div>
+          <div class="closed">
+            <svg class="emblem" viewBox="0 0 44 44" style="width:36px;height:36px"><rect width="44" height="44" rx="12" fill="#e6eee8"/><path d="M12 24c3-6 7-6 10 0s7 6 10 0" fill="none" stroke="#5f7f6e" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="15" r="2.2" fill="#5f7f6e"/></svg>
+            <div><b>Check-in</b><span>12:52pm · locked</span></div>
+            <button class="btn">Open</button>
+          </div>
+          <div class="crumbs" style="margin-top:22px">Riley T. · timeline</div>
+          <div class="timeline">
+            <div class="tl"><i></i>Catch-up with Riley <span>· meeting</span></div>
+            <div class="tl"><i style="background:var(--sage-2)"></i>Check-in <span>· see meeting</span></div>
+            <div class="tl"><i></i>Motivation · English <span>· guide</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">The meeting shows only a closed card. The profile shows only a marker. Nothing from inside the record appears anywhere until you tap Open.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
