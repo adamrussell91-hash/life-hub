@@ -33,6 +33,7 @@ import { renderDocumentPage } from '@/teacher/sections/documents';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { mountMarkPage } from '@/marking/mark-page';
+import { mountToMarkPage } from '@/marking/to-mark-view';
 import { mountTeacherStudentProfile } from '@/teacher/student-profile-page';
 import { renderTrashSection } from '@/teacher/sections/trash';
 import { renderFeedbackSection } from '@/teacher/sections/feedback';
@@ -132,6 +133,7 @@ let classPageHandle: { dispose?: () => void } | null = null;
 let unitsIndexHandle: { dispose?: () => void } | null = null;
 let lessonsIndexHandle: { dispose?: () => void } | null = null;
 let markPageHandle: { dispose?: () => void } | null = null;
+let toMarkPageHandle: { dispose: () => void } | null = null;
 let trashSectionHandle: { dispose?: () => void } | null = null;
 let feedbackSectionHandle: { dispose?: () => void } | null = null;
 let unitPageHandle: { dispose?: () => void } | null = null;
@@ -185,6 +187,11 @@ function teardownStudentProfileView(): void {
   if (!studentProfileViewHandle) return;
   studentProfileViewHandle.dispose();
   studentProfileViewHandle = null;
+}
+
+function teardownToMarkPage(): void {
+  toMarkPageHandle?.dispose();
+  toMarkPageHandle = null;
 }
 
 function teardownFeedbackSection(): void {
@@ -761,6 +768,17 @@ function renderTeacherTrashRoute(token: number): void {
   });
 }
 
+function renderTeacherToMarkRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'to-mark', undefined, () => {
+    teardownToMarkPage();
+    toMarkPageHandle = mountToMarkPage(refs.canvas);
+  });
+}
+
 function renderTeacherFeedbackRoute(token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -1049,6 +1067,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-templates':
       renderTeacherTemplatesRoute(token);
       break;
+    case 'teacher-to-mark':
+      renderTeacherToMarkRoute(token);
+      break;
     case 'teacher-feedback':
       renderTeacherFeedbackRoute(token);
       break;
@@ -1136,6 +1157,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownMarkPage();
   teardownTrashSection();
   teardownFeedbackSection();
+  teardownToMarkPage();
   teardownUnitPage();
   teardownStudentLessonView();
   teardownLessonDisplayView();
