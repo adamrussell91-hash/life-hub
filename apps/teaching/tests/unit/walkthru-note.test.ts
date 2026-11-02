@@ -4,6 +4,7 @@ import { filterBlocksForStudent } from '@/blocks/visibility';
 import { attachedTechniques, suggestedTechnique, withTechnique } from '@/blocks/walkthru-note/attach';
 import { blockQuestion } from '@/blocks/walkthru-note/badge';
 import type { Block } from '@/schemas/block';
+import { renderPlanningPrompts } from '@/blocks/walkthru-note/planning';
 
 const SENTINEL = 'JOT-SENTINEL-1357';
 
@@ -405,5 +406,14 @@ describe('suggestedTechnique', () => {
   it('offers nothing for plain Voice blocks or other blocks', () => {
     expect(suggestedTechnique(voice())).toBeNull();
     expect(suggestedTechnique({ block_type: 'quiz', content: {} } as unknown as Block)).toBeNull();
+  });
+});
+
+describe('WalkThru book colour', () => {
+  it('marks each unit prompt with its book, so Book 2 prompts read blue', () => {
+    const prompts = renderPlanningPrompts()!;
+    const sets = [...prompts.querySelectorAll<HTMLElement>('.tk-wt-badge')].map((badge) => badge.dataset.set);
+    expect(sets).toContain('1');
+    expect(sets).toContain('2');
   });
 });

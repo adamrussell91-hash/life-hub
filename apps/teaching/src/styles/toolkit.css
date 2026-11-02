@@ -2723,7 +2723,13 @@ button.tk-qdot {
 .wts__hex svg { width: 100%; height: 100%; }
 /* Book 2 is the blue book. */
 .wts[data-set="2"] { border-color: #7cc7ea; background: #e4f4fc; }
-.wts[data-set="2"] .wts__hex, .wts[data-set="2"] .wts__time { background: #2da8e0; }
+.wts[data-set="2"] .wts__hex, .wts[data-set="2"] .wts__time, .wts__hex[data-set="2"] { background: #2da8e0; }
+.tk-wt-badge[data-set="2"] { border-color: #7cc7ea; background: #e4f4fc; }
+.tk-wt-badge[data-set="2"] .tk-wt-badge__glyph { background: #2da8e0; }
+.wts[data-set="2"] .wts__cell, .wts[data-set="2"] .wts__next, .wts[data-set="2"] .tk-wt__tick.is-done::before, .tk-wt[data-set="2"] .tk-wt__tick.is-done::before { background-color: #2da8e0; }
+.wts[data-set="2"] .wts__say li { border-color: #7cc7ea; background: #e4f4fc; }
+.wts[data-set="2"] .wts__label b, .wts[data-set="2"] .wts-tool__go, .wts[data-set="2"] .wts__name:not(.is-empty) { color: #7cc7ea; }
+.wts[data-set="2"] .wts__adapted, .tk-wt[data-set="2"] .tk-wt__adapted { border-left-color: #2da8e0; }
 .wts__title { font-weight: 800; }
 .wts__meta { font-size: var(--text-xs); color: var(--muted); }
 .wts__body { padding: 0 0.75rem 0.75rem; }
