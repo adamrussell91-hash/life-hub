@@ -4,7 +4,7 @@ import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block, Lesson, Unit } from '@/schemas';
 import type { ScheduledLesson } from '@/schemas/scheduled-lesson';
 import './deep.css';
-import { evidenceStepOf, piecesTaught, withEvidenceStep, withPiecesTaught } from './block-tags';
+import { addEvidenceStep, evidenceSteps, piecesTaught, removeEvidenceStep, withPiecesTaught } from './block-tags';
 import { placements, planGaps } from './derive';
 import {
   button,
@@ -119,9 +119,10 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
         if (ids[0]) put(opts.weeks.get(ids[0]) ?? null, 'K', 'k');
       }
       for (const step of ['2a', '2b', '3', '4'] as const) {
-        const t = p.steps.get(step);
-        if (t) put(opts.weeks.get(t.lesson_id) ?? null, STEP_LABEL[step], 's');
-        else if (cols.length) put(cols[last] ?? null, `${STEP_LABEL[step]}?`, 'gap');
+        const tasks = p.steps.get(step) ?? [];
+        for (const t of tasks) put(opts.weeks.get(t.lesson_id) ?? null, STEP_LABEL[step], 's');
+        if (tasks.length) continue;
+        if (cols.length) put(cols[last] ?? null, `${STEP_LABEL[step]}?`, 'gap');
       }
       const tr = h('tr');
       tr.append(h('td', 'rowh', `${i + 1}. ${du.claim || 'No claim yet'}`));
@@ -179,7 +180,7 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
       const box = h('div', 'du-step');
       const hd = h('div', 'du-hd');
       hd.append(h('b', '', `Step ${STEP_LABEL[step]} · ${STEP_NAME[step]}`));
-      const t = p.steps.get(step);
+      const t = p.steps.get(step)?.[0];
       hd.append(h('span', t ? 'du-where' : 'du-where gap', t ? `${lessonCode(opts.lessons, t.lesson_id)} · ${weekLabel(opts.weeks.get(t.lesson_id) ?? null)}` : 'No task yet'));
       box.append(hd);
       const fill = du.steps.find((x) => x.step === step)?.fill;
@@ -302,9 +303,9 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
       let changed = false;
       await rewrite(lesson.id, (blocks) => {
         const next = mapTree(blocks, (b) => {
-          const here = evidenceStepOf(b);
-          if (lesson.id === picked.lesson_id && b.id === picked.block_id) { changed = true; return withEvidenceStep(b, { du: duId, step }); }
-          if (here && here.du === duId && here.step === step) { changed = true; return withEvidenceStep(b, null); }
+          // Choosing the task for a step moves that step here; any other steps on a block stay.
+          if (lesson.id === picked.lesson_id && b.id === picked.block_id) { changed = true; return addEvidenceStep(b, { du: duId, step }); }
+          if (evidenceSteps(b).some((s) => s.du === duId && s.step === step)) { changed = true; return removeEvidenceStep(b, { du: duId, step }); }
           return b;
         });
         return changed ? next : null;

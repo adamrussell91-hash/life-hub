@@ -56,6 +56,7 @@ import {
   summariseWriting
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
+import { answerRungs, readRubricLedger } from './rubric.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { cleanStepPick } from './next-steps.mjs';
 import { exitUnlocked } from './tutorial-status.mjs';
@@ -343,7 +344,7 @@ const INSIGHT_SETTLE_MS = 60_000;
  * write, no listing: a saved copy carries the stamp it was built with, so an
  * older copy simply stops matching.
  */
-async function markInsightChanged(store, lessonId) {
+export async function markInsightChanged(store, lessonId) {
   await store.setJSON(keys(lessonId).stamp, { at: new Date().toISOString() });
   // The WalkThrus pattern monitor reads this evidence; it catches up on the next board load.
   await markWalkthruDirty(store);
@@ -1314,6 +1315,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   const rosters = new Map();
   const students = roster ? roster.students.map(({ id, name, initials }) => ({ id, name, initials })) : [];
   const attempts = [];
+  const ledger = roster ? await readRubricLedger(store, cls) : null;
   for (const a of counted) {
     const rec = narrow(await recordFor(store, lessonId, a.start.version, record), a.start.student_id);
     const scored = scoreAttempt(rec, a.result, a.marks, a.aiMarks);
@@ -1336,7 +1338,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
         const entry = rec.questions[r.id];
         const outcomes = entry.key.outcomes ?? fallback;
         const key = withCurrentPieces(entry.key, entryFor(record, r.id)?.key);
-        const items = answerEvidence({ question: entry.question, key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback });
+        const items = answerEvidence({ question: entry.question, key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback, rungs: answerRungs(ledger, student, lessonId, r.id, attemptId(a.owner, a.n)) });
         return { id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, codes: r.codes, outcomes, items, ...(hasAnswer(r.response) ? {} : { unanswered: true }), ...(r.set ? { set: r.set } : {}) };
       })
     });

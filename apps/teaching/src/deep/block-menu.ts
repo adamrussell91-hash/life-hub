@@ -1,5 +1,5 @@
 import type { Block } from '@/schemas/block';
-import { evidenceStepOf, passChecks, PASS_CHECKS, piecesTaught, targetPieces, withEvidenceStep, withPassChecks, withPiecesTaught, withTargetPieces, type EvidenceStep } from './block-tags';
+import { evidenceStepOf, evidenceSteps, passChecks, PASS_CHECKS, piecesTaught, targetPieces, withEvidenceStep, withPassChecks, withPiecesTaught, withTargetPieces, type EvidenceStep } from './block-tags';
 import { STEP_LABEL, type DeepUnderstanding, type PlacedStep } from './schema';
 import './block-menu.css';
 
@@ -33,9 +33,10 @@ export function deepBlockLine(block: Block, deep: readonly DeepUnderstanding[]):
   const known = new Set(deep.flatMap((d) => d.pieces.map((p) => p.id)));
   const taught = piecesTaught(block).filter((id) => known.has(id));
   if (taught.length) parts.push(`Teaches ${taught.length} ${taught.length === 1 ? 'piece' : 'pieces'}`);
-  const step = evidenceStepOf(block);
-  const n = step ? deep.findIndex((d) => d.id === step.du) : -1;
-  if (step && n >= 0) parts.push(`Evidence for DU ${n + 1} Step ${STEP_LABEL[step.step]}`);
+  for (const step of evidenceSteps(block)) {
+    const n = deep.findIndex((d) => d.id === step.du);
+    if (n >= 0) parts.push(`Evidence for DU ${n + 1} Step ${STEP_LABEL[step.step]}`);
+  }
   return parts.join(' · ');
 }
 

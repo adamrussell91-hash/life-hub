@@ -5,7 +5,7 @@ import { outcomeLabels } from '@/markbook/parse';
 import { loadSkills } from '@/skills/api';
 import { loadAlignment } from '@/alignment/api';
 import type { Alignment } from '@/alignment/schema';
-import { lessonOutcomeMap, lessonPointMap, outcomePointMap } from './syllabus';
+import { buildPointChain, lessonOutcomeMap, lessonPointMap, outcomePointMap, type PointChain } from './syllabus';
 import type { TagContext } from './tags';
 
 /**
@@ -19,9 +19,11 @@ export type InsightContext = TagContext & {
   /** Each lesson's dot point tags, and the dot points each outcome tag reaches. */
   lessonPoints?: ReadonlyMap<string, string[]>;
   outcomePoints?: ReadonlyMap<string, string[]>;
+  /** How a quiz item's own tags reach dot points and outcomes. Null with no alignment. */
+  chain?: PointChain | null;
 };
 
-let cached: Promise<Omit<InsightContext, 'outcomes' | 'lessonOutcomes' | 'lessonPoints' | 'outcomePoints' | 'alignment'> & { alignment: Alignment | null }> | null = null;
+let cached: Promise<Omit<InsightContext, 'outcomes' | 'lessonOutcomes' | 'lessonPoints' | 'outcomePoints' | 'alignment' | 'chain'> & { alignment: Alignment | null }> | null = null;
 
 export async function loadInsightContext(): Promise<InsightContext> {
   let failed = false;
@@ -51,7 +53,8 @@ export async function loadInsightContext(): Promise<InsightContext> {
     outcomes,
     lessonOutcomes: lessonOutcomeMap(curriculum?.lessons ?? [], alignment, outcomes),
     lessonPoints: lessonPointMap(curriculum?.lessons ?? [], alignment),
-    outcomePoints: outcomePointMap(alignment, outcomes)
+    outcomePoints: outcomePointMap(alignment, outcomes),
+    chain: buildPointChain({ alignment, labels: outcomes, continuum: rest.skills, units: curriculum?.units ?? [], lessons: curriculum?.lessons ?? [] })
   };
 }
 

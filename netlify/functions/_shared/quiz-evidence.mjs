@@ -1,5 +1,26 @@
 // Generated from apps/teaching/src/quiz/evidence.ts; regenerate with scripts/generate-alchemy-schema.mjs.
 
+// apps/teaching/src/evidence/constants.ts
+var NEXT = {
+  /** Fewer students assessed than this, and a tag makes no move. */
+  minStudents: 3,
+  /** This share of the students assessed weak: reteach to the class. */
+  reteachShare: 0.5,
+  /** A small group is this many weak students. */
+  groupMin: 2,
+  groupMax: 6,
+  /** Two small groups sharing this much of their students become one card. */
+  sameGroup: 0.6,
+  /** This share secure, with at most one weak: move on. */
+  moveOnShare: 2 / 3
+};
+var RUNG_CUTS = { capable: 0.4, skilled: 0.6, accomplished: 0.8, excellent: 0.9 };
+var RUBRIC_BELOW = 0.2;
+function rungShare(rung) {
+  if (rung === "below") return RUBRIC_BELOW;
+  return rung === "capable" || rung === "skilled" || rung === "accomplished" || rung === "excellent" ? RUNG_CUTS[rung] : null;
+}
+
 // apps/teaching/src/quiz/core.ts
 import { z as z2 } from "zod";
 
@@ -398,9 +419,10 @@ function answerEvidence(input) {
   const share = input.awarded === null ? null : key.marks > 0 ? Math.min(1, Math.max(0, input.awarded / key.marks)) : null;
   const r = isRecord2(input.response) ? input.response : {};
   const a = key.answer;
-  const one = (tags, why) => [
-    { item: key.id, tags: unique([...base2, ...tags]), share, why: share === null || share >= 1 ? [] : [...why, ...codes] }
-  ];
+  const one = (tags, why) => {
+    const item = { item: key.id, tags: unique([...base2, ...tags]), share, why: share === null || share >= 1 ? [] : [...why, ...codes] };
+    return input.rungs ? withRungs(item, input.rungs) : [item];
+  };
   switch (a.type) {
     case "spots":
       return spotEvidence(input, a, base2, codes);
@@ -426,6 +448,18 @@ function answerEvidence(input) {
     default:
       return one([], []);
   }
+}
+function withRungs(item, rungs) {
+  const rated = Object.keys(rungs).filter((s) => rungShare(rungs[s]) !== null);
+  if (!rated.length) return [item];
+  const rest = item.tags.filter((t) => !t.startsWith("skill:") || !rated.includes(t.slice(6)));
+  const keep = rest.some((t) => !t.startsWith("out:"));
+  const carried = keep ? [] : rest;
+  const own = rated.map((s, i) => {
+    const share = rungShare(rungs[s]);
+    return { item: `${item.item}#skill:${s}`, tags: [`skill:${s}`, ...carried], share, why: !keep && i === 0 && share < 1 ? item.why : [] };
+  });
+  return keep ? [{ ...item, tags: rest }, ...own] : own;
 }
 function spotEvidence(input, a, base2, codes) {
   const { question, key } = input;

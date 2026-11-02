@@ -6301,7 +6301,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z15 } from "zod";
@@ -6350,6 +6350,36 @@ function quizRunsIn(value2) {
 function pedagogicalModeLabel(value2) {
   return PEDAGOGICAL_MODE_LABELS[resolvePedagogicalMode(value2)];
 }
+
+// apps/teaching/src/deep/schema.ts
+import { z as z16 } from "zod";
+var DEEP_LIMITS = { perUnit: 4, pieces: 24, claim: 400, why: 300, piece: 200, fill: 400 };
+var TIERS = ["essential", "strong", "sophisticated"];
+var DuIdSchema = z16.string().regex(/^du_[a-z0-9]{4,16}$/);
+var PieceIdSchema = z16.string().regex(/^kp_[a-z0-9]{4,16}$/);
+var ConceptBulletSchema = z16.string().regex(/^[A-Z]{2,5}\d{1,2}$/);
+var KnowledgePieceSchema = z16.object({
+  id: PieceIdSchema,
+  text: z16.string().trim().min(1).max(DEEP_LIMITS.piece),
+  tier: z16.enum(TIERS),
+  /** The one Understanding dot point this piece builds. Older pieces have none yet; marks on them fall back to the lesson's points. */
+  dot_point: DotPointRefSchema.optional()
+});
+var DeepUnderstandingSchema = z16.object({
+  id: DuIdSchema,
+  claim: z16.string().trim().max(DEEP_LIMITS.claim),
+  why: z16.string().trim().max(DEEP_LIMITS.why).default(""),
+  dot_points: z16.array(DotPointRefSchema).min(1).max(8),
+  concept_bullets: z16.array(ConceptBulletSchema).min(1).max(8),
+  pieces: z16.array(KnowledgePieceSchema).max(DEEP_LIMITS.pieces).default([]),
+  /** Pieces owned by another deep understanding in this unit. */
+  shared_piece_ids: z16.array(PieceIdSchema).max(DEEP_LIMITS.pieces).default([]),
+  steps: z16.array(z16.object({ step: z16.enum(["2a", "2b", "3", "4"]), fill: z16.string().trim().max(DEEP_LIMITS.fill) })).max(4).default([])
+});
+var DeepUnderstandingDraftSchema = DeepUnderstandingSchema.extend({
+  dot_points: z16.array(DotPointRefSchema).max(8),
+  concept_bullets: z16.array(ConceptBulletSchema).max(8)
+});
 
 // apps/teaching/src/tutorial/model.ts
 function groupSection(block) {
@@ -6489,10 +6519,10 @@ function caseIssues(lesson) {
 }
 
 // apps/teaching/src/schemas/source.ts
-import { z as z16 } from "zod";
-var SourceSchema = z16.object({
-  system: z16.literal("notion"),
-  page_id: z16.string().min(1).max(64),
+import { z as z17 } from "zod";
+var SourceSchema = z17.object({
+  system: z17.literal("notion"),
+  page_id: z17.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -7158,22 +7188,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z17.object({
+var LessonSchema = z18.object({
   ...CommonFields,
   ...TrashFields,
-  type: z17.literal("lesson"),
-  unit_id: z17.string().min(1),
-  sequence: z17.number().int(),
-  blocks: z17.array(BlockSchema),
+  type: z18.literal("lesson"),
+  unit_id: z18.string().min(1),
+  sequence: z18.number().int(),
+  blocks: z18.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z17.array(z17.string().min(1).max(40)).max(24).optional(),
-  author_id: z17.string().min(1).optional(),
-  review_status: z17.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z17.array(z17.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z17.array(z17.string().min(1).max(64)).max(24).optional(),
+  tags: z18.array(z18.string().min(1).max(40)).max(24).optional(),
+  author_id: z18.string().min(1).optional(),
+  review_status: z18.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z18.array(z18.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z18.array(z18.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z17.array(LineStopSchema).max(16).optional(),
+  line_stops: z18.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -7185,22 +7215,26 @@ var LessonSchema = z17.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z17.string().min(1).max(64).nullable().optional(),
+  branch_from: z18.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z17.boolean().nullable().optional(),
+  pre_unit: z18.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z17.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z18.array(DotPointRefSchema).max(20).optional(),
+  /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
+  focus_pieces: z18.array(PieceIdSchema).max(24).optional(),
+  /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
+  focus_skills: z18.array(z18.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z17.array(z17.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z18.array(z18.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z17.boolean().optional(),
+  feedback_off: z18.boolean().optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z17.object({
-    on: z17.boolean().optional(),
-    skip: z17.array(z17.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z17.boolean().optional()
+  end_questions: z18.object({
+    on: z18.boolean().optional(),
+    skip: z18.array(z18.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z18.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -7215,7 +7249,7 @@ var LessonSchema = z17.object({
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -7227,7 +7261,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z17.ZodIssueCode.custom,
+        code: z18.ZodIssueCode.custom,
         message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -7235,22 +7269,22 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["case"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });

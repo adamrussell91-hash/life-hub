@@ -15,6 +15,7 @@ import { read, reject, walkBlocks } from './question-drop.mjs';
 import { handinKey, pieceId, stepPicks, writingParts } from './lesson-work.mjs';
 import { publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
+import { recordRubric } from './rubric.mjs';
 
 export const pieceKey = (classId, studentId, piece) => `piece_feedback/${classId}/${studentId}/${piece}`;
 export const piecePrefix = (classId, studentId) => `piece_feedback/${classId}/${studentId}/`;
@@ -106,10 +107,15 @@ export async function piecesAction(store, classId, body) {
 
   const now = new Date().toISOString();
   if (action === 'save') {
+    // Left out of the body, a rubric stays as it was.
+    const saved = body.rubric === undefined
+      ? { rubric: feedback?.rubric ?? null, deep: null, blocked: [] }
+      : await recordRubric(store, { class_id: classId, student_id: student.id, piece, lesson_id, title: column.title, column_id: column.id, writing_key: block_id, raw: body.rubric, prior: feedback?.rubric ?? null, today: body.today });
     const next = {
       kind: 'written', title: column.title, ...(column.piece.short ? { short: column.piece.short } : {}), lesson_id, block_id, column_id: column.id,
       tags: cleanTags(body.tags, handin.text, codes),
       comment: typeof body.comment === 'string' ? body.comment.trim().slice(0, MAX_COMMENT) : '',
+      ...(saved.rubric ? { rubric: saved.rubric } : {}),
       status: feedback?.status === 'returned' ? 'returned' : 'draft',
       ...(feedback?.returned_at ? { returned_at: feedback.returned_at } : {}),
       ...(feedback?.seen_at ? { seen_at: feedback.seen_at } : {}),
@@ -120,7 +126,7 @@ export async function piecesAction(store, classId, body) {
       const mark = book.marks?.[column.id]?.[student.id] ?? { criteria: {} };
       await markbookAction(store, classId, { action: 'set_mark', column_id: column.id, student_id: student.id, mark: { ...mark, steps: body.steps } });
     }
-    return { feedback: next };
+    return { feedback: next, ...(saved.deep ? { deep: saved.deep } : {}), ...(saved.blocked.length ? { blocked: saved.blocked } : {}) };
   }
 
   if (!feedback) reject(409, 'not_marked', 'Mark this piece before you return it.');

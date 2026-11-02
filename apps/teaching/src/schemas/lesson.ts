@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
-import { QuizSettingsSchema } from '../quiz/core';
+import { QuizSettingsSchema, SkillRefPattern } from '../quiz/core';
+import { PieceIdSchema } from '../deep/schema';
 import { TutorialSettingsSchema } from '../tutorial/schema';
 import { SprintSettingsSchema } from '../sprint/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
@@ -56,6 +57,10 @@ export const LessonSchema = z.object({
   pre_unit: z.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
   dot_points: z.array(DotPointRefSchema).max(20).optional(),
+  /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
+  focus_pieces: z.array(PieceIdSchema).max(24).optional(),
+  /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
+  focus_skills: z.array(z.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
   plan_covered: z.array(z.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */

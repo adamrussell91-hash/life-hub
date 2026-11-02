@@ -9,5 +9,5 @@ import type { Evidence } from './types';
 export function classEvidence(view: MarkbookView, ctx: InsightContext): { evidence: Evidence[]; sources: Source[] } {
   const { evidence, sources } = markbookEvidence(view, ctx.outcomes);
   const outcomed = withLessonOutcomes(expandTags(evidence, ctx.table), ctx.lessonOutcomes ?? new Map());
-  return { evidence: withPointTags(outcomed, ctx.lessonPoints ?? new Map(), ctx.outcomePoints ?? new Map()), sources };
+  return { evidence: withPointTags(outcomed, ctx.lessonPoints ?? new Map(), ctx.outcomePoints ?? new Map(), ctx.chain ?? null), sources };
 }

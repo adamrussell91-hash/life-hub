@@ -14,7 +14,8 @@ import { readBook } from './markbook.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { read, reject } from './question-drop.mjs';
 import { cleanTags, pieceKey, recentCodes } from './piece-feedback.mjs';
-import { quizAnswersToMark } from './quiz.mjs';
+import { markInsightChanged, quizAnswersToMark } from './quiz.mjs';
+import { recordRubric } from './rubric.mjs';
 import { draftLessonKey } from './teaching-blobs.mjs';
 import { sprintKeys } from './sprint-keys.mjs';
 import { ownerOf } from './sprint.mjs';
@@ -45,7 +46,7 @@ async function answerContext(store, roster, studentId, piece) {
   const key = pieceKey(roster.cls.id, studentId, piece);
   const [feedback, library, recent] = await Promise.all([read(store, key), readFeedbackCodes(store), recentCodes(store, roster.cls.id, studentId, key)]);
   return {
-    feedback: feedback ? { tags: feedback.tags ?? [], comment: feedback.comment ?? '', status: feedback.status } : null,
+    feedback: feedback ? { tags: feedback.tags ?? [], comment: feedback.comment ?? '', status: feedback.status, ...(feedback.rubric ? { rubric: feedback.rubric } : {}) } : null,
     codes: library.filter((c) => !c.hidden && c.group === 'composition'),
     recent_codes: recent.map((r) => r.codes)
   };
@@ -93,11 +94,20 @@ export async function toMarkAction(store, body) {
   const key = pieceKey(roster.cls.id, student.id, piece);
   const kept = await read(store, key);
   const now = new Date().toISOString();
+  const title = String(body.title ?? '').slice(0, 200) || 'Answer';
+  const lessonId = String(body.lesson_id ?? '');
+  // Left out of the body, a rubric stays as it was. An answer's work is its question; a sprint reflection's is the lesson.
+  const saved = body.rubric === undefined
+    ? { rubric: kept?.rubric ?? null, deep: null, blocked: [] }
+    : await recordRubric(store, { class_id: roster.cls.id, student_id: student.id, piece, lesson_id: lessonId, title, attempt_id: body.attempt_id, writing_key: piece.startsWith('q:') ? piece.split(':').at(-1) : lessonId, raw: body.rubric, prior: kept?.rubric ?? null, today: body.today });
   const next = {
-    kind: 'answer', title: String(body.title ?? '').slice(0, 200) || 'Answer', lesson_id: String(body.lesson_id ?? ''), column_id: null,
+    kind: 'answer', title, lesson_id: lessonId, column_id: null,
     text, tags: cleanTags(body.tags, text, library), comment: typeof body.comment === 'string' ? body.comment.trim().slice(0, MAX_COMMENT) : '',
+    ...(saved.rubric ? { rubric: saved.rubric } : {}),
     status: 'returned', returned_at: kept?.returned_at ?? now, updated_at: now, ...(kept?.seen_at ? { seen_at: kept.seen_at } : {})
   };
   await store.setJSON(key, next);
-  return { feedback: next };
+  // An answer's rungs are read into its quiz's evidence, so a saved copy goes stale.
+  if (body.rubric !== undefined && piece.startsWith('q:')) await markInsightChanged(store, lessonId);
+  return { feedback: next, ...(saved.deep ? { deep: saved.deep } : {}), ...(saved.blocked.length ? { blocked: saved.blocked } : {}) };
 }

@@ -30,7 +30,9 @@ const ConceptBulletSchema = z.string().regex(/^[A-Z]{2,5}\d{1,2}$/);
 export const KnowledgePieceSchema = z.object({
   id: PieceIdSchema,
   text: z.string().trim().min(1).max(DEEP_LIMITS.piece),
-  tier: z.enum(TIERS)
+  tier: z.enum(TIERS),
+  /** The one Understanding dot point this piece builds. Older pieces have none yet; marks on them fall back to the lesson's points. */
+  dot_point: DotPointRefSchema.optional()
 });
 
 export const DeepUnderstandingSchema = z.object({

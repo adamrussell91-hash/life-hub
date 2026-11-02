@@ -40,7 +40,7 @@ describe('placements', () => {
     const p = placements(lessons, 'du_ab12cd');
     expect(p.taught.get('kp_aa11bb')).toEqual(['L1']);
     expect(p.tested.get('kp_aa11bb')).toEqual({ lessons: ['L2', 'L3'], items: 3 });
-    expect(p.steps.get('2a')).toEqual({ lesson_id: 'L2', block_id: 'b2', title: 'Paragraph' });
+    expect(p.steps.get('2a')).toEqual([{ lesson_id: 'L2', block_id: 'b2', title: 'Paragraph' }]);
   });
 });
 

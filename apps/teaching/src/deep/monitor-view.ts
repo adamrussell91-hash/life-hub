@@ -320,7 +320,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
 
     const ev = h('div');
     ev.append(h('h6', '', 'Evidence for this step'));
-    const t = LANE_STEP[lane] ? stepTask.get(LANE_STEP[lane]!) : null;
+    const t = LANE_STEP[lane] ? stepTask.get(LANE_STEP[lane]!)?.[0] : null;
     ev.append(h('p', '', t ? `${t.title} (${lessonCode(options.lessons, t.lesson_id)})` : lane === '1' ? 'Quiz items on each piece.' : 'No evidence task placed for this step.'));
     const circ = m.circles[student] ?? {};
     ev.append(h('small', '', `${pieces.filter((p) => circ[p.id]?.fill === 'full').length} of ${pieces.length} pieces secure`));

@@ -65,5 +65,12 @@ export const FOLLOW_UP = {
  */
 export const RUNG_CUTS = { capable: 0.4, skilled: 0.6, accomplished: 0.8, excellent: 0.9 } as const;
 
+/** The share a rung tapped on a rubric counts as: each rung's own cut, so `rungOf` reads the same rung back. Below Capable counts as 0.2. */
+export const RUBRIC_BELOW = 0.2;
+export function rungShare(rung: unknown): number | null {
+  if (rung === 'below') return RUBRIC_BELOW;
+  return rung === 'capable' || rung === 'skilled' || rung === 'accomplished' || rung === 'excellent' ? RUNG_CUTS[rung] : null;
+}
+
 /** The syllabus Grid: a student needs this many items on a row to get a colour. */
 export const GRID = { minItems: 1 } as const;

@@ -16,6 +16,8 @@ import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from '.
 import { stepsBySkill } from './next-steps.mjs';
 import { mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
+import { rubricPlaces } from './rubric-model.mjs';
+import { rubricForStudent } from './rubric.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
 
@@ -41,10 +43,11 @@ async function vivaTakes(store, lessonId, studentId) {
   return rows.filter((r) => r?.student_id === studentId && r.status === 'returned');
 }
 
-/** The confirmed tags on a student's returned viva takes in one lesson. */
-async function vivaTags(store, lessonId, studentId) {
-  return (await vivaTakes(store, lessonId, studentId)).flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })));
-}
+/** The confirmed tags on returned viva takes. */
+const vivaTags = (takes) => takes.flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })));
+
+/** The rungs on returned viva takes: a later take on a skill replaces an earlier one. */
+const vivaPlaces = (takes) => Object.assign({}, ...[...takes].sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at))).map((t) => rubricPlaces(t.rubric)));
 
 /** Every returned piece for one student, oldest first. */
 export async function studentPieces(store, classId, studentId) {
@@ -56,8 +59,11 @@ export async function studentPieces(store, classId, studentId) {
     if (row?.status !== 'returned') continue;
     const id = key.slice(piecePrefix(classId, studentId).length);
     const column = columns.get(row.column_id);
-    const tags = row.kind === 'viva' ? await vivaTags(store, row.lesson_id, studentId) : (row.tags ?? []).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) }));
-    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places: column ? placesFor(column, book.marks?.[column.id]?.[studentId]) : {}, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '' });
+    const takes = row.kind === 'viva' ? await vivaTakes(store, row.lesson_id, studentId) : [];
+    const tags = row.kind === 'viva' ? vivaTags(takes) : (row.tags ?? []).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) }));
+    // A rung tapped on a rubric says where the student sits on that skill.
+    const places = { ...(column ? placesFor(column, book.marks?.[column.id]?.[studentId]) : {}), ...rubricPlaces(row.rubric), ...vivaPlaces(takes) };
+    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '' });
   }
   for (const column of book.columns.filter((c) => c.kind === 'assessment' && !c.piece)) {
     const mark = book.marks?.[column.id]?.[studentId];
@@ -199,6 +205,7 @@ export async function pieceFor(store, roster, student, item) {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
     text: row.text ?? (handin?.text ? writingParts(handin.text) : null),
     tags,
+    ...(row.rubric ? { rubric: await rubricForStudent(store, row.rubric, row.lesson_id) } : {}),
     ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
     codes: library.filter((c) => used.has(c.id)),
     rungs: rungsFrom(history),

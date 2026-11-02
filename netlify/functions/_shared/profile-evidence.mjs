@@ -14,6 +14,46 @@ var sydneyDay = (iso) => todayInSydney(new Date(iso));
 var findOutcome = (token, labels) => labels.find((l) => l.code.toLowerCase() === token.toLowerCase()) ?? labels.find((l) => l.id === token);
 var outcomeIdOf = (token, labels) => findOutcome(token, labels)?.id ?? token;
 
+// apps/teaching/src/evidence/constants.ts
+var BANDS = {
+  /** A tag below this is Weak. */
+  weak: 0.5,
+  /** At or above this (and confident enough, when asked) is Secure. */
+  secure: 0.8,
+  secureConfidence: 2.5,
+  /** A tag needs this many questions before it gets a band. */
+  minQuestions: 2,
+  /** A student needs this many items on a tag to be put in a group. */
+  groupMin: 2
+};
+var MASTERY = { checkpoints: 2 };
+var NEXT = {
+  /** Fewer students assessed than this, and a tag makes no move. */
+  minStudents: 3,
+  /** This share of the students assessed weak: reteach to the class. */
+  reteachShare: 0.5,
+  /** A small group is this many weak students. */
+  groupMin: 2,
+  groupMax: 6,
+  /** Two small groups sharing this much of their students become one card. */
+  sameGroup: 0.6,
+  /** This share secure, with at most one weak: move on. */
+  moveOnShare: 2 / 3
+};
+var FLAGS = {
+  /** Students sure (3) but below full marks on one tag. */
+  sureWrongStudents: 2,
+  /** Share of full-mark answers given at confidence 1. */
+  guessShare: 0.25,
+  guessMin: 2
+};
+var RUNG_CUTS = { capable: 0.4, skilled: 0.6, accomplished: 0.8, excellent: 0.9 };
+var RUBRIC_BELOW = 0.2;
+function rungShare(rung) {
+  if (rung === "below") return RUBRIC_BELOW;
+  return rung === "capable" || rung === "skilled" || rung === "accomplished" || rung === "excellent" ? RUNG_CUTS[rung] : null;
+}
+
 // apps/teaching/src/evidence/markbook-evidence.ts
 var trailingBlanks = (rows) => {
   let n = 0;
@@ -35,6 +75,7 @@ function markbookEvidence(view, labels = []) {
       for (const row of score.rows) for (const item of row.items ?? []) evidence.push({ ...item, tags: item.tags.map(norm), student, source, date, confidence: row.confidence });
     }
   }
+  const rated = new Set((view.rubrics ?? []).flatMap((r) => r.column_id ? Object.keys(r.skills).map((s) => `${r.column_id}|${r.student}|${s}`) : []));
   for (const column of assessments(view.markbook)) {
     const source = `assess:${column.id}`;
     sources.push({ source, title: column.title });
@@ -45,10 +86,23 @@ function markbookEvidence(view, labels = []) {
         const given = mark.criteria?.[c.id];
         if (typeof given !== "number" || c.max <= 0) continue;
         const share = Math.min(1, given / c.max);
-        const tags = [...c.outcomes.map((o) => norm(`out:${o}`)), ...c.skill ? [`skill:${c.skill}`] : []];
+        const tags = [...c.outcomes.map((o) => norm(`out:${o}`)), ...c.skill && !rated.has(`${column.id}|${student}|${c.skill}`) ? [`skill:${c.skill}`] : []];
         const why = share < 1 ? (mark.codes?.[c.id] ?? []).map((id) => ({ type: "code", id })) : [];
         evidence.push({ item: `${column.id}:${c.id}`, tags, share, why, student, source, date: column.date, confidence: null });
       }
+    }
+  }
+  const named = /* @__PURE__ */ new Set();
+  for (const row of view.rubrics ?? []) {
+    const source = `work:${row.lesson_id}`;
+    if (!named.has(source)) {
+      named.add(source);
+      sources.push({ source, title: row.title });
+    }
+    const date = sydneyDay(row.at);
+    for (const [skill, rung] of Object.entries(row.skills)) {
+      const share = rungShare(rung);
+      if (share !== null) evidence.push({ item: `${row.piece}#skill:${skill}`, tags: [`skill:${skill}`], share, why: [], student: row.student, source, date, confidence: null });
     }
   }
   return { evidence, sources, timing };
@@ -109,40 +163,6 @@ function rungForMark(mark, max) {
   return reached;
 }
 
-// apps/teaching/src/evidence/constants.ts
-var BANDS = {
-  /** A tag below this is Weak. */
-  weak: 0.5,
-  /** At or above this (and confident enough, when asked) is Secure. */
-  secure: 0.8,
-  secureConfidence: 2.5,
-  /** A tag needs this many questions before it gets a band. */
-  minQuestions: 2,
-  /** A student needs this many items on a tag to be put in a group. */
-  groupMin: 2
-};
-var MASTERY = { checkpoints: 2 };
-var NEXT = {
-  /** Fewer students assessed than this, and a tag makes no move. */
-  minStudents: 3,
-  /** This share of the students assessed weak: reteach to the class. */
-  reteachShare: 0.5,
-  /** A small group is this many weak students. */
-  groupMin: 2,
-  groupMax: 6,
-  /** Two small groups sharing this much of their students become one card. */
-  sameGroup: 0.6,
-  /** This share secure, with at most one weak: move on. */
-  moveOnShare: 2 / 3
-};
-var FLAGS = {
-  /** Students sure (3) but below full marks on one tag. */
-  sureWrongStudents: 2,
-  /** Share of full-mark answers given at confidence 1. */
-  guessShare: 0.25,
-  guessMin: 2
-};
-
 // apps/teaching/src/evidence/mastery.ts
 var MASTERY_GROUPS = ["understanding", "responding", "concepts", "skills"];
 function levelFor(group, tag, evidence) {
@@ -186,6 +206,29 @@ function fillsFor(items, evidence) {
 }
 
 // apps/teaching/src/evidence/syllabus.ts
+var numbers = (code) => (code.match(/\d+/g) ?? []).map(Number).join(".");
+function catalogueId(code, labels) {
+  const found = findOutcome(code, labels);
+  if (found) return found.id;
+  const same = labels.filter((l) => numbers(l.code) === numbers(code));
+  return same.length === 1 ? same[0].id : code;
+}
+function dotPointOutcomes(dotPoints, alignment, labels) {
+  if (!alignment || !dotPoints.length) return [];
+  const tags = /* @__PURE__ */ new Set();
+  for (const ref of dotPoints) {
+    const [area, id] = ref.split(":");
+    const point = alignment.focus_areas.find((a) => a.id === area)?.points.find((p) => p.id === id);
+    if (!point) continue;
+    const shared = point.outcomes.filter((o) => o.link === "shared");
+    for (const { n } of shared.length ? shared : point.outcomes) {
+      const code = alignment.outcomes.find((o) => o.n === n)?.code;
+      if (code) tags.add(`out:${catalogueId(code, labels)}`);
+    }
+  }
+  return [...tags];
+}
+var lessonOf = (source) => source.startsWith("quiz:") ? source.slice(5) : source.startsWith("work:") ? source.slice(5) : null;
 var pointTag = (area, id) => `dp:${area}:${id}`;
 function lessonPointMap(lessons, alignment) {
   const map = /* @__PURE__ */ new Map();
@@ -200,10 +243,70 @@ function lessonPointMap(lessons, alignment) {
   }
   return map;
 }
-function withPointTags(evidence, byLesson, byOutcome) {
-  if (!byLesson.size && !byOutcome.size) return evidence;
+var areaOf = (ref) => ref.split(":")[0] ?? "";
+function unitAreas(unit, lessons) {
+  const fromDus = (unit?.deep_understandings ?? []).flatMap((d) => d.dot_points ?? []);
+  const refs = fromDus.length ? fromDus : lessons.flatMap((l) => l.dot_points ?? []);
+  return [...new Set(refs.map(areaOf).filter(Boolean))];
+}
+function buildPointChain(input) {
+  const { alignment, labels, continuum, units, lessons } = input;
+  if (!alignment) return null;
+  const exists = (ref) => {
+    const [area, id] = ref.split(":");
+    return !!alignment.focus_areas.find((a) => a.id === area)?.points.some((p) => p.id === id);
+  };
+  const pieces = /* @__PURE__ */ new Map();
+  for (const unit of units) {
+    for (const du of unit.deep_understandings ?? []) {
+      for (const piece of du.pieces ?? []) {
+        if (piece.dot_point && exists(piece.dot_point)) pieces.set(piece.id, pointTag(areaOf(piece.dot_point), piece.dot_point.split(":")[1]));
+      }
+    }
+  }
+  const skills = /* @__PURE__ */ new Map();
+  for (const strand of continuum?.strands ?? []) {
+    for (const sub of strand.sub_strands) {
+      const points = (sub.points ?? []).filter((p) => p.point.startsWith("R")).map((p) => `${p.area}:${p.point}`);
+      if (points.length) skills.set(`${strand.strand}.${sub.id}`, points);
+    }
+  }
+  const byUnit = /* @__PURE__ */ new Map();
+  for (const lesson of lessons) if (lesson.unit_id) byUnit.set(lesson.unit_id, [...byUnit.get(lesson.unit_id) ?? [], lesson]);
+  const unitById = new Map(units.map((u) => [u.id, u]));
+  const lessonAreas = /* @__PURE__ */ new Map();
+  for (const lesson of lessons) {
+    const areas = lesson.unit_id ? unitAreas(unitById.get(lesson.unit_id), byUnit.get(lesson.unit_id) ?? []) : unitAreas(void 0, [lesson]);
+    if (areas.length) lessonAreas.set(lesson.id, areas);
+  }
+  return { alignment, labels, pieces, skills, lessonAreas };
+}
+function chainedPoints(tags, lessonId, byLesson, chain) {
+  const areas = chain.lessonAreas.get(lessonId) ?? [];
+  const points = /* @__PURE__ */ new Set();
+  for (const tag of tags) {
+    if (tag.startsWith("kp:")) {
+      const point = chain.pieces.get(tag.slice(3));
+      if (point) points.add(point);
+    } else if (tag.startsWith("skill:")) {
+      for (const ref of chain.skills.get(tag.slice(6)) ?? []) {
+        const [area, id] = ref.split(":");
+        if (area && id && areas.includes(area) && chain.alignment.focus_areas.find((a) => a.id === area)?.points.some((p) => p.id === id)) points.add(pointTag(area, id));
+      }
+    }
+  }
+  return points.size ? [...points] : [...byLesson.get(lessonId) ?? []];
+}
+function withPointTags(evidence, byLesson, byOutcome, chain = null) {
+  if (!byLesson.size && !byOutcome.size && !chain) return evidence;
   return evidence.map((e) => {
-    const extra = e.source.startsWith("quiz:") ? byLesson.get(e.source.slice(5)) ?? [] : e.tags.flatMap((t) => t.startsWith("out:") ? byOutcome.get(t) ?? [] : []);
+    const lesson = lessonOf(e.source);
+    if (lesson !== null && chain) {
+      const points = chainedPoints(e.tags, lesson, byLesson, chain);
+      const outcomes = dotPointOutcomes(points.map((t) => t.slice(3)), chain.alignment, chain.labels);
+      return { ...e, tags: [.../* @__PURE__ */ new Set([...e.tags.filter((t) => !t.startsWith("out:")), ...points, ...outcomes])] };
+    }
+    const extra = lesson !== null ? byLesson.get(lesson) ?? [] : e.tags.flatMap((t) => t.startsWith("out:") ? byOutcome.get(t) ?? [] : []);
     return extra.length ? { ...e, tags: [.../* @__PURE__ */ new Set([...e.tags, ...extra])] } : e;
   });
 }
@@ -359,6 +462,8 @@ export {
   DEFAULT_MONITOR,
   MASTERY_GROUPS,
   PROBLEM_TYPES,
+  buildPointChain,
+  chainedPoints,
   countPatterns,
   fillsFor,
   lessonPointMap,

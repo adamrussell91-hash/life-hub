@@ -406,7 +406,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
         const rest = du.steps.filter((x) => x.step !== step);
         commit({ ...du, steps: fill.value.trim() ? [...rest, { step, fill: fill.value }] : rest });
       });
-      const task = p.steps.get(step);
+      const task = p.steps.get(step)?.[0];
       const evd = h('div', 'du-where');
       if (task) {
         const t = h('span', 'du-task', task.title);

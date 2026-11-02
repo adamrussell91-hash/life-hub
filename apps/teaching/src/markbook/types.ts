@@ -87,7 +87,11 @@ export type MarkbookView = {
   work?: WorkColumn[];
   /** Lessons each student marked done, by student id then lesson id. */
   done?: Record<string, Record<string, DoneRecord>>;
+  /** Rungs tapped on rubrics of written work and viva takes; a quiz answer's reach its own items instead. Missing from an older server. */
+  rubrics?: RubricEvidenceRow[];
 };
+/** One marked piece's rungs, as the markbook reads them. `column_id` when the piece is a Markbook task. */
+export type RubricEvidenceRow = { student: string; piece: string; lesson_id: string; title: string; at: string; skills: Record<string, string>; column_id?: string };
 export type AnyColumn = Column | QuizColumn | WorkColumn;
 export type OutcomeLabel = { id: string; code: string; title: string; group: string };
 
