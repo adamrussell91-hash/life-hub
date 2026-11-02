@@ -1,6 +1,6 @@
 import { STAGES, applyCycleDecision, evidenceGain, isLiveWalkthruGoal, normalizeWalkthru, openCycle, pieceFor, withOpenCycle, withSnapshot } from '../../../../packages/walkthrus/goal.mjs';
 import { PROBLEM_TYPES, PROBLEM_TYPE_IDS } from '../../../../packages/walkthrus/problem-types.mjs';
-import { seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
+import { pageRefOf, seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import { summarise, hasLapsed } from '../../../../packages/walkthrus/reps.mjs';
 import {
   loadWalkthruGoals, loadWalkthruReps, loadWalkthruText, patchWalkthruGoal,
@@ -216,7 +216,7 @@ function mount(root: HTMLElement, goals: WalkthruGoal[], reps: WalkthruRep[]): v
       const entry = techniqueById(wt.technique_id);
       const series = entry ? seriesByKey(entry.series) : null;
       const head = el('header', 'wt-goal__head');
-      head.append(el('p', 'wt-panel__code', `${entry?.code ?? ''} | ${entry?.page ?? ''}${series ? ` · ${series.name}` : ''}`), el('h2', 'wt-goal__title', entry?.name ?? goal.title));
+      head.append(el('p', 'wt-panel__code', `${entry ? pageRefOf(entry) : ''}${series ? ` · ${series.name}` : ''}`), el('h2', 'wt-goal__title', entry?.name ?? goal.title));
       const piece = pieceFor(goal);
       if (piece) head.append(el('p', 'wt-goal__piece', piece === 'city' ? 'It worked: a city on the board.' : piece === 'house' ? 'A house on the board.' : 'A dashed house on the board.'));
       const board = el('a', 'btn btn--secondary btn--small', 'See it on the board');

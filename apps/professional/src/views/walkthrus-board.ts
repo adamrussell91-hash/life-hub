@@ -1,5 +1,5 @@
 import { FIGURE_SVGS } from '../../../../packages/walkthrus/glyphs';
-import { CATALOGUE, SERIES, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, SERIES, pageRefOf, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import { SETS } from '../../../../packages/walkthrus/sets.mjs';
 import { checkOneActive, isLiveWalkthruGoal, normalizeWalkthru, pieceFor } from '../../../../packages/walkthrus/goal.mjs';
 import { countsAsRep, hasLapsed } from '../../../../packages/walkthrus/reps.mjs';
@@ -358,7 +358,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     const d = layout.drawn;
     const goal = goalFor(tile.id);
     const piece = goal ? pieceFor(goal) : null;
-    const label = tile.fusion ? `${tile.name}, a fusion` : `${tile.name}, ${tile.code} page ${tile.page}`;
+    const label = tile.fusion ? `${tile.name}, a fusion` : `${tile.name}, ${tile.set > 1 ? `Book ${tile.set}, ` : ''}${tile.code} page ${tile.page}`;
     const g = svg('g', { class: `wt-tile${tile.fusion ? ' is-fusion' : ''}`, 'data-tile': tile.id, 'data-key': tile.key, 'data-cluster': tile.cluster, role: 'button', tabindex: 0, 'aria-label': label });
     const points = tile.corners.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
     if (tile.fusion) {
@@ -730,7 +730,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
     if (state.proofState === 'loading') { proofPane.append(el('p', 'canvas-status', 'Working out the numbers…')); return; }
     renderWhatsWorking(proofPane, state.proof, {
       titleOf: (id) => nameOf(id),
-      codeOf: (id) => { const e = techniqueById(id); return e ? `${e.code} | ${e.page}` : isFusionId(id) ? 'FUSED' : null; },
+      codeOf: (id) => { const e = techniqueById(id); return e ? pageRefOf(e) : isFusionId(id) ? 'FUSED' : null; },
       onOpen: (id) => openFromProof(id)
     });
   }
@@ -1142,7 +1142,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   function showTip(tile: BoardTile, anchor: Element): void {
     const entry = techniqueById(tile.id);
     if (!entry) return;
-    tip.replaceChildren(el('p', 'wt-tip__code', `${entry.code} | ${entry.page}`), el('p', 'wt-tip__name', entry.name));
+    tip.replaceChildren(el('p', 'wt-tip__code', pageRefOf(entry)), el('p', 'wt-tip__name', entry.name));
     const master = state.text?.sets.flatMap((s) => s.techniques).find((t) => t.id === tile.id);
     if (master) {
       const list = el('ol', 'wt-tip__steps');

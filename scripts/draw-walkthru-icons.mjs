@@ -9,9 +9,10 @@
 // focus, in a 100 × 100 frame. The drawings live in scripts/walkthru-icons/, one file per series,
 // built from parts.mjs.
 //
-// figure/<id>.svg (the people in the board hexes and on a block's WalkThru bar) is not drawn here.
-// It is the hexagon from the same set as the step pictures, drawn in the private data repo
-// (data/teaching/walkthrus/pictures/source) and copied in from pictures/hexagons/.
+// figure/<id>.svg (the people in the board hexes and on a block's WalkThru bar): Book 1's come from
+// the same set as its step pictures, drawn in the private data repo
+// (data/teaching/walkthrus/pictures/source) and copied in from pictures/hexagons/, so they are not
+// drawn here. Book 2's are drawn here from packages/walkthrus/draw/hex/set-2/.
 import { writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../packages/walkthrus/catalogue.mjs';
@@ -24,7 +25,17 @@ for (const key of SERIES) {
   const mod = await import(`./walkthru-icons/${key}.mjs`).catch(() => null);
   if (!mod) continue;
   Object.assign(sets.symbol, mod.symbols);
+  const second = await import(`./walkthru-icons/set-2/${key}.mjs`).catch(() => null);
+  if (second) Object.assign(sets.symbol, second.symbols);
 }
+
+const figures = {};
+for (const key of SERIES) {
+  const mod = await import(`../packages/walkthrus/draw/hex/set-2/${key}.mjs`).catch(() => null);
+  if (mod) Object.assign(figures, mod.figures);
+}
+for (const [id, markup] of Object.entries(figures)) await writeFile(`${OUT}figure/${id}.svg`, markup);
+console.log(`figure: ${Object.keys(figures).length} Book 2 drawn`);
 
 const known = new Set(CATALOGUE.map((e) => e.id));
 for (const [dir, set] of Object.entries(sets)) {

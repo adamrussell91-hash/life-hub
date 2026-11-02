@@ -1,6 +1,6 @@
 import type { TeacherNoteBlock } from '@/toolkit/content';
 import type { Block } from '@/schemas/block';
-import { CATALOGUE, SERIES, seriesByKey, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, SERIES, pageRefOf, seriesByKey, techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
 import { countsAsRep, hasLapsed, isToLog, repKey } from '../../../../../packages/walkthrus/reps.mjs';
 import { isFusionId } from '../../../../../packages/walkthrus/tiles.mjs';
 import { classLabel } from '@/toolkit/class-context';
@@ -238,7 +238,7 @@ export function renderWalkthruSection(content: WalkthruContent, ctx: { lessonId?
   wrap.dataset.technique = content.id;
   if (entry) {
     const series = entry.series ? seriesByKey(entry.series) : null;
-    wrap.append(el('p', 'tk-wt__code', `${entry.code} | ${entry.page}${series ? ` · ${series.name}` : ''}`), el('p', 'tk-wt__name', entry.name));
+    wrap.append(el('p', 'tk-wt__code', `${pageRefOf(entry)}${series ? ` · ${series.name}` : ''}`), el('p', 'tk-wt__name', entry.name));
   } else {
     fusionHead(wrap, content.id);
   }
@@ -263,13 +263,13 @@ export function walkthruEditorFields(current: WalkthruContent | undefined, emit:
   const wrap = el('div', 'tk-wt-ed');
   const jots = el('div', 'tk-wt-ed__jots');
 
-  // 52 techniques is not a small choice, so it is the kit filter menu (with type-ahead), never a native select.
+  // 104 techniques is not a small choice, so it is the kit filter menu (with type-ahead), never a native select.
   // Fusions from the board join the list once they load.
   const bookOptions = [
     { value: '', label: 'None' },
-    ...(CATALOGUE as unknown as Array<{ id: string; kind: string; code: string; name: string }>)
+    ...(CATALOGUE as unknown as Array<{ id: string; kind: string; set: number; code: string; name: string }>)
       .filter((e) => e.kind === 'technique')
-      .map((e) => ({ value: e.id, label: `${e.name} · ${e.code}` }))
+      .map((e) => ({ value: e.id, label: `${e.name} · ${e.set > 1 ? `Book ${e.set} ` : ''}${e.code}` }))
   ];
   let fusions: Fusion[] = [];
   const stepCount = (id: string): number => (isFusionId(id) ? Math.min(9, fusions.find((f) => f.id === id)?.steps.length || STEPS.length) : STEPS.length);

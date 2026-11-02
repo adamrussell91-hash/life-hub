@@ -2721,6 +2721,9 @@ button.tk-qdot {
 .wts[open] > .wts__sum::after { content: '–'; }
 .wts__hex { display: inline-grid; place-items: center; flex: none; width: 2.75rem; height: 2.4rem; padding: 0.2rem 0.45rem; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); background: #ffd400; color: #111; }
 .wts__hex svg { width: 100%; height: 100%; }
+/* Book 2 is the blue book. */
+.wts[data-set="2"] { border-color: #7cc7ea; background: #e4f4fc; }
+.wts[data-set="2"] .wts__hex, .wts[data-set="2"] .wts__time { background: #2da8e0; }
 .wts__title { font-weight: 800; }
 .wts__meta { font-size: var(--text-xs); color: var(--muted); }
 .wts__body { padding: 0 0.75rem 0.75rem; }

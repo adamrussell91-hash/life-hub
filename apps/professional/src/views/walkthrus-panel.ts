@@ -1,5 +1,5 @@
 import { STAGES, normalizeWalkthru, evidenceGain, openCycle } from '../../../../packages/walkthrus/goal.mjs';
-import { seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
+import { pageRefOf, seriesByKey, techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 import type { WalkthruGoal, WalkthruRep, WalkthruText, WalkthruTechniqueText } from '@/api/walkthrus';
 import { summarise } from '../../../../packages/walkthrus/reps.mjs';
 import { isFusionId } from '../../../../packages/walkthrus/tiles.mjs';
@@ -327,7 +327,7 @@ export function renderPanel(host: HTMLElement, model: PanelModel, actions: Panel
   const series = seriesByKey(entry.series);
   const head = el('header', 'wt-panel__head');
   const titles = el('div');
-  titles.append(el('p', 'wt-panel__code', `${entry.code} | ${entry.page}${series ? ` · ${series.name}` : ''}`), el('h2', 'wt-panel__title', entry.name));
+  titles.append(el('p', 'wt-panel__code', `${pageRefOf(entry)}${series ? ` · ${series.name}` : ''}`), el('h2', 'wt-panel__title', entry.name));
   head.append(titles, closeButton(entry.name, actions));
 
   const wt = normalizeWalkthru(model.goal?.walkthru);

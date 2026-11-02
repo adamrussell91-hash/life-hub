@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { CATALOGUE, CATALOGUE_IDS, SERIES, techniquesOf, frameworksOf, isTechniqueId } from '../../packages/walkthrus/catalogue.mjs';
+import { CATALOGUE, CATALOGUE_IDS, SERIES, pageRefOf, techniquesOf, frameworksOf, isTechniqueId } from '../../packages/walkthrus/catalogue.mjs';
 import { SETS, setById } from '../../packages/walkthrus/sets.mjs';
 import { PROBLEM_TYPES, PROBLEM_TYPE_IDS, rankedFor } from '../../packages/walkthrus/problem-types.mjs';
 import { createGlyphSet, placeholderGlyph } from '../../packages/design-kit/js/glyph-set.js';
@@ -16,12 +16,23 @@ test('catalogue ids are unique and every entry belongs to a known set and series
   }
   assert.equal(frameworksOf(1).length, 5);
   assert.ok(techniquesOf(1).length >= 50);
+  assert.equal(frameworksOf(2).length, 10);
+  assert.equal(techniquesOf(2).length, 52);
 });
 
 test('every see_also resolves, and printed page numbers are unique within a set', () => {
   for (const e of CATALOGUE) for (const ref of e.see_also) assert.ok(CATALOGUE_IDS.includes(ref), `${e.id} → ${ref}`);
-  const pages = techniquesOf(1).map((e) => e.page);
-  assert.equal(new Set(pages).size, pages.length);
+  for (const set of [1, 2]) {
+    const pages = techniquesOf(set).map((e) => e.page);
+    assert.equal(new Set(pages).size, pages.length);
+  }
+});
+
+test('page references name the book once page numbers can repeat', () => {
+  const inFirst = techniquesOf(1).find((e) => e.code === 'Q&F');
+  const inSecond = techniquesOf(2).find((e) => e.code === 'Q&F');
+  assert.equal(pageRefOf(inFirst), `Q&F | ${inFirst.page}`);
+  assert.equal(pageRefOf(inSecond), `Book 2 · Q&F | ${inSecond.page}`);
 });
 
 test('sets: three colours, set 1 yellow', () => {
