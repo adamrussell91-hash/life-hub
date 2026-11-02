@@ -12,7 +12,7 @@ import { readFeedbackCodes } from './feedback-codes.mjs';
 import { codeApplies } from './progress-patterns.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { read, reject, walkBlocks } from './question-drop.mjs';
-import { handinKey, pieceId, stepPicks, writingParts } from './lesson-work.mjs';
+import { draftKey, handinKey, pieceId, stepPicks, writingParts } from './lesson-work.mjs';
 import { publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { recordRubric } from './rubric.mjs';
@@ -54,18 +54,65 @@ export function cleanTags(raw, text, codes) {
   return out;
 }
 
+/** Every code on a piece across its drafts: for each code and sign, the most it appeared on any one draft. */
+export function unionTags(row) {
+  const most = new Map();
+  for (const list of [row?.earlier_tags ?? [], row?.tags ?? []]) {
+    const here = new Map();
+    for (const t of list) {
+      const key = `${t.code_id}|${Boolean(t.positive)}`;
+      here.set(key, (here.get(key) ?? 0) + 1);
+    }
+    for (const [key, n] of here) most.set(key, Math.max(most.get(key) ?? 0, n));
+  }
+  return [...most].flatMap(([key, n]) => {
+    const [code_id, positive] = key.split('|');
+    return Array.from({ length: n }, () => ({ code_id, positive: positive === 'true' }));
+  });
+}
+
+const WORD = /[\p{L}\p{N}'’]/u;
+
+/** A redraft's scope: 'whole', or a section grown to the whole words it touches. Refuses a range off the frozen text. */
+export function cleanScope(raw, text) {
+  if (raw === 'whole') return 'whole';
+  const body = typeof raw?.part === 'string' && !raw.part.startsWith('step.') ? text?.[raw.part]?.[raw.field] : undefined;
+  let start = Math.floor(Number(raw?.start));
+  let end = Math.floor(Number(raw?.end));
+  if (typeof body !== 'string' || !(start >= 0) || !(end > start) || end > body.length) reject(400, 'bad_section', 'That section can’t be used. Select it again.');
+  while (start > 0 && WORD.test(body[start - 1])) start -= 1;
+  while (end < body.length && WORD.test(body[end])) end += 1;
+  return { part: raw.part, field: raw.field, start, end };
+}
+
+/** The drafts before `upTo`, oldest first. */
+export async function readDrafts(store, lessonId, blockId, studentId, upTo) {
+  const rows = [];
+  for (let n = 1; n < upTo; n += 1) {
+    const row = await read(store, draftKey(lessonId, blockId, studentId, n));
+    if (row) rows.push({ n, ...row, text: writingParts(row.text) });
+  }
+  return rows;
+}
+
 /** The growth codes on each of a student's returned pieces, oldest first, for the "come up again" warning. */
 export async function recentCodes(store, classId, studentId, exceptKey) {
   const recent = [];
   for (const k of await listBlobKeys(store, piecePrefix(classId, studentId))) {
     const row = await read(store, k);
-    if (row?.status === 'returned' && k !== exceptKey) recent.push({ at: row.returned_at, codes: [...new Set((row.tags ?? []).filter((t) => !t.positive).map((t) => t.code_id))] });
+    if ((row?.status === 'returned' || row?.draft > 1) && k !== exceptKey) recent.push({ at: row.returned_at ?? row.first?.returned_at, codes: [...new Set(unionTags(row).filter((t) => !t.positive).map((t) => t.code_id))] });
   }
   recent.sort((a, b) => (a.at < b.at ? -1 : 1));
   return recent;
 }
 
-const statusOf = (handin, feedback) => (!handin ? 'not_in' : feedback?.status === 'returned' ? 'returned' : feedback ? 'marking' : 'waiting');
+const statusOf = (handin, feedback) => {
+  if (!handin) return 'not_in';
+  if (feedback?.status === 'returned') return feedback.redraft ? 'redraft_asked' : 'returned';
+  if (!feedback) return 'waiting';
+  // A redraft just sent has no marking on it yet.
+  return feedback.sent_at && feedback.sent_at === feedback.updated_at ? 'waiting' : 'marking';
+};
 
 export async function piecesAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
@@ -78,7 +125,7 @@ export async function piecesAction(store, classId, body) {
     const students = [];
     for (const s of roster.students) {
       const [handin, feedback] = await Promise.all([read(store, handinKey(lesson_id, block_id, s.id)), read(store, pieceKey(classId, s.id, piece))]);
-      students.push({ id: s.id, initials: s.initials, name: s.name, handed_in_at: handin?.handed_in_at ?? null, status: statusOf(handin, feedback), seen_at: feedback?.seen_at ?? null });
+      students.push({ id: s.id, initials: s.initials, name: s.name, handed_in_at: handin?.handed_in_at ?? null, status: statusOf(handin, feedback), seen_at: feedback?.seen_at ?? null, draft: feedback?.draft ?? 1, asked_at: feedback?.redraft?.asked_at ?? null, sent_scope: feedback?.sent_scope ?? null });
     }
     return { column, students };
   }
@@ -102,7 +149,9 @@ export async function piecesAction(store, classId, body) {
     const lesson = hasSteps ? await read(store, publishedLessonKey(lesson_id)) : null;
     const block = lesson ? [...walkBlocks(lesson.blocks)].find((b) => b.id === block_id) : null;
     const steps = block ? stepPicks(handin.text, block) : [];
-    return { column: named, student: { id: student.id, initials: student.initials, name: student.name }, text: writingParts(handin.text), ...(steps.length ? { steps } : {}), handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes) };
+    const draft = feedback?.draft ?? 1;
+    const drafts = draft > 1 ? await readDrafts(store, lesson_id, block_id, student.id, draft) : [];
+    return { column: named, student: { id: student.id, initials: student.initials, name: student.name }, text: writingParts(handin.text), ...(steps.length ? { steps } : {}), handed_in_at: handin.handed_in_at, feedback, mark: book.marks?.[column.id]?.[student.id] ?? null, codes, recent_codes: recent.map((r) => r.codes), draft, drafts: drafts.map(({ n, text, tags, comment, returned_at, steps, scope }) => ({ n, text, tags: tags ?? [], comment: comment ?? '', returned_at, steps: steps ?? {}, scope: scope ?? null })), ...(feedback?.redraft ? { redraft: feedback.redraft } : {}) };
   }
 
   const now = new Date().toISOString();
@@ -119,6 +168,12 @@ export async function piecesAction(store, classId, body) {
       status: feedback?.status === 'returned' ? 'returned' : 'draft',
       ...(feedback?.returned_at ? { returned_at: feedback.returned_at } : {}),
       ...(feedback?.seen_at ? { seen_at: feedback.seen_at } : {}),
+      ...(feedback?.redraft ? { redraft: feedback.redraft } : {}),
+      ...(feedback?.draft ? { draft: feedback.draft } : {}),
+      ...(feedback?.first ? { first: feedback.first } : {}),
+      ...(feedback?.earlier_tags ? { earlier_tags: feedback.earlier_tags } : {}),
+      ...(feedback?.sent_at ? { sent_at: feedback.sent_at } : {}),
+      ...(feedback?.sent_scope ? { sent_scope: feedback.sent_scope } : {}),
       updated_at: now
     };
     await store.setJSON(key, next);
@@ -130,9 +185,15 @@ export async function piecesAction(store, classId, body) {
   }
 
   if (!feedback) reject(409, 'not_marked', 'Mark this piece before you return it.');
-  const next = action === 'return'
-    ? { ...feedback, status: 'returned', returned_at: now, updated_at: now }
-    : (({ returned_at, seen_at, ...rest }) => ({ ...rest, status: 'draft', updated_at: now }))(feedback);
+  const { redraft: _asked, ...kept } = feedback;
+  if (action === 'return') {
+    const ask = body.redraft ? { redraft: { scope: cleanScope(body.redraft.scope, handin.text), asked_at: now } } : {};
+    const next = { ...kept, ...ask, status: 'returned', returned_at: now, updated_at: now };
+    await store.setJSON(key, next);
+    return { feedback: next };
+  }
+  const { returned_at: _at, seen_at: _seen, ...rest } = kept;
+  const next = { ...rest, status: 'draft', updated_at: now };
   await store.setJSON(key, next);
   return { feedback: next };
 }

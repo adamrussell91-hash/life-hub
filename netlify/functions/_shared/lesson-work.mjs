@@ -24,12 +24,14 @@ import { cleanStepPick } from './next-steps.mjs';
 
 export const WORK_LIMITS = { blocks: 60, parts: 6, steps: 60, fields: 60, field: 80, text: 4000 };
 const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;
-const STEP_PART = /^step\.(\d{1,3})$/;
+export const STEP_PART = /^step\.(\d{1,3})$/;
 const FIELD = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 const workPrefix = (lesson) => `work/${lesson}/`;
 const workKey = (lesson, owner) => `work/${lesson}/${owner}`;
 export const handinKey = (lesson, block, student) => `work_handins/${lesson}/${block}/${student}`;
+export const draftKey = (lesson, block, student, n) => `work_drafts/${lesson}/${block}/${student}/${n}`;
+export const redraftKey = (lesson, block, student) => `work_redraft/${lesson}/${block}/${student}`;
 export const pieceId = (lesson, block) => `w:${lesson}:${block}`;
 export const workOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
 
@@ -170,7 +172,7 @@ export async function workAction(store, lessonId, body) {
 }
 
 /** What the teacher needs to read a block's fields: its title, and question prompts by id. */
-function blockLabels(block) {
+export function blockLabels(block) {
   const c = block.content ?? {};
   const title = typeof c.title === 'string' && c.title.trim() ? c.title.trim() : '';
   const prompts = {};
