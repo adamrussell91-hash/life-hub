@@ -258,3 +258,13 @@ test('the teacher can set or change who a submission belongs to, and a return ad
   assert.equal(piece.status, 'returned');
   assert.equal(piece.kind, 'viva');
 });
+
+test('saving marks keeps each tag on its word when the words sit inside segments', async () => {
+  const { transcriptWordCount } = await import('../../netlify/functions/_shared/voice-submissions.mjs');
+  const words = ['a', 'b', 'c', 'd'].map((word, i) => ({ word, start: i, end: i + 1 }));
+  assert.equal(transcriptWordCount({ words }), 4);
+  assert.equal(transcriptWordCount({ segments: [{ text: 'a b', words: words.slice(0, 2) }, { text: 'c d', words: words.slice(2) }] }), 4);
+  assert.equal(transcriptWordCount({ segments: [{ text: 'a b c' }] }), 3);
+  assert.equal(transcriptWordCount({ text: 'a b' }), 2);
+  assert.equal(transcriptWordCount(null), 0);
+});
