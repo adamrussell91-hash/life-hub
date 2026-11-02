@@ -14,6 +14,7 @@ import { createFoodJournalHandler } from "../../netlify/functions/food-journal.m
 import { createFoodJournalAssistHandler } from "../../netlify/functions/food-journal-assist.mjs";
 import { createFoodJournalRunHandler } from "../../netlify/functions/food-journal-run.mjs";
 import { createFoodJournalMediaHandler } from "../../netlify/functions/food-journal-media.mjs";
+import { createFoodChecksHandler } from "../../netlify/functions/food-checks.mjs";
 import { createMemoryChatJobStore } from "../../netlify/functions/_shared/chat-job-store.mjs";
 let browser, server, base, pages = 0;
 const JPEG =
@@ -76,7 +77,7 @@ function fixture() {
     ],
   };
 }
-async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {}) {
+async function pageFor(width = 1440, { editorial = false, seed, media = {}, checks } = {}) {
   const page = await browser.newPage({
     ...(process.env.PLAYWRIGHT_BROWSER === "webkit" && width <= 720
       ? devices["iPhone 13"] : {}),
@@ -131,6 +132,45 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {
       body: await response.text(),
     });
   });
+  if (checks) {
+    const blobs = new Map();
+    const checkStore = {
+      get: async (key) => (blobs.has(key) ? structuredClone(blobs.get(key)) : null),
+      setJSON: async (key, value) => void blobs.set(key, structuredClone(value)),
+      delete: async (key) => void blobs.delete(key),
+      list: async ({ prefix }) => ({
+        blobs: [...blobs.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })),
+      }),
+    };
+    const checksHandler = createFoodChecksHandler({
+      env: {
+        LIFE_HUB_PASSPHRASE_HASH: "configured",
+        SESSION_SECRET: "x".repeat(32),
+        ALLOWED_ORIGINS: base,
+      },
+      verifySessionToken: () => ({ valid: true }),
+      createFoodJournalRepository: () => repo,
+      getCheckStore: async () => checkStore,
+      readChecks: async () => checks(journal),
+    });
+    await page.route("**/api/food-checks", async (route) => {
+      const r = route.request(),
+        headers = r.headers();
+      delete headers.origin;
+      const response = await checksHandler(
+        new Request(r.url(), {
+          method: r.method(),
+          headers,
+          ...(r.postData() ? { body: r.postData() } : {}),
+        }),
+      );
+      await route.fulfill({
+        status: response.status,
+        headers: Object.fromEntries(response.headers),
+        body: await response.text(),
+      });
+    });
+  }
   const jobs = createMemoryChatJobStore(),
     assets = new Map(Object.entries(media));
   const deps = {
@@ -1704,3 +1744,87 @@ test("a hand-off Brisket can't take keeps the sheet, the choice and the photo fo
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+function quickCheckSeed(journal) {
+  const [v] = journal.visits;
+  const second = structuredClone(v);
+  second.id = "visit_second";
+  second.date = "2026-10-05";
+  second.title = "Second tapas night";
+  second.dishes = [{ ...newDish(), id: "dish_second", title: "Paella", cuisine: "", tags: [] }];
+  journal.visits.push(second);
+  const third = structuredClone(second);
+  third.id = "visit_third";
+  third.date = "2026-09-20";
+  third.title = "Quiet tapas night";
+  third.dishes = [{ ...newDish(), id: "dish_third", title: "Tortilla", cuisine: "Spanish", tags: ["Eggs"] }];
+  journal.visits.push(third);
+  journal.visits[0].dishes[0].photos = [{ id: "photo_lasagne", key: "food/photos/photo_lasagne.jpg" }];
+}
+const quickChecks = (journal) => {
+  const member = (id) => ({
+    id,
+    before: { name: "Cafe Test", address: "Sydney" },
+    point: { lat: -33.8, lon: 151.2 },
+  });
+  return [
+    {
+      id: "chk_venue",
+      kind: "venue",
+      visits: [member(journal.visits[0].id), member("visit_second"), member("visit_third")],
+      suggestion: { name: "Two Herons Tapas", address: "4 Quay Street", lat: -33.8, lon: 151.2 },
+      alternatives: [{ name: "Corner Bodega", address: "6 Quay Street", lat: -33.8001, lon: 151.2 }],
+      reason: "The photo GPS sits at this tapas bar.",
+      evidence: [{ kind: "map", text: "Nearest food place" }],
+    },
+    {
+      id: "chk_dish",
+      kind: "dish",
+      dishes: [{ visit_id: "visit_second", dish_id: "dish_second", before: { cuisine: "", tags: [] } }],
+      suggestion: { cuisine: "Spanish", tags: ["Rice"] },
+      reason: "Paella is a Spanish rice dish.",
+      evidence: [{ kind: "note", text: "Dish name" }],
+    },
+  ];
+};
+for (const width of [1440, 390])
+  test(`quick check moves card to card and answers reach the journal, ${width}`, async () => {
+    const { page, errors, read } = await pageFor(width, {
+      media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+      seed: quickCheckSeed,
+      checks: quickChecks,
+    });
+    const tab = page.getByRole("tab", { name: "Quick check (2)", exact: true });
+    await tab.click();
+    await page.getByRole("heading", { name: "Were these all at Two Herons Tapas?" }).waitFor();
+    await page.waitForFunction(() => document.querySelector(".fj-check__photos img")?.naturalWidth > 0);
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      true,
+      "no sideways scroll",
+    );
+    // Leave one meal out of the group, answer, then take it back and answer again.
+    await page.getByRole("checkbox", { name: /Quiet tapas night/ }).uncheck();
+    await page.locator('.fj-check__pick[data-key="1"]').click();
+    await page.getByRole("heading", { name: "Paella" }).waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("heading", { name: "Were these all at Two Herons Tapas?" }).waitFor();
+    assert.equal(await page.getByRole("checkbox", { name: /Quiet tapas night/ }).isChecked(), false);
+    await page.locator('.fj-check__pick[data-key="1"]').click();
+    await page.getByRole("heading", { name: "Paella" }).waitFor();
+    // Keyboard on desktop; both widths end up answering the same way.
+    if (width > 720) await page.keyboard.press("1");
+    else await page.locator('.fj-check__pick[data-key="1"]').click();
+    await page.getByText("All done.", { exact: false }).waitFor();
+    await page.getByRole("tab", { name: "Timeline", exact: true }).click();
+    // Once the answers are in, the tab with nothing left to ask goes away.
+    await page.getByRole("tab", { name: /Quick check/ }).waitFor({ state: "detached" });
+    const saved = read();
+    const named = (id) => saved.visits.find((v) => v.id === id);
+    assert.equal(named("visit_second").venue.match.basis, "picked");
+    assert.equal(named("visit_third").venue.name, "Cafe Test", "the unticked meal is untouched");
+    assert.equal(named("visit_second").dishes[0].cuisine, "Spanish");
+    assert.deepEqual(named("visit_second").dishes[0].tags, ["Rice"]);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });

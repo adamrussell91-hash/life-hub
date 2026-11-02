@@ -2192,3 +2192,129 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
     flex: none;
   }
 }
+
+/* Quick check: one prepared answer at a time. */
+.fj-check {
+  gap: var(--space-4);
+}
+.fj-check__card {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.fj-check__card > .fj-check__body:only-child {
+  grid-column: 1 / -1;
+}
+.fj-check__photos {
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fj-check__photos[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.fj-check__photos img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+.fj-check__body {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fj-check__said {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fj-check__why {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+.fj-check__link {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+.fj-check__problem {
+  margin: 0;
+  color: var(--navy);
+  font-weight: var(--weight-semibold);
+}
+.fj-check__picks {
+  display: grid;
+  gap: var(--space-2);
+}
+.fj-check .fj-check__pick {
+  display: grid;
+  gap: 2px;
+  justify-content: start;
+  justify-items: start;
+  width: 100%;
+  height: auto;
+  min-height: 52px;
+  text-align: left;
+  white-space: normal;
+}
+.fj-check__pick-main {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+.fj-check__key {
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+.fj-check__pick-sub {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular, 400);
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.fj-check__members {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.fj-check__member {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.fj-check__member-text {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fj-check__actions {
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .fj-check__card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  /* The answers have to stay within reach of a thumb. */
+  .fj-check__photos {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .fj-check__photos[data-count="1"] img {
+    aspect-ratio: 16 / 9;
+    max-height: 28vh;
+  }
+  .fj-check__members {
+    max-height: 9.5rem;
+  }
+  .fj-check__key {
+    display: none;
+  }
+}

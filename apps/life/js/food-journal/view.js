@@ -52,6 +52,7 @@ import {
 } from "./pages.js";
 import { paintRecipeBook } from "./recipe-book.js";
 import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
+import { createQuickCheckSession, paintQuickCheck } from "./quick-check-page.js";
 import {
   compressPhoto,
   inspectPhoto,
@@ -530,6 +531,8 @@ export function createFoodJournalView({
       version = value.version;
       loaded = true;
       render();
+      // No checks prepared, or none reachable, simply means no tab.
+      void quickChecks.load().catch(() => {});
       const tidy = tidyImports(journal);
       if (tidy.changed && !busy)
         await persist(tidy.journal, { quiet: true }).catch(() => {});
@@ -852,9 +855,25 @@ export function createFoodJournalView({
     host?.scrollIntoView?.({ block: "start" });
   }
   function setMode(next) {
+    if (mode === "quick" && next !== "quick") void settleQuickChecks();
     mode = next;
     entryId = null;
     render();
+  }
+  // Leaving Quick check folds its answers in now and picks up the new version,
+  // so the next save here is not refused as coming from an old copy.
+  async function settleQuickChecks() {
+    const token = epoch;
+    try {
+      if (!(await quickChecks.settle()) || token !== epoch || busy) return;
+      const value = await api.load();
+      if (token !== epoch || busy) return;
+      journal = value.journal;
+      version = value.version;
+      render();
+    } catch {
+      // The scheduled run applies them; the answers are already stored.
+    }
   }
   async function rateDish(visit, dish, value) {
     if (busy) return;
@@ -919,6 +938,14 @@ export function createFoodJournalView({
       if (trigger.isConnected) trigger.disabled = false;
     }
   }
+  const quickChecks = createQuickCheckSession({
+    api,
+    storage,
+    journal: () => journal,
+    onChange: () => {
+      if (loaded) render();
+    },
+  });
   const pageContext = {
     journal: () => journal,
     today,
@@ -978,6 +1005,10 @@ export function createFoodJournalView({
     ];
     if (queue) tabs.push(["fixup", `Fix up (${queue})`]);
     if (unsure) tabs.push(["venues", `Check venues (${unsure})`]);
+    const checksLeft = loaded && quickChecks.loaded ? quickChecks.cards().length : 0;
+    if (mode === "quick" && !checksLeft && !quickChecks.answeredNow) mode = "magazine";
+    if (checksLeft || quickChecks.answeredNow)
+      tabs.push(["quick", `Quick check (${checksLeft})`]);
     for (const [id, label] of tabs) {
       const b = button(label, () => setMode(id), "ghost");
       b.className = "hub-pills__btn";
@@ -1047,6 +1078,10 @@ export function createFoodJournalView({
     }
     if (mode === "venues") {
       paintVenueCheck(pageContext, host, venueIndex);
+      return;
+    }
+    if (mode === "quick") {
+      paintQuickCheck(pageContext, host, quickChecks);
       return;
     }
     if (mode === "recipes") {
@@ -2703,6 +2738,7 @@ export function createFoodJournalView({
     loaded = false;
     entryId = null;
     fixIndex = 0;
+    quickChecks.reset();
     book = { sort: "recent" };
     editorialFailed.clear();
     photoCache.clear();
