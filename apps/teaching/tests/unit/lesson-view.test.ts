@@ -128,6 +128,21 @@ describe('mountStudentLessonView', () => {
     });
   });
 
+  it('a plain link finds its class for the token, and the lesson stays as it was', async () => {
+    localStorage.clear();
+    vi.mocked(apiGet).mockImplementation(async (path: string) =>
+      (path.endsWith('?classes=1') ? { classes: [{ id: CLASS_ID, title: '12 English' }] } : publishedLesson()) as never
+    );
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008' });
+    await vi.waitFor(() => {
+      const href = root.querySelector('a.st-token')?.getAttribute('href') ?? '';
+      expect(href).toContain(`/s/classes/${CLASS_ID}/profile?from=${encodeURIComponent('/s/lessons/lesson_lkeep_008')}`);
+    });
+    expect(root.querySelector('.lf')).toBeNull();
+  });
+
   it('shows not-found without a back link when lesson missing', async () => {
     vi.mocked(apiGet).mockRejectedValue(
       new ApiClientError({ code: 'not_found', message: 'missing' })

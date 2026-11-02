@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import { lessonToReturnTo, mountInitialsToken } from '@/student/initials-token';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { classForPlainLesson, lessonToReturnTo, mountInitialsToken } from '@/student/initials-token';
+import { apiGet, apiPost } from '@/api/client';
+
+vi.mock('@/api/client', () => ({ apiGet: vi.fn(), apiPost: vi.fn(), ApiClientError: class extends Error {} }));
 
 const flush = async () => { for (let i = 0; i < 4; i += 1) await new Promise((r) => setTimeout(r, 0)); };
 const mount = (call: () => Promise<{ need: 'initials' | null; initials?: string; unseen?: number }>) =>
@@ -49,5 +52,37 @@ describe('lessonToReturnTo', () => {
     expect(from('https://elsewhere.example/s/lessons/l1')).toBeNull();
     expect(from('//elsewhere.example/s/lessons/l1')).toBeNull();
     expect(lessonToReturnTo('')).toBeNull();
+  });
+});
+
+describe('classForPlainLesson', () => {
+  const classes = (...ids: string[]) => vi.mocked(apiGet).mockResolvedValue({ classes: ids.map((id) => ({ id })) });
+  beforeEach(() => {
+    localStorage.clear();
+    vi.mocked(apiGet).mockReset();
+    vi.mocked(apiPost).mockReset();
+  });
+  it('takes the lesson\'s only class and remembers it, so the lookup runs once', async () => {
+    classes('c1');
+    expect(await classForPlainLesson('l1')).toBe('c1');
+    expect(await classForPlainLesson('l1')).toBe('c1');
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(apiGet).toHaveBeenCalledWith('/api/published/lessons/l1?classes=1');
+  });
+  it('picks the class that knows this device when there are several', async () => {
+    classes('c1', 'c2');
+    vi.mocked(apiPost).mockImplementation(async (path: string) => (path.includes('c2') ? { need: null, initials: 'BB', unseen: 0 } : { need: 'initials' }) as never);
+    expect(await classForPlainLesson('l2')).toBe('c2');
+  });
+  it('names no class when several classes share it and none knows the device, and asks again next time', async () => {
+    classes('c1', 'c2');
+    vi.mocked(apiPost).mockResolvedValue({ need: 'initials' } as never);
+    expect(await classForPlainLesson('l3')).toBeNull();
+    await classForPlainLesson('l3');
+    expect(apiGet).toHaveBeenCalledTimes(2);
+  });
+  it('names no class when the lesson is on none', async () => {
+    classes();
+    expect(await classForPlainLesson('l4')).toBeNull();
   });
 });

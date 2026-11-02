@@ -9,7 +9,7 @@ import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
-import { mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
+import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
@@ -315,6 +315,16 @@ export function mountStudentLessonView(
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh() });
       content.append(footer.element);
+    } else {
+      // A plain link: the token still finds its class, in its own time.
+      void classForPlainLesson(lesson.lesson_id).then(
+        (found) => {
+          if (!found || disposed || isStale() || token) return;
+          token = mountInitialsToken({ classId: found, from: `/s/lessons/${lesson.lesson_id}` });
+          header.append(token.element);
+        },
+        () => undefined
+      );
     }
   };
 

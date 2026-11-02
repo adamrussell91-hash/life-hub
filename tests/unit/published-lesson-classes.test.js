@@ -49,3 +49,16 @@ test('a lecture link lists the classes it is scheduled in; a quiz link adds noth
   assert.deepEqual((await load(store, 'lec1')).classes, [{ id: 'c2', title: '10 History' }]);
   assert.equal((await load(store, 'q1')).classes, undefined);
 });
+
+test('?classes=1 names an ordinary lesson\'s classes, and the lesson itself still adds none', async () => {
+  const store = storeOf(Object.fromEntries([
+    ['lessons/l1', { id: 'l1', unit_id: 'u1' }],
+    ['published/lessons/l1', { lesson_id: 'l1', blocks: [] }],
+    ['scheduled_lessons/s1', { id: 's1', class_id: 'c1', lesson_id: 'l1' }],
+    classRow('c1', '9 English'),
+    classRow('c2', '10 History')
+  ]));
+  const body = await load(store, 'l1?classes=1');
+  assert.deepEqual(body, { classes: [{ id: 'c1', title: '9 English' }] });
+  assert.equal((await load(store, 'l1')).classes, undefined);
+});
