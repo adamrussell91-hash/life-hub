@@ -21,7 +21,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
-import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
+import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
@@ -66,7 +66,9 @@ export const voiceKeys = {
   part: (uploadId, index) => `voice_parts/${uploadId}/${String(index).padStart(4, '0')}`,
   queue: (lesson, block, id) => `voice_transcribe_queue/${lesson}/${block}/${id}`,
   queuePrefix: (lesson, block) => (lesson ? `voice_transcribe_queue/${lesson}/${block}/` : 'voice_transcribe_queue/'),
-  due: (stamp, lesson, block, id) => `voice_audio_due/${stamp}/${lesson}/${block}/${id}`
+  due: (stamp, lesson, block, id) => `voice_audio_due/${stamp}/${lesson}/${block}/${id}`,
+  /** The AI's read of a take (To mark): teacher only, so it sits beside the record students read. */
+  aiRead: (lesson, block, id) => `voice_ai/${lesson}/${block}/${id}`
 };
 
 /** 2026-11-18T03:04:05Z → 202611180304; sorts as text. */
@@ -317,7 +319,8 @@ export async function getVoiceSubmission(store, lesson, block, id) {
     const roster = await loadRoster(store, classId);
     if (roster) classes.push({ id: classId, title, students: roster.students.map(({ id: sid, initials, name }) => ({ id: sid, initials, name })) });
   }
-  return { ...record, classes };
+  const aiRead = await read(store, voiceKeys.aiRead(lesson, block, id));
+  return { ...record, classes, ...(aiRead ? { ai_read: aiRead } : {}) };
 }
 
 /** How many words the transcript holds, wherever Whisper put them: top level, in segments, or only as text. */
@@ -398,6 +401,7 @@ export async function deleteVoiceSubmission(store, lesson, block, id) {
   await Promise.all([
     store.delete(voiceKeys.claim(lesson, block, record.device_hash)),
     store.delete(voiceKeys.queue(lesson, block, id)).catch(() => undefined),
+    store.delete(voiceKeys.aiRead(lesson, block, id)).catch(() => undefined),
     store.delete(voiceKeys.due(dueStamp(record.audio_delete_after), lesson, block, id)).catch(() => undefined)
   ]);
   await store.delete(voiceKeys.submission(lesson, block, id));
@@ -410,7 +414,57 @@ export async function requeueTranscription(store, lesson, block, id) {
   const next = { ...record, transcript_status: 'pending', transcribe_attempts: 0, transcript_error: undefined };
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
   await store.setJSON(voiceKeys.queue(lesson, block, id), {});
+  await store.delete(voiceKeys.aiRead(lesson, block, id)).catch(() => undefined);
   return teacherRecord(next);
+}
+
+/* ── The AI's read of a take (To mark) ────────────────────────────── */
+
+const spokenText = (record) => (record.transcript?.words ?? record.transcript?.segments?.flatMap((s) => s.words ?? []) ?? []).map((w) => w.word).join(' ').replace(/\s+/g, ' ').trim();
+
+/** What a question asks the AI to listen for: its pass checklist and target pieces. Null when it isn't step evidence. */
+export function readingQuestion(block, unit) {
+  const settings = block?.settings ?? {};
+  const checks = Array.isArray(settings.deep_checks) ? settings.deep_checks.filter((c) => typeof c === 'string' && c.trim()) : [];
+  const all = (unit?.deep_understandings ?? []).flatMap((d) => d.pieces ?? []);
+  const targets = (Array.isArray(settings.deep_targets) ? settings.deep_targets : []).map((id) => all.find((p) => p.id === id)).filter(Boolean);
+  if (!settings.deep_step || (!checks.length && !targets.length)) return null;
+  return { prompt: block.content?.prompt ?? '', checks, pieces: targets.map((p, i) => ({ ref: `p${i + 1}`, text: p.text, piece: p.id })) };
+}
+
+/** Takes on one question the AI hasn't read and the teacher hasn't returned, under opaque ids the server maps back. */
+export async function gatherVoiceRead(store, lesson, block) {
+  if (!isSafeId(lesson) || !isSafeId(block)) reject(404, 'not_found', 'Activity not found.');
+  const draft = await read(store, draftLessonKey(lesson));
+  const found = draft ? findVoiceBlock(draft.blocks, block) : null;
+  const unit = draft?.unit_id ? await read(store, unitKey(draft.unit_id)) : null;
+  const question = readingQuestion(found, unit);
+  if (!question) return { question: null, takes: [], refs: {} };
+  const takes = [];
+  const refs = {};
+  for (const key of await listBlobKeys(store, voiceKeys.submissions(lesson, block))) {
+    const record = await read(store, key);
+    if (!record || record.status === 'returned') continue;
+    const text = spokenText(record);
+    if (!text || (await read(store, voiceKeys.aiRead(lesson, block, record.id)))) continue;
+    const id = `t${takes.length + 1}`;
+    takes.push({ id, text });
+    refs[id] = record.id;
+  }
+  return { question, takes, refs };
+}
+
+/** Saves each read, mapping pieces back to their ids. Returns how many were written. */
+export async function applyVoiceReads(store, lesson, block, gathered, reads, { job, at = new Date().toISOString() } = {}) {
+  let written = 0;
+  for (const r of reads) {
+    const id = Object.hasOwn(gathered.refs, r.id) ? gathered.refs[r.id] : null;
+    if (!id) continue;
+    const pieces = Object.fromEntries(gathered.question.pieces.map((p) => [p.piece, r.pieces[p.ref]]));
+    await store.setJSON(voiceKeys.aiRead(lesson, block, id), { checks: r.checks, pieces, model: r.model, at, job: job ?? null });
+    written += 1;
+  }
+  return { written };
 }
 
 /* ── Background work: transcription and retention ─────────────────── */

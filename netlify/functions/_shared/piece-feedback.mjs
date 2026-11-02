@@ -36,7 +36,7 @@ function studentOf(roster, id) {
 }
 
 /** Tags that land inside the frozen text, with known codes. */
-function cleanTags(raw, text, codes) {
+export function cleanTags(raw, text, codes) {
   if (!Array.isArray(raw)) return [];
   const known = new Set(codes.map((c) => c.id));
   const out = [];
@@ -51,6 +51,17 @@ function cleanTags(raw, text, codes) {
     out.push(tag);
   }
   return out;
+}
+
+/** The growth codes on each of a student's returned pieces, oldest first, for the "come up again" warning. */
+export async function recentCodes(store, classId, studentId, exceptKey) {
+  const recent = [];
+  for (const k of await listBlobKeys(store, piecePrefix(classId, studentId))) {
+    const row = await read(store, k);
+    if (row?.status === 'returned' && k !== exceptKey) recent.push({ at: row.returned_at, codes: [...new Set((row.tags ?? []).filter((t) => !t.positive).map((t) => t.code_id))] });
+  }
+  recent.sort((a, b) => (a.at < b.at ? -1 : 1));
+  return recent;
 }
 
 const statusOf = (handin, feedback) => (!handin ? 'not_in' : feedback?.status === 'returned' ? 'returned' : feedback ? 'marking' : 'waiting');
@@ -77,12 +88,7 @@ export async function piecesAction(store, classId, body) {
   if (!handin) reject(409, 'not_in', 'This student hasn’t handed this in yet.');
 
   if (action === 'load') {
-    const recent = [];
-    for (const k of await listBlobKeys(store, piecePrefix(classId, student.id))) {
-      const row = await read(store, k);
-      if (row?.status === 'returned' && k !== key) recent.push({ at: row.returned_at, codes: [...new Set((row.tags ?? []).filter((t) => !t.positive).map((t) => t.code_id))] });
-    }
-    recent.sort((a, b) => (a.at < b.at ? -1 : 1));
+    const recent = await recentCodes(store, classId, student.id, key);
     // Skill criteria show the continuum's name for the sub-strand, not its id.
     const continuum = column.criteria.some((c) => c.skill) ? await readStoredSkills(store).catch(() => null) : null;
     const skillName = (ref) => {

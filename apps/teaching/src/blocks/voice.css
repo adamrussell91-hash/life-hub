@@ -1043,3 +1043,9 @@
     display: none;
   }
 }
+
+.voice-pass__item.is-ai input { outline: 1.5px dashed var(--pastel-lilac-ink); outline-offset: 1px; }
+.voice-pass__heard { display: block; font-size: var(--text-xs, .75rem); font-style: italic; color: var(--pastel-lilac-ink); }
+.voice-pass__piece.is-ai { border-style: dashed; border-color: var(--pastel-lilac-ink); }
+.voice-pass__piece.is-ai .voice-pass__mark { background: var(--pastel-lilac); border-color: var(--pastel-lilac-ink); color: var(--pastel-lilac-ink); }
+.voice-run--heard { background: var(--pastel-lilac) !important; }

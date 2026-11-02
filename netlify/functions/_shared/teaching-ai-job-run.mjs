@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
-import { runLessonAiJob, runNextStepsFill, runLaddersDraft, applyFilledBoxes, NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, runAnswerMarking, markingSummary, usdToAud } from './teaching-ai-runtime.mjs';
+import { runLessonAiJob, runNextStepsFill, runLaddersDraft, applyFilledBoxes, NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND, runVoiceRead, runAnswerMarking, markingSummary, usdToAud } from './teaching-ai-runtime.mjs';
 import { QuizError, applyAiMarks, gatherAiMarking } from './quiz.mjs';
+import { applyVoiceReads, gatherVoiceRead } from './voice-submissions.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs';
@@ -324,7 +325,7 @@ export async function runStoredNextStepJob({
   return finish(patch);
 }
 
-export { ANSWER_MARK_JOB_KIND };
+export { ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND };
 /** A class's written answers go in calls of 12 on the standard lane; inside the panel's 10-minute wait. */
 export const ANSWER_MARK_JOB_DEADLINE_MS = 8 * 60 * 1000;
 
@@ -334,6 +335,60 @@ export const ANSWER_MARK_JOB_DEADLINE_MS = 8 * 60 * 1000;
  * skipped. Only answer text and opaque ids reach the model; the marks are
  * written to each attempt's ai-marks record and the cost is logged.
  */
+/** Reads viva takes on one question for To mark: suggestions beside each take, never a mark or a pass. */
+export async function runStoredVoiceReadJob({ store, jobId, env = process.env, complete, deadlineMs = ANSWER_MARK_JOB_DEADLINE_MS, nowIso = () => new Date().toISOString() }) {
+  const job = await getJSON(store, aiJobKey(jobId));
+  if (!job || job.status !== 'working' || job.kind !== VOICE_READ_JOB_KIND || !job.lesson_id || !job.block_id) return job;
+  const finish = patch => patchWorkingJob(store, jobId, { ...patch, phase: undefined }, nowIso);
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!complete && !apiKey) return finish({ status: 'error', error: 'Teaching AI is not configured: ANTHROPIC_API_KEY is missing on the server.' });
+  const gathered = await gatherVoiceRead(store, job.lesson_id, job.block_id);
+  if (!gathered.takes.length) return finish({ status: 'done', response: 'Nothing was waiting for the AI.', read: 0, waiting: 0, usage: [], cost_usd: 0 });
+
+  await patchWorkingJob(store, jobId, { phase: 'writing' }, nowIso);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  let result;
+  try {
+    result = await runVoiceRead({
+      complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }),
+      question: gathered.question,
+      takes: gathered.takes,
+      models: teachingModels(env),
+      signal: controller.signal
+    });
+  } catch (error) {
+    result = { status: 'error', error: error instanceof Error ? error.message : 'The AI job failed.', reads: [], waiting: 0, usage: [], cost_usd: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+  const patch = result.status !== 'done'
+    ? { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd }
+    : {
+        status: 'done',
+        response: `Read ${result.reads.length}`,
+        read: (await applyVoiceReads(store, job.lesson_id, job.block_id, gathered, result.reads, { job: jobId, at: nowIso() })).written,
+        waiting: result.waiting,
+        usage: result.usage,
+        cost_usd: result.cost_usd,
+        cost_aud: usdToAud(result.cost_usd)
+      };
+  await appendUsageLog(store, {
+    job_id: jobId,
+    lesson_id: job.lesson_id,
+    agent: null,
+    action: VOICE_READ_JOB_KIND,
+    protocol_id: null,
+    status: patch.status,
+    turns: result.usage?.length ?? 0,
+    failed_checks: result.waiting ?? 0,
+    cost_usd: result.cost_usd,
+    usage: result.usage,
+    at: nowIso()
+  });
+  return finish(patch);
+}
+
 export async function runStoredAnswerMarkingJob({
   store,
   jobId,

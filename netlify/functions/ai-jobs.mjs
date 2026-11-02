@@ -16,8 +16,9 @@ import {
   unresolvedJobForPage
 } from './_shared/knowledge-intake.mjs';
 import { kickLessonJobRun } from './_shared/teaching-ai-job-kick.mjs';
-import { ANSWER_MARK_JOB_KIND, estimateAnswerMarking, estimateLaddersDraft, estimateNextStepsFill, MAX_FILL_TARGETS, NEXT_STEP_JOB_KINDS } from './_shared/teaching-ai-runtime.mjs';
+import { ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND, estimateVoiceRead, estimateAnswerMarking, estimateLaddersDraft, estimateNextStepsFill, MAX_FILL_TARGETS, NEXT_STEP_JOB_KINDS } from './_shared/teaching-ai-runtime.mjs';
 import { QuizError, gatherAiMarking } from './_shared/quiz.mjs';
+import { gatherVoiceRead } from './_shared/voice-submissions.mjs';
 import { readFeedbackCodes } from './_shared/feedback-codes.mjs';
 import { readStoredSkills } from './_shared/skills-continuum.mjs';
 
@@ -40,7 +41,7 @@ function inboxFrom(jobs) {
 
 const NEXT_STEP_KINDS = new Set(NEXT_STEP_JOB_KINDS);
 /** Structured jobs that run beside a lesson's chat: next steps and AI marking. */
-const SIDE_JOB_KINDS = new Set([...NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND]);
+const SIDE_JOB_KINDS = new Set([...NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND]);
 
 /** A lesson's open chat job. Next-step and marking jobs run beside the chat, so they never hold it up. */
 export function unresolvedJobForLesson(inbox, lessonId) {
@@ -161,6 +162,39 @@ async function answerMarkJob(request, env, store, deps, value) {
   return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
 }
 
+/** The AI's read of viva takes on one question (`voice_ai_read`), from To mark. Suggestions only. */
+async function voiceReadJob(request, env, store, deps, value) {
+  const lesson_id = typeof value.lesson_id === 'string' ? value.lesson_id : '';
+  const block_id = typeof value.block_id === 'string' ? value.block_id : '';
+  if (!lesson_id || !block_id) return withCors(errorResponse(400, 'validation_error', 'Name the question to read.', false), request, env);
+  const gathered = await gatherVoiceRead(store, lesson_id, block_id);
+  const estimate = gathered.question ? estimateVoiceRead({ question: gathered.question, takes: gathered.takes, models: teachingModelsOf(env) }) : { kind: VOICE_READ_JOB_KIND, takes: 0, calls: 0, input_tokens: 0, output_tokens: 0, cost_usd: 0, cost_aud: 0 };
+  if (value.dry_run === true) return withCors(okResponse(200, { estimate }), request, env);
+  if (!estimate.takes) return withCors(errorResponse(400, 'validation_error', 'No takes are waiting for the AI.', false), request, env);
+
+  const inbox = (await getJSON(store, aiJobsInboxKey(), STRONG)) ?? { jobs: [] };
+  const open = (inbox.jobs ?? []).find(job => job.kind === VOICE_READ_JOB_KIND && job.status === 'working' && job.lesson_id === lesson_id && job.block_id === block_id);
+  const record = open ? await getJSON(store, aiJobKey(open.id), STRONG) : null;
+  if (record?.status === 'working' && !jobIsStale(record, (deps.now ?? Date.now)())) {
+    return withCors(jsonResponse(409, {
+      ok: false,
+      error: { code: 'conflict', message: 'These takes are already being read', retryable: false, details: { id: record.id, status: record.status } }
+    }), request, env);
+  }
+  const id = newId('ai_job');
+  const job = { id, kind: VOICE_READ_JOB_KIND, lesson_id, block_id, status: 'working', message: 'AI read takes', estimate, phase: 'queued', created_at: new Date().toISOString() };
+  await setJSON(store, aiJobKey(id), job);
+  await writeJobInbox(store, job);
+  const kicked = await (deps.kickLessonJobRun ?? kickLessonJobRun)(request, id);
+  if (!kicked) {
+    const failed = { ...job, status: 'error', phase: undefined, error: 'Could not start the AI runner. Try again.' };
+    await setJSON(store, aiJobKey(id), failed);
+    await writeJobInbox(store, failed);
+    return withCors(okResponse(202, { id, status: 'error', estimate }), request, env);
+  }
+  return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
+}
+
 /** Lane models can be overridden per deploy without a code change. */
 function teachingModelsOf(env) {
   return {
@@ -203,6 +237,7 @@ export function createAiJobsHandler(deps = {}) {
     const kind = typeof parsed.value.kind === 'string' ? parsed.value.kind : '';
     if (NEXT_STEP_KINDS.has(kind)) return nextStepJob(request, env, store, deps, parsed.value);
     if (kind === ANSWER_MARK_JOB_KIND) return answerMarkJob(request, env, store, deps, parsed.value);
+    if (kind === VOICE_READ_JOB_KIND) return voiceReadJob(request, env, store, deps, parsed.value);
     if (kind === 'knowledge_intake') {
       const page_id = typeof parsed.value.page_id === 'string' ? parsed.value.page_id.trim() : '';
       const agent = typeof parsed.value.agent === 'string' && parsed.value.agent

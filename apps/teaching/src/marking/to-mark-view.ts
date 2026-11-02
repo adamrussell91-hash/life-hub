@@ -1,7 +1,6 @@
 import { el } from '@/quiz/dom';
 import { navigate } from '@/app/router';
 import { apiGet } from '@/api/client';
-import { renderPageHeader } from '@/teacher/page-header';
 import './marking.css';
 
 export type ToMarkKind = 'piece' | 'quiz' | 'voice' | 'sprint' | 'handup' | 'ask';
@@ -21,6 +20,9 @@ export type ToMarkTask = {
   roster: number;
   answers?: number;
   who?: string[];
+  rows?: unknown[];
+  /** Takes on a tagged viva question the AI could still read. */
+  ai_ready?: number;
   oldest_at: string | null;
   late: boolean;
 };
@@ -96,7 +98,7 @@ export function toMarkView(tasks: ToMarkTask[], o: { limit?: number } = {}): HTM
   return root;
 }
 
-const loadQueue = () => apiGet<{ tasks: ToMarkTask[] }>('/api/to-mark').then((r) => r.tasks);
+export const loadQueue = () => apiGet<{ tasks: ToMarkTask[] }>('/api/to-mark').then((r) => r.tasks);
 
 /** The To mark box on the Teaching home: always there, so an empty queue reads as empty, not missing. */
 export function mountToMark(host: HTMLElement, load: () => Promise<ToMarkTask[]> = loadQueue): void {
@@ -105,31 +107,4 @@ export function mountToMark(host: HTMLElement, load: () => Promise<ToMarkTask[]>
     (tasks) => host.replaceChildren(toMarkView(tasks, { limit: 5 })),
     () => host.replaceChildren(el('p', 'tm-sub', 'Could not load what is waiting for feedback.'))
   );
-}
-
-/** The To mark page: the whole queue. */
-export function mountToMarkPage(canvas: HTMLElement): { dispose: () => void } {
-  canvas.replaceChildren();
-  renderPageHeader(canvas, { eyebrow: 'Teaching', title: 'To mark', supporting: 'Student work waiting for your feedback, across your classes. Oldest first.' });
-  const body = el('div', 'tm-page');
-  body.append(el('p', 'tm-sub', 'Loading…'));
-  canvas.append(body);
-  let disposed = false;
-  void loadQueue().then(
-    (tasks) => {
-      if (disposed) return;
-      const view = toMarkView(tasks);
-      view.querySelector('.tm-top')?.remove();
-      body.replaceChildren(view);
-    },
-    () => {
-      if (!disposed) body.replaceChildren(el('p', 'tm-sub', 'Could not load what is waiting for feedback. Reload to try again.'));
-    }
-  );
-  return {
-    dispose: () => {
-      disposed = true;
-      body.remove();
-    }
-  };
 }

@@ -120,3 +120,20 @@ test('deleting an attempt or giving another go clears its AI marks', async () =>
   await quizTeacherAction(store, 'quiz1', { action: 'reset', attempt_id: wrenId });
   assert.equal(store.data.has(aiKey(wrenId)), false);
 });
+
+test('an AI-marked answer still waits in To mark, with its tags for the teacher and none for the student', async () => {
+  const { store, pipId } = await setup();
+  const { quizAnswersToMark } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const gathered = await gatherAiMarking(store, 'quiz1');
+  const id = Object.entries(gathered.refs).find(([, r]) => `${r.device}~${r.n}` === pipId && r.question_id === 'qb')[0];
+  await applyAiMarks(store, 'quiz1', gathered.refs, [{ id, marks: 3, reason: 'ESSAY-REASON', feedback: 'Add one more quote.', model: 'm', tags: [{ code_id: 'ev', quote: 'forgets its grief', why: 'TAG-WHY' }] }]);
+  const { students } = await loadRoster(store, 'class1');
+  const found = await quizAnswersToMark(store, 'quiz1', 'class1', students);
+  const answer = found.questions.find((q) => q.id === 'qb').answers.find((a) => a.initials === 'PQ');
+  assert.equal(answer.by, 'ai');
+  assert.equal(answer.ai.marks, 3);
+  assert.deepEqual(answer.ai.tags, [{ code_id: 'ev', quote: 'forgets its grief', why: 'TAG-WHY' }]);
+  const seen = JSON.stringify(await quizAction(store, 'quiz1', { ...pip }));
+  for (const leak of ['TAG-WHY', 'ESSAY-REASON']) assert.ok(!seen.includes(leak), `${leak} stays with the teacher`);
+});

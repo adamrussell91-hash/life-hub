@@ -56,6 +56,7 @@ import {
   summariseWriting
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
+import { readFeedbackCodes } from './feedback-codes.mjs';
 import { cleanStepPick } from './next-steps.mjs';
 import { exitUnlocked } from './tutorial-status.mjs';
 import { interleave, isGroupSet, liftGroupSets } from './group-sets.mjs';
@@ -399,6 +400,7 @@ function cleanAiMark(raw, max) {
     ...(VERDICTS.has(raw.verdict) ? { verdict: raw.verdict } : {}),
     ...(gaps ? { gaps } : {}),
     ...(typeof raw.suggested === 'number' && raw.suggested >= 0 && raw.suggested <= max ? { suggested: roundMarks(raw.suggested) } : {}),
+    ...(Array.isArray(raw.tags) && raw.tags.length ? { tags: raw.tags } : {}),
     reason: raw.reason,
     ...(typeof raw.feedback === 'string' && raw.feedback ? { feedback: raw.feedback } : {}),
     model: typeof raw.model === 'string' ? raw.model : '',
@@ -1116,8 +1118,53 @@ export async function quizTeacherAction(store, lessonId, body) {
 /** A scored row the AI can still mark: waiting for it, with no AI or teacher mark yet. */
 const waitsForAi = (row) => row.mark.pending === 'ai' && row.awarded === null && !row.ai;
 
+/**
+ * The To mark flow: one class's latest answers still waiting on the teacher,
+ * by question. An answer waits with no mark yet, or with only the AI's mark,
+ * since the AI suggests and the teacher decides.
+ */
+export async function quizAnswersToMark(store, lessonId, classId, students) {
+  let loaded;
+  try {
+    loaded = await loadQuiz(store, lessonId);
+  } catch (error) {
+    if (error instanceof QuizError) return null;
+    throw error;
+  }
+  const { record, k } = loaded;
+  const insight = await classInsight(store, lessonId, classId, loaded, { family: false });
+  if (!insight) return null;
+  const who = new Map(students.map((s) => [s.id, s]));
+  const questions = new Map();
+  await mapBounded(insight.attempts.filter((a) => who.has(a.student) && (a.pending > 0 || a.ai_review > 0)), 8, async (a) => {
+    const match = ATTEMPT_ID.exec(a.attempt_id);
+    if (!match) return;
+    const [device, n] = [match[1], Number(match[2])];
+    const [start, result, marks, aiMarks] = await Promise.all([read(store, k.attempt(device, n)), read(store, k.result(device, n)), read(store, k.marks(device, n)), read(store, k.aiMarks(device, n))]);
+    if (!start || !result) return;
+    const rec = narrow(await recordFor(store, lessonId, start.version, record), start.student_id);
+    for (const row of scoreAttempt(rec, result, marks, aiMarks).rows) {
+      if (row.awarded !== null && row.by !== 'ai') continue;
+      const { question, key } = rec.questions[row.id];
+      if (!questions.has(row.id)) {
+        questions.set(row.id, {
+          id: row.id, kind: key.kind, marks: key.marks, prompt: question.prompt ?? '', ...(question.quote ? { quote: question.quote } : {}),
+          ...(key.answer?.type === 'manual' && key.answer.guide ? { guide: key.answer.guide } : {}),
+          ...(key.answer?.type === 'manual' && key.answer.model_answer ? { model_answer: key.answer.model_answer } : {}),
+          answers: []
+        });
+      }
+      questions.get(row.id).answers.push({
+        attempt_id: a.attempt_id, student_id: a.student, initials: who.get(a.student).initials, name: who.get(a.student).name, submitted_at: a.submitted_at,
+        response: row.response, awarded: row.awarded, by: row.by, ai_ready: waitsForAi(row) && hasAnswer(row.response), ...(row.ai ? { ai: row.ai } : {}), ...(row.comment ? { comment: row.comment } : {})
+      });
+    }
+  });
+  return { lesson_id: lessonId, title: insight.title, questions: [...questions.values()] };
+}
+
 /** A question as the AI marker reads it (MarkingQuestion in answer-marking-jobs.ts): teaching text and the key, nothing about students. */
-function markingQuestion(ref, { question, key }) {
+function markingQuestion(ref, { question, key }, codes = []) {
   const a = key.answer;
   const passage = key.kind === 'fill_gap' && Array.isArray(question.parts)
     ? question.parts.map((part) => (part.type === 'gap' ? `[gap ${part.id}]` : part.text)).join('')
@@ -1134,7 +1181,8 @@ function markingQuestion(ref, { question, key }) {
     ...(a.type === 'gaps' ? { gaps: a.gaps } : {}),
     ...(key.looking_for ? { looking_for: key.looking_for } : {}),
     ...(a.type === 'manual' && a.guide ? { guide: a.guide } : {}),
-    ...(a.type === 'manual' && a.model_answer ? { model_answer: a.model_answer } : {})
+    ...(a.type === 'manual' && a.model_answer ? { model_answer: a.model_answer } : {}),
+    ...(a.type === 'manual' && codes.length ? { codes } : {})
   };
 }
 
@@ -1147,6 +1195,8 @@ function markingQuestion(ref, { question, key }) {
  */
 export async function gatherAiMarking(store, lessonId) {
   const { record, k } = await loadQuiz(store, lessonId);
+  const library = await readFeedbackCodes(store);
+  const codes = library.filter((c) => !c.hidden && c.group === 'composition').map(({ id, code, label }) => ({ id, code, label }));
   const questions = new Map();
   const answers = [];
   const refs = {};
@@ -1162,7 +1212,7 @@ export async function gatherAiMarking(store, lessonId) {
     for (const row of scoreAttempt(rec, result, teacherMarks, aiMarks).rows) {
       if (!waitsForAi(row) || !hasAnswer(row.response)) continue;
       const qKey = `${rec.version}:${row.id}`;
-      if (!questions.has(qKey)) questions.set(qKey, markingQuestion(`q${questions.size + 1}`, rec.questions[row.id]));
+      if (!questions.has(qKey)) questions.set(qKey, markingQuestion(`q${questions.size + 1}`, rec.questions[row.id], codes));
       const id = `a${answers.length + 1}`;
       const { text, gaps } = row.response;
       answers.push({ id, question: questions.get(qKey).ref, ...(typeof text === 'string' ? { text } : {}), ...(gaps && typeof gaps === 'object' ? { gaps } : {}) });
@@ -1200,6 +1250,7 @@ export async function applyAiMarks(store, lessonId, refs, marks, { job, at = new
         ...(typeof m.suggested === 'number' ? { suggested: m.suggested } : {}),
         reason: m.reason,
         ...(m.feedback ? { feedback: m.feedback } : {}),
+        ...(m.tags?.length ? { tags: m.tags } : {}),
         model: m.model,
         at,
         job: job ?? null
@@ -1278,6 +1329,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
       score: scored.score,
       max: scored.max,
       pending: scored.pending,
+      ai_review: scored.rows.filter((r) => r.by === 'ai').length,
       practice: scored.practice,
       writing_flags: flaggedAnswers(a.result),
       rows: scored.rows.map((r) => {
@@ -1465,7 +1517,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   let firstAt = null;
   for (const a of insight.attempts) {
     if (!wanted.has(a.student)) continue;
-    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
+    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, ai_review: a.ai_review ?? 0, practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
   const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store, loaded.record);

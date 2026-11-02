@@ -162,7 +162,7 @@ async function ownNote(store, roster, student, item) {
 }
 
 export async function pieceFor(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     const doc = await ownNote(store, roster, student, item);
     return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: null, ...toPublishedFeedbackPayload(doc, null) };
@@ -185,7 +185,7 @@ export async function pieceFor(store, roster, student, item) {
   const used = new Set([...tags, ...takes.flatMap((t) => t.tags ?? [])].map((t) => t.code_id));
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
-    text: handin?.text ? writingParts(handin.text) : null,
+    text: row.text ?? (handin?.text ? writingParts(handin.text) : null),
     tags,
     ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
     codes: library.filter((c) => used.has(c.id)),
@@ -199,7 +199,7 @@ export async function pieceFor(store, roster, student, item) {
 }
 
 export async function markSeen(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     await markNoteSeen(store, await ownNote(store, roster, student, item));
     return { ok: true };

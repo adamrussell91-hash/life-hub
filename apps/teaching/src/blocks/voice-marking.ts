@@ -150,3 +150,15 @@ export function commonestFiller(words: readonly VoiceWord[], ranges: ReadonlyArr
   }
   return best;
 }
+
+/** The first and last word of a quote in a transcript, ignoring case and punctuation. Null when it isn't there. */
+export function findQuoteWords(words: readonly VoiceWord[], quote: string): [number, number] | null {
+  const plain = (word: string): string => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const wanted = quote.split(/\s+/).map(plain).filter(Boolean);
+  if (!wanted.length) return null;
+  const said = words.map((w) => plain(w.w));
+  for (let i = 0; i + wanted.length <= said.length; i += 1) {
+    if (wanted.every((w, j) => said[i + j] === w)) return [i, i + wanted.length - 1];
+  }
+  return null;
+}

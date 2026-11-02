@@ -16,7 +16,9 @@ import { piecesAction } from './piece-feedback.mjs';
 import { readBook, classLessonIds } from './markbook.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
-import { CLASS_PREFIX, draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
+import { CLASS_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
+import { walkBlocks } from './question-drop.mjs';
+import { readingQuestion, voiceKeys } from './voice-submissions.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { sprintKeys } from './sprint-keys.mjs';
 import { ownerOf } from './sprint.mjs';
@@ -64,6 +66,7 @@ async function pieceItems(store, classId, book, base) {
       ...base, kind: 'piece', what: 'Handed-in work', column_id: column.id, title: column.title, lesson_id: column.piece.lesson_id, block_id: column.piece.block_id,
       href: `/mark/${encodeURIComponent(classId)}/${encodeURIComponent(column.id)}`,
       waiting: waiting.length, handed_in: handed.length, who: waiting.map((s) => s.initials).filter(Boolean),
+      rows: waiting.map((s) => ({ student_id: s.id, initials: s.initials })),
       oldest_at: oldest(waiting.map((s) => s.handed_in_at))
     });
   }
@@ -78,11 +81,12 @@ async function quizItems(store, roster, lessonIds, base) {
   const items = [];
   for (const q of found) {
     if (!q) continue;
-    const waiting = Object.entries(q.scores).filter(([, s]) => s.pending > 0);
+    // An answer only the AI has marked still waits: it suggests, the teacher decides.
+    const waiting = Object.entries(q.scores).filter(([, s]) => s.pending > 0 || s.ai_review > 0);
     if (!waiting.length) continue;
     items.push({
       ...base, kind: 'quiz', what: 'Quiz answers to mark', title: q.title, lesson_id: q.lesson_id, href: lessonPath(q.lesson_id),
-      waiting: waiting.length, handed_in: Object.keys(q.scores).length, answers: waiting.reduce((n, [, s]) => n + s.pending, 0),
+      waiting: waiting.length, handed_in: Object.keys(q.scores).length, answers: waiting.reduce((n, [, s]) => n + s.pending + (s.ai_review ?? 0), 0),
       who: waiting.map(([id]) => initials.get(id)).filter(Boolean), oldest_at: oldest(waiting.map(([, s]) => s.submitted_at))
     });
   }
@@ -108,7 +112,8 @@ async function sprintItems(store, roster, book, lessonIds, base) {
     if (waiting.length) {
       items.push({
         ...base, kind: 'sprint', what: 'Sprint reflections to mark', title, lesson_id: lessonId, href: lessonPath(lessonId),
-        waiting: waiting.length, handed_in: handed.length, who: waiting.map((s) => initials.get(s.id)).filter(Boolean), oldest_at: oldest(waiting.map((s) => s.sub.submitted_at))
+        waiting: waiting.length, handed_in: handed.length, who: waiting.map((s) => initials.get(s.id)).filter(Boolean), oldest_at: oldest(waiting.map((s) => s.sub.submitted_at)),
+        column_id: column || undefined, rows: waiting.map((s) => ({ student_id: s.id, initials: initials.get(s.id) ?? '–' }))
       });
     }
     const groups = await mapBounded(config.groups ?? [], 4, async (g) => ({ g, state: await read(store, k.group(g.id)) }));
@@ -141,6 +146,7 @@ function recordItems(byLesson, roster, lessonIds, claimed, base, o) {
       items.push({
         ...base, kind: o.kind, what: o.what, lesson_id: lessonId, block_id: blockId || undefined, href: lessonPath(lessonId, blockId),
         waiting: list.length, who: [...new Set(list.map(({ record }) => initials.get(record.student_id) ?? record.initials).filter(Boolean))],
+        rows: list.map((row) => ({ ...o.row(row), initials: initials.get(row.record.student_id) ?? row.record.initials ?? '–' })),
         oldest_at: oldest(list.map(({ record }) => o.at(record)))
       });
     }
@@ -158,14 +164,29 @@ const byBlock = (rows) => {
   return out;
 };
 const oneGroup = (rows) => (rows.length ? new Map([['', rows]]) : new Map());
+const voiceRow = ({ parts, record }) => ({ id: parts[2], student_id: record.student_id, has_transcript: Boolean(record.transcript?.words?.length ?? record.transcript?.segments?.length) });
+const handupRow = (source) => ({ parts, record }) => ({ id: `${parts[2]}~${parts[3]}`, source, text: record.text, scene_label: record.scene_label ?? record.block_label ?? '' });
 const handupKey = (key) => /^[^/]+\/[^/]+\/handups\//.test(key);
+
+/** Marks each take the AI has read, and counts the takes on a tagged question it could still read. */
+async function markAiReads(store, tasks, read_ids) {
+  await mapBounded(tasks.filter((t) => t.kind === 'voice'), 4, async (task) => {
+    const draft = await read(store, draftLessonKey(task.lesson_id));
+    const block = [...walkBlocks(draft?.blocks ?? [])].find((b) => b.id === task.block_id);
+    const unit = draft?.unit_id ? await read(store, unitKey(draft.unit_id)) : null;
+    const readable = Boolean(readingQuestion(block, unit));
+    for (const row of task.rows) row.ai_read = read_ids.has(voiceKeys.aiRead(task.lesson_id, task.block_id, row.id));
+    task.ai_ready = readable ? task.rows.filter((r) => r.has_transcript && !r.ai_read).length : 0;
+  });
+}
 
 export async function toMarkQueue(store, deps = {}) {
   const now = deps.now ? deps.now() : Date.now();
-  const [voice, lectureUps, tutorialUps] = await Promise.all([
+  const [voice, lectureUps, tutorialUps, aiReads] = await Promise.all([
     recordsByLesson(store, 'voice_submissions/', () => true),
     recordsByLesson(store, 'lecture/', handupKey),
-    recordsByLesson(store, 'tutorial/', handupKey)
+    recordsByLesson(store, 'tutorial/', handupKey),
+    listBlobKeys(store, 'voice_ai/')
   ]);
   const claimed = { voice: new Set(), lecture: new Set(), tutorial: new Set() };
   const tasks = [];
@@ -175,9 +196,9 @@ export async function toMarkQueue(store, deps = {}) {
     const base = { class_id: classId, class_title: roster.cls.display_name || roster.cls.title || 'Class', roster: roster.students.length };
     const [{ book }, lessonIds] = await Promise.all([readBook(store, classId), classLessonIds(store, roster)]);
     const records = [
-      ...recordItems(voice, roster, lessonIds, claimed.voice, base, { kind: 'voice', what: 'Recordings to return', waiting: (r) => r.status !== 'returned', group: byBlock, at: (r) => r.submitted_at }),
-      ...recordItems(lectureUps, roster, lessonIds, claimed.lecture, base, { kind: 'handup', what: 'Lecture hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at }),
-      ...recordItems(tutorialUps, roster, lessonIds, claimed.tutorial, base, { kind: 'handup', what: 'Tutorial hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at })
+      ...recordItems(voice, roster, lessonIds, claimed.voice, base, { kind: 'voice', what: 'Recordings to return', waiting: (r) => r.status !== 'returned', group: byBlock, at: (r) => r.submitted_at, row: voiceRow }),
+      ...recordItems(lectureUps, roster, lessonIds, claimed.lecture, base, { kind: 'handup', what: 'Lecture hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at, row: handupRow('lecture') }),
+      ...recordItems(tutorialUps, roster, lessonIds, claimed.tutorial, base, { kind: 'handup', what: 'Tutorial hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at, row: handupRow('tutorial') })
     ];
     const [pieces, quizzes, sprints, titled] = await Promise.all([
       pieceItems(store, classId, book, base),
@@ -187,6 +208,7 @@ export async function toMarkQueue(store, deps = {}) {
     ]);
     tasks.push(...pieces, ...quizzes, ...sprints, ...titled);
   }
+  await markAiReads(store, tasks, new Set(aiReads));
   for (const t of tasks) t.late = Boolean(t.waiting && t.oldest_at) && now - Date.parse(t.oldest_at) >= LATE_DAYS * 86400000;
   tasks.sort((a, b) => (b.waiting > 0) - (a.waiting > 0) || String(a.oldest_at).localeCompare(String(b.oldest_at)));
   return { tasks };

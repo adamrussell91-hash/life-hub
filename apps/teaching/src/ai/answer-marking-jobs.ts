@@ -52,6 +52,8 @@ export type MarkingQuestion = {
   looking_for?: string;
   guide?: string;
   model_answer?: string;
+  /** Written answers: the teacher's feedback codes the AI may suggest on the student's words. */
+  codes?: { id: string; code: string; label: string }[];
 };
 
 /** One answer, under its opaque id: text for short and written answers, gaps for fill the gap. */
@@ -67,8 +69,14 @@ export type AnswerMark = {
   suggested?: number;
   reason: string;
   feedback?: string;
+  /** Written answers: codes suggested on the student's exact words, for the teacher to keep or drop. */
+  tags?: SuggestedTag[];
   model: string;
 };
+
+export type SuggestedTag = { code_id: string; quote: string; why?: string };
+/** Few enough to check at a glance. */
+export const MAX_SUGGESTED_TAGS = 3;
 
 const isLong = (kind: AiMarkKind): boolean => kind === 'extended_response' || kind === 'explain_effect';
 const hasCriteria = (q: MarkingQuestion): boolean => !!(q.guide?.trim() || q.model_answer?.trim());
@@ -118,7 +126,8 @@ export const LONG_SYSTEM = [
   'Give marks as a whole or half number from 0 to the maximum. Set unsure to true when a fair teacher could reasonably give a different mark, and still give your best mark.',
   'reason: one or two sentences for the teacher on why it earns that mark.',
   'feedback: one to three sentences to the student, speaking to them as "you". First say what they did well, then give one next step as something to do or add in this answer. Open with what they did, never with a phrase about the answer or task such as "This answer" or "In this response". Avoid the words "not", "without", "never", "rather than", "lacks", "weak" and "fails". Never mention marks.',
-  'Reply with JSON only: {"marks":[{"id":"a1","marks":2,"unsure":false,"reason":"…","feedback":"…"}]}'
+  'tags: when the question lists Codes, up to three of them on the student’s own words, each with the code, an exact quote of their words and why in under twelve words. Leave tags out when no code fits.',
+  'Reply with JSON only: {"marks":[{"id":"a1","marks":2,"unsure":false,"reason":"…","feedback":"…","tags":[{"code":"E","quote":"…","why":"…"}]}]}'
 ].join('\n\n');
 
 const systemFor = (kind: AiMarkKind): string => (kind === 'fill_gap' ? GAP_SYSTEM : isLong(kind) ? LONG_SYSTEM : SHORT_SYSTEM);
@@ -142,6 +151,7 @@ export function markingPrompt(q: MarkingQuestion, answers: readonly MarkingAnswe
     if (q.guide?.trim()) lines.push(`How to mark it: ${q.guide.trim()}`);
     if (q.model_answer?.trim()) lines.push(`Model answer: ${q.model_answer.trim()}`);
     if (!hasCriteria(q)) lines.push('No criteria given: mark against the question alone.');
+    if (q.codes?.length) lines.push(`Codes: ${q.codes.map((c) => `${c.code} ${c.label}`).join('; ')}`);
   }
   lines.push('', 'Answers:');
   for (const a of answers) {
@@ -153,6 +163,22 @@ export function markingPrompt(q: MarkingQuestion, answers: readonly MarkingAnswe
 /* ── Reading the reply ─────────────────────────────────────────────── */
 
 const cleanText = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+
+/** Tags with a known code on words the student really wrote; anything else is dropped. */
+function suggestedTags(raw: unknown, q: MarkingQuestion, text: string): SuggestedTag[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SuggestedTag[] = [];
+  for (const t of raw) {
+    const row = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
+    const code = q.codes?.find((c) => c.code === row.code);
+    const quote = cleanText(row.quote, 300);
+    if (!code || !quote || !text.includes(quote)) continue;
+    const why = cleanText(row.why, 200);
+    out.push({ code_id: code.id, quote, ...(why ? { why } : {}) });
+    if (out.length === MAX_SUGGESTED_TAGS) break;
+  }
+  return out;
+}
 
 /**
  * The marks in a reply that pass every check, for the answers this call sent.
@@ -200,7 +226,9 @@ export function readMarkingReply(text: string, q: MarkingQuestion, sent: readonl
       if (!feedback) continue;
       if (!hasCriteria(q) && !reason.startsWith(NO_CRITERIA)) reason = `${NO_CRITERIA} ${reason}`;
       const mark = roundMarks(marks);
-      out.push(row.unsure === true ? { id, marks: null, suggested: mark, reason, feedback, model } : { id, marks: mark, reason, feedback, model });
+      const tags = suggestedTags(row.tags, q, answer.text ?? '');
+      const extra = tags.length ? { tags } : {};
+      out.push(row.unsure === true ? { id, marks: null, suggested: mark, reason, feedback, model, ...extra } : { id, marks: mark, reason, feedback, model, ...extra });
     }
     seen.add(id);
   }

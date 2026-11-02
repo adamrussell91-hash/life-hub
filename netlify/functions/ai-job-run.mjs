@@ -1,6 +1,6 @@
 import { methodNotAllowed, okResponse, withCors, errorResponse } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
-import { ANSWER_MARK_JOB_KIND, NEXT_STEP_KINDS, runStoredAnswerMarkingJob, runStoredLessonJob, runStoredNextStepJob } from './_shared/teaching-ai-job-run.mjs';
+import { ANSWER_MARK_JOB_KIND, NEXT_STEP_KINDS, VOICE_READ_JOB_KIND, runStoredAnswerMarkingJob, runStoredLessonJob, runStoredNextStepJob, runStoredVoiceReadJob } from './_shared/teaching-ai-job-run.mjs';
 import { aiJobKey, getJSON } from './_shared/teaching-blobs.mjs';
 
 /**
@@ -22,6 +22,7 @@ export function createAiJobRunHandler(deps = {}) {
     const job = await getJSON(store, aiJobKey(jobId));
     if (NEXT_STEP_KINDS.has(job?.kind)) await runStoredNextStepJob({ store, jobId, env, ...(deps.runDeps ?? {}) });
     else if (job?.kind === ANSWER_MARK_JOB_KIND) await runStoredAnswerMarkingJob({ store, jobId, env, ...(deps.runDeps ?? {}) });
+    else if (job?.kind === VOICE_READ_JOB_KIND) await runStoredVoiceReadJob({ store, jobId, env, ...(deps.runDeps ?? {}) });
     else await runStoredLessonJob({ store, jobId, env, ...(deps.runDeps ?? {}) });
     return withCors(okResponse(202, { id: jobId }), request, env);
   }, deps);
