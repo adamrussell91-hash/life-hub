@@ -3,6 +3,7 @@
  */
 import { apiGet, ApiClientError } from '@/api/client';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { audioUrl } from '@/blocks/voice-client';
 import { createStudentShell, renderStudentChrome, renderStudentStatus, STUDENT_BRAND } from '@/student/shell';
 
 export type MountStudentFeedbackViewOptions = {
@@ -83,7 +84,7 @@ export function mountStudentFeedbackView(
       if (data.audio_url) {
         const audio = document.createElement('audio');
         audio.controls = true;
-        audio.src = data.audio_url;
+        audio.src = audioUrl(data.audio_url);
         audio.className = 'student-feedback__audio';
         article.append(audio);
       }
