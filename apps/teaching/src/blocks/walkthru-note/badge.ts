@@ -138,16 +138,22 @@ function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string; dis
     const cue = step.cue;
     if (cue) {
       if (cue.time) card.append(el('p', 'wts__time', cue.time));
+      const cues = el('div', 'wts__cues');
       if (cue.do.length) {
         const list = el('ul', 'wts__do');
         for (const line of cue.do) list.append(el('li', '', line));
-        card.append(el('p', 'wts__h', 'Do'), list);
+        const col = el('div', 'wts__cue');
+        col.append(el('p', 'wts__h', 'Do'), list);
+        cues.append(col);
       }
       if (cue.say.length) {
         const list = el('ul', 'wts__say');
         for (const line of cue.say) list.append(sayLine(line, state, question));
-        card.append(el('p', 'wts__h', 'Say'), list);
+        const col = el('div', 'wts__cue');
+        col.append(el('p', 'wts__h', 'Say'), list);
+        cues.append(col);
       }
+      if (cues.childElementCount) card.append(cues);
     }
     const adapted = data.goal?.walkthru?.adapted?.[String(step.n)];
     if (adapted) card.append(el('p', 'wts__adapted', adapted));
@@ -177,10 +183,13 @@ function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string; dis
     panel.append(pic, label);
     panel.addEventListener('click', () => state.goTo(step.n));
     cell.append(panel);
-    if (ticks) cell.append(ticks.button(step.n));
+    // One row under the picture: the step's tool, then the tick, which stays in the same corner of every step.
+    const foot = el('div', 'wts__foot');
     const tool = step.cue?.tool;
-    if (tool?.kind === 'timer') cell.append(miniTimer(tool.seconds, step.n, state));
-    else if (tool?.kind === 'names') cell.append(miniNames(step.n, state));
+    if (tool?.kind === 'timer') foot.append(miniTimer(tool.seconds, step.n, state));
+    else if (tool?.kind === 'names') foot.append(miniNames(step.n, state));
+    if (ticks) foot.append(ticks.button(step.n));
+    if (foot.childElementCount) cell.append(foot);
     cells.set(step.n, cell);
     strip.append(cell);
   }

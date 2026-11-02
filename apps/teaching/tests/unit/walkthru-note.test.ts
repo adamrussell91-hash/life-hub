@@ -343,6 +343,21 @@ describe('WalkThru strip under a block', () => {
   })) }] }] };
   const block = { id: 'r1', type: 'block', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher', content: { html: '<p>Why does the river keep rising?</p>' }, settings: { walkthru: 'w1-cold-calling' } } as unknown as Block;
 
+  it('keeps the tick last in one row with the step tool, on every step', async () => {
+    api.loadWalkthruText.mockResolvedValue(CUED);
+    api.loadWalkthruPictures.mockResolvedValue([null, null, null, null, null]);
+    const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+    const node = renderTechniqueBadge(block, { lessonId: 'lesson_1' }) as HTMLDetailsElement;
+    node.open = true;
+    node.dispatchEvent(new Event('toggle'));
+    await flush(); await flush();
+    const feet = [...node.querySelectorAll('.wts__cell > .wts__foot')];
+    expect(feet).toHaveLength(5);
+    for (const foot of feet) expect(foot.lastElementChild!.classList.contains('tk-wt__tick')).toBe(true);
+    expect(feet[1]!.querySelector('.wts-tool')).not.toBeNull();
+    expect(feet[0]!.querySelector('.wts-tool')).toBeNull();
+  });
+
   it('shows nothing for a block with no WalkThru chosen', async () => {
     const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
     expect(renderTechniqueBadge({ ...block, settings: {} } as Block)).toBeNull();
@@ -365,6 +380,7 @@ describe('WalkThru strip under a block', () => {
     expect(cells[2]!.querySelector('.wts-tool--names')).not.toBeNull();
     expect(cells[0]!.querySelector('.wts-tool')).toBeNull();
     const card = node.querySelector('.wts__card')!;
+    expect([...card.querySelectorAll('.wts__cues > .wts__cue > .wts__h')].map((h) => h.textContent)).toEqual(['Do', 'Say']);
     expect(card.textContent).toContain('Before you ask');
     expect(card.textContent).toContain('Everyone: Why does the river keep rising?');
     expect(card.querySelector('details.wts__book')).not.toBeNull();
