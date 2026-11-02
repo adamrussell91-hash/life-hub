@@ -79,3 +79,10 @@ await build({
   alias: { '@': './apps/teaching/src' },
   banner: {js:'// Generated from apps/teaching/src/evidence/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/marking/rubric-model.ts'],
+  outfile: 'netlify/functions/_shared/rubric-model.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  alias: { '@': './apps/teaching/src' },
+  banner: {js:'// Generated from apps/teaching/src/marking/rubric-model.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});

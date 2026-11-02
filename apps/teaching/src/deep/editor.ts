@@ -1,6 +1,6 @@
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block } from '@/schemas/block';
-import { placements, planGaps } from './derive';
+import { chainGaps, placements, planGaps } from './derive';
 import type { ScopeBullet, ScopePoint } from './scope';
 import {
   DEEP_LIMITS,
@@ -148,9 +148,11 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     );
     const parsed = DeepUnderstandingSchema.safeParse(du);
     const gaps = planGaps(du, all, p);
+    chainNote.replaceChildren(...chainGaps(du).map((gap) => h('div', 'du-warn', gap)));
     readyNote.textContent = parsed.success && !gaps.length ? 'Ready to teach.' : 'Fill the open circles to finish the plan. It saves as you go.';
   }
   const readyNote = h('p', 'du-sub');
+  const chainNote = h('div', 'du-chain');
 
   // ---------- 1 the claim ----------
   const sectionClaim = (): HTMLElement => {
@@ -308,6 +310,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
       evd.append(button('Write items', 'du-wr', () => opts.onOpenLesson?.(taught[0] ?? opts.lessons[0]!.id)));
     } else evd.append(h('span', 'du-cnt', 'No items yet'));
     row.append(seg, text, where, evd);
+    if (own) row.append(uPicker(piece));
     if (own) {
       const rm = button('Remove', 'du-link', () => {
         commit({ ...du, pieces: du.pieces.filter((x) => x.id !== piece.id) });
@@ -326,6 +329,35 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     const wrap = h('div', 'du-pwrap');
     wrap.append(row);
     if (finderFor === piece.id && opts.onTagLessons) wrap.append(finder(piece, taught));
+    return wrap;
+  }
+
+  /** The U dot point this piece builds, chosen from its deep understanding's own U points. */
+  function uPicker(piece: KnowledgePiece): HTMLElement {
+    const wrap = h('label', 'du-where du-upick');
+    wrap.append(h('span', 'du-wl', 'Builds'));
+    const select = h('select', 'du-upick__select');
+    select.setAttribute('aria-label', 'The U dot point this piece builds');
+    const short = (ref: string): string => opts.scope.points.find((x) => x.ref === ref)?.short ?? '';
+    const option = (value: string, label: string): void => {
+      const o = h('option', '', label);
+      o.value = value;
+      select.append(o);
+    };
+    option('', du.dot_points.some((r) => r.split(':')[1]?.startsWith('U')) ? 'Pick a U dot point' : 'This deep understanding has no U dot point yet');
+    const own = du.dot_points.filter((r) => r.split(':')[1]?.startsWith('U'));
+    for (const ref of own) option(ref, `${ref.split(':')[1]} ${short(ref)}`.trim());
+    if (piece.dot_point && !own.includes(piece.dot_point)) option(piece.dot_point, `${piece.dot_point.split(':')[1]} ${short(piece.dot_point)} (outside this deep understanding)`.trim());
+    select.value = piece.dot_point ?? '';
+    select.addEventListener('change', () => {
+      commit({ ...du, pieces: du.pieces.map((x) => {
+        if (x.id !== piece.id) return x;
+        const { dot_point: _old, ...rest } = x;
+        return select.value ? { ...rest, dot_point: select.value } : rest;
+      }) });
+      refreshLive();
+    });
+    wrap.append(select);
     return wrap;
   }
 
@@ -406,7 +438,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
         const rest = du.steps.filter((x) => x.step !== step);
         commit({ ...du, steps: fill.value.trim() ? [...rest, { step, fill: fill.value }] : rest });
       });
-      const task = p.steps.get(step);
+      const task = p.steps.get(step)?.[0];
       const evd = h('div', 'du-where');
       if (task) {
         const t = h('span', 'du-task', task.title);
@@ -439,7 +471,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     const panel = h('div', 'du-panel');
     const hd = h('h4', '', 'Ready to teach?');
     hd.append(info('Open circles are the gaps still in this plan. Close them in any order.'));
-    panel.append(hd, ready, readyNote);
+    panel.append(hd, ready, readyNote, chainNote);
     side.append(panel);
     root.replaceChildren(main, side);
     refreshLive();

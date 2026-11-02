@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mountVoiceDeep } from '@/blocks/voice-deep';
-import type { DeepProgress } from '@/deep/api';
 
 const block = {
   id: 'blk1',
@@ -11,72 +10,73 @@ const block = {
   }
 };
 const unit = {
-  unitId: 'unit_1',
-  deep: [{ id: 'du_hybform', pieces: [{ id: 'kp_hf01', text: 'Form acts out', tier: 'essential' }, { id: 'kp_hf02', text: 'Haibun', tier: 'essential' }] }]
-} as never;
-
-function fakeApi(progress: DeepProgress) {
-  return {
-    load: vi.fn(async () => progress),
-    setStep: vi.fn(async () => progress),
-    setWriting: vi.fn(async () => progress)
-  };
-}
+  deep_understandings: [{ id: 'du_hybform', dot_points: [], pieces: [{ id: 'kp_hf01', text: 'Form acts out', tier: 'essential' }, { id: 'kp_hf02', text: 'Haibun', tier: 'essential' }], steps: [] }]
+};
+const load = { lesson: async () => ({ unit_id: 'unit_1', blocks: [{ ...block, block_type: 'audio', content: {} }] }) as never, unit: async () => unit as never, codes: async () => [] };
+const progress = (step?: string) => vi.fn(async () => ({ steps: step ? { st1: { du_hybform: { step } } } : {} }));
+const who = { classId: 'class_1', studentId: 'st1' };
 const settle = () => new Promise((r) => setTimeout(r, 0));
-const buttons = (root: HTMLElement) => [...root.querySelectorAll('button')].map((b) => b.textContent ?? '');
 
-describe('voice marking deep panel', () => {
-  it('is absent for a question that is no step evidence', () => {
+describe('the rubric in the Voice marking dock', () => {
+  it('is absent for a question with no tags', () => {
     expect(mountVoiceDeep({ id: 'b', settings: {} }, 'lesson_1', null)).toBeNull();
   });
 
-  it('asks for the student before showing ticks', async () => {
-    const panel = mountVoiceDeep(block, 'lesson_1', null, { loadUnit: async () => unit, api: fakeApi({ steps: {}, writing: {} }) })!;
-    await settle();
-    expect(panel.el.textContent).toContain('Names two poems');
-    expect(panel.el.textContent).toContain('Pick the student');
+  it('appears for a question tagged with only a skill', () => {
+    expect(mountVoiceDeep({ id: 'b', settings: { deep_skills: ['arguing.thesis'] } }, 'lesson_1', null, { load })).not.toBeNull();
   });
 
-  it('offers Pass once the step before is passed, and saves it', async () => {
-    const api = fakeApi({ steps: { st1: { du_hybform: { step: '2b', at: '2026-11-01' } } }, writing: {} });
-    const panel = mountVoiceDeep(block, 'lesson_1', { classId: 'class_1', studentId: 'st1' }, { loadUnit: async () => unit, api })!;
+  it('asks for the student, and shows the rows', async () => {
+    const panel = mountVoiceDeep(block, 'lesson_1', null, { load, progress: progress() })!;
+    await panel.ready;
+    expect(panel.el.textContent).toContain('Names two poems');
+    expect(panel.el.textContent).toContain('Form acts out');
+    expect(panel.el.textContent).toContain('Pick the student');
+    panel.setWho(who);
     await settle();
+    expect(panel.el.textContent).not.toContain('Pick the student');
+  });
+
+  it('offers Pass once the step before is passed, and sends it with the take, leaving no direct save', async () => {
+    const onChange = vi.fn();
+    const panel = mountVoiceDeep(block, 'lesson_1', who, { load, progress: progress('2b'), onChange })!;
+    await panel.ready;
     await settle();
     const pass = [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Pass on Step 3')!;
+    expect(pass.hidden).toBe(false);
     pass.click();
-    expect(api.setStep).toHaveBeenCalledWith('class_1', 'unit_1', 'st1', 'du_hybform', '3', false);
+    expect(onChange).toHaveBeenCalled();
+    expect(panel.saveFields().rubric!.steps).toEqual({ 'du_hybform:3': { checks: [false], pass: true } });
   });
 
   it('holds Pass back until the earlier step is passed', async () => {
-    const panel = mountVoiceDeep(block, 'lesson_1', { classId: 'class_1', studentId: 'st1' }, { loadUnit: async () => unit, api: fakeApi({ steps: {}, writing: {} }) })!;
+    const panel = mountVoiceDeep(block, 'lesson_1', who, { load, progress: progress() })!;
+    await panel.ready;
     await settle();
-    await settle();
-    expect(buttons(panel.el)).not.toContain('Pass on Step 3');
+    expect(panel.el.querySelector<HTMLElement>('.rb-pass')!.hidden).toBe(true);
     expect(panel.el.textContent).toContain('Pass Step 2B first');
   });
 
-  it('cycles a piece from blank to used', async () => {
-    const api = fakeApi({ steps: {}, writing: {} });
-    const panel = mountVoiceDeep(block, 'lesson_1', { classId: 'class_1', studentId: 'st1' }, { loadUnit: async () => unit, api })!;
-    await settle();
-    await settle();
-    const piece = [...panel.el.querySelectorAll('button')].find((b) => b.textContent?.includes('Haibun'))!;
-    piece.click();
-    expect(api.setWriting).toHaveBeenCalledWith('class_1', 'unit_1', 'blk1', 'st1', ['kp_hf02'], []);
+  it('shows the AI read dashed with what it heard, keeps it on request, and never passes', async () => {
+    const ai = { checks: [{ met: true, quote: 'two poems here' }], pieces: { kp_hf01: true, kp_hf02: false } };
+    const panel = mountVoiceDeep(block, 'lesson_1', who, { load, progress: progress('2b'), ai })!;
+    await panel.ready;
+    expect(panel.el.querySelector('.rb-check')!.classList.contains('is-ai')).toBe(true);
+    expect(panel.el.textContent).toContain('“two poems here”');
+    expect(panel.el.querySelectorAll('.rb-pill.is-ai')).toHaveLength(2);
+    expect(panel.saveFields()).toEqual({});
+    [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Keep the AI’s read')!.click();
+    const rubric = panel.saveFields().rubric!;
+    expect(rubric.pieces).toEqual({ kp_hf01: 'used', kp_hf02: 'missed' });
+    expect(rubric.steps['du_hybform:3']).toEqual({ checks: [true], pass: false });
   });
 
-  it('shows the AI read dashed with what it heard, and the first tap makes it the teacher’s', async () => {
-    const ai = { checks: [{ met: true, quote: 'two poems here' }], pieces: { kp_hf01: true, kp_hf02: false } };
-    const panel = mountVoiceDeep(block, 'lesson_1', null, { loadUnit: async () => unit, api: fakeApi({ steps: {}, writing: {} }), ai })!;
-    await settle();
-    document.body.append(panel.el);
-    const label = panel.el.querySelector<HTMLElement>('.voice-pass__item')!;
-    const tick = label.querySelector('input')!;
-    expect(label.classList.contains('is-ai')).toBe(true);
-    expect(tick.checked).toBe(true);
-    expect(label.textContent).toContain('“two poems here”');
-    tick.click();
-    expect(label.classList.contains('is-ai')).toBe(false);
-    panel.el.remove();
+  it('opens itself to say a step stayed practice', async () => {
+    const panel = mountVoiceDeep(block, 'lesson_1', who, { load, progress: progress('2b') })!;
+    await panel.ready;
+    (panel.el as HTMLDetailsElement).open = false;
+    expect(panel.applyReply({ blocked: ['du_hybform:3'] })).toBe(true);
+    expect((panel.el as HTMLDetailsElement).open).toBe(true);
+    expect(panel.el.textContent).toContain('stays as practice');
   });
 });

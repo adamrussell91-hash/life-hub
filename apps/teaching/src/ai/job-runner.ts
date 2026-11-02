@@ -500,8 +500,8 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
         const isError = Boolean(value && typeof value === 'object' && 'error' in value);
         if (!isError) sight(value);
         if (call.name === 'list_question_tags' && !isError) {
-          const lists = value as { outcomes?: unknown[]; skills?: unknown[] };
-          sightings.tagLists = { outcomes: Boolean(lists.outcomes?.length), skills: Boolean(lists.skills?.length) };
+          const lists = value as { pieces?: unknown[]; skills?: unknown[] };
+          sightings.tagLists = { pieces: Boolean(lists.pieces?.length), skills: Boolean(lists.skills?.length) };
         }
         results.push({
           type: 'tool_result',

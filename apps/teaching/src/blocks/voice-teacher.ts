@@ -30,6 +30,7 @@ import { clock } from '@/blocks/voice-pacing';
 import { focusBox, summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
 import type { VoiceWord } from '@/blocks/voice-transcript';
 import { mountVoiceDeep, type VoiceAiRead } from '@/blocks/voice-deep';
+import type { Rubric } from '@/marking/rubric-model';
 
 /**
  * The teacher side of a Voice block: the submissions inbox and the one-tap
@@ -68,6 +69,7 @@ type Submission = Omit<Row, 'tag_count'> & {
   audio_url: string | null;
   fillers_suggested?: boolean;
   returned_at?: string;
+  rubric?: Rubric;
 };
 
 const STATUS_LABEL: Record<Status, string> = { new: 'New', marked: 'Marked', returned: 'Returned' };
@@ -104,11 +106,16 @@ function typingTarget(target: EventTarget | null): boolean {
 }
 
 /** One take on its own, for the To mark flow: no inbox, and its Return lives on the flow's bar. */
-export type VoiceTake = { el: HTMLElement; finish: () => Promise<void>; close: () => void };
+export type VoiceTake = {
+  el: HTMLElement;
+  /** Saves and returns the take. False when a step stayed practice: it isn't returned, and the rubric says why. */
+  finish: () => Promise<boolean>;
+  close: () => void;
+};
 
 export function mountVoiceTake(block: VoiceBlock, lessonId: string, takeId: string, onGone: () => void): VoiceTake {
-  let finish: () => Promise<void> = async () => undefined;
-  const take = { id: takeId, onGone, ready: (fn: () => Promise<void>) => { finish = fn; }, close: () => undefined as void };
+  let finish: () => Promise<boolean> = async () => true;
+  const take = { id: takeId, onGone, ready: (fn: () => Promise<boolean>) => { finish = fn; }, close: () => undefined as void };
   const root = mountVoiceTeacher(block, lessonId, take);
   return { el: root, finish: () => finish(), close: () => take.close() };
 }
@@ -116,7 +123,7 @@ export function mountVoiceTake(block: VoiceBlock, lessonId: string, takeId: stri
 export function mountVoiceTeacher(
   block: VoiceBlock,
   lessonId: string,
-  take?: { id: string; onGone: () => void; ready: (finish: () => Promise<void>) => void; close: () => void }
+  take?: { id: string; onGone: () => void; ready: (finish: () => Promise<boolean>) => void; close: () => void }
 ): HTMLElement {
   const root = el('div', 'voice-teacher');
   const alert = el('p', 'pf-alert');
@@ -248,7 +255,13 @@ export function mountVoiceTeacher(
     let saving: Promise<void> = Promise.resolve();
     let status = record.status;
     const aiRead = (record as Submission & { ai_read?: VoiceAiRead }).ai_read ?? null;
-    const deepPanel = mountVoiceDeep(block, lessonId, record.class_id && record.student_id ? { classId: record.class_id, studentId: record.student_id } : null, { ai: aiRead });
+    let stayedPractice = false;
+    const deepPanel = mountVoiceDeep(block, lessonId, record.class_id && record.student_id ? { classId: record.class_id, studentId: record.student_id } : null, {
+      ai: aiRead,
+      saved: record.rubric ?? null,
+      tagged: () => tags.filter((t) => t.confirmed),
+      onChange: () => queueSave()
+    });
 
     const screen = el('section', 'voice-mark');
     const top = el('div', 'voice-mark__top');
@@ -273,8 +286,12 @@ export function mountVoiceTeacher(
       if (guess) picker.value = `${guess.classId}|${guess.id}`;
       picker.addEventListener('change', () => {
         const [class_id, student_id] = picker.value.split('|');
-        if (class_id && student_id) void flush({ class_id, student_id });
         deepPanel?.setWho(class_id && student_id ? { classId: class_id, studentId: student_id } : null);
+        // A rubric saved before the student was named counts from here.
+        if (class_id && student_id) {
+          deepPanel?.touch();
+          void flush({ class_id, student_id });
+        }
       });
       const label = el('label', 'pf-field__label', 'This is');
       label.htmlFor = picker.id;
@@ -461,7 +478,12 @@ export function mountVoiceTeacher(
       actions.append(remove);
       take.ready(async () => {
         await flush();
+        if (stayedPractice) {
+          stayedPractice = false;
+          return false;
+        }
         await apiPost(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}/return`, {});
+        return true;
       });
     } else actions.append(send, remove);
     screen.append(summary, commentBox, actions);
@@ -860,6 +882,7 @@ export function mountVoiceTeacher(
       paintNotes();
       paintSummary();
       paintTime();
+      deepPanel?.refresh();
     }
 
     /* saving */
@@ -872,11 +895,14 @@ export function mountVoiceTeacher(
     function flush(extra: Record<string, unknown> = {}): Promise<void> {
       window.clearTimeout(saveTimer);
       saving = saving.then(async () => {
+        const fields = deepPanel?.saveFields() ?? {};
         try {
-          const saved = await apiPut<Submission>(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}`, { tags, comment, ...extra });
+          const saved = await apiPut<Submission>(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}`, { tags, comment, ...fields, ...extra });
           status = saved.status;
+          stayedPractice = deepPanel?.applyReply(saved) ?? false;
           saveState.textContent = status === 'returned' ? 'Saved. The student sees changes as you save.' : 'Saved';
         } catch (error) {
+          deepPanel?.failed();
           saveState.textContent = 'Not saved';
           showError(error);
         }

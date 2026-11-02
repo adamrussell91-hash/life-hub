@@ -13,6 +13,7 @@ import '@/blocks/voice.css';
 import type { FeedbackCode } from '@/blocks/feedback-codes';
 import type { MineState } from '@/blocks/voice-client';
 import type { Place, ReturnedItem } from '@/progress/types';
+import { returnedRubric, type ReturnedRubric } from './returned-rubric';
 
 const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', answer: 'Answer', note: 'Note' };
 
@@ -47,6 +48,8 @@ export type PiecePayload = {
   /** The codes this piece used, and the student's rung on each skill, for its one focus. */
   codes?: FeedbackCode[];
   rungs?: Record<string, string | null>;
+  /** Their skill rungs, the pieces they used and their next step, if the teacher marked with a rubric. */
+  rubric?: ReturnedRubric;
 };
 /** A note the teacher wrote and returned: its own document, with no tags or criteria. */
 export type NotePayload = { id: string; kind: 'note'; title: string; date: string; body_html: string; audio_url?: string | null; audio_deleted?: boolean };
@@ -79,6 +82,8 @@ function explain(tag: PieceTag): HTMLElement[] {
 
 function sideBoxes(p: PiecePayload): HTMLElement {
   const side = el('div', 'pg-piece__side');
+  const rubric = returnedRubric(p.rubric);
+  if (rubric) side.append(rubric);
   if (p.comment) {
     const c = el('div', 'pg-box');
     c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', p.comment));
@@ -119,7 +124,9 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HT
     return root;
   }
   const takes = p.takes ?? [];
-  const focus = focusBox(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs);
+  // A next step the teacher chose stands alone, with no second one worked out from the codes.
+  const chosen = p.rubric?.next_step || takes.some((t) => t.rubric?.next_step);
+  const focus = chosen ? null : focusBox(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs);
   if (focus) root.append(focus);
   if (takes.length) {
     takes.forEach((take, i) => root.append(renderVoiceFeedback(take, { focus: false, title: take.prompt?.trim() || `Take ${i + 1}` })));

@@ -662,3 +662,9 @@
   font-weight: 600;
   text-align: center;
 }
+
+/* Syllabus card: the pieces and skills this lesson works on, tapped as chips (chip look from deep/tag-row.css). */
+.dots-picks { display: grid; gap: var(--space-3, 12px); }
+.dots-picks__group { display: grid; gap: 4px; min-width: 0; }
+.dots-picks__title { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--navy); }
+.dots-picks__hint { margin: 0; font-size: var(--text-xs); color: var(--muted); }

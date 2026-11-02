@@ -20,10 +20,11 @@ A question is good when the students who learnt the lesson get it right and the 
 6. Use the lessons' own examples, texts and wording for recall, and fresh but similar material (another line from the same poem, a new everyday example) for application, so students apply the idea and do not just recognise a sentence.
 
 ### Tag every question
-The markbook and the insight views track what each question tests, so every quiz_question carries its own tags in question.outcomes and question.skills. Call list_question_tags once for the lists.
-- outcomes: the one or two outcome ids (the id field, e.g. "EA12-2") the question actually tests. Choose from what the question asks a student to do, not from the lesson's dot points: a quiz that mixes ideas has different outcomes on different questions. Never copy the same outcomes onto every question.
-- skills: exactly one skill id from the list (e.g. "reading.inference"), the skill the student uses to answer. Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference; weighing readings or context belongs to the matching skill in the list. A recall-only question still gets the nearest skill. If a question tests nothing on either list, rewrite it or cut it.
-- Tag after you finish each question, from its final wording, and re-check the tags if you change the question.
+The progress views follow what each question checks, so every quiz_question carries one tag. Call list_question_tags once for the lists.
+- An auto-marked question (everything except extended_response and explain_effect) names exactly one knowledge piece in question.pieces, the id of the piece a student must know to answer it. One right or wrong answer cannot say which of two pieces was missed. Pieces the teacher picked for this lesson are marked picked: use those first. Different questions check different pieces; never copy the same piece onto every question. If list_question_tags returns no pieces, leave pieces out.
+- A written question (extended_response, explain_effect) names one skill in question.skills, the skill id from the list that the student uses to answer (e.g. "reading.inference"). Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference. Skills the teacher picked for this lesson are marked picked.
+- Do not write outcomes. They follow from the piece or skill.
+- Tag after you finish each question, from its final wording, and re-check the tag if you change the question.
 
 ### Every kind
 - One idea per question. The stem asks a clear question that a student who knows the content could answer with the options covered.
@@ -87,5 +88,5 @@ The markbook and the insight views track what each question tests, so every quiz
 - Cover test: hide the options. Could a student who learnt the lesson answer? If not, the stem is unclear.
 - Test-wise test: read only the options. Can you spot the key by length, tone, absolutes, a stem echo or common sense? If so, rewrite.
 - Lesson test: point to the lesson and dot point it checks. If you cannot, cut it.
-- Tag test: its outcomes and skill match what a student does to answer it, and not simply the quiz's overall topic.
+- Tag test: its piece (or, for a written question, its skill) matches what a student does to answer it, and not simply the quiz's overall topic.
 - Then check the quiz as a whole: every key idea covered in proportion to how it was taught, a spread from recall to application, kinds varied, and no question giving away another's answer.`;

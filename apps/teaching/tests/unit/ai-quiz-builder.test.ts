@@ -45,7 +45,7 @@ function lesson(mode?: 'quiz' | 'direct_instruction' | 'seminar' | 'lecture', bl
 function quizBlock(id: string, question: Record<string, unknown>): Block {
   const block = createBlock('quiz_question', id);
   if (block.block_type !== 'quiz_question') throw new Error('expected quiz_question');
-  return { ...block, content: { question: { id, marks: 1, outcomes: ['EA12-1'], skills: ['reading.inference'], ...question } as never } };
+  return { ...block, content: { question: { id, marks: 1, pieces: ['kp_aaaa11'], skills: ['reading.inference'], ...question } as never } };
 }
 
 const goodMc = quizBlock('q1', {
@@ -115,12 +115,17 @@ describe('quizProposalIssues', () => {
     expect(quizProposalIssues(insertQuiz([goodMc, goodTf]), lesson('quiz'))).toEqual([]);
   });
 
-  it('asks for outcomes and a skill on every question', () => {
-    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, outcomes: undefined, skills: undefined });
+  it('asks an auto-marked question for one piece and a written one for a skill', () => {
+    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, pieces: undefined, skills: undefined });
     const issues = quizProposalIssues(insertQuiz([goodMc, bare]), lesson('quiz'));
-    expect(issues).toHaveLength(2);
-    expect(issues[0]).toMatch(/^Question 2 \(q_bare\): add outcomes/);
-    expect(issues[1]).toMatch(/^Question 2 \(q_bare\): add skills/);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/^Question 2 \(q_bare\): add pieces/);
+    const two = quizBlock('q_two', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, pieces: ['kp_aaaa11', 'kp_aaaa22'] });
+    expect(quizProposalIssues(insertQuiz([two]), lesson('quiz'))[0]).toMatch(/exactly one piece/);
+    const written = quizBlock('q_written', { kind: 'extended_response', prompt: 'Explain how the poet shapes the reader’s view of the road.', pieces: undefined, skills: undefined });
+    const writtenIssues = quizProposalIssues(insertQuiz([written]), lesson('quiz'));
+    expect(writtenIssues.join(' ')).toMatch(/q_written\): add skills/);
+    expect(writtenIssues.join(' ')).not.toMatch(/add pieces/);
   });
 
   it('names the question and the fix when an answer is missing', () => {
@@ -142,17 +147,17 @@ describe('quizProposalIssues', () => {
     expect(issues.join(' ')).toMatch(/question_set/);
   });
 
-  it('stops asking for outcomes when list_question_tags found none', () => {
-    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, outcomes: undefined });
-    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'), { tagLists: { outcomes: false, skills: true } })).toEqual([]);
-    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'))[0]).toMatch(/add outcomes/);
+  it('stops asking for a piece when the unit has none', () => {
+    const bare = quizBlock('q_bare', { kind: 'true_false', prompt: 'The alliance system linked Britain, France and Russia.', answer: true, pieces: undefined });
+    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'), { tagLists: { pieces: false, skills: true } })).toEqual([]);
+    expect(quizProposalIssues(insertQuiz([bare]), lesson('quiz'))[0]).toMatch(/add pieces/);
   });
 
   it('accepts a fill-the-gap question written without a prompt key, and still asks other kinds for one', () => {
     // Live test 21 Oct: Ann left prompt out of a fill_gap question and the check said "Write the question."
     const gap = createBlock('quiz_question', 'q_gap');
     if (gap.block_type !== 'quiz_question') throw new Error('expected quiz_question');
-    const noPrompt = { ...gap, content: { question: { id: 'q_gap', kind: 'fill_gap', marks: 2, passage: '[[Maiwar]] is the river.', outcomes: ['EA12-1'], skills: ['reading.inference'] } as never } } as Block;
+    const noPrompt = { ...gap, content: { question: { id: 'q_gap', kind: 'fill_gap', marks: 2, passage: '[[Maiwar]] is the river.', pieces: ['kp_aaaa11'], skills: ['reading.inference'] } as never } } as Block;
     expect(quizProposalIssues(insertQuiz([noPrompt]), lesson('quiz'))).toEqual([]);
     expect(validateMutatingProposal(insertQuiz([noPrompt]), emptySearchPack(''))).toEqual({ ok: true });
     expect(checkQuestion({ id: 'q_tf', kind: 'true_false', marks: 1, answer: true })).toEqual({ ok: false, message: 'Write the question.' });
@@ -395,7 +400,7 @@ describe('runLessonAiJob', () => {
     const reading = createBlock('rich_text', 'b_read');
     if (reading.block_type !== 'rich_text') throw new Error('expected rich_text');
     const linked = { ...reading, content: { ...reading.content, html: `<p><a href="${pdf}">Read the extract</a></p>` } } as Block;
-    const untagged = quizBlock('q_un', { kind: 'true_false', prompt: 'The road in the poem is a place of danger.', answer: true, outcomes: undefined });
+    const untagged = quizBlock('q_un', { kind: 'true_false', prompt: 'The road in the poem is a place of danger.', answer: true, pieces: undefined });
     const propose = (id: string) => toolUse(id, 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [linked, untagged] });
     const { complete } = scripted([
       { stop_reason: 'tool_use', usage, content: [propose('t1')] },
@@ -410,11 +415,11 @@ describe('runLessonAiJob', () => {
       complete,
       tools: [{ name: 'list_question_tags', input_schema: { type: 'object' } }, { name: 'search_notes', input_schema: { type: 'object' } }],
       runTool: async (name) => (name === 'list_question_tags'
-        ? { outcomes: [], skills: [{ id: 'reading.inference', name: 'Inferring' }] }
+        ? { pieces: [], skills: [{ id: 'reading.inference', name: 'Inferring' }] }
         : { hits: [`Bode's essay, free at ${pdf}.`] })
     });
     expect(result.checks?.[0]).toMatch(/Links and media must be ones already in the lesson.*ch07\.pdf/s);
-    expect(result.checks?.[0]).toMatch(/add outcomes/);
+    expect(result.checks?.[0]).toMatch(/add pieces/);
     expect(result.status).toBe('done');
     expect(result.proposal).toMatchObject({ kind: 'insert_blocks' });
   });

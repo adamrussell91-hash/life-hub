@@ -13,6 +13,10 @@ import { placements } from './derive';
 import { button, h, info, lessonCode, type LessonLike } from './editor';
 import { piecesFor, STEP_LABEL, STEP_NAME, type DeepUnderstanding, type KnowledgePiece, type PlacedStep, type Step } from './schema';
 import { circleFor, step1Passed, studentStep, type Circle } from './track';
+import { readyToPass, skillRungOf, skillsForDu } from './progress-extras';
+import { tagLabel } from '@/evidence/tags';
+import type { InsightContext } from '@/evidence/context';
+import { RUNG_NAME } from '@/evidence/syllabus-grid';
 
 export type Lane = '1' | '2a' | '2b' | '3' | '4' | 'done';
 const LANES: Lane[] = ['1', '2a', '2b', '3', '4', 'done'];
@@ -102,7 +106,8 @@ export type MonitorOptions = {
   scheduled: ScheduledLesson[];
 };
 
-type Loaded = { students: Array<{ id: string; initials: string }>; evidence: Evidence[]; progress: DeepProgress };
+/** `all` is every mark in the class, for skill rungs and ready-to-pass; `evidence` is the knowledge-piece marks the circles read. */
+type Loaded = { students: Array<{ id: string; initials: string }>; evidence: Evidence[]; all: Evidence[]; ctx: InsightContext; progress: DeepProgress };
 
 export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { destroy: () => void } {
   const root = h('div', 'du-root du-mon');
@@ -114,6 +119,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
   let filter: Lane | 'all' = 'all';
   let sort: 'initials' | 'notUsed' = 'initials';
   let selected: string | null = null;
+  let ready = new Map<string, PlacedStep[]>();
   let disposed = false;
   const today = todayInSydney();
 
@@ -127,10 +133,11 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     try {
       const view = await httpMarkbookApi.load(classId);
       const ctx = await loadInsightContext();
-      const evidence = classEvidence(view, ctx).evidence.filter((e) => e.tags.some((t) => t.startsWith('kp:')));
+      const all = classEvidence(view, ctx).evidence;
+      const evidence = all.filter((e) => e.tags.some((t) => t.startsWith('kp:')));
       const progress = await deepApi.load(classId, options.unit.id);
       if (disposed) return;
-      loaded = { students: view.students.filter((s) => !s.removed).map((s) => ({ id: s.id, initials: s.initials })), evidence, progress };
+      loaded = { students: view.students.filter((s) => !s.removed).map((s) => ({ id: s.id, initials: s.initials })), evidence, all, ctx, progress };
       message = '';
     } catch {
       loaded = null;
@@ -207,6 +214,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     if (message) { const m = h('p', 'du-sub', message); m.setAttribute('role', 'status'); root.append(m); }
     if (!loaded) return;
 
+    ready = readyToPass({ lessons: options.lessons, evidence: loaded.all, students: loaded.students.map((s) => s.id), steps: loaded.progress.steps });
     const model = buildMonitor({ deep: options.deep, students: loaded.students, evidence: loaded.evidence, progress: loaded.progress, introduced: introduced(), today });
 
     // 2 all at once
@@ -224,7 +232,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     where.append(wh);
     const pills = h('div', 'du-dutabs');
     options.deep.forEach((d, i) => pills.append(button(`${i + 1}. ${d.claim || 'New'}`, d.id === du.id ? 'on' : '', () => { duId = d.id; selected = null; paint(); })));
-    where.append(pills, distRow('', m.lanes, loaded.students.length));
+    where.append(pills, distRow('', m.lanes, loaded.students.length), skillsNeeded(du));
     const filt = h('div', 'du-filt');
     filt.append(h('span', 'fl', 'Show'));
     for (const f of ['all', ...LANES] as const) {
@@ -254,6 +262,12 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
         chip.append(pips);
         if (s.since) chip.append(h('span', 'du-tag old', ageText(s.since, today)));
         if (s.notUsed) chip.append(h('span', 'du-tag nu', `${s.notUsed} not used`));
+        const readySteps = ready.get(`${s.id}|${du.id}`) ?? [];
+        if (readySteps.length) {
+          const note = h('span', 'du-tag mon-ready', `Ready to pass ${readySteps.map((x) => STEP_LABEL[x]).join(', ')}`);
+          note.title = 'Full marks on the task for this step. You still press Pass.';
+          chip.append(note);
+        }
         chip.addEventListener('click', () => { selected = selected === s.id ? null : s.id; paint(); });
         sts.append(chip);
       }
@@ -320,7 +334,7 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
 
     const ev = h('div');
     ev.append(h('h6', '', 'Evidence for this step'));
-    const t = LANE_STEP[lane] ? stepTask.get(LANE_STEP[lane]!) : null;
+    const t = LANE_STEP[lane] ? stepTask.get(LANE_STEP[lane]!)?.[0] : null;
     ev.append(h('p', '', t ? `${t.title} (${lessonCode(options.lessons, t.lesson_id)})` : lane === '1' ? 'Quiz items on each piece.' : 'No evidence task placed for this step.'));
     const circ = m.circles[student] ?? {};
     ev.append(h('small', '', `${pieces.filter((p) => circ[p.id]?.fill === 'full').length} of ${pieces.length} pieces secure`));
@@ -353,8 +367,37 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     if (amber.length) acts.append(button('Add to a regroup', '', () => void regroup('regroup', [student], amber)));
     if (step) acts.append(hint);
     next.append(acts);
-    grid.append(ev, kn, next);
+    const readySteps = ready.get(`${student}|${du.id}`) ?? [];
+    if (readySteps.length) ev.append(h('p', 'mon-ready-line', `Ready to pass on ${readySteps.map((x) => `Step ${STEP_LABEL[x]}`).join(', ')}: full marks on the task. You still press Pass.`));
+    grid.append(ev, kn, next, skillRungsBox(du, student));
     box.append(grid);
+    return box;
+  }
+
+  /** The skills this understanding's Responding points need, listed above its lanes. */
+  function skillsNeeded(du: DeepUnderstanding): HTMLElement {
+    const box = h('div', 'mon-skills');
+    const ids = loaded ? skillsForDu(du, loaded.ctx.chain) : [];
+    box.append(h('b', '', 'Skills this needs '));
+    if (!ids.length) { box.append(h('span', 'du-cnt', 'None named yet. Add a Responding dot point to this understanding.')); return box; }
+    const list = h('ul', 'mon-skills__list');
+    for (const id of ids) list.append(h('li', '', loaded ? tagLabel(`skill:${id}`, loaded.ctx) : id));
+    box.append(list);
+    return box;
+  }
+
+  /** One student's rung on each of those skills, for reading. It never counts towards a step. */
+  function skillRungsBox(du: DeepUnderstanding, student: string): HTMLElement {
+    const box = h('div', 'mon-rungs');
+    box.append(h('h6', '', 'Skill rungs, for reading'));
+    const ids = loaded ? skillsForDu(du, loaded.ctx.chain) : [];
+    if (!ids.length) { box.append(h('p', 'muted', 'No skills named for this understanding.')); return box; }
+    for (const id of ids) {
+      const rung = loaded ? skillRungOf(loaded.all, student, id) : null;
+      const text = rung === null ? 'no marks' : rung === 'below' ? 'building towards Capable' : RUNG_NAME[rung];
+      box.append(h('p', 'mon-rungs__row', `${loaded ? tagLabel(`skill:${id}`, loaded.ctx) : id}: ${text}`));
+    }
+    box.append(h('small', 'du-cnt', 'Rungs do not move a student between steps.'));
     return box;
   }
 

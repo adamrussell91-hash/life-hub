@@ -1,3 +1,4 @@
+import type { ReturnedRubric } from '@/student/returned-rubric';
 import { apiPost, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import { readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
@@ -46,6 +47,7 @@ export type MineState =
       tags?: VoiceTag[];
       comment?: string;
       codes?: FeedbackCode[];
+      rubric?: ReturnedRubric;
     };
 
 function randomHex(bytes: number): string {

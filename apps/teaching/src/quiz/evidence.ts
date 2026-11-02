@@ -1,3 +1,4 @@
+import { rungShare } from '../evidence/constants';
 import { matchSpots, norm, passageWords, spotList, type PublicQuestion, type QuestionKey } from './core';
 
 /**
@@ -26,6 +27,8 @@ export type AnswerInput = {
   codes?: string[];
   /** The lesson's outcomes, for questions without their own. */
   fallbackOutcomes?: string[];
+  /** The rungs tapped on this answer's rubric, by skill. */
+  rungs?: Readonly<Record<string, string>> | null;
 };
 
 /** A technique tag: the catalogue id when known, else the normalised name for the browser to resolve. */
@@ -73,9 +76,10 @@ export function answerEvidence(input: AnswerInput): EvidenceItem[] {
   const share = input.awarded === null ? null : key.marks > 0 ? Math.min(1, Math.max(0, input.awarded / key.marks)) : null;
   const r = isRecord(input.response) ? input.response : {};
   const a = key.answer;
-  const one = (tags: string[], why: Why[]): EvidenceItem[] => [
-    { item: key.id, tags: unique([...base, ...tags]), share, why: share === null || share >= 1 ? [] : [...why, ...codes] }
-  ];
+  const one = (tags: string[], why: Why[]): EvidenceItem[] => {
+    const item: EvidenceItem = { item: key.id, tags: unique([...base, ...tags]), share, why: share === null || share >= 1 ? [] : [...why, ...codes] };
+    return input.rungs ? withRungs(item, input.rungs) : [item];
+  };
 
   switch (a.type) {
     case 'spots':
@@ -106,6 +110,26 @@ export function answerEvidence(input: AnswerInput): EvidenceItem[] {
     default:
       return one([], []);
   }
+}
+
+/**
+ * One answer with rungs on a rubric: each skill rated gets its own item at that
+ * rung's share, so each reads back the rung tapped. The rest of the tags stay on
+ * the mark's item, including a skill with no rung, which falls back to the mark's
+ * share. With nothing else on it that item goes, since an item with no tags of
+ * its own would count towards the lesson's dot points.
+ */
+function withRungs(item: EvidenceItem, rungs: Readonly<Record<string, string>>): EvidenceItem[] {
+  const rated = Object.keys(rungs).filter((s) => rungShare(rungs[s]) !== null);
+  if (!rated.length) return [item];
+  const rest = item.tags.filter((t) => !t.startsWith('skill:') || !rated.includes(t.slice(6)));
+  const keep = rest.some((t) => !t.startsWith('out:'));
+  const carried = keep ? [] : rest;
+  const own = rated.map((s, i): EvidenceItem => {
+    const share = rungShare(rungs[s]) as number;
+    return { item: `${item.item}#skill:${s}`, tags: [`skill:${s}`, ...carried], share, why: !keep && i === 0 && share < 1 ? item.why : [] };
+  });
+  return keep ? [{ ...item, tags: rest }, ...own] : own;
 }
 
 /**

@@ -34,7 +34,7 @@ import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
 import { mountEndQuestions } from '@/teacher/end-questions';
 import type { Block } from '@/schemas/block';
-import { onUnitDeep, unitDeep } from '@/deep/context';
+import { onUnitDeep, setLessonPicks, unitDeep } from '@/deep/context';
 import { deepBlockLine, deepMenuItems } from '@/deep/block-menu';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -1088,6 +1088,7 @@ function blockOrDescendantHasError(block: Block, errorIds: Set<string>): boolean
 export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptions): LessonPageHandle {
   let lesson = options.lesson;
   let media = options.media ?? [];
+  setLessonPicks(lesson);
 
   const root = document.createElement('div');
   root.className = 'lesson-page';
@@ -1097,6 +1098,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   let afterEmit: () => void = () => {};
   function emitLesson(next: Lesson): void {
     lesson = next;
+    setLessonPicks(next);
     options.onChange(next);
     afterEmit();
   }
@@ -1751,6 +1753,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         dotPoints: lesson.dot_points,
         ...options.dotPoints,
         planHost: syllabus.plan,
+        picksHost: syllabus.picks,
+        picks: { pieces: lesson.focus_pieces, skills: lesson.focus_skills },
+        onPicks: (picks) => emitLesson({ ...lesson, focus_pieces: picks.pieces.length ? picks.pieces : undefined, focus_skills: picks.skills.length ? picks.skills : undefined }),
         covered: lesson.plan_covered,
         onCovered: (covered) => emitLesson({ ...lesson, plan_covered: covered }),
         onPaint: ({ points, outcomes, plan }) => syllabus.setSummary({ points, outcomes, plan }),
@@ -1767,7 +1772,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
-      dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? []);
+      setLessonPicks(lesson);
+      dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? [], { pieces: lesson.focus_pieces, skills: lesson.focus_skills });
       lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.route_role ?? options.flowRole, lesson.skip_rule ?? undefined, lesson.branch_from ?? undefined, lesson.pre_unit ?? undefined);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);

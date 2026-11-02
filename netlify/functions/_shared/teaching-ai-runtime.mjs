@@ -422,6 +422,23 @@ var QUIZ_QUESTION_KINDS = [
   "explain_effect"
 ];
 var QuizQuestionKindSchema = z9.enum(QUIZ_QUESTION_KINDS);
+var QUIZ_KIND_INFO = {
+  multiple_choice: { label: "Multiple choice", blurb: "Pick the one right answer.", tier: 1, manual: false },
+  multi_select: { label: "Multi-select", blurb: "Pick every answer that applies.", tier: 1, manual: false },
+  true_false: { label: "True or false", blurb: "Is the statement true or false?", tier: 1, manual: false },
+  short_answer: { label: "Short answer", blurb: "Type a word or a short phrase.", tier: 1, manual: false },
+  fill_gap: { label: "Fill the gap", blurb: "Fill the missing words in a sentence or quote.", tier: 1, manual: false },
+  odd_one_out: { label: "Odd one out", blurb: "Spot the one that doesn\u2019t belong.", tier: 1, manual: false },
+  matching: { label: "Matching pairs", blurb: "Match each item to its partner.", tier: 2, manual: false },
+  ordering: { label: "Put in order", blurb: "Put the items in the right order.", tier: 2, manual: false },
+  categorise: { label: "Sort into groups", blurb: "Sort each item into its group.", tier: 2, manual: false },
+  quote_technique: { label: "Quote \u2192 technique", blurb: "Name the technique in a quote.", tier: 2, manual: false },
+  find_it: { label: "Find it in the text", blurb: "Tap the line that answers the question.", tier: 2, manual: false },
+  spot_technique: { label: "Spot the technique", blurb: "Select the words in a passage, then name the technique.", tier: 2, manual: false },
+  label_image: { label: "Label the image", blurb: "Match each label to its pin on the image.", tier: 2, manual: false },
+  extended_response: { label: "Extended response", blurb: "Write a paragraph. Your teacher marks it.", tier: 3, manual: true },
+  explain_effect: { label: "Explain the effect", blurb: "Explain the effect of a technique. Your teacher marks it.", tier: 3, manual: true }
+};
 var QUIZ_LIMITS = {
   prompt: 1e3,
   option: 300,
@@ -5821,10 +5838,11 @@ A question is good when the students who learnt the lesson get it right and the 
 6. Use the lessons' own examples, texts and wording for recall, and fresh but similar material (another line from the same poem, a new everyday example) for application, so students apply the idea and do not just recognise a sentence.
 
 ### Tag every question
-The markbook and the insight views track what each question tests, so every quiz_question carries its own tags in question.outcomes and question.skills. Call list_question_tags once for the lists.
-- outcomes: the one or two outcome ids (the id field, e.g. "EA12-2") the question actually tests. Choose from what the question asks a student to do, not from the lesson's dot points: a quiz that mixes ideas has different outcomes on different questions. Never copy the same outcomes onto every question.
-- skills: exactly one skill id from the list (e.g. "reading.inference"), the skill the student uses to answer. Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference; weighing readings or context belongs to the matching skill in the list. A recall-only question still gets the nearest skill. If a question tests nothing on either list, rewrite it or cut it.
-- Tag after you finish each question, from its final wording, and re-check the tags if you change the question.
+The progress views follow what each question checks, so every quiz_question carries one tag. Call list_question_tags once for the lists.
+- An auto-marked question (everything except extended_response and explain_effect) names exactly one knowledge piece in question.pieces, the id of the piece a student must know to answer it. One right or wrong answer cannot say which of two pieces was missed. Pieces the teacher picked for this lesson are marked picked: use those first. Different questions check different pieces; never copy the same piece onto every question. If list_question_tags returns no pieces, leave pieces out.
+- A written question (extended_response, explain_effect) names one skill in question.skills, the skill id from the list that the student uses to answer (e.g. "reading.inference"). Naming or explaining a technique and its effect is reading.technique; inferring an implied meaning, attitude or value is reading.inference. Skills the teacher picked for this lesson are marked picked.
+- Do not write outcomes. They follow from the piece or skill.
+- Tag after you finish each question, from its final wording, and re-check the tag if you change the question.
 
 ### Every kind
 - One idea per question. The stem asks a clear question that a student who knows the content could answer with the options covered.
@@ -5888,7 +5906,7 @@ The markbook and the insight views track what each question tests, so every quiz
 - Cover test: hide the options. Could a student who learnt the lesson answer? If not, the stem is unclear.
 - Test-wise test: read only the options. Can you spot the key by length, tone, absolutes, a stem echo or common sense? If so, rewrite.
 - Lesson test: point to the lesson and dot point it checks. If you cannot, cut it.
-- Tag test: its outcomes and skill match what a student does to answer it, and not simply the quiz's overall topic.
+- Tag test: its piece (or, for a written question, its skill) matches what a student does to answer it, and not simply the quiz's overall topic.
 - Then check the quiz as a whole: every key idea covered in proportion to how it was taught, a spread from recall to application, kinds varied, and no question giving away another's answer.`;
 
 // apps/teaching/src/ai/block-recipes.ts
@@ -6024,7 +6042,7 @@ function buildAiStaticPrompt(input) {
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
     `- Finish the job. Work to the teacher's goal, not the literal request. When something is unclear or missing (an outcome's wording, which lesson, which kind of question, how many, where it goes), find it with your tools (list_lessons, read_lesson, list_question_tags, notes, web_search), or choose the best-supported option, build on it and say which you chose in one line. Ask a question only when two readings would produce genuinely different builds and nothing you can read settles it. Never hand a gap back as a to-do ("check the wording", "delete the examples if you want", "tell me which code you meant"), never list nearest options instead of picking one, and never present a tool you have as a limit (web research is available when the lesson and notes do not cover it).`,
-    "- Do the whole task. If the build needs a closing task, a missing outcome or skill tag, a better question kind or a fix to something you notice in the same blocks, include it. Check your own proposal against the quiz-writing rules before you send it and fix what fails; the teacher should not be the one finding weak items. Your note says what you built, what you assumed and what you sourced, briefly, with no checklist for the teacher.",
+    "- Do the whole task. If the build needs a closing task, a missing piece or skill tag, a better question kind or a fix to something you notice in the same blocks, include it. Check your own proposal against the quiz-writing rules before you send it and fix what fails; the teacher should not be the one finding weak items. Your note says what you built, what you assumed and what you sourced, briefly, with no checklist for the teacher.",
     '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply with a short plan (no proposal and no web or notes research yet; do read the lessons it builds on with list_lessons and read_lesson, so the plan is grounded in what was taught) headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you; the lessons you read, named, with the key ideas and dot points the questions will test; their notes; web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Settle every open detail yourself in the plan and state it as your choice; ask only the confirm-or-change question. Then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
     "",
     BLOCK_BUILD_RECIPES,
@@ -6301,7 +6319,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z15 } from "zod";
@@ -6350,6 +6368,36 @@ function quizRunsIn(value2) {
 function pedagogicalModeLabel(value2) {
   return PEDAGOGICAL_MODE_LABELS[resolvePedagogicalMode(value2)];
 }
+
+// apps/teaching/src/deep/schema.ts
+import { z as z16 } from "zod";
+var DEEP_LIMITS = { perUnit: 4, pieces: 24, claim: 400, why: 300, piece: 200, fill: 400 };
+var TIERS = ["essential", "strong", "sophisticated"];
+var DuIdSchema = z16.string().regex(/^du_[a-z0-9]{4,16}$/);
+var PieceIdSchema = z16.string().regex(/^kp_[a-z0-9]{4,16}$/);
+var ConceptBulletSchema = z16.string().regex(/^[A-Z]{2,5}\d{1,2}$/);
+var KnowledgePieceSchema = z16.object({
+  id: PieceIdSchema,
+  text: z16.string().trim().min(1).max(DEEP_LIMITS.piece),
+  tier: z16.enum(TIERS),
+  /** The one Understanding dot point this piece builds. Older pieces have none yet; marks on them fall back to the lesson's points. */
+  dot_point: DotPointRefSchema.optional()
+});
+var DeepUnderstandingSchema = z16.object({
+  id: DuIdSchema,
+  claim: z16.string().trim().max(DEEP_LIMITS.claim),
+  why: z16.string().trim().max(DEEP_LIMITS.why).default(""),
+  dot_points: z16.array(DotPointRefSchema).min(1).max(8),
+  concept_bullets: z16.array(ConceptBulletSchema).min(1).max(8),
+  pieces: z16.array(KnowledgePieceSchema).max(DEEP_LIMITS.pieces).default([]),
+  /** Pieces owned by another deep understanding in this unit. */
+  shared_piece_ids: z16.array(PieceIdSchema).max(DEEP_LIMITS.pieces).default([]),
+  steps: z16.array(z16.object({ step: z16.enum(["2a", "2b", "3", "4"]), fill: z16.string().trim().max(DEEP_LIMITS.fill) })).max(4).default([])
+});
+var DeepUnderstandingDraftSchema = DeepUnderstandingSchema.extend({
+  dot_points: z16.array(DotPointRefSchema).max(8),
+  concept_bullets: z16.array(ConceptBulletSchema).max(8)
+});
 
 // apps/teaching/src/tutorial/model.ts
 function groupSection(block) {
@@ -6489,10 +6537,10 @@ function caseIssues(lesson) {
 }
 
 // apps/teaching/src/schemas/source.ts
-import { z as z16 } from "zod";
-var SourceSchema = z16.object({
-  system: z16.literal("notion"),
-  page_id: z16.string().min(1).max(64),
+import { z as z17 } from "zod";
+var SourceSchema = z17.object({
+  system: z17.literal("notion"),
+  page_id: z17.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -7158,22 +7206,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z17.object({
+var LessonSchema = z18.object({
   ...CommonFields,
   ...TrashFields,
-  type: z17.literal("lesson"),
-  unit_id: z17.string().min(1),
-  sequence: z17.number().int(),
-  blocks: z17.array(BlockSchema),
+  type: z18.literal("lesson"),
+  unit_id: z18.string().min(1),
+  sequence: z18.number().int(),
+  blocks: z18.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z17.array(z17.string().min(1).max(40)).max(24).optional(),
-  author_id: z17.string().min(1).optional(),
-  review_status: z17.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z17.array(z17.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z17.array(z17.string().min(1).max(64)).max(24).optional(),
+  tags: z18.array(z18.string().min(1).max(40)).max(24).optional(),
+  author_id: z18.string().min(1).optional(),
+  review_status: z18.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z18.array(z18.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z18.array(z18.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z17.array(LineStopSchema).max(16).optional(),
+  line_stops: z18.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -7185,22 +7233,26 @@ var LessonSchema = z17.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z17.string().min(1).max(64).nullable().optional(),
+  branch_from: z18.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z17.boolean().nullable().optional(),
+  pre_unit: z18.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z17.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z18.array(DotPointRefSchema).max(20).optional(),
+  /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
+  focus_pieces: z18.array(PieceIdSchema).max(24).optional(),
+  /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
+  focus_skills: z18.array(z18.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z17.array(z17.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z18.array(z18.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z17.boolean().optional(),
+  feedback_off: z18.boolean().optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z17.object({
-    on: z17.boolean().optional(),
-    skip: z17.array(z17.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z17.boolean().optional()
+  end_questions: z18.object({
+    on: z18.boolean().optional(),
+    skip: z18.array(z18.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z18.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -7215,7 +7267,7 @@ var LessonSchema = z17.object({
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -7227,7 +7279,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z17.ZodIssueCode.custom,
+        code: z18.ZodIssueCode.custom,
         message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -7235,22 +7287,22 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z17.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["case"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -7400,13 +7452,17 @@ function questionGiveaways(question) {
   }
   return issues;
 }
-function questionTagIssues(label, question, lists = { outcomes: true, skills: true }) {
+function questionTagIssues(label, question, lists = { pieces: true, skills: true }) {
   const issues = [];
-  if (lists.outcomes && !question.outcomes?.length) {
-    issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
-  }
-  if (lists.skills && !question.skills?.length) {
-    issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
+  const written = QUIZ_KIND_INFO[question.kind]?.manual === true;
+  if (written) {
+    if (lists.skills && !question.skills?.length) {
+      issues.push(`${label}: add skills, the one skill id a student uses to answer (call list_question_tags).`);
+    }
+  } else if (lists.pieces) {
+    const n = question.pieces?.length ?? 0;
+    if (n === 0) issues.push(`${label}: add pieces, the one knowledge piece id this question checks (call list_question_tags; prefer the pieces marked picked).`);
+    else if (n > 1) issues.push(`${label}: name exactly one piece in pieces; one right or wrong answer can't say which of two was missed.`);
   }
   return issues;
 }
@@ -8373,7 +8429,7 @@ If the request cannot fit the limits, say so plainly instead.`,
         if (!isError) sight(value2);
         if (call.name === "list_question_tags" && !isError) {
           const lists = value2;
-          sightings.tagLists = { outcomes: Boolean(lists.outcomes?.length), skills: Boolean(lists.skills?.length) };
+          sightings.tagLists = { pieces: Boolean(lists.pieces?.length), skills: Boolean(lists.skills?.length) };
         }
         results.push({
           type: "tool_result",

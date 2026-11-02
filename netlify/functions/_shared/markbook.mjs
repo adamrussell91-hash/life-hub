@@ -21,6 +21,7 @@ import { markWalkthruDirty } from './walkthru-dirty.mjs';
 import { progressFor, studentPieces } from './profile-feedback.mjs';
 import { classPatterns } from './progress-patterns.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
+import { ledgerRows, readRubricLedger } from './rubric.mjs';
 import { MARKBOOK_LIMITS, MarkbookSchema, checkColumn, checkMark, pruneMarks } from './markbook-schema.mjs';
 
 const bookKey = (classId) => `markbook/${classId}`;
@@ -189,12 +190,14 @@ async function markbookActionInner(store, classId, body) {
 
   if (action === 'load') {
     const [{ book }, lessonIds] = await Promise.all([readBook(store, classId), classLessonIds(store, roster)]);
-    const [quizzes, work] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds)]);
+    const [quizzes, work, ledger] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds), readRubricLedger(store, classId)]);
+    const rubrics = ledgerRows(ledger, roster.students.map((s) => s.id));
     return {
       markbook: book,
       students: roster.students.map(({ id, name, initials }) => ({ id, name, initials })),
       quizzes,
       work,
+      ...(rubrics.length ? { rubrics } : {}),
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
       ...(body.skip_done ? {} : { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) })
     };

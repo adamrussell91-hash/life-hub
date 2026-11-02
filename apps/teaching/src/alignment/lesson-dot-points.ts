@@ -1,5 +1,7 @@
 import { autoUpdateHubFloating, positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
 import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
+import { onUnitDeep, unitDeep } from '@/deep/context';
+import { piecesOffered, skillsOffered } from '@/deep/lesson-picks';
 import { loadSkills } from '@/skills/api';
 import type { SkillsContinuum } from '@/skills/schema';
 import type { AutoLineContext } from './auto-lines';
@@ -7,6 +9,7 @@ import { loadAlignment } from './coverage-panel';
 import { dotPointRef, focusAreaFor } from './coverage';
 import { conceptKeyOf } from './model';
 import type { Alignment, AlignmentPoint } from './schema';
+import '@/deep/tag-row.css';
 import './coverage.css';
 
 export type LessonDotPointsOptions = {
@@ -21,6 +24,12 @@ export type LessonDotPointsOptions = {
   onCovered?: (covered: string[]) => void;
   /** The chosen point ids, outcomes they reach and plan items ticked, after each paint, for a summary. */
   onPaint?: (summary: { points: string[]; outcomes: number[]; plan: { done: number; total: number } }) => void;
+  /** Where the pieces and skills these points offer are picked, to come first when tagging a question. */
+  picksHost?: HTMLElement;
+  /** The lesson's saved picks (focus_pieces, focus_skills). */
+  picks?: { pieces?: readonly string[]; skills?: readonly string[] };
+  /** The whole picks, after a tap or after a dot point change drops one. */
+  onPicks?: (picks: { pieces: string[]; skills: string[] }) => void;
   /** With the alignment the points were read against, so the page can set the lesson's lines. */
   onChange: (dotPoints: string[], ctx: AutoLineContext) => void;
 };
@@ -40,8 +49,9 @@ const GROUPS = [['U', 'Understanding'], ['R', 'Responding']] as const;
  * bullets, learning processes, thinking skills) follows from the alignment,
  * in full and tagged with the points it comes from, into the plan host.
  */
-export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined, covered?: readonly string[]): void; dispose(): void } {
+export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined, covered?: readonly string[], picks?: { pieces?: readonly string[]; skills?: readonly string[] }): void; dispose(): void } {
   let chosen = [...(options.dotPoints ?? [])];
+  let picked = { pieces: [...(options.picks?.pieces ?? [])], skills: [...(options.picks?.skills ?? [])] };
   let covered = new Set(options.covered ?? []);
   /** The chip whose definition is open; stays open when a tick repaints the plan. */
   let chipOpen: string | undefined;
@@ -76,7 +86,65 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     chosen = next.slice(0, 20);
     paint();
     if (doc && area) options.onChange(chosen, { doc, skills, areaId: area.id });
+    // Picks only come from ticked points, so a removed point takes its picks with it.
+    const offered = offers();
+    const keep = { pieces: picked.pieces.filter((id) => offered.pieces.some((o) => o.piece.id === id)), skills: picked.skills.filter((ref) => offered.skills.some((o) => o.ref === ref)) };
+    if (keep.pieces.length !== picked.pieces.length || keep.skills.length !== picked.skills.length) {
+      picked = keep;
+      options.onPicks?.(keep);
+      paintPicks();
+    }
   };
+
+  const offers = () => ({ pieces: piecesOffered(chosen, unitDeep()), skills: skillsOffered(chosen, skills) });
+
+  /** After the points: the pieces and skills they offer, as chips. A tap saves the lesson's picks. */
+  function paintPicks(): void {
+    const host = options.picksHost;
+    if (!host) return;
+    const offered = offers();
+    host.replaceChildren();
+    if (!offered.pieces.length && !offered.skills.length) return;
+    const wrap = el('div', 'dots-picks');
+    const group = (title: string, hint: string, chips: Array<{ key: string; label: string; on: boolean; toggle: () => void }>) => {
+      if (!chips.length) return;
+      const g = el('div', 'dots-picks__group');
+      g.setAttribute('role', 'group');
+      g.setAttribute('aria-label', title);
+      g.append(el('p', 'dots-picks__title', title), el('p', 'dots-picks__hint', hint));
+      const row = el('div', 'tg-chips');
+      for (const c of chips) {
+        const b = el('button', `tg-chip${c.on ? ' tg-chip--on' : ''}`, c.label);
+        b.type = 'button';
+        b.dataset.key = c.key;
+        b.setAttribute('aria-pressed', String(c.on));
+        b.addEventListener('click', () => {
+          c.toggle();
+          options.onPicks?.({ pieces: [...picked.pieces], skills: [...picked.skills] });
+          paintPicks();
+          host.querySelector<HTMLElement>(`[data-key="${c.key}"]`)?.focus();
+        });
+        row.append(b);
+      }
+      g.append(row);
+      wrap.append(g);
+    };
+    const flip = (list: string[], id: string, limit: number): string[] => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-limit));
+    group('Knowledge pieces', 'Tap the pieces this lesson works on. They come first when you tag a question.', offered.pieces.map(({ piece }) => ({
+      key: `piece:${piece.id}`,
+      label: piece.text,
+      on: picked.pieces.includes(piece.id),
+      toggle: () => { picked = { ...picked, pieces: flip(picked.pieces, piece.id, 24) }; }
+    })));
+    group('Skills', 'Skills that name a dot point you ticked, shared links first.', offered.skills.map((o) => ({
+      key: `skill:${o.ref}`,
+      label: o.name,
+      on: picked.skills.includes(o.ref),
+      toggle: () => { picked = { ...picked, skills: flip(picked.skills, o.ref, 12) }; }
+    })));
+    host.append(wrap);
+  }
+  const stopDeep = onUnitDeep(() => paintPicks());
 
   const openMenu = (anchor: HTMLElement) => {
     closeMenu();
@@ -133,9 +201,10 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     add.addEventListener('click', () => (menu ? closeMenu() : openMenu(add)));
     root.replaceChildren(...(list.childElementCount ? [list] : []), add);
     root.hidden = false;
-    const picked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
-    const plan = paintPlan(picked);
-    options.onPaint?.({ points: picked.map((p) => p.id), outcomes: [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b), plan });
+    const ticked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
+    const plan = paintPlan(ticked);
+    paintPicks();
+    options.onPaint?.({ points: ticked.map((p) => p.id), outcomes: [...new Set(ticked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b), plan });
   }
 
   /** A tick for one plan item; ticking saves the lesson's covered list. */
@@ -291,12 +360,15 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     .catch(() => { /* No alignment: nothing to tag. */ });
 
   return {
-    update(next, nextCovered) {
+    update(next, nextCovered, nextPicks) {
       chosen = [...(next ?? [])];
       if (nextCovered) covered = new Set(nextCovered);
+      if (nextPicks) picked = { pieces: [...(nextPicks.pieces ?? [])], skills: [...(nextPicks.skills ?? [])] };
       paint();
     },
     dispose() {
+      stopDeep();
+      options.picksHost?.replaceChildren();
       closeMenu();
       root.remove();
       options.planHost?.replaceChildren();

@@ -15135,3 +15135,15 @@ button.block-annotation__margin-note.is-collapsed:hover {
 .block-question-set__model {
   margin-top: var(--space-2);
 }
+
+.lesson-editor__tag-note {
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--pastel-peach-ink, var(--ink));
+  background: var(--pastel-peach, var(--glass));
+  border-radius: var(--radius-md);
+}
+
+.lesson-editor__tag-note .lesson-editor__publish-jump { min-height: 44px; }

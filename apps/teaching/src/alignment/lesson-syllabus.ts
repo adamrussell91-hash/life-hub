@@ -31,6 +31,8 @@ export type LessonSyllabusCard = {
   lines: HTMLElement;
   outcomes: HTMLElement;
   plan: HTMLElement;
+  /** Where the lesson's pieces and skills are picked, once dot points are ticked. */
+  picks: HTMLElement;
   /** The closed card's one-line summary. */
   setSummary(next: { points?: string[]; lines?: NetworkLine[]; outcomes?: number[]; plan?: { done: number; total: number } }): void;
   dispose(): void;
@@ -71,6 +73,7 @@ export function mountLessonSyllabus(host: HTMLElement): LessonSyllabusCard {
   const lines = section('Lines', 'lsyl__section--lines');
   const outcomes = section('Tagged outcomes', 'lsyl__section--outcomes');
   const plan = section('Plan activities for', 'lsyl__section--plan');
+  const picks = section('Pieces and skills to tag first', 'lsyl__section--picks');
   root.append(head, body);
   host.append(root);
 
@@ -122,6 +125,7 @@ export function mountLessonSyllabus(host: HTMLElement): LessonSyllabusCard {
     lines,
     outcomes,
     plan,
+    picks,
     setSummary(next) {
       state = { ...state, ...next };
       paintSummary();

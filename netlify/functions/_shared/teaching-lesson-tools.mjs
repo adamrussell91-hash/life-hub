@@ -1,5 +1,5 @@
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
-import { draftLessonKey, getJSON, listJSON, OUTCOME_PREFIX, outcomeKey, SCHEDULED_LESSON_PREFIX, subjectKey, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, getJSON, listJSON, outcomeKey, SCHEDULED_LESSON_PREFIX, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadAlignment } from './syllabus-alignment.mjs';
 import { loadSkills } from './skills-continuum.mjs';
 import { childBlocks, editableFields } from '../../../packages/alchemy/patches.js';
@@ -30,7 +30,7 @@ export const LESSON_TOOLS = [
   },
   {
     name: 'list_question_tags',
-    description: 'List the outcomes (id, code and wording) and skills (id and name) a quiz question can be tagged with, for this lesson\'s subject. Call it before writing quiz questions: every question gets its own outcomes and skill from these lists. Read-only.',
+    description: 'List the knowledge pieces (id, text and deep understanding) of this lesson\'s unit and the skills (id and name) a quiz question can be tagged with. The ones the teacher picked for this lesson are marked picked. Call it before writing quiz questions: an auto-marked question names one piece, a written one names one skill. Read-only.',
     input_schema: { type: 'object', additionalProperties: false, properties: {} }
   }
 ];
@@ -162,23 +162,23 @@ export function createLessonToolRunner({ store, lesson, alignment = () => loadAl
       }
       case 'list_question_tags': {
         const unit = await liveUnit(lesson.unit_id);
-        const subject = unit?.subject_id ? await getJSON(store, subjectKey(unit.subject_id)).catch(() => null) : null;
-        // The picker's catalog: the subject's ordered outcome_ids, then any other
-        // outcome filed under the subject, then the lesson's own outcomes.
-        const live = withoutDeleted(await listJSON(store, OUTCOME_PREFIX).catch(() => [])).filter(o => o.status !== 'trashed');
-        const byId = new Map(live.map(o => [o.id, o]));
-        const ids = [
-          ...(subject?.outcome_ids ?? []),
-          ...live.filter(o => subject && o.subject_id === subject.id).map(o => o.id).sort(),
-          ...(lesson.outcome_ids ?? [])
-        ];
-        const outcomes = [...new Set(ids)]
-          .map(id => byId.get(id))
-          .filter(Boolean)
-          .map(o => ({ id: o.id, code: o.code, description: o.description ?? o.title }));
+        const pickedPieces = new Set(lesson.focus_pieces ?? []);
+        const pickedSkills = new Set(lesson.focus_skills ?? []);
+        const seen = new Set();
+        const pieces = (unit?.deep_understandings ?? []).flatMap((du, n) =>
+          (du.pieces ?? []).filter(p => p?.id && p.text && !seen.has(p.id) && seen.add(p.id)).map(p => ({
+            id: p.id,
+            text: p.text,
+            du: n + 1,
+            ...(pickedPieces.has(p.id) ? { picked: true } : {})
+          }))
+        ).sort((a, b) => Number(Boolean(b.picked)) - Number(Boolean(a.picked)));
         const continuum = await Promise.resolve().then(skills).catch(() => null);
-        const skillList = (continuum?.strands ?? []).flatMap(strand => strand.sub_strands.map(sub => ({ id: `${strand.id}.${sub.id}`, name: sub.name })));
-        return { outcomes, skills: skillList };
+        const skillList = (continuum?.strands ?? [])
+          .flatMap(strand => strand.sub_strands.map(sub => ({ id: `${strand.strand ?? strand.id}.${sub.id}`, name: sub.name })))
+          .map(s => (pickedSkills.has(s.id) ? { ...s, picked: true } : s))
+          .sort((a, b) => Number(Boolean(b.picked)) - Number(Boolean(a.picked)));
+        return { pieces, skills: skillList };
       }
       default:
         return { error: 'Unknown tool.' };

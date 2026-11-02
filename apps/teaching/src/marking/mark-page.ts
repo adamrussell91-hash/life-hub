@@ -2,7 +2,8 @@
 import { apiPost } from '@/api/client';
 import { el } from '@/quiz/dom';
 import { errorText } from '@/quiz/dom';
-import { markPieceView, type MarkPieceData } from './mark-piece';
+import { markPieceView, type MarkPieceActions, type MarkPieceData } from './mark-piece';
+import { loadRubricSetup } from './rubric-setup';
 
 type ListedStudent = { id: string; initials: string; name: string; handed_in_at: string | null; status: 'not_in' | 'waiting' | 'marking' | 'returned' };
 type ListResponse = { column: { id: string; title: string }; students: ListedStudent[] };
@@ -28,13 +29,15 @@ export function mountMarkPage(canvas: HTMLElement, classId: string, columnId: st
     const firstWaiting = handed.find((s) => s.status === 'waiting') ?? handed[0]!;
     const open = (id: string): void => {
       const index = handed.findIndex((s) => s.id === id);
-      void call<LoadResponse>({ action: 'load', student_id: id }).then((data) => {
+      void call<LoadResponse>({ action: 'load', student_id: id }).then(async (data) => {
+        const where = data.column.piece;
+        const rubric = where ? await loadRubricSetup({ lessonId: where.lesson_id, blockId: where.block_id, who: { classId, studentId: id } }) : null;
         if (disposed) return;
         const url = new URL(window.location.href);
         url.searchParams.set('student', id);
         window.history.replaceState(null, '', url);
         const act = {
-          save: (body: { tags: unknown[]; comment: string; steps: Record<string, string> }) => call({ action: 'save', student_id: id, ...body }),
+          save: (body: Parameters<MarkPieceActions['save']>[0]) => call({ action: 'save', student_id: id, ...body }),
           returnIt: () => call({ action: 'return', student_id: id }),
           takeBack: () => call({ action: 'take_back', student_id: id }),
           move: (by: -1 | 1) => {
@@ -42,7 +45,7 @@ export function mountMarkPage(canvas: HTMLElement, classId: string, columnId: st
             if (target) open(target.id);
           }
         };
-        canvas.replaceChildren(markPieceView({ ...data, position: { index, total: handed.length } }, act));
+        canvas.replaceChildren(markPieceView({ ...data, position: { index, total: handed.length } }, act, { rubric }));
       }, fail);
     };
     open((startStudent && handed.find((s) => s.id === startStudent)?.id) || firstWaiting.id);

@@ -1,13 +1,14 @@
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block } from '@/schemas/block';
-import { evidenceStepOf, piecesTaught } from './block-tags';
-import { piecesFor, STEP_LABEL, type DeepUnderstanding, type PlacedStep } from './schema';
+import { evidenceSteps, piecesTaught } from './block-tags';
+import { piecesFor, STEP_LABEL, type DeepUnderstanding, type KnowledgePiece, type PlacedStep } from './schema';
 
-/** Where a unit's pieces are taught and tested, and which task is each step's evidence, read from lesson tags. */
+export type StepTask = { lesson_id: string; block_id: string; title: string };
+/** Where a unit's pieces are taught and tested, and every task that is evidence for each step, read from lesson tags. A step with no task has no entry. */
 export type Placements = {
   taught: Map<string, string[]>;
   tested: Map<string, { lessons: string[]; items: number }>;
-  steps: Map<PlacedStep, { lesson_id: string; block_id: string; title: string }>;
+  steps: Map<PlacedStep, StepTask[]>;
 };
 type LessonLike = { id: string; title?: string; blocks?: Block[] };
 
@@ -29,8 +30,11 @@ export function placements(lessons: readonly LessonLike[], duId: string): Placem
         row.items += 1;
         out.tested.set(p, row);
       }
-      const step = evidenceStepOf(block);
-      if (step?.du === duId && !out.steps.has(step.step)) out.steps.set(step.step, { lesson_id: lesson.id, block_id: block.id, title: blockTitle(block) });
+      for (const step of evidenceSteps(block)) {
+        if (step.du !== duId) continue;
+        const tasks = out.steps.get(step.step) ?? out.steps.set(step.step, []).get(step.step)!;
+        tasks.push({ lesson_id: lesson.id, block_id: block.id, title: blockTitle(block) });
+      }
     });
   }
   return out;
@@ -65,4 +69,42 @@ export function planGaps(du: DeepUnderstanding, all: readonly DeepUnderstanding[
   const missing = (['2a', '2b', '3', '4'] as const).filter((s) => !p.steps.has(s)).map((s) => STEP_LABEL[s]);
   if (missing.length) gaps.push(`No evidence task for Step${missing.length === 1 ? '' : 's'} ${missing.join(', ')}`);
   return gaps;
+}
+
+/** The chain's links for one deep understanding: rules 1, 3 and 4 of the one-chain model. Flags only; nothing here blocks a save. */
+export type ChainFlags = {
+  /** Its own pieces with no dot point yet. Shared pieces are flagged on the deep understanding that owns them. */
+  no_point: KnowledgePiece[];
+  /** Its own pieces whose dot point isn't one of this deep understanding's. */
+  off_du: KnowledgePiece[];
+  no_u: boolean;
+  no_r: boolean;
+};
+
+const pointKind = (ref: string): string => ref.split(':')[1]?.charAt(0) ?? '';
+
+export function chainFlags(du: DeepUnderstanding): ChainFlags {
+  return {
+    no_point: du.pieces.filter((p) => !p.dot_point),
+    off_du: du.pieces.filter((p) => p.dot_point && !du.dot_points.includes(p.dot_point)),
+    no_u: !du.dot_points.some((ref) => pointKind(ref) === 'U'),
+    no_r: !du.dot_points.some((ref) => pointKind(ref) === 'R')
+  };
+}
+
+/** The peach warnings for those links, worded like planGaps. Empty when the links are whole. */
+export function chainGaps(du: DeepUnderstanding): string[] {
+  const f = chainFlags(du);
+  const gaps: string[] = [];
+  if (f.no_u) gaps.push('Needs a U dot point');
+  if (f.no_r) gaps.push('Needs an R dot point');
+  if (f.no_point.length) gaps.push(`${f.no_point.length} piece${f.no_point.length === 1 ? '' : 's'} with no U dot point`);
+  if (f.off_du.length) gaps.push(`${f.off_du.length} piece${f.off_du.length === 1 ? '' : 's'} on a U outside this deep understanding`);
+  return gaps;
+}
+
+/** The unit's U and R points (ticked on its lessons, for instance: `unitScope`) that sit in no deep understanding. */
+export function pointsOutsideDus(unitPoints: readonly string[], deep: readonly DeepUnderstanding[]): string[] {
+  const placed = new Set(deep.flatMap((d) => d.dot_points));
+  return [...new Set(unitPoints)].filter((ref) => !placed.has(ref));
 }

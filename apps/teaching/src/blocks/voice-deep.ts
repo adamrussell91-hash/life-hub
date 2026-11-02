@@ -1,179 +1,112 @@
 import type { Block } from '@/schemas/block';
-import { apiGet } from '@/api/client';
-import { button, el } from '@/blocks/peer-feedback-ui';
-import { deepApi, type DeepProgress } from '@/deep/api';
-import { evidenceStepOf, passChecks, targetPieces, type EvidenceStep } from '@/deep/block-tags';
-import { STEP_LABEL, type DeepUnderstanding, type PlacedStep } from '@/deep/schema';
+import { el } from '@/blocks/peer-feedback-ui';
+import { voiceReadForRubric, type VoiceAiRead } from '@/marking/ai-read';
+import { rubricTags, type Rubric } from '@/marking/rubric-model';
+import { mountRubricPanel, type RubricPanel, type RubricSetup } from '@/marking/rubric-panel';
+import { deepApi } from '@/deep/api';
+import { loadRubricSetup, passedOf, type RubricDeps } from '@/marking/rubric-setup';
 
 /**
- * The deep understanding panel on a Voice marking screen, for a question that
- * is a step's evidence task: what a pass sounds like, the target pieces to tick
- * used or missed, and the Pass button. Ticks and passes save to the class's
- * deep progress, the same record Monitoring reads.
+ * The rubric on a Voice marking screen, in the dock under the player and codes.
+ * It folds and scrolls on its own, so a long rubric never pushes the codes out
+ * of reach. What it holds saves with the take (voice-teacher.ts), which records
+ * the rungs, ticks and passes on the server.
  */
 
+export type { VoiceAiRead };
 export type Who = { classId: string; studentId: string } | null;
-/** What the AI heard in this take (To mark): dashed until the teacher decides. */
-export type VoiceAiRead = { checks: { met: boolean; quote?: string; why?: string }[]; pieces: Record<string, boolean> };
 type Deps = {
   ai?: VoiceAiRead | null;
-  loadUnit?: (lessonId: string) => Promise<{ unitId: string; deep: DeepUnderstanding[] }>;
-  api?: Pick<typeof deepApi, 'load' | 'setStep' | 'setWriting'>;
+  saved?: Rubric | null;
+  tagged?: () => { code_id: string; positive: boolean }[];
+  onChange?: () => void;
+  load?: RubricDeps;
+  progress?: (classId: string, unitId: string) => Promise<{ steps: Record<string, Record<string, { step: string }>> }>;
 };
 
-const PLACED: PlacedStep[] = ['2a', '2b', '3', '4'];
-const PREV: Record<PlacedStep, PlacedStep | null> = { '2a': null, '2b': '2a', '3': '2b', '4': '3' };
+export type VoiceRubric = {
+  el: HTMLElement;
+  setWho: (next: Who) => void;
+  saveFields: RubricPanel['saveFields'];
+  failed: () => void;
+  applyReply: (reply: unknown) => boolean;
+  touch: () => void;
+  refresh: () => void;
+  /** Settled once the panel is drawn. */
+  ready: Promise<void>;
+};
 
-async function defaultLoadUnit(lessonId: string): Promise<{ unitId: string; deep: DeepUnderstanding[] }> {
-  const lesson = await apiGet<{ unit_id?: string }>(`/api/lessons/${encodeURIComponent(lessonId)}`);
-  if (!lesson.unit_id) return { unitId: '', deep: [] };
-  const unit = await apiGet<{ deep_understandings?: DeepUnderstanding[] }>(`/api/units/${encodeURIComponent(lesson.unit_id)}`);
-  return { unitId: lesson.unit_id, deep: unit.deep_understandings ?? [] };
-}
+const PICK_FIRST = 'Pick the student above so this counts.';
 
-/** Null when the question isn't a step's evidence task. `setWho` repaints for another student. */
-export function mountVoiceDeep(block: Pick<Block, 'id' | 'settings'>, lessonId: string, who: Who, deps: Deps = {}): { el: HTMLElement; setWho: (next: Who) => void } | null {
-  const found = evidenceStepOf(block);
-  if (!found) return null;
-  const step: EvidenceStep = found;
-  const checks = passChecks(block);
-  const targets = targetPieces(block);
-  const api = deps.api ?? deepApi;
+/** Null when the question carries no tags. `setWho` follows the student picker. */
+export function mountVoiceDeep(block: Pick<Block, 'id' | 'settings'>, lessonId: string, who: Who, deps: Deps = {}): VoiceRubric | null {
+  const tags = rubricTags(block);
+  if (!tags.skills.length && !tags.pieces.length && !tags.steps.length) return null;
 
-  const box = el('details', 'voice-pass');
+  const box = el('details', 'voice-rubric');
   box.open = !window.matchMedia?.('(max-width: 560px)').matches;
-  box.append(el('summary', 'voice-pass__title', `Step ${STEP_LABEL[step.step]} evidence${checks.length ? ', listen for' : ''}`));
-
-  if (checks.length) {
-    const list = el('ul', 'voice-pass__list');
-    checks.forEach((check, n) => {
-      const label = el('label', 'voice-pass__item');
-      const tick = el('input');
-      tick.type = 'checkbox';
-      const heard = deps.ai?.checks[n];
-      if (heard) {
-        tick.checked = heard.met;
-        label.classList.add('is-ai');
-      }
-      // Hand focus back at once, so number and letter keys keep tagging.
-      tick.addEventListener('change', () => {
-        tick.blur();
-        label.classList.remove('is-ai');
-      });
-      const text = el('span', undefined, check);
-      if (heard?.quote || heard?.why) text.append(el('small', 'voice-pass__heard', heard.quote ? `“${heard.quote}”` : heard.why));
-      label.append(tick, text);
-      const item = el('li');
-      item.append(label);
-      list.append(item);
-    });
-    box.append(list);
-  }
-
-  const live = el('div', 'voice-pass__live');
-  const status = el('p', 'voice-pass__note block-secondary');
-  status.setAttribute('role', 'status');
-  box.append(live, status);
+  const summary = el('summary', 'voice-rubric__title', 'Rubric');
+  const status = el('p', 'block-secondary', 'Opening the rubric…');
+  box.append(summary, status);
 
   let current = who;
-  let unit: { unitId: string; deep: DeepUnderstanding[] } | null = null;
-  let progress: DeepProgress | null = null;
-  let loadedFor = '';
-  let unitLoad: Promise<void> | null = null;
+  let panel: RubricPanel | null = null;
+  let setup: RubricSetup | null = null;
+  let touched = false;
 
-  const pieceText = (id: string): string => unit?.deep.flatMap((d) => d.pieces).find((p) => p.id === id)?.text ?? id;
-  const duNumber = (): number => (unit?.deep.findIndex((d) => d.id === step.du) ?? -1) + 1;
-
-  async function save(run: () => Promise<DeepProgress>): Promise<void> {
-    status.textContent = 'Saving…';
-    try {
-      progress = await run();
-      status.textContent = 'Saved.';
-    } catch {
-      status.textContent = 'Could not save. Try again.';
-    }
-    paint();
-  }
-
-  function paint(): void {
-    live.replaceChildren();
-    if (!current) {
-      live.append(el('p', 'voice-pass__note block-secondary', 'Pick the student above to tick pieces and pass the step.'));
+  const paintWho = async (): Promise<void> => {
+    if (!panel || !setup) return;
+    panel.setNote(current ? '' : PICK_FIRST);
+    if (!current || !setup.unitId || !setup.rows.steps.length) {
+      panel.setPassed(null, current?.studentId ?? null);
       return;
     }
-    if (!unit || !progress) return;
-    const { classId, studentId } = current;
-    const n = duNumber();
-    if (!n) {
-      live.append(el('p', 'voice-pass__note block-secondary', 'This deep understanding is no longer on the unit.'));
-      return;
-    }
+    const { studentId, classId } = current;
+    const load = deps.progress ?? ((c: string, u: string) => deepApi.load(c, u));
+    const progress = await load(classId, setup.unitId).catch(() => null);
+    if (current?.studentId === studentId) panel.setPassed(progress ? passedOf(progress, studentId) : null, studentId);
+  };
 
-    if (targets.length) {
-      const pieces = el('div', 'voice-pass__pieces');
-      pieces.append(el('span', 'voice-strip__label', 'Pieces used'));
-      const tick = progress.writing[block.id]?.[studentId] ?? { used: [], missed: [], at: '' };
-      for (const id of targets) {
-        const marked = tick.used.includes(id) ? 'used' : tick.missed.includes(id) ? 'missed' : 'blank';
-        // A blank piece shows what the AI heard; the first tap keeps it.
-        const heard = marked === 'blank' && typeof deps.ai?.pieces[id] === 'boolean' ? (deps.ai.pieces[id] ? 'used' : 'missed') : null;
-        const state = heard ?? marked;
-        const b = button('', 'ghost', () => {
-          b.blur();
-          const next = heard ?? (state === 'blank' ? 'used' : state === 'used' ? 'missed' : 'blank');
-          const used = tick.used.filter((x) => x !== id).concat(next === 'used' ? [id] : []);
-          const missed = tick.missed.filter((x) => x !== id).concat(next === 'missed' ? [id] : []);
-          void save(() => api.setWriting(classId, unit!.unitId, block.id, studentId, used, missed));
-        });
-        b.className = `voice-pass__piece is-${state}${heard ? ' is-ai' : ''}`;
-        b.setAttribute('aria-label', `${pieceText(id)}: ${state === 'used' ? 'used' : state === 'missed' ? 'missed' : 'not marked'}. Tap to change.`);
-        b.append(el('span', 'voice-pass__mark', state === 'used' ? '✓' : state === 'missed' ? '–' : ''), el('span', undefined, pieceText(id)));
-        pieces.append(b);
+  const ready = loadRubricSetup({ lessonId, blockId: block.id }, deps.load).then(
+    (loaded) => {
+      setup = loaded;
+      if (!loaded) {
+        status.textContent = 'Could not open the rubric. Reload to try again.';
+        return;
       }
-      live.append(pieces);
-    }
+      panel = mountRubricPanel(loaded, {
+        saved: deps.saved ?? null,
+        ai: voiceReadForRubric(deps.ai, loaded.rows),
+        ...(deps.tagged ? { tagged: deps.tagged } : {}),
+        ...(deps.onChange ? { onChange: deps.onChange } : {}),
+        studentId: current?.studentId ?? null
+      });
+      if (touched) panel.touch();
+      status.remove();
+      box.append(panel.el);
+      return paintWho();
+    },
+    () => { status.textContent = 'Could not open the rubric. Reload to try again.'; }
+  );
 
-    const passed = progress.steps[studentId]?.[step.du]?.step;
-    const passedIdx = passed ? PLACED.indexOf(passed) : -1;
-    const mine = PLACED.indexOf(step.step);
-    const prev = PREV[step.step];
-    const row = el('div', 'voice-pass__step');
-    row.append(el('span', 'voice-pass__now', passed ? `DU ${n}: passed Step ${STEP_LABEL[passed]}` : `DU ${n}: no step passed yet`));
-    if (passedIdx >= mine) {
-      row.append(button(`Undo Step ${STEP_LABEL[step.step]}`, 'ghost', () => void save(() => api.setStep(classId, unit!.unitId, studentId, step.du, prev, false))));
-    } else if (passedIdx === mine - 1) {
-      row.append(button(`Pass on Step ${STEP_LABEL[step.step]}`, 'secondary', () => void save(() => api.setStep(classId, unit!.unitId, studentId, step.du, step.step, false))));
-      if (!prev) row.append(el('span', 'voice-pass__note block-secondary', 'Check Step 1 is through in Monitoring first.'));
-    } else {
-      row.append(el('span', 'voice-pass__note block-secondary', `Pass Step ${STEP_LABEL[prev!]} first. This take still counts as practice.`));
-    }
-    live.append(row);
-  }
-
-  async function refresh(): Promise<void> {
-    paint();
-    if (!current) return;
-    try {
-      unitLoad ??= (deps.loadUnit ?? defaultLoadUnit)(lessonId).then((u) => { unit = u; });
-      await unitLoad;
-      if (!unit?.unitId) { status.textContent = 'This lesson is not in a unit.'; return; }
-      if (loadedFor !== current.classId) {
-        progress = await api.load(current.classId, unit.unitId);
-        loadedFor = current.classId;
-      }
-      status.textContent = '';
-    } catch {
-      status.textContent = 'Could not load deep understanding progress.';
-    }
-    paint();
-  }
-
-  void refresh();
   return {
     el: box,
+    ready,
     setWho(next) {
       current = next;
-      void refresh();
-    }
+      void paintWho();
+    },
+    saveFields: () => panel?.saveFields() ?? {},
+    failed: () => panel?.failed(),
+    applyReply(reply) {
+      const stayed = panel?.applyReply(reply) ?? false;
+      if (stayed) box.open = true;
+      return stayed;
+    },
+    touch() {
+      touched = true;
+      panel?.touch();
+    },
+    refresh: () => panel?.refresh()
   };
 }

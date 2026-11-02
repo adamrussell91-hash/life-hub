@@ -370,7 +370,15 @@ export function renderClassPage(
 
   const markbookHost = document.createElement('div');
   markbookHost.className = 'class-page__markbook-host';
+  // The unit page's Monitoring tab links here with ?progress=du&unit=…, to open the second lens.
+  const progressLink = new URLSearchParams(window.location.search);
+  if (progressLink.get('progress') === 'du') window.setTimeout(() => markbookHost.scrollIntoView?.({ block: 'start' }), 0);
   disposers.push(mountMarkbook(markbookHost, pageClass, {
+    deepUnits: activeUnits,
+    currentUnitId: currentActiveUnitId,
+    scheduled: classScheduled,
+    lens: progressLink.get('progress') === 'du' ? 'du' : 'point',
+    lensUnitId: progressLink.get('unit') ?? undefined,
     outcomes: outcomeLabels(curriculum.outcomes ?? []),
     pieceLessons: unitProgressLessons(activeUnits, curriculum.lessons, []).map((l) => ({ id: l.id, title: l.title })),
     // Dates by lesson, whatever unit the calendar row was filed under: the lesson page's Date row

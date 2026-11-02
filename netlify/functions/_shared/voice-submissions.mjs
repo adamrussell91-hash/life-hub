@@ -25,6 +25,8 @@ import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mj
 import { listBlobKeys } from './blobs-list.mjs';
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
+import { cleanRubric, evidenceSteps } from './rubric-model.mjs';
+import { forgetRubric, recordRubric, rubricForStudent } from './rubric.mjs';
 import { claimFor, classesForLesson, loadRoster } from './class-claims.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
@@ -251,6 +253,7 @@ export async function mineView(store, record) {
     points: record.points,
     transcript: record.transcript,
     tags: tags.map(({ source: _source, confirmed: _confirmed, ...tag }) => tag),
+    ...(record.rubric ? { rubric: await rubricForStudent(store, record.rubric, record.lesson_id) } : {}),
     comment: record.comment ?? '',
     codes: library.filter((c) => used.has(c.id))
   };
@@ -357,7 +360,7 @@ function cleanTags(raw, wordCount) {
   });
 }
 
-/** Saves the teacher's marking onto the latest record, leaving audio and transcript alone. */
+/** Saves the teacher's marking onto the latest record, leaving audio and transcript alone. A rubric on a take with no student yet is kept, and records nothing until one is named. */
 export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}) {
   const record = await readSubmission(store, lesson, block, id);
   const next = { ...record };
@@ -371,11 +374,19 @@ export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}
     next.student_id = body.student_id;
   }
   if (body.fillers_suggested === true) next.fillers_suggested = true;
-  const marked = (next.tags ?? []).some((t) => t.confirmed !== false) || Boolean(next.comment?.trim());
+  let saved = { deep: null, blocked: [] };
+  if (body.rubric !== undefined) {
+    saved = next.class_id && next.student_id
+      ? await recordRubric(store, { class_id: next.class_id, student_id: next.student_id, piece: `v:${lesson}:${block}`, lesson_id: lesson, title: String(record.prompt ?? '').trim().slice(0, 200) || 'Viva practice', writing_key: block, raw: body.rubric, prior: record.rubric ?? null, today: body.today })
+      : { rubric: cleanRubric(body.rubric), deep: null, blocked: [] };
+    if (saved.rubric) next.rubric = saved.rubric;
+    else delete next.rubric;
+  }
+  const marked = (next.tags ?? []).some((t) => t.confirmed !== false) || Boolean(next.comment?.trim()) || Boolean(next.rubric);
   if (record.status === 'new' && marked) next.status = 'marked';
   next.updated_at = new Date(deps.now ? deps.now() : Date.now()).toISOString();
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
-  return teacherRecord(next);
+  return { ...teacherRecord(next), ...(saved.deep ? { deep: saved.deep } : {}), ...(saved.blocked.length ? { blocked: saved.blocked } : {}) };
 }
 
 export async function returnVoiceSubmission(store, lesson, block, id, deps = {}) {
@@ -397,6 +408,7 @@ export async function returnVoiceSubmission(store, lesson, block, id, deps = {})
 /** Removes everything for a submission and frees the device to submit again. */
 export async function deleteVoiceSubmission(store, lesson, block, id) {
   const record = await readSubmission(store, lesson, block, id);
+  if (record.rubric && record.class_id && record.student_id) await forgetRubric(store, record.class_id, record.student_id, `v:${lesson}:${block}`);
   if (record.audio_key) await store.delete(voiceKeys.audio(record.audio_key)).catch(() => undefined);
   await Promise.all([
     store.delete(voiceKeys.claim(lesson, block, record.device_hash)),
@@ -425,7 +437,9 @@ const spokenText = (record) => (record.transcript?.words ?? record.transcript?.s
 /** What a question asks the AI to listen for: its pass checklist and target pieces. Null when it isn't step evidence. */
 export function readingQuestion(block, unit) {
   const settings = block?.settings ?? {};
-  const checks = Array.isArray(settings.deep_checks) ? settings.deep_checks.filter((c) => typeof c === 'string' && c.trim()) : [];
+  // Every step's checks, first step first, so a reply's checks line up with the first step's list on the marking panel.
+  const steps = evidenceSteps(block ?? {});
+  const checks = steps.length ? steps.flatMap((s) => s.checks) : Array.isArray(settings.deep_checks) ? settings.deep_checks.filter((c) => typeof c === 'string' && c.trim()) : [];
   const all = (unit?.deep_understandings ?? []).flatMap((d) => d.pieces ?? []);
   const targets = (Array.isArray(settings.deep_targets) ? settings.deep_targets : []).map((id) => all.find((p) => p.id === id)).filter(Boolean);
   if (!settings.deep_step || (!checks.length && !targets.length)) return null;

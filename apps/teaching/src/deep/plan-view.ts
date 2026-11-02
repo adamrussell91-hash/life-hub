@@ -4,8 +4,8 @@ import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block, Lesson, Unit } from '@/schemas';
 import type { ScheduledLesson } from '@/schemas/scheduled-lesson';
 import './deep.css';
-import { evidenceStepOf, piecesTaught, withEvidenceStep, withPiecesTaught } from './block-tags';
-import { placements, planGaps } from './derive';
+import { addEvidenceStep, evidenceSteps, piecesTaught, removeEvidenceStep, withPiecesTaught } from './block-tags';
+import { chainGaps, placements, planGaps, pointsOutsideDus } from './derive';
 import {
   button,
   h,
@@ -17,7 +17,7 @@ import {
   type LessonLike,
   type Scope
 } from './editor';
-import { mountDeepMonitor } from './monitor-view';
+import { navigate } from '@/app/router';
 import {
   DEEP_LIMITS,
   newDuId,
@@ -69,7 +69,7 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
       for (const ref of du.dot_points) { const s = h('span', 'du-pill dp', codeOf(ref)); s.title = pointText(ref); pills.append(s); }
       for (const ref of du.concept_bullets) { const s = h('span', 'du-pill con', ref); s.title = bulletText(ref); pills.append(s); }
       card.append(pills);
-      for (const gap of planGaps(du, opts.deep, p)) card.append(h('div', 'du-warn', gap));
+      for (const gap of [...planGaps(du, opts.deep, p), ...chainGaps(du)]) card.append(h('div', 'du-warn', gap));
       const choose = (): void => { current = du.id; render(); };
       card.addEventListener('click', choose);
       card.addEventListener('keydown', (e) => { if (e.key === 'Enter') choose(); });
@@ -84,6 +84,12 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
       cards.append(add);
     }
     root.append(cards);
+    const loose = pointsOutsideDus(opts.scope.points.map((x) => x.ref), opts.deep);
+    if (opts.deep.length && loose.length) {
+      const note = h('div', 'du-warn', `${loose.length} dot point${loose.length === 1 ? '' : 's'} in this unit ${loose.length === 1 ? 'sits' : 'sit'} in no deep understanding: ${loose.map(codeOf).join(', ')}`);
+      note.title = loose.map(pointText).join('; ');
+      root.append(note);
+    }
     if (!opts.deep.length) root.append(h('p', 'du-empty', 'Start with the claim you most want students to carry out of this unit.'));
     if (!opts.deep.length) return;
 
@@ -119,9 +125,10 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
         if (ids[0]) put(opts.weeks.get(ids[0]) ?? null, 'K', 'k');
       }
       for (const step of ['2a', '2b', '3', '4'] as const) {
-        const t = p.steps.get(step);
-        if (t) put(opts.weeks.get(t.lesson_id) ?? null, STEP_LABEL[step], 's');
-        else if (cols.length) put(cols[last] ?? null, `${STEP_LABEL[step]}?`, 'gap');
+        const tasks = p.steps.get(step) ?? [];
+        for (const t of tasks) put(opts.weeks.get(t.lesson_id) ?? null, STEP_LABEL[step], 's');
+        if (tasks.length) continue;
+        if (cols.length) put(cols[last] ?? null, `${STEP_LABEL[step]}?`, 'gap');
       }
       const tr = h('tr');
       tr.append(h('td', 'rowh', `${i + 1}. ${du.claim || 'No claim yet'}`));
@@ -179,7 +186,7 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
       const box = h('div', 'du-step');
       const hd = h('div', 'du-hd');
       hd.append(h('b', '', `Step ${STEP_LABEL[step]} · ${STEP_NAME[step]}`));
-      const t = p.steps.get(step);
+      const t = p.steps.get(step)?.[0];
       hd.append(h('span', t ? 'du-where' : 'du-where gap', t ? `${lessonCode(opts.lessons, t.lesson_id)} · ${weekLabel(opts.weeks.get(t.lesson_id) ?? null)}` : 'No task yet'));
       box.append(hd);
       const fill = du.steps.find((x) => x.step === step)?.fill;
@@ -302,9 +309,9 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
       let changed = false;
       await rewrite(lesson.id, (blocks) => {
         const next = mapTree(blocks, (b) => {
-          const here = evidenceStepOf(b);
-          if (lesson.id === picked.lesson_id && b.id === picked.block_id) { changed = true; return withEvidenceStep(b, { du: duId, step }); }
-          if (here && here.du === duId && here.step === step) { changed = true; return withEvidenceStep(b, null); }
+          // Choosing the task for a step moves that step here; any other steps on a block stay.
+          if (lesson.id === picked.lesson_id && b.id === picked.block_id) { changed = true; return addEvidenceStep(b, { du: duId, step }); }
+          if (evidenceSteps(b).some((s) => s.du === duId && s.step === step)) { changed = true; return removeEvidenceStep(b, { du: duId, step }); }
           return b;
         });
         return changed ? next : null;
@@ -356,7 +363,16 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
         onClose: () => show('plan')
       });
     } else {
-      mountDeepMonitor(body, { unit: options.unit, deep: written(), lessons: like(), classes: options.classes ?? [], scheduled: options.scheduled ?? [] });
+      // Progress lives in the class Markbook now, on its By deep understanding view.
+      const panel = h('section', 'du-panel');
+      panel.append(h('h4', '', 'Monitoring has moved to the Markbook'));
+      panel.append(h('p', 'du-sub', 'Each class\'s Markbook shows progress by dot point or by deep understanding. Open a class to see this unit\'s lanes.'));
+      const classes = options.classes ?? [];
+      if (!classes.length) panel.append(h('p', 'du-empty', 'No class is teaching this unit yet.'));
+      const links = h('div', 'du-filt');
+      for (const c of classes) links.append(button(`Open ${c.label}`, '', () => navigate(`/classes/${encodeURIComponent(c.id)}?progress=du&unit=${encodeURIComponent(options.unit.id)}`)));
+      panel.append(links);
+      body.append(panel);
     }
   }
   show('plan');
