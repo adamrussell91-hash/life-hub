@@ -14,6 +14,6 @@ export type Resource = { kind: 'link' | 'video'; url: string; title?: string; st
 export type NextStep = { code_id: string; code: string; colour: string; positive: boolean; hit: number; of: number; action: string; resource?: Resource };
 export type ProgressPayload = {
   need: null; initials: string; pieces: PieceCol[]; outcomes: TargetRow[]; concepts: TargetRow[];
-  skills: { strand: string; rows: SkillRow[] }[]; codes: CodeRow[]; next: NextStep[]; unseen: number; map: unknown;
+  skills: { strand: string; rows: SkillRow[] }[]; codes: CodeRow[]; next: NextStep[]; unseen: number; has_returned?: boolean; map: unknown;
 };
 export type ReturnedItem = { id: string; kind: 'written' | 'viva' | 'quiz' | 'answer' | 'note'; title: string; date: string; new: boolean; codes: string[] };

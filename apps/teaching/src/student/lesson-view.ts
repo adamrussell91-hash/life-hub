@@ -9,6 +9,7 @@ import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
+import { mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
@@ -288,12 +289,15 @@ export function mountStudentLessonView(
   };
   let work: WorkSyncHandle | null = null;
   let footer: LessonFooterHandle | null = null;
+  let token: InitialsTokenHandle | null = null;
   const show = (content: HTMLElement, lesson: PublishedLesson, extras: Parameters<typeof renderPublishedLesson>[2]) => {
     lecture?.dispose();
     work?.dispose();
     work = null;
     footer?.dispose();
     footer = null;
+    token?.dispose();
+    token = null;
     lecture = renderPublishedLesson(content, lesson, extras);
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
@@ -302,9 +306,14 @@ export function mountStudentLessonView(
     // Previous, the finish tick and next. Neighbours come from the class's schedule when the lesson was opened from it.
     if (workClass) {
       const cls = extras?.cls;
+      token = mountInitialsToken({
+        classId: workClass,
+        from: cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`
+      });
+      header.append(token.element);
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
-      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work });
+      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh() });
       content.append(footer.element);
     }
   };
@@ -354,16 +363,7 @@ export function mountStudentLessonView(
         return;
       }
 
-      renderStudentChrome(header, {
-        brand: cls.code || STUDENT_BRAND,
-        links: [
-          {
-            href: `/s/classes/${classId}`,
-            label: 'Back to class',
-            className: 'student-surface__back-class'
-          }
-        ]
-      });
+      renderStudentChrome(header, { brand: cls.code || STUDENT_BRAND });
       show(content, lesson, { cls });
       mountExamples(content);
     });
@@ -428,6 +428,8 @@ export function mountStudentLessonView(
       work = null;
       footer?.dispose();
       footer = null;
+      token?.dispose();
+      token = null;
     }
   };
 }
