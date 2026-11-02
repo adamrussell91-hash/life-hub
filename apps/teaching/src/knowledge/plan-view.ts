@@ -1,6 +1,6 @@
 import { KNOWLEDGE_LIMITS, type AlreadyKnow, type KnowledgeItem, type KnowledgePlan, type KnowledgeWeek, type ScopeSequence } from '@/schemas';
 import {
-  alreadyState, blankWeek, buildRows, emptyPlan, indexItems, markFromBefore, newItemId, pieceSuggestions, planIssues, removeItem, setsUp,
+  alreadyState, blankWeek, buildRows, emptyPlan, indexItems, markFromBefore, newInWeek, newItemId, pieceSuggestions, placedLater, planIssues, removeItem, setsUp,
   teachIn, threadOf, unitPlanFor, unplacedCount, type ItemIndex, type PlanRow
 } from './plan';
 import './plan.css';
@@ -141,7 +141,7 @@ export function mountKnowledgePlan(host: HTMLElement, options: KnowledgePlanOpti
     return btn('kplan-fix', 'It comes from last year', () => { markFromBefore(plan, text); changed(); });
   }
 
-  function alreadyCell(row: PlanRow, list: () => AlreadyKnow[], name: string): HTMLElement {
+  function alreadyCell(row: PlanRow, list: () => AlreadyKnow[], name: string, weekIndex?: number): HTMLElement {
     const cell = el('div', 'kplan-c-start');
     label(cell, 'Already know');
     const ul = el('ul', 'kplan-items');
@@ -149,7 +149,12 @@ export function mountKnowledgePlan(host: HTMLElement, options: KnowledgePlanOpti
       const state = alreadyState(entry, row.n, index);
       if (!state) continue;
       const li = el('li', 'kplan-li');
-      if (state.state === 'ok' && !editing) {
+      const lateWeek = weekIndex !== undefined && state.state === 'ok' ? placedLater(row.plan, weekIndex, state.item_id) : null;
+      if (lateWeek) {
+        const gap = el('div', 'kplan-gap', state.text);
+        gap.append(el('small', undefined, `Placed in ${lateWeek.label || 'a later week'}, after this week needs it`));
+        li.append(gap);
+      } else if (state.state === 'ok' && !editing) {
         const item = btn('kplan-item', state.text, () => follow(state.item_id));
         item.dataset.k = state.item_id;
         item.dataset.role = 'known';
@@ -386,6 +391,8 @@ export function mountKnowledgePlan(host: HTMLElement, options: KnowledgePlanOpti
     } else {
       first.append(el('div', 'kplan-w-name', week.label || `Part ${w + 1}`));
     }
+    const fresh = newInWeek(row.plan, w);
+    if (fresh) first.append(el('div', 'kplan-w-new', `${fresh} new`));
 
     const concept = el('div', 'kplan-c-concept');
     label(concept, 'Question');
@@ -449,7 +456,7 @@ export function mountKnowledgePlan(host: HTMLElement, options: KnowledgePlanOpti
     const line = after ? (after.label || `Part ${w + 2}`) + (after.question ? `: ${after.question}` : '') : nextUnit ? `Unit ${nextUnit.n}: ${nextUnit.title}` : row.plan.leads_on;
     if (line) next.append(el('div', 'kplan-next', line));
 
-    node.append(first, alreadyCell(row, () => week.already, week.label || row.title), concept, content, words, skills, evaluation, next);
+    node.append(first, alreadyCell(row, () => week.already, week.label || row.title, w), concept, content, words, skills, evaluation, next);
     return node;
   }
 
@@ -558,10 +565,12 @@ export function mountKnowledgePlan(host: HTMLElement, options: KnowledgePlanOpti
       const untaught = issues.filter((x) => x.state === 'untaught').length;
       const later = issues.filter((x) => x.state === 'later').length;
       const off = issues.filter((x) => x.state === 'off').length;
+      const order = issues.filter((x) => x.state === 'week_order').length;
       const parts = [
         untaught ? `${untaught} assumed and taught nowhere` : '',
         later ? `${later} taught after ${later === 1 ? 'it is' : 'they are'} needed` : '',
-        off ? `${off} from a unit off the Timeline` : ''
+        off ? `${off} from a unit off the Timeline` : '',
+        order ? `${order} placed in a week after ${order === 1 ? 'it is' : 'they are'} needed` : ''
       ].filter(Boolean);
       readout.append(el('span', 'kplan-warn', `${parts.join(', ')}: `), issues.slice(0, 3).map((x) => `${shorten(x.text, 32)} in Unit ${x.n}`).join(', '));
       if (issues.length > 3) readout.append(` and ${issues.length - 3} more`);

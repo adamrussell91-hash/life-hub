@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  alreadyState, blankUnitPlan, blankWeek, buildRows, indexItems, markFromBefore, pieceSuggestions, planIssues, removeItem, setsUp, teachIn, threadOf, unitPlanFor, unplacedCount
+  alreadyState, blankUnitPlan, blankWeek, buildRows, indexItems, markFromBefore, newInWeek, pieceSuggestions, placedLater, planIssues, removeItem, setsUp, teachIn, threadOf, unitPlanFor, unplacedCount
 } from '@/knowledge/plan';
 import { KnowledgePlanSchema, type KnowledgePlan } from '@/schemas';
 
@@ -80,6 +80,40 @@ describe('already know', () => {
       { state: 'later', text: 'Moorings', n: 2 },
       { state: 'untaught', text: 'Knots', n: 3 }
     ]);
+  });
+});
+
+describe('small steps inside a unit', () => {
+  const stepped = (): KnowledgePlan => {
+    const plan = planFixture();
+    plan.units[0]!.weeks = [
+      { ...blankWeek('Weeks 1-2'), must_ids: ['ki_a001'], already: [{ from: 'plan', item_id: 'ki_a002' }] },
+      { ...blankWeek('Weeks 3-4'), must_ids: ['ki_a001', 'ki_a002'], already: [{ from: 'plan', item_id: 'ki_a001' }] }
+    ];
+    return plan;
+  };
+
+  it('flags a week relying on something a later week places', () => {
+    const plan = stepped();
+    const unit = plan.units[0]!;
+    expect(placedLater(unit, 0, 'ki_a002')?.label).toBe('Weeks 3-4');
+    expect(placedLater(unit, 1, 'ki_a001')).toBeNull();
+    const { rows, index } = read(plan);
+    expect(planIssues(rows, index)).toContainEqual({ state: 'week_order', text: 'Moon phases', n: 1 });
+  });
+
+  it('leaves a same-week or unplaced reliance alone', () => {
+    const plan = stepped();
+    expect(placedLater(plan.units[0]!, 1, 'ki_a002')).toBeNull();
+    expect(placedLater(plan.units[0]!, 0, 'ki_a003')).toBeNull();
+  });
+
+  it('counts only what a week introduces', () => {
+    const unit = stepped().units[0]!;
+    expect(newInWeek(unit, 0)).toBe(1);
+    expect(newInWeek(unit, 1)).toBe(1);
+    unit.weeks[1]!.must_ids.push('ki_gone');
+    expect(newInWeek(unit, 1)).toBe(1);
   });
 });
 

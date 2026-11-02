@@ -24,7 +24,7 @@ export type AlreadyState =
   | { state: 'untaught'; text: string }
   | { state: 'later'; text: string; item_id: string; n: number }
   | { state: 'off'; text: string; item_id: string };
-export type PlanIssue = { state: 'untaught' | 'later' | 'off'; text: string; n: number };
+export type PlanIssue = { state: 'untaught' | 'later' | 'off' | 'week_order'; text: string; n: number };
 export type SetsUp = { n: number; title: string; texts: string[] };
 export type PlanSuggestions = { essential: Array<{ id: string; text: string }>; others: Array<{ id: string; text: string }> };
 type PieceLike = { id: string; text: string; tier: string };
@@ -123,9 +123,31 @@ export function threadOf(itemId: string, rows: readonly PlanRow[], index: ItemIn
   return { home, usedIn };
 }
 
+const firstWeekOf = (unit: KnowledgeUnitPlan, itemId: string): number =>
+  unit.weeks.findIndex((w) => w.must_ids.includes(itemId) || w.skill_ids.includes(itemId));
+
+/** The later week of this unit that teaches something this week relies on. Null when the order is fine. */
+export function placedLater(unit: KnowledgeUnitPlan, weekIndex: number, itemId: string): KnowledgeWeek | null {
+  const first = firstWeekOf(unit, itemId);
+  return first > weekIndex ? unit.weeks[first]! : null;
+}
+
+/** How many must-know items this week introduces: those no earlier week has placed. */
+export function newInWeek(unit: KnowledgeUnitPlan, weekIndex: number): number {
+  const known = new Set(unit.must.map((m) => m.id));
+  return new Set(unit.weeks[weekIndex]?.must_ids.filter((id) => known.has(id) && firstWeekOf(unit, id) === weekIndex)).size;
+}
+
 export function planIssues(rows: readonly PlanRow[], index: ItemIndex): PlanIssue[] {
   const out: PlanIssue[] = [];
   for (const row of rows) {
+    row.plan.weeks.forEach((week, w) => {
+      for (const entry of week.already) {
+        if (entry.from !== 'plan' || !placedLater(row.plan, w, entry.item_id)) continue;
+        const text = index.get(entry.item_id)?.text ?? '';
+        if (text.trim() && !out.some((x) => x.state === 'week_order' && x.text === text && x.n === row.n)) out.push({ state: 'week_order', text, n: row.n });
+      }
+    });
     for (const entry of entriesOf(row.plan)) {
       const read = alreadyState(entry, row.n, index);
       if (!read || read.state === 'ok' || read.state === 'before' || !read.text.trim()) continue;
