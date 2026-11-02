@@ -73,10 +73,10 @@ async function pieceCard(item: FlowItem): Promise<Card> {
   const rubric = where ? await loadRubricSetup({ lessonId: where.lesson_id, blockId: where.block_id, who: { classId: task.class_id, studentId: row!.student_id! } }) : null;
   const view = openMarkPiece({ ...data, position: { index: 0, total: 1 } }, {
     save: (body) => call({ action: 'save', ...body }),
-    returnIt: () => call({ action: 'return' }),
+    returnIt: (ask) => call({ action: 'return', ...ask }),
     takeBack: () => call({ action: 'take_back' }),
     move: () => undefined
-  }, { embedded: true, rubric });
+  }, { embedded: true, rubric, redraft: true });
   return { el: view.el, leave: () => void view.save(), finish: () => view.finish() };
 }
 
