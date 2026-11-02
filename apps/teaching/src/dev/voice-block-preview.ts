@@ -41,6 +41,19 @@ function mine() {
   return { ...base, points: submission.points, transcript: submission.transcript, tags: (submission.tags as Array<{ confirmed?: boolean }>).filter((t) => t.confirmed !== false), comment: submission.comment, codes };
 }
 
+// ?seed=1 starts with a long marked-length take, so the teacher view can be scrolled without recording first.
+if (new URLSearchParams(location.search).has('seed')) {
+  const now = new Date();
+  const long = Array(8).fill(SAMPLE).join(' ');
+  const words = long.split(' ');
+  submission = {
+    id: 'vs_demo', initials: 'JS', device_hash: 'a1b2c3', submitted_at: now.toISOString(),
+    audio_delete_after: new Date(now.getTime() + 28 * 86400_000).toISOString(), duration_s: 120, status: 'new',
+    transcript_status: 'done', points: [], prompt: 'How does the composer represent isolation?', tags: [], comment: '', audio_url: '', audio_deleted: false,
+    transcript: { text: long, segments: [{ text: long, start: 0, end: 120, words: words.map((word, i) => ({ word, start: (i * 120) / words.length, end: ((i + 0.8) * 120) / words.length })) }] }
+  };
+}
+
 let lastBlob: Blob | null = null;
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -302,7 +302,6 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
       player.replaceChildren(el('p', 'voice-feedback__gone block-secondary', 'Audio removed after 4 weeks. The transcript and your tags are kept.'));
     }
     audio.hidden = true;
-    screen.append(audio, player);
 
     // Code strip
     const strip = el('div', 'voice-strip');
@@ -348,13 +347,19 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
         })
       );
     paintReaction();
-    strip.append(typing, reactionRow);
+    strip.append(typing);
+    // Player and codes stick together, so the codes stay in reach while the transcript scrolls.
+    const dock = el('div', 'voice-mark__dock');
+    dock.append(player, strip);
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(() => screen.style.setProperty('--voice-dock-h', `${dock.offsetHeight}px`)).observe(dock);
+    }
     const keysHelp = el(
       'p',
       'voice-strip__help block-secondary',
       'Number keys tag speaking · type letters + Space for other codes · Shift = strength · Space plays/pauses · ←/→ 5 s · Enter adds a note · Backspace undoes · Esc clears'
     );
-    screen.append(strip, keysHelp);
+    screen.append(audio, dock, reactionRow, keysHelp);
 
     // Transcript + notes
     const work = el('div', 'voice-mark__work');
