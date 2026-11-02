@@ -7,23 +7,28 @@ const code = (id: string, hits: number) => ({ id, code: id.toUpperCase(), colour
 
 describe('chooseStep', () => {
   it('takes the code with most hits, at the student’s rung', () => {
-    const skills: StepSkills = { 'writing.thesis': { rung: 'skilled', code: code('ts', 2) }, 'analysis.evidence': { rung: 'below', code: code('ev', 3) } };
+    const skills: StepSkills = { 'writing.thesis': { rung: 'skilled', codes: [code('ts', 2)] }, 'analysis.evidence': { rung: 'below', codes: [code('ev', 3)] } };
     expect(chooseStep(item, skills)).toEqual({ code_id: 'ev', code: 'EV', colour: 'lilac', line: 'EV line 0.' });
   });
 
   it('keeps the first skill on a tie', () => {
-    const skills: StepSkills = { 'writing.thesis': { rung: 'excellent', code: code('ts', 2) }, 'analysis.evidence': { rung: 'below', code: code('ev', 2) } };
+    const skills: StepSkills = { 'writing.thesis': { rung: 'excellent', codes: [code('ts', 2)] }, 'analysis.evidence': { rung: 'below', codes: [code('ev', 2)] } };
     expect(chooseStep(item, skills)?.line).toBe('TS line 4.');
   });
 
+  it('moves past a code the bank lacks to the next one on that skill', () => {
+    const skills: StepSkills = { 'writing.thesis': { rung: 'capable', codes: [code('x', 4), code('ts', 2)] } };
+    expect(chooseStep(item, skills)).toMatchObject({ code_id: 'ts', line: 'TS line 1.' });
+  });
+
   it('gives the Capable line when the skill has no rung yet', () => {
-    expect(chooseStep(item, { 'writing.thesis': { rung: null, code: code('ts', 1) } })?.line).toBe('TS line 1.');
+    expect(chooseStep(item, { 'writing.thesis': { rung: null, codes: [code('ts', 1)] } })?.line).toBe('TS line 1.');
   });
 
   it('has no step when the bank lacks the code, the box is untagged, or there is no claim', () => {
-    expect(chooseStep(item, { 'writing.thesis': { rung: 'capable', code: code('ar', 4) } })).toBeNull();
-    expect(chooseStep({ next_steps: item.next_steps }, { 'writing.thesis': { rung: 'capable', code: code('ts', 1) } })).toBeNull();
-    expect(chooseStep(item, { 'writing.thesis': { rung: 'capable', code: null } })).toBeNull();
+    expect(chooseStep(item, { 'writing.thesis': { rung: 'capable', codes: [code('ar', 4)] } })).toBeNull();
+    expect(chooseStep({ next_steps: item.next_steps }, { 'writing.thesis': { rung: 'capable', codes: [code('ts', 1)] } })).toBeNull();
+    expect(chooseStep(item, { 'writing.thesis': { rung: 'capable', codes: [] } })).toBeNull();
     expect(chooseStep(item, null)).toBeNull();
   });
 });
@@ -52,7 +57,7 @@ describe('readStepPick', () => {
 
 describe('stepsLoader', () => {
   it('asks once and fixes each box’s step', async () => {
-    const ask = vi.fn(async () => ({ need: null, skills: { 'writing.thesis': { rung: 'capable', code: code('ts', 1) } } as StepSkills }));
+    const ask = vi.fn(async () => ({ need: null, skills: { 'writing.thesis': { rung: 'capable', codes: [code('ts', 1)] } } as StepSkills }));
     const stepFor = stepsLoader('c1', 'l1', ask);
     const a = await stepFor(item, 'b.q1');
     const b = await stepFor(item, 'b.q2');

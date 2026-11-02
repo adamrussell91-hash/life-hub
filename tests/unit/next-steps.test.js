@@ -32,7 +32,7 @@ test('bankSource changes with any input and ignores skill order', () => {
   assert.notEqual(bankSource('Why does the town change?', ['arguing.thesis', 'reading.inference'], ['a', 'b', 'c', 'd', 'f']), base);
 });
 
-test('stepsBySkill: first ranked code per skill wins; codes without a skill are ignored', () => {
+test('stepsBySkill: each skill lists its codes, top ranked first; codes without a skill are ignored', () => {
   const codes = new Map([
     ['ts', { id: 'ts', code: 'TS', colour: 'lilac', skill: 'arguing.thesis' }],
     ['ar', { id: 'ar', code: 'AR', colour: 'lilac', skill: 'arguing.thesis' }],
@@ -41,11 +41,11 @@ test('stepsBySkill: first ranked code per skill wins; codes without a skill are 
   const ranked = [{ code_id: 'l', hit: 4 }, { code_id: 'ar', hit: 3 }, { code_id: 'ts', hit: 2 }];
   const out = stepsBySkill(ranked, codes, { 'arguing.thesis': 'skilled', 'reading.inference': 'capable' });
   assert.deepEqual(out, {
-    'arguing.thesis': { rung: 'skilled', code: { id: 'ar', code: 'AR', colour: 'lilac', hits: 3 } },
-    'reading.inference': { rung: 'capable', code: null }
+    'arguing.thesis': { rung: 'skilled', codes: [{ id: 'ar', code: 'AR', colour: 'lilac', hits: 3 }, { id: 'ts', code: 'TS', colour: 'lilac', hits: 2 }] },
+    'reading.inference': { rung: 'capable', codes: [] }
   });
   assert.deepEqual(stepsBySkill([{ code_id: 'ts', hit: 2 }], codes, {}), {
-    'arguing.thesis': { rung: null, code: { id: 'ts', code: 'TS', colour: 'lilac', hits: 2 } }
+    'arguing.thesis': { rung: null, codes: [{ id: 'ts', code: 'TS', colour: 'lilac', hits: 2 }] }
   });
 });
 
@@ -78,4 +78,19 @@ test('the library keeps a good skill and ladder and drops malformed ones', () =>
   assert.equal(short.skill, 'reading.inference');
   assert.equal(short.ladder, undefined);
   assert.equal(long.ladder, undefined);
+});
+
+test('a saved Accuracy code picks up the evidence link and ladder; a code with its own ladder keeps it', async () => {
+  const { readFeedbackCodes } = await import('../../netlify/functions/_shared/feedback-codes.mjs');
+  const own = ['a', 'b', 'c', 'd', 'e'];
+  const store = { get: async () => ({ codes: [
+    { id: 'viva_x', code: 'X', group: 'viva' },
+    { id: 'comp_e', code: 'E', group: 'composition' },
+    { id: 'speak_fw', code: 'FW', group: 'speaking', ladder: own }
+  ] }) };
+  const [x, e, fw] = await readFeedbackCodes(store);
+  assert.equal(x.skill, 'arguing.evidence');
+  assert.equal(x.ladder.length, 5);
+  assert.equal(e.skill, undefined, 'a composition code stays as saved');
+  assert.deepEqual(fw.ladder, own);
 });
