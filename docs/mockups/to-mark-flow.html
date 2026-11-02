@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To mark flow mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.14);
+  --blue: #dceafa; --sage: #dfe9e1; --sage-ink: #3d6b4a; --green: #4f9a63;
+  --peach: #f8e1cf; --peach-ink: #8a5420; --gold: #f6ecc4; --gold-ink: #7a6216;
+  --lilac: #e7e2f5; --lilac-ink: #5a4a8c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.mockbar { background: var(--navy); color: #fff; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.mockbar b { margin-right: 8px; }
+.mockbar button { background: transparent; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 999px; padding: 3px 12px; }
+.mockbar button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.stagewrap { padding: 16px; display: flex; justify-content: center; }
+.frame { width: 100%; max-width: 1280px; height: calc(100vh - 80px); min-height: 620px; background: var(--paper); border-radius: 14px; box-shadow: 0 10px 30px rgba(19,35,58,.14); overflow: hidden; container-type: inline-size; display: flex; flex-direction: column; }
+.frame.phone { width: 390px; max-width: 390px; border-radius: 32px; border: 8px solid #1c2534; }
+
+/* Header */
+.head { padding: 14px 20px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.head__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.head h1 { margin: 0; font-size: 20px; color: var(--navy); }
+.progress { flex: 1 1 160px; min-width: 120px; height: 8px; border-radius: 999px; background: rgba(23,55,94,.1); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--green); transition: width .25s; }
+.count { font-size: 13px; font-weight: 600; color: var(--navy); white-space: nowrap; }
+.pills { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.pill { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 12px; font-size: 13px; font-weight: 500; }
+.pill[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.pill small { opacity: .7; font-size: 12px; margin-left: 2px; }
+.ai-run { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--lilac); color: var(--lilac-ink); border-radius: 12px; padding: 7px 12px; font-size: 13px; }
+.ai-run button { margin-left: auto; background: var(--lilac-ink); color: #fff; border: 0; border-radius: 999px; padding: 4px 14px; font-weight: 600; }
+.ai-run.done { background: var(--sage); color: var(--sage-ink); }
+
+/* Body */
+.body { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr); }
+.queue { border-right: 1px solid var(--line); overflow-y: auto; padding: 10px; display: grid; align-content: start; gap: 12px; }
+.group__t { font-size: 13px; font-weight: 600; color: var(--navy); padding: 0 6px; display: grid; gap: 1px; }
+.group__t small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.q-item { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 6px; font-size: 13px; }
+.q-item:hover { background: rgba(23,55,94,.05); }
+.q-item.on { background: var(--blue); font-weight: 600; }
+.q-item.done { color: var(--muted); text-decoration: line-through; }
+.who { flex: none; width: 34px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #fff; border: 1px solid var(--line); font-size: 12px; font-weight: 700; text-decoration: none; }
+.q-item.done .who { background: var(--sage); color: var(--sage-ink); border-color: transparent; }
+.kind { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
+.k-voice { background: var(--lilac); color: var(--lilac-ink); }
+.k-quiz { background: var(--blue); color: var(--navy); }
+.k-writing { background: var(--gold); color: var(--gold-ink); }
+.k-sprint { background: var(--peach); color: var(--peach-ink); }
+.k-handup { background: var(--sage); color: var(--sage-ink); }
+.ai-dot { margin-left: auto; font-size: 11px; color: var(--lilac-ink); }
+
+.work { overflow-y: auto; padding: 18px 22px 24px; display: grid; align-content: start; gap: 14px; }
+.work__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work__head h2 { margin: 0; font-size: 19px; color: var(--navy); }
+.crumb { font-size: 12px; color: var(--muted); }
+.prompt { font-family: 'Source Serif 4', Georgia, serif; font-size: 17px; line-height: 1.45; color: var(--navy); margin: 0; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.card h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--navy); }
+.player { position: sticky; top: -18px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; box-shadow: 0 6px 12px -10px rgba(19,35,58,.4); }
+.play { border: 0; background: var(--navy); color: #fff; border-radius: 999px; padding: 4px 16px; font-weight: 600; }
+.scrub { flex: 1 1 120px; height: 6px; border-radius: 99px; background: rgba(23,55,94,.12); position: relative; }
+.scrub i { position: absolute; inset: 0 62% 0 0; background: var(--wave); border-radius: 99px; }
+.codes { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; }
+.code { border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 1px 8px; font-size: 12px; }
+.code b { color: var(--navy); }
+.two { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+.transcript { font-family: 'Source Serif 4', Georgia, serif; font-size: 16px; line-height: 1.7; margin: 0; }
+.transcript mark { background: var(--lilac); border-radius: 4px; padding: 0 2px; cursor: pointer; }
+.transcript mark.lit { outline: 2px solid var(--lilac-ink); }
+.transcript .fw { border-bottom: 2px dashed var(--peach-ink); }
+.check { display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; background: transparent; border: 0; padding: 4px; border-radius: 8px; font-size: 14px; }
+.check:hover { background: rgba(23,55,94,.05); }
+.box { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; border: 1.5px solid #c6cedb; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: #fff; }
+.box.y { background: var(--green); border-color: var(--green); color: #fff; }
+.box.n { border-color: var(--navy); color: var(--navy); }
+.box.ai { border-style: dashed; background: var(--lilac); border-color: var(--lilac-ink); color: var(--lilac-ink); }
+.check small { display: block; color: var(--lilac-ink); font-size: 12px; font-style: italic; }
+.step { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 13px; }
+.step b { color: var(--navy); }
+.btn { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 14px; font-weight: 600; font-size: 13px; }
+.btn.pass { background: var(--sage); border-color: transparent; color: var(--sage-ink); }
+.btn.pass.on { background: var(--green); color: #fff; }
+.note { color: var(--muted); font-size: 12px; }
+textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: #fff; resize: vertical; }
+.quote { font-family: 'Source Serif 4', Georgia, serif; font-size: 16px; line-height: 1.6; margin: 0; }
+
+/* Tagging typed work: the same codes and highlights as the marking screen */
+.palette { position: sticky; top: -18px; z-index: 2; display: grid; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; box-shadow: 0 6px 12px -10px rgba(19,35,58,.4); }
+.palette__hint { font-size: 12px; color: var(--muted); }
+.palette__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { border: 1px solid transparent; border-radius: 8px; padding: 2px 9px; font-size: 13px; }
+.chip b { margin-right: 2px; }
+.chip kbd { margin-left: 5px; }
+.chip.is-armed { outline: 2px solid var(--navy); outline-offset: 1px; }
+.c-blue { background: var(--blue); color: var(--navy); }
+.c-sage { background: var(--sage); color: var(--sage-ink); }
+.c-peach { background: var(--peach); color: var(--peach-ink); }
+.c-gold { background: var(--gold); color: var(--gold-ink); }
+.c-lilac { background: var(--lilac); color: var(--lilac-ink); }
+.sheet { white-space: pre-wrap; cursor: text; }
+.sheet .run.pending { background: rgba(55,111,183,.22); border-radius: 3px; }
+.sheet .run.tagged { border-radius: 3px; padding: 1px 0; cursor: pointer; }
+.sheet .run.ai { background: transparent !important; outline: 1.5px dashed var(--lilac-ink); outline-offset: 1px; }
+.sheet .run.open { box-shadow: 0 0 0 2px var(--navy); }
+.sheet sup { font: 700 10px Inter, sans-serif; margin: 0 2px 0 1px; user-select: none; -webkit-user-select: none; cursor: pointer; color: var(--navy); }
+.sheet sup.pos::before { content: '+'; color: var(--green); }
+.sheet sup.ai { color: var(--lilac-ink); }
+.tagmenu { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 13px; }
+.tagmenu p { margin: 0; }
+.tagmenu input { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.tagmenu__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.why { color: var(--lilac-ink); font-style: italic; }
+.notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.notes li { border-left: 3px solid var(--line); padding-left: 8px; }
+.notes small { display: block; color: var(--muted); }
+.warn { margin: 0; font-size: 12px; color: var(--peach-ink); background: var(--peach); border-radius: 8px; padding: 4px 8px; }
+.rubric { display: grid; gap: 10px; }
+.rubric__row { display: grid; gap: 4px; font-size: 13px; }
+.rubric__steps { display: flex; flex-wrap: wrap; gap: 4px; }
+.stepbtn { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+.stepbtn[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* Quiz stack */
+.ans { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.ans:first-of-type { border-top: 0; }
+.ans p { margin: 0; font-size: 14px; }
+.ans small { display: block; color: var(--lilac-ink); font-size: 12px; font-style: italic; }
+.ans .btns { display: flex; gap: 4px; }
+.tick { width: 34px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-weight: 700; }
+.tick.ai { border-style: dashed; border-color: var(--lilac-ink); background: var(--lilac); color: var(--lilac-ink); }
+.tick.right { background: var(--green); border-color: var(--green); color: #fff; }
+.tick.wrong { background: var(--peach-ink); border-color: var(--peach-ink); color: #fff; }
+.marks { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+
+/* Action bar */
+.bar { border-top: 1px solid var(--line); background: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 8px; }
+.bar .go { margin-left: auto; background: var(--navy); color: #fff; border: 0; border-radius: 999px; padding: 8px 20px; font-weight: 600; }
+kbd { font: 600 11px Inter, sans-serif; border: 1px solid rgba(23,55,94,.25); border-radius: 5px; padding: 0 5px; margin-left: 6px; background: rgba(255,255,255,.15); }
+.bar .ghost { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-weight: 500; font-size: 13px; }
+.queue-toggle { display: none; }
+.clear { text-align: center; padding: 70px 20px; display: grid; gap: 6px; }
+.clear h2 { margin: 0; color: var(--navy); font-size: 24px; }
+
+/* Phone */
+@container (max-width: 760px) {
+  .body { grid-template-columns: minmax(0, 1fr); }
+  .queue { display: none; border-right: 0; }
+  .body.show-queue .queue { display: grid; }
+  .body.show-queue .work { display: none; }
+  .queue-toggle { display: inline-block; }
+  .two { grid-template-columns: minmax(0, 1fr); }
+  .palette__chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .chip { flex: none; }
+  .head, .work { padding-left: 14px; padding-right: 14px; }
+  .bar { padding: 8px 12px; }
+  kbd { display: none; }
+  .bar .go { flex: 1; }
+}
+</style>
+</head>
+<body>
+<div class="mockbar">
+  <b>To mark mockup</b> Invented students. Click through it: the keys work too.
+  <button id="vDesk" aria-pressed="true">Desktop</button>
+  <button id="vPhone" aria-pressed="false">Phone</button>
+  <button id="reset">Start again</button>
+</div>
+<div class="stagewrap"><div class="frame" id="frame">
+  <div class="head">
+    <div class="head__row">
+      <h1>To mark</h1>
+      <div class="progress"><i id="bar"></i></div>
+      <span class="count" id="count"></span>
+      <button class="pill queue-toggle" id="qt">Queue</button>
+    </div>
+    <div class="pills" id="pills"></div>
+    <div class="ai-run" id="airun"></div>
+  </div>
+  <div class="body" id="body">
+    <nav class="queue" id="queue" aria-label="Queue"></nav>
+    <main class="work" id="work"></main>
+  </div>
+  <div class="bar">
+    <button class="ghost" id="prev">Back<kbd>↑</kbd></button>
+    <button class="ghost" id="skip">Skip<kbd>↓</kbd></button>
+    <button class="go" id="go"></button>
+  </div>
+</div></div>
+
+<script>
+const LABEL = { voice: 'Viva', quiz: 'Quiz', writing: 'Writing', sprint: 'Sprint', handup: 'Hand-up' };
+const VERB = { voice: 'Return', quiz: 'Save marks', writing: 'Return', sprint: 'Return', handup: 'Send reply' };
+const CHECKS = ['Names two poems and a form choice in each', 'Says how each form choice acts out the experience', 'Links the form to an identity made from two cultures', 'Compares: what one poem does that the other does differently'];
+const CODES = [['TS', 'Topic sentence', 'blue'], ['AR', 'Relevance', 'sage'], ['E', 'Evidence', 'peach'], ['T', 'Techniques', 'gold'], ['EX', 'Expression', 'lilac']];
+const codeOf = (c) => CODES.find((x) => x[0] === c);
+const BANDS = ['Starting', 'Building', 'Secure', 'Extending'];
+const RUNGS = ['Capable', 'Skilled', 'Accomplished', 'Excellent'];
+const LEVELS = ['Starting', 'Showing', 'Strong'];
+const fresh = () => [
+  { id: 'v1', kind: 'voice', who: 'JS', group: 'Viva Practice 1 · hybrid form', cls: '12ENX', time: '1:04', step: 'DU 1 · Step 3', prev: 'passed Step 2B', canPass: true,
+    prompt: 'How is the hybrid nature of both form and identity in the poetry represented and used?',
+    transcript: [['So, '], ['um,', 'fw'], [' I think the form is doing a lot of the work. '], ['In the road poem he goes from long prose into a haiku at the end, and in the river poem he borrows an American story.', 0], [' '], ['The prose keeps you moving like traffic, then the haiku just stops you on one image.', 1], [' And '], ['that shape is a bit like him, two cultures joined together that don’t sit smoothly.', 2], [' So it’s, '], ['like,', 'fw'], [' not just what he says, it’s the shape of it.']],
+    ai: [['y', 'In the road poem… in the river poem'], ['y', 'keeps you moving like traffic'], ['y', 'two cultures joined together'], ['n', 'Sets the two poems side by side but says only what each does']],
+    pieces: [['Form can act out the experience', 'y'], ['Hybridity', 'y'], ['A haibun joins prose to a haiku', 'n']] },
+  { id: 'v2', kind: 'voice', who: 'RK', group: 'Viva Practice 1 · hybrid form', cls: '12ENX', time: '0:58', step: 'DU 1 · Step 3', prev: 'passed Step 2B', canPass: true,
+    prompt: 'How is the hybrid nature of both form and identity in the poetry represented and used?',
+    transcript: [['The poems show identity by talking about Country and the city. '], ['He uses a lot of metaphors,', 'x'], [' like the road being hell. '], ['I think that shows he comes from two places.', 2], [' And the river poem has Huckleberry in it.']],
+    ai: [['n', 'One form choice named, none in the second poem'], ['n', 'Names metaphors, not the shape of the poem'], ['y', 'he comes from two places'], ['n', 'No comparison yet']],
+    pieces: [['Form can act out the experience', 'n'], ['Hybridity', 'y'], ['A haibun joins prose to a haiku', 'n']] },
+  { id: 'v3', kind: 'voice', who: 'PL', group: 'Viva Practice 1 · hybrid form', cls: '12ENX', time: '1:11', step: 'DU 1 · Step 3', prev: 'no step passed yet', canPass: false,
+    prompt: 'How is the hybrid nature of both form and identity in the poetry represented and used?',
+    transcript: [['Watson joins things that don’t match. '], ['The haibun in the road poem goes prose then haiku,', 0], [' and '], ['the switch slows you right down.', 1], [' '], ['That mismatch is what being from two cultures is like.', 2]],
+    ai: [['n', 'One poem so far'], ['y', 'the switch slows you right down'], ['y', 'being from two cultures'], ['n', 'One poem so far']],
+    pieces: [['Form can act out the experience', 'y'], ['Hybridity', 'y'], ['A haibun joins prose to a haiku', 'y']] },
+  { id: 'q1', kind: 'quiz', who: '5', group: 'Week 3 Review · haiku image', cls: '12ENX', count: 5,
+    prompt: 'A haiku compresses an idea into one concrete image. What is the one image here?',
+    answers: [['JS', 'the curve in the road', 'r', 'Accepted answer'], ['RK', 'a bend where temptation waits', 'r', 'Same image in other words'], ['PL', 'a vagabond walking', 'u', 'Names a figure; the line’s image is the curve'], ['DW', 'hell', 'w', 'Names an idea, no image'], ['HN', 'demons curve', 'r', 'Accepted, spelling aside']] },
+  { id: 'q2', kind: 'quiz', who: 'OB', group: 'Seminar · written answer', cls: '12ENX', marks: 4, ai: 3,
+    prompt: 'Justify how the critic’s claims affirm or challenge a reader’s relationship with the past. Use one of her judging words. (4 marks)',
+    text: 'Bode says the road is “clearly” a colonial symbol, and that challenges readers who see roads as neutral. Using “clearly” shows she is sure. The poem makes a similar point because the talking never stops, so the past is still being dealt with now.',
+    reason: 'Uses a judging word and links to the poem. The link to the reader’s relationship stays general.',
+    aiTags: [['E', 'Using “clearly” shows she is sure', 'Names the judging word and what it does'], ['AR', 'the past is still being dealt with now', 'Close to the reader’s relationship with the past, but says no more about the reader']] },
+  { id: 'w1', kind: 'writing', who: 'EV', group: 'Your own road · composition', cls: '12ENX', recent: { EX: 3 },
+    rubric: [['Borrows a code and bends it', BANDS], ['Form acts out the idea', BANDS], ['Skill · Crafting language', RUNGS]],
+    prompt: 'Compose about 200 words that borrow a code and bend it, ending on a haiku.',
+    text: 'For new Year 7s. 1. Students must keep to the left, where the lockers lean in close. 2. Students must keep moving. Standing still is loitering, unless you are the right kind of still. 3. The bell is always right. 4. Hats belong to a different country, and you will hand them in at the border.\n\nlast bell, wet asphalt\none shoe still on the crossing\nthe bus does not wait' },
+  { id: 's1', kind: 'sprint', who: 'DW', group: 'Design sprint · reflection', cls: '11PSX', rubric: [['Used what the testers showed', LEVELS, 1], ['Says what to do next time', LEVELS, 2]], rubricTitle: 'Reflection criteria',
+    prompt: 'What changed in your design after the test?',
+    text: 'We moved the instructions to the start because three testers got stuck at the same place. Next time we would test earlier.' },
+  { id: 'h1', kind: 'handup', who: 'HN', group: 'Lecture · hand-up', cls: '11PSX', reply: true,
+    prompt: 'Asked at 4:12 in the lecture',
+    text: 'Is correlation enough to say one thing causes another if the sample is really big?' }
+];
+
+let items, done, cur, filter, aiRun, state;
+function start() { items = fresh(); done = new Set(); cur = 0; filter = 'all'; aiRun = false; state = {}; paint(); }
+const count = (i) => i.count ?? 1;
+const shown = () => items.filter((i) => filter === 'all' || i.kind === filter);
+const current = () => items[cur];
+const voiceLeft = () => items.filter((i) => i.kind !== 'writing' && i.kind !== 'handup' && i.kind !== 'sprint' && !done.has(i.id)).reduce((n, i) => n + count(i), 0);
+const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h !== undefined) n.innerHTML = h; return n; };
+
+function move(step) {
+  const list = shown();
+  let at = list.indexOf(current());
+  for (let tries = 0; tries < list.length; tries++) {
+    at = (at + step + list.length) % list.length;
+    if (!done.has(list[at].id) || step < 0) { cur = items.indexOf(list[at]); break; }
+  }
+  document.getElementById('body').classList.remove('show-queue');
+  paint();
+}
+function finish() {
+  done.add(current().id);
+  if (shown().every((i) => done.has(i.id))) { paint(); return; }
+  move(1);
+}
+
+function paintHead() {
+  const total = items.reduce((n, i) => n + count(i), 0);
+  const gone = items.filter((i) => done.has(i.id)).reduce((n, i) => n + count(i), 0);
+  document.getElementById('bar').style.width = `${(gone / total) * 100}%`;
+  document.getElementById('count').textContent = `${gone} of ${total} done`;
+  const pills = document.getElementById('pills'); pills.replaceChildren();
+  for (const k of ['all', 'voice', 'quiz', 'writing', 'sprint', 'handup']) {
+    const n = items.filter((i) => (k === 'all' || i.kind === k) && !done.has(i.id)).reduce((s, i) => s + count(i), 0);
+    const b = el('button', 'pill', `${k === 'all' ? 'Everything' : LABEL[k]} <small>${n}</small>`);
+    b.setAttribute('aria-pressed', String(filter === k));
+    b.onclick = () => { filter = k; const first = shown().find((i) => !done.has(i.id)) ?? shown()[0]; if (first) cur = items.indexOf(first); paint(); };
+    pills.append(b);
+  }
+  const ai = document.getElementById('airun'); ai.className = 'ai-run' + (aiRun ? ' done' : '');
+  ai.replaceChildren();
+  if (aiRun) ai.append(el('span', '', '<b>AI has read everything waiting.</b> Its ticks and tags are dashed: yours decide. It never passes a step.'));
+  else {
+    ai.append(el('span', '', `<b>${voiceLeft()} takes and answers</b> can be read by AI before you start.`));
+    const go = el('button', '', 'AI read them'); go.onclick = () => { aiRun = true; paint(); }; ai.append(go);
+  }
+}
+
+function paintQueue() {
+  const q = document.getElementById('queue'); q.replaceChildren();
+  const groups = new Map();
+  for (const i of shown()) { const key = `${i.cls} · ${i.group}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i); }
+  for (const [key, list] of groups) {
+    const g = el('div', 'group');
+    const [cls, ...rest] = key.split(' · ');
+    g.append(el('div', 'group__t', `<span>${rest.join(' · ')}</span><small>${cls}</small>`));
+    for (const i of list) {
+      const b = el('button', `q-item${i === current() ? ' on' : ''}${done.has(i.id) ? ' done' : ''}`);
+      b.innerHTML = `<span class="who">${done.has(i.id) ? '✓' : i.who}</span><span class="kind k-${i.kind}">${LABEL[i.kind]}</span>`;
+      if (aiRun && (i.kind === 'voice' || i.ai !== undefined || i.answers) && !done.has(i.id)) b.append(el('span', 'ai-dot', 'AI read'));
+      b.onclick = () => { cur = items.indexOf(i); document.getElementById('body').classList.remove('show-queue'); paint(); };
+      g.append(b);
+    }
+    q.append(g);
+  }
+}
+
+function checkRow(i, n, text) {
+  const s = state[i.id] ??= {};
+  const mine = s[n];
+  const ai = aiRun ? i.ai[n] : null;
+  const val = mine ?? ai?.[0] ?? null;
+  const b = el('button', 'check');
+  const cls = val === null ? '' : mine ? val : 'ai';
+  b.innerHTML = `<span class="box ${cls}">${val === 'y' ? '✓' : val === 'n' ? '–' : ''}</span><span>${text}${!mine && ai ? `<small>“${ai[1]}”</small>` : ''}</span>`;
+  b.onclick = () => { s[n] = val === null ? 'y' : mine ? (val === 'y' ? 'n' : 'y') : val; paintWork(); };
+  return b;
+}
+
+function voice(i, w) {
+  const p = el('div', 'player');
+  p.innerHTML = `<button class="play">Play</button><span class="note">−5 s  +5 s</span><div class="scrub"><i></i></div><span class="note">0:24 / ${i.time}</span><div class="codes"><span class="code"><b>FW</b> Filler</span><span class="code"><b>PF</b> Too fast</span><span class="code"><b>PA</b> Pause</span><span class="code"><b>TS</b> Topic sentence</span><span class="code"><b>AR</b> Relevance</span><span class="code"><b>E</b> Evidence</span><span class="code"><b>T</b> Techniques</span></div>`;
+  w.append(p);
+  const two = el('div', 'two');
+  const left = el('div', 'card');
+  left.append(el('h3', '', 'Transcript'));
+  const t = el('p', 'transcript');
+  for (const [text, tag] of i.transcript) {
+    if (tag === 'fw') t.append(el('span', 'fw', text));
+    else if (aiRun && typeof tag === 'number') { const m = el('mark', '', text); m.title = CHECKS[tag]; t.append(m); }
+    else t.append(document.createTextNode(text));
+  }
+  left.append(t);
+  const right = el('div', 'card');
+  right.append(el('h3', '', `${i.step}: listen for`));
+  CHECKS.forEach((c, n) => right.append(checkRow(i, n, c)));
+  right.append(el('h3', '', 'Pieces used'));
+  i.pieces.forEach(([text, v], n) => {
+    const s = state[i.id] ??= {}; const key = `p${n}`; const mine = s[key];
+    const val = mine ?? (aiRun ? v : null);
+    const b = el('button', 'check');
+    b.innerHTML = `<span class="box ${val === null ? '' : mine ? val : 'ai'}">${val === 'y' ? '✓' : val === 'n' ? '–' : ''}</span><span>${text}</span>`;
+    b.onclick = () => { s[key] = val === null ? 'y' : mine ? (val === 'y' ? 'n' : 'y') : val; paintWork(); };
+    right.append(b);
+  });
+  const step = el('div', 'step');
+  step.append(el('span', '', `<b>${i.who}</b> ${i.prev}`));
+  if (i.canPass) {
+    const pass = el('button', `btn pass${state[i.id]?.passed ? ' on' : ''}`, state[i.id]?.passed ? 'Passed Step 3 ✓' : 'Pass on Step 3');
+    pass.onclick = () => { (state[i.id] ??= {}).passed = !state[i.id].passed; paintWork(); };
+    step.append(pass);
+  } else step.append(el('span', 'note', 'Pass Step 2B first. This take counts as practice.'));
+  right.append(step);
+  two.append(left, right);
+  w.append(two);
+  const c = commentBox(i, 'Overall comment (optional)'); w.append(c);
+}
+
+function quizStack(i, w) {
+  const c = el('div', 'card');
+  c.append(el('h3', '', `${i.count} answers to one question. Tap to overrule.`));
+  const s = state[i.id] ??= {};
+  for (const [who, text, verdict, why] of i.answers) {
+    const row = el('div', 'ans');
+    row.append(el('span', 'who', who));
+    row.append(el('p', '', `${text}${aiRun ? `<small>${why}</small>` : ''}`));
+    const btns = el('div', 'btns');
+    const pick = s[who] ?? null;
+    const sug = aiRun && !pick ? verdict : null;
+    const r = el('button', `tick ${pick === 'r' ? 'right' : sug === 'r' ? 'ai' : ''}`, '✓'); r.setAttribute('aria-label', `${who} right`); r.onclick = () => { s[who] = 'r'; paintWork(); };
+    const x = el('button', `tick ${pick === 'w' ? 'wrong' : sug === 'w' ? 'ai' : ''}`, '✗'); x.setAttribute('aria-label', `${who} wrong`); x.onclick = () => { s[who] = 'w'; paintWork(); };
+    btns.append(r, x);
+    row.append(btns);
+    c.append(row);
+  }
+  if (aiRun) {
+    const keep = el('button', 'btn', 'Keep the AI’s clear ones');
+    keep.onclick = () => { for (const [who, , verdict] of i.answers) if (verdict !== 'u' && !s[who]) s[who] = verdict; paintWork(); };
+    c.append(keep);
+  }
+  w.append(c);
+}
+
+function commentBox(i, placeholder, rows = 2) {
+  const s = state[i.id] ??= {};
+  const c = el('textarea'); c.rows = rows; c.placeholder = placeholder; c.value = s.comment ?? '';
+  c.oninput = () => { s.comment = c.value; };
+  return c;
+}
+
+// Character offsets into the student's text, as the real marking screen stores them.
+function offsetIn(node, off) {
+  const run = (node.nodeType === 3 ? node.parentElement : node)?.closest?.('.run');
+  return run ? Number(run.dataset.start) + off : null;
+}
+function wholeWords(text, a, b) {
+  while (a < b && /\s/.test(text[a])) a++;
+  while (b > a && /\s/.test(text[b - 1])) b--;
+  if (a === b) return null;
+  while (a > 0 && /[\w’'-]/.test(text[a - 1])) a--;
+  while (b < text.length && /[\w’'-]/.test(text[b])) b++;
+  return [a, b];
+}
+function tagsOf(i) {
+  const s = state[i.id] ??= {};
+  s.tags ??= [];
+  if (aiRun && i.aiTags && !s.seeded) {
+    s.seeded = true;
+    for (const [c, quote, why] of i.aiTags) { const at = i.text.indexOf(quote); s.tags.push({ c, start: at, end: at + quote.length, ai: true, why }); }
+  }
+  return s.tags;
+}
+function addTag(i, c, positive) {
+  const s = state[i.id];
+  if (!s.pending) return false;
+  s.tags.push({ c, start: s.pending[0], end: s.pending[1], positive });
+  s.pending = null;
+  s.open = s.tags.length - 1;
+  return true;
+}
+function pressCode(i, c, positive) {
+  const s = state[i.id] ??= {};
+  if (!addTag(i, c, positive)) s.armed = s.armed?.c === c ? null : { c, positive };
+  paintWork();
+}
+
+function palette(i) {
+  const s = state[i.id];
+  const p = el('div', 'palette');
+  p.append(el('span', 'palette__hint', 'Select the words, then tap a code or press its number. Hold Shift for a strength. Tap a tag to add a note.'));
+  const row = el('div', 'palette__chips');
+  CODES.forEach(([c, label, colour], n) => {
+    const chip = el('button', `chip c-${colour}${s.armed?.c === c ? ' is-armed' : ''}`, `<b>${c}</b> ${label}<kbd>${n + 1}</kbd>`);
+    chip.onmousedown = (e) => e.preventDefault();
+    chip.onclick = (e) => pressCode(i, c, e.shiftKey);
+    row.append(chip);
+  });
+  p.append(row);
+  return p;
+}
+
+function sheet(i) {
+  const s = state[i.id];
+  const tags = tagsOf(i);
+  const cuts = new Set([0, i.text.length]);
+  for (const t of tags) { cuts.add(t.start); cuts.add(t.end); }
+  if (s.pending) { cuts.add(s.pending[0]); cuts.add(s.pending[1]); }
+  const at = [...cuts].sort((a, b) => a - b);
+  const q = el('p', 'quote sheet');
+  for (let n = 0; n < at.length - 1; n++) {
+    const [a, b] = [at[n], at[n + 1]];
+    const run = el('span', 'run'); run.dataset.start = a; run.textContent = i.text.slice(a, b);
+    const idx = tags.findLastIndex((t) => t.start <= a && t.end >= b);
+    if (idx >= 0) {
+      const t = tags[idx];
+      run.classList.add('tagged', `c-${codeOf(t.c)[2]}`);
+      if (t.ai) run.classList.add('ai');
+      if (s.open === idx) run.classList.add('open');
+      run.dataset.tag = idx;
+    }
+    if (s.pending && s.pending[0] <= a && s.pending[1] >= b) run.classList.add('pending');
+    q.append(run);
+    const ending = tags.map((t, k) => [t, k]).filter(([t]) => t.end === b);
+    for (const [t, k] of ending) {
+      const sup = el('sup', `${t.positive ? 'pos' : ''}${t.ai ? ' ai' : ''}`, t.note ? `${t.c}✎` : t.c);
+      sup.dataset.tag = k;
+      q.append(sup);
+    }
+  }
+  q.onmouseup = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const a = offsetIn(sel.anchorNode, sel.anchorOffset);
+    const b = offsetIn(sel.focusNode, sel.focusOffset);
+    if (a === null || b === null) return;
+    const range = wholeWords(i.text, Math.min(a, b), Math.max(a, b));
+    sel.removeAllRanges();
+    if (!range) return;
+    s.pending = range;
+    s.justSelected = true;
+    if (s.armed) addTag(i, s.armed.c, s.armed.positive);
+    paintWork();
+  };
+  q.onclick = (e) => {
+    if (s.justSelected) { s.justSelected = false; return; }
+    const hit = e.target.closest?.('[data-tag]');
+    s.open = hit ? (s.open === Number(hit.dataset.tag) ? null : Number(hit.dataset.tag)) : null;
+    s.pending = null;
+    paintWork();
+  };
+  return q;
+}
+
+function tagMenu(i) {
+  const s = state[i.id];
+  const t = s.tags[s.open];
+  if (!t) return null;
+  const [c, label] = codeOf(t.c);
+  const m = el('div', 'tagmenu');
+  m.append(el('p', '', `<b>${c} ${label}</b>${t.ai ? ' · AI suggests' : t.positive ? ' · strength' : ' · to grow'}: “${i.text.slice(t.start, t.end)}”`));
+  if (t.why) m.append(el('p', 'why', t.why));
+  const note = el('input'); note.placeholder = 'Note the student will see (optional)'; note.value = t.note ?? '';
+  note.oninput = () => { t.note = note.value; };
+  note.onchange = () => paintWork();
+  m.append(note);
+  const row = el('div', 'tagmenu__row');
+  const act = (text, fn) => { const b = el('button', 'btn', text); b.onclick = () => { fn(); paintWork(); }; row.append(b); };
+  if (t.ai) act('Keep it', () => { t.ai = false; s.open = null; });
+  act(t.positive ? 'Make it to grow' : 'Make it a strength', () => { t.positive = !t.positive; t.ai = false; });
+  act(t.ai ? 'Drop it' : 'Remove', () => { s.tags.splice(s.open, 1); s.open = null; });
+  act('Done', () => { s.open = null; });
+  m.append(row);
+  return m;
+}
+
+function textWork(i, w) {
+  const s = state[i.id] ??= {};
+  if (i.reply) {
+    const c = el('div', 'card'); c.append(el('p', 'quote', i.text)); w.append(c);
+    w.append(commentBox(i, 'Your reply', 3));
+    return;
+  }
+  const tags = tagsOf(i);
+  w.append(palette(i));
+  const two = el('div', 'two');
+  const left = el('div', 'card');
+  left.append(el('h3', '', 'Their writing'), sheet(i));
+  const menu = tagMenu(i); if (menu) left.append(menu);
+
+  const m = el('div', 'card');
+  if (i.rubric) {
+    m.append(el('h3', '', i.rubricTitle ?? 'Rubric: where this piece sits'));
+    s.steps ??= {};
+    const rub = el('div', 'rubric');
+    for (const [crit, ladder, theirs] of i.rubric) {
+      const row = el('div', 'rubric__row', `<b>${crit}</b>`);
+      if (theirs !== undefined) row.append(el('span', 'note', `They judged: ${ladder[theirs]}`));
+      const btns = el('div', 'rubric__steps');
+      for (const name of ladder) {
+        const b = el('button', 'stepbtn', name);
+        b.setAttribute('aria-pressed', String(s.steps[crit] === name));
+        b.onclick = () => { s.steps[crit] = s.steps[crit] === name ? undefined : name; paintWork(); };
+        btns.append(b);
+      }
+      row.append(btns); rub.append(row);
+    }
+    m.append(rub);
+    if (!i.rubricTitle) m.append(el('p', 'note', 'Your step sets where the student sits. The codes don’t.'));
+  } else {
+    m.append(el('h3', '', 'Mark'));
+    const row = el('div', 'marks');
+    for (let n = 0; n <= i.marks; n++) {
+      const on = s.mark === n; const sug = aiRun && s.mark === undefined && i.ai === n;
+      const b = el('button', `tick ${on ? 'right' : sug ? 'ai' : ''}`, String(n));
+      b.onclick = () => { s.mark = n; paintWork(); };
+      row.append(b);
+    }
+    row.append(el('span', 'note', `out of ${i.marks}`));
+    m.append(row);
+    if (aiRun && i.reason) m.append(el('p', 'note', `<span style="color:var(--lilac-ink)">AI suggests ${i.ai}: ${i.reason}</span>`));
+  }
+  m.append(el('h3', '', 'Codes on this piece'));
+  const counts = new Map();
+  for (const t of tags) counts.set(t.c, (counts.get(t.c) ?? 0) + 1);
+  m.append(el('p', 'note', [...counts].map(([c, n]) => `${c} ${n}`).join(' · ') || 'No codes yet.'));
+  const again = [...counts.keys()].find((c) => (i.recent?.[c] ?? 0) >= 3);
+  if (again) m.append(el('p', 'warn', `${again} has come up on ${i.who}’s last ${i.recent[again]} pieces.`));
+  const noted = tags.filter((t) => t.note);
+  if (noted.length) {
+    const list = el('ul', 'notes');
+    for (const t of noted) list.append(el('li', '', `${t.note}<small>${t.c}: “${i.text.slice(t.start, t.end)}”</small>`));
+    m.append(el('h3', '', 'Notes'), list);
+  }
+  m.append(el('h3', '', 'Comment'), commentBox(i, 'Comment the student will see'));
+  two.append(left, m);
+  w.append(two);
+}
+
+function paintWork() {
+  const w = document.getElementById('work'); const y = w.scrollTop; w.replaceChildren();
+  const i = current();
+  const goBtn = document.getElementById('go');
+  if (shown().every((x) => done.has(x.id))) {
+    w.append(el('div', 'clear', '<h2>All clear</h2><p class="note">Nothing else waiting here.</p>'));
+    goBtn.style.visibility = 'hidden';
+    return;
+  }
+  goBtn.style.visibility = '';
+  goBtn.innerHTML = `${i.kind === 'quiz' && i.text ? 'Return' : VERB[i.kind]} and next<kbd>⌘↵</kbd>`;
+  const head = el('div', 'work__head');
+  head.append(el('span', `kind k-${i.kind}`, LABEL[i.kind]));
+  head.append(el('h2', '', i.count ? i.group.split(' · ').pop() : `${i.who}`));
+  head.append(el('span', 'crumb', `${i.cls} · ${i.group}`));
+  w.append(head, el('p', 'prompt', i.prompt));
+  if (i.kind === 'voice') voice(i, w);
+  else if (i.answers) quizStack(i, w);
+  else textWork(i, w);
+  w.scrollTop = y;
+}
+function paint() { paintHead(); paintQueue(); paintWork(); document.getElementById('work').scrollTop = 0; }
+
+document.getElementById('go').onclick = finish;
+document.getElementById('skip').onclick = () => move(1);
+document.getElementById('prev').onclick = () => move(-1);
+document.getElementById('reset').onclick = start;
+document.getElementById('qt').onclick = () => document.getElementById('body').classList.toggle('show-queue');
+const setView = (phone) => {
+  document.getElementById('frame').classList.toggle('phone', phone);
+  document.getElementById('vDesk').setAttribute('aria-pressed', String(!phone));
+  document.getElementById('vPhone').setAttribute('aria-pressed', String(phone));
+};
+document.getElementById('vDesk').onclick = () => setView(false);
+document.getElementById('vPhone').onclick = () => setView(true);
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('textarea, input')) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') finish(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); finish(); }
+  else if (/^Digit[1-9]$/.test(e.code) && current().text && !current().reply && CODES[Number(e.code.slice(5)) - 1]) pressCode(current(), CODES[Number(e.code.slice(5)) - 1][0], e.shiftKey);
+  else if (e.key === 'Escape' && state[current().id]) { Object.assign(state[current().id], { armed: null, pending: null, open: null }); paintWork(); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+});
+start();
+</script>
+</body>
+</html>

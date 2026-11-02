@@ -163,7 +163,7 @@ async function ownNote(store, roster, student, item) {
 }
 
 export async function pieceFor(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     const doc = await ownNote(store, roster, student, item);
     return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: null, ...toPublishedFeedbackPayload(doc, null) };
@@ -189,7 +189,7 @@ export async function pieceFor(store, roster, student, item) {
   const comment = row.comment || takes.map((t) => t.comment?.trim()).filter(Boolean).join('\n\n');
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: comment ?? '',
-    text: handin?.text ? writingParts(handin.text) : null,
+    text: row.text ?? (handin?.text ? writingParts(handin.text) : null),
     tags,
     ...(row.kind === 'viva' && row.lesson_id ? { lesson_href: `/s/classes/${roster.cls.id}/lessons/${row.lesson_id}` } : {}),
     criteria: (column?.criteria ?? []).map((c) => {
@@ -201,7 +201,7 @@ export async function pieceFor(store, roster, student, item) {
 }
 
 export async function markSeen(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvn]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     await markNoteSeen(store, await ownNote(store, roster, student, item));
     return { ok: true };

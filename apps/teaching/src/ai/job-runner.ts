@@ -546,3 +546,4 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
 // Next-step and answer-marking jobs ride in the same server bundle (teaching-ai-runtime.mjs).
 export * from '@/ai/next-step-jobs';
 export * from '@/ai/answer-marking-jobs';
+export * from '@/ai/voice-read-jobs';

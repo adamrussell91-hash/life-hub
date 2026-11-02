@@ -17,6 +17,7 @@ import {
   DEFAULT_REACTION_S,
   buildPaper,
   fillerSuggestions,
+  findQuoteWords,
   pointIndexAt,
   tapTarget,
   transcriptWords,
@@ -27,7 +28,7 @@ import { audioUrl, type VoiceTag, type WhisperTranscript } from '@/blocks/voice-
 import { clock } from '@/blocks/voice-pacing';
 import { summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
 import type { VoiceWord } from '@/blocks/voice-transcript';
-import { mountVoiceDeep } from '@/blocks/voice-deep';
+import { mountVoiceDeep, type VoiceAiRead } from '@/blocks/voice-deep';
 
 /**
  * The teacher side of a Voice block: the submissions inbox and the one-tap
@@ -101,7 +102,21 @@ function typingTarget(target: EventTarget | null): boolean {
   return Boolean(node?.closest?.('input, textarea, select, [contenteditable="true"]'));
 }
 
-export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElement {
+/** One take on its own, for the To mark flow: no inbox, and its Return lives on the flow's bar. */
+export type VoiceTake = { el: HTMLElement; finish: () => Promise<void>; close: () => void };
+
+export function mountVoiceTake(block: VoiceBlock, lessonId: string, takeId: string, onGone: () => void): VoiceTake {
+  let finish: () => Promise<void> = async () => undefined;
+  const take = { id: takeId, onGone, ready: (fn: () => Promise<void>) => { finish = fn; }, close: () => undefined as void };
+  const root = mountVoiceTeacher(block, lessonId, take);
+  return { el: root, finish: () => finish(), close: () => take.close() };
+}
+
+export function mountVoiceTeacher(
+  block: VoiceBlock,
+  lessonId: string,
+  take?: { id: string; onGone: () => void; ready: (finish: () => Promise<void>) => void; close: () => void }
+): HTMLElement {
   const root = el('div', 'voice-teacher');
   const alert = el('p', 'pf-alert');
   alert.setAttribute('role', 'alert');
@@ -200,9 +215,10 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     try {
       const [record, codes] = await Promise.all([apiGet<Submission>(`${base(lessonId, block.id)}/${encodeURIComponent(id)}`), loadFeedbackCodes()]);
       closeMarking = markingScreen(record, codes);
+      if (take) take.close = () => backToInbox();
     } catch (error) {
       showError(error);
-      paintInbox();
+      if (!take) paintInbox();
     }
   }
 
@@ -210,6 +226,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     closeMarking?.();
     closeMarking = null;
     polls = 0;
+    if (take) return;
     void loadInbox();
   }
 
@@ -229,12 +246,13 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     let saveTimer = 0;
     let saving: Promise<void> = Promise.resolve();
     let status = record.status;
-    const deepPanel = mountVoiceDeep(block, lessonId, record.class_id && record.student_id ? { classId: record.class_id, studentId: record.student_id } : null);
+    const aiRead = (record as Submission & { ai_read?: VoiceAiRead }).ai_read ?? null;
+    const deepPanel = mountVoiceDeep(block, lessonId, record.class_id && record.student_id ? { classId: record.class_id, studentId: record.student_id } : null, { ai: aiRead });
 
     const screen = el('section', 'voice-mark');
     const top = el('div', 'voice-mark__top');
+    if (!take) top.append(button('← Submissions', 'ghost', () => void flush().then(backToInbox)));
     top.append(
-      button('← Submissions', 'ghost', () => void flush().then(backToInbox)),
       el('p', 'voice-mark__who', `${record.initials} · ${clock(record.duration_s)} · ${shortWhen(record.submitted_at)}`)
     );
     const saveState = el('span', 'voice-mark__save block-secondary');
@@ -433,11 +451,18 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
       try {
         await apiDelete(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}`);
         backToInbox();
+        take?.onGone();
       } catch (error) {
         showError(error);
       }
     });
-    actions.append(send, remove);
+    if (take) {
+      actions.append(remove);
+      take.ready(async () => {
+        await flush();
+        await apiPost(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}/return`, {});
+      });
+    } else actions.append(send, remove);
     screen.append(summary, commentBox, actions);
     body.replaceChildren(screen);
 
@@ -691,7 +716,18 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
         end: sheet.ranges[Math.min(tag.w[1], sheet.ranges.length - 1)]?.end ?? 0
       });
       const marks: Mark[] = tags.map((tag, i) => ({ ...span(tag), layer: i, colour: tagColour(tag, byId) }));
-      const sheetEl = paper(sheet.text, marks, null);
+      // Where the AI heard a check met, under the teacher's tags.
+      const heard: Mark[] = (aiRead?.checks ?? []).flatMap((c, i) => {
+        const at = c.quote ? findQuoteWords(words, c.quote) : null;
+        if (!at) return [];
+        return [{ start: sheet.ranges[at[0]]!.start, end: sheet.ranges[at[1]]!.end, layer: tags.length + i, colour: 'var(--pastel-lilac-ink)' }];
+      });
+      const sheetEl = paper(sheet.text, [...marks, ...heard], null);
+      for (const h of heard) {
+        sheetEl.querySelectorAll<HTMLElement>('.pa-run--mark').forEach((run) => {
+          if (Number(run.dataset.start) >= h.start && Number(run.dataset.end) <= h.end) run.classList.add('voice-run--heard');
+        });
+      }
       tags.forEach((tag, i) => {
         if (tag.source === 'suggested' && !tag.confirmed) {
           sheetEl.querySelectorAll<HTMLElement>('.pa-run--mark').forEach((run) => {
@@ -874,6 +910,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
     };
   }
 
-  void loadInbox();
+  if (take) void openMarking(take.id);
+  else void loadInbox();
   return root;
 }

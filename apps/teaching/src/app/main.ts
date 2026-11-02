@@ -33,7 +33,7 @@ import { renderDocumentPage } from '@/teacher/sections/documents';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { mountMarkPage } from '@/marking/mark-page';
-import { mountToMarkPage } from '@/marking/to-mark-view';
+import { mountToMarkPage } from '@/marking/to-mark-flow';
 import { mountTeacherStudentProfile } from '@/teacher/student-profile-page';
 import { renderTrashSection } from '@/teacher/sections/trash';
 import { renderFeedbackSection } from '@/teacher/sections/feedback';

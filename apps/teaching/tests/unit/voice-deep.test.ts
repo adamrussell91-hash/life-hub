@@ -64,4 +64,19 @@ describe('voice marking deep panel', () => {
     piece.click();
     expect(api.setWriting).toHaveBeenCalledWith('class_1', 'unit_1', 'blk1', 'st1', ['kp_hf02'], []);
   });
+
+  it('shows the AI read dashed with what it heard, and the first tap makes it the teacher’s', async () => {
+    const ai = { checks: [{ met: true, quote: 'two poems here' }], pieces: { kp_hf01: true, kp_hf02: false } };
+    const panel = mountVoiceDeep(block, 'lesson_1', null, { loadUnit: async () => unit, api: fakeApi({ steps: {}, writing: {} }), ai })!;
+    await settle();
+    document.body.append(panel.el);
+    const label = panel.el.querySelector<HTMLElement>('.voice-pass__item')!;
+    const tick = label.querySelector('input')!;
+    expect(label.classList.contains('is-ai')).toBe(true);
+    expect(tick.checked).toBe(true);
+    expect(label.textContent).toContain('“two poems here”');
+    tick.click();
+    expect(label.classList.contains('is-ai')).toBe(false);
+    panel.el.remove();
+  });
 });

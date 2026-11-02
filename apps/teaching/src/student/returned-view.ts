@@ -8,7 +8,7 @@ import { placeName, STEP_ORDER, RUNG_ORDER } from '@/progress/story-text';
 import { codeChip } from '@/progress/code-grid';
 import type { Place, ReturnedItem } from '@/progress/types';
 
-const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', note: 'Note' };
+const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', answer: 'Answer', note: 'Note' };
 
 export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew: boolean) => void): HTMLElement {
   const box = el('section', 'pg-returned');

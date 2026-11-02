@@ -136,3 +136,21 @@ describe('AI answer marking job', () => {
     expect(estimate.cost_aud).toBeLessThan(0.05);
   });
 });
+
+describe('AI tags on written answers', () => {
+  const coded: MarkingQuestion = { ...essay, codes: [{ id: 'ev', code: 'E', label: 'Evidence', descriptor: 'Quote it.' }] };
+  const written = [{ id: 'a1', question: 'q3', text: 'The town forgets its grief.' }] as unknown as MarkingAnswer[];
+
+  it('keeps tags with a known code on words the student wrote, at most three', () => {
+    const tags = [
+      { code: 'E', quote: 'forgets its grief', why: 'Needs a quote.' },
+      { code: 'Z', quote: 'The town' },
+      { code: 'E', quote: 'words nobody wrote' },
+      { code: 'E', quote: 'The town' },
+      { code: 'E', quote: 'town' },
+      { code: 'E', quote: 'grief' }
+    ];
+    const [mark] = readMarkingReply(JSON.stringify({ marks: [{ id: 'a1', marks: 2, reason: 'Clear claim.', feedback: 'Add a quote.', tags }] }), coded, written, 'm');
+    expect(mark!.tags).toEqual([{ code_id: 'ev', quote: 'forgets its grief', why: 'Needs a quote.' }, { code_id: 'ev', quote: 'The town' }, { code_id: 'ev', quote: 'town' }]);
+  });
+});

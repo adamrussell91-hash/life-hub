@@ -13,7 +13,10 @@ import { STEP_LABEL, type DeepUnderstanding, type PlacedStep } from '@/deep/sche
  */
 
 export type Who = { classId: string; studentId: string } | null;
+/** What the AI heard in this take (To mark): dashed until the teacher decides. */
+export type VoiceAiRead = { checks: { met: boolean; quote?: string; why?: string }[]; pieces: Record<string, boolean> };
 type Deps = {
+  ai?: VoiceAiRead | null;
   loadUnit?: (lessonId: string) => Promise<{ unitId: string; deep: DeepUnderstanding[] }>;
   api?: Pick<typeof deepApi, 'load' | 'setStep' | 'setWriting'>;
 };
@@ -43,17 +46,27 @@ export function mountVoiceDeep(block: Pick<Block, 'id' | 'settings'>, lessonId: 
 
   if (checks.length) {
     const list = el('ul', 'voice-pass__list');
-    for (const check of checks) {
+    checks.forEach((check, n) => {
       const label = el('label', 'voice-pass__item');
       const tick = el('input');
       tick.type = 'checkbox';
+      const heard = deps.ai?.checks[n];
+      if (heard) {
+        tick.checked = heard.met;
+        label.classList.add('is-ai');
+      }
       // Hand focus back at once, so number and letter keys keep tagging.
-      tick.addEventListener('change', () => tick.blur());
-      label.append(tick, el('span', undefined, check));
+      tick.addEventListener('change', () => {
+        tick.blur();
+        label.classList.remove('is-ai');
+      });
+      const text = el('span', undefined, check);
+      if (heard?.quote || heard?.why) text.append(el('small', 'voice-pass__heard', heard.quote ? `“${heard.quote}”` : heard.why));
+      label.append(tick, text);
       const item = el('li');
       item.append(label);
       list.append(item);
-    }
+    });
     box.append(list);
   }
 
@@ -101,15 +114,18 @@ export function mountVoiceDeep(block: Pick<Block, 'id' | 'settings'>, lessonId: 
       pieces.append(el('span', 'voice-strip__label', 'Pieces used'));
       const tick = progress.writing[block.id]?.[studentId] ?? { used: [], missed: [], at: '' };
       for (const id of targets) {
-        const state = tick.used.includes(id) ? 'used' : tick.missed.includes(id) ? 'missed' : 'blank';
+        const marked = tick.used.includes(id) ? 'used' : tick.missed.includes(id) ? 'missed' : 'blank';
+        // A blank piece shows what the AI heard; the first tap keeps it.
+        const heard = marked === 'blank' && typeof deps.ai?.pieces[id] === 'boolean' ? (deps.ai.pieces[id] ? 'used' : 'missed') : null;
+        const state = heard ?? marked;
         const b = button('', 'ghost', () => {
           b.blur();
-          const next = state === 'blank' ? 'used' : state === 'used' ? 'missed' : 'blank';
+          const next = heard ?? (state === 'blank' ? 'used' : state === 'used' ? 'missed' : 'blank');
           const used = tick.used.filter((x) => x !== id).concat(next === 'used' ? [id] : []);
           const missed = tick.missed.filter((x) => x !== id).concat(next === 'missed' ? [id] : []);
           void save(() => api.setWriting(classId, unit!.unitId, block.id, studentId, used, missed));
         });
-        b.className = `voice-pass__piece is-${state}`;
+        b.className = `voice-pass__piece is-${state}${heard ? ' is-ai' : ''}`;
         b.setAttribute('aria-label', `${pieceText(id)}: ${state === 'used' ? 'used' : state === 'missed' ? 'missed' : 'not marked'}. Tap to change.`);
         b.append(el('span', 'voice-pass__mark', state === 'used' ? '✓' : state === 'missed' ? '–' : ''), el('span', undefined, pieceText(id)));
         pieces.append(b);
