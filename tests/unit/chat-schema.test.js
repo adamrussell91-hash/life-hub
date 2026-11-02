@@ -620,3 +620,49 @@ test('a bad dish id or portion fraction is refused', () => {
     assert.equal(out.valid, false, JSON.stringify(extra));
   }
 });
+
+test('meal confirm tolerates blank and numeric-string optional macros from the edit form', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-11-02',
+    time: '13:00',
+    fields: {
+      meal: 'lunch', calories: '336', protein_g: 45, fat_g: 8, saturated_fat_g: '',
+      unsaturated_fat_g: ' ', carbs_g: '4', sugar_g: null, sodium_mg: 120,
+      calcium_mg: 80, polyphenol_score: 1, omega3: 'none'
+    }
+  }, { id: 'meal-lunch', now: '2026-11-02T13:00:00+11:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.calories, 336);
+  assert.equal(result.record.carbs_g, 4);
+  assert.equal('saturated_fat_g' in result.record, false);
+  assert.equal('unsaturated_fat_g' in result.record, false);
+});
+
+test('meal validation still rejects non-numeric macro text', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-11-02',
+    time: '13:00',
+    fields: {
+      meal: 'lunch', calories: 336, protein_g: 45, fat_g: 8, saturated_fat_g: 'about 3',
+      sodium_mg: 120, calcium_mg: 80, polyphenol_score: 1, omega3: 'none'
+    }
+  }, { id: 'meal-lunch', now: '2026-11-02T13:00:00+11:00' });
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.errors, ['saturated_fat_g must be a finite number']);
+});
+
+test('a blank required meal macro reports as required, not as a finite-number error', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-11-02',
+    time: '13:00',
+    fields: {
+      meal: 'lunch', calories: 336, protein_g: 45, fat_g: 8,
+      sodium_mg: '', calcium_mg: 80, polyphenol_score: 1, omega3: 'none'
+    }
+  }, { id: 'meal-lunch', now: '2026-11-02T13:00:00+11:00' });
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.errors, ['sodium_mg is required']);
+});
