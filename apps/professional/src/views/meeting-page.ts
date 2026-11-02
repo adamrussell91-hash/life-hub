@@ -46,6 +46,12 @@ import { openCoachingPanel, renderCoachingCard, type CoachingSheet } from '@/gui
 import { saveSheet } from '../../../../packages/walkthrus/coaching.mjs';
 import { guideDigest, historyFor, noteLine, placeRuns, type PlacedRun } from '@/guides/runs';
 import type { GuideRun } from '@/guides/types';
+import { openCheckInPanel } from '@/guides/check-in/panel';
+import { renderCheckInCard } from '@/guides/check-in/card';
+import { CHECK_IN_EMBLEM } from '@/guides/check-in/icons';
+import { deleteCheckIn, getCheckIn, listMeetingCheckIns, saveCheckIn } from '@/guides/check-in/api';
+import { followUpTaskTitle, newFollowUps } from '@/guides/check-in/model';
+import type { CheckInRecord, CheckInSummary } from '@/guides/check-in/types';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -660,6 +666,44 @@ export async function renderMeetingPage(
     openCoachingPanel(document, { about: aboutCandidates(), onSave: storeCoachingSheet, edit });
   }
 
+  // Check-ins are sealed in their own store, never on this meeting record, so nothing that reads
+  // meetings (Clare, search, sync, briefs) can see them. Only who and when come back for the card.
+  let checkInsCache: Promise<CheckInSummary[]> | null = null;
+  const meetingCheckIns = () => (checkInsCache ??= listMeetingCheckIns(id).catch(() => []));
+
+  async function storeCheckIn(saved: CheckInRecord, before: CheckInRecord | null): Promise<void> {
+    await saveCheckIn(saved);
+    checkInsCache = null;
+    // Each newly ticked follow-up becomes a task that says what to do, not who or why.
+    for (const item of newFollowUps(before?.follow_ups ?? [], saved.follow_ups)) {
+      try {
+        const task = await createTask({ title: followUpTaskTitle(item) });
+        await createUniversalLink({ source_ref: `tasks:task:${task.id}`, target_ref: meetingRef, relationship_type: 'tagged_with' });
+      } catch {
+        // The record is saved; a missed task is not worth failing the save over.
+      }
+    }
+    await paintCheckIns();
+  }
+
+  async function removeCheckIn(checkInId: string): Promise<void> {
+    await deleteCheckIn(checkInId);
+    checkInsCache = null;
+    await paintCheckIns();
+  }
+
+  function openCheckIn(edit?: CheckInRecord, entrance: 'slide' | 'fade' = 'slide'): void {
+    openCheckInPanel(document, { meetingId: id, about: aboutCandidates(), onSave: storeCheckIn, onDelete: removeCheckIn, edit, entrance });
+  }
+
+  const checkInHost = el('div', 'meeting-check-ins');
+  async function paintCheckIns(): Promise<void> {
+    const list = await meetingCheckIns();
+    checkInHost.replaceChildren(...list.map((summary) => renderCheckInCard(document, summary, async () => {
+      openCheckIn(await getCheckIn(summary.id));
+    })));
+  }
+
   function openGuides(edit?: GuideRun): void {
     const guide = edit ? guideById(edit.guide) : null;
     openGuidePanel(document, {
@@ -667,7 +711,8 @@ export async function renderMeetingPage(
       about: aboutCandidates(),
       placedRuns: placed,
       onSave: storeGuideRun,
-      edit: edit && guide ? { guide, run: edit } : undefined
+      edit: edit && guide ? { guide, run: edit } : undefined,
+      protocols: [{ id: 'check_in', name: 'Check-in', line: 'Steps for a supportive conversation', emblem: CHECK_IN_EMBLEM, start: () => openCheckIn(undefined, 'fade') }]
     });
   }
 
@@ -685,7 +730,8 @@ export async function renderMeetingPage(
     coach.dataset.part = 'coaching-sheet';
     coach.addEventListener('click', () => openCoaching());
     head.append(el('h3', undefined, 'Guides'), run, coach);
-    guidesHost.replaceChildren(head);
+    guidesHost.replaceChildren(head, checkInHost);
+    void paintCheckIns();
     for (const sheet of record.coaching_sheets ?? []) guidesHost.append(renderCoachingCard(document, sheet, () => openCoaching(sheet)));
     if (!runs.length) {
       guidesHost.append(el('p', 'muted', 'Structured reads you run with someone in the room land here.'));
