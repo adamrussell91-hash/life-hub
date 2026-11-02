@@ -1661,7 +1661,7 @@ git commit -m "Redrafting: draft tabs, ask banner and hand-in bar for students"
 
 ### Task 9: Walk, gate and PR
 
-- [ ] **Step 1: Link dependencies.** The worktree needs `node_modules`; see `student-progress-feedback` in memory for the symlink note. Add a `redraft-dev` entry to `.claude/launch.json` pinned to `/Users/adamrussell/Projects/life-hub-redraft`, and start it with `preview_start`.
+- [ ] **Step 1: Link dependencies.** The worktree needs `node_modules`; see `student-progress-feedback` in memory for the symlink note. Add a `redraft-dev` entry to `.claude/launch.json` pinned to the redraft worktree, and start it with `preview_start`.
 
 - [ ] **Step 2: Walk in the dev mock, desktop and 390px.** Teacher: `/mark/class_2026_12engadv2/...`, from the sixth piece waiting. Student: `/s/classes/class_2026_12engadv2/profile`, initials AN. Check, in order:
   1. Section ask, with the gold section showing and the Return button refusing until there is one.
