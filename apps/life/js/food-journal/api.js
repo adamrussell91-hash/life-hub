@@ -35,6 +35,10 @@ export function createFoodJournalApi(fetchImpl) {
           new URLSearchParams({ lat: String(gps.lat), lon: String(gps.lon), q }),
       ),
     load: () => request("/api/food-journal"),
+    checks: () => request("/api/food-checks"),
+    answerCheck: (answer) => post("/api/food-checks", { action: "answer", answer }),
+    undoCheck: (checkId) => post("/api/food-checks", { action: "undo", check_id: checkId }),
+    applyChecks: () => post("/api/food-checks", { action: "apply" }),
     save: (journal, version, removeMeals = [], clearRecount = []) =>
       request("/api/food-journal", {
         method: "PUT",

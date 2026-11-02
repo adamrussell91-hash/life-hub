@@ -128,3 +128,19 @@ Verification: Chromium Food Journal suite 35/35 (four new quick-entry cases at
 it off). New unit tests in `tests/unit/food-journal-quick-entry.test.js`.
 WebKit was not available in this environment; run the phone cases there with
 `PLAYWRIGHT_BROWSER=webkit node --test --test-name-pattern='quick entry|phone (390|320)' tests/browser/food-journal.spec.mjs`.
+
+## Quick check (backlog cleanup)
+
+Codex prepares answers for unsure venues and dishes with no cuisine or tags, following
+`docs/food-journal/CODEX-QUICK-CHECKS.md`. Batches live in private
+`data/food-journal/quick-checks/batch-*.json` and must pass `scripts/food-checks/check.mjs`.
+
+- The Quick check tab shows one card at a time: tap, number keys, S to skip, B to go back. The next
+  card appears at once. Groups let meals be unticked.
+- Answers wait in Netlify Blobs (`life-hub-food-checks`), so a tap never rewrites the 2 MB journal.
+  An outbox in local storage holds them if the network drops.
+- Leaving the tab applies them, and `food-checks-apply-scheduled` catches the rest every 10 minutes.
+  One commit per run. A save conflict leaves answers waiting for the next run.
+- An answer never overwrites a record that changed after the check was prepared, or a venue Adam
+  picked: it is held instead. Venue answers set `basis: picked`. Dish answers only fill blank
+  cuisines and add tags, so they cannot flag a Brisket re-count.
