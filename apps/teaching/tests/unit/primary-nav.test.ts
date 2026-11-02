@@ -24,6 +24,7 @@ describe('primary nav', () => {
     expect(labels).toEqual([
       'Dashboard',
       'Chat',
+      'To mark',
       'Classes',
       'Scope & Sequences',
       'Units',
@@ -38,7 +39,7 @@ describe('primary nav', () => {
       [...container.querySelectorAll('.hub-rail__majors .primary-nav__label')].map((el) => el.textContent)
     ).toEqual(['Dashboard', 'Chat']);
     const links = [...container.querySelectorAll('.primary-nav__link')];
-    expect(links).toHaveLength(10);
+    expect(links).toHaveLength(11);
     for (const link of links) {
       expect(link.querySelector('svg.primary-nav__glyph')).not.toBeNull();
     }
