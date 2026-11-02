@@ -465,6 +465,8 @@ export const AudioBlockSchema = z.object({
    * The Voice block. `listen` plays a clip (the original audio block); `respond`
    * and `viva` have students record a spoken answer and submit their best take.
    * Viva adds dot points the timer walks through. `url` is only used by listen.
+   * `oracy` layers a type over those modes: speech, debate and presentation run
+   * as viva, recite as respond with `recite_text` in place of a required prompt.
    */
   content: z.object({
     url: z.string(),
@@ -477,7 +479,11 @@ export const AudioBlockSchema = z.object({
       .array(z.object({ label: z.string().max(80), weight: z.number().min(0.5).max(3).default(1) }))
       .max(8)
       .optional(),
-    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional()
+    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional(),
+    oracy: z.enum(['speech', 'debate', 'presentation', 'recite']).optional(),
+    side: z.enum(['proposing', 'opposing']).optional(),
+    stems: z.array(z.string().max(120)).max(12).optional(),
+    recite_text: z.string().max(8000).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

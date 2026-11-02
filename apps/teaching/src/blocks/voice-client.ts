@@ -127,6 +127,7 @@ export async function submitTake(input: {
   duration_s: number;
   initials: string;
   points: Array<{ label: string; t: number }>;
+  side?: 'proposing' | 'opposing';
   onProgress?: (sent: number, total: number) => void;
 }): Promise<MineState> {
   const { token } = voiceDevice();
@@ -155,7 +156,8 @@ export async function submitTake(input: {
       parts: total,
       mime: input.mime,
       duration_s: input.duration_s,
-      points: input.points
+      points: input.points,
+      ...(input.side ? { side: input.side } : {})
     })
   );
 }

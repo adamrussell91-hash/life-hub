@@ -105,8 +105,6 @@ Progress stays in the device's plan draft, so a reload resumes the same place. A
 
 **Recording.** The text stays hidden during recording. A student who gets stuck keeps going or stops and tries another take. Between takes they can open the text again. The practice-take list and sending are unchanged.
 
-**Live captions.** These stay on as in the existing flow. They show what the student says, not the source text.
-
 ## Teacher marking
 
 Marking stays as it is: one-tap codes landing on transcript words.

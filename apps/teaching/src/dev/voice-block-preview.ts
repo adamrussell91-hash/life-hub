@@ -1,4 +1,5 @@
 import { renderBlock } from '@/blocks/render';
+import { createAudioEditor } from '@/blocks/editors';
 import { BlockSchema, type Block } from '@/schemas/block';
 import type { FeedbackCode } from '@/blocks/feedback-codes';
 import '../styles/app.css';
@@ -87,6 +88,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       submission = {
         id: 'vs_demo',
         initials: body.initials,
+        ...(body.side ? { side: body.side } : {}),
         device_hash: 'a1b2c3',
         submitted_at: now.toISOString(),
         audio_delete_after: new Date(now.getTime() + 28 * 86400_000).toISOString(),
@@ -139,19 +141,28 @@ if (navigator.mediaDevices) {
   };
 }
 
+// ?oracy=speech|debate|presentation|recite previews an oracy type. Invented text only.
+const previewOracy = new URLSearchParams(location.search).get('oracy');
+const ORACY_PREVIEW: Record<string, Record<string, unknown>> = {
+  speech: { mode: 'viva', oracy: 'speech', prompt: 'The one rule I would change at this school', time_limit_s: 30, stems: ['Rhetorical opener', 'Rule of three', 'Repetition', 'Pause'], scaffold: [{ label: 'Hook', weight: 1 }, { label: 'Main message', weight: 1 }, { label: 'Call to action', weight: 1 }] },
+  debate: { mode: 'viva', oracy: 'debate', prompt: 'Cities should ban cars from their centres', time_limit_s: 30, stems: ['I believe that…', 'Firstly… secondly…', 'Moreover…', 'Our opponents may argue…'], scaffold: [{ label: 'Our case', weight: 1 }, { label: 'First reason', weight: 1 }, { label: 'Close', weight: 1 }] },
+  presentation: { mode: 'viva', oracy: 'presentation', prompt: 'How a volcano forms', time_limit_s: 30, scaffold: [{ label: 'Slide 1', weight: 1 }, { label: 'Slide 2', weight: 1 }] },
+  recite: { mode: 'respond', oracy: 'recite', recite_text: 'Tyger Tyger, burning bright,\nIn the forests of the night;\n\nWhat immortal hand or eye,\nCould frame thy fearful symmetry?' }
+};
+
 const block = BlockSchema.parse({
   id: 'viva1',
   type: 'block',
   block_type: 'audio',
   variant: 'medium',
   visibility: 'student_teacher',
-  content: {
+  content: (previewOracy && ORACY_PREVIEW[previewOracy] ? { url: '', ...ORACY_PREVIEW[previewOracy] } : {
     url: '',
     mode: 'viva',
     prompt: 'Explain how the composer represents the human experience of isolation.',
     time_limit_s: 30,
     scaffold: [{ label: 'Concept', weight: 1 }, { label: 'Evidence and technique', weight: 2 }, { label: 'Link back', weight: 1 }]
-  },
+  }),
   settings: {
     deep_step: { du: 'du_demo01', step: '3' },
     deep_targets: ['kp_demo01', 'kp_demo02'],
@@ -164,9 +175,14 @@ const block = BlockSchema.parse({
 
 const mount = document.getElementById('mount')!;
 const nav = document.createElement('p');
-nav.innerHTML = '<a href="?view=student">Student</a> · <a href="?view=teacher">Teacher</a>';
+nav.innerHTML = '<a href="?view=student">Student</a> · <a href="?view=teacher">Teacher</a> · <a href="?view=editor">Editor</a>';
 const view = new URLSearchParams(location.search).get('view') === 'teacher' ? 'teacher' : 'student';
 (window as unknown as { voiceRerender: (v: 'student' | 'teacher') => void }).voiceRerender = (v) => {
   mount.replaceChildren(nav, renderBlock(block, v, { lessonId: 'lesson_demo' }));
 };
-mount.replaceChildren(nav, renderBlock(block, view, { lessonId: 'lesson_demo' }));
+if (new URLSearchParams(location.search).get('view') === 'editor') {
+  let latest = block as Extract<Block, { block_type: 'audio' }>;
+  mount.replaceChildren(nav, createAudioEditor(latest, (next) => (latest = next), () => latest));
+} else {
+  mount.replaceChildren(nav, renderBlock(block, view, { lessonId: 'lesson_demo' }));
+}

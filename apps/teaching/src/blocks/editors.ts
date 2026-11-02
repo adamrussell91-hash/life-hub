@@ -1264,9 +1264,8 @@ export function createAudioEditor(
     task.refresh();
   };
   fields.append(
-    createVoiceModePicker(getLatest, (mode) => {
-      const latest = getLatest();
-      onChange({ ...latest, content: { ...latest.content, mode } });
+    createVoiceModePicker(getLatest, (next) => {
+      onChange(next);
       paintMode();
     }),
     listen,

@@ -2347,6 +2347,8 @@ var AudioBlockSchema = z12.object({
    * The Voice block. `listen` plays a clip (the original audio block); `respond`
    * and `viva` have students record a spoken answer and submit their best take.
    * Viva adds dot points the timer walks through. `url` is only used by listen.
+   * `oracy` layers a type over those modes: speech, debate and presentation run
+   * as viva, recite as respond with `recite_text` in place of a required prompt.
    */
   content: z12.object({
     url: z12.string(),
@@ -2356,7 +2358,11 @@ var AudioBlockSchema = z12.object({
     time_limit_s: z12.number().int().min(30).max(300).optional(),
     student_chooses_time: z12.boolean().optional(),
     scaffold: z12.array(z12.object({ label: z12.string().max(80), weight: z12.number().min(0.5).max(3).default(1) })).max(8).optional(),
-    code_groups: z12.array(z12.enum(["composition", "viva", "speaking"])).optional()
+    code_groups: z12.array(z12.enum(["composition", "viva", "speaking"])).optional(),
+    oracy: z12.enum(["speech", "debate", "presentation", "recite"]).optional(),
+    side: z12.enum(["proposing", "opposing"]).optional(),
+    stems: z12.array(z12.string().max(120)).max(12).optional(),
+    recite_text: z12.string().max(8e3).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -4487,7 +4493,9 @@ function ownIssue(block, discernHosts) {
   }
   if (block.block_type === "audio") {
     const mode = block.content.mode ?? "listen";
-    if (mode !== "listen" && !block.content.prompt?.trim()) {
+    if (block.content.oracy === "recite") {
+      if (!block.content.recite_text?.trim()) return "Recite blocks need a text to publish";
+    } else if (mode !== "listen" && !block.content.prompt?.trim()) {
       return "Voice blocks need a question to publish";
     }
     if (mode === "listen" && !isHttpUrl(block.content.url)) {

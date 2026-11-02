@@ -287,7 +287,9 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   }
   if (block.block_type === 'audio') {
     const mode = block.content.mode ?? 'listen';
-    if (mode !== 'listen' && !block.content.prompt?.trim()) {
+    if (block.content.oracy === 'recite') {
+      if (!block.content.recite_text?.trim()) return 'Recite blocks need a text to publish';
+    } else if (mode !== 'listen' && !block.content.prompt?.trim()) {
       return 'Voice blocks need a question to publish';
     }
     if (mode === 'listen' && !isHttpUrl(block.content.url)) {

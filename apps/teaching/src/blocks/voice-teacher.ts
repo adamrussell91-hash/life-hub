@@ -25,6 +25,8 @@ import {
   wordAt,
   type Paper
 } from '@/blocks/voice-marking';
+import { SIDE_LABELS } from '@/blocks/voice-oracy';
+import { reciteTextFold } from '@/blocks/voice-recite';
 import { audioUrl, type VoiceTag, type WhisperTranscript } from '@/blocks/voice-client';
 import { clock } from '@/blocks/voice-pacing';
 import { focusBox, summaryList, tagChip, tagColour } from '@/blocks/voice-feedback-view';
@@ -62,6 +64,7 @@ type Submission = Omit<Row, 'tag_count'> & {
   classes?: Array<{ id: string; title: string; students: Array<{ id: string; initials: string; name: string }> }>;
   prompt: string;
   points: Array<{ label: string; t: number }>;
+  side?: 'proposing' | 'opposing';
   transcript: WhisperTranscript | null;
   transcript_error?: string;
   tags: MarkTag[];
@@ -269,10 +272,12 @@ export function mountVoiceTeacher(
     top.append(
       el('p', 'voice-mark__who', `${record.initials} · ${clock(record.duration_s)} · ${shortWhen(record.submitted_at)}`)
     );
+    if (record.side) top.append(el('span', 'voice-take__chip', SIDE_LABELS[record.side]));
     const saveState = el('span', 'voice-mark__save block-secondary');
     saveState.setAttribute('role', 'status');
     top.append(saveState);
     screen.append(top);
+    if (block.content.oracy === 'recite') screen.append(reciteTextFold(block.content.recite_text, 'Text'));
 
     // Whose take this is. A device that claimed its initials in the class page is matched already.
     const people = (record.classes ?? []).flatMap((c) => c.students.map((st) => ({ classId: c.id, classTitle: c.title, ...st })));

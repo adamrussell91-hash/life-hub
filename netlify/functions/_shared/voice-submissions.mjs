@@ -125,6 +125,15 @@ export function cleanInitials(value) {
   return initials;
 }
 
+/** A Debate take says which side it argued: the block's side if the teacher set one, otherwise the student's. */
+function sideFor(block, raw) {
+  if (block.content?.oracy !== 'debate') return null;
+  if (block.content.side) return block.content.side;
+  if (raw === undefined || raw === null) return null;
+  if (raw !== 'proposing' && raw !== 'opposing') reject(400, 'bad_side', 'Pick your side again and resend.');
+  return raw;
+}
+
 function cleanPoints(raw, duration) {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, 8).map((p) => ({
@@ -183,6 +192,7 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
   const duration = Number(body.duration_s);
   if (!Number.isFinite(duration) || duration < 1) reject(400, 'too_short', 'That recording is too short.');
   if (duration > maxSecondsFor(live)) reject(400, 'too_long', 'That recording is longer than the time allowed.');
+  const side = sideFor(live, body.side);
 
   const now = deps.now ? new Date(deps.now()) : new Date();
   const id = `vs_${now.getTime().toString(36)}_${randomBytes(4).toString('hex')}`;
@@ -214,6 +224,7 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
     audio_bytes: bytes.byteLength,
     audio_delete_after: deleteAfter,
     points: cleanPoints(body.points, duration),
+    ...(side ? { side } : {}),
     transcript: null,
     transcript_status: 'pending',
     transcribe_attempts: 0,
