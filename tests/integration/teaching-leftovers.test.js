@@ -312,6 +312,35 @@ test('scope sequence create links the subject and accepts a timeline patch', asy
     })
   ));
   assert.equal(badClimb.status, 400);
+  const planned = await read(await createScopeSequenceHandler(deps)(
+    request(`https://api.adam-russell.com/api/scope-sequences/${created.body.data.id}`, {
+      method: 'PATCH',
+      body: { knowledge_plan: {
+        year_target: ' End here ',
+        units: [{
+          unit_id: 'unit_1',
+          big_idea: 'An idea',
+          must: [{ id: 'ki_abcd', text: ' Taught thing ' }],
+          already: [{ from: 'before', text: 'Earlier thing' }, { from: 'plan', item_id: 'ki_abcd' }],
+          weeks: [{ id: 'kw_abcd', label: 'Weeks 1–2', must_ids: ['ki_abcd'] }]
+        }]
+      } }
+    })
+  ));
+  assert.equal(planned.status, 200);
+  const plan = planned.body.data.knowledge_plan;
+  assert.equal(plan.year_target, 'End here');
+  assert.equal(plan.units[0].must[0].text, 'Taught thing');
+  assert.deepEqual(plan.units[0].weeks[0].must_ids, ['ki_abcd']);
+  assert.deepEqual(plan.units[0].words, []);
+  assert.equal(planned.body.data.outcome_climb.length, 1);
+  const badPlan = await read(await createScopeSequenceHandler(deps)(
+    request(`https://api.adam-russell.com/api/scope-sequences/${created.body.data.id}`, {
+      method: 'PATCH',
+      body: { knowledge_plan: { units: [{ unit_id: 'unit_1', must: [{ id: 'nope', text: 'x' }] }] } }
+    })
+  ));
+  assert.equal(badPlan.status, 400);
 });
 
 test('scope sequence delete removes it and unlinks the subject', async () => {

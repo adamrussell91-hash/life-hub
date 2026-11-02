@@ -97,9 +97,16 @@ export {
   TimelineNoteItemSchema,
   TimelineItemSchema,
   ScopeSequenceSchema,
+  KNOWLEDGE_LIMITS,
+  KnowledgePlanSchema,
   type ScopeSequence,
   type TimelineItem,
-  type OutcomeClimbEntry
+  type OutcomeClimbEntry,
+  type KnowledgePlan,
+  type KnowledgeUnitPlan,
+  type KnowledgeItem,
+  type KnowledgeWeek,
+  type AlreadyKnow
 } from './scope-sequence';
 export {
   MediaProviderSchema,

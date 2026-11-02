@@ -10,6 +10,7 @@ import {
   unitKey
 } from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { parseKnowledgePlan } from './_shared/knowledge-plan.mjs';
 
 export const config = { path: '/api/scope-sequences/:id' };
 
@@ -94,9 +95,10 @@ export function createScopeSequenceHandler(deps = {}) {
     const hasTimeline = parsed.value.timeline_items !== undefined;
     const hasOutcomes = parsed.value.outcome_ids !== undefined;
     const hasClimb = parsed.value.outcome_climb !== undefined;
-    if (!hasTimeline && !hasOutcomes && !hasClimb) {
+    const hasKnowledge = parsed.value.knowledge_plan !== undefined;
+    if (!hasTimeline && !hasOutcomes && !hasClimb && !hasKnowledge) {
       return withCors(
-        errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids and/or outcome_climb', false),
+        errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids, outcome_climb and/or knowledge_plan', false),
         request,
         env
       );
@@ -142,11 +144,20 @@ export function createScopeSequenceHandler(deps = {}) {
       }
       outcome_climb = parsedClimb.outcome_climb;
     }
+    let knowledge_plan = existing.knowledge_plan;
+    if (hasKnowledge) {
+      const parsedPlan = parseKnowledgePlan(parsed.value.knowledge_plan);
+      if (parsedPlan.error) {
+        return withCors(errorResponse(400, 'validation_error', parsedPlan.error, false), request, env);
+      }
+      knowledge_plan = parsedPlan.knowledge_plan;
+    }
     const next = {
       ...existing,
       timeline_items,
       ...(outcome_ids !== undefined ? { outcome_ids } : {}),
       ...(outcome_climb !== undefined ? { outcome_climb } : {}),
+      ...(knowledge_plan !== undefined ? { knowledge_plan } : {}),
       updated_at: new Date().toISOString()
     };
     await setJSON(store, scopeSequenceKey(id), next);

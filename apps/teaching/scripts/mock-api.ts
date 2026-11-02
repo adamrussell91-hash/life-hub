@@ -2495,8 +2495,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasTimeline = record.timeline_items !== undefined;
     const hasOutcomes = record.outcome_ids !== undefined;
     const hasClimb = record.outcome_climb !== undefined;
-    if (!hasTimeline && !hasOutcomes && !hasClimb) {
-      return errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids and/or outcome_climb');
+    const hasKnowledge = record.knowledge_plan !== undefined;
+    if (!hasTimeline && !hasOutcomes && !hasClimb && !hasKnowledge) {
+      return errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids, outcome_climb and/or knowledge_plan');
     }
 
     const rawScope = store.getJSON(scopeSequenceKey(scopeId));
@@ -2580,6 +2581,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       timeline_items,
       ...(outcome_ids !== undefined ? { outcome_ids } : {}),
       ...(hasClimb ? { outcome_climb: record.outcome_climb } : {}),
+      ...(hasKnowledge ? { knowledge_plan: record.knowledge_plan } : {}),
       updated_at: nowIso
     };
 
