@@ -25,6 +25,8 @@ export type DrawState = {
   progress?: ProgressLayer | null;
   /** Width of the lesson-name column; it gives way so the branches fit. */
   nameW: number;
+  /** Spacing between branch columns; the student's map spaces them wider. */
+  laneW?: number;
 };
 
 /** The student's map reads at a larger size: taller rows and bigger names. */
@@ -36,6 +38,8 @@ type Lane = { x: number; group: MapGroup; items: MapItem[]; collapsed: boolean; 
 export const ROW_H = 24;
 const HEAD_H = 150;
 const LANE_W = 24;
+/** The student's map: wider columns, so the angled labels sit over their own dot. */
+export const PROGRESS_LANE_W = 32;
 const X_SUPPORT = 46;
 const X_CORE = 68;
 const X_SIDE = 90;
@@ -62,28 +66,40 @@ export const rowTag = (row: MapRow): string | undefined =>
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
 /** The widest name column (and so map) that fits `available` pixels, between 120 and `max`: wide pages fill with lesson names. */
-export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number, max = 340): number {
-  const branches = layoutLanes(map, { collapsed, nameW: 0 }).width - NAME_X - 14;
+export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number, max = 340, laneW = LANE_W): number {
+  const branches = layoutLanes(map, { collapsed, nameW: 0, laneW }).width - NAME_X - 14;
   return Math.max(120, Math.min(max, available - NAME_X - 14 - branches));
 }
 
-export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed' | 'nameW'>): { lanes: Lane[]; start: number; width: number } {
+/** The name column the student's map needs: its longest name and tag plus the done tick, so the columns sit close to the names. */
+export function progressNameWidth(map: CoverageMap, measure: (text: string) => number = (t) => t.length * 7.8): number {
+  const widest = Math.max(0, ...map.rows.map((row) => {
+    const tag = rowTag(row) ?? 'Next up';
+    return tag.length * 6 + 15 + measure(row.title);
+  }));
+  return Math.ceil(widest + 24);
+}
+
+export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed' | 'nameW' | 'laneW'>): { lanes: Lane[]; start: number; width: number } {
+  const laneW = state.laneW ?? LANE_W;
   const start = NAME_X + state.nameW + 14;
   const lanes: Lane[] = [];
   let slot = 0;
   map.groups.forEach((group, gi) => {
     if (gi) slot += 0.7;
     if (state.collapsed.has(group.id)) {
-      lanes.push({ x: start + slot * LANE_W + LANE_W / 2, group, items: group.items, collapsed: true, id: `group:${group.id}` });
+      lanes.push({ x: start + slot * laneW + laneW / 2, group, items: group.items, collapsed: true, id: `group:${group.id}` });
       slot++;
     } else {
       for (const item of group.items) {
-        lanes.push({ x: start + slot * LANE_W + LANE_W / 2, group, items: [item], collapsed: false, id: item.id });
+        lanes.push({ x: start + slot * laneW + laneW / 2, group, items: [item], collapsed: false, id: item.id });
         slot++;
       }
     }
   });
-  return { lanes, start, width: Math.ceil(start + slot * LANE_W + 12) };
+  // Angled labels lean right past the last column; the student's map leaves them room.
+  const tail = state.laneW ? 24 : 12;
+  return { lanes, start, width: Math.ceil(start + slot * laneW + tail) };
 }
 
 export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: string; width: number; height: number } {
@@ -138,7 +154,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       push(`<rect x="${x0 - 14}" y="0" width="${x1 - x0 + 28}" height="30" fill="transparent"/>`);
       push(`<text class="cm-group" x="${(x0 + x1) / 2}" y="16" text-anchor="middle">${esc(group.name)}</text></g>`);
     }
-    push(`<line class="cm-bus" x1="${x0}" y1="26" x2="${x1}" y2="26" style="stroke:${group.items[0]?.colour ?? 'currentColor'}"/>`);
+    if (!(pr && x0 === x1)) push(`<line class="cm-bus" x1="${x0}" y1="26" x2="${x1}" y2="26" style="stroke:${group.items[0]?.colour ?? 'currentColor'}"/>`);
   }
   for (const lane of lanes) {
     const colour = lane.items[0]!.colour;
@@ -148,7 +164,9 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       push(`<g class="cm-hit" data-item="${esc(item.id)}" role="button" tabindex="0" aria-label="Follow ${esc(item.label)}: ${esc(item.title)}">`);
       push(`<title>${esc(item.label)}: ${esc(item.title)}</title>`);
       push(`<rect x="${lane.x - 10}" y="30" width="20" height="74" fill="transparent"/>`);
-      push(`<text class="cm-item${state.focus === item.id ? ' cm-item--on' : ''}" transform="translate(${lane.x + 3},92) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text></g>`);
+      // On the student's map the label's foot sits right over its dot.
+      const [lx, ly] = pr ? [lane.x - 2, 100] : [lane.x + 3, 92];
+      push(`<text class="cm-item${state.focus === item.id ? ' cm-item--on' : ''}" transform="translate(${lx},${ly}) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text></g>`);
     }
     if (pr) {
       const any = rows.some((r) => lane.items.some((it) => r.teaches.has(it.id)) && lit(r.id));
