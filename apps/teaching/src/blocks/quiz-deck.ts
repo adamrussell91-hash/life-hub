@@ -1,11 +1,15 @@
 import type { Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
+import { button } from '@/quiz/dom';
 
 /**
  * A run of quiz questions on the lesson page shows as a deck: one card at a
  * time, arrows and a numbered strip to move through, and a swipe on a phone.
  * A forty-question quiz stays one card tall instead of forty. The teacher can
- * flip a deck back to the plain list (kept on this device).
+ * flip a deck back to the plain list (kept on this device). Students answering
+ * in place get the same deck: their strip marks what they have answered, and a
+ * Back and Next sit under the card for when a long question has scrolled the
+ * arrows away.
  */
 
 const LIST_KEY = 'teaching_quiz_deck_list_v1';
@@ -69,11 +73,12 @@ export type QuizDeckOptions = {
   /** The card to open on. */
   showId: string;
   onShow: (blockId: string) => void;
-  onList: () => void;
+  /** The List switch. A student deck leaves it out. */
+  onList?: () => void;
 };
 
 export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
-  const { blocks, rows } = options;
+  const { blocks, rows, onList } = options;
   const total = blocks.length;
   let at = Math.max(0, blocks.findIndex((b) => b.id === options.showId));
 
@@ -89,9 +94,12 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
   const count = document.createElement('span');
   count.className = 'qz-deck__count';
   count.setAttribute('aria-live', 'polite');
-  const list = navButton('Show the questions as a list', 'List', 'btn btn--ghost qz-deck__mode');
-  list.addEventListener('click', options.onList);
-  bar.append(prev, count, next, list);
+  bar.append(prev, count, next);
+  if (onList) {
+    const list = navButton('Show the questions as a list', 'List', 'btn btn--ghost qz-deck__mode');
+    list.addEventListener('click', onList);
+    bar.append(list);
+  }
 
   const strip = document.createElement('div');
   strip.className = 'qz-dots qz-deck__strip';
@@ -99,7 +107,8 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
   strip.setAttribute('aria-label', 'Jump to a question');
   const dots = blocks.map((block, i) => {
     const dot = navButton(`Question ${i + 1}`, String(i + 1), 'qz-dot');
-    if (block.block_type === 'quiz_question' && !checkQuestion({ ...block.content.question, id: block.id }).ok) {
+    // A student's copy has no answers in it, so only the teacher's can be checked.
+    if (onList && block.block_type === 'quiz_question' && !checkQuestion({ ...block.content.question, id: block.id }).ok) {
       dot.dataset.warn = 'true';
       dot.setAttribute('aria-label', `Question ${i + 1}, not ready`);
     }
@@ -116,24 +125,42 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
   });
   deck.append(bar, strip, track);
 
+  const turnFromFoot = (index: number) => {
+    go(index);
+    deck.scrollIntoView?.({ block: 'nearest' });
+  };
+  const footBack = button('Back', 'secondary', () => turnFromFoot(at - 1));
+  const footNext = button('Next', 'primary', () => turnFromFoot(at + 1));
+  if (!onList) {
+    const foot = document.createElement('div');
+    foot.className = 'qz-deck__foot';
+    foot.append(footBack, footNext);
+    deck.append(foot);
+  }
+
+  function paintDots(): void {
+    dots.forEach((dot, i) => {
+      dot.removeAttribute('aria-current');
+      if (i === at) {
+        dot.dataset.state = 'now';
+        dot.setAttribute('aria-current', 'true');
+      } else if (rows[i]?.querySelector('[data-quiz-answered="true"]')) dot.dataset.state = 'done';
+      else delete dot.dataset.state;
+    });
+  }
+
   function paint(direction: 0 | 1 | -1): void {
     rows.forEach((row, i) => {
       row.hidden = i !== at;
       row.classList.remove('qz-deck__card--in-next', 'qz-deck__card--in-prev');
     });
     if (direction) rows[at]?.classList.add(direction > 0 ? 'qz-deck__card--in-next' : 'qz-deck__card--in-prev');
-    dots.forEach((dot, i) => {
-      if (i === at) {
-        dot.dataset.state = 'now';
-        dot.setAttribute('aria-current', 'true');
-      } else {
-        delete dot.dataset.state;
-        dot.removeAttribute('aria-current');
-      }
-    });
+    paintDots();
     count.textContent = `Question ${at + 1} of ${total}`;
     prev.disabled = at === 0;
     next.disabled = at === total - 1;
+    footBack.hidden = at === 0;
+    footNext.hidden = at === total - 1;
     // Keep the current number in view without moving the page.
     const dot = dots[at];
     if (dot && strip.scrollWidth > strip.clientWidth) {
@@ -162,6 +189,8 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
     else delete dots[i]!.dataset.ann;
   });
   new MutationObserver(markAnn).observe(track, { attributes: true, attributeFilter: ['class'], subtree: true });
+  // The student's quiz marks each slot once it holds an answer.
+  new MutationObserver(paintDots).observe(track, { attributes: true, attributeFilter: ['data-quiz-answered'], subtree: true });
 
   prev.addEventListener('click', () => go(at - 1));
   next.addEventListener('click', () => go(at + 1));
@@ -209,7 +238,7 @@ const nestedShown = new Set<string>();
  * quiz questions as a deck. The List switch flips the run in place, since
  * these renderers have no page to redraw.
  */
-export function appendWithQuizDecks(host: HTMLElement, blocks: Block[], render: (block: Block) => HTMLElement, decks: boolean): void {
+export function appendWithQuizDecks(host: HTMLElement, blocks: Block[], render: (block: Block) => HTMLElement, decks: 'teacher' | 'student' | null): void {
   for (let index = 0; index < blocks.length; ) {
     const run = decks ? quizRunLength(blocks, index) : 0;
     if (run < 2) {
@@ -226,7 +255,7 @@ export function appendWithQuizDecks(host: HTMLElement, blocks: Block[], render: 
         row.hidden = false;
         row.classList.remove('qz-deck__card', 'qz-deck__card--in-next', 'qz-deck__card--in-prev');
       });
-      if (readDeckAsList()) {
+      if (decks === 'teacher' && readDeckAsList()) {
         group.replaceChildren(deckListBar(run, () => {
           writeDeckAsList(false);
           paint();
@@ -242,10 +271,14 @@ export function appendWithQuizDecks(host: HTMLElement, blocks: Block[], render: 
           for (const b of runBlocks) nestedShown.delete(b.id);
           nestedShown.add(id);
         },
-        onList: () => {
-          writeDeckAsList(true);
-          paint();
-        }
+        ...(decks === 'teacher'
+          ? {
+              onList: () => {
+                writeDeckAsList(true);
+                paint();
+              }
+            }
+          : {})
       }));
     };
     paint();

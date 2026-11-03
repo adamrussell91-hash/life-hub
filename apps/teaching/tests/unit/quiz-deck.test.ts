@@ -115,3 +115,95 @@ describe('quiz question deck', () => {
     expect(renderBlock(section, 'student').querySelector('.qz-deck')).toBeNull();
   });
 });
+
+describe('quiz deck for a student answering in place', () => {
+  const quiz = (id: string) => ({ id, type: 'block', block_type: 'quiz_question', content: { question: { id, kind: 'true_false', prompt: `Prompt ${id}`, marks: 1 } } }) as unknown as Block;
+  const section = (blocks: Block[]) => ({ id: 's1', type: 'block', block_type: 'section', content: { title: 'Part', blocks } }) as unknown as Block;
+  // A deck remembers its last card by block id, so each test has its own ids.
+  let run = 0;
+  const shown = (host: HTMLElement) =>
+    Array.from(host.querySelectorAll<HTMLElement>('.qz-deck__card'))
+      .filter((card) => !card.hidden)
+      .map((card) => card.querySelector<HTMLElement>('[data-slot]')?.dataset.slot);
+
+  const mount = (ctx: { quizSlot?: (id: string) => HTMLElement }) => {
+    run += 1;
+    const host = document.createElement('div');
+    host.append(renderBlock(section(['q1', 'q2', 'q3'].map((id) => quiz(`${id}-${run}`))), 'student', ctx));
+    return host;
+  };
+  const slotted = () => {
+    const slots = new Map<string, HTMLElement>();
+    const quizSlot = (id: string) => {
+      const short = id.split('-')[0]!;
+      const slot = document.createElement('div');
+      slot.dataset.slot = short;
+      slots.set(short, slot);
+      return slot;
+    };
+    return { slots, host: mount({ quizSlot }) };
+  };
+
+  it('turns a nested run into one card at a time, with no List switch', () => {
+    localStorage.setItem('teaching_quiz_deck_list_v1', '1');
+    const { host } = slotted();
+    expect(shown(host)).toEqual(['q1']);
+    expect(host.querySelector('.qz-deck__mode')).toBeNull();
+    localStorage.clear();
+  });
+
+  it('never flags a student copy as not ready, though it holds no answers', () => {
+    const { host } = slotted();
+    expect(host.querySelector('.qz-dot[data-warn]')).toBeNull();
+  });
+
+  it('leaves the list alone where questions are not answered in place', () => {
+    expect(mount({}).querySelector('.qz-deck')).toBeNull();
+  });
+
+  it('moves with Back and Next under the card, each hiding at its end', () => {
+    const { host } = slotted();
+    const [back, next] = Array.from(host.querySelectorAll<HTMLButtonElement>('.qz-deck__foot button'));
+    expect(back!.hidden).toBe(true);
+    next!.click();
+    next!.click();
+    expect(shown(host)).toEqual(['q3']);
+    expect(next!.hidden).toBe(true);
+    back!.click();
+    expect(shown(host)).toEqual(['q2']);
+  });
+
+  it('turns to a slot asked for from outside the deck', () => {
+    const { host, slots } = slotted();
+    slots.get('q3')!.dispatchEvent(new CustomEvent(ROW_REVEAL_EVENT, { bubbles: true }));
+    expect(shown(host)).toEqual(['q3']);
+  });
+
+  it('marks answered questions on the strip', async () => {
+    const { host, slots } = slotted();
+    slots.get('q2')!.dataset.quizAnswered = 'true';
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const dots = host.querySelectorAll<HTMLElement>('.qz-deck__strip .qz-dot');
+    expect(dots[0]!.dataset.state).toBe('now');
+    expect(dots[1]!.dataset.state).toBe('done');
+    expect(dots[2]!.dataset.state).toBeUndefined();
+  });
+
+  it('a sideways swipe moves it, a tap or a swipe from a text box does not', () => {
+    const { host, slots } = slotted();
+    const track = host.querySelector<HTMLElement>('.qz-deck__track')!;
+    const swipe = (target: HTMLElement, dx: number) => {
+      const fire = (type: string, x: number) => target.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { pointerType: 'touch', clientX: x, clientY: 100 }));
+      fire('pointerdown', 200);
+      fire('pointerup', 200 + dx);
+    };
+    swipe(track, 5);
+    expect(shown(host)).toEqual(['q1']);
+    swipe(track, -100);
+    expect(shown(host)).toEqual(['q2']);
+    const box = document.createElement('textarea');
+    slots.get('q2')!.append(box);
+    swipe(box, -100);
+    expect(shown(host)).toEqual(['q2']);
+  });
+});
