@@ -559,6 +559,7 @@ export async function renderMeetingPage(
     blockPage = mountBlockPage(host, {
       blocks: seeded,
       editable: true,
+      extraBlockTypes: ['annotation'],
       onSave: async (blocks) => {
         const decisions = decisionsFrom(blocks, record.minutes_notes ?? []);
         record = (await updateMeeting(id, { blocks, decisions })).meeting;

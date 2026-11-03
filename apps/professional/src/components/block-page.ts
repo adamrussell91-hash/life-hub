@@ -1,6 +1,6 @@
 import { mountBlockCanvas, type Block } from '@teaching/teacher/lesson-canvas/mount-page';
 import { nextBlockIdFactory } from '@teaching/teacher/lesson-canvas/drop';
-import { mountBlockInsert } from '@tasks/views/block-insert';
+import { mountBlockInsert, taskPaletteFamilies } from '@tasks/views/block-insert';
 
 export type BlockPageHandle = {
   flush(): Promise<void>;
@@ -21,6 +21,8 @@ export function mountBlockPage(
     onSave: (blocks: Block[]) => Promise<void>;
     debounceMs?: number;
     editable?: boolean;
+    /** Classroom blocks this page offers on top of the usual menu. */
+    extraBlockTypes?: readonly string[];
   }
 ): BlockPageHandle {
   const debounceMs = options.debounceMs ?? 800;
@@ -60,7 +62,10 @@ export function mountBlockPage(
   const insert =
     options.editable === false
       ? null
-      : mountBlockInsert(add, { onInsert: (type) => canvas.insertType(type) });
+      : mountBlockInsert(add, {
+          families: taskPaletteFamilies(options.extraBlockTypes),
+          onInsert: (type) => canvas.insertType(type)
+        });
 
   return {
     flush: save,

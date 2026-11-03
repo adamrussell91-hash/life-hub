@@ -20,11 +20,14 @@ export const TASK_BLOCK_TYPES: ReadonlySet<string> = new Set([
   'section', 'columns', 'spacer', 'tabs'
 ]);
 
-/** Teaching's palette families, narrowed to the blocks Tasks pages offer. */
-export function taskPaletteFamilies(): PaletteFamily[] {
+/**
+ * Teaching's palette families, narrowed to the blocks Tasks pages offer. A
+ * page that also wants a classroom block names it in `extraTypes`.
+ */
+export function taskPaletteFamilies(extraTypes: readonly string[] = []): PaletteFamily[] {
   const groups = BLOCK_GROUPS.map((group) => ({
     ...group,
-    types: [...new Set(group.types)].filter((type) => TASK_BLOCK_TYPES.has(type))
+    types: [...new Set(group.types)].filter((type) => TASK_BLOCK_TYPES.has(type) || extraTypes.includes(type))
   })).filter((group) => group.types.length > 0);
   return familiesFromGroups(groups);
 }
