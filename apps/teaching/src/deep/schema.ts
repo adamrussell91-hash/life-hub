@@ -9,6 +9,9 @@ import { DotPointRefSchema } from '@/schemas/block';
  */
 
 export const DEEP_LIMITS = { perUnit: 4, pieces: 24, claim: 400, why: 300, piece: 200, fill: 400 } as const;
+/** How many Essential and Strong pieces one deep understanding should rest on. Advisory: `DEEP_LIMITS.pieces` is the hard cap. */
+export const PIECE_TARGET = { min: 4, max: 6 } as const;
+export const PIECE_TARGET_LABEL = `${PIECE_TARGET.min} to ${PIECE_TARGET.max}`;
 export const TIERS = ['essential', 'strong', 'sophisticated'] as const;
 export type Tier = (typeof TIERS)[number];
 export const STEPS = ['1', '2a', '2b', '3', '4'] as const;

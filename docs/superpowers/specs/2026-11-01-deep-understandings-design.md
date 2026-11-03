@@ -20,7 +20,7 @@ A unit-level record with:
   - Essential — the claim can't stand without it.
   - Strong — most of the class should hold it.
   - Sophisticated — extension students bring it into writing. Never counts towards Step 1.
-  Aim for 8–12 Essential + Strong. A piece can belong to more than one deep understanding in the same unit.
+  Aim for 4–6 Essential + Strong (cut from 8–12 on 3 Nov 2026: a one-minute viva answer can't use more). A piece can belong to more than one deep understanding in the same unit.
 - **Steps.** The same five for every unit, each with a unit fill-in line (what a student at this step would say about this unit) and an evidence task:
   1. Know the pieces
   2A. Explain it in one text

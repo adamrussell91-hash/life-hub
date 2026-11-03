@@ -7,6 +7,8 @@ import {
   DeepUnderstandingSchema,
   newPieceId,
   piecesFor,
+  PIECE_TARGET,
+  PIECE_TARGET_LABEL,
   STEP_LABEL,
   STEP_NAME,
   type DeepUnderstanding,
@@ -125,7 +127,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     const all = allWith();
     const pieces = piecesFor(du, all);
     const core = pieces.filter((p) => p.tier !== 'sophisticated').length;
-    countLine.textContent = `${core} Essential and Strong piece${core === 1 ? '' : 's'} (aim for 8 to 12).`;
+    countLine.textContent = `${core} Essential and Strong piece${core === 1 ? '' : 's'} (aim for ${PIECE_TARGET_LABEL}).`;
     const p = placements(opts.lessons, du.id);
     const untaught = pieces.filter((x) => !p.taught.has(x.id));
     const untested = pieces.filter((x) => !p.tested.has(x.id));
@@ -134,7 +136,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
       [words >= 6, 'A claim students can argue'],
       [du.dot_points.length > 0, 'Linked to a dot point'],
       [du.concept_bullets.length > 0, 'Linked to a concept bullet'],
-      [core >= 8 && core <= 12, '8 to 12 Essential and Strong pieces', `Now ${core}`],
+      [core >= PIECE_TARGET.min && core <= PIECE_TARGET.max, `${PIECE_TARGET_LABEL} Essential and Strong pieces`, `Now ${core}`],
       [pieces.length > 0 && untaught.length === 0, 'Every piece is taught in a lesson', untaught.length ? `${untaught.length} to tag` : undefined],
       [pieces.length > 0 && untested.length === 0, 'Every piece has quiz items', untested.length ? `${untested.length} to write` : undefined],
       [missing.length === 0, 'An evidence task for each of Steps 2A to 4', missing.length ? `Place ${missing.map((s) => STEP_LABEL[s]).join(', ')}` : undefined]
@@ -225,7 +227,7 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
   const piecesHost = h('div', 'du-pieces');
   const sectionPieces = (): HTMLElement => {
     const s = section(3, 'Knowledge pieces');
-    s.append(h('p', 'du-sub', 'The facts and ideas students need in hand before they can use the claim. Aim for 8 to 12 Essential and Strong, plus a few Sophisticated.'), countLine, piecesHost);
+    s.append(h('p', 'du-sub', `The facts and ideas students need in hand before they can use the claim. Aim for ${PIECE_TARGET_LABEL} Essential and Strong, plus a Sophisticated or two.`), countLine, piecesHost);
     renderPieces();
     return s;
   };
