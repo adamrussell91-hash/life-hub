@@ -48,6 +48,8 @@ test('student paths are the published lesson, unit, and class routes only', () =
   assert.equal(studentPath('/s/classes/class_1/profile'), '/s/classes/class_1/profile');
   assert.equal(studentPath('/s/feedback/tok_1'), '/s/feedback/tok_1');
   assert.equal(studentPath('/s/feedback'), null);
+  assert.equal(studentPath('/s/sheets/tok_1'), '/s/sheets/tok_1');
+  assert.equal(studentPath('/s/sheets'), null);
   assert.equal(studentPath('/s/classes/class_1/profile/x'), null);
   assert.equal(studentPath('/teaching/s/lessons/lesson_1'), null);
   assert.equal(studentPath('/'), null);
