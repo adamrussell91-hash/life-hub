@@ -16,7 +16,7 @@ import { read } from './question-drop.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { CLASS_PREFIX, SCHEDULED_LESSON_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import {
-  OrganiserError, REVIEW_LIMIT, applyChange, applyResult, buildCards, releasedSheet, studentSheet, sydneyDay, todaysCards
+  OrganiserError, REVIEW_LIMIT, applyChange, applyResult, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
 } from './organiser-model.mjs';
 
 export { OrganiserError };
@@ -28,7 +28,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}/;
 const reject = (status, code, message) => {
   throw new OrganiserError(status, code, message);
 };
-const empty = () => ({ sections: [] });
+const empty = () => ({ v: 2, sections: [] });
 
 async function readWithEtag(store, key) {
   if (typeof store.getWithMetadata !== 'function') return { data: await read(store, key), etag: null };
@@ -107,7 +107,7 @@ async function teacherStatus(store, unitId, organiser, today) {
   const status = {};
   for (const section of organiser.sections) {
     for (const line of section.lines) {
-      const states = line.lesson_id ? per.map((p) => p[line.lesson_id]?.state ?? 'gone') : ['released'];
+      const states = line.lesson_id ? per.map((p) => p[line.lesson_id]?.state ?? 'gone') : [line.open ? 'released' : 'waiting'];
       status[line.id] = states.includes('released') ? 'released' : states.every((s) => s === 'gone') ? 'lesson_gone' : 'waiting';
     }
   }
@@ -142,7 +142,7 @@ export async function organiserTeacherAction(store, unitId, method, body = {}, {
       if (attempt >= 3) reject(409, 'changed', 'The organiser changed in another tab. Try again.');
     }
   } else {
-    organiser = (await read(store, key)) ?? empty();
+    organiser = upgradeOrganiser((await read(store, key)) ?? empty());
   }
   const result = { organiser, status: await teacherStatus(store, unitId, organiser, today) };
   if (method === 'GET' && body.class) result.sheet = await classSheet(store, unit, unitId, organiser, body.class, today);
@@ -231,10 +231,10 @@ export async function organiserStudentAction(store, classId, body, { now = new D
   const sheets = await classSheets(store, roster.cls, today);
   if (action === 'lesson') {
     if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
-    const mine = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_id === body.lesson_id && l.cells[0]).map((l) => ({ line: l, section: x }))));
-    // Only table lines with a hidden column become cards, and only a line released today is news.
-    const joining = mine.some(({ line, section }) => line.released_on === today && section.kind === 'table' && section.columns?.some((c) => c.hide) && section.columns?.some((c) => !c.hide));
-    return { lines: mine.map(({ line }) => line.cells[0]), joining };
+    const mine = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_id === body.lesson_id && lineText(x, l)).map((l) => ({ line: l, section: x }))));
+    // Only a line that makes a card joins practice, and only a line released today is news.
+    const joining = mine.some(({ line, section }) => line.released_on === today && buildCards([{ ...section, lines: [line] }]).length > 0);
+    return { lines: mine.map(({ line, section }) => lineText(section, line)), joining };
   }
 
   const need = student ? null : roster.students.length ? 'initials' : 'no_list';

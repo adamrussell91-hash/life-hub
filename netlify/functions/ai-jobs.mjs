@@ -164,8 +164,8 @@ async function answerMarkJob(request, env, store, deps, value) {
 }
 
 /**
- * Ann, suggest lines (`organiser_suggest`): one lesson's text read for organiser lines. `dry_run: true`
- * answers with the A$ estimate and starts nothing. The job only proposes; the teacher adds what they tick.
+ * Ann, suggest ticks (`organiser_suggest`): one lesson's text read against the unclaimed organiser lines. `dry_run: true`
+ * answers with the A$ estimate and starts nothing. The job only proposes; the teacher ticks.
  */
 async function organiserSuggestJob(request, env, store, deps, value) {
   const lesson_id = typeof value.lesson_id === 'string' ? value.lesson_id : '';
@@ -191,7 +191,7 @@ async function organiserSuggestJob(request, env, store, deps, value) {
     }), request, env);
   }
   const id = newId('ai_job');
-  const job = { id, kind: ORGANISER_SUGGEST_JOB_KIND, lesson_id, status: 'working', message: 'Ann, suggest lines', estimate, phase: 'queued', created_at: new Date().toISOString() };
+  const job = { id, kind: ORGANISER_SUGGEST_JOB_KIND, lesson_id, status: 'working', message: 'Ann, suggest ticks', estimate, phase: 'queued', created_at: new Date().toISOString() };
   await setJSON(store, aiJobKey(id), job);
   await writeJobInbox(store, job);
   const kicked = await (deps.kickLessonJobRun ?? kickLessonJobRun)(request, id);

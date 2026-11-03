@@ -18,6 +18,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 function printSection(section: SheetSection, blank: boolean): HTMLElement {
   const wrap = el('div', 'ko-print__section');
   wrap.append(el('h4', 'ko-print__name', section.name));
+  if (section.sentence) wrap.append(el('p', 'ko-print__tag', section.sentence));
   if (section.kind === 'table') {
     const columns = section.columns ?? [];
     const table = el('table', 'ko-print__table');

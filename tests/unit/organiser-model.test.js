@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, buildCards, releasedSheet, studentSheet, sydneyDay, todaysCards
+  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
 } from '../../netlify/functions/_shared/organiser-model.mjs';
 
 const T = '2026-11-10';
@@ -142,6 +142,8 @@ test('release: published, future date, no date, no lesson, unpublished, deleted'
       { cells: [texts.gone], lesson_id: 'gone' }
     ]
   });
+  // Written before lessons ticked, so students already have it.
+  o.sections[0].lines[3].open = true;
   const releases = {
     pub: { state: 'released', day: '2026-11-01' },
     future: { state: 'waiting' },
@@ -169,6 +171,7 @@ test('a section with nothing released is left out, and so is the week banner for
 test('the week banner shows until its day', () => {
   let o = applyChange(organiser(), { op: 'add_section', name: 'Facts', kind: 'list' });
   o = applyChange(o, { op: 'add_lines', section_id: o.sections[0].id, lines: [{ cells: ['x'] }] });
+  o.sections[0].lines[0].open = true;
   o = applyChange(o, { op: 'set_week', week: { section_id: o.sections[0].id, due: T, reason: 'Review quiz' } });
   assert.equal(releasedSheet(o, {}, T).week.reason, 'Review quiz');
   assert.equal(releasedSheet(o, {}, addDays(T, 1)).week, undefined);
@@ -247,4 +250,90 @@ test('limits', () => {
   const lines = Array.from({ length: ORGANISER_LIMITS.lines }, (_, i) => ({ cells: [`fact ${i}`] }));
   const filled = applyChange(full, { op: 'add_lines', section_id: full.sections[0].id, lines });
   fails(() => applyChange(filled, { op: 'add_lines', section_id: full.sections[0].id, lines: [{ cells: ['more'] }] }), 'too_many_lines');
+});
+
+test('each section role starts with its own columns, so its lines make the right cards', () => {
+  let o = applyChange(null, { op: 'add_section', role: 'concept', name: 'Perspective', concept_key: 'PERS', sentence: ' A sentence  for the unit. ' });
+  o = applyChange(o, { op: 'add_section', role: 'vocab', name: 'Vocabulary' });
+  o = applyChange(o, { op: 'add_section', role: 'facts', name: 'Facts and topics' });
+  o = applyChange(o, { op: 'add_section', role: 'story', name: 'Story order' });
+  const [concept, vocab, facts, story] = o.sections;
+  assert.equal(concept.sentence, 'A sentence for the unit.');
+  assert.deepEqual(concept.columns.map((c) => [c.label, c.hide]), [['Prompt', false], ['What to know', true], ['Example', false]]);
+  assert.deepEqual(vocab.columns.map((c) => [c.label, c.hide]), [['Word', false], ['Meaning', true], ['In a sentence', false]]);
+  assert.deepEqual(facts.columns.map((c) => [c.label, c.hide]), [['Label', false], ['Detail', true]]);
+  assert.equal(story.kind, 'sequence');
+  assert.throws(() => applyChange(o, { op: 'add_section', role: 'concept', name: 'Again', concept_key: 'PERS' }), (e) => e.status === 409);
+  assert.throws(() => applyChange(o, { op: 'add_section', role: 'nope', name: 'x' }), OrganiserError);
+
+  o = applyChange(o, { op: 'add_lines', section_id: concept.id, lines: [{ cells: ['What does a frame do?', 'It shapes belief.', ''] }, { cells: ['', 'No prompt yet.', ''] }] });
+  o = applyChange(o, { op: 'add_lines', section_id: vocab.id, lines: [{ cells: ['Hubris', 'Overreaching pride', ''], tier: 3 }] });
+  o = applyChange(o, { op: 'add_lines', section_id: facts.id, lines: [{ cells: ['Author', 'An invented writer'] }] });
+  const out = releasedSheet({ ...o, sections: o.sections.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, open: true })) })) }, {}, T);
+  const cards = buildCards(out.sections);
+  assert.deepEqual(cards.map((c) => [c.section, c.cue, c.answer]), [
+    ['Perspective', 'What does a frame do?', 'It shapes belief.'],
+    ['Vocabulary', 'Hubris', 'Overreaching pride'],
+    ['Facts and topics', 'Author', 'An invented writer']
+  ]);
+  const sent = studentSheet(out);
+  assert.equal(sent.sections[0].sentence, 'A sentence for the unit.');
+  assert.equal(sent.sections[0].role, 'concept');
+  assert.equal(sent.sections[1].lines[0].tier, 3);
+  assert.equal('concept_key' in sent.sections[0], false);
+  assert.equal('dot_points' in sent.sections[0], false);
+});
+
+test('a tick clears open, tier and dot points are checked, and a section ticked off stays home', () => {
+  let o = applyChange(null, { op: 'add_section', role: 'key_lines', name: 'Key lines' });
+  const id = o.sections[0].id;
+  o = applyChange(o, { op: 'add_lines', section_id: id, lines: [{ cells: ['A line', 'Someone', ''] }] });
+  const line = o.sections[0].lines[0];
+  assert.equal(line.open, undefined);
+  assert.equal(releasedSheet(o, {}, T).sections.length, 0);
+
+  o.sections[0].lines[0].open = true;
+  assert.equal(releasedSheet(o, {}, T).sections.length, 1);
+  o = applyChange(o, { op: 'update_section', section_id: id, off: true });
+  assert.equal(releasedSheet(o, {}, T).sections.length, 0);
+  o = applyChange(o, { op: 'update_section', section_id: id, off: false });
+  assert.equal(o.sections[0].off, undefined);
+
+  o = applyChange(o, { op: 'update_line', line_id: line.id, lesson_id: 'lesson_a' });
+  assert.equal(o.sections[0].lines[0].open, undefined);
+  assert.equal(releasedSheet(o, { lesson_a: { state: 'waiting' } }, T).sections.length, 0);
+
+  o = applyChange(o, { op: 'update_line', line_id: line.id, tier: 2 });
+  assert.equal(o.sections[0].lines[0].tier, 2);
+  o = applyChange(o, { op: 'update_line', line_id: line.id, tier: null });
+  assert.equal(o.sections[0].lines[0].tier, undefined);
+  assert.throws(() => applyChange(o, { op: 'update_line', line_id: line.id, tier: 4 }), OrganiserError);
+  assert.deepEqual(applyChange(o, { op: 'update_section', section_id: id, dot_points: [2, 2, 5] }).sections[0].dot_points, [2, 5]);
+  assert.throws(() => applyChange(o, { op: 'update_section', section_id: id, dot_points: ['x'] }), OrganiserError);
+});
+
+test('upgrade: usual names get roles, no-lesson lines stay open, and it only runs once', () => {
+  const up = upgradeOrganiser({
+    sections: [
+      { id: 'a', name: 'Key ideas', kind: 'table', columns: [], lines: [{ id: 'l1', cells: [] }, { id: 'l2', cells: [], lesson_id: 'x' }] },
+      { id: 'b', name: 'Vocabulary', kind: 'table', columns: [], lines: [] },
+      { id: 'c', name: 'Key lines', kind: 'list', lines: [] },
+      { id: 'd', name: 'Timeline', kind: 'sequence', lines: [] }
+    ]
+  });
+  assert.equal(up.v, 2);
+  assert.deepEqual(up.sections.map((s) => s.role), ['ideas', 'vocab', undefined, undefined]);
+  assert.equal(up.sections[0].lines[0].open, true);
+  assert.equal(up.sections[0].lines[1].open, undefined);
+  const added = { ...up, sections: [{ ...up.sections[0], lines: [{ id: 'l3', cells: [] }] }] };
+  assert.equal(upgradeOrganiser(added).sections[0].lines[0].open, undefined);
+  assert.deepEqual(upgradeOrganiser(null), { sections: [], v: 2 });
+});
+
+test('lineText: a key idea says what to know, others say both sides', () => {
+  const columns = [{ label: 'Word', hide: false }, { label: 'Meaning', hide: true }];
+  assert.equal(lineText({ kind: 'table', role: 'concept', columns }, { cells: ['Prompt', 'What to know'] }), 'What to know');
+  assert.equal(lineText({ kind: 'table', role: 'concept', columns }, { cells: ['Prompt', ''] }), 'Prompt');
+  assert.equal(lineText({ kind: 'table', role: 'vocab', columns }, { cells: ['Hubris', 'Pride'] }), 'Hubris: Pride');
+  assert.equal(lineText({ kind: 'sequence' }, { cells: ['A step'] }), 'A step');
 });

@@ -1,5 +1,7 @@
 # Knowledge Organiser in Teaching
 
+> **Revised 4 November 2026.** The sheet is now written on the unit page before teaching, and each lesson ticks lines from it. This replaces setting a line's lesson on the unit page. Sections have roles: concepts (a sentence for the unit, dot points, key ideas), facts and topics, vocabulary by tier, and optional key lines and story order. A line with no lesson waits, unless it predates this change (`open`). Set for this week and Run with the class moved to the lesson card. Ann suggests ticks and writes no lines. Release timing and practice gaps are unchanged. Where the sections below differ, this note wins.
+
 Design approved in conversation, 3 November 2026. Mockup: [`docs/mockups/knowledge-organiser.html`](../../mockups/knowledge-organiser.html). Examples here and in the mockup are invented. Real unit content stays in Teaching's storage and the private data repo.
 
 The technique is WalkThrus Book 1, Using a knowledge organiser, p.116. Its wording stays in the private book pack.

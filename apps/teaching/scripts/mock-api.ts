@@ -4454,19 +4454,17 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (!body || typeof body !== 'object') {
         return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
       }
-      // Ann's organiser lines: no model here, just invented proposals to walk the card with.
+      // Ann's organiser ticks: no model here, she just picks the first two unclaimed lines.
       if ((body as { kind?: string }).kind === 'organiser_suggest') {
         const estimate = { kind: 'organiser_suggest', cost_usd: 0.012, cost_aud: 0.02 };
         if ((body as { dry_run?: boolean }).dry_run) return okResponse(200, { estimate });
         const id = `ai_job_mock_${Date.now()}`;
         const lessonId = String((body as { lesson_id?: string }).lesson_id);
-        const organiser = (store.getJSON(`unit_organisers/${store.getJSON<Lesson>(draftLessonKey(lessonId))?.unit_id}`) ?? { sections: [] }) as { sections: Array<{ id: string }> };
+        const organiser = (store.getJSON(`unit_organisers/${store.getJSON<Lesson>(draftLessonKey(lessonId))?.unit_id}`) ?? { sections: [] }) as { sections: Array<{ lines: Array<{ id: string; lesson_id?: string }> }> };
+        const free = organiser.sections.flatMap((section) => section.lines).filter((line) => !line.lesson_id).slice(0, 2);
         store.setJSON(aiJobKey(id), {
           id, kind: 'organiser_suggest', lesson_id: lessonId, status: 'done', cost_aud: 0.02,
-          proposals: [
-            { section_id: organiser.sections[0]?.id, cells: ['What does the lantern mean to the town?', 'A promise nobody will name', 'The relit tower'], tag: 'Knowledge piece' },
-            { new_section: { name: 'Places', kind: 'table', columns: [{ label: 'Place', hide: false }, { label: 'Why it matters', hide: true }] }, cells: ['The chapel', 'Where the silence began'], tag: 'Vocabulary' }
-          ]
+          proposals: free.map((line) => ({ line_id: line.id }))
         });
         return okResponse(202, { id, status: 'working', estimate });
       }

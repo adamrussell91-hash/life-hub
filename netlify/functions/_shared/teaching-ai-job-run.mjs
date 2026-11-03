@@ -466,7 +466,7 @@ export async function runStoredAnswerMarkingJob({
   return finish(patch);
 }
 
-/** Ann, suggest lines: reads one lesson and records proposals on the job. It writes nothing to the organiser. */
+/** Ann, suggest ticks: reads one lesson and records her picks on the job. It writes nothing to the organiser. */
 export async function runStoredOrganiserSuggestJob({
   store,
   jobId,
@@ -506,7 +506,7 @@ export async function runStoredOrganiserSuggestJob({
     ? { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd }
     : {
         status: 'done',
-        response: result.proposals.length ? `${result.proposals.length} line${result.proposals.length === 1 ? '' : 's'} to look at` : 'No new lines to suggest',
+        response: result.proposals.length ? `${result.proposals.length} line${result.proposals.length === 1 ? '' : 's'} to look at` : 'No lines to suggest',
         proposals: result.proposals,
         dropped: result.dropped.length,
         usage: result.usage,

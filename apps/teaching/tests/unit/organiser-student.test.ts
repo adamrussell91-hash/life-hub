@@ -35,17 +35,24 @@ const byText = (root: ParentNode, sel: string, text: string): HTMLElement =>
 beforeEach(() => localStorage.clear());
 
 describe('organiser panel', () => {
-  it('shows folded sections with counts and new labels', () => {
-    const p = renderOrganiserPanel(loadOf(), { classId: 'c1' });
-    const heads = [...p.querySelectorAll('.kos-fold__head')];
-    expect(heads).toHaveLength(2);
-    expect(heads[0]!.textContent).toContain('2 new');
-    expect(heads[0]!.querySelector('.kos-fold__meta')!.textContent).toBe('3');
-    expect(heads[1]!.textContent).not.toContain('new');
+  it('shows the sheet as it has grown, with new marks and Test myself under a card', () => {
+    const concept: SheetSection = { ...table, id: 's3', name: 'Perspective', role: 'concept', sentence: 'A sentence for the unit.' };
+    const words: SheetSection = { id: 's4', name: 'Vocabulary', kind: 'table', role: 'vocab', columns: table.columns, lines: [
+      { id: 'w1', cells: ['Hubris', 'Pride'], fresh: false, tier: 3 },
+      { id: 'w2', cells: ['Ambition', 'A drive'], fresh: true, tier: 2 }
+    ] };
+    const p = renderOrganiserPanel(loadOf({ sheets: [sheet({ sections: [concept, words, list] })] }), { classId: 'c1' });
+    expect(p.querySelector('.kos-capsule')!.textContent).toBe('Perspective');
+    expect(p.querySelector('.kos-concept__line')!.textContent).toBe('A sentence for the unit.');
+    expect(p.querySelector('.kos-stop')!.textContent).toContain('Answer');
+    expect(p.querySelectorAll('.kos-stop .kos-new')).toHaveLength(2);
+    expect([...p.querySelectorAll('.kos-tier')].map((n) => n.textContent)).toEqual(['Tier 2', 'Tier 3']);
+    expect(p.querySelector('.kos-pair')!.textContent).toContain('Ambition');
     expect(p.querySelector('.kos-sec')).toBeNull();
-    (heads[0] as HTMLElement).click();
+    (p.querySelector('.kos-quiet') as HTMLElement).click();
     expect(p.querySelector('.kos-sec')).toBeTruthy();
-    expect(p.textContent).toContain('Test myself');
+    (p.querySelector('.kos-quiet') as HTMLElement).click();
+    expect(p.querySelector('.kos-sec')).toBeNull();
   });
   it('shows the practice block with a count and the banner wording', () => {
     const p = renderOrganiserPanel(loadOf({ sheets: [sheet({ week: { section_id: 's1', section_name: 'Key ideas', due: '2026-11-13', reason: 'the Week 3 Review' } })] }), { classId: 'c1' });

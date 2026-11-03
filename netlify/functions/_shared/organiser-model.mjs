@@ -3,13 +3,28 @@
  * class gets, the practice cards and the Leitner boxes. No storage and no clock in here; the
  * caller passes `today` (a Sydney day, YYYY-MM-DD) and the release map.
  *
- *   organiser   { sections: [{ id, name, kind, columns?, lines: [{ id, cells, lesson_id?, piece_id? }] }], week?, updated_at }
+ *   organiser   { v: 2, sections: [{ id, name, kind, role?, concept_key?, sentence?, dot_points?, off?, columns?,
+ *                 lines: [{ id, cells, lesson_id?, piece_id?, tier?, open? }] }], week?, updated_at }
+ *
+ * The sheet is written on the unit page before teaching. A lesson ticks lines by setting lesson_id; an
+ * unticked line waits. `open` marks a line from before lessons ticked (v1, no lesson): students already have it.
  *   boxes       { [line_id]: { box: 1..5, due: day, last: day } }
  */
 import { randomBytes } from 'node:crypto';
 
-export const ORGANISER_LIMITS = { sections: 8, lines: 200, cell: 400, reason: 80, columns: 4, name: 60 };
+export const ORGANISER_LIMITS = { sections: 24, lines: 200, cell: 400, reason: 80, columns: 4, name: 60 };
 export const KINDS = ['table', 'list', 'sequence'];
+export const ROLES = ['concept', 'ideas', 'facts', 'vocab', 'key_lines', 'story'];
+const CONCEPT_KEY = /^[A-Z]{2,5}$/;
+const IDEA_COLUMNS = [['Prompt', false], ['What to know', true], ['Example', false]];
+const ROLE_COLUMNS = {
+  concept: IDEA_COLUMNS,
+  ideas: IDEA_COLUMNS,
+  facts: [['Label', false], ['Detail', true]],
+  vocab: [['Word', false], ['Meaning', true], ['In a sentence', false]],
+  key_lines: [['Line', false], ['Who', true], ['Why it matters', false]]
+};
+const ROLE_OF_NAME = { 'key ideas': 'ideas', vocabulary: 'vocab', 'key lines': 'key_lines', 'story order': 'story', 'facts and topics': 'facts' };
 /** Days a card waits in box 1 to 5. */
 export const GAPS = [1, 3, 7, 14, 28];
 export const DAILY_CARDS = 20;
@@ -50,6 +65,23 @@ const gapOf = (box) => GAPS[Math.min(Math.max(box, 1), GAPS.length) - 1];
 // ---- Teacher changes -------------------------------------------------------------------------
 
 const clone = (value) => structuredClone(value);
+
+/**
+ * The v2 shape of a stored sheet: sections with a usual name get their role, and a line with no
+ * lesson stays with students (`open`). Saved on the next change; safe to run on any sheet.
+ */
+export function upgradeOrganiser(organiser) {
+  if (organiser?.v === 2) return organiser;
+  const next = clone(organiser ?? { sections: [] });
+  next.v = 2;
+  next.sections = Array.isArray(next.sections) ? next.sections : [];
+  for (const section of next.sections) {
+    const role = ROLE_OF_NAME[String(section.name ?? '').trim().toLowerCase()];
+    if (role && (role === 'story' ? section.kind !== 'table' : section.kind === 'table')) section.role = role;
+    for (const line of section.lines ?? []) if (!line.lesson_id) line.open = true;
+  }
+  return next;
+}
 const text = (value) => (typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '');
 
 function cleanName(value, what = 'section') {
@@ -128,6 +160,12 @@ const slot = (value, length) => {
 function updateSection(organiser, change) {
   const section = findSection(organiser, change.section_id);
   if (change.name !== undefined) section.name = cleanName(change.name);
+  if (change.sentence !== undefined) section.sentence = cleanSentence(change.sentence);
+  if (change.dot_points !== undefined) section.dot_points = cleanDotPoints(change.dot_points);
+  if (change.off !== undefined) {
+    if (change.off === true) section.off = true;
+    else delete section.off;
+  }
   const kind = change.kind === undefined ? section.kind : change.kind;
   if (!KINDS.includes(kind)) reject(400, 'bad_kind', 'A section is a table, a list or a sequence.');
 
@@ -155,8 +193,29 @@ function updateSection(organiser, change) {
   section.kind = kind;
 }
 
+const tierOf = (value) => {
+  if (![1, 2, 3].includes(value)) reject(400, 'bad_request', 'A word is Tier 1, 2 or 3.');
+  return value;
+};
+
+function cleanSentence(value) {
+  const sentence = text(value).replace(/\s+/g, ' ');
+  if (sentence.length > ORGANISER_LIMITS.cell) reject(400, 'too_long', `A sentence can be up to ${ORGANISER_LIMITS.cell} characters.`);
+  return sentence;
+}
+
+function cleanDotPoints(value) {
+  if (!Array.isArray(value) || value.length > 40 || value.some((n) => !Number.isInteger(n) || n < 1 || n > 99)) reject(400, 'bad_request', 'Those dot points aren’t valid.');
+  return [...new Set(value)];
+}
+
+function roleColumns(role) {
+  return ROLE_COLUMNS[role].map(([label, hide]) => ({ id: newId('column'), label, hide }));
+}
+
 function newLine(section, raw) {
   const line = { id: newId('line'), cells: cellsFor(section, raw?.cells) };
+  if (raw?.tier !== undefined) line.tier = tierOf(raw.tier);
   if (raw?.lesson_id) line.lesson_id = ref(raw.lesson_id, 'lesson');
   if (raw?.piece_id) line.piece_id = ref(raw.piece_id, 'piece');
   return line;
@@ -167,16 +226,23 @@ function newLine(section, raw) {
  * the sheet can't hold. Line, section and column ids are made here and never change after.
  */
 export function applyChange(organiser, change) {
-  const next = clone(organiser ?? { sections: [] });
-  if (!Array.isArray(next.sections)) next.sections = [];
+  const next = clone(upgradeOrganiser(organiser));
   if (!change || typeof change !== 'object' || Array.isArray(change)) reject(400, 'bad_request', 'Invalid request.');
   switch (change.op) {
     case 'add_section': {
       if (next.sections.length >= ORGANISER_LIMITS.sections) reject(400, 'too_many_sections', `A unit can have ${ORGANISER_LIMITS.sections} sections.`);
-      const kind = change.kind === undefined ? 'table' : change.kind;
+      if (change.role !== undefined && !ROLES.includes(change.role)) reject(400, 'bad_request', 'Unknown section.');
+      const kind = change.kind === undefined ? (change.role === 'story' ? 'sequence' : 'table') : change.kind;
       if (!KINDS.includes(kind)) reject(400, 'bad_kind', 'A section is a table, a list or a sequence.');
       const section = { id: newId('section'), name: cleanName(change.name), kind, lines: [] };
-      if (kind === 'table') section.columns = change.columns === undefined ? defaultColumns() : cleanColumns(change.columns);
+      if (change.role) section.role = change.role;
+      if (change.concept_key !== undefined) {
+        if (typeof change.concept_key !== 'string' || !CONCEPT_KEY.test(change.concept_key)) reject(400, 'bad_request', 'Unknown concept.');
+        if (next.sections.some((s) => s.concept_key === change.concept_key)) reject(409, 'exists', 'That concept is already on the sheet.');
+        section.concept_key = change.concept_key;
+      }
+      if (change.sentence !== undefined) section.sentence = cleanSentence(change.sentence);
+      if (kind === 'table') section.columns = change.columns !== undefined ? cleanColumns(change.columns) : ROLE_COLUMNS[change.role] ? roleColumns(change.role) : defaultColumns();
       next.sections.push(section);
       break;
     }
@@ -208,6 +274,12 @@ export function applyChange(organiser, change) {
     case 'update_line': {
       const { section, line } = findLine(next, change.line_id);
       if (change.cells !== undefined) line.cells = cellsFor(section, change.cells);
+      if (change.tier !== undefined) {
+        if (change.tier === null) delete line.tier;
+        else line.tier = tierOf(change.tier);
+      }
+      // Ticking or unticking in a lesson decides this line from now on.
+      if (change.lesson_id !== undefined) delete line.open;
       for (const [field, what] of [['lesson_id', 'lesson'], ['piece_id', 'piece']]) {
         if (change[field] === undefined) continue;
         if (change[field] === null || change[field] === '') delete line[field];
@@ -249,15 +321,28 @@ export function applyChange(organiser, change) {
 
 // ---- Release ---------------------------------------------------------------------------------
 
+/** What a line says, in one string: for the end-of-lesson card and the lesson picker's wording. */
+export function lineText(section, line) {
+  const cells = line.cells ?? [];
+  if (section.kind !== 'table') return cells[0]?.trim() ?? '';
+  const columns = section.columns ?? [];
+  const cue = cells[columns.findIndex((c) => !c.hide)]?.trim() ?? '';
+  const answer = cells[columns.findIndex((c) => c.hide)]?.trim() ?? '';
+  if (section.role === 'concept' || section.role === 'ideas') return answer || cue;
+  return cue && answer ? `${cue}: ${answer}` : cue || answer || cells.find((c) => c?.trim())?.trim() || '';
+}
+
 /**
  * What a class may see. `releases` maps lesson id to { state: 'released', day } | { state: 'waiting' }
- * | { state: 'gone' } (see lessonReleases). A line with no lesson is always released. Sections with
- * no released line are left out, so waiting text and its section names never leave the server.
+ * | { state: 'gone' } (see lessonReleases). A line goes out when a lesson that ticked it is released,
+ * or when it is `open`. Sections with no released line are left out, so waiting text and its section
+ * names never leave the server. A section the teacher ticked off stays home too.
  * Lines carry lesson_id, piece_id and released_on for the server's own use: studentSheet strips them.
  */
 export function releasedSheet(organiser, releases, today) {
   const sections = [];
-  for (const section of organiser?.sections ?? []) {
+  for (const section of upgradeOrganiser(organiser).sections) {
+    if (section.off) continue;
     const lines = [];
     for (const line of section.lines ?? []) {
       let day = null;
@@ -265,6 +350,8 @@ export function releasedSheet(organiser, releases, today) {
         const release = releases?.[line.lesson_id];
         if (release?.state !== 'released') continue;
         day = release.day ?? null;
+      } else if (!line.open) {
+        continue;
       }
       lines.push({
         id: line.id,
@@ -272,11 +359,20 @@ export function releasedSheet(organiser, releases, today) {
         fresh: day !== null && addDays(day, FRESH_DAYS) > today,
         ...(line.lesson_id ? { lesson_id: line.lesson_id } : {}),
         ...(line.piece_id ? { piece_id: line.piece_id } : {}),
+        ...(line.tier ? { tier: line.tier } : {}),
         ...(day ? { released_on: day } : {})
       });
     }
     if (!lines.length) continue;
-    sections.push({ id: section.id, name: section.name, kind: section.kind, ...(section.kind === 'table' ? { columns: section.columns } : {}), lines });
+    sections.push({
+      id: section.id,
+      name: section.name,
+      kind: section.kind,
+      ...(section.role ? { role: section.role } : {}),
+      ...(section.sentence ? { sentence: section.sentence } : {}),
+      ...(section.kind === 'table' ? { columns: section.columns } : {}),
+      lines
+    });
   }
   const w = organiser?.week;
   const target = w && sections.find((s) => s.id === w.section_id);
@@ -289,7 +385,7 @@ export function studentSheet(sheet) {
   return {
     sections: sheet.sections.map((s) => ({
       ...s,
-      lines: s.lines.map(({ id, cells, fresh }) => ({ id, cells, fresh }))
+      lines: s.lines.map(({ id, cells, fresh, tier }) => ({ id, cells, fresh, ...(tier ? { tier } : {}) }))
     })),
     ...(sheet.week ? { week: sheet.week } : {})
   };

@@ -3,7 +3,8 @@ import { el } from '@/quiz/dom';
 import { printOrganiser } from './print';
 import { mountPractice, nextCardsLine, type PracticeApi } from './practice';
 import { mountTestMyself, type TestMyselfHandle } from './test-myself';
-import type { OrganiserLoad, Sheet, SheetSection } from './types';
+import { conceptColourAt, isIdeas, lineWords } from './editor-model';
+import type { OrganiserLoad, Sheet, SheetLine, SheetSection } from './types';
 import './organiser-student.css';
 
 export type OrganiserPanelOptions = {
@@ -34,24 +35,19 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
     live.clear();
   };
 
-  function foldFor(sec: SheetSection): HTMLElement {
-    const fold = el('div', 'kos-fold');
-    const head = el('button', 'kos-fold__head');
-    head.type = 'button';
-    const fresh = sec.lines.filter((l) => l.fresh).length;
-    const name = el('span');
-    name.append(el('b', undefined, sec.name));
-    if (fresh) name.append(el('span', 'kos-new', `${fresh} new`));
-    head.append(name, el('span', 'kos-fold__meta', String(sec.lines.length)));
+  /** Test myself under a card, opened from its button. */
+  function testToggle(sec: SheetSection, host: HTMLElement): HTMLElement {
+    const go = el('button', 'kos-quiet', 'Test myself');
+    go.type = 'button';
     let body: HTMLElement | null = null;
     const sync = (): void => {
       const on = open.has(sec.id);
-      head.setAttribute('aria-expanded', String(on));
+      go.setAttribute('aria-expanded', String(on));
       if (on && !body) {
         body = el('section', 'kos-sec');
         body.dataset.sec = sec.id;
         live.set(sec.id, mountTestMyself(body, sec));
-        fold.append(body);
+        host.append(body);
       } else if (!on && body) {
         live.get(sec.id)?.dispose();
         live.delete(sec.id);
@@ -59,14 +55,60 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
         body = null;
       }
     };
-    head.addEventListener('click', () => {
+    go.addEventListener('click', () => {
       if (open.has(sec.id)) open.delete(sec.id);
       else open.add(sec.id);
       sync();
     });
-    fold.append(head);
     sync();
-    return fold;
+    return go;
+  }
+
+  const newMark = (line: SheetLine): HTMLElement[] => (line.fresh ? [el('span', 'kos-new', 'New')] : []);
+
+  function conceptCard(sec: SheetSection, at: number): HTMLElement {
+    const card = el('article', 'kos-concept');
+    card.style.setProperty('--c', conceptColourAt(at));
+    card.dataset.sec = sec.id;
+    card.append(el('span', 'kos-capsule', sec.name));
+    if (sec.sentence) card.append(el('p', 'kos-concept__line', sec.sentence));
+    const stops = el('div', 'kos-stops');
+    for (const line of sec.lines) {
+      const stop = el('div', `kos-stop${line.fresh ? ' is-new' : ''}`, lineWords(sec, line).body);
+      stop.append(...newMark(line));
+      stops.append(stop);
+    }
+    const foot = el('div', 'kos-foot');
+    foot.append(testToggle(sec, card));
+    card.append(stops, foot);
+    return card;
+  }
+
+  function sidePanel(sec: SheetSection): HTMLElement {
+    const box = el('section', 'kos-panel');
+    box.dataset.sec = sec.id;
+    box.append(el('h3', 'kos-panel__name', sec.name));
+    const row = (line: SheetLine): HTMLElement => {
+      const { head, body } = lineWords(sec, line);
+      const pair = el('div', 'kos-pair');
+      if (head) pair.append(el('b', undefined, head));
+      pair.append(document.createTextNode(body), ...newMark(line));
+      return pair;
+    };
+    if (sec.role === 'vocab') {
+      for (const tier of [1, 2, 3, undefined] as const) {
+        const words = sec.lines.filter((l) => l.tier === tier);
+        if (!words.length) continue;
+        if (tier) box.append(el('p', 'kos-tier', `Tier ${tier}`));
+        for (const line of words) box.append(row(line));
+      }
+    } else {
+      for (const line of sec.lines) box.append(row(line));
+    }
+    const foot = el('div', 'kos-foot');
+    foot.append(testToggle(sec, box));
+    box.append(foot);
+    return box;
   }
 
   function showOverview(): void {
@@ -121,9 +163,16 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
       }
     }
 
-    const folds = el('div', 'kos-folds');
-    for (const sec of sheet.sections) folds.append(foldFor(sec));
-    parts.push(folds);
+    const grid = el('div', 'kos-sheet');
+    const left = el('div', 'kos-column');
+    const right = el('div', 'kos-column');
+    let at = 0;
+    for (const sec of sheet.sections) {
+      if (isIdeas(sec)) left.append(conceptCard(sec, at++));
+      else right.append(sidePanel(sec));
+    }
+    grid.append(left, right);
+    parts.push(grid);
 
     const print = el('button', 'kos-link', 'Print my organiser');
     print.type = 'button';

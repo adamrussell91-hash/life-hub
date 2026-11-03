@@ -18,16 +18,6 @@ export function parsePaste(text: string, columns: number): string[][] {
   return rows;
 }
 
-/** What to tell the teacher when a table cannot make practice cards, or null. */
-export function noCardWarning(section: Pick<OrganiserSection, 'kind' | 'columns'>): string | null {
-  if (section.kind !== 'table') return null;
-  const columns = section.columns ?? [];
-  const hidden = columns.filter((c) => c.hide).length;
-  if (hidden === 0) return 'Nothing is hidden here, so this table makes no practice cards. Choose a column to hide.';
-  if (hidden >= columns.length) return 'Every column is hidden, so this table makes no practice cards. Keep one column showing.';
-  return null;
-}
-
 /** Lesson ids of the n most recent release days on a sheet, newest first. Lines with no lesson never count. */
 export function recentLessonIds(sheet: Pick<Sheet, 'sections'>, n = 2): Set<string> {
   const released = new Map<string, { day: string; at: number }>();
@@ -65,11 +55,34 @@ export function firstHidden(columns: readonly OrganiserColumn[]): number {
   return columns.findIndex((c) => c.hide);
 }
 
-/** The columns with one flipped. At least one column always stays showing. */
-export function toggleHide(columns: readonly OrganiserColumn[], id: string): OrganiserColumn[] {
-  const next = columns.map((c) => (c.id === id ? { ...c, hide: !c.hide } : { ...c }));
-  return next.every((c) => c.hide) ? columns.map((c) => ({ ...c })) : next;
+/** Where a table's prompt, answer and other columns sit. One-cell sections answer in cell 0. */
+export function columnSlots(section: Pick<OrganiserSection, 'kind' | 'columns'>): { cue: number; answer: number; rest: number[] } {
+  if (section.kind !== 'table') return { cue: -1, answer: 0, rest: [] };
+  const columns = section.columns ?? [];
+  const cue = columns.findIndex((c) => !c.hide);
+  const answer = firstHidden(columns);
+  return { cue, answer, rest: columns.map((_c, i) => i).filter((i) => i !== cue && i !== answer) };
 }
+
+export const isIdeas = (section: Pick<OrganiserSection, 'role'>): boolean => section.role === 'concept' || section.role === 'ideas';
+
+/** A line's main words, as the picker and the sheet show them. */
+export function lineWords(section: Pick<OrganiserSection, 'kind' | 'columns' | 'role'>, line: Pick<OrganiserSection['lines'][number], 'cells'>): { head: string; body: string } {
+  const { cue, answer } = columnSlots(section);
+  const main = line.cells[answer]?.trim() ?? '';
+  if (isIdeas(section) || cue === -1) return { head: '', body: main || (line.cells[cue]?.trim() ?? '') };
+  return { head: line.cells[cue]?.trim() ?? '', body: main };
+}
+
+/** Whether a line can become a practice card, by the server's rule. */
+export function makesCard(section: OrganiserSection, line: Pick<OrganiserSection['lines'][number], 'cells'>): boolean {
+  const { cue, answer } = columnSlots(section);
+  return section.kind === 'table' && cue !== -1 && answer !== -1 && !!line.cells[cue]?.trim() && !!line.cells[answer]?.trim();
+}
+
+const CONCEPT_COLOURS = ['#376fb7', '#5d4e70', '#a85a0c', '#2f7a4f'];
+/** A fallback colour for the nth concept, where the unit map names none. */
+export const conceptColourAt = (n: number): string => CONCEPT_COLOURS[n % CONCEPT_COLOURS.length]!;
 
 /** One queue so changes reach the server in the order they were made. */
 export function createSerialQueue(): { add: <T>(job: () => Promise<T>) => Promise<T> } {
@@ -81,20 +94,4 @@ export function createSerialQueue(): { add: <T>(job: () => Promise<T>) => Promis
       return run;
     }
   };
-}
-
-/** The usual three sections for a new unit. The second column of each is covered. */
-export const USUAL_THREE: Array<{ name: string; columns: Array<{ label: string; hide: boolean }> }> = [
-  { name: 'Key ideas', columns: [{ label: 'Prompt', hide: false }, { label: 'What to know', hide: true }, { label: 'Example', hide: false }] },
-  { name: 'Vocabulary', columns: [{ label: 'Word', hide: false }, { label: 'Meaning', hide: true }, { label: 'In a sentence', hide: false }] },
-  { name: 'Key lines', columns: [{ label: 'Line', hide: false }, { label: 'Who', hide: true }, { label: 'Why it matters', hide: false }] }
-];
-
-/** Cells shaped for a section: one per column for a table, otherwise one joined cell. */
-export function fitCells(cells: readonly string[], section: Pick<OrganiserSection, 'kind' | 'columns'>): string[] {
-  if (section.kind !== 'table') return [cells.map((c) => c.trim()).filter(Boolean).join(' - ')];
-  const width = (section.columns ?? []).length;
-  const out = cells.slice(0, width).map((c) => c.trim());
-  while (out.length < width) out.push('');
-  return out;
 }

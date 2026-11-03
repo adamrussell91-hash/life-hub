@@ -1,6 +1,11 @@
 import './organiser.css';
-import { navigate } from '@/app/router';
+import { loadAlignment } from '@/alignment/api';
+import { focusAreaFor } from '@/alignment/coverage';
+import { conceptKeyOf, subjectUsesAlignment } from '@/alignment/model';
+import type { Alignment, AlignmentConcept } from '@/alignment/schema';
+import { lineColour } from '@/network/colour';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
+import { unitConceptKeysFor, unitLessonLines, unitMapContent, unitNetworkContext } from '@/teacher/network-context';
 import { lessonsByDate } from '@/teacher/unit-lesson-order';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Unit } from '@/schemas';
@@ -18,15 +23,16 @@ import {
   type BringItem,
   type BringSource
 } from './bring-in';
-import { createSerialQueue, lessonCodes, noCardWarning, parsePaste, toggleHide, USUAL_THREE } from './editor-model';
+import { columnSlots, conceptColourAt, createSerialQueue, parsePaste } from './editor-model';
 import { printOrganiser } from './print';
-import type { OrganiserChange, OrganiserKind, OrganiserSection, TeacherOrganiser } from './types';
+import type { OrganiserChange, OrganiserLine, OrganiserRole, OrganiserSection, TeacherOrganiser, VocabTier } from './types';
 
 /**
- * The whole sheet on the unit page: set for this week, sections and their lines, hide pills,
- * paste, bring in, reorder, print, run with the class, and the routine as help text.
- * Cell edits wait ~600ms, then go to the server one at a time. Every reply replaces the state,
- * but the page is not redrawn while a field has focus.
+ * The whole sheet on the unit page, written before teaching: concepts with their sentence and key
+ * ideas down the left; facts, words and any other sections down the right. Nothing here says when
+ * a line goes out: a lesson ticks that (lesson-card.ts).
+ * Edits wait ~600ms, then go to the server one at a time. Every reply replaces the state, but the
+ * page is not redrawn while a field has focus.
  */
 
 export interface OrganiserSectionOptions {
@@ -37,10 +43,13 @@ export interface OrganiserSectionOptions {
 }
 
 const SAVE_DELAY_MS = 600;
-const KINDS: Array<{ kind: OrganiserKind; label: string }> = [
-  { kind: 'table', label: 'Table' },
-  { kind: 'list', label: 'List' },
-  { kind: 'sequence', label: 'Sequence' }
+const TIER_WORDS: Record<VocabTier, string> = { 1: 'everyday', 2: 'across subjects', 3: 'this subject' };
+const CHEVRON = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5 3 8.500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SIDE_ROLES: Array<{ role: OrganiserRole; name: string; add: string; optional?: boolean }> = [
+  { role: 'facts', name: 'Facts and topics', add: 'Add fact' },
+  { role: 'vocab', name: 'Vocabulary', add: 'Add word' },
+  { role: 'key_lines', name: 'Key lines', add: 'Add line', optional: true },
+  { role: 'story', name: 'Story order', add: 'Add step', optional: true }
 ];
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -50,79 +59,60 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, te
   return node;
 }
 
-function button(label: string, className = 'btn btn--ghost ko-btn', onClick?: () => void): HTMLButtonElement {
-  const node = h('button', className, label);
+function quiet(label: string, onClick: () => void, extra = ''): HTMLButtonElement {
+  const node = h('button', `ko-quiet${extra ? ` ${extra}` : ''}`, label);
   node.type = 'button';
-  if (onClick) node.addEventListener('click', onClick);
+  node.addEventListener('click', onClick);
   return node;
 }
 
-function pill(label: string, pressed: boolean, onClick: () => void): HTMLButtonElement {
-  const node = button(label, 'ko-pill', onClick);
-  node.setAttribute('aria-pressed', String(pressed));
-  return node;
-}
-
-function mini(label: string, aria: string, onClick: () => void, disabled = false, extra = ''): HTMLButtonElement {
-  const node = button(label, `ko-mini${extra ? ` ${extra}` : ''}`, onClick);
-  node.setAttribute('aria-label', aria);
-  node.disabled = disabled;
-  return node;
-}
-
-const isField = (node: Element | null): boolean => !!node && node.matches('input, textarea, select');
+const isField = (node: Element | null): boolean => !!node && node.matches('input:not([type="checkbox"]), textarea');
 const sameCells = (a: readonly string[] | undefined, b: readonly string[]): boolean => !!a && a.length === b.length && a.every((c, i) => c === b[i]);
-/** A cell shows all its text: the box grows with what's typed, and the table row with it. */
+/** A field shows all its text: the box grows with what's typed. */
 const fitField = (field: HTMLTextAreaElement): void => {
   field.style.height = 'auto';
   if (field.scrollHeight) field.style.height = `${field.scrollHeight}px`;
 };
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const shorten = (text: string, n: number): string => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
-
-const ROUTINE: string[] = [
-  'In the first lesson, model it: read a section aloud, cover a column, say it from memory, then uncover and check.',
-  'Open most lessons with a three to five minute starter from the sheet, using Run with the class.',
-  'Let pairs test each other, one covering and one checking, then swap.',
-  'Name the sections students practise for the next review so homework has a clear job.',
-  'Check it with review quizzes, and look for the same knowledge in their writing and vivas.'
-];
+/** One concept card: a section on the sheet, or a concept the unit map names that has no section yet. */
+type ConceptRow = { id: string; name: string; key?: string; section?: OrganiserSection; colour: string; bullets: AlignmentConcept['bullets'] };
 
 export function mountOrganiserSection(host: HTMLElement, options: OrganiserSectionOptions): { dispose(): void } {
-  const { unit, classes } = options;
+  const { unit, classes, curriculum } = options;
   const root = h('div', 'ko-root');
   host.append(root);
 
-  const ordered = lessonsByDate(
-    options.lessons,
-    options.curriculum.scheduled_lessons.filter((row) => row.unit_id === unit.id)
-  );
-  const order = ordered.map((lesson) => lesson.id);
-  const codes = lessonCodes(order);
-  const titleOf = new Map(options.lessons.map((lesson) => [lesson.id, lesson.title]));
+  const order = lessonsByDate(options.lessons, curriculum.scheduled_lessons.filter((row) => row.unit_id === unit.id)).map((lesson) => lesson.id);
+  const networkLines = unitNetworkContext(curriculum, unit).lines;
+  const colourOfKey = new Map(networkLines.flatMap((l) => (l.alignment?.kind === 'concept' ? [[l.alignment.key, lineColour(l.colour)] as const] : [])));
+  const skillNames = unitMapContent(unit)?.skill_lines?.length ? unitLessonLines(unit, networkLines).filter((l) => l.mode === 'light_rail' && l.name).map((l) => l.name) : [];
 
   let data: TeacherOrganiser | null = null;
+  let alignment: Alignment | null = null;
+  let mapKeys: string[] = [];
   let loadFailed = false;
   let status = '';
   let statusBad = false;
   let disposed = false;
   let renderPending = false;
+  let printing = false;
+  /** Folds that are open, by concept, line or dot-point id. */
   const open = new Set<string>();
   let openedFirst = false;
-  const local = new Map<string, string[]>();
+  const localCells = new Map<string, string[]>();
+  const localSentences = new Map<string, string>();
   const timers = new Map<string, number>();
+  /** Draft rows being typed, by the panel or concept they belong to. */
   const drafts = new Map<string, string[]>();
-  let weekDraft: { section_id: string; due: string; reason: string } | null = null;
-  let weekDirty = false;
-  let which: 'run' | 'print' | null = null;
-  let panel: { kind: 'paste' | 'bring'; section_id: string; source?: BringSource } | null = null;
+  let panel: { kind: 'paste' | 'syllabus' | 'bring'; at: string; source?: BringSource } | null = null;
   let pasteText = '';
-  let bringCache: Promise<{ deep: BringItem[]; anthology: BringItem[]; plan: BringItem[] }> | null = null;
+  let bringCache: Promise<Record<BringSource, BringItem[]>> | null = null;
   let focusAfter: (() => void) | null = null;
   const queue = createSerialQueue();
 
-  const organiser = () => data?.organiser;
-  const sectionOf = (id: string): OrganiserSection | undefined => organiser()?.sections.find((s) => s.id === id);
+  const sections = (): OrganiserSection[] => data?.organiser.sections ?? [];
+  const sectionOf = (role: OrganiserRole): OrganiserSection | undefined => sections().find((s) => s.role === role);
 
   // ---- talking to the server ---------------------------------------------------------------
 
@@ -137,22 +127,31 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
 
   function softRender(): void {
     if (disposed) return;
-    if (host.contains(document.activeElement) && isField(document.activeElement)) {
+    const active = document.activeElement;
+    const typing = host.contains(active) && isField(active);
+    const draft = typing ? active?.closest<HTMLElement>('.ko-draft') : null;
+    if (typing && !draft) {
       renderPending = true;
       return;
     }
+    // A draft row keeps its words in `drafts`, so the new line can show while the teacher keeps typing.
+    const at = draft ? [...draft.querySelectorAll('textarea')].indexOf(active as HTMLTextAreaElement) : -1;
+    const keep = draft && !focusAfter ? draft.dataset.draft : undefined;
     render();
+    if (!keep) return;
+    const field = root.querySelectorAll<HTMLTextAreaElement>(`[data-draft="${keep}"] textarea`)[at];
+    field?.focus();
+    field?.setSelectionRange(field.value.length, field.value.length);
   }
 
   /** One change, in order. Resolves true when the server took it. */
-  function send(change: OrganiserChange, after?: (before: TeacherOrganiser | null, next: TeacherOrganiser) => void): Promise<boolean> {
+  function send(change: OrganiserChange, after?: (next: TeacherOrganiser) => void): Promise<boolean> {
     return queue
       .add(() => organiserApi.change(unit.id, change))
       .then((next) => {
-        const before = data;
         data = next;
         say('');
-        after?.(before, next);
+        after?.(next);
         softRender();
         return true;
       })
@@ -168,31 +167,60 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
   function flushLine(lineId: string): void {
     window.clearTimeout(timers.get(lineId));
     timers.delete(lineId);
-    const cells = local.get(lineId);
+    const cells = localCells.get(lineId);
     if (!cells) return;
     const sent = cells.slice();
     void send({ op: 'update_line', line_id: lineId, cells: sent }, () => {
-      if (sameCells(local.get(lineId), sent)) local.delete(lineId);
+      if (sameCells(localCells.get(lineId), sent)) localCells.delete(lineId);
     });
   }
 
   function editLine(lineId: string, cells: string[]): void {
-    local.set(lineId, cells);
+    localCells.set(lineId, cells);
     window.clearTimeout(timers.get(lineId));
     timers.set(lineId, window.setTimeout(() => flushLine(lineId), SAVE_DELAY_MS));
+  }
+
+  function flushSentence(sectionId: string): void {
+    const key = `s:${sectionId}`;
+    window.clearTimeout(timers.get(key));
+    timers.delete(key);
+    const sentence = localSentences.get(sectionId);
+    if (sentence === undefined) return;
+    void send({ op: 'update_section', section_id: sectionId, sentence }, () => {
+      if (localSentences.get(sectionId) === sentence) localSentences.delete(sectionId);
+    });
+  }
+
+  /** The section a concept card writes to, made on first use. */
+  async function ensureConcept(row: ConceptRow, sentence?: string): Promise<OrganiserSection | undefined> {
+    if (row.section) return row.section;
+    const ok = await send({ op: 'add_section', role: 'concept', name: row.name, ...(row.key ? { concept_key: row.key } : {}), ...(sentence ? { sentence } : {}) });
+    return ok ? sections().find((s) => s.concept_key === row.key) : undefined;
+  }
+
+  /** The section a side panel writes to, made on first use. */
+  async function ensureRole(role: OrganiserRole, name: string): Promise<OrganiserSection | undefined> {
+    const held = sectionOf(role);
+    if (held) return held;
+    const ok = await send({ op: 'add_section', role, name });
+    return ok ? sectionOf(role) : undefined;
   }
 
   function load(): void {
     loadFailed = false;
     render();
-    void organiserApi
-      .get(unit.id)
-      .then((next) => {
+    const usesAlignment = subjectUsesAlignment(curriculum.subjects.find((s) => s.id === unit.subject_id)?.title ?? '');
+    void Promise.all([organiserApi.get(unit.id), usesAlignment ? loadAlignment().catch(() => null) : Promise.resolve(null)])
+      .then(([next, doc]) => {
         if (disposed) return;
         data = next;
+        alignment = doc;
+        mapKeys = doc ? unitConceptKeysFor(curriculum, unit, doc) : [];
         if (!openedFirst) {
           openedFirst = true;
-          if (next.organiser.sections[0]) open.add(next.organiser.sections[0].id);
+          const first = conceptRows()[0];
+          if (first) open.add(first.id);
         }
         render();
       })
@@ -203,21 +231,525 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       });
   }
 
-  // ---- pieces of the page ------------------------------------------------------------------
+  // ---- what the page shows -----------------------------------------------------------------
 
-  function classThen(run: (classId: string) => void, which_: 'run' | 'print'): void {
-    if (classes.length === 1) return run(classes[0].id);
-    which = which === which_ ? null : which_;
+  function conceptRows(): ConceptRow[] {
+    const byKey = new Map((alignment?.concepts ?? []).map((c) => [c.key, c]));
+    const held = sections().filter((s) => s.role === 'concept');
+    const keys = [...mapKeys, ...held.flatMap((s) => (s.concept_key && !mapKeys.includes(s.concept_key) ? [s.concept_key] : []))];
+    const rows: ConceptRow[] = keys.flatMap((key) => {
+      const section = held.find((s) => s.concept_key === key);
+      const concept = byKey.get(key);
+      return concept || section ? [{ id: `concept:${key}`, key, name: section?.name ?? concept?.name ?? key, section, colour: '', bullets: concept?.bullets ?? [] }] : [];
+    });
+    for (const section of held) if (!section.concept_key) rows.push({ id: section.id, name: section.name, section, colour: '', bullets: [] });
+    return rows.map((row, i) => ({ ...row, colour: (row.key && colourOfKey.get(row.key)) || conceptColourAt(i) }));
+  }
+
+  /** Dot points kept: what the teacher ticked, else the ones this unit's focus area links to. */
+  function keptDots(row: ConceptRow): number[] {
+    if (row.section?.dot_points) return row.section.dot_points;
+    if (!alignment || !row.key) return [];
+    const area = focusAreaFor(alignment, unit.title, unitMapContent(unit)?.focus_area);
+    const points = alignment.focus_areas.find((f) => f.id === area?.id)?.points ?? [];
+    return row.bullets.map((b) => b.n).filter((n) => points.some((p) => p.concepts.some((c) => c.ref === `${row.key}${n}`)));
+  }
+
+  function syllabusItems(row: ConceptRow): BringItem[] {
+    if (!alignment || !row.key) return [];
+    const area = focusAreaFor(alignment, unit.title, unitMapContent(unit)?.focus_area);
+    const areas = area ? alignment.focus_areas.filter((f) => f.id === area.id) : alignment.focus_areas;
+    return areas.flatMap((f) => f.points.filter((p) => p.concepts.some((c) => conceptKeyOf(c.ref) === row.key)).map((p): BringItem => ({
+      key: `syllabus:${p.id}`,
+      source: 'plan',
+      group: f.name,
+      label: p.text,
+      know: p.text
+    })));
+  }
+
+  // ---- small pieces ------------------------------------------------------------------------
+
+  function chevron(id: string, label: string): HTMLButtonElement {
+    const node = h('button', 'ko-chev');
+    node.type = 'button';
+    node.innerHTML = CHEVRON;
+    node.setAttribute('aria-label', label);
+    node.setAttribute('aria-expanded', String(open.has(id)));
+    node.setAttribute('aria-controls', foldId(id));
+    node.addEventListener('click', () => toggle(id, node));
+    return node;
+  }
+
+  const foldId = (id: string): string => `ko-fold-${id.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
+  function toggle(id: string, control: HTMLElement): void {
+    const on = !open.has(id);
+    if (on) open.add(id);
+    else open.delete(id);
+    control.setAttribute('aria-expanded', String(on));
+    root.querySelector(`#${foldId(id)}`)?.classList.toggle('open', on);
+  }
+
+  function fold(id: string, ...inner: Node[]): HTMLElement {
+    const box = h('div', `ko-fold${open.has(id) ? ' open' : ''}`);
+    box.id = foldId(id);
+    const clip = h('div');
+    clip.append(...inner);
+    box.append(clip);
+    return box;
+  }
+
+  function cellField(section: OrganiserSection, line: OrganiserLine, at: number, label: string, className = 'ko-edit'): HTMLTextAreaElement {
+    const field = h('textarea', className);
+    field.rows = 1;
+    field.maxLength = 400;
+    field.placeholder = label;
+    field.setAttribute('aria-label', label);
+    field.value = (localCells.get(line.id) ?? line.cells)[at] ?? '';
+    field.addEventListener('input', () => {
+      const cells = (localCells.get(line.id) ?? line.cells).slice();
+      cells[at] = field.value;
+      editLine(line.id, cells);
+    });
+    field.addEventListener('change', () => flushLine(line.id));
+    return field;
+  }
+
+  function lineTools(section: OrganiserSection, line: OrganiserLine): HTMLElement {
+    const at = section.lines.findIndex((l) => l.id === line.id);
+    const tools = h('div', 'ko-tools');
+    const up = quiet('Move up', () => void send({ op: 'move_line', line_id: line.id, to: at - 1 }));
+    up.disabled = at === 0;
+    const down = quiet('Move down', () => void send({ op: 'move_line', line_id: line.id, to: at + 1 }));
+    down.disabled = at === section.lines.length - 1;
+    tools.append(up, down);
+    if (section.role === 'concept' || section.role === 'ideas') tools.append(moveToConcept(section, line));
+    tools.append(quiet('Delete', () => {
+      window.clearTimeout(timers.get(line.id));
+      timers.delete(line.id);
+      localCells.delete(line.id);
+      void send({ op: 'delete_line', line_id: line.id });
+    }, 'ko-quiet--danger'));
+    return tools;
+  }
+
+  function moveToConcept(section: OrganiserSection, line: OrganiserLine): HTMLSelectElement {
+    const select = h('select', 'ko-select');
+    select.setAttribute('aria-label', 'Move to another concept');
+    select.append(new Option('Move to…', ''));
+    const rows = conceptRows().filter((row) => row.section?.id !== section.id);
+    rows.forEach((row) => select.append(new Option(row.name, row.id)));
+    select.addEventListener('change', () => {
+      const row = rows.find((r) => r.id === select.value);
+      if (!row) return;
+      void ensureConcept(row).then((target) => {
+        if (target) void send({ op: 'move_line', line_id: line.id, section_id: target.id, to: target.lines.length });
+      });
+    });
+    return select;
+  }
+
+  function moreFields(section: OrganiserSection, line: OrganiserLine, slots: number[]): HTMLElement[] {
+    const columns = section.columns ?? [];
+    return slots.map((at) => {
+      const row = h('label', 'ko-field');
+      row.append(h('small', undefined, columns[at]?.label ?? ''), cellField(section, line, at, `Add ${(columns[at]?.label ?? 'detail').toLowerCase()}`));
+      return row;
+    });
+  }
+
+  /** The typing row at the foot of a list. `labels` name the cells it fills, `slots` where they go. */
+  function draftRow(id: string, labels: string[], commit: (values: string[]) => void): HTMLElement {
+    const values = drafts.get(id) ?? labels.map(() => '');
+    drafts.set(id, values);
+    const row = h('div', 'ko-draft');
+    row.dataset.draft = id;
+    const submit = (): void => {
+      if (!values.some((v) => v.trim())) return;
+      const sent = values.slice();
+      values.fill('');
+      focusAfter = () => root.querySelector<HTMLTextAreaElement>(`[data-draft="${id}"] textarea`)?.focus();
+      commit(sent);
+    };
+    labels.forEach((label, i) => {
+      const field = h('textarea', 'ko-edit ko-edit--draft');
+      field.rows = 1;
+      field.maxLength = 400;
+      field.placeholder = label;
+      field.setAttribute('aria-label', label);
+      field.value = values[i] ?? '';
+      field.addEventListener('input', () => { values[i] = field.value; });
+      field.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          values[i] = field.value;
+          submit();
+        }
+        if (event.key === 'Escape') {
+          drafts.delete(id);
+          render();
+        }
+      });
+      row.append(field);
+    });
+    const tools = h('div', 'ko-tools');
+    tools.append(quiet('Add', submit), quiet('Close', () => { drafts.delete(id); render(); }));
+    row.append(tools);
+    return row;
+  }
+
+  function openDraft(id: string): void {
+    if (!drafts.has(id)) drafts.set(id, []);
+    focusAfter = () => root.querySelector<HTMLTextAreaElement>(`[data-draft="${id}"] textarea`)?.focus();
     render();
   }
 
-  function runWith(classId: string): void {
-    which = null;
-    navigate(`/units/${encodeURIComponent(unit.id)}/organiser/run?class=${encodeURIComponent(classId)}`);
+  // ---- concepts ----------------------------------------------------------------------------
+
+  function ideaRow(section: OrganiserSection, line: OrganiserLine): HTMLElement {
+    const { answer, cue, rest } = columnSlots(section);
+    const stop = h('div', 'ko-stop');
+    const row = h('div', 'ko-linerow');
+    const main = answer !== -1 ? answer : Math.max(cue, 0);
+    row.append(cellField(section, line, main, 'Key idea'), chevron(line.id, 'Prompt and example'));
+    const inner = h('div', 'ko-more__in');
+    inner.append(...moreFields(section, line, [cue, ...rest].filter((i) => i !== -1 && i !== main)), lineTools(section, line));
+    stop.append(row, fold(line.id, inner));
+    return stop;
   }
 
+  function dotPoints(row: ConceptRow): HTMLElement {
+    const id = `dots:${row.id}`;
+    const kept = new Set(keptDots(row));
+    const box = h('div', 'ko-dots');
+    for (const bullet of row.bullets) {
+      const label = h('label');
+      const check = h('input');
+      check.type = 'checkbox';
+      check.checked = kept.has(bullet.n);
+      check.addEventListener('change', () => {
+        const next = new Set(keptDots(row));
+        if (check.checked) next.add(bullet.n);
+        else next.delete(bullet.n);
+        void ensureConcept(row).then((section) => {
+          if (section) void send({ op: 'update_section', section_id: section.id, dot_points: [...next].sort((a, b) => a - b) });
+        });
+      });
+      label.append(check, h('span', undefined, bullet.text));
+      box.append(label);
+    }
+    return fold(id, box);
+  }
+
+  function conceptCard(row: ConceptRow): HTMLElement {
+    const section = row.section;
+    const card = h('article', 'ko-concept');
+    card.style.setProperty('--c', row.colour);
+    card.dataset.concept = row.id;
+    const top = h('div', 'ko-concept__row');
+    const text = h('div');
+    const meta = h('div', 'ko-concept__meta');
+    meta.append(h('span', 'ko-capsule', row.name), h('span', 'ko-count', plural(section?.lines.length ?? 0, 'key idea')));
+    const sentence = h('textarea', 'ko-edit ko-concept__line');
+    sentence.rows = 1;
+    sentence.maxLength = 400;
+    sentence.placeholder = 'One sentence for this unit';
+    sentence.setAttribute('aria-label', `${row.name}: one sentence for this unit`);
+    sentence.value = (section && localSentences.get(section.id)) ?? section?.sentence ?? '';
+    sentence.addEventListener('input', () => {
+      if (!section) return;
+      localSentences.set(section.id, sentence.value);
+      window.clearTimeout(timers.get(`s:${section.id}`));
+      timers.set(`s:${section.id}`, window.setTimeout(() => flushSentence(section.id), SAVE_DELAY_MS));
+    });
+    sentence.addEventListener('change', () => {
+      if (section) flushSentence(section.id);
+      else if (sentence.value.trim()) void ensureConcept(row, sentence.value);
+    });
+    text.append(meta, sentence);
+    top.append(text, chevron(row.id, `Open ${row.name}`));
+    card.append(top);
+
+    const stops = h('div', 'ko-stops');
+    for (const line of section?.lines ?? []) if (section) stops.append(ideaRow(section, line));
+    const foot = h('div', 'ko-foot');
+    const draftId = `idea:${row.id}`;
+    foot.append(quiet('+ Add key idea', () => openDraft(draftId)));
+    if (row.key && alignment) foot.append(quiet('From syllabus', () => togglePanel({ kind: 'syllabus', at: row.id })));
+    foot.append(quiet('Bring in', () => togglePanel({ kind: 'bring', at: row.id, source: 'deep' })));
+    if (row.bullets.length) {
+      const dotsButton = quiet(`Dot points ${keptDots(row).length} of ${row.bullets.length}`, () => toggle(`dots:${row.id}`, dotsButton));
+      dotsButton.setAttribute('aria-expanded', String(open.has(`dots:${row.id}`)));
+      foot.append(dotsButton);
+    }
+    if (section && !row.key) foot.append(quiet('Remove', () => removeSection(section), 'ko-quiet--danger'));
+
+    const inner: Node[] = [stops];
+    if (drafts.has(draftId)) {
+      inner.push(draftRow(draftId, ['New key idea'], ([value]) => {
+        void ensureConcept(row).then((target) => {
+          if (!target) return;
+          const cells = (target.columns ?? []).map(() => '');
+          const { answer } = columnSlots(target);
+          cells[answer] = value ?? '';
+          void send({ op: 'add_lines', section_id: target.id, lines: [{ cells }] });
+        });
+      }));
+    }
+    inner.push(foot);
+    if (row.bullets.length) inner.push(dotPoints(row));
+    if (panel?.at === row.id && panel.kind === 'syllabus') inner.push(syllabusHolder(row));
+    if (panel?.at === row.id && panel.kind === 'bring') inner.push(bringHolder(row));
+    card.append(fold(row.id, ...inner));
+    return card;
+  }
+
+  function looseIdeas(section: OrganiserSection): HTMLElement {
+    const card = h('article', 'ko-concept');
+    card.style.setProperty('--c', 'var(--muted)');
+    const top = h('div', 'ko-concept__row');
+    const text = h('div');
+    const meta = h('div', 'ko-concept__meta');
+    meta.append(h('span', 'ko-capsule', section.name), h('span', 'ko-count', plural(section.lines.length, 'key idea')));
+    text.append(meta, h('p', 'ko-status', 'Written before concepts. Open one and use Move to.'));
+    top.append(text, chevron(section.id, `Open ${section.name}`));
+    const stops = h('div', 'ko-stops');
+    for (const line of section.lines) stops.append(ideaRow(section, line));
+    card.append(top, fold(section.id, stops));
+    return card;
+  }
+
+  function addConcept(): HTMLElement {
+    const held = new Set(conceptRows().map((row) => row.key));
+    const others = (alignment?.concepts ?? []).filter((c) => !held.has(c.key));
+    if (!others.length) {
+      return quiet('+ Add concept', () => void send({ op: 'add_section', role: 'concept', name: 'New concept' }));
+    }
+    const select = h('select', 'ko-select');
+    select.setAttribute('aria-label', 'Add a concept');
+    select.append(new Option('+ Add concept', ''));
+    for (const c of others) select.append(new Option(c.name, c.key));
+    select.addEventListener('change', () => {
+      const concept = others.find((c) => c.key === select.value);
+      if (!concept) return;
+      open.add(`concept:${concept.key}`);
+      void send({ op: 'add_section', role: 'concept', name: concept.name, concept_key: concept.key });
+    });
+    return select;
+  }
+
+  function removeSection(section: OrganiserSection): void {
+    void askConfirmCard({
+      title: `Delete “${section.name}”?`,
+      supporting: `Its ${plural(section.lines.length, 'line')} are deleted too, and students lose them.`,
+      confirmLabel: 'Delete section'
+    }).then((ok) => { if (ok) void send({ op: 'delete_section', section_id: section.id }); });
+  }
+
+  // ---- side panels -------------------------------------------------------------------------
+
+  function sideRow(section: OrganiserSection, line: OrganiserLine): HTMLElement {
+    const { cue, answer, rest } = columnSlots(section);
+    const item = h('div', 'ko-item');
+    const row = h('div', 'ko-linerow');
+    const pair = h('div', 'ko-pair');
+    const columns = section.columns ?? [];
+    if (cue !== -1) pair.append(cellField(section, line, cue, columns[cue]?.label ?? 'Name', 'ko-edit ko-edit--name'));
+    if (answer !== -1) pair.append(cellField(section, line, answer, columns[answer]?.label ?? 'Detail'));
+    row.append(pair, chevron(line.id, 'More'));
+    const inner = h('div', 'ko-more__in');
+    inner.append(...moreFields(section, line, rest));
+    if (section.role === 'vocab') {
+      const levels = h('div', 'ko-tools');
+      levels.append(h('span', 'ko-label', 'Level'));
+      for (const tier of [1, 2, 3] as VocabTier[]) {
+        const button = quiet(`Tier ${tier}`, () => void send({ op: 'update_line', line_id: line.id, tier: line.tier === tier ? null : tier }));
+        button.setAttribute('aria-pressed', String(line.tier === tier));
+        levels.append(button);
+      }
+      inner.append(levels);
+    }
+    inner.append(lineTools(section, line));
+    item.append(row, fold(line.id, inner));
+    return item;
+  }
+
+  function sideBody(section: OrganiserSection, into: HTMLElement): void {
+    if (section.role !== 'vocab') {
+      for (const line of section.lines) into.append(sideRow(section, line));
+      return;
+    }
+    for (const tier of [1, 2, 3, undefined] as Array<VocabTier | undefined>) {
+      const words = section.lines.filter((l) => l.tier === tier);
+      if (!words.length) continue;
+      const head = h('div', 'ko-tier');
+      if (tier) {
+        const bars = h('span', 'ko-bars');
+        bars.setAttribute('aria-hidden', 'true');
+        for (const n of [1, 2, 3]) bars.append(h('i', n <= tier ? 'on' : undefined));
+        head.append(bars, `Tier ${tier} `, h('span', undefined, `· ${TIER_WORDS[tier]}`));
+      } else {
+        head.append('No level yet');
+      }
+      into.append(head);
+      for (const line of words) into.append(sideRow(section, line));
+    }
+  }
+
+  function sidePanel(name: string, add: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): HTMLElement {
+    const box = h('section', 'ko-panel');
+    box.dataset.panel = role ?? section?.id ?? '';
+    const head = h('div', 'ko-panel__head');
+    const tools = h('div', 'ko-panel__tools');
+    const id = `side:${role ?? section?.id}`;
+    tools.append(
+      quiet(`+ ${add}`, () => openDraft(id)),
+      quiet('Paste', () => {
+        const ready = role ? ensureRole(role, name) : Promise.resolve(section);
+        void ready.then((target) => { if (target) togglePanel({ kind: 'paste', at: target.id }); });
+      })
+    );
+    if (section && !role) tools.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
+    head.append(h('h3', 'ko-panel__name', name), tools);
+    box.append(head);
+    if (section) sideBody(section, box);
+    if (drafts.has(id)) {
+      const single = (section?.kind ?? (role === 'story' ? 'sequence' : 'table')) !== 'table';
+      const labels = single ? ['Next step'] : section ? [section.columns?.find((c) => !c.hide)?.label ?? 'Name', section.columns?.find((c) => c.hide)?.label ?? 'Detail'] : role === 'vocab' ? ['Word', 'Meaning'] : role === 'key_lines' ? ['Line', 'Who'] : ['Label', 'Detail'];
+      box.append(draftRow(id, labels, (values) => {
+        const ready = role ? ensureRole(role, name) : Promise.resolve(section);
+        void ready.then((target) => {
+          if (!target) return;
+          const { cue, answer } = columnSlots(target);
+          const cells = target.kind === 'table' ? (target.columns ?? []).map(() => '') : [''];
+          if (target.kind !== 'table') cells[0] = values[0] ?? '';
+          else {
+            if (cue !== -1) cells[cue] = values[0] ?? '';
+            if (answer !== -1) cells[answer] = values[1] ?? '';
+          }
+          void send({ op: 'add_lines', section_id: target.id, lines: [{ cells }] });
+        });
+      }));
+    }
+    if (section && panel?.kind === 'paste' && panel.at === section.id) box.append(pastePanel(section));
+    return box;
+  }
+
+  function togglePanel(next: NonNullable<typeof panel>): void {
+    panel = panel?.kind === next.kind && panel.at === next.at ? null : next;
+    render();
+  }
+
+  function pastePanel(section: OrganiserSection): HTMLElement {
+    const width = section.kind === 'table' ? (section.columns ?? []).length : 1;
+    const labels = section.kind === 'table' ? (section.columns ?? []).map((c) => c.label).join(', ') : 'one item';
+    const wrap = h('div', 'ko-paste ko-bring');
+    wrap.append(h('p', 'ko-bring__head', `Paste rows from Word or Sheets: ${labels}.`));
+    const area = h('textarea');
+    area.value = pasteText;
+    area.setAttribute('aria-label', 'Pasted rows');
+    const count = h('p', 'ko-status');
+    const update = (): void => {
+      const rows = parsePaste(area.value, width);
+      count.textContent = rows.length ? `${plural(rows.length, 'row')} ready.` : 'Nothing to add yet.';
+      add.disabled = !rows.length;
+    };
+    const add = h('button', 'btn btn--primary ko-btn', 'Add these rows');
+    add.type = 'button';
+    add.addEventListener('click', () => {
+      const rows = parsePaste(area.value, width);
+      if (!rows.length) return;
+      add.disabled = true;
+      pasteText = '';
+      panel = null;
+      void send({ op: 'add_lines', section_id: section.id, lines: rows.map((cells) => ({ cells })) });
+    });
+    area.addEventListener('input', () => { pasteText = area.value; update(); });
+    update();
+    const actions = h('div', 'ko-actions');
+    actions.append(add, quiet('Close', () => { panel = null; render(); }));
+    wrap.append(area, count, actions);
+    return wrap;
+  }
+
+  // ---- bringing lines in -------------------------------------------------------------------
+
+  function addItems(row: ConceptRow, chosen: BringItem[]): Promise<void> {
+    return ensureConcept(row).then(async (target) => {
+      if (!target) throw new Error('not added');
+      // Copies only: the lesson that teaches a line ticks it.
+      const lines = chosen.map((item) => {
+        const { cells, piece_id } = bringLine(item, target);
+        return { cells, ...(piece_id ? { piece_id } : {}) };
+      });
+      if (!(await send({ op: 'add_lines', section_id: target.id, lines }))) throw new Error('not added');
+    });
+  }
+
+  function syllabusHolder(row: ConceptRow): HTMLElement {
+    return renderBringPanel({
+      title: `Syllabus points for ${row.name}`,
+      items: freshItems(syllabusItems(row), data?.organiser ?? { sections: [] }),
+      startTicked: false,
+      onAdd: (chosen) => addItems(row, chosen),
+      onClose: () => { panel = null; render(); }
+    });
+  }
+
+  function bringData() {
+    bringCache ??= (async () => {
+      const lessons = await loadUnitLessons(order);
+      const deep = unit.deep_understandings ?? [];
+      const plan = curriculum.scope_sequences
+        .find((scope) => scope.subject_id === unit.subject_id && scope.knowledge_plan)
+        ?.knowledge_plan?.units.find((row) => row.unit_id === unit.id);
+      return {
+        deep: deepItems(deep, lessons, order),
+        anthology: anthologyItems(anthologyFromLessons(lessons, order)),
+        plan: planItems(plan, lessons, order, deep)
+      };
+    })();
+    return bringCache;
+  }
+
+  function bringHolder(row: ConceptRow): HTMLElement {
+    const source = panel?.source ?? 'deep';
+    const wrap = h('div', 'ko-bringwrap');
+    const pills = h('div', 'ko-pills');
+    for (const each of ['deep', 'anthology', 'plan'] as BringSource[]) {
+      const pill = h('button', 'ko-pill', BRING_LABEL[each]);
+      pill.type = 'button';
+      pill.setAttribute('aria-pressed', String(each === source));
+      pill.addEventListener('click', () => { panel = { kind: 'bring', at: row.id, source: each }; render(); });
+      pills.append(pill);
+    }
+    const holder = h('div');
+    holder.append(h('p', 'ko-status', 'Loading…'));
+    wrap.append(pills, holder);
+    void bringData().then(
+      (all) => {
+        if (disposed || !holder.isConnected || !data) return;
+        holder.replaceChildren(
+          renderBringPanel({
+            title: BRING_LABEL[source],
+            items: freshItems(all[source], data.organiser),
+            onAdd: (chosen) => addItems(row, chosen),
+            onClose: () => { panel = null; render(); }
+          })
+        );
+      },
+      () => {
+        holder.replaceChildren(h('p', 'ko-status ko-status--bad', 'Could not read the source. Close this and try again.'));
+      }
+    );
+    return wrap;
+  }
+
+  // ---- banner ------------------------------------------------------------------------------
+
   function printFor(classId: string): void {
-    which = null;
+    printing = false;
     say('Getting the sheet…');
     render();
     void organiserApi
@@ -225,7 +757,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       .then((res) => {
         if (disposed) return;
         if (!res.sheet || !res.sheet.sections.length) {
-          say('Nothing is released for that class yet, so there is nothing to print.');
+          say('Nothing has gone out to that class yet, so there is nothing to print.');
           render();
           return;
         }
@@ -239,505 +771,72 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       });
   }
 
-  function headBlock(): HTMLElement {
-    const head = h('div', 'ko-head');
-    const text = h('div');
-    text.append(
-      h('h2', 'ko-title', 'Organiser'),
-      h('p', 'ko-sub', 'Lines come from your lessons. Students see a line once its lesson is published and its class date arrives.')
-    );
-    const actions = h('div', 'ko-actions');
-    const runBtn = button('Run with the class', 'btn btn--ghost ko-btn', () => classThen(runWith, 'run'));
-    const printBtn = button('Print', 'btn btn--ghost ko-btn', () => classThen(printFor, 'print'));
-    if (!classes.length) {
-      runBtn.disabled = true;
-      printBtn.disabled = true;
-      runBtn.title = printBtn.title = 'Give this unit to a class first.';
+  function hero(): HTMLElement {
+    const box = h('header', 'ko-hero');
+    const top = h('div', 'ko-hero__top');
+    const title = h('div');
+    title.append(h('p', 'ko-hero__crumb', `${unit.title} · Unit plan`), h('h2', 'ko-hero__title', 'Organiser'));
+    const right = h('div', 'ko-hero__right');
+    const stats = h('div', 'ko-hero__stats');
+    const count = (role: OrganiserRole): number => sections().filter((s) => s.role === role && !s.off).reduce((n, s) => n + s.lines.length, 0);
+    const rows: Array<[number, string]> = [
+      [conceptRows().length, 'concepts'],
+      [count('concept') + count('ideas'), 'key ideas'],
+      [count('facts'), 'facts'],
+      [count('vocab'), 'words']
+    ];
+    for (const [n, word] of rows) {
+      const span = h('span');
+      span.append(h('b', undefined, String(n)), ` ${word}`);
+      stats.append(span);
     }
-    actions.append(runBtn, printBtn);
-    head.append(text, actions);
-    if (which && classes.length > 1) {
-      const ask = h('div', 'ko-pills');
-      ask.append(h('span', 'ko-label', which === 'run' ? 'Run with which class?' : 'Print for which class?'));
-      for (const klass of classes) ask.append(pill(klass.label, false, () => (which === 'run' ? runWith(klass.id) : printFor(klass.id))));
-      head.append(ask);
-    }
-    return head;
-  }
-
-  function weekBlock(): HTMLElement | null {
-    const org = organiser();
-    if (!org || !org.sections.length) return null;
-    if (!weekDraft || !weekDirty) {
-      weekDraft = org.week ? { section_id: org.week.section_id, due: org.week.due, reason: org.week.reason } : { section_id: '', due: '', reason: '' };
-    }
-    const draft = weekDraft;
-    const save = (): void => {
-      if (!draft.section_id) {
-        if (org.week) void send({ op: 'set_week', week: null });
-        weekDirty = false;
-        return;
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.due)) return;
-      weekDirty = false;
-      void send({ op: 'set_week', week: { section_id: draft.section_id, due: draft.due, reason: draft.reason.trim().slice(0, 80) } });
-    };
-    const box = h('div', 'ko-block');
-    box.append(h('b', 'ko-block__title', 'Set for this week'));
-    const row = h('div', 'ko-setbox');
-    const pills = h('div', 'ko-pills');
-    for (const section of org.sections) {
-      pills.append(
-        pill(section.name || 'Untitled', draft.section_id === section.id, () => {
-          draft.section_id = draft.section_id === section.id ? '' : section.id;
-          weekDirty = true;
-          save();
-          render();
-        })
-      );
-    }
-    const date = h('input');
-    date.type = 'date';
-    date.value = draft.due;
-    date.setAttribute('aria-label', 'Due date');
-    date.addEventListener('change', () => { draft.due = date.value; weekDirty = true; save(); });
-    const why = h('input');
-    why.type = 'text';
-    why.maxLength = 80;
-    why.placeholder = 'Week 3 Review';
-    why.value = draft.reason;
-    why.setAttribute('aria-label', 'Reason');
-    why.addEventListener('change', () => { draft.reason = why.value; weekDirty = true; save(); });
-    row.append(pills, h('span', undefined, 'by'), date, h('span', undefined, 'for'), why);
-    box.append(row);
-    box.append(
-      h(
-        'p',
-        'ko-status',
-        draft.section_id && !draft.due
-          ? 'Pick the day it is due and the banner turns on.'
-          : 'Students see this banner on their Organiser tab until the day after the date.'
-      )
-    );
-    return box;
-  }
-
-  function lessonPicker(lineId: string, current: string | undefined, gone: boolean): HTMLSelectElement {
-    const select = h('select');
-    select.setAttribute('aria-label', 'Lesson this line comes from');
-    const none = h('option', undefined, 'No lesson');
-    none.value = '';
-    select.append(none);
-    ordered.forEach((lesson) => {
-      const opt = h('option', undefined, shorten(`${codes.get(lesson.id)} ${lesson.title}`, 30));
-      opt.value = lesson.id;
-      opt.title = lesson.title;
-      select.append(opt);
+    const print = h('button', 'ko-hero__print', 'Print');
+    print.type = 'button';
+    print.disabled = !classes.length;
+    if (!classes.length) print.title = 'Give this unit to a class first.';
+    print.addEventListener('click', () => {
+      if (classes.length === 1) return printFor(classes[0]!.id);
+      printing = !printing;
+      render();
     });
-    if (current && !codes.has(current)) {
-      const opt = h('option', undefined, gone ? 'Lesson removed' : 'Another lesson');
-      opt.value = current;
-      select.append(opt);
-    }
-    select.value = current ?? '';
-    select.addEventListener('change', () => {
-      void send({ op: 'update_line', line_id: lineId, lesson_id: select.value || null });
-    });
-    return select;
-  }
-
-  function fromCell(section: OrganiserSection, lineIndex: number, td: HTMLElement): void {
-    const line = section.lines[lineIndex];
-    const state = data?.status[line.id];
-    td.append(lessonPicker(line.id, line.lesson_id, state === 'lesson_gone'));
-    if (line.piece_id) td.append(' ', Object.assign(h('span', 'ko-chip', 'Piece'), { title: 'Linked to a knowledge piece. Only you see this.' }));
-    if (state === 'waiting') td.append(h('small', undefined, 'Waiting'));
-    if (state === 'lesson_gone') td.append(h('small', undefined, 'Lesson removed. Pick another.'));
-  }
-
-  function controls(section: OrganiserSection, i: number): HTMLElement {
-    const line = section.lines[i];
-    const box = h('div', 'ko-row');
-    box.style.flexWrap = 'nowrap';
-    box.append(
-      mini('↑', 'Move line up', () => void send({ op: 'move_line', line_id: line.id, to: i - 1 }), i === 0),
-      mini('↓', 'Move line down', () => void send({ op: 'move_line', line_id: line.id, to: i + 1 }), i === section.lines.length - 1),
-      mini('✕', 'Delete line', () => {
-        window.clearTimeout(timers.get(line.id));
-        timers.delete(line.id);
-        local.delete(line.id);
-        void send({ op: 'delete_line', line_id: line.id });
-      }, false, 'ko-mini--danger')
-    );
-    return box;
-  }
-
-  function cellField(section: OrganiserSection, i: number, c: number, label: string): HTMLTextAreaElement {
-    const line = section.lines[i];
-    const field = h('textarea');
-    field.rows = 1;
-    field.maxLength = 400;
-    field.setAttribute('aria-label', label);
-    field.value = (local.get(line.id) ?? line.cells)[c] ?? '';
-    field.addEventListener('input', () => {
-      const cells = (local.get(line.id) ?? line.cells).slice();
-      cells[c] = field.value;
-      editLine(line.id, cells);
-    });
-    field.addEventListener('change', () => flushLine(line.id));
-    return field;
-  }
-
-  function draftFor(section: OrganiserSection): string[] {
-    const width = section.kind === 'table' ? (section.columns ?? []).length : 1;
-    let draft = drafts.get(section.id);
-    if (!draft || draft.length !== width) {
-      draft = new Array<string>(width).fill('');
-      drafts.set(section.id, draft);
-    }
-    return draft;
-  }
-
-  function addDraft(section: OrganiserSection): void {
-    const draft = draftFor(section);
-    if (!draft.some((c) => c.trim())) return;
-    const cells = draft.slice();
-    drafts.set(section.id, new Array<string>(draft.length).fill(''));
-    void send({ op: 'add_lines', section_id: section.id, lines: [{ cells }] }, () => {
-      focusAfter = () => root.querySelector<HTMLTextAreaElement>(`[data-draft="${section.id}"] textarea`)?.focus();
-    });
-  }
-
-  function draftFields(section: OrganiserSection, labels: string[]): HTMLTextAreaElement[] {
-    const draft = draftFor(section);
-    return labels.map((label, c) => {
-      const field = h('textarea');
-      field.rows = 1;
-      field.maxLength = 400;
-      field.placeholder = label;
-      field.setAttribute('aria-label', `New line: ${label}`);
-      field.value = draft[c] ?? '';
-      field.addEventListener('input', () => { draft[c] = field.value; });
-      field.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-          event.preventDefault();
-          draft[c] = field.value;
-          addDraft(section);
-        }
-      });
-      return field;
-    });
-  }
-
-  function tableBlock(section: OrganiserSection): HTMLElement {
-    const columns = section.columns ?? [];
-    const scroll = h('div', 'ko-scroll');
-    scroll.dataset.scrollFor = section.id;
-    const table = h('table', 'ko-t');
-    const head = h('tr');
-    for (const column of columns) {
-      const th = h('th');
-      const input = h('input');
-      input.value = column.label;
-      input.maxLength = 60;
-      input.setAttribute('aria-label', 'Column heading');
-      input.addEventListener('change', () => {
-        const label = input.value.trim() || column.label;
-        void send({ op: 'update_section', section_id: section.id, columns: columns.map((c) => (c.id === column.id ? { ...c, label } : c)) });
-      });
-      th.append(input);
-      if (columns.length > 2) th.append(mini('✕', `Remove the “${column.label}” column`, () => void removeColumn(section, column.id), false, 'ko-mini--th'));
-      head.append(th);
-    }
-    head.append(h('th', 'ko-from', 'From'), h('th', 'ko-ctl'));
-    const thead = h('thead');
-    thead.append(head);
-    const body = h('tbody');
-    section.lines.forEach((line, i) => {
-      const tr = h('tr');
-      const state = data?.status[line.id];
-      if (state && state !== 'released') tr.className = 'is-wait';
-      columns.forEach((column, c) => {
-        const td = h('td');
-        td.append(cellField(section, i, c, column.label));
-        tr.append(td);
-      });
-      const from = h('td', 'ko-from');
-      fromCell(section, i, from);
-      const ctl = h('td', 'ko-ctl');
-      ctl.append(controls(section, i));
-      tr.append(from, ctl);
-      body.append(tr);
-    });
-    const add = h('tr', 'ko-new');
-    add.dataset.draft = section.id;
-    for (const field of draftFields(section, columns.map((c) => c.label))) {
-      const td = h('td');
-      td.append(field);
-      add.append(td);
-    }
-    const addCell = h('td', 'ko-ctl');
-    addCell.colSpan = 2;
-    addCell.append(button('Add line', 'btn btn--ghost ko-btn', () => addDraft(section)));
-    add.append(addCell);
-    body.append(add);
-    table.append(thead, body);
-    scroll.append(table);
-    return scroll;
-  }
-
-  function listBlock(section: OrganiserSection): HTMLElement {
-    const list = h('ul', 'ko-lines');
-    section.lines.forEach((line, i) => {
-      const li = h('li');
-      const field = cellField(section, i, 0, section.kind === 'sequence' ? `Step ${i + 1}` : 'Item');
-      const from = h('div', 'ko-from');
-      fromCell(section, i, from);
-      li.append(field, from, controls(section, i));
-      if (data?.status[line.id] && data.status[line.id] !== 'released') li.style.opacity = '.75';
-      list.append(li);
-    });
-    const li = h('li');
-    li.dataset.draft = section.id;
-    const [field] = draftFields(section, [section.kind === 'sequence' ? 'Next step' : 'New item']);
-    li.append(field, button('Add line', 'btn btn--ghost ko-btn', () => addDraft(section)));
-    list.append(li);
-    return list;
-  }
-
-  async function removeColumn(section: OrganiserSection, columnId: string): Promise<void> {
-    const columns = section.columns ?? [];
-    const at = columns.findIndex((c) => c.id === columnId);
-    const hasText = section.lines.some((l) => (local.get(l.id) ?? l.cells)[at]?.trim());
-    if (hasText) {
-      const ok = await askConfirmCard({
-        title: `Remove the “${columns[at].label}” column?`,
-        supporting: 'The words in that column are removed from every line.',
-        confirmLabel: 'Remove column'
-      });
-      if (!ok) return;
-    }
-    const left = columns.filter((c) => c.id !== columnId);
-    if (left.every((c) => c.hide)) left[0] = { ...left[0], hide: false };
-    void send({ op: 'update_section', section_id: section.id, columns: left });
-  }
-
-  function sectionBody(section: OrganiserSection, index: number): HTMLElement {
-    const box = h('div', 'ko-block');
-    box.dataset.section = section.id;
-    const top = h('div', 'ko-row');
-    const name = h('input', 'ko-name');
-    name.value = section.name;
-    name.maxLength = 60;
-    name.setAttribute('aria-label', 'Section name');
-    name.addEventListener('change', () => {
-      const next = name.value.trim();
-      if (next && next !== section.name) void send({ op: 'update_section', section_id: section.id, name: next });
-    });
-    const kinds = h('div', 'ko-pills');
-    for (const { kind, label } of KINDS) {
-      kinds.append(
-        pill(label, section.kind === kind, () => {
-          if (section.kind !== kind) void send({ op: 'update_section', section_id: section.id, kind });
-        })
-      );
-    }
-    const total = organiser()?.sections.length ?? 0;
-    top.append(
-      name,
-      kinds,
-      mini('↑', 'Move section up', () => void send({ op: 'move_section', section_id: section.id, to: index - 1 }), index === 0),
-      mini('↓', 'Move section down', () => void send({ op: 'move_section', section_id: section.id, to: index + 1 }), index === total - 1),
-      mini('Hide', 'Fold this section', () => { open.delete(section.id); render(); }),
-      mini('✕', 'Delete section', () => {
-        void askConfirmCard({
-          title: `Delete “${section.name}”?`,
-          supporting: `Its ${section.lines.length} line${section.lines.length === 1 ? '' : 's'} are deleted too.`,
-          confirmLabel: 'Delete section'
-        }).then((ok) => { if (ok) void send({ op: 'delete_section', section_id: section.id }); });
-      }, false, 'ko-mini--danger')
-    );
+    right.append(stats, print);
+    top.append(title, right);
     box.append(top);
 
-    box.append(section.kind === 'table' ? tableBlock(section) : listBlock(section));
-
-    if (section.kind === 'table') {
-      const columns = section.columns ?? [];
-      const hide = h('div', 'ko-pills');
-      hide.append(h('span', 'ko-label', 'Usually hide:'));
-      for (const column of columns) {
-        hide.append(pill(column.label || 'Column', column.hide, () => void send({ op: 'update_section', section_id: section.id, columns: toggleHide(columns, column.id) })));
-      }
-      if (columns.length < 4) hide.append(button('Add column', 'btn btn--quiet ko-btn', () => void send({ op: 'update_section', section_id: section.id, columns: [...columns, { label: 'Column', hide: false }] })));
-      box.append(hide);
-      const warn = noCardWarning(section);
-      if (warn) box.append(h('p', 'ko-warn', warn));
+    const row = h('div', 'ko-hero__row');
+    const chips = h('div', 'ko-hero__chips');
+    if (skillNames.length) {
+      chips.append(h('span', undefined, 'Skills'));
+      for (const name of skillNames) chips.append(h('span', 'ko-hero__chip', name));
     }
-
-    const tools = h('div', 'ko-row');
-    tools.append(
-      button('Paste from Word or Sheets', 'btn btn--ghost ko-btn', () => {
-        panel = panel?.kind === 'paste' && panel.section_id === section.id ? null : { kind: 'paste', section_id: section.id };
-        render();
-      }),
-      h('span', 'ko-label', 'Bring in:')
-    );
-    for (const source of ['deep', 'anthology', 'plan'] as BringSource[]) {
-      tools.append(
-        pill(BRING_LABEL[source], panel?.kind === 'bring' && panel.section_id === section.id && panel.source === source, () => {
-          panel = panel?.kind === 'bring' && panel.section_id === section.id && panel.source === source ? null : { kind: 'bring', section_id: section.id, source };
-          render();
-        })
-      );
-    }
-    box.append(tools);
-
-    if (panel && panel.section_id === section.id) box.append(panel.kind === 'paste' ? pastePanel(section) : bringHolder(section, panel.source as BringSource));
-    return box;
-  }
-
-  function pastePanel(section: OrganiserSection): HTMLElement {
-    const width = section.kind === 'table' ? (section.columns ?? []).length : 1;
-    const wrap = h('div', 'ko-paste ko-bring');
-    wrap.append(h('p', 'ko-bring__head', `Paste rows. Each new line is a line, each tab starts a cell${width > 1 ? `, and the first ${width} cells are used` : ''}.`));
-    const area = h('textarea');
-    area.value = pasteText;
-    area.setAttribute('aria-label', 'Pasted rows');
-    const count = h('p', 'ko-status');
-    const update = (): void => {
-      const rows = parsePaste(area.value, width);
-      count.textContent = rows.length ? `${rows.length} row${rows.length === 1 ? '' : 's'} ready.` : 'Nothing to add yet.';
-      add.disabled = !rows.length;
-    };
-    const add = button('Add these rows', 'btn btn--primary ko-btn', () => {
-      const rows = parsePaste(area.value, width);
-      if (!rows.length) return;
-      add.disabled = true;
-      pasteText = '';
-      panel = null;
-      void send({ op: 'add_lines', section_id: section.id, lines: rows.map((cells) => ({ cells })) });
-    });
-    area.addEventListener('input', () => { pasteText = area.value; update(); });
-    update();
-    const actions = h('div', 'ko-actions');
-    actions.append(add, button('Close', 'btn btn--ghost ko-btn', () => { panel = null; render(); }));
-    wrap.append(area, count, actions);
-    return wrap;
-  }
-
-  function bringData() {
-    bringCache ??= (async () => {
-      const lessons = await loadUnitLessons(order);
-      const deep = unit.deep_understandings ?? [];
-      const plan = options.curriculum.scope_sequences
-        .find((scope) => scope.subject_id === unit.subject_id && scope.knowledge_plan)
-        ?.knowledge_plan?.units.find((row) => row.unit_id === unit.id);
-      return {
-        deep: deepItems(deep, lessons, order),
-        anthology: anthologyItems(anthologyFromLessons(lessons, order)),
-        plan: planItems(plan, lessons, order, deep)
-      };
-    })();
-    return bringCache;
-  }
-
-  function bringHolder(section: OrganiserSection, source: BringSource): HTMLElement {
-    const holder = h('div');
-    holder.append(h('p', 'ko-status', 'Loading…'));
-    void bringData().then(
-      (all) => {
-        if (disposed || !holder.isConnected || !data) return;
-        const items = freshItems(all[source], data.organiser);
-        const current = sectionOf(section.id) ?? section;
-        holder.replaceChildren(
-          renderBringPanel({
-            title: BRING_LABEL[source],
-            items,
-            onAdd: async (chosen) => {
-              const ok = await send({ op: 'add_lines', section_id: section.id, lines: chosen.map((item) => bringLine(item, current)) });
-              if (!ok) throw new Error('not added');
-            },
-            onClose: () => { panel = null; render(); }
-          })
-        );
-      },
-      () => {
-        holder.replaceChildren(h('p', 'ko-status ko-status--bad', 'Could not read the source. Close this and try again.'));
-      }
-    );
-    return holder;
-  }
-
-  function collapsed(section: OrganiserSection): HTMLElement {
-    const box = h('div', 'ko-block');
-    const row = button('', 'ko-collapsed', () => { open.add(section.id); render(); });
-    const released = section.lines.filter((l) => data?.status[l.id] === 'released').length;
-    const kind = KINDS.find((k) => k.kind === section.kind)?.label ?? '';
-    row.append(h('b', undefined, section.name || 'Untitled'), h('span', undefined, `${kind} · ${released} released, ${section.lines.length} written`));
-    box.append(row);
-    return box;
-  }
-
-  function startBlock(): HTMLElement {
-    const box = h('div', 'ko-block');
-    box.append(h('b', 'ko-block__title', 'Start your organiser'));
-    box.append(h('p', 'ko-sub', 'Three sections most units use: Key ideas, Vocabulary and Key lines. In each, the middle column starts covered for practice.'));
-    const go = button('Start with the usual three', 'btn btn--primary ko-btn', () => {
-      go.disabled = true;
-      void (async () => {
-        for (const spec of USUAL_THREE) {
-          const ok = await send({ op: 'add_section', name: spec.name, kind: 'table', columns: spec.columns });
-          if (!ok) return;
-        }
-        const first = data?.organiser.sections[0];
-        if (first) open.add(first.id);
-        render();
-      })();
-    });
-    box.append(go);
-    return box;
-  }
-
-  function addSectionRow(): HTMLElement {
-    const row = h('div', 'ko-row');
-    row.append(h('span', 'ko-label', 'Add section:'));
-    const count = organiser()?.sections.length ?? 0;
-    for (const { kind, label } of KINDS) {
-      const add = button(label, 'ko-pill', () => {
-        const prior = new Set((organiser()?.sections ?? []).map((s) => s.id));
-        void send(
-          {
-            op: 'add_section',
-            name: `New ${label.toLowerCase()}`,
-            kind,
-            ...(kind === 'table' ? { columns: [{ label: 'Prompt', hide: false }, { label: 'Answer', hide: true }] } : {})
-          },
-          (_before, next) => {
-            const created = next.organiser.sections.find((s) => !prior.has(s.id));
-            if (!created) return;
-            open.add(created.id);
-            focusAfter = () => {
-              const input = root.querySelector<HTMLInputElement>(`[data-section="${created.id}"] .ko-name`);
-              input?.focus();
-              input?.select();
-            };
-          }
-        );
+    const ticks = h('div', 'ko-hero__ticks');
+    for (const spec of SIDE_ROLES.filter((s) => s.optional)) {
+      const label = h('label');
+      const check = h('input');
+      check.type = 'checkbox';
+      const held = sectionOf(spec.role);
+      check.checked = !!held && !held.off;
+      check.addEventListener('change', () => {
+        if (held) void send({ op: 'update_section', section_id: held.id, off: !check.checked });
+        else void send({ op: 'add_section', role: spec.role, name: spec.name });
       });
-      if (count >= 8) add.disabled = true;
-      row.append(add);
+      label.append(check, h('span', undefined, spec.name));
+      ticks.append(label);
     }
-    if (count >= 8) row.append(h('span', 'ko-label', 'A unit can have 8 sections.'));
-    return row;
-  }
-
-  function helpBlock(): HTMLElement {
-    const details = h('details', 'ko-help');
-    details.append(h('summary', undefined, 'The routine that makes the organiser work'));
-    const list = h('ul');
-    for (const step of ROUTINE) list.append(h('li', undefined, step));
-    details.append(list);
-    return details;
+    row.append(chips, ticks);
+    box.append(row);
+    if (printing && classes.length > 1) {
+      const ask = h('div', 'ko-hero__chips');
+      ask.append(h('span', undefined, 'Print for which class?'));
+      for (const klass of classes) {
+        const pick = h('button', 'ko-hero__chip', klass.label);
+        pick.type = 'button';
+        pick.addEventListener('click', () => printFor(klass.id));
+        ask.append(pick);
+      }
+      box.append(ask);
+    }
+    return box;
   }
 
   // ---- drawing -----------------------------------------------------------------------------
@@ -745,18 +844,16 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
   function render(): void {
     if (disposed) return;
     renderPending = false;
-    const scrolls = new Map<string, number>();
-    root.querySelectorAll<HTMLElement>('[data-scroll-for]').forEach((node) => scrolls.set(node.dataset.scrollFor ?? '', node.scrollLeft));
-
-    root.replaceChildren(headBlock());
+    root.replaceChildren(hero());
     if (status) {
       const line = h('p', `ko-status${statusBad ? ' ko-status--bad' : ''}`, status);
       line.setAttribute('role', 'status');
       root.append(line);
     }
-
     if (loadFailed) {
-      const again = button('Try again', 'btn btn--ghost ko-btn', load);
+      const again = h('button', 'btn btn--ghost ko-btn', 'Try again');
+      again.type = 'button';
+      again.addEventListener('click', load);
       root.append(h('p', 'ko-status ko-status--bad', 'The organiser could not be loaded.'), again);
       return;
     }
@@ -765,18 +862,36 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       return;
     }
 
-    const sections = data.organiser.sections;
-    const week = weekBlock();
-    if (week) root.append(week);
-    if (!sections.length) root.append(startBlock());
-    sections.forEach((section, i) => root.append(open.has(section.id) ? sectionBody(section, i) : collapsed(section)));
-    root.append(addSectionRow(), helpBlock());
+    const grid = h('div', 'ko-grid');
+    const left = h('section', 'ko-column');
+    const head = h('div', 'ko-panel__head');
+    const tools = h('div', 'ko-panel__tools');
+    const rows = conceptRows();
+    const allOpen = rows.length > 0 && rows.every((row) => open.has(row.id));
+    tools.append(addConcept(), quiet(allOpen ? 'Close all' : 'Open all', () => {
+      for (const row of rows) {
+        if (allOpen) open.delete(row.id);
+        else open.add(row.id);
+      }
+      render();
+    }));
+    head.append(h('h3', 'ko-panel__name', 'Concepts'), tools);
+    left.append(head);
+    const loose = sectionOf('ideas');
+    if (loose?.lines.length) left.append(looseIdeas(loose));
+    for (const row of rows) left.append(conceptCard(row));
 
-    scrolls.forEach((left, id) => {
-      const node = root.querySelector<HTMLElement>(`[data-scroll-for="${id}"]`);
-      if (node) node.scrollLeft = left;
-    });
-    root.querySelectorAll<HTMLTextAreaElement>('.ko-t textarea').forEach(fitField);
+    const right = h('div', 'ko-column');
+    for (const spec of SIDE_ROLES) {
+      const section = sectionOf(spec.role);
+      if (spec.optional && (!section || section.off)) continue;
+      right.append(sidePanel(spec.name, spec.add, spec.role, section));
+    }
+    for (const section of sections().filter((s) => !s.role)) right.append(sidePanel(section.name, 'Add line', undefined, section));
+
+    grid.append(left, right);
+    root.append(grid);
+    root.querySelectorAll<HTMLTextAreaElement>('textarea.ko-edit').forEach(fitField);
     const run = focusAfter;
     focusAfter = null;
     run?.();
@@ -791,7 +906,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
   };
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('input', (event) => {
-    if (event.target instanceof HTMLTextAreaElement && event.target.closest('.ko-t')) fitField(event.target);
+    if (event.target instanceof HTMLTextAreaElement && event.target.classList.contains('ko-edit')) fitField(event.target);
   });
 
   load();
@@ -799,7 +914,8 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
   return {
     dispose() {
       // Edits still waiting for their delay go now, so leaving the page loses nothing.
-      for (const lineId of [...local.keys()]) flushLine(lineId);
+      for (const lineId of [...localCells.keys()]) flushLine(lineId);
+      for (const sectionId of [...localSentences.keys()]) flushSentence(sectionId);
       disposed = true;
       for (const timer of timers.values()) window.clearTimeout(timer);
       timers.clear();

@@ -74,7 +74,11 @@ async function seeded(store) {
       { cells: [SECRET.gone, 'w'], lesson_id: 'gone' }
     ]
   });
-  return { sid, lines: out.organiser.sections[0].lines };
+  // A line from before lessons ticked: students already have it.
+  const held = store.data.get('unit_organisers/unit1');
+  held.sections[0].lines.find((l) => l.cells[0] === 'free term').open = true;
+  store.data.set('unit_organisers/unit1', held);
+  return { sid, lines: held.sections[0].lines };
 }
 
 test('teacher: two changes in a row keep both lines, with stable ids', async () => {
@@ -260,10 +264,45 @@ test('review: a withdrawn line keeps its box; a deleted line drops out', async (
   assert.equal(store.data.get(key).boxes[lines[3].id], undefined);
 });
 
-test('lesson: the first cell of each released line from that lesson, no claim needed', async () => {
+test('a line written on the sheet waits until a lesson ticks it, then goes out with that lesson', async () => {
+  const store = await fixture();
+  const { sid } = await seeded(store);
+  let out = await teacher(store, { op: 'add_lines', section_id: sid, lines: [{ cells: ['written ahead', 'not yet'] }] });
+  const line = out.organiser.sections[0].lines.at(-1);
+  assert.equal(out.status[line.id], 'waiting');
+  assert.equal(JSON.stringify(await student(store, {})).includes('written ahead'), false);
+
+  out = await teacher(store, { op: 'update_line', line_id: line.id, lesson_id: 'past' });
+  assert.equal(out.status[line.id], 'released');
+  const loaded = await student(store, {});
+  assert.ok(loaded.sheets[0].sections[0].lines.some((l) => l.cells[0] === 'written ahead'));
+  assert.deepEqual((await student(store, { action: 'lesson', lesson_id: 'past' })).lines, ['past term: past meaning', 'written ahead: not yet']);
+});
+
+test('a v1 sheet: lines with no lesson stay with students, and a tick then decides', async () => {
+  const store = await fixture();
+  store.data.set('unit_organisers/unit1', {
+    sections: [{
+      id: 'os_v1',
+      name: 'Key ideas',
+      kind: 'table',
+      columns: [{ id: 'oc_a', label: 'Prompt', hide: false }, { id: 'oc_b', label: 'What to know', hide: true }],
+      lines: [{ id: 'ol_old', cells: ['An old prompt', 'An old answer'] }]
+    }]
+  });
+  assert.equal((await student(store, {})).sheets[0].sections[0].lines[0].cells[0], 'An old prompt');
+  const seen = await organiserTeacherAction(store, 'unit1', 'GET', {}, { now: NOW });
+  assert.equal(seen.organiser.sections[0].role, 'ideas');
+  assert.equal(seen.status.ol_old, 'released');
+  const unticked = await teacher(store, { op: 'update_line', line_id: 'ol_old', lesson_id: null });
+  assert.equal(unticked.status.ol_old, 'waiting');
+  assert.equal((await student(store, {})).sheets.length && JSON.stringify(await student(store, {})).includes('An old prompt'), false);
+});
+
+test('lesson: what each released line from that lesson says, no claim needed', async () => {
   const store = await fixture();
   await seeded(store);
-  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { lines: ['past term'], joining: false });
+  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { lines: ['past term: past meaning'], joining: false });
   assert.deepEqual(await student(store, { action: 'lesson', lesson_id: 'future' }), { lines: [], joining: false });
   await assert.rejects(student(store, { action: 'lesson', lesson_id: '../x' }), (e) => e.status === 400);
 });
@@ -272,7 +311,8 @@ test('the daily cap and order reach the endpoint', async () => {
   const store = await fixture();
   let out = await teacher(store, { op: 'add_section', name: 'Words', kind: 'table', columns: [{ label: 'Term' }, { label: 'Meaning', hide: true }] });
   const lines = Array.from({ length: 30 }, (_, i) => ({ cells: [`term ${i}`, `meaning ${i}`] }));
-  out = await teacher(store, { op: 'add_lines', section_id: out.organiser.sections[0].id, lines: lines.slice(0, 30) });
+  out = await teacher(store, { op: 'add_lines', section_id: out.organiser.sections[0].id, lines: lines.slice(0, 30).map((l) => ({ ...l, lesson_id: 'nodate' })) });
+  store.data.set('published/lessons/nodate', { lesson_id: 'nodate', unit_id: 'unit1', published_at: '2026-11-01T01:00:00Z' });
   const load = await student(store, { action: 'load', class_token: token(1) });
   assert.equal(load.practice.today, 20);
   assert.equal(load.practice.cards[0].cue, 'term 0');

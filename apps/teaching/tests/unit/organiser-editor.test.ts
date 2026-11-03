@@ -9,14 +9,14 @@ import {
   planItems
 } from '@/organiser/bring-in';
 import {
+  columnSlots,
   createSerialQueue,
-  fitCells,
+  firstHidden,
   lessonCodes,
-  noCardWarning,
+  lineWords,
+  makesCard,
   parsePaste,
-  recentLessonIds,
-  toggleHide,
-  USUAL_THREE
+  recentLessonIds
 } from '@/organiser/editor-model';
 import { runLines, clock } from '@/organiser/run-view';
 import type { Organiser, Sheet } from '@/organiser/types';
@@ -47,26 +47,22 @@ describe('parsePaste', () => {
   });
 });
 
-describe('noCardWarning', () => {
-  it('warns when a table hides nothing', () => {
-    expect(noCardWarning({ kind: 'table', columns: cols(false, false) })).toMatch(/no practice cards/);
+describe('columnSlots, lineWords and makesCard', () => {
+  const idea = { kind: 'table' as const, role: 'concept' as const, columns: [{ id: 'a', label: 'Prompt', hide: false }, { id: 'b', label: 'What to know', hide: true }, { id: 'c', label: 'Example', hide: false }] };
+  it('finds the prompt, the answer and the rest', () => {
+    expect(columnSlots(idea)).toEqual({ cue: 0, answer: 1, rest: [2] });
+    expect(columnSlots({ kind: 'list' })).toEqual({ cue: -1, answer: 0, rest: [] });
   });
-  it('warns when every column is hidden', () => {
-    expect(noCardWarning({ kind: 'table', columns: cols(true, true) })).toMatch(/no practice cards/);
+  it('shows a key idea as what to know, and a word as both sides', () => {
+    expect(lineWords(idea, { cells: ['P', 'Know', 'E'] })).toEqual({ head: '', body: 'Know' });
+    expect(lineWords({ ...idea, role: 'vocab' }, { cells: ['Word', 'Means', ''] })).toEqual({ head: 'Word', body: 'Means' });
+    expect(lineWords({ kind: 'sequence' }, { cells: ['A step'] })).toEqual({ head: '', body: 'A step' });
   });
-  it('is quiet for a table with one hidden and one shown, and for lists', () => {
-    expect(noCardWarning({ kind: 'table', columns: cols(false, true, false) })).toBeNull();
-    expect(noCardWarning({ kind: 'list' })).toBeNull();
-    expect(noCardWarning({ kind: 'sequence' })).toBeNull();
-  });
-});
-
-describe('toggleHide', () => {
-  it('flips one column but never hides the last shown one', () => {
-    const two = cols(false, true);
-    expect(toggleHide(two, 'oc_0').map((c) => c.hide)).toEqual([false, true]);
-    expect(toggleHide(two, 'oc_1').map((c) => c.hide)).toEqual([false, false]);
-    expect(toggleHide(cols(false, false, true), 'oc_0').map((c) => c.hide)).toEqual([true, false, true]);
+  it('needs both sides to make a card', () => {
+    const section = { ...idea, id: 's', name: 'S', lines: [] };
+    expect(makesCard(section, { cells: ['P', 'Know', ''] })).toBe(true);
+    expect(makesCard(section, { cells: ['', 'Know', ''] })).toBe(false);
+    expect(makesCard({ ...section, kind: 'list', columns: undefined }, { cells: ['x'] })).toBe(false);
   });
 });
 
@@ -194,19 +190,6 @@ describe('last two lessons', () => {
 describe('small helpers', () => {
   it('codes lessons L1, L2 in the unit order', () => {
     expect([...lessonCodes(['x', 'y'])]).toEqual([['x', 'L1'], ['y', 'L2']]);
-  });
-
-  it('fits cells to a section', () => {
-    expect(fitCells(['a', 'b', 'c'], { kind: 'table', columns: cols(false, true) })).toEqual(['a', 'b']);
-    expect(fitCells(['a'], { kind: 'table', columns: cols(false, true) })).toEqual(['a', '']);
-    expect(fitCells(['a', 'b'], { kind: 'list' })).toEqual(['a - b']);
-  });
-
-  it('starts a new unit with the usual three, middle column covered', () => {
-    expect(USUAL_THREE.map((s) => s.name)).toEqual(['Key ideas', 'Vocabulary', 'Key lines']);
-    for (const spec of USUAL_THREE) {
-      expect(spec.columns.map((c) => c.hide)).toEqual([false, true, false]);
-    }
   });
 
   it('runs jobs one at a time in the order they were added', async () => {
