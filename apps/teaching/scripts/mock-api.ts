@@ -346,6 +346,34 @@ function mockWalkthruPicture(n: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" fill="none" stroke="currentColor" stroke-width="3"><rect x="20" y="20" width="200" height="140" rx="10" stroke-dasharray="6 8"/><circle cx="120" cy="80" r="26" fill="var(--wt-paper, white)"/><path d="M95 150c0-30 50-30 50 0"/><text x="120" y="88" text-anchor="middle" font-size="24" fill="currentColor" stroke="none">${n}</text></svg>`;
 }
 
+/** A made-up share sheet for walking /s/sheets/aaa… (48 a's) locally. */
+const MOCK_SHARED_SHEET = {
+  title: 'Our coaching session: questioning',
+  message: 'Have a look at the two notes on your transcript before we talk again.',
+  from: 'A. Coach',
+  meeting_date: '2026-11-03T04:30:00.000Z',
+  time_zone: 'Australia/Sydney',
+  summary: 'Your follow-up questions are strong. The next step is widening who answers the first one.',
+  blocks: [
+    { id: 'b1', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher', content: { html: '<p>Twelve questions in nine minutes, and four students answered them all.</p>' } },
+    {
+      id: 'b2',
+      block_type: 'annotation',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        text: { kind: 'verse', stanzas: [{ id: 's1', lines: [{ id: 'l1', text: 'Who can tell me why the narrator lies here?' }, { id: 'l2', text: 'What in the text makes you say that?' }] }] },
+        layers: [{ id: 'worked', name: 'What worked', kind: 'free', colour: 'navy' }],
+        annotations: [{ id: 'n1', layer_id: 'worked', anchor: { granularity: 'phrase', stanza: 's1', line: 'l2', quote: { exact: 'makes you say that', prefix: 'What in the text ', suffix: '?' } }, body: { html: '<p>This sent everyone back to the words.</p>', attachments: [] } }],
+        settings: { show_markers: true, default_layer_id: 'worked' }
+      }
+    }
+  ],
+  minutes: [{ heading: 'Next observation', text: 'Same class, same part of the lesson.' }],
+  coaching: [],
+  shared_at: '2026-11-04T01:00:00.000Z'
+};
+
 function jsonResponse(
   status: number,
   body: unknown,
@@ -4223,6 +4251,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return okResponse(200, { pictures: { id: query.get('id'), steps: [1, 2, 3, 4, 5].map(mockWalkthruPicture) } });
     }
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
+    if (method === 'GET' && path.startsWith('/api/published/sheets/')) {
+      return path.endsWith('/' + 'a'.repeat(48))
+        ? okResponse(200, MOCK_SHARED_SHEET)
+        : jsonResponse(404, { ok: false, error: { code: 'not_found', message: 'This sheet is no longer shared.', retryable: false } });
+    }
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
     if (method === 'GET' && path === '/api/export') return handleGetExport(cookie, query);

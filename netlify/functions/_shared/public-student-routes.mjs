@@ -33,6 +33,7 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'GET', pattern: /^\/api\/published\/feedback\/[^/]+\/audio$/ },
   { method: 'GET', pattern: /^\/api\/published\/examples\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/lines\/[^/]+$/ },
+  { method: 'GET', pattern: /^\/api\/published\/sheets\/[a-f0-9]{48}$/ },
   { method: 'POST', pattern: /^\/api\/published\/examples\/[^/]+\/(?:unlock|submit)$/ },
   { method: 'GET', pattern: /^\/api\/media\/[^/]+\/file$/ },
   { method: 'POST', pattern: /^\/api\/published\/pulse\/[^/]+$/ },

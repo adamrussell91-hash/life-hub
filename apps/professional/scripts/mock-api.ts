@@ -1,4 +1,5 @@
 import { CATALOGUE } from '../../../packages/walkthrus/catalogue.mjs';
+import { buildSheet, defaultPicks, sheetOptions } from '../../../netlify/functions/_shared/meeting-sheet.mjs';
 import { normalizeArrows, normalizePicked } from '../../../packages/walkthrus/arrows.mjs';
 import { checkOneActive } from '../../../packages/walkthrus/goal.mjs';
 import { normalizeClusters } from '../../../packages/walkthrus/clusters.mjs';
@@ -343,6 +344,7 @@ export function createMockApi() {
   }
 
   let authenticated = false;
+  const meetingSheetShares = new Map<string, { token: string; created_at: string; updated_at: string; picks: unknown; sheet: unknown }>();
 
   function json(status: number, body: unknown) {
     return { status, body };
@@ -2190,6 +2192,37 @@ export function createMockApi() {
           )
         }
       });
+    }
+
+    if (path === '/api/meeting-sheets') {
+      const id = url.searchParams.get('meeting_id') ?? '';
+      const meeting = meetings.get(id);
+      if (!meeting) {
+        return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
+      }
+      const share = meetingSheetShares.get(id) ?? null;
+      if (method === 'GET') {
+        return json(200, { ok: true, data: { options: sheetOptions(meeting), picks: share?.picks ?? defaultPicks(meeting), share } });
+      }
+      const action = url.searchParams.get('action');
+      if (action === 'stop') {
+        meetingSheetShares.delete(id);
+        return json(200, { ok: true, data: { share: null } });
+      }
+      const built = buildSheet(meeting, (body as { picks?: unknown } | undefined)?.picks);
+      if (action === 'preview') {
+        return json(200, { ok: true, data: { sheet: built.sheet, left_off: built.left_off } });
+      }
+      const at = new Date().toISOString();
+      const next = {
+        token: share?.token ?? 'a'.repeat(48),
+        created_at: share?.created_at ?? at,
+        updated_at: at,
+        picks: built.picks,
+        sheet: built.sheet
+      };
+      meetingSheetShares.set(id, next);
+      return json(200, { ok: true, data: { share: next, left_off: built.left_off } });
     }
 
     if (path === '/api/meetings' && method === 'POST') {

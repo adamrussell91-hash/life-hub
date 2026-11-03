@@ -43,6 +43,7 @@ import { GUIDES, guideById } from '@/guides/registry';
 import { openGuidePanel } from '@/guides/guide-panel';
 import { renderGuideCard } from '@/guides/guide-card';
 import { openCoachingPanel, renderCoachingCard, type CoachingSheet } from '@/guides/coaching-sheet';
+import { openShareSheet } from '@/guides/share-sheet';
 import { saveSheet } from '../../../../packages/walkthrus/coaching.mjs';
 import { guideDigest, historyFor, noteLine, placeRuns, type PlacedRun } from '@/guides/runs';
 import type { GuideRun } from '@/guides/types';
@@ -236,7 +237,14 @@ export async function renderMeetingPage(
   const editBtn = el('button', 'btn btn--secondary', 'Edit details') as HTMLButtonElement;
   editBtn.type = 'button';
   editBtn.dataset.part = 'edit-details';
-  headActions.append(editBtn);
+  const shareBtn = el('button', 'btn btn--secondary', 'Share sheet') as HTMLButtonElement;
+  shareBtn.type = 'button';
+  shareBtn.dataset.part = 'share-sheet';
+  shareBtn.addEventListener('click', async () => {
+    await blockPage?.flush();
+    openShareSheet(id, () => shareBtn.focus());
+  });
+  headActions.append(shareBtn, editBtn);
   const actionStatus = el('p', 'meeting-form__status');
   actionStatus.hidden = true;
   let stateActionPending = false;
