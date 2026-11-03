@@ -165,7 +165,7 @@ describe('lesson end card', () => {
     const content = document.createElement('div');
     const footer = document.createElement('div');
     content.append(footer);
-    await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ lines: ['Line one', 'Line two'] }) } });
+    await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ lines: ['Line one', 'Line two'], joining: true }) } });
     expect(content.firstElementChild!.className).toBe('kos-end');
     expect(content.textContent).toContain('From this lesson: 2 new lines');
     expect(content.querySelector('a')!.getAttribute('href')).toContain('/s/classes/c1/profile?tab=organiser');

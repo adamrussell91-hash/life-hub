@@ -263,8 +263,8 @@ test('review: a withdrawn line keeps its box; a deleted line drops out', async (
 test('lesson: the first cell of each released line from that lesson, no claim needed', async () => {
   const store = await fixture();
   await seeded(store);
-  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { lines: ['past term'] });
-  assert.deepEqual(await student(store, { action: 'lesson', lesson_id: 'future' }), { lines: [] });
+  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { lines: ['past term'], joining: false });
+  assert.deepEqual(await student(store, { action: 'lesson', lesson_id: 'future' }), { lines: [], joining: false });
   await assert.rejects(student(store, { action: 'lesson', lesson_id: '../x' }), (e) => e.status === 400);
 });
 
