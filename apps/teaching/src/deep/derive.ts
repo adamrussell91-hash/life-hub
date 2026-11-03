@@ -60,8 +60,6 @@ export function planGaps(du: DeepUnderstanding, all: readonly DeepUnderstanding[
   if (!du.dot_points.length) gaps.push('Needs a dot point');
   if (!du.concept_bullets.length) gaps.push('Needs a concept bullet');
   const pieces = piecesFor(du, all);
-  const core = pieces.filter((x) => x.tier !== 'sophisticated').length;
-  if (core < 8) gaps.push(`Only ${core} knowledge piece${core === 1 ? '' : 's'} (aim for 8 to 12 Essential and Strong)`);
   const untaught = pieces.filter((x) => !p.taught.has(x.id)).length;
   if (untaught) gaps.push(`${untaught} piece${untaught === 1 ? '' : 's'} not taught yet`);
   const untested = pieces.filter((x) => !p.tested.has(x.id)).length;
