@@ -114,6 +114,8 @@ export type RenderContext = {
   /** A lesson's Anthology block: the unit's map, fetched once the page is open. */
   loadAnthology?: () => Promise<{ data: AnthologyData; knowledge?: KnowledgeApi }>;
   openNoteId?: string;
+  /** The teacher's editing canvas: keeps the notes typed into a block's WalkThru strip, without redrawing the strip. */
+  saveWalkthruNotes?: (blockId: string, notes: Record<string, string>) => void;
   /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
   pageBlocks?: Block[];
   /** A student lesson whose quiz questions sit inside sections or columns: the answer space for a question, by block id. */
@@ -2936,7 +2938,12 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   }
   if (mode === 'teacher' && !ctx.display) {
     // The chosen WalkThru is the teacher's alone: never on Display, even before publishing strips it.
-    const technique = renderTechniqueBadge(block, { lessonId: ctx.lessonId, display: ctx.display });
+    const saveWalkthruNotes = ctx.saveWalkthruNotes;
+    const technique = renderTechniqueBadge(block, {
+      lessonId: ctx.lessonId,
+      display: ctx.display,
+      ...(saveWalkthruNotes ? { saveNotes: (notes: Record<string, string>) => saveWalkthruNotes(block.id, notes) } : {})
+    });
     if (technique) attachments.push(technique);
     const think = renderThinkAloud(block);
     if (think) attachments.push(think);

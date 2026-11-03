@@ -2,7 +2,7 @@ import { FIGURE_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import type { Block } from '@/schemas/block';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { techniqueById } from '../../../../../packages/walkthrus/catalogue.mjs';
-import { attachedTechniques } from './attach';
+import { attachedTechniques, stepNotes } from './attach';
 import { loadLiveGoal, loadWalkthruPictures, loadWalkthruText, type GoalLite, type WalkthruStepText } from './api';
 import { miniNames, miniTimer, type StripState } from './mini-tools';
 import { lessonSlots } from './note';
@@ -50,6 +50,8 @@ function sayLine(line: string, state: StripState, question: string | null): HTML
   return item;
 }
 
+interface StripContext { lessonId?: string; display?: boolean; saveNotes?: (notes: Record<string, string>) => void }
+
 interface StripData { techniqueId: string; steps: WalkthruStepText[]; pictures: Array<string | null>; goal: GoalLite | null }
 
 /**
@@ -57,9 +59,10 @@ interface StripData { techniqueId: string; steps: WalkthruStepText[]; pictures: 
  * five step pictures as a strip, small classroom tools under the steps that use one, and a cue
  * card for the step you are on: what to do, what to say, and the book's coaching folded away.
  * Display and student pages never get it (the chosen id is stripped from the published lesson).
- * In a lesson each step also carries a tick that saves against the lesson and class.
+ * In a lesson each step also carries a tick that saves against the lesson and class. Each step has
+ * a box for the teacher's own notes wherever `saveNotes` can keep them.
  */
-export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string; display?: boolean } = {}): HTMLElement | null {
+export function renderTechniqueBadge(block: Block, ctx: StripContext = {}): HTMLElement | null {
   const [id] = attachedTechniques(block);
   const entry = id ? techniqueById(id) : null;
   if (!entry) return null;
@@ -94,8 +97,33 @@ export function renderTechniqueBadge(block: Block, ctx: { lessonId?: string; dis
   return details;
 }
 
-function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string; display?: boolean }): HTMLElement[] {
+/** The teacher's notes for a step: a box that saves as they type, or just the words where nothing can save them. */
+function notesFor(n: number, notes: Record<string, string>, save: StripContext['saveNotes']): HTMLElement | null {
+  const key = String(n);
+  if (!save && !notes[key]) return null;
+  const wrap = el('div', 'wts__notes');
+  wrap.append(el('p', 'wts__h', 'My notes'));
+  if (!save) {
+    wrap.append(el('p', 'wts__note', notes[key]));
+    return wrap;
+  }
+  const area = el('textarea', 'wts__note-input');
+  area.rows = 2;
+  area.maxLength = 2000;
+  area.value = notes[key] ?? '';
+  area.placeholder = 'Add your own notes for this step';
+  area.setAttribute('aria-label', `Your notes for step ${n}`);
+  area.addEventListener('input', () => {
+    if (area.value.trim()) notes[key] = area.value; else delete notes[key];
+    save({ ...notes });
+  });
+  wrap.append(area);
+  return wrap;
+}
+
+function buildStrip(data: StripData, block: Block, ctx: StripContext): HTMLElement[] {
   const question = blockQuestion(block);
+  const notes = stepNotes(block);
   const ticks = ctx.lessonId && !ctx.display
     ? createStepTicks({ techniqueId: data.techniqueId, lessonId: ctx.lessonId, slots: lessonSlots(ctx.lessonId), total: Math.min(9, data.steps.length) })
     : null;
@@ -158,6 +186,8 @@ function buildStrip(data: StripData, block: Block, ctx: { lessonId?: string; dis
     }
     const adapted = data.goal?.walkthru?.adapted?.[String(step.n)];
     if (adapted) card.append(el('p', 'wts__adapted', adapted));
+    const mine = notesFor(step.n, notes, ctx.saveNotes);
+    if (mine) card.append(mine);
     const book = cue ? el('details', 'wts__book') : el('div', 'wts__book wts__book--open');
     if (cue) book.append(el('summary', '', 'The book’s coaching'));
     for (const para of step.text.split(/\n\s*\n/)) book.append(el('p', '', para));
