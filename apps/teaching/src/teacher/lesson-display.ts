@@ -128,7 +128,7 @@ export function mountLessonDisplayView(
     const hero = document.createElement('section');
     hero.className = 'lesson-display__step lesson-display__step--hero';
     content.append(hero);
-    const outcomes = renderPublishedLessonHero(hero, lesson);
+    renderPublishedLessonHero(hero, lesson);
 
     examples = createTeacherClassExamples({ lessonId: lesson.lesson_id });
     const isQuiz = hasLiveQuiz(lesson);
@@ -147,7 +147,6 @@ export function mountLessonDisplayView(
             lessonId: lesson.lesson_id,
             display: true,
             pageBlocks: lesson.blocks,
-            attachedOutcomes: outcomes,
             // The class screen shows the students' view: no initials, no review list.
             loadAnthology: () => studentUnitAnthology(lesson.unit_id)
           })

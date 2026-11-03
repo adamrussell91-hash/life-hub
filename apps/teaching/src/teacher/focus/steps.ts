@@ -39,7 +39,6 @@ const SUPPORTING = new Set<Block['block_type']>([
   'code',
   'divider',
   'spacer',
-  'outcomes',
   'countdown'
 ]);
 

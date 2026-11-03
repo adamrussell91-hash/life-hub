@@ -3075,10 +3075,14 @@ var AnthologyBlockObjectSchema = z12.object({
 var OutcomesBlockSchema = z12.object({
   id: z12.string().min(1),
   type: z12.literal("block"),
+  // Shows as What, How, Why. The type keeps its old name so blocks already placed carry over.
   block_type: z12.literal("outcomes"),
   variant: z12.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z12.object({}).default({}),
+  content: z12.object({
+    what: z12.string().default(""),
+    how: z12.array(z12.object({ id: z12.string().min(1), text: z12.string() })).default([])
+  }).default({ what: "", how: [] }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -4634,6 +4638,9 @@ function ownIssue(block, discernHosts) {
     if (validBlanks.length < 1) {
       return "Cloze blocks need at least one blank to publish";
     }
+  }
+  if (block.block_type === "outcomes" && !block.content.what.trim()) {
+    return "Write what the class is learning in this What, how, why block";
   }
   if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
     return "Write the prompt for this note cue";

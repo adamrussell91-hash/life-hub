@@ -2233,10 +2233,14 @@ var AnthologyBlockObjectSchema = z12.object({
 var OutcomesBlockSchema = z12.object({
   id: z12.string().min(1),
   type: z12.literal("block"),
+  // Shows as What, How, Why. The type keeps its old name so blocks already placed carry over.
   block_type: z12.literal("outcomes"),
   variant: z12.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z12.object({}).default({}),
+  content: z12.object({
+    what: z12.string().default(""),
+    how: z12.array(z12.object({ id: z12.string().min(1), text: z12.string() })).default([])
+  }).default({ what: "", how: [] }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -4526,7 +4530,7 @@ var NEW_BLOCK_LABEL = {
   tabs: "Panels",
   collection: "Collection",
   anthology: "Anthology",
-  outcomes: "Outcomes",
+  outcomes: "What, how, why",
   annotation: "Annotation",
   teacher_note: "Teacher note",
   toolkit_skill: "Skill",
@@ -5206,7 +5210,7 @@ function createBlock(type, id) {
         ...shared,
         block_type: "outcomes",
         variant: "medium",
-        content: {}
+        content: { what: "", how: [] }
       };
     case "annotation":
       return {
@@ -6046,8 +6050,10 @@ What you cannot do:
 - Upload, record, or attach files. image, gallery, video, embed, audio, and attachment URLs (and flashcard image_url) can only come from the search pack. You cannot use the teacher's own photos, PDFs, or recordings; tell them to add those in the editor.
 - Draw on a whiteboard. Its canvas lives outside the lesson JSON, so you can only add an empty board for the teacher to draw on.
 - Add voice tracks (readings, think-alouds) to an annotation block; those need a real recording.
-- Fill anthology or outcomes blocks; they show the unit's tags and the page's outcomes automatically. You can only place them.
+- Fill anthology blocks; they show the unit's tags automatically. You can only place them.
 - Use collection in a lesson.
+
+What, how, why blocks (block_type outcomes): set content.what to what the class is learning, and content.how to the criteria for how they learn it and show it, each { id, text } as a short thing a student can do. Leave the why to the students: each writes their own in class.
 
 Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. Choose the stanza or line each note anchors to from the text itself and build it.`;
 function withStableIds(block, prefix) {
@@ -7196,6 +7202,9 @@ function ownIssue(block, discernHosts) {
     if (validBlanks.length < 1) {
       return "Cloze blocks need at least one blank to publish";
     }
+  }
+  if (block.block_type === "outcomes" && !block.content.what.trim()) {
+    return "Write what the class is learning in this What, how, why block";
   }
   if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
     return "Write the prompt for this note cue";

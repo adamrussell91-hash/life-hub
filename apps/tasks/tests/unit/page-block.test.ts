@@ -21,12 +21,11 @@ describe('page block schema', () => {
     });
   });
 
-  it('keeps the full Teaching Hub family list on task pages', () => {
+  it('keeps the Teaching Hub families that have blocks for task pages', () => {
     const families = taskPaletteFamilies();
     expect(families.map((family) => family.id)).toEqual([
       'Basic',
       'Media',
-      'Teaching',
       'Learning',
       'Visualisation',
       'Layout'

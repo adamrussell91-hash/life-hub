@@ -761,12 +761,15 @@
     "anthology.title filler"
   ],
   "every-block/every_outcomes/student": [
-    "No outcomes tagged on this page yet.",
-    "Outcomes"
+    "How we’ll learn it and show it",
+    "What we’re learning",
+    "Why it matters"
   ],
   "every-block/every_outcomes/teacher": [
-    "No outcomes tagged on this page yet.",
-    "Outcomes"
+    "How we’ll learn it and show it",
+    "What we’re learning",
+    "Why it matters",
+    "Write what the class is learning"
   ],
   "every-block/every_annotation/student": [
     "Annotations will appear here as they are added.",

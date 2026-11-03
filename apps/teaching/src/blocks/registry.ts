@@ -73,7 +73,6 @@ import {
   renderHtmlBlock,
   renderImageBlock,
   renderMindMapBlock,
-  renderOutcomesBlock,
   renderQuestionSetBlock,
   renderQuoteBlock,
   renderRichTextBlock,
@@ -91,6 +90,7 @@ import {
 import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderDone, createDoneEditor } from '@/blocks/done';
+import { renderWhatHowWhy } from '@/blocks/what-how-why';
 import { renderBrainstorm, createBrainstormEditor } from '@/blocks/brainstorm';
 import { renderHingeQuestion, createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { renderContinuumLine, createContinuumLineEditor } from '@/blocks/continuum-line';
@@ -249,7 +249,7 @@ export const blockRegistry: {
     createEditor: createAnthologyEditor
   },
   outcomes: {
-    render: renderOutcomesBlock,
+    render: renderWhatHowWhy,
     createEditor: createOutcomesEditor
   },
   section: {

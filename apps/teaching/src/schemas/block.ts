@@ -1304,10 +1304,16 @@ export const AnthologyBlockSchema = AnthologyBlockObjectSchema;
 export const OutcomesBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
+  // Shows as What, How, Why. The type keeps its old name so blocks already placed carry over.
   block_type: z.literal('outcomes'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
-  content: z.object({}).default({}),
+  content: z
+    .object({
+      what: z.string().default(''),
+      how: z.array(z.object({ id: z.string().min(1), text: z.string() })).default([])
+    })
+    .default({ what: '', how: [] }),
   ...blockLayout,
   ...blockTimestamps
 });

@@ -228,7 +228,7 @@ describe('page editor', () => {
     });
   });
 
-  it('lists every Teaching Hub family in the plus menu', async () => {
+  it('lists the Teaching Hub families that have blocks for pages in the plus menu', async () => {
     vi.mocked(tasksApi.getTask).mockResolvedValue(task());
     vi.mocked(tasksApi.listProjects).mockResolvedValue([project]);
 
@@ -237,7 +237,7 @@ describe('page editor', () => {
     canvas.querySelector<HTMLButtonElement>('.page-editor__add-btn')!.click();
 
     const labels = [...canvas.querySelectorAll('.page-editor__insert-label')].map((node) => node.textContent);
-    expect(labels).toEqual(['Basic', 'Media', 'Teaching', 'Learning', 'Visualisation', 'Layout']);
+    expect(labels).toEqual(['Basic', 'Media', 'Learning', 'Visualisation', 'Layout']);
   });
 
   it('lists project tasks and keeps a newly added task on the page', async () => {

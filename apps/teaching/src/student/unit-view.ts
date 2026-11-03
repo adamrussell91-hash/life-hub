@@ -67,7 +67,6 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
               ...(lesson.after_lesson_ids ? { after: lesson.after_lesson_ids } : {})
             }))
           },
-          attachedOutcomes: publishedOutcomes,
           anthology: unit.anthology,
           anthologyKnowledge: studentKnowledgeApi(unit.unit_id)
         })

@@ -6,7 +6,7 @@ export type BrainstormBlock = Extract<Block, { block_type: 'brainstorm' }>;
 const POLL_MS = 5000;
 
 /** Runs `tick` now and every few seconds while the block is on the page and the tab is visible. */
-export function poller(root: HTMLElement, tick: () => Promise<void>): void {
+export function poller(root: HTMLElement, tick: () => Promise<void>, everyMs = POLL_MS): void {
   let timer: number | undefined;
   const onVisible = () => {
     if (!root.isConnected) return document.removeEventListener('visibilitychange', onVisible);
@@ -18,7 +18,7 @@ export function poller(root: HTMLElement, tick: () => Promise<void>): void {
       if (!root.isConnected) return document.removeEventListener('visibilitychange', onVisible);
       if (!document.hidden) await tick();
       schedule();
-    }, POLL_MS);
+    }, everyMs);
   };
   document.addEventListener('visibilitychange', onVisible);
   void tick().finally(schedule);

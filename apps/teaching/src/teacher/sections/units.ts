@@ -53,7 +53,7 @@ import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
 import { unitPaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
-import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
+import { mountOutcomeStrip } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
 import { settleConceptLines, settleSkillLines, unitConceptKeysFor, unitNetworkContext } from '@/teacher/network-context';
@@ -598,8 +598,7 @@ export function renderUnitPage(
       const saved = await patchUnit(unit.id, { blocks });
       unit.blocks = saved.blocks;
       if (refresh) await options.onMutated?.();
-    },
-    attachedOutcomes: publicOutcomesForPage(unit, curriculum.outcomes ?? [])
+    }
   });
 
   const subject = curriculum.subjects.find((entry) => entry.id === unit.subject_id);
@@ -614,7 +613,6 @@ export function renderUnitPage(
         onChange: async (ids) => {
           const saved = await patchUnit(unit.id, { outcome_ids: ids });
           unit.outcome_ids = saved.outcome_ids;
-          planEditor.updateOutcomes(publicOutcomesForPage(unit, curriculum.outcomes ?? []));
         },
         onCatalogChange: (created) => {
           curriculum.outcomes = [...(curriculum.outcomes ?? []), created];
@@ -891,13 +889,11 @@ function mountUnitPlanEditor(
     unit: Unit;
     curriculum: CurriculumResponse;
     onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
-    attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
   }
-): { dispose: () => void; updateOutcomes: (next: ReturnType<typeof publicOutcomesForPage>) => void; addFrameworkLens: (lensId: string) => boolean } {
+): { dispose: () => void; addFrameworkLens: (lensId: string) => boolean } {
   let blocks = structuredClone(initialBlocks);
   let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
-  let attachedOutcomes = options.attachedOutcomes ?? [];
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let saveChain = Promise.resolve();
   let revision = 0;
@@ -1059,7 +1055,6 @@ function mountUnitPlanEditor(
         pageBlocks: blocks,
         unitLessons,
         network: unitNetworkContext(options.curriculum, options.unit),
-        attachedOutcomes,
         anthology: anthologyData,
         anthologyKnowledge: teacherKnowledgeApi(options.unit.id),
         onMakeAnthologyCards: (request) => {
@@ -1136,10 +1131,6 @@ function mountUnitPlanEditor(
   });
 
   return {
-    updateOutcomes(next) {
-      attachedOutcomes = next;
-      canvas.update(blocks);
-    },
     /** A framework lens on the whole unit: a new plan block that carries the lens, at the end of the plan. */
     addFrameworkLens(lensId) {
       const lens = steppedLens(lensId);

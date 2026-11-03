@@ -225,7 +225,6 @@ function renderPublishedLesson(
         lessonId: lesson.lesson_id,
         classId: extras?.cls?.id ?? extras?.quizClassId,
         pageBlocks: lesson.blocks,
-        attachedOutcomes: publishedOutcomes,
         openNoteId,
         ...(stepFor ? { stepFor } : {}),
         loadAnthology: () => studentUnitAnthology(lesson.unit_id),

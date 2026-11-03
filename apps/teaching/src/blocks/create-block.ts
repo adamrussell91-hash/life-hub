@@ -142,7 +142,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   tabs: 'Panels',
   collection: 'Collection',
   anthology: 'Anthology',
-  outcomes: 'Outcomes',
+  outcomes: 'What, how, why',
   annotation: 'Annotation',
   teacher_note: 'Teacher note',
   toolkit_skill: 'Skill',
@@ -890,7 +890,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
         ...shared,
         block_type: 'outcomes',
         variant: 'medium',
-        content: {}
+        content: { what: '', how: [] }
       };
     case 'annotation':
       return {
