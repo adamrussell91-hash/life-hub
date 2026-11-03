@@ -20,7 +20,7 @@ import { loadBoardClusters } from '../walkthru-note/api';
 import { hasThinkAloud, thinkAloudFields, thinkAloudOf, withThinkAloud, type ThinkAloud } from '../think-aloud';
 
 const walkthruGlyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
-/** The hexagon carries its book, so Book 2 reads blue wherever it's picked. */
+/** The hexagon carries its book, so each book reads in its own colour wherever it's picked. */
 const walkthruHex = (id: string): HTMLSpanElement => {
   const hex = walkthruGlyphs.element(id);
   hex.dataset.set = String(techniqueById(id)?.set ?? 1);
