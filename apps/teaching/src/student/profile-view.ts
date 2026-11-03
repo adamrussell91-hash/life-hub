@@ -27,7 +27,7 @@ import '@/progress/progress.css';
 import './profile.css';
 
 type Role = 'core' | 'support' | 'extension' | 'optional';
-export type ProfileLesson = { id: string; title: string; role: Role; kind: 'lesson' | 'quiz' | 'assessment'; done: boolean; assigned: boolean };
+export type ProfileLesson = { id: string; title: string; role: Role; kind: 'lesson' | 'quiz' | 'assessment'; done: boolean };
 /** What the server sends to draw the map; see netlify/functions/_shared/profile-map.mjs. */
 export type ProfileUnit = {
   content: unknown;
@@ -168,7 +168,7 @@ function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HT
     classId,
     label: 'Your unit map',
     done: new Set(map.lessons.filter((l) => l.done).map((l) => l.id)),
-    faded: new Set(map.lessons.filter((l) => !l.assigned).map((l) => l.id)),
+    faded: new Set(),
     next: map.next
   });
   return section;

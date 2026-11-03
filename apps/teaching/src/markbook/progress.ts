@@ -1,6 +1,7 @@
 import { apiPost } from '@/api/client';
 import { el } from '@/quiz/dom';
 import type { ScheduledLesson, Unit } from '@/schemas';
+import { isCurriculumLinesV2 } from '@/schemas/block';
 import type { DoneRecord, MarkbookView } from './types';
 
 export type { DoneRecord };
@@ -8,8 +9,8 @@ export type { DoneRecord };
 /**
  * Lesson progress for the markbook's Marks & progress view: which lessons of the class's active units
  * each student has done. A tick is complete, a half circle is partial, a grey box is not for that
- * student, and a red dot means it is still not complete a week after its set date. Every lesson in
- * the unit is for every student, side lessons too; only a tutorial is for just the students in its groups.
+ * student, and a red dot means it is still not complete a week after its set date. A core lesson is
+ * for every student. A side lesson is for the students ticked for it, a tutorial for those in its groups.
  */
 
 /** A lesson is late this many days after its set date. */
@@ -25,7 +26,7 @@ export type ProgressLesson = {
   date?: string;
   /** The unit it belongs to, for the band above the columns. */
   unit?: string;
-  /** A tutorial: only the students in its groups. Missing means every student. */
+  /** A tutorial: only the students in its groups. Missing goes by the role and the ticks. */
   students?: string[];
 };
 
@@ -36,7 +37,7 @@ type TutorialGroups = { class_id: string; groups: ReadonlyArray<{ students: read
  * Undated lessons follow the dated ones in unit order.
  */
 export function unitProgressLessons(
-  units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & { title?: string }>,
+  units: ReadonlyArray<Pick<Unit, 'lesson_ids'> & Partial<Pick<Unit, 'blocks'>> & { title?: string }>,
   lessons: ReadonlyArray<{ id: string; title: string; status?: string; route_role?: ProgressLesson['role'] | null; pedagogical_mode?: string; tutorial?: TutorialGroups | null }>,
   scheduled: readonly (Pick<ScheduledLesson, 'lesson_id' | 'date'> & { delivery_status?: ScheduledLesson['delivery_status'] })[],
   /** The class, so a tutorial set for another class is for nobody here. */
@@ -54,7 +55,7 @@ export function unitProgressLessons(
     out.push({
       id,
       title: lesson.title,
-      role: lesson.route_role ?? 'core',
+      role: lesson.route_role ?? sideStopRole(unit, id) ?? 'core',
       assessment: lesson.pedagogical_mode === 'assessment',
       ...(dates[0] ? { date: dates[0] } : {}),
       ...(unit.title ? { unit: unit.title } : {}),
@@ -62,6 +63,16 @@ export function unitProgressLessons(
     });
   }
   return out.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0));
+}
+
+/** An older side lesson whose role is only on the unit map's stop. */
+function sideStopRole(unit: Pick<Unit, 'blocks'>, lessonId: string): ProgressLesson['role'] | undefined {
+  for (const block of unit.blocks ?? []) {
+    if (block.block_type !== 'curriculum_lines' || !isCurriculumLinesV2(block.content)) continue;
+    const kind = block.content.rail_stops.find((s) => s.lesson_id === lessonId && s.kind !== 'stop')?.kind;
+    if (kind && kind !== 'stop') return kind;
+  }
+  return undefined;
 }
 
 function tutorialStudents(tutorial: TutorialGroups | null | undefined, classId: string | undefined): string[] {
@@ -85,9 +96,9 @@ export type CellInput = {
   /** Handed in with nothing left to mark. */
   quizMarked?: boolean;
   quizStarted: boolean;
-  /** The teacher ticked this lesson as taken for the student. */
+  /** The teacher ticked this lesson for the student. */
   took: boolean;
-  /** The lesson is set for this student: every lesson is, except a tutorial they aren't grouped in. */
+  /** The lesson is set for this student whatever the ticks say: a core lesson, or a tutorial they're grouped in. */
   forStudent: boolean;
   today: string;
 };
@@ -152,7 +163,7 @@ export function lessonCell(view: MarkbookView, studentId: string, lesson: Progre
     // Written work saved in the lesson counts as under way, like a quiz go not handed in.
     quizStarted: Boolean(quiz?.started?.includes(studentId)) || Boolean(view.work?.find((w) => w.lesson_id === lesson.id)?.students[studentId]),
     took: (view.markbook.took?.[studentId] ?? []).includes(lesson.id),
-    forStudent: !lesson.students || lesson.students.includes(studentId),
+    forStudent: lesson.students ? lesson.students.includes(studentId) : lesson.role === 'core',
     today
   });
 }

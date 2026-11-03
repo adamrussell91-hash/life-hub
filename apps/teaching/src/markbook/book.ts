@@ -63,8 +63,13 @@ export function doneText(view: MarkbookView, studentId: string, lessons: readonl
 const lessonTag = (l: ProgressLesson): string =>
   l.students ? 'Tutorial' : l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
 
-/** A tutorial's exit check is only for the students in its groups. */
-const notForStudent = (c: AnyColumn, studentId: string): boolean => c.kind === 'quiz' && Boolean(c.groups) && !c.groups![studentId] && !c.scores[studentId];
+/** A tutorial's exit check is only for the students in its groups; a side lesson's quiz is for those ticked for it. */
+function notForStudent(view: MarkbookView, lessons: readonly ProgressLesson[], c: AnyColumn, studentId: string): boolean {
+  if (c.kind !== 'quiz' || c.scores[studentId]) return false;
+  if (c.groups) return !c.groups[studentId];
+  const lesson = lessons.find((l) => l.id === c.lesson_id);
+  return Boolean(lesson) && lesson!.role !== 'core' && !(view.markbook.took?.[studentId] ?? []).includes(c.lesson_id);
+}
 
 /** The grey box for a student a column isn't set for, matching the lesson boxes. */
 function naBox(student: RosterStudent, title: string): HTMLElement {
@@ -221,7 +226,7 @@ export function renderBook(o: BookOptions): HTMLElement {
     name.append(studentHead(o.view, s, o.actions.openStudent));
     tr.append(name);
     for (const c of columns) {
-      const na = c.kind === 'marked' && notForStudent(c.column, s.id);
+      const na = c.kind === 'marked' && notForStudent(o.view, o.lessons, c.column, s.id);
       const td = el('td', c.kind === 'lesson' || na ? 'mb-progress__cell' : 'mb-progress__cell mb-book__marked');
       td.append(c.kind === 'lesson' ? lessonButton(o.view, s, c.lesson, o.today, o.onMark) : na ? naBox(s, c.column.title) : cellFor(o.view, c.column, s, o.actions, o.today, { quizScore: true }));
       tr.append(td);
@@ -303,7 +308,7 @@ export function renderBookPhone(o: BookOptions & { index: number; move: (index: 
       unit = c.unit;
       list.append(el('p', 'mb-book__unit', unit));
     }
-    const na = c.kind === 'marked' && notForStudent(c.column, s.id);
+    const na = c.kind === 'marked' && notForStudent(o.view, o.lessons, c.column, s.id);
     const row = el('div', c.kind === 'marked' && !na ? 'mb-phone__row mb-book__marked' : 'mb-phone__row');
     const label = el('div', 'mb-phone__label');
     if (c.kind === 'lesson') {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 import { mapRows, profileAction, teacherProfileAction } from '../../netlify/functions/_shared/profile.mjs';
+import { markbookAction } from '../../netlify/functions/_shared/markbook.mjs';
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -60,9 +61,31 @@ test('done by an unclaimed device is refused', async () => {
 test('the profile lists lessons in unit order with roles and which are done', async () => {
   const s = await fixture();
   await profileAction(s, 'class1', { action: 'done', class_token: token(1), lesson_id: 'l1' });
+  const { students } = await loadRoster(s, 'class1');
+  await markbookAction(s, 'class1', { action: 'set_lesson_students', lesson_id: 'l2', student_ids: [students[0].id] });
   const out = await profileAction(s, 'class1', { action: 'status', class_token: token(1) });
-  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.role, l.done]), [['l1', 'core', true], ['l2', 'support', false], ['l3', 'extension', false]]);
+  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.role, l.done]), [['l1', 'core', true], ['l2', 'support', false]]);
   assert.equal(out.map.next, null, 'with no core lessons left there is nothing next');
+});
+
+test('a side lesson reaches only ticked students, and the tick list reads back', async () => {
+  const s = await fixture();
+  const roster = await loadRoster(s, 'class1');
+  const [bob, tom] = roster.students;
+  await claimInitials(s, roster, token(2), 'TT');
+  const titles = async (n) => (await profileAction(s, 'class1', { class_token: token(n) })).map.unit.lessons.map((l) => l.title);
+  assert.deepEqual(await titles(1), ['Ghost poem'], 'nobody ticked yet');
+  await markbookAction(s, 'class1', { action: 'set_lesson_students', lesson_id: 'l3', student_ids: [tom.id] });
+  assert.deepEqual(await titles(1), ['Ghost poem']);
+  assert.deepEqual(await titles(2), ['Ghost poem', 'Stretch']);
+  // Bob starts the support lesson without a tick and keeps it.
+  await profileAction(s, 'class1', { action: 'done', class_token: token(1), lesson_id: 'l2' });
+  assert.deepEqual(await titles(1), ['Ghost poem', 'Tutorial']);
+  assert.deepEqual(await markbookAction(s, 'class1', { action: 'lesson_students', lesson_id: 'l2' }).then((r) => [r.ticked, r.started, r.students.length]), [[], [bob.id], 2]);
+  // Clearing one lesson leaves the student's other ticks alone.
+  await markbookAction(s, 'class1', { action: 'set_lesson_students', lesson_id: 'l2', student_ids: [tom.id] });
+  await markbookAction(s, 'class1', { action: 'set_lesson_students', lesson_id: 'l2', student_ids: [] });
+  assert.deepEqual((await markbookAction(s, 'class1', { action: 'lesson_students', lesson_id: 'l3' })).ticked, [tom.id]);
 });
 
 test('next is the first core lesson not yet done', async () => {
@@ -118,11 +141,11 @@ test('a released claim loses the profile', async () => {
   assert.equal((await profileAction(s, 'class1', { class_token: token(1) })).need, 'initials');
 });
 
-test('a submitted quiz counts as done, and a took tick makes a support lesson assigned', () => {
-  const lessons = [{ id: 'q1', title: 'Quiz' }, { id: 's1', title: 'Support', route_role: 'support' }, { id: 's2', title: 'Other', route_role: 'support' }];
-  const view = { quizzes: [{ lesson_id: 'q1', scores: { st1: { submitted_at: '2026-10-01T00:00:00Z' } } }], markbook: { took: { st1: ['s1'] } } };
+test('a submitted quiz counts as done', () => {
+  const lessons = [{ id: 'q1', title: 'Quiz' }, { id: 's1', title: 'Support', route_role: 'support' }];
+  const view = { quizzes: [{ lesson_id: 'q1', scores: { st1: { submitted_at: '2026-10-01T00:00:00Z' } } }], markbook: { took: {} } };
   const rows = mapRows(lessons, view, {}, 'st1');
-  assert.deepEqual(rows.map((r) => [r.id, r.kind, r.done, r.assigned]), [['q1', 'quiz', true, true], ['s1', 'lesson', false, true], ['s2', 'lesson', false, false]]);
+  assert.deepEqual(rows.map((r) => [r.id, r.kind, r.done]), [['q1', 'quiz', true], ['s1', 'lesson', false]]);
   assert.equal(mapRows(lessons, view, {}, 'st2')[0].done, false, 'another student has not submitted');
 });
 
@@ -214,12 +237,16 @@ test('the progress map carries only published lessons and nothing a student shou
   ]);
   await claimInitials(s, await loadRoster(s, 'class1'), token(1), 'BB');
   const out = await profileAction(s, 'class1', { class_token: token(1) });
-  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.kind]), [['l1', 'lesson'], ['l2', 'lesson'], ['l4', 'assessment']]);
+  assert.deepEqual(out.map.lessons.map((l) => [l.id, l.kind]), [['l1', 'lesson'], ['l4', 'assessment']]);
   const unit = out.map.unit;
-  assert.deepEqual(unit.lessons.map((l) => l.id), ['l1', 'l2', 'l4']);
+  assert.deepEqual(unit.lessons.map((l) => l.id), ['l1', 'l4']);
   assert.deepEqual(unit.lines, [{ id: 'ln1', mode: 'train', name: 'Argument', colour: 'wave' }]);
   assert.deepEqual(unit.schedule, [{ lesson_id: 'l1', date: '2026-10-05', start_time: '09:00' }], 'only this class’s dates');
-  assert.equal(unit.lessons[2].assessment, true);
-  const text = JSON.stringify(out);
+  assert.equal(unit.lessons[1].assessment, true);
+  const { students } = await loadRoster(s, 'class1');
+  await markbookAction(s, 'class1', { action: 'set_lesson_students', lesson_id: 'l2', student_ids: [students[0].id] });
+  const ticked = await profileAction(s, 'class1', { class_token: token(1) });
+  assert.deepEqual(ticked.map.unit.lessons.map((l) => l.id), ['l1', 'l2', 'l4'], 'a tick brings the side lesson back');
+  const text = JSON.stringify([out, ticked]);
   for (const leak of ['TEACHER ONLY RULE', 'secret label', 'PRIVATE', 'Unpublished surprise', 'secret']) assert.ok(!text.includes(leak), leak);
 });

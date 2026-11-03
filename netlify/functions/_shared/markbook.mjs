@@ -16,6 +16,7 @@ import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { classWork } from './lesson-work.mjs';
 import { listClassDone } from './profile-done.mjs';
+import { hasStarted } from './lesson-assign.mjs';
 import { read, reject } from './question-drop.mjs';
 import { markWalkthruDirty } from './walkthru-dirty.mjs';
 import { progressFor, studentPieces } from './profile-feedback.mjs';
@@ -280,6 +281,36 @@ async function markbookActionInner(store, classId, body) {
       const took = { ...(book.took ?? {}) };
       if (!lessonIds.length) delete took[body.student_id];
       else took[body.student_id] = lessonIds;
+      book.took = took;
+      return book;
+    });
+    return { markbook };
+  }
+
+  // A lesson's tick list: who is ticked, and who has started it so keeps it either way.
+  if (action === 'lesson_students') {
+    if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    const ids = roster.students.map((s) => s.id);
+    const [{ book }, quiz, work, done] = await Promise.all([readBook(store, classId), classQuizScores(store, body.lesson_id, classId, ids), classWork(store, body.lesson_id, classId, ids), listClassDone(store, classId, ids)]);
+    const evidence = { quizzes: quiz ? [{ ...quiz, lesson_id: body.lesson_id }] : [], work: work ? [{ ...work, lesson_id: body.lesson_id }] : [] };
+    return {
+      students: roster.students.map(({ id, name }) => ({ id, name })),
+      ticked: ids.filter((id) => book.took?.[id]?.includes(body.lesson_id)),
+      started: ids.filter((id) => hasStarted(id, body.lesson_id, { ...evidence, done: done[id] }))
+    };
+  }
+
+  if (action === 'set_lesson_students') {
+    if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    const wanted = new Set(Array.isArray(body.student_ids) ? body.student_ids : []);
+    const markbook = await changeBook(store, classId, (book) => {
+      const took = { ...(book.took ?? {}) };
+      for (const { id } of roster.students) {
+        const without = (took[id] ?? []).filter((l) => l !== body.lesson_id);
+        const next = wanted.has(id) ? [...without, body.lesson_id].slice(-200) : without;
+        if (next.length) took[id] = next;
+        else delete took[id];
+      }
       book.took = took;
       return book;
     });

@@ -1765,7 +1765,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         onSelf: (patch) => emitLesson({ ...lesson, ...patch }),
         onPeer: options.onFlowPeer,
         ...(options.flowClasses ? { classes: options.flowClasses } : {}),
-        ...(options.onFlowDate ? { onDate: options.onFlowDate } : {})
+        ...(options.onFlowDate ? { onDate: options.onFlowDate } : {}),
+        ...(resolvePedagogicalMode(lesson.pedagogical_mode) === 'tutorial' ? {} : { students: httpMarkbookApi })
       })
     : null;
 

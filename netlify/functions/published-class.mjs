@@ -5,6 +5,7 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { isSideLesson } from './_shared/lesson-assign.mjs';
 import {
   classKey,
   draftLessonKey,
@@ -71,7 +72,9 @@ export function createPublishedClassHandler(deps = {}) {
         typeof rawLesson.title === 'string' &&
         rawLesson.title
       ) {
-        lessons.push({ id: lessonId, title: rawLesson.title });
+        // Side lessons reach students through their own My progress map, once ticked.
+        const unit = units.find(u => u.id === rawLesson.unit_id || u.lesson_ids?.includes(lessonId));
+        if (!isSideLesson(unit, rawLesson)) lessons.push({ id: lessonId, title: rawLesson.title });
       }
     }
     // Schedule rows pointing at a trashed or deleted lesson would surface as a raw-id orphan.

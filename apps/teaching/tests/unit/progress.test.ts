@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cellFor, withMark, type ProgressLesson } from '@/markbook/progress';
+import { cellFor, lessonCell, withMark, type ProgressLesson } from '@/markbook/progress';
+import type { MarkbookView } from '@/markbook/types';
 import { renderBook, renderBookPhone } from '@/markbook/book';
 
 const core: ProgressLesson = { id: 'l1', title: 'Poem', role: 'core', assessment: false, date: '2026-10-01' };
@@ -20,10 +21,13 @@ describe('cellFor', () => {
     expect(cellFor({ ...base, lesson: { ...core, date: undefined }, today: '2027-01-01' }).late).toBe(false);
     expect(cellFor({ ...base, quizStarted: true, today: '2026-10-20' })).toEqual({ state: 'partial', late: true });
   });
-  it('a side lesson is set for every student, like a core one', () => {
+  it('a side lesson counts once the student is ticked, and a grey box stays until then', () => {
     const side = { ...core, role: 'support' as const };
-    expect(cellFor({ ...base, lesson: side, today: '2027-01-01' })).toEqual({ state: 'open', late: true });
-    expect(cellFor({ ...base, lesson: side, record: { at: 'x', via: 'tick' } }).state).toBe('complete');
+    const view = (took: Record<string, string[]>) => ({ markbook: { took }, quizzes: [], done: {} }) as unknown as MarkbookView;
+    expect(lessonCell(view({}), 's1', side, '2027-01-01')).toEqual({ state: 'na', late: false });
+    expect(lessonCell(view({ s1: [side.id] }), 's1', side, '2027-01-01')).toEqual({ state: 'open', late: true });
+    expect(lessonCell(view({ s2: [side.id] }), 's1', side, '2027-01-01').state).toBe('na');
+    expect(lessonCell({ ...view({}), done: { s1: { [side.id]: { at: 'x', via: 'tick' } } } } as MarkbookView, 's1', side, '2027-01-01').state).toBe('complete');
   });
   it('a lesson not set for the student (a tutorial outside their group) is a grey box, and never late', () => {
     expect(cellFor({ ...base, forStudent: false, today: '2027-01-01' })).toEqual({ state: 'na', late: false });
@@ -73,7 +77,7 @@ describe('renderBook', () => {
     expect(cell('s1', 'l1').dataset.state).toBe('complete');
     expect(cell('s2', 'l1').dataset.state).toBe('open');
     expect(cell('s2', 'l1').dataset.late).toBe('true');
-    expect(cell('s2', 'l2').dataset.state).toBe('open');
+    expect(cell('s2', 'l2').dataset.state).toBe('na');
     expect(cell('s1', 'l3').dataset.state).toBe('open');
     expect(cell('s2', 'l3').dataset.state).toBe('na');
     expect(cell('s2', 'l1').getAttribute('aria-label')).toContain('overdue');

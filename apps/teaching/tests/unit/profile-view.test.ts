@@ -24,11 +24,11 @@ const payload = {
     next: 'l4',
     unit,
     lessons: [
-      { id: 'l1', title: 'Ghost poem', role: 'core', kind: 'lesson', done: true, assigned: true },
-      { id: 'l2', title: 'Tutorial', role: 'support', kind: 'lesson', done: false, assigned: true },
-      { id: 'l3', title: 'Stretch', role: 'extension', kind: 'lesson', done: false, assigned: false },
-      { id: 'l4', title: 'Quiz 1', role: 'core', kind: 'quiz', done: false, assigned: true },
-      { id: 'l5', title: 'Essay', role: 'core', kind: 'assessment', done: false, assigned: true }
+      { id: 'l1', title: 'Ghost poem', role: 'core', kind: 'lesson', done: true },
+      { id: 'l2', title: 'Tutorial', role: 'support', kind: 'lesson', done: false },
+      { id: 'l3', title: 'Stretch', role: 'extension', kind: 'lesson', done: false },
+      { id: 'l4', title: 'Quiz 1', role: 'core', kind: 'quiz', done: false },
+      { id: 'l5', title: 'Essay', role: 'core', kind: 'assessment', done: false }
     ]
   }
 };
@@ -52,11 +52,6 @@ describe('profile map', () => {
   it('rings the next lesson in words too', () => {
     expect(row('l4').querySelector('.cm-station')!.classList.contains('cm-p-next')).toBe(true);
     expect(row('l4').textContent).toContain('Next up');
-  });
-  it('fades an unassigned lesson but keeps it pressable', () => {
-    expect(row('l3').classList.contains('cm-faded')).toBe(true);
-    expect(row('l3').getAttribute('role')).toBe('button');
-    expect(row('l2').classList.contains('cm-faded')).toBe(false);
   });
   it('draws the quiz as a diamond and the assessment as a square', () => {
     expect(row('l4').querySelector('rect[transform^="rotate(45"]')).toBeTruthy();
