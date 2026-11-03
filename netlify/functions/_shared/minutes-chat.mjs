@@ -1,24 +1,28 @@
-// file_minutes: Adam attaches official minutes as a PDF in chat and names the
-// meeting. The tool stores the PDF and marks it pending on that meeting's
+// file_minutes: Adam gives official minutes in chat, as a PDF or pasted text, and
+// names the meeting. The tool stores them and marks them pending on that meeting's
 // Minutes card; Adam reviews and ticks items on the meeting page.
 
 import { createMeetingRepository } from './meeting-repository.mjs';
 import { isValidMeetingId } from './meeting-schema.mjs';
-import { saveMinutesPdf } from '../meeting-minutes-file.mjs';
+import { getJSON, setJSON } from './professional-blobs.mjs';
+import { saveMinutesPdf, saveMinutesText } from '../meeting-minutes-file.mjs';
 
 const NOTE_MAX = 300;
 const PDF_DATA_URL_RE = /^data:application\/pdf;base64,(.+)$/s;
+// "Which meeting?" takes a second message, and the attachment only rides on the first.
+const STASH_KEY = 'chat-minutes-stash/latest';
+export const MINUTES_STASH_MAX_AGE_MS = 60 * 60_000;
 
 export function fileMinutesSchema() {
   return {
     name: 'file_minutes',
     description:
-      'Use when Adam attaches official meeting minutes as a PDF and says which meeting they are for. Call search_professional first to get the meeting id. This puts the PDF on that meeting\'s Minutes card for Adam to review and tick. Do not copy the minutes into notes or decisions yourself.',
+      'Use when Adam gives official meeting minutes, as a PDF or pasted text, and says which meeting they are for. Call search_professional first to get the meeting id. If he gave the minutes in an earlier message of this chat, still call this: they are kept for an hour, so never ask him to send them again unless this tool says they are gone. This puts the minutes on that meeting\'s Minutes card for Adam to review and tick. Do not copy the minutes into notes or decisions yourself.',
     input_schema: {
       type: 'object',
       properties: {
         meeting_id: { type: 'string', description: 'meeting_… id from search_professional.' },
-        attachment_id: { type: 'string', description: 'The PDF attachment id. Optional when only one PDF is attached.' },
+        attachment_id: { type: 'string', description: 'The attachment id. Optional when only one PDF or text attachment was given.' },
         note: { type: 'string', description: 'Optional short note for Adam, at most 300 characters.' }
       },
       required: ['meeting_id'],
@@ -27,28 +31,45 @@ export function fileMinutesSchema() {
   };
 }
 
-function pdfBase64(attachment) {
-  if (!attachment || typeof attachment.dataUrl !== 'string') return null;
-  const match = PDF_DATA_URL_RE.exec(attachment.dataUrl);
-  return match ? match[1] : null;
+function minutesFrom(attachment) {
+  if (!attachment) return null;
+  const match = typeof attachment.dataUrl === 'string' ? PDF_DATA_URL_RE.exec(attachment.dataUrl) : null;
+  if (match) return { pdf: match[1] };
+  const text = typeof attachment.textExcerpt === 'string' ? attachment.textExcerpt.trim() : '';
+  return text ? { text } : null;
 }
 
-function pickPdf(attachments, attachmentId) {
+function pickMinutes(attachments, attachmentId) {
   const list = Array.isArray(attachments) ? attachments : [];
   if (typeof attachmentId === 'string' && attachmentId.trim()) {
-    const found = list.find(item => item?.id === attachmentId.trim());
-    return pdfBase64(found);
+    const named = minutesFrom(list.find(item => item?.id === attachmentId.trim()));
+    if (named) return named;
   }
-  const pdfs = list.filter(item => item?.mime === 'application/pdf' && pdfBase64(item));
-  return pdfs.length === 1 ? pdfBase64(pdfs[0]) : null;
+  const usable = list.map(minutesFrom).filter(Boolean);
+  return usable.length === 1 ? usable[0] : null;
+}
+
+/** Keep this turn's minutes for a follow-up message, or clear older ones it replaces. */
+export async function stashChatMinutes(store, attachments, now = Date.now) {
+  const minutes = pickMinutes(attachments);
+  if (minutes) await setJSON(store, STASH_KEY, { ...minutes, at: now() });
+  else await store.delete(STASH_KEY);
+}
+
+async function stashedMinutes(store, now) {
+  const stash = await getJSON(store, STASH_KEY, { consistency: 'strong' });
+  if (!stash || now() - stash.at > MINUTES_STASH_MAX_AGE_MS) return null;
+  return stash.pdf ? { pdf: stash.pdf } : stash.text ? { text: stash.text } : null;
 }
 
 export async function runFileMinutes(input, { store, env, attachments, now = Date.now } = {}) {
   if (!store) return { ok: false, error: 'professional_store_unavailable' };
   const meetingId = typeof input?.meeting_id === 'string' ? input.meeting_id.trim() : '';
   if (!isValidMeetingId(meetingId)) return { ok: false, error: 'invalid_meeting_id' };
-  const data = pickPdf(attachments, input?.attachment_id);
-  if (!data) return { ok: false, error: 'no_pdf_attached' };
+  const minutes = pickMinutes(attachments, input?.attachment_id) ?? await stashedMinutes(store, now);
+  if (!minutes) {
+    return { ok: false, error: 'no_minutes_found', next: 'Tell Adam the minutes are no longer here and ask him to attach or paste them again.' };
+  }
   const note = typeof input?.note === 'string' ? input.note.trim().slice(0, NOTE_MAX) || null : null;
 
   const repo = createMeetingRepository({ store, env, now: () => new Date(now()).toISOString() });
@@ -59,7 +80,9 @@ export async function runFileMinutes(input, { store, env, attachments, now = Dat
     if (error?.code === 'meeting_not_found') return { ok: false, error: 'meeting_not_found' };
     throw error;
   }
-  const fileKey = await saveMinutesPdf(store, meetingId, data, now);
+  const fileKey = minutes.pdf
+    ? await saveMinutesPdf(store, meetingId, minutes.pdf, now)
+    : await saveMinutesText(store, meetingId, minutes.text, now);
   await repo.updateMeeting(meetingId, {
     minutes_pending: {
       file_key: fileKey,
@@ -68,6 +91,7 @@ export async function runFileMinutes(input, { store, env, attachments, now = Dat
       note
     }
   });
+  await store.delete(STASH_KEY);
   return {
     ok: true,
     meeting_id: meetingId,

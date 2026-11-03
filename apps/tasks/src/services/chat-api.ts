@@ -1,6 +1,7 @@
 /**
  * Thin Tasks client for Life Hub /api/chat — same job/SSE contract as apps/life/js/app/chat-api.js.
  */
+import type { HubChatAttachment } from '../../design-kit/js/hub-chat-attachments.js';
 import { getApiBaseUrl } from '@/api/config';
 import { ApiClientError } from '@/api/client';
 
@@ -46,6 +47,7 @@ export type StreamChatOptions = {
   history?: ChatHistoryEntry[];
   priorAgentSlug?: string;
   protocolId?: string;
+  attachments?: HubChatAttachment[];
 };
 
 export type ScheduleOverride = {
@@ -149,7 +151,7 @@ export function createChatApi(
   return {
     async *send(
       message: string,
-      { signal, history, priorAgentSlug, protocolId }: StreamChatOptions = {}
+      { signal, history, priorAgentSlug, protocolId, attachments }: StreamChatOptions = {}
     ): AsyncGenerator<Record<string, unknown>> {
       const base = baseUrl ?? getApiBaseUrl();
       const response = await fetchImpl(`${base}/api/chat`, {
@@ -160,14 +162,15 @@ export function createChatApi(
           message,
           ...(history?.length ? { history } : {}),
           ...(priorAgentSlug ? { priorAgentSlug } : {}),
-          ...(protocolId ? { protocolId } : {})
+          ...(protocolId ? { protocolId } : {}),
+          ...(attachments?.length ? { attachments } : {})
         }),
         signal
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw httpError(
-          'Chat request failed',
+          payload?.error?.code === 'message_too_long' ? payload.error.message : 'Chat request failed',
           response.status,
           payload?.error?.code ?? 'request_failed'
         );

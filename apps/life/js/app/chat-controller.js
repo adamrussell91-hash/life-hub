@@ -952,6 +952,8 @@ export function createChatController({
         if (!abortedForNewChat && abort.signal.reason !== 'stop') {
           fail('That search took too long. Try again in a moment.');
         }
+      } else if (error?.code === 'message_too_long') {
+        fail('That is too long to paste. Attach it as a PDF instead.');
       } else if (error?.code === 'request_too_large' || error?.status === 413) {
         fail('That photo is too large to send. Try a smaller image.');
       } else {

@@ -169,7 +169,16 @@ export function buildChatView(): HTMLElement {
   send.id = 'chat-send';
   send.type = 'submit';
   const tools = el('div', 'chat-form__tools hub-ai-bar__tools');
-  tools.append(send);
+  const attachInput = el('input') as HTMLInputElement;
+  attachInput.id = 'chat-attach-input';
+  attachInput.type = 'file';
+  attachInput.accept = 'image/*,text/plain,application/pdf';
+  attachInput.multiple = true;
+  attachInput.hidden = true;
+  const attach = el('button', 'btn btn--ghost', 'Attach');
+  attach.id = 'chat-attach';
+  attach.type = 'button';
+  tools.append(attachInput, attach, send);
   const aside = el('div', 'hub-ai-bar__aside');
   const attachList = el('div', 'chat-attach-list');
   attachList.id = 'chat-attach-list';

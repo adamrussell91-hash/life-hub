@@ -704,7 +704,7 @@ test('rejects an empty or oversized message', async () => {
     fetchImpl: githubFetchStub()
   });
   assert.equal((await handler(request({ message: '' }))).status, 400);
-  assert.equal((await handler(request({ message: 'x'.repeat(5000) }))).status, 400);
+  assert.equal((await handler(request({ message: 'x'.repeat(60_001) }))).status, 400);
 });
 
 test('accepts a phone-photo attachment and delivers image blocks to the model', async () => {
@@ -4950,3 +4950,43 @@ test('Clare fetches a query-string URL only when Adam typed it or web_search ret
   assert.equal(results.typed.error, 'fetch_failed');
   assert.equal(results.built.error, 'url_query_not_allowed');
 });
+
+test('a long pasted message reaches Clare in full, and is kept for filing on a later message', async () => {
+  let captured = null;
+  const kept = new Map();
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    getProfessionalStore: async () => ({
+      setJSON: async (key, value) => { kept.set(key, value); },
+      delete: async (key) => { kept.delete(key); },
+      get: async (key) => kept.get(key) ?? null
+    }),
+    createAnthropicClient: () => ({
+      streamMessage: async function* (input) {
+        captured = input;
+        yield { type: 'agent', slug: 'clare' };
+        yield { type: 'text', delta: 'Which meeting are these for?' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const paste = `Minutes of the faculty meeting. ${'Agenda item. '.repeat(600)}Last line of the minutes.`;
+  const response = await handler(request({ message: paste, priorAgentSlug: 'clare' }));
+  assert.equal(response.status, 200);
+  await readSse(response);
+  const user = captured.messages.find(entry => entry.role === 'user');
+  assert.ok(user.content.some(block => block.type === 'text' && block.text.includes('Last line of the minutes.')));
+  assert.ok(captured.tools.some(tool => tool.name === 'file_minutes'));
+  assert.equal([...kept.values()][0]?.text, paste.trim());
+});
+
+test('a message past the paste limit gets a plain answer', async () => {
+  const handler = createChatHandler({ env: validEnv, now: () => Date.parse('2026-08-01T06:00:00Z'), fetchImpl: githubFetchStub() });
+  const response = await handler(request({ message: 'x'.repeat(60_001) }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'message_too_long');
+});
+

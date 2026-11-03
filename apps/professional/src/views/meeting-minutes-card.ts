@@ -11,6 +11,8 @@ export type MinutesCardDeps = {
   openFile: (fileKey: string) => Promise<void>;
   /** Base64 of a stored minutes PDF. */
   fetchPdf: (fileKey: string) => Promise<string>;
+  /** Minutes that were pasted into chat. */
+  fetchText: (fileKey: string) => Promise<string>;
   /** Clears minutes_pending on the meeting. */
   dismissPending: () => Promise<MeetingRecord>;
   /** Keeps the typed text on the meeting. Empty text clears it. */
@@ -91,6 +93,10 @@ export function mountMinutesCard(options: {
     const review = button('Review them', 'minutes-pending-review', 'btn--primary');
     review.addEventListener('click', () => {
       const fileKey = pending.file_key;
+      if (fileKey.endsWith('.txt')) {
+        void runRead(async () => ({ text: await options.deps.fetchText(fileKey) }), null, null);
+        return;
+      }
       void runRead(async () => ({ pdf: { media_type: 'application/pdf', data: await options.deps.fetchPdf(fileKey) } }), null, fileKey);
     });
     const dismiss = button('Dismiss', 'minutes-pending-dismiss', 'btn--ghost');
