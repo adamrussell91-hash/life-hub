@@ -32,6 +32,15 @@ vi.mock('@/ai/jobs-client', () => {
   };
 });
 
+const picksHarness: { onPicks?: (picks: { pieces: string[]; skills: string[] }) => void } = {};
+
+vi.mock('@/alignment/lesson-dot-points', () => ({
+  mountLessonDotPoints: (_host: HTMLElement, options: { onPicks?: (picks: { pieces: string[]; skills: string[] }) => void }) => {
+    picksHarness.onPicks = options.onPicks;
+    return { update: vi.fn(), dispose: vi.fn() };
+  }
+}));
+
 const historyHarness: { onRestored?: (live: unknown) => void } = {};
 
 vi.mock('@/teacher/history-panel', () => ({
@@ -584,6 +593,26 @@ describe('mountLessonEditor', () => {
     await handle.flush();
 
     expect(apiPutMock).toHaveBeenCalledWith('/api/lessons/lesson_001', expect.objectContaining({ route_role: 'optional' }));
+  });
+
+  it('saves the pieces and skills picked in the Syllabus card, and an emptied list', async () => {
+    const unit = { id: 'unit_001', type: 'unit', title: 'Poetry', slug: 'poetry', year_id: 'y', subject_id: 'sub_001', lesson_ids: ['lesson_001'], status: 'active', schema_version: 1 };
+    const subject = { id: 'sub_001', title: 'English Advanced' };
+    const curriculum = { ...emptyCurriculum, subjects: [subject], units: [unit], lessons: [{ id: 'lesson_001', title: 'Intro to Testing', unit_id: 'unit_001' }] };
+    mockLessonLoad();
+    const base = apiGetMock.getMockImplementation()!;
+    apiGetMock.mockImplementation(async (path: string) => (path === '/api/curriculum' ? curriculum : base(path)));
+    apiPutMock.mockResolvedValue(makeLesson());
+    const handle = mount();
+    await tick();
+
+    picksHarness.onPicks!({ pieces: ['kp_aaaa11'], skills: ['arguing.evidence'] });
+    await handle.flush();
+    expect(apiPutMock).toHaveBeenLastCalledWith('/api/lessons/lesson_001', expect.objectContaining({ focus_pieces: ['kp_aaaa11'], focus_skills: ['arguing.evidence'] }));
+
+    picksHarness.onPicks!({ pieces: [], skills: [] });
+    await handle.flush();
+    expect(apiPutMock).toHaveBeenLastCalledWith('/api/lessons/lesson_001', expect.objectContaining({ focus_pieces: [], focus_skills: [] }));
   });
 
   it('saves the core lesson a side lesson branches off', async () => {

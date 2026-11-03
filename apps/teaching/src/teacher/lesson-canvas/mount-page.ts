@@ -1761,7 +1761,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         planHost: syllabus.plan,
         picksHost: syllabus.picks,
         picks: { pieces: lesson.focus_pieces, skills: lesson.focus_skills },
-        onPicks: (picks) => emitLesson({ ...lesson, focus_pieces: picks.pieces.length ? picks.pieces : undefined, focus_skills: picks.skills.length ? picks.skills : undefined }),
+        // Saves merge into the stored lesson, so clearing sends an empty list.
+        onPicks: (picks) => emitLesson({ ...lesson, focus_pieces: picks.pieces, focus_skills: picks.skills }),
         covered: lesson.plan_covered,
         onCovered: (covered) => emitLesson({ ...lesson, plan_covered: covered }),
         onPaint: ({ points, outcomes, plan }) => syllabus.setSummary({ points, outcomes, plan }),

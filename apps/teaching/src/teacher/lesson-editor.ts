@@ -279,6 +279,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.dot_points) lesson.dot_points = next.dot_points;
       if (next.plan_covered) lesson.plan_covered = next.plan_covered;
+      if (next.focus_pieces) lesson.focus_pieces = next.focus_pieces;
+      if (next.focus_skills) lesson.focus_skills = next.focus_skills;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
       if (next.end_questions) lesson.end_questions = next.end_questions;
       if (next.quiz) {
