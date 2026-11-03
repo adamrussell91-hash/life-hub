@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFromInsertMenu } from '@/blocks/create-block';
 import { fadeLines, renderWhatHowWhy } from '@/blocks/what-how-why';
-import { criteriaFromLines } from '@/blocks/what-how-why-editor';
+import { createWhatHowWhyFields, criteriaFromLines } from '@/blocks/what-how-why-editor';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { listPublishBlockIssues } from '@/schemas/publish-block-issues';
 
@@ -26,6 +26,14 @@ describe('What, how, why block', () => {
     expect(parsed.content).toEqual({ what: '', how: [] });
     expect(renderWhatHowWhy(parsed, 'student').hidden).toBe(true);
     expect(renderWhatHowWhy(parsed, 'teacher').hidden).toBe(false);
+  });
+
+  it('a block saved with empty content shows and edits without being parsed first', () => {
+    const raw = { ...makeBlock(), content: {} } as unknown as OutcomesBlock;
+    expect(renderWhatHowWhy(raw, 'student').hidden).toBe(true);
+    expect(renderWhatHowWhy(raw, 'teacher').querySelector('.whw__what')?.textContent).toBe('Write what the class is learning');
+    expect(createWhatHowWhyFields(() => {}, () => raw).querySelectorAll('textarea').length).toBe(2);
+    expect(listPublishBlockIssues([raw]).length).toBe(1);
   });
 
   it('asks for a What before publishing', () => {

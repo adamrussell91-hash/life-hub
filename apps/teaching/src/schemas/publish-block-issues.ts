@@ -397,7 +397,7 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
       return 'Cloze blocks need at least one blank to publish';
     }
   }
-  if (block.block_type === 'outcomes' && !block.content.what.trim()) {
+  if (block.block_type === 'outcomes' && !block.content.what?.trim()) {
     return 'Write what the class is learning in this What, how, why block';
   }
   if (block.block_type === 'note_cue' && !block.content.prompt.trim()) {
