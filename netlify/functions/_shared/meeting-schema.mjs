@@ -45,6 +45,8 @@ export const LOCATION_MAX_LENGTH = 500;
 export const AGENDA_MAX_LENGTH = 8000;
 export const NOTES_MAX_LENGTH = 16000;
 export const MINUTES_DRAFT_MAX_LENGTH = 60000;
+export const MINUTES_NOTES_MAX = 60;
+export const MINUTES_NOTE_MAX_LENGTH = 8000;
 export const REASON_MAX_LENGTH = 500;
 
 const MEETING_ID_PATTERN = /^meeting_[0-9a-f-]{36}$/;
@@ -187,6 +189,22 @@ export function validateCoachingSheets(value) {
   });
 }
 
+/** Adam's own notes under each minutes item. Kept apart from the minutes, so replacing them leaves these alone. */
+export function validateMinutesNotes(value) {
+  const fail = (why) => validationError('invalid_minutes_notes', `minutes_notes: ${why}`);
+  if (!Array.isArray(value) || value.length > MINUTES_NOTES_MAX) throw fail(`an array of at most ${MINUTES_NOTES_MAX}.`);
+  const seen = new Set();
+  return value.map((note) => {
+    if (!note || typeof note !== 'object' || Array.isArray(note)) throw fail('each note is an object.');
+    const key = typeof note.key === 'string' ? note.key.trim() : '';
+    if (!key || key.length > 220 || seen.has(key)) throw fail('each note needs its own key.');
+    seen.add(key);
+    const heading = trimBounded(note.heading ?? null, 'minutes_notes heading', 200);
+    if (typeof note.text !== 'string' || note.text.length > MINUTES_NOTE_MAX_LENGTH) throw fail(`text is a string of at most ${MINUTES_NOTE_MAX_LENGTH} characters.`);
+    return { key, heading, text: note.text };
+  });
+}
+
 /** Official minutes for this meeting: the text by agenda item, where the PDF sits, what was saved from it. */
 export function validateMinutes(value) {
   if (value === null) return null;
@@ -256,7 +274,8 @@ const STORED_KEYS = new Set([
   'coaching_sheets',
   'minutes',
   'minutes_pending',
-  'minutes_draft'
+  'minutes_draft',
+  'minutes_notes'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -328,7 +347,8 @@ export function parseMeetingRecord(raw) {
     coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : [],
     minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null,
     minutes_pending: raw.minutes_pending && typeof raw.minutes_pending === 'object' && !Array.isArray(raw.minutes_pending) ? raw.minutes_pending : null,
-    minutes_draft: typeof raw.minutes_draft === 'string' ? raw.minutes_draft : null
+    minutes_draft: typeof raw.minutes_draft === 'string' ? raw.minutes_draft : null,
+    minutes_notes: Array.isArray(raw.minutes_notes) ? raw.minutes_notes : []
   };
 }
 
@@ -379,7 +399,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending', 'minutes_draft']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -411,6 +431,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.minutes !== undefined) patch.minutes = validateMinutes(input.minutes);
   if (input.minutes_pending !== undefined) patch.minutes_pending = validateMinutesPending(input.minutes_pending);
   if (input.minutes_draft !== undefined) patch.minutes_draft = trimBounded(input.minutes_draft, 'minutes_draft', MINUTES_DRAFT_MAX_LENGTH);
+  if (input.minutes_notes !== undefined) patch.minutes_notes = validateMinutesNotes(input.minutes_notes);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -485,7 +506,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     coaching_sheets: record.coaching_sheets ?? [],
     minutes: record.minutes ?? null,
     minutes_pending: record.minutes_pending ?? null,
-    minutes_draft: record.minutes_draft ?? null
+    minutes_draft: record.minutes_draft ?? null,
+    minutes_notes: record.minutes_notes ?? []
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

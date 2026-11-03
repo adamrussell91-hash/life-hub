@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { keepMinutesDecisions, mergeMinutesDecisions, ownerForMine, savedLine, saveMinutesReview, PDF_MAX_BYTES } from '@/lib/meeting-minutes';
+import { keepMinutesDecisions, mergeMinutesDecisions, minutesSectionKeys, orphanedItemNotes, ownerForMine, savedLine, saveMinutesReview, PDF_MAX_BYTES } from '@/lib/meeting-minutes';
 import type { LedgerItem, MeetingRecord } from '@/domain/types';
 
 const MEETING_ID = 'meeting_00000000-0000-4000-8000-000000000001';
@@ -98,4 +98,23 @@ it('savedLine reads naturally and the size cap is 4 MB', () => {
   expect(savedLine({ tasks: 1, promises: 2, decisions: 0 })).toBe('Added 1 task and 2 promises.');
   expect(savedLine({ tasks: 0, promises: 0, decisions: 0 })).toBe('Nothing new to add.');
   expect(PDF_MAX_BYTES).toBe(4_000_000);
+});
+
+describe('item note keys', () => {
+  it('match a filled-in version of the same agenda, whatever the numbering', () => {
+    expect(minutesSectionKeys([{ heading: '5. Financial  Update' }])).toEqual(minutesSectionKeys([{ heading: 'Item 7: financial update' }]));
+  });
+
+  it('keep repeated and missing headings apart', () => {
+    expect(minutesSectionKeys([{ heading: 'Other' }, { heading: '2. Other' }, { heading: null }, { heading: '' }])).toEqual(['other', 'other#2', 'minutes', 'minutes#2']);
+  });
+
+  it('leave only notes with words in them and no matching item as orphans', () => {
+    const notes = [
+      { key: 'finance', heading: 'Finance', text: 'matched' },
+      { key: 'gone', heading: 'Gone', text: 'keep' },
+      { key: 'empty', heading: 'Empty', text: '  ' }
+    ];
+    expect(orphanedItemNotes(notes, [{ heading: 'Finance' }]).map((note) => note.key)).toEqual(['gone']);
+  });
 });

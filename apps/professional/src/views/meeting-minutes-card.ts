@@ -1,7 +1,7 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { fileBase64, type ClareMinutesReview } from '@/api/clare-comms';
-import { PDF_MAX_BYTES, savedLine, type MinutesSaveInput } from '@/lib/meeting-minutes';
-import type { MeetingMinutes, MeetingRecord } from '@/domain/types';
+import { minutesSectionKeys, orphanedItemNotes, PDF_MAX_BYTES, savedLine, type MinutesSaveInput } from '@/lib/meeting-minutes';
+import type { MeetingMinutes, MeetingRecord, MinutesItemNote } from '@/domain/types';
 
 type CardAttendee = { ref: string; name: string; role: string | null };
 
@@ -17,6 +17,10 @@ export type MinutesCardDeps = {
   dismissPending: () => Promise<MeetingRecord>;
   /** Keeps the typed text on the meeting. Empty text clears it. */
   saveDraft: (text: string) => Promise<void>;
+  /** Saves every item's notes. Runs as they type, so it must not file promises. */
+  saveItemNotes: (notes: MinutesItemNote[]) => Promise<void>;
+  /** Files the » lines in one finished note. Returns the names that aren't in the room. */
+  commitItemNote: (text: string) => Promise<string[]>;
 };
 
 type ReadInput = Parameters<MinutesCardDeps['read']>[0];
@@ -37,6 +41,22 @@ function button(label: string, part: string, kind = 'btn--secondary'): HTMLButto
 
 const DRAFT_SAVE_MS = 800;
 const DRAFT_MAX = 60000;
+const NOTE_MAX = 8000;
+const NOTE_HINT = 'Under any item: »me for something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.';
+
+/** Why a » line stayed a note. »me has no one to be owed to until the room has someone in it. */
+function unmatchedLine(owners: string[]): string {
+  const names = [...new Set(owners)].filter((owner) => owner.toLowerCase() !== 'me');
+  const parts: string[] = [];
+  if (names.length < new Set(owners).size) parts.push('»me needs someone in The room to owe it to, so that line stays as a note.');
+  if (names.length) parts.push(`Add ${names.join(', ')} to The room to make ${names.length === 1 ? 'that line' : 'those lines'} a promise. It stays as a note for now.`);
+  return parts.join(' ');
+}
+
+function growToFit(area: HTMLTextAreaElement): void {
+  area.style.height = 'auto';
+  area.style.height = `${area.scrollHeight + 2}px`;
+}
 
 const due = (value: string | null) => (value ? ` · due ${formatDisplayDate(value)}` : '');
 
@@ -59,6 +79,84 @@ export function mountMinutesCard(options: {
   let draftTimer: ReturnType<typeof setTimeout> | null = null;
   let draftWrite: Promise<void> = Promise.resolve();
   let draftStatus: HTMLElement | null = null;
+  // Adam's notes under each item, by section key. Separate from the minutes, so Replace leaves them.
+  const itemNotes = new Map<string, MinutesItemNote>((options.record().minutes_notes ?? []).map((note) => [note.key, note]));
+  let notesDirty = false;
+  let notesTimer: ReturnType<typeof setTimeout> | null = null;
+  let notesWrite: Promise<void> = Promise.resolve();
+  let notesStatus: HTMLElement | null = null;
+
+  /** Writes run in order, and the latest text always goes, so a failed save is retried by the next one. */
+  function flushItemNotes(): Promise<void> {
+    if (notesTimer !== null) clearTimeout(notesTimer);
+    notesTimer = null;
+    notesWrite = notesWrite.then(async () => {
+      if (!notesDirty) return;
+      notesDirty = false;
+      const status = notesStatus;
+      try {
+        await options.deps.saveItemNotes([...itemNotes.values()].filter((note) => note.text.trim()));
+        if (status) status.textContent = notesDirty ? 'Saving…' : 'Saved.';
+      } catch {
+        notesDirty = true;
+        if (status) status.textContent = 'Not saved yet. Keep this page open and check your connection.';
+      }
+    });
+    return notesWrite;
+  }
+
+  function noteBox(key: string, heading: string | null, name: string, onChange: () => void, grow: Array<() => void>): HTMLElement {
+    const box = el('div', 'meeting-minutes__note-box');
+    const id = `minutes-note-${key.replace(/[^a-z0-9]+/g, '-')}`;
+    const label = el('label', undefined, 'Your notes');
+    label.htmlFor = id;
+    const area = el('textarea') as HTMLTextAreaElement;
+    area.id = id;
+    area.rows = 3;
+    area.maxLength = NOTE_MAX;
+    area.value = itemNotes.get(key)?.text ?? '';
+    area.setAttribute('aria-label', `Your notes on ${name}`);
+    grow.push(() => growToFit(area));
+    const status = el('p', 'muted meeting-minutes__note-status');
+    status.setAttribute('role', 'status');
+    area.addEventListener('input', () => {
+      growToFit(area);
+      itemNotes.set(key, { key, heading, text: area.value });
+      notesDirty = true;
+      notesStatus = status;
+      status.textContent = 'Saving…';
+      onChange();
+      if (notesTimer !== null) clearTimeout(notesTimer);
+      notesTimer = setTimeout(() => void flushItemNotes(), DRAFT_SAVE_MS);
+    });
+    // Promises wait until the note is finished, so a half-typed line never becomes one.
+    area.addEventListener('blur', async () => {
+      await flushItemNotes();
+      const unmatched = await options.deps.commitItemNote(area.value).catch(() => [] as string[]);
+      if (unmatched.length) status.textContent = unmatchedLine(unmatched);
+    });
+    box.append(label, area, status);
+    return box;
+  }
+
+  function itemFold(key: string, heading: string | null, text: string | null): HTMLDetailsElement {
+    const name = heading || 'Minutes';
+    const fold = el('details', 'meeting-minutes__item') as HTMLDetailsElement;
+    fold.dataset.part = 'minutes-item';
+    const summary = el('summary');
+    const marker = el('span', 'meeting-minutes__has-note', 'Your notes');
+    const paintMarker = () => { marker.hidden = !itemNotes.get(key)?.text.trim(); };
+    summary.append(el('span', undefined, name), marker);
+    paintMarker();
+    const inner = el('div', 'meeting-minutes__item-body');
+    if (text) inner.append(el('p', 'meeting-minutes__text', text));
+    // A closed fold has no height to measure, so boxes size themselves on opening.
+    const grow: Array<() => void> = [];
+    inner.append(noteBox(key, heading, name, paintMarker, grow));
+    fold.addEventListener('toggle', () => { if (fold.open) grow.forEach((fit) => fit()); });
+    fold.append(summary, inner);
+    return fold;
+  }
 
   function showDraftStatus(text: string): void {
     if (draftStatus) draftStatus.textContent = text;
@@ -298,12 +396,25 @@ export function mountMinutesCard(options: {
     draftStatus = null;
     body.replaceChildren();
     if (line) body.append(el('p', 'meeting-minutes__saved', line));
-    for (const section of minutes.sections) {
-      const block = el('div', 'meeting-minutes__section');
-      if (section.heading) block.append(el('h4', undefined, section.heading));
-      block.append(el('p', 'meeting-minutes__text', section.text));
-      body.append(block);
+    const keys = minutesSectionKeys(minutes.sections);
+    const items = el('div', 'meeting-minutes__items');
+    minutes.sections.forEach((section, index) => {
+      items.append(itemFold(keys[index]!, section.heading || null, section.text));
+    });
+    const notes = [...itemNotes.values()];
+    const orphans = orphanedItemNotes(notes, minutes.sections);
+    for (const note of orphans) {
+      items.append(itemFold(note.key, note.heading, null));
     }
+    const foldAll = button('Open all', 'minutes-fold-all', 'btn--ghost meeting-minutes__fold-all');
+    foldAll.addEventListener('click', () => {
+      const folds = [...items.querySelectorAll<HTMLDetailsElement>('details')];
+      const open = !folds.every((fold) => fold.open);
+      for (const fold of folds) fold.open = open;
+      foldAll.textContent = open ? 'Close all' : 'Open all';
+    });
+    body.append(el('p', 'muted meeting-page__hint', NOTE_HINT), foldAll, items);
+    if (orphans.length) body.append(el('p', 'muted meeting-page__hint', `${orphans.length === 1 ? 'The last item above is' : `The last ${orphans.length} items above are`} from earlier minutes, kept with your notes.`));
     const row = el('div', 'clare-row');
     if (minutes.file_key) {
       const open = button('Open the PDF', 'minutes-open-pdf', 'btn--ghost');

@@ -17,8 +17,8 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const PENDING_KEY = `meeting-minutes/${MEETING_ID}/1762000000000.pdf`;
 const pending = { file_key: PENDING_KEY, added_at: '2026-10-31T23:00:00.000Z', source: 'chat' as const, note: 'From the faculty email.' };
 
-function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: MeetingRecord['minutes_pending'] = null, minutesDraft: string | null = null) {
-  const record = { id: MEETING_ID, decisions: [], minutes, minutes_pending: minutesPending, minutes_draft: minutesDraft } as unknown as MeetingRecord;
+function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: MeetingRecord['minutes_pending'] = null, minutesDraft: string | null = null, minutesNotes: MeetingRecord['minutes_notes'] = []) {
+  const record = { id: MEETING_ID, decisions: [], minutes, minutes_pending: minutesPending, minutes_draft: minutesDraft, minutes_notes: minutesNotes } as unknown as MeetingRecord;
   const deps: MinutesCardDeps = {
     read: vi.fn(async () => review),
     save: vi.fn(async (input) => ({ record: { ...record, minutes: { sections: input.sections, file_key: null, source: 'page', added_at: 'x', saved_counts: { tasks: 1, promises: 2, decisions: 1 } } } as MeetingRecord, counts: { tasks: 1, promises: 2, decisions: 1 } })),
@@ -26,7 +26,9 @@ function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: Meeting
     fetchPdf: vi.fn(async () => 'JVBERi0xLjQK'),
     fetchText: vi.fn(async () => 'Pasted minutes'),
     dismissPending: vi.fn(async () => ({ ...record, minutes_pending: null }) as MeetingRecord),
-    saveDraft: vi.fn(async () => undefined)
+    saveDraft: vi.fn(async () => undefined),
+    saveItemNotes: vi.fn(async () => undefined),
+    commitItemNote: vi.fn(async () => [])
   };
   const onSaved = vi.fn();
   const card = mountMinutesCard({
@@ -40,6 +42,105 @@ function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: Meeting
 }
 
 describe('Minutes card', () => {
+  describe('notes under each item', () => {
+    const MINUTES = {
+      sections: [
+        { heading: '5. Financial update', text: 'Balance is healthy.' },
+        { heading: '6. Memberships update', text: '134 members.' }
+      ],
+      file_key: null, source: 'page', added_at: '2026-11-03T07:00:00.000Z', saved_counts: { tasks: 0, promises: 0, decisions: 0 }
+    } as unknown as MeetingRecord['minutes'];
+    const folds = (card: HTMLElement) => [...card.querySelectorAll<HTMLDetailsElement>('[data-part="minutes-item"]')];
+    const write = (fold: HTMLElement, text: string) => {
+      const area = fold.querySelector('textarea') as HTMLTextAreaElement;
+      area.value = text;
+      area.dispatchEvent(new Event('input'));
+      return area;
+    };
+
+    it('shows a closed fold per item, each with its own notes box', () => {
+      const { card } = setup(MINUTES);
+      expect(folds(card).map((fold) => fold.querySelector('summary span')?.textContent)).toEqual(['5. Financial update', '6. Memberships update']);
+      expect(folds(card).every((fold) => !fold.open)).toBe(true);
+      expect(card.querySelectorAll('textarea')).toHaveLength(2);
+    });
+
+    it('Open all opens every item, then closes them', () => {
+      const { card } = setup(MINUTES);
+      const all = card.querySelector('[data-part="minutes-fold-all"]') as HTMLButtonElement;
+      all.click();
+      expect(folds(card).every((fold) => fold.open)).toBe(true);
+      expect(all.textContent).toBe('Close all');
+      all.click();
+      expect(folds(card).every((fold) => !fold.open)).toBe(true);
+    });
+
+    it('saves a note keyed to its item, without filing promises until the box is left', async () => {
+      const { card, deps } = setup(MINUTES);
+      const area = write(folds(card)[1]!, '»me chase the software');
+      await new Promise((resolve) => setTimeout(resolve, 850));
+      expect(deps.saveItemNotes).toHaveBeenCalledWith([{ key: 'memberships update', heading: '6. Memberships update', text: '»me chase the software' }]);
+      expect(deps.commitItemNote).not.toHaveBeenCalled();
+      area.dispatchEvent(new Event('blur'));
+      await flush();
+      await flush();
+      expect(deps.commitItemNote).toHaveBeenCalledWith('»me chase the software');
+    });
+
+    it('sends the other items’ notes too, so saving one never drops another', async () => {
+      const kept = [{ key: 'financial update', heading: '5. Financial update', text: 'Check the CommBank access' }];
+      const { card, deps } = setup(MINUTES, null, null, kept);
+      write(folds(card)[1]!, 'New note').dispatchEvent(new Event('blur'));
+      await flush();
+      expect(vi.mocked(deps.saveItemNotes).mock.calls[0]![0]).toEqual([...kept, { key: 'memberships update', heading: '6. Memberships update', text: 'New note' }]);
+    });
+
+    it('marks items with notes and reopens with the text in place', () => {
+      const { card } = setup(MINUTES, null, null, [{ key: 'financial update', heading: '5. Financial update', text: 'Check access' }]);
+      expect((folds(card)[0]!.querySelector('.meeting-minutes__has-note') as HTMLElement).hidden).toBe(false);
+      expect((folds(card)[1]!.querySelector('.meeting-minutes__has-note') as HTMLElement).hidden).toBe(true);
+      expect((folds(card)[0]!.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Check access');
+    });
+
+    it('says what to do when a » name is not in the room', async () => {
+      const { card, deps } = setup(MINUTES);
+      vi.mocked(deps.commitItemNote).mockResolvedValueOnce(['Kerryn']);
+      write(folds(card)[0]!, '»Kerryn send it').dispatchEvent(new Event('blur'));
+      await flush();
+      await flush();
+      expect(folds(card)[0]!.querySelector('.meeting-minutes__note-status')?.textContent).toContain('Add Kerryn to The room');
+    });
+
+    it('explains »me when nobody is in the room', async () => {
+      const { card, deps } = setup(MINUTES);
+      vi.mocked(deps.commitItemNote).mockResolvedValueOnce(['me']);
+      write(folds(card)[0]!, '»me send it').dispatchEvent(new Event('blur'));
+      await flush();
+      await flush();
+      expect(folds(card)[0]!.querySelector('.meeting-minutes__note-status')?.textContent).toContain('»me needs someone in The room');
+    });
+
+    it('says so when a note fails to save, and the next save carries it', async () => {
+      const { card, deps } = setup(MINUTES);
+      vi.mocked(deps.saveItemNotes).mockRejectedValueOnce(new Error('offline'));
+      const area = write(folds(card)[0]!, 'Keep me');
+      area.dispatchEvent(new Event('blur'));
+      await flush();
+      expect(folds(card)[0]!.querySelector('.meeting-minutes__note-status')?.textContent).toContain('Not saved yet');
+      area.dispatchEvent(new Event('blur'));
+      await flush();
+      expect(deps.saveItemNotes).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps a note whose item is gone from the minutes, as its own item', () => {
+      const { card } = setup(MINUTES, null, null, [{ key: 'old business', heading: '9. Old business', text: 'Still matters' }]);
+      const last = folds(card).at(-1)!;
+      expect(last.querySelector('summary span')?.textContent).toBe('9. Old business');
+      expect((last.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Still matters');
+      expect(card.textContent).toContain('from earlier minutes');
+    });
+  });
+
   describe('typed text', () => {
     const SAVED_MINUTES = { sections: [{ heading: null, text: 'Old minutes.' }], file_key: null, source: 'page', added_at: '2026-10-31T23:00:00.000Z', saved_counts: { tasks: 0, promises: 0, decisions: 0 } } as unknown as MeetingRecord['minutes'];
     const typeText = (card: HTMLElement, text: string) => {
@@ -134,7 +235,7 @@ describe('Minutes card', () => {
       (card.querySelector('[data-part="minutes-save"]') as HTMLButtonElement).click();
       await flush();
       expect(vi.mocked(deps.save).mock.calls[0]![0]).not.toHaveProperty('clearDraft');
-      expect((card.querySelector('textarea') as HTMLTextAreaElement | null)).toBeNull();
+      expect(card.querySelector('textarea[aria-label="Paste the minutes"]')).toBeNull();
       expect(card.querySelector('[data-part="minutes-back-to-text"]')).not.toBeNull();
     });
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
+import { agendaToBlocks, extractDecisions, extractItemNoteDecisions, extractMentions } from '@/lib/meeting-notes';
 
 describe('agendaToBlocks', () => {
   it('turns a pasted agenda into a heading and an empty text block per item', () => {
@@ -38,6 +38,18 @@ describe('extractMentions', () => {
     expect(extractMentions(text)).toEqual([
       { name: 'Ben', lines: ['surplus of $4.2k', 'grant closes 30 Oct'] },
       { name: 'Sam O.', lines: ['first time here'] }
+    ]);
+  });
+});
+
+describe('extractItemNoteDecisions', () => {
+  it('files ✓ and Decision: lines under the item they sit in', () => {
+    expect(extractItemNoteDecisions([
+      { heading: '5. Finance', text: 'Some talk\n✓ Budget approved\nDecision: Audit in May' },
+      { heading: null, text: 'Nothing here' }
+    ])).toEqual([
+      { text: 'Budget approved', agenda_heading: '5. Finance' },
+      { text: 'Audit in May', agenda_heading: '5. Finance' }
     ]);
   });
 });
