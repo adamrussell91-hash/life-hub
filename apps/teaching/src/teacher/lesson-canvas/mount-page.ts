@@ -44,6 +44,7 @@ import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
 import { mountLessonSyllabus } from '@/alignment/lesson-syllabus';
+import { mountOrganiserCard } from '@/organiser/lesson-card';
 import { autoLineIds, syncAutoStops } from '@/alignment/auto-lines';
 import { revealBlockFromHash } from '@/app/block-hash';
 import type { LessonRouteRole, NetworkLine } from '@/schemas/block';
@@ -1677,6 +1678,11 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   metaRow.after(syllabus.element);
   const stripHost = syllabus.outcomes;
 
+  // Organiser lines from this lesson, right after the Syllabus card. Stays when the syllabus card is hidden.
+  const organiserHost = document.createElement('div');
+  const organiserCard = lesson.unit_id ? mountOrganiserCard(organiserHost, { lesson: { id: lesson.id, unit_id: lesson.unit_id } }) : null;
+  if (organiserCard) syllabus.element.after(organiserHost);
+
   // Every dot's counts in one panel above the canvas, opened from the meta row.
   // The questions after the finish tick sit at the foot of the same panel: settings, then answers.
   const endQuestions = mountEndQuestions({
@@ -1831,6 +1837,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       lessonFlow?.dispose();
       dotPoints?.dispose();
       syllabus.dispose();
+      organiserCard?.dispose();
+      organiserHost.remove();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

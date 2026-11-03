@@ -1,0 +1,392 @@
+/**
+ * Knowledge organiser, pure code: the teacher's changes to a unit's sheet, the released view a
+ * class gets, the practice cards and the Leitner boxes. No storage and no clock in here; the
+ * caller passes `today` (a Sydney day, YYYY-MM-DD) and the release map.
+ *
+ *   organiser   { sections: [{ id, name, kind, columns?, lines: [{ id, cells, lesson_id?, piece_id? }] }], week?, updated_at }
+ *   boxes       { [line_id]: { box: 1..5, due: day, last: day } }
+ */
+import { randomBytes } from 'node:crypto';
+
+export const ORGANISER_LIMITS = { sections: 8, lines: 200, cell: 400, reason: 80, columns: 4, name: 60 };
+export const KINDS = ['table', 'list', 'sequence'];
+/** Days a card waits in box 1 to 5. */
+export const GAPS = [1, 3, 7, 14, 28];
+export const DAILY_CARDS = 20;
+export const REVIEW_LIMIT = 40;
+const FRESH_DAYS = 7;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const REF = /^[A-Za-z0-9_-]{1,120}$/;
+const PREFIX = { section: 'os_', column: 'oc_', line: 'ol_' };
+
+export class OrganiserError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+const reject = (status, code, message) => {
+  throw new OrganiserError(status, code, message);
+};
+
+const newId = (kind) => `${PREFIX[kind]}${randomBytes(5).toString('hex')}`;
+
+const sydneyParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' });
+/** The Sydney calendar day of a moment, as YYYY-MM-DD. */
+export function sydneyDay(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  return sydneyParts.format(d);
+}
+
+export function addDays(day, n) {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+const gapOf = (box) => GAPS[Math.min(Math.max(box, 1), GAPS.length) - 1];
+
+// ---- Teacher changes -------------------------------------------------------------------------
+
+const clone = (value) => structuredClone(value);
+const text = (value) => (typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '');
+
+function cleanName(value, what = 'section') {
+  const name = text(value).replace(/\s+/g, ' ');
+  if (!name) reject(400, 'missing_name', `Give the ${what} a name.`);
+  if (name.length > ORGANISER_LIMITS.name) reject(400, 'too_long', `A ${what} name can be up to ${ORGANISER_LIMITS.name} characters.`);
+  return name;
+}
+
+const defaultColumns = () => [
+  { id: newId('column'), label: 'Prompt', hide: false },
+  { id: newId('column'), label: 'Answer', hide: true }
+];
+
+/** Columns from a request: ones carrying a known id keep it (and their cells); the rest are new. */
+function cleanColumns(raw, known = []) {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > ORGANISER_LIMITS.columns) {
+    reject(400, 'bad_columns', `A table has 2 to ${ORGANISER_LIMITS.columns} columns.`);
+  }
+  const used = new Set();
+  return raw.map((c) => {
+    const keep = typeof c?.id === 'string' && known.includes(c.id) && !used.has(c.id);
+    const id = keep ? c.id : newId('column');
+    used.add(id);
+    return { id, label: cleanName(c?.label, 'column'), hide: c?.hide === true };
+  });
+}
+
+function cleanCell(value) {
+  const cell = typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '';
+  if (cell.length > ORGANISER_LIMITS.cell) reject(400, 'too_long', `A cell can be up to ${ORGANISER_LIMITS.cell} characters.`);
+  return cell;
+}
+
+/** Cells in the shape a section holds: one per column for a table, one otherwise. */
+function cellsFor(section, raw) {
+  const want = section.kind === 'table' ? section.columns.length : 1;
+  if (!Array.isArray(raw) || raw.length > want) reject(400, 'bad_cells', want === 1 ? 'A line here has one cell.' : `A line here has ${want} cells.`);
+  const cells = raw.map(cleanCell);
+  while (cells.length < want) cells.push('');
+  return cells;
+}
+
+const joined = (cells) => cells.filter((c) => c).join(' - ');
+
+/** Cells carried to another section: positions for tables, joined text for a one-cell section. */
+function recast(cells, section) {
+  if (section.kind !== 'table') return [joined(cells)];
+  const out = cells.slice(0, section.columns.length);
+  while (out.length < section.columns.length) out.push('');
+  return out;
+}
+
+function findSection(organiser, id) {
+  const section = organiser.sections.find((s) => s.id === id);
+  if (!section) reject(404, 'not_found', 'That section has gone.');
+  return section;
+}
+function findLine(organiser, id) {
+  for (const section of organiser.sections) {
+    const index = section.lines.findIndex((l) => l.id === id);
+    if (index !== -1) return { section, index, line: section.lines[index] };
+  }
+  return reject(404, 'not_found', 'That line has gone.');
+}
+const lineCount = (organiser) => organiser.sections.reduce((n, s) => n + s.lines.length, 0);
+const ref = (value, what) => {
+  if (typeof value !== 'string' || !REF.test(value)) reject(400, 'bad_request', `That ${what} isn’t valid.`);
+  return value;
+};
+const slot = (value, length) => {
+  if (!Number.isInteger(value)) reject(400, 'bad_request', 'Say where it goes.');
+  return Math.min(Math.max(value, 0), length);
+};
+
+function updateSection(organiser, change) {
+  const section = findSection(organiser, change.section_id);
+  if (change.name !== undefined) section.name = cleanName(change.name);
+  const kind = change.kind === undefined ? section.kind : change.kind;
+  if (!KINDS.includes(kind)) reject(400, 'bad_kind', 'A section is a table, a list or a sequence.');
+
+  if (kind === 'table') {
+    const wasTable = section.kind === 'table';
+    if (!wasTable && change.columns === undefined) {
+      section.columns = defaultColumns();
+      for (const line of section.lines) line.cells = [line.cells[0] ?? '', ''];
+    } else if (change.columns !== undefined) {
+      const before = wasTable ? section.columns : [];
+      const next = cleanColumns(change.columns, before.map((c) => c.id));
+      for (const line of section.lines) {
+        const old = wasTable ? line.cells : [line.cells[0] ?? ''];
+        line.cells = next.map((c, i) => {
+          const was = before.findIndex((b) => b.id === c.id);
+          return was !== -1 ? old[was] ?? '' : !wasTable && i === 0 ? old[0] ?? '' : '';
+        });
+      }
+      section.columns = next;
+    }
+  } else if (section.kind === 'table') {
+    for (const line of section.lines) line.cells = [joined(line.cells)];
+    delete section.columns;
+  }
+  section.kind = kind;
+}
+
+function newLine(section, raw) {
+  const line = { id: newId('line'), cells: cellsFor(section, raw?.cells) };
+  if (raw?.lesson_id) line.lesson_id = ref(raw.lesson_id, 'lesson');
+  if (raw?.piece_id) line.piece_id = ref(raw.piece_id, 'piece');
+  return line;
+}
+
+/**
+ * One teacher change, applied to a copy of the organiser. Throws OrganiserError for anything
+ * the sheet can't hold. Line, section and column ids are made here and never change after.
+ */
+export function applyChange(organiser, change) {
+  const next = clone(organiser ?? { sections: [] });
+  if (!Array.isArray(next.sections)) next.sections = [];
+  if (!change || typeof change !== 'object' || Array.isArray(change)) reject(400, 'bad_request', 'Invalid request.');
+  switch (change.op) {
+    case 'add_section': {
+      if (next.sections.length >= ORGANISER_LIMITS.sections) reject(400, 'too_many_sections', `A unit can have ${ORGANISER_LIMITS.sections} sections.`);
+      const kind = change.kind === undefined ? 'table' : change.kind;
+      if (!KINDS.includes(kind)) reject(400, 'bad_kind', 'A section is a table, a list or a sequence.');
+      const section = { id: newId('section'), name: cleanName(change.name), kind, lines: [] };
+      if (kind === 'table') section.columns = change.columns === undefined ? defaultColumns() : cleanColumns(change.columns);
+      next.sections.push(section);
+      break;
+    }
+    case 'update_section':
+      updateSection(next, change);
+      break;
+    case 'delete_section': {
+      const section = findSection(next, change.section_id);
+      next.sections = next.sections.filter((s) => s !== section);
+      if (next.week?.section_id === section.id) delete next.week;
+      break;
+    }
+    case 'move_section': {
+      const section = findSection(next, change.section_id);
+      const to = slot(change.to, next.sections.length - 1);
+      next.sections = next.sections.filter((s) => s !== section);
+      next.sections.splice(to, 0, section);
+      break;
+    }
+    case 'add_lines': {
+      const section = findSection(next, change.section_id);
+      if (!Array.isArray(change.lines)) reject(400, 'bad_request', 'Add at least one line.');
+      const added = change.lines.map((raw) => newLine(section, raw)).filter((l) => l.cells.some((c) => c));
+      if (!added.length) reject(400, 'empty_line', 'Type something in the line.');
+      if (lineCount(next) + added.length > ORGANISER_LIMITS.lines) reject(400, 'too_many_lines', `A unit can have ${ORGANISER_LIMITS.lines} lines.`);
+      section.lines.push(...added);
+      break;
+    }
+    case 'update_line': {
+      const { section, line } = findLine(next, change.line_id);
+      if (change.cells !== undefined) line.cells = cellsFor(section, change.cells);
+      for (const [field, what] of [['lesson_id', 'lesson'], ['piece_id', 'piece']]) {
+        if (change[field] === undefined) continue;
+        if (change[field] === null || change[field] === '') delete line[field];
+        else line[field] = ref(change[field], what);
+      }
+      break;
+    }
+    case 'delete_line': {
+      const { section, index } = findLine(next, change.line_id);
+      section.lines.splice(index, 1);
+      break;
+    }
+    case 'move_line': {
+      const { section, index, line } = findLine(next, change.line_id);
+      const target = change.section_id === undefined ? section : findSection(next, change.section_id);
+      section.lines.splice(index, 1);
+      if (target !== section) line.cells = recast(line.cells, target);
+      target.lines.splice(slot(change.to, target.lines.length), 0, line);
+      break;
+    }
+    case 'set_week': {
+      if (change.week === null) {
+        delete next.week;
+        break;
+      }
+      const week = change.week;
+      const section = findSection(next, week?.section_id);
+      if (typeof week.due !== 'string' || !DAY.test(week.due) || Number.isNaN(Date.parse(week.due))) reject(400, 'bad_date', 'Pick the day it is due.');
+      const reason = text(week.reason).replace(/\s+/g, ' ');
+      if (reason.length > ORGANISER_LIMITS.reason) reject(400, 'too_long', `A reason can be up to ${ORGANISER_LIMITS.reason} characters.`);
+      next.week = { section_id: section.id, due: week.due, reason };
+      break;
+    }
+    default:
+      reject(400, 'bad_action', 'Unknown change.');
+  }
+  return next;
+}
+
+// ---- Release ---------------------------------------------------------------------------------
+
+/**
+ * What a class may see. `releases` maps lesson id to { state: 'released', day } | { state: 'waiting' }
+ * | { state: 'gone' } (see lessonReleases). A line with no lesson is always released. Sections with
+ * no released line are left out, so waiting text and its section names never leave the server.
+ * Lines carry lesson_id, piece_id and released_on for the server's own use: studentSheet strips them.
+ */
+export function releasedSheet(organiser, releases, today) {
+  const sections = [];
+  for (const section of organiser?.sections ?? []) {
+    const lines = [];
+    for (const line of section.lines ?? []) {
+      let day = null;
+      if (line.lesson_id) {
+        const release = releases?.[line.lesson_id];
+        if (release?.state !== 'released') continue;
+        day = release.day ?? null;
+      }
+      lines.push({
+        id: line.id,
+        cells: line.cells,
+        fresh: day !== null && addDays(day, FRESH_DAYS) > today,
+        ...(line.lesson_id ? { lesson_id: line.lesson_id } : {}),
+        ...(line.piece_id ? { piece_id: line.piece_id } : {}),
+        ...(day ? { released_on: day } : {})
+      });
+    }
+    if (!lines.length) continue;
+    sections.push({ id: section.id, name: section.name, kind: section.kind, ...(section.kind === 'table' ? { columns: section.columns } : {}), lines });
+  }
+  const w = organiser?.week;
+  const target = w && sections.find((s) => s.id === w.section_id);
+  const week = target && today <= w.due ? { section_id: target.id, section_name: target.name, due: w.due, reason: w.reason ?? '' } : undefined;
+  return { sections, ...(week ? { week } : {}) };
+}
+
+/** The sheet as a student receives it: no lesson or piece ids, no release days. */
+export function studentSheet(sheet) {
+  return {
+    sections: sheet.sections.map((s) => ({
+      ...s,
+      lines: s.lines.map(({ id, cells, fresh }) => ({ id, cells, fresh }))
+    })),
+    ...(sheet.week ? { week: sheet.week } : {})
+  };
+}
+
+// ---- Practice --------------------------------------------------------------------------------
+
+/**
+ * One card per released line of a table with a hidden and a shown column. `builds` maps a piece id
+ * to the claim it builds. `from` is the first day the card can be served: the day after release.
+ */
+export function buildCards(sections, builds = new Map()) {
+  const cards = [];
+  for (const section of sections ?? []) {
+    if (section.kind !== 'table') continue;
+    const columns = section.columns ?? [];
+    const cueAt = columns.findIndex((c) => !c.hide);
+    const answerAt = columns.findIndex((c) => c.hide);
+    if (cueAt === -1 || answerAt === -1) continue;
+    for (const line of section.lines) {
+      const cue = line.cells[cueAt]?.trim();
+      const answer = line.cells[answerAt]?.trim();
+      if (!cue || !answer) continue;
+      const more = columns
+        .map((c, i) => ({ label: c.label, text: line.cells[i]?.trim() ?? '', i }))
+        .filter((m) => m.i !== cueAt && m.i !== answerAt && m.text)
+        .map(({ label, text: t }) => ({ label, text: t }));
+      const claim = line.piece_id ? builds.get(line.piece_id) : undefined;
+      cards.push({
+        line_id: line.id,
+        section: section.name,
+        cue_label: columns[cueAt].label,
+        cue,
+        answer_label: columns[answerAt].label,
+        answer,
+        more,
+        ...(claim ? { builds: claim } : {}),
+        from: line.released_on ? addDays(line.released_on, 1) : ''
+      });
+    }
+  }
+  return cards;
+}
+
+/**
+ * The Leitner box after an answer. A card moves up at most once a day: Got it again on the day it
+ * last moved (a resend, or Got it on a repeat after Again) keeps its box.
+ */
+export function applyResult(entry, result, today) {
+  if (result === 'again') return { box: 1, due: today, last: today };
+  if (entry && entry.last === today) return { box: entry.box, due: addDays(today, gapOf(entry.box)), last: today };
+  const box = Math.min(GAPS.length, (entry?.box ?? 1) + 1);
+  return { box, due: addDays(today, gapOf(box)), last: today };
+}
+
+const publicCard = ({ from, ...card }) => card;
+
+/**
+ * Today's cards and when the next ones arrive. Due cards come oldest first, then new cards in
+ * sheet order, up to the daily cap less what was already done today. A repeat (Again today, due
+ * today) is never held back by the cap. Late cards just wait: nothing moves down.
+ */
+export function todaysCards(cards, boxes, today) {
+  const served = cards.filter((c) => c.from <= today);
+  const later = cards.filter((c) => c.from > today);
+  const entry = (c) => boxes?.[c.line_id];
+  const doneToday = served.filter((c) => entry(c)?.last === today && entry(c).due > today).length;
+  const room = Math.max(0, DAILY_CARDS - doneToday);
+  const due = served
+    .map((c, order) => ({ c, order, e: entry(c) }))
+    .filter((x) => x.e && x.e.due <= today)
+    .sort((a, b) => a.e.due.localeCompare(b.e.due) || a.order - b.order);
+  const fresh = served.filter((c) => !entry(c));
+
+  const chosen = new Set();
+  let used = 0;
+  for (const { c, e } of due) {
+    const repeat = e.last === today;
+    if (!repeat && used >= room) continue;
+    chosen.add(c);
+    if (!repeat) used += 1;
+  }
+  for (const c of fresh) {
+    if (used >= room) break;
+    chosen.add(c);
+    used += 1;
+  }
+  // Keep due order for the cards that were due, then new ones in sheet order.
+  const ordered = [...due.map((x) => x.c), ...fresh].filter((c) => chosen.has(c));
+
+  const upcoming = new Map();
+  const bump = (day) => upcoming.set(day, (upcoming.get(day) ?? 0) + 1);
+  const tomorrow = addDays(today, 1);
+  for (const { c, e } of due) if (e.last !== today && !chosen.has(c)) bump(tomorrow);
+  for (const c of fresh) if (!chosen.has(c)) bump(tomorrow);
+  for (const c of served) if (entry(c) && entry(c).due > today) bump(entry(c).due);
+  for (const c of later) bump(c.from);
+  const date = [...upcoming.keys()].sort()[0];
+  return { cards: ordered.map(publicCard), next: date ? { date, count: upcoming.get(date) } : null };
+}

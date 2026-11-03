@@ -22,6 +22,12 @@ test('the student profile endpoint is public for POST only', () => {
   assert.equal(isPublicStudentApi('POST', '/api/classes/class1/profile'), false);
 });
 
+test('the organiser student endpoint is public for POST only', () => {
+  assert.equal(isPublicStudentApi('POST', '/api/published/organiser/class1'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/published/organiser/class1'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/units/unit1/organiser'), false);
+});
+
 test('teacher text tools stay behind the operator session', () => {
   assert.equal(isPublicStudentApi('POST', '/api/text-tools'), false);
   assert.equal(isPublicStudentApi('GET', `/api/text-tools/${'a'.repeat(64)}`), false);

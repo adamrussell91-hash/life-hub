@@ -16,6 +16,7 @@ import { mountQuizLive } from '@/teacher/focus/quiz-live';
 import { focusSteps } from '@/teacher/focus/steps';
 import { tutorialCommon } from '@/tutorial/model';
 import { mountDisplayTimer } from '@/blocks/walkthru-note/display-timer';
+import { organiserApi } from '@/organiser/api';
 
 /**
  * Display view: the page the teacher projects. It shows the published lesson,
@@ -95,9 +96,12 @@ export function mountLessonDisplayView(
     fullScreen.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
   };
   document.addEventListener('fullscreenchange', syncFullScreen);
+  const organiserButton = chromeButton('Organiser', () => {});
+  organiserButton.hidden = true;
   actions.append(
     chromeButton('Refresh', () => load()),
     fullScreen,
+    organiserButton,
     chromeButton('Builder', () => navigate(`/lessons/${encodeURIComponent(lessonId)}`))
   );
   header.append(brand, actions);
@@ -110,6 +114,17 @@ export function mountLessonDisplayView(
     examples?.dispose();
     content.replaceChildren();
     document.title = `${lesson.title || 'Lesson'} · Display`;
+    // Run the unit's organiser with the class; the run view asks which class when it has to.
+    const unitId = lesson.unit_id;
+    organiserButton.hidden = !unitId;
+    organiserButton.onclick = unitId ? () => navigate(`/units/${encodeURIComponent(unitId)}/organiser/run`) : null;
+    // A unit with no sheet has nothing to run. If the check fails the button stays.
+    if (unitId) {
+      void organiserApi.get(unitId).then(
+        (res) => { if (!disposed && !res.organiser.sections.length) organiserButton.hidden = true; },
+        () => undefined
+      );
+    }
     const hero = document.createElement('section');
     hero.className = 'lesson-display__step lesson-display__step--hero';
     content.append(hero);

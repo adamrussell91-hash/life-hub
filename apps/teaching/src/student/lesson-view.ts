@@ -9,6 +9,7 @@ import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
+import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
@@ -290,6 +291,16 @@ export function mountStudentLessonView(
   let work: WorkSyncHandle | null = null;
   let footer: LessonFooterHandle | null = null;
   let token: InitialsTokenHandle | null = null;
+  let endCard: { dispose(): void } | null = null;
+  // Plain lessons only: the players and any live quiz round keep the page to themselves.
+  const addEndCard = (content: HTMLElement, lesson: PublishedLesson, classId: string, from: string, before?: Node | null): void => {
+    if (lecture || lesson.pedagogical_mode === 'quiz') return;
+    const mine = (endCard = { dispose: () => undefined });
+    void mountOrganiserEndCard(content, { lessonId: lesson.lesson_id, classId, from, before }).then((h) => {
+      if (disposed || endCard !== mine) h.dispose();
+      else endCard = h;
+    });
+  };
   const show = (content: HTMLElement, lesson: PublishedLesson, extras: Parameters<typeof renderPublishedLesson>[2]) => {
     lecture?.dispose();
     work?.dispose();
@@ -298,6 +309,8 @@ export function mountStudentLessonView(
     footer = null;
     token?.dispose();
     token = null;
+    endCard?.dispose();
+    endCard = null;
     lecture = renderPublishedLesson(content, lesson, extras);
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
@@ -315,6 +328,7 @@ export function mountStudentLessonView(
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh() });
       content.append(footer.element);
+      addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, footer.element);
     } else {
       // A plain link: the token still finds its class, in its own time.
       void classForPlainLesson(lesson.lesson_id).then(
@@ -322,6 +336,7 @@ export function mountStudentLessonView(
           if (!found || disposed || isStale() || token) return;
           token = mountInitialsToken({ classId: found, from: `/s/lessons/${lesson.lesson_id}` });
           header.append(token.element);
+          addEndCard(content, lesson, found, `/s/lessons/${lesson.lesson_id}`);
         },
         () => undefined
       );
@@ -440,6 +455,8 @@ export function mountStudentLessonView(
       footer = null;
       token?.dispose();
       token = null;
+      endCard?.dispose();
+      endCard = null;
     }
   };
 }

@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Organiser Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.14); --wash: rgba(20,43,81,.04);
+  --success: #3d6b4a; --sage: #dfe9e1; --peach: #fdf0e3; --peach-ink: #8a5a24;
+  --card: #fff; --r: .875rem; --r-xs: .375rem;
+  --font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 var(--font); }
+button, input, textarea { font: inherit; color: inherit; }
+.top { position: sticky; top: 0; z-index: 5; background: var(--navy); color: #fff; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.top h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 600; }
+.top button { font-size: 13px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.top button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.top .gap { flex: 1; }
+.note { max-width: 880px; margin: 16px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.note b { color: var(--navy); }
+.stage { display: flex; justify-content: center; padding: 16px 16px 64px; }
+.screen { width: 100%; max-width: 880px; background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; container-type: inline-size; }
+.stage.phone .screen { max-width: 390px; }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--card); }
+.chrome .dot { width: 24px; height: 24px; border-radius: 8px; background: var(--wave); flex: none; }
+.chrome b { color: var(--navy); font-size: 14px; }
+.chrome span { color: var(--muted); font-size: 13px; }
+.page { padding: 20px; display: grid; gap: 16px; }
+@container (max-width: 520px) { .page { padding: 16px; } }
+
+h2 { margin: 0; font-size: 20px; line-height: 1.25; color: var(--navy); }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+/* The block */
+.ko { display: grid; gap: 12px; }
+.ko-sec { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.ko-sec__head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+.ko-sec__name { margin: 0; font-size: 16px; font-weight: 600; color: var(--navy); }
+.ko-sec__last { font-size: 13px; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 14px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn:hover { background: var(--wash); }
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn--primary:hover { background: #102a49; }
+.btn--quiet { border-color: transparent; background: transparent; color: var(--wave); padding-inline: 6px; }
+.btn:focus-visible, .pill:focus-visible, .tick:focus-visible, .seq-card:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Same steps and wording as Recite in the Voice block */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.steps li { padding-bottom: 4px; font-size: 13px; text-align: center; color: var(--muted); border-bottom: 2px solid var(--line); }
+.steps li[aria-current="step"] { font-weight: 600; color: var(--ink); border-bottom-color: var(--ink); }
+.hint { margin: 0; font-size: 14px; color: var(--ink); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pills__label { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.pill { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* Table */
+.ko-t { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ko-t th, .ko-t td { padding: 8px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.ko-t th { background: var(--wash); font-weight: 600; }
+.ko-t td.is-hidden { background: repeating-linear-gradient(135deg, #dfe4ec 0 7px, #eef1f6 7px 14px); color: transparent; user-select: none; }
+.ko-t td.is-write { padding: 4px; }
+.ko-t textarea { display: block; width: 100%; min-height: 40px; resize: vertical; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 6px 8px; background: #fff; font-size: 14px; }
+.ko-t .tick-col { width: 48px; text-align: center; }
+.ko-t tr.is-got td { background: #f3f7f4; }
+.answer { font-weight: 500; }
+.wrote { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.wrote::before { content: 'You wrote: '; }
+.wrote--none::before { content: ''; }
+tr.is-open .answer, .is-open-item .answer { color: var(--wave); }
+.tick { width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border: 2px solid var(--wave); border-radius: 50%; background: #fff; color: var(--wave); cursor: pointer; }
+.tick[aria-pressed="true"] { background: var(--success); border-color: var(--success); color: #fff; }
+.tick svg { width: 16px; height: 16px; }
+.tally { margin: 0; font-size: 14px; font-weight: 600; color: var(--success); }
+@container (max-width: 520px) {
+  .ko-t, .ko-t tbody, .ko-t tr, .ko-t td { display: block; width: 100%; }
+  .ko-t thead { display: none; }
+  .ko-t tr { border: 1px solid var(--line); border-radius: var(--r-xs); margin-bottom: 8px; overflow: hidden; }
+  .ko-t td { border: 0; border-bottom: 1px solid var(--line); }
+  .ko-t tr td:last-child { border-bottom: 0; }
+  .ko-t td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .ko-t td.is-hidden { min-height: 44px; }
+  .ko-t td.is-hidden::before { color: var(--muted); }
+  .ko-t td.is-write { padding: 8px 10px; }
+  .ko-t .tick-col { width: 100%; text-align: right; }
+}
+
+/* List and sequence */
+.ko-l { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.write-box { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 8px 10px; background: #fff; font-size: 14px; resize: vertical; }
+.check-row { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-xs); font-size: 14px; }
+.check-row.is-got { background: #f3f7f4; }
+.wrote-block { padding: 8px 10px; border-radius: var(--r-xs); background: var(--wash); font-size: 14px; white-space: pre-wrap; }
+.wrote-block b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.stack { display: grid; gap: 6px; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.flow li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-xs); background: #fff; }
+.flow .n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--wash); color: var(--navy); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.flow li.is-right { background: #f3f7f4; }
+.flow li.is-right .n { background: var(--success); color: #fff; }
+.flow li.is-moved { background: var(--peach); }
+.flow li.is-moved .n { background: #fff; color: var(--peach-ink); }
+.flow small { display: block; font-size: 12px; color: var(--peach-ink); }
+.seq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@container (max-width: 520px) { .seq-grid { grid-template-columns: 1fr; } }
+.seq-col__label { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seq-card { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-xs); background: #fff; font-size: 14px; cursor: pointer; margin-bottom: 6px; }
+.seq-card:hover { background: var(--wash); }
+
+/* Lesson: where this section sits in the unit */
+.ko-map { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.ko-map span { padding: 2px 9px; border-radius: 999px; border: 1px dashed var(--line); }
+.ko-map span.now { border: 1px solid var(--navy); background: var(--navy); color: #fff; }
+.ko-link { color: var(--wave); font-size: 13px; }
+
+/* Teacher editor */
+.ed-sec { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+.ed-name { font-size: 15px; font-weight: 600; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 5px 8px; flex: 1; min-width: 150px; }
+.ed-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ed-wrap { overflow-x: auto; }
+.ed-t { border-collapse: collapse; width: 100%; min-width: 460px; font-size: 13px; }
+.ed-t td, .ed-t th { border: 1px solid var(--line); padding: 0; }
+.ed-t input { width: 100%; border: 0; padding: 6px 8px; background: transparent; font-size: 13px; }
+.ed-t th input { font-weight: 600; background: var(--wash); }
+.bring { background: var(--wash); border-radius: var(--r-xs); padding: 10px 12px; display: grid; gap: 6px; font-size: 14px; }
+.bring label { display: flex; gap: 8px; align-items: flex-start; }
+.bring__head { margin: 0; font-weight: 600; font-size: 13px; }
+.bring__meta { color: var(--muted); font-size: 12px; }
+.ed-collapsed { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ed-collapsed b { color: var(--navy); }
+.ed-collapsed span { color: var(--muted); font-size: 13px; }
+
+/* Print */
+.sheets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@container (max-width: 620px) { .sheets { grid-template-columns: 1fr; } }
+.sheet { background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(19,35,58,.08); padding: 14px; font-size: 10.5px; display: grid; gap: 8px; align-content: start; }
+.sheet h3 { margin: 0; font-size: 13px; color: var(--navy); }
+.sheet h4 { margin: 0 0 3px; font-size: 11px; color: var(--navy); }
+.sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.sheet th, .sheet td { border: 1px solid #b9c1cc; padding: 3px 5px; text-align: left; vertical-align: top; }
+.sheet th { background: #f0f2f5; }
+.sheet ol, .sheet ul { margin: 0; padding-left: 14px; }
+.sheet .blank-line { border-bottom: 1px solid #b9c1cc; height: 16px; }
+.sheet__tag { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* Progress page tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tabs span { padding: 7px 12px; font-size: 14px; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs span.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+.set { background: var(--peach); border-radius: var(--r); padding: 10px 14px; font-size: 14px; color: var(--peach-ink); }
+.set b { color: var(--ink); }
+.prac { background: var(--navy); color: #fff; border-radius: var(--r); padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.prac b { display: block; font-size: 16px; }
+.prac span { font-size: 13px; opacity: .85; }
+.prac .btn { background: #fff; color: var(--navy); border-color: #fff; }
+/* Folded sections */
+.fold { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.fold__head { width: 100%; display: flex; gap: 10px; align-items: center; justify-content: space-between; background: none; border: 0; padding: 12px 16px; cursor: pointer; text-align: left; }
+.fold__head b { color: var(--navy); font-size: 15px; }
+.fold__meta { font-size: 13px; color: var(--muted); }
+.new { display: inline-block; font-size: 11px; font-weight: 600; color: var(--peach-ink); background: var(--peach); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
+.fold .ko-sec { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+/* Practice card */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 12px; max-width: 560px; width: 100%; margin: 0 auto; }
+.card__from { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.card__cue { margin: 0; font-size: 18px; font-weight: 600; color: var(--navy); line-height: 1.35; }
+.card__answer { margin: 0; font-size: 16px; font-weight: 500; color: var(--wave); }
+.card__more { display: grid; gap: 2px; font-size: 13px; color: var(--ink); }
+.card__more span { color: var(--muted); }
+.card__builds { margin: 0; padding: 8px 10px; background: var(--wash); border-radius: var(--r-xs); font-size: 13px; }
+.card__builds b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.card__type { width: 100%; min-height: 56px; border: 1px solid var(--line); border-radius: var(--r-xs); padding: 7px 9px; font-size: 14px; }
+.card__count { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+.card__back { margin: 0; font-size: 13px; color: var(--muted); }
+/* Lesson placeholder + end card */
+.ph { background: var(--card); border: 1px dashed var(--line); border-radius: var(--r); padding: 18px; color: var(--muted); font-size: 14px; }
+.endcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--wave); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
+.endcard h3 { margin: 0; font-size: 16px; color: var(--navy); }
+.endcard ul { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+/* Teacher */
+.chip { display: inline-block; font-size: 11px; font-weight: 600; background: #e6edf7; color: var(--wave); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.ann { background: #f1f4fa; border: 1px solid #d9e2f0; border-radius: var(--r-xs); padding: 10px 12px; display: grid; gap: 8px; font-size: 14px; }
+.ann__head { margin: 0; font-weight: 600; font-size: 13px; color: var(--navy); }
+.ann label { display: flex; gap: 8px; align-items: flex-start; }
+.line-row { display: grid; gap: 2px; }
+.line-row small { color: var(--muted); }
+.wait td { color: var(--muted); background: #faf9f6; }
+.setbox { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.setbox input { border: 1px solid var(--line); border-radius: var(--r-xs); padding: 4px 8px; font-size: 13px; }
+/* Run with the class */
+.run { background: #101f33; color: #fff; padding: 22px; display: grid; gap: 14px; min-height: 520px; align-content: start; }
+.run h3 { margin: 0; font-size: 20px; }
+.run .pill { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+.run .pill[aria-pressed="true"] { background: #fff; color: var(--navy); border-color: #fff; }
+.run .pills__label { color: rgba(255,255,255,.7); }
+.run table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.run th, .run td { padding: 9px 11px; border: 1px solid rgba(255,255,255,.2); text-align: left; vertical-align: top; }
+.run th { background: rgba(255,255,255,.08); }
+.run td.cov { background: repeating-linear-gradient(135deg, #2a3e5c 0 8px, #1d3048 8px 16px); color: transparent; }
+.run .btn { background: #fff; color: var(--navy); border-color: #fff; }
+.run .btn--out { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+.run__timer { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+@container (max-width: 520px) { .run table { font-size: 13px; } .run { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Organiser</h1>
+  <button data-screen="profile" aria-pressed="true">Student: progress page</button>
+  <button data-screen="practise" aria-pressed="false">Student: practice</button>
+  <button data-screen="lesson" aria-pressed="false">Student: end of lesson</button>
+  <button data-screen="tlesson" aria-pressed="false">You: lesson</button>
+  <button data-screen="tunit" aria-pressed="false">You: unit</button>
+  <button data-screen="run" aria-pressed="false">You: run with class</button>
+  <button data-screen="print" aria-pressed="false">Print</button>
+  <span class="gap"></span>
+  <button data-width="desk" aria-pressed="true">Desktop</button>
+  <button data-width="phone" aria-pressed="false">Phone 390</button>
+</div>
+<p class="note" id="note"></p>
+<div class="stage" id="stage"><div class="screen" id="screen"></div></div>
+
+<script>
+const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>';
+const tickMark = () => TICK.replace('<svg', '<svg width="16" style="color:var(--success);flex:none"');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Invented sample unit. The novel is out of copyright. "Now" is Lesson 6.
+const NOW = 6;
+const DU = {
+  a: 'Monsters are made by how others treat them',
+  b: 'Gothic settings make inner states visible'
+};
+const SECTIONS = [
+  { id: 's1', name: 'Key ideas', kind: 'table', last: 'Last covered 3 days ago',
+    cols: ['Prompt', 'What to know', 'Where we see it'], hide: [1],
+    rows: [
+      { c: ['What does the frame narrative do?', 'It makes each teller shape what we believe', "Walton's letters hold Victor's tale"], l: 1, piece: 'b' },
+      { c: ['What does the sublime do in Gothic writing?', 'Vast nature mirrors a feeling too big to say', 'The glacier below Mont Blanc'], l: 2, piece: 'b' },
+      { c: ['Why does the creature turn cruel?', 'Repeated rejection teaches him cruelty', 'The cottagers drive him out'], l: 5, piece: 'a' },
+      { c: ['How is Victor a double of the creature?', 'Each mirrors what the other hides', 'Their chase across the ice'], l: 6, piece: 'a' },
+      { c: ['Who is to blame for the deaths?', 'Blame moves between maker and made', 'The final scene on the ship'], l: 9, piece: 'a' }
+    ] },
+  { id: 's2', name: 'Vocabulary', kind: 'table', last: 'Last covered yesterday',
+    cols: ['Word', 'What it means', 'In the novel'], hide: [1],
+    rows: [
+      { c: ['Gothic', 'Fiction of dread, ruin and the supernatural', "Victor's secret workshop"], l: 1 },
+      { c: ['Hubris', 'Overreaching pride that brings a fall', 'Victor trying to create life'], l: 2 },
+      { c: ['Doppelgänger', "A double who mirrors someone's hidden self", 'Victor and the creature'], l: 5 },
+      { c: ['Transgression', 'Crossing a moral boundary', 'Making life without care for it'], l: 6 },
+      { c: ['Epistolary', 'Told through letters', "Walton's letters to his sister"], l: 8 }
+    ] },
+  { id: 's3', name: 'Key lines', kind: 'table', last: 'Last covered 6 days ago',
+    cols: ['Line', 'Who says it', 'What it shows'], hide: [0],
+    rows: [
+      { c: ['"It was on a dreary night of November"', 'Victor', 'Creation brings dread at the moment of triumph'], l: 3 },
+      { c: ['"I am malicious because I am miserable."', 'The creature', 'Cruelty grows out of rejection'], l: 5, piece: 'a' },
+      { c: ['"How dare you sport thus with life?"', 'The creature', 'He holds his maker to account'], l: 6, piece: 'a' },
+      { c: ['"Beware; for I am fearless, and therefore powerful."', 'The creature', 'Having nothing to lose gives him power'], l: 8 }
+    ] },
+  { id: 's4', name: 'Story order', kind: 'sequence', last: 'Not covered yet',
+    items: [['Walton finds Victor on the ice', 1], ['Victor brings the creature to life', 2], ['William is killed and Justine is hanged', 4], ['The creature tells his story and asks for a mate', 5], ['Victor destroys the unfinished mate', 6], ['Elizabeth is killed on her wedding night', 7], ["Victor dies on Walton's ship", 9]] }
+];
+const released = (sec) => sec.kind === 'table' ? sec.rows.filter((r) => r.l <= NOW) : sec.items.filter((i) => i[1] <= NOW);
+const fresh = (sec) => sec.kind === 'table' ? released(sec).filter((r) => r.l >= NOW - 1).length : released(sec).filter((i) => i[1] >= NOW - 1).length;
+function viewOf(sec) {
+  if (sec.kind !== 'table') return { ...sec, seq: released(sec).map((i) => i[0]) };
+  return { ...sec, grid: released(sec).map((r) => r.c), meta: released(sec) };
+}
+
+const state = {};
+function st(id) {
+  if (!state[id]) reset(id);
+  return state[id];
+}
+function reset(id, last) {
+  const sec = SECTIONS.find((x) => x.id === id);
+  state[id] = { step: 'sheet', hide: new Set(sec.hide || []), keep: new Set(), got: new Set(), wrote: {}, order: [], placed: [], last: last || sec.last, open: false };
+}
+let screen = 'profile';
+
+function stepper(step) {
+  return `<ol class="steps">${[['read', 'Read'], ['cover', 'Cover'], ['check', 'Check']].map(([k, n]) => `<li ${k === step ? 'aria-current="step"' : ''}>${n}</li>`).join('')}</ol>`;
+}
+
+function tableHtml(v, s, rowsOverride) {
+  const grid = rowsOverride || v.grid;
+  const ths = v.cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('') + (s.step === 'check' ? '<th class="tick-col">Got it</th>' : '');
+  const body = grid.map((row, r) => {
+    const covering = s.hide.size && !s.keep.has(r);
+    const cells = row.map((text, c) => {
+      const label = `data-label="${esc(v.cols[c])}"`;
+      const covered = covering && s.hide.has(c);
+      if (s.step === 'read' && covered) return `<td ${label} class="is-hidden">${esc(text)}</td>`;
+      if (s.step === 'cover' && covered) return `<td ${label} class="is-write"><textarea aria-label="${esc(v.cols[c])}, row ${r + 1}" data-write="${r}:${c}">${esc(s.wrote[`${r}:${c}`] || '')}</textarea></td>`;
+      if (s.step === 'check' && covered) {
+        const w = (s.wrote[`${r}:${c}`] || '').trim();
+        return `<td ${label}><span class="wrote ${w ? '' : 'wrote--none'}">${w ? esc(w) : 'Left for next round'}</span><span class="answer">${esc(text)}</span></td>`;
+      }
+      return `<td ${label}>${esc(text)}</td>`;
+    }).join('');
+    const tick = s.step === 'check' ? `<td class="tick-col">${covering ? `<button class="tick" data-tick="${r}" aria-label="I got row ${r + 1}" aria-pressed="${s.got.has(r)}">${TICK}</button>` : tickMark()}</td>` : '';
+    return `<tr class="${s.step === 'check' && (s.got.has(r) || !covering) ? 'is-got' : ''} ${s.step === 'check' && covering ? 'is-open' : ''}">${cells}${tick}</tr>`;
+  }).join('');
+  return `<table class="ko-t"><thead><tr>${ths}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function loopBody(sec, s, rowsOverride) {
+  const v = viewOf(sec);
+  const total = rowsOverride ? rowsOverride.length : sec.kind === 'table' ? v.grid.length : v.seq.length;
+  const parts = [];
+  if (s.step !== 'sheet') parts.push(stepper(s.step));
+  if (sec.kind === 'table') {
+    if (s.step === 'read') {
+      parts.push('<p class="hint">Read it through slowly, headings too. Then choose what to hide.</p>');
+      parts.push(`<div class="pills"><span class="pills__label">Hide:</span>${sec.cols.map((c, i) => `<button class="pill" data-hide="${i}" aria-pressed="${s.hide.has(i)}">${esc(c)}</button>`).join('')}</div>`);
+    }
+    if (s.step === 'cover') parts.push('<p class="hint">Write what you can remember. Short notes are fine.</p>');
+    if (s.step === 'check') parts.push('<p class="hint">Compare, and tick each row you recalled.</p>');
+    parts.push(tableHtml(v, s, rowsOverride));
+  } else {
+    if (s.step === 'sheet' || s.step === 'read') {
+      if (s.step === 'read') parts.push('<p class="hint">Follow it through from first to last, and notice what causes what.</p>');
+      parts.push(`<ol class="flow">${v.seq.map((t, i) => `<li><span class="n">${i + 1}</span><span>${esc(t)}</span></li>`).join('')}</ol>`);
+    }
+    if (s.step === 'cover') {
+      parts.push('<p class="hint">Tap the events in the order they happen.</p>');
+      const left = s.order.filter((i) => !s.placed.includes(i));
+      parts.push(`<div class="seq-grid"><div><p class="seq-col__label">Events</p>${left.map((i) => `<button class="seq-card" data-place="${i}">${esc(v.seq[i])}</button>`).join('') || '<p class="sub">All placed.</p>'}</div>
+        <div><p class="seq-col__label">Your order</p><ol class="flow">${s.placed.map((i, n) => `<li><span class="n">${n + 1}</span><span style="flex:1">${esc(v.seq[i])}</span><button class="btn btn--quiet" data-unplace="${i}">Undo</button></li>`).join('') || '<li style="color:var(--muted)">Tap an event to start</li>'}</ol></div></div>`);
+    }
+    if (s.step === 'check') {
+      parts.push('<p class="hint">Green events are in the right place. The others show where they belong.</p>');
+      parts.push(`<ol class="flow">${s.placed.map((i, n) => i === n ? `<li class="is-right"><span class="n">${n + 1}</span><span>${esc(v.seq[i])}</span></li>` : `<li class="is-moved"><span class="n">${n + 1}</span><span>${esc(v.seq[i])}<small>Belongs at ${i + 1}</small></span></li>`).join('')}</ol>`);
+    }
+  }
+  const act = [];
+  if (s.step === 'sheet') act.push('<button class="btn btn--primary" data-go="read">Test myself</button>');
+  if (s.step === 'read') {
+    act.push(`<button class="btn btn--primary" data-go="cover" ${sec.kind === 'table' && !s.hide.size ? 'disabled' : ''}>Cover it</button>`);
+    act.push('<button class="btn btn--quiet" data-go="sheet">Back to the sheet</button>');
+  }
+  if (s.step === 'cover') act.push(`<button class="btn btn--primary" data-go="check" ${sec.kind !== 'table' && s.placed.length !== s.order.length ? 'disabled' : ''}>Check</button>`);
+  if (s.step === 'check') {
+    let remaining, message;
+    if (sec.kind === 'table') {
+      remaining = new Set([...s.keep, ...s.got]).size < total;
+      message = !remaining ? 'You recalled all of it. Come back in a few days and see what stays.' : s.got.size ? `You recalled ${s.got.size} more this round. Go again on the rest.` : '';
+    } else {
+      const right = s.placed.filter((i, n) => i === n).length;
+      remaining = right < total;
+      message = remaining ? `${right} in the right place. Try the order again.` : 'You have the whole sequence. Come back in a few days and see what stays.';
+    }
+    if (message) parts.push(`<p class="tally" role="status">${message}</p>`);
+    if (remaining) act.push('<button class="btn btn--primary" data-again="rest">Go again</button>');
+    if (sec.kind === 'table') act.push(`<button class="btn ${remaining ? '' : 'btn--primary'}" data-again="all">Cover everything</button>`);
+    act.push('<button class="btn btn--quiet" data-go="done">Done for now</button>');
+  }
+  parts.push(`<div class="actions">${act.join('')}</div>`);
+  return parts.join('');
+}
+
+function foldHtml(sec) {
+  const s = st(sec.id);
+  const count = released(sec).length;
+  const n = fresh(sec);
+  return `<div class="fold"><button class="fold__head" data-fold="${sec.id}" aria-expanded="${s.open}"><span><b>${esc(sec.name)}</b>${n ? `<span class="new">${n} new</span>` : ''}</span><span class="fold__meta">${count} · ${esc(s.last)}</span></button>
+    ${s.open ? `<section class="ko-sec" data-sec="${sec.id}">${loopBody(sec, s)}</section>` : ''}</div>`;
+}
+
+// Practice: a Leitner deck. Seeded with invented due cards.
+const GAPS = [1, 3, 7, 14, 28];
+function buildDeck() {
+  const pick = [['s1', 2, 2], ['s2', 1, 1], ['s3', 2, 0], ['s1', 3, 0], ['s2', 3, 0], ['s3', 1, 3]];
+  return pick.map(([id, r, box]) => ({ id, r, box }));
+}
+let deck = null;
+let prac = { i: 0, shown: false, typed: '', done: 0, last: '' };
+function resetPrac() { deck = buildDeck(); prac = { i: 0, shown: false, typed: '', done: 0, last: '' }; }
+resetPrac();
+
+function practiceHtml() {
+  const head = `${chrome('Your progress', 'Organiser · Practice')}<div class="page">`;
+  if (prac.i >= deck.length) {
+    return `${head}<div class="card"><p class="card__cue">All done for today.</p><p class="hint">Everything you practised is booked in to come back. Next up: 4 on Thursday.</p><div class="actions"><button class="btn btn--primary" data-prac="restart">Run it again in this mockup</button></div></div></div>`;
+  }
+  const c = deck[prac.i];
+  const sec = SECTIONS.find((x) => x.id === c.id);
+  const row = sec.rows[c.r];
+  const answerCol = sec.hide[0];
+  const cueCol = answerCol === 0 ? 2 : 0;
+  const others = row.c.map((t, i) => [sec.cols[i], t, i]).filter((x) => x[2] !== answerCol && x[2] !== cueCol);
+  const parts = [`<p class="card__from">${esc(sec.name)}</p><p class="card__cue">${esc(row.c[cueCol])}</p>`];
+  if (!prac.shown) {
+    parts.push(`<textarea class="card__type" placeholder="Type it if you like, or say it to yourself" aria-label="Your answer" data-prac-type>${esc(prac.typed)}</textarea>`);
+    parts.push('<div class="actions"><button class="btn btn--primary" data-prac="show">Show answer</button></div>');
+  } else {
+    if (prac.typed.trim()) parts.push(`<div class="wrote-block"><b>You wrote</b>${esc(prac.typed.trim())}</div>`);
+    parts.push(`<p class="card__answer">${esc(row.c[answerCol])}</p>`);
+    others.forEach((o) => parts.push(`<div class="card__more"><span>${esc(o[0])}</span>${esc(o[1])}</div>`));
+    if (row.piece) parts.push(`<p class="card__builds"><b>This builds your big idea</b>${esc(DU[row.piece])}</p>`);
+    parts.push('<div class="actions"><button class="btn btn--primary" data-prac="got">Got it</button><button class="btn" data-prac="again">Again</button></div>');
+  }
+  const left = deck.length - prac.i;
+  return `${head}<div class="card">${parts.join('')}</div><p class="card__count">${left} to go today${prac.last ? ` · ${esc(prac.last)}` : ''}</p></div>`;
+}
+
+function chrome(a, b) { return `<div class="chrome"><span class="dot"></span><b>${a}</b><span>${b}</span></div>`; }
+
+function profileHtml() {
+  return `${chrome('Your progress', 'BB on this device')}
+  <div class="page"><div class="tabs"><span>My progress</span><span>Returned work</span><span class="on">Organiser</span></div>
+    <div><h2>Gothic Fiction organiser</h2><p class="sub">Grows as your lessons come out.</p></div>
+    <div class="set"><b>This week:</b> Key lines, by Friday, for the Week 3 Review.</div>
+    <div class="prac"><div><b>Practise: 6 today</b><span>About 4 minutes. New lines join after each lesson.</span></div><button class="btn" data-screen-link="practise">Start</button></div>
+    <div class="ko">${SECTIONS.map(foldHtml).join('')}</div>
+    <a class="ko-link" href="#" data-screen-link="print">Print my organiser</a>
+  </div>`;
+}
+
+function lessonHtml() {
+  const sec = SECTIONS[0];
+  const rows = sec.rows.filter((r) => r.l === NOW).concat(SECTIONS[1].rows.filter((r) => r.l === NOW), SECTIONS[2].rows.filter((r) => r.l === NOW));
+  return `${chrome('Lesson 6: The creature speaks', 'Gothic Fiction')}
+  <div class="page"><div class="ph">The lesson runs as normal here. You add nothing to it.</div>
+    <div class="endcard"><h3>From this lesson: ${rows.length} new lines</h3>
+      <ul>${rows.map((r) => `<li>${esc(r.c[0])}</li>`).join('')}</ul>
+      <p class="hint">They join your practice tomorrow.</p>
+      <div class="actions"><button class="btn btn--primary" data-screen-link="profile">Open my organiser</button></div></div>
+    <div class="ph">Lesson footer: previous, finish tick, next.</div></div>`;
+}
+
+let annOpen = false;
+const addedLines = [];
+const ANN = [
+  { c: ['How is Victor a double of the creature?', 'Each mirrors what the other hides', 'Their chase across the ice'], tag: 'Knowledge piece', sec: 'Key ideas' },
+  { c: ['Transgression', 'Crossing a moral boundary', 'Making life without care for it'], tag: 'Vocabulary in this lesson', sec: 'Vocabulary' },
+  { c: ['"How dare you sport thus with life?"', 'The creature', 'He holds his maker to account'], tag: 'Quote in this lesson', sec: 'Key lines' }
+];
+function tLessonHtml() {
+  const rows = addedLines.map((a) => `<tr><td>${esc(a.sec)}</td><td>${esc(a.c[0])}</td><td>${esc(a.c[1])}</td><td>${a.tag === 'Knowledge piece' ? '<span class="chip">Piece</span>' : ''}</td></tr>`).join('');
+  return `${chrome('Lesson 6: The creature speaks', 'Editing')}
+  <div class="page"><div class="ph">Syllabus card sits here, above.</div>
+  <div class="ed-sec"><div class="ed-collapsed"><b>Organiser</b><span>${addedLines.length} lines from this lesson · appear when it is published</span></div>
+    ${addedLines.length ? `<div class="ed-wrap"><table class="ed-t"><thead><tr><th style="padding:6px 8px">Section</th><th style="padding:6px 8px">Line</th><th style="padding:6px 8px">What to know</th><th style="padding:6px 8px"></th></tr></thead><tbody>${rows.replaceAll('<td>', '<td style="padding:6px 8px">')}</tbody></table></div>` : ''}
+    <div class="ed-row"><button class="btn btn--primary" data-ann>Ann, suggest lines</button><button class="btn">Add a line</button><span class="pills__label">Cost shows before she runs.</span></div>
+    ${annOpen ? `<div class="ann"><p class="ann__head">Ann read this lesson and its 2 knowledge pieces. Keep what you want and edit it after.</p>
+      ${ANN.map((a, i) => `<label><input type="checkbox" data-annpick="${i}" checked><span class="line-row"><span>${esc(a.c[0])} <span class="chip">${esc(a.tag)}</span></span><small>${esc(a.c[1])} · goes in ${esc(a.sec)}</small></span></label>`).join('')}
+      <div class="actions"><button class="btn btn--primary" data-annadd>Add these lines</button><button class="btn btn--quiet" data-annclose>Close</button></div></div>` : ''}
+  </div><div class="ph">Lesson blocks continue below.</div></div>`;
+}
+
+function tUnitHtml() {
+  const sec = SECTIONS[0];
+  const sets = SECTIONS.map((x) => `<button class="pill" aria-pressed="${x.id === 's3'}">${esc(x.name)}</button>`).join('');
+  return `${chrome('Gothic Fiction', 'Unit plan · Organiser')}
+  <div class="page"><div class="actions" style="justify-content:space-between"><div><h2>Organiser</h2><p class="sub">Lines come from your lessons. Students see a line once its lesson is published and its class date arrives.</p></div><div class="actions"><button class="btn" data-screen-link="run">Run with the class</button><button class="btn" data-screen-link="print">Print</button></div></div>
+  <div class="ed-sec"><b style="color:var(--navy)">Set for this week</b><div class="setbox"><div class="pills">${sets}</div><span>by</span><input value="Fri 13 Nov" aria-label="Date"><span>for</span><input value="Week 3 Review" aria-label="Reason"></div></div>
+  <div class="ed-sec"><div class="ed-row"><input class="ed-name" value="Key ideas" aria-label="Section name"><div class="pills"><button class="pill" aria-pressed="true">Table</button><button class="pill" aria-pressed="false">List</button><button class="pill" aria-pressed="false">Sequence</button></div></div>
+    <div class="ed-wrap"><table class="ed-t"><thead><tr>${sec.cols.map((c) => `<th><input value="${esc(c)}" aria-label="Column heading"></th>`).join('')}<th style="padding:6px 8px;background:var(--wash);font-size:12px">From</th></tr></thead>
+    <tbody>${sec.rows.map((r) => `<tr class="${r.l > NOW ? 'wait' : ''}">${r.c.map((c) => `<td><input value="${esc(c)}" aria-label="Cell"></td>`).join('')}<td style="padding:6px 8px;white-space:nowrap">L${r.l} ${r.piece ? '<span class="chip">Piece</span>' : ''}${r.l > NOW ? '<br><small>Waiting</small>' : ''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="pills"><span class="pills__label">Usually hide:</span>${sec.cols.map((c, i) => `<button class="pill" aria-pressed="${sec.hide.includes(i)}">${esc(c)}</button>`).join('')}</div>
+    <div class="ed-row"><button class="btn">Add line</button><button class="btn">Paste from Word or Sheets</button><span class="pills__label">Bring in:</span><button class="pill">Deep understandings</button><button class="pill">Anthology</button><button class="pill">Knowledge plan</button></div></div>
+  ${SECTIONS.slice(1).map((x) => `<div class="ed-sec"><div class="ed-collapsed"><b>${esc(x.name)}</b><span>${x.kind === 'table' ? 'Table' : 'Sequence'} · ${released(x).length} released, ${(x.kind === 'table' ? x.rows : x.items).length} written</span></div></div>`).join('')}
+  </div>`;
+}
+
+let run = { id: 's1', mode: 'all', covered: true };
+function runHtml() {
+  const sec = SECTIONS.find((x) => x.id === run.id);
+  const rows = run.mode === 'last' ? sec.rows.filter((r) => r.l >= NOW - 1 && r.l <= NOW) : sec.rows.filter((r) => r.l <= NOW);
+  const tables = SECTIONS.filter((x) => x.kind === 'table');
+  return `<div class="run"><div class="actions" style="justify-content:space-between"><h3>${esc(sec.name)}</h3><span class="run__timer">3:00</span></div>
+    <div class="pills">${tables.map((x) => `<button class="pill" data-runsec="${x.id}" aria-pressed="${x.id === run.id}">${esc(x.name)}</button>`).join('')}</div>
+    <div class="pills"><span class="pills__label">Show:</span><button class="pill" data-runmode="last" aria-pressed="${run.mode === 'last'}">Last two lessons</button><button class="pill" data-runmode="all" aria-pressed="${run.mode === 'all'}">Everything so far</button></div>
+    <table><thead><tr>${sec.cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.c.map((c, i) => `<td class="${run.covered && sec.hide.includes(i) ? 'cov' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <div class="actions"><button class="btn" data-runreveal>${run.covered ? 'Reveal' : 'Cover again'}</button><button class="btn btn--out">Start timer</button></div></div>`;
+}
+
+function printSection(sec, blank) {
+  const v = viewOf(sec);
+  if (sec.kind === 'table') {
+    const hide = new Set(sec.hide);
+    return `<div><h4>${esc(sec.name)}</h4><table><tr>${sec.cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr>${v.grid.map((r) => `<tr>${r.map((c, i) => `<td>${blank && hide.has(i) ? '&nbsp;' : esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  }
+  return `<div><h4>${esc(sec.name)}</h4><ol>${v.seq.map((t) => `<li>${blank ? '<div class="blank-line"></div>' : esc(t)}</li>`).join('')}</ol></div>`;
+}
+function printHtml() {
+  return `${chrome('Gothic Fiction', 'Print preview · released so far')}
+  <div class="page"><div class="sheets">
+    <div class="sheet"><p class="sheet__tag">Page 1: full sheet</p><h3>Gothic Fiction: organiser</h3>${SECTIONS.map((s) => printSection(s, false)).join('')}</div>
+    <div class="sheet"><p class="sheet__tag">Page 2: rebuild it</p><h3>Gothic Fiction: from memory</h3>${SECTIONS.map((s) => printSection(s, true)).join('')}</div>
+  </div></div>`;
+}
+
+const SCREENS = {
+  profile: { note: '<b>Where students work.</b> A third tab on the progress page, reached from their initials in any lesson. Only released lines show, sections stay folded, and Start opens practice. Open a section and press Test myself for the full cover loop.', html: profileHtml },
+  practise: { note: '<b>Leitner practice.</b> Got it moves a card up a box (back after 1, 3, 7, 14, 28 days). Again sends it to box 1 and repeats it today. Boxes save on the server under the class initials. Cards with a knowledge piece show the deep understanding on the back.', html: practiceHtml },
+  lesson: { note: '<b>Automatic.</b> If a lesson added lines, this card appears at its end. You place nothing. Lessons with no lines show nothing.', html: lessonHtml },
+  tlesson: { note: '<b>Writing as you design.</b> Press Ann, suggest lines. She drafts lines around this lesson and its knowledge pieces, you keep what you want. A piece is one part of a line, with a prompt and an example around it.', html: tLessonHtml },
+  tunit: { note: '<b>The whole sheet, and this week.</b> Every line shows which lesson it came from and whether it is waiting on that lesson. Set for this week puts the banner on the Organiser tab.', html: tUnitHtml },
+  run: { note: '<b>For the projector.</b> No block needed: a button on the unit page and in Display. Choose a section, students write from memory, press Reveal.', html: runHtml },
+  print: { note: '<b>Print gives two pages</b> of what is released so far: the full sheet, and a blank copy with the "usually hide" columns left empty.', html: printHtml }
+};
+
+const $screen = document.getElementById('screen');
+function setScreen(name) {
+  screen = name;
+  document.querySelectorAll('[data-screen]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.screen === name)));
+  paint();
+}
+function paint() {
+  $screen.innerHTML = SCREENS[screen].html();
+  document.getElementById('note').innerHTML = SCREENS[screen].note;
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, a');
+  if (!t) return;
+  if (t.dataset.screen) return setScreen(t.dataset.screen);
+  if (t.dataset.screenLink) { e.preventDefault(); return setScreen(t.dataset.screenLink); }
+  if (t.dataset.width) {
+    document.getElementById('stage').classList.toggle('phone', t.dataset.width === 'phone');
+    document.querySelectorAll('[data-width]').forEach((b) => b.setAttribute('aria-pressed', String(b === t)));
+    return;
+  }
+  if (t.dataset.fold) { const s = st(t.dataset.fold); s.open = !s.open; return paint(); }
+  if (t.dataset.prac) {
+    const a = t.dataset.prac;
+    if (a === 'restart') resetPrac();
+    if (a === 'show') prac.shown = true;
+    if (a === 'got') {
+      const c = deck[prac.i];
+      const box = c.again ? 0 : Math.min(c.box + 1, GAPS.length - 1);
+      const gap = GAPS[box];
+      prac.last = `That one comes back in ${gap} day${gap === 1 ? '' : 's'}`;
+      prac.i += 1; prac.shown = false; prac.typed = '';
+    }
+    if (a === 'again') {
+      const c = deck[prac.i];
+      deck.push({ ...c, box: 0, again: true });
+      prac.last = 'That one comes round again today';
+      prac.i += 1; prac.shown = false; prac.typed = '';
+    }
+    return paint();
+  }
+  if ('ann' in t.dataset) { annOpen = true; return paint(); }
+  if ('annclose' in t.dataset) { annOpen = false; return paint(); }
+  if ('annadd' in t.dataset) {
+    document.querySelectorAll('[data-annpick]:checked').forEach((c) => addedLines.push(ANN[Number(c.dataset.annpick)]));
+    annOpen = false; return paint();
+  }
+  if (t.dataset.runsec) { run.id = t.dataset.runsec; run.covered = true; return paint(); }
+  if (t.dataset.runmode) { run.mode = t.dataset.runmode; return paint(); }
+  if ('runreveal' in t.dataset) { run.covered = !run.covered; return paint(); }
+
+  const host = t.closest('[data-sec]');
+  if (!host) return;
+  const sec = SECTIONS.find((x) => x.id === host.dataset.sec);
+  const s = st(sec.id);
+  if (t.dataset.hide !== undefined) {
+    const c = Number(t.dataset.hide);
+    if (s.hide.has(c)) s.hide.delete(c);
+    else if (s.hide.size < sec.cols.length - 1) s.hide.add(c);
+  } else if (t.dataset.go) {
+    const go = t.dataset.go;
+    if (go === 'done') { reset(sec.id, 'Last covered today'); state[sec.id].open = true; return paint(); }
+    if (go === 'sheet') { s.step = 'sheet'; return paint(); }
+    if (go === 'cover' && sec.kind === 'sequence') { const n = released(sec).length; s.order = [...Array(n).keys()].reverse(); s.placed = []; }
+    if (go === 'check' && sec.kind === 'table') s.got = new Set();
+    s.step = go;
+  } else if (t.dataset.tick !== undefined) {
+    const r = Number(t.dataset.tick);
+    s.got.has(r) ? s.got.delete(r) : s.got.add(r);
+  } else if (t.dataset.again) {
+    if (sec.kind === 'sequence') { s.placed = []; s.step = 'cover'; }
+    else {
+      if (t.dataset.again === 'all') s.keep = new Set(); else s.got.forEach((i) => s.keep.add(i));
+      s.got = new Set(); s.wrote = {}; s.step = 'cover';
+    }
+  } else if (t.dataset.place !== undefined) s.placed.push(Number(t.dataset.place));
+  else if (t.dataset.unplace !== undefined) s.placed = s.placed.filter((i) => i !== Number(t.dataset.unplace));
+  else return;
+  paint();
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.dataset && 'pracType' in e.target.dataset) { prac.typed = e.target.value; return; }
+  const key = e.target.dataset && e.target.dataset.write;
+  if (!key) return;
+  const host = e.target.closest('[data-sec]');
+  st(host.dataset.sec).wrote[key] = e.target.value;
+});
+
+paint();
+</script>
+</body>
+</html>

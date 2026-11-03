@@ -117,6 +117,8 @@ import { createPublishedCaseHandler } from '../../../netlify/functions/published
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
 import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
 import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
+import { createOrganiserHandler } from '../../../netlify/functions/organiser.mjs';
+import { createPublishedOrganiserHandler } from '../../../netlify/functions/published-organiser.mjs';
 import { createPublishedSprintHandler } from '../../../netlify/functions/published-sprint.mjs';
 import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
 import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-practice.mjs';
@@ -3986,6 +3988,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedTutorialHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
+      : /^\/api\/units\/[^/]+\/organiser$/.test(path)
+        ? createOrganiserHandler(deps)
+      : path.startsWith('/api/published/organiser/')
+        ? createPublishedOrganiserHandler(deps)
       : /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path)
         ? createAnthologyKnowledgeHandler(deps)
       : path.startsWith('/api/published/anthology-knowledge/')
@@ -4143,6 +4149,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
+      /^\/api\/units\/[^/]+\/organiser$/.test(path) ||
+      /^\/api\/published\/organiser\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path) ||
       /^\/api\/published\/anthology-knowledge\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint$/.test(path) ||
@@ -4445,6 +4453,22 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (!session.authenticated) return unauthorizedResponse();
       if (!body || typeof body !== 'object') {
         return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
+      }
+      // Ann's organiser lines: no model here, just invented proposals to walk the card with.
+      if ((body as { kind?: string }).kind === 'organiser_suggest') {
+        const estimate = { kind: 'organiser_suggest', cost_usd: 0.012, cost_aud: 0.02 };
+        if ((body as { dry_run?: boolean }).dry_run) return okResponse(200, { estimate });
+        const id = `ai_job_mock_${Date.now()}`;
+        const lessonId = String((body as { lesson_id?: string }).lesson_id);
+        const organiser = (store.getJSON(`unit_organisers/${store.getJSON<Lesson>(draftLessonKey(lessonId))?.unit_id}`) ?? { sections: [] }) as { sections: Array<{ id: string }> };
+        store.setJSON(aiJobKey(id), {
+          id, kind: 'organiser_suggest', lesson_id: lessonId, status: 'done', cost_aud: 0.02,
+          proposals: [
+            { section_id: organiser.sections[0]?.id, cells: ['What does the lantern mean to the town?', 'A promise nobody will name', 'The relit tower'], tag: 'Knowledge piece' },
+            { new_section: { name: 'Places', kind: 'table', columns: [{ label: 'Place', hide: false }, { label: 'Why it matters', hide: true }] }, cells: ['The chapel', 'Where the silence began'], tag: 'Vocabulary' }
+          ]
+        });
+        return okResponse(202, { id, status: 'working', estimate });
       }
       const parsed = AiJobCreateSchema.safeParse(body);
       if (!parsed.success) {

@@ -211,6 +211,8 @@ export async function permanentDelete(store: JsonStore, type: LifecycleEntityTyp
   }
   await store.delete(key);
   if (type === 'lesson') await store.delete(publishedLessonKey(id));
+  // A unit's knowledge organiser lives in its own blob and goes with the unit.
+  if (type === 'unit') await store.delete(`unit_organisers/${id}`);
   const kind = versionKindFor(type);
   if (kind && store.listKeys) {
     const versionKeys = await store.listKeys(versionsPrefix(kind, id));
