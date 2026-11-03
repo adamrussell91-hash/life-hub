@@ -13,9 +13,13 @@ export type BlockInsertHandle = {
   dispose(): void;
 };
 
+export type PaletteFamily = { id: string; cards: unknown[] };
+
+export function taskPaletteFamilies(extraTypes?: readonly string[]): PaletteFamily[];
+
 export function mountBlockInsert(
   host: HTMLElement,
-  options: { onInsert: (type: InsertMenuValue) => void }
+  options: { families?: PaletteFamily[]; onInsert: (type: InsertMenuValue) => void }
 ): BlockInsertHandle;
 
 export type Block = { id: string; block_type: string; content?: unknown; [key: string]: unknown };

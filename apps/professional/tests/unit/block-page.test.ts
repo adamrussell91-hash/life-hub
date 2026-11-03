@@ -23,6 +23,31 @@ describe('mountBlockPage', () => {
     page.dispose();
   });
 
+  it('keeps annotation out of the menu unless the page asks for it', () => {
+    const plain = document.createElement('div');
+    const meeting = document.createElement('div');
+    document.body.append(plain, meeting);
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    mountBlockPage(plain, { blocks: [], onSave });
+    mountBlockPage(meeting, { blocks: [], onSave, extraBlockTypes: ['annotation'] });
+    plain.querySelector<HTMLButtonElement>('.page-editor__add-btn')!.click();
+    expect(plain.querySelector('[data-block-type="annotation"]')).toBeNull();
+    meeting.querySelector<HTMLButtonElement>('.page-editor__add-btn')!.click();
+    expect(meeting.querySelector('[data-block-type="annotation"]')).not.toBeNull();
+  });
+
+  it('saves an inserted annotation block', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const page = mountBlockPage(host, { blocks: [], onSave, extraBlockTypes: ['annotation'] });
+    host.querySelector<HTMLButtonElement>('.page-editor__add-btn')!.click();
+    host.querySelector<HTMLButtonElement>('[data-block-type="annotation"]')!.click();
+    await page.flush();
+    expect((onSave.mock.calls[0]![0] as Array<{ block_type: string }>).map((block) => block.block_type)).toEqual(['annotation']);
+    page.dispose();
+  });
+
   it('flush saves at once', async () => {
     const host = document.createElement('div');
     document.body.append(host);

@@ -78,6 +78,11 @@
   min-width: 0;
 }
 
+/* The notes column is too narrow for the text and its notes side by side. */
+.meeting-page__notes .block-editor__annotation-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* ── The room, grouped by organisation ── */
 .room__org {
   padding: var(--space-3);
