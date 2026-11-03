@@ -54,6 +54,7 @@ test('problem types rank real technique ids, and sit in a real series', () => {
     assert.equal(new Set(rankedFor(type)).size, rankedFor(type).length, type);
     assert.match(rankedFor(type)[0], /^w1-/, `${type} keeps its first suggestion`);
     assert.ok(rankedFor(type).some((id) => id.startsWith('w2-')), `${type} offers Book 2`);
+    assert.ok(rankedFor(type).some((id) => id.startsWith('w3-')), `${type} offers Book 3`);
   }
   assert.deepEqual(rankedFor('nope'), []);
 });

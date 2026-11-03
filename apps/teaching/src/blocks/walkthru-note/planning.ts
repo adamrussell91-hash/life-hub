@@ -24,7 +24,12 @@ export const PLANNING_FIELDS: ReadonlyArray<{ label: string; technique: string; 
   { label: 'Mode B set pieces', technique: 'w2-mode-a-mode-b' },
   { label: 'Exemplars to show', technique: 'w2-exemplars' },
   { label: 'Pitching to the top', technique: 'w2-teach-to-the-top' },
-  { label: 'SEND goals and supports', technique: 'w2-send-aim-high-plan-support' }
+  { label: 'SEND goals and supports', technique: 'w2-send-aim-high-plan-support' },
+  { label: 'Big questions for the unit', technique: 'w3-big-questions' },
+  { label: 'Types of knowledge in this unit', technique: 'w3-types-of-subject-knowledge' },
+  { label: 'Culture of reading', technique: 'w3-building-a-culture-of-reading' },
+  { label: 'Test design', technique: 'w3-assessment-test-design' },
+  { label: 'Academic writing', technique: 'w3-writing-developing-academic-voices' }
 ];
 
 const glyphs = createGlyphSet({ svgs: SYMBOL_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'tk-wt-badge__glyph' });
