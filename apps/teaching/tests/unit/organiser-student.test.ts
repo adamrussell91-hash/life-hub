@@ -37,37 +37,37 @@ beforeEach(() => localStorage.clear());
 describe('organiser panel', () => {
   it('shows folded sections with counts and new labels', () => {
     const p = renderOrganiserPanel(loadOf(), { classId: 'c1' });
-    const heads = [...p.querySelectorAll('.ko-fold__head')];
+    const heads = [...p.querySelectorAll('.kos-fold__head')];
     expect(heads).toHaveLength(2);
     expect(heads[0]!.textContent).toContain('2 new');
-    expect(heads[0]!.querySelector('.ko-fold__meta')!.textContent).toBe('3');
+    expect(heads[0]!.querySelector('.kos-fold__meta')!.textContent).toBe('3');
     expect(heads[1]!.textContent).not.toContain('new');
-    expect(p.querySelector('.ko-sec')).toBeNull();
+    expect(p.querySelector('.kos-sec')).toBeNull();
     (heads[0] as HTMLElement).click();
-    expect(p.querySelector('.ko-sec')).toBeTruthy();
+    expect(p.querySelector('.kos-sec')).toBeTruthy();
     expect(p.textContent).toContain('Test myself');
   });
   it('shows the practice block with a count and the banner wording', () => {
     const p = renderOrganiserPanel(loadOf({ sheets: [sheet({ week: { section_id: 's1', section_name: 'Key ideas', due: '2026-11-13', reason: 'the Week 3 Review' } })] }), { classId: 'c1' });
-    expect(p.querySelector('.ko-prac b')!.textContent).toBe('Practise: 2 today');
-    expect(p.querySelector('.ko-set')!.textContent).toBe('This week: Key ideas, by Friday, for the Week 3 Review.');
-    expect(p.querySelector('.ko-prac .ko-btn')!.textContent).toBe('Start');
+    expect(p.querySelector('.kos-prac b')!.textContent).toBe('Practise: 2 today');
+    expect(p.querySelector('.kos-set')!.textContent).toBe('This week: Key ideas, by Friday, for the Week 3 Review.');
+    expect(p.querySelector('.kos-prac .kos-btn')!.textContent).toBe('Start');
   });
   it('says when the next cards come when none are due', () => {
     const p = renderOrganiserPanel(loadOf({ practice: { today: 0, cards: [], next: { date: '2026-11-12', count: 4 } } }), { classId: 'c1' });
-    expect(p.querySelector('.ko-prac')!.textContent).toContain('4 cards come on Thursday');
-    expect(p.querySelector('.ko-prac button')).toBeNull();
+    expect(p.querySelector('.kos-prac')!.textContent).toContain('4 cards come on Thursday');
+    expect(p.querySelector('.kos-prac button')).toBeNull();
   });
   it('has no practice block when practice is null', () => {
     const p = renderOrganiserPanel(loadOf({ practice: null }), { classId: 'c1' });
-    expect(p.querySelector('.ko-prac')).toBeNull();
+    expect(p.querySelector('.kos-prac')).toBeNull();
   });
   it('switches unit only with more than one sheet, current first', () => {
-    expect(renderOrganiserPanel(loadOf(), { classId: 'c1' }).querySelector('.ko-switch')).toBeNull();
+    expect(renderOrganiserPanel(loadOf(), { classId: 'c1' }).querySelector('.kos-switch')).toBeNull();
     const p = renderOrganiserPanel(loadOf({ sheets: [sheet({ unit_id: 'old', title: 'Old unit', current: false }), sheet()] }), { classId: 'c1' });
-    const pills = [...p.querySelectorAll('.ko-switch .ko-pill')].map((x) => x.textContent);
+    const pills = [...p.querySelectorAll('.kos-switch .kos-pill')].map((x) => x.textContent);
     expect(pills).toEqual(['Sample unit organiser', 'Old unit']);
-    expect(p.querySelector('.ko-title')!.textContent).toBe('Sample unit organiser');
+    expect(p.querySelector('.kos-title')!.textContent).toBe('Sample unit organiser');
   });
   it('shows no scores, streaks or percentages', () => {
     const p = renderOrganiserPanel(loadOf(), { classId: 'c1' });
@@ -79,17 +79,17 @@ describe('test myself', () => {
   it('goes again on the unticked rows only', () => {
     const host = document.createElement('div');
     mountTestMyself(host, table);
-    click(host, '.ko-btn--primary'); // Test myself
-    click(host, '.ko-btn--primary'); // Cover it (Hide starts from the section)
+    click(host, '.kos-btn--primary'); // Test myself
+    click(host, '.kos-btn--primary'); // Cover it (Hide starts from the section)
     expect(host.querySelectorAll('textarea')).toHaveLength(3);
     const first = host.querySelector('textarea') as HTMLTextAreaElement;
     first.value = 'my try';
     first.dispatchEvent(new Event('input'));
-    click(host, '.ko-btn--primary'); // Check
+    click(host, '.kos-btn--primary'); // Check
     expect(host.textContent).toContain('my try');
     (host.querySelector('[data-label="What to know"]') as HTMLElement);
-    click(host, '.ko-tick');
-    expect(host.querySelector('.ko-tally')!.textContent).toContain('1 more');
+    click(host, '.kos-tick');
+    expect(host.querySelector('.kos-tally')!.textContent).toContain('1 more');
     byText(host, 'button', 'Go again').click();
     expect(host.querySelectorAll('textarea')).toHaveLength(2);
     byText(host, 'button', 'Check').click();
@@ -100,13 +100,13 @@ describe('test myself', () => {
     const spy = vi.spyOn(Storage.prototype, 'setItem');
     const host = document.createElement('div');
     mountTestMyself(host, list);
-    click(host, '.ko-btn--primary');
-    click(host, '.ko-btn--primary');
+    click(host, '.kos-btn--primary');
+    click(host, '.kos-btn--primary');
     const ta = host.querySelector('textarea') as HTMLTextAreaElement;
     ta.value = 'First\nSecond';
     ta.dispatchEvent(new Event('input'));
     byText(host, 'button', 'Check').click();
-    expect(host.querySelector('.ko-wroteblock')!.textContent).toContain('First');
+    expect(host.querySelector('.kos-wroteblock')!.textContent).toContain('First');
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
@@ -166,7 +166,7 @@ describe('lesson end card', () => {
     const footer = document.createElement('div');
     content.append(footer);
     await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ lines: ['Line one', 'Line two'] }) } });
-    expect(content.firstElementChild!.className).toBe('ko-end');
+    expect(content.firstElementChild!.className).toBe('kos-end');
     expect(content.textContent).toContain('From this lesson: 2 new lines');
     expect(content.querySelector('a')!.getAttribute('href')).toContain('/s/classes/c1/profile?tab=organiser');
   });

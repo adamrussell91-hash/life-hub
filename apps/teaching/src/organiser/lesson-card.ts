@@ -79,6 +79,8 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   const mine = (): Array<{ section: OrganiserSection; line: OrganiserSection['lines'][number] }> =>
     sections().flatMap((section) => section.lines.filter((line) => line.lesson_id === lesson.id).map((line) => ({ section, line })));
 
+  const waitingLines = (): boolean => mine().some(({ line }) => data?.status[line.id] !== 'released');
+
   function paintHead(): void {
     root.classList.toggle('ko-card--open', isOpen);
     head.setAttribute('aria-expanded', String(isOpen));
@@ -88,7 +90,7 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     else if (!data) summary.textContent = 'Loading…';
     else {
       const n = mine().length;
-      summary.textContent = n ? `${plural(n, 'line')} from this lesson · appear when it is published` : 'No lines from this lesson yet';
+      summary.textContent = n ? `${plural(n, 'line')} from this lesson${waitingLines() ? ' · students see them once it is published and its date arrives' : ''}` : 'No lines from this lesson yet';
     }
   }
 

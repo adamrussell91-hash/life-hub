@@ -12,7 +12,7 @@ export type EndCardOptions = {
   /** Insert ahead of this node (the lesson footer) when it is still in `content`. */
   before?: Node | null;
   /** Test seam. */
-  api?: { lesson(classId: string, lessonId: string): Promise<{ lines: string[] }> };
+  api?: { lesson(classId: string, lessonId: string): Promise<{ lines: string[]; joining?: boolean }> };
 };
 
 export async function mountOrganiserEndCard(content: HTMLElement, options: EndCardOptions): Promise<{ dispose(): void }> {
@@ -28,21 +28,24 @@ export async function mountOrganiserEndCard(content: HTMLElement, options: EndCa
     }
   };
   let lines: string[] = [];
+  let joining = false;
   try {
-    lines = (await api.lesson(classId, lessonId)).lines ?? [];
+    const found = await api.lesson(classId, lessonId);
+    lines = found.lines ?? [];
+    joining = !!found.joining;
   } catch {
     return handle;
   }
   if (disposed || !lines.length) return handle;
 
-  card = el('section', 'ko-end');
+  card = el('section', 'kos-end');
   card.setAttribute('aria-label', 'From this lesson');
-  card.append(el('h3', undefined, `From this lesson: ${lines.length} new ${lines.length === 1 ? 'line' : 'lines'}`));
+  card.append(el('h3', undefined, `From this lesson: ${lines.length} ${joining ? 'new ' : ''}${lines.length === 1 ? 'line' : 'lines'}`));
   const ul = el('ul');
   for (const l of lines) ul.append(el('li', undefined, l));
-  card.append(ul, el('p', 'ko-hint', 'They join your practice tomorrow.'));
+  card.append(ul, el('p', 'kos-hint', joining ? 'They join your practice tomorrow.' : 'You can find them on your organiser.'));
   const path = `/s/classes/${encodeURIComponent(classId)}/profile?tab=organiser${from ? `&from=${encodeURIComponent(from)}` : ''}`;
-  const open = studentAnchor(path, 'ko-btn ko-btn--primary', 'Open my organiser');
+  const open = studentAnchor(path, 'kos-btn kos-btn--primary', 'Open my organiser');
   open.style.display = 'inline-flex';
   open.style.alignItems = 'center';
   open.style.justifySelf = 'start';

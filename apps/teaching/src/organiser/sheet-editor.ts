@@ -72,6 +72,12 @@ function mini(label: string, aria: string, onClick: () => void, disabled = false
 
 const isField = (node: Element | null): boolean => !!node && node.matches('input, textarea, select');
 const sameCells = (a: readonly string[] | undefined, b: readonly string[]): boolean => !!a && a.length === b.length && a.every((c, i) => c === b[i]);
+/** A cell shows all its text: the box grows with what's typed, and the table row with it. */
+const fitField = (field: HTMLTextAreaElement): void => {
+  field.style.height = 'auto';
+  if (field.scrollHeight) field.style.height = `${field.scrollHeight}px`;
+};
+
 const shorten = (text: string, n: number): string => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
 
 const ROUTINE: string[] = [
@@ -440,6 +446,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         void send({ op: 'update_section', section_id: section.id, columns: columns.map((c) => (c.id === column.id ? { ...c, label } : c)) });
       });
       th.append(input);
+      if (columns.length > 2) th.append(mini('✕', `Remove the “${column.label}” column`, () => void removeColumn(section, column.id), false, 'ko-mini--th'));
       head.append(th);
     }
     head.append(h('th', 'ko-from', 'From'), h('th', 'ko-ctl'));
@@ -562,11 +569,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         hide.append(pill(column.label || 'Column', column.hide, () => void send({ op: 'update_section', section_id: section.id, columns: toggleHide(columns, column.id) })));
       }
       if (columns.length < 4) hide.append(button('Add column', 'btn btn--quiet ko-btn', () => void send({ op: 'update_section', section_id: section.id, columns: [...columns, { label: 'Column', hide: false }] })));
-      if (columns.length > 2) {
-        for (const column of columns) {
-          hide.append(button(`Remove “${shorten(column.label || 'Column', 14)}”`, 'btn btn--quiet ko-btn', () => void removeColumn(section, column.id)));
-        }
-      }
       box.append(hide);
       const warn = noCardWarning(section);
       if (warn) box.append(h('p', 'ko-warn', warn));
@@ -774,6 +776,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       const node = root.querySelector<HTMLElement>(`[data-scroll-for="${id}"]`);
       if (node) node.scrollLeft = left;
     });
+    root.querySelectorAll<HTMLTextAreaElement>('.ko-t textarea').forEach(fitField);
     const run = focusAfter;
     focusAfter = null;
     run?.();
@@ -787,6 +790,9 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     }, 0);
   };
   root.addEventListener('focusout', onFocusOut);
+  root.addEventListener('input', (event) => {
+    if (event.target instanceof HTMLTextAreaElement && event.target.closest('.ko-t')) fitField(event.target);
+  });
 
   load();
 

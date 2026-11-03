@@ -43,8 +43,11 @@
 .ko-t { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 13px; }
 .ko-t th, .ko-t td { border: 1px solid var(--line); padding: 0; vertical-align: top; text-align: left; }
 .ko-t th { background: rgba(20, 43, 81, .04); }
+.ko-t th:has(.ko-mini--th) { position: relative; }
+.ko-mini--th { position: absolute; top: 4px; right: 4px; min-width: 0; padding: 0 5px; font-size: 11px; opacity: .55; }
+.ko-mini--th:hover, .ko-mini--th:focus-visible { opacity: 1; }
 .ko-t th input { width: 100%; border: 0; padding: 6px 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
-.ko-t td textarea { display: block; width: 100%; min-height: 40px; resize: vertical; border: 0; padding: 6px 8px; background: transparent; font: inherit; font-size: 13px; color: var(--ink); }
+.ko-t td textarea { display: block; width: 100%; min-height: 40px; resize: none; overflow: hidden; border: 0; padding: 6px 8px; background: transparent; font: inherit; font-size: 13px; color: var(--ink); }
 .ko-t td textarea:focus, .ko-t th input:focus { outline: 2px solid var(--wave); outline-offset: -2px; background: #fff; }
 .ko-t tr.is-wait td { background: #faf9f6; }
 .ko-t tr.is-wait td textarea { color: var(--muted); }
@@ -117,6 +120,7 @@
 /* Phones: 16px inputs so iOS does not zoom */
 @media (max-width: 640px) {
   .ko-root input, .ko-root textarea, .ko-root select, .ko-card input, .ko-card textarea, .ko-card select { font-size: 16px; }
+  .ko-t { min-width: 760px; }
   .ko-t th input, .ko-t td textarea, .ko-from select { font-size: 16px; }
   .ko-run { padding: 16px; }
   .ko-run table, .ko-run ol, .ko-run ul { font-size: 15px; }

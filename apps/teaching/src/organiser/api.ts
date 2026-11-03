@@ -23,5 +23,5 @@ export const studentOrganiserApi = {
   review: (classId: string, results: ReviewResult[]) =>
     apiPost<{ today: number; next: PracticeNext }>(studentPath(classId), { action: 'review', class_token: token(classId), results }),
   lesson: (classId: string, lessonId: string) =>
-    apiPost<{ lines: string[] }>(studentPath(classId), { action: 'lesson', class_token: token(classId), lesson_id: lessonId })
+    apiPost<{ lines: string[]; joining?: boolean }>(studentPath(classId), { action: 'lesson', class_token: token(classId), lesson_id: lessonId })
 };

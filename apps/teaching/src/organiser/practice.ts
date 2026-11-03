@@ -82,15 +82,15 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
 
   function paint(): void {
     if (disposed) return;
-    const wrap = el('div', 'ko-root');
+    const wrap = el('div', 'kos-root');
     if (i >= queue.length) {
-      const card = el('div', 'ko-card');
-      card.append(el('p', 'ko-card__cue', 'All done for today.'));
-      const line = el('p', 'ko-hint', `Everything you practised is booked in to come back. ${nextCardsLine(next)}`);
+      const card = el('div', 'kos-card');
+      card.append(el('p', 'kos-card__cue', 'All done for today.'));
+      const line = el('p', 'kos-hint', `Everything you practised is booked in to come back. ${nextCardsLine(next)}`);
       line.setAttribute('role', 'status');
       card.append(line);
-      const actions = el('div', 'ko-actions');
-      const back = el('button', 'ko-btn ko-btn--primary', 'Back to my organiser');
+      const actions = el('div', 'kos-actions');
+      const back = el('button', 'kos-btn kos-btn--primary', 'Back to my organiser');
       back.type = 'button';
       back.addEventListener('click', () => options.onExit?.());
       actions.append(back);
@@ -104,16 +104,16 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
       return;
     }
     const c = queue[i]!;
-    const card = el('div', 'ko-card');
-    card.append(el('p', 'ko-card__from', c.section), el('p', 'ko-card__cue', c.cue));
+    const card = el('div', 'kos-card');
+    card.append(el('p', 'kos-card__from', c.section), el('p', 'kos-card__cue', c.cue));
     if (!shown) {
-      const ta = el('textarea', 'ko-card__type');
+      const ta = el('textarea', 'kos-card__type');
       ta.placeholder = 'Type it if you like, or say it to yourself';
       ta.setAttribute('aria-label', 'Your answer');
       ta.value = typed;
       ta.addEventListener('input', () => (typed = ta.value));
-      const actions = el('div', 'ko-actions');
-      const show = el('button', 'ko-btn ko-btn--primary', 'Show answer');
+      const actions = el('div', 'kos-actions');
+      const show = el('button', 'kos-btn kos-btn--primary', 'Show answer');
       show.type = 'button';
       show.addEventListener('click', () => {
         shown = true;
@@ -123,27 +123,27 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
       card.append(ta, actions);
     } else {
       if (typed.trim()) {
-        const w = el('div', 'ko-wroteblock');
+        const w = el('div', 'kos-wroteblock');
         w.append(el('b', undefined, 'You wrote'), document.createTextNode(typed.trim()));
         card.append(w);
       }
-      card.append(el('p', 'ko-card__answer', c.answer));
+      card.append(el('p', 'kos-card__answer', c.answer));
       for (const m of c.more) {
-        const d = el('div', 'ko-card__more');
+        const d = el('div', 'kos-card__more');
         d.append(el('span', undefined, m.label), document.createTextNode(m.text));
         card.append(d);
       }
       if (c.builds) {
-        const b = el('p', 'ko-card__builds');
+        const b = el('p', 'kos-card__builds');
         b.append(el('b', undefined, 'This builds your big idea'), document.createTextNode(c.builds));
         card.append(b);
       }
-      const actions = el('div', 'ko-actions');
-      const got = el('button', 'ko-btn ko-btn--primary', 'Got it');
+      const actions = el('div', 'kos-actions');
+      const got = el('button', 'kos-btn kos-btn--primary', 'Got it');
       got.type = 'button';
       got.dataset.result = 'got';
       got.addEventListener('click', () => answerCard('got'));
-      const again = el('button', 'ko-btn', 'Again');
+      const again = el('button', 'kos-btn', 'Again');
       again.type = 'button';
       again.dataset.result = 'again';
       again.addEventListener('click', () => answerCard('again'));
@@ -151,7 +151,7 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
       card.append(actions);
     }
     const left = queue.length - i;
-    wrap.append(card, el('p', 'ko-card__count', `${left} to go today`));
+    wrap.append(card, el('p', 'kos-card__count', `${left} to go today`));
     host.replaceChildren(wrap);
   }
 

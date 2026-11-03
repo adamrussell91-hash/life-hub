@@ -231,8 +231,10 @@ export async function organiserStudentAction(store, classId, body, { now = new D
   const sheets = await classSheets(store, roster.cls, today);
   if (action === 'lesson') {
     if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
-    const lines = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_id === body.lesson_id).map((l) => l.cells[0]).filter(Boolean)));
-    return { lines };
+    const mine = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_id === body.lesson_id && l.cells[0]).map((l) => ({ line: l, section: x }))));
+    // Only table lines with a hidden column become cards, and only a line released today is news.
+    const joining = mine.some(({ line, section }) => line.released_on === today && section.kind === 'table' && section.columns?.some((c) => c.hide) && section.columns?.some((c) => !c.hide));
+    return { lines: mine.map(({ line }) => line.cells[0]), joining };
   }
 
   const need = student ? null : roster.students.length ? 'initials' : 'no_list';

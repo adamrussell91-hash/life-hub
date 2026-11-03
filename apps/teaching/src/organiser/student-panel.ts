@@ -22,7 +22,7 @@ function weekday(date: string): string {
 const minutesFor = (n: number): number => Math.max(1, Math.round((n * 2) / 3));
 
 export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPanelOptions): HTMLElement {
-  const root = el('div', 'ko-root');
+  const root = el('div', 'kos-root');
   const sheets = [...load.sheets].sort((a, b) => Number(b.current) - Number(a.current));
   if (!sheets.length) return root;
   let sheet: Sheet = sheets[0]!;
@@ -35,20 +35,20 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
   };
 
   function foldFor(sec: SheetSection): HTMLElement {
-    const fold = el('div', 'ko-fold');
-    const head = el('button', 'ko-fold__head');
+    const fold = el('div', 'kos-fold');
+    const head = el('button', 'kos-fold__head');
     head.type = 'button';
     const fresh = sec.lines.filter((l) => l.fresh).length;
     const name = el('span');
     name.append(el('b', undefined, sec.name));
-    if (fresh) name.append(el('span', 'ko-new', `${fresh} new`));
-    head.append(name, el('span', 'ko-fold__meta', String(sec.lines.length)));
+    if (fresh) name.append(el('span', 'kos-new', `${fresh} new`));
+    head.append(name, el('span', 'kos-fold__meta', String(sec.lines.length)));
     let body: HTMLElement | null = null;
     const sync = (): void => {
       const on = open.has(sec.id);
       head.setAttribute('aria-expanded', String(on));
       if (on && !body) {
-        body = el('section', 'ko-sec');
+        body = el('section', 'kos-sec');
         body.dataset.sec = sec.id;
         live.set(sec.id, mountTestMyself(body, sec));
         fold.append(body);
@@ -73,15 +73,15 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
     stopAll();
     const parts: HTMLElement[] = [];
     const head = el('div');
-    head.append(el('h2', 'ko-title', sheet.title), el('p', 'ko-sub', 'Grows as your lessons come out.'));
+    head.append(el('h2', 'kos-title', sheet.title), el('p', 'kos-sub', 'Grows as your lessons come out.'));
     parts.push(head);
 
     if (sheets.length > 1) {
-      const sw = el('div', 'ko-switch');
+      const sw = el('div', 'kos-switch');
       sw.setAttribute('role', 'group');
       sw.setAttribute('aria-label', 'Unit');
       for (const s of sheets) {
-        const p = el('button', 'ko-pill', s.title);
+        const p = el('button', 'kos-pill', s.title);
         p.type = 'button';
         p.setAttribute('aria-pressed', String(s === sheet));
         p.addEventListener('click', () => {
@@ -96,7 +96,7 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
 
     const w = sheet.week;
     if (w) {
-      const banner = el('div', 'ko-set');
+      const banner = el('div', 'kos-set');
       banner.append(el('b', undefined, 'This week:'), document.createTextNode(` ${w.section_name}, by ${weekday(w.due)}, for ${w.reason}.`));
       parts.push(banner);
     }
@@ -104,16 +104,16 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
     const prac = load.practice;
     if (prac && load.need !== 'no_list') {
       if (prac.today > 0 && prac.cards.length) {
-        const box = el('div', 'ko-prac');
+        const box = el('div', 'kos-prac');
         const text = el('div');
         text.append(el('b', undefined, `Practise: ${prac.today} today`), el('span', undefined, `About ${minutesFor(prac.today)} minutes. New lines join after each lesson.`));
-        const start = el('button', 'ko-btn', 'Start');
+        const start = el('button', 'kos-btn', 'Start');
         start.type = 'button';
         start.addEventListener('click', showPractice);
         box.append(text, start);
         parts.push(box);
       } else {
-        const box = el('div', 'ko-prac ko-prac--calm');
+        const box = el('div', 'kos-prac kos-prac--calm');
         const text = el('div');
         text.append(el('b', undefined, 'Practise: 0 today'), el('span', undefined, nextCardsLine(prac.next)));
         box.append(text);
@@ -121,11 +121,11 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
       }
     }
 
-    const folds = el('div', 'ko-folds');
+    const folds = el('div', 'kos-folds');
     for (const sec of sheet.sections) folds.append(foldFor(sec));
     parts.push(folds);
 
-    const print = el('button', 'ko-link', 'Print my organiser');
+    const print = el('button', 'kos-link', 'Print my organiser');
     print.type = 'button';
     print.addEventListener('click', () => printOrganiser(sheet));
     parts.push(print);
