@@ -327,7 +327,7 @@ function entryFor(record, id) {
   return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
 }
 
-const INSIGHT_SCHEMA = 5;
+const INSIGHT_SCHEMA = 6;
 
 /** Closed by the teacher's Close now, or by the Closes date. */
 async function closedState(store, k, settings, now = Date.now()) {
@@ -1300,13 +1300,17 @@ async function latestAttempts(store, k, lessonId, owners) {
 }
 
 /**
- * Knowledge-piece tags are teacher metadata, so an attempt made before a question was tagged still
- * counts: the current record's pieces replace the attempted version's. Marks never change.
+ * Piece and skill tags are teacher metadata, so an attempt made before a question was tagged still
+ * counts: the current record's tags replace the attempted version's. Marks never change.
  */
-export function withCurrentPieces(key, current) {
+export function withCurrentTags(key, current) {
   if (!current || current.kind !== key.kind) return key;
-  const { pieces: _old, ...rest } = key;
-  return current.pieces?.length ? { ...rest, pieces: [...current.pieces] } : rest;
+  const { pieces: _pieces, skills: _skills, ...rest } = key;
+  return {
+    ...rest,
+    ...(current.skills?.length ? { skills: [...current.skills] } : {}),
+    ...(current.pieces?.length ? { pieces: [...current.pieces] } : {})
+  };
 }
 
 async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
@@ -1337,7 +1341,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
       rows: scored.rows.map((r) => {
         const entry = rec.questions[r.id];
         const outcomes = entry.key.outcomes ?? fallback;
-        const key = withCurrentPieces(entry.key, entryFor(record, r.id)?.key);
+        const key = withCurrentTags(entry.key, entryFor(record, r.id)?.key);
         const items = answerEvidence({ question: entry.question, key, response: r.response, awarded: r.awarded, codes: r.codes, fallbackOutcomes: fallback, rungs: answerRungs(ledger, student, lessonId, r.id, attemptId(a.owner, a.n)) });
         return { id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, codes: r.codes, outcomes, items, ...(hasAnswer(r.response) ? {} : { unanswered: true }), ...(r.set ? { set: r.set } : {}) };
       })
