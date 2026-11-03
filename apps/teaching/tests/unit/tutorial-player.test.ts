@@ -111,8 +111,8 @@ describe('tutorial player', () => {
     const host = document.createElement('div');
     mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
     await flush();
-    host.querySelector('.tut__page')!.dispatchEvent(new CustomEvent('tutorial:faded', { bubbles: true, detail: { blockId: 'f1', parts: { 0: 'x' }, rating: 'right' } }));
-    expect(c.answer).toHaveBeenCalledWith('f1', { 0: 'x' }, 'right');
+    host.querySelector('.tut__page')!.dispatchEvent(new CustomEvent('tutorial:faded', { bubbles: true, detail: { blockId: 'f1', stepKey: 's2', parts: { 0: 'x' }, rating: 'right' } }));
+    expect(c.answer).toHaveBeenCalledWith('s2', { 0: 'x' }, 'right');
   });
 
   it('shows the hero once, above the Common page', async () => {
