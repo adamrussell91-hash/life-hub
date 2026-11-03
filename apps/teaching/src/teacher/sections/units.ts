@@ -60,6 +60,7 @@ import { settleConceptLines, settleSkillLines, unitConceptKeysFor, unitNetworkCo
 import { loadAlignment } from '@/alignment/api';
 import { lessonWeeks } from '@/deep/derive';
 import { mountDeepSection } from '@/deep/plan-view';
+import { mountOrganiserSection } from '@/organiser/sheet-editor';
 import { unitScope } from '@/deep/scope';
 import { loadSkills } from '@/skills/api';
 import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
@@ -647,6 +648,18 @@ export function renderUnitPage(
     });
   })();
 
+  const organiserHost = document.createElement('section');
+  organiserHost.className = 'unit-page__organiser glass-panel';
+  organiserHost.dataset.unitSection = 'organiser';
+  const organiser = mountOrganiserSection(organiserHost, {
+    unit,
+    lessons: curriculum.lessons.filter((l) => l.unit_id === unit.id).map((l) => ({ id: l.id, title: l.title, sequence: l.sequence })),
+    classes: curriculum.classes
+      .filter((c) => c.current_unit_id === unit.id || c.active_unit_ids.includes(unit.id))
+      .map((c) => ({ id: c.id, label: c.display_name || c.code })),
+    curriculum
+  });
+
   planSection.append(planHeading);
   const planningPrompts = renderPlanningPrompts();
   if (planningPrompts) planSection.append(planningPrompts);
@@ -823,7 +836,7 @@ export function renderUnitPage(
     lessonsSection.append(list);
   }
 
-  root.append(coverHost, stripHost, deepHost, planSection, tagsHost, lessonsSection);
+  root.append(coverHost, stripHost, deepHost, organiserHost, planSection, tagsHost, lessonsSection);
   canvas.append(root);
 
   return {
@@ -835,6 +848,7 @@ export function renderUnitPage(
       banner.dispose();
       planEditor.dispose();
       outcomeStrip?.dispose();
+      organiser.dispose();
       disposed = true;
     }
   };

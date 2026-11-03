@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
 import { renderProfile } from '@/student/profile-view';
 import { pieceView, returnedList } from '@/student/returned-view';
 
@@ -175,5 +177,50 @@ describe('returned work', () => {
     expect(view.querySelector('.pg-pop')!.textContent).toContain('Open with your argument.');
     expect(view.querySelector('.pg-box__delta')!.textContent).toBe('up from Starting');
     expect(view.querySelector('.pg-ladder__step.is-on')!.textContent).toBe('Building');
+  });
+});
+
+describe('organiser tab', () => {
+  const organiser = {
+    need: null,
+    practice: null,
+    sheets: [{ unit_id: 'u1', title: 'Sample unit organiser', current: true, sections: [{ id: 's1', name: 'Key ideas', kind: 'list', lines: [{ id: 'a', cells: ['One idea'], fresh: false }] }] }]
+  };
+  const tabNames = (h: HTMLElement): string[] => [...h.querySelectorAll('.pg-tab')].map((t) => (t.textContent ?? '').replace(/\d+$/, ''));
+
+  it('keeps today’s page with no organiser', () => {
+    const h = renderProfile(payload as never, { classId: 'class1', organiser: null });
+    expect(h.querySelector('.pg-tabs')).toBeNull();
+    expect(h.querySelector('.pm-empty')!.textContent).toContain('first piece of work');
+    expect(h.querySelector('.pm-map')).toBeTruthy();
+  });
+  it('shows My progress and Organiser when nothing is returned, with the map and empty message in My progress', () => {
+    const h = renderProfile(payload as never, { classId: 'class1', organiser: organiser as never });
+    expect(tabNames(h)).toEqual(['My progress', 'Organiser']);
+    const progress = h.querySelectorAll('.pg-panel')[0]!;
+    expect(progress.querySelector('.pm-map')).toBeTruthy();
+    expect(progress.textContent).toContain('first piece of work');
+    expect(h.querySelector('.ko-root')).toBeTruthy();
+    expect((h.querySelector('.ko-root') as HTMLElement).hidden).toBe(true);
+  });
+  it('lands on the Organiser tab for ?tab=organiser', () => {
+    const h = renderProfile(payload as never, { classId: 'class1', organiser: organiser as never, tab: 'organiser' });
+    expect((h.querySelector('.ko-root') as HTMLElement).hidden).toBe(false);
+    expect(h.querySelector('.pg-tab.is-on')!.textContent).toBe('Organiser');
+  });
+  it('adds the tab beside Returned work when work is returned', () => {
+    const h = renderProfile({ ...payload, pieces: [], has_returned: true } as never, { classId: 'class1', organiser: organiser as never });
+    expect(tabNames(h)).toEqual(['My progress', 'Returned work', 'Organiser']);
+  });
+  it('gives the teacher’s view no Organiser tab', () => {
+    const h = renderProfile(payload as never, { classId: 'class1', organiser: organiser as never, teacher: { name: 'Ava Nguyen' } });
+    expect(h.querySelector('.pg-tabs')).toBeNull();
+    expect(h.querySelector('.ko-root')).toBeNull();
+  });
+  it('shows the sheet without an initials box when the class has no list', () => {
+    const h = renderProfile({ need: 'initials' } as never, { classId: 'class1', organiser: { ...organiser, need: 'no_list' } as never });
+    expect(h.querySelector('.pm-claim')).toBeNull();
+    expect(h.querySelector('.ko-title')!.textContent).toBe('Sample unit organiser');
+    expect(h.querySelector('.ko-prac')).toBeNull();
   });
 });

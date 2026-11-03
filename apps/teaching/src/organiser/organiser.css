@@ -1,0 +1,148 @@
+/*
+ * Knowledge organiser: teacher screens (unit sheet, lesson card, run with the class) and print.
+ * Ported from docs/mockups/knowledge-organiser.html with a .ko- prefix. Colours are the app tokens.
+ */
+
+.ko-root { display: grid; gap: var(--space-3, 12px); min-width: 0; max-width: 100%; color: var(--ink); }
+.ko-root *, .ko-run *, .ko-card * { box-sizing: border-box; }
+.ko-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; justify-content: space-between; }
+.ko-title { margin: 0; font-size: 20px; line-height: 1.25; color: var(--navy); }
+.ko-sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.ko-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ko-label { font-size: 13px; color: var(--muted); }
+.ko-status { margin: 0; font-size: 13px; color: var(--muted); }
+.ko-status--bad { color: var(--danger, #9b2c2c); }
+.ko-link { color: var(--wave); font-size: 13px; }
+
+.ko-btn { border-radius: 999px; font-size: 14px; }
+.ko-btn:focus-visible, .ko-pill:focus-visible, .ko-mini:focus-visible, .ko-tick:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
+.ko-mini { width: 32px; height: 32px; min-width: 32px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--navy); cursor: pointer; font-size: 14px; line-height: 1; }
+.ko-mini:hover:not(:disabled) { background: rgba(20, 43, 81, .06); }
+.ko-mini:disabled { opacity: .35; cursor: default; }
+.ko-mini--danger { color: var(--danger, #9b2c2c); }
+
+.ko-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ko-pill { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; min-height: 30px; }
+.ko-pill[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+.ko-block { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.ko-block--wait { background: #faf9f6; }
+.ko-block__title { margin: 0; font-size: 15px; font-weight: 600; color: var(--navy); }
+.ko-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ko-name { font: inherit; font-size: 15px; font-weight: 600; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; flex: 1; min-width: 150px; background: #fff; color: var(--ink); }
+.ko-collapsed { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; width: 100%; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ko-collapsed b { color: var(--navy); }
+.ko-collapsed span { color: var(--muted); font-size: 13px; }
+.ko-warn { margin: 0; padding: 8px 10px; border-radius: 6px; background: #fdf0e3; color: #8a5a24; font-size: 13px; }
+
+.ko-setbox { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.ko-setbox input { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: #fff; color: var(--ink); }
+
+/* Editable table: scrolls inside its own box, never the page */
+.ko-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+.ko-t { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 13px; }
+.ko-t th, .ko-t td { border: 1px solid var(--line); padding: 0; vertical-align: top; text-align: left; }
+.ko-t th { background: rgba(20, 43, 81, .04); }
+.ko-t th input { width: 100%; border: 0; padding: 6px 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
+.ko-t td textarea { display: block; width: 100%; min-height: 40px; resize: vertical; border: 0; padding: 6px 8px; background: transparent; font: inherit; font-size: 13px; color: var(--ink); }
+.ko-t td textarea:focus, .ko-t th input:focus { outline: 2px solid var(--wave); outline-offset: -2px; background: #fff; }
+.ko-t tr.is-wait td { background: #faf9f6; }
+.ko-t tr.is-wait td textarea { color: var(--muted); }
+.ko-t .ko-from { padding: 6px 8px; white-space: nowrap; font-size: 12px; min-width: 120px; }
+.ko-t .ko-ctl { padding: 4px; white-space: nowrap; width: 1%; }
+.ko-t .ko-hint th { background: none; border-style: dashed; color: var(--muted); font-size: 12px; font-weight: 400; padding: 3px 8px; }
+.ko-t tr.ko-new td { background: rgba(55, 111, 183, .05); }
+.ko-from select { max-width: 9.5rem; font: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; background: #fff; color: var(--ink); }
+.ko-from small { display: block; color: var(--muted); font-size: 11px; }
+.ko-chip { display: inline-block; font-size: 11px; font-weight: 600; background: #e6edf7; color: var(--wave); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.ko-chip--wait { background: #fdf0e3; color: #8a5a24; }
+.ko-lines { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ko-lines li { display: flex; gap: 8px; align-items: flex-start; }
+.ko-lines textarea { flex: 1; min-width: 0; min-height: 40px; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: #fff; color: var(--ink); }
+
+.ko-bring { background: rgba(20, 43, 81, .04); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; font-size: 14px; }
+.ko-bring label { display: flex; gap: 8px; align-items: flex-start; }
+.ko-bring__head { margin: 0; font-weight: 600; font-size: 13px; }
+.ko-bring__meta { color: var(--muted); font-size: 12px; }
+.ko-paste { display: grid; gap: 6px; }
+.ko-paste textarea { width: 100%; min-height: 96px; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: #fff; color: var(--ink); }
+
+.ko-help { font-size: 14px; color: var(--ink); }
+.ko-help summary { cursor: pointer; color: var(--wave); font-size: 13px; }
+.ko-help ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 3px; }
+
+/* Lesson card: collapsible, sits beside the Syllabus card */
+.ko-card { margin: 0 0 var(--space-4, 1rem); border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.ko-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; width: 100%; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 12px; background: transparent; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.ko-card__head:hover { background: rgba(66, 72, 96, .04); }
+.ko-card__head:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.ko-card--open .ko-card__head { border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+.ko-card__title { font-size: var(--text-sm, .8125rem); font-weight: 650; }
+.ko-card__summary { flex: 1 1 auto; font-size: var(--text-sm, .8125rem); color: var(--muted); }
+.ko-card__toggle { color: var(--muted); font-size: 12px; }
+.ko-card__body { display: grid; gap: 10px; padding: 12px 14px 14px; }
+.ko-card__body[hidden] { display: none; }
+.ko-add { display: grid; gap: 8px; }
+.ko-add__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.ko-add__fields label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.ko-add__fields input { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: #fff; color: var(--ink); min-width: 0; }
+.ko-ann { background: #f1f4fa; border: 1px solid #d9e2f0; border-radius: 6px; padding: 10px 12px; display: grid; gap: 8px; font-size: 14px; }
+.ko-ann__head { margin: 0; font-weight: 600; font-size: 13px; color: var(--navy); }
+.ko-ann label { display: flex; gap: 8px; align-items: flex-start; }
+.ko-ann__line { display: grid; gap: 2px; }
+.ko-ann__line small { color: var(--muted); }
+
+/* Run with the class */
+.ko-run-page { min-height: 100vh; background: #101f33; }
+.ko-run { color: #fff; padding: 22px; display: grid; gap: 14px; align-content: start; max-width: 1200px; margin: 0 auto; min-height: 100vh; }
+.ko-run h3 { margin: 0; font-size: 22px; }
+.ko-run .ko-label { color: rgba(255, 255, 255, .7); }
+.ko-run .ko-pill { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .35); }
+.ko-run .ko-pill[aria-pressed="true"] { background: #fff; color: var(--navy); border-color: #fff; }
+.ko-run .ko-btn { background: #fff; color: var(--navy); border: 1px solid #fff; padding: 7px 16px; cursor: pointer; font-weight: 500; }
+.ko-run .ko-btn--out { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .4); }
+.ko-run .ko-link { color: #bcd2f0; background: none; border: 0; cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
+.ko-run__bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.ko-run__timer { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ko-run__timer.is-done { color: #f6b26b; }
+.ko-run table { width: 100%; border-collapse: collapse; font-size: 18px; }
+.ko-run th, .ko-run td { padding: 9px 11px; border: 1px solid rgba(255, 255, 255, .2); text-align: left; vertical-align: top; }
+.ko-run th { background: rgba(255, 255, 255, .08); }
+.ko-run td.cov, .ko-run li.cov { background: repeating-linear-gradient(135deg, #2a3e5c 0 8px, #1d3048 8px 16px); color: transparent; user-select: none; }
+.ko-run ol, .ko-run ul { margin: 0; padding-left: 26px; display: grid; gap: 8px; font-size: 18px; }
+.ko-run__scroll { overflow-x: auto; max-width: 100%; }
+.ko-run__empty { margin: 0; color: rgba(255, 255, 255, .75); }
+.ko-run__ask { display: grid; gap: 10px; justify-items: start; }
+
+/* Phones: 16px inputs so iOS does not zoom */
+@media (max-width: 640px) {
+  .ko-root input, .ko-root textarea, .ko-root select, .ko-card input, .ko-card textarea, .ko-card select { font-size: 16px; }
+  .ko-t th input, .ko-t td textarea, .ko-from select { font-size: 16px; }
+  .ko-run { padding: 16px; }
+  .ko-run table, .ko-run ol, .ko-run ul { font-size: 15px; }
+}
+
+/* Print: only the organiser pages, on paper */
+.ko-print-host { position: fixed; left: -10000px; top: 0; width: 180mm; background: #fff; color: #111; font: 10.5pt/1.35 Inter, ui-sans-serif, system-ui, sans-serif; }
+.ko-print__title { margin: 0 0 6pt; font-size: 15pt; color: #17375e; }
+.ko-print__tag { margin: 0 0 8pt; font-size: 9.5pt; color: #555; }
+.ko-print__name { margin: 10pt 0 3pt; font-size: 11.5pt; color: #17375e; }
+.ko-print__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ko-print__table th, .ko-print__table td { border: 1px solid #8a94a3; padding: 3pt 5pt; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.ko-print__table th { background: #eef0f4; }
+.ko-print__blank { height: 2.1em; }
+.ko-print__list { margin: 0; padding-left: 16pt; display: grid; gap: 3pt; }
+.ko-print__ruled { border-bottom: 1px solid #8a94a3; height: 1.5em; }
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+  body > *:not(.ko-print-host) { display: none !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  .ko-print-host { position: static; left: auto; width: auto; }
+  .ko-print__page { break-inside: auto; }
+  .ko-print__page--blank { break-before: page; }
+  .ko-print__table tr { break-inside: avoid; }
+  .ko-print__name { break-after: avoid; }
+}
+
+/* Unit page host */
+.unit-page__organiser { min-width: 0; max-width: 100%; padding: var(--space-4, 16px) var(--space-5, 20px) var(--space-5, 20px); }

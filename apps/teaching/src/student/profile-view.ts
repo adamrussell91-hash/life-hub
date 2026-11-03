@@ -7,6 +7,9 @@
  */
 import { apiPost } from '@/api/client';
 import { button, deviceToken, el, errorText } from '@/quiz/dom';
+import { studentOrganiserApi } from '@/organiser/api';
+import { renderOrganiserPanel } from '@/organiser/student-panel';
+import type { OrganiserLoad } from '@/organiser/types';
 import { ensureNoIndex } from '@/student/feedback-view';
 import { lessonToReturnTo } from '@/student/initials-token';
 import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor, STUDENT_BRAND } from '@/student/shell';
@@ -48,6 +51,12 @@ export type RenderProfileOptions = {
   markSeen?: (id: string) => void;
   /** The teacher viewing a student's page: their name heads it and the device line goes. */
   teacher?: { name: string };
+  /** The student's organiser; the Organiser tab shows only when it has released lines. */
+  organiser?: OrganiserLoad | null;
+  /** Reload the organiser and redraw on its tab. */
+  reloadOrganiser?: () => void;
+  /** `organiser` lands on the Organiser tab. */
+  tab?: string;
 };
 
 function seeHow(r?: { url: string; title?: string; kind: string; start?: number }): HTMLElement | null {
@@ -180,10 +189,11 @@ function renderInitials(options: RenderProfileOptions): HTMLElement {
   return card;
 }
 
-function tabs(unseen: number, start: 'progress' | 'returned', panels: { progress: HTMLElement; returned: HTMLElement }, onReturned: () => void): HTMLElement {
+type TabId = 'progress' | 'returned' | 'organiser';
+function tabs(unseen: number, start: TabId, panels: { progress: HTMLElement; returned?: HTMLElement; organiser?: HTMLElement }, onReturned: () => void): HTMLElement {
   const bar = el('div', 'pg-tabs');
   bar.setAttribute('role', 'tablist');
-  const make = (id: 'progress' | 'returned', label: string, badge = 0): HTMLButtonElement => {
+  const make = (id: TabId, label: string, badge = 0): HTMLButtonElement => {
     const tab = el('button', 'pg-tab');
     tab.type = 'button';
     tab.setAttribute('role', 'tab');
@@ -192,22 +202,24 @@ function tabs(unseen: number, start: 'progress' | 'returned', panels: { progress
     if (badge > 0) tab.append(el('span', 'pg-tab__badge', String(badge)));
     return tab;
   };
-  const a = make('progress', 'My progress');
-  const b = make('returned', 'Returned work', unseen);
-  const select = (id: 'progress' | 'returned'): void => {
-    for (const t of [a, b]) {
-      const on = t.dataset.tab === id;
+  const all: Array<[TabId, HTMLButtonElement]> = [['progress', make('progress', 'My progress')]];
+  if (panels.returned) all.push(['returned', make('returned', 'Returned work', unseen)]);
+  if (panels.organiser) all.push(['organiser', make('organiser', 'Organiser')]);
+  const select = (id: TabId): void => {
+    for (const [tid, t] of all) {
+      const on = tid === id;
       t.setAttribute('aria-selected', String(on));
       t.classList.toggle('is-on', on);
+      const panel = panels[tid];
+      if (panel) panel.hidden = !on;
     }
-    panels.progress.hidden = id !== 'progress';
-    panels.returned.hidden = id !== 'returned';
     if (id === 'returned') onReturned();
   };
-  a.addEventListener('click', () => select('progress'));
-  b.addEventListener('click', () => select('returned'));
-  bar.append(a, b);
-  select(start);
+  for (const [tid, t] of all) {
+    t.addEventListener('click', () => select(tid));
+    bar.append(t);
+  }
+  select(all.some(([tid]) => tid === start) ? start : 'progress');
   return bar;
 }
 
@@ -241,10 +253,25 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () =>
   return showList;
 }
 
+function organizerPanelFor(organiser: OrganiserLoad, options: RenderProfileOptions): HTMLElement {
+  // With no list to claim against, there is nothing to practise either.
+  const load = organiser.need === 'no_list' ? { ...organiser, practice: null } : organiser;
+  const panel = renderOrganiserPanel(load, { classId: options.classId, reload: options.reloadOrganiser });
+  panel.setAttribute('role', 'tabpanel');
+  return panel;
+}
+
 export function renderProfile(payload: ProfilePayload, options: RenderProfileOptions): HTMLElement {
   const root = el('article', 'pm-profile');
+  const organiser = !options.teacher && options.organiser?.sheets.length ? options.organiser : null;
   if (payload.need === 'initials' || !payload.map) {
-    root.append(el('h1', 'pm-title', 'Your progress'), renderInitials(options));
+    root.append(el('h1', 'pm-title', 'Your progress'));
+    // A class with no list still has a sheet to read; there is nobody to ask for initials.
+    if (organiser && organiser.need === 'no_list') {
+      root.append(organizerPanelFor(organiser, options));
+      return root;
+    }
+    root.append(renderInitials(options));
     return root;
   }
   if (options.teacher) root.append(el('h1', 'pm-title', options.teacher.name));
@@ -253,7 +280,10 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
   }
   const map = renderMap(payload.map, options.classId);
-  if (!payload.pieces?.length && !payload.has_returned) {
+  const hasReturned = !!(payload.pieces?.length || payload.has_returned);
+  const organiserPanel = organiser ? organizerPanelFor(organiser, options) : null;
+  const wantOrganiser = options.tab === 'organiser' && !!organiserPanel;
+  if (!hasReturned && !organiserPanel) {
     // The teacher knows nothing is returned yet; only the student needs telling.
     if (!options.teacher) root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'));
     root.append(map);
@@ -261,6 +291,11 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   const progress = el('div', 'pg-panel');
   progress.setAttribute('role', 'tabpanel');
+  if (!hasReturned) {
+    progress.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'), map);
+    root.append(tabs(0, wantOrganiser ? 'organiser' : 'progress', { progress, organiser: organiserPanel! }, () => undefined), progress, organiserPanel!);
+    return root;
+  }
   progress.append(renderNext(payload), renderLearning(payload));
   const skills = renderSkills(payload);
   if (skills) progress.append(skills);
@@ -276,13 +311,14 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   const load = returnedPanel(returned, options);
   root.append(
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
-    tabs(payload.unseen ?? 0, payload.unseen && !options.teacher ? 'returned' : 'progress', { progress, returned }, () => {
+    tabs(payload.unseen ?? 0, wantOrganiser ? 'organiser' : payload.unseen && !options.teacher ? 'returned' : 'progress', { progress, returned, ...(organiserPanel ? { organiser: organiserPanel } : {}) }, () => {
       if (loaded) return;
       loaded = true;
       load();
     }),
     progress,
-    returned
+    returned,
+    ...(organiserPanel ? [organiserPanel] : [])
   );
   return root;
 }
@@ -305,18 +341,38 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen', extra: Record<string, unknown> = {}): Promise<T> =>
     apiPost<T>(`/api/published/profile/${encodeURIComponent(classId)}`, { action, class_token: deviceToken(`class:${classId}`), ...extra });
 
+  let organiser: OrganiserLoad | null = null;
+  let latest: ProfilePayload | null = null;
+  let startTab = new URLSearchParams(window.location.search).get('tab') ?? undefined;
+  // A failed organiser load leaves the rest of the page as it was.
+  const loadOrganiser = (): Promise<OrganiserLoad | null> => studentOrganiserApi.load(classId).catch(() => null);
+
   const show = (payload: ProfilePayload, message?: string): void => {
     if (disposed || isStale()) return;
+    latest = payload;
     content.replaceChildren(
       renderProfile(payload, {
         classId,
         message,
+        organiser,
+        tab: startTab,
+        reloadOrganiser: () => {
+          void loadOrganiser().then((o) => {
+            if (disposed || isStale() || !latest) return;
+            organiser = o;
+            startTab = 'organiser';
+            show(latest);
+          });
+        },
         onClaim: (initials) => {
           // A claim only binds the device; the page itself is always the progress payload.
           void call('claim', { initials })
-            .then(() => call('progress'))
+            .then(() => Promise.all([call('progress'), loadOrganiser()]))
             .then(
-              (next) => show(next),
+              ([next, org]) => {
+                organiser = org;
+                show(next);
+              },
               (error: unknown) => show({ need: 'initials' }, errorText(error))
             );
         },
@@ -327,10 +383,16 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
     );
   };
 
-  void call('progress').then(show, (error: unknown) => {
-    if (disposed || isStale()) return;
-    renderStudentStatus(content, errorText(error, 'Couldn’t load your progress. Try again.'));
-  });
+  void Promise.all([call('progress'), loadOrganiser()]).then(
+    ([payload, org]) => {
+      organiser = org;
+      show(payload);
+    },
+    (error: unknown) => {
+      if (disposed || isStale()) return;
+      renderStudentStatus(content, errorText(error, 'Couldn’t load your progress. Try again.'));
+    }
+  );
 
   return {
     dispose() {

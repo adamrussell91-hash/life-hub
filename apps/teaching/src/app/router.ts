@@ -12,6 +12,7 @@ export type RouteName =
   | 'teacher-scope-sequence'
   | 'teacher-units'
   | 'teacher-unit'
+  | 'teacher-organiser-run'
   | 'teacher-document'
   | 'teacher-lessons'
   | 'teacher-lesson'
@@ -42,6 +43,7 @@ export type RouteParams = {
   'teacher-scope-sequence': { subjectId: string };
   'teacher-units': Record<string, never>;
   'teacher-unit': { unitId: string };
+  'teacher-organiser-run': { unitId: string };
   'teacher-document': { documentId: string };
   'teacher-lessons': Record<string, never>;
   'teacher-lesson': { lessonId: string };
@@ -316,6 +318,16 @@ export function match(pathname: string): RouteMatch | null {
     return {
       name: 'teacher-scope-sequence',
       params: { subjectId: scopeSequence[1] },
+      requiresAuth: true,
+      path
+    };
+  }
+
+  const organiserRun = path.match(/^\/units\/([^/]+)\/organiser\/run$/);
+  if (organiserRun) {
+    return {
+      name: 'teacher-organiser-run',
+      params: { unitId: organiserRun[1] },
       requiresAuth: true,
       path
     };

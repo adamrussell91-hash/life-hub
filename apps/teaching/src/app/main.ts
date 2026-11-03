@@ -77,6 +77,7 @@ import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { currentAppPath } from './base-path';
 import { isClassSiteHost, isClassSiteStudentRoute, renderClassSiteDeadEnd } from './class-site';
 import { navigate, start, type RouteMatch } from './router';
+import { mountOrganiserRun } from '@/organiser/run-view';
 import { renderPageHeader } from '@/teacher/page-header';
 import {
   mountTeachingCalendar,
@@ -107,6 +108,7 @@ let teacherShellRefs: TeacherShellRefs | null = null;
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
 let lessonDisplayViewHandle: LessonDisplayViewHandle | null = null;
+let organiserRunHandle: { dispose(): void } | null = null;
 
 // The student unit view mounted for the current public route, if any.
 let studentUnitViewHandle: StudentUnitViewHandle | null = null;
@@ -158,6 +160,12 @@ function teardownLessonDisplayView(): void {
   if (!lessonDisplayViewHandle) return;
   lessonDisplayViewHandle.dispose();
   lessonDisplayViewHandle = null;
+}
+
+function teardownOrganiserRun(): void {
+  if (!organiserRunHandle) return;
+  organiserRunHandle.dispose();
+  organiserRunHandle = null;
 }
 
 function teardownStudentLessonView(): void {
@@ -983,6 +991,15 @@ function renderLessonDisplayRoute(lessonId: string, token: number): void {
   });
 }
 
+function renderOrganiserRunRoute(unitId: string, token: number): void {
+  organiserRunHandle = mountOrganiserRun({
+    root: appRoot,
+    unitId,
+    classId: new URLSearchParams(window.location.search).get('class'),
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderStudentLessonRoute(
   lessonId: string,
   token: number,
@@ -1107,6 +1124,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-lesson-display':
       renderLessonDisplayRoute(match.params.lessonId, token);
       break;
+    case 'teacher-organiser-run':
+      renderOrganiserRunRoute(match.params.unitId, token);
+      break;
     case 'student-lesson':
       renderStudentLessonRoute(match.params.lessonId, token);
       break;
@@ -1162,6 +1182,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownUnitPage();
   teardownStudentLessonView();
   teardownLessonDisplayView();
+  teardownOrganiserRun();
   teardownStudentUnitView();
   teardownStudentClassView();
   teardownStudentFeedbackView();
