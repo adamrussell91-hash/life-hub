@@ -61,10 +61,24 @@ describe('plan gaps', () => {
     const du = { id: 'du_ab12cd', claim: 'c', why: '', dot_points: [], concept_bullets: ['ARG1'], pieces: [{ id: 'kp_aa11bb', text: 't', tier: 'essential' as const }, { id: 'kp_cc22dd', text: 'u', tier: 'strong' as const }], shared_piece_ids: [], steps: [] };
     expect(planGaps(du, [du], placements(lessons, 'du_ab12cd'))).toEqual([
       'Needs a dot point',
-      'Only 2 knowledge pieces (aim for 8 to 12 Essential and Strong)',
+      'Only 2 knowledge pieces (aim for 4 to 6 Essential and Strong)',
       '1 piece not taught yet',
       '1 piece not tested yet',
       'No evidence task for Steps 2B, 3, 4'
     ]);
+  });
+
+  const withCore = (n: number) => {
+    const pieces = Array.from({ length: n }, (_, i) => ({ id: `kp_piece${i}`, text: 't', tier: 'strong' as const }));
+    const stretch = { id: 'kp_stretch', text: 't', tier: 'sophisticated' as const };
+    const du = { id: 'du_ab12cd', claim: 'c', why: '', dot_points: [], concept_bullets: [], pieces: [...pieces, stretch], shared_piece_ids: [], steps: [] };
+    return planGaps(du, [du], placements([], 'du_ab12cd')).filter((g) => g.includes('aim for'));
+  };
+
+  it('flags too few and too many Essential and Strong pieces, leaving Sophisticated out of the count', () => {
+    expect(withCore(3)).toEqual(['Only 3 knowledge pieces (aim for 4 to 6 Essential and Strong)']);
+    expect(withCore(4)).toEqual([]);
+    expect(withCore(6)).toEqual([]);
+    expect(withCore(7)).toEqual(['7 knowledge pieces (aim for 4 to 6 Essential and Strong)']);
   });
 });

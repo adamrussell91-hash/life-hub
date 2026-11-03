@@ -6425,6 +6425,8 @@ function pedagogicalModeLabel(value2) {
 // apps/teaching/src/deep/schema.ts
 import { z as z17 } from "zod";
 var DEEP_LIMITS = { perUnit: 4, pieces: 24, claim: 400, why: 300, piece: 200, fill: 400 };
+var PIECE_TARGET = { min: 4, max: 6 };
+var PIECE_TARGET_LABEL = `${PIECE_TARGET.min} to ${PIECE_TARGET.max}`;
 var TIERS = ["essential", "strong", "sophisticated"];
 var DuIdSchema = z17.string().regex(/^du_[a-z0-9]{4,16}$/);
 var PieceIdSchema = z17.string().regex(/^kp_[a-z0-9]{4,16}$/);
