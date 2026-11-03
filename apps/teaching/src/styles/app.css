@@ -3965,6 +3965,10 @@ a:hover {
   pointer-events: none;
 }
 
+.entity-page-title--in-banner {
+  position: static;
+}
+
 .entity-page-title .entity-page-title__input,
 .entity-page-title .entity-page-title__text {
   min-width: 0;
