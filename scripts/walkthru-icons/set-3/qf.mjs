@@ -1,5 +1,5 @@
 // Questioning and feedback (Q&F), Book 3.
-import { circle, path, rect, thin, dashed, bubble, q, tick, cross, arrow, symbol, FILL } from '../parts.mjs';
+import { P, circle, path, rect, thin, dashed, bubble, q, tick, cross, arrow, symbol, FILL } from '../parts.mjs';
 
 export const symbols = {
   'w3-cold-call-variations': symbol([
@@ -39,9 +39,10 @@ export const symbols = {
   ].join('')),
 
   'w3-c-r-a-f-t-feedback-time': symbol([
-    path('M50 34L50 12M50 34L72 27M50 34L64 53M50 34L36 53M50 34L28 27'),
-    circle(50, 10, 8), circle(75, 26, 8), circle(66, 56, 8), circle(34, 56, 8), circle(25, 26, 8),
-    circle(50, 34, 8, true), path('M50 64V92M30 92H70')
+    path('M50 30V74'),
+    circle(50, 12, 9), circle(67, 24.5, 9), circle(60.6, 44.6, 9), circle(39.4, 44.6, 9), circle(33, 24.5, 9),
+    circle(50, 30, 7.5, true),
+    rect(18, 74, 64, 22, 3), tick(50, 85, 1.1)
   ].join('')),
 
   'w3-assessment-for-student-agency': symbol([
@@ -51,11 +52,12 @@ export const symbols = {
   ].join('')),
 
   'w3-formative-use-of-tests': symbol([
-    rect(8, 4, 60, 92, 4),
-    tick(20, 20, 1), thin('M32 20H58'),
-    rect(14, 36, 48, 22, 2, true),
-    tick(20, 74, 1), thin('M32 74H58'),
-    arrow([82, 86], [82, 16])
+    rect(4, 4, 56, 92, 4),
+    tick(16, 20, 1.1), path('M28 20H52'),
+    path(`M10 38H54V62H10Z${P([14, 46], [16, 44], [20, 48], [24, 44], [26, 46], [22, 50], [26, 54], [24, 56], [20, 52], [16, 56], [14, 54], [18, 50])}Z M31 48H48V52H31Z`, `${FILL} fill-rule="evenodd" stroke="none"`),
+    tick(16, 80, 1.1), path('M28 80H52'),
+    rect(72, 8, 24, 24, 2), path('M78 20H90'),
+    arrow([60, 50], [84, 38], [84, 50])
   ].join('')),
 
   'w3-assessment-portfolios': symbol([

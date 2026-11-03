@@ -8,8 +8,8 @@ const dots = (d) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${
 const ball = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}" stroke="${INK}" stroke-width="${W}"/>`;
 const tickMark = (x, y, r, c = INK, w = 2.8) => ln(`M${x - r} ${y} l${f(r * 0.7)} ${f(r * 0.7)} l${f(r * 1.3)} ${f(-r * 1.4)}`, w, c);
 const crossMark = (x, y, r, c = INK, w = 2.8) => ln(`M${x - r} ${y - r} L${x + r} ${y + r} M${x + r} ${y - r} L${x - r} ${y + r}`, w, c);
-const flower = (x, y) => [[0, -11], [10.5, -3.4], [6.5, 8.9], [-6.5, 8.9], [-10.5, -3.4]]
-  .map(([dx, dy]) => ln(`M${x} ${y} L${f(x + dx)} ${f(y + dy)}`, W) + disc(f(x + dx), f(y + dy), 3.2)).join('') + ball(x, y, 4.6);
+const flower = (x, y) => [[0, -9.5], [9, -2.9], [5.6, 7.7], [-5.6, 7.7], [-9, -2.9]]
+  .map(([dx, dy]) => disc(x + dx, y + dy, 5.2)).join('') + ball(x, y, 4.6);
 const folder = (x, y, fill) => blob(`M${x} ${y + 6} V${y + 34} H${x + 34} V${y + 6} H${x + 16} L${x + 12} ${y} H${x + 3} Z`, fill);
 
 export const figures = {
@@ -48,10 +48,10 @@ export const figures = {
     ball(58, 26, 6), arrowTo([46, 18], [70, 18], [58, 4], { w: W }), arrowTo([70, 34], [46, 34], [58, 48], { w: W })
   ].join('')),
   'w3-c-r-a-f-t-feedback-time': HEX([
-    ln('M26 24 V38 M94 24 V38', W), flower(26, 18), flower(94, 18),
-    pupil(26, 46, { s: 0.8 }), pupil(94, 46, { s: 0.8 }),
-    box(6, 70, 108, 9),
-    box(48, 42, 24, 28, PAPER, 1), ln('M53 50 H67 M53 57 H61', W * 0.8), tickMark(62, 60, 3.4, INK, 2)
+    ln('M24 18 V44 M96 18 V44', W), flower(24, 18), flower(96, 18),
+    pupil(24, 53, { s: 0.85 }), pupil(96, 53, { s: 0.85 }),
+    box(4, 76, 112, 9),
+    box(46, 42, 28, 34, PAPER, 1), ln('M52 51 H68', W), tickMark(58, 62, 4.4, INK, 2.4)
   ].join('')),
   'w3-assessment-for-student-agency': HEX([
     ln('M56 86 L78 6 M74 86 L94 12', W * 1.3),
@@ -60,10 +60,11 @@ export const figures = {
     person(32, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[14, 8], [30, -2]]] })
   ].join('')),
   'w3-formative-use-of-tests': HEX([
-    box(8, 12, 32, 46), tickMark(16, 21, 3.6, INK, 2.2), ln('M24 21 H34', W * 0.8), box(11, 28, 26, 12, INK, 1),
-    crossMark(17, 34, 2.8, PAPER, 2), ln('M24 34 H33', W, PAPER), tickMark(16, 49, 3.6, INK, 2.2), ln('M24 49 H34', W * 0.8),
-    person(60, 88, { s: 0.54, arms: [[[-14, 8], [-24, -6]], [[14, 8], [26, -8]]] }),
-    board(82, 12, 32, 34), ln('M88 22 H108 M88 30 H108 M88 38 H100', W)
+    box(4, 6, 36, 56), tickMark(11, 16, 3.6, INK, 2.2), ln('M20 16 H34', W), box(7, 26, 30, 16, INK, 1),
+    crossMark(14, 34, 3, PAPER, 2.2), ln('M22 34 H33', W, PAPER), tickMark(11, 52, 3.6, INK, 2.2), ln('M20 52 H34', W),
+    person(60, 88, { s: 0.54, turn: 1, arms: [[[-12, 10], [-20, 0]], [[14, 8], [26, -8]]] }),
+    arrowTo([38, 7], [86, 17], [66, -4], { w: W }),
+    board(80, 20, 36, 38), ln('M87 31 H109 M87 39 H109 M87 47 H100', W)
   ].join('')),
   'w3-assessment-portfolios': HEX([
     arrowTo([30, 18], [90, 18], [60, -6], { w: W }), ln('M36 12 L30 18 L38 21', W),

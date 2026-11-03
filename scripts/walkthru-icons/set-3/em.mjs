@@ -1,5 +1,5 @@
 // Explaining and modelling (E&M), Book 3.
-import { circle, path, rect, thin, bubble, tick, cross, symbol, FILL } from '../parts.mjs';
+import { circle, path, rect, thin, bubble, tick, cross, arrow, symbol, FILL } from '../parts.mjs';
 
 export const symbols = {
   'w3-giving-an-explanation': symbol([
@@ -52,9 +52,10 @@ export const symbols = {
   ].join('')),
 
   'w3-graphic-organisers-kernel-sentences': symbol([
-    rect(30, 36, 40, 28, 4, true),
-    path('M36 36L24 26M64 36L76 26M50 64V76'),
-    rect(4, 6, 28, 20), rect(68, 6, 28, 20), rect(34, 76, 32, 18)
+    rect(32, 16, 36, 22, 3, true),
+    rect(3, 3, 24, 15), rect(73, 3, 24, 15), path('M24 18L36 24M76 18L64 24'),
+    arrow([50, 42], [50, 58]),
+    path('M6 70H94'), path('M6 90H64'), circle(78, 90, 4.4, true)
   ].join('')),
 
   'w3-modelling-handover-i-do-we-do-you-do': symbol([

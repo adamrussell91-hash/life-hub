@@ -1,5 +1,5 @@
 // Board hexagon figures, Book 3, Behaviour and relationships. 120 × 90, pen 1.9.
-import { pen, person, pupil, desk, talk, think, bust, dotted, stroke, disc, sheet, f, INK, PAPER, HEX } from '../../people.mjs';
+import { pen, person, pupil, desk, talk, think, bust, dotted, stroke, blob, disc, sheet, f, INK, PAPER, HEX } from '../../people.mjs';
 pen(1.9);
 const W = 1.9;
 const r = (x, y, w, h, fill = PAPER, rx = 1.5) => `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" ` +
@@ -77,8 +77,9 @@ export const figures = {
     talk(46, 6, 28, 18, [50, 34], { text: '…' })
   ].join('')),
   'w3-repair-and-rebuild': HEX([
-    person(32, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[14, 16], [28, 20]]] }),
-    person(88, 88, { s: 0.6, turn: -1, arms: [[[-14, 16], [-28, 20]], [[4, 30], [3, 52]]] }),
-    talk(44, 3, 32, 19, [60, 30], { ink: true })
+    person(22, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[22, 26], [47, 30]]] }),
+    person(98, 88, { s: 0.6, turn: -1, arms: [[[-22, 26], [-47, 30]], [[4, 30], [3, 52]]] }),
+    blob('M60 35 C47 25 42 19 42 12 C42 4 55 1 60 10 C65 1 78 4 78 12 C78 19 73 25 60 35 Z', INK),
+    paperLine('M60 11 L56 17 L63 21 L58.5 28', 2.2)
   ].join(''))
 };

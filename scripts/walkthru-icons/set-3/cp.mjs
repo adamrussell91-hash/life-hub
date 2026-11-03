@@ -3,10 +3,13 @@ import { circle, path, rect, tick, symbol, FILL } from '../parts.mjs';
 
 export const symbols = {
   'w3-big-questions': symbol([
-    path('M6 58Q4 18 30 16Q50 18 50 42L41 42Q41 27 30 26Q15 28 15 58Z', FILL),
-    path('M12 58Q12 36 30 36Q46 36 46 56V70H37V58H23V80H12Z', FILL),
-    path('M62 34C62 12 94 12 92 34C91 48 76 46 76 62', 'stroke-width="7"'),
-    circle(76, 80, 4.6, true)
+    path('M4 44Q2 12 28 10Q46 9 54 26L45 30Q40 19 28 20Q13 22 13 44Z', FILL),
+    path('M13 52A19 19 0 0 1 51 52'),
+    path('M8 52H56'),
+    path('M30 52V78Q38 82 44 72L46 52'),
+    path('M13 52Q12 66 4 70'),
+    path('M64 34C64 12 96 12 94 34C93 48 78 46 78 62', 'stroke-width="6"'),
+    circle(78, 80, 4.4, true)
   ].join('')),
 
   'w3-the-museum-curation-analogy': symbol([
@@ -26,9 +29,10 @@ export const symbols = {
   ].join('')),
 
   'w3-types-of-subject-knowledge': symbol([
-    rect(4, 37, 26, 26, 2), rect(70, 37, 26, 26, 2, true),
-    path('M17 37Q50 -6 83 37M28 37Q50 12 72 37'),
-    path('M17 63Q50 106 83 63M28 63Q50 88 72 63')
+    path('M42 24H30A26 26 0 0 0 30 76H42V60H30A10 10 0 0 1 30 40H42Z', FILL),
+    path('M58 24H70A26 26 0 0 1 70 76H58V60H70A10 10 0 0 0 70 40H58Z'),
+    path('M45 32H55M45 68H55'),
+    path('M32 14Q50 0 68 14M32 86Q50 100 68 86')
   ].join('')),
 
   'w3-building-a-culture-of-reading': symbol([
