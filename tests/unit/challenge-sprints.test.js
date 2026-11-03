@@ -340,7 +340,7 @@ test('Knowledge Clementine handler injects sprint lane and runs track_checkin_la
   let capturedSystem = '';
   const secret = 's'.repeat(32);
   const token = createSessionToken({
-    // The handler checks expiry against the real clock, so a fixed date here stops working once it lapses.
+    // Issued now: a fixed date expires and the request is refused as signed out.
     now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 9)
   }, secret).token;

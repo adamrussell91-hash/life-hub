@@ -194,11 +194,11 @@ function filterBlocksForStudentInner(
         return { ...block, content } as Block;
       }
       if (block.block_type === 'hinge_question') {
-        // The right answer, misconception notes, move-on marks and back-up question are the teacher's alone.
+        // The right answer, misconception notes, answer tiers, move-on marks and back-up question are the teacher's alone.
         const { correct_id: _right, move_on: _move, reteach: _reteach, backup: _backup, ...content } = block.content;
         return {
           ...block,
-          content: { ...content, options: content.options.map(({ misconception: _note, ...option }) => option) }
+          content: { ...content, options: content.options.map(({ misconception: _note, tier: _tier, ...option }) => option) }
         } as unknown as Block;
       }
       if (block.block_type === 'flashcards') {

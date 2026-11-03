@@ -7,7 +7,18 @@ import { liveStatements, type ContinuumBlock, type Phase } from './shared';
 
 type Entry = { symbol: string; pos?: number; reason?: string; flagged?: boolean; new_pos?: number; why?: string; why_flagged?: boolean };
 type Group = { id: string; name: string; answer_ids: string[] };
-type StatementState = { id: string; phase: Phase; placed: number; moved: number; moves_shown: boolean; entries: Entry[]; groups: Group[] | null };
+type StatementState = {
+  id: string;
+  phase: Phase;
+  placed: number;
+  moved: number;
+  moves_shown: boolean;
+  entries: Entry[];
+  groups: Group[] | null;
+  /** Predict mode: where the statement really sits (null when none is set), and whether students can see it yet. */
+  answer?: number | null;
+  answer_shown?: boolean;
+};
 type TeacherState =
   | { phase: 'idle' }
   | { phase: 'live'; session: string; code: string; open: boolean; pace: 'teacher' | 'student' | 'self'; replace: boolean; current: number; joined: number; statements: StatementState[] };
@@ -171,7 +182,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       counter.append(String(st.moved), el('span', '', ' moved'));
       status.textContent = st.moves_shown ? 'Dashed = where they started.' : 'Moves stay hidden until you show them.';
     }
-    const key = JSON.stringify([st.id, st.phase, st.moves_shown, panelMode, s.replace, s.pace, viewing]);
+    const key = JSON.stringify([st.id, st.phase, st.moves_shown, st.answer_shown, panelMode, s.replace, s.pace, viewing]);
     if (key === paintedKey) return;
     paintedKey = key;
     const btns: HTMLElement[] = [];
@@ -218,6 +229,11 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       btns.push(showMoves);
       if (st.moves_shown) btns.push(toggle('Who moved and why', 'moved'));
       btns.push(toggle('Show all reasons', 'all'), sortBtn());
+    }
+    if (st.phase !== 'collect' && st.answer != null) {
+      btns.unshift(button(st.answer_shown ? 'Hide answer' : 'Show answer', st.answer_shown ? 'secondary' : 'primary', function () {
+        void send('show_answer', { statement: st.id, show: !st.answer_shown }, this);
+      }));
     }
     if (st.phase !== 'collect' && s.pace === 'teacher' && viewing < statements.length - 1) {
       btns.push(button('Next statement', 'secondary', () => go(viewing + 1, s)));
@@ -381,7 +397,8 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       phase: st.phase,
       movesShown: st.moves_shown,
       entries: st.entries,
-      picked
+      picked,
+      answer: st.answer_shown ? st.answer ?? null : null
     });
     paintCard(st);
     followCard();

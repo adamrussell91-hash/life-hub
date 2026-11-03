@@ -63,3 +63,44 @@ export function secondsLeft(closesAt: string | null | undefined): number | null 
 export function formatSeconds(s: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/* ── Independent mode ───────────────────────────────────────────────── */
+
+export type HingeTier = 'right' | 'close' | 'mixup';
+export type HingePace = 'live' | 'independent';
+export const REASON_MAX = 280;
+
+export const paceOf = (content: HingeContent): HingePace => (content.pace === 'independent' ? 'independent' : 'live');
+
+/** The right answer is always right; the rest are close only when the teacher says so. */
+export function tierOf(option: { id: string; tier?: HingeTier }, correctId: string): HingeTier {
+  if (option.id === correctId) return 'right';
+  return option.tier === 'close' ? 'close' : 'mixup';
+}
+
+export type Feedback = { tone: 'right' | 'close' | 'wrong'; title: string; body: string };
+
+/**
+ * What a student reads after one independent try, from how near their answer
+ * was and how sure they said they were (null: they didn't say). The teacher's
+ * note on the answer they picked is the nudge. It speaks to this student only,
+ * never about the class.
+ */
+export function independentFeedback(tier: HingeTier, sure: boolean | null, note = ''): Feedback {
+  const nudge = note.trim();
+  if (tier === 'right') {
+    if (sure === false) return { tone: 'right', title: 'You know more than you think.', body: 'You were right. Back your reasoning next time.' };
+    return { tone: 'right', title: 'Locked in.', body: sure ? 'Right, and you knew it.' : 'Your answer was right.' };
+  }
+  if (tier === 'close') {
+    return {
+      tone: 'close',
+      title: 'Nearly — look again.',
+      body: nudge || 'Check what the question asks, and what your answer leaves out.'
+    };
+  }
+  const body = nudge || 'Read the question again slowly and check what each answer really says.';
+  if (sure === true) return { tone: 'wrong', title: 'This one’s sneaky — it’s a common mix-up.', body };
+  if (sure === false) return { tone: 'wrong', title: 'Good call flagging it.', body };
+  return { tone: 'wrong', title: 'Not quite — it’s a common mix-up.', body };
+}

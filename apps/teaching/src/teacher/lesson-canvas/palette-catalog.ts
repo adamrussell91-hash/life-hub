@@ -1,3 +1,4 @@
+import { BUILTIN_COMPOSITIONS } from '@/marge/template';
 import {
   HOMEPAGE_BLOCK_GROUPS,
   LESSON_BLOCK_GROUPS,
@@ -62,6 +63,12 @@ export function lessonPaletteFamilies(
   emptyMessage = 'No saved compositions yet. Use “Save as composition” in a section’s menu to reuse it here.'
 ): PaletteFamily[] {
   const families: PaletteFamily[] = familiesFromGroups(LESSON_BLOCK_GROUPS);
+
+  // Ready-made sections that ship with the hub. Kept apart from saved compositions so that panel's empty, loading and error notes still show.
+  families.push({
+    id: 'Lesson kits',
+    cards: BUILTIN_COMPOSITIONS.map((kit) => ({ kind: 'composition' as const, id: kit.id, title: kit.title }))
+  });
 
   families.push({
     id: 'Compositions',

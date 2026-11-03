@@ -2,6 +2,7 @@ import { ApiClientError } from '@/api/client';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Lesson, LessonTemplateSummary, Unit } from '@/schemas';
 import { listLessonTemplates, useLessonTemplate } from '@/teacher/template-api';
+import { BUILTIN_LESSON_TEMPLATES } from '@/marge/template';
 
 function labeledSelect(
   name: string,
@@ -148,7 +149,7 @@ function openFromTemplateMessage(message: string): Promise<Lesson | null> {
 }
 
 function openFromTemplatePicker(
-  templates: LessonTemplateSummary[],
+  templates: Array<Pick<LessonTemplateSummary, 'id' | 'title'>>,
   units: Unit[],
   preselectTemplateId?: string
 ): Promise<Lesson | null> {
@@ -197,15 +198,13 @@ export async function promptLessonFromTemplate(
     return openFromTemplateMessage('Create a unit before using a lesson template.');
   }
 
+  // Built-in templates always show, so the picker works before anything is saved, and when saved ones fail to load.
+  const builtins = BUILTIN_LESSON_TEMPLATES.map(({ id, title }) => ({ id, title }));
+  let saved: LessonTemplateSummary[] = [];
   try {
-    const { templates } = await listLessonTemplates();
-    if (templates.length === 0) {
-      return openFromTemplateMessage(
-        'No lesson templates yet. Save one from a lesson editor.'
-      );
-    }
-    return openFromTemplatePicker(templates, units, preselectTemplateId);
+    saved = (await listLessonTemplates()).templates;
   } catch {
-    return openFromTemplateMessage('Unable to create from template.');
+    saved = [];
   }
+  return openFromTemplatePicker([...builtins, ...saved], units, preselectTemplateId);
 }

@@ -31,6 +31,8 @@ import {
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
 import { mountPublicLinkControl } from '@/teacher/public-link';
+import { isBuiltinComposition, margeCloseSection, margeOpenerSection, MARGE_OPENER_ID } from '@/marge/template';
+import { returnSources } from '@/blocks/continuum-line/shared';
 import { lessonDisplayPath } from '@/teacher/lesson-display';
 import {
   buildLinkedPreview,
@@ -519,6 +521,18 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     async function insertSelectedComposition(id: string): Promise<void> {
       if (!id) return;
+      if (isBuiltinComposition(id)) {
+        // The close returns to the lesson's first continuum line, if there is one.
+        const root = id === MARGE_OPENER_ID ? margeOpenerSection(nextId) : margeCloseSection(nextId, returnSources(lesson.blocks, '')[0]?.id ?? null);
+        const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, root);
+        if (!result.ok) {
+          setCompositionStatus(result.message);
+          return;
+        }
+        applyBlocks(result.blocks);
+        setCompositionStatus(`Inserted “${root.content.title}”.`);
+        return;
+      }
       try {
         const full = await apiGet<CompositionTemplate>(`/api/compositions/${id}`);
         const clone = insertCompositionRoot(full.root, nextId);
@@ -607,9 +621,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       });
     }
 
+    /** Built-in compositions have no source to stay linked to, so they go straight in as a copy. */
+    function chooseComposition(id: string): void {
+      if (isBuiltinComposition(id)) void insertSelectedComposition(id);
+      else palette?.showCompositionConfirm(id);
+    }
+
     function onPaletteInsert(payload: PaletteInsertPayload): void {
       if (payload.kind === 'composition') {
-        palette?.showCompositionConfirm(payload.id);
+        chooseComposition(payload.id);
         return;
       }
       palette?.hideCompositionConfirm();
@@ -764,7 +784,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         void detachLinkedSection(blockId);
       },
       onCompositionDrop: (id) => {
-        palette?.showCompositionConfirm(id);
+        chooseComposition(id);
       },
       renderLinkedPreview: (compositionId) =>
         buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch),

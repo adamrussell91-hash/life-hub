@@ -9,12 +9,19 @@ import {
   type BoardOverlay,
   type BoardScene
 } from './excalidraw-board';
+import {
+  WHITEBOARD_STARTERS,
+  whiteboardStarterScene,
+  type WhiteboardStarterId
+} from './starters.mjs';
 import './whiteboard.css';
 
 export type WhiteboardBlockLike = {
   content: {
     document_id: string;
     seed_document_id?: string;
+    /** A built-in layout to draw into the board when it has no document yet. */
+    starter?: WhiteboardStarterId;
     title?: string;
     published_snapshot?: unknown;
   };
@@ -38,27 +45,37 @@ const SAVE_DELAY_MS = 600;
 const UPDATED_EVENT = 'hub-whiteboard:updated';
 type UpdatedDetail = { documentId: string; scene: BoardScene };
 
+/**
+ * The board's own document wins; a copied block falls back to its source's
+ * document; a block with a built-in starter draws that layout. A seed or
+ * starter is written into the block's own document once, then dropped.
+ */
 async function resolveDraftScene(
   block: WhiteboardBlockLike,
   baseUrl: string
 ): Promise<{ scene: BoardScene; seeded: boolean }> {
   const own = await loadWhiteboardDocument(baseUrl, block.content.document_id);
-  if (own) return { scene: toScene(own.snapshot), seeded: false };
+  if (own) {
+    return {
+      scene: toScene(own.snapshot),
+      seeded: Boolean(block.content.seed_document_id || block.content.starter)
+    };
+  }
 
   const seedId = block.content.seed_document_id;
-  if (!seedId) return { scene: toScene(null), seeded: false };
+  const seed = seedId ? await loadWhiteboardDocument(baseUrl, seedId) : null;
+  const starter = whiteboardStarterScene(block.content.starter);
+  const source = seed ? toScene(seed.snapshot) : starter;
+  if (!source) return { scene: toScene(null), seeded: Boolean(seedId) };
 
-  const seed = await loadWhiteboardDocument(baseUrl, seedId);
-  if (!seed) return { scene: toScene(null), seeded: true };
-
-  const scene = toScene(seed.snapshot);
-  await saveWhiteboardDocument(baseUrl, block.content.document_id, scene);
-  return { scene, seeded: true };
+  await saveWhiteboardDocument(baseUrl, block.content.document_id, source);
+  return { scene: source, seeded: true };
 }
 
 function clearSeed<B extends WhiteboardBlockLike>(block: B, onBlockChange?: (block: B) => void): void {
-  if (!block.content.seed_document_id || !onBlockChange) return;
-  const { seed_document_id: _seed, ...content } = block.content;
+  if (!onBlockChange) return;
+  if (!block.content.seed_document_id && !block.content.starter) return;
+  const { seed_document_id: _seed, starter: _starter, ...content } = block.content;
   onBlockChange({ ...block, content } as B);
 }
 
@@ -217,6 +234,7 @@ export async function mountHubWhiteboard<B extends WhiteboardBlockLike>(
       start.addEventListener('click', () => void open());
       actions.append(start);
       empty.append(actions);
+      if (!options.published) empty.append(starterPicker());
       host.replaceChildren(empty);
       return;
     }
@@ -245,6 +263,44 @@ export async function mountHubWhiteboard<B extends WhiteboardBlockLike>(
 
     host.replaceChildren(frame, actions);
   };
+
+  // A blank board offers the built-in layouts: picking one saves it as the
+  // board's document, so it is chosen once and then edited like any drawing.
+  function starterPicker(): HTMLElement {
+    const group = document.createElement('div');
+    group.className = 'block-whiteboard__starters';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Or start from a layout');
+    const lead = document.createElement('span');
+    lead.className = 'block-whiteboard__starters-label';
+    lead.textContent = 'Or start from a layout:';
+    group.append(lead);
+    for (const starter of WHITEBOARD_STARTERS) {
+      const choice = button(starter.label, 'secondary');
+      choice.dataset.starter = starter.id;
+      choice.title = starter.description;
+      choice.addEventListener('click', () => void applyStarter(starter.id));
+      group.append(choice);
+    }
+    return group;
+  }
+
+  async function applyStarter(starterId: WhiteboardStarterId): Promise<void> {
+    const next = whiteboardStarterScene(starterId);
+    pending = null;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    scene = next;
+    report('Saving…');
+    try {
+      await saveChain;
+      await saveWhiteboardDocument(options.getBaseUrl(), block.content.document_id, next);
+      report('Saved');
+    } catch (error) {
+      report(error instanceof Error ? error.message : 'Whiteboard save failed.', true);
+    }
+    await paint();
+  }
 
   const onUpdated = (event: Event) => {
     if (!host.isConnected) {

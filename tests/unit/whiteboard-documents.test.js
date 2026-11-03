@@ -3,6 +3,8 @@ import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createLessonPublishHandler } from '../../netlify/functions/lesson-publish.mjs';
 import { createWhiteboardsHandler } from '../../netlify/functions/whiteboards.mjs';
+import { materialiseWhiteboardSnapshots } from '../../netlify/functions/_shared/whiteboard-blobs.mjs';
+import { whiteboardStarterScene } from '../../packages/whiteboard/starters.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -147,4 +149,60 @@ test('lesson publish freezes a live whiteboard snapshot for student rendering', 
     teachingStore.snapshot()['lessons/lesson_1'].blocks[0].content.seed_document_id,
     'doc_source'
   );
+});
+
+test('lesson publish freezes a starter layout when the board has no document yet', async () => {
+  const stamp = '2026-08-01T00:00:00.000Z';
+  const teachingStore = memoryStore({
+    'lessons/lesson_2': {
+      id: 'lesson_2',
+      type: 'lesson',
+      title: 'Starter lesson',
+      unit_id: 'unit_1',
+      blocks: [{
+        id: 'wb_2',
+        type: 'block',
+        block_type: 'whiteboard',
+        variant: 'large',
+        visibility: 'student_teacher',
+        content: { document_id: 'doc_never_opened', starter: 'venn', height_px: 640 },
+        layout: {},
+        print: {},
+        settings: {},
+        created_at: stamp,
+        updated_at: stamp,
+        schema_version: 1
+      }],
+      created_at: stamp,
+      updated_at: stamp,
+      schema_version: 1
+    }
+  });
+  const handler = createLessonPublishHandler({
+    ...deps(teachingStore),
+    getWhiteboardStore: async () => memoryStore()
+  });
+  const response = await handler(request(
+    'https://api.adam-russell.com/api/lessons/lesson_2/publish',
+    { method: 'POST', body: {} }
+  ));
+  assert.equal(response.status, 200);
+
+  const content = teachingStore.snapshot()['published/lessons/lesson_2'].blocks[0].content;
+  assert.deepEqual(content.published_snapshot, whiteboardStarterScene('venn'));
+  assert.equal('starter' in content, false);
+});
+
+test('shared whiteboard materialiser prefers a saved document over the starter', async () => {
+  const saved = { format: 'excalidraw', version: 1, elements: [{ id: 'mine' }], appState: {}, files: {} };
+  const store = memoryStore({ 'documents/doc_a': { id: 'doc_a', snapshot: saved } });
+  const [withDoc, withoutDoc, blank] = await materialiseWhiteboardSnapshots([
+    { block_type: 'whiteboard', content: { document_id: 'doc_a', starter: 'sort_groups' } },
+    { block_type: 'whiteboard', content: { document_id: 'doc_b', starter: 'same_different' } },
+    { block_type: 'whiteboard', content: { document_id: 'doc_c' } }
+  ], store);
+  assert.deepEqual(withDoc.content.published_snapshot, saved);
+  assert.deepEqual(withoutDoc.content.published_snapshot, whiteboardStarterScene('same_different'));
+  assert.equal(blank.content.published_snapshot, null);
+  assert.equal('starter' in withDoc.content, false);
 });

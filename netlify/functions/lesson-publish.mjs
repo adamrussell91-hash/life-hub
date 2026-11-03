@@ -17,6 +17,7 @@ import {
   getWhiteboardJSON,
   whiteboardKey
 } from './_shared/whiteboard-blobs.mjs';
+import { whiteboardStarterScene } from '../../packages/whiteboard/starters.mjs';
 import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from './_shared/teaching-student.mjs';
 import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
 import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
@@ -66,7 +67,9 @@ async function materialisePublishedWhiteboards(blocks, store) {
         if (record?.snapshot) break;
       }
       delete content.seed_document_id;
-      content.published_snapshot = record?.snapshot ?? null;
+      // A starter board nobody has opened yet has no document: freeze the layout itself.
+      content.published_snapshot = record?.snapshot ?? whiteboardStarterScene(content.starter);
+      delete content.starter;
       return { ...block, content };
     }
 

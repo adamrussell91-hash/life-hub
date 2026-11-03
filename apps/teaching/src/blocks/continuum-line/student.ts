@@ -4,10 +4,10 @@ import { poller } from '@/blocks/brainstorm/shared';
 import { lineMarks, liveStatements, nearestStop, scaleValueText, type ContinuumBlock, type Phase } from './shared';
 
 type Mine = { pos: number; reason: string; new_pos?: number; why?: string };
-type StatementView = { id: string; phase: Phase; placed: number; mine: Mine | null; class: number[] | null };
+type StatementView = { id: string; phase: Phase; placed: number; mine: Mine | null; class: number[] | null; answer?: number };
 type StudentState =
   | { phase: 'idle' }
-  | { phase: 'live'; session: string; open: boolean; pace: 'teacher' | 'student' | 'self'; joined?: boolean; symbol?: string; current?: number; statements?: StatementView[] };
+  | { phase: 'live'; session: string; open: boolean; pace: 'teacher' | 'student' | 'self'; mode?: 'opinion' | 'predict'; joined?: boolean; symbol?: string; current?: number; statements?: StatementView[] };
 type Live = Extract<StudentState, { phase: 'live' }>;
 /** What a device keeps: the round it joined and its secret token. */
 type Device = { session: string; token: string };
@@ -15,9 +15,33 @@ type Device = { session: string; token: string };
 const lastState = new Map<string, StudentState>();
 const MAX_REASON = 280;
 
+/**
+ * Where this device last put its symbol on each statement of an earlier line
+ * (a return line's source), by statement id. Reads the source line's own
+ * device token, so it needs no account; empty if this device never joined it.
+ */
+async function earlierPlacements(lessonId: string, sourceId: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const device = readJSON<Device>(`continuum:${lessonId}:${sourceId}:device`);
+  if (!device) return out;
+  try {
+    const endpoint = `/api/published/continuum/${encodeURIComponent(lessonId)}/${encodeURIComponent(sourceId)}`;
+    const s = await apiPost<StudentState>(endpoint, { ...device, action: 'status' });
+    if (s.phase !== 'live') return out;
+    for (const sv of s.statements ?? []) if (sv.mine) out.set(sv.id, sv.mine.new_pos ?? sv.mine.pos);
+  } catch {
+    // The earlier line has gone or closed: the student just places fresh.
+  }
+  return out;
+}
+
 export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HTMLElement, stimulus: HTMLElement): HTMLElement {
   const endpoint = `/api/published/continuum/${encodeURIComponent(lessonId)}/${encodeURIComponent(block.id)}`;
   const storage = `continuum:${lessonId}:${block.id}`;
+  const predict = block.content.mode === 'predict';
+  const returning = !!block.content.returns_to;
+  /** A return line: where this student put their symbol the first time. */
+  let before = new Map<string, number>();
   const statements = liveStatements(block);
   const root = el('div', 'cl-run cl-run--student');
   const body = el('div', 'cl-student');
@@ -150,12 +174,18 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
    * A line the student can place on: tap or drag, or nudge with the arrows.
    * `ghost` is where they first placed; `dots` is the class after a reveal.
    */
-  function line(opts: { symbol: string; pos: number | null; snap: boolean; ghost?: number; dots?: number[]; onMove?: (pos: number) => void }): HTMLElement {
+  function line(opts: { symbol: string; pos: number | null; snap: boolean; ghost?: number; dots?: number[]; answer?: number; onMove?: (pos: number) => void }): HTMLElement {
     const wrap = el('div', 'cl-place');
     const box = el('div', `cl-line${opts.onMove ? ' cl-line--live' : ''}`);
     const track = el('div', 'cl-track');
     track.append(lineMarks(block.content.scale, opts.snap));
     box.append(track);
+    if (opts.answer != null) {
+      const mark = el('span', 'cl-answer-mark');
+      mark.append(el('span', 'cl-answer-mark__label', 'Answer'));
+      mark.style.left = `${opts.answer * 100}%`;
+      box.append(mark);
+    }
     for (const d of opts.dots ?? []) {
       const dot = el('i', 'cl-line__dot');
       dot.style.left = `${d * 100}%`;
@@ -259,6 +289,10 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     const wrap = el('div', 'cl-answer');
     const draft = drafts.get(sv.id) ?? { pos: sv.mine?.pos ?? null, text: sv.mine?.reason ?? '' };
     drafts.set(sv.id, draft);
+    const first = before.get(sv.id);
+    if (returning) {
+      wrap.append(el('p', 'cl-lead block-body', first != null ? 'You’ve come back to this. The dashed symbol is where you put it earlier. Where would you put it now?' : 'You’ve come back to this. Where would you put it now?'));
+    }
     const go = button(sv.mine ? 'Save my change' : 'Place it', 'primary', function () {
       void send('place', { statement: sv.id, pos: draft.pos, reason: draft.text }, this).then((ok) => {
         if (!ok) return;
@@ -272,8 +306,12 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       go.disabled = draft.pos == null || !draft.text.trim();
     };
     wrap.append(
-      line({ symbol: s.symbol ?? '0-0', pos: draft.pos, snap, onMove: (p) => ((draft.pos = p), ready()) }),
-      reasonField('Why there?', 'I put it here because…', draft, ready),
+      line({ symbol: s.symbol ?? '0-0', pos: draft.pos, snap, ghost: first, onMove: (p) => ((draft.pos = p), ready()) }),
+      returning
+        ? reasonField(first != null ? 'What moved you, or what kept you there?' : 'Why there?', 'Now I think… because…', draft, ready)
+        : predict
+          ? reasonField('What makes you predict that?', 'I predict this because…', draft, ready)
+          : reasonField('Why there?', 'I put it here because…', draft, ready),
       el('p', 'pf-field__hint block-secondary', 'You need a reason before you can place it.')
     );
     const row = el('div', 'pf-actions block-actions');
@@ -368,7 +406,11 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       return wrap;
     }
     if (!sv.mine) {
-      wrap.append(waitPanel('Revealed', 'Here’s where the class put their symbols.'), line({ symbol, pos: null, snap: st.snap, dots: sv.class ?? [] }), nav());
+      wrap.append(
+        sv.answer != null ? waitPanel('The answer is up', 'The marked spot is where it really sits.') : waitPanel('Revealed', 'Here’s where the class put their symbols.'),
+        line({ symbol, pos: null, snap: st.snap, dots: sv.class ?? [], answer: sv.answer }),
+        nav()
+      );
       return wrap;
     }
     if (sv.phase === 'replace' && sv.mine.new_pos == null && !kept.has(sv.id) && s.open) {
@@ -376,10 +418,18 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
       return wrap;
     }
     const moved = sv.mine.new_pos != null;
-    const title = moved ? 'Moved' : sv.phase === 'replace' ? 'Kept where it was' : 'Revealed';
-    const sub = moved ? 'Your teacher will show the moves.' : sv.phase === 'replace' ? 'You can still move if the discussion changes your mind.' : 'The grey dots are the class. Yours is your symbol.';
+    const title = sv.answer != null ? 'The answer is up' : moved ? 'Moved' : sv.phase === 'replace' ? 'Kept where it was' : 'Revealed';
+    // A prediction is a guess made before the evidence: the gap is something to wonder about, never a score.
+    const sub =
+      sv.answer != null
+        ? 'The marked spot is where it really sits. What surprised you? What would you look at differently next time?'
+        : moved
+          ? 'Your teacher will show the moves.'
+          : sv.phase === 'replace'
+            ? 'You can still move if the discussion changes your mind.'
+            : 'The grey dots are the class. Yours is your symbol.';
     const panel = waitPanel(title, sub);
-    panel.append(line({ symbol, pos: moved ? sv.mine.new_pos! : sv.mine.pos, snap: st.snap, ghost: moved ? sv.mine.pos : undefined, dots: sv.class ?? [] }));
+    panel.append(line({ symbol, pos: moved ? sv.mine.new_pos! : sv.mine.pos, snap: st.snap, ghost: moved ? sv.mine.pos : undefined, dots: sv.class ?? [], answer: sv.answer }));
     const row = nav();
     if (sv.phase === 'replace' && !moved && kept.has(sv.id) && s.open) row.prepend(button('Move after all', 'secondary', () => (kept.delete(sv.id), (view = ''), paint())));
     panel.append(row);
@@ -440,13 +490,20 @@ export function mountStudent(block: ContinuumBlock, lessonId: string, corner: HT
     const index = Math.min(s.pace === 'teacher' ? s.current ?? 0 : at, statements.length - 1);
     const sv = s.statements?.find((x) => x.id === statements[index]!.id);
     // The class count changes as others place; leave it out so typing isn't interrupted.
-    const key = JSON.stringify([index, s.open, s.pace, sv && [sv.id, sv.phase, sv.mine, sv.class], editing.has(sv?.id ?? ''), kept.has(sv?.id ?? '')]);
+    const key = JSON.stringify([index, s.open, s.pace, sv && [sv.id, sv.phase, sv.mine, sv.class, sv.answer], editing.has(sv?.id ?? ''), kept.has(sv?.id ?? ''), before.size]);
     if (key === view) return;
     view = key;
     body.replaceChildren(statementView(s, index));
   }
 
   paint();
+  if (returning) {
+    void earlierPlacements(lessonId, block.content.returns_to!).then((found) => {
+      before = found;
+      view = '';
+      paint();
+    });
+  }
   poller(root, async () => {
     await send('status');
   });
