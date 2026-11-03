@@ -5,6 +5,7 @@ import { loadActivityState, saveActivityState, shuffleArray, storageKey } from '
 import { button, el, errorText, isNotPublished, notLivePanel } from '@/blocks/peer-feedback-ui';
 import { poller } from '@/blocks/brainstorm/shared';
 import { deviceToken } from '@/quiz/dom';
+import { whatHowWhyContent } from '@/blocks/what-how-why-editor';
 import '@/blocks/peer-feedback.css';
 import './what-how-why.css';
 
@@ -396,7 +397,8 @@ function mountTeacher(block: OutcomesBlock, lessonId: string, parts: Parts, disp
 
 type Parts = { root: HTMLElement; how: HTMLElement; howExtra: HTMLElement; why: HTMLElement };
 
-export function renderWhatHowWhy(block: OutcomesBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
+export function renderWhatHowWhy(placed: OutcomesBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
+  const block: OutcomesBlock = { ...placed, content: whatHowWhyContent(placed.content) };
   const root = el('section', 'whw');
   root.dataset.blockId = block.id;
   const { what, how } = block.content;

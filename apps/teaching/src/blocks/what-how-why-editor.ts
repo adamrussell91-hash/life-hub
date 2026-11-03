@@ -5,6 +5,11 @@ import '@/blocks/peer-feedback.css';
 type OutcomesBlock = Extract<Block, { block_type: 'outcomes' }>;
 type Criterion = OutcomesBlock['content']['how'][number];
 
+/** A block placed before this design can be saved with empty content, and lessons reach here unparsed. */
+export function whatHowWhyContent(content: Partial<OutcomesBlock['content']> | undefined): OutcomesBlock['content'] {
+  return { what: content?.what ?? '', how: content?.how ?? [] };
+}
+
 /** One criterion a line. A line that stays the same keeps its id, so a student's self-check stays with it. */
 export function criteriaFromLines(text: string, existing: Criterion[]): Criterion[] {
   const spare = [...existing];
@@ -25,7 +30,7 @@ export function createWhatHowWhyFields(onChange: (block: OutcomesBlock) => void,
     const latest = getLatest();
     onChange({ ...latest, content: { ...latest.content, ...patch } });
   };
-  const start = getLatest().content;
+  const start = whatHowWhyContent(getLatest().content);
 
   const what = field('What we’re learning', 'One line on what the class is learning about.');
   what.input.rows = 2;
@@ -36,7 +41,7 @@ export function createWhatHowWhyFields(onChange: (block: OutcomesBlock) => void,
   const how = field('How we’ll learn it and show it', 'One a line. Leave it short if you’ll build the list with the class.');
   how.input.rows = 4;
   how.input.value = start.how.map((c) => c.text).join('\n');
-  how.input.addEventListener('input', () => set({ how: criteriaFromLines(how.input.value, getLatest().content.how) }));
+  how.input.addEventListener('input', () => set({ how: criteriaFromLines(how.input.value, whatHowWhyContent(getLatest().content).how) }));
 
   root.append(
     what.wrap,
