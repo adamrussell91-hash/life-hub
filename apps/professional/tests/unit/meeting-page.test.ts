@@ -163,6 +163,17 @@ describe('meeting page', () => {
     expect(createLedgerItem).toHaveBeenCalledWith(expect.objectContaining({ direction: 'you_owe', text: expect.stringContaining('Carried:') }));
   });
 
+  it('After: Minutes sits at the top, above actions and notes', async () => {
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    const main = canvas.querySelector('.meeting-page__main')!;
+    expect(main.firstElementChild?.getAttribute('data-part')).toBe('minutes');
+    const parts = [...main.children].map((node) => node.getAttribute('data-part'));
+    expect(parts.indexOf('minutes')).toBeLessThan(parts.indexOf('actions'));
+    expect(parts.indexOf('minutes')).toBeLessThan(parts.indexOf('notes'));
+  });
+
   it('shows when, where and who in the header', async () => {
     const canvas = await render();
     const facts = canvas.querySelector('[data-part="facts"]')!.textContent!;
@@ -294,7 +305,7 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['purpose-check-card', 'wrap-up', 'actions', 'notes', 'minutes', 'guides', 'mentions']);
+    expect(parts()).toEqual(['minutes', 'purpose-check-card', 'wrap-up', 'actions', 'notes', 'guides', 'mentions']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
   });
