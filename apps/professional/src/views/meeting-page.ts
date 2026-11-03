@@ -18,7 +18,7 @@ import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
 import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
-import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
+import { agendaToBlocks, extractDecisions, extractItemNoteDecisions, extractMentions } from '@/lib/meeting-notes';
 import { keepMinutesDecisions, saveMinutesReview } from '@/lib/meeting-minutes';
 import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
@@ -27,7 +27,7 @@ import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
 import { utcIsoToWallLocal, wallLocalToUtcIso } from '@/lib/wall-time';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
-import type { LedgerItem, MeetingRecord } from '@/domain/types';
+import type { LedgerItem, MeetingDecision, MeetingRecord, MinutesItemNote } from '@/domain/types';
 import {
   clareBrief,
   clareDrafts,
@@ -543,6 +543,14 @@ export async function renderMeetingPage(
     return 'Wrap-up.';
   }
 
+  // Both note surfaces feed the same list, so saving one must not drop the other's decisions.
+  function decisionsFrom(blocks: unknown[], itemNotes: MinutesItemNote[]): MeetingDecision[] {
+    return keepMinutesDecisions(record.decisions ?? [], [
+      ...extractDecisions(blocks as Array<{ block_type: string; content?: unknown }>),
+      ...extractItemNoteDecisions(itemNotes)
+    ]);
+  }
+
   function mountNotes(host: HTMLElement): void {
     let n = 0;
     const seeded = (record.blocks ?? []).length
@@ -552,8 +560,7 @@ export async function renderMeetingPage(
       blocks: seeded,
       editable: true,
       onSave: async (blocks) => {
-        const found = extractDecisions(blocks as Array<{ block_type: string; content?: unknown }>);
-        const decisions = keepMinutesDecisions(record.decisions ?? [], found);
+        const decisions = decisionsFrom(blocks, record.minutes_notes ?? []);
         record = (await updateMeeting(id, { blocks, decisions })).meeting;
         await syncPromises(blocks);
         paintActions();
@@ -625,7 +632,18 @@ export async function renderMeetingPage(
         fetchPdf: async (key) => (await fetchMinutesFile(key)).data,
         fetchText: async (key) => new TextDecoder().decode(Uint8Array.from(atob((await fetchMinutesFile(key)).data), (c) => c.charCodeAt(0))),
         dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting,
-        saveDraft: async (text) => { record = (await updateMeeting(id, { minutes_draft: text || null })).meeting; }
+        saveDraft: async (text) => { record = (await updateMeeting(id, { minutes_draft: text || null })).meeting; },
+        saveItemNotes: async (notes) => {
+          const decisions = decisionsFrom(blockPage?.current() ?? record.blocks ?? [], notes);
+          record = (await updateMeeting(id, { minutes_notes: notes, decisions })).meeting;
+          paintActions();
+          paintMentions(blockPage?.current() ?? record.blocks ?? []);
+        },
+        commitItemNote: async (text) => {
+          const unmatched = await syncPromiseLines(text);
+          paintActions();
+          return unmatched;
+        }
       }
     });
     return minutesCardEl;
@@ -1079,12 +1097,22 @@ export async function renderMeetingPage(
   }
 
   async function syncPromises(blocks: unknown[]): Promise<void> {
-    for (const promise of extractInlinePromises(blockPlainText(blocks))) {
+    await syncPromiseLines(blockPlainText(blocks));
+  }
+
+  /** Files each » line as a promise. Returns the names that aren't in the room. */
+  async function syncPromiseLines(text: string): Promise<string[]> {
+    const unmatched: string[] = [];
+    for (const promise of extractInlinePromises(text)) {
       const owner = resolvePromiseOwner(promise.owner, people);
-      if (!owner) continue;
+      if (!owner) {
+        unmatched.push(promise.owner);
+        continue;
+      }
       const { item, created } = await createLedgerItem({ ...owner, text: promise.text, comm_ref: meetingRef });
       if (created) ledger.push(item);
     }
+    return unmatched;
   }
 
   function paintActions(): void {
@@ -1147,7 +1175,8 @@ export async function renderMeetingPage(
 
   function paintMentions(blocks: unknown[]): void {
     mentions.replaceChildren(el('h3', undefined, 'Who said what'));
-    const found = extractMentions(blockPlainText(blocks));
+    const itemNotes = (record.minutes_notes ?? []).map((note) => note.text).join('\n');
+    const found = extractMentions(`${blockPlainText(blocks)}\n${itemNotes}`);
     if (!found.length) {
       mentions.append(el('p', 'muted meeting-page__hint', 'Start a line in your notes with @Name and it’s filed under that person here.'));
       return;

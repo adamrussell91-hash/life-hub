@@ -34,6 +34,18 @@ export function extractDecisions(blocks: Array<{ block_type: string; content?: u
   return out;
 }
 
+/** The same `✓ …` lines in the notes under each minutes item, filed under that item. */
+export function extractItemNoteDecisions(notes: Array<{ heading: string | null; text: string }>): Array<{ text: string; agenda_heading: string | null }> {
+  const out: Array<{ text: string; agenda_heading: string | null }> = [];
+  for (const note of notes) {
+    for (const line of note.text.split('\n')) {
+      const match = DECISION.exec(line.trim());
+      if (match) out.push({ text: match[1]!.trim(), agenda_heading: note.heading });
+    }
+  }
+  return out;
+}
+
 const MENTION = /^@([A-Z][\p{L}'’-]*(?:\s[A-Z][\p{L}'’.-]*)?)\s+(.+)$/u;
 
 /** `@Name …` lines grouped by name, in first-seen order. */

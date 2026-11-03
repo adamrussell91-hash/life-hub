@@ -59,3 +59,15 @@ test('minutes_draft saves, reads back and clears', () => {
   assert.throws(() => validateMeetingFieldUpdate({ minutes_draft: 'x'.repeat(60001) }), (e) => e.code === 'minutes_draft_too_long');
   assert.throws(() => validateMeetingFieldUpdate({ minutes_draft: 3 }), (e) => e.code === 'invalid_minutes_draft');
 });
+
+test('minutes_notes saves per item, reads back, and rejects bad shapes', () => {
+  const note = { key: 'finance', heading: '5. Finance', text: 'Check access' };
+  assert.deepEqual(validateMeetingFieldUpdate({ minutes_notes: [note] }).minutes_notes, [note]);
+  assert.deepEqual(validateMeetingFieldUpdate({ minutes_notes: [] }).minutes_notes, []);
+  const reject = (value) => assert.throws(() => validateMeetingFieldUpdate({ minutes_notes: value }), (e) => e.code === 'invalid_minutes_notes');
+  reject('text');
+  reject([note, note]);
+  reject([{ key: '', heading: null, text: 'x' }]);
+  reject([{ key: 'k', heading: null, text: 'x'.repeat(8001) }]);
+  reject(Array.from({ length: 61 }, (_, i) => ({ key: `k${i}`, heading: null, text: 'x' })));
+});

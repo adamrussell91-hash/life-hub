@@ -1,4 +1,4 @@
-import type { LedgerItem, MeetingDecision, MeetingMinutes, MeetingRecord } from '@/domain/types';
+import type { LedgerItem, MeetingDecision, MeetingMinutes, MeetingRecord, MinutesItemNote } from '@/domain/types';
 
 export const PDF_MAX_BYTES = 4_000_000;
 const DECISIONS_MAX = 50;
@@ -30,6 +30,29 @@ export function keepMinutesDecisions(
 ): MeetingDecision[] {
   const notes = fromNotes.map((decision, index) => ({ id: `d_${index + 1}`, ...decision }));
   return [...notes, ...existing.filter((decision) => decision.source === 'minutes')].slice(0, DECISIONS_MAX);
+}
+
+const noteBase = (heading: string | null) =>
+  norm(heading ?? '').replace(/^(?:item\s*)?\d+\s*[.):-]?\s*/, '') || 'minutes';
+
+/**
+ * A key per section, from its heading without the item number, so a filled-in
+ * version of the same agenda finds the notes again. Repeats get #2, #3…
+ */
+export function minutesSectionKeys(sections: Array<{ heading: string | null }>): string[] {
+  const seen = new Map<string, number>();
+  return sections.map((section) => {
+    const base = noteBase(section.heading);
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base}#${n}`;
+  });
+}
+
+/** Notes whose item is not in these minutes, kept so they are never lost. */
+export function orphanedItemNotes(notes: MinutesItemNote[], sections: Array<{ heading: string | null }>): MinutesItemNote[] {
+  const keys = new Set(minutesSectionKeys(sections));
+  return notes.filter((note) => !keys.has(note.key) && note.text.trim());
 }
 
 /** Adam's minutes actions are owed to the chair, else the first attendee. */
