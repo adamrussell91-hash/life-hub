@@ -570,6 +570,44 @@
   color: #fff;
 }
 
+.lesson-flow__pill--kept {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.lesson-flow__row--top {
+  align-items: start;
+}
+
+.lesson-flow__students {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lesson-flow__students-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lesson-flow__students-tools .lesson-flow__hint {
+  margin: 0;
+  flex-basis: 100%;
+}
+
+.lesson-flow__students-tools button {
+  min-height: 30px;
+  padding: 3px 12px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.lesson-flow__students-class {
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 650;
+}
+
 .lesson-flow__rule {
   flex: 1 1 14rem;
   min-width: 0;

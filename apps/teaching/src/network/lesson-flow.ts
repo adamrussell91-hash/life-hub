@@ -1,6 +1,7 @@
 import type { LessonRouteRole } from '@/schemas/block';
 import { buildFlow, hangSides, linkProblem, lessonsBefore, type FlowLesson } from './flow';
 import { el, ghostButton } from './lines-editor';
+import { mountLessonStudents, type LessonStudentsApi } from './lesson-students';
 import './network.css';
 
 export type FlowPeer = {
@@ -33,6 +34,8 @@ export type LessonFlowOptions = {
   classes?: ReadonlyArray<{ id: string; name: string; date?: string }>;
   /** Dates this lesson for a class; resolves to the unit's lessons in their new order. */
   onDate?: (classId: string, date: string) => Promise<FlowPeer[]>;
+  /** Tick who gets a side lesson. A tutorial's students come from its groups, so it leaves this out. */
+  students?: LessonStudentsApi;
 };
 
 const ROLE_LABEL: Record<LessonRouteRole, string> = { core: 'Core', support: 'Support', extension: 'Extension', optional: 'Optional' };
@@ -60,6 +63,7 @@ export function mountLessonFlow(
   let preUnit = Boolean(options.preUnit);
   let classes = (options.classes ?? []).map((c) => ({ ...c }));
   const self = options.lessonId;
+  const whoFor = options.students ? mountLessonStudents(options.lessonId, options.classes ?? [], options.students) : null;
   const root = el('section', 'lesson-flow');
   root.setAttribute('aria-label', 'Before and after this lesson');
   host.append(root);
@@ -228,7 +232,7 @@ export function mountLessonFlow(
     dateRow.append(dateList);
 
     if (isSide(self)) {
-      root.append(route, dateRow, ...branchRows());
+      root.append(route, ...(whoFor ? [whoFor.open()] : []), dateRow, ...branchRows());
       return;
     }
 

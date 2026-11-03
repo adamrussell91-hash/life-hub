@@ -135,6 +135,34 @@ test('legacy published-lesson function path stays public', async () => {
   assert.equal(response.status, 200);
 });
 
+test('published unit and class leave side lessons out; a side lesson still feeds the anthology', async () => {
+  const deps = {
+    env,
+    getContentStore: async () => memoryStore({
+      'classes/class-1': { id: 'class-1', title: 'Class 1', status: 'active', current_unit_id: 'unit-1' },
+      'units/unit-1': {
+        id: 'unit-1',
+        title: 'Unit 1',
+        lesson_ids: ['lesson-a', 'lesson-b', 'lesson-c'],
+        blocks: [{ id: 'm', block_type: 'curriculum_lines', visibility: 'student_teacher', content: { version: 2, rail_stops: [{ id: 'r1', kind: 'support', lesson_id: 'lesson-c', label: 'Old stop' }], gates: [], nudges: {}, terminus: { label: 'End' } } }]
+      },
+      'lessons/lesson-a': { id: 'lesson-a', title: 'Core one', unit_id: 'unit-1' },
+      'lessons/lesson-b': { id: 'lesson-b', title: 'Stretch one', unit_id: 'unit-1', route_role: 'extension' },
+      'lessons/lesson-c': { id: 'lesson-c', title: 'Old stop one', unit_id: 'unit-1' },
+      'published/lessons/lesson-a': { lesson_id: 'lesson-a', title: 'Core one', unit_id: 'unit-1' },
+      'published/lessons/lesson-b': { lesson_id: 'lesson-b', title: 'Stretch one', unit_id: 'unit-1' },
+      'published/lessons/lesson-c': { lesson_id: 'lesson-c', title: 'Old stop one', unit_id: 'unit-1' }
+    })
+  };
+  const unit = (await (await createPublishedUnitHandler(deps)(jsonRequest('https://api.adam-russell.com/api/published/units/unit-1'))).json()).data;
+  assert.deepEqual(unit.lessons.map(row => row.lesson_id), ['lesson-a']);
+  assert.deepEqual(unit.blocks[0].content.rail_stops, []);
+  const cls = await (await createPublishedClassHandler(deps)(jsonRequest('https://api.adam-russell.com/api/published/classes/class-1'))).json();
+  assert.ok(!JSON.stringify(cls).includes('Stretch one'));
+  assert.ok(!JSON.stringify(cls).includes('Old stop one'));
+  assert.ok(JSON.stringify(cls).includes('Core one'));
+});
+
 test('published unit hides teacher-only blocks and orders lessons', async () => {
   const handler = createPublishedUnitHandler({
     env,

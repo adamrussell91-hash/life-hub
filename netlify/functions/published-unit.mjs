@@ -5,6 +5,7 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { isSideLesson } from './_shared/lesson-assign.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import {
   draftLessonKey,
@@ -52,6 +53,7 @@ export function createPublishedUnitHandler(deps = {}) {
     const { blobs } = await store.list({ prefix: PUBLISHED_LESSON_PREFIX });
     const snapshots = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
     const matching = [];
+    const sideLessonIds = new Set();
     const anthologySnapshots = [];
     for (const snapshot of snapshots) {
       if (!snapshot || snapshot.unit_id !== id) continue;
@@ -59,7 +61,9 @@ export function createPublishedUnitHandler(deps = {}) {
       const draft = await getJSON(store, draftLessonKey(snapshot.lesson_id));
       if (!draft || isDeletedRecord(draft)) continue;
       const lineStops = publicLineStops(draft.line_stops);
-      matching.push({
+      // Side lessons reach students through their own My progress map, once ticked. The anthology still reads them.
+      if (isSideLesson(unit, draft)) sideLessonIds.add(snapshot.lesson_id);
+      else matching.push({
         lesson_id: snapshot.lesson_id,
         title: snapshot.title,
         ...(lineStops.length ? { line_stops: lineStops } : {})
@@ -83,7 +87,11 @@ export function createPublishedUnitHandler(deps = {}) {
       ...lesson,
       ...(afterLinks.has(lesson.lesson_id) ? { after_lesson_ids: afterLinks.get(lesson.lesson_id) } : {})
     }));
-    const filteredBlocks = filterBlocksForStudent(unit.blocks ?? []);
+    const filteredBlocks = filterBlocksForStudent(unit.blocks ?? []).map(block => (
+      block?.block_type === 'curriculum_lines' && Array.isArray(block.content?.rail_stops)
+        ? { ...block, content: { ...block.content, rail_stops: block.content.rail_stops.filter(stop => !sideLessonIds.has(stop.lesson_id)) } }
+        : block
+    ));
     let resolvedBlocks = filteredBlocks;
     if (containsWhiteboardBlocks(filteredBlocks)) {
       try {

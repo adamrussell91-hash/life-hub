@@ -17,6 +17,7 @@ import { markbookAction } from './markbook.mjs';
 import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
+import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -35,7 +36,9 @@ async function unitLessons(store, cls) {
     if (!isSafeId(id)) continue;
     const [lesson, published] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
     // Students only ever see lessons that are published and not trashed.
-    if (lesson && published && lesson.title && !isDeletedRecord(lesson)) lessons.push(lesson);
+    if (!lesson || !published || !lesson.title || isDeletedRecord(lesson)) continue;
+    const role = routeRoleOf(unit, lesson);
+    lessons.push(role ? { ...lesson, route_role: role } : lesson);
   }
   return { unit, lessons };
 }
@@ -83,7 +86,6 @@ export async function profileAction(store, classId, body) {
 export function mapRows(lessons, view, done, studentId) {
   const submitted = new Set(view.quizzes.filter((q) => q.scores?.[studentId]?.submitted_at).map((q) => q.lesson_id));
   const quizLessons = new Set(view.quizzes.map((q) => q.lesson_id));
-  const took = new Set(view.markbook.took?.[studentId] ?? []);
   return lessons.map((l) => {
     const role = ROLES.has(l.route_role) ? l.route_role : 'core';
     const assessment = l.pedagogical_mode === 'assessment';
@@ -94,17 +96,18 @@ export function mapRows(lessons, view, done, studentId) {
       title: l.title,
       role,
       kind: assessment ? 'assessment' : quizLessons.has(l.id) ? 'quiz' : 'lesson',
-      done: counted || (!assessment && submitted.has(l.id)),
-      assigned: role === 'core' || took.has(l.id)
+      done: counted || (!assessment && submitted.has(l.id))
     };
   });
 }
 
 async function profileFor(store, roster, student) {
   const classId = roster.cls.id;
-  const { unit, lessons } = await unitLessons(store, roster.cls);
+  const { unit, lessons: unitList } = await unitLessons(store, roster.cls);
   const view = await markbookAction(store, classId, { action: 'load', skip_done: true });
   const done = await listDone(store, classId, student.id);
+  // Side lessons only reach the students they are set for; the map never carries the others' titles.
+  const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
   const rows = mapRows(lessons, view, done, student.id);
   const next = rows.find((r) => r.role === 'core' && !r.done)?.id ?? null;
   return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) } };
