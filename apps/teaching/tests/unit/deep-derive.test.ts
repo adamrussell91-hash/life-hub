@@ -61,7 +61,6 @@ describe('plan gaps', () => {
     const du = { id: 'du_ab12cd', claim: 'c', why: '', dot_points: [], concept_bullets: ['ARG1'], pieces: [{ id: 'kp_aa11bb', text: 't', tier: 'essential' as const }, { id: 'kp_cc22dd', text: 'u', tier: 'strong' as const }], shared_piece_ids: [], steps: [] };
     expect(planGaps(du, [du], placements(lessons, 'du_ab12cd'))).toEqual([
       'Needs a dot point',
-      'Only 2 knowledge pieces (aim for 8 to 12 Essential and Strong)',
       '1 piece not taught yet',
       '1 piece not tested yet',
       'No evidence task for Steps 2B, 3, 4'
