@@ -29,6 +29,15 @@ test('a student in no group is told so', async () => {
   await assert.rejects(tutorialAction(store, 'tut1', { action: 'progress', ...who(3), stage: 'before' }), { code: 'not_for_you' });
 });
 
+test('a faded step in the student group takes an answer; another group step does not', async () => {
+  const store = storeFor();
+  await claim(store, 1, 'AB');
+  await tutorialAction(store, 'tut1', { action: 'answer', ...who(1), block_id: 'f3_s2', parts: { 0: 'It repeats' }, rating: 'right' });
+  const key = [...store.data.keys()].find((k) => k.startsWith('tutorial/tut1/answers/'));
+  assert.equal(store.data.get(key).f3_s2.rating, 'right');
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'answer', ...who(1), block_id: 'f2_s1', parts: {}, rating: 'right' }), { code: 'bad_block' });
+});
+
 test('progress and faded answers are saved under the student', async () => {
   const store = storeFor();
   await claim(store, 1, 'AB');

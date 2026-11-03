@@ -113,7 +113,12 @@ async function loadTutorial(store, lessonId) {
 
 const blockIds = (blocks) => {
   const ids = new Set();
-  const walk = (list) => (Array.isArray(list) ? list : []).forEach((b) => { if (typeof b?.id === 'string') ids.add(b.id); walk(b?.content?.blocks); });
+  const walk = (list) => (Array.isArray(list) ? list : []).forEach((b) => {
+    if (typeof b?.id === 'string') ids.add(b.id);
+    // Faded example answers are stored by step.
+    if (Array.isArray(b?.content?.steps)) for (const step of b.content.steps) if (typeof step?.id === 'string') ids.add(step.id);
+    walk(b?.content?.blocks);
+  });
   walk(blocks);
   return ids;
 };

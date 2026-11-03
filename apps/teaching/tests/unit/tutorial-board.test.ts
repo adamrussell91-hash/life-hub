@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { mountTutorialBoard } from '@/tutorial/board';
+import { fadedColumns, mountTutorialBoard } from '@/tutorial/board';
 import type { LiveBoard, TutorialSummary, TutorialTeacherApi } from '@/tutorial/api';
 import { ApiClientError } from '@/api/client';
 import type { Block } from '@/schemas/block';
@@ -123,6 +123,15 @@ describe('tutorial board', () => {
     expect(heads).toEqual(['Where', 'Effect']);
     expect(handle.root.querySelector('.tut-live')!.textContent).toContain('In the chorus');
     handle.dispose();
+  });
+
+  it('columns come from each writing step, keyed by step, and old blocks by their own id', () => {
+    const fresh = { id: 'n1', type: 'block', block_type: 'faded_example', variant: 'medium', visibility: 'student_teacher', content: {
+      prompt: '', part_labels: ['What', 'Why'], criteria: {},
+      steps: [{ id: 's1', extract: 'a', answers: ['x', 'y'], blanks: [] }, { id: 's2', extract: 'b', answers: ['x', 'y'], blanks: [1] }]
+    } } as Block;
+    const { steps } = fadedColumns([fresh, step('c1', [1])], 'ga');
+    expect(steps.map((s) => [s.key, s.blanks.map((i) => s.labels[i])])).toEqual([['s2', ['Why']], ['c1', ['Where']]]);
   });
 
   it('Done unlocks the students who are here, with absent ones unticked', async () => {

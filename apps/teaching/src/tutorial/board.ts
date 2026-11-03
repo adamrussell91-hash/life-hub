@@ -1,6 +1,7 @@
 // apps/teaching/src/tutorial/board.ts
 import type { Block } from '@/schemas/block';
 import { visitBlocks } from '@/blocks/walk-blocks';
+import { fadedContent, fadedStepKey, fadedWritingSteps } from '@/schemas/faded';
 import { button, el, errorText } from '@/quiz/dom';
 import { splitAtTeacher, tutorialParts } from './model';
 import type { GroupSummary, LiveBoard, TutorialSummary, TutorialTeacherApi } from './api';
@@ -14,7 +15,7 @@ export type TutorialBoardOptions = {
 };
 export type TutorialBoardHandle = { root: HTMLElement; refresh(): Promise<void>; dispose(): void };
 
-type FadedStep = Extract<Block, { block_type: 'faded_example' }>;
+type FadedColumn = { key: string; labels: string[]; blanks: number[] };
 
 const POLL_MS = 4000;
 const SUMMARY_MS = 15000;
@@ -37,14 +38,16 @@ const dateText = (iso: string) => {
 const stageText = (stage: string) => stage.replace(/_/g, ' ');
 
 /** Faded steps the students write in: Common first, then the group's tab before With teacher. */
-function fadedColumns(blocks: Block[], groupId: string): { steps: FadedStep[]; talking: string[] } {
+export function fadedColumns(blocks: Block[], groupId: string): { steps: FadedColumn[]; talking: string[] } {
   const parts = tutorialParts(blocks);
   const tab = parts.tabs.get(groupId);
   const { before, withTeacher } = splitAtTeacher((tab?.content.blocks as Block[] | undefined) ?? []);
-  const steps: FadedStep[] = [];
+  const steps: FadedColumn[] = [];
   const take = (list: Block[]) =>
     visitBlocks(list, (b) => {
-      if (b.block_type === 'faded_example' && b.content.blanks.length > 0) steps.push(b);
+      if (b.block_type !== 'faded_example') return;
+      const faded = fadedContent(b);
+      for (const step of fadedWritingSteps(faded)) steps.push({ key: fadedStepKey(b, step), labels: faded.part_labels, blanks: step.blanks });
     });
   take(parts.common);
   take(before);
@@ -300,7 +303,7 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
     const headRow = el('div', 'tut-live__cols');
     headRow.setAttribute('aria-hidden', 'true');
     headRow.append(el('span', 'tut-live__here-head', 'Here'), el('span', 'tut-live__who', ''));
-    for (const st of steps) for (const i of st.content.blanks) headRow.append(el('span', 'tut-live__col', st.content.parts[i]?.label ?? ''));
+    for (const st of steps) for (const i of st.blanks) headRow.append(el('span', 'tut-live__col', st.labels[i] ?? ''));
     rows.append(headRow);
 
     for (const s of board.students) {
@@ -318,15 +321,15 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
       who.append(el('strong', 'tut-live__initials', s.initials), el('span', 'tut-live__name', s.name), el('span', 'tut-live__stage', stageText(s.stage)));
       row.append(tick, who);
       for (const st of steps) {
-        const answer = s.answers[st.id];
-        for (const index of st.content.blanks) {
+        const answer = s.answers[st.key];
+        for (const index of st.blanks) {
           const cell = el('div', `tut-live__cell${answer?.rating === 'wrong' ? ' tut-live__cell--wrong' : ''}`);
           // Read out on a desktop (the column heads are hidden from screen readers), shown on a phone.
-          cell.append(el('span', 'tut-live__label tk-visually-hidden', st.content.parts[index]?.label ?? ''));
+          cell.append(el('span', 'tut-live__label tk-visually-hidden', st.labels[index] ?? ''));
           const text = answer?.parts[String(index)];
           if (text) {
             cell.append(el('p', 'tut-live__answer', text));
-            const show = button('Show to group', 'ghost', () => void act([show], () => options.api.show(group.id, s.id, st.id, String(index))));
+            const show = button('Show to group', 'ghost', () => void act([show], () => options.api.show(group.id, s.id, st.key, String(index))));
             show.classList.add('tut-live__show');
             cell.append(show);
           } else cell.append(el('p', 'tut-live__none', '…'));
