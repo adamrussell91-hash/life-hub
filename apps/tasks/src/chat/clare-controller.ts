@@ -17,6 +17,8 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
 import { notifyTasksChanged } from '@/services/task-cache';
+import { bindChatAttachments } from '@/chat/chat-attachments';
+import type { HubChatAttachment } from '../../design-kit/js/hub-chat-attachments.js';
 import { confirmChat, streamChat, clareWorkChat, listPendingConfirms } from '@/services/chat-api';
 import type { Task } from '@/schemas/task';
 import { ApiClientError } from '@/api/client';
@@ -694,6 +696,7 @@ export function createClareChatController({
   let lastPendingActionId: string | null = null;
 
   const input = () => root.querySelector<HTMLTextAreaElement>('#chat-input');
+  let composerAttachments: ReturnType<typeof bindChatAttachments> | null = null;
   const currentAgent = () => agentBySlug(selectedSlug);
 
   /**
@@ -1379,7 +1382,7 @@ export function createClareChatController({
     }
   }
 
-  async function submitChat(text: string, protocolId?: string): Promise<void> {
+  async function submitChat(text: string, protocolId?: string, attachments: HubChatAttachment[] = []): Promise<void> {
     const mine = ++turn;
     sending = true;
     productivityActive = true;
@@ -1398,7 +1401,8 @@ export function createClareChatController({
         priorAgentSlug: 'clare',
         protocolId:
           protocolId ||
-          (selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined)
+          (selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined),
+        attachments
       })) {
         if (mine !== turn) return;
         if (event.type === 'status') {
@@ -1546,7 +1550,8 @@ export function createClareChatController({
 
   async function send(raw?: string): Promise<void> {
     const field = input();
-    const text = (raw ?? field?.value ?? '').trim();
+    const attachments = composerAttachments?.take() ?? [];
+    const text = (raw ?? field?.value ?? '').trim() || (attachments.length ? 'Please look at the attached file.' : '');
     collapseTools();
     if (!text) {
       if (selectedSlug === 'clare' && isProductivityProtocol(selectedProtocolId)) {
@@ -1570,12 +1575,25 @@ export function createClareChatController({
       await loadBriefing('morning-sweep');
       return;
     }
-    appendMessage(root, { role: 'user', text });
+    const bubble = appendMessage(root, { role: 'user', text });
+    if (attachments.length) {
+      const sent = document.createElement('div');
+      sent.className = 'chat-attach-list';
+      for (const item of attachments) {
+        const chip = document.createElement('span');
+        chip.className = 'chat-attach-chip';
+        chip.textContent = item.name;
+        sent.append(chip);
+      }
+      bubble?.append(sent);
+    }
     if (field) field.value = '';
-    if (useChatRuntime()) {
+    // Attachments only travel on Clare's chat route.
+    if (useChatRuntime() || attachments.length) {
       await submitChat(
         text,
-        selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined
+        selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined,
+        attachments
       );
       return;
     }
@@ -1657,6 +1675,7 @@ export function createClareChatController({
   }
 
   function bindChrome(): void {
+    composerAttachments = bindChatAttachments(root);
     root.querySelector('#chat-form')?.addEventListener('submit', (event) => {
       event.preventDefault();
       void send();

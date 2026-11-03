@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fileMinutesSchema, runFileMinutes } from '../../netlify/functions/_shared/minutes-chat.mjs';
+import { fileMinutesSchema, MINUTES_STASH_MAX_AGE_MS, runFileMinutes, stashChatMinutes } from '../../netlify/functions/_shared/minutes-chat.mjs';
 import { saveMinutesPdf } from '../../netlify/functions/meeting-minutes-file.mjs';
 import { createMeetingRepository } from '../../netlify/functions/_shared/meeting-repository.mjs';
 
@@ -14,6 +14,7 @@ function memoryStore() {
     },
     async setJSON(key, value) { map.set(key, structuredClone(value)); },
     async set(key, value, opts) { map.set(key, { value, metadata: opts?.metadata ?? {} }); },
+    async delete(key) { map.delete(key); },
     async list({ prefix = '' } = {}) {
       return { blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
     },
@@ -22,6 +23,8 @@ function memoryStore() {
 }
 
 const NOW = 1762000000000;
+const gone = { ok: false, error: 'no_minutes_found', next: 'Tell Adam the minutes are no longer here and ask him to attach or paste them again.' };
+const pasted = { id: 'att_pasted', kind: 'file', mime: 'text/plain', name: 'Pasted message', textExcerpt: 'Item 1. Exams move to Week 8.' };
 const pdfData = Buffer.from('%PDF-1.4 invented minutes').toString('base64');
 const pdf = (id = 'att_pdf1') => ({ id, kind: 'file', mime: 'application/pdf', name: 'minutes.pdf', dataUrl: `data:application/pdf;base64,${pdfData}` });
 const photo = { id: 'att_img', kind: 'image', mime: 'image/jpeg', name: 'photo.jpg', dataUrl: 'data:image/jpeg;base64,/9j/' };
@@ -88,7 +91,7 @@ test('runFileMinutes picks an attachment by id when there are several PDFs', asy
   const attachments = [pdf('att_a'), pdf('att_b')];
   assert.deepEqual(
     await runFileMinutes({ meeting_id: meeting.id }, { store, env: {}, attachments, now: () => NOW }),
-    { ok: false, error: 'no_pdf_attached' }
+    gone
   );
   const result = await runFileMinutes({ meeting_id: meeting.id, attachment_id: 'att_b' }, { store, env: {}, attachments, now: () => NOW });
   assert.equal(result.ok, true);
@@ -101,12 +104,12 @@ test('runFileMinutes reports missing PDFs, bad ids and unknown meetings without 
   const meeting = await seed(store);
   const before = store._map.size;
   const run = (input, attachments) => runFileMinutes(input, { store, env: {}, attachments, now: () => NOW });
-  assert.deepEqual(await run({ meeting_id: meeting.id }, []), { ok: false, error: 'no_pdf_attached' });
-  assert.deepEqual(await run({ meeting_id: meeting.id }, [photo]), { ok: false, error: 'no_pdf_attached' });
-  assert.deepEqual(await run({ meeting_id: meeting.id, attachment_id: 'att_img' }, [photo]), { ok: false, error: 'no_pdf_attached' });
+  assert.deepEqual(await run({ meeting_id: meeting.id }, []), gone);
+  assert.deepEqual(await run({ meeting_id: meeting.id }, [photo]), gone);
+  assert.deepEqual(await run({ meeting_id: meeting.id, attachment_id: 'att_img' }, [photo]), gone);
   assert.deepEqual(
     await run({ meeting_id: meeting.id }, [{ ...pdf(), dataUrl: undefined }]),
-    { ok: false, error: 'no_pdf_attached' }
+    gone
   );
   assert.deepEqual(await run({ meeting_id: 'Faculty meeting' }, [pdf()]), { ok: false, error: 'invalid_meeting_id' });
   assert.deepEqual(
@@ -114,4 +117,39 @@ test('runFileMinutes reports missing PDFs, bad ids and unknown meetings without 
     { ok: false, error: 'meeting_not_found' }
   );
   assert.equal(store._map.size, before);
+});
+
+test('pasted minutes wait on the card as text', async () => {
+  const store = memoryStore();
+  const meeting = await seed(store);
+  const result = await runFileMinutes({ meeting_id: meeting.id }, { store, env: {}, attachments: [pasted], now: () => NOW });
+  assert.equal(result.ok, true);
+  const saved = await createMeetingRepository({ store, env: {} }).getMeeting(meeting.id);
+  assert.equal(saved.minutes_pending.file_key, `meeting-minutes/${meeting.id}/${NOW}.txt`);
+  assert.equal(store._map.get(saved.minutes_pending.file_key).value.toString('utf8'), pasted.textExcerpt);
+});
+
+test('minutes given in an earlier message can be filed once, then are gone', async () => {
+  const store = memoryStore();
+  const meeting = await seed(store);
+  await stashChatMinutes(store, [pdf()], () => NOW);
+  const run = () => runFileMinutes({ meeting_id: meeting.id }, { store, env: {}, attachments: [], now: () => NOW + 60_000 });
+  assert.equal((await run()).ok, true);
+  assert.deepEqual(await run(), gone);
+});
+
+test('kept minutes run out after an hour', async () => {
+  const store = memoryStore();
+  const meeting = await seed(store);
+  await stashChatMinutes(store, [pasted], () => NOW);
+  const late = NOW + MINUTES_STASH_MAX_AGE_MS + 1;
+  assert.deepEqual(await runFileMinutes({ meeting_id: meeting.id }, { store, env: {}, attachments: [], now: () => late }), gone);
+});
+
+test('a later unclear attachment clears older kept minutes, so the wrong file is never filed', async () => {
+  const store = memoryStore();
+  const meeting = await seed(store);
+  await stashChatMinutes(store, [pdf()], () => NOW);
+  await stashChatMinutes(store, [pdf('att_a'), pdf('att_b')], () => NOW);
+  assert.deepEqual(await runFileMinutes({ meeting_id: meeting.id }, { store, env: {}, attachments: [], now: () => NOW }), gone);
 });

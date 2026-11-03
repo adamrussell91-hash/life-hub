@@ -383,7 +383,8 @@ import {
   buildEventUpdateProposal,
   buildCommunicationProposal
 } from './_shared/professional-edit-agent.mjs';
-import { runFileMinutes } from './_shared/minutes-chat.mjs';
+import { runFileMinutes, stashChatMinutes } from './_shared/minutes-chat.mjs';
+import { foldLongMessage, MAX_PASTED_MESSAGE_CHARS } from './_shared/chat-long-message.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import {
   buildApplicationProposal,
@@ -437,7 +438,6 @@ export const MAX_BODY_BYTES = Math.min(
   MAX_CHAT_BODY_BYTES,
   48 * 1024 + 3 * MAX_ATTACHMENT_WIRE_BYTES
 );
-const MAX_MESSAGE_LENGTH = 4000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1652,6 +1652,14 @@ export function createChatHandler({
           ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts),
           ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
         ];
+
+        if (parsed.attachments.length && tools.some(tool => tool.name === 'file_minutes')) {
+          try {
+            await stashChatMinutes(await getProfessionalStore(env), parsed.attachments);
+          } catch {
+            // Filing in this same turn still works; only a follow-up would miss it.
+          }
+        }
 
         // Public protocols are generic; Adam-specific standing context is appended
         // from the private data repo (config/agent-context/<slug>.md) when present.
@@ -4055,14 +4063,17 @@ async function parseRequest(request) {
   } catch {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
-  if (!body || typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > MAX_MESSAGE_LENGTH) {
+  if (!body || typeof body.message !== 'string' || body.message.trim().length === 0) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
-  const attachments = normalizeChatAttachments(body.attachments);
+  if (body.message.length > MAX_PASTED_MESSAGE_CHARS) {
+    return { error: errorResponse(400, 'message_too_long', 'That is too long to paste. Attach it as a PDF instead.', false, PRIVATE_CACHE) };
+  }
+  const { message, attachments } = foldLongMessage(body.message, normalizeChatAttachments(body.attachments));
   return {
-    message: body.message,
+    message,
     attachments,
-    userContent: buildUserContent(body.message, attachments),
+    userContent: buildUserContent(message, attachments),
     history: sanitizeHistory(body.history),
     priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
     auditSession: normalizeAuditSession(body.auditSession),

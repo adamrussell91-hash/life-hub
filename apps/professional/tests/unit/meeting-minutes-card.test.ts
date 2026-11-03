@@ -24,6 +24,7 @@ function setup(minutes: MeetingRecord['minutes'] = null, minutesPending: Meeting
     save: vi.fn(async (input) => ({ record: { ...record, minutes: { sections: input.sections, file_key: null, source: 'page', added_at: 'x', saved_counts: { tasks: 1, promises: 2, decisions: 1 } } } as MeetingRecord, counts: { tasks: 1, promises: 2, decisions: 1 } })),
     openFile: vi.fn(async () => undefined),
     fetchPdf: vi.fn(async () => 'JVBERi0xLjQK'),
+    fetchText: vi.fn(async () => 'Pasted minutes'),
     dismissPending: vi.fn(async () => ({ ...record, minutes_pending: null }) as MeetingRecord)
   };
   const onSaved = vi.fn();
@@ -88,6 +89,15 @@ describe('Minutes card', () => {
   });
 
   describe('minutes from chat', () => {
+    it('reviews minutes pasted into chat as text', async () => {
+      const textKey = PENDING_KEY.replace(/\.pdf$/, '.txt');
+      const { card, deps } = setup(null, { ...pending, file_key: textKey });
+      (card.querySelector('[data-part="minutes-pending-review"]') as HTMLButtonElement).click();
+      await vi.waitFor(() => expect(deps.read).toHaveBeenCalledWith({ text: 'Pasted minutes' }));
+      expect(deps.fetchText).toHaveBeenCalledWith(textKey);
+      expect(deps.fetchPdf).not.toHaveBeenCalled();
+    });
+
     it('shows the pending box with its date and note above the empty card', () => {
       const { card } = setup(null, pending);
       const box = card.querySelector('[data-part="minutes-pending"]') as HTMLElement;

@@ -1,4 +1,5 @@
-// The original minutes PDF for a meeting, kept in the private Professional store.
+// The original minutes for a meeting (a PDF, or text filed from chat), kept in the
+// private Professional store.
 // POST saves one ({ meeting_id, media_type, data }) and returns its file_key;
 // GET ?key= returns it as base64 for the page to open.
 
@@ -11,12 +12,19 @@ import { isValidMeetingId } from './_shared/meeting-schema.mjs';
 export const config = { path: '/api/meetings/minutes-file' };
 
 const PDF_MAX_CHARS = 5_400_000;
-const KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.pdf$/;
+const KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.(pdf|txt)$/;
 
 /** Write a minutes PDF (base64) for a meeting and return its file key. */
 export async function saveMinutesPdf(store, meetingId, base64, now = Date.now) {
   const key = `meeting-minutes/${meetingId}/${now()}.pdf`;
   await store.set(key, Buffer.from(base64, 'base64'), { metadata: { meeting_id: meetingId, media_type: 'application/pdf' } });
+  return key;
+}
+
+/** Write minutes pasted into chat and return their file key. */
+export async function saveMinutesText(store, meetingId, text, now = Date.now) {
+  const key = `meeting-minutes/${meetingId}/${now()}.txt`;
+  await store.set(key, Buffer.from(text, 'utf8'), { metadata: { meeting_id: meetingId, media_type: 'text/plain' } });
   return key;
 }
 
@@ -26,7 +34,7 @@ export async function handleMinutesFile(request, { store, now = Date.now }) {
     if (!KEY_RE.test(key)) return errorResponse(400, 'invalid_key', 'That is not a minutes file.', false);
     const entry = await store.getWithMetadata(key, { type: 'arrayBuffer' });
     if (!entry?.data) return errorResponse(404, 'not_found', 'Those minutes are no longer stored.', false);
-    return okResponse(200, { media_type: 'application/pdf', data: Buffer.from(entry.data).toString('base64') });
+    return okResponse(200, { media_type: key.endsWith('.txt') ? 'text/plain' : 'application/pdf', data: Buffer.from(entry.data).toString('base64') });
   }
   if (request.method === 'POST') {
     const parsed = await readJsonObject(request);

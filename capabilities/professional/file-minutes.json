@@ -9,7 +9,7 @@
   ],
   "risk": "auto",
   "kind": "capacity",
-  "prompt_one_liner": "Put an attached minutes PDF on a meeting's Minutes card for Adam to review.",
+  "prompt_one_liner": "Put minutes Adam attached or pasted on a meeting's Minutes card for him to review.",
   "surfaces": [
     "chat"
   ]

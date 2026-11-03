@@ -17,6 +17,8 @@ export const DECISIONS_MAX = 50;
 export const GUIDE_RUNS_MAX = 20;
 export const MINUTES_SECTIONS_MAX = 40;
 const MINUTES_FILE_KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.pdf$/;
+// Minutes pasted into chat wait as text; only a PDF is ever kept on saved minutes.
+const MINUTES_PENDING_KEY_RE = /^meeting-minutes\/meeting_[0-9a-f-]{36}\/\d{13}\.(pdf|txt)$/;
 const DECISION_SOURCES = new Set(['minutes']);
 
 export const MEETING_STATES = new Set([
@@ -211,12 +213,12 @@ export function validateMinutes(value) {
 
 export const MINUTES_PENDING_NOTE_MAX = 300;
 
-/** Minutes PDF filed from chat, waiting for Adam to review on the meeting page. */
+/** Minutes filed from chat, waiting for Adam to review on the meeting page. */
 export function validateMinutesPending(value) {
   if (value === null) return null;
   const fail = (why) => validationError('invalid_minutes_pending', `minutes_pending: ${why}`);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw fail('an object or null.');
-  if (typeof value.file_key !== 'string' || !MINUTES_FILE_KEY_RE.test(value.file_key)) throw fail('file_key is not a minutes file.');
+  if (typeof value.file_key !== 'string' || !MINUTES_PENDING_KEY_RE.test(value.file_key)) throw fail('file_key is not a minutes file.');
   if (!isIsoTimestamp(value.added_at)) throw fail('added_at must be a timestamp.');
   if (value.source !== 'chat') throw fail('source must be chat.');
   const rawNote = value.note ?? null;
