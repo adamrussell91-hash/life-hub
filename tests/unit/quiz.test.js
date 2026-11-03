@@ -689,8 +689,8 @@ test('insight: evidence per answer; a closed, fully marked quiz is saved until s
   assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).closed, false);
 });
 
-test('insight: pieces tagged after an attempt count for it, without changing its marks', async () => {
-  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+test('insight: pieces and skills tagged after an attempt count for it, without changing its marks', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', { ...mc, skills: ['old.tag'] }), qBlock('qb', sa)] }));
   await publishQuiz(store);
   await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
   await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
@@ -699,12 +699,14 @@ test('insight: pieces tagged after an attempt count for it, without changing its
   assert.ok(!before.items[0].tags.some((t) => t.startsWith('kp:')));
 
   const draft = await store.get('lessons/quiz1');
-  draft.blocks = [qBlock('qa', { ...mc, pieces: ['kp_ab12'] }), qBlock('qb', sa)];
+  draft.blocks = [qBlock('qa', { ...mc, pieces: ['kp_ab12'], skills: ['reading.technique'] }), qBlock('qb', sa)];
   store.data.set('lessons/quiz1', draft);
   await publishQuiz(store);
 
   const after = (await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts[0].rows.find((r) => r.id === 'qa');
-  assert.ok(after.items[0].tags.includes('kp:kp_ab12'), 'the older attempt picks up the new tag');
+  assert.ok(after.items[0].tags.includes('kp:kp_ab12'), 'the older attempt picks up the new piece');
+  assert.ok(after.items[0].tags.includes('skill:reading.technique'), 'the older attempt picks up the new skill');
+  assert.ok(!after.items[0].tags.includes('skill:old.tag'), 'a replaced skill stops counting');
   assert.equal(after.awarded, before.awarded);
   assert.equal(after.items[0].share, before.items[0].share);
 });
