@@ -1472,7 +1472,9 @@ var PeerFeedbackBlockSchema = z11.object({
 var ContinuumStatementSchema = z11.object({
   id: z11.string().min(1),
   text: z11.string().max(300).default(""),
-  snap: z11.boolean().default(false)
+  snap: z11.boolean().default(false),
+  /** Predict mode: where the statement really sits on the line (0 to 1). Teacher only: publish strips it. */
+  answer: z11.number().min(0).max(1).optional()
 });
 var ContinuumLineBlockSchema = z11.object({
   id: z11.string().min(1),
@@ -1494,7 +1496,11 @@ var ContinuumLineBlockSchema = z11.object({
     }).prefault({ left: "Implied", right: "Not implied", stops: [] }),
     statements: z11.array(ContinuumStatementSchema).max(10).default([]),
     pace: z11.enum(["teacher", "student", "self"]).default("teacher"),
-    replace: z11.boolean().default(true)
+    replace: z11.boolean().default(true),
+    /** Opinion: no right answer, the reason is the point. Predict: each statement has an answer the teacher shows after the reveal. Absent means opinion. */
+    mode: z11.enum(["opinion", "predict"]).optional(),
+    /** A return line: the id of an earlier continuum line in the lesson. It runs that line's stimulus, scale and statements again, and shows each student where they first put their symbol. */
+    returns_to: z11.string().min(1).max(64).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1518,7 +1524,9 @@ var BrainstormBlockSchema = z11.object({
 var HingeOptionSchema = z11.object({
   id: z11.string().min(1).max(40),
   text: z11.string().max(300).default(""),
-  misconception: z11.string().max(300).default("")
+  misconception: z11.string().max(300).default(""),
+  /** Independent mode: how near this answer is. Absent: the right answer is right, the rest are mix-ups. */
+  tier: z11.enum(["right", "close", "mixup"]).optional()
 });
 var HingeBackupSchema = z11.object({
   prompt: z11.string().max(500).default(""),
@@ -1542,7 +1550,13 @@ var HingeQuestionBlockSchema = z11.object({
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
     backup: HingeBackupSchema.optional(),
     /** Lecture: students must answer before moving on. On unless false. */
-    gate: z11.boolean().optional()
+    gate: z11.boolean().optional(),
+    /**
+     * Live: the teacher opens and closes a round. Independent: each student
+     * answers alone with a reason, gets their own feedback and one retry on
+     * the back-up question. Absent means live.
+     */
+    pace: z11.enum(["live", "independent"]).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1979,6 +1993,7 @@ var ConceptMapBlockSchema = z11.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var WhiteboardStarterIdSchema = z11.enum(["sort_groups", "venn", "same_different"]);
 var WhiteboardBlockSchema = z11.object({
   id: z11.string().min(1),
   type: z11.literal("block"),
@@ -1988,6 +2003,8 @@ var WhiteboardBlockSchema = z11.object({
   content: z11.object({
     document_id: z11.string().min(1),
     seed_document_id: z11.string().min(1).optional(),
+    /** Built-in layout drawn into the board the first time it opens with no document (packages/whiteboard/starters.mjs). */
+    starter: WhiteboardStarterIdSchema.optional(),
     title: z11.string().optional(),
     height_px: z11.number().int().min(360).max(1400).default(640),
     published_snapshot: z11.unknown().optional()
@@ -2851,6 +2868,7 @@ export {
   VideoProviderSchema,
   VisibilitySchema,
   WhiteboardBlockSchema,
+  WhiteboardStarterIdSchema,
   WithTeacherBlockSchema,
   isCurriculumLinesV2,
   refineAnnotationVoiceTracks

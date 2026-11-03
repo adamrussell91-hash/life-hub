@@ -20,6 +20,8 @@ export type StageView = {
   movesShown: boolean;
   entries: StageEntry[];
   picked: string | null;
+  /** Predict mode, once the teacher shows it: where the statement really sits. */
+  answer?: number | null;
 };
 
 type Item = {
@@ -48,7 +50,12 @@ export function mountStage(onPick: (symbol: string | null) => void): Stage {
   svg.setAttribute('aria-hidden', 'true');
   const rail = el('div', 'cl-stage__rail');
   const track = el('div', 'cl-track');
-  rail.append(track);
+  // The label is written only once an answer shows, so an opinion line carries no hidden answer text.
+  const answerMark = el('span', 'cl-answer-mark');
+  const answerLabel = el('span', 'cl-answer-mark__label');
+  answerMark.append(answerLabel);
+  answerMark.hidden = true;
+  rail.append(track, answerMark);
   root.append(note, svg, rail);
   root.addEventListener('click', (e) => {
     if (e.target === root || e.target === rail) onPick(null);
@@ -259,6 +266,9 @@ export function mountStage(onPick: (symbol: string | null) => void): Stage {
       it.node.setAttribute('aria-label', next.phase === 'collect' ? 'A placed symbol' : 'Show this reason');
     }
     root.classList.toggle('is-collecting', next.phase === 'collect');
+    answerMark.hidden = next.answer == null;
+    answerLabel.textContent = next.answer == null ? '' : 'Answer';
+    if (next.answer != null) answerMark.style.left = `${next.answer * 100}%`;
     targets();
     if (!raf && typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(frame);
   }

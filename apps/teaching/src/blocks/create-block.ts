@@ -2,7 +2,7 @@ import { blankQuestion } from '@/quiz/core';
 import { starterHingeOptions } from '@/blocks/hinge-question/shared';
 import { starterCurriculumLinesContent } from '@/blocks/curriculum-lines/starter';
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
-import type { Block, EmbedProvider } from '@/schemas/block';
+import type { Block, EmbedProvider, WhiteboardStarterId } from '@/schemas/block';
 import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
 import { analogyMoveContent } from '@/toolkit/analogy-moves';
 import {
@@ -401,6 +401,19 @@ export function createEmbedBlock(id: string, provider: EmbedProvider): Extract<B
     variant: 'large',
     content: { url: '', provider }
   };
+}
+
+/**
+ * A whiteboard that opens on a built-in 3 Cs layout (sort into groups, Venn,
+ * same / different / so what). The layout is written into the board's own
+ * document the first time it loads, then `starter` is dropped.
+ */
+export function createWhiteboardWithStarter(
+  id: string,
+  starter?: WhiteboardStarterId
+): Extract<Block, { block_type: 'whiteboard' }> {
+  const block = createBlock('whiteboard', id) as Extract<Block, { block_type: 'whiteboard' }>;
+  return starter ? { ...block, content: { ...block.content, starter } } : block;
 }
 
 export function createFromInsertMenu(value: string, id: string): Block {

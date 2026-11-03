@@ -3225,7 +3225,7 @@ export function createWhiteboardEditor(
     getTitle: () => getLatest().content.title,
     onBlockChange: () => {
       const latest = getLatest();
-      const { seed_document_id: _seed, ...content } = latest.content;
+      const { seed_document_id: _seed, starter: _starter, ...content } = latest.content;
       onChange({ ...latest, content });
     },
     onStatus: (message, isError = false) => {
@@ -3428,7 +3428,7 @@ function createBlockEditorFields(
     case 'hinge_question':
       return createHingeQuestionEditor(block, onChange);
     case 'continuum_line':
-      return createContinuumLineEditor(block, onChange);
+      return createContinuumLineEditor(block, onChange, context.getLessonBlocks);
     case 'curriculum_lines':
       return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }

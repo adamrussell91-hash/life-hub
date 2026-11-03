@@ -197,12 +197,17 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
         return { ...block, content };
       }
       if (block.block_type === 'hinge_question') {
-        // The right answer, misconception notes, move-on marks and back-up question are the teacher's alone.
+        // The right answer, misconception notes, answer tiers, move-on marks and back-up question are the teacher's alone.
         const { correct_id: _right, move_on: _move, reteach: _reteach, backup: _backup, ...content } = block.content ?? {};
         return {
           ...block,
-          content: { ...content, options: (Array.isArray(content.options) ? content.options : []).map(({ misconception: _note, ...option }) => option) }
+          content: { ...content, options: (Array.isArray(content.options) ? content.options : []).map(({ misconception: _note, tier: _tier, ...option }) => option) }
         };
+      }
+      if (block.block_type === 'continuum_line') {
+        // A predict line's answers stay with the teacher until shown, through the continuum endpoint.
+        const statements = Array.isArray(block.content?.statements) ? block.content.statements : [];
+        return { ...block, content: { ...block.content, statements: statements.map(({ answer: _answer, ...s }) => s) } };
       }
       if (block.block_type === 'flashcards') {
         return {

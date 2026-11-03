@@ -340,7 +340,8 @@ test('Knowledge Clementine handler injects sprint lane and runs track_checkin_la
   let capturedSystem = '';
   const secret = 's'.repeat(32);
   const token = createSessionToken({
-    now: Date.parse('2026-10-04T00:00:00Z'),
+    // Issued now: a fixed date expires and the request is refused as signed out.
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 9)
   }, secret).token;
   const testEnv = {

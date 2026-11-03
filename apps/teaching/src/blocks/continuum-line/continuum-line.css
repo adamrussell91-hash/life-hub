@@ -814,3 +814,47 @@
     transition: none;
   }
 }
+
+/* Predict mode: where the statement really sits, once the teacher shows it. */
+.cl-answer-mark {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 56px;
+  border-left: 2px dashed var(--accent, var(--ink));
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.cl-stage__rail .cl-answer-mark {
+  bottom: -6px;
+  height: 120px;
+}
+
+.cl-answer-mark__label {
+  position: absolute;
+  top: -1.4em;
+  left: 0;
+  transform: translateX(-50%);
+  padding: 0 var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--accent, var(--ink));
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.cl-editor__answer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+
+.cl-editor__answer input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}

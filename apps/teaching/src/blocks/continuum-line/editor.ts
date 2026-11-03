@@ -1,5 +1,6 @@
 import { button, el, field } from '@/blocks/peer-feedback-ui';
-import type { ContinuumBlock } from './shared';
+import type { Block } from '@/schemas/block';
+import { nearestStop, returnSources, type ContinuumBlock } from './shared';
 
 type Content = ContinuumBlock['content'];
 
@@ -67,12 +68,74 @@ function toggle(label: string, checked: boolean, onChange: (on: boolean) => void
   return wrap;
 }
 
-export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: ContinuumBlock) => void): HTMLElement {
+/** Where a statement really sits, as a 0 to 100 slider; snapped statements land on a stop. */
+function answerSlider(label: string, value: number | undefined, stops: readonly string[], snap: boolean, onSet: (v: number) => void): HTMLElement {
+  const wrap = el('label', 'cl-editor__answer');
+  const range = el('input');
+  range.type = 'range';
+  range.min = '0';
+  range.max = '100';
+  range.value = String(Math.round((value ?? 0.5) * 100));
+  range.setAttribute('aria-label', label);
+  const shown = el('span', 'block-secondary', value == null ? 'Answer not set' : `Answer at ${Math.round(value * 100)}`);
+  range.addEventListener('input', () => {
+    const raw = Number(range.value) / 100;
+    const v = snap ? nearestStop(raw, stops) : raw;
+    shown.textContent = `Answer at ${Math.round(v * 100)}`;
+    onSet(v);
+  });
+  wrap.append(range, shown);
+  return wrap;
+}
+
+export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: ContinuumBlock) => void, getLessonBlocks?: () => Block[]): HTMLElement {
   const root = el('div', 'peer-feedback peer-feedback--editor cl-editor');
   let current = block;
   const set = (patch: Partial<Content>) => {
     current = { ...current, content: { ...current.content, ...patch } };
     onChange(current);
+  };
+
+  // A return line: everything but pace and re-place comes from the earlier line.
+  const returnBox = el('div', 'cl-editor__group');
+  const ownParts: HTMLElement[] = [];
+  const paintReturn = () => {
+    const sources = returnSources(getLessonBlocks?.() ?? [], current.id);
+    const id = `cl-ed-${++seq}`;
+    const lab = el('label', 'pf-field__label', 'Returns to');
+    lab.htmlFor = id;
+    const pick = el('select', 'pf-field__input');
+    pick.id = id;
+    const none = el('option', '', 'Nothing: this is a new line');
+    none.value = '';
+    pick.append(none);
+    for (const [i, s] of sources.entries()) {
+      const first = s.content.statements.find((x) => x.text.trim())?.text ?? 'No statements yet';
+      const o = el('option', '', `Line ${i + 1}: ${first.slice(0, 60)}`);
+      o.value = s.id;
+      pick.append(o);
+    }
+    const missing = current.content.returns_to && !sources.some((s) => s.id === current.content.returns_to);
+    if (missing) {
+      const o = el('option', '', 'A line that is no longer in the lesson');
+      o.value = current.content.returns_to!;
+      pick.append(o);
+    }
+    pick.value = current.content.returns_to ?? '';
+    pick.addEventListener('change', () => {
+      const { returns_to: _old, ...rest } = current.content;
+      current = { ...current, content: pick.value ? { ...rest, returns_to: pick.value } : rest };
+      onChange(current);
+      paintReturn();
+    });
+    const hint = current.content.returns_to
+      ? 'Students meet the earlier line again and place once more, seeing where they first put their symbol. Its stimulus, line and statements come from that line.'
+      : sources.length
+        ? 'Bring an earlier line back at the end of the lesson: where would they put it now?'
+        : 'Add another continuum line to this lesson to bring it back here later.';
+    returnBox.replaceChildren(lab, pick, el('p', 'pf-field__hint block-secondary', hint));
+    if (missing) returnBox.append(el('p', 'pf-alert', 'The line this returns to has gone. Pick another, or choose Nothing.'));
+    for (const p of ownParts) p.hidden = !!current.content.returns_to;
   };
 
   // Stimulus
@@ -168,6 +231,9 @@ export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: C
         remove.setAttribute('aria-label', `Remove statement ${i + 1}`);
         remove.hidden = all.length <= 1;
         row.append(el('b', 'cl-editor__num', String(i + 1)), text, toggle('Snap to stops', s.snap, (on) => update({ snap: on })), remove);
+        if (current.content.mode === 'predict') {
+          row.append(answerSlider(`Answer for statement ${i + 1}`, s.answer, current.content.scale.stops, s.snap, (v) => update({ answer: v })));
+        }
         return row;
       })
     );
@@ -177,6 +243,16 @@ export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: C
   statementsBox.append(statementsHead, el('p', 'pf-field__hint block-secondary', 'Snap forces a choice: the symbol lands on an end or a named stop. Use it to make students defend a side.'), list, add);
   paintStatements();
 
+  // Mode
+  const modeBox = el('div', 'cl-editor__group');
+  modeBox.append(
+    chips('Kind of line', [{ value: 'opinion', label: 'Opinion: no right answer' }, { value: 'predict', label: 'Predict: there is an answer' }], current.content.mode ?? 'opinion', (mode) => {
+      set({ mode });
+      paintStatements();
+    }),
+    el('p', 'pf-field__hint block-secondary', 'Predict: set where each statement really sits. Students commit to a guess first; after the reveal you show the answer on the line. Students never see it before you do.')
+  );
+
   // Round
   const roundBox = el('div', 'cl-editor__group');
   roundBox.append(
@@ -185,9 +261,13 @@ export function createContinuumLineEditor(block: ContinuumBlock, onChange: (b: C
     toggle('Offer a re-place round after each reveal: students move their symbol and say why', current.content.replace, (on) => set({ replace: on }))
   );
 
+  ownParts.push(stimulusBox, lineBox, modeBox, statementsBox);
+  paintReturn();
   root.append(
+    returnBox,
     stimulusBox,
     lineBox,
+    modeBox,
     statementsBox,
     roundBox,
     el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Start the line on the block.')

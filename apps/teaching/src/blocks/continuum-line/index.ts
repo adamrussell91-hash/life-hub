@@ -2,7 +2,7 @@ import { el } from '@/blocks/peer-feedback-ui';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import { mountTeacher } from './teacher';
 import { mountStudent } from './student';
-import { lineMarks, liveStatements, renderStimulus, type ContinuumBlock } from './shared';
+import { lineMarks, liveStatements, renderStimulus, resolveReturnLine, type ContinuumBlock } from './shared';
 import '@/blocks/peer-feedback.css';
 import './continuum-line.css';
 
@@ -17,12 +17,20 @@ import './continuum-line.css';
 
 export { createContinuumLineEditor } from './editor';
 
-export function renderContinuumLine(block: ContinuumBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
+export function renderContinuumLine(given: ContinuumBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const root = el('section', 'peer-feedback continuum-line');
-  root.dataset.blockId = block.id;
+  root.dataset.blockId = given.id;
   const head = el('header', 'pf-head');
+  const resolved = resolveReturnLine(given, ctx.pageBlocks);
+  if (resolved === 'missing') {
+    head.append(el('p', 'pf-eyebrow block-eyebrow', 'Continuum line · Return'));
+    root.append(head, el('p', 'pf-note block-secondary', mode === 'teacher' ? 'This return line points at a continuum line that isn’t in the lesson. Pick one in the block settings.' : 'This activity isn’t ready yet.'));
+    return root;
+  }
+  const block = resolved;
   const { left, right } = block.content.scale;
-  head.append(el('p', 'pf-eyebrow block-eyebrow', 'Continuum line'), el('h3', 'pf-prompt block-title', `${left || '…'} ↔ ${right || '…'}`));
+  const eyebrow = block.content.returns_to ? 'Continuum line · Return' : block.content.mode === 'predict' ? 'Continuum line · Predict' : 'Continuum line';
+  head.append(el('p', 'pf-eyebrow block-eyebrow', eyebrow), el('h3', 'pf-prompt block-title', `${left || '…'} ↔ ${right || '…'}`));
   root.append(head);
   const statements = liveStatements(block);
 
