@@ -62,6 +62,7 @@ import {
   mountStudentFeedbackView,
   type StudentFeedbackViewHandle
 } from '@/student/feedback-view';
+import { mountStudentSheetView, type StudentSheetViewHandle } from '@/student/sheet-view';
 import { mountStudentProfileView, type StudentProfileViewHandle } from '@/student/profile-view';
 import {
   applyCreatedEntity,
@@ -118,6 +119,7 @@ let studentClassViewHandle: StudentClassViewHandle | null = null;
 
 // The student feedback view mounted for the current public route, if any.
 let studentFeedbackViewHandle: StudentFeedbackViewHandle | null = null;
+let studentSheetViewHandle: StudentSheetViewHandle | null = null;
 
 // The student progress view mounted for the current public route, if any.
 let studentProfileViewHandle: StudentProfileViewHandle | null = null;
@@ -184,6 +186,12 @@ function teardownStudentClassView(): void {
   if (!studentClassViewHandle) return;
   studentClassViewHandle.dispose();
   studentClassViewHandle = null;
+}
+
+function teardownStudentSheetView(): void {
+  if (!studentSheetViewHandle) return;
+  studentSheetViewHandle.dispose();
+  studentSheetViewHandle = null;
 }
 
 function teardownStudentFeedbackView(): void {
@@ -808,6 +816,15 @@ function renderStudentFeedbackRoute(feedbackToken: string, token: number): void 
   });
 }
 
+function renderStudentSheetRoute(sheetToken: string, token: number): void {
+  teardownStudentSheetView();
+  studentSheetViewHandle = mountStudentSheetView({
+    root: appRoot,
+    token: sheetToken,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderStudentProfileRoute(classId: string, token: number): void {
   teardownStudentProfileView();
   studentProfileViewHandle = mountStudentProfileView({
@@ -1142,6 +1159,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-feedback':
       renderStudentFeedbackRoute(match.params.token, token);
       break;
+    case 'student-sheet':
+      renderStudentSheetRoute(match.params.token, token);
+      break;
     case 'student-profile':
       renderStudentProfileRoute(match.params.classId, token);
       break;
@@ -1186,6 +1206,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownStudentUnitView();
   teardownStudentClassView();
   teardownStudentFeedbackView();
+  teardownStudentSheetView();
   teardownStudentProfileView();
 
   if (isClassSiteHost() && !isClassSiteStudentRoute(match.name)) {

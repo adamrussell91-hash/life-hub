@@ -76,3 +76,42 @@
   text-transform: uppercase;
   color: var(--muted);
 }
+
+/* Block editors ask for names and confirmations in this dialog (Teaching's
+   app.css styles it there). Unstyled, it lands at the foot of the page and the
+   browser scrolls down to it. */
+.confirm-card-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--depth, #0a1536) 42%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-card-overlay .confirm-card {
+  width: min(100%, 26rem);
+  margin: 0;
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.confirm-card-overlay .create-modal__input,
+.confirm-card-overlay .create-modal__select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  box-sizing: border-box;
+}

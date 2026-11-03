@@ -44,3 +44,9 @@ export function mountBlockCanvas(
 export function nextBlockIdFactory(prefix: string, blocks: Block[]): () => string;
 
 export function setClassroomExtras(on: boolean): void;
+
+export const CLASS_SITE_ORIGIN: string;
+
+export type SharedSheet = { title: string; shared_at?: string; [key: string]: unknown };
+
+export function renderSharedSheet(sheet: SharedSheet): { el: HTMLElement; dispose(): void };

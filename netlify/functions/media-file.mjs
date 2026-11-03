@@ -10,6 +10,7 @@ import {
 import { isIndexKey, listBlobKeys } from './_shared/blobs-list.mjs';
 import { referencedMediaIds } from './_shared/media-usage.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
+import { SHEET_SNAPSHOT_PREFIX } from './_shared/meeting-sheet.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import {
   CLASS_PREFIX,
@@ -54,8 +55,8 @@ const publicSets = new WeakMap(); // store → { ids, at }
 /**
  * Media ids a student page can show: referenced by a live published lesson snapshot
  * (the draft not trashed), or by a live unit or class, whose public pages
- * (/api/published/units|classes/:id) render their content. Everything else in the
- * teacher's library stays private, whatever its id.
+ * (/api/published/units|classes/:id) render their content, or by a share sheet while
+ * its link is on. Everything else in the teacher's library stays private, whatever its id.
  */
 export async function loadPublicMediaIds(store) {
   const snapshots = await listJSON(store, PUBLISHED_LESSON_PREFIX);
@@ -66,11 +67,12 @@ export async function loadPublicMediaIds(store) {
     const draft = await getJSON(store, draftLessonKey(lessonId));
     if (draft && !isDeletedRecord(draft)) live.push(snapshot);
   }
-  const [units, classes] = await Promise.all([
+  const [units, classes, sheets] = await Promise.all([
     topLevelRecords(store, UNIT_PREFIX),
-    topLevelRecords(store, CLASS_PREFIX)
+    topLevelRecords(store, CLASS_PREFIX),
+    listJSON(store, SHEET_SNAPSHOT_PREFIX)
   ]);
-  return referencedMediaIds([...live, ...units, ...classes]);
+  return referencedMediaIds([...live, ...units, ...classes, ...sheets]);
 }
 
 /** `units/{id}` and `classes/{id}` only, never their sub-documents. */

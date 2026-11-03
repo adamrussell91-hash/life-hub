@@ -30,6 +30,7 @@ import '../styles/comm-page.css';
 import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
 import '../styles/guides.css';
+import '../styles/share-sheet.css';
 import '../styles/check-in.css';
 import '../styles/event-page.css';
 
