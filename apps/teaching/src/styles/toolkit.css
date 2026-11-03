@@ -2730,6 +2730,15 @@ button.tk-qdot {
 .wts[data-set="2"] .wts__say li { border-color: #7cc7ea; background: #e4f4fc; }
 .wts[data-set="2"] .wts__label b, .wts[data-set="2"] .wts-tool__go, .wts[data-set="2"] .wts__name:not(.is-empty) { color: #7cc7ea; }
 .wts[data-set="2"] .wts__adapted, .tk-wt[data-set="2"] .tk-wt__adapted { border-left-color: #2da8e0; }
+/* Book 3 is the green book. */
+.wts[data-set="3"] { border-color: #b5d36a; background: #f1f7de; }
+.wts[data-set="3"] .wts__hex, .wts[data-set="3"] .wts__time, .wts__hex[data-set="3"] { background: #9dc33b; }
+.tk-wt-badge[data-set="3"] { border-color: #b5d36a; background: #f1f7de; }
+.tk-wt-badge[data-set="3"] .tk-wt-badge__glyph { background: #9dc33b; }
+.wts[data-set="3"] .wts__cell, .wts[data-set="3"] .wts__next, .wts[data-set="3"] .tk-wt__tick.is-done::before, .tk-wt[data-set="3"] .tk-wt__tick.is-done::before { background-color: #9dc33b; }
+.wts[data-set="3"] .wts__say li { border-color: #b5d36a; background: #f1f7de; }
+.wts[data-set="3"] .wts__label b, .wts[data-set="3"] .wts-tool__go, .wts[data-set="3"] .wts__name:not(.is-empty) { color: #b5d36a; }
+.wts[data-set="3"] .wts__adapted, .tk-wt[data-set="3"] .tk-wt__adapted { border-left-color: #9dc33b; }
 .wts__title { font-weight: 800; }
 .wts__meta { font-size: var(--text-xs); color: var(--muted); }
 .wts__body { padding: 0 0.75rem 0.75rem; }

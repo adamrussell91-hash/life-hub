@@ -264,7 +264,7 @@ export function walkthruEditorFields(current: WalkthruContent | undefined, emit:
   const wrap = el('div', 'tk-wt-ed');
   const jots = el('div', 'tk-wt-ed__jots');
 
-  // 104 techniques is not a small choice, so it is the kit filter menu (with type-ahead), never a native select.
+  // 160 techniques is not a small choice, so it is the kit filter menu (with type-ahead), never a native select.
   // Fusions from the board join the list once they load.
   const bookOptions = [
     { value: '', label: 'None' },

@@ -18,11 +18,13 @@ test('catalogue ids are unique and every entry belongs to a known set and series
   assert.ok(techniquesOf(1).length >= 50);
   assert.equal(frameworksOf(2).length, 10);
   assert.equal(techniquesOf(2).length, 52);
+  assert.equal(frameworksOf(3).length, 12);
+  assert.equal(techniquesOf(3).length, 56);
 });
 
 test('every see_also resolves, and printed page numbers are unique within a set', () => {
   for (const e of CATALOGUE) for (const ref of e.see_also) assert.ok(CATALOGUE_IDS.includes(ref), `${e.id} → ${ref}`);
-  for (const set of [1, 2]) {
+  for (const set of [1, 2, 3]) {
     const pages = techniquesOf(set).map((e) => e.page);
     assert.equal(new Set(pages).size, pages.length);
   }
@@ -33,6 +35,8 @@ test('page references name the book once page numbers can repeat', () => {
   const inSecond = techniquesOf(2).find((e) => e.code === 'Q&F');
   assert.equal(pageRefOf(inFirst), `Q&F | ${inFirst.page}`);
   assert.equal(pageRefOf(inSecond), `Book 2 · Q&F | ${inSecond.page}`);
+  const inThird = techniquesOf(3).find((e) => e.code === 'Q&F');
+  assert.equal(pageRefOf(inThird), `Book 3 · Q&F | ${inThird.page}`);
 });
 
 test('sets: three colours, set 1 yellow', () => {

@@ -23,6 +23,7 @@ const technique = (set, series, name, page, seeAlso) => {
 
 const t = (series, name, page, seeAlso = []) => technique(1, series, name, page, seeAlso);
 const t2 = (series, name, page, seeAlso = []) => technique(2, series, name, page, seeAlso);
+const t3 = (series, name, page, seeAlso = []) => technique(3, series, name, page, seeAlso);
 
 const TECHNIQUES = [
   t('QF', 'Check for understanding', 96),
@@ -130,7 +131,64 @@ const TECHNIQUES = [
   t2('MB', 'Off-piste', 142, ['w2-fw-trivium']),
   t2('MB', 'Self-directed learning', 144, ['w1-independent-practice']),
   t2('MB', 'Museum/gallery visits', 146, []),
-  t2('MB', 'Online class forums', 148, [])
+  t2('MB', 'Online class forums', 148, []),
+
+  t3('BR', 'Front-loading behaviour management', 42),
+  t3('BR', 'Seating plans', 44),
+  t3('BR', 'Build a vocal repertoire', 46, ['w1-positive-framing', 'w2-assertiveness']),
+  t3('BR', 'Certainty v. severity', 48, ['w1-establish-your-expectations', 'w1-positive-framing', 'w1-choices-and-consequences']),
+  t3('BR', 'Modelling mindsets', 50, ['w2-normalise-error-and-uncertainty']),
+  t3('BR', 'Ending lessons: the last 10 minutes', 52, ['w1-check-for-understanding', 'w3-strategies-to-check-for-understanding']),
+  t3('BR', 'Pastoral conversations with visual records', 54, ['w3-repair-and-rebuild']),
+  t3('BR', 'Repair & rebuild', 56, ['w1-choices-and-consequences', 'w3-pastoral-conversations-with-visual-records']),
+  t3('CP', 'Big questions', 60),
+  t3('CP', 'The museum curation analogy', 62),
+  t3('CP', 'Interdisciplinary units', 64),
+  t3('CP', 'Principles of curriculum implementation', 66),
+  t3('CP', 'Types of subject knowledge', 68),
+  t3('CP', 'Building a culture of reading', 70, ['w1-plan-for-reading', 'w1-independent-learning-pre-reading', 'w2-summarising-academic-reading']),
+  t3('CP', 'Assessment: test design', 72, ['w2-multiple-choice-questions', 'w2-the-face-it-revision-model']),
+  t3('CP', 'Assessment: triangulate the data', 74, ['w1-feedback-as-actions', 'w3-formative-use-of-tests']),
+  t3('CP', 'Adaptive online assessment platforms', 76),
+  t3('CP', 'Comparative judgement', 78),
+  t3('EM', 'Giving an explanation', 82, ['w1-check-for-understanding', 'w1-concrete-examples', 'w1-worked-examples-and-backward-fading', 'w1-dual-coding', 'w1-abstract-models-with-concrete-examples', 'w2-dual-coding-diagrams', 'w2-analogies', 'w3-examples-and-non-examples']),
+  t3('EM', 'Examples & non-examples', 84),
+  t3('EM', 'Sequences, causes & consequences', 86),
+  t3('EM', 'Predict & verify', 88, ['w2-fw-fiorella-mayer']),
+  t3('EM', 'Chunking', 90, ['w1-big-picture-small-picture', 'w1-sequence-concepts-in-small-steps']),
+  t3('EM', 'Advance organisers', 92, ['w1-check-for-understanding', 'w1-big-picture-small-picture', 'w2-make-everyone-think']),
+  t3('EM', 'The creative writing process', 94),
+  t3('EM', 'Writing: developing academic voices', 96),
+  t3('EM', 'Graphic organisers: kernel sentences', 98),
+  t3('EM', 'Modelling handover: I do, we do, you do', 100, ['w1-check-for-understanding', 'w1-cold-calling', 'w1-guided-practice', 'w1-live-modelling', 'w1-worked-examples-and-backward-fading', 'w3-show-call']),
+  t3('QF', 'Cold call variations', 104, ['w1-cold-calling', 'w1-think-pair-share', 'w2-make-everyone-think', 'w3-scaffold-verbal-responses']),
+  t3('QF', 'Strategies to check for understanding', 106, ['w1-check-for-understanding']),
+  t3('QF', 'Class discussion', 108, ['w1-cold-calling', 'w1-think-pair-share', 'w2-hands-up-for-asking-or-ideas']),
+  t3('QF', 'Show call', 110, ['w1-cold-calling', 'w1-signal-pause-insist']),
+  t3('QF', 'Scaffold verbal responses', 112),
+  t3('QF', 'Short feedback loops', 114, ['w1-check-for-understanding', 'w1-signal-pause-insist', 'w2-success-criteria', 'w3-show-call']),
+  t3('QF', 'C|R|A|F|T feedback time', 116, ['w1-whole-class-feedback', 'w1-feedback-that-moves-forward', 'w1-feedback-as-actions', 'w2-redrafting', 'w2-spot-your-mistakes', 'w3-assessment-for-student-agency', 'w3-formative-use-of-tests']),
+  t3('QF', 'Assessment for student agency', 118, ['w1-using-a-knowledge-organiser', 'w1-big-picture-small-picture', 'w2-exemplars', 'w2-success-criteria', 'w2-flash-cards', 'w3-fw-briceno']),
+  t3('QF', 'Formative use of tests', 120, ['w3-assessment-test-design', 'w3-c-r-a-f-t-feedback-time', 'w3-assessment-for-student-agency']),
+  t3('QF', 'Assessment portfolios', 122, ['w2-exemplars', 'w2-success-criteria', 'w3-comparative-judgement']),
+  t3('PR', 'SSDD synoptic practice questions', 126, ['w1-process-questions', 'w1-weekly-and-monthly-review']),
+  t3('PR', 'A repertoire of retrieval routines', 128, ['w1-quizzing', 'w1-elaborative-interrogation', 'w2-multiple-choice-questions']),
+  t3('PR', 'Consolidation', 130),
+  t3('PR', 'Accountable independent reading (AIR)', 132, ['w1-check-for-understanding']),
+  t3('PR', 'Close reading', 134),
+  t3('PR', 'I say, you say; my turn, your turn', 136),
+  t3('PR', 'Sustained independent practice', 138, ['w1-independent-practice', 'w1-rehearse-routines', 'w1-establish-your-expectations', 'w2-perspective-the-dot-in-the-empty-square']),
+  t3('PR', 'Teaching assistants: working in tandem', 140, ['w1-check-for-understanding', 'w1-scaffolding', 'w3-strategies-to-check-for-understanding', 'w3-show-call']),
+  t3('MB', 'Play detective', 144, ['w1-check-for-understanding', 'w1-cold-calling', 'w1-process-questions', 'w3-show-call']),
+  t3('MB', 'Ambiguity & uncertainty', 146, ['w1-oracy-debating']),
+  t3('MB', 'Independent learning: video tutorials', 148, ['w1-check-for-understanding', 'w1-cold-calling', 'w1-think-pair-share', 'w1-quizzing', 'w2-practise-explaining']),
+  t3('MB', 'Activity rotations', 150),
+  t3('MB', 'Creativity: opportunities for choices', 152, ['w1-process-questions', 'w3-short-feedback-loops']),
+  t3('MB', 'Creativity: opportunities to experiment', 154, ['w1-set-the-standards', 'w2-gather-around-demonstrations-and-stories', 'w2-exemplars', 'w2-thresholds-and-pathways', 'w3-creativity-opportunities-for-choices']),
+  t3('MB', 'Play in practice', 156),
+  t3('MB', 'Role-plays & simulations', 158, ['w1-cold-calling', 'w1-think-pair-share']),
+  t3('MB', 'Deep end', 160),
+  t3('MB', 'Keep it real: authentic products', 162, ['w1-feedback-as-actions', 'w1-rehearsal-and-performance', 'w2-redrafting', 'w3-fw-briceno'])
 ];
 
 const framework = (set, key, name, page, seeAlso) => {
@@ -139,6 +197,7 @@ const framework = (set, key, name, page, seeAlso) => {
 };
 const f = (key, name) => framework(1, key, name, null, []);
 const f2 = (key, name, page, seeAlso = []) => framework(2, key, name, page, seeAlso);
+const f3 = (key, name, page, seeAlso = []) => framework(3, key, name, page, seeAlso);
 
 const FRAMEWORKS = [
   f('rosenshine', 'Rosenshine’s principles'),
@@ -156,7 +215,20 @@ const FRAMEWORKS = [
   f2('sweller', 'The ABCDE of cognitive load theory', 24, []),
   f2('fiorella-mayer', 'Learning as a generative activity', 26, []),
   f2('apprenticeship', 'Cognitive apprenticeship', 28, []),
-  f2('trivium', 'Trivium 21c', 30, ['w2-trivium-in-practice'])
+  f2('trivium', 'Trivium 21c', 30, ['w2-trivium-in-practice']),
+
+  f3('eef', 'Professional development mechanisms', 14, ['w3-predict-and-verify']),
+  f3('briceno', 'Briceño’s learning zone & performance zone', 16),
+  f3('furst', 'How memories are constructed: a model', 18),
+  f3('motivation', 'Motivation for learning', 20),
+  f3('habits-of-success', 'Habits of success: get students learning', 22),
+  f3('making-every-lesson-count', 'Making every lesson count', 24),
+  f3('bjork', 'Bjork’s desirable difficulties', 26),
+  f3('cpa', 'Concrete-pictorial-abstract', 28),
+  f3('curiosity', 'Curiosity & wonder', 30),
+  f3('writing', 'Key concepts in writing', 32),
+  f3('reading', 'Key concepts in reading', 34),
+  f3('metacognition', 'Metacognition & self-regulation', 36, ['w1-probing-questions', 'w1-process-questions', 'w1-independent-practice', 'w1-metacognitive-talk', 'w3-assessment-for-student-agency', 'w3-sustained-independent-practice'])
 ];
 
 export const CATALOGUE = Object.freeze([...TECHNIQUES, ...FRAMEWORKS]);

@@ -12,30 +12,35 @@
 // figure/<id>.svg (the people in the board hexes and on a block's WalkThru bar): Book 1's come from
 // the same set as its step pictures, drawn in the private data repo
 // (data/teaching/walkthrus/pictures/source) and copied in from pictures/hexagons/, so they are not
-// drawn here. Book 2's are drawn here from packages/walkthrus/draw/hex/set-2/.
+// drawn here. Books 2 and 3 are drawn here from packages/walkthrus/draw/hex/set-<n>/.
 import { writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../packages/walkthrus/catalogue.mjs';
 
 const OUT = fileURLToPath(new URL('../packages/walkthrus/glyphs/', import.meta.url));
 const SERIES = ['qf', 'pr', 'em', 'cp', 'br', 'mb'];
+const DRAWN_SETS = [2, 3];
 
 const sets = { symbol: {} };
 for (const key of SERIES) {
   const mod = await import(`./walkthru-icons/${key}.mjs`).catch(() => null);
   if (!mod) continue;
   Object.assign(sets.symbol, mod.symbols);
-  const second = await import(`./walkthru-icons/set-2/${key}.mjs`).catch(() => null);
-  if (second) Object.assign(sets.symbol, second.symbols);
+  for (const set of DRAWN_SETS) {
+    const later = await import(`./walkthru-icons/set-${set}/${key}.mjs`).catch(() => null);
+    if (later) Object.assign(sets.symbol, later.symbols);
+  }
 }
 
 const figures = {};
-for (const key of SERIES) {
-  const mod = await import(`../packages/walkthrus/draw/hex/set-2/${key}.mjs`).catch(() => null);
-  if (mod) Object.assign(figures, mod.figures);
+for (const set of DRAWN_SETS) {
+  for (const key of SERIES) {
+    const mod = await import(`../packages/walkthrus/draw/hex/set-${set}/${key}.mjs`).catch(() => null);
+    if (mod) Object.assign(figures, mod.figures);
+  }
 }
 for (const [id, markup] of Object.entries(figures)) await writeFile(`${OUT}figure/${id}.svg`, markup);
-console.log(`figure: ${Object.keys(figures).length} Book 2 drawn`);
+console.log(`figure: ${Object.keys(figures).length} Books 2 and 3 drawn`);
 
 const known = new Set(CATALOGUE.map((e) => e.id));
 for (const [dir, set] of Object.entries(sets)) {
