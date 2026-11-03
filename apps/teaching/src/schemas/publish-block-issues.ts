@@ -7,6 +7,7 @@ import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
 import { hingeIssue } from '@/blocks/hinge-question/shared';
 import { isGate, isSidePath, takesSidePath } from '@/lecture/scenes';
+import { fadedContent } from '@/schemas/faded';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -403,11 +404,15 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   if (block.block_type === 'note_cue' && !block.content.prompt.trim()) {
     return 'Write the prompt for this note cue';
   }
-  if (
-    block.block_type === 'faded_example' &&
-    (!block.content.extract.trim() || block.content.parts.some((p) => !p.answer.trim()))
-  ) {
-    return 'Faded example needs an extract and a model answer for every part.';
+  if (block.block_type === 'faded_example') {
+    const faded = fadedContent(block);
+    if (faded.steps.some((s) => !s.extract.trim() || s.answers.some((a) => !a.trim()))) {
+      return 'Faded example needs an extract and a model answer for every part of every step.';
+    }
+    const written = new Set(faded.steps.flatMap((s) => s.blanks.map((i) => faded.part_labels[i]!)));
+    if ([...written].some((label) => !faded.criteria[label]?.some((t) => t.trim()))) {
+      return 'Faded example needs a checklist for every part students write.';
+    }
   }
   if (block.block_type === 'self_check') {
     if (block.content.prompt.trim().length === 0) {

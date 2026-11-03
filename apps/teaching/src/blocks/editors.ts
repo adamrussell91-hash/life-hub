@@ -1,6 +1,6 @@
 import { createNoteCueEditor } from '@/blocks/note-cue';
 import { createWithTeacherEditor } from '@/blocks/with-teacher';
-import { createFadedExampleEditor } from '@/blocks/faded-example';
+import { createFadedExampleEditor } from '@/blocks/faded-example-editor';
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';

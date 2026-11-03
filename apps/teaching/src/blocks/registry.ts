@@ -1,5 +1,6 @@
 import { renderWithTeacher, createWithTeacherEditor } from '@/blocks/with-teacher';
-import { renderFadedExample, createFadedExampleEditor } from '@/blocks/faded-example';
+import { renderFadedExample } from '@/blocks/faded-example';
+import { createFadedExampleEditor } from '@/blocks/faded-example-editor';
 import { renderNoteCue, createNoteCueEditor } from '@/blocks/note-cue';
 import {
   createAccordionEditor,

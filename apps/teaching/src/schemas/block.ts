@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SKILL_STRANDS } from '../skills/schema';
 import { IsoDateSchema } from './common';
+import { FadedContentSchema } from './faded';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
 import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
@@ -1031,19 +1032,7 @@ export const FadedExampleBlockSchema = z.object({
   block_type: z.literal('faded_example'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
-  content: z
-    .object({
-      prompt: z.string().max(300),
-      extract: z.string().max(2000),
-      parts: z.array(z.object({ label: z.string().min(1).max(40), answer: z.string().max(600) })).min(1).max(4),
-      blanks: z.array(z.number().int().min(0).max(3)).max(4),
-      /** A step with blanks is a gate unless switched off. */
-      gate: z.boolean().optional()
-    })
-    .refine((c) => c.blanks.every((i) => i < c.parts.length) && new Set(c.blanks).size === c.blanks.length, {
-      message: 'Each blank must name a different part of the example.',
-      path: ['blanks']
-    }),
+  content: FadedContentSchema,
   ...blockLayout,
   ...blockTimestamps
 });

@@ -14,8 +14,8 @@ export function storeFor() {
     [publishedLessonKey('tut1'), { lesson_id: 'tut1', pedagogical_mode: 'tutorial', blocks: [block('h1', 'heading', { text: 'Demo' })] }],
     [classKey('class1'), { id: 'class1', status: 'active', title: '7B', students: ROSTER }],
     [tutorialKeys('tut1').tabs, { version: 'v1', class_id: 'class1', groups: [
-      { id: 'ga', goal: 'Today: the effect', students: ['st_ann'], blocks: [block('f1', 'faded_example', {}), block('w1', 'with_teacher', { talking_points: [] }), block('y1', 'self_check', {})] },
-      { id: 'gb', goal: 'Today: telling them apart', students: ['st_cy'], blocks: [block('w2', 'with_teacher', { talking_points: [] })] }
+      { id: 'ga', goal: 'Today: the effect', students: ['st_ann'], blocks: [block('f1', 'faded_example', { steps: [{ id: 'f3_s2' }] }), block('w1', 'with_teacher', { talking_points: [] }), block('y1', 'self_check', {})] },
+      { id: 'gb', goal: 'Today: telling them apart', students: ['st_cy'], blocks: [block('w2', 'with_teacher', { talking_points: [] }), block('f2', 'faded_example', { steps: [{ id: 'f2_s1' }] })] }
     ] }]
   ]);
   // Each write bumps a key's etag, so onlyIfMatch can be tested. `beforeWrite` lets a test slip in another tab's write.

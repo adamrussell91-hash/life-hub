@@ -55,8 +55,8 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
 
   // Faded answers go to the teacher's live board.
   root.addEventListener(FADED_EVENT, (e) => {
-    const { blockId, parts, rating } = (e as CustomEvent<FadedDetail>).detail;
-    void client?.answer(blockId, parts, rating).catch(() => {});
+    const { stepKey, parts, rating } = (e as CustomEvent<FadedDetail>).detail;
+    void client?.answer(stepKey, parts, rating).catch(() => {});
   });
 
   /** A run of blocks as one scrolling page. */

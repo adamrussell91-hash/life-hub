@@ -1,4 +1,5 @@
 // apps/teaching/src/lecture/scenes.ts
+import { fadedContent, fadedWritingSteps } from '@/schemas/faded';
 import type { Block, Narration } from '@/schemas/block';
 import { shortLabel } from '@/teacher/focus/steps';
 
@@ -41,8 +42,9 @@ const SKIPPED = new Set<Block['block_type']>(['spacer', 'divider', 'teacher_note
 export function isGate(block: Block): boolean {
   if (!GATE_TYPES.has(block.block_type)) return false;
   if (block.block_type === 'faded_example') {
-    // A fully worked step has nothing to answer.
-    return block.content.gate !== false && block.content.blanks.length > 0;
+    // A block of only worked steps has nothing to answer.
+    const faded = fadedContent(block);
+    return faded.gate !== false && fadedWritingSteps(faded).length > 0;
   }
   return (block.content as { gate?: boolean }).gate !== false;
 }

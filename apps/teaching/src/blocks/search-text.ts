@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas';
+import { fadedContent } from '@/schemas/faded';
 
 export function htmlToPlainText(html: string): string {
   const withBreaks = html
@@ -131,9 +132,18 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, (c.talking_points as string[] | undefined)?.join(' '));
       break;
     case 'faded_example':
-      push(parts, c.prompt);
-      push(parts, c.extract);
-      for (const p of (c.parts as Array<{ answer?: string }> | undefined) ?? []) push(parts, p.answer);
+      {
+        const faded = fadedContent({ content: c });
+        push(parts, faded.prompt);
+        for (const step of faded.steps) {
+          push(parts, step.prompt);
+          push(parts, step.extract);
+          for (const answer of step.answers) push(parts, answer);
+          push(parts, step.question?.prompt);
+          for (const choice of step.question?.choices ?? []) push(parts, choice);
+        }
+        for (const list of Object.values(faded.criteria)) for (const item of list) push(parts, item);
+      }
       break;
     case 'question_set':
     case 'flashcards':
