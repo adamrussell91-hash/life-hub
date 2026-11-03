@@ -5,7 +5,7 @@ import { errorText } from '@/quiz/dom';
 import { markPieceView, type MarkPieceActions, type MarkPieceData } from './mark-piece';
 import { loadRubricSetup } from './rubric-setup';
 
-type ListedStudent = { id: string; initials: string; name: string; handed_in_at: string | null; status: 'not_in' | 'waiting' | 'marking' | 'returned' };
+type ListedStudent = { id: string; initials: string; name: string; handed_in_at: string | null; status: 'not_in' | 'waiting' | 'marking' | 'returned' | 'redraft_asked'; draft?: number };
 type ListResponse = { column: { id: string; title: string }; students: ListedStudent[] };
 type LoadResponse = Omit<MarkPieceData, 'position'>;
 
@@ -38,14 +38,14 @@ export function mountMarkPage(canvas: HTMLElement, classId: string, columnId: st
         window.history.replaceState(null, '', url);
         const act = {
           save: (body: Parameters<MarkPieceActions['save']>[0]) => call({ action: 'save', student_id: id, ...body }),
-          returnIt: () => call({ action: 'return', student_id: id }),
+          returnIt: (ask?: Parameters<MarkPieceActions['returnIt']>[0]) => call({ action: 'return', student_id: id, ...ask }),
           takeBack: () => call({ action: 'take_back', student_id: id }),
           move: (by: -1 | 1) => {
             const target = handed[index + by];
             if (target) open(target.id);
           }
         };
-        canvas.replaceChildren(markPieceView({ ...data, position: { index, total: handed.length } }, act, { rubric }));
+        canvas.replaceChildren(markPieceView({ ...data, position: { index, total: handed.length } }, act, { rubric, redraft: true }));
       }, fail);
     };
     open((startStudent && handed.find((s) => s.id === startStudent)?.id) || firstWaiting.id);

@@ -61,12 +61,15 @@ async function pieceItems(store, classId, book, base) {
     const { students } = await piecesAction(store, classId, { action: 'list', column_id: column.id });
     const waiting = students.filter((s) => s.status === 'waiting' || s.status === 'marking');
     const handed = students.filter((s) => s.handed_in_at);
+    const asked = students.filter((s) => s.status === 'redraft_asked');
     if (!handed.length) continue;
     items.push({
       ...base, kind: 'piece', what: 'Handed-in work', column_id: column.id, title: column.title, lesson_id: column.piece.lesson_id, block_id: column.piece.block_id,
       href: `/mark/${encodeURIComponent(classId)}/${encodeURIComponent(column.id)}`,
-      waiting: waiting.length, handed_in: handed.length, who: waiting.map((s) => s.initials).filter(Boolean),
-      rows: waiting.map((s) => ({ student_id: s.id, initials: s.initials })),
+      waiting: waiting.length, handed_in: handed.length,
+      who: waiting.map((s) => (s.initials && s.draft > 1 ? `${s.initials} · Redraft ${s.draft}, ${s.sent_scope === 'whole' ? 'whole piece' : 'one section'}` : s.initials)).filter(Boolean),
+      rows: waiting.map((s) => ({ student_id: s.id, initials: s.initials, ...(s.draft > 1 ? { draft: s.draft, sent_scope: s.sent_scope } : {}) })),
+      ...(asked.length ? { asked: asked.map((s) => ({ initials: s.initials, asked_at: s.asked_at })) } : {}),
       oldest_at: oldest(waiting.map((s) => s.handed_in_at))
     });
   }

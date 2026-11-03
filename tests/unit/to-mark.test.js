@@ -29,6 +29,7 @@ async function setup() {
 }
 
 import { toMarkQueue } from '../../netlify/functions/_shared/to-mark.mjs';
+import { pieceKey } from '../../netlify/functions/_shared/piece-feedback.mjs';
 
 test('the queue lists linked tasks with waiting pieces, oldest first, and flags 7+ days', async () => {
   const { store } = await setup();
@@ -69,4 +70,17 @@ test('the queue gathers voice takes, hand-ups, sprint reflections and sprint que
   assert.deepEqual([by.sprint.waiting, by.sprint.handed_in, by.sprint.title], [1, 2, 'Bridge sprint']);
   assert.deepEqual([by.ask.waiting, by.ask.who], [1, ['Group 1']]);
   assert.equal(tasks[0].kind, 'piece', 'oldest waiting first');
+});
+
+test('the queue labels a redraft, carries its draft on the row, and lists who was asked for one', async () => {
+  const { store, ava } = await setup();
+  const [, noah] = (await loadRoster(store, 'class1')).students;
+  store.data.set(pieceKey('class1', ava.id, 'w:lesson1:qset1'), { student_id: ava.id, status: 'draft', draft: 2, sent_scope: { part: 'answers', field: 'q1', start: 0, end: 7 }, tags: [], comment: '' });
+  store.data.set(`work_handins/lesson1/qset1/${noah.id}`, { class_id: 'class1', student_id: noah.id, text: { answers: { q1: 'The road runs north.' } }, handed_in_at: '2026-10-29T00:00:00Z' });
+  store.data.set(pieceKey('class1', noah.id, 'w:lesson1:qset1'), { student_id: noah.id, status: 'returned', draft: 1, redraft: { scope: 'whole', asked_at: '2026-11-01T00:00:00Z' }, tags: [], comment: '' });
+
+  const { tasks: [task] } = await toMarkQueue(store, { now: () => Date.parse('2026-11-05T00:00:00Z') });
+  assert.deepEqual(task.who, ['AN · Redraft 2, one section']);
+  assert.deepEqual(task.rows, [{ student_id: ava.id, initials: 'AN', draft: 2, sent_scope: { part: 'answers', field: 'q1', start: 0, end: 7 } }]);
+  assert.deepEqual(task.asked, [{ initials: 'NP', asked_at: '2026-11-01T00:00:00Z' }]);
 });

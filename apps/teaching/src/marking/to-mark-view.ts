@@ -21,6 +21,8 @@ export type ToMarkTask = {
   answers?: number;
   who?: string[];
   rows?: unknown[];
+  /** Students asked for a redraft, whose rewrite hasn't come back yet. */
+  asked?: { initials: string; asked_at: string }[];
   /** Takes on a tagged viva question the AI could still read. */
   ai_ready?: number;
   oldest_at: string | null;
@@ -37,7 +39,7 @@ const KIND_LABEL: Record<ToMarkKind, string> = {
 };
 
 const days = (iso: string) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86400000));
-const ageText = (iso: string) => {
+export const ageText = (iso: string) => {
   const d = days(iso);
   return d === 0 ? 'today' : d === 1 ? '1 day' : `${d} days`;
 };
@@ -69,6 +71,7 @@ function row(t: ToMarkTask): HTMLElement {
   text.append(head, el('p', 'tm-task__where', where));
   const who = whoText(t);
   if (who) text.append(el('p', 'tm-task__who', who));
+  if (t.asked?.length) text.append(el('p', 'tm-task__asked', `Redraft asked: ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
   const age = el('span', 'tm-age', t.oldest_at ? ageText(t.oldest_at) : 'open');
   const count = el('span', 'tm-count', t.waiting ? `${t.waiting} waiting` : `${t.handed_in ?? 0} in`);
   item.append(text);
@@ -82,7 +85,7 @@ export function toMarkView(tasks: ToMarkTask[], o: { limit?: number } = {}): HTM
   const root = el('section', 'tm');
   const waiting = tasks.filter((t) => t.waiting > 0);
   // Linked tasks with nothing to mark stay only while some of the class has still to hand in.
-  const open = tasks.filter((t) => t.waiting === 0 && t.handed_in !== undefined && t.handed_in < t.roster);
+  const open = tasks.filter((t) => t.waiting === 0 && t.handed_in !== undefined && (t.handed_in < t.roster || Boolean(t.asked?.length)));
   const total = waiting.reduce((n, t) => n + t.waiting, 0);
   const top = el('div', 'tm-top');
   top.append(el('h2', 'tm-title', 'To mark'));

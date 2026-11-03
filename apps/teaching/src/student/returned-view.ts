@@ -14,6 +14,7 @@ import type { FeedbackCode } from '@/blocks/feedback-codes';
 import type { MineState } from '@/blocks/voice-client';
 import type { Place, ReturnedItem } from '@/progress/types';
 import { returnedRubric, type ReturnedRubric } from './returned-rubric';
+import { redraftEditor, type RedraftApi, type RedraftScope } from '@/student/redraft-editor';
 
 const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', answer: 'Answer', note: 'Note' };
 
@@ -29,6 +30,7 @@ export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew:
     card.append(el('span', `pg-returned__tag is-${item.kind}`, TAG[item.kind]));
     const t = el('span', 'pg-returned__title', item.title);
     if (item.new) t.append(el('span', 'pg-returned__new', 'New'));
+    if (item.redraft) t.append(el('span', 'pg-returned__ask', item.redraft === 'asked' ? 'Redraft asked' : 'Sent to your teacher'));
     card.append(t, el('span', 'pg-returned__meta', `Returned ${item.date}`), el('span', 'pg-returned__chev', '›'));
     card.addEventListener('click', () => onOpen(item.id, Boolean(item.new)));
     box.append(card);
@@ -42,7 +44,14 @@ export type PiecePayload = {
   id: string; kind: string; title: string; date: string; comment: string;
   text: Record<string, Record<string, string>> | null;
   tags: PieceTag[];
-  criteria: { label: string; step: Place | null; was: Place | null }[];
+  criteria: { label: string; step: Place | null; was: Place | null; first?: Place }[];
+  /** This draft's number, and the earlier ones. Absent means there's only the first. */
+  draft?: number;
+  drafts?: { n: number; text: Record<string, Record<string, string>>; tags: PieceTag[]; comment: string; date: string }[];
+  /** The teacher has asked for a rewrite of this much of it. */
+  redraft?: { scope: RedraftScope };
+  /** The student's redraft is with the teacher; this is the draft before it. */
+  sent?: boolean;
   /** A viva's takes, each as the lesson's feedback view reads it. */
   takes?: Extract<MineState, { submitted: true }>[];
   /** The codes this piece used, and the student's rung on each skill, for its one focus. */
@@ -80,13 +89,13 @@ function explain(tag: PieceTag): HTMLElement[] {
   return out;
 }
 
-function sideBoxes(p: PiecePayload): HTMLElement {
+function sideBoxes(p: PiecePayload, comment = p.comment): HTMLElement {
   const side = el('div', 'pg-piece__side');
   const rubric = returnedRubric(p.rubric);
   if (rubric) side.append(rubric);
-  if (p.comment) {
+  if (comment) {
     const c = el('div', 'pg-box');
-    c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', p.comment));
+    c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', comment));
     side.append(c);
   }
   if (p.criteria.length) {
@@ -94,7 +103,8 @@ function sideBoxes(p: PiecePayload): HTMLElement {
     c.append(el('h3', 'pg-box__title', 'Where this piece sits'));
     for (const cr of p.criteria) {
       // Only a rise gets words; a step lower than last time says nothing.
-      const delta = !cr.was || !cr.step ? '' : cr.was === cr.step ? 'same as last time' : rank(cr.was) < rank(cr.step) ? `up from ${placeName(cr.was)}` : '';
+      const moved = cr.first && cr.step && cr.first !== cr.step ? `${placeName(cr.first)}, then ${placeName(cr.step)} after redraft` : '';
+      const delta = moved || (!cr.was || !cr.step ? '' : cr.was === cr.step ? 'same as last time' : rank(cr.was) < rank(cr.step) ? `up from ${placeName(cr.was)}` : '');
       const head = el('div', 'pg-box__row');
       head.append(el('b', undefined, cr.label), el('span', 'pg-box__delta', delta));
       c.append(head, ladder(cr.step, cr.was));
@@ -104,7 +114,10 @@ function sideBoxes(p: PiecePayload): HTMLElement {
   return side;
 }
 
-export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HTMLElement {
+/** A student's page passes these so an ask can be acted on; without them it's only a note, as a teacher sees it. */
+export type PieceViewOptions = { redraft?: RedraftApi; onSent?: () => void };
+
+export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: PieceViewOptions = {}): HTMLElement {
   const root = el('section', 'pg-piece');
   const back = el('button', 'pg-back', '← Returned work');
   back.type = 'button';
@@ -133,16 +146,56 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HT
     root.append(sideBoxes(p));
     return root;
   }
+  if (p.sent) root.append(el('p', 'pg-ask', 'Sent. Your teacher has it.'));
+  else if (p.redraft) root.append(el('p', 'pg-ask', p.redraft.scope === 'whole' ? 'Your teacher asked for a redraft of this piece.' : 'Your teacher asked for a redraft of one section.'));
+  const canRewrite = Boolean(p.redraft && o.redraft);
   const cols = el('div', 'pg-piece__cols');
   const left = el('div');
+  const side = el('div');
+  type View = 'write' | 'latest' | number;
+  let view: View = canRewrite ? 'write' : 'latest';
+  const earlier = [...(p.drafts ?? [])].reverse();
+  const tabs: Array<[View, string]> = [
+    ...(canRewrite ? [['write', 'Your redraft'] as [View, string]] : []),
+    ...(earlier.length || canRewrite ? [['latest', `Draft ${p.draft ?? 1}`] as [View, string]] : []),
+    ...earlier.map((d) => [d.n, `Draft ${d.n}`] as [View, string])
+  ];
+  // The editor keeps its words when the student flips to read their feedback.
+  const editor = canRewrite ? redraftEditor(o.redraft!, () => o.onSent?.()) : null;
+  const paint = (): void => {
+    left.replaceChildren();
+    if (tabs.length > 1) {
+      const row = el('div', 'pg-drafts');
+      for (const [to, label] of tabs) {
+        const b = el('button', `pg-draft-pill${view === to ? ' is-on' : ''}`, label);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', String(view === to));
+        b.addEventListener('click', () => { view = to; paint(); });
+        row.append(b);
+      }
+      left.append(row);
+    }
+    const past = typeof view === 'number' ? p.drafts?.find((d) => d.n === view) : null;
+    side.replaceChildren(sideBoxes(p, past ? past.comment : p.comment));
+    if (view === 'write' && editor) left.append(editor);
+    else writingInto(left, past?.text ?? p.text, past?.tags ?? p.tags, past?.comment ?? p.comment);
+  };
+  paint();
+  cols.append(left, side);
+  root.append(cols);
+  return root;
+}
+
+/** A draft's words with its highlights; tapping one explains it. A note has no typed text, so each tag is its own line. */
+function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: PieceTag[], comment: string): void {
   const pop = el('div', 'pg-pop');
   pop.hidden = true;
-  if (p.text) {
-    for (const [part, fields] of Object.entries(p.text)) {
-      for (const [field, text] of Object.entries(fields)) {
-        const tags = p.tags.filter((t) => t.part === part && t.field === field);
+  if (text) {
+    for (const [part, fields] of Object.entries(text)) {
+      for (const [field, words] of Object.entries(fields)) {
+        const tags = tagged.filter((t) => t.part === part && t.field === field);
         const marks: Mark[] = tags.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.colour}-ink)` }));
-        const sheet = paper(text, marks, null);
+        const sheet = paper(words, marks, null);
         sheet.addEventListener('click', (e) => {
           const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark');
           if (!run) return;
@@ -156,19 +209,15 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void): HT
       }
     }
     left.append(pop, el('p', 'pg-hint', 'Tap a highlight to see what it means.'));
-  } else {
-    // A note has no typed text: each tag is a line of its own.
-    const list = el('ul', 'pg-viva');
-    for (const tag of p.tags) {
-      const item = el('li', 'pg-box');
-      if (tag.quote) item.append(el('p', 'pg-pop__note', `“${tag.quote}”`));
-      item.append(...explain(tag));
-      list.append(item);
-    }
-    if (p.tags.length) left.append(list);
-    else left.append(el('p', 'pm-empty', p.comment ? 'Your teacher left a comment on this one.' : 'Your teacher has marked this. There are no notes on it yet.'));
+    return;
   }
-  cols.append(left, sideBoxes(p));
-  root.append(cols);
-  return root;
+  const list = el('ul', 'pg-viva');
+  for (const tag of tagged) {
+    const item = el('li', 'pg-box');
+    if (tag.quote) item.append(el('p', 'pg-pop__note', `“${tag.quote}”`));
+    item.append(...explain(tag));
+    list.append(item);
+  }
+  if (tagged.length) left.append(list);
+  else left.append(el('p', 'pm-empty', comment ? 'Your teacher left a comment on this one.' : 'Your teacher has marked this. There are no notes on it yet.'));
 }

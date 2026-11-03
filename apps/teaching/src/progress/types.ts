@@ -16,4 +16,4 @@ export type ProgressPayload = {
   need: null; initials: string; pieces: PieceCol[]; outcomes: TargetRow[]; concepts: TargetRow[];
   skills: { strand: string; rows: SkillRow[] }[]; codes: CodeRow[]; next: NextStep[]; unseen: number; has_returned?: boolean; map: unknown;
 };
-export type ReturnedItem = { id: string; kind: 'written' | 'viva' | 'quiz' | 'answer' | 'note'; title: string; date: string; new: boolean; codes: string[] };
+export type ReturnedItem = { id: string; kind: 'written' | 'viva' | 'quiz' | 'answer' | 'note'; title: string; date: string; new: boolean; codes: string[]; redraft?: 'asked' | 'sent' };

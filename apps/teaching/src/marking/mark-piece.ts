@@ -8,6 +8,7 @@ import { paper, offsetOf, trimRange, type Mark } from '@/blocks/peer-annotate';
 import { drawPick, pickCaption, pickMark, placedPick, stepHead, type StepPick } from './step-pick';
 import type { Rubric } from './rubric-model';
 import { mountRubricPanel, type RubricAiRead, type RubricPanel, type RubricSetup } from './rubric-panel';
+import { changesSheet } from './draft-diff';
 import './marking.css';
 
 type Criterion = { id: string; label: string; outcomes: string[]; concepts: string[]; skill?: string };
@@ -16,6 +17,8 @@ type Tag = { code_id: string; positive: boolean; part: string; field: string; st
 /** A code the AI suggests on the student's words: dashed until the teacher keeps it, and never saved otherwise. */
 export type SuggestedMarkTag = { code_id: string; part: string; field: string; start: number; end: number; why?: string };
 type ShownTag = Tag & { ai?: boolean; why?: string };
+export type RedraftScope = 'whole' | { part: string; field: string; start: number; end: number };
+export type EarlierDraft = { n: number; text: Record<string, Record<string, string>>; tags: Tag[]; comment: string; returned_at: string; steps: Record<string, string>; scope: RedraftScope | null };
 export type MarkPieceData = {
   column: { id: string; title: string; criteria: Criterion[]; piece?: { lesson_id: string; block_id: string } };
   student: { id: string; initials: string; name: string };
@@ -27,10 +30,13 @@ export type MarkPieceData = {
   codes: Code[];
   recent_codes: string[][];
   position: { index: number; total: number };
+  draft?: number;
+  drafts?: EarlierDraft[];
+  redraft?: { scope: RedraftScope; asked_at: string };
 };
 export type MarkPieceActions = {
   save: (body: { tags: Tag[]; comment: string; steps: Record<string, string>; rubric?: Rubric | null; today?: string }) => Promise<unknown>;
-  returnIt: () => Promise<unknown>;
+  returnIt: (ask?: { redraft: { scope: RedraftScope } }) => Promise<unknown>;
   takeBack: () => Promise<unknown>;
   move: (by: -1 | 1) => void;
 };
@@ -59,6 +65,8 @@ export type MarkPieceOptions = {
   rubricAi?: RubricAiRead | null;
   /** A single score for this work, for the panel's Mark row. */
   rubricMarks?: { max: number; value?: number | null; ai?: number | null };
+  /** Handed-in writing only: offers Return for a redraft. */
+  redraft?: boolean;
 };
 
 export function markPieceView(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): HTMLElement {
@@ -82,6 +90,16 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   let selected: { part: string; field: string; start: number; end: number } | null = null;
   let clearSelected = 0;
   const codes = new Map(d.codes.map((c) => [c.id, c]));
+  const draft = d.draft ?? 1;
+  const drafts = d.drafts ?? [];
+  const lastDraft = drafts.at(-1);
+  // A redraft opens on what changed; codes only go on the latest words.
+  let view: 'changes' | 'latest' | number = lastDraft ? 'changes' : 'latest';
+  let ask: 'none' | 'section' | 'whole' = 'none';
+  let section: { part: string; field: string; start: number; end: number } | null = null;
+  const askBody = (): { redraft: { scope: RedraftScope } } | undefined =>
+    ask === 'whole' ? { redraft: { scope: 'whole' } } : ask === 'section' && section ? { redraft: { scope: section } } : undefined;
+  const missingSection = (): boolean => ask === 'section' && !section;
 
   const root = el('section', 'mk');
   const bar = el('div', 'mk-bar');
@@ -94,7 +112,8 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   saveBtn.dataset.action = 'save';
   const retBtn = button('', 'primary', () => {
     if (status === 'returned') void act.takeBack().then(() => { status = 'draft'; paint(); });
-    else void save().then(() => act.returnIt()).then(() => { status = 'returned'; paint(); });
+    else if (missingSection()) askHint.textContent = 'Drag across the section first.';
+    else void save().then(() => act.returnIt(askBody())).then(() => { status = 'returned'; paint(); });
   });
   retBtn.dataset.action = 'return';
   bar.append(prev, next, saveBtn, retBtn);
@@ -174,9 +193,55 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   draftNote.hidden = !(o.draftComment && !d.feedback?.comment);
   comment.addEventListener('input', () => { draftNote.hidden = true; });
   side.append(el('h3', 'mk-side__title', 'Codes on this piece'), tally, warn, el('h3', 'mk-side__title', 'Comment'), draftNote, comment);
+  if (lastDraft) {
+    const earlier = el('div', 'mk-earlier');
+    earlier.append(el('h3', 'mk-side__title', `What you said on Draft ${lastDraft.n}`));
+    for (const id of new Set(lastDraft.tags.map((t) => t.code_id))) {
+      const c = codes.get(id);
+      if (c) earlier.append(el('p', 'mk-hint', `${c.code} ${c.label}`));
+    }
+    if (lastDraft.comment) earlier.append(el('p', 'mk-earlier__comment', lastDraft.comment));
+    else if (!lastDraft.tags.length) earlier.append(el('p', 'mk-hint', 'No codes or comment.'));
+    side.prepend(earlier);
+  }
+  const askHint = el('p', 'mk-hint');
+  askHint.setAttribute('role', 'status');
+  if (o.redraft) {
+    const box = el('fieldset', 'mk-ask');
+    box.append(el('legend', 'mk-side__title', 'When you return it'));
+    const again = draft > 1 ? 'Ask for another redraft' : 'Return for a redraft';
+    const options: Array<['none' | 'section' | 'whole', string]> = [['none', 'Return, finished'], ['section', `${again}: this section`], ['whole', `${again}: the whole piece`]];
+    for (const [value, label] of options) {
+      const line = el('label', 'mk-ask__line');
+      const radio = el('input');
+      radio.type = 'radio';
+      radio.name = 'mk-ask';
+      radio.value = value;
+      radio.checked = value === 'none';
+      radio.addEventListener('change', () => {
+        ask = value;
+        askHint.textContent = value === 'section' && !section ? 'Drag across the words you want rewritten.' : '';
+        if (value === 'section') view = 'latest';
+        paint();
+      });
+      line.append(radio, document.createTextNode(` ${label}`));
+      box.append(line);
+    }
+    box.append(askHint);
+    side.append(box);
+  }
 
   root.addEventListener('pm:select', (e) => {
     const sel = (e as CustomEvent<{ part: string; field: string; start: number; end: number }>).detail;
+    if (ask === 'section') {
+      section = sel;
+      selected = null;
+      justTagged = true;
+      window.getSelection()?.removeAllRanges();
+      askHint.textContent = '';
+      paint();
+      return;
+    }
     if (!armed) return;
     tags.push({ code_id: armed.id, positive: armed.positive, ...sel });
     justTagged = true;
@@ -207,14 +272,57 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     menu.hidden = false;
   }
 
+  function draftPills(): HTMLElement | null {
+    if (!lastDraft) return null;
+    const row = el('div', 'mk-drafts');
+    const pill = (label: string, to: typeof view): void => {
+      const b = el('button', `mk-draft-pill${view === to ? ' is-on' : ''}`, label);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(view === to));
+      b.addEventListener('click', () => { view = to; paint(); });
+      row.append(b);
+    };
+    pill('Changes', 'changes');
+    pill(`Draft ${draft}`, 'latest');
+    for (const past of [...drafts].reverse()) pill(`Draft ${past.n}`, past.n);
+    return row;
+  }
+
+  /** The non-editable views: what changed, or an earlier draft with its own codes. */
+  function readOnlySheets(): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    if (view === 'changes') {
+      for (const [part, fields] of Object.entries(d.text)) {
+        if (part.startsWith('step.')) continue;
+        for (const [field, text] of Object.entries(fields)) out.push(changesSheet(lastDraft?.text[part]?.[field] ?? '', text));
+      }
+      return out;
+    }
+    const past = drafts.find((x) => x.n === view);
+    for (const [part, fields] of Object.entries(past?.text ?? {})) {
+      // A frozen draft keeps the student's step picks as JSON, which are never writing to show.
+      if (part.startsWith('step.')) continue;
+      for (const [field, text] of Object.entries(fields)) {
+        const mine = (past?.tags ?? []).filter((t) => t.part === part && t.field === field);
+        out.push(paper(text, mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${codes.get(t.code_id)?.colour ?? 'blue'}-ink)` })), null));
+      }
+    }
+    return out;
+  }
+
   function paint(): void {
     sheets.replaceChildren();
-    for (const [part, fields] of Object.entries(d.text)) {
+    const pills = draftPills();
+    if (pills) sheets.append(pills);
+    palette.hidden = view !== 'latest';
+    if (view !== 'latest') sheets.append(...readOnlySheets());
+    else for (const [part, fields] of Object.entries(d.text)) {
       // A step pick is JSON for its own layer, never writing to mark.
       if (part.startsWith('step.')) continue;
       for (const [field, text] of Object.entries(fields)) {
         const mine = tags.filter((t) => t.part === part && t.field === field);
         const marks: Mark[] = mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${codes.get(t.code_id)?.colour ?? 'blue'}-ink)` }));
+        if (ask === 'section' && section?.part === part && section.field === field) marks.push({ start: section.start, end: section.end, layer: marks.length, colour: 'var(--pastel-gold-ink)' });
         const step = d.steps?.find((s) => s.part === part && s.field === field);
         const pick = placedPick(step?.pick, text);
         const pickCode = pick ? codes.get(pick.code_id) : undefined;
@@ -262,6 +370,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       const on = steps[cid!] === step;
       b.classList.toggle('is-on', on);
       b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('is-was', !on && lastDraft?.steps[cid!] === step);
     }
     const counts = new Map<string, number>();
     for (const t of tags) if (!t.ai) counts.set(t.code_id, (counts.get(t.code_id) ?? 0) + 1);
@@ -270,7 +379,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     const run = (id: string) => { let n = 0; for (const list of [...d.recent_codes].reverse()) { if (!list.includes(id)) break; n += 1; } return n; };
     const flagged = [...counts.keys()].map((id) => [id, run(id)] as const).filter(([, n]) => n >= 3).sort((x, y) => y[1] - x[1])[0];
     warn.textContent = flagged ? `${codes.get(flagged[0])?.code} has come up on ${first(d.student.name)}’s last ${flagged[1]} pieces.` : '';
-    retBtn.textContent = status === 'returned' ? 'Take back' : `Return to ${first(d.student.name)}`;
+    retBtn.textContent = status === 'returned' ? 'Take back' : ask !== 'none' ? 'Return for a redraft' : draft > 1 ? 'Return, finished' : `Return to ${first(d.student.name)}`;
     panel?.refresh();
   }
 
@@ -315,7 +424,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     selected = { part: sheet.dataset.part!, field: sheet.dataset.field!, ...range };
   };
   const onKey = (e: KeyboardEvent): void => {
-    if (!root.isConnected) return;
+    if (!root.isConnected || view !== 'latest') return;
     if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
     const n = /^Digit([1-9])$/.exec(e.code)?.[1];
     const code = n ? d.codes[Number(n) - 1] : undefined;
@@ -337,9 +446,13 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     save,
     rubric: panel,
     finish: async () => {
+      if (missingSection()) {
+        askHint.textContent = 'Drag across the section first.';
+        return false;
+      }
       await save();
       if (stayedPractice) return false;
-      await act.returnIt();
+      await act.returnIt(askBody());
       status = 'returned';
       return true;
     }

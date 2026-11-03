@@ -366,3 +366,17 @@
   color: var(--navy);
   text-decoration: underline;
 }
+
+/* ── Redrafting ────────────────────────────────────────────────────── */
+
+.pg-redraft { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); justify-items: start; }
+.pg-redraft__prompt { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.pg-redraft__locked { color: var(--muted); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-redraft__box { width: 100%; box-sizing: border-box; min-height: 110px; font: inherit; line-height: 1.6; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: inherit; }
+.pg-redraft__status { margin: 0; min-height: 1.4em; font-size: var(--text-sm); color: var(--muted); }
+.pg-redraft .btn { min-height: 44px; }
+.pg-ask { background: var(--pastel-gold); color: var(--pastel-gold-ink); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-weight: 600; margin: 0 0 var(--space-3); }
+.pg-drafts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.pg-draft-pill { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: var(--radius-full); padding: 4px 12px; min-height: 36px; font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.pg-draft-pill.is-on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.pg-returned__ask { display: block; font-size: var(--text-sm); color: var(--pastel-gold-ink); font-weight: 600; }

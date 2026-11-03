@@ -22,6 +22,7 @@ import { codeGrid, codeChip } from '@/progress/code-grid';
 import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
+import type { RedraftApi } from '@/student/redraft-editor';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -49,6 +50,8 @@ export type RenderProfileOptions = {
   loadReturned?: () => Promise<ReturnedItem[]>;
   loadPiece?: (id: string) => Promise<PiecePayload | NotePayload>;
   markSeen?: (id: string) => void;
+  /** A student's calls for rewriting a piece. Without them an ask is only a note, as a teacher sees it. */
+  redraft?: (item: string) => RedraftApi;
   /** The teacher viewing a student's page: their name heads it and the device line goes. */
   teacher?: { name: string };
   /** The student's organiser; the Organiser tab shows only when it has released lines. */
@@ -243,7 +246,8 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () =>
   const open = (id: string, wasNew = false): void => {
     void options.loadPiece?.(id).then(
       (piece) => {
-        panel.replaceChildren(pieceView(piece, showList));
+        const redraft = id.startsWith('w:') && 'redraft' in piece && piece.redraft ? options.redraft?.(id) : undefined;
+        panel.replaceChildren(pieceView(piece, showList, redraft ? { redraft, onSent: () => open(id) } : {}));
         options.markSeen?.(id);
         if (wasNew) dropBadge(panel.closest('.pm-profile'));
       },
@@ -378,7 +382,17 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
         },
         loadReturned: () => call<{ items: ReturnedItem[] }>('returned').then((r) => r.items),
         loadPiece: (id) => call<PiecePayload | NotePayload>('piece', { item: id }),
-        markSeen: (id) => void call('seen', { item: id }).catch(() => undefined)
+        markSeen: (id) => void call('seen', { item: id }).catch(() => undefined),
+        redraft: (item) => {
+          const [, lessonId = '', blockId = ''] = item.split(':');
+          const work = <T>(action: string, extra: Record<string, unknown> = {}): Promise<T> =>
+            apiPost<T>(`/api/published/work/${encodeURIComponent(lessonId)}`, { action, block_id: blockId, class_id: classId, class_token: deviceToken(`class:${classId}`), ...extra });
+          return {
+            load: () => work('redraft_load'),
+            save: (part, field, text) => work('redraft_save', { part, field, text }),
+            send: () => work('redraft_send')
+          };
+        }
       })
     );
   };

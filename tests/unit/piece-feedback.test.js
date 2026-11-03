@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesAction, pieceKey } from '../../netlify/functions/_shared/piece-feedback.mjs';
+import { piecesAction, pieceKey, unionTags } from '../../netlify/functions/_shared/piece-feedback.mjs';
 import { loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 
 function storeFixture(entries = []) {
@@ -74,4 +74,57 @@ test('nothing returns without a hand-in', async () => {
   const { store } = await setup();
   const roster = await loadRoster(store, 'class1');
   await assert.rejects(piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: roster.students[1].id }), /hasn’t handed this in/);
+});
+
+const saved = async (store, ava) => {
+  await piecesAction(store, 'class1', { action: 'save', column_id: 'column001', student_id: ava.id, tags: [tag], comment: 'Name the effect.' });
+};
+
+test('return can ask for a whole-piece redraft, and list shows it as asked', async () => {
+  const { store, ava } = await setup();
+  await saved(store, ava);
+  const out = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: 'whole' } });
+  assert.equal(out.feedback.status, 'returned');
+  assert.equal(out.feedback.redraft.scope, 'whole');
+  const list = await piecesAction(store, 'class1', { action: 'list', column_id: 'column001' });
+  assert.equal(list.students.find((s) => s.id === ava.id).status, 'redraft_asked');
+});
+
+test('a section ask snaps to whole words and refuses a range off the text', async () => {
+  const { store, ava } = await setup();
+  await saved(store, ava);
+  const out = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 8, end: 12 } } });
+  assert.deepEqual(out.feedback.redraft.scope, { part: 'answers', field: 'q1', start: 7, end: 15 });
+  const stop = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 26, end: 33 } } });
+  assert.deepEqual(stop.feedback.redraft.scope, { part: 'answers', field: 'q1', start: 26, end: 34 }, 'takes the full stop with the word');
+  await assert.rejects(
+    piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: { part: 'answers', field: 'q1', start: 5, end: 9000 } } }),
+    /section/
+  );
+});
+
+test('take back clears the ask, and saving keeps it', async () => {
+  const { store, ava } = await setup();
+  await saved(store, ava);
+  await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id, redraft: { scope: 'whole' } });
+  const edited = await piecesAction(store, 'class1', { action: 'save', column_id: 'column001', student_id: ava.id, tags: [tag], comment: 'Changed.' });
+  assert.equal(edited.feedback.redraft.scope, 'whole');
+  const back = await piecesAction(store, 'class1', { action: 'take_back', column_id: 'column001', student_id: ava.id });
+  assert.equal(back.feedback.redraft, undefined);
+});
+
+test('a plain return carries no ask', async () => {
+  const { store, ava } = await setup();
+  await saved(store, ava);
+  const out = await piecesAction(store, 'class1', { action: 'return', column_id: 'column001', student_id: ava.id });
+  assert.equal(out.feedback.redraft, undefined);
+});
+
+test('unionTags takes the largest count per code and sign across drafts', () => {
+  const row = { tags: [{ code_id: 'ts', positive: false }], earlier_tags: [{ code_id: 'ts', positive: false }, { code_id: 'ts', positive: false }, { code_id: 'qu', positive: true }] };
+  assert.deepEqual(unionTags(row).sort((a, b) => a.code_id.localeCompare(b.code_id)), [
+    { code_id: 'qu', positive: true },
+    { code_id: 'ts', positive: false },
+    { code_id: 'ts', positive: false }
+  ]);
 });
