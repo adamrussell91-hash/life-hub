@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createClareCommsHandler } from '../../netlify/functions/clare-comms.mjs';
+import { createClareMinutesReadHandler } from '../../netlify/functions/clare-minutes-read.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -27,6 +28,9 @@ function memoryStore() {
     },
     async setJSON(key, value) {
       map.set(key, value);
+    },
+    async delete(key) {
+      map.delete(key);
     },
     async list({ prefix = '' } = {}) {
       return {
@@ -106,4 +110,26 @@ test('no API key is a clear 503', async () => {
 test('unknown action is a 400', async () => {
   const handler = makeHandler({ env: { ...env, ANTHROPIC_API_KEY: 'k' }, complete: async () => ({}) });
   assert.equal((await send(handler, 'POST', '/api/clare/comms', { action: 'send_email', context })).status, 400);
+});
+
+test('minutes: start returns at once, the background read runs, the page collects the review', async () => {
+  const store = memoryStore();
+  const deps = { env: { ...env, ANTHROPIC_API_KEY: 'k' }, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+  const kicked = [];
+  const handler = createClareCommsHandler({ ...deps, invokeMinutesRead: async (_request, jobId) => { kicked.push(jobId); return true; } });
+  const worker = createClareMinutesReadHandler({
+    ...deps,
+    complete: async () => ({ sections: [{ heading: 'Assessment', text: 'Exams move.' }], actions: [{ who: 'me', text: 'Send the plan', due: null }], decisions: [], differences: [] })
+  });
+
+  const started = await (await send(handler, 'POST', '/api/clare/comms', { action: 'minutes_start', context, minutes: { text: 'Minutes' } })).json();
+  const jobId = started.data.job_id;
+  assert.deepEqual(kicked, [jobId]);
+  const waiting = await (await send(handler, 'POST', '/api/clare/comms', { action: 'minutes_status', job_id: jobId })).json();
+  assert.equal(waiting.data.status, 'reading');
+
+  assert.equal((await send(worker, 'POST', '/api/clare/minutes-read', { job_id: jobId })).status, 202);
+  const done = await (await send(handler, 'POST', '/api/clare/comms', { action: 'minutes_status', job_id: jobId })).json();
+  assert.equal(done.data.status, 'done');
+  assert.deepEqual(done.data.review.mine, [{ text: 'Send the plan', due: null }]);
 });
