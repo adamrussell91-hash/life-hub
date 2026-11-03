@@ -25,8 +25,22 @@ export function suggestedTechnique(block: Block): string | null {
   return techniqueById(id) ? id : null;
 }
 
-/** The block with this WalkThru on it, or with none when `id` is null. */
+/** The block with this WalkThru on it, or with none when `id` is null. Notes belong to their technique, so they go with it. */
 export function withTechnique<T extends Block>(block: T, id: string | null): T {
-  const { walkthru: _old, ...settings } = (block.settings ?? {}) as Record<string, unknown>;
-  return { ...block, settings: id ? { ...settings, walkthru: id } : settings };
+  const { walkthru: old, walkthru_notes: notes, ...settings } = (block.settings ?? {}) as Record<string, unknown>;
+  if (!id) return { ...block, settings };
+  return { ...block, settings: { ...settings, walkthru: id, ...(old === id && notes ? { walkthru_notes: notes } : {}) } };
+}
+
+/** The teacher's own notes on the chosen WalkThru, by step number. Teacher-only, like the choice itself. */
+export function stepNotes(block: Pick<Block, 'settings'>): Record<string, string> {
+  const raw = (block.settings as Record<string, unknown> | undefined)?.walkthru_notes;
+  if (!raw || typeof raw !== 'object') return {};
+  return Object.fromEntries(Object.entries(raw).filter((pair): pair is [string, string] => typeof pair[1] === 'string' && Boolean(pair[1].trim())));
+}
+
+/** The block with these step notes on it. No notes takes the setting off. */
+export function withStepNotes<T extends Block>(block: T, notes: Record<string, string>): T {
+  const { walkthru_notes: _old, ...settings } = (block.settings ?? {}) as Record<string, unknown>;
+  return { ...block, settings: Object.keys(notes).length ? { ...settings, walkthru_notes: notes } : settings };
 }

@@ -1,4 +1,5 @@
 import { renderPlanningPrompts, renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
+import { withStepNotes } from '@/blocks/walkthru-note/attach';
 import { steppedLens } from '@/blocks/lenses/registry';
 import { createBlock, UNIT_PLAN_BLOCK_GROUPS, pageBlockTypes } from '@/blocks/create-block';
 import { mountAnnReview } from '@/alchemy/ann-review';
@@ -1057,6 +1058,7 @@ function mountUnitPlanEditor(
         network: unitNetworkContext(options.curriculum, options.unit),
         anthology: anthologyData,
         anthologyKnowledge: teacherKnowledgeApi(options.unit.id),
+        saveWalkthruNotes: (id, notes) => canvas.patchBlock(id, (latest) => withStepNotes(latest, notes)),
         onMakeAnthologyCards: (request) => {
           void makeCardsFromAnthology(request);
         }

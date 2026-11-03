@@ -2788,6 +2788,10 @@ span.wts-tool__aux { cursor: default; }
 .wts__name { padding: 0 0.25rem; border-radius: 4px; background: #111; color: #ffd400; }
 .wts__name.is-empty { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
 .wts__adapted { padding-left: 0.6rem; border-left: 3px solid #ffd400; font-style: italic; }
+.wts__notes { margin-top: 0.6rem; }
+.wts__note { white-space: pre-wrap; }
+.wts__note-input { display: block; box-sizing: border-box; width: 100%; min-height: 2.75rem; padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 1rem; resize: vertical; field-sizing: content; }
+.wts__note-input:focus-visible { outline: 2px solid #111; outline-offset: 1px; }
 .wts__book { margin-top: 0.6rem; padding-top: 0.35rem; border-top: 1px solid var(--line); color: var(--muted); }
 .wts__book summary { min-height: 2.25rem; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .wts__book--open { color: inherit; border-top: 0; margin-top: 0.25rem; padding-top: 0; }

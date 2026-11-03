@@ -360,6 +360,62 @@ describe('WalkThru strip under a block', () => {
     expect(feet[0]!.querySelector('.wts-tool')).toBeNull();
   });
 
+  it('gives every step a notes box that saves as you type and keeps each step apart', async () => {
+    api.loadWalkthruText.mockResolvedValue(CUED);
+    api.loadWalkthruPictures.mockResolvedValue([null, null, null, null, null]);
+    const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+    const saved: Array<Record<string, string>> = [];
+    const noted = { ...block, settings: { ...block.settings, walkthru_notes: { 2: 'Count to ten' } } } as Block;
+    const node = renderTechniqueBadge(noted, { saveNotes: (notes) => saved.push(notes) }) as HTMLDetailsElement;
+    node.open = true;
+    node.dispatchEvent(new Event('toggle'));
+    await flush(); await flush();
+    const box = (): HTMLTextAreaElement => node.querySelector<HTMLTextAreaElement>('.wts__card .wts__note-input')!;
+    const panels = [...node.querySelectorAll<HTMLButtonElement>('.wts__panel')];
+    expect(box().value).toBe('');
+    box().value = 'Use the back row';
+    box().dispatchEvent(new Event('input'));
+    expect(saved.at(-1)).toEqual({ 1: 'Use the back row', 2: 'Count to ten' });
+    panels[1]!.click();
+    expect(box().value).toBe('Count to ten');
+    // A step with no cue still has the box.
+    panels[4]!.click();
+    expect(box().value).toBe('');
+    panels[0]!.click();
+    expect(box().value).toBe('Use the back row');
+    box().value = '  ';
+    box().dispatchEvent(new Event('input'));
+    expect(saved.at(-1)).toEqual({ 2: 'Count to ten' });
+  });
+
+  it('shows saved notes as plain words where nothing can save them', async () => {
+    api.loadWalkthruText.mockResolvedValue(CUED);
+    api.loadWalkthruPictures.mockResolvedValue([null, null, null, null, null]);
+    const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
+    const noted = { ...block, settings: { ...block.settings, walkthru_notes: { 1: 'Count to ten' } } } as Block;
+    const node = renderTechniqueBadge(noted) as HTMLDetailsElement;
+    node.open = true;
+    node.dispatchEvent(new Event('toggle'));
+    await flush(); await flush();
+    expect(node.querySelector('.wts__note-input')).toBeNull();
+    expect(node.querySelector('.wts__note')!.textContent).toBe('Count to ten');
+  });
+
+  it('keeps step notes with their technique and off the student page', async () => {
+    const { stepNotes, withStepNotes, withTechnique } = await import('@/blocks/walkthru-note/attach');
+    const { filterBlocksForStudent } = await import('@/blocks/visibility');
+    const noted = withStepNotes(block as Block, { 1: 'Mine' });
+    expect(stepNotes(noted)).toEqual({ 1: 'Mine' });
+    expect(stepNotes(withStepNotes(noted, {}))).toEqual({});
+    expect(stepNotes(withTechnique(noted, 'w1-cold-calling'))).toEqual({ 1: 'Mine' });
+    expect(stepNotes(withTechnique(noted, 'w1-quizzing'))).toEqual({});
+    expect(stepNotes(withTechnique(noted, null))).toEqual({});
+    const [student] = filterBlocksForStudent([noted]);
+    expect(JSON.stringify(student)).not.toContain('Mine');
+    const { filterBlocksForStudent: serverFilter } = await import('../../../../netlify/functions/_shared/teaching-student.mjs');
+    expect(JSON.stringify(serverFilter([noted]))).not.toContain('Mine');
+  });
+
   it('shows nothing for a block with no WalkThru chosen', async () => {
     const { renderTechniqueBadge } = await import('@/blocks/walkthru-note/badge');
     expect(renderTechniqueBadge({ ...block, settings: {} } as Block)).toBeNull();

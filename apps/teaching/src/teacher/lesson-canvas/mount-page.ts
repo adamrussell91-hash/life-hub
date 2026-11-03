@@ -1,4 +1,5 @@
 import { refreshCalloutReferences } from '@/blocks/callout-reference';
+import { withStepNotes } from '@/blocks/walkthru-note/attach';
 import { questionForLesson } from '@/blocks/question-type';
 import { isLinkedSection } from '@/blocks/composition-link';
 import { offerTimedUndo } from '../../../design-kit/js/hub-feedback.js';
@@ -151,6 +152,8 @@ export type MountBlockCanvasOptions = {
 
 export type BlockCanvasHandle = {
   update(blocks: Block[], nextMedia?: Media[]): void;
+  /** Saves a change made inside a block's preview. The preview stays as it is, so the field being typed in keeps its focus. */
+  patchBlock(blockId: string, change: (block: Block) => Block): void;
   insertType(type: InsertMenuValue): void;
   revealPublishBlock(blockId: string, errorIds?: string[]): void;
   /** Closes the open block editor, if any. */
@@ -1033,6 +1036,18 @@ export function mountBlockCanvas(
       if (selectedId && !findBlockById(blocks, selectedId)) selectedId = null;
       render();
     },
+    patchBlock(blockId: string, change: (block: Block) => Block) {
+      const block = findBlockById(blocks, blockId);
+      if (!block) return;
+      const before = blocks;
+      blocks = replaceBlockInTree(blocks, change(block));
+      // A later redraw reuses these previews instead of closing what the teacher has open.
+      for (const top of blocks) {
+        const kept = previews.get(top.id);
+        if (kept && kept.block !== top && before.includes(kept.block)) kept.block = top;
+      }
+      options.onChange(blocks);
+    },
     insertType(type: InsertMenuValue) {
       if (!canEdit) return;
       const block = newBlock(type);
@@ -1660,7 +1675,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       renderBlock(block, 'teacher', {
         lessonId: lesson.id,
         pageBlocks: lesson.blocks,
-        loadAnthology: () => teacherUnitAnthology(lesson.unit_id)
+        loadAnthology: () => teacherUnitAnthology(lesson.unit_id),
+        saveWalkthruNotes: (id, notes) => canvas.patchBlock(id, (latest) => withStepNotes(latest, notes))
       })
   });
 
