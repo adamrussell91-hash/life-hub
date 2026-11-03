@@ -17,7 +17,8 @@ const STUDENT_PATHS = [
   /^\/s\/classes\/[^/]+$/,
   /^\/s\/classes\/[^/]+\/lessons\/[^/]+$/,
   /^\/s\/classes\/[^/]+\/profile$/,
-  /^\/s\/feedback\/[^/]+$/
+  /^\/s\/feedback\/[^/]+$/,
+  /^\/s\/sheets\/[^/]+$/
 ];
 
 const ASSET_PATH =
