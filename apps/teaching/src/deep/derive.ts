@@ -1,7 +1,7 @@
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block } from '@/schemas/block';
 import { evidenceSteps, piecesTaught } from './block-tags';
-import { PIECE_TARGET, PIECE_TARGET_LABEL, piecesFor, STEP_LABEL, type DeepUnderstanding, type KnowledgePiece, type PlacedStep } from './schema';
+import { piecesFor, STEP_LABEL, type DeepUnderstanding, type KnowledgePiece, type PlacedStep } from './schema';
 
 export type StepTask = { lesson_id: string; block_id: string; title: string };
 /** Where a unit's pieces are taught and tested, and every task that is evidence for each step, read from lesson tags. A step with no task has no entry. */
@@ -60,9 +60,6 @@ export function planGaps(du: DeepUnderstanding, all: readonly DeepUnderstanding[
   if (!du.dot_points.length) gaps.push('Needs a dot point');
   if (!du.concept_bullets.length) gaps.push('Needs a concept bullet');
   const pieces = piecesFor(du, all);
-  const core = pieces.filter((x) => x.tier !== 'sophisticated').length;
-  if (core < PIECE_TARGET.min) gaps.push(`Only ${core} knowledge piece${core === 1 ? '' : 's'} (aim for ${PIECE_TARGET_LABEL} Essential and Strong)`);
-  if (core > PIECE_TARGET.max) gaps.push(`${core} knowledge pieces (aim for ${PIECE_TARGET_LABEL} Essential and Strong)`);
   const untaught = pieces.filter((x) => !p.taught.has(x.id)).length;
   if (untaught) gaps.push(`${untaught} piece${untaught === 1 ? '' : 's'} not taught yet`);
   const untested = pieces.filter((x) => !p.tested.has(x.id)).length;
