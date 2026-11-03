@@ -29,6 +29,7 @@ export async function completeJson({ system, content, apiKey, fetchImpl = fetch,
   }
   if (!response.ok) throw clareFailed(`HTTP ${response.status}`);
   const payload = await response.json().catch(() => null);
+  if (payload?.stop_reason === 'max_tokens') throw clareFailed('the reply was too long');
   const text = payload?.content?.find((block) => block.type === 'text')?.text ?? '';
   try {
     const parsed = JSON.parse(extractJsonText(text));

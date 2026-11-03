@@ -137,7 +137,7 @@ export function mountMinutesCard(options: {
   }
 
   async function runRead(load: () => Promise<ReadInput>, pdfData: string | null, fileKey: string | null): Promise<void> {
-    body.replaceChildren(el('p', 'muted', 'Clare is reading the minutes…'));
+    body.replaceChildren(el('p', 'muted', 'Clare is reading the minutes. This can take a minute or two.'));
     try {
       paintReview(await options.deps.read(await load()), pdfData, fileKey);
     } catch (err) {

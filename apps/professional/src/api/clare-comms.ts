@@ -1,4 +1,4 @@
-import { apiPost } from '@/api/client';
+import { ApiClientError, apiPost } from '@/api/client';
 
 export type ClareContext = {
   title: string;
@@ -55,7 +55,37 @@ export type ClareMinutesReview = {
   differences: Array<{ text: string }>;
 };
 
-export const clareMinutes = (
+type MinutesStatus =
+  | { status: 'reading' }
+  | { status: 'done'; review: ClareMinutesReview }
+  | { status: 'failed'; message: string };
+
+const MINUTES_POLL_MS = 2500;
+const MINUTES_WAIT_MS = 5 * 60_000;
+
+/** Starts Clare's read on the server, then asks until she has finished. */
+export async function clareMinutes(
   context: ClareContext & { agenda_headings: string[] },
-  minutes: { pdf: { media_type: 'application/pdf'; data: string } } | { text: string }
-) => call<ClareMinutesReview>('minutes', { context, minutes });
+  minutes: { pdf: { media_type: 'application/pdf'; data: string } } | { text: string },
+  { pollMs = MINUTES_POLL_MS, waitMs = MINUTES_WAIT_MS }: { pollMs?: number; waitMs?: number } = {}
+): Promise<ClareMinutesReview> {
+  const { job_id: jobId } = await call<{ job_id: string }>('minutes_start', { context, minutes });
+  const deadline = Date.now() + waitMs;
+  let lastError: unknown = null;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+    let reply: MinutesStatus;
+    try {
+      reply = await call<MinutesStatus>('minutes_status', { job_id: jobId });
+    } catch (err) {
+      // A signed-out or refused check won't recover. A dropped one says nothing about the read.
+      if (err instanceof ApiClientError && err.status !== undefined && err.status < 500) throw err;
+      lastError = err;
+      continue;
+    }
+    lastError = null;
+    if (reply.status === 'done') return reply.review;
+    if (reply.status === 'failed') throw new Error(reply.message);
+  }
+  throw lastError instanceof Error ? lastError : new Error('Clare is taking too long with these minutes. Try again.');
+}

@@ -220,6 +220,7 @@ function timelineLabel(
   return `${link.inverse_label} ${endpoint.display_label}`.trim();
 }
 
+let mockMinutesPeople: Array<{ ref: string; name: string }> = [];
 let walkthruArrows: Array<Record<string, unknown>> = [];
 let walkthruPicked: string[] | null = null;
 let walkthruClusters: Array<Record<string, unknown>> | null = null;
@@ -2376,9 +2377,13 @@ export function createMockApi() {
     }
 
     // Minutes card: synthetic review, never real minutes.
-    if (path === '/api/clare/comms' && method === 'POST' && (body as { action?: string }).action === 'minutes') {
-      const people = ((body as { context?: { people?: Array<{ ref: string; name: string }> } }).context?.people ?? []);
-      return json(200, { ok: true, data: {
+    if (path === '/api/clare/comms' && method === 'POST' && (body as { action?: string }).action === 'minutes_start') {
+      mockMinutesPeople = ((body as { context?: { people?: Array<{ ref: string; name: string }> } }).context?.people ?? []);
+      return json(200, { ok: true, data: { job_id: '00000000-0000-4000-8000-000000000000' } });
+    }
+    if (path === '/api/clare/comms' && method === 'POST' && (body as { action?: string }).action === 'minutes_status') {
+      const people = mockMinutesPeople;
+      return json(200, { ok: true, data: { status: 'done', review: {
         sections: [
           { heading: 'Assessment', text: 'Year 10 exams move to Week 8. Draft unit plan to be circulated.' },
           { heading: 'Excursions', text: 'Museum trip pending budget confirmation.' }
@@ -2388,7 +2393,7 @@ export function createMockApi() {
         unmatched: [{ text: 'Follow up with the venue', who_text: 'JT', due: null }],
         decisions: [{ text: 'Year 10 exams move to Week 8', agenda_heading: 'Assessment' }],
         differences: [{ text: 'My notes say the trip was approved; the minutes say it is pending.' }]
-      } });
+      } } });
     }
 
     if (path === '/api/meetings/minutes-file' && method === 'POST') {

@@ -176,25 +176,27 @@ function invalidMinutes(message) {
   return Object.assign(new Error(message), { status: 400, code: 'invalid_minutes' });
 }
 
+/** The model content block for minutes, or a plain 400 when they can't be read. */
+export function minutesSource(minutes) {
+  const pdf = minutes?.pdf;
+  const text = typeof minutes?.text === 'string' ? minutes.text.trim() : '';
+  if (pdf) {
+    if (pdf.media_type !== 'application/pdf' || typeof pdf.data !== 'string' || !pdf.data || pdf.data.length > MINUTES_PDF_MAX_CHARS) {
+      throw invalidMinutes('Send a PDF under 4 MB, or paste the minutes as text.');
+    }
+    return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } };
+  }
+  if (text) return { type: 'text', text: `Minutes:\n${text.slice(0, MINUTES_TEXT_MAX)}` };
+  throw invalidMinutes('Add a PDF or paste the minutes.');
+}
+
 /**
  * Read official minutes (a PDF or pasted text) for the meeting in ctx. Writes nothing:
  * Adam ticks what to keep on the page. Actions for Adam come back as `mine`; actions
  * for an attendee as `others`; anyone Clare cannot place as `unmatched`.
  */
 export async function readMinutes(ctx, minutes, { complete }) {
-  const pdf = minutes?.pdf;
-  const text = typeof minutes?.text === 'string' ? minutes.text.trim() : '';
-  let source;
-  if (pdf) {
-    if (pdf.media_type !== 'application/pdf' || typeof pdf.data !== 'string' || !pdf.data || pdf.data.length > MINUTES_PDF_MAX_CHARS) {
-      throw invalidMinutes('Send a PDF under 4 MB, or paste the minutes as text.');
-    }
-    source = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } };
-  } else if (text) {
-    source = { type: 'text', text: `Minutes:\n${text.slice(0, MINUTES_TEXT_MAX)}` };
-  } else {
-    throw invalidMinutes('Add a PDF or paste the minutes.');
-  }
+  const source = minutesSource(minutes);
   const context = JSON.stringify({
     ...JSON.parse(contextText(ctx)),
     agenda_headings: (Array.isArray(ctx.agenda_headings) ? ctx.agenda_headings : []).slice(0, 40).map((h) => line(h, 200))
@@ -202,7 +204,7 @@ export async function readMinutes(ctx, minutes, { complete }) {
   const reply = await complete({
     system: `${HOUSE}\nTask: these are the official minutes of this meeting, written by someone else. Adam may appear in them as Adam, Mr Russell or AR.\nsections: the minutes split by agenda item, in order, each a heading and its text. Tidy layout only; keep every fact and never change meaning.\nactions: every action item. who is "me" for Adam, otherwise the name or initials exactly as written. due is YYYY-MM-DD only if a date is given; the meeting is ${line(ctx.when, 80)}.\ndecisions: every decision or resolution, with the agenda heading it sits under, using the wording in context.agenda_headings when one matches.\ndifferences: at most 10 places where the minutes and Adam's notes (context.notes) disagree, or where the minutes give Adam an action his notes do not have. One sentence each, in Adam's voice ("My notes say…"). Empty when there are no notes.\nShape: {"sections":[{"heading":string,"text":string}],"actions":[{"who":string,"text":string,"due":string|null}],"decisions":[{"text":string,"agenda_heading":string|null}],"differences":[{"text":string}]}`,
     content: [source, { type: 'text', text: context }],
-    maxTokens: 4000
+    maxTokens: 16000
   });
 
   const sections = (Array.isArray(reply.sections) ? reply.sections : [])
