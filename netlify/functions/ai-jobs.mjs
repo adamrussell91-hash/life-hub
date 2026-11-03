@@ -21,6 +21,7 @@ import { QuizError, gatherAiMarking } from './_shared/quiz.mjs';
 import { gatherVoiceRead } from './_shared/voice-submissions.mjs';
 import { readFeedbackCodes } from './_shared/feedback-codes.mjs';
 import { readStoredSkills } from './_shared/skills-continuum.mjs';
+import { ORGANISER_SUGGEST_JOB_KIND, SuggestError, estimateOrganiserSuggest, gatherOrganiserSuggest } from './_shared/organiser-suggest.mjs';
 
 export const config = { path: '/api/ai/jobs' };
 
@@ -41,7 +42,7 @@ function inboxFrom(jobs) {
 
 const NEXT_STEP_KINDS = new Set(NEXT_STEP_JOB_KINDS);
 /** Structured jobs that run beside a lesson's chat: next steps and AI marking. */
-const SIDE_JOB_KINDS = new Set([...NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND]);
+const SIDE_JOB_KINDS = new Set([...NEXT_STEP_JOB_KINDS, ANSWER_MARK_JOB_KIND, VOICE_READ_JOB_KIND, ORGANISER_SUGGEST_JOB_KIND]);
 
 /** A lesson's open chat job. Next-step and marking jobs run beside the chat, so they never hold it up. */
 export function unresolvedJobForLesson(inbox, lessonId) {
@@ -162,6 +163,47 @@ async function answerMarkJob(request, env, store, deps, value) {
   return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
 }
 
+/**
+ * Ann, suggest lines (`organiser_suggest`): one lesson's text read for organiser lines. `dry_run: true`
+ * answers with the A$ estimate and starts nothing. The job only proposes; the teacher adds what they tick.
+ */
+async function organiserSuggestJob(request, env, store, deps, value) {
+  const lesson_id = typeof value.lesson_id === 'string' ? value.lesson_id : '';
+  if (!lesson_id) return withCors(errorResponse(400, 'validation_error', 'Name the lesson to read.', false), request, env);
+  let gathered;
+  try {
+    gathered = await gatherOrganiserSuggest(store, lesson_id);
+  } catch (error) {
+    if (error instanceof SuggestError) return withCors(errorResponse(error.message === 'Lesson not found.' ? 404 : 400, error.message === 'Lesson not found.' ? 'not_found' : 'validation_error', error.message, false), request, env);
+    throw error;
+  }
+  const estimate = estimateOrganiserSuggest({ ...gathered, models: teachingModelsOf(env) });
+  if (value.dry_run === true) return withCors(okResponse(200, { estimate }), request, env);
+  if (!gathered.lessonText.trim()) return withCors(errorResponse(400, 'validation_error', 'This lesson has no text to read yet.', false), request, env);
+
+  const inbox = (await getJSON(store, aiJobsInboxKey(), STRONG)) ?? { jobs: [] };
+  const open = (inbox.jobs ?? []).find(job => job.kind === ORGANISER_SUGGEST_JOB_KIND && job.status === 'working' && job.lesson_id === lesson_id);
+  const record = open ? await getJSON(store, aiJobKey(open.id), STRONG) : null;
+  if (record?.status === 'working' && !jobIsStale(record, (deps.now ?? Date.now)())) {
+    return withCors(jsonResponse(409, {
+      ok: false,
+      error: { code: 'conflict', message: 'Ann is already reading this lesson', retryable: false, details: { id: record.id, status: record.status } }
+    }), request, env);
+  }
+  const id = newId('ai_job');
+  const job = { id, kind: ORGANISER_SUGGEST_JOB_KIND, lesson_id, status: 'working', message: 'Ann, suggest lines', estimate, phase: 'queued', created_at: new Date().toISOString() };
+  await setJSON(store, aiJobKey(id), job);
+  await writeJobInbox(store, job);
+  const kicked = await (deps.kickLessonJobRun ?? kickLessonJobRun)(request, id);
+  if (!kicked) {
+    const failed = { ...job, status: 'error', phase: undefined, error: 'Could not start the AI runner. Try again.' };
+    await setJSON(store, aiJobKey(id), failed);
+    await writeJobInbox(store, failed);
+    return withCors(okResponse(202, { id, status: 'error', estimate }), request, env);
+  }
+  return withCors(okResponse(202, { id, status: 'working', estimate }), request, env);
+}
+
 /** The AI's read of viva takes on one question (`voice_ai_read`), from To mark. Suggestions only. */
 async function voiceReadJob(request, env, store, deps, value) {
   const lesson_id = typeof value.lesson_id === 'string' ? value.lesson_id : '';
@@ -238,6 +280,7 @@ export function createAiJobsHandler(deps = {}) {
     if (NEXT_STEP_KINDS.has(kind)) return nextStepJob(request, env, store, deps, parsed.value);
     if (kind === ANSWER_MARK_JOB_KIND) return answerMarkJob(request, env, store, deps, parsed.value);
     if (kind === VOICE_READ_JOB_KIND) return voiceReadJob(request, env, store, deps, parsed.value);
+    if (kind === ORGANISER_SUGGEST_JOB_KIND) return organiserSuggestJob(request, env, store, deps, parsed.value);
     if (kind === 'knowledge_intake') {
       const page_id = typeof parsed.value.page_id === 'string' ? parsed.value.page_id.trim() : '';
       const agent = typeof parsed.value.agent === 'string' && parsed.value.agent

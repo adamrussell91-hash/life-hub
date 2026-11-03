@@ -11,6 +11,7 @@ import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs
 import { TOOLS as ALCHEMY_TOOLS } from './alchemy-agent.mjs';
 import { refreshNoteIndex, searchNotes, noteFilters, readNoteText, readAttachmentText } from './alchemy-notes-index.mjs';
 import { writeJobInbox } from '../ai-jobs.mjs';
+import { ORGANISER_SUGGEST_JOB_KIND, gatherOrganiserSuggest, runOrganiserSuggest, SuggestError } from './organiser-suggest.mjs';
 import { LESSON_TOOLS, LESSON_TOOL_NAMES, createLessonToolRunner } from './teaching-lesson-tools.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -458,6 +459,69 @@ export async function runStoredAnswerMarkingJob({
     status: patch.status,
     turns: result.usage?.length ?? 0,
     failed_checks: result.waiting ?? 0,
+    cost_usd: result.cost_usd,
+    usage: result.usage,
+    at: nowIso()
+  });
+  return finish(patch);
+}
+
+/** Ann, suggest lines: reads one lesson and records proposals on the job. It writes nothing to the organiser. */
+export async function runStoredOrganiserSuggestJob({
+  store,
+  jobId,
+  env = process.env,
+  complete,
+  deadlineMs = ANSWER_MARK_JOB_DEADLINE_MS,
+  nowIso = () => new Date().toISOString()
+}) {
+  const job = await getJSON(store, aiJobKey(jobId));
+  if (!job || job.status !== 'working' || job.kind !== ORGANISER_SUGGEST_JOB_KIND || !job.lesson_id) return job;
+  const finish = patch => patchWorkingJob(store, jobId, { ...patch, phase: undefined }, nowIso);
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!complete && !apiKey) return finish({ status: 'error', error: 'Teaching AI is not configured: ANTHROPIC_API_KEY is missing on the server.' });
+
+  let gathered;
+  try {
+    gathered = await gatherOrganiserSuggest(store, job.lesson_id);
+  } catch (error) {
+    if (error instanceof SuggestError) return finish({ status: 'error', error: error.message });
+    throw error;
+  }
+  if (!gathered.lessonText.trim()) return finish({ status: 'error', error: 'This lesson has no text to read yet.' });
+
+  await patchWorkingJob(store, jobId, { phase: 'writing' }, nowIso);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  let result;
+  try {
+    result = await runOrganiserSuggest({ ...gathered, complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }), models: teachingModels(env) });
+  } catch (error) {
+    result = { status: 'error', error: error instanceof Error ? error.message : 'The AI job failed.', proposals: [], dropped: [], usage: [], cost_usd: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const patch = result.status !== 'done'
+    ? { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd }
+    : {
+        status: 'done',
+        response: result.proposals.length ? `${result.proposals.length} line${result.proposals.length === 1 ? '' : 's'} to look at` : 'No new lines to suggest',
+        proposals: result.proposals,
+        dropped: result.dropped.length,
+        usage: result.usage,
+        cost_usd: result.cost_usd,
+        cost_aud: usdToAud(result.cost_usd)
+      };
+  await appendUsageLog(store, {
+    job_id: jobId,
+    lesson_id: job.lesson_id,
+    agent: null,
+    action: ORGANISER_SUGGEST_JOB_KIND,
+    protocol_id: null,
+    status: patch.status,
+    turns: result.usage?.length ?? 0,
+    failed_checks: result.dropped?.length ?? 0,
     cost_usd: result.cost_usd,
     usage: result.usage,
     at: nowIso()
