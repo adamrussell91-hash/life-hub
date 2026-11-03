@@ -14,8 +14,10 @@ export const TASKS_FULL_SUITE_TRIGGERS = [
   /^apps\/tasks\/(fixtures|tests\/helpers)\//,
   /^apps\/tasks\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
   // Render and chrome tests read package CSS as text (problem-solver.css,
-  // design-kit/*.css through the apps/tasks/design-kit symlink).
-  /^packages\/.*\.css$/,
+  // design-kit/*.css through the apps/tasks/design-kit symlink). The generated
+  // block-styles/blocks.css is left out: no Tasks test reads it, and every
+  // Teaching block-style change regenerates it.
+  /^packages\/(?!block-styles\/blocks\.css$).*\.css$/,
   // day-dial-face-bar and overlay-chat-form read these as source text.
   /^packages\/design-kit\/js\/(visual-viewport|calendar\/render-day-dial)\.js$/,
   /^scripts\/pre-pr-check\.mjs$/,

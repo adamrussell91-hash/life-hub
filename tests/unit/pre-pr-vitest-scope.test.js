@@ -22,6 +22,13 @@ test('package CSS that Tasks tests read from disk runs the whole Tasks suite', (
   assert.equal(teaching('packages/problem-solver/problem-solver.css'), undefined);
 });
 
+test('generated block CSS runs no whole suite, because no Tasks test reads it', () => {
+  assert.equal(tasks('packages/block-styles/blocks.css'), undefined);
+  assert.equal(teaching('packages/block-styles/blocks.css'), undefined);
+  assert.equal(tasks('packages/block-styles/other.css'), 'packages/block-styles/other.css');
+  assert.equal(tasks('packages/block-styles/blocks.css', 'packages/design-kit/calendar.css'), 'packages/design-kit/calendar.css');
+});
+
 test('design-kit JS that Tasks tests read as text runs the whole Tasks suite', () => {
   assert.ok(tasks('packages/design-kit/js/visual-viewport.js'));
   assert.ok(tasks('packages/design-kit/js/calendar/render-day-dial.js'));
