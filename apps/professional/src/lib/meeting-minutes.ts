@@ -50,7 +50,7 @@ export type MinutesSaveDeps = {
   createLedgerItem: (body: { person_ref: string; direction: 'you_owe' | 'they_owe'; text: string; comm_ref: string; due?: string | null }) => Promise<{ item: LedgerItem; created: boolean }>;
   makeActionTask: (item: LedgerItem, sourceRef: string) => Promise<LedgerItem>;
   createLooseTask: (title: string, sourceRef: string) => Promise<void>;
-  saveMeeting: (patch: { minutes: MeetingMinutes; decisions: MeetingDecision[]; minutes_pending: null }) => Promise<MeetingRecord>;
+  saveMeeting: (patch: { minutes: MeetingMinutes; decisions: MeetingDecision[]; minutes_pending: null; minutes_draft?: null }) => Promise<MeetingRecord>;
   now?: () => Date;
 };
 
@@ -65,6 +65,8 @@ export type MinutesSaveInput = {
   mine: Array<{ text: string; due: string | null }>;
   others: Array<{ text: string; person_ref: string; due: string | null }>;
   decisions: Array<{ text: string; agenda_heading: string | null }>;
+  /** These minutes were read from the typed draft, so the draft has done its job. */
+  clearDraft?: boolean;
 };
 
 /** Save what Adam ticked. Ledger create is idempotent, so a replaced set of minutes never doubles up. */
@@ -99,5 +101,5 @@ export async function saveMinutesReview(input: MinutesSaveInput, deps: MinutesSa
     added_at: (deps.now?.() ?? new Date()).toISOString(),
     saved_counts: counts
   };
-  return { record: await deps.saveMeeting({ minutes, decisions: merged.decisions, minutes_pending: null }), counts };
+  return { record: await deps.saveMeeting({ minutes, decisions: merged.decisions, minutes_pending: null, ...(input.clearDraft ? { minutes_draft: null } : {}) }), counts };
 }

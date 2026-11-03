@@ -2338,6 +2338,7 @@ export function createMockApi() {
         coaching_sheets: [] as unknown[],
         minutes: null as unknown,
         minutes_pending: null as unknown,
+        minutes_draft: null as unknown,
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -2369,7 +2370,7 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending', 'minutes_draft']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();

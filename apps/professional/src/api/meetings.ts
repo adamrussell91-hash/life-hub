@@ -64,6 +64,7 @@ export function updateMeeting(
     coaching_sheets?: CoachingSheet[];
     minutes?: MeetingMinutes | null;
     minutes_pending?: MeetingMinutesPending | null;
+    minutes_draft?: string | null;
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ meeting: MeetingRecord }> {
