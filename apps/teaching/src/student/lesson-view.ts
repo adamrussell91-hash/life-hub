@@ -99,15 +99,18 @@ export function renderPublishedLessonHero(
   });
   coverHost.querySelector('.entity-banner__eyebrow')?.classList.add('lesson-hero__eyebrow');
 
-  // Use the planner's title overlay and typography, with a semantic heading
-  // instead of its editable input. The banner's decorative title stays hidden.
+  // Use the planner's title typography, with a semantic heading instead of its
+  // editable input. It takes the banner's title slot, so a wrapped title pushes
+  // the eyebrow up rather than sitting on it.
   const titleOverlay = document.createElement('div');
-  titleOverlay.className = 'entity-page-title';
+  titleOverlay.className = 'entity-page-title entity-page-title--in-banner';
   const title = document.createElement('h1');
   title.className = 'entity-page-title__text lesson-hero__title';
   title.textContent = lesson.title;
   titleOverlay.append(title);
-  coverHost.append(titleOverlay);
+  const bannerTitle = coverHost.querySelector('.entity-banner__title');
+  if (bannerTitle) bannerTitle.replaceWith(titleOverlay);
+  else coverHost.append(titleOverlay);
   hero.append(coverHost);
   if (meta) hero.append(meta);
   content.append(hero);
