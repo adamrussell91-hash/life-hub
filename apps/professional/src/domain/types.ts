@@ -376,6 +376,14 @@ export interface MeetingRecord {
   minutes_pending?: MeetingMinutesPending | null;
   /** Text typed or pasted into the Minutes box, kept until minutes read from it are saved. */
   minutes_draft?: string | null;
+  /** Adam's notes under each minutes item, matched by heading. Replacing the minutes leaves them alone. */
+  minutes_notes?: MinutesItemNote[];
+}
+
+export interface MinutesItemNote {
+  key: string;
+  heading: string | null;
+  text: string;
 }
 
 export interface MeetingMinutesPending {
