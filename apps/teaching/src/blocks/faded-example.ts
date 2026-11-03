@@ -204,7 +204,7 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
   };
 
   const nextButton = (i: number): HTMLButtonElement => {
-    const go = el('button', 'btn btn--secondary block-faded__next', i === last ? 'Done' : `On to step ${i + 2}`);
+    const go = el('button', 'btn btn--primary block-faded__next', i === last ? 'Done' : `On to step ${i + 2}`);
     go.type = 'button';
     go.addEventListener('click', () => goNext(i));
     return go;
