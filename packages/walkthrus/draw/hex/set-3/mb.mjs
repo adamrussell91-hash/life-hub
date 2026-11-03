@@ -19,14 +19,14 @@ const checks = [0, 1, 2, 3].flatMap((i) => [0, 1, 2, 3].filter((j) => (i + j) % 
 
 export const figures = {
   'w3-play-detective': HEX([
-    stroke('M44 62 H112 M52 62 L104 88 M104 62 L52 88', W * 1.2),
-    rr(74, 44, 24, 18, 2),
-    person(20, 88, { s: 0.58, turn: 1, arms: [[[-4, 30], [-3, 52]], [[14, 6], [36, 20]]] }),
-    stroke('M51 37 L62 32', 4),
-    disc(69, 28, 8.5),
-    disc(96, 18, 11, INK),
-    stroke('M96 12 V19', 3).replace(INK, PAPER),
-    `<circle cx="96" cy="24.5" r="1.8" fill="${PAPER}"/>`
+    stroke('M44 68 H114 M52 68 V88 M106 68 V88', W * 1.2),
+    rr(56, 56, 40, 12, 2),
+    person(20, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[14, 6], [30, 16]]] }),
+    solid('M12.6 11 Q13 2.6 20 2.6 Q27 2.6 27.4 9.5 L33.5 11 Q35 13 31 13 L12.6 13 Z'),
+    stroke('M48 36 L60 31', 4.4),
+    disc(74, 25, 17),
+    stroke('M74 15 V27', 4.2),
+    `<circle cx="74" cy="34" r="2.6" fill="${INK}"/>`
   ].join('')),
   'w3-ambiguity-and-uncertainty': HEX([
     solid('M20 32 Q20 28 26 28 L52 28 Q59 28 62 32 Q59 36 52 36 L26 36 Q20 36 20 32 Z'),
@@ -58,10 +58,12 @@ export const figures = {
     person(20, 88, { s: 0.58, turn: 1, arms: [[[-4, 30], [-3, 52]], [[14, 8], [24, 32]]] })
   ].join('')),
   'w3-creativity-opportunities-for-choices': HEX([
-    dotted(circleD(32, 46, 27), W), dotted(circleD(88, 46, 27), W), dotted(circleD(60, 28, 23), W),
-    disc(60, 48, 24, INK),
-    pupil(60, 37, { s: 0.8 }),
-    desk(42, 78, 60)
+    dotted('M49 44 L30 30 M60 36 V30 M71 44 L90 30', W),
+    disc(18, 20, 12),
+    rr(47, 3, 26, 26, 2.5, INK),
+    `<path d="M102 6 L116 31 H88 Z" fill="${PAPER}" stroke="${INK}" stroke-width="${W}" stroke-linejoin="round"/>`,
+    pupil(60, 48, { s: 0.8 }),
+    desk(36, 84, 66)
   ].join('')),
   'w3-creativity-opportunities-to-experiment': HEX([
     stroke('M46 62 H112 M52 62 V86 M106 62 V86', W * 1.2),

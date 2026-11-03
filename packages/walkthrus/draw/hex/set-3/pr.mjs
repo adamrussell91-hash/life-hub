@@ -5,6 +5,7 @@ const W = 1.9;
 const rr = (x, y, w, h, rx, fill = PAPER) =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="${INK}" stroke-width="${W}"/>`;
 const ring = (x, y) => [0, 60, 120, 180, 240, 300].map((a) => [x + 13 * Math.cos(a * Math.PI / 180), y + 13 * Math.sin(a * Math.PI / 180)]);
+const solid = (d) => `<path d="${d}" fill="${INK}" stroke="none"/>`;
 const writing = [[[14, 16], [34, 30]], [[12, 20], [38, 30]]];
 const ssddCard = (x, inked, mark) => {
   const c = inked ? PAPER : INK;
@@ -57,11 +58,13 @@ export const figures = {
     arrowTo([75, 20], [44, 20], [60, 30], { w: W })
   ].join('')),
   'w3-sustained-independent-practice': HEX([
-    stroke('M38 60 H112 M48 60 V86 M106 60 V86', W * 1.2),
+    stroke('M38 62 H112 M48 62 V86 M106 62 V86', W * 1.2),
     sitter(22, 60, { s: 0.6, arms: writing }),
-    stroke('M46 56 H68', 2.6),
-    stroke('M80 12 H104 M80 60 H104', 3),
-    `<path d="M83 13 H101 L95 36 L101 59 H83 L89 36 Z" fill="${INK}" stroke="${INK}" stroke-width="${W}"/>`
+    rr(44, 56, 24, 6, 1),
+    stroke('M72 4 H104 M72 60 H104', 2.6),
+    stroke('M76 4 V14 Q76 26 88 32 Q76 38 76 50 V60 M100 4 V14 Q100 26 88 32 Q100 38 100 50 V60', W),
+    solid('M80 16 H96 Q94 24 88 28.5 Q82 24 80 16 Z'),
+    solid('M78 59 Q88 40 98 59 Z')
   ].join('')),
   'w3-teaching-assistants-working-in-tandem': HEX([
     pupil(60, 50, { s: 0.68 }), desk(42, 78, 67),

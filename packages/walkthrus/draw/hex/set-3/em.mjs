@@ -1,5 +1,5 @@
 // Board hexagon figures, Book 3, Explaining and modelling. 120 × 90, pen 1.9.
-import { pen, person, pupil, sitter, bust, talk, think, board, blob, disc, f, INK, PAPER, HEX } from '../../people.mjs';
+import { pen, person, pupil, sitter, bust, talk, think, board, blob, disc, arrowTo, f, INK, PAPER, HEX } from '../../people.mjs';
 pen(1.9);
 const W = 1.9;
 const ln = (d, w = W, c = INK) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${f(w)}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -62,10 +62,11 @@ export const figures = {
     pupil(22, 50, { s: 0.8 }), pupil(98, 50, { s: 0.8 }), box(6, 74, 108, 9)
   ].join('')),
   'w3-graphic-organisers-kernel-sentences': HEX([
-    person(20, 88, { s: 0.6, turn: 1, arms: [[[8, 22], [18, 42]], [[14, 24], [28, 14]]] }),
-    ln('M82 42 L60 16 M82 42 L104 16 M82 42 L82 74', W),
-    box(46, 6, 26, 16), box(92, 6, 22, 16), box(68, 70, 30, 16),
-    box(62, 30, 40, 24, INK, 4), ln('M69 38 H95 M69 46 H87', W, PAPER)
+    person(18, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[12, 10], [26, 2]]] }),
+    ln('M56 12 L72 22 M104 12 L88 22', W),
+    box(44, 3, 20, 13), box(96, 3, 20, 13), box(66, 14, 28, 18, INK, 3),
+    arrowTo([80, 36], [80, 52], null, { w: W }),
+    ln('M46 62 H116', W * 1.5), ln('M46 78 H92', W * 1.5), ball(103, 78, 2.2)
   ].join('')),
   'w3-modelling-handover-i-do-we-do-you-do': HEX([
     ln('M16 20 L40 84 M24 12 L54 84', W * 0.8), ln('M104 20 L80 84 M96 12 L66 84', W * 0.8), ln('M54 12 L44 84 M66 12 L76 84', W * 0.8),

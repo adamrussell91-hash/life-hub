@@ -32,9 +32,11 @@ export const symbols = {
     arrow([36, 80], [12, 60], [12, 80])
   ].join('')),
   'w3-sustained-independent-practice': symbol([
-    rect(5, 14, 46, 72, 4), thin('M14 32H42M14 48H42M14 64H32'),
-    path('M60 10H95M60 90H95'),
-    path('M65 12H90L80 50L90 88H65L75 50Z', FILL)
+    rect(4, 18, 40, 66, 4), thin('M12 34H36M12 50H36M12 66H28'),
+    path('M54 8H96M54 92H96'),
+    path('M60 8V22Q60 40 75 50Q60 60 60 78V92M90 8V22Q90 40 75 50Q90 60 90 78V92'),
+    path('M64 24H86Q84 38 75 46Q66 38 64 24Z', FILL),
+    path('M63 90Q75 62 87 90Z', FILL)
   ].join('')),
   'w3-teaching-assistants-working-in-tandem': symbol([
     circle(14, 50, 10), circle(86, 50, 10), circle(50, 50, 10, true),

@@ -12,12 +12,13 @@ const spines = (y, xs) => xs.map(([x, h]) => r(x, y - h, 7, h, PAPER, 1)).join('
 
 export const figures = {
   'w3-big-questions': HEX([
-    person(50, 88, { s: 0.56, turn: 1, arms: [[[-16, 14], [-24, 28]], [[16, 8], [26, -6]]] }),
-    filled('M43 20 Q41 12 50 11 Q59 12 57 20 Q50 15 43 20 Z'),
-    filled('M41 15 Q39 3 51 3 Q61 4 60 14 L56 13 Q56 8 50 8 Q45 9 45 14 Z'),
-    blob('M16 42 H38 V62 Q38 74 27 79 Q16 74 16 62 Z'),
-    stroke('M27 42 V79 M16 57 H38', W * 0.8),
-    talk(72, 8, 32, 26, [64, 32], { text: '?' })
+    person(46, 88, { s: 0.56, turn: 1, arms: [[[-14, 12], [-20, 28]], [[8, 22], [16, 42]]] }),
+    filled('M39.2 17 A6.9 6.9 0 0 1 52.8 17 Z'),
+    filled('M54 9 Q48 -1 38 3 Q31 7 34 21 L38.5 17 Q37 10 43 8 Q49 6 54 9 Z'),
+    stroke('M64 50 L72 74 M61 53 L68 49', W * 1.2),
+    r(8, 38, 24, 40, PAPER, 4), `<circle cx="20" cy="58" r="4" fill="${PAPER}" stroke="${INK}" stroke-width="${W}"/>`,
+    stroke('M20 42 V54 M20 62 V74', W * 0.8),
+    talk(66, 2, 48, 32, [66, 43], { text: '?' })
   ].join('')),
   'w3-the-museum-curation-analogy': HEX([
     r(18, 52, 36, 36), r(13, 47, 46, 6, PAPER, 1),
@@ -50,10 +51,13 @@ export const figures = {
     paperLine('M63 13 V36', 1.8)
   ].join('')),
   'w3-types-of-subject-knowledge': HEX([
-    stroke('M43 28 Q60 2 77 28 M50 28 Q60 15 70 28 M43 50 Q60 76 77 50 M50 50 Q60 63 70 50', W),
-    person(16, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[10, 12], [22, 18]]] }),
-    person(104, 88, { s: 0.6, turn: -1, arms: [[[-10, 12], [-22, 18]], [[4, 30], [3, 52]]] }),
-    r(36, 28, 18, 22, INK, 2), r(66, 28, 18, 22, PAPER, 2)
+    stroke('M42 20 Q60 2 78 20 M42 62 Q60 80 78 62 M53 30.5 H67 M53 51.5 H67', W),
+    person(14, 88, { s: 0.6, turn: 1, arms: [[[-4, 30], [-3, 52]], [[6, 14], [8, 30]]] }),
+    person(106, 88, { s: 0.6, turn: -1, arms: [[[-6, 14], [-8, 30]], [[4, 30], [3, 52]]] }),
+    filled('M53 26 H42 A15 15 0 0 0 42 56 H53 V47 H42 A6 6 0 0 1 42 35 H53 Z'),
+    paperLine('M47 27 V34 M47 48 V55', 1.8),
+    blob('M67 26 H78 A15 15 0 0 1 78 56 H67 V47 H78 A6 6 0 0 0 78 35 H67 Z'),
+    stroke('M73 26 V35 M73 47 V56', W * 0.8)
   ].join('')),
   'w3-building-a-culture-of-reading': HEX([
     stroke('M12 32 H108 M6 62 H114', W * 1.3),
