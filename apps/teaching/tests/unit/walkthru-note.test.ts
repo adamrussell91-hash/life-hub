@@ -466,10 +466,11 @@ describe('suggestedTechnique', () => {
 });
 
 describe('WalkThru book colour', () => {
-  it('marks each unit prompt with its book, so Book 2 prompts read blue', () => {
+  it('marks each unit prompt with its book, so Book 2 prompts read blue and Book 3 green', () => {
     const prompts = renderPlanningPrompts()!;
     const sets = [...prompts.querySelectorAll<HTMLElement>('.tk-wt-badge')].map((badge) => badge.dataset.set);
     expect(sets).toContain('1');
     expect(sets).toContain('2');
+    expect(sets.filter((set) => set === '3')).toHaveLength(5);
   });
 });
