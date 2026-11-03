@@ -1,15 +1,21 @@
 import './organiser.css';
 import { ApiClientError } from '@/api/client';
+import { getCurriculum } from '@/app/curriculum-state';
 import { navigate } from '@/app/router';
 import { costText } from '@/blocks/next-step-run';
+import { lineColour } from '@/network/colour';
+import { unitNetworkContext } from '@/teacher/network-context';
+import { lessonsByDate } from '@/teacher/unit-lesson-order';
 import { organiserApi } from './api';
-import { fitCells } from './editor-model';
-import type { OrganiserSection, SuggestProposal, TeacherOrganiser } from './types';
+import { conceptColourAt, createSerialQueue, isIdeas, lessonCodes, lineWords, makesCard } from './editor-model';
+import type { OrganiserLine, OrganiserSection, SuggestProposal, TeacherOrganiser } from './types';
+import { renderWeekRow } from './week-row';
 
 /**
- * Organiser card on the lesson page: how many lines this lesson has given the unit's organiser,
- * Add a line, and Ann, suggest lines. Lines added here link to this lesson. Ann runs as a job
- * (never the chat); her proposals are ticked here and only added when the teacher presses the button.
+ * Organiser card on the lesson page: the unit's whole sheet as ticks. A ticked line reaches students
+ * when this lesson is published and its class date arrives, and joins practice the day after. A line
+ * another lesson ticked is shown greyed. Ann runs as a job (never the chat) and only suggests; the
+ * teacher presses the button.
  */
 
 export interface OrganiserCardOptions {
@@ -34,10 +40,6 @@ function button(label: string, className = 'btn btn--ghost ko-btn', onClick?: ()
   return node;
 }
 
-const padded = <T extends HTMLElement>(node: T): T => {
-  node.style.padding = '6px 8px';
-  return node;
-};
 const say = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -55,7 +57,8 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   head.setAttribute('aria-controls', body.id);
   const mainBox = h('div', 'ko-add');
   const annBox = h('div', 'ko-add');
-  body.append(mainBox, annBox);
+  const moreBox = h('div', 'ko-add');
+  body.append(mainBox, annBox, moreBox);
   root.append(head, body);
   host.append(root);
 
@@ -65,21 +68,21 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   let loadFailed = false;
   let message = '';
   let messageBad = false;
-  let sectionId = '';
-  let draft: string[] = [];
+  let codes = new Map<string, string>();
+  let titles = new Map<string, string>();
+  let colourOfKey = new Map<string, string>();
+  const queue = createSerialQueue();
 
   type Estimate = { state: 'idle' | 'loading' | 'ready' | 'error'; cost_aud?: number };
   let estimate: Estimate = { state: 'idle' };
   type Run = { state: 'idle' | 'running' | 'done' | 'error'; text?: string; proposals?: SuggestProposal[] };
   let run: Run = { state: 'idle' };
-  const picked = new Set<number>();
   let pollGeneration = 0;
 
-  const sections = (): OrganiserSection[] => data?.organiser.sections ?? [];
-  const mine = (): Array<{ section: OrganiserSection; line: OrganiserSection['lines'][number] }> =>
-    sections().flatMap((section) => section.lines.filter((line) => line.lesson_id === lesson.id).map((line) => ({ section, line })));
-
-  const waitingLines = (): boolean => mine().some(({ line }) => data?.status[line.id] !== 'released');
+  const sections = (): OrganiserSection[] => (data?.organiser.sections ?? []).filter((s) => !s.off);
+  const allLines = (): Array<{ section: OrganiserSection; line: OrganiserLine }> => sections().flatMap((section) => section.lines.map((line) => ({ section, line })));
+  const mine = (): OrganiserLine[] => allLines().map((x) => x.line).filter((line) => line.lesson_id === lesson.id);
+  const claimedElsewhere = (line: OrganiserLine): boolean => !!line.lesson_id && line.lesson_id !== lesson.id && data?.status[line.id] !== 'lesson_gone';
 
   function paintHead(): void {
     root.classList.toggle('ko-card--open', isOpen);
@@ -90,16 +93,47 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     else if (!data) summary.textContent = 'Loading…';
     else {
       const n = mine().length;
-      summary.textContent = n ? `${plural(n, 'line')} from this lesson${waitingLines() ? ' · students see them once it is published and its date arrives' : ''}` : 'No lines from this lesson yet';
+      summary.textContent = n ? `${plural(n, 'line')} from this lesson` : 'No lines from this lesson yet';
     }
   }
 
-  function currentSection(): OrganiserSection | undefined {
-    return sections().find((s) => s.id === sectionId) ?? sections()[0];
+  function lineTag(line: OrganiserLine): HTMLElement | null {
+    if (line.lesson_id && line.lesson_id !== lesson.id) {
+      if (!claimedElsewhere(line)) return h('span', 'ko-tag', 'Lesson removed');
+      const tag = h('span', 'ko-tag', codes.get(line.lesson_id) ?? 'Another lesson');
+      const name = titles.get(line.lesson_id);
+      if (name) tag.title = name;
+      return tag;
+    }
+    return line.open ? h('span', 'ko-tag', 'Already out') : null;
   }
 
-  function widthOf(section: OrganiserSection): number {
-    return section.kind === 'table' ? (section.columns ?? []).length : 1;
+  function pickRow(section: OrganiserSection, line: OrganiserLine): HTMLElement {
+    const row = h('label', `ko-pick${claimedElsewhere(line) ? ' is-elsewhere' : ''}`);
+    const check = h('input');
+    check.type = 'checkbox';
+    check.checked = !!line.lesson_id && (line.lesson_id === lesson.id || claimedElsewhere(line));
+    check.disabled = claimedElsewhere(line);
+    check.dataset.line = line.id;
+    check.addEventListener('change', () => void tick(line.id, check.checked));
+    const words = h('span');
+    const { head: name, body: text } = lineWords(section, line);
+    if (name) words.append(h('b', undefined, name), ' ');
+    words.append(text);
+    if (!makesCard(section, line) && section.kind === 'table' && !claimedElsewhere(line)) {
+      words.append(h('small', 'ko-pick__warn', section.columns?.find((c) => !c.hide)?.label === 'Prompt' ? 'No prompt yet, so no practice card' : 'Needs both sides to make a practice card'));
+    }
+    row.append(check, words);
+    const tag = lineTag(line);
+    row.append(tag ?? h('span'));
+    return row;
+  }
+
+  function group(name: HTMLElement, section: OrganiserSection): HTMLElement {
+    const box = h('div', 'ko-pickgroup');
+    box.append(name);
+    for (const line of section.lines) box.append(pickRow(section, line));
+    return box;
   }
 
   function paintMain(): void {
@@ -114,130 +148,90 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
       return;
     }
     if (!data) return;
-
-    const lines = mine();
-    if (lines.length) {
-      const scroll = h('div', 'ko-scroll');
-      const table = h('table', 'ko-t');
-      table.style.minWidth = '0';
-      const thead = h('thead');
-      const hr = h('tr');
-      for (const label of ['Section', 'Line', 'What to know', '']) hr.append(padded(h('th', undefined, label)));
-      thead.append(hr);
-      const tbody = h('tbody');
-      for (const { section, line } of lines) {
-        const tr = h('tr');
-        const cells = [section.name, line.cells[0] ?? '', line.cells.slice(1).find((c) => c) ?? ''];
-        for (const text of cells) tr.append(padded(h('td', undefined, text)));
-        const last = h('td');
-        last.style.padding = '4px 8px';
-        if (line.piece_id) last.append(h('span', 'ko-chip', 'Piece'), ' ');
-        const remove = button('✕', 'ko-mini ko-mini--danger', () => {
-          remove.disabled = true;
-          void change({ op: 'delete_line', line_id: line.id });
-        });
-        remove.setAttribute('aria-label', 'Remove this line');
-        last.append(remove);
-        tr.append(last);
-        tbody.append(tr);
-      }
-      table.append(thead, tbody);
-      scroll.append(table);
-      mainBox.append(scroll);
-    }
-
-    const secs = sections();
-    if (!secs.length) {
+    const openUnit = (): void => navigate(`/units/${encodeURIComponent(lesson.unit_id)}`);
+    if (!allLines().length) {
       const row = h('div', 'ko-row');
-      row.append(h('span', 'ko-label', 'This unit has no sections yet. Start its organiser first.'));
-      row.append(button('Open the unit', 'btn btn--ghost ko-btn', () => navigate(`/units/${encodeURIComponent(lesson.unit_id)}`)));
+      row.append(h('span', 'ko-label', 'This unit’s sheet is empty. Write it on the unit page first.'), button('Open the unit', 'btn btn--ghost ko-btn', openUnit));
       mainBox.append(row);
       return;
     }
+    mainBox.append(h('p', 'ko-status', 'Tick what this lesson teaches. Students see it when the lesson’s class date arrives.'));
 
-    const target = currentSection() as OrganiserSection;
-    const pills = h('div', 'ko-pills');
-    pills.append(h('span', 'ko-label', 'Add a line to:'));
-    for (const section of secs) {
-      const pill = button(section.name || 'Untitled', 'ko-pill', () => {
-        sectionId = section.id;
-        draft = [];
-        paintMain();
-      });
-      pill.setAttribute('aria-pressed', String(section.id === target.id));
-      pills.append(pill);
+    const cols = h('div', 'ko-pickcols');
+    const left = h('div');
+    const right = h('div');
+    let at = 0;
+    for (const section of sections()) {
+      if (!section.lines.length) {
+        if (section.role === 'concept') at += 1;
+        continue;
+      }
+      if (isIdeas(section)) {
+        const capsule = h('span', 'ko-capsule', section.name);
+        const colour = section.concept_key && colourOfKey.get(section.concept_key);
+        capsule.style.setProperty('--c', colour || conceptColourAt(at));
+        const name = h('div', 'ko-pickgroup__name');
+        name.append(capsule);
+        left.append(group(name, section));
+        at += 1;
+      } else {
+        right.append(group(h('div', 'ko-pickgroup__name', section.name), section));
+      }
     }
-    const fields = h('div', 'ko-add__fields');
-    const labels = target.kind === 'table' ? (target.columns ?? []).map((c) => c.label) : [target.kind === 'sequence' ? 'Step' : 'Item'];
-    while (draft.length < labels.length) draft.push('');
-    draft = draft.slice(0, labels.length);
-    const submit = (): void => {
-      if (!draft.some((c) => c.trim())) return;
-      const cells = draft.slice();
-      draft = [];
-      void change({ op: 'add_lines', section_id: target.id, lines: [{ cells, lesson_id: lesson.id }] });
-    };
-    labels.forEach((label, i) => {
-      const wrap = h('label', undefined, label);
-      const input = h('input');
-      input.type = 'text';
-      input.maxLength = 400;
-      input.value = draft[i] ?? '';
-      input.addEventListener('input', () => { draft[i] = input.value; });
-      input.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          draft[i] = input.value;
-          submit();
-        }
-      });
-      wrap.append(input);
-      fields.append(wrap);
-    });
-    const actions = h('div', 'ko-actions');
-    actions.append(
-      button('Add line', 'btn btn--primary ko-btn', submit),
-      button('Edit the whole organiser', 'btn btn--quiet ko-btn', () => navigate(`/units/${encodeURIComponent(lesson.unit_id)}`))
-    );
-    mainBox.append(pills, fields, actions);
+    cols.append(left, right);
+    mainBox.append(cols);
   }
 
-  async function change(op: Parameters<typeof organiserApi.change>[1]): Promise<TeacherOrganiser | null> {
-    try {
-      data = await organiserApi.change(lesson.unit_id, op);
-      message = '';
-      messageBad = false;
-      paintAll();
-      return data;
-    } catch (error) {
-      message = say(error, 'That did not save. Try again.');
-      messageBad = true;
-      paintAll();
-      return null;
-    }
+  function paintMore(): void {
+    moreBox.replaceChildren();
+    if (!data || !allLines().length) return;
+    moreBox.append(renderWeekRow(data.organiser, (op) => void change(op)));
+    const actions = h('div', 'ko-actions');
+    actions.append(
+      button('Run with the class', 'btn btn--ghost ko-btn', () => navigate(`/units/${encodeURIComponent(lesson.unit_id)}/organiser/run`)),
+      button('Edit the whole organiser', 'btn btn--quiet ko-btn', () => navigate(`/units/${encodeURIComponent(lesson.unit_id)}`))
+    );
+    moreBox.append(actions);
+  }
+
+  function change(op: Parameters<typeof organiserApi.change>[1]): Promise<TeacherOrganiser | null> {
+    return queue
+      .add(() => organiserApi.change(lesson.unit_id, op))
+      .then((next) => {
+        data = next;
+        message = '';
+        messageBad = false;
+        paintAll();
+        return next;
+      })
+      .catch((error: unknown) => {
+        message = say(error, 'That did not save. Try again.');
+        messageBad = true;
+        paintAll();
+        return null;
+      });
+  }
+
+  function tick(lineId: string, on: boolean): Promise<TeacherOrganiser | null> {
+    return change({ op: 'update_line', line_id: lineId, lesson_id: on ? lesson.id : null });
   }
 
   // ---- Ann ---------------------------------------------------------------------------------
 
   function annLabel(): string {
     return estimate.state === 'ready' && typeof estimate.cost_aud === 'number'
-      ? `Ann, suggest lines (${costText({ cost_aud: estimate.cost_aud })})`
-      : 'Ann, suggest lines';
-  }
-
-  function sectionName(p: SuggestProposal): string {
-    const own = p.section_id ? sections().find((s) => s.id === p.section_id)?.name : p.new_section?.name;
-    return own ?? 'a section';
+      ? `Ann, suggest ticks (${costText({ cost_aud: estimate.cost_aud })})`
+      : 'Ann, suggest ticks';
   }
 
   function paintAnn(): void {
     annBox.replaceChildren();
+    if (!data || !allLines().length) return;
     const row = h('div', 'ko-actions');
-    const ann = button(annLabel(), 'btn btn--primary ko-btn', startRun);
-    ann.disabled = estimate.state !== 'ready' || run.state === 'running' || !data;
+    const ann = button(annLabel(), 'btn btn--ghost ko-btn', startRun);
+    ann.disabled = estimate.state !== 'ready' || run.state === 'running';
     row.append(ann);
     if (estimate.state === 'loading') row.append(h('span', 'ko-label', 'Checking what she would cost…'));
-    if (estimate.state === 'idle' || estimate.state === 'ready') row.append(h('span', 'ko-label', 'The cost shows before she runs.'));
     annBox.append(row);
 
     if (estimate.state === 'error') {
@@ -252,38 +246,28 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     }
     if (run.state === 'error') {
       const fail = h('div', 'ko-actions');
-      fail.append(h('span', 'ko-status ko-status--bad', run.text ?? 'Ann could not suggest lines.'), button('Try again', 'btn btn--ghost ko-btn', startRun));
+      fail.append(h('span', 'ko-status ko-status--bad', run.text ?? 'Ann could not suggest ticks.'), button('Try again', 'btn btn--ghost ko-btn', startRun));
       annBox.append(fail);
     }
     if (run.state === 'done') {
-      const proposals = run.proposals ?? [];
+      const found = (run.proposals ?? []).flatMap((p) => allLines().filter((x) => x.line.id === p.line_id && !x.line.lesson_id));
       const box = h('div', 'ko-ann');
-      if (!proposals.length) {
-        box.append(h('p', 'ko-ann__head', run.text ?? 'Ann found nothing new to add from this lesson.'));
+      if (!found.length) {
+        box.append(h('p', 'ko-ann__head', 'Ann found no more lines this lesson teaches.'));
         box.append(button('Close', 'btn btn--ghost ko-btn', () => { run = { state: 'idle' }; paintAnn(); }));
       } else {
-        box.append(h('p', 'ko-ann__head', 'Ann read this lesson and its knowledge pieces. Keep what you want and edit it after.'));
-        proposals.forEach((p, i) => {
-          const label = h('label');
-          const check = h('input');
-          check.type = 'checkbox';
-          check.checked = picked.has(i);
-          check.addEventListener('change', () => {
-            if (check.checked) picked.add(i);
-            else picked.delete(i);
-          });
-          const text = h('span', 'ko-ann__line');
-          const first = h('span', undefined, p.cells[0] ?? '');
-          if (p.tag) first.append(' ', h('span', 'ko-chip', p.tag));
-          const more = p.cells.slice(1).filter(Boolean).join(' · ');
-          text.append(first, h('small', undefined, `${more ? `${more} · ` : ''}goes in ${sectionName(p)}${p.new_section ? ' (new section)' : ''}`));
-          label.append(check, text);
-          box.append(label);
-        });
+        box.append(h('p', 'ko-ann__head', `Ann thinks this lesson teaches ${plural(found.length, 'more line')}:`));
+        const list = h('ul');
+        for (const { section, line } of found) {
+          const { head: name, body: text } = lineWords(section, line);
+          list.append(h('li', undefined, name ? `${name}: ${text}` : text));
+        }
+        box.append(list);
         const actions = h('div', 'ko-actions');
-        const add = button('Add these lines', 'btn btn--primary ko-btn', () => {
+        const add = button('Tick these', 'btn btn--primary ko-btn', () => {
           add.disabled = true;
-          void addProposals(proposals);
+          run = { state: 'idle' };
+          for (const { line } of found) void tick(line.id, true);
         });
         actions.append(add, button('Close', 'btn btn--quiet ko-btn', () => { run = { state: 'idle' }; paintAnn(); }));
         box.append(actions);
@@ -333,15 +317,12 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
         try {
           const job = await organiserApi.suggestJob(id);
           if (job.status === 'done') {
-            const proposals = job.proposals ?? [];
-            picked.clear();
-            proposals.forEach((_p, i) => picked.add(i));
-            run = { state: 'done', proposals, text: proposals.length ? undefined : 'Ann found nothing new to add from this lesson.' };
+            run = { state: 'done', proposals: job.proposals ?? [] };
             paintAnn();
             return;
           }
           if (job.status === 'error') {
-            run = { state: 'error', text: job.error || 'Ann could not suggest lines. Try again.' };
+            run = { state: 'error', text: job.error || 'Ann could not suggest ticks. Try again.' };
             paintAnn();
             return;
           }
@@ -355,72 +336,28 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     })();
   }
 
-  async function addProposals(all: SuggestProposal[]): Promise<void> {
-    const chosen = all.filter((_p, i) => picked.has(i));
-    if (!chosen.length) return;
-    const bySection = new Map<string, Array<{ cells: string[]; lesson_id: string; piece_id?: string }>>();
-    const created = new Map<string, string>();
-    let skipped = 0;
-    for (const p of chosen) {
-      let target = p.section_id;
-      if (target && !sections().some((s) => s.id === target)) target = undefined;
-      if (!target && p.new_section) {
-        const key = `${p.new_section.kind}|${p.new_section.name.toLowerCase()}`;
-        target = created.get(key);
-        if (!target) {
-          const prior = new Set(sections().map((s) => s.id));
-          const next = await change({
-            op: 'add_section',
-            name: p.new_section.name,
-            kind: p.new_section.kind,
-            ...(p.new_section.kind === 'table' && p.new_section.columns ? { columns: p.new_section.columns } : {})
-          });
-          target = next?.organiser.sections.find((s) => !prior.has(s.id))?.id;
-          if (!target) {
-            skipped += 1;
-            continue;
-          }
-          created.set(key, target);
-        }
-      }
-      const section = sections().find((s) => s.id === target);
-      if (!target || !section) {
-        skipped += 1;
-        continue;
-      }
-      const list = bySection.get(target) ?? [];
-      list.push({ cells: fitCells(p.cells, section), lesson_id: lesson.id, ...(p.piece_id ? { piece_id: p.piece_id } : {}) });
-      bySection.set(target, list);
-    }
-    let added = 0;
-    for (const [sid, lines] of bySection) {
-      const next = await change({ op: 'add_lines', section_id: sid, lines });
-      if (next) added += lines.length;
-      else skipped += lines.length;
-    }
-    run = { state: 'idle' };
-    message = added
-      ? `Added ${plural(added, 'line')}${skipped ? `, ${skipped} could not be added` : ''}. Edit them on the unit page.`
-      : 'None of those lines could be added.';
-    messageBad = !added;
-    paintAll();
-  }
-
   function paintAll(): void {
     if (disposed) return;
     paintHead();
     paintMain();
     paintAnn();
+    paintMore();
   }
 
   function load(): void {
     loadFailed = false;
     paintAll();
-    void organiserApi
-      .get(lesson.unit_id)
-      .then((next) => {
+    void Promise.all([organiserApi.get(lesson.unit_id), getCurriculum().catch(() => null)])
+      .then(([next, curriculum]) => {
         if (disposed) return;
         data = next;
+        const unit = curriculum?.units.find((u) => u.id === lesson.unit_id);
+        if (curriculum && unit) {
+          const lessons = curriculum.lessons.filter((l) => l.unit_id === unit.id);
+          codes = lessonCodes(lessonsByDate(lessons, curriculum.scheduled_lessons.filter((row) => row.unit_id === unit.id)).map((l) => l.id));
+          titles = new Map(lessons.map((l) => [l.id, l.title]));
+          colourOfKey = new Map(unitNetworkContext(curriculum, unit).lines.flatMap((l) => (l.alignment?.kind === 'concept' ? [[l.alignment.key, lineColour(l.colour)] as const] : [])));
+        }
         paintAll();
       })
       .catch(() => {

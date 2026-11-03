@@ -159,6 +159,8 @@ export function anthologyFromLessons(lessons: readonly Lesson[], order: readonly
 export type BringPanelOptions = {
   title: string;
   items: BringItem[];
+  /** Whether a row starts ticked. Defaults to yes. */
+  startTicked?: boolean;
   /** Called with the chosen items; resolves when they are on the sheet. */
   onAdd: (items: BringItem[]) => Promise<void>;
   onClose: () => void;
@@ -185,7 +187,7 @@ export function renderBringPanel(options: BringPanelOptions): HTMLElement {
     const row = document.createElement('label');
     const box = document.createElement('input');
     box.type = 'checkbox';
-    box.checked = true;
+    box.checked = options.startTicked !== false;
     const text = document.createElement('span');
     text.textContent = item.label;
     if (item.piece_id) {

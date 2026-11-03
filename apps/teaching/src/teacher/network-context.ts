@@ -165,7 +165,7 @@ export function settleSkillLines<B extends Block>(blocks: readonly B[], lines: r
   return changed ? next : null;
 }
 
-function unitMapContent(unit: Unit): CurriculumLinesV2Content | undefined {
+export function unitMapContent(unit: Unit): CurriculumLinesV2Content | undefined {
   for (const block of unit.blocks ?? []) {
     if (block.block_type === 'curriculum_lines' && isCurriculumLinesV2(block.content)) return block.content;
   }

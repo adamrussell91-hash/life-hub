@@ -19,7 +19,7 @@
 .kos-btn--primary { background: var(--ko-navy); border-color: var(--ko-navy); color: #fff; }
 .kos-btn--primary:hover { background: #102a49; }
 .kos-btn--quiet { border-color: transparent; background: transparent; color: var(--ko-wave); padding-inline: 8px; }
-.kos-btn:focus-visible, .kos-pill:focus-visible, .kos-tick:focus-visible, .kos-seq:focus-visible, .kos-fold__head:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 2px; }
+.kos-btn:focus-visible, .kos-pill:focus-visible, .kos-tick:focus-visible, .kos-seq:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 2px; }
 .kos-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 .kos-switch, .kos-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -36,11 +36,6 @@
 .kos-prac--calm { background: var(--ko-wash); color: var(--ko-ink); border: 1px solid var(--ko-line); }
 .kos-link { color: var(--ko-wave); font-size: 14px; background: none; border: 0; padding: 8px 0; min-height: 40px; cursor: pointer; text-align: left; font: inherit; }
 
-.kos-folds { display: grid; gap: 12px; }
-.kos-fold { background: var(--ko-card); border: 1px solid var(--ko-line); border-radius: var(--ko-r); overflow: hidden; min-width: 0; }
-.kos-fold__head { width: 100%; min-height: 48px; display: flex; gap: 10px; align-items: center; justify-content: space-between; background: none; border: 0; padding: 12px 16px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
-.kos-fold__head b { color: var(--ko-navy); font-size: 15px; }
-.kos-fold__meta { font-size: 13px; color: var(--ko-muted); }
 .kos-new { display: inline-block; font-size: 11px; font-weight: 600; color: var(--ko-peach-ink); background: var(--ko-peach); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
 .kos-sec { border-top: 1px solid var(--ko-line); padding: 16px; display: grid; gap: 12px; min-width: 0; }
 
@@ -105,3 +100,29 @@
 .kos-end h3 { margin: 0; font-size: 16px; color: #17375e; }
 .kos-end ul { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
 .kos-root[hidden] { display: none; }
+
+/* The organiser as it has grown: concept cards on the left, facts and words on the right. */
+.kos-sheet { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.kos-column { display: grid; gap: 8px; min-width: 0; }
+.kos-concept { --c: var(--ko-wave); background: #fff; border: 1px solid var(--ko-line); border-left: 4px solid var(--c); border-radius: 12px; padding: 8px 12px 6px; min-width: 0; }
+.kos-capsule { background: var(--c); color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600; }
+.kos-concept__line { margin: 3px 0 0; font-weight: 550; color: var(--ko-navy); }
+.kos-stops { margin: 5px 0 2px 6px; padding-left: 22px; position: relative; }
+.kos-stops::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 6px; width: 3px; border-radius: 3px; background: var(--c); }
+.kos-stop { position: relative; padding: 4px 0; }
+.kos-stop::before { content: ""; position: absolute; left: -27px; top: 8px; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 3px solid var(--c); }
+.kos-stop.is-new::before { background: var(--c); }
+.kos-panel { background: #fff; border: 1px solid var(--ko-line); border-radius: 12px; padding: 8px 12px; min-width: 0; }
+.kos-panel__name { margin: 0 0 4px; font-size: 14.5px; color: var(--ko-navy); }
+.kos-pair { padding: 4px 0; border-top: 1px solid var(--ko-line); overflow-wrap: anywhere; }
+.kos-pair b { color: var(--ko-navy); margin-right: 6px; }
+.kos-tier { margin: 7px 0 2px; font-size: 11.5px; font-weight: 600; color: var(--ko-navy); }
+.kos-foot { display: flex; justify-content: flex-end; }
+.kos-quiet { background: none; border: 0; padding: 3px 7px; border-radius: 6px; font: inherit; font-size: 12.5px; color: var(--ko-muted); cursor: pointer; }
+.kos-quiet:hover { background: rgba(20, 43, 81, .05); color: var(--ko-navy); }
+.kos-quiet:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 1px; }
+.kos-stop .kos-new, .kos-pair .kos-new { margin-left: 5px; }
+@media (max-width: 760px) {
+  .kos-sheet { grid-template-columns: minmax(0, 1fr); }
+  .kos-quiet { padding: 10px 8px; }
+}
