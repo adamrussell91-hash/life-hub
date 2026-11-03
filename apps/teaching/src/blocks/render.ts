@@ -64,8 +64,7 @@ import {
   mountCardStackControls
 } from '@/blocks/card-stack';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from '@/schemas/block';
-import { renderOutcomeList } from '@/outcomes/display';
-import type { PublicOutcome } from '@/curriculum/outcome-catalog';
+import { renderWhatHowWhy } from '@/blocks/what-how-why';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
 import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
 import { renderVoiceTask } from '@/blocks/voice-block';
@@ -109,7 +108,6 @@ export type RenderContext = {
   saveScope?: string;
   /** The class a student is viewing the lesson in, for blocks that record against the class (Done). */
   classId?: string;
-  attachedOutcomes?: PublicOutcome[];
   anthology?: AnthologyData;
   /** The unit's class additions to the Anthology map, read and written for this viewer. */
   anthologyKnowledge?: KnowledgeApi;
@@ -1292,26 +1290,6 @@ export function renderCardStackBlock(
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', block.content.title?.trim() || 'Card stack');
   mountCardStackControls(root, cardEls);
-  return wrapBlock(root, block, mode);
-}
-
-export function renderOutcomesBlock(
-  block: Extract<Block, { block_type: 'outcomes' }>,
-  mode: RenderMode,
-  ctx: RenderContext = {}
-): HTMLElement {
-  const root = document.createElement('div');
-  root.className = 'block-outcomes';
-  const heading = document.createElement('h2');
-  heading.className = 'block-outcomes__title block-eyebrow';
-  heading.textContent = 'Outcomes';
-  root.append(heading);
-  root.append(
-    renderOutcomeList(
-      ctx.attachedOutcomes ?? [],
-      'No outcomes tagged on this page yet.'
-    )
-  );
   return wrapBlock(root, block, mode);
 }
 
@@ -2854,7 +2832,7 @@ function renderBlockContent(
     case 'anthology':
       return renderAnthologyBlock(block, mode, ctx);
     case 'outcomes':
-      return renderOutcomesBlock(block, mode, ctx);
+      return renderWhatHowWhy(block, mode, ctx);
     case 'spacer':
       return renderSpacerBlock(block, mode);
     case 'section':

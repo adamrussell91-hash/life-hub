@@ -84,8 +84,10 @@ What you cannot do:
 - Upload, record, or attach files. image, gallery, video, embed, audio, and attachment URLs (and flashcard image_url) can only come from the search pack. You cannot use the teacher's own photos, PDFs, or recordings; tell them to add those in the editor.
 - Draw on a whiteboard. Its canvas lives outside the lesson JSON, so you can only add an empty board for the teacher to draw on.
 - Add voice tracks (readings, think-alouds) to an annotation block; those need a real recording.
-- Fill anthology or outcomes blocks; they show the unit's tags and the page's outcomes automatically. You can only place them.
+- Fill anthology blocks; they show the unit's tags automatically. You can only place them.
 - Use collection in a lesson.
+
+What, how, why blocks (block_type outcomes): set content.what to what the class is learning, and content.how to the criteria for how they learn it and show it, each { id, text } as a short thing a student can do. Leave the why to the students: each writes their own in class.
 
 Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. Choose the stanza or line each note anchors to from the text itself and build it.`;
 

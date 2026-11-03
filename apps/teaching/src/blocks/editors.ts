@@ -5,6 +5,7 @@ import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createDoneEditor } from '@/blocks/done';
+import { createWhatHowWhyFields } from '@/blocks/what-how-why-editor';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
@@ -3335,10 +3336,7 @@ export function createOutcomesEditor(
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'outcomes' }>>,
   getLatest: () => Extract<Block, { block_type: 'outcomes' }> = () => block
 ): HTMLElement {
-  const hint = document.createElement('p');
-  hint.className = 'block-editor__hint';
-  hint.textContent = 'Shows the outcomes tagged on this page.';
-  return editorShell(block, onChange, hint, getLatest);
+  return editorShell(block, onChange, createWhatHowWhyFields(onChange, getLatest), getLatest);
 }
 
 export function createAnnotationEditor(

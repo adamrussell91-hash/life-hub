@@ -148,8 +148,10 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'gallery':
     case 'collection':
     case 'anthology':
-    case 'outcomes':
       walkStrings(c, parts);
+      break;
+    case 'outcomes':
+      parts.push(String(c.what ?? ''), ...((c.how as Array<{ text?: string }> | undefined) ?? []).map((item) => item.text ?? ''));
       break;
     case 'columns': {
       const cols = (c.columns as Array<{ blocks?: Block[] }> | undefined) ?? [];

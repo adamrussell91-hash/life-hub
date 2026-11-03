@@ -14,7 +14,7 @@ import {
 export const TASK_BLOCK_TYPES: ReadonlySet<string> = new Set([
   'rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html', 'html_app',
   'image', 'gallery', 'video', 'embed', 'audio', 'attachment',
-  'accordion', 'table', 'question_set', 'timeline', 'card_stack', 'outcomes',
+  'accordion', 'table', 'question_set', 'timeline', 'card_stack',
   'flashcards', 'cloze', 'self_check',
   'chart', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard',
   'section', 'columns', 'spacer', 'tabs'

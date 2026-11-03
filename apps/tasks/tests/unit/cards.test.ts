@@ -122,7 +122,6 @@ describe('card domain helpers', () => {
     expect(taskPaletteFamilies().map((family) => family.id)).toEqual([
       'Basic',
       'Media',
-      'Teaching',
       'Learning',
       'Visualisation',
       'Layout'

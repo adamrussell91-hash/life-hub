@@ -2101,10 +2101,14 @@ var AnthologyBlockSchema = AnthologyBlockObjectSchema;
 var OutcomesBlockSchema = z11.object({
   id: z11.string().min(1),
   type: z11.literal("block"),
+  // Shows as What, How, Why. The type keeps its old name so blocks already placed carry over.
   block_type: z11.literal("outcomes"),
   variant: z11.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z11.object({}).default({}),
+  content: z11.object({
+    what: z11.string().default(""),
+    how: z11.array(z11.object({ id: z11.string().min(1), text: z11.string() })).default([])
+  }).default({ what: "", how: [] }),
   ...blockLayout,
   ...blockTimestamps
 });

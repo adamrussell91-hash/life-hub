@@ -39,7 +39,7 @@ import { deepBlockLine, deepMenuItems } from '@/deep/block-menu';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
-import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
+import { mountOutcomeStrip } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
@@ -876,8 +876,8 @@ export function mountBlockCanvas(
    * the whole lesson flashed. A block whose object hasn't changed keeps its preview.
    */
   const previews = new Map<string, { block: Block; media: Media[]; el: HTMLElement }>();
-  // These read other blocks or the page's outcomes, so they are drawn fresh.
-  const PAGE_DEPENDENT = new Set<string>(['discern_confirm', 'outcomes']);
+  // These read other blocks, so they are drawn fresh.
+  const PAGE_DEPENDENT = new Set<string>(['discern_confirm']);
 
   /** A new Question in a lesson type with no quiz starts as a written question. */
   function newBlock(type: InsertMenuValue): Block {
@@ -1660,7 +1660,6 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       renderBlock(block, 'teacher', {
         lessonId: lesson.id,
         pageBlocks: lesson.blocks,
-        attachedOutcomes: publicOutcomesForPage(lesson, options.outcomesCatalog ?? []),
         loadAnthology: () => teacherUnitAnthology(lesson.unit_id)
       })
   });

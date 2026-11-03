@@ -60,7 +60,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   tabs: 'Labelled panels of blocks, shown as tabs or as fold-outs.',
   collection: 'Curate a set of related items students browse together.',
   anthology: 'Gather tagged notes across this unit by text, theme, technique and connection.',
-  outcomes: 'Show the outcomes tagged on this page as a readable list.',
+  outcomes: 'Set what the class is learning, how they will show it, and why it matters to each of them.',
   annotation: 'Annotate a poem or passage with revealable teacher notes.',
   teacher_note: 'A private note to yourself. Only you see it; students never do.',
   toolkit_skill: 'Teach a thinking skill (justify, explain, compare …) step by step.',
