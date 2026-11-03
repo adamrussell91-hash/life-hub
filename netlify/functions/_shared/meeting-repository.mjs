@@ -1,5 +1,6 @@
 import {
   MEETING_SCHEMA_VERSION,
+  MEETING_STATE_TRANSITIONS,
   PERMITTED_CREATE_LINK_TYPES,
   assertMeetingStateTransition,
   compareMeetingsSoonestFirst,
@@ -318,7 +319,8 @@ export function createMeetingRepository(deps = {}) {
     const validated = validateMeetingRescheduleInput(input);
     const existing = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
     if (!existing) throw notFound();
-    assertMeetingStateTransition(existing.state, 'rescheduled');
+    // Any meeting's time can be corrected, however old. A closed meeting stays closed.
+    const nextState = MEETING_STATE_TRANSITIONS[existing.state]?.includes('rescheduled') ? 'rescheduled' : existing.state;
     const changedAt = now();
     const historyEntry = {
       scheduled_start: existing.scheduled_start,
@@ -332,7 +334,7 @@ export function createMeetingRepository(deps = {}) {
       scheduled_start: validated.scheduled_start,
       scheduled_end: validated.scheduled_end,
       time_zone: validated.time_zone,
-      state: 'rescheduled',
+      state: nextState,
       occurrence_history: [...(existing.occurrence_history ?? []), historyEntry],
       updated_at: changedAt
     };

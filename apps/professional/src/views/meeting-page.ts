@@ -774,8 +774,9 @@ export async function renderMeetingPage(
   }
 
   function paintAfter(): void {
+    main.append(minutesCard());
     if (record.purpose) main.append(purposeCheckCard());
-    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), minutesCard(), guidesHost, mentions);
+    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), guidesHost, mentions);
     void paintGuides();
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
