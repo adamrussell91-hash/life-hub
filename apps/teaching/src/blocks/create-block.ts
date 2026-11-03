@@ -1,3 +1,4 @@
+import { fadedContent, suggestedBlanks } from '@/schemas/faded';
 import { blankQuestion } from '@/quiz/core';
 import { starterHingeOptions } from '@/blocks/hinge-question/shared';
 import { starterCurriculumLinesContent } from '@/blocks/curriculum-lines/starter';
@@ -732,7 +733,18 @@ export function createBlock(type: NewBlockType, id: string): Block {
         ...shared,
         block_type: 'faded_example',
         variant: 'medium',
-        content: { prompt: '', extract: '', parts: FADED_DEFAULT_PARTS.map((label) => ({ label, answer: '' })), blanks: [] }
+        content: {
+          prompt: '',
+          part_labels: [...FADED_DEFAULT_PARTS],
+          steps: [0, 1, 2, 3].map((i) => ({
+            id: `${id}_s${i + 1}`,
+            extract: '',
+            answers: FADED_DEFAULT_PARTS.map(() => ''),
+            blanks: suggestedBlanks(i, FADED_DEFAULT_PARTS.length),
+            ...(i === 0 ? { question: { prompt: '', choices: ['', ''], correct: 0 } } : {})
+          })),
+          criteria: Object.fromEntries(FADED_DEFAULT_PARTS.map((label) => [label, ['']]))
+        }
       };
     case 'chart':
       return {
@@ -938,6 +950,10 @@ export function cloneBlockWithNewIds(
         cloneBlockWithNewIds(child, nextId, now)
       ) as SectionBlock['content']['blocks']
     };
+  } else if (cloned.block_type === 'faded_example') {
+    // Steps key saved answers, so a copy gets its own.
+    const faded = fadedContent(cloned);
+    cloned.content = { ...faded, steps: faded.steps.map((step) => ({ ...step, id: nextId() })) };
   } else if (cloned.block_type === 'timeline') {
     cloned.content = {
       events: cloned.content.events.map((event) => ({
