@@ -19,6 +19,7 @@ describe('lesson palette catalog', () => {
       'Learning',
       'Visualisation',
       'Layout',
+      'Lesson kits',
       'Compositions'
     ]);
     expect(families.find((f) => f.id === 'Layout')?.cards.some((c) => c.kind === 'block' && c.type === 'collection')).toBe(
@@ -41,7 +42,7 @@ describe('lesson palette catalog', () => {
     expect(empty.find((f) => f.id === 'Compositions')?.disabled).not.toBe(true);
     const withOne = lessonPaletteFamilies([{ id: 'comp_1', title: 'Hook' }]);
     expect(withOne.find((f) => f.id === 'Compositions')?.disabled).not.toBe(true);
-    expect(withOne.find((f) => f.id === 'Compositions')?.cards[0]).toMatchObject({
+    expect(withOne.find((f) => f.id === 'Compositions')?.cards.find((c) => c.kind === 'composition' && c.id === 'comp_1')).toMatchObject({
       kind: 'composition',
       id: 'comp_1',
       title: 'Hook'

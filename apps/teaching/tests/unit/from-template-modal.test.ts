@@ -61,7 +61,7 @@ describe('promptLessonFromTemplate', () => {
     vi.clearAllMocks();
   });
 
-  it('shows a kit dialog when there are no lesson templates, not window.alert', async () => {
+  it('with no saved templates, still offers the built-in MARGE template in a kit dialog, not window.alert', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const promptSpy = vi.spyOn(window, 'prompt').mockImplementation(() => null);
     vi.mocked(listLessonTemplates).mockResolvedValue({ templates: [] });
@@ -72,13 +72,12 @@ describe('promptLessonFromTemplate', () => {
     });
 
     expect(document.body.textContent).toContain('From template');
-    expect(document.body.textContent).toContain(
-      'No lesson templates yet. Save one from a lesson editor.'
-    );
+    const options = [...document.querySelectorAll<HTMLOptionElement>('[data-from-template-field="template_id"] option')].map((o) => o.value);
+    expect(options).toContain('builtin:marge');
     expect(alertSpy).not.toHaveBeenCalled();
     expect(promptSpy).not.toHaveBeenCalled();
 
-    document.querySelector<HTMLButtonElement>('[data-from-template-action="close"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-from-template-action="cancel"]')?.click();
     await expect(pending).resolves.toBeNull();
   });
 
@@ -100,6 +99,8 @@ describe('promptLessonFromTemplate', () => {
     const unitSelect = document.querySelector<HTMLSelectElement>(
       '[data-from-template-field="unit_id"]'
     );
+    // Built-in templates sit first, so the saved one is chosen rather than preselected.
+    templateSelect!.value = 'tpl_1';
     expect(templateSelect?.value).toBe('tpl_1');
     expect(unitSelect?.value).toBe('unit_partial');
     expect(promptSpy).not.toHaveBeenCalled();

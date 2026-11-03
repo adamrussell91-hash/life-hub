@@ -13,6 +13,12 @@
  *   continuum/{lesson}/{block}/{session}/move/{statement}/{symbol}  { pos, why, flagged, at }
  *   continuum/{lesson}/{block}/{session}/groups/{statement}         { groups: [{ id, name, answer_ids }], made_at } (teacher)
  *
+ * Predict mode: each statement has an answer (a place on the line) kept in
+ * the draft. After a reveal the teacher can show it; students get it only
+ * then. A return line (`returns_to`) runs an earlier line's stimulus, scale
+ * and statements again as its own round, so students can place once more at
+ * the end of the lesson.
+ *
  * Each statement in the round has a phase: collect → revealed → replace.
  * Placing is open only while collecting, moving only during re-place.
  * Teacher led: students answer the statement the teacher is on. Student
@@ -70,13 +76,23 @@ function findBlock(blocks, id) {
   return null;
 }
 
-/** The block must exist in both the draft and the published lesson. Returns the published block. */
+/**
+ * The block must exist in both the draft and the published lesson. Returns the
+ * published block, the draft block (which alone holds predict answers) and,
+ * for a return line, the line it returns to.
+ */
 async function assertLive(store, lesson, block) {
   if (!isSafeId(lesson) || !isSafeId(block)) reject(404, 'not_found', 'Activity not found.');
   const [draft, published] = await Promise.all([read(store, draftLessonKey(lesson)), read(store, publishedLessonKey(lesson))]);
-  const live = draft && !isDeletedRecord(draft) && findBlock(draft.blocks, block) && published && findBlock(published.blocks, block);
+  const draftBlock = draft && !isDeletedRecord(draft) ? findBlock(draft.blocks, block) : null;
+  const live = draftBlock && published ? findBlock(published.blocks, block) : null;
   if (!live) reject(404, 'not_published', 'Publish this lesson and block before starting an activity.');
-  return live;
+  const sourceId = live.content?.returns_to;
+  if (!sourceId) return { live, draftBlock, source: null, draftSource: null };
+  const source = isSafeId(sourceId) && sourceId !== block ? findBlock(published.blocks, sourceId) : null;
+  const draftSource = source ? findBlock(draft.blocks, sourceId) : null;
+  if (!source || !draftSource || source.content?.returns_to) reject(409, 'no_source', 'The line this returns to isn’t in the published lesson.');
+  return { live, draftBlock, source, draftSource };
 }
 
 /** Where a snapped statement can land: the two ends and any named stops, evenly spaced. */
@@ -85,19 +101,30 @@ export function snapPoints(stops) {
   return [0, ...Array.from({ length: n }, (_, i) => (i + 1) / (n + 1)), 1];
 }
 
-/** The block's settings, clamped. */
-function settings(block) {
-  const c = block.content ?? {};
+/**
+ * The block's settings, clamped. A return line takes its stimulus, scale,
+ * statements and mode from the line it returns to, and keeps its own pace and
+ * re-place setting. Answers come from the draft only.
+ */
+function settings({ live, draftBlock, source, draftSource }) {
+  const own = live.content ?? {};
+  const c = { ...(source ? source.content : own), pace: own.pace, replace: own.replace };
+  const answers = new Map(
+    ((source ? draftSource : draftBlock)?.content?.statements ?? [])
+      .filter((s) => s && typeof s.answer === 'number' && s.answer >= 0 && s.answer <= 1)
+      .map((s) => [s.id, s.answer])
+  );
   const scale = c.scale ?? {};
   const stops = (Array.isArray(scale.stops) ? scale.stops : []).filter((s) => typeof s === 'string').slice(0, 3);
   return {
     pace: c.pace === 'student' || c.pace === 'self' ? c.pace : 'teacher',
     replace: c.replace !== false,
+    mode: c.mode === 'predict' ? 'predict' : 'opinion',
     scale: { left: String(scale.left ?? ''), right: String(scale.right ?? ''), stops },
     statements: (Array.isArray(c.statements) ? c.statements : [])
       .filter((s) => s && isSafeId(s.id) && typeof s.text === 'string' && s.text.trim())
       .slice(0, 10)
-      .map((s) => ({ id: s.id, text: s.text.trim(), snap: s.snap === true }))
+      .map((s) => ({ id: s.id, text: s.text.trim(), snap: s.snap === true, answer: c.mode === 'predict' ? answers.get(s.id) ?? null : null }))
   };
 }
 
@@ -145,10 +172,22 @@ async function entriesFor(store, k, joined, sid) {
   return joined.map((symbol, i) => ({ symbol, place: places[i], move: moves[i] })).filter((e) => e.place);
 }
 
+/** A predict answer reaches students only after a reveal, once the teacher shows it. */
+const answerShown = (activity, statement) =>
+  statement.answer != null && phaseOf(activity, statement.id) !== 'collect' && activity.phases?.[statement.id]?.answer_shown === true;
+
 function teacherStatement(statement, activity, entries, groups) {
   const phase = phaseOf(activity, statement.id);
   const showMoves = phase === 'replace' && activity.phases?.[statement.id]?.moves_shown === true;
-  const base = { id: statement.id, phase, placed: entries.length, moved: entries.filter((e) => e.move).length, moves_shown: showMoves };
+  const base = {
+    id: statement.id,
+    phase,
+    placed: entries.length,
+    moved: entries.filter((e) => e.move).length,
+    moves_shown: showMoves,
+    answer: statement.answer,
+    answer_shown: answerShown(activity, statement)
+  };
   if (phase === 'collect') return { ...base, entries: entries.map((e) => ({ symbol: e.symbol })), groups: null };
   return {
     ...base,
@@ -165,7 +204,7 @@ function teacherStatement(statement, activity, entries, groups) {
 
 async function teacherAction(store, k, activity, setup, body, opts) {
   const action = body.action ?? 'status';
-  const allowed = ['status', 'go', 'reveal', 'collect', 'replace', 'show_moves', 'group'];
+  const allowed = ['status', 'go', 'reveal', 'collect', 'replace', 'show_moves', 'show_answer', 'group'];
   if (!allowed.includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const statement = action === 'status' ? null : setup.statements.find((s) => s.id === body.statement);
   if (action !== 'status' && action !== 'go' && !statement) reject(400, 'bad_request', 'Unknown statement.');
@@ -181,7 +220,12 @@ async function teacherAction(store, k, activity, setup, body, opts) {
     await saveRound(store, k.base, activity);
   }
   if (action === 'reveal') await setPhase(statement.id, { phase: 'revealed' });
-  if (action === 'collect') await setPhase(statement.id, { phase: 'collect' });
+  if (action === 'collect') await setPhase(statement.id, { phase: 'collect', answer_shown: false });
+  if (action === 'show_answer') {
+    if (statement.answer == null) reject(400, 'no_answer', 'This statement has no answer set.');
+    if (phaseOf(activity, statement.id) === 'collect') reject(409, 'not_revealed', 'Reveal the line first.');
+    await setPhase(statement.id, { answer_shown: body.show !== false });
+  }
   if (action === 'replace') {
     if (!setup.replace) reject(400, 'bad_request', 'This line has no re-place round.');
     if (phaseOf(activity, statement.id) === 'collect') reject(409, 'not_revealed', 'Reveal the line first.');
@@ -230,6 +274,7 @@ async function teacherAction(store, k, activity, setup, body, opts) {
     open: activity.open,
     pace: setup.pace,
     replace: setup.replace,
+    mode: setup.mode,
     current: Math.min(activity.current ?? 0, Math.max(0, setup.statements.length - 1)),
     joined: joined.length,
     statements
@@ -240,7 +285,7 @@ async function studentAction(store, k, activity, setup, body) {
   const action = body.action ?? 'status';
   if (!['status', 'join', 'place', 'move'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (body.session && body.session !== activity.session) reject(409, 'new_session', 'Your teacher started a new round. Join again.');
-  const shared = { phase: 'live', session: activity.session, open: activity.open, pace: setup.pace };
+  const shared = { phase: 'live', session: activity.session, open: activity.open, pace: setup.pace, mode: setup.mode };
   if (!body.token) {
     if (action !== 'status') reject(400, 'not_joined', 'Join the activity first.');
     return shared;
@@ -293,7 +338,8 @@ async function studentAction(store, k, activity, setup, body) {
         placed: entries.length,
         mine: own ? { pos: own.place.pos, reason: own.place.reason, ...(own.move ? { new_pos: own.move.pos, why: own.move.why } : {}) } : null,
         // The class line after a reveal: first positions only, no symbols, no reasons, in a fixed order.
-        class: phase === 'collect' ? null : entries.map((e) => e.place.pos).sort((a, b) => a - b)
+        class: phase === 'collect' ? null : entries.map((e) => e.place.pos).sort((a, b) => a - b),
+        ...(answerShown(activity, s) ? { answer: s.answer } : {})
       };
     })
   );
@@ -320,8 +366,9 @@ function freshRound() {
 export async function continuumAction(store, lesson, block, body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const teacher = opts.teacher === true;
-  const live = await assertLive(store, lesson, block);
-  const setup = settings(live);
+  const found = await assertLive(store, lesson, block);
+  const setup = settings(found);
+  const live = found.source ?? found.live;
   const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 

@@ -213,3 +213,83 @@ test('self-run: reopening keeps the same session so nothing is lost', async () =
   assert.equal(back.open, true);
   assert.equal(back.statements[0].mine.pos, 0.4);
 });
+
+test('predict: answers stay hidden until the teacher reveals and then shows them', async () => {
+  const store = storeFixture({ mode: 'predict', statements: [{ id: 's1', text: 'It will rain by noon.', snap: false, answer: 0.9 }, { id: 's2', text: 'No answer set.', snap: false }] });
+  const { students: [a] } = await startWith(store, 1);
+  await place(store, a, 's1', 0.2, 'Clouds are building.');
+  const before = await teach(store, {});
+  assert.equal(before.mode, 'predict');
+  assert.equal(before.statements[0].answer, 0.9, 'the teacher always sees the answer');
+  assert.equal(before.statements[0].answer_shown, false);
+  await assert.rejects(teach(store, { action: 'show_answer', statement: 's1' }), /Reveal the line first/);
+  await teach(store, { action: 'reveal', statement: 's1' });
+  const revealed = await learn(store, { ...a, action: 'status' });
+  assert.equal(revealed.statements[0].answer, undefined, 'revealing the class line does not show the answer');
+  await teach(store, { action: 'show_answer', statement: 's1' });
+  const shown = await learn(store, { ...a, action: 'status' });
+  assert.equal(shown.statements[0].answer, 0.9);
+  await assert.rejects(teach(store, { action: 'show_answer', statement: 's2' }), /no answer set/);
+  await teach(store, { action: 'collect', statement: 's1' });
+  const hidden = await learn(store, { ...a, action: 'status' });
+  assert.equal(hidden.statements[0].answer, undefined, 'hiding the line hides the answer again');
+});
+
+test('opinion lines never send an answer, even if one is stored', async () => {
+  const store = storeFixture({ statements: [{ id: 's1', text: 'Stored answer, opinion mode.', snap: false, answer: 0.4 }] });
+  const { students: [a] } = await startWith(store, 1);
+  const t = await teach(store, { action: 'reveal', statement: 's1' });
+  assert.equal(t.statements[0].answer, null);
+  await assert.rejects(teach(store, { action: 'show_answer', statement: 's1' }), /no answer set/);
+  assert.equal((await learn(store, { ...a, action: 'status' })).statements[0].answer, undefined);
+});
+
+test('predict answers come from the draft, never the published copy', async () => {
+  const store = storeFixture({ mode: 'predict', statements: [{ id: 's1', text: 'It will rain by noon.', snap: false, answer: 0.9 }] });
+  const pub = structuredClone(store.data.get('published/lessons/lesson1'));
+  pub.blocks[0].content.statements[0].answer = 0.1;
+  store.data.set('published/lessons/lesson1', pub);
+  await startWith(store, 1);
+  assert.equal((await teach(store, {})).statements[0].answer, 0.9);
+});
+
+function returnStore({ sourceContent = {}, returnContent = {}, publishSource = true } = {}) {
+  const source = blockWith({ mode: 'predict', statements: [{ id: 's1', text: 'It will rain by noon.', snap: false, answer: 0.7 }], ...sourceContent });
+  const back = { ...blockWith({ statements: [], stimulus: { kind: 'text', text: '', url: '', alt_text: '' }, pace: 'self', returns_to: 'cl1', ...returnContent }), id: 'cl2' };
+  const store = storeFixture();
+  store.data.set('lessons/lesson1', { blocks: [source, back] });
+  store.data.set('published/lessons/lesson1', { blocks: publishSource ? [source, back] : [back] });
+  return store;
+}
+const backTeach = (store, body) => continuumAction(store, 'lesson1', 'cl2', body, { teacher: true });
+const backLearn = (store, body) => continuumAction(store, 'lesson1', 'cl2', body);
+
+test('return line: runs the source line again as its own round, with its own pace', async () => {
+  const store = returnStore();
+  const t = await backTeach(store, { action: 'start' });
+  assert.equal(t.pace, 'self');
+  assert.equal(t.mode, 'predict');
+  assert.deepEqual(t.statements.map(s => s.id), ['s1']);
+  assert.equal(t.statements[0].answer, 0.7);
+  const [tok] = tokens(1);
+  const joined = await backLearn(store, { token: tok, session: t.session, action: 'join', code: '' });
+  const placed = await backLearn(store, { token: tok, session: joined.session, action: 'place', statement: 's1', pos: 0.65, reason: 'The forecast said so.' });
+  assert.equal(placed.statements[0].mine.pos, 0.65);
+  assert.ok(store.data.has(`continuum/lesson1/cl2/self/place/s1/${placed.symbol}`), 'stored under the return line, not the source');
+});
+
+test('return line: a missing or chained source is refused clearly', async () => {
+  await assert.rejects(backTeach(returnStore({ publishSource: false }), { action: 'start' }), /isn’t in the published lesson/);
+  const chained = returnStore({ sourceContent: { returns_to: 'cl9' } });
+  await assert.rejects(backTeach(chained, { action: 'start' }), /isn’t in the published lesson/);
+});
+
+test('publish strips predict answers from the student copy', async () => {
+  const { filterBlocksForStudent } = await import('../../netlify/functions/_shared/teaching-student.mjs');
+  const block = blockWith({ mode: 'predict', statements: [{ id: 's1', text: 'It will rain by noon.', snap: false, answer: 0.9 }] });
+  const [out] = filterBlocksForStudent([block]);
+  assert.equal(out.content.mode, 'predict');
+  assert.equal(out.content.statements[0].text, 'It will rain by noon.');
+  assert.equal('answer' in out.content.statements[0], false);
+  assert.equal(block.content.statements[0].answer, 0.9, 'the draft is untouched');
+});

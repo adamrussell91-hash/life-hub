@@ -1,5 +1,6 @@
 import { apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
+import { builtinLessonTemplate } from '@/marge/template';
 import type {
   Lesson,
   LessonTemplate,
@@ -61,12 +62,14 @@ export async function useLessonTemplate(options: {
   unitId: string;
   title?: string;
 }): Promise<Lesson> {
-  const template = await getLessonTemplate(options.templateId);
+  const builtin = builtinLessonTemplate(options.templateId);
+  const template = builtin ? null : await getLessonTemplate(options.templateId);
   const created = await postLesson({
-    title: options.title?.trim() || template.title,
+    title: options.title?.trim() || (builtin ? builtin.title.split(' (')[0]! : template!.title),
     unit_id: options.unitId
   });
-  const blocks = cloneBlocksWithNewIds(template.blocks);
+  const freshId = () => `block_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const blocks = builtin ? builtin.build(freshId) : cloneBlocksWithNewIds(template!.blocks);
   const updated: Lesson = {
     ...created,
     blocks,

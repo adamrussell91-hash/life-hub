@@ -29,11 +29,13 @@ import { listBlobKeys } from './blobs-list.mjs';
 import { deviceHash, validToken, walkBlocks } from './question-drop.mjs';
 import { backupForBlock, cleanBackupDraft, hingeBackupSource } from './hinge-backup.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
+import { flagText } from './peer-feedback-filter.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
 const TIMES = [0, 30, 60, 90, 120];
 /** Answers sent a moment after the timer still count: phones lag. */
 const GRACE_MS = 3000;
+const TIERS = new Set(['right', 'close', 'mixup']);
 
 export class HingeError extends Error {
   constructor(status, code, message) {
@@ -71,7 +73,7 @@ function backupOf(draft) {
   if (!b || typeof b.prompt !== 'string' || !b.prompt.trim() || !Array.isArray(b.options)) return null;
   const options = b.options
     .filter((o) => o && typeof o.id === 'string' && typeof o.text === 'string' && o.text.trim())
-    .map((o) => ({ id: o.id, text: o.text, misconception: typeof o.misconception === 'string' ? o.misconception : '' }));
+    .map((o) => ({ id: o.id, text: o.text, misconception: typeof o.misconception === 'string' ? o.misconception : '', ...(TIERS.has(o.tier) ? { tier: o.tier } : {}) }));
   if (options.length < 2 || !options.some((o) => o.id === b.correct_id)) return null;
   return { prompt: b.prompt, options, correct_id: b.correct_id, source: b.source === 'ann' ? 'ann' : 'teacher' };
 }
@@ -85,7 +87,8 @@ function setup(draft, published, round = 'main') {
   const options = (Array.isArray(p.options) ? p.options : []).map((o) => ({
     id: String(o.id),
     text: typeof o.text === 'string' ? o.text : '',
-    misconception: typeof notes.get(o.id)?.misconception === 'string' ? notes.get(o.id).misconception : ''
+    misconception: typeof notes.get(o.id)?.misconception === 'string' ? notes.get(o.id).misconception : '',
+    ...(TIERS.has(notes.get(o.id)?.tier) ? { tier: notes.get(o.id).tier } : {})
   }));
   const moveOn = Number.isInteger(d.move_on) ? Math.min(100, Math.max(1, d.move_on)) : 80;
   const reteach = Number.isInteger(d.reteach) ? Math.min(moveOn - 1, Math.max(0, d.reteach)) : Math.min(50, moveOn - 1);
@@ -233,11 +236,151 @@ async function soloAnswer(store, lesson, block, body, { draft, published, publis
   return { phase: 'solo', mine: body.pick, correct_id: s.correct_id, right };
 }
 
+/* ── Independent mode ─────────────────────────────────────────────────
+ * Outside a lecture, a block set to independent pace runs without a round:
+ * each student picks, says why, optionally says how sure they are, and gets
+ * their own feedback. A miss earns one fresh try on the back-up question,
+ * then they move on regardless; a student still not right is "still stuck"
+ * on the teacher's panel. The right answer, the tiers and the notes come from
+ * the draft; the student never sees the main question's right answer before
+ * their retry is done, and never sees anyone else's answers.
+ *
+ *   hinge/{lesson}/{block}/independent/{device}
+ *     { first: { pick, reason, sure, tier, flagged }, retry?: { … }, retry_skipped?, stuck, done, at }
+ */
+export const INDEPENDENT_REASON_MAX = 280;
+const INDEPENDENT_ACTIONS = ['independent_status', 'independent_answer', 'independent_retry', 'independent_skip'];
+
+/** An answer's tier: the right answer is always right; the rest are close only when the teacher says so. */
+export function hingeTier(option, correctId) {
+  if (!option) return 'mixup';
+  if (option.id === correctId) return 'right';
+  return option.tier === 'close' ? 'close' : 'mixup';
+}
+
+const isIndependent = (draft) => draft.content?.pace === 'independent';
+const independentKey = (lesson, block, device) => `hinge/${lesson}/${block}/independent/${device}`;
+
+function cleanReason(raw) {
+  const reason = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (!reason) reject(400, 'no_reason', 'Say why you think that.');
+  if (reason.length > INDEPENDENT_REASON_MAX) reject(400, 'too_long', `Keep your reason under ${INDEPENDENT_REASON_MAX} characters.`);
+  return reason;
+}
+
+/** One graded try. `sure` is true, false or null (they skipped it). */
+function gradeTry(question, body) {
+  const option = question.options.find((o) => o.id === body.pick);
+  if (!option) reject(400, 'bad_pick', 'Choose one of the answers.');
+  const reason = cleanReason(body.reason);
+  const sure = body.sure === true ? true : body.sure === false ? false : null;
+  return { pick: option.id, reason, sure, tier: hingeTier(option, question.correct_id), flagged: flagText(reason) };
+}
+
+/** What the student sees of a graded try: their pick, tier and the note on the answer they chose. */
+function tryView(question, t) {
+  const note = t.tier === 'right' ? '' : question.options.find((o) => o.id === t.pick)?.misconception ?? '';
+  return { pick: t.pick, sure: t.sure, tier: t.tier, note };
+}
+
+function independentView(record, main, backup) {
+  if (!record?.first) return { phase: 'independent', first: null, retry: null, done: false };
+  const view = { phase: 'independent', first: tryView(main, record.first), retry: null, done: !!record.done };
+  const offered = record.first.tier !== 'right' && backup;
+  if (offered && !record.retry_skipped) {
+    view.retry = {
+      prompt: backup.prompt,
+      options: backup.options.map(({ id, text }) => ({ id, text })),
+      answer: record.retry ? tryView(backup, record.retry) : null,
+      // The back-up's right answer only once the retry is answered.
+      ...(record.retry ? { correct_id: backup.correct_id } : {})
+    };
+  }
+  // The main question's right answer only once the student is finished.
+  if (record.done) view.correct_id = main.correct_id;
+  return view;
+}
+
+async function independentAnswer(store, lesson, block, body, { draft, published, publishedLesson }) {
+  if (publishedLesson?.pedagogical_mode === 'lecture') reject(409, 'lecture', 'In a lecture this question is answered on its own step.');
+  if (!isIndependent(draft)) reject(409, 'not_independent', 'This question is answered with your teacher.');
+  if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to answer.');
+  const main = setup(draft, published, 'main');
+  if (main.options.length < 2 || !main.correct_id) reject(409, 'unfinished', 'This question isn\u2019t ready yet.');
+  const backup = main.backup;
+  const key = independentKey(lesson, block, deviceHash(body.token));
+  let record = await read(store, key);
+  const now = new Date().toISOString();
+
+  if (body.action === 'independent_answer') {
+    if (record?.first) reject(409, 'answered', 'You\u2019ve already answered this one.');
+    const first = gradeTry(main, body);
+    const right = first.tier === 'right';
+    // No back-up to retry on: a miss is final.
+    const done = right || !backup;
+    record = { first, stuck: !right && done, done, at: now };
+    await store.setJSON(key, record);
+  } else if (body.action === 'independent_retry' || body.action === 'independent_skip') {
+    if (!record?.first) reject(409, 'not_answered', 'Answer the first question first.');
+    if (record.done || record.first.tier === 'right' || !backup) reject(409, 'finished', 'You\u2019ve finished this one.');
+    if (body.action === 'independent_retry') {
+      const retry = gradeTry(backup, body);
+      record = { ...record, retry, stuck: retry.tier !== 'right', done: true, at: now };
+    } else {
+      record = { ...record, retry_skipped: true, stuck: true, done: true, at: now };
+    }
+    await store.setJSON(key, record);
+  }
+  return independentView(record, main, backup);
+}
+
+/** The teacher's panel: tallies by tier, "sure and wrong", who is still stuck, and every reason. */
+async function independentReport(store, lesson, block, { draft, published }) {
+  const main = setup(draft, published, 'main');
+  const prefix = `hinge/${lesson}/${block}/independent/`;
+  const list = await listBlobKeys(store, prefix);
+  const records = (await Promise.all(list.map(async (key) => ({ id: key.slice(prefix.length), record: await read(store, key) })))).filter((r) => r.record?.first);
+  records.sort((a, b) => String(a.record.at).localeCompare(String(b.record.at)));
+  const tiers = { right: 0, close: 0, mixup: 0 };
+  const retry = { tried: 0, right: 0 };
+  let sureWrong = 0;
+  const strip = (t) => (t ? { pick: t.pick, reason: t.reason, sure: t.sure ?? null, tier: t.tier, flagged: !!t.flagged } : null);
+  const responses = records.map(({ id, record }) => {
+    if (record.first.tier in tiers) tiers[record.first.tier] += 1;
+    if (record.first.sure === true && record.first.tier !== 'right') sureWrong += 1;
+    if (record.retry) {
+      retry.tried += 1;
+      if (record.retry.tier === 'right') retry.right += 1;
+    }
+    // No accounts: a short, stable id from the device hash tells rows apart.
+    return { id: id.slice(0, 6), first: strip(record.first), retry: strip(record.retry), stuck: !!record.stuck, done: !!record.done, at: record.at ?? null };
+  });
+  return {
+    phase: 'independent',
+    stale: main.stale,
+    ready: main.options.length >= 2 && !!main.correct_id,
+    prompt: main.prompt,
+    options: main.options.map((o) => ({ id: o.id, text: o.text, tier: hingeTier(o, main.correct_id) })),
+    correct_id: main.correct_id,
+    backup: main.backup
+      ? { prompt: main.backup.prompt, options: main.backup.options.map((o) => ({ id: o.id, text: o.text, tier: hingeTier(o, main.backup.correct_id) })), correct_id: main.backup.correct_id }
+      : null,
+    answered: responses.length,
+    tiers,
+    sure_wrong: sureWrong,
+    retry,
+    stuck: responses.filter((r) => r.stuck).map((r) => r.id),
+    responses
+  };
+}
+
 export async function hingeAction(store, lesson, block, body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const teacher = opts.teacher === true;
   const { draft, published, draftLesson, publishedLesson } = await assertLive(store, lesson, block);
   if (!teacher && body.action === 'solo') return soloAnswer(store, lesson, block, body, { draft, published, publishedLesson });
+  if (!teacher && INDEPENDENT_ACTIONS.includes(body.action)) return independentAnswer(store, lesson, block, body, { draft, published, publishedLesson });
+  if (teacher && body.action === 'independent') return independentReport(store, lesson, block, { draft, published });
   const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 

@@ -1,5 +1,5 @@
 import { button, el, field } from '@/blocks/peer-feedback-ui';
-import { LETTERS, MAX_OPTIONS, MIN_OPTIONS, type HingeBlock, type HingeContent, type HingeOption } from './shared';
+import { LETTERS, MAX_OPTIONS, MIN_OPTIONS, paceOf, tierOf, type HingeBlock, type HingeContent, type HingeOption, type HingePace, type HingeTier } from './shared';
 
 const TIMES: Array<{ value: HingeContent['seconds']; label: string }> = [
   { value: 30, label: '30 seconds' },
@@ -35,15 +35,49 @@ function numberField(label: string, value: number, min: number, max: number, onI
 
 type Answers = { options: HingeOption[]; correct_id: string };
 
-/** The answers list with a right-answer pick and a misconception note per wrong answer. */
+const TIER_CHOICES: Array<{ value: HingeTier; label: string }> = [
+  { value: 'right', label: 'Right' },
+  { value: 'close', label: 'Close' },
+  { value: 'mixup', label: 'Mix-up' }
+];
+
+/** Live or independent: how the class answers. */
+function paceChips(value: HingePace, onPick: (pace: HingePace) => void): HTMLElement {
+  const wrap = el('div', 'pf-field hq-editor__pace');
+  wrap.append(el('p', 'pf-field__label', 'How students answer'));
+  const row = el('div', 'hq-chips');
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', 'How students answer');
+  const paint = (current: HingePace) => {
+    for (const b of row.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-pressed', String(b.dataset.value === current));
+  };
+  for (const o of [
+    { value: 'live' as const, label: 'Live: I ask the class' },
+    { value: 'independent' as const, label: 'Independent: on their own' }
+  ]) {
+    const b = button(o.label, 'ghost', () => {
+      paint(o.value);
+      onPick(o.value);
+    });
+    b.className = 'hq-chip';
+    b.dataset.value = o.value;
+    row.append(b);
+  }
+  paint(value);
+  wrap.append(row);
+  return wrap;
+}
+
+/** The answers list with a right-answer pick and a misconception note per wrong answer. In independent mode, a tier per answer. */
 function answersEditor(opts: {
   legend: string;
   hint: string;
   newId: () => string;
   get: () => Answers;
   set: (patch: Partial<Answers>) => void;
-}): HTMLFieldSetElement {
-  const wrap = el('fieldset', 'hq-editor__options');
+  independent: () => boolean;
+}): HTMLFieldSetElement & { repaint: () => void } {
+  const wrap = el('fieldset', 'hq-editor__options') as HTMLFieldSetElement & { repaint: () => void };
   const groupName = nextId('hq-right');
   const setOption = (id: string, patch: Partial<HingeOption>) =>
     opts.set({ options: opts.get().options.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
@@ -77,7 +111,32 @@ function answersEditor(opts: {
       pick.append(radio, el('span', '', 'Right answer'));
 
       const head = el('div', 'hq-editor__head');
-      head.append(letter, text, pick);
+      head.append(letter, text);
+      if (opts.independent()) {
+        // The tier stands in for the right-answer pick: choosing Right marks this one right.
+        const tier = el('select', 'bs-select hq-editor__tier');
+        tier.setAttribute('aria-label', `How near answer ${LETTERS[i]} is`);
+        const now = tierOf(o, correctId);
+        for (const t of TIER_CHOICES) {
+          const option = el('option', undefined, t.label);
+          option.value = t.value;
+          tier.append(option);
+        }
+        tier.value = now;
+        tier.addEventListener('change', () => {
+          const value = tier.value as HingeTier;
+          const cur = opts.get();
+          if (value === 'right') {
+            opts.set({ correct_id: o.id, options: cur.options.map((x) => (x.id === o.id ? { ...x, tier: 'right' as const } : x.id === cur.correct_id ? { ...x, tier: 'mixup' as const } : x)) });
+          } else {
+            opts.set({ correct_id: cur.correct_id === o.id ? '' : cur.correct_id, options: cur.options.map((x) => (x.id === o.id ? { ...x, tier: value } : x)) });
+          }
+          paint();
+        });
+        head.append(tier);
+      } else {
+        head.append(pick);
+      }
       if (options.length > MIN_OPTIONS) {
         const remove = button('Remove', 'ghost', () => {
           const now = opts.get();
@@ -92,7 +151,7 @@ function answersEditor(opts: {
         const note = el('input', 'hq-editor__note');
         note.type = 'text';
         note.maxLength = 300;
-        note.placeholder = 'Picking this means they think…';
+        note.placeholder = opts.independent() ? 'A nudge for a student who picks this…' : 'Picking this means they think…';
         note.setAttribute('aria-label', `Misconception behind answer ${LETTERS[i]}`);
         note.value = o.misconception;
         note.addEventListener('input', () => setOption(o.id, { misconception: note.value }));
@@ -100,7 +159,10 @@ function answersEditor(opts: {
       }
       return row;
     });
-    wrap.replaceChildren(legend, hint, ...rows);
+    const extra = opts.independent()
+      ? [el('p', 'pf-field__hint block-secondary', 'Close: nearly there, so they get a nudge. Mix-up: a common wrong idea. A student who picks a wrong answer sees its note, so write the note to them.')]
+      : [];
+    wrap.replaceChildren(legend, hint, ...extra, ...rows);
     if (options.length < MAX_OPTIONS) {
       wrap.append(
         button('Add an answer', 'secondary', () => {
@@ -110,6 +172,7 @@ function answersEditor(opts: {
       );
     }
   }
+  wrap.repaint = paint;
   paint();
   return wrap;
 }
@@ -132,7 +195,8 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
     hint: 'Mark the right one. For each wrong one, note the misconception a student who picks it probably holds. Only you see the notes.',
     newId: () => `${current.id}_${Date.now().toString(36)}`,
     get: () => ({ options: current.content.options, correct_id: current.content.correct_id }),
-    set: (patch) => set(patch)
+    set: (patch) => set(patch),
+    independent: () => paceOf(current.content) === 'independent'
   });
 
   const timeId = nextId('hq-time');
@@ -195,17 +259,35 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
     hint: 'Mark the right one, and keep the wrong ones as tempting as the originals.',
     newId: () => `${current.id}_bk${Date.now().toString(36)}`.slice(0, 40),
     get: () => ({ options: getBackup().options, correct_id: getBackup().correct_id }),
-    set: (patch) => setBackup(patch)
+    set: (patch) => setBackup(patch),
+    independent: () => paceOf(current.content) === 'independent'
   });
-  backup.append(summary, backupHint, bq.wrap, backupAnswers);
+  const independentHint = el('p', 'pf-field__hint block-secondary', 'In independent mode, a student who misses the main question gets this as one fresh try before moving on.');
+  backup.append(summary, backupHint, independentHint, bq.wrap, backupAnswers);
 
-  root.append(
-    q.wrap,
-    optionsWrap,
-    time,
-    thresholds,
-    backup,
-    el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Ask the class on the block.')
-  );
+  const runNote = el('p', 'pf-note block-secondary');
+  const paceHint = el('p', 'pf-field__hint block-secondary', '');
+  const applyPace = () => {
+    const independent = paceOf(current.content) === 'independent';
+    time.hidden = independent;
+    thresholds.hidden = independent;
+    independentHint.hidden = !independent;
+    paceHint.textContent = independent
+      ? 'Each student answers alone, says why and how sure they are, then gets feedback on their own answer. A miss gets one try at the back-up question. In a lecture it runs as a solo check.'
+      : 'You open and close the question; students answer together and you see the spread.';
+    runNote.textContent = independent
+      ? 'Publish the lesson and students answer it from the lesson link. Your panel on the block shows how they went.'
+      : 'To run it, publish the lesson, close this editor and press Ask the class on the block.';
+  };
+  const pace = paceChips(paceOf(current.content), (p) => {
+    set({ pace: p });
+    applyPace();
+    optionsWrap.repaint();
+    backupAnswers.repaint();
+  });
+  pace.append(paceHint);
+  applyPace();
+
+  root.append(q.wrap, pace, optionsWrap, time, thresholds, backup, runNote);
   return root;
 }

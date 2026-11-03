@@ -583,7 +583,9 @@ export const PeerFeedbackBlockSchema = z.object({
 export const ContinuumStatementSchema = z.object({
   id: z.string().min(1),
   text: z.string().max(300).default(''),
-  snap: z.boolean().default(false)
+  snap: z.boolean().default(false),
+  /** Predict mode: where the statement really sits on the line (0 to 1). Teacher only: publish strips it. */
+  answer: z.number().min(0).max(1).optional()
 });
 export const ContinuumLineBlockSchema = z.object({
   id: z.string().min(1), type: z.literal('block'),
@@ -603,7 +605,11 @@ export const ContinuumLineBlockSchema = z.object({
     }).prefault({ left: 'Implied', right: 'Not implied', stops: [] }),
     statements: z.array(ContinuumStatementSchema).max(10).default([]),
     pace: z.enum(['teacher', 'student', 'self']).default('teacher'),
-    replace: z.boolean().default(true)
+    replace: z.boolean().default(true),
+    /** Opinion: no right answer, the reason is the point. Predict: each statement has an answer the teacher shows after the reveal. Absent means opinion. */
+    mode: z.enum(['opinion', 'predict']).optional(),
+    /** A return line: the id of an earlier continuum line in the lesson. It runs that line's stimulus, scale and statements again, and shows each student where they first put their symbol. */
+    returns_to: z.string().min(1).max(64).optional()
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -634,7 +640,9 @@ export const BrainstormBlockSchema = z.object({
 export const HingeOptionSchema = z.object({
   id: z.string().min(1).max(40),
   text: z.string().max(300).default(''),
-  misconception: z.string().max(300).default('')
+  misconception: z.string().max(300).default(''),
+  /** Independent mode: how near this answer is. Absent: the right answer is right, the rest are mix-ups. */
+  tier: z.enum(['right', 'close', 'mixup']).optional()
 });
 
 export const HingeBackupSchema = z.object({
@@ -658,7 +666,13 @@ export const HingeQuestionBlockSchema = z.object({
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
     backup: HingeBackupSchema.optional(),
     /** Lecture: students must answer before moving on. On unless false. */
-    gate: z.boolean().optional()
+    gate: z.boolean().optional(),
+    /**
+     * Live: the teacher opens and closes a round. Independent: each student
+     * answers alone with a reason, gets their own feedback and one retry on
+     * the back-up question. Absent means live.
+     */
+    pace: z.enum(['live', 'independent']).optional()
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1162,6 +1176,9 @@ export const ConceptMapBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const WhiteboardStarterIdSchema = z.enum(['sort_groups', 'venn', 'same_different']);
+export type WhiteboardStarterId = z.infer<typeof WhiteboardStarterIdSchema>;
+
 export const WhiteboardBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
@@ -1171,6 +1188,8 @@ export const WhiteboardBlockSchema = z.object({
   content: z.object({
     document_id: z.string().min(1),
     seed_document_id: z.string().min(1).optional(),
+    /** Built-in layout drawn into the board the first time it opens with no document (packages/whiteboard/starters.mjs). */
+    starter: WhiteboardStarterIdSchema.optional(),
     title: z.string().optional(),
     height_px: z.number().int().min(360).max(1400).default(640),
     published_snapshot: z.unknown().optional()

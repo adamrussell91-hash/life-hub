@@ -38,6 +38,9 @@ function familyIcon(familyId: string): Element {
       '<circle cx="5" cy="14.2" r="3"/><rect x="12" y="11.2" width="6" height="6" rx="1.4"/><path d="M5 11.2C5 4.2 15 4.2 15 9.4"/><path d="m12.9 7.6 2.1 2 1.9-2.2"/>',
     Layout:
       '<rect x="3" y="3" width="14" height="14" rx="1.3"/><path d="M8.3 3v14"/>',
+    // A page in bands: a lesson kit's ready-made phases.
+    'Lesson kits':
+      '<rect x="4" y="3" width="12" height="14" rx="1.3"/><path d="M4 7.5h12M4 12h12"/>',
     Compositions:
       '<rect x="3.5" y="4" width="9" height="6" rx="1"/><rect x="7.5" y="10" width="9" height="6" rx="1"/>'
   };

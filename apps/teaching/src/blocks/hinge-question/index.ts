@@ -3,7 +3,9 @@ import type { RenderMode, RenderContext } from '@/blocks/render';
 import { mountTeacher } from './teacher';
 import { mountStudent } from './student';
 import { mountSolo } from './solo';
-import { LETTERS, type HingeBlock } from './shared';
+import { mountIndependent } from './independent';
+import { mountIndependentTeacher } from './teacher-independent';
+import { LETTERS, paceOf, type HingeBlock } from './shared';
 import '@/blocks/peer-feedback.css';
 import './hinge-question.css';
 
@@ -40,6 +42,12 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
   }
   if (mode === 'student' && ctx.lecture) {
     root.append(mountSolo(block, ctx.lessonId, ctx.lecture === 'preview'));
+    return root;
+  }
+  // Independent pace (outside a lecture): each student answers alone with a reason; no round to run.
+  if (paceOf(block.content) === 'independent') {
+    root.classList.add('is-independent');
+    root.append(mode === 'teacher' ? mountIndependentTeacher(block, ctx.lessonId, ctx.display === true) : mountIndependent(block, ctx.lessonId));
     return root;
   }
   root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId, prompt, ctx.display === true) : mountStudent(block, ctx.lessonId, prompt));

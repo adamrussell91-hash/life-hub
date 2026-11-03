@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { findBlockById } from '@/blocks/find-block';
 import { el } from '@/blocks/peer-feedback-ui';
 import { parseVideoInput, videoEmbedSrc } from '@/blocks/video-url';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -90,4 +91,37 @@ export function renderStimulus(stimulus: ContinuumBlock['content']['stimulus']):
 /** The statements worth showing: written ones only. */
 export function liveStatements(block: ContinuumBlock): ContinuumBlock['content']['statements'] {
   return block.content.statements.filter((s) => s.text.trim()).slice(0, 10);
+}
+
+/**
+ * A return line shows an earlier line's stimulus, scale, statements and mode,
+ * with its own id, pace and re-place setting. 'missing' when the earlier line
+ * isn't on the page (or is itself a return line). Without the page's blocks
+ * the line renders as it is.
+ */
+export function resolveReturnLine(block: ContinuumBlock, pageBlocks: readonly Block[] | undefined): ContinuumBlock | 'missing' {
+  const sourceId = block.content.returns_to;
+  if (!sourceId) return block;
+  if (!pageBlocks) return block;
+  const source = findBlockById(pageBlocks as Block[], sourceId);
+  if (!source || source.block_type !== 'continuum_line' || source.id === block.id || source.content.returns_to) return 'missing';
+  return {
+    ...block,
+    content: { ...source.content, pace: block.content.pace, replace: block.content.replace, returns_to: sourceId }
+  };
+}
+
+/** Continuum lines in a lesson that a return line can point at: not itself, and not another return line. */
+export function returnSources(pageBlocks: readonly Block[], selfId: string): ContinuumBlock[] {
+  const out: ContinuumBlock[] = [];
+  const walk = (list: readonly Block[]) => {
+    for (const b of list) {
+      if (b.block_type === 'continuum_line' && b.id !== selfId && !b.content.returns_to) out.push(b);
+      if (b.block_type === 'section') walk(b.content.blocks as Block[]);
+      else if (b.block_type === 'columns') for (const c of b.content.columns) walk(c.blocks as Block[]);
+      else if (b.block_type === 'tabs') for (const t of b.content.tabs) walk(t.blocks as Block[]);
+    }
+  };
+  walk(pageBlocks);
+  return out;
 }

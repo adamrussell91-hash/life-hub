@@ -1,3 +1,5 @@
+import { whiteboardStarterScene } from '../../../packages/whiteboard/starters.mjs';
+
 export const WHITEBOARD_CONTENT_STORE = 'hub-whiteboards';
 export const WHITEBOARD_PREFIX = 'documents/';
 
@@ -59,7 +61,9 @@ export async function materialiseWhiteboardSnapshots(blocks, store) {
         if (record?.snapshot) break;
       }
       delete content.seed_document_id;
-      content.published_snapshot = record?.snapshot ?? null;
+      // A starter board nobody has opened yet has no document: freeze the layout itself.
+      content.published_snapshot = record?.snapshot ?? whiteboardStarterScene(content.starter);
+      delete content.starter;
       return { ...block, content };
     }
 

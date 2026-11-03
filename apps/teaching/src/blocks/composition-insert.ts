@@ -1,5 +1,6 @@
 import type { Block } from '@/schemas/block';
 import { cloneBlockWithNewIds } from '@/blocks/create-block';
+import { relinkCopiedBlocks } from '@/blocks/clone-blocks';
 
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
 
@@ -9,5 +10,5 @@ export function insertCompositionRoot(
   nextId: () => string,
   now?: () => string
 ): SectionBlock {
-  return cloneBlockWithNewIds(root, nextId, now) as SectionBlock;
+  return relinkCopiedBlocks([root], [cloneBlockWithNewIds(root, nextId, now) as SectionBlock])[0]!;
 }
