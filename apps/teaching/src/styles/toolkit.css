@@ -2802,3 +2802,19 @@ span.wts-tool__aux { cursor: default; }
 .wts-display-timer.is-done { color: #ff6b5b; }
 .wts-display-timer[hidden] { display: none; }
 @media print { .tk-wt, .tk-wt-badges, .tk-wt-plan, .wts { display: none; } }
+
+/* A block's think-aloud: the teacher's script for modelling their thinking. Teacher view only, never Display. */
+.think-aloud { margin-top: 0.75rem; border: 1px solid #c9b8ef; border-radius: 12px; background: #f4effd; color: #111; }
+.think-aloud__sum { display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0.35rem 0.75rem; cursor: pointer; list-style: none; }
+.think-aloud__sum::-webkit-details-marker { display: none; }
+.think-aloud__sum::after { content: '+'; margin-left: auto; padding-left: 0.5rem; font-weight: 700; color: var(--muted); }
+.think-aloud[open] > .think-aloud__sum::after { content: '–'; }
+.think-aloud__title { font-weight: 700; }
+.think-aloud__meta { color: var(--muted); font-size: 0.85rem; }
+.think-aloud__moves { display: grid; gap: 0.6rem; margin: 0; padding: 0 0.9rem 0.9rem 2.1rem; }
+.think-aloud__ask { margin: 0; font-weight: 600; font-size: 0.9rem; }
+.think-aloud__say { margin: 0.15rem 0 0; white-space: pre-wrap; }
+.think-aloud-edit { display: grid; gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
+.think-aloud-edit__field { display: grid; gap: 0.3rem; }
+.think-aloud-edit__label { font-weight: 600; font-size: 0.9rem; }
+.think-aloud-edit__box { width: 100%; min-height: 3.5rem; resize: vertical; }

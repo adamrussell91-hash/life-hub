@@ -31,6 +31,21 @@ export function loadFusions(): Promise<Fusion[]> {
   return fusionsCache;
 }
 
+/** A cluster on Adam's WalkThrus board, as the picker needs it. */
+export interface BoardClusterLite { id: string; name: string; tiles: Array<{ id: string }> }
+let boardCache: Promise<BoardClusterLite[]> | null = null;
+
+/** The board's clusters (names and tile ids), fetched once per page load. A failed load isn't kept. */
+export function loadBoardClusters(): Promise<BoardClusterLite[]> {
+  boardCache ??= apiGet<{ board: { clusters?: unknown } }>('/api/walkthrus-board').then((r) =>
+    (Array.isArray(r.board?.clusters) ? r.board.clusters : [])
+      .filter((c): c is BoardClusterLite => !!c && typeof c === 'object' && typeof (c as BoardClusterLite).name === 'string' && Array.isArray((c as BoardClusterLite).tiles))
+      .map((c) => ({ id: String(c.id), name: c.name, tiles: c.tiles.filter((t) => t && typeof t.id === 'string').map((t) => ({ id: t.id })) }))
+  );
+  boardCache.catch(() => { boardCache = null; });
+  return boardCache;
+}
+
 /** The step text, fetched once per page load. A failed load isn't kept. */
 export function loadWalkthruText(): Promise<WalkthruText> {
   textCache ??= apiGet<{ text: WalkthruText }>('/api/walkthrus-text').then((r) => r.text);
@@ -91,5 +106,6 @@ export function resetWalkthruNoteCachesForTests(): void {
   textCache = null;
   goalsCache = null;
   fusionsCache = null;
+  boardCache = null;
   pictureCache.clear();
 }

@@ -3,6 +3,7 @@ import {
   orphans,
   type BuildAnchorSelection
 } from '@/blocks/annotation-anchor';
+import { createExemplarEditor } from '@/blocks/annotation-exemplar';
 import { studentStops } from '@/blocks/annotation-layers';
 import {
   applyLineLayout,
@@ -2914,6 +2915,9 @@ export function createAnnotationEditorFields(
     blockConcepts
   );
 
+  // Exemplar saves its own field on the latest block, so the editor's other saves keep it.
+  const exemplarDetails = createExemplarEditor(getLatest, onChange);
+
   // Voice sits with the mode switch, above the poem, so Record is in reach while reading.
   fields.append(
     intro,
@@ -2923,6 +2927,7 @@ export function createAnnotationEditorFields(
     textPane,
     annotatePane,
     layersDetails,
+    exemplarDetails,
     settingsDetails
   );
   setMode(mode);

@@ -6880,3 +6880,50 @@ button.block-annotation__margin-note.is-collapsed:hover {
 .block-question-set__model {
   margin-top: var(--space-2);
 }
+.block-annotation__exemplar {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line, rgba(27, 42, 74, 0.15));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.block-annotation__exemplar-prompt { margin: 0; font-weight: 700; }
+.block-annotation__exemplar-reveal { justify-self: start; min-height: 2.75rem; }
+.block-annotation__exemplar-questions { display: grid; gap: var(--space-1); margin: 0; padding-left: 1.25rem; }
+.block-annotation__exemplar-question { display: flex; gap: var(--space-2); align-items: baseline; }
+.block-annotation__exemplar-kind {
+  flex: none;
+  min-width: 2.75rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--navy, #1b2a4a);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.block-annotation__exemplar-books { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.block-annotation[data-exemplar-revealed='false'] .block-annotation__exemplar:not(.block-annotation__exemplar--print) .block-annotation__exemplar-after { display: none; }
+.block-annotation__piece-placeholder { display: none; }
+.block-annotation[data-exemplar-revealed='false'] .block-annotation__piece-name { display: none; }
+.block-annotation[data-exemplar-revealed='false'] .block-annotation__piece-placeholder { display: inline; }
+.block-annotation__piece { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.block-annotation__piece-label {
+  margin: 0;
+  padding-bottom: var(--space-1);
+  border-bottom: 2px solid var(--line, rgba(27, 42, 74, 0.15));
+  font-size: 0.95rem;
+}
+.block-annotation__stanzas--pieces { grid-template-columns: minmax(0, 1fr); }
+.block-annotation__poem--margin > .block-annotation__stanzas--pieces { width: auto; }
+@media (min-width: 48rem) {
+  .block-annotation__stanzas--pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-5, 2rem); }
+  .block-annotation__stanzas--pieces > .block-annotation__panel { grid-column: 1 / -1; }
+}
+@media print {
+  .block-annotation__stanzas--pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.5rem; }
+}

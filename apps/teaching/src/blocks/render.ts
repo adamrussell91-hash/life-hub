@@ -79,6 +79,7 @@ import type { ClassEvidence } from '@/network/coverage-map/mount';
 import '@/styles/block-anatomy.css';
 import { emitAnswered } from '@/lecture/answered';
 import { renderTechniqueBadge } from '@/blocks/walkthru-note/badge';
+import { renderThinkAloud } from '@/blocks/think-aloud';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 /** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
@@ -2959,6 +2960,8 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
     // The chosen WalkThru is the teacher's alone: never on Display, even before publishing strips it.
     const technique = renderTechniqueBadge(block, { lessonId: ctx.lessonId, display: ctx.display });
     if (technique) attachments.push(technique);
+    const think = renderThinkAloud(block);
+    if (think) attachments.push(think);
   }
   if (attachments.length) {
     // A question keeps its process next to its prompt, before the response space.

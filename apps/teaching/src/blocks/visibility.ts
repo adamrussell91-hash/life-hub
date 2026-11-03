@@ -1,4 +1,5 @@
 import { DEEP_SETTING_KEYS } from '@/deep/block-tags';
+import { THINK_ALOUD_KEY } from '@/blocks/think-aloud';
 import { studentTechniqueScan } from '@/blocks/technique-scan';
 import type { Block } from '@/schemas/block';
 
@@ -119,8 +120,8 @@ function stripTeacherSettings(block: Block): Block {
     out = { ...out, content: rest } as Block;
   }
   const settings = (out as { settings?: Record<string, unknown> }).settings;
-  if (settings && ['walkthru', ...DEEP_SETTING_KEYS].some((key) => Object.prototype.hasOwnProperty.call(settings, key))) {
-    const { walkthru: _chosen, deep_taught: _taught, deep_step: _step, deep_targets: _targets, deep_checks: _checks, deep_skills: _skills, ...rest } = settings;
+  if (settings && ['walkthru', THINK_ALOUD_KEY, ...DEEP_SETTING_KEYS].some((key) => Object.prototype.hasOwnProperty.call(settings, key))) {
+    const { walkthru: _chosen, think_aloud: _script, deep_taught: _taught, deep_step: _step, deep_targets: _targets, deep_checks: _checks, deep_skills: _skills, ...rest } = settings;
     out = { ...out, settings: rest } as Block;
   }
   return out;

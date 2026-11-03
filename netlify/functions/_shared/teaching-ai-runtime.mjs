@@ -2486,6 +2486,20 @@ var AnnotationBlockSettingsSchema = z12.object({
   /** How notes are drawn on the text. Absent = fineliner. */
   ink_style: z12.enum(["fineliner", "highlighter"]).optional()
 });
+var AnnotationExemplarQuestionSchema = z12.object({
+  id: z12.string().min(1).max(40),
+  kind: z12.enum(["what", "why", "how"]),
+  text: z12.string().trim().max(300)
+});
+var AnnotationExemplarSchema = z12.object({
+  kind: z12.enum(["single", "compare", "counter"]),
+  /** What the exemplar shows, e.g. "a topic sentence that argues". */
+  focus: z12.string().trim().max(120).optional(),
+  labels: z12.array(z12.string().trim().max(40)).max(2).default([]),
+  split_at: z12.string().min(1).optional(),
+  hide_labels: z12.boolean().default(false),
+  questions: z12.array(AnnotationExemplarQuestionSchema).max(8).default([])
+});
 var AnnotationBlockObjectSchema = z12.object({
   id: z12.string().min(1),
   type: z12.literal("block"),
@@ -2500,6 +2514,7 @@ var AnnotationBlockObjectSchema = z12.object({
     annotations: z12.array(AnnotationItemSchema).default([]),
     voice_tracks: z12.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
+    exemplar: AnnotationExemplarSchema.optional(),
     settings: AnnotationBlockSettingsSchema.prefault({ show_markers: true })
   }),
   ...blockLayout,

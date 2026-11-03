@@ -76,7 +76,7 @@ describe('Add lens picker', () => {
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     document.body.append(editor);
     const items = [...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent);
-    expect(items).toEqual(['Add lens…', 'Add WalkThru…']);
+    expect(items).toEqual(['Add lens…', 'Add WalkThru…', 'Add think-aloud…']);
     click(editor, 'Add lens…');
     expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Literature', 'Questioning', 'Writing', 'Thinking', 'Frameworks', 'Judgement', 'Thinking toolkit']);
     click(editor, 'DiscernInitial answer → against → for → step back');
@@ -90,7 +90,7 @@ describe('Add lens picker', () => {
     // Two sleeves is the most a block holds.
     for (const sleeve of SLEEVE_LENSES.slice(0, 2)) block = sleeve.write(block, sleeve.create());
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
-    expect([...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent)).toEqual(['Add WalkThru…']);
+    expect([...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent)).toEqual(['Add WalkThru…', 'Add think-aloud…']);
     expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(15);
   });
 });

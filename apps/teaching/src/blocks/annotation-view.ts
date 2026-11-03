@@ -60,6 +60,7 @@ import {
 } from '@/blocks/voice-note-player';
 import { renderElementCard, type TechniqueCardPoemSpot } from '@/blocks/technique-card';
 import { renderAnnotationCode } from '@/blocks/annotation-code-field';
+import { groupIntoPieces, renderExemplarHeader } from '@/blocks/annotation-exemplar';
 import {
   buildTechniqueTile,
   buildTileCard,
@@ -802,6 +803,7 @@ function buildInteractiveView(
     attr.textContent = content.attribution.trim();
     root.append(attr);
   }
+  if (content.exemplar) root.append(renderExemplarHeader(content.exemplar, root));
 
   const layout = document.createElement('div');
   layout.className = 'block-annotation__layout';
@@ -1752,6 +1754,8 @@ function buildInteractiveView(
       stanzaEl.append(linesCol);
       stanzasHost.append(stanzaEl);
     }
+    // An exemplar's pieces: the drawn stanzas regrouped into labelled columns.
+    if (content.exemplar) groupIntoPieces(stanzasHost, content);
 
     poemHost.append(stanzasHost);
     textCol.append(poemHost);
@@ -1914,6 +1918,7 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
     attr.textContent = content.attribution.trim();
     root.append(attr);
   }
+  if (content.exemplar) root.append(renderExemplarHeader(content.exemplar, root, { print: true }));
 
   const placed = placedFor(content, 'print');
   const threadAnns = threadsOf({ content } as AnnotationBlock).filter((ann) =>
@@ -1935,9 +1940,16 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
     footnoteById.set(`voice:${clip.track.id}:${clip.id}`, fn++);
   }
 
+  // An exemplar prints its pieces as labelled columns; any other text keeps its flat stanzas.
+  const printStanzas = content.exemplar ? document.createElement('div') : root;
+  if (content.exemplar) {
+    printStanzas.className = 'block-annotation__stanzas';
+    root.append(printStanzas);
+  }
   for (const stanza of content.text.stanzas) {
     const stanzaEl = document.createElement('div');
     stanzaEl.className = 'block-annotation__stanza';
+    stanzaEl.dataset.stanzaId = stanza.id;
     for (const line of stanza.lines) {
       const p = document.createElement('p');
       p.className = 'block-annotation__line-text';
@@ -1979,8 +1991,9 @@ function buildPrintView(content: AnnotationContent): HTMLElement {
       }
       stanzaEl.append(p);
     }
-    root.append(stanzaEl);
+    printStanzas.append(stanzaEl);
   }
+  if (content.exemplar) groupIntoPieces(printStanzas, content);
 
   if (nonThreadPlaced.length > 0 || threadAnns.length > 0 || voiceClips.length > 0) {
     const notes = document.createElement('ol');
