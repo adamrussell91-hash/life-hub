@@ -1869,7 +1869,21 @@
 
 .qz-deck__track {
   min-width: 0;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
+}
+
+.qz-deck__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.qz-deck__foot [hidden] {
+  display: none;
+}
+
+.qz-deck__foot > :last-child {
+  margin-left: auto;
 }
 
 .qz-deck__card[hidden] {

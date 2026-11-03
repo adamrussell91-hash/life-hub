@@ -1112,7 +1112,7 @@ export function renderSectionBlock(
 
   const body = document.createElement('div');
   body.className = 'block-section__body';
-  appendWithQuizDecks(body, block.content.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
+  appendWithQuizDecks(body, block.content.blocks, (child) => renderBlock(child, mode, ctx), quizDeckMode(mode, ctx));
 
   section.append(title, body);
   return wrapBlock(section, block, mode);
@@ -1135,7 +1135,7 @@ export function renderColumnsBlock(
     const cell = document.createElement('div');
     cell.className = 'block-columns__col';
     cell.dataset.width = String(col.width);
-    appendWithQuizDecks(cell, col.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
+    appendWithQuizDecks(cell, col.blocks, (child) => renderBlock(child, mode, ctx), quizDeckMode(mode, ctx));
     grid.append(cell);
   }
 
@@ -1379,7 +1379,7 @@ export function renderTabsBlock(
       fold.addEventListener('toggle', () => {
         if (fold.open && !body.dataset.built) {
           body.dataset.built = '1';
-          appendWithQuizDecks(body, panelData.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
+          appendWithQuizDecks(body, panelData.blocks, (child) => renderBlock(child, mode, ctx), quizDeckMode(mode, ctx));
         }
       });
       root.append(fold);
@@ -1410,7 +1410,7 @@ export function renderTabsBlock(
       panel.hidden = !active;
       if (active && !panel.dataset.built) {
         panel.dataset.built = '1';
-        appendWithQuizDecks(panel, block.content.tabs[i]!.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
+        appendWithQuizDecks(panel, block.content.tabs[i]!.blocks, (child) => renderBlock(child, mode, ctx), quizDeckMode(mode, ctx));
       }
     });
   }
@@ -2913,6 +2913,12 @@ function turnIntoSleeveButton(block: Block, ctx: RenderContext): HTMLElement | n
 
 /** Practice blocks show their student view on the class display, so answers stay hidden until revealed there. */
 const STUDENT_VIEW_ON_DISPLAY: ReadonlySet<string> = new Set(['flashcards', 'cloze', 'self_check', 'faded_example']);
+
+/** Teachers get decks everywhere; students only where questions are answered in place. */
+function quizDeckMode(mode: RenderMode, ctx: RenderContext): 'teacher' | 'student' | null {
+  if (mode === 'teacher') return 'teacher';
+  return mode === 'student' && ctx.quizSlot ? 'student' : null;
+}
 
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const contentMode = mode === 'teacher' && ctx.display && STUDENT_VIEW_ON_DISPLAY.has(block.block_type) ? 'student' : mode;

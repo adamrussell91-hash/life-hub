@@ -136,4 +136,27 @@ describe('quiz questions answered where they sit', () => {
     expect((slots.get('block_q2') as HTMLElement).querySelector('.qz-player')).toBeTruthy();
     page.remove();
   });
+
+  it('tells each slot whether it holds an answer, and asks its deck to turn to a blank one', async () => {
+    state = { ...base, current };
+    const slots = new Map([['block_q1', document.createElement('div')], ['block_q2', document.createElement('div')]]);
+    const turned: string[] = [];
+    const row = document.createElement('div');
+    row.addEventListener('lesson-row-reveal', (event) => turned.push((event.target as HTMLElement).dataset.id ?? ''));
+    slots.forEach((slot, id) => {
+      slot.dataset.id = id;
+      slot.scrollIntoView = vi.fn();
+      row.append(slot);
+    });
+    const root = mountStudentQuiz(lesson, { slots });
+    await settle();
+    expect(slots.get('block_q2')!.dataset.quizAnswered).toBe('false');
+    const input = slots.get('block_q2')!.querySelector('input, textarea') as HTMLInputElement;
+    input.value = 'Mars';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(slots.get('block_q2')!.dataset.quizAnswered).toBe('true');
+    expect(slots.get('block_q1')!.dataset.quizAnswered).toBe('false');
+    buttonNamed(root, /^Question 1$/)!.click();
+    expect(turned).toEqual(['block_q1']);
+  });
 });

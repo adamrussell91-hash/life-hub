@@ -1,3 +1,5 @@
+import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
+
 /**
  * `#block=<id>` deep links (curriculum map stops that point at one activity):
  * once the lesson is on the page, scroll that block into view and mark it
@@ -19,6 +21,8 @@ export function revealBlockFromHash(root: ParentNode, attempts = 20): void {
       if (left > 0) setTimeout(() => tryReveal(left - 1), 100);
       return;
     }
+    // A question in a deck may be on another card, so the deck turns to it first.
+    target.dispatchEvent(new CustomEvent(ROW_REVEAL_EVENT, { bubbles: true }));
     target.scrollIntoView({ block: 'start', behavior: 'smooth' });
     target.classList.add('block--linked');
     setTimeout(() => target.classList.remove('block--linked'), 2400);
