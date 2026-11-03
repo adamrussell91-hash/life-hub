@@ -1604,6 +1604,28 @@ export const AnnotationBlockSettingsSchema = z.object({
   ink_style: z.enum(['fineliner', 'highlighter']).optional()
 });
 
+/**
+ * An annotation block used as an exemplar. `single` is one model piece; `compare` sets a stronger
+ * piece beside a nearly-there one; `counter` sets an example beside a counterexample. Two-piece
+ * kinds split the one text at `split_at` (the first stanza of the second piece) and show the pieces
+ * side by side, so notes and threads still work across both. With `hide_labels` the pieces read
+ * A and B until revealed, which also reveals the questions. Students answer in their books.
+ */
+export const AnnotationExemplarQuestionSchema = z.object({
+  id: z.string().min(1).max(40),
+  kind: z.enum(['what', 'why', 'how']),
+  text: z.string().trim().max(300)
+});
+export const AnnotationExemplarSchema = z.object({
+  kind: z.enum(['single', 'compare', 'counter']),
+  /** What the exemplar shows, e.g. "a topic sentence that argues". */
+  focus: z.string().trim().max(120).optional(),
+  labels: z.array(z.string().trim().max(40)).max(2).default([]),
+  split_at: z.string().min(1).optional(),
+  hide_labels: z.boolean().default(false),
+  questions: z.array(AnnotationExemplarQuestionSchema).max(8).default([])
+});
+
 /** Plain object — must stay ZodObject for discriminatedUnion leaf lists. */
 export const AnnotationBlockObjectSchema = z.object({
   id: z.string().min(1),
@@ -1619,6 +1641,7 @@ export const AnnotationBlockObjectSchema = z.object({
     annotations: z.array(AnnotationItemSchema).default([]),
     voice_tracks: z.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
+    exemplar: AnnotationExemplarSchema.optional(),
     settings: AnnotationBlockSettingsSchema.prefault({ show_markers: true })
   }),
   ...blockLayout,

@@ -2354,6 +2354,20 @@ var AnnotationBlockSettingsSchema = z11.object({
   /** How notes are drawn on the text. Absent = fineliner. */
   ink_style: z11.enum(["fineliner", "highlighter"]).optional()
 });
+var AnnotationExemplarQuestionSchema = z11.object({
+  id: z11.string().min(1).max(40),
+  kind: z11.enum(["what", "why", "how"]),
+  text: z11.string().trim().max(300)
+});
+var AnnotationExemplarSchema = z11.object({
+  kind: z11.enum(["single", "compare", "counter"]),
+  /** What the exemplar shows, e.g. "a topic sentence that argues". */
+  focus: z11.string().trim().max(120).optional(),
+  labels: z11.array(z11.string().trim().max(40)).max(2).default([]),
+  split_at: z11.string().min(1).optional(),
+  hide_labels: z11.boolean().default(false),
+  questions: z11.array(AnnotationExemplarQuestionSchema).max(8).default([])
+});
 var AnnotationBlockObjectSchema = z11.object({
   id: z11.string().min(1),
   type: z11.literal("block"),
@@ -2368,6 +2382,7 @@ var AnnotationBlockObjectSchema = z11.object({
     annotations: z11.array(AnnotationItemSchema).default([]),
     voice_tracks: z11.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
+    exemplar: AnnotationExemplarSchema.optional(),
     settings: AnnotationBlockSettingsSchema.prefault({ show_markers: true })
   }),
   ...blockLayout,
@@ -2719,6 +2734,8 @@ export {
   AnnotationBlockSettingsSchema,
   AnnotationCodeRefSchema,
   AnnotationColourSchema,
+  AnnotationExemplarQuestionSchema,
+  AnnotationExemplarSchema,
   AnnotationFamilyKeySchema,
   AnnotationGranularitySchema,
   AnnotationItemSchema,

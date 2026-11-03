@@ -1083,6 +1083,10 @@ export function cloneBlockWithNewIds(
         taps: track.taps?.map((tap) => ({ ...tap, anchor: remapAnchor(tap.anchor) })),
         clips: track.clips.map((clip) => ({ ...clip, anchor: clip.anchor ? remapAnchor(clip.anchor) : undefined }))
       })),
+      // An exemplar's split points at the copy's stanza, so its two pieces survive a duplicate.
+      exemplar: cloned.content.exemplar
+        ? { ...cloned.content.exemplar, split_at: cloned.content.exemplar.split_at ? (stanzaMap.get(cloned.content.exemplar.split_at) ?? cloned.content.exemplar.split_at) : undefined }
+        : undefined,
       settings: {
         ...cloned.content.settings,
         default_layer_id: cloned.content.settings.default_layer_id

@@ -15,6 +15,9 @@ import { CATALOGUE, SERIES, pageRefOf, techniqueById } from '../../../../../pack
 import { FIGURE_SVGS } from '../../../../../packages/walkthrus/glyphs';
 import { createGlyphSet } from '../../../../../packages/design-kit/js/glyph-set.js';
 import { attachedTechniques, suggestedTechnique, withTechnique } from '../walkthru-note/attach';
+import { boardGroups, recommendedTechniques } from '../walkthru-note/picker-groups';
+import { loadBoardClusters } from '../walkthru-note/api';
+import { hasThinkAloud, thinkAloudFields, thinkAloudOf, withThinkAloud, type ThinkAloud } from '../think-aloud';
 
 const walkthruGlyphs = createGlyphSet({ svgs: FIGURE_SVGS, labelOf: (id: string) => techniqueById(id)?.name ?? id, className: 'wts__hex' });
 /** The hexagon carries its book, so Book 2 reads blue wherever it's picked. */
@@ -194,6 +197,17 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
         chip.setAttribute('aria-label', `Change the ${technique.name} WalkThru (only you see it)`);
         attached.append(chip);
       }
+      // Think aloud goes wherever a WalkThru can: a script for modelling your thinking, not a new block.
+      const scripted = hasThinkAloud(options.getBlock());
+      const think = button(scripted ? 'Edit think-aloud…' : 'Add think-aloud…', () => { menu.open = false; status.textContent = ''; editThinkAloud(); });
+      think.className = 'page-options__item';
+      entries.append(think);
+      if (scripted) {
+        const chip = button('Think aloud', () => editThinkAloud());
+        chip.className = 'kaplan-chip think-aloud-chip';
+        chip.setAttribute('aria-label', 'Edit the think-aloud script (only you see it)');
+        attached.append(chip);
+      }
     }
     menu.hidden = !entries.childElementCount;
   }
@@ -277,13 +291,10 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     search.setAttribute('aria-label', 'Find a technique');
     panel.append(caption, search);
     const lists: Array<{ heading: HTMLElement; list: HTMLElement; picks: Array<[string, HTMLButtonElement]> }> = [];
-    const suggested = suggestedTechnique(options.getBlock());
-    const groups = [
-      { name: 'For this type of Voice block', items: CATALOGUE.filter((e) => e.id === suggested) },
-      ...SERIES.map((series) => ({ name: series.name, items: CATALOGUE.filter((e) => e.kind === 'technique' && e.series === series.key) }))
-    ];
-    for (const { name, items } of groups) {
-      if (!items.length) continue;
+    type Entry = NonNullable<ReturnType<typeof techniqueById>>;
+    const entriesOf = (ids: readonly string[]): Entry[] => ids.map((id) => techniqueById(id)).filter((e): e is Entry => !!e && e.kind === 'technique');
+    const buildGroup = (name: string, items: Entry[]): HTMLElement[] => {
+      if (!items.length) return [];
       const heading = document.createElement('h4');
       heading.className = 'kaplan-lens-group';
       heading.textContent = name;
@@ -301,9 +312,17 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
         return [item.name.toLowerCase(), pick];
       });
       lists.push({ heading, list, picks });
-      panel.append(heading, list);
-    }
-    search.addEventListener('input', () => {
+      return [heading, list];
+    };
+    const block = options.getBlock();
+    // Recommended for this kind of block first, then Adam's board (loaded below), then every technique by series.
+    const voice = suggestedTechnique(block);
+    panel.append(...buildGroup(voice ? 'For this type of Voice block' : 'Recommended for this block', entriesOf(recommendedTechniques(block))));
+    const boardSlot = document.createElement('div');
+    boardSlot.className = 'wts-pick__board';
+    panel.append(boardSlot);
+    for (const series of SERIES) panel.append(...buildGroup(series.name, CATALOGUE.filter((e) => e.kind === 'technique' && e.series === series.key)));
+    const filter = (): void => {
       const q = search.value.trim().toLowerCase();
       for (const group of lists) {
         let shown = 0;
@@ -315,7 +334,16 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
         }
         group.heading.style.display = group.list.style.display = shown ? '' : 'none';
       }
-    });
+    };
+    search.addEventListener('input', filter);
+    // The board loads after the picker opens; until then (or if it can't load) the picker works without it.
+    loadBoardClusters()
+      .then((clusters) => {
+        if (!boardSlot.isConnected) return;
+        for (const group of boardGroups(clusters)) boardSlot.append(...buildGroup(group.name, entriesOf(group.items)));
+        filter();
+      })
+      .catch(() => undefined);
     const buttons = [button('Cancel', close)];
     if (chosen) {
       buttons.unshift(button('Take the WalkThru off', () => {
@@ -324,6 +352,35 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
         close();
         renderBar();
         status.textContent = `${name} WalkThru taken off this block.`;
+      }));
+    }
+    actions(...buttons);
+  }
+  /** The think-aloud script: one box per move, saved on the block's settings, teacher view only. */
+  function editThinkAloud(): void {
+    const had = hasThinkAloud(options.getBlock());
+    title(had ? 'Edit the think-aloud' : 'Add a think-aloud');
+    const caption = document.createElement('p');
+    caption.className = 'kaplan-caption';
+    caption.textContent = 'Write what you will say as you model this. Only the moves you fill in show under the block in your lesson view. Students and Display never see it.';
+    let script: ThinkAloud = thinkAloudOf(options.getBlock());
+    panel.append(caption, thinkAloudFields(script, (next) => { script = next; }));
+    const buttons = [
+      button('Save', () => {
+        const next = withThinkAloud(options.getBlock(), script);
+        options.onChange(next);
+        close();
+        renderBar();
+        status.textContent = hasThinkAloud(next) ? 'Think-aloud saved. Only you see it, under this block.' : 'Think-aloud taken off this block.';
+      }, true),
+      button('Cancel', close)
+    ];
+    if (had) {
+      buttons.splice(1, 0, button('Take it off', () => {
+        options.onChange(withThinkAloud(options.getBlock(), {}));
+        close();
+        renderBar();
+        status.textContent = 'Think-aloud taken off this block.';
       }));
     }
     actions(...buttons);
