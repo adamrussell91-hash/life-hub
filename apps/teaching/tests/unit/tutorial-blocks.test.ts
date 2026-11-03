@@ -8,7 +8,7 @@ describe('tutorial blocks', () => {
   it('creates valid empty blocks', () => {
     expect(BlockSchema.parse(createBlock('with_teacher', 'w1')).block_type).toBe('with_teacher');
     const faded = BlockSchema.parse(createBlock('faded_example', 'f1'));
-    expect(faded.block_type === 'faded_example' && faded.content.parts.map((p) => p.label)).toEqual(['Technique', 'Where', 'Effect']);
+    expect(faded.block_type === 'faded_example' && faded.content.part_labels).toEqual(['Technique', 'Where', 'Effect']);
   });
 
   it('renders With teacher to students without the talking points', () => {
@@ -21,11 +21,12 @@ describe('tutorial blocks', () => {
 
   it('shows a worked step in full and a faded step with inputs', () => {
     const base = createBlock('faded_example', 'f1') as Extract<Parameters<typeof renderBlock>[0], { block_type: 'faded_example' }>;
-    const full = { ...base, content: { ...base.content, extract: 'Text', parts: base.content.parts.map((p) => ({ ...p, answer: `${p.label} answer` })), blanks: [] } };
-    const el = renderBlock(full, 'student', { lessonId: 'l1', pageBlocks: [] });
+    const step = (blanks: number[]) => ({ extract: 'Text', answers: base.content.part_labels.map((l) => `${l} answer`), blanks });
+    const worked = { ...base, content: { ...base.content, steps: [step([])] } };
+    const el = renderBlock(worked, 'student', { lessonId: 'l1', pageBlocks: [] });
     expect(el.textContent).toContain('Effect answer');
     expect(el.querySelectorAll('textarea')).toHaveLength(0);
-    const faded = { ...full, content: { ...full.content, blanks: [2] } };
+    const faded = { ...base, content: { ...base.content, steps: [step([2])] } };
     const el2 = renderBlock(faded, 'student', { lessonId: 'l1', pageBlocks: [] });
     expect(el2.querySelectorAll('textarea')).toHaveLength(1);
     expect(el2.textContent).not.toContain('Effect answer');

@@ -32,9 +32,8 @@ describe('class display keeps answers and student work off the projector', () =>
 
   it('faded example hides the model answer for blank parts', () => {
     const block = createBlock('faded_example', 'e1') as Extract<Block, { block_type: 'faded_example' }>;
-    block.content.extract = 'The road ran on.';
-    block.content.parts = [{ label: 'Technique', answer: 'Personification' }];
-    block.content.blanks = [0];
+    block.content.part_labels = ['Technique'];
+    block.content.steps = [{ extract: 'The road ran on.', answers: ['Personification'], blanks: [0] }];
     const shown = renderBlock(block, 'teacher', display);
     expect(shown.textContent).not.toContain('Personification');
   });

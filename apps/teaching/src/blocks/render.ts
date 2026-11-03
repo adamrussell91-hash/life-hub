@@ -2824,7 +2824,7 @@ function renderBlockContent(
     case 'with_teacher':
       return wrapBlock(renderWithTeacher(block, mode), block, mode);
     case 'faded_example':
-      return wrapBlock(renderFadedExample(block, mode), block, mode);
+      return wrapBlock(renderFadedExample(block, mode, { unlocked: !!ctx.display }), block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
     case 'card_stack':

@@ -6415,12 +6415,13 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
 .block-faded__parts dt { font-size: var(--text-xs, 0.75rem); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.05em; color: var(--marine); padding-top: var(--space-2); }
 .block-faded__parts dd { margin: 0; min-width: 0; padding: var(--space-2) var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .block-faded__parts dd:has(.block-faded__input) { padding: 0; border: 0; background: none; }
-.block-faded__input { width: 100%; border: 1px dashed var(--marine); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
+.block-faded__input { width: 100%; font: inherit; border: 1px dashed var(--marine); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
+.block-faded__input[readonly] { border-style: solid; background: color-mix(in srgb, var(--line) 25%, var(--paper)); }
 .block-faded__model { color: var(--success); }
 p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--success); border-radius: var(--radius-md); font-size: var(--text-sm); }
 .block-faded__nudge { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 .block-faded__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
-.block-faded__rate--chosen { outline: 2px solid var(--marine); outline-offset: 2px; }
+.block-faded-rail__mark:disabled { cursor: default; opacity: 0.55; }
 .block-faded-rail { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-3) 0; background: color-mix(in srgb, var(--line) 25%, var(--paper)); border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; margin-top: var(--space-3); }
 .block-faded-rail__mark { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border: 0; border-top: 3px solid var(--line); background: none; font: inherit; font-size: var(--text-sm); color: var(--muted); text-align: left; cursor: pointer; }
 .block-faded-rail__mark b { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--line); color: var(--ink); font-size: var(--text-xs, 0.75rem); }
@@ -6429,10 +6430,30 @@ p.block-faded__model { margin: var(--space-1, 4px) 0 0; padding: var(--space-2) 
 .block-faded-rail__mark--on b { background: var(--marine); color: var(--paper); }
 .block-faded-rail__mark--done { border-top-color: var(--success); }
 .block-faded-rail__mark--done b { background: var(--success); color: var(--paper); }
-.block-faded-step { padding: var(--space-3) var(--space-4); margin: 0; background: color-mix(in srgb, var(--line) 25%, var(--paper)); border: 1px solid var(--line); border-top: 0; border-bottom: 0; }
-.block-faded-step--last { border-bottom: 1px solid var(--line); border-radius: 0 0 var(--radius-md) var(--radius-md); }
-.block-faded-step--shut { display: none; }
-@media print { .block-faded-step--shut { display: block; } .block-faded-rail { display: none; } }
+/* One open step. With a rail above it, the step reads as the rail's card. */
+.block-faded__step { display: grid; gap: var(--space-3); }
+.block-faded__step + .block-faded__step { margin-top: var(--space-4); }
+.block-faded-rail + .block-faded__step { padding: var(--space-3) var(--space-4); background: color-mix(in srgb, var(--line) 25%, var(--paper)); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.block-faded__step:focus { outline: none; }
+.block-faded__step > * { margin-top: 0; margin-bottom: 0; }
+.block-faded__tag { margin-right: var(--space-2); font-size: var(--text-xs, 0.75rem); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.block-faded__space { min-height: 5rem; }
+.block-faded__qprompt { margin: 0 0 var(--space-2); font-weight: var(--weight-semibold); }
+.block-faded__choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+ul.block-faded__choices { display: block; padding-left: var(--space-4); }
+.block-faded__choice { min-height: 44px; text-align: left; }
+.block-faded__choice--right { outline: 2px solid var(--success); outline-offset: 2px; }
+.block-faded__ticks { margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); display: grid; gap: var(--space-1, 4px); }
+.block-faded__ticks-head { padding: 0 var(--space-1, 4px); font-weight: var(--weight-semibold); }
+.block-faded__tick { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; }
+.block-faded__tick input { flex: none; width: 22px; height: 22px; }
+.block-faded__criteria { padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.block-faded__criteria-head { margin: 0; font-weight: var(--weight-semibold); }
+.block-faded__criteria ul { margin: var(--space-1, 4px) 0 0; padding-left: var(--space-4); }
+.block-faded__finish { padding: var(--space-3) var(--space-4); border: 1px solid var(--success); border-radius: var(--radius-md); display: grid; gap: var(--space-2); }
+.block-faded__finish-head { margin: 0; font-weight: var(--weight-semibold); color: var(--success); }
+.block-faded__actions .btn { min-height: 44px; }
+@media print { .block-faded-rail { display: none; } }
 .block-with-teacher { padding: var(--space-3) var(--space-4); border: 1px dashed var(--line); border-radius: var(--radius-md); }
 .block-with-teacher__head { margin: 0; font-weight: var(--weight-semibold); }
 .block-with-teacher__points { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
@@ -15202,3 +15223,28 @@ button.block-annotation__margin-note.is-collapsed:hover {
 @media print {
   .block-annotation__stanzas--pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.5rem; }
 }
+
+/* Faded example editor */
+.block-editor__faded { display: grid; gap: var(--space-4); }
+.block-editor__faded-heading { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.block-editor__faded-parts, .block-editor__faded-steps, .block-editor__faded-criteria { display: grid; gap: var(--space-3); min-width: 0; }
+.block-editor__faded-part { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.block-editor__faded-part .block-editor__label { flex: 1 1 12rem; min-width: 0; }
+.block-editor__faded-error { flex: 1 1 100%; margin: 0; color: var(--danger, #b3261e); font-size: var(--text-sm); }
+.block-editor__faded input[aria-invalid='true'] { border-color: var(--danger, #b3261e); }
+.block-editor__faded-button { min-height: 44px; min-width: 44px; }
+.block-editor__faded-warnings { margin: 0; padding-left: var(--space-5, 1.25rem); color: var(--muted); font-size: var(--text-sm); }
+.block-editor__faded-warnings:empty { display: none; }
+.block-editor__faded-step { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); min-width: 0; }
+.block-editor__faded-summary { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; min-height: 44px; padding: var(--space-2) var(--space-3); cursor: pointer; }
+.block-editor__faded-step-name { font-weight: var(--weight-semibold); }
+.block-editor__faded-pill { padding: 2px var(--space-2); border-radius: 99px; background: var(--line); font-size: var(--text-xs, 0.75rem); }
+.block-editor__faded-pill--writes { background: color-mix(in srgb, var(--marine) 15%, var(--paper)); color: var(--marine); }
+.block-editor__faded-step-body { display: grid; gap: var(--space-3); padding: var(--space-3); min-width: 0; }
+.block-editor__faded-answer { display: grid; gap: var(--space-1, 4px); }
+.block-editor__faded-check { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; }
+.block-editor__faded-check input { width: 24px; height: 24px; flex: none; }
+.block-editor__faded-question { display: grid; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-3); min-width: 0; }
+.block-editor__faded-choice { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.block-editor__faded-choice .block-editor__label { flex: 1 1 12rem; min-width: 0; }
+.block-editor__faded textarea, .block-editor__faded input[type='text'] { width: 100%; min-height: 44px; box-sizing: border-box; }

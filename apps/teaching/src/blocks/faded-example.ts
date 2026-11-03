@@ -1,313 +1,395 @@
 import type { Block } from '@/schemas/block';
 import type { RenderMode } from '@/blocks/render';
 import { loadActivityState, saveActivityState, storageKey } from '@/blocks/learning-activity';
-import { emitAnswered, LECTURE_ANSWERED } from '@/lecture/answered';
-import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
+import { emitAnswered } from '@/lecture/answered';
+import { fadedContent, fadedStepKey, fadedWritingSteps, type FadedContent, type FadedStep } from '@/schemas/faded';
+import { checkAttempt } from '@/blocks/faded-attempt';
 
 export type FadedExampleBlock = Extract<Block, { block_type: 'faded_example' }>;
 
-/** Fired when a student rates a faded step; the tutorial player sends it to the live board. */
+/** Fired when a student reaches the model on a writing step; the tutorial player sends it to the live board. */
 export const FADED_EVENT = 'tutorial:faded';
-export type FadedDetail = { blockId: string; parts: Record<number, string>; rating: 'right' | 'wrong' };
+export type FadedDetail = { blockId: string; stepKey: string; parts: Record<number, string>; rating: 'right' | 'wrong' };
 
-/**
- * One step of a faded worked example: the extract, then each part of the
- * model answer. Blank parts are for the student to write; the rest show.
- * Students press Check to see the model beside their answer, then rate themselves.
- */
-export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode): HTMLElement {
-  const root = document.createElement('div');
-  root.className = 'block-faded';
-  root.dataset.blockId = block.id;
-  const { prompt, extract, parts, blanks } = block.content;
-  const modeChip = document.createElement('p');
-  modeChip.className = 'block-faded__mode';
-  modeChip.textContent = fadedModeText(block);
-  root.append(modeChip);
-  if (prompt) {
-    const p = document.createElement('p');
-    p.className = 'block-faded__prompt';
-    p.textContent = prompt;
-    root.append(p);
-  }
-  const quote = document.createElement('blockquote');
-  quote.className = 'block-faded__extract';
-  quote.textContent = extract;
-  root.append(quote);
-  const list = document.createElement('dl');
-  list.className = 'block-faded__parts';
-  parts.forEach((part, index) => {
-    const term = document.createElement('dt');
-    term.textContent = part.label;
-    const value = document.createElement('dd');
-    if (blanks.includes(index) && mode !== 'teacher') {
-      const input = document.createElement('textarea');
-      input.className = 'block-faded__input';
-      input.rows = 2;
-      input.dataset.part = String(index);
-      input.setAttribute('aria-label', `Your ${part.label.toLowerCase()}`);
-      value.append(input);
-    } else {
-      value.textContent = part.answer;
-      if (blanks.includes(index)) value.classList.add('block-faded__model');
-    }
-    list.append(term, value);
-  });
-  root.append(list);
-  if (mode === 'student' && blanks.length > 0) attachFadedCheck(root, block);
-  if (mode === 'student') root.dataset.fadedStudent = '1';
-  // Lessons mount blocks one at a time; once they sit side by side, join a run into one card.
-  setTimeout(() => {
-    const parent = root.closest('.block')?.parentElement;
-    if (parent) groupFadedRuns(parent);
-  }, 0);
-  return root;
-}
+type Stage = 'write' | 'tick' | 'model';
+type StepWork = { stage: Stage; texts: Record<number, string>; ticks: string[]; picked: number | null };
+type Opts = { unlocked?: boolean };
+
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+const tickId = (part: number, n: number): string => `${part}:${n}`;
 
 /** What the student does in this step, from its blanks. */
-export function fadedModeText(block: FadedExampleBlock): string {
-  const { parts, blanks } = block.content;
+export function fadedModeText(step: FadedStep, labels: string[]): string {
+  const blanks = step.blanks.filter((i) => i < labels.length);
   if (blanks.length === 0) return 'Worked example';
-  if (blanks.length === parts.length) return parts.length === 1 ? `You write the ${parts[0]!.label.toLowerCase()}` : `You write all ${parts.length} parts`;
-  const names = blanks.map((i) => parts[i]!.label.toLowerCase());
+  if (blanks.length === labels.length) return labels.length === 1 ? `You write the ${labels[0]!.toLowerCase()}` : `You write all ${labels.length} parts`;
+  const names = blanks.map((i) => labels[i]!.toLowerCase());
   return `You write the ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}`;
 }
 
-/**
- * Consecutive faded_example blocks in one container read as one sequence:
- * a step rail above them, "Step n of N" on each, and in student view one
- * step open at a time. Every step stays its own block (own id, gate, saved
- * rating), so nothing else needs to know about the grouping. Safe to call again.
- */
-export function groupFadedRuns(container: Element): void {
-  const runs: HTMLElement[][] = [];
-  let run: HTMLElement[] = [];
-  for (const child of Array.from(container.children) as HTMLElement[]) {
-    if (child.matches('.block[data-block-type="faded_example"]')) run.push(child);
-    else if (!child.classList.contains('block-faded-rail')) {
-      if (run.length) runs.push(run);
-      run = [];
-    }
-  }
-  if (run.length) runs.push(run);
-  for (const steps of runs) if (steps.length > 1) buildFadedRun(steps);
+function chip(step: FadedStep, c: FadedContent, index: number): HTMLElement {
+  const mode = el('p', 'block-faded__mode');
+  if (c.steps.length > 1) mode.append(el('span', 'block-faded__num', `Step ${index + 1} of ${c.steps.length} · `));
+  mode.append(document.createTextNode(fadedModeText(step, c.part_labels)));
+  return mode;
 }
 
-const runControllers = new WeakMap<HTMLElement, AbortController>();
+function promptLine(step: FadedStep, c: FadedContent): HTMLElement | null {
+  const text = step.prompt?.trim() ? step.prompt : c.prompt;
+  return text ? el('p', 'block-faded__prompt', text) : null;
+}
 
-function buildFadedRun(steps: HTMLElement[]): void {
-  const first = steps[0]!;
-  const signature = steps.map((s) => s.dataset.blockId).join('|');
-  if (first.dataset.fadedRun === signature && first.previousElementSibling?.classList.contains('block-faded-rail')) return;
-  first.dataset.fadedRun = signature;
-  runControllers.get(first)?.abort();
-  const controller = new AbortController();
-  runControllers.set(first, controller);
-  const { signal } = controller;
-  if (first.previousElementSibling?.classList.contains('block-faded-rail')) {
-    first.previousElementSibling.remove();
-  }
-  for (const old of steps.flatMap((s) => Array.from(s.querySelectorAll('.block-faded__next-row')))) old.remove();
-  const roots = steps.map((s) => s.querySelector<HTMLElement>('.block-faded')!);
-  if (roots.some((r) => !r)) return;
-  const total = steps.length;
-  const interactive = roots.every((r) => r.dataset.fadedStudent === '1');
-  steps.forEach((step, i) => {
-    step.classList.add('block-faded-step');
-    step.classList.toggle('block-faded-step--first', i === 0);
-    step.classList.toggle('block-faded-step--last', i === total - 1);
-    const mode = roots[i]!.querySelector('.block-faded__mode');
-    let num = roots[i]!.querySelector('.block-faded__num');
-    if (!num && mode) {
-      num = document.createElement('span');
-      num.className = 'block-faded__num';
-      mode.prepend(num);
-    }
-    if (num) num.textContent = `Step ${i + 1} of ${total} · `;
-  });
-  if (!interactive) return;
+function extractQuote(step: FadedStep): HTMLElement {
+  return el('blockquote', 'block-faded__extract', step.extract);
+}
 
-  const isRated = (i: number) => !!roots[i]!.querySelector('.block-faded__rate--chosen, .block-faded__rate:disabled');
-  const needsRating = (i: number) => !!roots[i]!.querySelector('.block-faded__input, .block-faded__rating');
-  const rail = document.createElement('div');
-  rail.className = 'block-faded-rail';
-  rail.setAttribute('role', 'group');
-  rail.setAttribute('aria-label', 'Steps');
-  const marks = steps.map((_, i) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'block-faded-rail__mark';
-    const num = document.createElement('b');
-    const label = document.createElement('span');
-    label.textContent = roots[i]!.querySelector('.block-faded__mode')?.textContent?.replace(/^Step \d+ of \d+ · /, '') ?? '';
-    button.append(num, label);
-    button.addEventListener('click', () => show(i), { signal });
-    rail.append(button);
-    return { button, num };
-  });
-  first.before(rail);
-
-  let current = 0;
-  const firstOpen = roots.findIndex((_, i) => needsRating(i) && !isRated(i));
-  if (roots.some((_, i) => needsRating(i) && isRated(i))) current = firstOpen === -1 ? total - 1 : firstOpen;
-  const show = (index: number): void => {
-    current = index;
-    steps.forEach((step, i) => step.classList.toggle('block-faded-step--shut', i !== index));
-    marks.forEach((m, i) => {
-      const done = needsRating(i) ? isRated(i) : i < index;
-      m.button.classList.toggle('block-faded-rail__mark--on', i === index);
-      m.button.classList.toggle('block-faded-rail__mark--done', done && i !== index);
-      m.button.setAttribute('aria-current', i === index ? 'step' : 'false');
-      m.num.textContent = done && i !== index ? '✓' : String(i + 1);
+/** Teacher and print: every step in order with all answers. */
+function renderAll(root: HTMLElement, c: FadedContent, mode: RenderMode): void {
+  c.steps.forEach((step, index) => {
+    const section = el('section', 'block-faded__step');
+    section.append(chip(step, c, index));
+    const prompt = promptLine(step, c);
+    if (prompt) section.append(prompt);
+    section.append(extractQuote(step));
+    const list = el('dl', 'block-faded__parts');
+    c.part_labels.forEach((label, p) => {
+      const term = el('dt', undefined, label);
+      const value = el('dd');
+      const blank = step.blanks.includes(p);
+      if (blank && mode === 'print') {
+        value.classList.add('block-faded__space');
+      } else {
+        value.textContent = step.answers[p] ?? '';
+        if (blank) {
+          value.classList.add('block-faded__model');
+          value.prepend(el('span', 'block-faded__tag', 'Student writes'));
+        }
+      }
+      list.append(term, value);
     });
-  };
-  roots.forEach((r, i) => {
-    r.addEventListener(LECTURE_ANSWERED, () => show(Math.min(i + 1, total - 1)), { signal });
-    if (!needsRating(i)) {
-      const next = document.createElement('div');
-      next.className = 'block-faded__actions block-faded__next-row';
-      const go = document.createElement('button');
-      go.type = 'button';
-      go.className = 'btn btn--secondary block-faded__next';
-      go.textContent = i === total - 1 ? 'Done' : `On to step ${i + 2}`;
-      go.addEventListener('click', () => show(Math.min(i + 1, total - 1)), { signal });
-      if (i < total - 1) {
-        next.append(go);
-        r.append(next);
+    section.append(list);
+    if (step.question?.prompt) {
+      const q = el('div', 'block-faded__question');
+      q.append(el('p', 'block-faded__qprompt', step.question.prompt));
+      const choices = el('ul', 'block-faded__choices');
+      step.question.choices.forEach((choice, i) => {
+        const li = el('li', undefined, choice);
+        if (mode === 'teacher' && i === step.question!.correct) li.classList.add('block-faded__model');
+        choices.append(li);
+      });
+      q.append(choices);
+      section.append(q);
+    }
+    if (mode === 'teacher') {
+      const blanks = step.blanks.filter((p) => (c.criteria[c.part_labels[p] ?? ''] ?? []).length > 0);
+      for (const p of blanks) {
+        const label = c.part_labels[p]!;
+        const box = el('div', 'block-faded__criteria');
+        box.append(el('p', 'block-faded__criteria-head', `A strong ${label.toLowerCase()}`));
+        const ul = el('ul');
+        for (const text of c.criteria[label]!) ul.append(el('li', undefined, text));
+        box.append(ul);
+        section.append(box);
       }
     }
+    root.append(section);
   });
-  show(current);
 }
 
-type SavedFaded = { parts: Record<number, string>; rating: 'right' | 'wrong' };
-
-function attachFadedCheck(root: HTMLElement, block: FadedExampleBlock): void {
-  const key = storageKey('local', block.id);
-  const actions = document.createElement('div');
-  actions.className = 'block-faded__actions';
-  const nudge = document.createElement('p');
-  nudge.className = 'block-faded__nudge';
-  nudge.setAttribute('aria-live', 'polite');
-  const check = document.createElement('button');
-  check.type = 'button';
-  check.className = 'btn btn--primary block-faded__check';
-  check.textContent = 'Check';
-  actions.append(check, nudge);
-  root.append(actions);
-  const inputs = () => [...root.querySelectorAll<HTMLTextAreaElement>('.block-faded__input')];
-
-  const lock = (): void => {
-    for (const input of inputs()) {
-      input.readOnly = true;
-      const model = document.createElement('p');
-      model.className = 'block-faded__model';
-      model.textContent = `Model: ${block.content.parts[Number(input.dataset.part)]!.answer}`;
-      input.after(model);
-    }
-  };
-  const rateButtons = (): { group: HTMLElement; right: HTMLButtonElement; wrong: HTMLButtonElement } => {
-    const group = document.createElement('div');
-    group.className = 'block-faded__rating';
-    group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', 'How did yours compare?');
-    const make = (rating: 'right' | 'wrong', label: string) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `btn btn--secondary block-faded__rate block-faded__rate--${rating}`;
-      button.textContent = label;
-      return button;
+function loadWork(block: FadedExampleBlock, c: FadedContent, step: FadedStep): StepWork {
+  const fresh: StepWork = { stage: 'write', texts: {}, ticks: [], picked: null };
+  const saved = loadActivityState<Record<string, unknown>>(storageKey('local', fadedStepKey(block, step)));
+  if (!saved || typeof saved !== 'object') return fresh;
+  if (saved.stage === 'write' || saved.stage === 'tick' || saved.stage === 'model') {
+    return {
+      stage: saved.stage,
+      texts: saved.texts && typeof saved.texts === 'object' ? (saved.texts as Record<number, string>) : {},
+      ticks: Array.isArray(saved.ticks) ? (saved.ticks as string[]) : [],
+      picked: typeof saved.picked === 'number' ? saved.picked : null
     };
-    const right = make('right', 'Got it');
-    const wrong = make('wrong', 'Not quite');
-    group.append(right, wrong);
-    return { group, right, wrong };
-  };
-
-  const saved = loadActivityState<SavedFaded>(key);
-  if (saved && saved.parts && (saved.rating === 'right' || saved.rating === 'wrong')) {
-    for (const input of inputs()) input.value = saved.parts[Number(input.dataset.part)] ?? '';
-    lock();
-    const { group, right, wrong } = rateButtons();
-    right.disabled = true;
-    wrong.disabled = true;
-    (saved.rating === 'right' ? right : wrong).setAttribute('aria-pressed', 'true');
-    (saved.rating === 'right' ? right : wrong).classList.add('block-faded__rate--chosen');
-    check.replaceWith(group);
-    nudge.textContent = saved.rating === 'right' ? 'You rated this: Got it.' : 'You rated this: Not quite.';
-    return;
   }
-
-  check.addEventListener('click', () => {
-    const fields = inputs();
-    if (fields.some((input) => !input.value.trim())) {
-      nudge.textContent = 'Write your part first.';
-      return;
-    }
-    const parts: Record<number, string> = Object.fromEntries(fields.map((input) => [Number(input.dataset.part), input.value.trim()]));
-    lock();
-    nudge.textContent = 'Compare yours with the model.';
-    const { group, right, wrong } = rateButtons();
-    const rate = (rating: 'right' | 'wrong') => {
-      right.disabled = true;
-      wrong.disabled = true;
-      saveActivityState(key, { parts, rating } satisfies SavedFaded);
-      root.dispatchEvent(new CustomEvent<FadedDetail>(FADED_EVENT, { bubbles: true, detail: { blockId: block.id, parts, rating } }));
-      emitAnswered(root, block.id, rating);
-    };
-    right.addEventListener('click', () => rate('right'));
-    wrong.addEventListener('click', () => rate('wrong'));
-    check.replaceWith(group);
-    right.focus();
-  });
+  // Old shape: { parts, rating } from before steps existed.
+  if (saved.parts && typeof saved.parts === 'object' && (saved.rating === 'right' || saved.rating === 'wrong')) {
+    const ticks =
+      saved.rating === 'right' ? step.blanks.flatMap((p) => (c.criteria[c.part_labels[p] ?? ''] ?? []).map((_, n) => tickId(p, n))) : [];
+    return { stage: 'model', texts: saved.parts as Record<number, string>, ticks, picked: null };
+  }
+  return fresh;
 }
 
-export function createFadedExampleEditor(
-  block: FadedExampleBlock,
-  onChange: BlockChangeHandler<FadedExampleBlock>,
-  getLatest: () => FadedExampleBlock = () => block
-): HTMLElement {
-  const fields = document.createElement('div');
-  fields.className = 'block-editor__fields block-editor__faded';
-  const emit = (patch: Partial<FadedExampleBlock['content']>) => {
-    const latest = getLatest();
-    onChange({ ...latest, content: { ...latest.content, ...patch } });
-  };
-  const area = (label: string, value: string, rows: number, on: (v: string) => void) => {
-    const wrap = document.createElement('label');
-    wrap.className = 'block-editor__label';
-    wrap.textContent = label;
-    const input = document.createElement('textarea');
-    input.rows = rows;
-    input.value = value;
-    input.addEventListener('input', () => on(input.value));
-    wrap.append(input);
-    return wrap;
-  };
-  fields.append(
-    area('Prompt', block.content.prompt, 1, (prompt) => emit({ prompt })),
-    area('Extract', block.content.extract, 3, (extract) => emit({ extract }))
-  );
-  block.content.parts.forEach((part, index) => {
-    const row = document.createElement('div');
-    row.className = 'block-editor__faded-part';
-    row.append(
-      area(`${part.label}: model answer`, part.answer, 2, (answer) =>
-        emit({ parts: getLatest().content.parts.map((p, i) => (i === index ? { ...p, answer } : p)) })
-      )
-    );
-    const blank = document.createElement('label');
-    blank.className = 'block-editor__check';
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = block.content.blanks.includes(index);
-    box.addEventListener('change', () => {
-      const current = getLatest().content.blanks.filter((i) => i !== index);
-      emit({ blanks: box.checked ? [...current, index].sort((a, b) => a - b) : current });
+export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, opts: Opts = {}): HTMLElement {
+  const root = el('div', 'block-faded');
+  root.dataset.blockId = block.id;
+  const c = fadedContent(block);
+  if (mode !== 'student') {
+    renderAll(root, c, mode);
+    return root;
+  }
+  root.dataset.fadedStudent = '1';
+  if (c.steps.length === 0) return root;
+
+  const works = c.steps.map((step) => loadWork(block, c, step));
+  const last = c.steps.length - 1;
+  const writing = fadedWritingSteps(c);
+  const lastWriting = writing.length ? c.steps.indexOf(writing[writing.length - 1]!) : -1;
+  const isDone = (i: number): boolean => works[i]!.stage === 'model';
+  const isOpenable = (i: number): boolean => !!opts.unlocked || works.slice(0, i).every((_, j) => isDone(j));
+  const save = (i: number): void => saveActivityState(storageKey('local', fadedStepKey(block, c.steps[i]!)), works[i]);
+  const criteriaFor = (step: FadedStep, p: number): string[] => c.criteria[c.part_labels[p] ?? ''] ?? [];
+  const allTicked = (i: number): boolean =>
+    c.steps[i]!.blanks.every((p) => criteriaFor(c.steps[i]!, p).every((_, n) => works[i]!.ticks.includes(tickId(p, n))));
+
+  let open = Math.max(0, works.findIndex((_, i) => !isDone(i)));
+  if (works.every((_, i) => isDone(i))) open = last;
+
+  const panel = el('section', 'block-faded__step');
+  panel.tabIndex = -1;
+  const rail = c.steps.length > 1 ? el('div', 'block-faded-rail') : null;
+  const marks: Array<{ button: HTMLButtonElement; num: HTMLElement }> = [];
+  if (rail) {
+    rail.setAttribute('role', 'group');
+    rail.setAttribute('aria-label', 'Steps');
+    c.steps.forEach((step, i) => {
+      const button = el('button', 'block-faded-rail__mark');
+      button.type = 'button';
+      const num = el('b');
+      button.append(num, el('span', undefined, fadedModeText(step, c.part_labels)));
+      button.addEventListener('click', () => {
+        open = i;
+        repaint(true);
+      });
+      rail.append(button);
+      marks.push({ button, num });
     });
-    blank.append(box, ' Students write this part');
-    row.append(blank);
-    fields.append(row);
-  });
-  return editorShell(block, onChange, fields, getLatest);
+    root.append(rail);
+  }
+  root.append(panel);
+
+  const syncRail = (): void => {
+    marks.forEach((m, i) => {
+      const done = isDone(i) && i !== open;
+      m.button.disabled = !isOpenable(i);
+      m.button.classList.toggle('block-faded-rail__mark--on', i === open);
+      m.button.classList.toggle('block-faded-rail__mark--done', done);
+      if (i === open) m.button.setAttribute('aria-current', 'step');
+      else m.button.removeAttribute('aria-current');
+      m.num.textContent = done ? '✓' : String(i + 1);
+    });
+  };
+
+  const reveal = (i: number): void => {
+    const work = works[i]!;
+    const step = c.steps[i]!;
+    work.stage = 'model';
+    save(i);
+    const rating: 'right' | 'wrong' = allTicked(i) ? 'right' : 'wrong';
+    const parts: Record<number, string> = Object.fromEntries(step.blanks.map((p) => [p, (work.texts[p] ?? '').trim()]));
+    root.dispatchEvent(new CustomEvent<FadedDetail>(FADED_EVENT, { bubbles: true, detail: { blockId: block.id, stepKey: fadedStepKey(block, step), parts, rating } }));
+    if (i === lastWriting) emitAnswered(root, block.id, rating);
+  };
+
+  const goNext = (i: number): void => {
+    if (works[i]!.stage !== 'model') {
+      works[i]!.stage = 'model';
+      save(i);
+    }
+    open = Math.min(i + 1, last);
+    repaint(true);
+  };
+
+  const nextButton = (i: number): HTMLButtonElement => {
+    const go = el('button', 'btn btn--secondary block-faded__next', i === last ? 'Done' : `On to step ${i + 2}`);
+    go.type = 'button';
+    go.addEventListener('click', () => goNext(i));
+    return go;
+  };
+
+  const paintStep = (i: number): void => {
+    const step = c.steps[i]!;
+    const work = works[i]!;
+    const writing = step.blanks.length > 0;
+    panel.replaceChildren();
+    panel.append(chip(step, c, i));
+    const prompt = promptLine(step, c);
+    if (prompt) panel.append(prompt);
+    panel.append(extractQuote(step));
+
+    const nudge = el('p', 'block-faded__nudge');
+    nudge.setAttribute('aria-live', 'polite');
+    const actions = el('div', 'block-faded__actions');
+
+    const list = el('dl', 'block-faded__parts');
+    c.part_labels.forEach((label, p) => {
+      const term = el('dt', undefined, label);
+      const value = el('dd');
+      if (step.blanks.includes(p)) {
+        const input = el('textarea', 'block-faded__input');
+        input.rows = 2;
+        input.value = work.texts[p] ?? '';
+        input.readOnly = work.stage !== 'write';
+        input.setAttribute('aria-label', `Your ${label.toLowerCase()}`);
+        input.addEventListener('input', () => {
+          work.texts[p] = input.value;
+          save(i);
+        });
+        value.append(input);
+        if (work.stage === 'model') value.append(el('p', 'block-faded__model', `Model: ${step.answers[p] ?? ''}`));
+      } else {
+        value.textContent = step.answers[p] ?? '';
+      }
+      list.append(term, value);
+    });
+    panel.append(list);
+
+    if (!writing) {
+      const q = step.question;
+      if (q && q.prompt) {
+        const box = el('div', 'block-faded__question');
+        box.append(el('p', 'block-faded__qprompt', q.prompt));
+        const group = el('div', 'block-faded__choices');
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-label', q.prompt);
+        const solved = work.picked === q.correct;
+        q.choices.forEach((choice, n) => {
+          const button = el('button', 'btn btn--secondary block-faded__choice', choice);
+          button.type = 'button';
+          button.disabled = solved;
+          if (solved && n === q.correct) {
+            button.setAttribute('aria-pressed', 'true');
+            button.classList.add('block-faded__choice--right');
+          }
+          button.addEventListener('click', () => {
+            if (n === q.correct) {
+              work.picked = n;
+              save(i);
+              paintStep(i);
+              panel.querySelector<HTMLButtonElement>('.block-faded__next')?.focus();
+            } else {
+              nudge.textContent = 'Look again and choose another.';
+            }
+          });
+          group.append(button);
+        });
+        box.append(group);
+        panel.append(box);
+        if (solved) nudge.textContent = 'Yes.';
+        panel.append(nudge);
+        if (solved && !(i === last && isDone(i))) actions.append(nextButton(i));
+      } else {
+        panel.append(nudge);
+        if (!(i === last && isDone(i))) actions.append(nextButton(i));
+      }
+    } else {
+      if (work.stage === 'tick' || work.stage === 'model') {
+        const locked = work.stage === 'model';
+        for (const p of step.blanks) {
+          const items = criteriaFor(step, p);
+          if (!items.length) continue;
+          const set = el('fieldset', 'block-faded__ticks');
+          set.append(el('legend', 'block-faded__ticks-head', `Does your ${c.part_labels[p]!.toLowerCase()} do these?`));
+          items.forEach((text, n) => {
+            const label = el('label', 'block-faded__tick');
+            const box = el('input');
+            box.type = 'checkbox';
+            box.disabled = locked;
+            box.checked = work.ticks.includes(tickId(p, n));
+            box.addEventListener('change', () => {
+              const id = tickId(p, n);
+              work.ticks = box.checked ? [...work.ticks.filter((t) => t !== id), id] : work.ticks.filter((t) => t !== id);
+              save(i);
+              syncButtons();
+            });
+            label.append(box, el('span', undefined, text));
+            set.append(label);
+          });
+          panel.append(set);
+        }
+      }
+      panel.append(nudge);
+      if (work.stage === 'write') {
+        const check = el('button', 'btn btn--primary block-faded__check', 'Check');
+        check.type = 'button';
+        let lastOdd = '';
+        check.addEventListener('click', () => {
+          const fields = [...panel.querySelectorAll<HTMLTextAreaElement>('.block-faded__input')];
+          const texts = fields.map((f) => f.value);
+          const verdict = checkAttempt(texts);
+          const joined = texts.join('\n');
+          if (verdict === 'short') {
+            nudge.textContent = 'Write a full sentence in each box, then check it.';
+            return;
+          }
+          if (verdict === 'odd' && joined !== lastOdd) {
+            lastOdd = joined;
+            nudge.textContent = 'Is that what you meant to write?';
+            return;
+          }
+          step.blanks.forEach((p, n) => (work.texts[p] = texts[n] ?? ''));
+          work.ticks = [];
+          work.stage = 'tick';
+          save(i);
+          paintStep(i);
+        });
+        actions.append(check);
+      } else if (work.stage === 'tick') {
+        const improve = el('button', 'btn block-faded__improve', 'Improve mine');
+        improve.type = 'button';
+        improve.addEventListener('click', () => {
+          work.stage = 'write';
+          save(i);
+          paintStep(i);
+          panel.querySelector<HTMLTextAreaElement>('.block-faded__input')?.focus();
+        });
+        const see = el('button', 'btn block-faded__model-btn', 'See the model');
+        see.type = 'button';
+        see.addEventListener('click', () => {
+          reveal(i);
+          paintStep(i);
+          syncRail();
+          panel.querySelector<HTMLButtonElement>('.block-faded__next')?.focus();
+        });
+        actions.append(improve, see);
+        syncButtons = () => {
+          const ready = allTicked(i);
+          improve.className = `btn ${ready ? 'btn--secondary' : 'btn--primary'} block-faded__improve`;
+          see.className = `btn ${ready ? 'btn--primary' : 'btn--secondary'} block-faded__model-btn`;
+        };
+        syncButtons();
+      } else if (i < last) {
+        actions.append(nextButton(i));
+      }
+    }
+    panel.append(actions);
+    if (i === last && isDone(i) && c.steps.length > 1) panel.append(finishView());
+  };
+  let syncButtons = (): void => {};
+
+  const finishView = (): HTMLElement => {
+    const box = el('div', 'block-faded__finish');
+    const w = lastWriting;
+    if (w < 0) return box;
+    const step = c.steps[w]!;
+    const allBlank = c.part_labels.every((_, p) => step.blanks.includes(p));
+    box.append(el('p', 'block-faded__finish-head', allBlank ? 'You wrote the whole answer yourself' : "That's the last step"));
+    const list = el('dl', 'block-faded__parts');
+    c.part_labels.forEach((label, p) => {
+      list.append(el('dt', undefined, label), el('dd', undefined, step.blanks.includes(p) ? (works[w]!.texts[p] ?? '').trim() : (step.answers[p] ?? '')));
+    });
+    box.append(list);
+    return box;
+  };
+
+  const repaint = (moveFocus = false): void => {
+    paintStep(open);
+    syncRail();
+    if (moveFocus) panel.focus();
+  };
+  repaint();
+  return root;
 }
