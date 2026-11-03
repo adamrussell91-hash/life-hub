@@ -6,6 +6,7 @@ import { mountQuestionPlayer, seededShuffle, type PlayerOptions } from '@/quiz/p
 import { stepsLoader, type StepFor, type StepPick } from '@/student/next-step';
 import type { WritingWatch } from '@/quiz/writing-watch';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
+import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
 import './quiz.css';
 
 /**
@@ -492,7 +493,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       wrap.append(
         button(s.results.length ? 'Try again' : 'Start the quiz', 'primary', async function () {
           this.disabled = true;
-          if ((await startAttempt()) && slots) firstSlot()?.scrollIntoView({ block: 'center' });
+          if ((await startAttempt()) && slots) revealSlot(firstSlot());
         })
       );
     }
@@ -693,6 +694,20 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   const slotList = () => [...(slots?.entries() ?? [])];
   const firstSlot = (only?: (id: string) => boolean) => slotList().find(([id]) => !only || only(id))?.[1];
 
+  /** A slot may sit on another card of its deck, so the deck turns to it first. */
+  function revealSlot(slot: HTMLElement | undefined): void {
+    slot?.dispatchEvent(new CustomEvent(ROW_REVEAL_EVENT, { bubbles: true }));
+    slot?.scrollIntoView({ block: 'center' });
+  }
+
+  /** The deck's strip reads this to show which questions are answered. */
+  function markAnsweredSlots(): void {
+    const current = status?.current;
+    for (const [id, slot] of slotList()) {
+      slot.dataset.quizAnswered = String(!!current && (hasAnswer(draft?.responses[id]) || !!current.answers[id] || !!checking[id]));
+    }
+  }
+
   function paintSlots(): void {
     for (const [id, slot] of slotList()) {
       // Repaint only when this question's state changes, so typing elsewhere keeps its place.
@@ -701,6 +716,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       slot.dataset.sig = sig;
       slot.replaceChildren(slotView(id));
     }
+    markAnsweredSlots();
   }
 
   function slotSignature(id: string): string {
@@ -778,6 +794,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
           saveDraft();
           // The hand-in box counts what's left to answer.
           paintBody();
+          markAnsweredSlots();
         }
       })
     );
@@ -840,7 +857,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
         list.append(
           button(`Question ${i + 1}`, 'ghost', () => {
             if (slots) {
-              slots.get(id)?.scrollIntoView({ block: 'center' });
+              revealSlot(slots.get(id));
               return;
             }
             view = 'quiz';

@@ -2,9 +2,11 @@ import { revealBlockFromHash } from '@/app/block-hash';
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
+import type { Block } from '@/schemas/block';
 import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { hasNestedQuizQuestion, mountStudentQuiz } from '@/quiz/student-quiz';
+import { appendWithQuizDecks } from '@/blocks/quiz-deck';
 import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
@@ -209,8 +211,20 @@ function renderPublishedLesson(
         return slot;
       }
     : undefined;
+  const renderForStudent = (block: Block) =>
+    renderBlock(block, 'student', {
+      lessonId: lesson.lesson_id,
+      classId: extras?.cls?.id ?? extras?.quizClassId,
+      pageBlocks: lesson.blocks,
+      openNoteId,
+      ...(stepFor ? { stepFor } : {}),
+      loadAnthology: () => studentUnitAnthology(lesson.unit_id),
+      ...(quizSlot ? { quizSlot } : {})
+    });
   let quizPlaced = false;
-  for (const block of lesson.blocks) {
+  // Answered in place, a run of questions on the page itself is a deck too.
+  if (quizSlots) appendWithQuizDecks(blocks, lesson.blocks.filter((block) => !isSidePath(block)), renderForStudent, 'student');
+  else for (const block of lesson.blocks) {
     if ((isQuiz || (inlineQuiz && !quizSlots)) && block.block_type === 'quiz_question') {
       if (inlineQuiz && !quizPlaced) {
         blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor }));
@@ -220,17 +234,7 @@ function renderPublishedLesson(
     }
     // A side path only plays inside a lecture.
     if (isSidePath(block)) continue;
-    blocks.append(
-      renderBlock(block, 'student', {
-        lessonId: lesson.lesson_id,
-        classId: extras?.cls?.id ?? extras?.quizClassId,
-        pageBlocks: lesson.blocks,
-        openNoteId,
-        ...(stepFor ? { stepFor } : {}),
-        loadAnthology: () => studentUnitAnthology(lesson.unit_id),
-        ...(quizSlot ? { quizSlot } : {})
-      })
-    );
+    blocks.append(renderForStudent(block));
   }
   mountStudentBlockPulse(blocks, {
     lessonId: lesson.lesson_id,
