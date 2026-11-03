@@ -624,7 +624,8 @@ export async function renderMeetingPage(
         },
         fetchPdf: async (key) => (await fetchMinutesFile(key)).data,
         fetchText: async (key) => new TextDecoder().decode(Uint8Array.from(atob((await fetchMinutesFile(key)).data), (c) => c.charCodeAt(0))),
-        dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting
+        dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting,
+        saveDraft: async (text) => { record = (await updateMeeting(id, { minutes_draft: text || null })).meeting; }
       }
     });
     return minutesCardEl;
