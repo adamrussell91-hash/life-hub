@@ -51,6 +51,26 @@ describe('Coverage map: model', () => {
     expect(map.rows.map((r) => r.id).slice(0, 4)).toEqual(['a', 'x', 'b', 'c']);
   });
 
+  it('shows a dated side lesson in its own week, under the lesson it branches off', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Poem' }, { id: 's', title: 'Later support', role: 'support', branchFrom: 'a' }, { id: 'u', title: 'Undated option', role: 'optional', branchFrom: 'a' },
+      { id: 'b', title: 'Review' }
+    ];
+    const bands = new Map([['a', 'Wk 3'], ['s', 'Wk 4'], ['b', 'Wk 4']]);
+    const map = buildCoverageMap({ content: v2(), lines: LINES, lessons, points: POINTS, bands });
+    expect(map.rows.slice(0, 4).map((r) => [r.id, r.band])).toEqual([['a', 'Wk 3'], ['s', 'Wk 4'], ['u', 'Wk 4'], ['b', 'Wk 4']]);
+  });
+
+  it('keeps the weeks in order when a side lesson is dated outside the lessons around it', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Poem' }, { id: 'early', title: 'Dated earlier', role: 'support', branchFrom: 'a' }, { id: 'far', title: 'Dated much later', role: 'extension', branchFrom: 'a' },
+      { id: 'b', title: 'Review' }
+    ];
+    const bands = new Map([['a', 'Wk 2'], ['early', 'Wk 1'], ['far', 'Wk 6'], ['b', 'Wk 3']]);
+    const map = buildCoverageMap({ content: v2(), lines: LINES, lessons, points: POINTS, bands });
+    expect(map.rows.slice(0, 4).map((r) => r.band)).toEqual(['Wk 2', 'Wk 2', 'Wk 3', 'Wk 3']);
+  });
+
   it('puts lessons on lanes from their role and marks quizzes and the task', () => {
     const map = build();
     expect(map.rows.map((r) => [r.id, r.lane, r.kind])).toEqual([

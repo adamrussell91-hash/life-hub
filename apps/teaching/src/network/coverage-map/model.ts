@@ -67,6 +67,37 @@ export const thinLimit = (coreLessons: number): number => Math.max(1, Math.floor
 const LEVEL_DEPTH = { introduced: 1, reinforced: 2, mastered: 3 } as const;
 const isSide = (lane: MapLane) => lane !== 'core';
 
+/** "Wk 3" → 3; "Pre" (before the unit starts) → 0. */
+const weekOf = (band: string): number => Number(/\d+/.exec(band)?.[0] ?? 0);
+
+/**
+ * Each row's week. A side lesson shows in its own week (an undated one in the week of the
+ * lesson it branches off), kept between the rows around it so the weeks still run in order.
+ */
+function rowBands(order: readonly string[], anchor: ReadonlyMap<string, string>, bands: ReadonlyMap<string, string> | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!bands) return out;
+  const later = (a: string, b: string) => (weekOf(b) > weekOf(a) ? b : a);
+  let last: string | undefined;
+  order.forEach((id, i) => {
+    const at = anchor.get(id);
+    if (!at) {
+      const own = bands.get(id);
+      if (own) { out.set(id, own); last = own; }
+      return;
+    }
+    const own = bands.get(id) ?? bands.get(at);
+    if (!own) return;
+    const next = order.slice(i + 1).find((x) => !anchor.has(x) && bands.has(x));
+    const ceiling = next ? bands.get(next)! : undefined;
+    const capped = ceiling && weekOf(own) > weekOf(ceiling) ? ceiling : own;
+    const band = last ? later(last, capped) : capped;
+    out.set(id, band);
+    last = band;
+  });
+  return out;
+}
+
 export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   const { content, lines, lessons, bands, dates, points } = input;
   const lineById = new Map(lines.map((l) => [l.id, l]));
@@ -104,7 +135,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     const role = byId.get(id)?.role ?? railRole.get(id);
     return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
-  // Side lessons sit under the core lesson they branch off, in that lesson's week.
+  // Side lessons sit under the core lesson they branch off.
   // With no pick and no rail stop, a dated side lesson hangs off the core lesson dated just before it:
   // explicit "after" links can walk the core route out of date order, and the date is what the teacher set.
   const datedCore = order.filter((id) => roleOf(id) === undefined && dates?.has(id)).map((id) => ({ id, when: dates!.get(id)! }));
@@ -117,6 +148,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   };
   const hung = hangSides(order, (id) => roleOf(id) !== undefined, (id) => byId.get(id)?.branchFrom ?? railAfter.get(id) ?? dateAnchor(id));
   const shown = withAutoDepths(hung.order.map((id) => byId.get(id)!).filter(Boolean));
+  const weekBands = rowBands(shown.map((l) => l.id), hung.anchor, bands);
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
   /* Items, in four groups. */
@@ -178,7 +210,6 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     // Every lesson is core unless it has its own support, extension or optional role: forks never make options.
     const lane = roleOf(lesson.id) ?? 'core';
     const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
-    const bandOf = hung.anchor.get(lesson.id) ?? lesson.id;
     const isGoal = content.terminus.lesson_id === lesson.id || lesson.assessment === true;
     return {
       id: lesson.id,
@@ -187,7 +218,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       lane,
       kind: isGoal ? 'goal' : lesson.quiz || gateLessons.has(lesson.id) ? 'check' : 'lesson',
       ...(skip && isSide(lane) ? { skip } : {}),
-      ...(bands?.get(bandOf) ? { band: bands.get(bandOf) } : {}),
+      ...(weekBands.get(lesson.id) ? { band: weekBands.get(lesson.id) } : {}),
       ...(dates?.get(lesson.id) ? { date: dates.get(lesson.id) } : {}),
       teaches
     };

@@ -180,10 +180,10 @@ describe('Side lessons branch off the core lesson the teacher picks', () => {
     expect(map.rows.map((r) => r.id)).toEqual(['intro', 'finn', 'sea', 'gull', 'pre', 'help', 'wrap', '__terminus']);
   });
 
-  it('puts a side lesson in its core lesson’s week', () => {
+  it('puts a dated side lesson in its own week', () => {
     const bands = new Map([['intro', 'Wk 1'], ['finn', 'Wk 2'], ['pre', 'Wk 3'], ['help', 'Wk 4'], ['wrap', 'Wk 4']]);
     const map = buildCoverageMap({ content, lines: [], lessons, bands });
-    expect(map.rows.find((r) => r.id === 'help')?.band).toBe('Wk 3');
+    expect(map.rows.find((r) => r.id === 'help')?.band).toBe('Wk 4');
   });
 
   it('with no pick, hangs off the core lesson before it', () => {
