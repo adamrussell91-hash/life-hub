@@ -13,6 +13,8 @@ export type MinutesCardDeps = {
   fetchPdf: (fileKey: string) => Promise<string>;
   /** Clears minutes_pending on the meeting. */
   dismissPending: () => Promise<MeetingRecord>;
+  /** Keeps the typed text on the meeting. Empty text clears it. */
+  saveDraft: (text: string) => Promise<void>;
 };
 
 type ReadInput = Parameters<MinutesCardDeps['read']>[0];
@@ -31,6 +33,9 @@ function button(label: string, part: string, kind = 'btn--secondary'): HTMLButto
   return node;
 }
 
+const DRAFT_SAVE_MS = 800;
+const DRAFT_MAX = 60000;
+
 const due = (value: string | null) => (value ? ` · due ${formatDisplayDate(value)}` : '');
 
 /** Official minutes: add a PDF or paste, review what Clare found, save what is ticked. */
@@ -46,6 +51,35 @@ export function mountMinutesCard(options: {
   card.append(el('h3', undefined, 'Minutes'), body);
   // Set once the pending minutes are reviewed and saved, or dismissed.
   let pendingCleared = false;
+  // The Minutes box text. Saved as it changes and kept until minutes read from it are saved.
+  let draft = options.record().minutes_draft ?? '';
+  let savedDraft = draft;
+  let draftTimer: ReturnType<typeof setTimeout> | null = null;
+  let draftWrite: Promise<void> = Promise.resolve();
+  let draftStatus: HTMLElement | null = null;
+
+  function showDraftStatus(text: string): void {
+    if (draftStatus) draftStatus.textContent = text;
+  }
+
+  /** Writes run in order, so an older save can't land after a newer one. */
+  function flushDraft(): Promise<void> {
+    if (draftTimer !== null) clearTimeout(draftTimer);
+    draftTimer = null;
+    draftWrite = draftWrite.then(async () => {
+      if (draft === savedDraft) return;
+      const text = draft;
+      showDraftStatus('Saving…');
+      try {
+        await options.deps.saveDraft(text);
+        savedDraft = text;
+        showDraftStatus(draft === text ? 'Saved on this meeting.' : 'Saving…');
+      } catch {
+        showDraftStatus('Not saved yet. Keep this page open and check your connection.');
+      }
+    });
+    return draftWrite;
+  }
 
   function pendingBox(): HTMLElement | null {
     const pending = pendingCleared ? null : options.record().minutes_pending ?? null;
@@ -87,8 +121,8 @@ export function mountMinutesCard(options: {
   }
 
   function paintFor(record: MeetingRecord): void {
-    if (record.minutes) paintSaved(record.minutes, null);
-    else paintEmpty(false);
+    if (record.minutes && !draft) paintSaved(record.minutes, null);
+    else paintEmpty(Boolean(record.minutes));
   }
 
   function paintEmpty(withCancel: boolean): void {
@@ -100,16 +134,27 @@ export function mountMinutesCard(options: {
     add.addEventListener('click', () => file.click());
     const pasteToggle = button('Paste instead', 'minutes-paste-toggle', 'btn--ghost');
     const paste = el('div', 'meeting-minutes__paste');
-    paste.hidden = true;
+    paste.hidden = !draft;
     const area = el('textarea') as HTMLTextAreaElement;
     area.rows = 8;
+    area.maxLength = DRAFT_MAX;
+    area.value = draft;
     area.setAttribute('aria-label', 'Paste the minutes');
+    draftStatus = el('p', 'muted meeting-minutes__draft-status', draft ? 'Saved on this meeting.' : 'Saves on this meeting as you type.');
+    draftStatus.setAttribute('role', 'status');
+    area.addEventListener('input', () => {
+      draft = area.value;
+      showDraftStatus('Saving…');
+      if (draftTimer !== null) clearTimeout(draftTimer);
+      draftTimer = setTimeout(() => void flushDraft(), DRAFT_SAVE_MS);
+    });
+    area.addEventListener('blur', () => void flushDraft());
     const readText = button('Read pasted minutes', 'minutes-read-text');
-    paste.append(area, readText);
+    paste.append(area, draftStatus, readText);
     pasteToggle.addEventListener('click', () => { paste.hidden = !paste.hidden; if (!paste.hidden) area.focus(); });
     readText.addEventListener('click', () => {
       const text = area.value.trim();
-      if (text) void runRead(async () => ({ text }), null, null);
+      if (text) void runRead(async () => ({ text }), null, null, true);
     });
     file.addEventListener('change', async () => {
       const picked = file.files?.[0];
@@ -136,18 +181,27 @@ export function mountMinutesCard(options: {
     body.append(el('p', 'muted meeting-minutes__note', message));
   }
 
-  async function runRead(load: () => Promise<ReadInput>, pdfData: string | null, fileKey: string | null): Promise<void> {
+  function backToDraft(): HTMLButtonElement {
+    const back = button('Back to your text', 'minutes-back-to-text', 'btn--ghost');
+    back.addEventListener('click', () => paintEmpty(Boolean(options.record().minutes)));
+    return back;
+  }
+
+  async function runRead(load: () => Promise<ReadInput>, pdfData: string | null, fileKey: string | null, fromDraft = false): Promise<void> {
+    if (fromDraft) await flushDraft();
+    draftStatus = null;
     body.replaceChildren(el('p', 'muted', 'Clare is reading the minutes. This can take a minute or two.'));
     try {
-      paintReview(await options.deps.read(await load()), pdfData, fileKey);
+      paintReview(await options.deps.read(await load()), pdfData, fileKey, fromDraft);
     } catch (err) {
       body.replaceChildren(
         el('p', 'muted', 'Clare couldn’t read these minutes.'),
         el('p', 'muted meeting-minutes__note', err instanceof Error ? err.message : '')
       );
       const retry = button('Try again', 'minutes-retry');
-      retry.addEventListener('click', () => void runRead(load, pdfData, fileKey));
+      retry.addEventListener('click', () => void runRead(load, pdfData, fileKey, fromDraft));
       body.append(retry);
+      if (fromDraft) body.append(backToDraft());
     }
   }
 
@@ -170,7 +224,7 @@ export function mountMinutesCard(options: {
     return boxes;
   }
 
-  function paintReview(review: ClareMinutesReview, pdfData: string | null, fileKey: string | null): void {
+  function paintReview(review: ClareMinutesReview, pdfData: string | null, fileKey: string | null, fromDraft: boolean): void {
     body.replaceChildren();
     const mine = tickGroup('mine', 'For you', review.mine, (item) => `${item.text}${due(item.due)}`);
     const others = tickGroup('others', 'For others', review.others, (item) => `${item.person_name}: ${item.text}${due(item.due)}`);
@@ -215,8 +269,13 @@ export function mountMinutesCard(options: {
           sections: review.sections,
           mine: ticked(mine).map(({ text, due: d }) => ({ text, due: d })),
           others: [...ticked(others).map(({ text, person_ref, due: d }) => ({ text, person_ref, due: d })), ...picked],
-          decisions: ticked(decisions)
+          decisions: ticked(decisions),
+          ...(fromDraft ? { clearDraft: true } : {})
         });
+        if (fromDraft) {
+          draft = '';
+          savedDraft = '';
+        }
         pendingCleared = true;
         options.onSaved(record);
         paintSaved(record.minutes!, savedLine(counts));
@@ -226,9 +285,11 @@ export function mountMinutesCard(options: {
       }
     });
     body.append(save);
+    if (fromDraft) body.append(backToDraft());
   }
 
   function paintSaved(minutes: MeetingMinutes, line: string | null): void {
+    draftStatus = null;
     body.replaceChildren();
     if (line) body.append(el('p', 'meeting-minutes__saved', line));
     for (const section of minutes.sections) {
@@ -246,12 +307,11 @@ export function mountMinutesCard(options: {
     const replace = button('Replace minutes', 'minutes-replace', 'btn--ghost');
     replace.addEventListener('click', () => paintEmpty(true));
     row.append(replace);
+    if (draft) row.append(backToDraft());
     body.append(row);
     withPending();
   }
 
-  const existing = options.record().minutes;
-  if (existing) paintSaved(existing, null);
-  else paintEmpty(false);
+  paintFor(options.record());
   return card;
 }

@@ -51,3 +51,11 @@ test('field update accepts minutes; projection and parse carry it', () => {
   assert.equal(projectMeeting({ id: MEETING, title: 'T', state: 'scheduled' }).minutes, null);
   assert.equal(parseMeetingRecord({ schema_version: 2, id: MEETING, title: 'T', scheduled_start: '2026-11-01T00:00:00.000Z', scheduled_end: '2026-11-01T01:00:00.000Z', time_zone: 'Australia/Sydney', state: 'scheduled', occurrence_history: [], created_at: 'x', updated_at: 'x', minutes: good() }).minutes.source, 'page');
 });
+
+test('minutes_draft saves, reads back and clears', () => {
+  assert.equal(validateMeetingFieldUpdate({ minutes_draft: '  typed notes  ' }).minutes_draft, 'typed notes');
+  assert.equal(validateMeetingFieldUpdate({ minutes_draft: null }).minutes_draft, null);
+  assert.equal(validateMeetingFieldUpdate({ minutes_draft: '   ' }).minutes_draft, null);
+  assert.throws(() => validateMeetingFieldUpdate({ minutes_draft: 'x'.repeat(60001) }), (e) => e.code === 'minutes_draft_too_long');
+  assert.throws(() => validateMeetingFieldUpdate({ minutes_draft: 3 }), (e) => e.code === 'invalid_minutes_draft');
+});

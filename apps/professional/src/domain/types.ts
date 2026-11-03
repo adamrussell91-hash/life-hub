@@ -374,6 +374,8 @@ export interface MeetingRecord {
   minutes?: MeetingMinutes | null;
   /** Minutes Clare filed from chat, waiting for Adam to review or dismiss. */
   minutes_pending?: MeetingMinutesPending | null;
+  /** Text typed or pasted into the Minutes box, kept until minutes read from it are saved. */
+  minutes_draft?: string | null;
 }
 
 export interface MeetingMinutesPending {

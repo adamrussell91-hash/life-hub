@@ -479,6 +479,7 @@
 .meeting-minutes__body { display: grid; gap: var(--space-3); }
 .meeting-minutes__paste { display: grid; gap: var(--space-2); }
 .meeting-minutes__paste textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.meeting-minutes__draft-status { margin: 0; font-size: var(--text-sm); }
 .meeting-minutes__group { display: grid; gap: var(--space-1); }
 .meeting-minutes__group h4, .meeting-minutes__section h4 { margin: 0; }
 .meeting-minutes__unmatched { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

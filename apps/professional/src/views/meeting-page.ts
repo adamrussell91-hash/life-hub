@@ -623,7 +623,8 @@ export async function renderMeetingPage(
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         },
         fetchPdf: async (key) => (await fetchMinutesFile(key)).data,
-        dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting
+        dismissPending: async () => (await updateMeeting(id, { minutes_pending: null })).meeting,
+        saveDraft: async (text) => { record = (await updateMeeting(id, { minutes_draft: text || null })).meeting; }
       }
     });
     return minutesCardEl;
