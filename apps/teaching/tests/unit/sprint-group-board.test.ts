@@ -92,4 +92,30 @@ describe('group board', () => {
     clickTab(host, 'Prototype');
     expect(host.querySelector('.sboard__pane')!.textContent).toContain('Parts and the pitch file show here');
   });
+  it('offers another go only where a student has work, says what it touches, and only acts once confirmed', async () => {
+    const anotherGo = vi.fn(async () => ({}));
+    const { host } = await mount({ ...board(), awaiting: null, progress: progress(['understand', 'sketch']) } as unknown as GroupBoard, { anotherGo });
+    const cy = [...host.querySelectorAll('.sboard__who tbody tr')][1]!;
+    const link = [...cy.querySelectorAll<HTMLButtonElement>('td.is-now .sboard__again')].find((b) => b.textContent === 'Give another go')!;
+    link.click();
+    expect(anotherGo).not.toHaveBeenCalled();
+    const box = host.querySelector('.smap-confirm')!;
+    expect(box.querySelector('strong')!.textContent).toBe('Give Cy Dale another go at Sketch?');
+    expect(box.textContent).toContain('Their earlier work is set aside, and you can bring it back here.');
+    expect(box.textContent).toContain('Their idea leaves the head-to-heads until they hand in again');
+    [...box.querySelectorAll('button')].find((b) => b.textContent === 'Give another go')!.click();
+    expect(anotherGo).toHaveBeenCalledWith('st_cy', 'sketch');
+  });
+
+  it('has no another go on a step with nothing in, and offers Bring back once work is set aside', async () => {
+    const bringBack = vi.fn(async () => ({}));
+    const data = progress(['understand', 'sketch']);
+    data.students[1] = { ...data.students[1]!, phases: { ...data.students[1]!.phases, sketch: 'none' }, earlier: { sketch: 1 } } as never;
+    const { host } = await mount({ ...board(), awaiting: null, progress: data } as unknown as GroupBoard, { bringBack });
+    const cell = [...host.querySelectorAll('.sboard__who tbody tr')][1]!.querySelector('td.is-now')!;
+    expect([...cell.querySelectorAll('.sboard__again')].map((b) => b.textContent)).toEqual(['Bring back earlier work']);
+    cell.querySelector<HTMLButtonElement>('.sboard__again')!.click();
+    [...host.querySelectorAll<HTMLButtonElement>('.smap-confirm button')].find((b) => b.textContent === 'Bring it back')!.click();
+    expect(bringBack).toHaveBeenCalledWith('st_cy', 'sketch');
+  });
 });

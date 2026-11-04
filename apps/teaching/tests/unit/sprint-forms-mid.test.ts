@@ -219,7 +219,7 @@ describe('prototype form', () => {
     area.value = 'The panel opens with the baker at dawn.';
     area.dispatchEvent(new Event('input'));
     first.dispose();
-    expect(c.client.save).toHaveBeenCalledWith('prototype', expect.objectContaining({ text: 'The panel opens with the baker at dawn.' }));
+    expect(c.client.save).toHaveBeenCalledWith('prototype', expect.objectContaining({ text: 'The panel opens with the baker at dawn.' }), undefined);
     const again = mountPrototype(c);
     expect(again.el.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('The panel opens with the baker at dawn.');
   });

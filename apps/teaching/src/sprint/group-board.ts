@@ -3,7 +3,7 @@ import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { LEVEL_LABELS, PHASE_LABELS, SPRINT_PHASES, type SprintPhaseKey } from './schema';
 import { mountMarking } from './marking';
-import { pairKey, pairsOf } from './rules';
+import { pairKey, pairsOf, phaseDue } from './rules';
 import type { GalleryIdea, GroupBoard, SprintTeacherApi } from './api';
 
 type Tab = 'understand' | 'ideas' | 'build' | 'test';
@@ -40,6 +40,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
   // Kept across repaints, so answering or picking doesn't throw the teacher back to the start.
   let tab: Tab | null = markNow ? 'test' : null;
   const openCards = new Set<string>();
+  const askHost = el('div');
 
   const link = (text: string, onClick: () => void) => { const b = button(text, 'ghost', onClick); b.classList.add('sboard__link'); return b; };
   const heading = (title: string, hint?: string) => {
@@ -74,6 +75,40 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     return cell;
   }
 
+  const againLink = (text: string, onClick: () => void) => { const b = link(text, onClick); b.classList.add('sboard__again'); return b; };
+
+  /** What setting this work aside touches beyond the student, only as far as it applies to this group now. */
+  function anotherGoNotes(b: GroupBoard, s: Student, key: SprintPhaseKey): string[] {
+    const name = PHASE_LABELS[key];
+    const notes = [`${name} starts blank for ${s.name}. Their earlier work is set aside, and you can bring it back here.`];
+    if (s.phases[key] === 'in' || s.phases[key] === 'late') notes.push('They hand it in again when they’re ready.');
+    const votesClosed = !!b.chosen || b.awaiting?.kind === 'idea';
+    if (key === 'understand' && b.question) notes.push('The group’s problem stays as chosen.');
+    if (key === 'sketch') notes.push(votesClosed ? 'Voting has closed, so new ideas stay out of the head-to-heads.' : 'Their idea leaves the head-to-heads until they hand in again, and they redo their match-ups.');
+    if (key === 'decide') notes.push(votesClosed ? 'Voting has closed, so the group’s result stays and new match-ups don’t count.' : 'They redo their match-ups, and voting waits for them.');
+    if (key === 'prototype') notes.push('Their part stays theirs, and the group’s pitch file stays.');
+    if (key === 'test') notes.push('Marks you’ve already given stay in the markbook.');
+    const next = SPRINT_PHASES[SPRINT_PHASES.indexOf(key) + 1];
+    const dates = b.progress?.phases.find((p) => p.key === key);
+    const due = dates ? phaseDue(dates) : null;
+    if (due !== null && due <= Date.now()) notes.push(`${name} has closed, so what they hand in counts as late. Extend their deadline to change that.`);
+    else if (next && b.progress?.open.includes(next)) notes.push(`If everyone being in is what opened ${PHASE_LABELS[next]}, the group waits on ${s.name} until they hand in again or ${name} closes.`);
+    return notes;
+  }
+
+  function askBox(title: string, notes: string[], label: string, go: () => void): void {
+    const box = el('div', 'smap-confirm');
+    const ul = el('ul');
+    for (const n of notes) ul.append(el('li', '', n));
+    box.append(el('strong', '', title), ul, button(label, 'primary', () => { askHost.replaceChildren(); go(); }), button('Not yet', 'secondary', () => askHost.replaceChildren()));
+    askHost.replaceChildren(box);
+    box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  const askAnotherGo = (b: GroupBoard, s: Student, key: SprintPhaseKey) => askBox(`Give ${s.name} another go at ${PHASE_LABELS[key]}?`, anotherGoNotes(b, s, key), 'Give another go', () => void act(o.api.anotherGo(s.id, key)));
+
+  const askBringBack = (s: Student, key: SprintPhaseKey) => askBox(`Bring back ${s.name}’s earlier ${PHASE_LABELS[key]} work?`, [s.phases[key] === 'none' ? 'It goes back just as it was.' : 'It goes back just as it was, and what they’ve written since is set aside in its place.'], 'Bring it back', () => void act(o.api.bringBack(s.id, key)));
+
   function whoTable(b: GroupBoard): HTMLElement | null {
     const p = b.progress;
     if (!p?.students.length) return null;
@@ -89,7 +124,13 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     for (const s of p.students) {
       const row = el('tr');
       row.append(el('td', '', s.name));
-      for (const k of shown) { const td = el('td', k === now ? 'is-now' : 'is-past'); td.append(statusCell(b, s, k)); row.append(td); }
+      for (const k of shown) {
+        const td = el('td', k === now ? 'is-now' : 'is-past');
+        td.append(statusCell(b, s, k));
+        if (s.phases[k] !== 'none') td.append(againLink('Give another go', () => askAnotherGo(b, s, k)));
+        if (s.earlier?.[k]) td.append(againLink('Bring back earlier work', () => askBringBack(s, k)));
+        row.append(td);
+      }
       body.append(row);
     }
     table.append(thead, body);
@@ -386,7 +427,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const needs = needsYou(b, show);
     if (needs) root.append(needs);
     const who = whoTable(b);
-    if (who) root.append(who);
+    if (who) root.append(who, askHost);
     root.append(tabs, body);
     show(tab);
   }

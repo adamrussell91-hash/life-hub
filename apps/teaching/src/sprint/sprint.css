@@ -131,6 +131,8 @@
 .sboard__state--in { color: #2f6b4f; }
 .sboard__state--go { color: var(--navy); }
 .sboard__state--not { font-weight: 400; color: var(--muted); }
+.sboard__again { display: block; margin-top: 2px; font-size: 13px; font-weight: 400; }
+.sprint-another-go { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .sboard__tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .sboard__tabs::-webkit-scrollbar { display: none; }
 .sboard__tab { font: inherit; font-size: 15px; padding: 8px 12px; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--muted); white-space: nowrap; cursor: pointer; }

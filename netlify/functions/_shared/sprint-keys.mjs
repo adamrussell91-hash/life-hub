@@ -6,6 +6,7 @@
  *   sprint/{lesson}/extend                    { group: { [g]: { [phase]: { due_date, due_time } } }, student: { [s]: { … } } }
  *   sprint/{lesson}/seen/{student}            { [phase]: iso }   first time the student opened the phase
  *   sprint/{lesson}/subs/{student}/{phase}    { payload, saved_at, submitted_at, late, frozen }
+ *   sprint/{lesson}/goes/{student}            { [phase]: { go, earlier: [{ ...sub, set_aside_at }] } }   Give another go: the count and the work set aside
  *   sprint/{lesson}/groups/{group}            { in: { [phase]: student[] }, question, chosen, awaiting, votes_closed_at, parts, claims, pitch,
  *                                               audience, ask_added[], ask_picked[], ask_sent[], answers: { [question]: { text, at } }, assembler }
  *   sprint/{lesson}/fileowner/{id}            { owner, student }
@@ -20,6 +21,7 @@ export const sprintKeys = (lesson) => ({
   extend: `sprint/${lesson}/extend`,
   seen: (student) => `sprint/${lesson}/seen/${student}`,
   sub: (student, phase) => `sprint/${lesson}/subs/${student}/${phase}`,
+  goes: (student) => `sprint/${lesson}/goes/${student}`,
   group: (group) => `sprint/${lesson}/groups/${group}`,
   file: (student, id) => `sprint/${lesson}/files/${student}/${id}`,
   fileMeta: (student, id) => `sprint/${lesson}/filemeta/${student}/${id}`,

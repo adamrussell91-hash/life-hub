@@ -7,7 +7,7 @@ import type { Dot, Duel, FeedbackEntry, Level, LimitBox, Part, PhasePayload, Spr
 
 export type PhaseRow = {
   key: SprintPhaseKey; open: boolean; due_date: string; due_time: string;
-  state: 'none' | 'draft' | 'in'; late: boolean; handed_in?: boolean; frozen: boolean; closed: boolean; count_in: number;
+  state: 'none' | 'draft' | 'in'; /** Times the teacher has given another go; saves carry it so an old tab can't overwrite the new start. */ go?: number; late: boolean; handed_in?: boolean; frozen: boolean; closed: boolean; count_in: number;
 };
 export type GalleryIdea = { id: string; index?: number; title: string; idea: string; answers: string; evidence: string; file: string | null; strongest: boolean };
 export type GallerySet = { id: string; ideas: GalleryIdea[] };
@@ -76,8 +76,8 @@ export type SprintClient = {
   status(): Promise<SprintStatus>;
   claim(initials: string): Promise<SprintStatus>;
   open(phase: SprintPhaseKey): Promise<SprintStatus>;
-  save<P extends SprintPhaseKey>(phase: P, payload: PhasePayload[P]): Promise<SprintStatus>;
-  submit<P extends SprintPhaseKey>(phase: P, payload: PhasePayload[P]): Promise<SprintStatus>;
+  save<P extends SprintPhaseKey>(phase: P, payload: PhasePayload[P], go?: number): Promise<SprintStatus>;
+  submit<P extends SprintPhaseKey>(phase: P, payload: PhasePayload[P], go?: number): Promise<SprintStatus>;
   parts(parts: Part[]): Promise<SprintStatus>;
   claimPart(partId: string): Promise<SprintStatus>;
   /** Give a part to members of the group (by member key); they leave any other part. */
@@ -120,8 +120,8 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
     status: () => call('status'),
     claim: (initials) => call('claim', { initials }),
     open: (phase) => call('open', { phase }),
-    save: (phase, payload) => call('save', { phase, payload }),
-    submit: (phase, payload) => call('submit', { phase, payload }),
+    save: (phase, payload, go) => call('save', { phase, payload, go }),
+    submit: (phase, payload, go) => call('submit', { phase, payload, go }),
     parts: (parts) => call('parts', { parts }),
     claimPart: (partId) => call('claim_part', { part_id: partId }),
     assign: (partId, keys) => call('assign', { part_id: partId, keys }),
@@ -166,7 +166,7 @@ export type GroupBoard = {
   progress?: {
     open: SprintPhaseKey[];
     phases: Array<{ key: SprintPhaseKey; due_date: string; due_time: string }>;
-    students: Array<{ id: string; name: string; voted: boolean; phases: MapStudent['phases']; saved_at: Partial<Record<SprintPhaseKey, string>> }>;
+    students: Array<{ id: string; name: string; voted: boolean; phases: MapStudent['phases']; saved_at: Partial<Record<SprintPhaseKey, string>>; earlier?: Partial<Record<SprintPhaseKey, number>> }>;
   };
   awaiting: MapGroup['awaiting'];
   voted?: { done: string[]; waiting: string[] };
@@ -196,6 +196,10 @@ export type SprintTeacherApi = {
   /** End the class lock now; the class part stays ended and the next phase opens. */
   liftLock(): Promise<SprintSummary>;
   unlock(studentId: string): Promise<SprintSummary>;
+  /** Set a student's work on a phase aside so it starts blank for them. */
+  anotherGo(studentId: string, phase: SprintPhaseKey): Promise<SprintSummary>;
+  /** Put back the work most recently set aside; anything newer is set aside instead. */
+  bringBack(studentId: string, phase: SprintPhaseKey): Promise<SprintSummary>;
   extend(input: { scope: 'class' | 'group' | 'student'; id?: string; phase: SprintPhaseKey; due_date: string; due_time: string }): Promise<SprintSummary>;
   confirm(groupId: string, kind: 'question' | 'idea', id: string): Promise<SprintSummary>;
   spotlight(studentId: string, phase: SprintPhaseKey, field: string): Promise<SprintSummary>;
@@ -219,6 +223,8 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
     reopenClass: (phase) => call('reopen_class', { phase }),
     liftLock: () => call('lift_lock'),
     unlock: (studentId) => call('unlock', { student_id: studentId }),
+    anotherGo: (studentId, phase) => call('another_go', { student_id: studentId, phase }),
+    bringBack: (studentId, phase) => call('bring_back', { student_id: studentId, phase }),
     extend: (input) => call('extend', input),
     confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
     spotlight: (studentId, phase, field) => call('spotlight', { student_id: studentId, phase, field }),
@@ -267,8 +273,8 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         status: () => call('status'),
         claim: () => call('status'),
         open: (phase) => call('open', { phase }),
-        save: (phase, payload) => call('save', { phase, payload }),
-        submit: (phase, payload) => call('submit', { phase, payload }),
+        save: (phase, payload, go) => call('save', { phase, payload, go }),
+        submit: (phase, payload, go) => call('submit', { phase, payload, go }),
         parts: (parts) => call('parts', { parts }),
         claimPart: (partId) => call('claim_part', { part_id: partId }),
         assign: (partId, keys) => call('assign', { part_id: partId, keys }),
@@ -298,6 +304,8 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
     reopenClass: (phase) => call('reopen_class', { phase }),
     liftLock: () => call('lift_lock'),
         unlock: (studentId) => call('unlock', { student_id: studentId }),
+        anotherGo: (studentId, phase) => call('another_go', { student_id: studentId, phase }),
+        bringBack: (studentId, phase) => call('bring_back', { student_id: studentId, phase }),
         extend: (input) => call('extend', input),
         confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
         spotlight: (studentId, phase, field) => call('spotlight', { student_id: studentId, phase, field }),

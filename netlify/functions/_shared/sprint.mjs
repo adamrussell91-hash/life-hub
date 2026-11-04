@@ -561,6 +561,7 @@ async function studentView(store, lessonId, config, who, group) {
   const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials]));
   const mine = {};
   const phases = [];
+  const goes = (await read(store, k.goes(owner))) ?? {};
   for (const key of PHASES) {
     const sub = await read(store, k.sub(owner, key));
     if (sub) mine[key] = sub.payload;
@@ -572,6 +573,7 @@ async function studentView(store, lessonId, config, who, group) {
       due_date: p.due_date,
       due_time: p.due_time,
       state: sub?.submitted_at ? 'in' : sub ? 'draft' : 'none',
+      go: goes[key]?.go ?? 0,
       late: !!sub?.late,
       handed_in: !!sub?.handed_in,
       frozen: !!sub?.frozen || isFrozen(lockRec.ended ?? {}, key, sid),
@@ -675,6 +677,8 @@ export async function sprintAction(store, lessonId, body) {
   if (action === 'save' || action === 'submit') {
     if (!PHASES.includes(phase)) reject(400, 'bad_phase', 'Unknown phase.');
     mayEdit(view, phase);
+    // A tab still open from before Give another go must not put the old work back.
+    if ((body.go ?? 0) !== view.phases.find((p) => p.key === phase).go) reject(409, 'another_go', 'Your teacher has given you another go at this step. Reload the page to start it.');
     const parsed = PAYLOAD_SCHEMAS[phase].safeParse(body.payload ?? {});
     if (!parsed.success) reject(400, 'bad_payload', parsed.error.issues[0]?.message ?? 'Check your answer.');
     const payload = parsed.data;
@@ -927,7 +931,7 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
 // Names show here only; anything put up for students goes through stage, nameless.
 // ---------------------------------------------------------------------------
 
-const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'reopen_class', 'lift_lock', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer'];
+const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'reopen_class', 'lift_lock', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer', 'another_go', 'bring_back'];
 
 async function teacherContext(store, lessonId) {
   const { config } = await loadSprint(store, lessonId);
@@ -948,7 +952,9 @@ async function studentProgress(store, k, owner) {
     phases[key] = !sub ? 'none' : !sub.submitted_at ? 'draft' : sub.late ? 'late' : 'in';
     if (sub?.saved_at) saved_at[key] = sub.saved_at;
   }
-  return { phases, saved_at };
+  const goes = (await read(store, k.goes(owner))) ?? {};
+  const earlier = Object.fromEntries(PHASES.map((key) => [key, list(goes[key]?.earlier).length]));
+  return { phases, saved_at, earlier };
 }
 
 async function teacherSummary(store, lessonId) {
@@ -1046,6 +1052,78 @@ async function moveStudent(store, lessonId, config, studentId, groupId) {
   reject(409, 'changed', 'The lesson changed in another tab. Try again.');
 }
 
+/** The group a student is in and the blob owner, for a teacher action on one student's phase. */
+function studentPhase(config, studentId, phase) {
+  if (!PHASES.includes(phase)) reject(400, 'bad_phase', 'Unknown phase.');
+  const group = config.groups.find((g) => g.students.includes(studentId));
+  if (!group) reject(404, 'not_found', 'That student isn’t in this sprint.');
+  return { group, owner: ownerOf(config.class_id, studentId) };
+}
+
+/** A group builds on its chosen idea, so the Sketch that idea came from stays where it is. */
+function keepChosenIdea(lessonId, owner, phase, sub, state) {
+  if (phase !== 'sketch' || !state.chosen) return;
+  if (list(sub?.payload?.cards).some((c) => ideaId(lessonId, owner, c.id) === state.chosen)) reject(409, 'chosen_idea', 'The group is building on this student’s idea, so their Sketch has to stay.');
+}
+
+/**
+ * Give another go: the student's work on one phase is set aside and the phase
+ * starts blank for them, even once it has closed or its class part has ended.
+ * Nothing is deleted, and Bring back returns it. Choices the group has already
+ * made stay made. The go count stops an open tab saving the old work over the new.
+ */
+async function anotherGo(store, lessonId, config, studentId, phase) {
+  const k = sprintKeys(lessonId);
+  const { group, owner } = studentPhase(config, studentId, phase);
+  const sub = await read(store, k.sub(owner, phase));
+  if (!sub) reject(404, 'nothing_here', 'This student has no work on this step yet.');
+  const state = await groupState(store, k, group.id);
+  keepChosenIdea(lessonId, owner, phase, sub, state);
+  const goes = (await read(store, k.goes(owner))) ?? {};
+  const rec = goes[phase] ?? { go: 0, earlier: [] };
+  await store.setJSON(k.goes(owner), { ...goes, [phase]: { go: rec.go + 1, earlier: [...list(rec.earlier), { ...sub, set_aside_at: iso(clock()) }] } });
+  await store.delete(k.sub(owner, phase));
+  // Sketch counts too: a new idea means new match-ups, so voting mustn't close without them.
+  const voted = phase === 'sketch' || phase === 'decide' ? list(state.voted).filter((s) => s !== studentId) : list(state.voted);
+  await store.setJSON(k.group(group.id), { ...state, in: { ...state.in, [phase]: list(state.in[phase]).filter((s) => s !== studentId) }, voted });
+  // Off the "was there" list so the phase isn't frozen for them, and through any lock so they can start.
+  const lockRec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
+  const ended = lockRec.ended[phase];
+  if (ended?.present.includes(studentId) || lockRec.lock) {
+    await store.setJSON(k.lock, {
+      ...lockRec,
+      ended: ended ? { ...lockRec.ended, [phase]: { ...ended, present: ended.present.filter((s) => s !== studentId) } } : lockRec.ended,
+      lock: lockRec.lock ? { ...lockRec.lock, unlocked: [...new Set([...lockRec.lock.unlocked, studentId])] } : null
+    });
+  }
+}
+
+/** Puts back the work most recently set aside. Anything written since is set aside in its place, so nothing is lost either way. */
+async function bringBack(store, lessonId, config, studentId, phase) {
+  const k = sprintKeys(lessonId);
+  const { group, owner } = studentPhase(config, studentId, phase);
+  const goes = (await read(store, k.goes(owner))) ?? {};
+  const rec = goes[phase];
+  const last = list(rec?.earlier).at(-1);
+  if (!last) reject(404, 'nothing_here', 'There’s no earlier work to bring back.');
+  const current = await read(store, k.sub(owner, phase));
+  const state = await groupState(store, k, group.id);
+  keepChosenIdea(lessonId, owner, phase, current, state);
+  const { set_aside_at: _at, ...sub } = last;
+  const earlier = [...rec.earlier.slice(0, -1), ...(current ? [{ ...current, set_aside_at: iso(clock()) }] : [])];
+  await store.setJSON(k.goes(owner), { ...goes, [phase]: { go: rec.go + 1, earlier } });
+  await store.setJSON(k.sub(owner, phase), sub);
+  const others = list(state.in[phase]).filter((s) => s !== studentId);
+  const next = { ...state, in: { ...state.in, [phase]: sub.submitted_at ? [...others, studentId] : others } };
+  if ((phase === 'sketch' || phase === 'decide') && !state.votes_closed_at) {
+    const ids = poolOf(await groupGallery(store, lessonId, config, group, null)).map((i) => i.id);
+    const duels = list((await read(store, k.sub(owner, 'decide')))?.payload?.duels);
+    const finished = duels.length > 0 && duelsDone(duels, ids);
+    next.voted = [...list(state.voted).filter((s) => s !== studentId), ...(finished ? [studentId] : [])];
+  }
+  await store.setJSON(k.group(group.id), next);
+}
+
 export async function sprintTeacherAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'summary';
@@ -1066,6 +1144,8 @@ export async function sprintTeacherAction(store, lessonId, body) {
     if (!config.phases.some((x) => x.key === body.phase && x.where === 'class')) reject(400, 'not_class', 'Only class phases have a class part to reopen.');
     await reopenClassPart(store, lessonId, config, body.phase);
   }
+  if (action === 'another_go') await anotherGo(store, lessonId, config, body.student_id, body.phase);
+  if (action === 'bring_back') await bringBack(store, lessonId, config, body.student_id, body.phase);
   if (action === 'lift_lock') {
     const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
     if (rec.lock) await store.setJSON(k.lock, { ...rec, lock: null });
