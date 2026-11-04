@@ -229,15 +229,45 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
     go(index - 1);
   }
 
-  /** Scale the current step to fill the stage, never below its page size. */
+  /**
+   * Fill the stage, width included. The step is laid out at the stage's width divided by
+   * the zoom, so once zoomed it spans the board edge to edge; the zoom is the largest that
+   * still fits the height (never below page size, never above MAX_ZOOM). A taller step sits
+   * at zoom 1, full width, and scrolls. A step marked `data-focus-fill` sizes itself.
+   */
   function fit(): void {
     const step = steps[index]?.el;
     if (mode !== 'focus' || !step) return;
+    if (step.dataset.focusFill) {
+      step.style.zoom = '';
+      step.style.width = '';
+      return;
+    }
+    // clientWidth leaves out a scrollbar; the step fills what is left inside the padding.
+    const style = getComputedStyle(stage);
+    const roomWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const roomHeight = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - 2;
+    if (roomWidth <= 0 || roomHeight <= 0) return;
     step.style.zoom = '1';
-    const room = stage.getBoundingClientRect();
-    const box = step.getBoundingClientRect();
-    if (!box.width || !box.height) return;
-    const zoom = Math.max(1, Math.min(MAX_ZOOM, (room.width * 0.94) / box.width, (room.height * 0.9) / box.height));
+    const fits = (zoom: number): boolean => {
+      step.style.width = `${Math.floor(roomWidth / zoom)}px`;
+      return step.getBoundingClientRect().height * zoom <= roomHeight;
+    };
+    let zoom = 1;
+    if (fits(MAX_ZOOM)) {
+      zoom = MAX_ZOOM;
+    } else if (fits(1)) {
+      // Taller as it narrows: the biggest zoom that fits lies between 1 and MAX_ZOOM.
+      let lo = 1;
+      let hi = MAX_ZOOM;
+      for (let i = 0; i < 7; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) lo = mid;
+        else hi = mid;
+      }
+      zoom = lo;
+    }
+    step.style.width = `${Math.floor(roomWidth / zoom)}px`;
     step.style.zoom = zoom.toFixed(3);
   }
   function scheduleFit(): void {
@@ -264,7 +294,10 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
       stopDock = null;
       dock.replaceChildren();
       dockStack = '';
-      steps.forEach((step) => (step.el.style.zoom = ''));
+      steps.forEach((step) => {
+        step.el.style.zoom = '';
+        step.el.style.width = '';
+      });
     }
     show();
   }

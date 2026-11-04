@@ -75,16 +75,75 @@
   transition: margin-right 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Auto margins centre the step and still let a tall step scroll from its top. */
+/* Auto margins centre the step and still let a tall step scroll from its top.
+   fit() sets its width so that, zoomed, it spans the stage edge to edge. */
 .lesson-display.is-focus .lesson-display__step {
-  width: min(820px, 100%);
+  width: 100%;
   margin: auto;
   flex: none;
 }
 
-/* The cover banner is laid out for a wide page: narrower, its title wraps over the eyebrow. */
+/* ── Title page: the cover fills the board, whole image, title over it ── */
 .lesson-display.is-focus .lesson-display__step--hero {
-  width: min(1040px, 100%);
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.lesson-display.is-focus .lesson-display__step--hero .lesson-hero,
+.lesson-display.is-focus .lesson-display__step--hero .lesson-page__cover {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+}
+
+.lesson-display.is-focus .lesson-display__step--hero .entity-banner {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  background: var(--depth, #0a1536);
+}
+
+/* The whole picture, letterboxed by a blurred, dimmed fill of itself. */
+.lesson-display.is-focus .lesson-display__step--hero .entity-banner__image {
+  position: relative;
+  object-fit: contain !important;
+}
+
+.lesson-display__cover-backdrop {
+  display: none;
+}
+
+.lesson-display.is-focus .lesson-display__cover-backdrop {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.55) saturate(1.1);
+  transform: scale(1.12);
+}
+
+.lesson-display.is-focus .lesson-display__step--hero .entity-banner__scrim {
+  z-index: 1;
+  padding: clamp(var(--space-5), 4vh, var(--space-12)) clamp(var(--space-6), 4vw, var(--space-16)) !important;
+  background: linear-gradient(to top, rgba(10, 21, 54, 0.88) 0%, rgba(10, 21, 54, 0.4) 28%, transparent 55%) !important;
+}
+
+.lesson-display.is-focus .lesson-display__step--hero .lesson-hero__eyebrow {
+  font-size: clamp(var(--text-sm), 1.6vw, 1.75rem);
+}
+
+.lesson-display.is-focus .lesson-display__step--hero .lesson-hero__title {
+  font-size: clamp(2.5rem, 6.5vw, 7.5rem);
+  line-height: 1.02;
 }
 
 .lesson-display.is-focus .lesson-display__step.is-current {
