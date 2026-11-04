@@ -177,28 +177,21 @@ describe('sketch form', () => {
     }
   });
 
-  it('stars up to the number put forward, and each star becomes a card to develop and justify', () => {
+  it('stars one best idea, which becomes the one card to develop and check', () => {
     const f = mountSketch(ctx({ row: sketchRow, sprint: { ...sprint, sketch_timer: 0 } }));
     for (const t of ['Objects', 'Streets', 'Letters']) typeIdea(f.el, t);
     const stars = () => [...f.el.querySelectorAll<HTMLButtonElement>('.sk-pick .sprint-star')];
     stars()[0]!.click();
-    stars()[2]!.click();
-    expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(2);
     expect(stars()[1]!.disabled).toBe(true);
+    expect(stars()[2]!.disabled).toBe(true);
     expect(f.el.querySelector<HTMLInputElement>('.sprint-card-pane input')!.value).toBe('Objects');
     expect(f.el.textContent).toContain('It fits our focus and audience because…');
-    // Criteria and requirements are checked for the strongest idea only.
-    expect(f.el.textContent).not.toContain('Two sources');
-    const pick = f.el.querySelector<HTMLSelectElement>('.sprint-strongest select')!;
-    pick.dispatchEvent(new Event('focus'));
-    pick.value = [...pick.options].find((o) => o.value)!.value;
-    pick.dispatchEvent(new Event('change'));
-    expect(f.el.textContent).toContain('Two sources');
-    expect(f.el.textContent).toContain('Is there another way to look at this?');
-    expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(false);
-    stars()[0]!.click();
-    expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(1);
+    expect(f.el.querySelector<HTMLElement>('.sprint-tabs')!.hidden).toBe(true);
     expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(true);
+    expect(f.el.textContent).toContain('Two sources');
+    stars()[0]!.click();
+    stars()[2]!.click();
+    expect(f.el.querySelector<HTMLInputElement>('.sprint-card-pane input')!.value).toBe('Letters');
   });
 });
 

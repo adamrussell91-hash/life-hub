@@ -42,20 +42,19 @@ export function sketchProblems(
   }
   // Only the idea chosen as strongest is checked against the criteria and requirements.
   const strongestId = p.cards.length === 1 ? p.cards[0]!.id : p.strongest;
+  // Students develop their one best idea. A draft from before can hold more: only the strongest has to be finished.
   p.cards.forEach((c, i) => {
-    const name = `Idea ${i + 1}`;
+    if (p.cards.length > 1 && c.id !== strongestId) return;
+    const name = p.cards.length === 1 ? 'Your idea' : `Idea ${i + 1}`;
     if (!c.title.trim()) out.push(`${name}: give it a title.`);
     for (const field of [c.idea, c.answers, c.evidence]) if (!fullSentence(field)) { out.push(`${name}: ${MORE}`); break; }
     if (c.id === strongestId) {
-      if (!Object.values(c.criteria).some((w) => w.trim())) out.push(`${name} (your strongest): link it to at least one criterion and quote the line that shows it.`);
-      for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name} (your strongest): say where it meets "${r.text}".`);
-      if (opts.valueCheck !== false && !fullSentence(c.value_answer)) out.push(`${name} (your strongest): answer the check question in a full sentence.`);
+      if (!Object.values(c.criteria).some((w) => w.trim())) out.push(`${name} (your best): link it to at least one criterion and quote the line that shows it.`);
+      for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name} (your best): say where it meets "${r.text}".`);
+      if (opts.valueCheck !== false && !fullSentence(c.value_answer)) out.push(`${name} (your best): answer the check question in a full sentence.`);
     }
   });
-  if (p.cards.length < opts.ideas) out.push(p.rapid ? `Pick: star your best ${opts.ideas} ideas. You have ${p.cards.length} starred.` : `Write ${opts.ideas} ideas. You have ${p.cards.length} so far.`);
-  const titles = new Set(p.cards.map((c) => c.title.trim().toLowerCase()));
-  const ideasText = new Set(p.cards.map((c) => c.idea.trim().toLowerCase()));
-  if (titles.size < p.cards.length || ideasText.size < p.cards.length) out.push('Give each idea its own title and its own idea.');
+  if (!p.cards.length) out.push('Pick: star your best idea.');
   if (p.cards.length > 1 && (!p.strongest || !fullSentence(p.strongest_why))) out.push('Pick your strongest idea and say why.');
   return out;
 }

@@ -19,8 +19,9 @@ describe('sprint checks', () => {
     expect(sketchProblems(good, { ideas: 3, requirements: reqs })).toEqual([]);
     const thin = { ...good, cards: [card({ answers: 'bread' }), ...good.cards.slice(1)] };
     expect(sketchProblems(thin, { ideas: 3, requirements: reqs })[0]).toMatch(/Idea 1: Add a little more/);
-    expect(sketchProblems({ ...good, cards: good.cards.slice(0, 2) }, { ideas: 3, requirements: reqs })).toContain('Write 3 ideas. You have 2 so far.');
-    expect(sketchProblems({ ...good, cards: [card(), card({ id: 'k2' }), card({ id: 'k3', title: 'P', idea: 'What if it used the letter?' })] }, { ideas: 3, requirements: reqs })).toContain('Give each idea its own title and its own idea.');
+    expect(sketchProblems({ ...good, cards: [] }, { ideas: 3, requirements: reqs })).toContain('Pick: star your best idea.');
+    // Older drafts can hold more cards: only the strongest has to be finished.
+    expect(sketchProblems({ ...good, cards: [good.cards[0]!, card({ id: 'k2', title: '', idea: '', answers: '', evidence: '' })] }, { ideas: 3, requirements: reqs })).toEqual([]);
     expect(sketchProblems({ ...good, cards: [card({ criteria: {} }), ...good.cards.slice(1)] }, { ideas: 3, requirements: reqs })[0]).toMatch(/link it to at least one criterion/);
     expect(sketchProblems({ ...good, cards: [card({ requirements: {} }), ...good.cards.slice(1)] }, { ideas: 3, requirements: reqs })[0]).toMatch(/say where it meets "Uses at least two sources"/);
     expect(sketchProblems({ ...good, strongest: '' }, { ideas: 3, requirements: reqs })).toContain('Pick your strongest idea and say why.');
@@ -31,7 +32,8 @@ describe('sprint checks', () => {
     expect(sketchProblems(two, { ideas: 2, requirements: reqs })).toEqual([]);
     expect(sketchProblems({ ...two, inspiration: [] }, { ideas: 2, requirements: reqs })[0]).toBe('Inspiration: note one example and what you’d borrow from it.');
     expect(sketchProblems({ ...two, rapid: ['Objects'] }, { ideas: 2, requirements: reqs })).toContain('Rapid ideas: write at least 2. You have 1 so far.');
-    expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1) }, { ideas: 2, requirements: reqs })).toContain('Pick: star your best 2 ideas. You have 1 starred.');
+    expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1), strongest: '' }, { ideas: 2, requirements: reqs })).toEqual([]);
+    expect(sketchProblems({ ...two, cards: [] }, { ideas: 2, requirements: reqs })).toContain('Pick: star your best idea.');
     expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1), strongest: '' }, { ideas: 1, requirements: reqs })).toEqual([]);
   });
 

@@ -38,7 +38,7 @@ export function evenGroups(students: ReadonlyArray<{ id: string }>, n: number): 
 /** One line on each phase, at the top of its tab. */
 const PHASE_SUMMARY: Record<SprintPhaseKey, string> = {
   understand: 'Students work out what they are designing for before anything else: alone first (spot, audience, dig, say it, limits), then together in their group’s space (vote on the focus, one audience, our limits, questions for you, your answers).',
-  sketch: 'Alone, at home: the group brief, inspiration to borrow from, rapid ideas against a timer, then their best ideas starred and developed into cards for the group.',
+  sketch: 'Alone, at home: the group brief, inspiration to borrow from, rapid ideas against a timer, then their best idea starred and developed into a card for the group.',
   decide: 'In class: each member’s strongest idea goes head to head, two at a time, with no names. Students pick the winner of each pair and what it is stronger in, and see their own 1st, 2nd and 3rd. The most wins across the group picks the idea; then the group writes the parts, gives each one out by initials and picks an assembler.',
   prototype: 'At home: each student builds their part; everyone sees the group’s parts as they come in; the assembler puts them together and uploads the finished prototype.',
   test: 'In class: each group pitches and the class gives feedback on the criteria. At home: a reflection on what their feedback showed.'
@@ -176,9 +176,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       }
     }
     if (key === 'sketch') {
-      const sk = card('Sketch settings', 'How many ideas each student puts forward to the group, and the rapid ideas timer.', 'settings');
+      const sk = card('Sketch settings', 'The fewest rapid ideas each student writes, and the timer. Each student then stars and develops only their best one.', 'settings');
       sk.append(
-        selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Each puts forward ${n} ${n === 1 ? 'idea' : 'ideas'}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }, true), 'Ideas each student puts forward'),
+        selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Rapid ideas: at least ${n}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }, true), 'Fewest rapid ideas'),
         selectOf([0, 3, 5, 8, 10, 15].map((n) => [String(n), n ? `Rapid ideas: ${n} minute timer` : 'Rapid ideas: no timer']), String(cur.sketch_timer ?? 8), (v) => put((d) => { d.sketch_timer = Number(v); }, true), 'Rapid ideas timer')
       );
       const kindOf = (d: SprintSettings) => (d.idea_kind ??= { one: '', many: '', judge: '', examples: { inspiration: [], rapid: [], pick: [], develop: [] } });

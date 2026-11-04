@@ -96,14 +96,14 @@ export const SKETCH_GUIDE: Record<'inspiration' | 'rapid' | 'pick' | 'develop', 
     stuck: ['Use the example you borrowed from, and twist it.', 'Silly ideas are allowed. They often lead somewhere good.', 'Ask: what if we had unlimited money? What if we had none?']
   },
   pick: {
-    doThis: 'Star the ideas that best fit your group’s focus.',
-    why: 'These go to your group, so choose the ones you can explain clearly.',
+    doThis: 'Star the one idea that best fits your group’s focus.',
+    why: 'This goes to your group, so choose one you can explain clearly.',
     example: ['Check each against your group’s focus and the criteria. Which does most of what they ask?'],
-    stuck: ['Pick the ones you’d be proud to defend, not just the funniest.']
+    stuck: ['Pick the one you’d be proud to defend.']
   },
   develop: {
-    doThis: 'Explain each starred idea so clearly that someone could follow it without you there.',
-    why: 'Your group can only choose well if every idea is easy to understand.',
+    doThis: 'Explain your starred idea so clearly that someone could follow it without you there.',
+    why: 'Your group can only choose well if your idea is easy to understand.',
     example: ['What it is: an app where you pick a lunch and a pickup time.', 'How it fits our focus: students collect from a shelf with no queue.'],
     stuck: ['Use the sentence starters.', 'Add a quick picture. A sketch is worth a paragraph.', 'Read it aloud. Does it make sense to someone who wasn’t there?']
   }
@@ -123,7 +123,7 @@ export function sketchGuide(step: keyof typeof SKETCH_GUIDE, kind?: IdeaKind): G
   const many = kind?.many?.trim();
   const doThis = !many ? base.doThis
     : step === 'rapid' ? `Write as many ${many} as you can, one line each. You judge them at the next step.`
-    : step === 'pick' ? `Star the ${many} that best fit your group’s focus.`
+    : step === 'pick' ? `Star the one that best fits your group’s focus.`
     : base.doThis;
   return own.length ? { ...base, doThis, example: own, scenario: KIT_SCENARIO } : { ...base, doThis, scenario: CANTEEN_SCENARIO };
 }
