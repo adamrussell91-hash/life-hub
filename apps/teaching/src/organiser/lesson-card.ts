@@ -112,7 +112,8 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     const row = h('label', `ko-pick${claimedElsewhere(line) ? ' is-elsewhere' : ''}`);
     const check = h('input');
     check.type = 'checkbox';
-    check.checked = !!line.lesson_id && (line.lesson_id === lesson.id || claimedElsewhere(line));
+    // Ticked means this lesson's own line. A line in another lesson stays unticked, grey, with that lesson's tag.
+    check.checked = line.lesson_id === lesson.id;
     check.disabled = claimedElsewhere(line);
     check.dataset.line = line.id;
     check.addEventListener('change', () => void tick(line.id, check.checked));
