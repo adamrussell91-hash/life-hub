@@ -154,6 +154,29 @@ describe('sketch form', () => {
     }
   });
 
+  it('keeps the box open after time is up only until the student reaches the number Submit asks for', () => {
+    vi.useFakeTimers();
+    try {
+      const needs = { ...sprint, phases: sprint.phases.map((p, i) => (i === 1 ? { ...p, ideas: 3 } : p)) };
+      const f = mountSketch(ctx({ row: sketchRow, sprint: needs }));
+      const box = () => f.el.querySelector('.sk-rapid')!.closest('section')!.querySelector<HTMLInputElement>('input')!;
+      expect(f.el.querySelector('[data-step="rapid"]')?.textContent).toContain('Write at least 3');
+      [...f.el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Start the 8-minute timer')!.click();
+      typeIdea(f.el, 'Objects');
+      typeIdea(f.el, 'Streets');
+      vi.advanceTimersByTime(8 * 60_000 + 1000);
+      expect(box().disabled).toBe(false);
+      expect(f.el.querySelector('.sk-timer')?.textContent).toContain('Time’s up. Add 1 more to reach 3.');
+      typeIdea(f.el, 'Letters');
+      expect(f.el.querySelectorAll('.sk-rapid li')).toHaveLength(3);
+      expect(box().disabled).toBe(true);
+      expect(f.el.querySelector('.sk-timer')?.textContent).toContain('Time’s up. 3 ideas.');
+      f.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('stars up to the number put forward, and each star becomes a card to develop and justify', () => {
     const f = mountSketch(ctx({ row: sketchRow, sprint: { ...sprint, sketch_timer: 0 } }));
     for (const t of ['Objects', 'Streets', 'Letters']) typeIdea(f.el, t);
