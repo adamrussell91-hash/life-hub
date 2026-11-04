@@ -921,3 +921,78 @@ test('writing check: off keeps no logs', async () => {
   const result = [...store.data.entries()].find(([k]) => k.startsWith('quiz/quiz1/results/'))[1];
   assert.equal(result.writing, undefined);
 });
+
+async function runLiveRound(store, { finish = 'live_end', skipLast = false } = {}) {
+  const { live } = await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_join', code: live.code });
+  let at = await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  while (at.live && at.live.phase === 'question') {
+    const last = at.live.index + 1 >= at.live.total;
+    if (!(skipLast && last)) {
+      const q = at.live.question;
+      const response = q.kind === 'multiple_choice' ? { selected: ['b'] } : { text: 'Romeo' };
+      await quizAction(store, 'quiz1', { token: token(1), action: 'live_answer', index: at.live.index, response });
+    }
+    if (last && finish === 'stay') { await quizTeacherAction(store, 'quiz1', { action: 'live_reveal' }); return live; }
+    if (last && finish === 'live_end') break;
+    await quizTeacherAction(store, 'quiz1', { action: 'live_reveal' });
+    at = await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  }
+  if (finish === 'live_end') await quizTeacherAction(store, 'quiz1', { action: 'live_end' });
+  return live;
+}
+
+test('a finished live round shows in Results as a handed-in attempt', async () => {
+  for (const finish of ['live_end', 'next', 'stay']) {
+    const store = baseStore({ quizSettings: { attempts: 3 } });
+    await publishQuiz(store);
+    await runLiveRound(store, { finish });
+    const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+    assert.equal(results.attempts.length, 1, finish);
+    assert.ok(results.attempts[0].score > 0, finish);
+    const insight = await quizTeacherAction(store, 'quiz1', { action: 'insight' });
+    assert.equal(insight.attempts.length, 1, finish);
+  }
+});
+
+test('a live round folds once, and a question not answered counts as unanswered', async () => {
+  const store = baseStore({ quizSettings: { attempts: 3 } });
+  await publishQuiz(store);
+  await runLiveRound(store, { skipLast: true });
+  await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  assert.equal(results.attempts.length, 1);
+  const result = [...store.data.entries()].find(([k]) => k.includes('/results/'))[1];
+  assert.equal(result.live, true);
+  assert.ok(Object.keys(result.marks).length > Object.keys(result.responses).length);
+});
+
+test('a round still running stays out of Results; starting another keeps the old answers', async () => {
+  const store = baseStore({ quizSettings: { attempts: 3 } });
+  await publishQuiz(store);
+  const { live } = await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_join', code: live.code });
+  await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_answer', index: 0, response: { selected: ['b'] } });
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'results' })).attempts.length, 0);
+  await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'results' })).attempts.length, 1);
+});
+
+test('an old live round never pushes aside a go handed in after it', async () => {
+  const store = baseStore({ quizSettings: { attempts: 3 } });
+  await publishQuiz(store);
+  const { live } = await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_join', code: live.code });
+  await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_answer', index: 0, response: { selected: ['a'] } });
+  // Answered well before the student's own go.
+  const key = [...store.data.keys()].find(k => k.includes('/answers/'));
+  store.data.set(key, { ...store.data.get(key), at: '2020-01-01T00:00:00.000Z' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'submit', responses: {} });
+  await quizTeacherAction(store, 'quiz1', { action: 'live_end' });
+  const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  assert.equal(results.attempts.length, 1);
+  assert.equal([...store.data.keys()].filter(k => k.includes('/results/')).length, 1);
+});

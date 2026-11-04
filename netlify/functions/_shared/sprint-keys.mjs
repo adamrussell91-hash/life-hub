@@ -2,7 +2,7 @@
  * Where a Design Sprint keeps its state. One class per sprint.
  *
  *   sprint/{lesson}/config                    { version, class_id, groups, decider, lock_hours, phases, criteria, reflection_criteria, requirements, ideas }
- *   sprint/{lesson}/lock                      { ended: { [phase]: { at, present[] } }, lock: { phase, until, unlocked[] } | null }
+ *   sprint/{lesson}/lock                      { ended: { [phase]: { at, present[] } }, lock: { phase, until, unlocked[] } | null, reopened: { [phase]: ends_at when undone } }
  *   sprint/{lesson}/extend                    { group: { [g]: { [phase]: { due_date, due_time } } }, student: { [s]: { … } } }
  *   sprint/{lesson}/seen/{student}            { [phase]: iso }   first time the student opened the phase
  *   sprint/{lesson}/subs/{student}/{phase}    { payload, saved_at, submitted_at, late, frozen }
