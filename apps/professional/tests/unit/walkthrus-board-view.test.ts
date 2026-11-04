@@ -24,6 +24,7 @@ vi.stubGlobal('localStorage', { getItem: (k: string) => stored.get(k) ?? null, s
 
 const { clustersFromPicked } = await import('../../../../packages/walkthrus/clusters.mjs');
 const { renderLearningBoard } = await import('@/views/walkthrus-board');
+const { ensureOnBoard, visibleClusters } = await import('@/views/walkthrus-clusters');
 const { renderLearningGoal } = await import('@/views/walkthrus-goal');
 const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); };
 
@@ -62,11 +63,11 @@ const click = (el: Element | null) => el!.dispatchEvent(new MouseEvent('click', 
 const tile = (root: HTMLElement, id: string) => root.querySelector(`[data-tile="${id}"]`);
 
 describe('the board', () => {
-  it('draws every technique, a label per cluster and the sets still in the box', async () => {
+  it('draws every technique and a label per cluster, with no set left in the box', async () => {
     const root = await mount();
-    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
-    expect(root.querySelectorAll('.wt-cluster-label').length).toBe(12);
-    expect(root.querySelectorAll('.wt-boxslot').length).toBe(1);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(160);
+    expect(root.querySelectorAll('.wt-cluster-label').length).toBe(18);
+    expect(root.querySelectorAll('.wt-boxslot').length).toBe(0);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('Draw arrow');
     expect(root.querySelector('.wt-panel')!.hasAttribute('hidden')).toBe(true);
   });
@@ -144,7 +145,7 @@ describe('the board', () => {
   it('says which data didn’t load and still draws the board; all three failing offers a retry', async () => {
     api.loadBoard.mockRejectedValue(new Error('x'));
     const root = await mount();
-    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(160);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('arrows didn’t load');
     api.loadWalkthruGoals.mockRejectedValue(new Error('x'));
     api.loadWalkthruReps.mockRejectedValue(new Error('x'));
@@ -166,7 +167,7 @@ describe('my board', () => {
     expect(root.querySelectorAll('.wt-tile').length).toBe(0);
     expect((root.querySelector('.wt-empty') as HTMLElement).hidden).toBe(false);
     click(button(root, 'Choose from the whole book'));
-    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(160);
     expect(localStorage.getItem('wt-board-view')).toBe('book');
   });
 
@@ -227,6 +228,27 @@ describe('my board', () => {
     await flush();
     expect(api.saveBoardArrows).toHaveBeenLastCalledWith([]);
     expect(root.querySelector('.wt-toolbar__status')!.textContent).toContain('with its arrow');
+  });
+
+  it('drops the empty My board cluster once there are others', async () => {
+    api.loadBoard.mockResolvedValue(loaded([], null, [
+      { id: 'cl_board', name: 'My board', x: 0, y: 0, tiles: [] },
+      { id: 'cl_retrieval', name: 'Retrieval', x: 400, y: 0, tiles: [{ id: 'w1-quizzing', q: 0, r: 0 }] }
+    ]));
+    const root = await mount();
+    expect([...root.querySelectorAll('.wt-cluster-label text')].map((l) => l.textContent)).toEqual(['RETRIEVAL']);
+    expect(root.querySelector('.wt-cluster-slot')).toBeNull();
+    // nothing is saved just by looking
+    expect(api.saveBoardClusters).not.toHaveBeenCalled();
+  });
+
+  it('sends a technique that must stay on the board to a shown cluster, and keeps the empty starter when it is alone', () => {
+    const starter = { id: 'cl_board', name: 'My board', x: 0, y: 0, tiles: [] };
+    const own = { id: 'cl_retrieval', name: 'Retrieval', x: 400, y: 0, tiles: [] };
+    const out = ensureOnBoard([starter, own], ['w1-quizzing']);
+    expect(out.find((c) => c.id === 'cl_board')!.tiles).toEqual([]);
+    expect(out.find((c) => c.id === 'cl_retrieval')!.tiles.map((t) => t.id)).toEqual(['w1-quizzing']);
+    expect(visibleClusters([starter])).toEqual([starter]);
   });
 
   it('makes a new cluster from a name typed in place', async () => {
@@ -356,7 +378,7 @@ describe('my board', () => {
 
   it('a link to a technique off the board opens the whole book on it', async () => {
     const root = await mount('w1-cold-calling');
-    expect(root.querySelectorAll('.wt-tile').length).toBe(104);
+    expect(root.querySelectorAll('.wt-tile').length).toBe(160);
     expect(root.querySelector('.wt-panel__title')!.textContent).toBe('Cold calling');
   });
 });

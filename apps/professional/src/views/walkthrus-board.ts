@@ -24,7 +24,7 @@ import {
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderPanel, type PanelModel } from '@/views/walkthrus-panel';
 import {
-  addTile, dropTarget, ensureOnBoard, makeCluster, moveCluster, newClusterSpot, placeTile, removeTile, snapCell, type TileMark
+  addTile, dropTarget, ensureOnBoard, makeCluster, moveCluster, newClusterSpot, placeTile, removeTile, snapCell, visibleClusters, type TileMark
 } from '@/views/walkthrus-clusters';
 import { createDrag, type DragSubject } from '@/views/walkthrus-drag';
 import { BOARD_CLUSTER_ID, MAX_CLUSTER_NAME, touchingFreeCells } from '../../../../packages/walkthrus/clusters.mjs';
@@ -220,7 +220,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   }
   const nameOf = (id: string | null | undefined): string => (id ? entryOf(id)?.name ?? 'That technique' : 'That technique');
   const clusterName = (id: string | null): string | null => state.clusters.find((c) => c.id === id)?.name ?? null;
-  const layoutFor = (): BoardLayout => (state.view === 'book' ? bookLayout : clustersLayout({ clusters: state.clusters, entryOf }));
+  const layoutFor = (): BoardLayout => (state.view === 'book' ? bookLayout : clustersLayout({ clusters: visibleClusters(state.clusters), entryOf }));
   let layout: BoardLayout = layoutFor();
   const tileFor = (id: string | null, cluster: string | null = null): BoardTile | null =>
     id ? (cluster ? layout.tiles.find((t) => t.id === id && t.cluster === cluster) : null) ?? layout.tiles.find((t) => t.id === id) ?? null : null;
@@ -942,7 +942,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   }
 
   function createCluster(name: string): string | null {
-    const made = makeCluster(state.clusters, name, newClusterSpot(clustersLayout({ clusters: state.clusters, entryOf })));
+    const made = makeCluster(state.clusters, name, newClusterSpot(clustersLayout({ clusters: visibleClusters(state.clusters), entryOf })));
     if (!made) { status.textContent = 'That cluster couldn’t be made. The board holds 40 clusters at most.'; return null; }
     state.clusters = made.clusters;
     return made.id;
@@ -963,7 +963,7 @@ function mountBoard(root: HTMLElement, data: BoardData, options: LearningOptions
   /** Adding from the whole book asks which cluster, or makes a new one. */
   function chooseCluster(id: string): void {
     const list = el('div', 'wt-pop__choices');
-    for (const c of state.clusters) {
+    for (const c of visibleClusters(state.clusters)) {
       const there = c.tiles.some((t) => t.id === id);
       const b = button(there ? `${c.name} · already there` : c.name, () => void addToClusterNamed(id, c.id), 'btn btn--secondary btn--small');
       b.disabled = there;

@@ -59,8 +59,13 @@ export function ensureOnBoard(clusters: ClusterData[], ids: Array<string | null 
   const missing = ids.filter((id): id is string => Boolean(id) && !on.has(id!));
   if (!missing.length) return clusters;
   let out = clusters.length ? clusters : [{ id: BOARD_CLUSTER_ID, name: BOARD_CLUSTER_NAME, x: 0, y: 0, tiles: [] }];
-  for (const id of [...new Set(missing)]) out = replace(out, addToCluster(out[0]!, id) as ClusterData);
+  for (const id of [...new Set(missing)]) out = replace(out, addToCluster(visibleClusters(out)[0]!, id) as ClusterData);
   return out;
+}
+
+/** The clusters to show. "My board" names the whole board, so the empty starter cluster goes once there are others. */
+export function visibleClusters<T extends { id: string; tiles: unknown[] }>(clusters: T[]): T[] {
+  return clusters.length > 1 ? clusters.filter((c) => c.id !== BOARD_CLUSTER_ID || c.tiles.length) : clusters;
 }
 
 /** The free cell touching the cluster nearest to a board point. The tile being moved doesn't count as there. */
