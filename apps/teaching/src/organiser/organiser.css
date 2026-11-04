@@ -233,6 +233,8 @@ button.ko-hero__chip { cursor: pointer; }
 
 .ko-panel { background: #fff; border-radius: 12px; border: 1px solid var(--line); padding: 5px 8px 7px 12px; display: grid; min-width: 0; }
 .ko-item { border-top: 1px solid var(--line); }
+.ko-sidename { display: block; width: 100%; min-height: 26px; padding: 2px 0; border: 0; border-radius: 3px; background: none; font: inherit; font-weight: 600; line-height: 1.42; color: var(--navy); text-align: left; cursor: pointer; }
+.ko-sidename:hover { background: rgba(20, 43, 81, .05); }
 .ko-pair { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; min-width: 0; }
 .ko-panel[data-panel="vocab"] .ko-pair, .ko-panel[data-panel="key_lines"] .ko-pair { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 .ko-tier { display: flex; align-items: center; gap: 6px; margin: 7px 0 3px; font-size: 11.5px; font-weight: 600; color: var(--navy); }
