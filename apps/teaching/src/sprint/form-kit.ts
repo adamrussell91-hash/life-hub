@@ -105,7 +105,9 @@ export function valueCheckField(ctx: FormContext, value: string, onInput: (v: st
  * checks. Class work is saved to the server, so ending the class part
  * submits what is there.
  */
-export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, payload: () => PhasePayload[P], problems: () => Problem[]): { el: HTMLElement; changed(): void; dispose(): void } {
+export type SubmitBar = { el: HTMLElement; changed(): void; dispose(): void; problems: () => Problem[]; onChange(fn: () => void): void };
+
+export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, payload: () => PhasePayload[P], problems: () => Problem[]): SubmitBar {
   const bar = el('div', 'sprint-submit');
   const list = el('ul', 'sprint-checks');
   const note = el('p', 'sprint-submit__note');
@@ -113,6 +115,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   err.setAttribute('role', 'alert');
   let timer = 0;
   let busy = false;
+  let onChange = () => {};
   // Once it's in, the Submitted banner says so; this line is for drafts.
   note.textContent = ctx.row.state === 'draft' && !ctx.row.frozen ? 'Saved as a draft.' : '';
   // A clear, lasting sign that it went in, not just a line of small print.
@@ -180,8 +183,11 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   bar.append(done, later, ask, note, err);
   return {
     el: bar,
+    problems,
+    onChange(fn) { onChange = fn; },
     changed() {
       if (!ctx.editable) return;
+      onChange();
       if (ctx.drafts) ctx.drafts[phase] = structuredClone(payload());
       // A list already showing shrinks as they fix things.
       if (list.childElementCount) check();
@@ -257,13 +263,19 @@ export function markLastStep(root: HTMLElement, last: boolean): void {
   root.classList.toggle('su-between', !last);
 }
 
+/** Does a check still point at something in this step card? */
+export function stillToDo(card: HTMLElement, problems: Problem[]): boolean {
+  return problems.some((p) => typeof p !== 'string' && !!card.querySelector(p.at));
+}
+
 /**
  * Show a phase's step cards one at a time, like Understand's slides: a numbered
  * rail and Back / Next. Does nothing when the Kit sets steps down the page, or
  * there is only one step. Call after the cards are in `root`; `start` is the
- * step shown first, and `onStep` hears each move.
+ * step shown first, and `onStep` hears each move. A dot ticks once its step has
+ * been seen and the checks in `bar` want nothing more from it.
  */
-export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined, start = 0, onStep?: (at: number) => void): void {
+export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undefined, bar: Pick<SubmitBar, 'problems' | 'onChange'>, start = 0, onStep?: (at: number) => void): void {
   const cards = [...root.children].filter((c): c is HTMLElement => c.classList.contains('su-step'));
   if (layout === 'vertical' || cards.length < 2) return;
   let at = Math.max(0, Math.min(cards.length - 1, start));
@@ -288,14 +300,15 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
     next.hidden = last;
     markLastStep(root, last);
     where.textContent = `Step ${at + 1} of ${cards.length}${last ? ' · Last step' : ''}`;
+    const left = bar.problems();
     rail.replaceChildren(...cards.map((c, i) => {
       const li = el('li', '');
       const title = c.querySelector('h3')?.textContent ?? `Step ${i + 1}`;
-      const done = seen.has(i) && i !== at;
+      const done = seen.has(i) && i !== at && !stillToDo(c, left);
       const b = el('button', `su-rail__dot${i === at ? ' is-now' : ''}${done ? ' is-done' : ''}`, done ? '✓' : String(i + 1));
       b.type = 'button';
       b.title = title;
-      b.setAttribute('aria-label', `Step ${i + 1}: ${title}`);
+      b.setAttribute('aria-label', `Step ${i + 1}: ${title}${done ? ' (finished)' : ''}`);
       if (i === at) b.setAttribute('aria-current', 'step');
       b.addEventListener('click', () => go(i));
       li.append(b);
@@ -304,6 +317,7 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
   }
   root.insertBefore(rail, cards[0]!);
   cards[cards.length - 1]!.after(nav);
+  bar.onChange(paint);
   paint();
 }
 
