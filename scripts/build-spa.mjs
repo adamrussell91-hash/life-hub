@@ -1,7 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectStaleEntryGuard } from './lib/stale-entry-guard.mjs';
 
 const name = process.argv[2];
 if (!['teaching', 'knowledge', 'tasks', 'professional', 'travel'].includes(name)) {
@@ -40,6 +41,7 @@ child.on('exit', code => {
     console.error(`build-spa: ${name} dist/index.html missing`);
     process.exit(1);
   }
+  writeFileSync(indexHtml, injectStaleEntryGuard(readFileSync(indexHtml, 'utf8')));
   copyFileSync(indexHtml, fallbackHtml);
   console.log(`build-spa: ${name} → dist/${name}/`);
 });
