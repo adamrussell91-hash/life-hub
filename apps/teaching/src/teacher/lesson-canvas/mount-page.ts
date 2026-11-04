@@ -1,3 +1,4 @@
+import { blocksToSearchText } from '@/blocks/search-text';
 import { refreshCalloutReferences } from '@/blocks/callout-reference';
 import { withStepNotes } from '@/blocks/walkthru-note/attach';
 import { questionForLesson } from '@/blocks/question-type';
@@ -1695,7 +1696,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   // Organiser lines from this lesson, right after the Syllabus card. Stays when the syllabus card is hidden.
   const organiserHost = document.createElement('div');
-  const organiserCard = lesson.unit_id ? mountOrganiserCard(organiserHost, { lesson: { id: lesson.id, unit_id: lesson.unit_id } }) : null;
+  const organiserCard = lesson.unit_id ? mountOrganiserCard(organiserHost, {
+    lesson: { id: lesson.id, unit_id: lesson.unit_id },
+    relevance: () => ({ pieces: lesson.focus_pieces ?? [], text: `${lesson.title} ${blocksToSearchText(lesson.blocks)}` })
+  }) : null;
   if (organiserCard) syllabus.element.after(organiserHost);
 
   // Every dot's counts in one panel above the canvas, opened from the meta row.
@@ -1778,7 +1782,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         picksHost: syllabus.picks,
         picks: { pieces: lesson.focus_pieces, skills: lesson.focus_skills },
         // Saves merge into the stored lesson, so clearing sends an empty list.
-        onPicks: (picks) => emitLesson({ ...lesson, focus_pieces: picks.pieces, focus_skills: picks.skills }),
+        onPicks: (picks) => {
+          emitLesson({ ...lesson, focus_pieces: picks.pieces, focus_skills: picks.skills });
+          organiserCard?.refresh();
+        },
         covered: lesson.plan_covered,
         onCovered: (covered) => emitLesson({ ...lesson, plan_covered: covered }),
         onPaint: ({ points, outcomes, plan }) => syllabus.setSummary({ points, outcomes, plan }),

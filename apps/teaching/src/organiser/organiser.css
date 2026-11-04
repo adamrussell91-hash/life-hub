@@ -252,6 +252,7 @@ button.ko-hero__chip { cursor: pointer; }
 
 /* Lesson card: the sheet as ticks */
 .ko-pickcols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; font-size: 14px; }
+.ko-pickcols--one { grid-template-columns: minmax(0, 1fr); }
 .ko-pickgroup { margin-bottom: 8px; }
 .ko-pickgroup__name { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 2px; }
 .ko-pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 7px; padding: 4px; border-radius: 6px; cursor: pointer; align-items: start; }

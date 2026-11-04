@@ -7,19 +7,21 @@ import { lineColour } from '@/network/colour';
 import { unitNetworkContext } from '@/teacher/network-context';
 import { lessonsByDate } from '@/teacher/unit-lesson-order';
 import { organiserApi } from './api';
-import { conceptColourAt, createSerialQueue, isIdeas, lessonCodes, lineWords, makesCard } from './editor-model';
+import { conceptColourAt, createSerialQueue, isIdeas, lessonCodes, lineIsRelevant, lineWords, makesCard, type LessonRelevance } from './editor-model';
 import type { OrganiserLine, OrganiserSection, SuggestProposal, TeacherOrganiser } from './types';
 import { renderWeekRow } from './week-row';
 
 /**
- * Organiser card on the lesson page: the unit's whole sheet as ticks. A ticked line reaches students
- * when this lesson is published and its class date arrives, and joins practice the day after. A line
- * another lesson ticked is shown greyed. Ann runs as a job (never the chat) and only suggests; the
- * teacher presses the button.
+ * Organiser card on the lesson page: this lesson's ticks and the lines relevant to it, with the unit's
+ * whole sheet one press away. A ticked line reaches students when this lesson is published and its class
+ * date arrives, and joins practice the day after. A line another lesson ticked is shown greyed. Ann runs
+ * as a job (never the chat) and only suggests; the teacher presses the button.
  */
 
 export interface OrganiserCardOptions {
   lesson: { id: string; unit_id: string };
+  /** The lesson as it stands now: its picked pieces and its words decide which unticked lines show. */
+  relevance?: () => LessonRelevance;
 }
 
 const POLL_MS = 2500;
@@ -43,7 +45,7 @@ function button(label: string, className = 'btn btn--ghost ko-btn', onClick?: ()
 const say = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOptions): { element: HTMLElement; dispose(): void } {
+export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOptions): { element: HTMLElement; refresh(): void; dispose(): void } {
   const { lesson } = options;
   const root = h('section', 'ko-card');
   root.setAttribute('aria-label', 'Organiser lines from this lesson');
@@ -64,6 +66,9 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
 
   let disposed = false;
   let isOpen = false;
+  let showAll = false;
+  /** Lines ticked at some point since the card opened: unticking one leaves it in place to re-tick. */
+  const keptOnCard = new Set<string>();
   let data: TeacherOrganiser | null = null;
   let loadFailed = false;
   let message = '';
@@ -130,11 +135,16 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     return row;
   }
 
-  function group(name: HTMLElement, section: OrganiserSection): HTMLElement {
+  function group(name: HTMLElement, section: OrganiserSection, lines: OrganiserLine[]): HTMLElement {
     const box = h('div', 'ko-pickgroup');
     box.append(name);
-    for (const line of section.lines) box.append(pickRow(section, line));
+    for (const line of lines) box.append(pickRow(section, line));
     return box;
+  }
+
+  function onCard(section: OrganiserSection, line: OrganiserLine, relevance: LessonRelevance): boolean {
+    if (line.lesson_id === lesson.id) keptOnCard.add(line.id);
+    return keptOnCard.has(line.id) || lineIsRelevant(section, line, relevance, claimedElsewhere(line));
   }
 
   function paintMain(): void {
@@ -158,6 +168,17 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
     }
     mainBox.append(h('p', 'ko-status', 'Tick what this lesson teaches. Students see it when the lesson’s class date arrives.'));
 
+    const relevance = options.relevance?.() ?? { pieces: [], text: '' };
+    const shown = (section: OrganiserSection): OrganiserLine[] => section.lines.filter((line) => onCard(section, line, relevance) || showAll);
+    const total = allLines().length;
+    const count = sections().reduce((n, section) => n + shown(section).length, 0);
+    const scope = h('div', 'ko-row');
+    if (!showAll && !count) scope.append(h('span', 'ko-label', 'No lines on this lesson yet.'));
+    if (showAll || count < total) {
+      scope.append(button(showAll ? 'Show this lesson’s lines' : `Show all ${plural(total, 'line')}`, 'btn btn--quiet ko-btn', () => { showAll = !showAll; paintMain(); }));
+    }
+    if (scope.childElementCount) mainBox.append(scope);
+
     const cols = h('div', 'ko-pickcols');
     const left = h('div');
     const right = h('div');
@@ -167,20 +188,23 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
         if (section.role === 'concept') at += 1;
         continue;
       }
+      const lines = shown(section);
       if (isIdeas(section)) {
         const capsule = h('span', 'ko-capsule', section.name);
         const colour = section.concept_key && colourOfKey.get(section.concept_key);
         capsule.style.setProperty('--c', colour || conceptColourAt(at));
         const name = h('div', 'ko-pickgroup__name');
         name.append(capsule);
-        left.append(group(name, section));
+        if (lines.length) left.append(group(name, section, lines));
         at += 1;
-      } else {
-        right.append(group(h('div', 'ko-pickgroup__name', section.name), section));
+      } else if (lines.length) {
+        right.append(group(h('div', 'ko-pickgroup__name', section.name), section, lines));
       }
     }
-    cols.append(left, right);
-    mainBox.append(cols);
+    // One kind of line takes the card's full width, with no empty column beside it.
+    for (const side of [left, right]) if (side.childElementCount) cols.append(side);
+    cols.classList.toggle('ko-pickcols--one', cols.childElementCount === 1);
+    if (cols.childElementCount) mainBox.append(cols);
   }
 
   function paintMore(): void {
@@ -371,6 +395,7 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   head.addEventListener('click', () => {
     isOpen = !isOpen;
     paintHead();
+    if (isOpen) paintMain();
     if (isOpen && estimate.state === 'idle') loadEstimate();
   });
 
@@ -379,6 +404,7 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
 
   return {
     element: root,
+    refresh: paintMain,
     dispose() {
       disposed = true;
       pollGeneration += 1;

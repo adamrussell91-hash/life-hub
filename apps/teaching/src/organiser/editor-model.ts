@@ -74,6 +74,27 @@ export function lineWords(section: Pick<OrganiserSection, 'kind' | 'columns' | '
   return { head: line.cells[cue]?.trim() ?? '', body: main };
 }
 
+/** What a lesson offers for judging which sheet lines belong on its card. */
+export type LessonRelevance = { pieces: readonly string[]; text: string };
+
+/**
+ * Whether a line this lesson has not ticked still belongs on its card: its knowledge piece is one the
+ * lesson picked, or it is unclaimed and its word or label appears in the lesson. Whole words only.
+ */
+export function lineIsRelevant(
+  section: Pick<OrganiserSection, 'kind' | 'columns' | 'role'>,
+  line: OrganiserSection['lines'][number],
+  relevance: LessonRelevance,
+  claimedElsewhere: boolean
+): boolean {
+  if (line.piece_id && relevance.pieces.includes(line.piece_id)) return true;
+  if (claimedElsewhere) return false;
+  const label = lineWords(section, line).head.toLowerCase();
+  if (label.length < 3) return false;
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'u').test(relevance.text.toLowerCase());
+}
+
 /** Whether a line can become a practice card, by the server's rule. */
 export function makesCard(section: OrganiserSection, line: Pick<OrganiserSection['lines'][number], 'cells'>): boolean {
   const { cue, answer } = columnSlots(section);
