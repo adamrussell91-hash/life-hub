@@ -7,6 +7,7 @@ import { stepsLoader, type StepFor, type StepPick } from '@/student/next-step';
 import type { WritingWatch } from '@/quiz/writing-watch';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
+import { isTeacherPreview } from '@/quiz/teacher-preview';
 import './quiz.css';
 
 /**
@@ -140,6 +141,9 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   useClass(classId);
   let autoPick = true;
   const slots = options.slots?.size ? options.slots : null;
+  // Opened from the teacher hub: show the questions, ask for no initials, write nothing.
+  const preview = isTeacherPreview();
+  const previewResponses: Record<string, QuizResponse> = {};
 
   const root = el('section', 'qz-quiz');
   root.setAttribute('aria-label', 'Quiz');
@@ -168,6 +172,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   };
 
   async function call(action: string, extra: Record<string, unknown> = {}): Promise<Status | null> {
+    // A preview only reads: no claim, start, check, save or hand-in ever leaves this tab.
+    if (preview && action !== 'status') return null;
     try {
       const next = await apiPost<Status>(endpoint, { action, ...(token ? { token } : {}), ...classFields, ...extra });
       if (next.now) clockOffset = Date.parse(next.now) - Date.now();
@@ -294,7 +300,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   /** Sends the answers so far to the server. Safe to call often; failures retry on the next beat. */
   async function pushSave(): Promise<void> {
     window.clearTimeout(saveTimer);
-    if (saving || !draft || !status?.current || submitting) return;
+    if (preview || saving || !draft || !status?.current || submitting) return;
     saving = true;
     saveState = 'saving';
     paintSaveChips();
@@ -359,6 +365,10 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     window.clearInterval(tick);
     if (!status) {
       body.replaceChildren(el('p', 'qz-note', 'Loading the quiz…'));
+      return;
+    }
+    if (preview) {
+      body.replaceChildren(previewView());
       return;
     }
     if (!token || (classId && !classToken)) {
@@ -737,8 +747,46 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     ]);
   }
 
+  /** Teacher preview: every question as a student meets it. Answers stay in this tab. */
+  function previewView(): HTMLElement {
+    const wrap = el('div', 'qz-preview');
+    wrap.append(
+      panel(
+        'Teacher preview',
+        slots
+          ? 'Each question shows where it sits in the lesson. Try them out: nothing is saved, marked or sent, and no initials are needed.'
+          : 'This is what students answer. Try the questions out: nothing is saved, marked or sent, and no initials are needed.'
+      )
+    );
+    if (slots) return wrap;
+    if (!questions.length) {
+      wrap.append(el('p', 'qz-note', 'This quiz has no questions yet.'));
+      return wrap;
+    }
+    questions.forEach((q, i) => wrap.append(previewPlayer(q, i + 1)));
+    return wrap;
+  }
+
+  function previewPlayer(q: PublicQuestion, number?: number): HTMLElement {
+    return mountQuestionPlayer({
+      question: q,
+      ...(number ? { number } : {}),
+      response: previewResponses[q.id] ?? null,
+      shuffle: !!settings.shuffle_options,
+      seed: 'preview',
+      onChange: (response) => {
+        previewResponses[q.id] = response;
+      }
+    });
+  }
+
   function slotView(id: string): HTMLElement {
     const q = byId.get(id);
+    if (preview && q) {
+      const box = el('div', 'qz-slot qz-slot--preview');
+      box.append(previewPlayer(q));
+      return box;
+    }
     const current = status?.current;
     if (current && q) {
       if (!draft) draft = loadDraft(current);
@@ -990,7 +1038,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   let liveTimer: number | undefined;
 
   async function pollLive(): Promise<void> {
-    if (!token) return;
+    if (!token || preview) return;
     try {
       const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_status', token, ...classFields, ...(liveSession ? { session: liveSession } : {}) });
       liveState = res.live;
@@ -1122,14 +1170,14 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     handle: {
       progress() {
         const current = status?.current;
-        if (!current) return { open: false, answered: 0, total: 0, blank: [] };
+        if (!current || preview) return { open: false, answered: 0, total: 0, blank: [] };
         const d = draft ?? loadDraft(current);
         const done = (id: string) => hasAnswer(d.responses[id]) || !!current.answers[id];
         const blank = d.order.filter((id) => !done(id)).map((id) => byId.get(id)).filter((q): q is PublicQuestion => !!q);
         return { open: true, answered: d.order.length - blank.length, total: d.order.length, blank: blank.map((q) => ({ prompt: q.prompt, marks: q.marks })) };
       },
       async handIn() {
-        if (!status?.current) return true;
+        if (!status?.current || preview) return true;
         return submit(false);
       }
     }

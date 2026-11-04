@@ -1,4 +1,5 @@
 import { createSkipLink } from '@/app/failure';
+import { isTeacherPreview } from '@/quiz/teacher-preview';
 import { CLASS_SITE_HOST, CLASS_SITE_ORIGIN, isClassSiteHost } from '@/app/class-site';
 import { navigate } from '@/app/router';
 
@@ -105,6 +106,14 @@ export function createStudentShell(contentExtraClass = ''): {
   brand.className = 'student-surface__brand student-chrome__brand';
   brand.textContent = STUDENT_BRAND;
   header.append(brand);
+  // Read once per page so the preview flag is kept before any in-page navigation drops the hash.
+  if (isTeacherPreview()) {
+    const chip = document.createElement('span');
+    chip.className = 'student-chrome__preview';
+    chip.textContent = 'Teacher preview';
+    chip.title = 'Opened from Teaching Hub. Quiz answers here are not saved.';
+    header.append(chip);
+  }
 
   surface.append(createSkipLink('student-main'), header, content);
   if (isClassSiteHost()) {

@@ -354,6 +354,7 @@ function railCreateClassHandler(
 }
 
 import { absolutePublicUrl, type PublicEntityKind } from '@/teacher/public-link';
+import { withTeacherPreview } from '@/quiz/teacher-preview';
 
 function studentShareForTeacherPath(pathname: string): string | null {
   const match = pathname.match(/^\/(lessons|units|classes)\/([^/]+)\/?$/);
@@ -439,7 +440,7 @@ function openTeacherSearch(): void {
             break;
           case 'open-student-view': {
             const studentPath = studentShareForTeacherPath(currentAppPath());
-            if (studentPath) window.open(studentPath, '_blank', 'noopener,noreferrer');
+            if (studentPath) window.open(withTeacherPreview(studentPath), '_blank', 'noopener,noreferrer');
             break;
           }
           case 'open-a4':

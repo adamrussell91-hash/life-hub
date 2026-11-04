@@ -24,17 +24,17 @@ describe('public link helpers', () => {
     it('opens the student host from the LifeHub umbrella, never the umbrella URL', () => {
       vi.stubGlobal('location', new URL('https://life-hub.adam-russell.com/teaching/lessons/lesson_1'));
       expect(teacherPreviewUrl('lesson', 'lesson_1')).toBe(
-        'https://class.adam-russell.com/s/lessons/lesson_1'
+        'https://class.adam-russell.com/s/lessons/lesson_1#preview'
       );
       expect(teacherPreviewUrl('class', 'class_1')).toBe(
-        'https://class.adam-russell.com/s/classes/class_1'
+        'https://class.adam-russell.com/s/classes/class_1#preview'
       );
     });
 
     it('keeps the dev origin on localhost', () => {
       vi.stubGlobal('location', new URL('http://localhost:5173/lessons/lesson_1'));
       expect(teacherPreviewUrl('lesson', 'lesson_1')).toBe(
-        'http://localhost:5173/s/lessons/lesson_1'
+        'http://localhost:5173/s/lessons/lesson_1#preview'
       );
     });
   });
@@ -141,8 +141,10 @@ describe('mountPublicLinkControl', () => {
     expect(copy).toBeTruthy();
     copy!.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText).toHaveBeenCalledWith('https://class.adam-russell.com/s/lessons/lesson_1');
+    // Open is the teacher's own look, so it carries the preview flag; the copied link never does.
     expect(host.querySelector('a')?.getAttribute('href')).toBe(
-      'https://class.adam-russell.com/s/lessons/lesson_1'
+      'https://class.adam-russell.com/s/lessons/lesson_1#preview'
     );
     handle.dispose();
   });
