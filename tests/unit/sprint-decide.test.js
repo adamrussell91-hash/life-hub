@@ -314,3 +314,16 @@ test('a new idea in the pool puts finished voters back to going, and voting wait
   assert.equal(done.votes_closed, true);
   assert.equal(done.chosen.title, 'Ash');
 });
+
+test('a blank card left in an older draft stays out of the group’s view', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor(CONFIG());
+  for (const n of [1, 2]) await act(store, n, 'claim', { initials: INITIALS[n] });
+  const s = await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we a?'], star: '', stretch: '' } });
+  const star = s.notes[0].id;
+  for (const n of [1, 2]) await act(store, n, 'submit', { phase: 'understand', payload: { notes: [`How might we ${n}?`], star, stretch: '' } });
+  await act(store, 1, 'submit', { phase: 'sketch', payload: { cards: [card('k1', 'Ash'), { ...card('k2', 'Blank'), idea: '' }], strongest: 'k1', strongest_why: 'It is the clearest of mine.' } });
+  await act(store, 2, 'submit', { phase: 'sketch', payload: { cards: [card('k1', 'Baker')], strongest: 'k1', strongest_why: 'One person’s day.' } });
+  const after = await act(store, 1, 'status');
+  assert.deepEqual(after.gallery.flatMap((set) => set.ideas.map((i) => i.title)).sort(), ['Ash', 'Baker']);
+});

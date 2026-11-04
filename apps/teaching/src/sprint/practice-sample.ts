@@ -43,7 +43,7 @@ async function samplePayload(
   if (key === 'sketch') {
     const n = sprint.phases[1]!.ideas ?? 2;
     const rapid = Array.from({ length: n + 2 }, (_, i) => `${name} rapid idea ${i + 1}`);
-    const cards = Array.from({ length: n }, (_, i) => ({
+    const cards = Array.from({ length: 1 }, (_, i) => ({
       id: `sample${tag}x${i + 1}`,
       seed: rapid[i]!,
       title: `${name} idea ${i + 1}`,

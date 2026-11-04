@@ -152,7 +152,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   if (minutes && state.rapid_started_at && left() > 0) startTick();
 
   // 3. Pick the best
-  const pickBox = step(3, 'pick', `Pick: star your best ${ideas}`, `These are the ${ideas === 1 ? 'idea' : 'ideas'} you put forward to your group, without your name.`);
+  const pickBox = step(3, 'pick', 'Pick: star your best one', 'This is the idea you put forward to your group, without your name.');
   const pickList = el('div', 'sk-pick');
   pickBox.append(pickList);
   const nextId = () => { let n = 1; while (state.cards.some((c) => c.id === `k${n}`)) n += 1; return `k${n}`; };
@@ -164,7 +164,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
       const on = state.cards.some((c) => c.seed && same(c.seed, t));
       const b = el('button', 'sprint-chip sprint-star', `${t}${on ? ' · starred' : ''}`);
       b.type = 'button';
-      b.disabled = off || (!on && count >= ideas);
+      b.disabled = off || (!on && count >= 1);
       b.setAttribute('aria-pressed', String(on));
       b.addEventListener('click', () => {
         if (on) state.cards = state.cards.filter((c) => !(c.seed && same(c.seed, t)));
@@ -184,7 +184,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   };
 
   // 4. Develop and justify each starred idea
-  const dev = step(4, 'develop', 'Develop and justify', '');
+  const dev = step(4, 'develop', 'Develop your best idea', '');
   const tabs = el('div', 'sprint-tabs');
   tabs.setAttribute('role', 'tablist');
   const pane = el('div', 'sprint-card-pane');
@@ -231,7 +231,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
     strongCheck.replaceChildren();
     const c = state.cards.length === 1 ? state.cards[0] : state.cards.find((x) => x.id === state.strongest);
     if (!c) {
-      if (state.cards.length > 1) strongCheck.append(el('p', 'sprint-note', 'Pick your strongest idea above. You check that one against the criteria and requirements. The others don’t need it.'));
+      if (state.cards.length > 1) strongCheck.append(el('p', 'sprint-note', 'Pick your strongest idea above. You finish that one and check it against the criteria and requirements.'));
       return;
     }
     const check = strongCheck;
@@ -258,6 +258,8 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   };
 
   const paintTabs = () => {
+    // One card needs no tabs; more only comes from a draft saved before students developed just one.
+    tabs.hidden = state.cards.length < 2;
     tabs.replaceChildren(...state.cards.map((c, i) => {
       const t = el('button', 'btn btn--secondary sprint-tab', `Idea ${i + 1}${c.title ? `: ${c.title}` : ''}`);
       t.type = 'button';
@@ -285,7 +287,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   refreshPick();
   pick.addEventListener('focus', refreshPick);
   pick.addEventListener('change', () => { state.strongest = pick.value; paintStrongCheck(); bar.changed(); });
-  strongest.append(el('h3', '', 'Your strongest idea'), pick, frameField({ label: 'Why is it the strongest?', value: state.strongest_why, max: 300, rows: 2, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.strongest_why = v; bar.changed(); } }));
+  strongest.append(el('h3', '', 'Your strongest idea'), el('p', 'sprint-note', 'You only need to finish your best idea now. Pick it here and the others can stay as they are.'), pick, frameField({ label: 'Why is it the strongest?', value: state.strongest_why, max: 300, rows: 2, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.strongest_why = v; bar.changed(); } }));
 
   paintPick();
   paintTabs();

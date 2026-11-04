@@ -395,7 +395,9 @@ export async function groupGallery(store, lessonId, config, group, closedAt) {
     .map(({ student, owner, sub }) => {
       const cards = list(sub.payload.cards);
       const strongest = sub.payload.strongest;
-      const ordered = [...cards.filter((c) => c.id === strongest), ...cards.filter((c) => c.id !== strongest)];
+      // Students finish only their best idea; a blank card left in an older draft stays out of the group's view.
+      const others = cards.filter((c) => c.id !== strongest && (!strongest || String(c.idea ?? '').trim()));
+      const ordered = [...cards.filter((c) => c.id === strongest), ...others];
       return {
         id: setId(lessonId, owner),
         student,
