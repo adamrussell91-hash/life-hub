@@ -418,6 +418,17 @@ function cleanAiMark(raw, max) {
  * Rows say which counted (`by`), and carry the AI's mark and the teacher's
  * comment for the teacher; student replies pick their own fields.
  */
+/**
+ * The option on the quiz as it stands now that a pick made on an earlier publish
+ * belongs to: the one with the same words, or else the same id. Null when it has gone.
+ */
+function currentPick(then, now, id) {
+  const options = now?.options;
+  if (!Array.isArray(options)) return id;
+  const text = then?.options?.find((o) => o.id === id)?.text;
+  return (options.find((o) => o.text === text) ?? options.find((o) => o.id === id))?.id ?? null;
+}
+
 function scoreAttempt(record, result, teacherMarks, aiMarks = null) {
   const hintCost = resolveQuizSettings(record.settings).hint_cost;
   const rows = record.order.map((id) => {
@@ -1100,7 +1111,10 @@ export async function quizTeacherAction(store, lessonId, body) {
         s.confidence[r.confidence][0] += 1;
         if (r.awarded !== null && r.awarded >= r.mark.max) s.confidence[r.confidence][1] += 1;
       }
-      if (start.version === record.version && r.response?.selected) for (const id of r.response.selected) s.picks[id] = (s.picks[id] ?? 0) + 1;
+      for (const id of r.response?.selected ?? []) {
+        const shown = currentPick(rec.questions[r.id]?.question, entryFor(record, r.id)?.question, id);
+        if (shown) s.picks[shown] = (s.picks[shown] ?? 0) + 1;
+      }
     }
   }
   rows.sort((x, y) => String(y.submitted_at).localeCompare(String(x.submitted_at)));

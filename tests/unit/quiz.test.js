@@ -996,3 +996,41 @@ test('an old live round never pushes aside a go handed in after it', async () =>
   assert.equal(results.attempts.length, 1);
   assert.equal([...store.data.keys()].filter(k => k.includes('/results/')).length, 1);
 });
+
+/** Publishing gives options fresh ids, so tests look an option up by its words. */
+function optionId(store, qid, text) {
+  const { version } = store.data.get('quiz/quiz1/current');
+  return store.data.get(`quiz/quiz1/keys/${version}`).questions[qid].question.options.find(o => o.text === text).id;
+}
+
+test('option counts include attempts from before a republish', async () => {
+  const store = baseStore({ quizSettings: { attempts: 3 } });
+  await publishQuiz(store);
+  const metaphor = optionId(store, 'qa', 'Metaphor');
+  const rhyme = optionId(store, 'qa', 'Rhyme');
+  await quizAction(store, 'quiz1', { token: token(1), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'submit', responses: { qa: { selected: [metaphor] } } });
+  await quizAction(store, 'quiz1', { token: token(2), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(2), action: 'submit', responses: { qa: { selected: [rhyme] } } });
+  const draft = store.data.get('lessons/quiz1');
+  // Metaphor keeps its words; Rhyme is replaced by Pun, so its pick has nowhere to go.
+  store.data.set('lessons/quiz1', { ...draft, blocks: draft.blocks.map(b => b.id === 'qa' ? { ...b, content: { question: { ...b.content.question, options: [{ id: 'a', text: 'Metaphor' }, { id: 'b', text: 'Simile' }, { id: 'd', text: 'Pun' }], correct: ['a'] } } } : b) });
+  await publishQuiz(store);
+  const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  assert.deepEqual(results.questions.find(x => x.id === 'qa').picks, { [optionId(store, 'qa', 'Metaphor')]: 1 });
+});
+
+test('a live round fills the option counts, with or without a republish after it', async () => {
+  for (const republish of [false, true]) {
+    const store = baseStore({ quizSettings: { attempts: 3 } });
+    await publishQuiz(store);
+    const { live } = await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+    await quizAction(store, 'quiz1', { token: token(1), action: 'live_join', code: live.code });
+    await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+    await quizAction(store, 'quiz1', { token: token(1), action: 'live_answer', index: 0, response: { selected: [optionId(store, 'qa', 'Metaphor')] } });
+    await quizTeacherAction(store, 'quiz1', { action: 'live_end' });
+    if (republish) await publishQuiz(store);
+    const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+    assert.deepEqual(results.questions.find(q => q.id === 'qa').picks, { [optionId(store, 'qa', 'Metaphor')]: 1 }, `republish ${republish}`);
+  }
+});
