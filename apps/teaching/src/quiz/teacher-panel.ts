@@ -646,6 +646,9 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
 
   function resultsView(): HTMLElement {
     const wrap = el('div', 'qz-results');
+    if (live && live.phase !== 'done' && !(live.phase === 'reveal' && live.index + 1 >= live.total)) {
+      wrap.append(el('p', 'qz-note block-secondary', 'A live round is still running. Finish or end it on the Live tab and its answers come here.'));
+    }
     if (openAttempt) {
       wrap.append(el('p', 'qz-note block-secondary', 'Loading attempt…'));
       void post<{ attempt: AttemptDetail }>({ action: 'attempt', attempt_id: openAttempt })

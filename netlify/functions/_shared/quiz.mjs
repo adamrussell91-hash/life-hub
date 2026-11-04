@@ -15,6 +15,7 @@
  *   quiz/{lesson}/live/active                        live round (teacher writes only)
  *   quiz/{lesson}/live/{session}/players/{device}    { joined_at }
  *   quiz/{lesson}/live/{session}/answers/{i}/{device} create-only answer to question i
+ *   quiz/{lesson}/live/{session}/folded              { at } this round's answers are now ordinary attempts
  *   quiz/{lesson}/closed                             { at } the teacher pressed Close now
  *   quiz/{lesson}/flags                              { dismissed } insight flags the teacher dismissed
  *   quiz/{lesson}/evidence/{class|all}               saved insight of a closed, fully marked quiz
@@ -90,6 +91,7 @@ const keys = (lesson) => ({
   players: (session) => `quiz/${lesson}/live/${session}/players/`,
   answer: (session, i, device) => `quiz/${lesson}/live/${session}/answers/${i}/${device}`,
   answers: (session, i) => `quiz/${lesson}/live/${session}/answers/${i}/`,
+  liveFolded: (session) => `quiz/${lesson}/live/${session}/folded`,
   closed: `quiz/${lesson}/closed`,
   flags: `quiz/${lesson}/flags`,
   insight: (cls) => `quiz/${lesson}/evidence/${cls}`,
@@ -946,6 +948,7 @@ export async function quizTeacherAction(store, lessonId, body) {
   }
   const { record, settings, k } = loaded;
   const rosters = new Map();
+  await foldFinishedLive(store, k, lessonId, record);
 
   if (action === 'insight') return classInsight(store, lessonId, body.class_id ?? null, loaded);
 
@@ -1433,6 +1436,7 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
   ]);
   const fallback = lessonOutcomes(draft);
   await sweepStale(store, k, lessonId, record, state.closed, now);
+  await foldFinishedLive(store, k, lessonId, record);
   const stamp = (await read(store, k.stamp))?.at ?? stampRow?.at ?? null;
   // A class with no list stays anonymous, so its insight covers every latest attempt.
   const listed = cls && roster?.students.length ? roster : null;
@@ -1552,6 +1556,58 @@ async function liveState(store, k) {
   return live && live.expires > Date.now() ? live : null;
 }
 
+/** A round nobody can add to any more: finished, ended, timed out, or sitting on the last question's answer. */
+const liveFinished = (live, now = Date.now()) =>
+  live.phase === 'done' || live.expires <= now || (live.phase === 'reveal' && live.index + 1 >= live.order.length);
+
+/**
+ * Turns a live round's answers into ordinary handed-in attempts, one per
+ * student who answered anything, so Results, the markbook and To mark read them
+ * like any other go. Safe to run again: the round's marker stops a repeat, and
+ * each attempt names its session. A go handed in after the round is never
+ * pushed aside by it, because the highest-numbered attempt is the one that counts.
+ */
+async function foldLiveRound(store, k, lessonId, record, live) {
+  if (await read(store, k.liveFolded(live.session))) return;
+  const rec = await recordFor(store, lessonId, live.version, record);
+  const playerKeys = await listBlobKeys(store, k.players(live.session));
+  let changed = false;
+  await mapBounded(playerKeys, 8, async (key) => {
+    const owner = key.slice(key.lastIndexOf('/') + 1);
+    const player = await read(store, key);
+    const given = await Promise.all(live.order.map((_, i) => read(store, k.answer(live.session, i, owner))));
+    const at = given.map((a) => a?.at).filter(Boolean).sort();
+    if (!at.length) return;
+    const lastAt = at[at.length - 1];
+    const attempts = await deviceAttempts(store, k, owner, await clearedFrom(store, k, owner));
+    if (attempts.some((a) => a.live_session === live.session || (a.result && String(a.result.submitted_at) > lastAt))) return;
+    const responses = {};
+    const marks = {};
+    live.order.forEach((id, i) => {
+      const entry = entryFor(rec, id);
+      if (!entry) return;
+      if (given[i]) responses[id] = given[i].response;
+      marks[id] = given[i]?.mark ?? markResponse(entry.key, null);
+    });
+    const start = { n: attempts.next, version: live.version, started_at: player?.joined_at ?? at[0], deadline: null, live_session: live.session, ...(player?.class_id ? { class_id: player.class_id } : {}), ...(player?.student_id ? { student_id: player.student_id } : {}) };
+    await store.setJSON(k.attempt(owner, start.n), start, { onlyIfNew: true });
+    await store.setJSON(k.result(owner, start.n), { responses, confidence: {}, marks, hints: {}, submitted_at: lastAt, overtime: false, live: true }, { onlyIfNew: true });
+    changed = true;
+  });
+  await store.setJSON(k.liveFolded(live.session), { at: new Date().toISOString() });
+  if (changed) await markInsightChanged(store, lessonId);
+}
+
+/** Brings a finished round into the results. Never in the way of the page reading them. */
+async function foldFinishedLive(store, k, lessonId, record) {
+  try {
+    const live = await read(store, k.live);
+    if (live?.session && liveFinished(live)) await foldLiveRound(store, k, lessonId, record, live);
+  } catch (error) {
+    console.warn('live round fold failed', error);
+  }
+}
+
 async function liveTeacher(store, lessonId, body, action) {
   if (!['live_status', 'live_start', 'live_next', 'live_reveal', 'live_end', 'live_back'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   let loaded;
@@ -1567,6 +1623,9 @@ async function liveTeacher(store, lessonId, body, action) {
 
   if (action === 'live_start') {
     if (!record.order.length) reject(409, 'empty', 'Add and publish some questions first.');
+    // The round this one replaces can't be reached again once its pointer is gone.
+    const previous = await read(store, k.live);
+    if (previous?.session) await foldLiveRound(store, k, lessonId, record, previous);
     live = {
       session: randomBytes(16).toString('hex'),
       code: String(randomInt(100000, 1000000)),
@@ -1586,6 +1645,7 @@ async function liveTeacher(store, lessonId, body, action) {
     live = { ...live, phase: 'reveal' };
   }
   if (action !== 'live_status' && live) await store.setJSON(k.live, live);
+  if (action !== 'live_status') await foldFinishedLive(store, k, lessonId, record);
   if (!live || live.expires < Date.now()) return { live: null };
 
   const rec = await recordFor(store, lessonId, live.version, record);
