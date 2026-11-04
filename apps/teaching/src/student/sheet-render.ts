@@ -110,6 +110,13 @@ export function renderSharedSheet(sheet: SharedSheet): { el: HTMLElement; dispos
   const shared = dateLabel(sheet.shared_at);
   root.append(el('p', 'shared-sheet__end', shared ? `Shared on ${shared}. Read only.` : 'Read only.'));
 
+  // The note covers the bottom of a narrow screen, so bring its mark up clear of it.
+  root.addEventListener('click', (event) => {
+    if (typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 999px)').matches) return;
+    const mark = event.target instanceof Element ? event.target.closest('.block-annotation__anchor') : null;
+    if (mark) requestAnimationFrame(() => mark.scrollIntoView?.({ block: 'center' }));
+  });
+
   lockTyping(root);
   // Blocks repaint as they are read, so a box drawn later is locked as well.
   const observer = new MutationObserver(() => lockTyping(root));
