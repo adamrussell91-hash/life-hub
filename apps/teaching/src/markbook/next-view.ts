@@ -8,6 +8,7 @@ import { tagLabel } from '@/evidence/tags';
 import { activeMembers, overlapsSaved } from '@/evidence/groups';
 import type { Evidence } from '@/evidence/types';
 import { pct, sectionHead } from '@/evidence/views/parts';
+import type { SavedGroup } from './schema';
 import type { MarkbookView, RosterStudent } from './types';
 import { formatDay } from './calc';
 
@@ -19,8 +20,8 @@ import { formatDay } from './calc';
 
 export type SyllabusSort = 'weakest' | 'syllabus' | 'change';
 /** Kept by the markbook between redraws. */
-export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean };
-export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false });
+export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean; editingGroup: string | null; refocus: string | null };
+export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false, editingGroup: null, refocus: null });
 
 export type NextActions = {
   openStudent: (studentId: string) => void;
@@ -31,6 +32,10 @@ export type NextActions = {
   saveGroup?: (tags: string[], students: string[]) => void;
   /** Add students the evidence now flags to a saved group. */
   addFlagged?: (groupId: string, students: string[]) => void;
+  /** Edit a saved group: the three together turn on its Edit button. */
+  renameGroup?: (groupId: string, name: string) => void;
+  addMember?: (groupId: string, student: string) => void;
+  removeMember?: (groupId: string, student: string) => void;
   pins: (studentId: string) => FocusPins;
   repaint: () => void;
 };
@@ -85,6 +90,88 @@ function legend(): HTMLElement {
     row.append(item);
   }
   return row;
+}
+
+/** The open saved group card: its name and who is in it. Each change saves straight away, like a mark. */
+function groupEditor(group: SavedGroup, active: string[], listed: RosterStudent[], nameOf: ReadonlyMap<string, string>, state: NextState, actions: NextActions): HTMLElement {
+  const form = el('div', 'mb-saved__editor');
+  // Saves redraw the card, so remember where the teacher is for each redraw.
+  form.addEventListener('focusin', (event) => {
+    const at = (event.target as HTMLElement).dataset.refocus;
+    if (at) state.refocus = at;
+  });
+
+  const nameField = el('label', 'mb-form__field');
+  nameField.append(el('span', 'mb-form__label', 'Group name'));
+  const name = el('input', 'mb-form__input mb-saved__name-input');
+  name.type = 'text';
+  name.maxLength = 120;
+  name.value = group.name;
+  name.dataset.refocus = 'name';
+  name.addEventListener('change', () => {
+    const next = name.value.trim();
+    if (!next || next === group.name) {
+      name.value = group.name;
+      return;
+    }
+    actions.renameGroup?.(group.id, next);
+  });
+  nameField.append(name);
+
+  const list = el('ul', 'mb-saved__members');
+  list.setAttribute('aria-label', 'Students in this group');
+  for (const student of active) {
+    const who = nameOf.get(student) ?? 'Removed student';
+    const row = el('li', 'mb-saved__member');
+    const remove = el('button', 'btn btn--ghost', 'Remove');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove ${who} from ${group.name}`);
+    remove.dataset.refocus = `remove:${student}`;
+    remove.addEventListener('click', () => {
+      state.refocus = 'add';
+      actions.removeMember?.(group.id, student);
+    });
+    row.append(el('span', 'mb-saved__member-name', who), remove);
+    list.append(row);
+  }
+
+  const children: HTMLElement[] = [nameField, list];
+  if (active.length === 1) children.push(el('p', 'mb__empty', 'Removing the last student retires the group. It stays in History.'));
+
+  const others = listed.filter((s) => !active.includes(s.id));
+  if (others.length) {
+    const addField = el('label', 'mb-form__field');
+    addField.append(el('span', 'mb-form__label', 'Add a student'));
+    const add = el('select', 'mb-form__input mb-saved__add-student');
+    add.dataset.refocus = 'add';
+    const prompt = el('option', undefined, 'Choose a student');
+    prompt.value = '';
+    add.append(prompt);
+    for (const s of others) {
+      const option = el('option', undefined, s.name);
+      option.value = s.id;
+      add.append(option);
+    }
+    add.addEventListener('change', () => {
+      if (!add.value) return;
+      state.refocus = 'add';
+      actions.addMember?.(group.id, add.value);
+    });
+    addField.append(add);
+    children.push(addField);
+  }
+
+  const done = el('button', 'btn btn--secondary mb-saved__done', 'Done');
+  done.type = 'button';
+  done.dataset.refocus = 'done';
+  done.addEventListener('click', () => {
+    state.editingGroup = null;
+    state.refocus = `edit:${group.id}`;
+    actions.repaint();
+  });
+  children.push(done);
+  form.append(...children);
+  return form;
 }
 
 export function renderNextSteps(view: MarkbookView, students: RosterStudent[], ctx: InsightContext, state: NextState, actions: NextActions): HTMLElement {
@@ -199,9 +286,10 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
       const active = activeMembers(g);
       card.append(
         el('h4', 'mb-saved__name', g.name),
-        el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${g.members.length} still in`),
-        el('p', 'mb-move__who', names(active))
+        el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${g.members.length} still in`)
       );
+      // The open card lists them, each with its Remove.
+      if (state.editingGroup !== g.id) card.append(el('p', 'mb-move__who', names(active)));
       const extra = repeats.get(g.id) ?? [];
       if (extra.length && actions.addFlagged) {
         const add = el('button', 'btn btn--secondary mb-saved__add', `${extra.length} more flagged, add?`);
@@ -209,9 +297,29 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
         add.addEventListener('click', () => actions.addFlagged?.(g.id, extra));
         card.append(add);
       }
+      if (actions.renameGroup && actions.addMember && actions.removeMember) {
+        if (state.editingGroup === g.id) card.append(groupEditor(g, active, listed, nameOf, state, actions));
+        else {
+          const edit = el('button', 'btn btn--ghost mb-saved__edit', 'Edit');
+          edit.type = 'button';
+          edit.setAttribute('aria-label', `Edit ${g.name}`);
+          edit.dataset.refocus = `edit:${g.id}`;
+          edit.addEventListener('click', () => {
+            state.editingGroup = g.id;
+            state.refocus = 'name';
+            actions.repaint();
+          });
+          card.append(edit);
+        }
+      }
       savedHost.append(card);
     }
     root.append(savedHost);
+    // A redraw replaces the card, so put focus back once the markbook has drawn it.
+    const refocus = state.refocus;
+    // Kept while the card is open: a save still on its way will redraw it again.
+    if (!state.editingGroup) state.refocus = null;
+    if (refocus) queueMicrotask(() => savedHost.querySelector<HTMLElement>(`[data-refocus="${refocus}"]`)?.focus());
   }
 
   // The syllabus, outcome by outcome.

@@ -248,6 +248,12 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-saved { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); font: var(--text-sm) / 1.4 var(--font-ui); color: var(--ink); }
 .mb-saved__name { margin: 0; font: var(--weight-semibold) var(--text-sm) / 1.3 var(--font-ui); }
 .mb-saved__add { justify-self: start; }
+.mb-saved__edit, .mb-saved__done { justify-self: start; }
+.mb-saved__editor { display: grid; gap: var(--space-2); min-width: 0; margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.mb-saved__members { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.mb-saved__member { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.mb-saved__member-name { min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
+.mb-saved__add-student { max-width: 100%; }
 
 .mb-hist { display: grid; gap: var(--space-3); }
 .mb-hist__bar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
