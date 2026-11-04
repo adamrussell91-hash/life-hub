@@ -405,6 +405,46 @@ export async function groupGallery(store, lessonId, config, group, closedAt) {
 }
 
 /**
+ * A student who wrote Sketch cards but never pressed Submit still gets a say:
+ * at their deadline, what they had saved by then goes in, on time and fixed,
+ * like any other submission. Work first saved after the deadline waits for
+ * Submit (and counts as late). Moving the deadline later opens it up again.
+ */
+async function handInSavedSketches(store, lessonId, config, extend, group, state, now) {
+  const k = sprintKeys(lessonId);
+  const handed = [];
+  for (const student of group.students) {
+    if (list(state.in?.sketch).includes(student)) continue;
+    const due = phaseDue(phaseFor(config, extend, 'sketch', group.id, student));
+    if (due === null || due > now) continue;
+    const owner = ownerOf(config.class_id, student);
+    const sub = await read(store, k.sub(owner, 'sketch'));
+    if (!sub || sub.submitted_at || Date.parse(sub.saved_at) > due) continue;
+    const cards = list(sub.payload?.cards).filter((c) => c.title?.trim() || c.idea?.trim());
+    if (!cards.length) continue;
+    await store.setJSON(k.sub(owner, 'sketch'), { ...sub, payload: { ...sub.payload, cards }, submitted_at: iso(due), late: false, handed_in: true });
+    handed.push(student);
+  }
+  return handed.length ? { ...state, in: { ...state.in, sketch: [...list(state.in?.sketch), ...handed] } } : state;
+}
+
+/** Done voting means every match-up in today's pool: a late Sketch or a changed star adds match-ups, and whoever hasn't had them is still going. */
+async function keepFinishedVotes(store, lessonId, config, group, state) {
+  if (state.votes_closed_at || !list(state.voted).length) return state;
+  const ids = poolOf(await groupGallery(store, lessonId, config, group, null)).map((i) => i.id);
+  const subs = await groupSubs(store, lessonId, config, group, 'decide');
+  const finished = (student) => {
+    const payload = subs.find((s) => s.student === student)?.sub?.payload;
+    const duels = list(payload?.duels);
+    // Ballots from before head-to-heads have no match-ups to finish.
+    if (!duels.length && Object.keys(payload?.votes ?? {}).length) return true;
+    return duelsDone(duels, ids);
+  };
+  const voted = list(state.voted).filter(finished);
+  return voted.length === list(state.voted).length ? state : { ...state, voted };
+}
+
+/**
  * Settle what a closed phase decides: the group question after Understand,
  * the chosen idea after Decide's votes. With the teacher as decider (or a
  * tie, or nothing to choose from) the group waits on the teacher instead.
@@ -421,6 +461,8 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
       ? { ...next, question: { id: top.id, text: top.text } }
       : { ...next, awaiting: { kind: 'question', tie: t.tie, empty: notes.length === 0 } };
   }
+  next = await handInSavedSketches(store, lessonId, config, extend, group, next, now);
+  next = await keepFinishedVotes(store, lessonId, config, group, next);
   const votesIn = group.students.every((s) => list(next.voted).includes(s));
   const decideOver = phaseDone(config, extend, group, next, lockRec, 'decide', now);
   if (!next.votes_closed_at && (votesIn || decideOver) && (next.question || next.awaiting?.kind !== 'question')) {
@@ -531,6 +573,7 @@ async function studentView(store, lessonId, config, who, group) {
       due_time: p.due_time,
       state: sub?.submitted_at ? 'in' : sub ? 'draft' : 'none',
       late: !!sub?.late,
+      handed_in: !!sub?.handed_in,
       frozen: !!sub?.frozen || isFrozen(lockRec.ended ?? {}, key, sid),
       closed: due !== null && due <= now,
       count_in: list(state.in[key]).filter((s) => group.students.includes(s)).length
@@ -651,6 +694,7 @@ export async function sprintAction(store, lessonId, body) {
       const problem = await submitProblem(store, lessonId, config, group, sid, phase, payload, view);
       if (problem) reject(400, problem[0], problem[1]);
       const p = phaseFor(config, (await read(store, k.extend)) ?? {}, phase, group.id, sid);
+      delete next.handed_in;
       next.submitted_at = prev?.submitted_at ?? iso(now);
       next.late = isLate(p, next.submitted_at);
     }

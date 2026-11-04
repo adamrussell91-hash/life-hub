@@ -127,7 +127,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     if (!submitted) return;
     const at = when ? ` at ${when.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : '';
     done.replaceChildren(el('span', 'sprint-submit__tick', '✓'), el('div', ''));
-    done.lastElementChild!.append(el('strong', '', `Submitted${at}`), el('span', '', ctx.row.frozen ? ' Your class work is in.' : ' You can still change it until the deadline. Changes save by themselves.'));
+    done.lastElementChild!.append(el('strong', '', `Submitted${at}`), el('span', '', ctx.row.frozen ? ' Your class work is in.' : ctx.row.handed_in && ctx.row.closed && !when ? ' What you had saved went in at the deadline.' : ' You can still change it until the deadline. Changes save by themselves.'));
   };
   const name = PHASE_LABELS[phase];
   const goLabel = () => (submitted ? 'Update my submission' : `Submit my ${name} work`);
@@ -140,7 +140,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     later.hidden = submitted;
     head.textContent = left > 1 ? `Nearly there: ${left} things left` : left ? 'Nearly there: one thing left' : submitted ? 'Changed something?' : `Finished with ${name}?`;
     lead.hidden = left > 0;
-    lead.textContent = submitted ? 'Update your submission so your teacher sees the latest.' : 'Submitting tells your teacher it’s ready. We check it first and show you anything to add.';
+    lead.textContent = submitted ? 'Update your submission so your teacher sees the latest.' : `Submitting tells your teacher it’s ready. We check it first and show you anything to add.${phase === 'sketch' ? ' If the deadline comes first, the cards you’ve saved go in as they are.' : ''}`;
   };
   const send = async (kind: 'save' | 'submit') => {
     if (busy || !ctx.editable) return;

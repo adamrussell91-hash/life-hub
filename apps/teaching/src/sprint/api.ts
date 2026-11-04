@@ -7,7 +7,7 @@ import type { Dot, Duel, FeedbackEntry, Level, LimitBox, Part, PhasePayload, Spr
 
 export type PhaseRow = {
   key: SprintPhaseKey; open: boolean; due_date: string; due_time: string;
-  state: 'none' | 'draft' | 'in'; late: boolean; frozen: boolean; closed: boolean; count_in: number;
+  state: 'none' | 'draft' | 'in'; late: boolean; handed_in?: boolean; frozen: boolean; closed: boolean; count_in: number;
 };
 export type GalleryIdea = { id: string; index?: number; title: string; idea: string; answers: string; evidence: string; file: string | null; strongest: boolean };
 export type GallerySet = { id: string; ideas: GalleryIdea[] };
