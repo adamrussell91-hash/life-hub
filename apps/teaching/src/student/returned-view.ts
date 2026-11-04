@@ -80,9 +80,14 @@ function seeHow(r: Resource): HTMLElement {
   return a;
 }
 
+/** A strength reads as one everywhere: sage, a "+" and the word. */
+function tagCodeChip(tag: PieceTag): HTMLElement {
+  return tag.positive ? codeChip(`Strength ${tag.code}+`, 'sage') : codeChip(tag.code, tag.colour);
+}
+
 function explain(tag: PieceTag): HTMLElement[] {
   const out: HTMLElement[] = [el('p', 'pg-pop__head')];
-  out[0]!.append(codeChip(tag.code, tag.colour), el('b', 'pg-pop__label', ` ${tag.label}`));
+  out[0]!.append(tagCodeChip(tag), el('b', 'pg-pop__label', ` ${tag.label}`));
   out.push(el('p', 'pg-pop__action', tag.action));
   if (tag.note) out.push(el('p', 'pg-pop__note', tag.note));
   if (tag.resource) out.push(seeHow(tag.resource));
@@ -194,7 +199,7 @@ function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: Piec
     for (const [part, fields] of Object.entries(text)) {
       for (const [field, words] of Object.entries(fields)) {
         const tags = tagged.filter((t) => t.part === part && t.field === field);
-        const marks: Mark[] = tags.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.colour}-ink)` }));
+        const marks: Mark[] = tags.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.positive ? 'sage' : t.colour}-ink)` }));
         const sheet = paper(words, marks, null);
         sheet.addEventListener('click', (e) => {
           const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark');
@@ -208,7 +213,7 @@ function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: Piec
         left.append(sheet);
       }
     }
-    left.append(pop, el('p', 'pg-hint', 'Tap a highlight to see what it means.'));
+    left.append(pop, el('p', 'pg-hint', tagged.some((t) => t.positive) ? 'Tap a highlight to see what it means. Green marks a strength.' : 'Tap a highlight to see what it means.'));
     return;
   }
   const list = el('ul', 'pg-viva');

@@ -128,6 +128,19 @@
 .fc-chip--strength {
   font-weight: var(--weight-bold);
 }
+/* Said in words, because a "+" alone is easy to miss. */
+.fc-chip--strength::before {
+  content: 'Strength\00a0';
+}
+.block-annotation__anchor--strength::after,
+.block-annotation__key-swatch--strength {
+  color: var(--pastel-sage-ink);
+  font-weight: var(--weight-bold);
+}
+.block-annotation__anchor--strength::after {
+  content: '+';
+  margin-inline-start: 0.1em;
+}
 
 /* ── Student: practice ─────────────────────────────────────────────── */
 
