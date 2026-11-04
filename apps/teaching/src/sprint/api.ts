@@ -183,7 +183,8 @@ export type GroupBoard = {
 export type SprintTeacherApi = {
   summary(): Promise<SprintSummary>;
   board(groupId: string): Promise<GroupBoard>;
-  endClass(phase: SprintPhaseKey): Promise<SprintSummary>;
+  /** End a class part; lockHours is the lock the teacher chose, none if left out. */
+  endClass(phase: SprintPhaseKey, lockHours?: number): Promise<SprintSummary>;
   /** Take back End class part: the phase reopens, its lock goes, auto-submitted work returns to draft. */
   reopenClass(phase: SprintPhaseKey): Promise<SprintSummary>;
   /** End the class lock now; the class part stays ended and the next phase opens. */
@@ -208,7 +209,7 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
   return {
     summary: () => call('summary'),
     board: (groupId) => call<GroupBoard>('board', { group_id: groupId }),
-    endClass: (phase) => call('end_class', { phase }),
+    endClass: (phase, lockHours) => call('end_class', { phase, lock_hours: lockHours }),
     reopenClass: (phase) => call('reopen_class', { phase }),
     liftLock: () => call('lift_lock'),
     unlock: (studentId) => call('unlock', { student_id: studentId }),
@@ -285,7 +286,7 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
       return {
         summary: () => call('summary'),
         board: (groupId) => call<GroupBoard>('board', { group_id: groupId }),
-        endClass: (phase) => call('end_class', { phase }),
+        endClass: (phase, lockHours) => call('end_class', { phase, lock_hours: lockHours }),
         reopenClass: (phase) => call('reopen_class', { phase }),
         liftLock: () => call('lift_lock'),
     reopenClass: (phase) => call('reopen_class', { phase }),

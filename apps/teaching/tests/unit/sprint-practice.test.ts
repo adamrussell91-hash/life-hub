@@ -28,15 +28,15 @@ describe('yourMove', () => {
   const phases = [{ key: 'understand' as const, where: 'class' as const }, { key: 'sketch' as const, where: 'home' as const }];
   const now = Date.parse('2026-10-26T00:00:00Z');
   it('asks for End class part during a class phase', () => {
-    expect(yourMove(base(), phases, 2, now).action).toEqual({ label: 'End class part', kind: 'end_class', phase: 'understand' });
+    expect(yourMove(base(), phases, now).action).toEqual({ label: 'End class part', kind: 'end_class', phase: 'understand' });
   });
   it('asks for a choice when the group waits', () => {
-    expect(yourMove(base({ awaiting: { kind: 'idea', tie: true, empty: false } }), phases, 2, now).text).toBe('The vote tied. Choose the group’s idea.');
+    expect(yourMove(base({ awaiting: { kind: 'idea', tie: true, empty: false } }), phases, now).text).toBe('The vote tied. Choose the group’s idea.');
   });
   it('says the lock is on while it runs', () => {
-    expect(yourMove(base({}, { lock: { phase: 'understand', until: '2026-10-26T02:00:00Z', unlocked: [] } }), phases, 2, now).action).toBeUndefined();
+    expect(yourMove(base({}, { lock: { phase: 'understand', until: '2026-10-26T02:00:00Z', unlocked: [] } }), phases, now).action).toBeUndefined();
   });
   it('has nothing during a home phase', () => {
-    expect(yourMove(base({ open: ['understand', 'sketch'] }), phases, 2, now).text).toMatch(/^Nothing waits on you/);
+    expect(yourMove(base({ open: ['understand', 'sketch'] }), phases, now).text).toMatch(/^Nothing waits on you/);
   });
 });

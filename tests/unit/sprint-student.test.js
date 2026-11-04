@@ -58,23 +58,18 @@ test('the next phase opens when the whole group is in', async () => {
   assert.equal(s.question.text, 'How might we a?');
 });
 
-test('ending the class part freezes work, locks the sprint and opens the next phase after the lock', async () => {
+test('a class part ending at its set time freezes work and opens the next phase, with no lock', async () => {
   const config = { ...CONFIG(), phases: CONFIG().phases.map((p) => (p.key === 'understand' ? { ...p, ends_at: '2026-11-02T11:00' } : p)) };
   const store = storeFor(config);
   setSprintClock(at('2026-11-01T22:00:00Z')); // 9 am Sydney, 2 Nov
   await claim(store, 1);
   await act(store, 1, 'open', { phase: 'understand' });
   await act(store, 1, 'save', { phase: 'understand', payload: notes('How might we keep it?') });
-  setSprintClock(at('2026-11-02T01:00:00Z')); // noon: ended at 11 am, locked until 1 pm
-  const locked = await act(store, 1, 'status');
-  assert.equal(locked.lock.until, '2026-11-02T02:00:00.000Z');
-  assert.equal(locked.phases[0].state, 'in');
-  assert.equal(locked.phases[0].frozen, true);
-  assert.deepEqual(locked.phases.filter((p) => p.open).map((p) => p.key), ['understand']);
-  await assert.rejects(act(store, 1, 'save', { phase: 'understand', payload: notes('More') }), { code: 'locked' });
-  setSprintClock(at('2026-11-02T02:30:00Z'));
+  setSprintClock(at('2026-11-02T01:00:00Z')); // noon: ended at 11 am
   const after = await act(store, 1, 'status');
   assert.equal(after.lock, null);
+  assert.equal(after.phases[0].state, 'in');
+  assert.equal(after.phases[0].frozen, true);
   assert.deepEqual(after.phases.filter((p) => p.open).map((p) => p.key), ['understand', 'sketch']);
   await assert.rejects(act(store, 1, 'save', { phase: 'understand', payload: notes('More') }), { code: 'frozen' });
 });

@@ -19,7 +19,7 @@ describe('sprint schema', () => {
     const s = SprintSettingsSchema.parse(settings());
     expect(s.decider).toBe('top_vote');
     expect(s.support).toBe('standard');
-    expect(s.lock_hours).toBe(2);
+    expect(s.lock_hours).toBe(0);
     expect(s.requirements).toEqual([]);
     expect(s.phases[1]!.ends_at).toBe('');
   });

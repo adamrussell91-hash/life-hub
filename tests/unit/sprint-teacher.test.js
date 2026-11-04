@@ -28,7 +28,7 @@ test('End class part freezes, locks and reports who was there; unlock frees one 
   const store = storeFor();
   await act(store, 1, 'claim', { initials: INITIALS[1] });
   await act(store, 1, 'open', { phase: 'understand' });
-  const s = await teach(store, 'end_class', { phase: 'understand' });
+  const s = await teach(store, 'end_class', { phase: 'understand', lock_hours: 2 });
   assert.equal(s.class_parts.understand, 'ended');
   assert.equal(s.lock.until, '2026-11-01T02:00:00.000Z');
   assert.deepEqual(s.ended.understand.present, ['st_ann']);
@@ -38,13 +38,32 @@ test('End class part freezes, locks and reports who was there; unlock frees one 
   await assert.rejects(teach(store, 'end_class', { phase: 'sketch' }), { code: 'not_class' });
 });
 
+test('End class part locks only for the hours chosen: none unless asked, whatever the Kit says', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  const s = await teach(store, 'end_class', { phase: 'understand' });
+  assert.equal(s.class_parts.understand, 'ended');
+  assert.equal(s.lock, null);
+  assert.deepEqual(s.groups[0].open, ['understand', 'sketch']);
+  await assert.rejects(teach(store, 'end_class', { phase: 'decide', lock_hours: 25 }), { code: 'bad_lock' });
+});
+
+test('a class part that ends at its set time doesn’t lock', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const config = CONFIG();
+  config.phases[0] = { ...config.phases[0], ends_at: '2026-11-01T09:00' };
+  const s = await teach(storeFor(config), 'summary');
+  assert.equal(s.class_parts.understand, 'ended');
+  assert.equal(s.lock, null);
+});
+
 test('Undo end reopens the class part: no lock, no freeze, auto-submitted work back to draft, handed-in work stays', async () => {
   setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
   const store = storeFor();
   await act(store, 1, 'claim', { initials: INITIALS[1] });
   await act(store, 1, 'open', { phase: 'understand' });
   await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we a?'], star: '', stretch: '' } });
-  await teach(store, 'end_class', { phase: 'understand' });
+  await teach(store, 'end_class', { phase: 'understand', lock_hours: 2 });
   const s = await teach(store, 'reopen_class', { phase: 'understand' });
   assert.equal(s.lock, null);
   assert.equal(s.class_parts.understand, 'open');
@@ -54,7 +73,7 @@ test('Undo end reopens the class part: no lock, no freeze, auto-submitted work b
   assert.equal(s.groups[0].question ?? null, null);
   const me = await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we b?'], star: '', stretch: '' } });
   assert.equal(me.lock, null);
-  const again = await teach(store, 'end_class', { phase: 'understand' });
+  const again = await teach(store, 'end_class', { phase: 'understand', lock_hours: 1 });
   assert.equal(again.class_parts.understand, 'ended');
   assert.ok(again.lock);
   await assert.rejects(teach(store, 'reopen_class', { phase: 'sketch' }), { code: 'not_class' });
@@ -83,7 +102,7 @@ test('Open the sprint now ends the lock, keeps the part ended and opens the next
   const store = storeFor();
   await act(store, 1, 'claim', { initials: INITIALS[1] });
   await act(store, 1, 'open', { phase: 'understand' });
-  await teach(store, 'end_class', { phase: 'understand' });
+  await teach(store, 'end_class', { phase: 'understand', lock_hours: 2 });
   const s = await teach(store, 'lift_lock');
   assert.equal(s.lock, null);
   assert.equal(s.class_parts.understand, 'ended');

@@ -65,7 +65,22 @@ describe('progress map', () => {
     expect(confirm.textContent).toContain('1 draft will be submitted as it is');
     expect(confirm.textContent).toContain('Mark 2 students absent (CD, EF)');
     confirm.querySelector<HTMLButtonElement>('.btn--primary')!.click();
-    expect(a.endClass).toHaveBeenCalledWith('decide');
+    expect(a.endClass).toHaveBeenCalledWith('decide', 0);
+  });
+
+  it('End class part asks how long to lock, and starts on no lock', async () => {
+    const a = api();
+    const m = mountSprintMap({ getLesson: () => lesson, api: a, emitLesson: vi.fn() });
+    await m.refresh();
+    m.root.querySelector<HTMLButtonElement>('[data-end="decide"]')!.click();
+    const confirm = m.root.querySelector('.smap-confirm')!;
+    const lock = confirm.querySelector<HTMLSelectElement>('select')!;
+    expect(lock.value).toBe('0');
+    lock.value = '3';
+    lock.dispatchEvent(new Event('change'));
+    expect(confirm.textContent).toContain('when the lock ends');
+    confirm.querySelector<HTMLButtonElement>('.btn--primary')!.click();
+    expect(a.endClass).toHaveBeenCalledWith('decide', 3);
   });
 
   it('opens a group board from its row', async () => {

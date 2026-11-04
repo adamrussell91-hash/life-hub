@@ -167,10 +167,10 @@ export function phaseDone(config, extend, group, state, lockRec, key, now) {
 
 /**
  * End a class part at `at`: students who opened the phase before then were
- * there, so their work is frozen and submitted as it stands; then the sprint
- * locks for lock_hours. Running it twice changes nothing.
+ * there, so their work is frozen and submitted as it stands. The sprint locks
+ * only for the hours the teacher chose when ending it. Running it twice changes nothing.
  */
-export async function endClassPart(store, lessonId, config, phase, at) {
+export async function endClassPart(store, lessonId, config, phase, at, lockHours = 0) {
   const k = sprintKeys(lessonId);
   const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
   if (rec.ended[phase]) return rec;
@@ -196,7 +196,7 @@ export async function endClassPart(store, lessonId, config, phase, at) {
   const next = {
     ...rec,
     ended: { ...rec.ended, [phase]: { at: iso(at), present } },
-    lock: config.lock_hours > 0 ? { phase, until: iso(at + config.lock_hours * 3600000), unlocked: [] } : null
+    lock: lockHours > 0 ? { phase, until: iso(at + lockHours * 3600000), unlocked: [] } : null
   };
   await store.setJSON(k.lock, next);
   return next;
@@ -253,7 +253,7 @@ export async function reopenClassPart(store, lessonId, config, phase) {
   return out;
 }
 
-/** Class parts whose end time has passed end on their own, as if End class part was pressed then. */
+/** Class parts whose end time has passed end on their own, with no lock: nobody was asked for one. */
 export async function endDueClassParts(store, lessonId, config) {
   const now = clock();
   let rec = { ...emptyLock(), ...((await read(store, sprintKeys(lessonId).lock)) ?? {}) };
@@ -999,7 +999,9 @@ export async function sprintTeacherAction(store, lessonId, body) {
   if (action === 'end_class') {
     const p = config.phases.find((x) => x.key === body.phase);
     if (!p || p.where !== 'class') reject(400, 'not_class', 'Only class phases have a class part to end.');
-    await endClassPart(store, lessonId, config, p.key, now);
+    const hours = body.lock_hours ?? 0;
+    if (!Number.isInteger(hours) || hours < 0 || hours > 24) reject(400, 'bad_lock', 'Pick a lock of 0 to 24 hours.');
+    await endClassPart(store, lessonId, config, p.key, now, hours);
   }
   if (action === 'reopen_class') {
     if (!config.phases.some((x) => x.key === body.phase && x.where === 'class')) reject(400, 'not_class', 'Only class phases have a class part to reopen.');

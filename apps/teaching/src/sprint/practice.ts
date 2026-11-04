@@ -14,7 +14,7 @@ export type YourMove = { text: string; when: string; action?: { label: string; k
  * What the practice run is waiting on the teacher for, if anything. Pure.
  * One move at a time, in the order a real lesson meets them.
  */
-export function yourMove(summary: SprintSummary, phases: ReadonlyArray<{ key: SprintPhaseKey; where: 'class' | 'home' }>, lockHours: number, now: number): YourMove {
+export function yourMove(summary: SprintSummary, phases: ReadonlyArray<{ key: SprintPhaseKey; where: 'class' | 'home' }>, now: number): YourMove {
   const g = summary.groups[0];
   if (!g) return { text: 'There’s no practice group.', when: '' };
   if (summary.lock && Date.parse(summary.lock.until) > now) {
@@ -32,7 +32,7 @@ export function yourMove(summary: SprintSummary, phases: ReadonlyArray<{ key: Sp
   const p = phases.find((x) => x.key === key);
   if (key && p?.where === 'class' && summary.class_parts[key] === 'open') {
     return {
-      text: `${PHASE_LABELS[key]} is a class phase. When the lesson ends, press End class part: work is saved and handed in, then locks for ${lockHours} h.`,
+      text: `${PHASE_LABELS[key]} is a class phase. When the lesson ends, press End class part: work is saved and handed in, and you choose whether it locks.`,
       when: 'In a real lesson you press it when the bell goes, or set a lesson end time in the Kit.',
       action: { label: 'End class part', kind: 'end_class', phase: key }
     };
@@ -133,8 +133,8 @@ export function openPracticeRun(o: { getLesson: () => Lesson; api?: PracticeApi 
       button('Exit', 'ghost', close)
     );
     const sprint = s.lesson.sprint!;
-    ganttHost.replaceChildren(renderPhaseGantt(phaseSpans(sprint.phases, sprint.lock_hours, s.summary.ended), { now: s.now }));
-    const move = yourMove(s.summary, sprint.phases, sprint.lock_hours, s.now);
+    ganttHost.replaceChildren(renderPhaseGantt(phaseSpans(sprint.phases, 0, s.summary.ended), { now: s.now }));
+    const move = yourMove(s.summary, sprint.phases, s.now);
     const card = el('div', 'spractice__card');
     card.append(el('b', '', 'Your move'), el('p', '', move.text));
     if (move.when) card.append(el('p', 'kit-why', move.when));
