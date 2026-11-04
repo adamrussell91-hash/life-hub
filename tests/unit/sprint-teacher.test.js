@@ -38,6 +38,61 @@ test('End class part freezes, locks and reports who was there; unlock frees one 
   await assert.rejects(teach(store, 'end_class', { phase: 'sketch' }), { code: 'not_class' });
 });
 
+test('Undo end reopens the class part: no lock, no freeze, auto-submitted work back to draft, handed-in work stays', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'open', { phase: 'understand' });
+  await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we a?'], star: '', stretch: '' } });
+  await teach(store, 'end_class', { phase: 'understand' });
+  const s = await teach(store, 'reopen_class', { phase: 'understand' });
+  assert.equal(s.lock, null);
+  assert.equal(s.class_parts.understand, 'open');
+  assert.equal(s.ended.understand, undefined);
+  assert.equal(s.groups[0].students.find((x) => x.initials === 'AB').phases.understand, 'draft');
+  assert.deepEqual(s.groups[0].open, ['understand']);
+  assert.equal(s.groups[0].question ?? null, null);
+  const me = await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we b?'], star: '', stretch: '' } });
+  assert.equal(me.lock, null);
+  const again = await teach(store, 'end_class', { phase: 'understand' });
+  assert.equal(again.class_parts.understand, 'ended');
+  assert.ok(again.lock);
+  await assert.rejects(teach(store, 'reopen_class', { phase: 'sketch' }), { code: 'not_class' });
+});
+
+test('a reopened class part stays open past its set end time until a new time is published', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const config = CONFIG();
+  config.phases[0] = { ...config.phases[0], ends_at: '2026-11-01T09:00' };
+  const store = storeFor(config);
+  setSprintClock(() => Date.parse('2026-11-01T00:30:00Z'));
+  const ended = await teach(store, 'summary');
+  assert.equal(ended.class_parts.understand, 'ended');
+  const open = await teach(store, 'reopen_class', { phase: 'understand' });
+  assert.equal(open.class_parts.understand, 'open');
+  assert.equal((await teach(store, 'summary')).class_parts.understand, 'open');
+  const next = CONFIG();
+  next.phases[0] = { ...next.phases[0], ends_at: '2026-11-01T10:00' };
+  await storeSprintConfig(store, 'sp1', next);
+  setSprintClock(() => Date.parse('2026-11-01T00:30:00Z'));
+  assert.equal((await teach(store, 'summary')).class_parts.understand, 'ended');
+});
+
+test('Open the sprint now ends the lock, keeps the part ended and opens the next phase', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'open', { phase: 'understand' });
+  await teach(store, 'end_class', { phase: 'understand' });
+  const s = await teach(store, 'lift_lock');
+  assert.equal(s.lock, null);
+  assert.equal(s.class_parts.understand, 'ended');
+  assert.deepEqual(s.groups[0].open, ['understand', 'sketch']);
+  const me = await act(store, 1, 'open', { phase: 'understand' });
+  assert.equal(me.lock, null);
+  assert.equal(me.phases.find((p) => p.key === 'understand').frozen, true);
+});
+
 test('extend moves a deadline for one group only', async () => {
   setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
   const store = storeFor();

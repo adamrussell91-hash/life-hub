@@ -64,6 +64,18 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     confirmHost.replaceChildren(box);
   }
 
+  function confirmReopen(key: SprintPhaseKey): void {
+    const box = el('div', 'smap-confirm');
+    const ul = el('ul');
+    ul.append(
+      el('li', '', `Students can work on ${PHASE_LABELS[key]} again, and the lock from it goes`),
+      el('li', '', 'Work submitted when you ended it goes back to draft; work students handed in stays in'),
+      el('li', '', 'The groups’ choice from this step is made again when it next ends')
+    );
+    box.append(el('strong', '', `Undo ending ${PHASE_LABELS[key]}?`), ul, button('Undo end', 'primary', () => { confirmHost.replaceChildren(); void run(o.api.reopenClass(key)); }), button('Not yet', 'secondary', () => confirmHost.replaceChildren()));
+    confirmHost.replaceChildren(box);
+  }
+
   function extendForm(): void {
     if (!summary) return;
     const box = el('div', 'smap-confirm');
@@ -152,7 +164,7 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       who.append(el('option', '', 'Unlock one student…'));
       for (const st of s.groups.flatMap((g) => g.students)) { const op = el('option', '', `${st.initials} · ${st.name}`); op.value = st.id; who.append(op); }
       who.addEventListener('change', () => { if (who.value) void run(o.api.unlock(who.value)); });
-      notice.append(el('span', 'pill pill--wait', `Locked until ${until}`), who);
+      notice.append(el('span', 'pill pill--wait', `Locked until ${until}`), button('Open the sprint now', 'secondary', () => void run(o.api.liftLock())), who);
     }
     if (sprint) {
       // Class deadlines after any class-wide extension, as the students see them.
@@ -175,7 +187,7 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
         end.dataset.end = key;
         h.append(end);
       }
-      if (s.class_parts[key] === 'ended') h.append(el('span', 'smap-due', 'Class part ended'));
+      if (s.class_parts[key] === 'ended') h.append(el('span', 'smap-due', 'Class part ended'), button('Undo end', 'ghost', () => confirmReopen(key)));
       header.append(h);
     }
     grid.append(header);

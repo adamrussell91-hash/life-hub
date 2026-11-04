@@ -194,11 +194,63 @@ export async function endClassPart(store, lessonId, config, phase, at) {
     if (changed) await store.setJSON(k.group(g.id), state);
   }
   const next = {
+    ...rec,
     ended: { ...rec.ended, [phase]: { at: iso(at), present } },
     lock: config.lock_hours > 0 ? { phase, until: iso(at + config.lock_hours * 3600000), unlocked: [] } : null
   };
   await store.setJSON(k.lock, next);
   return next;
+}
+
+/**
+ * Take back End class part: the phase is open again and its lock goes.
+ * Work submitted only because the part ended goes back to draft; work students
+ * handed in themselves stays in. A group's choice that rested on the ending is
+ * settled again when the phase next closes. The phase's set end time won't end
+ * it a second time unless a new time is published.
+ */
+export async function reopenClassPart(store, lessonId, config, phase) {
+  const k = sprintKeys(lessonId);
+  const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
+  const ended = rec.ended[phase];
+  if (!ended) return rec;
+  for (const g of config.groups) {
+    const state = await groupState(store, k, g.id);
+    let inList = list(state.in?.[phase]);
+    for (const s of g.students) {
+      if (!ended.present.includes(s)) continue;
+      const owner = ownerOf(config.class_id, s);
+      const sub = await read(store, k.sub(owner, phase));
+      if (!sub?.frozen) continue;
+      const { frozen: _frozen, ...open } = sub;
+      if (sub.submitted_at === ended.at) {
+        delete open.submitted_at;
+        delete open.late;
+        inList = inList.filter((x) => x !== s);
+      }
+      await store.setJSON(k.sub(owner, phase), open);
+    }
+    let next = { ...state, in: { ...state.in, [phase]: inList } };
+    if (!phaseDone(config, await read(store, k.extend) ?? {}, g, next, { ended: {} }, phase, clock())) {
+      if (phase === 'understand') {
+        next = { ...next, question: null, awaiting: next.awaiting?.kind === 'question' ? null : next.awaiting };
+      }
+      if (phase === 'decide') {
+        next = { ...next, votes_closed_at: null, chosen: null, awaiting: next.awaiting?.kind === 'idea' ? null : next.awaiting };
+      }
+    }
+    await store.setJSON(k.group(g.id), next);
+  }
+  const { [phase]: _gone, ...stillEnded } = rec.ended;
+  const endsAt = config.phases.find((p) => p.key === phase)?.ends_at ?? '';
+  const out = {
+    ...rec,
+    ended: stillEnded,
+    lock: rec.lock?.phase === phase ? null : rec.lock,
+    reopened: { ...(rec.reopened ?? {}), [phase]: endsAt }
+  };
+  await store.setJSON(k.lock, out);
+  return out;
 }
 
 /** Class parts whose end time has passed end on their own, as if End class part was pressed then. */
@@ -207,6 +259,7 @@ export async function endDueClassParts(store, lessonId, config) {
   let rec = { ...emptyLock(), ...((await read(store, sprintKeys(lessonId).lock)) ?? {}) };
   for (const p of config.phases) {
     if (p.where !== 'class' || rec.ended[p.key]) continue;
+    if (rec.reopened?.[p.key] === (p.ends_at ?? '')) continue;
     const at = endsAtEpoch(p.ends_at ?? '');
     if (at !== null && at <= now) rec = await endClassPart(store, lessonId, config, p.key, at);
   }
@@ -830,7 +883,7 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
 // Names show here only; anything put up for students goes through stage, nameless.
 // ---------------------------------------------------------------------------
 
-const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer'];
+const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'reopen_class', 'lift_lock', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer'];
 
 async function teacherContext(store, lessonId) {
   const { config } = await loadSprint(store, lessonId);
@@ -947,6 +1000,14 @@ export async function sprintTeacherAction(store, lessonId, body) {
     const p = config.phases.find((x) => x.key === body.phase);
     if (!p || p.where !== 'class') reject(400, 'not_class', 'Only class phases have a class part to end.');
     await endClassPart(store, lessonId, config, p.key, now);
+  }
+  if (action === 'reopen_class') {
+    if (!config.phases.some((x) => x.key === body.phase && x.where === 'class')) reject(400, 'not_class', 'Only class phases have a class part to reopen.');
+    await reopenClassPart(store, lessonId, config, body.phase);
+  }
+  if (action === 'lift_lock') {
+    const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
+    if (rec.lock) await store.setJSON(k.lock, { ...rec, lock: null });
   }
   if (action === 'unlock') {
     const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };

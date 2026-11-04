@@ -184,6 +184,10 @@ export type SprintTeacherApi = {
   summary(): Promise<SprintSummary>;
   board(groupId: string): Promise<GroupBoard>;
   endClass(phase: SprintPhaseKey): Promise<SprintSummary>;
+  /** Take back End class part: the phase reopens, its lock goes, auto-submitted work returns to draft. */
+  reopenClass(phase: SprintPhaseKey): Promise<SprintSummary>;
+  /** End the class lock now; the class part stays ended and the next phase opens. */
+  liftLock(): Promise<SprintSummary>;
   unlock(studentId: string): Promise<SprintSummary>;
   extend(input: { scope: 'class' | 'group' | 'student'; id?: string; phase: SprintPhaseKey; due_date: string; due_time: string }): Promise<SprintSummary>;
   confirm(groupId: string, kind: 'question' | 'idea', id: string): Promise<SprintSummary>;
@@ -205,6 +209,8 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
     summary: () => call('summary'),
     board: (groupId) => call<GroupBoard>('board', { group_id: groupId }),
     endClass: (phase) => call('end_class', { phase }),
+    reopenClass: (phase) => call('reopen_class', { phase }),
+    liftLock: () => call('lift_lock'),
     unlock: (studentId) => call('unlock', { student_id: studentId }),
     extend: (input) => call('extend', input),
     confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
@@ -280,6 +286,10 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         summary: () => call('summary'),
         board: (groupId) => call<GroupBoard>('board', { group_id: groupId }),
         endClass: (phase) => call('end_class', { phase }),
+        reopenClass: (phase) => call('reopen_class', { phase }),
+        liftLock: () => call('lift_lock'),
+    reopenClass: (phase) => call('reopen_class', { phase }),
+    liftLock: () => call('lift_lock'),
         unlock: (studentId) => call('unlock', { student_id: studentId }),
         extend: (input) => call('extend', input),
         confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
