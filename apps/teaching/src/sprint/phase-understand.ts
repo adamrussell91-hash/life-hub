@@ -9,10 +9,10 @@ import type { SprintStatus, UnderstandGroup } from './api';
 const STEP_TITLES: Record<UnderstandStep, string> = {
   spot: 'Spot: what stands out in the brief?',
   audience: 'Audience: who is this for?',
-  dig: 'Dig: what is the real problem?',
-  say: 'Say it: the problem in your own words',
+  dig: 'Dig: what does it really have to do?',
+  say: 'Say it: your focus in your own words',
   limits: 'Limits: what can you control, and what do you know?',
-  vote: 'Vote: which problem should your group take on?',
+  vote: 'Vote: which focus should your group take on?',
   merge: 'Together: one audience',
   grid: 'Together: our limits',
   ask: 'Ask: what does the expert need to answer?',
@@ -51,7 +51,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   const off = !ctx.editable;
 
   const root = el('div', 'sprint-understand');
-  root.append(el('h2', '', 'Understand the problem'));
+  root.append(el('h2', '', 'Understand the challenge'));
   if (ctx.sprint.phases[0]!.instruction) root.append(el('p', '', ctx.sprint.phases[0]!.instruction));
   const bar = submitBar(ctx, 'understand', () => state, () => understandProblems(state, steps, (status.notes ?? []).length).map((text) => {
     // Each check starts with its step's name ("Spot:", "Say it:"), so it can point there.
@@ -118,7 +118,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     const paint = () => {
       list.replaceChildren();
       state.dig.forEach((v, i) => {
-        list.append(frameField({ label: i === 0 ? 'What is the problem on the surface?' : `Why ${i}: why is that a problem?`, value: v, max: 300, rows: 2, support: ctx.support, disabled: off, onInput: (x) => { state.dig[i] = x; changed(); } }));
+        list.append(frameField({ label: i === 0 ? 'What does the challenge ask for on the surface?' : `Why ${i}: why does that matter?`, value: v, max: 300, rows: 2, support: ctx.support, disabled: off, onInput: (x) => { state.dig[i] = x; changed(); } }));
       });
       if (!off && state.dig.length < MAX_DIG) list.append(button('Ask why again', 'secondary', () => { state.dig.push(''); paint(); changed(); }));
     };
@@ -127,7 +127,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   }
 
   function say(box: HTMLElement): void {
-    box.append(frameField({ label: 'The problem, in 1–2 sentences', value: state.say, max: 400, starter: '[Who] needs ___ because ___.', support: ctx.support, disabled: off, onInput: (v) => { state.say = v; changed(); } }));
+    box.append(frameField({ label: 'What we are designing for, in 1–2 sentences', value: state.say, max: 400, starter: '[Who] needs ___ so that ___.', support: ctx.support, disabled: off, onInput: (v) => { state.say = v; changed(); } }));
     if (steps.vote) box.append(el('p', 'sprint-note', 'It goes up to your group’s space without your name.'));
   }
 
@@ -149,7 +149,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
         head.append(el('h4', '', meta.title));
         const more = el('div', 'su-box__more');
         more.hidden = true;
-        more.append(el('p', '', meta.more.what), el('p', '', meta.more.tell), el('strong', '', 'Examples (made-up canteen problem)'));
+        more.append(el('p', '', meta.more.what), el('p', '', meta.more.tell), el('strong', '', 'Examples (made-up canteen challenge)'));
         const ul = el('ul');
         for (const x of meta.more.examples) ul.append(el('li', '', x));
         more.append(ul);
@@ -255,7 +255,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
       agreed.append(el('span', 'su-agreed__tag', 'Not chosen yet'), el('span', '', 'Choose below, then press Save. Whatever is saved here is what your group designs for in Sketch.'));
     }
     box.append(
-      el('p', 'sprint-note', 'In Audience, each of you wrote who the problem is for. Your group now needs one answer, so you all design for the same people. Anyone in the group can save, and the last save is the one that counts.'),
+      el('p', 'sprint-note', 'In Audience, each of you wrote who this is for. Your group now needs one answer, so you all design for the same people. Anyone in the group can save, and the last save is the one that counts.'),
       agreed
     );
     const field = (label: string, hint: string, key: 'who' | 'why', options: UnderstandGroup['who']) => {

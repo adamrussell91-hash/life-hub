@@ -353,7 +353,10 @@ export function coach(guide: Guide, lead?: string): HTMLElement {
     panels.append(body);
   };
   add('why', 'Why this step', (b) => b.append(el('p', '', guide.why)));
-  add('example', 'See an example', (b) => { for (const l of guide.example) b.append(el('p', '', l)); });
+  add('example', 'See an example', (b) => {
+    if (guide.scenario) b.append(el('p', 'coach__scenario', guide.scenario));
+    for (const l of guide.example) b.append(el('p', '', l));
+  });
   add('stuck', 'I’m stuck', (b) => { const ul = el('ul'); for (const l of guide.stuck) ul.append(el('li', '', l)); b.append(ul); });
   box.append(line, help, panels);
   return box;

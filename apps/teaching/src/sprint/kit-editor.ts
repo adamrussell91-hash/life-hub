@@ -37,7 +37,7 @@ export function evenGroups(students: ReadonlyArray<{ id: string }>, n: number): 
 
 /** One line on each phase, at the top of its tab. */
 const PHASE_SUMMARY: Record<SprintPhaseKey, string> = {
-  understand: 'Students work out the problem before designing anything: alone first (spot, audience, dig, say it, limits), then together in their group’s space (vote on the problem, one audience, our limits, questions for you, your answers).',
+  understand: 'Students work out what they are designing for before anything else: alone first (spot, audience, dig, say it, limits), then together in their group’s space (vote on the focus, one audience, our limits, questions for you, your answers).',
   sketch: 'Alone, at home: the group brief, inspiration to borrow from, rapid ideas against a timer, then their best ideas starred and developed into cards for the group.',
   decide: 'In class: each member’s strongest idea goes head to head, two at a time, with no names. Students pick the winner of each pair and what it is stronger in, and see their own 1st, 2nd and 3rd. The most wins across the group picks the idea; then the group writes the parts, gives each one out by initials and picks an assembler.',
   prototype: 'At home: each student builds their part; everyone sees the group’s parts as they come in; the assembler puts them together and uploads the finished prototype.',
@@ -156,7 +156,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     root.append(intro);
 
     if (key === 'understand') {
-      const und = card('Understand steps', 'How students work out the problem: alone first, then together. Untick a step to leave it out.', 'understand');
+      const und = card('Understand steps', 'How students work out what they are designing for: alone first, then together. Untick a step to leave it out.', 'understand');
       const u = cur.understand ?? defaultUnderstand();
       und.append(selectOf([['slides', 'One step at a time (slides), in every phase'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }, true), 'Step layout for every phase'));
       for (const [title, keys] of [['Alone, on their own computer', UNDERSTAND_ALONE], ['Together, in the group’s space', UNDERSTAND_GROUP]] as const) {
@@ -181,6 +181,23 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
         selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Each puts forward ${n} ${n === 1 ? 'idea' : 'ideas'}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }, true), 'Ideas each student puts forward'),
         selectOf([0, 3, 5, 8, 10, 15].map((n) => [String(n), n ? `Rapid ideas: ${n} minute timer` : 'Rapid ideas: no timer']), String(cur.sketch_timer ?? 8), (v) => put((d) => { d.sketch_timer = Number(v); }, true), 'Rapid ideas timer')
       );
+      const kindOf = (d: SprintSettings) => (d.idea_kind ??= { one: '', many: '', judge: '', examples: { inspiration: [], rapid: [], pick: [], develop: [] } });
+      const kind = cur.idea_kind;
+      const ideaCard = card('What one idea is', 'Say what students are writing in this sprint, so nobody has to guess. Their Sketch headings and examples use your words.', 'idea_guide');
+      if (!kind?.one?.trim()) ideaCard.append(el('p', 'kit-warn', 'Not filled in yet. Students will see made-up canteen examples and the word “ideas”.'));
+      ideaCard.append(
+        el('label', 'kit-label', 'One idea is…'), text(kind?.one ?? '', 120, (v) => put((d) => { kindOf(d).one = v; }), 'One idea is'),
+        el('label', 'kit-label', 'Several of them are called (for headings)'), text(kind?.many ?? '', 60, (v) => put((d) => { kindOf(d).many = v; }), 'Several of them are called'),
+        el('label', 'kit-label', 'They judge ideas with'), text(kind?.judge ?? '', 240, (v) => put((d) => { kindOf(d).judge = v; }), 'They judge ideas with')
+      );
+      for (const [step, label] of [['inspiration', 'Example for Inspiration'], ['rapid', 'Examples for Rapid ideas (the first shows before the timer)'], ['pick', 'Example for Pick'], ['develop', 'Example for Develop']] as const) {
+        const box = el('textarea', 'qz-input');
+        box.rows = 3;
+        box.value = (kind?.examples?.[step] ?? []).join('\n');
+        box.setAttribute('aria-label', `${label}, one line each`);
+        box.addEventListener('input', () => put((d) => { kindOf(d).examples[step] = box.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 4); }));
+        ideaCard.append(el('label', 'kit-label', `${label}, one line each`), box);
+      }
       const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.', 'idea_guide');
       const lines = el('textarea', 'qz-input');
       lines.rows = 5;
@@ -227,9 +244,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
 
     if (view !== 'kit') { paintPhase(view, cur); return; }
 
-    const settings = card('Settings', 'Who chooses each group’s problem and idea, and how much scaffolding shows. Each phase’s own settings are on its tab.', 'settings');
+    const settings = card('Settings', 'Who chooses each group’s focus and idea, and how much scaffolding shows. Each phase’s own settings are on its tab.', 'settings');
     settings.append(
-      selectOf([['top_vote', 'Students choose by vote: the most-starred problem and the idea with the most wins go through (ties come to you)'], ['teacher', 'I approve each group’s problem and idea (suits junior classes)']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }, true), 'Who chooses'),
+      selectOf([['top_vote', 'Students choose by vote: the most-starred focus and the idea with the most wins go through (ties come to you)'], ['teacher', 'I approve each group’s focus and idea (suits junior classes)']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }, true), 'Who chooses'),
       selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level')
     );
 

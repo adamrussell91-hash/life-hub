@@ -11,7 +11,7 @@ import { SPRINT_PHASES, PHASE_LABELS, defaultUnderstand, type SprintPhaseKey, ty
  */
 
 export const DEFAULT_CHECKLIST = [
-  'It answers our group question.',
+  'It fits our group’s focus.',
   'It meets the criteria.',
   'It uses evidence from what we’ve studied, and names the source, text or quote.',
   'Our group could build it before the deadline.',
@@ -27,7 +27,7 @@ export const DEFAULT_MODEL = {
 export const DEFAULT_REFLECTION_CRITERION = 'Explains what the test showed and what to change next';
 export const DEFAULT_REFLECTION_PROMPTS = ['What did the feedback show your idea does well?', 'What would you change next, and why?'];
 
-export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It solves our problem for the audience because…', evidence: 'The evidence it uses is…' };
+export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It fits our focus and audience because…', evidence: 'The evidence it uses is…' };
 /** Pitch feedback: a one-line hint and sentence beginnings a student can tap in. */
 export const FEEDBACK_STARTERS = {
   worked: {
@@ -53,6 +53,7 @@ export function newSprintSettings(classId: string): SprintSettings {
     reflection_prompts: [...DEFAULT_REFLECTION_PROMPTS],
     requirements: [],
     idea_guide: { checklist: [...DEFAULT_CHECKLIST], model: { ...DEFAULT_MODEL, notes: [...DEFAULT_MODEL.notes] } },
+    idea_kind: { one: '', many: '', judge: '', examples: { inspiration: [], rapid: [], pick: [], develop: [] } },
     phases: SPRINT_PHASES.map((key) => ({
       key,
       where: WHERE[key],

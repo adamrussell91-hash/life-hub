@@ -72,7 +72,7 @@ describe('decide form', () => {
     expect(wait).toContain('your teacher confirms the idea');
     expect(wait).toContain('give each part to someone by their initials');
     const held = mountDecide(ctx(base({ awaiting: { kind: 'question' } })));
-    expect(held.el.querySelector('.sdd-wait')!.textContent).toContain('still has to confirm your group’s problem');
+    expect(held.el.querySelector('.sdd-wait')!.textContent).toContain('still has to confirm your group’s focus');
   });
 
   it('after voting, while the teacher confirms, shows the parts step locked with what opens it', () => {

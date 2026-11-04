@@ -39,3 +39,9 @@ test('publish problems stop an unfinished sprint on the server', async () => {
   assert.ok(sprintPublishProblems({ ...draft, sprint: { ...draft.sprint, groups: [] } }).includes('Put every student in a group.'));
   assert.ok(sprintPublishProblems({ ...draft, sprint: { ...draft.sprint, criteria: [draft.sprint.criteria[0]] } }).includes('Add at least 2 criteria in the Kit.'));
 });
+
+test('what one idea is goes out with the published sprint', () => {
+  const kind = { one: 'a kind of test question', many: 'kinds of test question', judge: '', examples: { inspiration: [], rapid: [], pick: [], develop: [] } };
+  const { snapshot } = prepareSprintPublish({ ...draft, sprint: { ...draft.sprint, idea_kind: kind } }, draft.blocks ?? []);
+  assert.deepEqual(snapshot.sprint.idea_kind, kind);
+});

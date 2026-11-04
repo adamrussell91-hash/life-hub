@@ -17,7 +17,7 @@ function badge(g: MapGroup, key: SprintPhaseKey): string {
   const a = g.awaiting;
   if (key === 'understand' && g.asked) return `${g.asked} ${g.asked === 1 ? 'question' : 'questions'} to answer`;
   if (!a) return '';
-  if (a.kind === 'question' && key === 'understand') return a.empty ? 'No problems in' : a.tie ? 'Tie: choose problem' : 'Choose problem';
+  if (a.kind === 'question' && key === 'understand') return a.empty ? 'No focus in' : a.tie ? 'Tie: choose focus' : 'Choose focus';
   if (a.kind === 'idea' && key === 'decide') return a.empty ? 'No ideas in' : a.tie ? 'Tie: choose idea' : 'Choose idea';
   return '';
 }
@@ -159,7 +159,7 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       box.append(el('strong', '', 'Waiting on you'));
       for (const g of waits) {
         const what = g.awaiting!.kind === 'question'
-          ? `choose the group’s problem. Decide can’t pick an idea until you do.`
+          ? `choose the group’s focus. Decide can’t pick an idea until you do.`
           : 'choose the group’s idea, so they can plan the parts.';
         box.append(button(`${g.name}: ${what}`, 'secondary', () => openBoard(g.id)));
       }

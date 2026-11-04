@@ -18,15 +18,15 @@ import { sprintParts } from './model';
 const FORMS: Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm> = { understand: mountUnderstand, sketch: mountSketch, decide: mountDecide, prototype: mountPrototype, test: mountTest };
 
 const row = (key: SprintPhaseKey) => ({ key, open: true, due_date: '', due_time: '', state: 'none' as const, late: false, frozen: false, closed: false, count_in: 1 });
-const brief = { limits: { can_known: [{ text: 'What we make', count: 3 }, { text: 'Class time', count: 2 }], cant_known: [{ text: 'The deadline', count: 3 }] }, problem: 'Our audience needs a clear way in, because the real problem sits under the brief.', audience: { who: 'The people the brief names', why: 'They need it to work for them.' }, answers: [{ question: 'What does a strong one look like?', answer: 'Your answer to the group shows here.' }] };
-const idea = (id: string, title: string, text: string) => ({ id, title, idea: text, answers: 'It solves the problem for the audience because it meets them where they are.', evidence: 'It uses what the class has studied.', file: null, strongest: false });
+const brief = { limits: { can_known: [{ text: 'What we make', count: 3 }, { text: 'Class time', count: 2 }], cant_known: [{ text: 'The deadline', count: 3 }] }, problem: 'Our audience needs a clear way in, so that the design does its job.', audience: { who: 'The people the brief names', why: 'They need it to work for them.' }, answers: [{ question: 'What does a strong one look like?', answer: 'Your answer to the group shows here.' }] };
+const idea = (id: string, title: string, text: string) => ({ id, title, idea: text, answers: 'It fits the focus and audience because it meets them where they are.', evidence: 'It uses what the class has studied.', file: null, strongest: false });
 const members = [{ key: 'm1', initials: 'You', me: true }, { key: 'm2', initials: 'CD', me: false }, { key: 'm3', initials: 'EF', me: false }];
 
 export function sampleStatus(key: SprintPhaseKey, sprint: PublicSprint): SprintStatus {
   const base: SprintStatus = { identity: { need: null, initials: 'AB' }, group: { id: 'g', name: 'Sample group', size: 3, mates: ['CD', 'EF'] }, mine: {}, brief, members };
   if (key === 'understand') return {
     ...base,
-    notes: [{ id: 'n1', text: 'A sample problem statement from one student.', mine: true }, { id: 'n2', text: 'Another student’s problem statement, without their name.', mine: false }],
+    notes: [{ id: 'n1', text: 'A sample focus from one student.', mine: true }, { id: 'n2', text: 'Another student’s focus, without their name.', mine: false }],
     understand_group: {
       who: [{ text: 'The people the brief names', count: 2 }, { text: 'Their teachers', count: 1 }], why: [{ text: 'They need it to work for them', count: 2 }], audience: null,
       limits: { can_known: [{ text: 'What we make', count: 3 }], cant_known: [{ text: 'The deadline', count: 3 }], can_unknown: [{ text: 'How long each part takes', count: 2 }], cant_unknown: [{ text: 'What the audience already knows', count: 2 }] },

@@ -1237,6 +1237,21 @@ var IdeaGuideSchema = z9.object({
   }),
   pair: z9.object({ developing: text(400), strong: text(400), note: text(200) }).optional()
 });
+var exampleLines = z9.array(text(240)).max(4).default([]);
+var IdeaKindSchema = z9.object({
+  /** "One idea is…": "a kind of viva question, with one sample". */
+  one: text(120).default(""),
+  /** The plural used in headings: "kinds of viva question". */
+  many: text(60).default(""),
+  /** What ideas get judged with, shown before the timer starts. */
+  judge: text(240).default(""),
+  examples: z9.object({
+    inspiration: exampleLines,
+    rapid: exampleLines,
+    pick: exampleLines,
+    develop: exampleLines
+  }).prefault({})
+});
 var SprintPhaseSchema = z9.object({
   key: SprintPhaseKeySchema,
   where: z9.enum(["class", "home"]),
@@ -1276,6 +1291,7 @@ var SprintSettingsSchema = z9.object({
   reflection_prompts: z9.array(text(200)).max(2).default([]),
   requirements: z9.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements).default([]),
   idea_guide: IdeaGuideSchema,
+  idea_kind: IdeaKindSchema.optional(),
   phases: z9.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z9.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
   understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
@@ -1294,6 +1310,7 @@ var PublicSprintSchema = z9.object({
   reflection_prompts: z9.array(z9.string().max(200)).max(2),
   requirements: z9.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
+  idea_kind: IdeaKindSchema.optional(),
   phases: z9.array(SprintPhaseSchema).length(5),
   understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   sketch_timer: z9.number().int().min(0).max(30).default(8),

@@ -131,7 +131,7 @@ function duelArena(ctx: FormContext, state: PhasePayload['decide'], pool: Galler
       c.append(el('span', 'sprint-idea__tag', label.get(id)!), el('strong', 'sdd-idea__title', i.title));
       const part = (name: string, text: string | undefined) => { if (!text?.trim()) return; const p = el('p', 'sdd-idea__part'); p.append(el('b', '', name), ' ', text); c.append(p); };
       part('The idea:', i.idea);
-      part('How it solves the problem:', i.answers);
+      part('How it fits our focus:', i.answers);
       part('The evidence:', i.evidence);
       if (i.file) c.append(button('Open the picture or PDF', 'ghost', async () => window.open(await ctx.client.fileUrl(i.file!), '_blank', 'noopener')));
       const pick = el('button', 'sdd-win', won ? '✓ This one wins' : 'This one wins');
@@ -174,7 +174,7 @@ function duelArena(ctx: FormContext, state: PhasePayload['decide'], pool: Galler
       note.disabled = !ctx.editable;
       note.addEventListener('input', () => { d!.why = note.value; changed(); });
       why.append(chips, note);
-    } else why.append(el('p', 'sprint-note', 'Which one better solves your group’s problem for your audience? Tap “This one wins” on it.'));
+    } else why.append(el('p', 'sprint-note', 'Which one better fits your group’s focus and audience? Tap “This one wins” on it.'));
     const nav = el('div', 'sdd-nav');
     const back = button('← Back', 'ghost', () => { at -= 1; paint(); });
     back.disabled = at === 0;
@@ -241,7 +241,7 @@ function waiting(s: SprintStatus, meDone: boolean): HTMLElement {
   const box = el('section', 'sdd-wait');
   box.append(el('h4', '', 'What happens next'));
   if (s.awaiting?.kind === 'question') {
-    box.append(el('p', '', 'Your teacher still has to confirm your group’s problem. Your picks are saved, and nothing else is needed from you for now.'));
+    box.append(el('p', '', 'Your teacher still has to confirm your group’s focus. Your picks are saved, and nothing else is needed from you for now.'));
     return box;
   }
   const members = s.members ?? [];
