@@ -1034,3 +1034,37 @@ test('a live round fills the option counts, with or without a republish after it
     assert.deepEqual(results.questions.find(q => q.id === 'qa').picks, { [optionId(store, 'qa', 'Metaphor')]: 1 }, `republish ${republish}`);
   }
 });
+
+test('Results shows what the class answered on every question kind', async () => {
+  const blocks = [
+    qBlock('tf', { kind: 'true_false', prompt: 'True?', marks: 1, answer: true }),
+    qBlock('gap', { kind: 'fill_gap', prompt: 'Fill the gap.', marks: 1, passage: 'The long road is [[hot]] today.' }),
+    qBlock('mat', { kind: 'matching', prompt: 'Match.', marks: 2, pairs: [{ id: 'p1', left: 'Sun', right: 'Hot' }, { id: 'p2', left: 'Snow', right: 'Cold' }] }),
+    qBlock('ord', { kind: 'ordering', prompt: 'Order.', marks: 2, items: [{ id: 'i1', text: 'First' }, { id: 'i2', text: 'Second' }, { id: 'i3', text: 'Third' }] }),
+    qBlock('wr', sa)
+  ];
+  const store = baseStore({ quizSettings: { attempts: 3 }, quizBlocks: blocks });
+  await publishQuiz(store);
+  const { version } = store.data.get('quiz/quiz1/current');
+  const q = store.data.get(`quiz/quiz1/keys/${version}`).questions;
+  const gapId = q.gap.question.parts.find(p => p.type === 'gap').id;
+  const id = (list, text) => list.find(x => x.text === text).id;
+  const sun = id(q.mat.question.left, 'Sun');
+  const responses = {
+    tf: { value: true },
+    gap: { gaps: { [gapId]: 'Warm' } },
+    mat: { map: { [sun]: id(q.mat.question.right, 'Hot') } },
+    ord: { order: [id(q.ord.question.items, 'Second'), id(q.ord.question.items, 'First'), id(q.ord.question.items, 'Third')] },
+    wr: { text: 'Romeo' }
+  };
+  await quizAction(store, 'quiz1', { token: token(1), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'submit', responses });
+  const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  const answers = Object.fromEntries(results.questions.map(x => [x.id, x.answers]));
+  assert.deepEqual(answers.tf.groups, [{ label: '', rows: [{ text: 'True', n: 1, right: true }] }]);
+  assert.deepEqual(answers.gap.groups, [{ label: 'Gap 1: …The long road is ___', rows: [{ text: 'Warm', n: 1, right: false }] }]);
+  assert.deepEqual(answers.mat.groups, [{ label: 'Sun', rows: [{ text: 'Hot', n: 1, right: true }] }]);
+  assert.deepEqual(answers.ord.groups.map(g => [g.label, g.rows[0].text, g.rows[0].right]), [['Position 1', 'Second', false], ['Position 2', 'First', false], ['Position 3', 'Third', true]]);
+  assert.equal(answers.wr.written[0].text, 'Romeo');
+  assert.deepEqual(answers.wr.written[0].awarded, 1);
+});
