@@ -5,6 +5,7 @@
  *
  *   hinge/{lesson}/{block}/active                       round state (teacher writes only)
  *   hinge/{lesson}/{block}/{session}/answers/{device}   { pick, at }, changeable while open
+ *   hinge/{lesson}/{block}/{session}/answered           { owners } who has answered, readable at once
  *
  * The right answer, the misconception notes and the move-on / reteach marks
  * never reach students: publish strips them (teaching-student.mjs), and this
@@ -25,7 +26,7 @@ import { randomBytes } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
-import { listBlobKeys } from './blobs-list.mjs';
+import { addToRoster, rosterOwners } from './live-roster.mjs';
 import { deviceHash, validToken, walkBlocks } from './question-drop.mjs';
 import { backupForBlock, cleanBackupDraft, hingeBackupSource } from './hinge-backup.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
@@ -131,7 +132,8 @@ function keys(lesson, block, session) {
     base,
     active: `${base}/active`,
     answer: (device) => `${base}/${session}/answers/${device}`,
-    answers: `${base}/${session}/answers/`
+    answers: `${base}/${session}/answers/`,
+    answered: `${base}/${session}/answered`
   };
 }
 
@@ -143,8 +145,9 @@ function isOpen(activity, now = Date.now()) {
 }
 
 async function tally(store, k, options) {
-  const list = await listBlobKeys(store, k.answers);
-  const answers = (await Promise.all(list.map((key) => read(store, key)))).filter(Boolean);
+  // By name, not by listing: a listing can hide fresh answers for up to a minute.
+  const owners = await rosterOwners(store, k.answered, k.answers);
+  const answers = (await Promise.all(owners.map((owner) => read(store, k.answer(owner))))).filter(Boolean);
   const known = new Set(options.map((o) => o.id));
   const picks = Object.fromEntries(options.map((o) => [o.id, 0]));
   for (const a of answers) if (known.has(a.pick)) picks[a.pick] += 1;
@@ -213,6 +216,7 @@ async function studentAction(store, k, activity, s, body) {
     if (body.session !== activity.session) reject(409, 'new_session', 'Your teacher asked again. Answer this one.');
     if (!s.options.some((o) => o.id === body.pick)) reject(400, 'bad_pick', 'Choose one of the answers.');
     await store.setJSON(answerKey, { pick: body.pick, at: new Date().toISOString() });
+    await addToRoster(store, k.answered, deviceHash(body.token));
   }
   const mine = (await read(store, answerKey))?.pick ?? null;
   return { ...shared, mine, ...(activity.revealed ? { correct_id: s.correct_id } : {}) };
@@ -320,6 +324,7 @@ async function independentAnswer(store, lesson, block, body, { draft, published,
     const done = right || !backup;
     record = { first, stuck: !right && done, done, at: now };
     await store.setJSON(key, record);
+    await addToRoster(store, `hinge/${lesson}/${block}/independent-answered`, deviceHash(body.token));
   } else if (body.action === 'independent_retry' || body.action === 'independent_skip') {
     if (!record?.first) reject(409, 'not_answered', 'Answer the first question first.');
     if (record.done || record.first.tier === 'right' || !backup) reject(409, 'finished', 'You\u2019ve finished this one.');
@@ -338,8 +343,8 @@ async function independentAnswer(store, lesson, block, body, { draft, published,
 async function independentReport(store, lesson, block, { draft, published }) {
   const main = setup(draft, published, 'main');
   const prefix = `hinge/${lesson}/${block}/independent/`;
-  const list = await listBlobKeys(store, prefix);
-  const records = (await Promise.all(list.map(async (key) => ({ id: key.slice(prefix.length), record: await read(store, key) })))).filter((r) => r.record?.first);
+  const owners = await rosterOwners(store, `hinge/${lesson}/${block}/independent-answered`, prefix);
+  const records = (await Promise.all(owners.map(async (id) => ({ id, record: await read(store, `${prefix}${id}`) })))).filter((r) => r.record?.first);
   records.sort((a, b) => String(a.record.at).localeCompare(String(b.record.at)));
   const tiers = { right: 0, close: 0, mixup: 0 };
   const retry = { tried: 0, right: 0 };

@@ -1,6 +1,7 @@
 import { apiPost } from '@/api/client';
 import { errorText } from '@/quiz/dom';
 import { formatCode, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
+import { createLiveClock, createLiveSwarm, liveControls, liveSignature, setLiveClock } from '@/quiz/live-show';
 import type { QuizSubject } from './checkpoint';
 
 /**
@@ -77,7 +78,7 @@ export function quizSubject(l: LiveQuiz | null, next: () => void): QuizSubject |
   return { key: `${l.session}:${l.index}`, pct, moveOnMark: mark, sub, talk, wrongLetter: wrong?.letter ?? null, next };
 }
 
-export function mountQuizLive(lessonId: string, onChange: () => void): QuizLiveHandle {
+export function mountQuizLive(lessonId: string, onChange: () => void, board: { press(): void; refit(): void } = { press() {}, refit() {} }): QuizLiveHandle {
   const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/quiz`;
   const root = el('div', 'fv-quiz-live');
   const body = el('div', 'fv-quiz-live__body');
@@ -92,13 +93,20 @@ export function mountQuizLive(lessonId: string, onChange: () => void): QuizLiveH
   let busy = false;
   let timer = 0;
   let painted = '';
+  const show = { clock: createLiveClock(), swarm: createLiveSwarm() };
+  /** Bumped by each move: a poll sent before it is out of date, so it can't put the old question back. */
+  let moves = 0;
 
-  async function act(action: string): Promise<void> {
+  async function act(action: string, fields: Record<string, unknown> = {}): Promise<void> {
     if (busy && action === 'live_status') return;
     busy = true;
+    if (action !== 'live_status') moves += 1;
+    const sentAt = moves;
     try {
-      live = (await apiPost<{ live: LiveQuiz | null }>(endpoint, { action })).live;
-      if (live?.phase === 'done') live = null;
+      const reply = (await apiPost<{ live: LiveQuiz | null }>(endpoint, { action, ...fields })).live;
+      if (sentAt !== moves) return;
+      live = reply?.phase === 'done' ? null : reply;
+      setLiveClock(show.clock, live);
       loaded = true;
       alert.hidden = true;
     } catch (error) {
@@ -126,9 +134,11 @@ export function mountQuizLive(lessonId: string, onChange: () => void): QuizLiveH
   }
 
   function paint(): void {
-    const sig = JSON.stringify([loaded, live]);
+    const sig = JSON.stringify([loaded, liveSignature(live)]);
     if (sig === painted) return;
     painted = sig;
+    // The new content can be a different height, and the big button has to stay on the board.
+    board.refit();
     if (!loaded) {
       body.replaceChildren(el('p', 'qz-note block-secondary', 'Loading the live quiz…'));
       return;
@@ -144,27 +154,25 @@ export function mountQuizLive(lessonId: string, onChange: () => void): QuizLiveH
       );
       return;
     }
-    const end = el('button', 'btn btn--ghost', 'End live quiz');
-    end.type = 'button';
-    end.addEventListener('click', () => {
-      if (window.confirm('End the live quiz?')) void act('live_end');
+    const controls = liveControls(live, {
+      move: () => board.press(),
+      back: () => void act('live_back'),
+      end: () => {
+        if (window.confirm('End the live quiz?')) void act('live_end');
+      },
+      act: (action, fields) => void act(action, fields)
     });
     if (live.phase === 'lobby') {
       body.replaceChildren(
         el('p', 'fv-quiz-live__label', 'Open the quiz and type this code'),
         el('p', 'fv-quiz-live__code', formatCode(live.code)),
         el('p', 'fv-quiz-live__label', `${live.joined} joined`),
-        hint('Press → for the first question.'),
-        end
+        controls,
+        hint('Or press → on the keyboard.')
       );
       return;
     }
-    const last = live.index + 1 >= live.total;
-    body.replaceChildren(
-      renderLiveStage(live, false),
-      hint(live.phase === 'question' ? 'Press → to reveal the answer.' : last ? 'Press → to finish the quiz.' : 'Press → for the next question.'),
-      end
-    );
+    body.replaceChildren(renderLiveStage(live, false, show), controls, hint('Or press → on the keyboard.'));
   }
 
   paint();

@@ -1466,10 +1466,10 @@
   inset: 0;
   z-index: 1000;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto;
   justify-items: center;
   gap: var(--space-4);
-  padding: var(--space-8) var(--space-4);
+  padding: var(--space-6) var(--space-4);
   overflow-y: auto;
   background: var(--cotton);
 }
@@ -1517,6 +1517,284 @@
 
 .qz-live__stage--board .qz-bars__row {
   font-size: clamp(var(--text-base), 2.2vw, var(--text-xl));
+}
+
+/* ── Live: the tally, the clock, the shapes, the big button ─────────── */
+
+.qz-live__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.qz-live-tally {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--ink);
+}
+
+.qz-live-tally__n {
+  display: inline-block;
+  font-size: 2.75rem;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  animation: qz-live-tally-pop 0.35s ease-out;
+}
+
+.qz-live__stage--board .qz-live-tally__n {
+  font-size: clamp(3rem, 7vw, 5.5rem);
+}
+
+.qz-live__stage--board .qz-clock__time {
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+}
+
+.qz-live-tally__of {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.qz-live-tally[data-state='all'] .qz-live-tally__n,
+.qz-live-tally[data-state='all'] .qz-live-tally__of {
+  color: var(--success);
+}
+
+@keyframes qz-live-tally-pop {
+  from {
+    transform: scale(1.5);
+  }
+}
+
+.qz-clock {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 7.5rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--cotton);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.qz-clock[hidden] {
+  display: none;
+}
+
+.qz-clock__time {
+  font-size: 1.75rem;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.qz-clock__bar {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.qz-clock__fill {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: inherit;
+  transition: width 0.25s linear;
+}
+
+.qz-clock[data-state='low'],
+.qz-clock[data-state='up'] {
+  background: var(--warning-surface);
+}
+
+.qz-clock[data-state='low'] .qz-clock__time,
+.qz-clock[data-state='up'] .qz-clock__time {
+  color: var(--warning);
+}
+
+.qz-clock[data-state='low'] .qz-clock__fill {
+  background: var(--warning);
+}
+
+.qz-clock[data-state='done'] .qz-clock__time {
+  color: var(--success);
+}
+
+.qz-clock[data-state='done'] .qz-clock__bar,
+.qz-clock[data-state='up'] .qz-clock__bar {
+  display: none;
+}
+
+/* On a phone the clock stays in sight while a long question scrolls. */
+.qz-live-student,
+.qz-quiz__live > .qz-clock {
+  margin-bottom: var(--space-3);
+}
+
+.qz-quiz__live > .qz-clock {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.qz-swarm {
+  position: relative;
+  height: 9rem;
+  background: var(--cotton);
+  border-radius: var(--radius-md);
+}
+
+.qz-live__stage--board .qz-swarm {
+  height: 22vh;
+  min-height: 8rem;
+}
+
+.qz-shape {
+  --shape-size: 2.25rem;
+  display: block;
+  width: var(--shape-size);
+  height: var(--shape-size);
+  background: var(--shape-colour, var(--ink));
+}
+
+.qz-live__stage--board .qz-shape {
+  --shape-size: 3.5rem;
+}
+
+.qz-shape[data-colour='0'] { --shape-colour: #e4572e; }
+.qz-shape[data-colour='1'] { --shape-colour: #2e86ab; }
+.qz-shape[data-colour='2'] { --shape-colour: #f2a900; }
+.qz-shape[data-colour='3'] { --shape-colour: #3a9d6e; }
+.qz-shape[data-colour='4'] { --shape-colour: #8e5bc2; }
+.qz-shape[data-colour='5'] { --shape-colour: #d6457f; }
+.qz-shape[data-colour='6'] { --shape-colour: #1f9e9e; }
+.qz-shape[data-colour='7'] { --shape-colour: #5b6bd6; }
+
+.qz-shape[data-shape='circle'] { border-radius: 50%; }
+.qz-shape[data-shape='square'] { border-radius: 18%; }
+.qz-shape[data-shape='triangle'] { clip-path: polygon(50% 4%, 98% 94%, 2% 94%); }
+.qz-shape[data-shape='diamond'] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.qz-shape[data-shape='hexagon'] { clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); }
+.qz-shape[data-shape='star'] { clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 60%, 81% 98%, 50% 76%, 19% 98%, 29% 60%, 0 38%, 37% 35%); }
+
+.qz-swarm__shape {
+  position: absolute;
+  margin: calc(var(--shape-size) / -2) 0 0 calc(var(--shape-size) / -2);
+  z-index: 5;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.qz-swarm__shape[data-result='wrong'] {
+  opacity: 0.22;
+  transform: scale(0.7);
+}
+
+.qz-swarm__shape[data-result='right'] {
+  transform: scale(1.15);
+}
+
+.qz-my-shape {
+  --shape-size: 3.5rem;
+  margin: var(--space-2) auto;
+}
+
+.qz-my-shape--sent {
+  animation: qz-shape-sent 0.9s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+@keyframes qz-shape-sent {
+  from {
+    transform: translateY(2rem) scale(0.6);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-1.25rem) rotate(25deg) scale(1.15);
+    opacity: 1;
+  }
+}
+
+.qz-live-moves {
+  display: grid;
+  gap: var(--space-3);
+  justify-self: stretch;
+}
+
+.qz-live-moves__go {
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.qz-live-moves__go[data-ready='true'] {
+  background: var(--success);
+  border-color: var(--success);
+  animation: qz-go-ready 1.2s ease-in-out infinite;
+}
+
+@keyframes qz-go-ready {
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--success) 30%, transparent);
+  }
+}
+
+.qz-live-moves__small {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.qz-live-times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.qz-live-times__label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.qz-live-times__chip {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.qz-live-times__chip[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qz-live-tally__n,
+  .qz-my-shape--sent,
+  .qz-live-moves__go[data-ready='true'] {
+    animation: none;
+  }
+
+  .qz-clock__fill,
+  .qz-swarm__shape {
+    transition: none;
+  }
 }
 
 /* ── Phone ─────────────────────────────────────────────────────────── */

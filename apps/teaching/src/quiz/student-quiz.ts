@@ -5,6 +5,7 @@ import { hasAnswer, QUIZ_KIND_INFO, WRITTEN_KINDS, type MarkResult, type PublicQ
 import { mountQuestionPlayer, seededShuffle, type PlayerOptions } from '@/quiz/player';
 import { stepsLoader, type StepFor, type StepPick } from '@/student/next-step';
 import type { WritingWatch } from '@/quiz/writing-watch';
+import { createLiveClock, shapeEl } from '@/quiz/live-show';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
 import { isTeacherPreview } from '@/quiz/teacher-preview';
@@ -74,6 +75,10 @@ type LiveView = {
   index: number;
   total: number;
   joined: boolean;
+  /** This student's shape for the round. */
+  badge?: string;
+  /** Milliseconds left on the question; null when no clock is running. */
+  ends_in?: number | null;
   question?: PublicQuestion;
   answered?: boolean;
   response?: QuizResponse | null;
@@ -1036,6 +1041,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   let livePainted = '';
   let liveResponse: QuizResponse | null = null;
   let liveTimer: number | undefined;
+  const liveClock = createLiveClock();
 
   async function pollLive(): Promise<void> {
     if (!token || preview) return;
@@ -1056,6 +1062,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
 
   function paintLive(): void {
     const l = liveState;
+    // The clock runs on its own, so a new time never repaints what they're typing.
+    liveClock.set(l?.joined && l.phase === 'question' ? l.ends_in : null);
     const signature = JSON.stringify(l ? [l.session, l.phase, l.index, l.joined, l.answered, !!l.mark] : null);
     if (signature === livePainted) return;
     livePainted = signature;
@@ -1097,7 +1105,9 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       row.append(input, join);
       box.append(el('p', 'qz-note', 'Type the code on the board.'), row);
     } else if (l.phase === 'lobby' || !l.question) {
-      box.append(el('p', 'qz-panel__title', 'You’re in.'), el('p', 'qz-note', 'The first question will appear here.'));
+      box.append(el('p', 'qz-panel__title', 'You’re in.'));
+      if (l.badge) box.append(shapeEl(l.badge, 'qz-my-shape'), el('p', 'qz-note', 'This is your shape. Watch for it on the board when you answer.'));
+      box.append(el('p', 'qz-note', 'The first question will appear here.'));
     } else {
       const q = l.question;
       box.append(el('p', 'qz-player__meta', `Live · Question ${l.index + 1} of ${l.total}`));
@@ -1131,10 +1141,13 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
             paintLive();
           })
         );
-      } else if (!revealed) box.append(el('p', 'qz-note', 'Answer sent. Wait for your teacher to show the answer.'));
+      } else if (!revealed) {
+        if (l.badge) box.append(shapeEl(l.badge, 'qz-my-shape qz-my-shape--sent'));
+        box.append(el('p', 'qz-note', 'Answer sent. Find your shape on the board.'));
+      }
       else if (!l.answered) box.append(el('p', 'qz-note', 'You didn’t answer this one.'));
     }
-    liveHost.replaceChildren(box);
+    liveHost.replaceChildren(liveClock.root, box);
   }
 
   function scheduleLive(): void {

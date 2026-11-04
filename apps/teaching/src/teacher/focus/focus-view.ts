@@ -31,6 +31,10 @@ export interface FocusControllerOptions {
 }
 
 export interface FocusController {
+  /** The same move as the forward arrow, for a button on the step. */
+  next(): void;
+  /** A step's content changed size: fit it to the board again. */
+  refit(): void;
   /** Hand over freshly rendered steps (first load and every Refresh), with the lesson's blocks for the tools. */
   setSteps(steps: FocusStepView[], pageBlocks: Block[]): void;
   /** A live quiz round changed: re-check the checkpoint cue. */
@@ -367,6 +371,9 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
   setMode(mode);
 
   return {
+    /** The same move as the forward arrow, for a button on the step. */
+    next: goNext,
+    refit: scheduleFit,
     setSteps(fresh, blocks) {
       for (const step of steps) if (!fresh.includes(step)) step.live?.dispose();
       steps = fresh;

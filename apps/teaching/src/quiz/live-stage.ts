@@ -1,6 +1,7 @@
 import { QUIZ_KIND_INFO, type PublicQuestion, type QuestionKey } from '@/quiz/core';
 import { el } from '@/quiz/dom';
 import { spanText } from '@/quiz/word-picker';
+import { everyoneIn, setLiveClock, type LiveClock, type LiveSwarm } from '@/quiz/live-show';
 
 /**
  * The live quiz round as the class sees it: the question, the answer count,
@@ -18,6 +19,12 @@ export type LiveQuiz = {
   joined: number;
   /** The teacher's move-on mark (% right) for focus view's checkpoint. */
   move_on?: number;
+  /** Seconds each question runs; 0 is no timer. */
+  seconds?: number;
+  /** Milliseconds left on the running question; null when no clock is running. */
+  ends_in?: number | null;
+  /** One anonymous shape per answer, in the order they came in. `right` only once revealed and marked. */
+  shapes?: Array<{ id: string; right?: boolean }>;
   question?: PublicQuestion;
   key?: QuestionKey;
   answered?: number;
@@ -27,7 +34,9 @@ export type LiveQuiz = {
   written?: string[];
 };
 
-export function renderLiveStage(l: LiveQuiz, big: boolean): HTMLElement {
+export type LiveStageShow = { clock: LiveClock; swarm: LiveSwarm };
+
+export function renderLiveStage(l: LiveQuiz, big: boolean, show?: LiveStageShow): HTMLElement {
   const stage = el('div', `qz-live__stage${big ? ' qz-live__stage--board' : ''}`);
   if (l.phase === 'lobby' || !l.question) {
     stage.append(el('p', 'qz-note block-secondary', 'Waiting for students to join. Start the first question when everyone’s in.'));
@@ -46,7 +55,18 @@ export function renderLiveStage(l: LiveQuiz, big: boolean): HTMLElement {
     stage.append(img);
   }
   const answered = l.answered ?? 0;
-  stage.append(el('p', 'qz-live__count', `${answered} of ${l.joined} answered`));
+  if (show) {
+    const all = everyoneIn(l);
+    const tally = el('div', 'qz-live-tally');
+    if (all) tally.dataset.state = 'all';
+    const number = el('span', 'qz-live-tally__n', String(answered));
+    tally.append(number, el('span', 'qz-live-tally__of', all ? `of ${l.joined}. Everyone’s in!` : `of ${l.joined} answered`));
+    setLiveClock(show.clock, l);
+    const top = el('div', 'qz-live__top');
+    top.append(tally, show.clock.root);
+    stage.append(top, show.swarm.root);
+    show.swarm.update(l);
+  } else stage.append(el('p', 'qz-live__count', `${answered} of ${l.joined} answered`));
   const picks = l.picks ?? {};
   const picksTotal = Object.values(picks).reduce((a, b) => a + b, 0);
   const right = l.key?.answer.type === 'choice' ? new Set(l.key.answer.ids) : new Set<string>();

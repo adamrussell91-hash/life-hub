@@ -36,11 +36,12 @@
  * keeps a hash of it. Attempts are counted by that hash, or by the student once initials are claimed.
  */
 import { markWalkthruDirty } from './walkthru-dirty.mjs';
-import { randomBytes, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
+import { addToRoster, rosterOwners } from './live-roster.mjs';
 import { claimFor, claimInitials, classesForLesson, loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, listSubmissions, read, reject, reviewSubmission, validToken, walkBlocks } from './question-drop.mjs';
 import {
@@ -69,8 +70,11 @@ export { QuizError };
 
 const GRACE_MS = 60_000;
 const LIVE_HOURS = 6;
-const ROSTER_TRIES = 12;
-const STRONG_JSON = { type: 'json', consistency: 'strong' };
+/** Seconds a live question runs unless the teacher or the quiz's settings say otherwise. */
+const LIVE_DEFAULT_SECONDS = 30;
+const LIVE_MAX_SECONDS = 600;
+const LIVE_EXTRA_MS = 15_000;
+const WRITTEN_TIME_FACTOR = 3;
 const cryptoRandom = () => randomInt(0, 2 ** 31) / 2 ** 31;
 
 const keys = (lesson) => ({
@@ -1580,35 +1584,18 @@ async function liveState(store, k) {
 const liveFinished = (live, now = Date.now()) =>
   live.phase === 'done' || live.expires <= now || (live.phase === 'reveal' && live.index + 1 >= live.order.length);
 
-/**
- * Puts a student on the round's roster. A listing can miss a fresh write for up
- * to a minute, long enough to hide a whole question, so the teacher's screen
- * reads the roster instead. Never in the way of a student: a roster that misses
- * them is corrected when they answer, and the listing catches up regardless.
- */
-async function addToRoster(store, k, session, owner) {
-  const key = k.roster(session);
-  try {
-    for (let attempt = 0; attempt < ROSTER_TRIES; attempt += 1) {
-      const row = await store.getWithMetadata(key, STRONG_JSON);
-      const owners = row?.data?.owners ?? [];
-      if (owners.includes(owner)) return;
-      const written = await store.setJSON(key, { owners: [...owners, owner] }, row ? { onlyIfMatch: row.etag } : { onlyIfNew: true });
-      if (written?.modified) return;
-      // A classmate joined at the same moment: wait a beat and add to their version.
-      await new Promise((resolve) => setTimeout(resolve, Math.random() * 60 * (attempt + 1)));
-    }
-    console.warn('live roster busy', session);
-  } catch (error) {
-    console.warn('live roster write failed', error);
-  }
+/** A student's shape for this round. Stable within the round, and it says nothing about who they are. */
+const liveBadge = (session, owner) => createHash('sha256').update(`${session}:${owner}`).digest('hex').slice(0, 8);
+
+/** How long a question runs. Written answers take longer than a pick. */
+function liveQuestionMs(live, entry) {
+  const seconds = Number(live.seconds) || 0;
+  if (!seconds) return 0;
+  return (entry?.key?.answer?.type === 'manual' ? Math.min(seconds * WRITTEN_TIME_FACTOR, LIVE_MAX_SECONDS) : seconds) * 1000;
 }
 
-/** Everyone in the round: the roster, plus anyone only the listing knows about. */
-async function livePlayers(store, k, session) {
-  const [roster, keys] = await Promise.all([read(store, k.roster(session)), listBlobKeys(store, k.players(session))]);
-  return [...new Set([...(roster?.owners ?? []), ...keys.map((key) => key.slice(key.lastIndexOf('/') + 1))])];
-}
+/** Milliseconds left on the running question, counted here so every device agrees. */
+const liveEndsIn = (live, now = Date.now()) => (live.phase === 'question' && live.closes_at ? Math.max(0, live.closes_at - now) : null);
 
 /**
  * Turns a live round's answers into ordinary handed-in attempts, one per
@@ -1620,7 +1607,7 @@ async function livePlayers(store, k, session) {
 async function foldLiveRound(store, k, lessonId, record, live) {
   if (await read(store, k.liveFolded(live.session))) return;
   const rec = await recordFor(store, lessonId, live.version, record);
-  const owners = await livePlayers(store, k, live.session);
+  const owners = await rosterOwners(store, k.roster(live.session), k.players(live.session));
   let changed = false;
   await mapBounded(owners, 8, async (owner) => {
     const player = await read(store, k.player(live.session, owner));
@@ -1658,7 +1645,7 @@ async function foldFinishedLive(store, k, lessonId, record) {
 }
 
 async function liveTeacher(store, lessonId, body, action) {
-  if (!['live_status', 'live_start', 'live_next', 'live_reveal', 'live_end', 'live_back'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['live_status', 'live_start', 'live_next', 'live_reveal', 'live_end', 'live_back', 'live_time', 'live_extra'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   let loaded;
   try {
     loaded = await loadQuiz(store, lessonId);
@@ -1682,32 +1669,45 @@ async function liveTeacher(store, lessonId, body, action) {
       index: -1,
       order: record.order,
       version: record.version,
+      seconds: record.settings?.question_seconds ?? LIVE_DEFAULT_SECONDS,
       expires: Date.now() + LIVE_HOURS * 3600_000
     };
   } else if (action === 'live_end' && live) {
     live = { ...live, phase: 'done', expires: 0 };
   } else if (live && action === 'live_next') {
-    live = live.index + 1 >= live.order.length ? { ...live, phase: 'done' } : { ...live, phase: 'question', index: live.index + 1, question_at: new Date().toISOString() };
+    if (live.index + 1 >= live.order.length) live = { ...live, phase: 'done', closes_at: null };
+    else {
+      const ms = liveQuestionMs(live, (await recordFor(store, lessonId, live.version, record)).questions[live.order[live.index + 1]]);
+      live = { ...live, phase: 'question', index: live.index + 1, question_at: new Date().toISOString(), closes_at: ms ? Date.now() + ms : null };
+    }
   } else if (live && action === 'live_back' && live.index > 0) {
-    live = { ...live, phase: 'reveal', index: live.index - 1 };
+    live = { ...live, phase: 'reveal', index: live.index - 1, closes_at: null };
   } else if (live && action === 'live_reveal' && live.phase === 'question') {
-    live = { ...live, phase: 'reveal' };
+    live = { ...live, phase: 'reveal', closes_at: null };
+  } else if (live && action === 'live_time') {
+    const seconds = Number(body.seconds);
+    if (!Number.isInteger(seconds) || seconds < 0 || seconds > LIVE_MAX_SECONDS) reject(400, 'bad_time', 'Choose a time for each question.');
+    live = { ...live, seconds };
+  } else if (live && action === 'live_extra' && live.phase === 'question') {
+    live = { ...live, closes_at: Math.max(live.closes_at ?? 0, Date.now()) + LIVE_EXTRA_MS };
   }
   if (action !== 'live_status' && live) await store.setJSON(k.live, live);
   if (action !== 'live_status') await foldFinishedLive(store, k, lessonId, record);
   if (!live || live.expires < Date.now()) return { live: null };
 
   const rec = await recordFor(store, lessonId, live.version, record);
-  const players = await livePlayers(store, k, live.session);
+  const players = await rosterOwners(store, k.roster(live.session), k.players(live.session));
   const joined = players.length;
   // The teacher's own move-on mark for focus view's checkpoint; never sent to students.
   const moveOn = Number.isInteger(record.settings?.move_on) ? record.settings.move_on : 80;
-  const out = { session: live.session, code: live.code, phase: live.phase, index: live.index, total: live.order.length, joined, move_on: moveOn };
+  const out = { session: live.session, code: live.code, phase: live.phase, index: live.index, total: live.order.length, joined, move_on: moveOn, seconds: Number(live.seconds) || 0 };
   if (live.index < 0 || live.phase === 'lobby') return { live: out };
   const id = live.order[live.index];
   const entry = rec.questions[id];
   // By name, not by listing: a listing would hide this question's answers until it caught up.
-  const answers = (await mapBounded(players, 16, (owner) => read(store, k.answer(live.session, live.index, owner)))).filter(Boolean);
+  const given = await mapBounded(players, 16, async (owner) => ({ owner, answer: await read(store, k.answer(live.session, live.index, owner)) }));
+  const arrived = given.filter((g) => g.answer).sort((x, y) => String(x.answer.at).localeCompare(String(y.answer.at)));
+  const answers = arrived.map((g) => g.answer);
   const picks = {};
   let full = 0;
   let marked = 0;
@@ -1724,6 +1724,12 @@ async function liveTeacher(store, lessonId, body, action) {
       ...out,
       question: entry.question,
       key: shownKey(entry.key),
+      ends_in: liveEndsIn(live),
+      // Anonymous shapes in the order they came in; whether each was right only once it's revealed.
+      shapes: arrived.map(({ owner, answer }) => ({
+        id: liveBadge(live.session, owner),
+        ...(live.phase === 'reveal' && answer.mark?.score !== null && answer.mark?.score !== undefined ? { right: answer.mark.score >= answer.mark.max } : {})
+      })),
       answered: answers.length,
       right: full,
       marked,
@@ -1752,11 +1758,12 @@ async function liveStudent(store, lessonId, body, action) {
     needIdentity(who);
     if (String(body.code ?? '').replace(/\D/g, '') !== live.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     await store.setJSON(k.player(live.session, device), { joined_at: new Date().toISOString(), ...studentFields(who) }, { onlyIfNew: true });
-    await addToRoster(store, k, live.session, device);
+    await addToRoster(store, k.roster(live.session), device);
   }
   const joined = !!(await read(store, k.player(live.session, device)));
   if (!joined) return { live: { ...out, joined: false } };
-  if (live.index < 0 || live.phase === 'lobby') return { live: { ...out, joined: true } };
+  const badge = liveBadge(live.session, device);
+  if (live.index < 0 || live.phase === 'lobby') return { live: { ...out, joined: true, badge } };
 
   const rec = await recordFor(store, lessonId, live.version, record);
   const id = live.order[live.index];
@@ -1769,13 +1776,15 @@ async function liveStudent(store, lessonId, body, action) {
     if (!response || !hasAnswer(response)) reject(400, 'empty', 'Choose or write an answer first.');
     const mark = markResponse(entry.key, response);
     await store.setJSON(answerKey, { response, mark, at: new Date().toISOString() }, { onlyIfNew: true });
-    await addToRoster(store, k, live.session, device);
+    await addToRoster(store, k.roster(live.session), device);
   }
   const mine = await read(store, answerKey);
   return {
     live: {
       ...out,
       joined: true,
+      badge,
+      ends_in: liveEndsIn(live),
       question: entry.question,
       answered: !!mine,
       response: mine?.response ?? null,
