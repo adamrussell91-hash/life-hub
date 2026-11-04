@@ -41,6 +41,26 @@ describe('understand form', () => {
     expect(f.el.querySelector('.sprint-submit__go')?.textContent).toBe('Submit my Understand work');
   });
 
+  it('after a first try, shows one thing to do, folds the rest, and shrinks as they fix it', async () => {
+    const { submitBar } = await import('@/sprint/form-kit');
+    let left = ['Say who it is for.', 'Write the problem.', 'Star a statement.'];
+    const bar = submitBar(ctx(), 'understand', () => ({}) as never, () => left);
+    document.body.append(bar.el);
+    bar.el.querySelector<HTMLButtonElement>('.sprint-submit__go')!.click();
+    expect(bar.el.querySelector('h3')?.textContent).toBe('Nearly there: 3 things left');
+    expect(bar.el.querySelector('summary')?.textContent).toBe('2 more after that');
+    expect(bar.el.querySelector('details')?.open).toBe(false);
+    left = ['Star a statement.'];
+    bar.changed();
+    expect(bar.el.querySelector('h3')?.textContent).toBe('Nearly there: one thing left');
+    expect(bar.el.querySelector('details')).toBeNull();
+    left = [];
+    bar.changed();
+    expect(bar.el.querySelector('h3')?.textContent).toBe('Finished with Understand?');
+    bar.el.remove();
+    bar.dispose();
+  });
+
   it('down the page, shows every step that is switched on, and leaves out the rest', () => {
     const f = mountUnderstand(ctx({ sprint: withSteps('vertical', ['dig', 'grid']), blocks: brief }));
     expect(visible(f.el)).toEqual(['spot', 'audience', 'say', 'limits', 'vote', 'merge', 'ask', 'expert']);

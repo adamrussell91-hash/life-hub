@@ -133,10 +133,11 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   const ask = el('div', 'sprint-submit__ask');
   const head = el('h3', '');
   const lead = el('p', 'sprint-submit__lead');
-  const paintAsk = () => {
+  const paintAsk = (left = 0) => {
     later.hidden = submitted;
-    head.textContent = submitted ? 'Changed something?' : `Finished with ${name}?`;
-    lead.textContent = submitted ? 'Update your submission so your teacher sees the latest.' : 'Submitting tells your teacher it’s ready. We check it first and list anything to add.';
+    head.textContent = left > 1 ? `Nearly there: ${left} things left` : left ? 'Nearly there: one thing left' : submitted ? 'Changed something?' : `Finished with ${name}?`;
+    lead.hidden = left > 0;
+    lead.textContent = submitted ? 'Update your submission so your teacher sees the latest.' : 'Submitting tells your teacher it’s ready. We check it first and show you anything to add.';
   };
   const send = async (kind: 'save' | 'submit') => {
     if (busy || !ctx.editable) return;
@@ -163,7 +164,9 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   };
   const check = () => {
     const p = problems();
-    list.replaceChildren(...checkList(bar.closest<HTMLElement>('.sprint-form') ?? bar.parentElement, p));
+    const items = checkList(bar.closest<HTMLElement>('.sprint-form') ?? bar.parentElement, p);
+    list.replaceChildren(...foldChecks(items, !!list.querySelector('details')?.open));
+    paintAsk(items.length);
     return p;
   };
   const go = button(goLabel(), 'primary', () => {
@@ -180,6 +183,8 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     changed() {
       if (!ctx.editable) return;
       if (ctx.drafts) ctx.drafts[phase] = structuredClone(payload());
+      // A list already showing shrinks as they fix things.
+      if (list.childElementCount) check();
       window.clearTimeout(timer);
       timer = window.setTimeout(() => { timer = 0; void send('save'); }, 4000);
     },
@@ -219,6 +224,21 @@ function checkList(form: HTMLElement | null, problems: Problem[]): HTMLElement[]
     lastList.append(el('li', '', text));
   }
   return out;
+}
+
+/** One thing to do next; the rest wait behind a fold, so a first try never meets a wall of jobs. */
+function foldChecks(items: HTMLElement[], open: boolean): HTMLElement[] {
+  const [first, ...rest] = items;
+  if (!first) return [];
+  if (!rest.length) return [first];
+  const more = el('li', 'sprint-checks__more');
+  const fold = el('details');
+  fold.open = open;
+  const inner = el('ul', 'sprint-checks');
+  inner.append(...rest);
+  fold.append(el('summary', '', `${rest.length} more after that`), inner);
+  more.append(fold);
+  return [first, more];
 }
 
 /** Open a step card: its rail dot when the steps are slides, else scroll to it. */
