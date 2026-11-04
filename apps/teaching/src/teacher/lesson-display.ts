@@ -129,6 +129,17 @@ export function mountLessonDisplayView(
     hero.className = 'lesson-display__step lesson-display__step--hero';
     content.append(hero);
     renderPublishedLessonHero(hero, lesson);
+    // Focus shows the cover as a title page: the whole image over a blurred fill of itself.
+    hero.dataset.focusFill = 'true';
+    const cover = hero.querySelector<HTMLImageElement>('.entity-banner__image');
+    if (cover) {
+      const backdrop = document.createElement('img');
+      backdrop.className = 'lesson-display__cover-backdrop';
+      backdrop.src = cover.src;
+      backdrop.alt = '';
+      backdrop.setAttribute('aria-hidden', 'true');
+      cover.before(backdrop);
+    }
 
     examples = createTeacherClassExamples({ lessonId: lesson.lesson_id });
     const isQuiz = hasLiveQuiz(lesson);
