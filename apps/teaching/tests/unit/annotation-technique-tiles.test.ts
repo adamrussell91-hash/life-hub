@@ -73,10 +73,10 @@ describe('technique tiles', () => {
     expect(el.querySelector('[data-tile-for="ann_simile"]')!.getAttribute('aria-expanded')).toBe('true');
 
     // Tapping the phrase itself toggles the same card.
-    el.querySelector<HTMLButtonElement>('button.block-annotation__anchor[data-annotation-id="ann_simile"]')!.click();
+    el.querySelector<HTMLElement>('.block-annotation__anchor[data-annotation-id="ann_simile"]')!.click();
     expect(el.querySelector('[data-tile-card-for]')).toBeNull();
 
-    el.querySelector<HTMLButtonElement>('button.block-annotation__anchor[data-annotation-id="ann_allit"]')!.click();
+    el.querySelector<HTMLElement>('.block-annotation__anchor[data-annotation-id="ann_allit"]')!.click();
     expect(el.querySelector('[data-tile-card-for="ann_allit"]')).toBeTruthy();
     el.querySelector<HTMLButtonElement>('.block-annotation__tile-card-close')!.click();
     expect(el.querySelector('[data-tile-card-for]')).toBeNull();
@@ -93,7 +93,7 @@ describe('technique tiles', () => {
 
     toggle(again).click();
     expect(again.querySelector('.block-annotation__tile')).toBeNull();
-    again.querySelector<HTMLButtonElement>('button.block-annotation__anchor[data-annotation-id="ann_simile"]')!.click();
+    again.querySelector<HTMLElement>('.block-annotation__anchor[data-annotation-id="ann_simile"]')!.click();
     expect(again.querySelector('[data-tile-card-for]')).toBeNull();
   });
 });

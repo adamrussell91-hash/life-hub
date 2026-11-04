@@ -497,7 +497,7 @@ function poemSpots(
 ): TechniqueCardPoemSpot[] {
   return annotations
     .filter((ann) => ann.id !== openId && ann.technique?.id)
-    .filter((ann) => root.querySelector(`button[data-annotation-id="${CSS.escape(ann.id)}"]`))
+    .filter((ann) => root.querySelector(openableMark(ann.id)))
     .map((ann) => ({
       annotationId: ann.id,
       quote: (ann.anchor.quote?.exact ?? '').trim().slice(0, 60) || 'this line',
@@ -535,7 +535,7 @@ function fillBody(
           poemSpots: poemSpots(root, annotations, annotation.id),
           onOpenNote: (id) => {
             root
-              .querySelector<HTMLElement>(`button[data-annotation-id="${CSS.escape(id)}"]`)
+              .querySelector<HTMLElement>(openableMark(id))
               ?.click();
           }
         })
@@ -647,11 +647,17 @@ function openAnnotation(
   else panel.scrollIntoView?.({ block: 'nearest' });
 }
 
+/** A note's clickable mark: a span in the text, a button in the margin. */
+function openableMark(id: string): string {
+  const match = `[data-annotation-id="${CSS.escape(id)}"]`;
+  return `button${match}, [role="button"]${match}`;
+}
+
 function wrapAnchor(
   className: string,
   annotation: AnnotationItem,
   layer: AnnotationLayer | undefined,
-  onOpen: ((btn: HTMLButtonElement) => void) | null
+  onOpen: ((mark: HTMLElement) => void) | null
 ): HTMLElement {
   if (!onOpen) {
     const span = document.createElement('span');
@@ -659,17 +665,24 @@ function wrapAnchor(
     span.dataset.annotationId = annotation.id;
     return span;
   }
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = className;
-  btn.dataset.annotationId = annotation.id;
-  btn.setAttribute('aria-expanded', 'false');
-  btn.setAttribute(
+  // A span, because a button can't wrap with its line: a long mark would drop to a box of its own.
+  const mark = document.createElement('span');
+  mark.className = className;
+  mark.dataset.annotationId = annotation.id;
+  mark.setAttribute('role', 'button');
+  mark.tabIndex = 0;
+  mark.setAttribute('aria-expanded', 'false');
+  mark.setAttribute(
     'aria-label',
     layer ? `Annotation: ${layer.name}` : 'Annotation'
   );
-  btn.addEventListener('click', () => onOpen(btn));
-  return btn;
+  mark.addEventListener('click', () => onOpen(mark));
+  mark.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onOpen(mark);
+  });
+  return mark;
 }
 
 type LineMark = {
@@ -682,7 +695,7 @@ function renderLineText(
   line: AnnotationLineModel,
   marks: LineMark[],
   opens: (item: PlacedAnnotation) => boolean,
-  onOpen: (item: PlacedAnnotation, btn: HTMLButtonElement) => void
+  onOpen: (item: PlacedAnnotation, btn: HTMLElement) => void
 ): DocumentFragment {
   return renderFormattedLine(
     line,
@@ -1037,7 +1050,7 @@ function buildInteractiveView(
       .forEach((el) => {
         const on = el.dataset.annotationId === activeNoteId;
         el.classList.toggle('is-active', on);
-        if (el.tagName === 'BUTTON' && !el.classList.contains('is-open')) {
+        if (el.hasAttribute('aria-expanded') && !el.classList.contains('is-open')) {
           el.setAttribute('aria-expanded', on ? 'true' : 'false');
         }
       });
@@ -1064,7 +1077,7 @@ function buildInteractiveView(
     if (!activeNoteId || state.focusThreadId) return;
     const target = event.target as Element | null;
     if (!target?.closest('.block-annotation__poem')) return;
-    if (target.closest('button, a, input, textarea, select, summary, .block-annotation__panel')) return;
+    if (target.closest('button, a, input, textarea, select, summary, .block-annotation__anchor, .block-annotation__panel')) return;
     dismissNote();
   });
 
@@ -1281,7 +1294,7 @@ function buildInteractiveView(
     const fullCard = renderElementCard(tile.technique, table!, {
       poemSpots: poemSpots(root, content.annotations, ann.id),
       onOpenNote: (id) => {
-        root.querySelector<HTMLElement>(`button[data-annotation-id="${CSS.escape(id)}"]`)?.click();
+        root.querySelector<HTMLElement>(openableMark(id))?.click();
       }
     });
     return buildTileCard({
@@ -1505,7 +1518,7 @@ function buildInteractiveView(
       pushGrouped(markersByLine, `${marker.stanzaId}:${marker.lineId}`, marker);
     }
 
-    function openPlaced(item: PlacedAnnotation, btn: HTMLButtonElement): void {
+    function openPlaced(item: PlacedAnnotation, btn: HTMLElement): void {
       if (
         (item.annotation.also_anchors?.length ?? 0) > 0 &&
         state.focusThreadId !== item.annotation.id

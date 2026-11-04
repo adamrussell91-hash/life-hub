@@ -207,8 +207,8 @@ describe('annotation render + sanitise', () => {
   it('a plain note does not open a second window; clicking selects its margin note', async () => {
     const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
     document.body.append(el);
-    const word = el.querySelector<HTMLButtonElement>('[data-annotation-id="ann_word"]')!;
-    expect(word.tagName).toBe('BUTTON');
+    const word = el.querySelector<HTMLElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.getAttribute('role')).toBe('button');
     word.click();
     expect(el.querySelector<HTMLElement>('.block-annotation__panel')!.hidden).toBe(true);
     expect(el.querySelector<HTMLElement>('.block-annotation__sheet')!.hidden).toBe(true);
@@ -284,8 +284,8 @@ describe('annotation render + sanitise', () => {
       } as MediaQueryList;
     });
     const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
-    const word = el.querySelector<HTMLButtonElement>('[data-annotation-id="ann_word"]')!;
-    expect(word.tagName).toBe('BUTTON');
+    const word = el.querySelector<HTMLElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.getAttribute('role')).toBe('button');
     word.click();
     const sheet = el.querySelector<HTMLElement>('.block-annotation__sheet')!;
     expect(sheet.hidden).toBe(false);
