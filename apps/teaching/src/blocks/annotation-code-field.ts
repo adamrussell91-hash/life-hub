@@ -63,6 +63,12 @@ export function mountAnnotationCodeField(current: AnnotationCodeRef | undefined,
   }
 
   let codes: FeedbackCode[] = [];
+  // What the note holds now: the field stays mounted after a code is typed.
+  let live = current;
+  const save = (next: AnnotationCodeRef) => {
+    live = next;
+    onChange(next);
+  };
   const apply = (confirm: boolean) => {
     const typed = input.value.toUpperCase().replace(/[^A-Z]/g, '');
     input.value = typed;
@@ -73,7 +79,7 @@ export function mountAnnotationCodeField(current: AnnotationCodeRef | undefined,
     const result = resolveTyped(typed, codes, confirm);
     if (result.kind === 'match') {
       hint.textContent = `${codeText(result.code, box.checked)} · ${result.code.label}`;
-      if (confirm || current?.code !== result.code.code || current?.positive !== box.checked) onChange(codeRef(result.code, box.checked));
+      if (confirm || live?.code !== result.code.code || live?.positive !== box.checked) save(codeRef(result.code, box.checked));
     } else if (result.kind === 'partial') {
       hint.textContent = `${result.matches.map((c) => `${c.code} ${c.label}`).join(' · ')}. Press Enter for ${typed}.`;
     } else {
@@ -88,10 +94,11 @@ export function mountAnnotationCodeField(current: AnnotationCodeRef | undefined,
     }
   });
   box.addEventListener('change', () => {
-    if (current && codes.length) {
-      const code = codes.find((c) => c.id === current.id);
-      if (code) onChange(codeRef(code, box.checked));
+    if (!input.value) {
+      hint.textContent = box.checked ? 'Type a code to save this note as a strength.' : '';
+      return;
     }
+    apply(false);
   });
   void loadFeedbackCodes()
     .then((loaded) => {

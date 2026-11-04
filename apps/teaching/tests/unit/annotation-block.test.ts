@@ -1,3 +1,4 @@
+import { annotationCodeChip } from '@/blocks/annotation-code-field';
 import { describe, expect, it, vi } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, NEW_BLOCK_TYPES, BLOCK_GROUPS } from '@/blocks/create-block';
@@ -202,6 +203,24 @@ describe('annotation render + sanitise', () => {
     const sentence = 'Fleeting and insubstantial (ephemeral butterfly).';
     expect(marginNoteText(`<p>${sentence}</p>`)).toBe(sentence);
     expect(marginNoteText('<p>ignored</p>', 'Visual Imagery')).toBe('Visual Imagery');
+  });
+
+  it('a note ticked as a strength says so on its mark, in the key and on its chip', () => {
+    const fixture = structuredClone(dulceAnnotationFixture);
+    fixture.content.annotations = fixture.content.annotations.map((ann) =>
+      ann.id === 'ann_word'
+        ? { ...ann, code: { id: 'code_ev', code: 'EV', label: 'Evidence', descriptor: '', colour: 'blue' as const, positive: true } }
+        : ann
+    );
+    const el = renderAnnotationBlock(fixture, 'teacher');
+    document.body.append(el);
+    const word = el.querySelector<HTMLElement>('[data-annotation-id="ann_word"]')!;
+    expect(word.classList.contains('block-annotation__anchor--strength')).toBe(true);
+    expect(el.querySelector('.block-annotation__key')!.textContent).toContain('a strength');
+    el.remove();
+    const chip = annotationCodeChip({ id: 'code_ev', code: 'EV', label: 'Evidence', descriptor: '', colour: 'blue', positive: true });
+    expect(chip.textContent).toBe('EV+');
+    expect(chip.classList.contains('fc-chip--strength')).toBe(true);
   });
 
   it('a plain note does not open a second window; clicking selects its margin note', async () => {

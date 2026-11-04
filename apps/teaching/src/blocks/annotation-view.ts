@@ -707,7 +707,7 @@ function renderLineText(
         end: mark.end,
         wrap: () =>
           wrapAnchor(
-            `block-annotation__anchor block-annotation__anchor--${grainClass} block-annotation__anchor--${colour}`,
+            `block-annotation__anchor block-annotation__anchor--${grainClass} block-annotation__anchor--${colour}${mark.placed.annotation.code?.positive ? ' block-annotation__anchor--strength' : ''}`,
             mark.placed.annotation,
             mark.placed.layer,
             opens(mark.placed) ? (btn) => onOpen(mark.placed, btn) : null
@@ -1087,7 +1087,8 @@ function buildInteractiveView(
       if (technique) return marginNoteText(ann.body.html, technique.name);
     }
     const text = marginNoteText(ann.body.html);
-    if (ann.code) return text ? `${ann.code.code}${ann.code.positive ? '+' : ''} · ${text}` : `${ann.code.code}${ann.code.positive ? '+' : ''}`;
+    if (ann.code?.positive) return text ? `Strength ${ann.code.code}+ · ${text}` : `Strength ${ann.code.code}+`;
+    if (ann.code) return text ? `${ann.code.code} · ${text}` : ann.code.code;
     return text;
   }
 
@@ -1145,6 +1146,16 @@ function buildInteractiveView(
       ? 'Colour = technique family (key below). Click any mark to read its note.'
       : 'Colour = which tick-box layer it belongs to. Click any mark to read its note.';
     markKey.append(tail);
+    if (placed.some((item) => item.annotation.code?.positive)) {
+      const item = document.createElement('span');
+      item.className = 'block-annotation__key-item';
+      const swatch = document.createElement('span');
+      swatch.className = 'block-annotation__key-swatch block-annotation__key-swatch--strength';
+      swatch.setAttribute('aria-hidden', 'true');
+      swatch.textContent = '+';
+      item.append(swatch, 'Green + = a strength');
+      markKey.append(item);
+    }
   }
 
   function techniqueFamilyOf(ann: AnnotationItem) {
