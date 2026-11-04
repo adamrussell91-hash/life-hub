@@ -1,3 +1,4 @@
+import { answerTallyView, type AnswerTally } from '@/quiz/answer-tally-view';
 import { apiPost } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
@@ -116,6 +117,7 @@ type QuestionStats = {
   hinted: number;
   confidence: Record<'1' | '2' | '3', [number, number]>;
   picks: Record<string, number>;
+  answers?: AnswerTally;
 };
 type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[]; sets?: Array<{ id: string; name: string; questions: number }>; ai_waiting?: number };
 type Tab = 'tray' | 'settings' | 'results' | 'live';
@@ -930,6 +932,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const notes: string[] = [];
     if (q.pending) notes.push(`${q.pending} to mark`);
     if (q.hinted) notes.push(`${q.hinted} used the hint`);
+    if (q.total > q.answered) notes.push(`${q.total - q.answered} left it blank`);
     const sureWrong = q.confidence['3'][0] - q.confidence['3'][1];
     if (sureWrong > 0) notes.push(`${sureWrong} ${sureWrong === 1 ? 'was' : 'were'} sure but didn’t get full marks`);
     if (notes.length) box.append(el('p', 'qz-note block-secondary', notes.join(' · ')));
@@ -946,6 +949,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       }
       box.append(bars);
     }
+    const answers = answerTallyView(q.answers, meter);
+    if (answers) box.append(answers);
     return box.childElementCount ? box : null;
   }
 

@@ -2105,3 +2105,12 @@
 .qz-slot--preview {
   justify-items: stretch;
 }
+
+/* Results: what the class answered, for question kinds with no option list. */
+.qz-tally { display: grid; gap: var(--space-2, 8px); min-width: 0; }
+.qz-tally__label { margin: var(--space-2, 8px) 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--navy); overflow-wrap: anywhere; }
+.qz-tally__written { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2, 8px); }
+.qz-tally__answer { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: var(--space-2, 8px); align-items: baseline; }
+.qz-tally__who { font-weight: 600; font-size: var(--text-sm); }
+.qz-tally__text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.qz-tally__mark { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }

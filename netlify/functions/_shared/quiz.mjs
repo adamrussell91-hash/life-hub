@@ -57,6 +57,7 @@ import {
   summariseWriting
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
+import { emptyTally, finishTally, tallyAnswer } from './quiz-answer-tally.mjs';
 import { answerRungs, readRubricLedger } from './rubric.mjs';
 import { readFeedbackCodes } from './feedback-codes.mjs';
 import { cleanStepPick } from './next-steps.mjs';
@@ -1068,7 +1069,7 @@ export async function quizTeacherAction(store, lessonId, body) {
 
   // results
   const resultKeys = await listBlobKeys(store, `quiz/${lessonId}/results/`);
-  const stats = new Map([...record.order, ...Object.values(record.sets ?? {}).flatMap((s) => s.questions)].map((id) => [id, { answered: 0, total: 0, full: 0, pending: 0, hinted: 0, confidence: { 1: [0, 0], 2: [0, 0], 3: [0, 0] }, picks: {} }]));
+  const stats = new Map([...record.order, ...Object.values(record.sets ?? {}).flatMap((s) => s.questions)].map((id) => [id, { answered: 0, total: 0, full: 0, pending: 0, hinted: 0, confidence: { 1: [0, 0], 2: [0, 0], 3: [0, 0] }, picks: {}, answers: emptyTally() }]));
   const rows = [];
   const froms = new Map();
   let aiWaiting = 0;
@@ -1083,10 +1084,11 @@ export async function quizTeacherAction(store, lessonId, body) {
     const [teacherMarks, aiMarks] = await Promise.all([read(store, k.marks(device, n)), read(store, k.aiMarks(device, n))]);
     const scored = scoreAttempt(rec, result, teacherMarks, aiMarks);
     aiWaiting += scored.rows.filter(waitsForAi).length;
+    const who = await studentLabel(store, start, rosters);
     rows.push({
       id: attemptId(device, n),
       device: device.slice(0, 6),
-      student: await studentLabel(store, start, rosters),
+      student: who,
       n,
       go: n - froms.get(device),
       started_at: start.started_at,
@@ -1107,6 +1109,7 @@ export async function quizTeacherAction(store, lessonId, body) {
       if (r.awarded === null) s.pending += 1;
       else if (r.awarded >= r.mark.max) s.full += 1;
       if (r.hinted) s.hinted += 1;
+      tallyAnswer(s.answers, rec.questions[r.id], r, who);
       if (r.confidence) {
         s.confidence[r.confidence][0] += 1;
         if (r.awarded !== null && r.awarded >= r.mark.max) s.confidence[r.confidence][1] += 1;
@@ -1127,7 +1130,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     // Handed-in answers the AI can mark and hasn't yet: the AI mark button shows when this is above 0.
     ai_waiting: aiWaiting,
     sets: Object.entries(record.sets ?? {}).map(([id, s]) => ({ id, name: s.name, questions: s.questions.length })),
-    questions: record.order.map((id) => ({ id, question: record.questions[id].question, key: record.questions[id].key, ...stats.get(id) }))
+    questions: record.order.map((id) => { const s = stats.get(id); return { id, question: record.questions[id].question, key: record.questions[id].key, ...s, answers: finishTally(s.answers) }; })
   };
 }
 
