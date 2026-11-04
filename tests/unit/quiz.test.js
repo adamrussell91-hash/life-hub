@@ -25,13 +25,18 @@ const essay = { kind: 'extended_response', prompt: 'Explain the ending.', marks:
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
+  const etags = new Map();
   if (!data.has('classes/class0')) data.set('classes/class0', { id: 'class0', type: 'class', title: 'Open class', students: [] });
   return {
     data,
     async get(key) { return structuredClone(data.get(key) ?? null); },
+    async getWithMetadata(key) {
+      return data.has(key) ? { data: structuredClone(data.get(key)), etag: String(etags.get(key) ?? 0), metadata: {} } : null;
+    },
     async setJSON(key, value, options) {
       if (options?.onlyIfNew && data.has(key)) return { modified: false };
-      data.set(key, structuredClone(value)); return { modified: true };
+      if (options?.onlyIfMatch !== undefined && options.onlyIfMatch !== String(etags.get(key) ?? 0)) return { modified: false };
+      data.set(key, structuredClone(value)); etags.set(key, (etags.get(key) ?? 0) + 1); return { modified: true };
     },
     async delete(key) { data.delete(key); },
     async list({ prefix }) { return { blobs: [...data.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) }; }
@@ -303,6 +308,89 @@ test('live mode: join with the code, answer once, the teacher sees the spread, t
   await teacher({ action: 'live_next' });
   assert.equal((await teacher({ action: 'live_next' })).live.phase, 'done');
   assert.equal((await student({ ...a, action: 'live_status' })).live, null);
+});
+
+/** A live store whose listings are stuck, as a cached listing is in the minute after a write. */
+function staleListings(store) {
+  const list = store.list.bind(store);
+  store.list = async (options) => (options.prefix.includes('/live/') ? { blobs: [] } : list(options));
+  return store;
+}
+
+test('live mode: the teacher sees every answer at once, even while listings are stale', async () => {
+  const store = staleListings(baseStore());
+  const prepared = await publishQuiz(store);
+  const teacher = body => quizTeacherAction(store, 'quiz1', body);
+  const student = body => quizAction(store, 'quiz1', body);
+  const { code } = (await teacher({ action: 'live_start' })).live;
+  const [a, b, c] = [1, 2, 3].map(n => ({ token: token(n) }));
+  for (const who of [a, b, c]) await student({ ...who, action: 'live_join', code });
+  assert.equal((await teacher({ action: 'live_status' })).live.joined, 3);
+
+  const right = prepared.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;
+  const opening = (await teacher({ action: 'live_next' })).live;
+  assert.equal(opening.answered, 0);
+  await student({ ...a, action: 'live_answer', index: 0, response: { selected: [right] } });
+  assert.equal((await teacher({ action: 'live_status' })).live.answered, 1);
+  await student({ ...b, action: 'live_answer', index: 0, response: { selected: ['other'] } });
+  const spread = (await teacher({ action: 'live_status' })).live;
+  assert.equal(spread.answered, 2);
+  assert.equal(spread.joined, 3);
+  assert.equal(spread.picks[right], 1);
+  assert.equal(spread.right, 1);
+  assert.equal(spread.marked, 2);
+
+  await teacher({ action: 'live_reveal' });
+  const second = (await teacher({ action: 'live_next' })).live;
+  assert.equal(second.index, 1);
+  assert.equal(second.answered, 0);
+  await student({ ...c, action: 'live_answer', index: 1, response: { text: 'Romeo' } });
+  assert.equal((await teacher({ action: 'live_status' })).live.answered, 1);
+});
+
+test('live mode: a whole class joining at once is all counted', async () => {
+  const store = staleListings(baseStore());
+  await publishQuiz(store);
+  const { code } = (await quizTeacherAction(store, 'quiz1', { action: 'live_start' })).live;
+  await Promise.all(Array.from({ length: 17 }, (_, i) => quizAction(store, 'quiz1', { token: (i + 1).toString(16).padStart(48, '0'), action: 'live_join', code })));
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'live_status' })).live.joined, 17);
+});
+
+test('live mode: answering puts a student back on a roster that missed them', async () => {
+  const store = staleListings(baseStore());
+  const prepared = await publishQuiz(store);
+  const live = (await quizTeacherAction(store, 'quiz1', { action: 'live_start' })).live;
+  const who = { token: token(1) };
+  await quizAction(store, 'quiz1', { ...who, action: 'live_join', code: live.code });
+  await store.delete(`quiz/quiz1/live/${live.session}/roster`);
+  await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  const right = prepared.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;
+  await quizAction(store, 'quiz1', { ...who, action: 'live_answer', index: 0, response: { selected: [right] } });
+  const seen = (await quizTeacherAction(store, 'quiz1', { action: 'live_status' })).live;
+  assert.equal(seen.answered, 1);
+  assert.equal(seen.joined, 1);
+});
+
+test('live mode: a round already running without a roster still counts from the listing', async () => {
+  const store = baseStore();
+  await publishQuiz(store);
+  const live = (await quizTeacherAction(store, 'quiz1', { action: 'live_start' })).live;
+  await quizAction(store, 'quiz1', { token: token(1), action: 'live_join', code: live.code });
+  await store.delete(`quiz/quiz1/live/${live.session}/roster`);
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'live_status' })).live.joined, 1);
+});
+
+test('live mode: a finished round reaches Results even while listings are stale', async () => {
+  const store = staleListings(baseStore());
+  const prepared = await publishQuiz(store);
+  const { code } = (await quizTeacherAction(store, 'quiz1', { action: 'live_start' })).live;
+  const who = { token: token(1) };
+  await quizAction(store, 'quiz1', { ...who, action: 'live_join', code });
+  await quizTeacherAction(store, 'quiz1', { action: 'live_next' });
+  const right = prepared.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;
+  await quizAction(store, 'quiz1', { ...who, action: 'live_answer', index: 0, response: { selected: [right] } });
+  await quizTeacherAction(store, 'quiz1', { action: 'live_end' });
+  assert.ok([...store.data.keys()].some(key => key.startsWith('quiz/quiz1/results/')));
 });
 
 test('the public quiz endpoint answers JSON errors without leaking stack traces', async () => {
