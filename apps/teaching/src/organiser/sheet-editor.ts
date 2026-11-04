@@ -553,13 +553,27 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const { cue, answer, rest } = columnSlots(section);
     const item = h('div', 'ko-item');
     const row = h('div', 'ko-linerow');
-    const pair = h('div', 'ko-pair');
-    const columns = section.columns ?? [];
-    if (cue !== -1) pair.append(cellField(section, line, cue, columns[cue]?.label ?? 'Name', 'ko-edit ko-edit--name'));
-    if (answer !== -1) pair.append(cellField(section, line, answer, columns[answer]?.label ?? 'Detail'));
-    row.append(pair, chevron(line.id, 'More'));
     const inner = h('div', 'ko-more__in');
-    inner.append(...moreFields(section, line, rest));
+    const columns = section.columns ?? [];
+    if (section.kind === 'table' && cue !== -1) {
+      // A table line is one short line, its name; everything else opens under it, as a concept does.
+      const nameOf = (): string => (localCells.get(line.id) ?? line.cells)[cue]?.trim() || 'Untitled';
+      const more = chevron(line.id, `Open ${nameOf()}`);
+      const name = h('button', 'ko-sidename', nameOf());
+      name.type = 'button';
+      name.tabIndex = -1;
+      name.addEventListener('click', () => more.click());
+      row.append(name, more);
+      const fields = moreFields(section, line, [cue, answer, ...rest].filter((i) => i !== -1));
+      fields[0]?.querySelector('textarea')?.addEventListener('input', () => { name.textContent = nameOf(); });
+      inner.append(...fields);
+    } else {
+      const pair = h('div', 'ko-pair');
+      if (cue !== -1) pair.append(cellField(section, line, cue, columns[cue]?.label ?? 'Name', 'ko-edit ko-edit--name'));
+      if (answer !== -1) pair.append(cellField(section, line, answer, columns[answer]?.label ?? 'Detail'));
+      row.append(pair, chevron(line.id, 'More'));
+      inner.append(...moreFields(section, line, rest));
+    }
     if (section.role === 'vocab') {
       const levels = h('div', 'ko-tools');
       levels.append(h('span', 'ko-label', 'Level'));
@@ -610,6 +624,16 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         void ready.then((target) => { if (target) togglePanel({ kind: 'paste', at: target.id }); });
       })
     );
+    if (section?.lines.length) {
+      const allOpen = section.lines.every((line) => open.has(line.id));
+      tools.append(quiet(allOpen ? 'Close all' : 'Open all', () => {
+        for (const line of section.lines) {
+          if (allOpen) open.delete(line.id);
+          else open.add(line.id);
+        }
+        render();
+      }));
+    }
     if (section && !role) tools.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
     head.append(h('h3', 'ko-panel__name', name), tools);
     box.append(head);
