@@ -24,6 +24,7 @@ function storeFixture(content, draftContent) {
   return {
     data,
     async get(key, options) { assert.equal(options.consistency, 'strong'); return structuredClone(data.get(key) ?? null); },
+    async getWithMetadata(key) { return data.has(key) ? { data: structuredClone(data.get(key)), etag: 'e' } : null; },
     async setJSON(key, value) { data.set(key, structuredClone(value)); return { modified: true }; },
     async list({ prefix }) { return { blobs: [...data.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) }; }
   };
@@ -58,6 +59,20 @@ test('students answer, can change their mind while open, and the teacher sees th
   assert.equal(t.correct_id, 'a');
   assert.equal(t.options[1].misconception, 'Any pull at a distance is magnetic');
   assert.equal(t.move_on, 80);
+});
+
+test('the teacher sees answers at once, even while listings are stale', async () => {
+  const store = storeFixture();
+  const list = store.list.bind(store);
+  store.list = async (options) => (options.prefix.includes('/answers/') ? { blobs: [] } : list(options));
+  const { session } = await teach(store, { action: 'ask' });
+  const [one, two] = tokens(2);
+  await answer(store, one, session, 'a');
+  await answer(store, two, session, 'b');
+  const seen = await teach(store, { action: 'status' });
+  assert.equal(seen.answered, 2);
+  assert.equal(seen.picks.a, 1);
+  assert.equal(seen.picks.b, 1);
 });
 
 test('students never see the spread, and see the right answer only after reveal', async () => {

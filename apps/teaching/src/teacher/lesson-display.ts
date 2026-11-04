@@ -175,7 +175,7 @@ export function mountLessonDisplayView(
       quiz.className = 'lesson-display__step';
       const selfPaced = mountStudentQuiz(lesson, { pickClass: false });
       selfPaced.classList.add('fv-quiz-page');
-      const live = mountQuizLive(lesson.lesson_id, () => focus.refreshCheckpoint());
+      const live = mountQuizLive(lesson.lesson_id, () => focus.refreshCheckpoint(), { press: () => focus.next(), refit: () => focus.refit() });
       quiz.append(selfPaced, live.root);
       content.append(quiz);
       views.push({ label: 'Live quiz', blocks: [], el: quiz, live });

@@ -24,6 +24,7 @@ import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
+import { createLiveClock, createLiveSwarm, liveControls as liveMoveControls, liveSignature, setLiveClock } from '@/quiz/live-show';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, practiceChip, select, textArea } from '@/quiz/dom';
 import { aiMarkDoneLine, aiMarkLabel, estimateAiMarking, runAiMarking, type AnswerMarkEstimate } from '@/quiz/ai-mark-run';
 import { findBlockById } from '@/blocks/find-block';
@@ -146,6 +147,9 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let openAttempt: string | null = null;
   const resultsUi = newResultsUi();
   let live: LiveQuiz | null = null;
+  const liveShow = { clock: createLiveClock(), swarm: createLiveSwarm() };
+  /** Bumped by each move: a poll sent before it is out of date, so it can't put the old question back. */
+  let liveMoveCount = 0;
   let disposed = false;
   let timer: number | undefined;
   const insightApi = options.insightApi ?? httpInsightApi;
@@ -265,7 +269,15 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         }
         data = [results, insight, compareInsight?.built_at ?? null, [...followInsights.values()].map((f) => f.built_at)];
       }
-      else if (tab === 'live') data = live = (await post<{ live: LiveQuiz | null }>({ action: 'live_status' })).live;
+      else if (tab === 'live') {
+        const sentAt = liveMoveCount;
+        const reply = (await post<{ live: LiveQuiz | null }>({ action: 'live_status' })).live;
+        if (sentAt !== liveMoveCount) return;
+        live = reply;
+        // The clock keeps its own time; only a real change to the round repaints.
+        setLiveClock(liveShow.clock, live);
+        data = liveSignature(live);
+      }
       else return;
       paintTabs();
       if (tab === 'tray' && editing) return; // never repaint under a teacher who is editing
@@ -1196,42 +1208,25 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       el('span', 'qz-note block-secondary', `${plural(l.joined, 'student')} joined${l.index >= 0 ? ` · Question ${l.index + 1} of ${l.total}` : ''}`),
       button('Show on board', 'ghost', () => showBoard())
     );
-    wrap.append(bar, renderLiveStage(l, false), liveControls(l));
+    wrap.append(bar, renderLiveStage(l, false, liveShow), liveControls(l));
     return wrap;
   }
 
   function liveControls(l: LiveQuiz): HTMLElement {
-    const actions = el('div', 'qz-actions');
-    if (l.phase === 'lobby') {
-      actions.append(button('First question', 'primary', async function () {
-        this.disabled = true;
-        await liveAction('live_next');
-      }));
-    } else if (l.phase === 'question') {
-      actions.append(button('Reveal answer', 'primary', async function () {
-        this.disabled = true;
-        await liveAction('live_reveal');
-      }));
-    } else if (l.phase === 'reveal') {
-      actions.append(button(l.index + 1 >= l.total ? 'Finish' : 'Next question', 'primary', async function () {
-        this.disabled = true;
-        await liveAction('live_next');
-      }));
-      if (l.index > 0) actions.append(button('Back', 'ghost', () => void liveAction('live_back')));
-    }
-    actions.append(
-      button('End', 'ghost', async function () {
-        if (!window.confirm('End the live quiz?')) return;
-        this.disabled = true;
-        await liveAction('live_end');
-      })
-    );
-    return actions;
+    return liveMoveControls(l, {
+      move: () => void liveAction(l.phase === 'question' ? 'live_reveal' : 'live_next'),
+      back: () => void liveAction('live_back'),
+      end: () => {
+        if (window.confirm('End the live quiz?')) void liveAction('live_end');
+      },
+      act: (action, fields) => void liveAction(action, fields)
+    });
   }
 
-  async function liveAction(action: string): Promise<void> {
+  async function liveAction(action: string, fields: Record<string, unknown> = {}): Promise<void> {
+    liveMoveCount += 1;
     try {
-      live = (await post<{ live: LiveQuiz | null }>({ action })).live;
+      live = (await post<{ live: LiveQuiz | null }>({ action, ...fields })).live;
       if (live?.phase === 'done') live = null;
       alert.hidden = true;
     } catch (error) {
@@ -1258,9 +1253,9 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       }
       inner.replaceChildren();
       if (live.phase === 'lobby') {
-        inner.append(el('p', 'qz-board__label', 'Open the quiz and type this code'), el('p', 'qz-board__code', formatCode(live.code)), el('p', 'qz-board__label', plural(live.joined, 'student') + ' joined'));
+        inner.append(el('p', 'qz-board__label', 'Open the quiz and type this code'), el('p', 'qz-board__code', formatCode(live.code)), el('p', 'qz-board__label', plural(live.joined, 'student') + ' joined'), liveControls(live));
       } else {
-        inner.append(renderLiveStage(live, true), liveControls(live));
+        inner.append(renderLiveStage(live, true, liveShow), liveControls(live));
       }
     };
     const onKey = (e: KeyboardEvent) => {

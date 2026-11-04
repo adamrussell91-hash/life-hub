@@ -393,6 +393,46 @@ test('live mode: a finished round reaches Results even while listings are stale'
   assert.ok([...store.data.keys()].some(key => key.startsWith('quiz/quiz1/results/')));
 });
 
+test('live mode: each question runs a countdown both screens agree on', async () => {
+  const store = baseStore();
+  const prepared = await publishQuiz(store);
+  const teacher = body => quizTeacherAction(store, 'quiz1', body);
+  const student = body => quizAction(store, 'quiz1', body);
+  const started = (await teacher({ action: 'live_start' })).live;
+  assert.equal(started.seconds, 30);
+  const who = { token: token(1) };
+  const joined = (await student({ ...who, action: 'live_join', code: started.code })).live;
+  assert.match(joined.badge, /^[a-f0-9]{8}$/);
+
+  await assert.rejects(teacher({ action: 'live_time', seconds: 9999 }), /Choose a time/);
+  assert.equal((await teacher({ action: 'live_time', seconds: 20 })).live.seconds, 20);
+  const running = (await teacher({ action: 'live_next' })).live;
+  assert.ok(running.ends_in > 18_000 && running.ends_in <= 20_000);
+  const theirs = (await student({ ...who, action: 'live_status' })).live;
+  assert.ok(theirs.ends_in > 18_000 && theirs.ends_in <= 20_000);
+  const more = (await teacher({ action: 'live_extra' })).live;
+  assert.ok(more.ends_in > 33_000);
+
+  const right = prepared.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;
+  await student({ ...who, action: 'live_answer', index: 0, response: { selected: [right] } });
+  const seen = (await teacher({ action: 'live_status' })).live;
+  assert.deepEqual(seen.shapes, [{ id: joined.badge }]);
+  const shown = (await teacher({ action: 'live_reveal' })).live;
+  assert.equal(shown.ends_in, null);
+  assert.deepEqual(shown.shapes, [{ id: joined.badge, right: true }]);
+
+  await teacher({ action: 'live_time', seconds: 0 });
+  assert.equal((await teacher({ action: 'live_next' })).live.ends_in, null);
+});
+
+test('live mode: written questions get longer on the clock', async () => {
+  const store = baseStore({ quizBlocks: [qBlock('qc', essay)] });
+  await publishQuiz(store);
+  await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  const running = (await quizTeacherAction(store, 'quiz1', { action: 'live_next' })).live;
+  assert.ok(running.ends_in > 88_000 && running.ends_in <= 90_000);
+});
+
 test('the public quiz endpoint answers JSON errors without leaking stack traces', async () => {
   const store = baseStore();
   await publishQuiz(store);
