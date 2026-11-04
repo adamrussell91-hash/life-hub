@@ -80,7 +80,7 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
     { pick: '.sp-parts, .sprint-pitch, .sprint-submit__err', title: 'Bring the parts together', guide: LATER_GUIDE.share },
     { pick: '.sprint-self', title: myParts.length > 1 ? 'Rate your parts' : 'Rate your part', guide: LATER_GUIDE.check }
   ], 'Prototype');
-  slidify(root, ctx.sprint.understand?.layout, ctx.steps?.prototype ?? 0, (i) => { if (ctx.steps) ctx.steps.prototype = i; });
+  slidify(root, ctx.sprint.understand?.layout, bar, ctx.steps?.prototype ?? 0, (i) => { if (ctx.steps) ctx.steps.prototype = i; });
   root.append(bar.el);
   return {
     el: root,

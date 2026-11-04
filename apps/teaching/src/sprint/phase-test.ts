@@ -55,7 +55,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
     }
   }
   root.append(got);
-  const bar = submitBar(ctx, 'test', () => state, () => reflectionProblems(state, !!ctx.valueCheck));
+  const bar = submitBar(ctx, 'test', () => state, () => reflectionProblems(state, !!ctx.valueCheck).map((text) => ({ text, at: '.sprint-field' })));
   prompts.forEach((p, i) => root.append(frameField({ label: p, value: state.reflection[i] ?? '', max: 1000, rows: 4, frames: ctx.frames, support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reflection[i] = v; bar.changed(); } })));
   root.append(frameField({ label: 'Quote one piece of feedback your group received', value: state.quote, max: 300, rows: 2, support: 'open', disabled: !ctx.editable, onInput: (v) => { state.quote = v; bar.changed(); } }));
   const crit = el('select', 'qz-input');
@@ -72,7 +72,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
     { pick: '.sprint-received', title: 'What your group got', guide: LATER_GUIDE.feedback },
     { pick: '.sprint-field, select.qz-input, .sprint-value', title: 'Think about what to change', guide: LATER_GUIDE.reflect }
   ], 'Test');
-  slidify(root, ctx.sprint.understand?.layout, ctx.steps?.test ?? 0, (i) => { if (ctx.steps) ctx.steps.test = i; });
+  slidify(root, ctx.sprint.understand?.layout, bar, ctx.steps?.test ?? 0, (i) => { if (ctx.steps) ctx.steps.test = i; });
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }

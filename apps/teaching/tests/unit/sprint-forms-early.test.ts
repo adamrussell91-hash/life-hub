@@ -41,6 +41,24 @@ describe('understand form', () => {
     expect(f.el.querySelector('.sprint-submit__go')?.textContent).toBe('Submit my Understand work');
   });
 
+  it('ticks a step’s dot only when it has been seen and its checks are met', () => {
+    const f = mountSketch(ctx({ sprint: withSteps('slides'), row: { ...ctx().row, key: 'sketch' } }));
+    const dots = () => [...f.el.querySelectorAll<HTMLButtonElement>('.su-rail__dot')];
+    dots()[1]!.click();
+    expect(dots()[0]!.textContent).toBe('1');
+    expect(dots()[0]!.classList.contains('is-done')).toBe(false);
+    dots()[0]!.click();
+    const [from, borrow] = [...f.el.querySelectorAll<HTMLInputElement>('[data-step="inspiration"] input')];
+    from!.value = 'A museum audio guide';
+    from!.dispatchEvent(new Event('input', { bubbles: true }));
+    borrow!.value = 'Short spoken stops';
+    borrow!.dispatchEvent(new Event('input', { bubbles: true }));
+    dots()[1]!.click();
+    expect(dots()[0]!.textContent).toBe('✓');
+    expect(dots()[0]!.getAttribute('aria-label')).toContain('(finished)');
+    f.dispose();
+  });
+
   it('after a first try, shows one thing to do, folds the rest, and shrinks as they fix it', async () => {
     const { submitBar } = await import('@/sprint/form-kit');
     let left = ['Say who it is for.', 'Write the problem.', 'Star a statement.'];

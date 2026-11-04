@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { briefText } from './model';
-import { coach, draftOf, frameField, markLastStep, stepHead, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { coach, draftOf, frameField, markLastStep, stepHead, stillToDo, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { LIMITS_SCENARIO, LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
 import { LIMIT_BOXES, UNDERSTAND_ALONE, defaultUnderstand, type LimitBox, type PhasePayload, type UnderstandStep } from './schema';
 import type { SprintStatus, UnderstandGroup } from './api';
@@ -424,11 +424,11 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   function paintRail(): void {
     rail.replaceChildren(...order.map((k, i) => {
       const li = el('li', '');
-      const done = stepDone(k);
+      const done = stepDone(k) && !stillToDo(boxes.get(k)!, bar.problems());
       const b = el('button', `su-rail__dot${i === at ? ' is-now' : ''}${done ? ' is-done' : ''}${alone(k) ? '' : ' is-group'}`, done && i !== at ? '✓' : String(i + 1));
       b.type = 'button';
       b.title = STEP_TITLES[k];
-      b.setAttribute('aria-label', `Step ${i + 1}: ${STEP_TITLES[k]}${done ? ' (has something in it)' : ''}`);
+      b.setAttribute('aria-label', `Step ${i + 1}: ${STEP_TITLES[k]}${done ? ' (finished)' : ''}`);
       if (i === at) b.setAttribute('aria-current', 'step');
       b.addEventListener('click', () => { at = i; show(); });
       li.append(b);

@@ -26,12 +26,12 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-decide');
   const voting = !s.votes_closed;
   const bar = submitBar(ctx, 'decide', () => state, () => [
-    ...(voting ? duelProblems(state.duels, ids) : []),
+    ...(voting ? duelProblems(state.duels, ids).map((text) => ({ text, at: '.sdd-arena' })) : []),
     ...(!s.chosen ? [voting
       ? 'Nothing to submit yet. Your picks save as you go. Once your group’s idea is chosen, a step to plan the parts opens here; submit after that.'
-      : 'Nothing to submit yet. Your teacher is confirming your group’s idea; then plan the parts in step 2 and submit.'] : []),
-    ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
-    ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
+      : { text: 'Nothing to submit yet. Your teacher is confirming your group’s idea; then plan the parts in step 2 and submit.', at: '.sprint-parts' }] : []),
+    ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? [{ text: 'Your group hasn’t given you a part yet. Pick your initials on a part.', at: '.sprint-parts' }] : []),
+    ...(s.chosen && s.assemble && !s.assembler ? [{ text: 'Pick who puts the prototype together.', at: '.sprint-parts' }] : [])
   ]);
 
   if (voting) {
@@ -54,7 +54,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     { pick: '.sdd-rank', title: 'Your 1st, 2nd and 3rd', guide: LATER_GUIDE.reasons }
   ], 'Decide');
   // Once the idea is chosen, the plan is the work: open on it (the result is one step back).
-  slidify(root, ctx.sprint.understand?.layout, !voting && s.chosen ? 1 : 0);
+  slidify(root, ctx.sprint.understand?.layout, bar, !voting && s.chosen ? 1 : 0);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }
