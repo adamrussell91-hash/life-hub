@@ -162,6 +162,12 @@ export type SprintSummary = {
 export type BoardSub = { student_id: string; name: string; sub: { payload: Record<string, unknown>; submitted_at?: string; late?: boolean } | null };
 export type GroupBoard = {
   group: { id: string; name: string };
+  /** Where the group is: phases open to it, its deadlines, and each student's state in each phase. */
+  progress?: {
+    open: SprintPhaseKey[];
+    phases: Array<{ key: SprintPhaseKey; due_date: string; due_time: string }>;
+    students: Array<{ id: string; name: string; voted: boolean; phases: MapStudent['phases']; saved_at: Partial<Record<SprintPhaseKey, string>> }>;
+  };
   awaiting: MapGroup['awaiting'];
   voted?: { done: string[]; waiting: string[] };
   question: { id: string; text: string } | null;
@@ -171,7 +177,7 @@ export type GroupBoard = {
   gallery: Array<{ id: string; name: string; student_id: string; ideas: GalleryIdea[] }>;
   totals: Record<string, number>;
   heat: Record<string, Record<string, HeatLevel>>;
-  reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[]; duels?: Duel[]; ranked?: string[] }>;
+  reasons: Array<{ student_id?: string; name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[]; duels?: Duel[]; ranked?: string[] }>;
   parts: Array<Part & { by: string[] }>;
   pitch: { kind: 'file' | 'link'; file?: string; link?: string; name?: string; by: string } | null;
   cover?: { file: string; name: string } | null;
