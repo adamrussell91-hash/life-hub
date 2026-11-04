@@ -17,7 +17,7 @@ Run and pass `npm run pre-pr-check` (or `node scripts/pre-pr-check.mjs`) from th
 
 **Ready, then auto-merge.** Open life-hub PRs as ready for review, not draft, unless Adam asks for a draft. Once `pre-pr-check` passes and the PR is pushed, enable auto-merge (merge commit). If auto-merge stalls on a merge conflict, merge `main` in, regenerate generated files (e.g. `node scripts/generate-alchemy-schema.mjs`, `node scripts/generate-block-css.mjs`), rerun the gate and push.
 
-**Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
+**Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
 
 ## Product stress test
 
@@ -38,7 +38,7 @@ From **this repo’s root** (`life-hub`):
 | File | Purpose |
 |------|---------|
 | `docs/consolidation/OVERSEER.md` | Your role, scope, inventory, prompts, checkpoint template |
-| `docs/consolidation/plan.md` | Architecture source of truth (Cursor maintains) |
+| `docs/consolidation/plan.md` | Architecture source of truth |
 | `docs/consolidation/POST-FOLD-AUDIT.md` | Post-fold test-spec (Phase C) — run every check, write `checkpoint-10.md` only |
 
 ### Where to write
@@ -64,7 +64,7 @@ Do not guess the overseer role from chat memory — **read `docs/consolidation/O
 
 ## Clare / Tasks PA assumptions audit
 
-When Adam asks you to **audit Clare**, **completed-task / Done-column retention**, **proactive PA automation**, **whether Clare should run holistic forecasting across hubs**, or **review Cursor’s proposed build**, read this first:
+When Adam asks you to **audit Clare**, **completed-task / Done-column retention**, **proactive PA automation**, **whether Clare should run holistic forecasting across hubs**, or **review a proposed build**, read this first:
 
 | File | Purpose |
 |------|---------|
@@ -73,11 +73,9 @@ When Adam asks you to **audit Clare**, **completed-task / Done-column retention*
 
 Re-verify claims against current `main`. Challenge the build plan’s Must / Must-not / Verify / Files. Do not invent a daily full-agent Sonnet “PA” cron. Do not implement from the brief alone unless Adam names a step (Docs / Slice A / Slice B item).
 
-## Cursor UI failure register
+## UI failure register
 
-When you **write a build brief for Cursor** or **review Cursor's UI work**, use [`docs/CURSOR-UI-FAILURES.md`](docs/CURSOR-UI-FAILURES.md):
+When you **write a build brief** or **review UI work**, use [`docs/CURSOR-UI-FAILURES.md`](docs/CURSOR-UI-FAILURES.md):
 
 - Brief: cite the relevant entry IDs in the brief's failure-modes section, each with a feature-specific check.
 - Review: every new failure becomes an entry in the same PR; a repeat extends that entry's **Seen** line.
-
-Cursor loads it via `.cursor/rules/ui-failure-register.mdc`.

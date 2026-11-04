@@ -1,11 +1,11 @@
-# Cursor UI failure register
+# UI failure register
 
-**What this is.** A running list of every UI/UX mistake Cursor has shipped in this repo more than once, or shipped while claiming it was done. Each entry has the rule that prevents it and a **check** that proves it's fixed. Nothing counts as fixed on "looks right to me".
+**What this is.** A running list of every UI/UX mistake an agent has shipped in this repo more than once, or shipped while claiming it was done. Each entry has the rule that prevents it and a **check** that proves it's fixed. Nothing counts as fixed on "looks right to me".
 
 **Who uses it**
-- **Cursor:** `.cursor/rules/ui-failure-register.mdc` makes you read this before any UI work. Before you tick any UI item, run the check for every entry that applies to your change.
+- **Any agent doing UI work:** read this first. Before you tick any UI item, run the check for every entry that applies to your change.
 - **Claude, when writing a build brief:** copy the IDs relevant to the feature into the brief's "failure modes" section (e.g. `L1 L2 S1 V1 D2 P1`), with a feature-specific check for each.
-- **Claude, when reviewing Cursor's work:** every new failure gets an entry here in the same PR as the review. A repeat failure gets its **Seen** line extended; repeats are the point of the list.
+- **Claude, when reviewing UI work:** every new failure gets an entry here in the same PR as the review. A repeat failure gets its **Seen** line extended; repeats are the point of the list.
 
 **Entry format:** `ID · name`: **Seen:** where it happened. **Rule:** what to do. **Check:** how to prove it.
 
