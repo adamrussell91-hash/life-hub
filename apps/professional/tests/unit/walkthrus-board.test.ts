@@ -71,7 +71,7 @@ describe('board layout', () => {
     const l = make();
     expect(l.tiles.length).toBe(entries.filter((e) => e.kind === 'technique').length);
     expect(new Set(l.tiles.map((t) => `${t.cell.q},${t.cell.r}`)).size).toBe(l.tiles.length);
-    expect(l.clusters.length).toBe(SERIES.length * 2);
+    expect(l.clusters.length).toBe(SERIES.length * 3);
     for (const c of l.clusters) for (const o of l.clusters) {
       if (c === o) continue;
       const apart = c.frame.x + c.frame.w < o.frame.x || o.frame.x + o.frame.w < c.frame.x || c.frame.y + c.frame.h < o.frame.y || o.frame.y + o.frame.h < c.frame.y;
