@@ -81,4 +81,22 @@ describe('sprint player', () => {
     await flush();
     expect(host.querySelector('.sprint-spotlight')?.textContent).toContain('How might we make ash talk?');
   });
+  it('starts the form again from the server when the teacher gives another go, and says so', async () => {
+    const host = document.createElement('div');
+    const phases = (go: number, state: string) => ['understand', 'sketch', 'decide', 'prototype', 'test'].map((k, i) => ({ ...row(k, i === 0), go: k === 'understand' ? go : 0, state: k === 'understand' ? state : 'none' })) as SprintStatus['phases'];
+    const before = status({ phases: phases(0, 'draft'), mine: { understand: { say: 'The old words', notes: [], star: '', stretch: '' } } as never });
+    const after = status({ phases: phases(1, 'none'), mine: {} });
+    const c = client(before);
+    vi.useFakeTimers();
+    mountSprintPlayer(host, { lesson, classId: 'class1', client: c, renderHero: () => {} });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(host.querySelector('.sprint-another-go')).toBeNull();
+    const form = host.querySelector('.sprint-form')!.firstElementChild;
+    (c.status as ReturnType<typeof vi.fn>).mockResolvedValue(after);
+    await vi.advanceTimersByTimeAsync(60_000);
+    vi.useRealTimers();
+    expect(host.querySelector('.sprint-form')!.contains(form)).toBe(false);
+    expect(host.querySelector('.sprint-another-go')?.textContent).toContain('another go at Understand');
+    expect(host.querySelector('.sprint-form')!.textContent).not.toContain('The old words');
+  });
 });

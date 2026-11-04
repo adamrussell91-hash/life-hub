@@ -148,7 +148,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     // An autosave keeps a submit's message in view; a new submit clears it.
     if (kind === 'submit') { window.clearTimeout(timer); timer = 0; err.textContent = ''; go.textContent = 'Submitting…'; go.disabled = true; }
     try {
-      const next = kind === 'save' ? await ctx.client.save(phase, payload()) : await ctx.client.submit(phase, payload());
+      const next = kind === 'save' ? await ctx.client.save(phase, payload(), ctx.row.go) : await ctx.client.submit(phase, payload(), ctx.row.go);
       note.textContent = kind === 'submit' ? '' : submitted ? 'Changes saved.' : 'Saved as a draft.';
       if (kind === 'submit') {
         submitted = true;
@@ -199,7 +199,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
       if (!timer) return;
       window.clearTimeout(timer);
       timer = 0;
-      void ctx.client.save(phase, payload()).catch(() => {});
+      void ctx.client.save(phase, payload(), ctx.row.go).catch(() => {});
     }
   };
 }

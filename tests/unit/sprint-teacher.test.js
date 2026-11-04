@@ -1,7 +1,7 @@
 // tests/unit/sprint-teacher.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sprintAction, sprintTeacherAction, setSprintClock, storeSprintConfig } from '../../netlify/functions/_shared/sprint.mjs';
+import { sprintAction, sprintTeacherAction, setSprintClock, storeSprintConfig, ownerOf } from '../../netlify/functions/_shared/sprint.mjs';
 import { draftLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { sprintKeys } from '../../netlify/functions/_shared/sprint-keys.mjs';
 import { storeFor, who, INITIALS, CONFIG } from './helpers/sprint-store.js';
@@ -194,4 +194,121 @@ test('a student taken off the class list leaves their group: no dash on the map,
   const me = await act(store, 1, 'claim', { initials: INITIALS[1] });
   assert.equal(me.group.size, 2);
   assert.ok(!me.group.mates.includes('–'));
+});
+
+const SKETCH = (title) => ({ inspiration: [], rapid: [title], rapid_started_at: '', cards: [{ id: 'k1', seed: title, title, idea: `${title} idea`, answers: 'a', evidence: 'e', criteria: {}, requirements: {}, value_answer: '' }], strongest: 'k1', strongest_why: 'why' });
+
+test('Give another go: the work is set aside, the phase is blank and open again, and the group stops counting them in', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  const before = await act(store, 1, 'submit', { phase: 'sketch', payload: SKETCH('Old') });
+  assert.equal(before.phases.find((p) => p.key === 'sketch').state, 'in');
+  const s = await teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' });
+  assert.equal(s.groups[0].students[0].phases.sketch, 'none');
+  const me = await act(store, 1, 'status');
+  const row = me.phases.find((p) => p.key === 'sketch');
+  assert.equal(row.state, 'none');
+  assert.equal(row.go, 1);
+  assert.equal(row.count_in, 0);
+  assert.equal(me.mine.sketch, undefined);
+  const k = sprintKeys('sp1');
+  const set = [...store.data.keys()].find((key) => key.startsWith('sprint/sp1/goes/'));
+  assert.equal(store.data.get(set).sketch.earlier[0].payload.cards[0].title, 'Old');
+});
+
+test('an open tab from before Give another go can’t save the old work back; a fresh page can', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'save', { phase: 'sketch', payload: SKETCH('Old') });
+  await teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' });
+  await assert.rejects(act(store, 1, 'save', { phase: 'sketch', payload: SKETCH('Old') }), { code: 'another_go' });
+  await assert.rejects(act(store, 1, 'save', { phase: 'sketch', go: 0, payload: SKETCH('Old') }), { code: 'another_go' });
+  const me = await act(store, 1, 'save', { phase: 'sketch', go: 1, payload: SKETCH('New') });
+  assert.equal(me.mine.sketch.cards[0].title, 'New');
+});
+
+test('Give another go works after the class part ended and during its lock', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'open', { phase: 'understand' });
+  await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['Old'], star: '', stretch: '' } });
+  await teach(store, 'end_class', { phase: 'understand', lock_hours: 2 });
+  await assert.rejects(act(store, 1, 'save', { phase: 'understand', payload: { notes: ['x'], star: '', stretch: '' } }), { code: 'locked' });
+  await teach(store, 'another_go', { student_id: 'st_ann', phase: 'understand' });
+  const me = await act(store, 1, 'save', { phase: 'understand', go: 1, payload: { notes: ['New'], star: '', stretch: '' } });
+  const row = me.phases.find((p) => p.key === 'understand');
+  assert.equal(row.frozen, false);
+  assert.equal(row.state, 'draft');
+  const other = await act(store, 2, 'claim', { initials: INITIALS[2] });
+  assert.ok(other.lock, 'the rest of the class stays locked');
+});
+
+test('after a phase has closed a student on another go can still write, and handing in counts as late', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'submit', { phase: 'sketch', payload: SKETCH('Old') });
+  setSprintClock(() => Date.parse('2026-11-05T00:00:00Z'));
+  await assert.rejects(act(store, 1, 'save', { phase: 'sketch', payload: SKETCH('x') }), { code: 'closed' });
+  await teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' });
+  const me = await act(store, 1, 'submit', { phase: 'sketch', go: 1, payload: SKETCH('New') });
+  const row = me.phases.find((p) => p.key === 'sketch');
+  assert.equal(row.state, 'in');
+  assert.equal(row.late, true);
+});
+
+test('Bring back returns the earlier work and sets aside anything newer, so going back and forth loses nothing', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await act(store, 1, 'submit', { phase: 'sketch', payload: SKETCH('Old') });
+  await teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' });
+  await act(store, 1, 'save', { phase: 'sketch', go: 1, payload: SKETCH('New') });
+  await teach(store, 'bring_back', { student_id: 'st_ann', phase: 'sketch' });
+  let me = await act(store, 1, 'status');
+  assert.equal(me.mine.sketch.cards[0].title, 'Old');
+  assert.equal(me.phases.find((p) => p.key === 'sketch').state, 'in');
+  assert.equal(me.phases.find((p) => p.key === 'sketch').count_in, 1);
+  await assert.rejects(act(store, 1, 'save', { phase: 'sketch', go: 1, payload: SKETCH('New') }), { code: 'another_go' });
+  await teach(store, 'bring_back', { student_id: 'st_ann', phase: 'sketch' });
+  me = await act(store, 1, 'status');
+  assert.equal(me.mine.sketch.cards[0].title, 'New');
+  assert.equal(me.phases.find((p) => p.key === 'sketch').state, 'draft');
+  const board = await teach(store, 'board', { group_id: 'g1' });
+  assert.equal(board.progress.students.find((x) => x.id === 'st_ann').earlier.sketch, 1);
+});
+
+test('Give another go needs work to set aside, and leaves a Sketch the group is building on', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  await assert.rejects(teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' }), { code: 'nothing_here' });
+  await assert.rejects(teach(store, 'bring_back', { student_id: 'st_ann', phase: 'sketch' }), { code: 'nothing_here' });
+  await assert.rejects(teach(store, 'another_go', { student_id: 'st_nobody', phase: 'sketch' }), { code: 'not_found' });
+  await assert.rejects(teach(store, 'another_go', { student_id: 'st_ann', phase: 'nope' }), { code: 'bad_phase' });
+  const me = await act(store, 1, 'submit', { phase: 'sketch', payload: SKETCH('Old') });
+  assert.equal(me.phases.find((p) => p.key === 'sketch').state, 'in');
+  const k = sprintKeys('sp1');
+  const board = await teach(store, 'board', { group_id: 'g1' });
+  const chosen = board.gallery[0].ideas[0].id;
+  await teach(store, 'confirm', { group_id: 'g1', kind: 'idea', id: chosen });
+  assert.equal(store.data.get(k.group('g1')).chosen, chosen);
+  await assert.rejects(teach(store, 'another_go', { student_id: 'st_ann', phase: 'sketch' }), { code: 'chosen_idea' });
+});
+
+test('another go at Decide takes them off the finished list so voting waits for them', async () => {
+  setSprintClock(() => Date.parse('2026-11-03T00:00:00Z'));
+  const store = storeFor();
+  await act(store, 1, 'claim', { initials: INITIALS[1] });
+  const k = sprintKeys('sp1');
+  const state = store.data.get(k.group('g1')) ?? {};
+  store.data.set(k.group('g1'), { ...state, in: { ...(state.in ?? {}), decide: ['st_ann'] }, voted: ['st_ann'] });
+  store.data.set(k.sub(ownerOf('class1', 'st_ann'), 'decide'), { payload: { votes: {}, reasons: {}, dots: [], duels: [] }, saved_at: '2026-11-03T00:00:00Z', submitted_at: '2026-11-03T00:00:00Z' });
+  await teach(store, 'another_go', { student_id: 'st_ann', phase: 'decide' });
+  const after = store.data.get(k.group('g1'));
+  assert.deepEqual(after.voted, []);
+  assert.deepEqual(after.in.decide, []);
 });

@@ -65,6 +65,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   let disposed = false;
   const opened = new Set<SprintPhaseKey>();
   const drafts: Partial<PhasePayload> = {};
+  const goes = new Map<SprintPhaseKey, number>();
   const steps: Partial<Record<SprintPhaseKey, number>> = {};
 
   const shell = el('div', 'sprint');
@@ -248,12 +249,19 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       fill.classList.add('sprint-practice-fill');
       work.append(fill);
     }
+    if (row.go && row.state === 'none') work.append(el('p', 'sprint-another-go', `Your teacher has given you another go at ${PHASE_LABELS[key]}. This is a fresh start.`));
     work.append(form.el);
     layout.append(work, guidesPanel(key));
     body.replaceChildren(layout);
   }
 
   function apply(next: SprintStatus): void {
+    // Given another go: what this tab was holding is the old work, so start that form again from the server.
+    for (const row of next.phases ?? []) {
+      const go = row.go ?? 0;
+      if (goes.has(row.key) && goes.get(row.key) !== go) { delete drafts[row.key]; formKey = ''; }
+      goes.set(row.key, go);
+    }
     status = next;
     paint();
   }

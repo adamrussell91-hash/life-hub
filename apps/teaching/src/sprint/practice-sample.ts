@@ -14,7 +14,7 @@ export async function fillPhaseSample(
 ): Promise<{ payload: PhasePayload[SprintPhaseKey]; status: SprintStatus }> {
   const out = await samplePayload(key, o);
   // Saved as a draft, as typing would, so End class part hands it in.
-  return { payload: out.payload, status: await o.client.save(key, out.payload as never) };
+  return { payload: out.payload, status: await o.client.save(key, out.payload as never, out.status.phases?.find((p) => p.key === key)?.go) };
 }
 
 async function samplePayload(
@@ -36,7 +36,7 @@ async function samplePayload(
       say: `The audience needs a clear way in because ${name} found the real problem underneath.`,
       limits: { can_known: [`What ${name} makes`], cant_known: ['The deadline'], can_unknown: [`How long ${name}'s part takes`], cant_unknown: ['What the audience already knows'] }
     };
-    status = await client.save('understand', payload);
+    status = await client.save('understand', payload, status.phases?.find((p) => p.key === 'understand')?.go);
     payload.star = status.notes?.[0]?.id ?? '';
     return { payload, status };
   }

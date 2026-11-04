@@ -88,8 +88,8 @@ export function openPracticeRun(o: { getLesson: () => Lesson; api?: PracticeApi 
     const after = <T>(p: Promise<T>) => p.finally(() => { void run(api.state()); void map?.refresh(); });
     return {
       ...client,
-      save: (phase, payload) => after(client.save(phase, payload)),
-      submit: (phase, payload) => after(client.submit(phase, payload)),
+      save: (phase, payload, go) => after(client.save(phase, payload, go)),
+      submit: (phase, payload, go) => after(client.submit(phase, payload, go)),
       parts: (parts) => after(client.parts(parts)),
       claimPart: (id) => after(client.claimPart(id)),
       assign: (id, keys) => after(client.assign(id, keys)),
