@@ -300,3 +300,21 @@ test('criteria take concepts and step descriptors; a column can link a lesson bl
   assert.equal(AssessmentMarkSchema.parse({ steps: { crit0001: 'building' } }).steps.crit0001, 'building');
   assert.throws(() => AssessmentMarkSchema.parse({ steps: { crit0001: 'great' } }));
 });
+
+test('saved groups: rename, add and remove after saving, with the record kept', async () => {
+  const { store, bob, tom } = await setup();
+  const run = (body) => call(store, body);
+  await run({ action: 'save_group', group: { id: 'grp0000001', name: 'Repetition', tags: ['fam:repetition'], members: [{ student: bob.id, why: 'Marks' }] }, today: '2026-11-01' });
+  let { markbook } = await run({ action: 'rename_group', group_id: 'grp0000001', name: 'Anaphora' });
+  assert.equal(markbook.groups[0].name, 'Anaphora');
+  ({ markbook } = await run({ action: 'add_members', group_id: 'grp0000001', members: [{ student: tom.id, why: 'Added by teacher' }], today: '2026-11-02' }));
+  assert.deepEqual(markbook.groups[0].members.map((m) => m.student), [bob.id, tom.id]);
+  ({ markbook } = await run({ action: 'remove_member', group_id: 'grp0000001', student: tom.id, today: '2026-11-03' }));
+  assert.equal(markbook.groups[0].members[1].left, '2026-11-03');
+  assert.equal(markbook.groups[0].retired, null);
+  ({ markbook } = await run({ action: 'remove_member', group_id: 'grp0000001', student: bob.id, today: '2026-11-03' }));
+  assert.equal(markbook.groups[0].retired, '2026-11-03');
+  ({ markbook } = await run({ action: 'add_members', group_id: 'grp0000001', members: [{ student: tom.id, why: 'Added by teacher' }], today: '2026-11-04' }));
+  assert.equal(markbook.groups[0].retired, null);
+  assert.deepEqual(markbook.history.map((e) => e.kind), ['joined', 'joined', 'left', 'left', 'retired', 'joined']);
+});

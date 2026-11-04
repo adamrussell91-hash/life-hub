@@ -216,6 +216,60 @@ describe('Next steps view', () => {
   });
 });
 
+describe('Saved group editing', () => {
+  const grouped = (): MarkbookView => ({
+    ...view({ a: 0, b: 0.2, c: 0.9, d: 1 }),
+    markbook: {
+      columns: [], hidden_quizzes: [], marks: {}, updated_at: '',
+      groups: [{ id: 'grp1', name: 'Repetition', tags: ['fam:repetition'], started: '2026-10-14', retired: null, members: ['a', 'b'].map((student) => ({ student, joined: '2026-10-14', left: null, why_joined: '', why_left: null })) }]
+    } as MarkbookView['markbook']
+  });
+  const setup = () => {
+    const actions = { renameGroup: vi.fn(), addMember: vi.fn(), removeMember: vi.fn() };
+    const state = newNextState();
+    const draw = (v = grouped()) => renderNextSteps(v, students, ctx, state, { openStudent: () => {}, pins: () => ({ pinned: [], dismissed: [] }), repaint: () => {}, ...actions });
+    return { actions, state, draw };
+  };
+
+  it('opens from Edit and closes on Done', () => {
+    const { state, draw } = setup();
+    draw().querySelector<HTMLButtonElement>('.mb-saved__edit')!.click();
+    expect(state.editingGroup).toBe('grp1');
+    const open = draw();
+    expect(open.querySelector('.mb-saved__edit')).toBeNull();
+    expect(open.querySelector<HTMLInputElement>('.mb-saved__name-input')?.value).toBe('Repetition');
+    open.querySelector<HTMLButtonElement>('.mb-saved__done')!.click();
+    expect(state.editingGroup).toBeNull();
+  });
+
+  it('saves a new name, and puts back a blank one', () => {
+    const { actions, state, draw } = setup();
+    state.editingGroup = 'grp1';
+    const name = draw().querySelector<HTMLInputElement>('.mb-saved__name-input')!;
+    name.value = '  Anaphora  ';
+    name.dispatchEvent(new Event('change'));
+    expect(actions.renameGroup).toHaveBeenCalledWith('grp1', 'Anaphora');
+    name.value = '   ';
+    name.dispatchEvent(new Event('change'));
+    expect(actions.renameGroup).toHaveBeenCalledTimes(1);
+    expect(name.value).toBe('Repetition');
+  });
+
+  it('removes a member and offers only students outside the group', () => {
+    const { actions, state, draw } = setup();
+    state.editingGroup = 'grp1';
+    const node = draw();
+    expect([...node.querySelectorAll('.mb-saved__member-name')].map((n) => n.textContent)).toEqual(['Ann Ash', 'Bea Bell']);
+    node.querySelector<HTMLButtonElement>('.mb-saved__member button')!.click();
+    expect(actions.removeMember).toHaveBeenCalledWith('grp1', 'a');
+    const add = node.querySelector<HTMLSelectElement>('.mb-saved__add-student')!;
+    expect([...add.options].map((o) => o.value)).toEqual(['', 'c', 'd']);
+    add.value = 'c';
+    add.dispatchEvent(new Event('change'));
+    expect(actions.addMember).toHaveBeenCalledWith('grp1', 'c');
+  });
+});
+
 describe('Detail view', () => {
   it('sorts the heatmap by a tag column, then turns the order round', () => {
     const host = document.createElement('div');

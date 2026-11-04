@@ -592,6 +592,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
             planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
             saveGroup: (tags, ids) => void saveGroup(current, context, tags, ids),
             addFlagged: (groupId, ids) => void addFlagged(current, context, groupId, ids),
+            renameGroup: (groupId, name) => void writeGroups(() => api.renameGroup(cls.id, groupId, name)),
+            addMember: (groupId, student) => void writeGroups(() => api.addMembers(cls.id, groupId, [{ student, why: 'Added by teacher' }], today())),
+            removeMember: (groupId, student) => void writeGroups(() => api.removeMember(cls.id, groupId, student, today())),
             pins: (id) => current.markbook.focus?.[id] ?? { pinned: [], dismissed: [] },
             repaint: paint
           })
