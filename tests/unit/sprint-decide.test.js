@@ -224,3 +224,93 @@ test('a group waiting on the teacher for its idea goes through once the teacher 
   assert.equal(after.chosen.title, 'Baker');
   assert.equal(after.awaiting, null);
 });
+
+// ---- Saved Sketch cards at the deadline, and votes when the pool grows
+
+const AFTER_SKETCH = Date.parse('2026-11-04T05:00:00Z'); // an hour past the 3pm Sydney deadline
+const BEFORE = Date.parse('2026-11-01T00:00:00Z');
+const threeInGroup = () => ({ ...CONFIG(), groups: [{ id: 'g1', name: 'Kestrel', students: ['st_ann', 'st_cy', 'st_ed'] }, { id: 'g2', name: 'Heron', students: ['st_gus'] }] });
+
+/** Ann, Cy and Ed get through Understand; the clock stays before Sketch's deadline. */
+async function atSketch() {
+  setSprintClock(() => BEFORE);
+  const store = storeFor(threeInGroup());
+  for (const n of [1, 2, 3]) await act(store, n, 'claim', { initials: INITIALS[n] });
+  const s = await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we a?'], star: '', stretch: '' } });
+  const star = s.notes[0].id;
+  for (const n of [1, 2, 3]) await act(store, n, 'submit', { phase: 'understand', payload: { notes: [`How might we ${n}?`], star, stretch: '' } });
+  return store;
+}
+const sketchOf = (title) => ({ cards: [card('k1', title)], strongest: 'k1', strongest_why: 'Because.' });
+const rowOf = (s, key) => s.phases.find((p) => p.key === key);
+
+test('saved Sketch cards go in at the deadline, on time and fixed', async () => {
+  const store = await atSketch();
+  await act(store, 1, 'submit', { phase: 'sketch', payload: sketchOf('Ash') });
+  await act(store, 2, 'save', { phase: 'sketch', payload: sketchOf('Baker') });
+  assert.equal(rowOf(await act(store, 2, 'status'), 'sketch').state, 'draft');
+  setSprintClock(() => AFTER_SKETCH);
+  const s = await act(store, 2, 'status');
+  const row = rowOf(s, 'sketch');
+  assert.equal(row.state, 'in');
+  assert.equal(row.late, false);
+  assert.equal(row.handed_in, true);
+  assert.deepEqual(s.pool.map((i) => i.title).sort(), ['Ash', 'Baker']);
+  await assert.rejects(act(store, 2, 'save', { phase: 'sketch', payload: sketchOf('Changed') }), { code: 'closed' });
+});
+
+test('a draft with no written card stays a draft at the deadline, and blank cards are left out', async () => {
+  const store = await atSketch();
+  const blank = { ...card('k2', ''), title: '', idea: '' };
+  await act(store, 1, 'save', { phase: 'sketch', payload: { cards: [blank], strongest: 'k2', strongest_why: '' } });
+  await act(store, 2, 'save', { phase: 'sketch', payload: { cards: [blank, card('k1', 'Baker')], strongest: 'k2', strongest_why: '' } });
+  setSprintClock(() => AFTER_SKETCH);
+  const s = await act(store, 1, 'status');
+  assert.equal(rowOf(s, 'sketch').state, 'draft');
+  assert.deepEqual(s.pool.map((i) => i.title), ['Baker']);
+});
+
+test('work first saved after the deadline waits for Submit and counts as late', async () => {
+  const store = await atSketch();
+  setSprintClock(() => AFTER_SKETCH);
+  await act(store, 1, 'save', { phase: 'sketch', payload: sketchOf('Ash') });
+  assert.equal(rowOf(await act(store, 1, 'status'), 'sketch').state, 'draft');
+  const s = await act(store, 1, 'submit', { phase: 'sketch', payload: sketchOf('Ash') });
+  assert.equal(rowOf(s, 'sketch').state, 'in');
+  assert.equal(rowOf(s, 'sketch').late, true);
+  assert.equal(rowOf(s, 'sketch').handed_in, false);
+});
+
+test('a later deadline holds the hand-in back', async () => {
+  const store = await atSketch();
+  await act(store, 1, 'save', { phase: 'sketch', payload: sketchOf('Ash') });
+  const config = threeInGroup();
+  config.phases = config.phases.map((p) => (p.key === 'sketch' ? { ...p, due_date: '2026-11-05' } : p));
+  await store.setJSON('sprint/sp1/config', config);
+  setSprintClock(() => AFTER_SKETCH);
+  assert.equal(rowOf(await act(store, 1, 'status'), 'sketch').state, 'draft');
+});
+
+test('a new idea in the pool puts finished voters back to going, and voting waits for them', async () => {
+  const store = await atSketch();
+  await act(store, 1, 'submit', { phase: 'sketch', payload: sketchOf('Ash') });
+  await act(store, 2, 'submit', { phase: 'sketch', payload: sketchOf('Baker') });
+  setSprintClock(() => AFTER_SKETCH);
+  const before = await act(store, 1, 'status');
+  assert.equal(before.pool.length, 2);
+  await act(store, 1, 'save', { phase: 'decide', payload: duelsFor(before, 'Ash') });
+  const voted = async () => (await store.get('sprint/sp1/groups/g1')).voted;
+  assert.deepEqual(await voted(), ['st_ann']);
+
+  // Ed's late Sketch adds an idea: Ann has two more match-ups to do.
+  const late = await act(store, 3, 'submit', { phase: 'sketch', payload: sketchOf('Cinder') });
+  assert.equal(late.pool.length, 3);
+  assert.deepEqual(await voted(), []);
+
+  await act(store, 2, 'save', { phase: 'decide', payload: duelsFor(late, 'Ash') });
+  const s = await act(store, 3, 'save', { phase: 'decide', payload: duelsFor(late, 'Ash') });
+  assert.equal(s.votes_closed, false);
+  const done = await act(store, 1, 'save', { phase: 'decide', payload: duelsFor(late, 'Ash') });
+  assert.equal(done.votes_closed, true);
+  assert.equal(done.chosen.title, 'Ash');
+});
