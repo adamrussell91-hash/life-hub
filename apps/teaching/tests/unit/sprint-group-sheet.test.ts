@@ -32,7 +32,7 @@ describe('group sheet', () => {
       parts: [{ id: 'p1', text: 'Screens', shows: '', how: '', criterion: 'c1', claimed: 1, mine: true, assigned: ['m1', 'm2'] }],
       pitch: { kind: 'link', name: '', file: null, link: 'https://example.com/proto' }
     }), 'prototype');
-    expect(labels(sheet.el)).toEqual(['Challenge', 'Must include', 'Problem', 'Audience', 'Limits', 'Our idea', 'Parts and who', 'Puts it together', 'Prototype']);
+    expect(labels(sheet.el)).toEqual(['Challenge', 'Must include', 'Our focus', 'Audience', 'Limits', 'Our idea', 'Parts and who', 'Puts it together', 'Prototype']);
     expect(sheet.el.querySelector('.sprint-sheet__limits')?.textContent).toBe('Have: CanvaAsk the expert: The budget');
     expect(sheet.el.querySelector('.sprint-sheet__expert summary')?.textContent).toBe('What the expert said (1)');
     expect(sheet.el.querySelector('.sprint-sheet__row--parts')?.textContent).toContain('Screens · AB (you), CD');
@@ -52,6 +52,6 @@ describe('group sheet', () => {
     info.click();
     expect(info.getAttribute('aria-expanded')).toBe('true');
     expect(meaning.hidden).toBe(false);
-    expect(meaning.textContent).toBe('The problem your teacher set for the whole class.');
+    expect(meaning.textContent).toBe('What your teacher has set the whole class to design.');
   });
 });

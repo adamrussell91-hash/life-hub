@@ -662,3 +662,11 @@ body.spractice-open { overflow: hidden; }
 .sprint-said__tag { font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--pastel-sage-ink); }
 .sprint-said__tag--next { color: var(--pastel-gold-ink); }
 @media (max-width: 560px) { .sprint-tally__row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Before the rapid ideas timer: what one idea is here. */
+.sk-what { margin: 0 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--paper, #f7f6f1); display: grid; gap: 2px; }
+.sk-what dt { font-size: 13px; font-weight: 600; color: var(--muted); }
+.sk-what dd { margin: 0 0 8px; font-size: 16px; overflow-wrap: anywhere; }
+.sk-what dd:last-child { margin-bottom: 0; }
+.coach__scenario { font-size: 13px; color: var(--muted); margin-bottom: 6px !important; }
+.kit-warn { margin: 0 0 8px; font-size: 14px; color: #8a5a00; }

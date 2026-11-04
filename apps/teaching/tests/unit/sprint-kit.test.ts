@@ -35,7 +35,7 @@ describe('kit editor', () => {
     expect(current.sprint!.understand.steps.dig).toBe(false);
     expect(k.root.querySelectorAll('.kit-preview .su-step')).toHaveLength(9);
     k.show('sketch');
-    expect(titles()).toEqual(['Sketch: what students do', 'Sketch settings', 'Idea guide', 'What students see']);
+    expect(titles()).toEqual(['Sketch: what students do', 'Sketch settings', 'What one idea is', 'Idea guide', 'What students see']);
     k.show('decide');
     expect(titles()).toEqual(['Decide: what students do', 'Decide settings', 'What students see']);
     k.show('test');

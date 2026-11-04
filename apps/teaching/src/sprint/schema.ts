@@ -58,6 +58,27 @@ export const IdeaGuideSchema = z.object({
 });
 export type IdeaGuide = z.infer<typeof IdeaGuideSchema>;
 
+const exampleLines = z.array(text(240)).max(4).default([]);
+/**
+ * What one idea is in this sprint, in the teacher's words, plus "See an example"
+ * lines for each Sketch step. Empty fields fall back to the labelled canteen example.
+ */
+export const IdeaKindSchema = z.object({
+  /** "One idea is…": "a kind of viva question, with one sample". */
+  one: text(120).default(''),
+  /** The plural used in headings: "kinds of viva question". */
+  many: text(60).default(''),
+  /** What ideas get judged with, shown before the timer starts. */
+  judge: text(240).default(''),
+  examples: z.object({
+    inspiration: exampleLines,
+    rapid: exampleLines,
+    pick: exampleLines,
+    develop: exampleLines
+  }).prefault({})
+});
+export type IdeaKind = z.infer<typeof IdeaKindSchema>;
+
 export const SprintPhaseSchema = z.object({
   key: SprintPhaseKeySchema,
   where: z.enum(['class', 'home']),
@@ -90,10 +111,10 @@ export type UnderstandStep = (typeof UNDERSTAND_STEPS)[number];
 export const UNDERSTAND_STEP_LABELS: Record<UnderstandStep, string> = {
   spot: 'Spot: words that stand out in the brief',
   audience: 'Audience: who it is for and why',
-  dig: 'Dig: why is that a problem?',
-  say: 'Say it: the problem in your own words',
+  dig: 'Dig: why does it matter?',
+  say: 'Say it: your focus in your own words',
   limits: 'Limits: control and known',
-  vote: 'Vote on the problem',
+  vote: 'Vote on the focus',
   merge: 'One audience',
   grid: 'Our limits',
   ask: 'Choose questions for the expert',
@@ -125,6 +146,7 @@ export const SprintSettingsSchema = z.object({
   reflection_prompts: z.array(text(200)).max(2).default([]),
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements).default([]),
   idea_guide: IdeaGuideSchema,
+  idea_kind: IdeaKindSchema.optional(),
   phases: z.array(SprintPhaseSchema).length(5).refine(phasesInOrder, 'Phases must be in order: Understand, Sketch, Decide, Prototype, Test.'),
   groups: z.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
   understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
@@ -146,6 +168,7 @@ export const PublicSprintSchema = z.object({
   reflection_prompts: z.array(z.string().max(200)).max(2),
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
+  idea_kind: IdeaKindSchema.optional(),
   phases: z.array(SprintPhaseSchema).length(5),
   understand: UnderstandSettingsSchema.prefault(defaultUnderstand),
   sketch_timer: z.number().int().min(0).max(30).default(8),

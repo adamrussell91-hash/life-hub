@@ -31,9 +31,9 @@ async function samplePayload(
     const payload: PhasePayload['understand'] = {
       notes: [], star: '', stretch: '',
       spot: ['brief', 'audience', 'problem'].map((w) => `${w}${tag}`),
-      audience: { who: `The people in ${name}'s brief`, why: `They need a clear answer to the problem ${name} found.` },
-      dig: [`The surface problem ${name} sees.`, `Because it hides the real problem for ${name}.`],
-      say: `The audience needs a clear way in because ${name} found the real problem underneath.`,
+      audience: { who: `The people in ${name}'s brief`, why: `They need a clear answer to what ${name} found.` },
+      dig: [`What ${name} sees on the surface.`, `Because it matters more than it looks for ${name}.`],
+      say: `The audience needs a clear way in so that ${name}'s design does its job.`,
       limits: { can_known: [`What ${name} makes`], cant_known: ['The deadline'], can_unknown: [`How long ${name}'s part takes`], cant_unknown: ['What the audience already knows'] }
     };
     status = await client.save('understand', payload, status.phases?.find((p) => p.key === 'understand')?.go);

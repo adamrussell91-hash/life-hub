@@ -83,7 +83,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const notes = [`${name} starts blank for ${s.name}. Their earlier work is set aside, and you can bring it back here.`];
     if (s.phases[key] === 'in' || s.phases[key] === 'late') notes.push('They hand it in again when they’re ready.');
     const votesClosed = !!b.chosen || b.awaiting?.kind === 'idea';
-    if (key === 'understand' && b.question) notes.push('The group’s problem stays as chosen.');
+    if (key === 'understand' && b.question) notes.push('The group’s focus stays as chosen.');
     if (key === 'sketch') notes.push(votesClosed ? 'Voting has closed, so new ideas stay out of the head-to-heads.' : 'Their idea leaves the head-to-heads until they hand in again, and they redo their match-ups.');
     if (key === 'decide') notes.push(votesClosed ? 'Voting has closed, so the group’s result stays and new match-ups don’t count.' : 'They redo their match-ups, and voting waits for them.');
     if (key === 'prototype') notes.push('Their part stays theirs, and the group’s pitch file stays.');
@@ -154,7 +154,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const a = b.awaiting;
     const unanswered = (b.understand?.sent ?? []).filter((q) => !q.answer).length;
     const band = (text: string, t: Tab, label: string) => { const box = el('div', 'sboard__needs'); box.append(el('span', '', text), button(label, 'secondary', () => go(t))); return box; };
-    if (a?.kind === 'question') return band(a.empty ? 'No problem statements are in yet. Decide can’t pick an idea until you choose one.' : `${a.tie ? 'It’s a tie. ' : ''}Choose the group’s problem. Decide can’t pick an idea until you do.`, 'understand', 'Go to the problems');
+    if (a?.kind === 'question') return band(a.empty ? 'No focus statements are in yet. Decide can’t pick an idea until you choose one.' : `${a.tie ? 'It’s a tie. ' : ''}Choose the group’s focus. Decide can’t pick an idea until you do.`, 'understand', 'Go to the problems');
     if (a?.kind === 'idea') return band(a.empty ? 'Voting has closed with no ideas in.' : `${a.tie ? 'It’s a tie. ' : 'Voting has closed. '}Choose the group’s idea so they can plan the parts.`, 'ideas', 'Go to the ideas');
     if (unanswered) return band(`${unanswered} ${unanswered === 1 ? 'question' : 'questions'} from the group to answer.`, 'understand', 'Go to the questions');
     return null;
@@ -173,7 +173,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     d.addEventListener('toggle', () => { if (d.open) openCards.add(i.id); else openCards.delete(i.id); });
     d.append(el('summary', '', 'Read the card'));
     const dl = el('dl');
-    for (const [label, text] of [['The idea', i.idea], ['How it solves the problem', i.answers], ['Evidence', i.evidence]] as const) {
+    for (const [label, text] of [['The idea', i.idea], ['How it fits the focus', i.answers], ['Evidence', i.evidence]] as const) {
       if (text?.trim()) dl.append(el('dt', '', label), el('dd', '', text));
     }
     d.append(dl);
@@ -231,7 +231,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const g = heading('Ideas in the head-to-heads', pool.length ? 'Each student’s starred idea, most wins first.' : undefined);
     if (b.chosen) g.append(el('p', 'sprint-note', 'The idea is chosen.'));
     else if (b.awaiting === null && pool.length) g.append(el('p', 'sprint-note', 'Head-to-heads are open. To move the group on without waiting, pick an idea.'));
-    else if (b.awaiting?.kind === 'question') g.append(el('p', 'sprint-note', 'Decide waits until you confirm the group’s problem in Understand.'));
+    else if (b.awaiting?.kind === 'question') g.append(el('p', 'sprint-note', 'Decide waits until you confirm the group’s focus in Understand.'));
     if (pool.length) {
       g.append(ideasTable(b));
       if (crit().length) g.append(el('p', 'sboard__key', 'Darker means students more often said it was the stronger one on that criterion.'));
@@ -276,7 +276,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     if (b.reasons.some((r) => Object.keys(r.reasons).length || r.dots?.length)) {
       const rs = heading('Vote reasons');
       for (const r of b.reasons) for (const c of crit()) if (r.reasons[c.id]) rs.append(el('p', '', `${r.name}, ${c.text}: ${r.reasons[c.id]}`));
-      for (const r of b.reasons) for (const d of r.dots ?? []) rs.append(el('p', 'sprint-note', `${r.name} dotted ${d.part === 'idea' ? 'the idea' : d.part === 'answers' ? 'how it solves the problem' : 'the evidence'} in "${titleOf.get(d.idea) ?? 'an idea'}"${d.note ? `: ${d.note}` : ''}`));
+      for (const r of b.reasons) for (const d of r.dots ?? []) rs.append(el('p', 'sprint-note', `${r.name} dotted ${d.part === 'idea' ? 'the idea' : d.part === 'answers' ? 'how it fits the focus' : 'the evidence'} in "${titleOf.get(d.idea) ?? 'an idea'}"${d.note ? `: ${d.note}` : ''}`));
       pane.append(rs);
     }
     return pane;
@@ -302,12 +302,12 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
 
   function understandPane(b: GroupBoard): HTMLElement {
     const pane = el('div', 'sboard__pane');
-    const problem = heading('The group’s problem');
+    const problem = heading('The group’s focus');
     if (b.question) problem.append(el('p', 'sboard__problem', b.question.text));
-    else problem.append(el('p', 'sprint-note', b.awaiting?.kind === 'question' ? 'Waiting for you to choose the problem.' : 'The problem is chosen when Understand closes.'));
+    else problem.append(el('p', 'sprint-note', b.awaiting?.kind === 'question' ? 'Waiting for you to choose the focus.' : 'The focus is chosen when Understand closes.'));
     pane.append(problem);
     if (b.notes.length) {
-      const st = heading('Everyone’s problem statements');
+      const st = heading('Everyone’s focus statements');
       for (const n of b.notes) {
         const r = el('div', 'sboard__statement');
         const who = el('span', 'sboard__statement-who');

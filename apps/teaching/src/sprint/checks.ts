@@ -17,15 +17,15 @@ export function understandProblems(p: PhasePayload['understand'], steps: Record<
   if (steps.spot && p.spot.length < 3) out.push(`Spot: tap at least 3 words in the brief that stand out. You have ${p.spot.length} so far.`);
   if (steps.audience && !p.audience.who.trim()) out.push('Audience: say who this is for.');
   if (steps.audience && !fullSentence(p.audience.why)) out.push('Audience: say why it matters to them in a full sentence.');
-  if (steps.dig && p.dig.filter((d) => d.trim()).length < 2) out.push('Dig: write the surface problem, then ask why at least once.');
-  if (steps.say && !fullSentence(p.say)) out.push('Say it: write the problem in your own words, in a full sentence.');
+  if (steps.dig && p.dig.filter((d) => d.trim()).length < 2) out.push('Dig: write what the challenge asks on the surface, then ask why at least once.');
+  if (steps.say && !fullSentence(p.say)) out.push('Say it: write your focus in your own words, in a full sentence.');
   if (steps.limits) {
     const known = p.limits.can_known.length + p.limits.cant_known.length;
     const unknown = p.limits.can_unknown.length + p.limits.cant_unknown.length;
     if (!known) out.push('Limits: add at least one thing you know.');
     if (!unknown) out.push('Limits: add at least one thing you don’t know yet.');
   }
-  if (steps.vote && statements > 0 && !p.star) out.push('Vote: star the problem statement your group should take on.');
+  if (steps.vote && statements > 0 && !p.star) out.push('Vote: star the focus your group should take on.');
   return out;
 }
 

@@ -1,10 +1,10 @@
 import { button, el } from '@/quiz/dom';
 import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
-import { SKETCH_GUIDE } from './guidance';
+import { SKETCH_GUIDE, sketchGuide } from './guidance';
 import { SKETCH_CHECKS } from './guidance';
 import { coach, slidify, draftOf, frameField, stepHead, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
-import type { PhasePayload, SketchCard } from './schema';
+import type { IdeaKind, PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
 const blank = (id: string, seed: string): SketchCard => ({ id, seed, title: seed.slice(0, 80), idea: '', answers: '', evidence: '', criteria: {}, requirements: {}, value_answer: '' });
@@ -31,6 +31,8 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   if (!state.inspiration.length) state.inspiration.push({ from: '', borrow: '' });
   const off = !ctx.editable;
   const reqs = ctx.sprint.requirements.filter((r) => r.phases.includes('sketch'));
+  const kind = ctx.sprint.idea_kind;
+  const many = kind?.many?.trim() || 'ideas';
   const root = el('div', 'sprint-sketch');
   root.append(el('h2', '', 'Sketch your ideas'));
   if (ctx.sprint.phases[1]!.instruction) root.append(el('p', '', ctx.sprint.phases[1]!.instruction));
@@ -43,7 +45,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const step = (n: number, key: keyof typeof SKETCH_GUIDE, title: string, note: string) => {
     const box = el('section', 'su-step su-step--alone');
     box.dataset.step = key;
-    box.append(...stepHead(`Sketch · Step ${n} of 4`, title), coach(SKETCH_GUIDE[key]));
+    box.append(...stepHead(`Sketch · Step ${n} of 4`, title), coach(sketchGuide(key, kind)));
     if (note) box.append(el('p', 'sprint-note', note));
     root.append(box);
     return box;
@@ -79,7 +81,9 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   insp.append(inspList);
 
   // 2. Rapid ideas against the timer
-  const rapid = step(2, 'rapid', 'Rapid ideas: as many as you can', `Write at least ${ideas}, then as many more as you can. ${minutes ? `You have ${minutes} minutes once you start. ` : ''}One line per idea, press Enter, no judging yet.`);
+  const rapid = step(2, 'rapid', `Rapid ideas: as many ${many} as you can`, `Write at least ${ideas}, then as many more as you can. ${minutes ? `You have ${minutes} minutes once you start. ` : ''}One line each, press Enter.`);
+  const what = whatYouWrite(kind);
+  if (what) rapid.append(what);
   const timer = el('div', 'sk-timer');
   const add = el('form', 'su-add');
   const input = el('input', 'qz-input');
@@ -291,6 +295,19 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   slidify(root, ctx.sprint.understand?.layout, bar, ctx.steps?.sketch ?? 0, (i) => { if (ctx.steps) ctx.steps.sketch = i; });
   root.append(bar.el);
   return { el: root, dispose: () => { window.clearInterval(tick); bar.dispose(); } };
+}
+
+/** Before the timer: what one idea is here, one to look at, and what ideas get judged with later. */
+export function whatYouWrite(kind: IdeaKind | undefined): HTMLElement | null {
+  const one = kind?.one?.trim();
+  if (!kind || !one) return null;
+  const box = el('dl', 'sk-what');
+  const line = (label: string, text: string) => box.append(el('dt', '', label), el('dd', '', text));
+  line('One idea is', one);
+  const sample = kind.examples?.rapid?.find((l) => l.trim());
+  if (sample) line('Here’s one from another topic', sample);
+  if (kind.judge?.trim()) line('You judge them with', kind.judge.trim());
+  return box;
 }
 
 /** A requirement: no tick, because every one is needed. Just the box saying where it is. */

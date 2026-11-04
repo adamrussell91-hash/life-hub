@@ -7,10 +7,11 @@ import type { LimitBox, PublicSprint, SprintPhaseKey } from './schema';
 
 /** What each row means, behind its small "i". */
 export const SHEET_INFO = {
-  challenge: 'The problem your teacher set for the whole class.',
+  idea_kind: 'What your teacher means by one idea in this sprint. You write several, star your best, and your group picks one to build.',
+  challenge: 'What your teacher has set the whole class to design.',
   must: 'Things every prototype has to have. Your teacher checks for these at the pitch.',
   stretch: 'An extra push if your group wants one. It’s optional.',
-  problem: 'The exact problem your group chose to solve in Understand.',
+  problem: 'The sentence your group chose in Understand: what you are designing, who for and what it has to achieve.',
   audience: 'Who your prototype is for, and why it matters to them.',
   limits: 'What boxes your group in. Have: tools and things you can use. Work around: facts you can’t change. Find out: things you still need to learn. Ask the expert: questions you sent your teacher.',
   idea: 'The idea your group chose in Decide. Everything you build from here is part of it.',
@@ -109,9 +110,11 @@ export function createGroupSheet(opts: GroupSheetOptions): { el: HTMLElement; up
     }
     const stretch = opts.sprint.phases.find((p) => p.key === phase)?.stretch?.trim();
     if (stretch) rows.push(row('stretch', 'Stretch', plain(`${stretch} (optional)`)));
+    const oneIdea = opts.sprint.idea_kind?.one?.trim();
+    if (oneIdea && (phase === 'sketch' || phase === 'decide')) rows.push(row('idea_kind', 'One idea is', plain(oneIdea)));
     const b = s.brief;
     const problem = b?.problem ?? s.question?.text ?? '';
-    if (problem) rows.push(row('problem', 'Problem', plain(problem)));
+    if (problem) rows.push(row('problem', 'Our focus', plain(problem)));
     if (b?.audience?.who) rows.push(row('audience', 'Audience', plain(`${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`)));
     const lim = b?.limits ?? {};
     const lines = SHEET_LIMITS.map(([k, name]) => [name, (lim[k] ?? []).map((c) => c.text)] as const).filter(([, l]) => l.length);

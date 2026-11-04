@@ -103,8 +103,8 @@ describe('understand form', () => {
     f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
     const checks = f.el.querySelector('.sprint-checks')?.textContent ?? '';
     expect(checks).toContain('Audience: say who this is for.');
-    expect(checks).toContain('Say it: write the problem in your own words');
-    expect(checks).toContain('Vote: star the problem statement');
+    expect(checks).toContain('Say it: write your focus in your own words');
+    expect(checks).toContain('Vote: star the focus');
     expect(checks).not.toContain('Spot');
     expect(c.client.submit).not.toHaveBeenCalled();
   });
@@ -186,7 +186,7 @@ describe('sketch form', () => {
     expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(2);
     expect(stars()[1]!.disabled).toBe(true);
     expect(f.el.querySelector<HTMLInputElement>('.sprint-card-pane input')!.value).toBe('Objects');
-    expect(f.el.textContent).toContain('It solves our problem for the audience because…');
+    expect(f.el.textContent).toContain('It fits our focus and audience because…');
     // Criteria and requirements are checked for the strongest idea only.
     expect(f.el.textContent).not.toContain('Two sources');
     const pick = f.el.querySelector<HTMLSelectElement>('.sprint-strongest select')!;

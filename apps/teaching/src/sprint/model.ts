@@ -51,6 +51,7 @@ export function publicSprint(s: SprintSettings): PublicSprint {
     reflection_prompts: [...s.reflection_prompts],
     requirements: s.requirements.map((r) => ({ ...r, phases: [...r.phases] })),
     idea_guide: s.idea_guide,
+    ...(s.idea_kind ? { idea_kind: s.idea_kind } : {}),
     phases: s.phases.map((p) => ({ ...p })),
     understand: s.understand ? { layout: s.understand.layout, steps: { ...s.understand.steps } } : defaultUnderstand(),
     sketch_timer: s.sketch_timer ?? 8,

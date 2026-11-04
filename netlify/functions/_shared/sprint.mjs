@@ -32,6 +32,7 @@ export function prepareSprintPublish(draft, studentBlocks) {
       reflection_prompts: [...s.reflection_prompts],
       requirements: s.requirements,
       idea_guide: s.idea_guide,
+      ...(s.idea_kind ? { idea_kind: s.idea_kind } : {}),
       phases: s.phases,
       understand: UnderstandSettingsSchema.parse(s.understand ?? {}),
       sketch_timer: Number.isInteger(s.sketch_timer) ? s.sketch_timer : 8,
@@ -630,8 +631,8 @@ async function studentView(store, lessonId, config, who, group) {
 /** Structural checks the server makes before a submit; the browser shows the kinder, fuller checks. */
 async function submitProblem(store, lessonId, config, group, sid, phase, payload, view) {
   if (phase === 'understand') {
-    if (stepOn(config, 'say') && !payload.say.trim() && !payload.notes.some((n) => n.trim())) return ['need_say', 'Write the problem in your own words first.'];
-    if (stepOn(config, 'vote') && !view.notes.some((n) => n.id === payload.star)) return ['need_star', 'Star one of your group’s problem statements.'];
+    if (stepOn(config, 'say') && !payload.say.trim() && !payload.notes.some((n) => n.trim())) return ['need_say', 'Write your focus in your own words first.'];
+    if (stepOn(config, 'vote') && !view.notes.some((n) => n.id === payload.star)) return ['need_star', 'Star one of your group’s focus statements.'];
   }
   if (phase === 'sketch' && !payload.cards.length) return ['need_ideas', 'Write at least one idea first.'];
   if (phase === 'decide') {
