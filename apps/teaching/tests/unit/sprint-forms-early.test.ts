@@ -24,10 +24,21 @@ describe('understand form', () => {
   it('as slides, shows one step at a time, alone steps first, then the group’s space', () => {
     const f = mountUnderstand(ctx({ sprint: withSteps('slides'), blocks: brief }));
     expect(visible(f.el)).toEqual(['spot']);
-    const next = [...f.el.querySelectorAll<HTMLButtonElement>('.su-nav button')].find((b) => b.textContent === 'Next')!;
+    const next = [...f.el.querySelectorAll<HTMLButtonElement>('.su-nav button')].find((b) => b.textContent === 'Next step')!;
     for (let i = 0; i < 5; i += 1) next.click();
     expect(visible(f.el)).toEqual(['vote']);
     expect(f.el.querySelector('.su-nav__where')?.textContent).toBe('Step 6 of 10 · Your group’s space');
+  });
+
+  it('as slides, offers Next on every step and Submit only on the last', () => {
+    const f = mountUnderstand(ctx({ sprint: withSteps('slides', ['vote', 'merge', 'ask', 'expert', 'limits']), blocks: brief }));
+    const next = [...f.el.querySelectorAll<HTMLButtonElement>('.su-nav button')].find((b) => b.textContent === 'Next step')!;
+    expect(f.el.classList.contains('su-between')).toBe(true);
+    expect(next.hidden).toBe(false);
+    while (!f.el.querySelector('.su-nav__where')?.textContent?.includes('Last step')) next.click();
+    expect(f.el.classList.contains('su-between')).toBe(false);
+    expect(next.hidden).toBe(true);
+    expect(f.el.querySelector('.sprint-submit__go')?.textContent).toBe('Submit my Understand work');
   });
 
   it('down the page, shows every step that is switched on, and leaves out the rest', () => {

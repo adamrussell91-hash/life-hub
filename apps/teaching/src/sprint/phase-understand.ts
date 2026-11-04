@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { briefText } from './model';
-import { coach, draftOf, frameField, stepHead, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { coach, draftOf, frameField, markLastStep, stepHead, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { LIMITS_SCENARIO, LIMIT_CELLS, UNDERSTAND_GUIDE } from './guidance';
 import { LIMIT_BOXES, UNDERSTAND_ALONE, defaultUnderstand, type LimitBox, type PhasePayload, type UnderstandStep } from './schema';
 import type { SprintStatus, UnderstandGroup } from './api';
@@ -380,7 +380,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   const go = () => { at = Math.min(order.length - 1, at + 1); show(); };
   /** On Ask, Next sends the starred questions to the teacher first, so they can't be skipped. */
   const sendFirst = () => order[at] === 'ask' && ctx.editable && group().questions.some((q) => q.picked && !q.sent);
-  const next = button('Next', 'primary', () => {
+  const next = button('Next step', 'primary', () => {
     if (!sendFirst()) { go(); return; }
     next.disabled = true;
     ctx.client.askSend().then((s) => { err.textContent = ''; status = s; paintShared(); go(); }).catch((e: unknown) => { err.textContent = e instanceof Error ? e.message : 'That didn’t work. Try again.'; paintNext(); });
@@ -390,8 +390,9 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     const asking = order[at] === 'ask' && ctx.editable;
     const g = group();
     const unsent = g.questions.some((q) => q.picked && !q.sent);
-    next.textContent = asking && unsent ? 'Send to teacher, then next' : 'Next';
-    next.disabled = at === order.length - 1 || (asking && !unsent && !g.sent.length);
+    next.textContent = asking && unsent ? 'Send to teacher, then next' : 'Next step';
+    next.hidden = at === order.length - 1;
+    next.disabled = asking && !unsent && !g.sent.length;
     next.title = next.disabled && asking && !g.sent.length ? 'Star at least one question to send' : '';
   };
   function show(): void {
@@ -399,7 +400,9 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     back.disabled = at === 0;
     paintNext();
     const k = order[at];
-    where.textContent = k ? `Step ${at + 1} of ${order.length} · ${alone(k) ? 'On your own' : 'Your group’s space'}` : '';
+    const last = at === order.length - 1;
+    if (slides) markLastStep(root, last);
+    where.textContent = k ? `Step ${at + 1} of ${order.length} · ${last ? 'Last step' : alone(k) ? 'On your own' : 'Your group’s space'}` : '';
     paintRail();
   }
   /** Has this step got something in it? Alone steps read the draft, shared ones the group's space. */

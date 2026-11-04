@@ -25,7 +25,17 @@
 .sprint-value { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
 .sprint-value p { margin: 4px 0 8px; }
 .sprint-value input { width: 100%; }
-.sprint-submit { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+.sprint-submit { margin-top: 18px; }
+/* The end of the phase: its own panel and its own green, so it never reads as another Next. */
+.sprint-submit__ask { padding: 16px 18px; border-radius: 14px; background: var(--pastel-sage); border: 1.5px solid var(--pastel-sage-ink); }
+.sprint-submit__ask h3 { margin: 0 0 4px; color: var(--pastel-sage-ink); }
+.sprint-submit__lead { margin: 0 0 12px; font-size: 14px; color: var(--pastel-sage-ink); }
+.btn.btn--primary.sprint-submit__go, .btn.btn--primary.sprint-submit__go:hover { background: var(--pastel-sage-ink); border-color: var(--pastel-sage-ink); color: #fff; }
+.sprint-submit__later { display: none; margin: 0; text-align: center; color: var(--muted); font-size: 13px; }
+.su-between .sprint-submit { margin-top: 2px; text-align: center; }
+.su-between .sprint-submit__later:not([hidden]) { display: block; }
+.su-nav [hidden] { display: none; }
+.su-between .sprint-submit__ask { display: none; }
 .sprint-checks { margin: 0 0 10px; padding-left: 18px; color: var(--pastel-peach-ink); }
 /* Checks grouped under the step where they're fixed. */
 .sprint-checks__step { list-style: none; margin: 0 0 10px -18px; }
