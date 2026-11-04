@@ -939,6 +939,18 @@ async function teacherContext(store, lessonId) {
   return { config, k, lockRec, extend, byId };
 }
 
+/** One student's state in each phase, and when each draft was last saved. */
+async function studentProgress(store, k, owner) {
+  const phases = {};
+  const saved_at = {};
+  for (const key of PHASES) {
+    const sub = await read(store, k.sub(owner, key));
+    phases[key] = !sub ? 'none' : !sub.submitted_at ? 'draft' : sub.late ? 'late' : 'in';
+    if (sub?.saved_at) saved_at[key] = sub.saved_at;
+  }
+  return { phases, saved_at };
+}
+
 async function teacherSummary(store, lessonId) {
   const { config, k, lockRec, extend, byId } = await teacherContext(store, lessonId);
   const now = clock();
@@ -948,11 +960,7 @@ async function teacherSummary(store, lessonId) {
     const open = openPhases(groupPhases(config, extend, g.id), factsFor(g, state, lockRec), now);
     const students = await Promise.all(g.students.map(async (id) => {
       const owner = ownerOf(config.class_id, id);
-      const phases = {};
-      for (const key of PHASES) {
-        const sub = await read(store, k.sub(owner, key));
-        phases[key] = !sub ? 'none' : !sub.submitted_at ? 'draft' : sub.late ? 'late' : 'in';
-      }
+      const { phases } = await studentProgress(store, k, owner);
       // Who has opened each phase: End class part uses it to say who was there.
       const seen = (await read(store, k.seen(owner))) ?? {};
       const opened = Object.fromEntries(PHASES.map((key) => [key, !!seen[key]]));
@@ -981,10 +989,17 @@ async function teacherBoard(store, lessonId, groupId) {
   for (const key of ['prototype', 'test']) {
     subs[key] = (await groupSubs(store, lessonId, config, g, key)).map(({ student, sub }) => ({ student_id: student, name: name(student), sub }));
   }
-  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {}, dots: list(sub?.payload?.dots), duels: list(sub?.payload?.duels), ranked: list(sub?.payload?.duels).length ? rankIdeas(list(sub.payload.duels), t.pool) : [] }));
+  const reasons = decide.map(({ student, sub }) => ({ student_id: student, name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {}, dots: list(sub?.payload?.dots), duels: list(sub?.payload?.duels), ranked: list(sub?.payload?.duels).length ? rankIdeas(list(sub.payload.duels), t.pool) : [] }));
   const round = (await read(store, k.round(g.id))) ?? null;
+  const dates = groupPhases(config, extend, g.id);
+  const progress = {
+    open: openPhases(dates, factsFor(g, state, lockRec), clock()),
+    phases: dates.map((p) => ({ key: p.key, due_date: p.due_date, due_time: p.due_time })),
+    students: await Promise.all(g.students.map(async (id) => ({ id, name: name(id), voted: list(state.voted).includes(id), ...(await studentProgress(store, k, ownerOf(config.class_id, id))) })))
+  };
   return {
     group: { id: g.id, name: g.name },
+    progress,
     awaiting: state.awaiting ?? null,
     // Who has finished Decide's head-to-heads and who is still going.
     voted: { done: g.students.filter((x) => list(state.voted).includes(x)).map(name), waiting: g.students.filter((x) => !list(state.voted).includes(x)).map(name) },

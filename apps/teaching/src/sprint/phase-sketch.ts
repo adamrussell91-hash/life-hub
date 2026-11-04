@@ -79,7 +79,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   insp.append(inspList);
 
   // 2. Rapid ideas against the timer
-  const rapid = step(2, 'rapid', 'Rapid ideas: as many as you can', minutes ? `You have ${minutes} minutes once you start. One line per idea, press Enter, no judging yet.` : 'One line per idea, press Enter, no judging yet.');
+  const rapid = step(2, 'rapid', 'Rapid ideas: as many as you can', `Write at least ${ideas}, then as many more as you can. ${minutes ? `You have ${minutes} minutes once you start. ` : ''}One line per idea, press Enter, no judging yet.`);
   const timer = el('div', 'sk-timer');
   const add = el('form', 'su-add');
   const input = el('input', 'qz-input');
@@ -92,6 +92,9 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const list = el('ol', 'sk-rapid');
   const left = () => (minutes && state.rapid_started_at ? Date.parse(state.rapid_started_at) + minutes * 60000 - Date.now() : 0);
   const running = () => !minutes || (!!state.rapid_started_at && left() > 0);
+  // The timer ends the sprint for more ideas, never the student's way to the minimum Submit asks for.
+  const stillShort = () => ideas - state.rapid.length;
+  const canAdd = () => running() || (!!state.rapid_started_at && stillShort() > 0);
   let tick = 0;
   const paintTimer = () => {
     const n = state.rapid.length;
@@ -108,8 +111,9 @@ export function mountSketch(ctx: FormContext): PhaseForm {
       start.disabled = off;
       timer.append(start, el('span', 'sprint-note', 'The box opens when you start.'));
     } else if (minutes && left() > 0) timer.append(el('strong', 'sk-timer__clock', clock(left())), el('span', 'sk-timer__count', count));
+    else if (minutes && stillShort() > 0) timer.append(el('strong', '', `Time’s up. Add ${stillShort()} more to reach ${ideas}.`));
     else timer.append(el('strong', '', minutes ? `Time’s up. ${count}.` : count));
-    const open = !off && running();
+    const open = !off && canAdd();
     input.disabled = !open;
     go.disabled = !open;
     if (minutes && state.rapid_started_at && left() <= 0) window.clearInterval(tick);
@@ -117,7 +121,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   add.addEventListener('submit', (e) => {
     e.preventDefault();
     const t = input.value.trim();
-    if (!t || !running() || state.rapid.length >= 40) return;
+    if (!t || !canAdd() || state.rapid.length >= 40) return;
     if (!state.rapid.some((r) => same(r, t))) state.rapid.push(t);
     input.value = '';
     change();

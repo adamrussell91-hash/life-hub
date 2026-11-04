@@ -156,6 +156,8 @@ test('confirm sets the group question or idea and clears the wait', async () => 
   const board = await teach(store, 'board', { group_id: 'g1' });
   assert.equal(board.awaiting.kind, 'question');
   assert.equal(board.notes[0].name, 'Ann Bell');
+  assert.equal(board.progress.open.at(-1), 'sketch');
+  assert.equal(board.progress.students.find((x) => x.name === 'Ann Bell').phases.understand, 'in');
   await teach(store, 'confirm', { group_id: 'g1', kind: 'question', id: board.notes[1].id });
   const after = await act(store, 2, 'status');
   assert.equal(after.question.text, board.notes[1].text);
