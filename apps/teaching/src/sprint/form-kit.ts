@@ -3,7 +3,7 @@ import { libraryValue } from '@/toolkit/library';
 import type { Block } from '@/schemas/block';
 import type { PhaseRow, SprintClient, SprintStatus } from './api';
 import type { Guide } from './guidance';
-import type { PhasePayload, PublicSprint, SprintPhaseKey } from './schema';
+import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 
 /** What every phase form is given. */
 export type FormContext = {
@@ -113,8 +113,8 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   err.setAttribute('role', 'alert');
   let timer = 0;
   let busy = false;
-  const saved = ctx.row.state === 'in' ? 'In. You can change it until the deadline.' : ctx.row.state === 'draft' ? 'Saved as a draft.' : '';
-  note.textContent = ctx.row.frozen ? 'Your class work is in.' : saved;
+  // Once it's in, the Submitted banner says so; this line is for drafts.
+  note.textContent = ctx.row.state === 'draft' && !ctx.row.frozen ? 'Saved as a draft.' : '';
   // A clear, lasting sign that it went in, not just a line of small print.
   const done = el('div', 'sprint-submit__done');
   done.setAttribute('role', 'status');
@@ -126,7 +126,19 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     done.replaceChildren(el('span', 'sprint-submit__tick', '✓'), el('div', ''));
     done.lastElementChild!.append(el('strong', '', `Submitted${at}`), el('span', '', ctx.row.frozen ? ' Your class work is in.' : ' You can still change it until the deadline. Changes save by themselves.'));
   };
-  const goLabel = () => (submitted ? 'Update my submission' : 'Check and submit');
+  const name = PHASE_LABELS[phase];
+  const goLabel = () => (submitted ? 'Update my submission' : `Submit my ${name} work`);
+  // Between slides only the "submit comes last" line shows; see markLastStep.
+  const later = el('p', 'sprint-submit__later', 'Your work saves as you go. Submit comes on the last step.');
+  const ask = el('div', 'sprint-submit__ask');
+  const head = el('h3', '');
+  const lead = el('p', 'sprint-submit__lead');
+  const paintAsk = (left = 0) => {
+    later.hidden = submitted;
+    head.textContent = left > 1 ? `Nearly there: ${left} things left` : left ? 'Nearly there: one thing left' : submitted ? 'Changed something?' : `Finished with ${name}?`;
+    lead.hidden = left > 0;
+    lead.textContent = submitted ? 'Update your submission so your teacher sees the latest.' : 'Submitting tells your teacher it’s ready. We check it first and show you anything to add.';
+  };
   const send = async (kind: 'save' | 'submit') => {
     if (busy || !ctx.editable) return;
     busy = true;
@@ -138,6 +150,7 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
       if (kind === 'submit') {
         submitted = true;
         paintDone(new Date());
+        paintAsk();
         done.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         ctx.onStatus(next);
       }
@@ -151,21 +164,27 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   };
   const check = () => {
     const p = problems();
-    list.replaceChildren(...checkList(bar.closest<HTMLElement>('.sprint-form') ?? bar.parentElement, p));
+    const items = checkList(bar.closest<HTMLElement>('.sprint-form') ?? bar.parentElement, p);
+    list.replaceChildren(...foldChecks(items, !!list.querySelector('details')?.open));
+    paintAsk(items.length);
     return p;
   };
-  const go = button('Check and submit', 'primary', () => {
+  const go = button(goLabel(), 'primary', () => {
     if (check().length === 0) void send('submit');
   });
+  go.classList.add('sprint-submit__go');
   go.disabled = !ctx.editable;
-  go.textContent = goLabel();
   paintDone();
-  bar.append(done, el('h3', '', 'Check before you submit'), list, go, note, err);
+  paintAsk();
+  ask.append(head, lead, list, go);
+  bar.append(done, later, ask, note, err);
   return {
     el: bar,
     changed() {
       if (!ctx.editable) return;
       if (ctx.drafts) ctx.drafts[phase] = structuredClone(payload());
+      // A list already showing shrinks as they fix things.
+      if (list.childElementCount) check();
       window.clearTimeout(timer);
       timer = window.setTimeout(() => { timer = 0; void send('save'); }, 4000);
     },
@@ -207,11 +226,35 @@ function checkList(form: HTMLElement | null, problems: Problem[]): HTMLElement[]
   return out;
 }
 
+/** One thing to do next; the rest wait behind a fold, so a first try never meets a wall of jobs. */
+function foldChecks(items: HTMLElement[], open: boolean): HTMLElement[] {
+  const [first, ...rest] = items;
+  if (!first) return [];
+  if (!rest.length) return [first];
+  const more = el('li', 'sprint-checks__more');
+  const fold = el('details');
+  fold.open = open;
+  const inner = el('ul', 'sprint-checks');
+  inner.append(...rest);
+  fold.append(el('summary', '', `${rest.length} more after that`), inner);
+  more.append(fold);
+  return [first, more];
+}
+
 /** Open a step card: its rail dot when the steps are slides, else scroll to it. */
 function openStep(form: HTMLElement, card: HTMLElement, n: number): void {
   const dot = form.querySelector<HTMLButtonElement>(`.su-rail__dot[aria-label^="Step ${n}:"]`);
   if (dot) dot.click();
   (dot ?? card).scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+}
+
+/**
+ * Slides show one main action at a time: Next on every step, Submit only on
+ * the last. The class sits on the phase's root and sprint.css does the hiding,
+ * so a "Submitted" banner and the saved note stay in view on every step.
+ */
+export function markLastStep(root: HTMLElement, last: boolean): void {
+  root.classList.toggle('su-between', !last);
 }
 
 /**
@@ -229,7 +272,7 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
   rail.setAttribute('aria-label', 'Steps');
   const where = el('span', 'su-nav__where');
   const back = button('Back', 'secondary', () => go(at - 1));
-  const next = button('Next', 'primary', () => go(at + 1));
+  const next = button('Next step', 'primary', () => go(at + 1));
   const nav = el('div', 'su-nav');
   nav.append(back, where, next);
   function go(i: number): void {
@@ -241,8 +284,10 @@ export function slidify(root: HTMLElement, layout: 'slides' | 'vertical' | undef
   function paint(): void {
     cards.forEach((c, i) => { c.hidden = i !== at; });
     back.disabled = at === 0;
-    next.disabled = at === cards.length - 1;
-    where.textContent = `Step ${at + 1} of ${cards.length}`;
+    const last = at === cards.length - 1;
+    next.hidden = last;
+    markLastStep(root, last);
+    where.textContent = `Step ${at + 1} of ${cards.length}${last ? ' · Last step' : ''}`;
     rail.replaceChildren(...cards.map((c, i) => {
       const li = el('li', '');
       const title = c.querySelector('h3')?.textContent ?? `Step ${i + 1}`;
