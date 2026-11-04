@@ -387,7 +387,7 @@ describe('classes section', () => {
   it('opens the student class page in a new tab from View as student', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
     const link = canvas.querySelector<HTMLAnchorElement>('.class-page__view-as-student');
-    expect(link?.getAttribute('href')).toMatch(/\/s\/classes\/class_2026_12engadv1$/);
+    expect(link?.getAttribute('href')).toMatch(/\/s\/classes\/class_2026_12engadv1#preview$/);
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.rel).toContain('noopener');
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));

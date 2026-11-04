@@ -1,5 +1,6 @@
 import { withAppBase } from '@/app/base-path';
 import { CLASS_SITE_ORIGIN, studentSiteOrigin } from '@/app/class-site';
+import { withTeacherPreview } from '@/quiz/teacher-preview';
 
 /**
  * Shared student public-path helpers and a discreet Copy/Open control.
@@ -35,8 +36,8 @@ export function absolutePublicUrl(kind: PublicEntityKind, id: string): string {
  */
 export function teacherPreviewUrl(kind: PublicEntityKind, id: string): string {
   const origin = studentSiteOrigin();
-  if (origin === CLASS_SITE_ORIGIN) return absolutePublicUrl(kind, id);
-  return `${origin}${publicStudentPath(kind, id)}`;
+  if (origin === CLASS_SITE_ORIGIN) return withTeacherPreview(absolutePublicUrl(kind, id));
+  return withTeacherPreview(`${origin}${publicStudentPath(kind, id)}`);
 }
 
 export interface PublicLinkControlOptions {
@@ -166,7 +167,8 @@ export function mountPublicLinkControl(
 
     const openBtn = document.createElement('a');
     openBtn.className = 'btn btn--secondary';
-    openBtn.href = absolute;
+    // Open is the teacher's own look; Copy stays the plain student link.
+    openBtn.href = withTeacherPreview(absolute);
     openBtn.target = '_blank';
     openBtn.rel = 'noopener noreferrer';
     openBtn.textContent = options.openLabel ?? 'Open';

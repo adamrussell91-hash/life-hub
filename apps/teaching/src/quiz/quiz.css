@@ -2094,3 +2094,14 @@
   margin: 0;
   color: var(--muted);
 }
+
+/* Teacher preview: the questions one after another, nothing saved. */
+.qz-preview {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.qz-slot--preview {
+  justify-items: stretch;
+}

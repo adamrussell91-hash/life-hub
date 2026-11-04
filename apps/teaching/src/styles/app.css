@@ -1471,6 +1471,15 @@ a:hover {
   color: var(--navy);
 }
 
+.student-chrome__preview {
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
 .student-chrome__links,
 .student-surface__header-links {
   display: flex;
