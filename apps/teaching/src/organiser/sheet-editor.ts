@@ -47,7 +47,6 @@ const TIER_WORDS: Record<VocabTier, string> = { 1: 'everyday', 2: 'across subjec
 const CHEVRON = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5 3 8.500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SIDE_ROLES: Array<{ role: OrganiserRole; name: string; add: string; optional?: boolean }> = [
   { role: 'facts', name: 'Facts and topics', add: 'Add fact' },
-  { role: 'vocab', name: 'Vocabulary', add: 'Add word' },
   { role: 'key_lines', name: 'Key lines', add: 'Add line', optional: true },
   { role: 'story', name: 'Story order', add: 'Add step', optional: true }
 ];
@@ -616,17 +615,28 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     box.dataset.panel = role ?? section?.id ?? '';
     const head = h('div', 'ko-panel__head');
     const tools = h('div', 'ko-panel__tools');
+    tools.append(...sideTools(name, add, role, section));
+    if (section && !role) tools.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
+    head.append(h('h3', 'ko-panel__name', name), tools);
+    box.append(head);
+    if (section) sideBody(section, box);
+    sideExtras(box, name, role, section);
+    return box;
+  }
+
+  /** Add, Paste and Open all for a list of lines. */
+  function sideTools(name: string, add: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): HTMLElement[] {
     const id = `side:${role ?? section?.id}`;
-    tools.append(
+    const tools: HTMLElement[] = [
       quiet(`+ ${add}`, () => openDraft(id)),
       quiet('Paste', () => {
         const ready = role ? ensureRole(role, name) : Promise.resolve(section);
         void ready.then((target) => { if (target) togglePanel({ kind: 'paste', at: target.id }); });
       })
-    );
+    ];
     if (section?.lines.length) {
       const allOpen = section.lines.every((line) => open.has(line.id));
-      tools.append(quiet(allOpen ? 'Close all' : 'Open all', () => {
+      tools.push(quiet(allOpen ? 'Close all' : 'Open all', () => {
         for (const line of section.lines) {
           if (allOpen) open.delete(line.id);
           else open.add(line.id);
@@ -634,10 +644,12 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         render();
       }));
     }
-    if (section && !role) tools.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
-    head.append(h('h3', 'ko-panel__name', name), tools);
-    box.append(head);
-    if (section) sideBody(section, box);
+    return tools;
+  }
+
+  /** The typing row and the paste box, when either is open. */
+  function sideExtras(box: HTMLElement, name: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): void {
+    const id = `side:${role ?? section?.id}`;
     if (drafts.has(id)) {
       const single = (section?.kind ?? (role === 'story' ? 'sequence' : 'table')) !== 'table';
       const labels = single ? ['Next step'] : section ? [section.columns?.find((c) => !c.hide)?.label ?? 'Name', section.columns?.find((c) => c.hide)?.label ?? 'Detail'] : role === 'vocab' ? ['Word', 'Meaning'] : role === 'key_lines' ? ['Line', 'Who'] : ['Label', 'Detail'];
@@ -657,7 +669,29 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       }));
     }
     if (section && panel?.kind === 'paste' && panel.at === section.id) box.append(pastePanel(section));
-    return box;
+  }
+
+  /** Vocabulary under the concepts: closed to its count, and open like a concept card. */
+  function vocabCard(): HTMLElement {
+    const section = sectionOf('vocab');
+    const id = 'card:vocab';
+    const card = h('article', 'ko-concept ko-vocab');
+    card.style.setProperty('--c', 'var(--navy)');
+    const top = h('div', 'ko-concept__row ko-vocab__row');
+    const meta = h('div', 'ko-concept__meta');
+    meta.append(h('span', 'ko-capsule', 'Vocabulary'), h('span', 'ko-count', plural(section?.lines.length ?? 0, 'word')));
+    const more = chevron(id, 'Vocabulary');
+    meta.addEventListener('click', () => more.click());
+    top.append(meta, more);
+    card.append(top);
+    const body = h('div', 'ko-vocab__body');
+    body.dataset.panel = 'vocab';
+    if (section) sideBody(section, body);
+    sideExtras(body, 'Vocabulary', 'vocab', section);
+    const foot = h('div', 'ko-foot');
+    foot.append(...sideTools('Vocabulary', 'Add word', 'vocab', section));
+    card.append(fold(id, body, foot));
+    return card;
   }
 
   function togglePanel(next: NonNullable<typeof panel>): void {
@@ -904,6 +938,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const loose = sectionOf('ideas');
     if (loose?.lines.length) left.append(looseIdeas(loose));
     for (const row of rows) left.append(conceptCard(row));
+    left.append(vocabCard());
 
     const right = h('div', 'ko-column');
     for (const spec of SIDE_ROLES) {
