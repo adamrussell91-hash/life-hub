@@ -51,16 +51,24 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     const students = summary.groups.flatMap((g) => g.students);
     const drafts = students.filter((s) => s.opened[key] && s.phases[key] === 'draft').length;
     const absent = students.filter((s) => !s.opened[key]);
-    const hours = o.getLesson().sprint?.lock_hours ?? 2;
     const box = el('div', 'smap-confirm');
+    const next = PHASE_LABELS[SPRINT_PHASES[SPRINT_PHASES.indexOf(key) + 1] ?? key];
+    const lock = el('select', 'qz-input');
+    lock.id = `smap-lock-${key}`;
+    for (const n of [0, 1, 2, 3, 4, 6, 12, 24]) { const op = el('option', '', n === 0 ? 'No lock' : `Lock for ${n} h`); op.value = String(n); lock.append(op); }
+    const lockLabel = el('label', '', 'How long should the sprint lock?');
+    lockLabel.htmlFor = lock.id;
     const ul = el('ul');
+    const opens = el('li');
+    const paintOpens = () => { opens.textContent = lock.value === '0' ? `${next} can open straight away` : `${next} can open when the lock ends`; };
+    paintOpens();
+    lock.addEventListener('change', paintOpens);
     ul.append(
       el('li', '', `Freeze ${PHASE_LABELS[key]} class work${drafts ? ` (${drafts} ${drafts === 1 ? 'draft will be submitted as it is' : 'drafts will be submitted as they are'})` : ''}`),
-      el('li', '', hours ? `Lock the sprint for ${hours} h` : 'No class lock is set'),
-      el('li', '', `Open ${PHASE_LABELS[SPRINT_PHASES[SPRINT_PHASES.indexOf(key) + 1] ?? key]} when the lock lifts`)
+      opens
     );
-    if (absent.length) ul.append(el('li', '', `Mark ${absent.length} ${absent.length === 1 ? 'student' : 'students'} absent (${absent.map((s) => s.initials).join(', ')}): they can catch up from home after the lock`));
-    box.append(el('strong', '', `End the ${PHASE_LABELS[key]} class part?`), ul, button('End and lock', 'primary', () => { confirmHost.replaceChildren(); void run(o.api.endClass(key)); }), button('Not yet', 'secondary', () => confirmHost.replaceChildren()));
+    if (absent.length) ul.append(el('li', '', `Mark ${absent.length} ${absent.length === 1 ? 'student' : 'students'} absent (${absent.map((s) => s.initials).join(', ')}): they can catch up from home`));
+    box.append(el('strong', '', `End the ${PHASE_LABELS[key]} class part?`), lockLabel, lock, ul, button('End class part', 'primary', () => { const hours = Number(lock.value); confirmHost.replaceChildren(); void run(o.api.endClass(key, hours)); }), button('Not yet', 'secondary', () => confirmHost.replaceChildren()));
     confirmHost.replaceChildren(box);
   }
 
@@ -169,7 +177,9 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
     if (sprint) {
       // Class deadlines after any class-wide extension, as the students see them.
       const ext = (s.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class ?? {};
-      const spans = phaseSpans(sprint.phases.map((p) => ({ ...p, ...(ext[p.key] ?? {}) })), sprint.lock_hours, s.ended);
+      const lockEnded = s.lock ? s.ended[s.lock.phase] : undefined;
+      const lockHours = s.lock && lockEnded ? (Date.parse(s.lock.until) - Date.parse(lockEnded.at)) / 3_600_000 : 0;
+      const spans = phaseSpans(sprint.phases.map((p) => ({ ...p, ...(ext[p.key] ?? {}) })), lockHours, s.ended);
       gantt.replaceChildren(renderPhaseGantt(spans, { now: now(), note: earlyNotes(spans, s.groups.map((g) => g.open), now()) }));
     }
     const classExt = (s.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class ?? {};
@@ -182,8 +192,6 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(classExt[key]?.due_date ?? p.due_date, classExt[key]?.due_time ?? p.due_time, now()) : ''));
       if (p?.where === 'class' && s.class_parts[key] === 'open' && s.groups.some((g) => g.open.includes(key))) {
         const end = button('End class part', 'secondary', () => confirmEnd(key));
-        // The lock length is dropped on a phone; the confirm still says it.
-        end.append(el('span', 'smap-lock-note', ` · locks ${sprint?.lock_hours ?? 2} h`));
         end.dataset.end = key;
         h.append(end);
       }

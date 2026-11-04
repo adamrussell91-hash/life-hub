@@ -31,9 +31,9 @@ describe('sprint api', () => {
   it('posts teacher actions to the lesson', async () => {
     const fetch = vi.fn(async () => ok({ groups: [] }));
     vi.stubGlobal('fetch', fetch);
-    await sprintTeacherApi('sp1').endClass('decide');
+    await sprintTeacherApi('sp1').endClass('decide', 2);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toMatch(/\/api\/lessons\/sp1\/sprint$/);
-    expect(JSON.parse(String(init.body))).toEqual({ action: 'end_class', phase: 'decide' });
+    expect(JSON.parse(String(init.body))).toEqual({ action: 'end_class', phase: 'decide', lock_hours: 2 });
   });
 });

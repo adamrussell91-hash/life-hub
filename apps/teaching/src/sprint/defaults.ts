@@ -47,7 +47,7 @@ export function newSprintSettings(classId: string): SprintSettings {
     class_id: classId,
     decider: 'top_vote',
     support: 'standard',
-    lock_hours: 2,
+    lock_hours: 0,
     criteria: [],
     reflection_criteria: [{ id: 'reflect', text: DEFAULT_REFLECTION_CRITERION }],
     reflection_prompts: [...DEFAULT_REFLECTION_PROMPTS],

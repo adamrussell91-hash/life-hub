@@ -130,7 +130,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       tick.addEventListener('change', () => put((d) => { d.phases[i]!.ends_at = tick.checked && d.phases[i]!.due_date ? `${d.phases[i]!.due_date}T${at.value || '12:30'}` : ''; }, true));
       at.addEventListener('change', () => put((d) => { if (d.phases[i]!.due_date && at.value) d.phases[i]!.ends_at = `${d.phases[i]!.due_date}T${at.value}`; }, true));
       lockRow.append(tick, lab, at);
-      box.append(lockRow, el('p', 'kit-why', p.due_date ? `Or press End class part on the progress map. Work then locks for ${s().lock_hours} h.` : 'Set the close day first. Or press End class part on the progress map.'));
+      box.append(lockRow, el('p', 'kit-why', p.due_date ? 'Or press End class part on the progress map, and choose a lock then. A set time ends the part with no lock.' : 'Set the close day first. Or press End class part on the progress map.'));
     }
     box.append(el('p', 'kit-why', `What students do in ${name}, and its stretch, are on the ${name} tab.`));
     return box;
@@ -227,11 +227,10 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
 
     if (view !== 'kit') { paintPhase(view, cur); return; }
 
-    const settings = card('Settings', 'Who chooses each group’s problem and idea, how much scaffolding shows, and the class lock. Each phase’s own settings are on its tab.', 'settings');
+    const settings = card('Settings', 'Who chooses each group’s problem and idea, and how much scaffolding shows. Each phase’s own settings are on its tab.', 'settings');
     settings.append(
       selectOf([['top_vote', 'Students choose by vote: the most-starred problem and the idea with the most wins go through (ties come to you)'], ['teacher', 'I approve each group’s problem and idea (suits junior classes)']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }, true), 'Who chooses'),
-      selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
-      selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
+      selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level')
     );
 
     const crit = card('Criteria', 'How good: the qualities ideas are judged on, at Starting · Showing · Strong. Students back the strongest idea with a quoted line, vote with these in Decide, and the class rates the pitch with them.', 'criteria');
@@ -276,7 +275,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     req.append(addR, el('p', 'kit-why', 'U Understand · S Sketch · D Decide · P Prototype · T Test'));
 
     const phases = card('Phases and deadlines', 'You set when each phase closes. Each phase opens when the one above it closes. Click a bar to edit it. Students get new dates when you publish, and a new date here replaces any extension you gave that phase on the map.', 'phases');
-    phases.append(renderPhaseGantt(phaseSpans(cur.phases, cur.lock_hours), { onPick: (key) => { picked = picked === key ? null : key; paint(); }, picked }));
+    phases.append(renderPhaseGantt(phaseSpans(cur.phases, 0), { onPick: (key) => { picked = picked === key ? null : key; paint(); }, picked }));
     const pi = cur.phases.findIndex((p) => p.key === picked);
     if (pi >= 0) phases.append(phaseEditor(cur.phases[pi]!, pi));
 

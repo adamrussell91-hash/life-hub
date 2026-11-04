@@ -1269,7 +1269,8 @@ var SprintSettingsSchema = z9.object({
   /** Who settles each group's problem and idea: the students' votes (ties come to the teacher), or the teacher approves each. */
   decider: z9.enum(["top_vote", "teacher"]).default("top_vote"),
   support: z9.enum(["guided", "standard", "open"]).default("standard"),
-  lock_hours: z9.number().int().min(0).max(24).default(2),
+  /** Older Kits' class lock; still loads, no longer used. The teacher picks a lock when ending a class part. */
+  lock_hours: z9.number().int().min(0).max(24).default(0),
   criteria: z9.array(SprintCriterionSchema).max(SPRINT_LIMITS.criteria).default([]),
   reflection_criteria: z9.array(SprintCriterionSchema).max(3).default([]),
   reflection_prompts: z9.array(text(200)).max(2).default([]),
