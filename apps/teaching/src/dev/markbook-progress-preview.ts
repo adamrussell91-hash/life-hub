@@ -38,7 +38,7 @@ const deepUnderstanding = { id: 'du_demo01', claim: 'Writers choose a form to ma
 const unit = { id: 'unit_demo', title: 'Invented unit', status: 'active', kind: 'unit', lesson_ids: ['lesson_demo'], deep_understandings: [deepUnderstanding] };
 const lesson = {
   id: 'lesson_demo', title: 'Invented lesson', unit_id: 'unit_demo', dot_points: ['texts:U1'],
-  blocks: [{ id: 'blk_task', type: 'block', block_type: 'quiz_question', variant: 'medium', visibility: 'all', content: {}, settings: { deep_step: { du: 'du_demo01', step: '2a' } } }]
+  blocks: [{ id: 'blk_task', type: 'block', block_type: 'quiz_question', variant: 'medium', visibility: 'all', content: {}, settings: { deep_step: { du: 'du_demo01', step: '2a' }, deep_targets: ['kp_demo01', 'kp_demo02'] } }]
 };
 
 const day = (n: number): string => `2026-10-${String(n).padStart(2, '0')}`;

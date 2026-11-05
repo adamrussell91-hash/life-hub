@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMonitor } from '@/deep/monitor-view';
+import { buildMonitor, studentsByPiece } from '@/deep/monitor-view';
 
 const pieces = [
   { id: 'kp_e1e1e1', text: 'E one', tier: 'essential' as const },
@@ -7,6 +7,24 @@ const pieces = [
 ];
 const du = { id: 'du_ab12cd', claim: 'c', why: '', dot_points: ['a:U1'], concept_bullets: ['ARG1'], pieces, shared_piece_ids: [], steps: [] };
 const ev = (student: string, date: string, piece: string, share: number) => ({ item: 'q', tags: [`kp:${piece}`], share, why: [], student, source: 'quiz:L1', date, confidence: null });
+
+describe('studentsByPiece', () => {
+  it('gives one row per piece, most students first, each student once', () => {
+    expect(studentsByPiece([
+      { student: 'st_a', pieces: ['kp_one', 'kp_two', 'kp_two'] },
+      { student: 'st_b', pieces: ['kp_two'] },
+      { student: 'st_c', pieces: ['kp_two', 'kp_three'] }
+    ])).toEqual([
+      { piece: 'kp_two', students: ['st_a', 'st_b', 'st_c'] },
+      { piece: 'kp_one', students: ['st_a'] },
+      { piece: 'kp_three', students: ['st_c'] }
+    ]);
+  });
+
+  it('is empty when nobody needs anything', () => {
+    expect(studentsByPiece([])).toEqual([]);
+  });
+});
 
 describe('monitor model', () => {
   it('places students in lanes, finds known-not-used and doesn’t-remember groups', () => {
