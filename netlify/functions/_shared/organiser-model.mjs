@@ -24,7 +24,7 @@ const ROLE_COLUMNS = {
   vocab: [['Word', false], ['Meaning', true], ['In a sentence', false]],
   key_lines: [['Line', false], ['Who', true], ['Why it matters', false]]
 };
-const ROLE_OF_NAME = { 'key ideas': 'ideas', vocabulary: 'vocab', 'key lines': 'key_lines', 'story order': 'story', 'facts and topics': 'facts' };
+const ROLE_OF_NAME = { 'key ideas': 'ideas', vocabulary: 'vocab', 'key lines': 'key_lines', 'story order': 'story', 'facts and topics': 'facts', context: 'facts' };
 /** Days a card waits in box 1 to 5. */
 export const GAPS = [1, 3, 7, 14, 28];
 export const DAILY_CARDS = 20;

@@ -2703,9 +2703,6 @@ button.tk-qdot {
 .tk-wt-ed__jots { display: grid; gap: 0.4rem; margin-top: 0.5rem; }
 .tk-ed__jot { width: 100%; resize: vertical; }
 .tk-wt-badges { margin-top: 0.5rem; }
-.tk-wt-plan { margin: 0 0 0.75rem; }
-.tk-wt-plan__head { cursor: pointer; font-size: var(--text-sm); font-weight: 600; min-height: 2.75rem; display: flex; align-items: center; }
-.tk-wt-plan .tk-wt-badges { display: grid; gap: 0.4rem; }
 /* WalkThrus book look: yellow card, the icon on a small yellow hexagon. */
 .tk-wt-badge { border: 1px solid #f2c200; border-radius: 10px; padding: 0.25rem 0.6rem; background: #fff7cc; color: #111; }
 .tk-wt-badge__summary { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: var(--text-sm); font-weight: 700; min-height: 2.75rem; }
@@ -2814,7 +2811,7 @@ span.wts-tool__aux { cursor: default; }
 .wts-display-timer { position: fixed; right: 2rem; bottom: 2rem; z-index: 50; padding: 0.5rem 1.5rem; border-radius: 16px; background: #111; color: #ffd400; font: 800 clamp(3rem, 9vw, 7rem) / 1 ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
 .wts-display-timer.is-done { color: #ff6b5b; }
 .wts-display-timer[hidden] { display: none; }
-@media print { .tk-wt, .tk-wt-badges, .tk-wt-plan, .wts { display: none; } }
+@media print { .tk-wt, .tk-wt-badges, .wts { display: none; } }
 
 /* A block's think-aloud: the teacher's script for modelling their thinking. Teacher view only, never Display. */
 .think-aloud { margin-top: 0.75rem; border: 1px solid #c9b8ef; border-radius: 12px; background: #f4effd; color: #111; }
