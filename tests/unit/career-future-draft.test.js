@@ -42,3 +42,25 @@ test('offline draft keeps a pasted paragraph instead of the stock list', async (
     assert.equal(c.source, 'ad');
   }
 });
+
+test('futures are read strongly, so a reload straight after a save sees it', async () => {
+  const { createCareerRepository } = await import('../../netlify/functions/_shared/career-repository.mjs');
+  const data = new Map();
+  const reads = [];
+  const store = {
+    get: async (key, options) => {
+      reads.push(options?.consistency);
+      return data.get(key) ?? null;
+    },
+    setJSON: async (key, value) => void data.set(key, value),
+    list: async () => ({ blobs: [...data.keys()].map((key) => ({ key })), directories: [] })
+  };
+  const repo = createCareerRepository({ store, now: () => '2026-11-05T00:00:00.000Z' });
+  const created = await repo.createFuture({ title: 'Lead', criteria: [], status: 'active' });
+  reads.length = 0;
+  await repo.updateFuture(created.id, { criteria: [{ text: 'Leads teams', order: 0, source: 'ad' }] });
+  const [listed] = await repo.listFutures();
+  assert.equal(listed.criteria[0].text, 'Leads teams');
+  assert.ok(reads.length >= 2);
+  assert.ok(reads.every((c) => c === 'strong'));
+});

@@ -213,6 +213,8 @@ export type CareerFutureModel = {
   colour_slot: number;
   criteria: CareerCriterionModel[];
   readiness: number | null;
+  /** At least one skill card is linked to a criterion. Until then readiness means nothing. */
+  checked: boolean;
   readiness_label: string;
   arrival_date: string | null;
   arrival_label: string | null;
@@ -435,6 +437,7 @@ export function buildCareerModel(
         supporting
       };
     });
+    const checked = criteriaModels.some((c) => c.coverage > 0);
     const ownStones = stoneModels.filter(
       (s) => s.future_ids.includes(future.id) && !s.shared && !s.done
     );
@@ -486,7 +489,8 @@ export function buildCareerModel(
       colour_slot: future.colour_slot,
       criteria: criteriaModels,
       readiness,
-      readiness_label: readiness == null ? 'Add criteria' : `${readiness}%`,
+      checked,
+      readiness_label: readiness == null ? 'Add criteria' : checked ? `${readiness}%` : 'Not checked',
       arrival_date: arrivalDate,
       arrival_label,
       split_date: splitDate,

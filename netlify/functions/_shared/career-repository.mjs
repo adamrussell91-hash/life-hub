@@ -48,6 +48,9 @@ function notFound(kind) {
  * Link writes for evidenced_by / supports_future / stone_for stay on the
  * Netlify handlers that already own Universal Link journals (Phase 5 keep).
  */
+// The page reloads straight after a save, and a stale read would show the old future.
+const STRONG_READ = { consistency: 'strong' };
+
 export function createCareerRepository(deps = {}) {
   const store = deps.store;
   if (!store) throw new Error('createCareerRepository requires a professional store.');
@@ -125,7 +128,7 @@ export function createCareerRepository(deps = {}) {
     for (const key of keys) {
       const id = key.slice('career/futures/index/'.length);
       if (!isValidFutureId(id)) continue;
-      const record = parseFutureRecord(await getJSON(store, careerFutureKey(id)));
+      const record = parseFutureRecord(await getJSON(store, careerFutureKey(id), STRONG_READ));
       if (record) records.push(record);
     }
     records.sort((a, b) => a.lane_order - b.lane_order || a.title.localeCompare(b.title));
@@ -134,7 +137,7 @@ export function createCareerRepository(deps = {}) {
 
   async function getFuture(id) {
     if (!isValidFutureId(id)) throw notFound('Future');
-    const record = parseFutureRecord(await getJSON(store, careerFutureKey(id)));
+    const record = parseFutureRecord(await getJSON(store, careerFutureKey(id), STRONG_READ));
     if (!record) throw notFound('Future');
     return record;
   }

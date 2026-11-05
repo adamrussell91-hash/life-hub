@@ -28,7 +28,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function coverageDot(coverage: number): string {
   if (coverage >= 1) return 'career-future__dot career-future__dot--green';
   if (coverage >= 0.5) return 'career-future__dot career-future__dot--amber';
-  return 'career-future__dot career-future__dot--red';
+  return 'career-future__dot career-future__dot--none';
 }
 
 function formatFadingSince(iso: string | null | undefined): string {
@@ -142,7 +142,7 @@ function inlineCriteriaForm(future: FutureModel, onChanged: () => void): HTMLEle
     el(
       'p',
       'career-page__meta',
-      `${BOX_HINT} Each line is checked against your skill cards, so you can see how ready you are and what is missing.`
+      `${BOX_HINT} Skill cards linked to a line count towards your readiness.`
     )
   );
   const box = criteriaBox('');
@@ -201,8 +201,8 @@ export function renderFutureDetail(
   }
   head.append(titles);
 
-  // No criteria means no score, so no ring until there is something to measure.
-  if (future.readiness != null) {
+  // No score until a skill card is linked: 0% would read as a verdict on Adam.
+  if (future.checked) {
     const ring = el('div', 'career-future__ring');
     ring.style.setProperty('--ring-color', branchColour(future.colour_slot));
     ring.style.setProperty('--ring-pct', String(future.readiness));
@@ -267,7 +267,9 @@ export function renderFutureDetail(
       el(
         'p',
         'career-page__meta',
-        'Green: your skill cards cover it. Amber: partly. Red: a gap, which you can make a stepping stone.'
+        future.checked
+          ? 'Green: a skill card covers it. Amber: a card partly covers it. Empty: no card linked yet.'
+          : 'Not checked yet. No skill cards are linked to these lines, which says nothing about whether you meet them.'
       )
     );
   }
