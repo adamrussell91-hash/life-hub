@@ -151,7 +151,7 @@ export const LATER_GUIDE = {
     doThis: 'List the parts the prototype needs, then give each part to someone by their initials.',
     why: 'Splitting the work means everyone has something to build and nothing is missed.',
     example: ['Part: order screen. It must show the pickup time. It serves: speed. Owner: AB.'],
-    stuck: ['Think about what the audience sees first, next and last.', 'Check “Worth borrowing” for strong parts from the other ideas.']
+    stuck: ['Think about what the audience sees first, next and last.', 'Open “borrow from an idea you didn’t choose” for strong parts from the other ideas.']
   },
   part: {
     doThis: 'Read your part: what it is, what it must show and which criterion it serves.',
