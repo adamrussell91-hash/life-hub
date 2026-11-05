@@ -136,7 +136,7 @@ describe('decide: parts', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.textContent).toContain('“Ash”');
     expect(rows[0]?.querySelector('.sd-borrow__strong')?.textContent).toMatch(/^Strongest in .+ and Why it matters$/);
-    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('Your group is building “Baker”.');
+    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain("You are building “Baker”.");
   });
 });
 
