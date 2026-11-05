@@ -1,7 +1,7 @@
 /**
- * A practice session: one card at a time. Got it and Again post at once; Again also brings the card
- * back later in this session. A result that can't be posted waits in local storage and goes with the next
- * review. No scores, streaks or percentages: only how many cards are left.
+ * A practice session: one card at a time, at most one set of 15 a day. Got it and Not yet post at once, and
+ * a card comes up once in a sitting: Not yet sends it back to box 1 for tomorrow. A result that can't be posted waits in local storage and goes with the next
+ * review. Each card shows its own history as green and red circles, with no scores or streaks.
  */
 import { el, readJSON, writeJSON } from '@/quiz/dom';
 import { studentOrganiserApi } from './api';
@@ -38,8 +38,26 @@ function weekday(date: string): string {
   return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' });
 }
 export function nextCardsLine(next: PracticeNext): string {
-  if (!next) return 'New lines join your practice after each lesson.';
+  if (!next) return 'Tick off a lesson to add its cards.';
   return `Your next ${next.count === 1 ? 'card comes' : `${next.count} cards come`} on ${weekday(next.date)}.`;
+}
+
+function shortDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/** A card's past answers, oldest first: a green or red circle over a small date. */
+function historyRow(history: NonNullable<PracticeCard['history']>): HTMLElement {
+  const row = el('ol', 'kos-hist');
+  row.setAttribute('aria-label', 'Your answers on this card');
+  for (const { d, ok } of history) {
+    const item = el('li', `kos-hist__item ${ok ? 'is-got' : 'is-miss'}`);
+    item.append(el('span', 'kos-hist__dot'), el('span', 'kos-hist__day', shortDay(d)));
+    item.setAttribute('aria-label', `${ok ? 'Got it' : 'Not yet'}, ${shortDay(d)}`);
+    row.append(item);
+  }
+  return row;
 }
 
 export function mountPractice(host: HTMLElement, options: PracticeOptions): PracticeHandle {
@@ -73,7 +91,6 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
   function answerCard(result: 'got' | 'again'): void {
     const card = queue[i]!;
     void post({ line_id: card.line_id, result });
-    if (result === 'again') queue.push(card);
     i += 1;
     shown = false;
     typed = '';
@@ -105,7 +122,10 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
     }
     const c = queue[i]!;
     const card = el('div', 'kos-card');
-    card.append(el('p', 'kos-card__from', c.section), el('p', 'kos-card__cue', c.cue));
+    const top = el('div', 'kos-card__top');
+    top.append(el('p', 'kos-card__from', `${c.section}${c.box ? ` · Box ${c.box}` : ''}`));
+    if (c.history?.length) top.append(historyRow(c.history));
+    card.append(top, el('p', 'kos-card__cue', c.cue));
     if (!shown) {
       const ta = el('textarea', 'kos-card__type');
       ta.placeholder = 'Type it if you like, or say it to yourself';
@@ -143,7 +163,7 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
       got.type = 'button';
       got.dataset.result = 'got';
       got.addEventListener('click', () => answerCard('got'));
-      const again = el('button', 'kos-btn', 'Again');
+      const again = el('button', 'kos-btn kos-btn--notyet', 'Not yet');
       again.type = 'button';
       again.dataset.result = 'again';
       again.addEventListener('click', () => answerCard('again'));

@@ -14,7 +14,8 @@ import { renderWeekRow } from './week-row';
 /**
  * Organiser card on the lesson page: this lesson's ticks and the lines relevant to it, with the unit's
  * whole sheet one press away. A ticked line reaches students when this lesson is published and its class
- * date arrives, and joins practice the day after. A line another lesson ticked is shown greyed. Ann runs
+ * date arrives, and joins a student's practice when they tick the lesson off. Several lessons can tick a
+ * line; the other lessons that hold it show as a tag. Ann runs
  * as a job (never the chat) and only suggests; the teacher presses the button.
  */
 
@@ -86,8 +87,9 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
 
   const sections = (): OrganiserSection[] => (data?.organiser.sections ?? []).filter((s) => !s.off);
   const allLines = (): Array<{ section: OrganiserSection; line: OrganiserLine }> => sections().flatMap((section) => section.lines.map((line) => ({ section, line })));
-  const mine = (): OrganiserLine[] => allLines().map((x) => x.line).filter((line) => line.lesson_id === lesson.id);
-  const claimedElsewhere = (line: OrganiserLine): boolean => !!line.lesson_id && line.lesson_id !== lesson.id && data?.status[line.id] !== 'lesson_gone';
+  const ticks = (line: OrganiserLine): string[] => [...(line.lesson_id ? [line.lesson_id] : []), ...(line.also_lesson_ids ?? [])];
+  const isMine = (line: OrganiserLine): boolean => ticks(line).includes(lesson.id);
+  const mine = (): OrganiserLine[] => allLines().map((x) => x.line).filter(isMine);
 
   function paintHead(): void {
     root.classList.toggle('ko-card--open', isOpen);
@@ -103,30 +105,28 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   }
 
   function lineTag(line: OrganiserLine): HTMLElement | null {
-    if (line.lesson_id && line.lesson_id !== lesson.id) {
-      if (!claimedElsewhere(line)) return h('span', 'ko-tag', 'Lesson removed');
-      const tag = h('span', 'ko-tag', codes.get(line.lesson_id) ?? 'Another lesson');
-      const name = titles.get(line.lesson_id);
-      if (name) tag.title = name;
+    const others = ticks(line).filter((id) => id !== lesson.id);
+    if (others.length) {
+      if (data?.status[line.id] === 'lesson_gone') return h('span', 'ko-tag', 'Lesson removed');
+      const tag = h('span', 'ko-tag', `${isMine(line) ? 'Also ' : ''}${others.map((id) => codes.get(id) ?? 'another lesson').join(', ')}`);
+      tag.title = others.map((id) => titles.get(id)).filter(Boolean).join(', ');
       return tag;
     }
     return line.open ? h('span', 'ko-tag', 'Already out') : null;
   }
 
   function pickRow(section: OrganiserSection, line: OrganiserLine): HTMLElement {
-    const row = h('label', `ko-pick${claimedElsewhere(line) ? ' is-elsewhere' : ''}`);
+    const row = h('label', 'ko-pick');
     const check = h('input');
     check.type = 'checkbox';
-    // Ticked means this lesson's own line. A line in another lesson stays unticked, grey, with that lesson's tag.
-    check.checked = line.lesson_id === lesson.id;
-    check.disabled = claimedElsewhere(line);
+    check.checked = isMine(line);
     check.dataset.line = line.id;
     check.addEventListener('change', () => void tick(line.id, check.checked));
     const words = h('span');
     const { head: name, body: text } = lineWords(section, line);
     if (name) words.append(h('b', undefined, name), ' ');
     words.append(text);
-    if (!makesCard(section, line) && section.kind === 'table' && !claimedElsewhere(line)) {
+    if (!makesCard(section, line) && section.kind === 'table') {
       words.append(h('small', 'ko-pick__warn', section.columns?.find((c) => !c.hide)?.label === 'Prompt' ? 'No prompt yet, so no practice card' : 'Needs both sides to make a practice card'));
     }
     row.append(check, words);
@@ -143,8 +143,8 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   }
 
   function onCard(section: OrganiserSection, line: OrganiserLine, relevance: LessonRelevance): boolean {
-    if (line.lesson_id === lesson.id) keptOnCard.add(line.id);
-    return keptOnCard.has(line.id) || lineIsRelevant(section, line, relevance, claimedElsewhere(line));
+    if (isMine(line)) keptOnCard.add(line.id);
+    return keptOnCard.has(line.id) || lineIsRelevant(section, line, relevance);
   }
 
   function paintMain(): void {
@@ -238,7 +238,7 @@ export function mountOrganiserCard(host: HTMLElement, options: OrganiserCardOpti
   }
 
   function tick(lineId: string, on: boolean): Promise<TeacherOrganiser | null> {
-    return change({ op: 'update_line', line_id: lineId, lesson_id: on ? lesson.id : null });
+    return change({ op: 'update_line', line_id: lineId, ...(on ? { add_lesson_id: lesson.id } : { remove_lesson_id: lesson.id }) });
   }
 
   // ---- Ann ---------------------------------------------------------------------------------

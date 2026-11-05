@@ -4,11 +4,11 @@
  * caller passes `today` (a Sydney day, YYYY-MM-DD) and the release map.
  *
  *   organiser   { v: 2, sections: [{ id, name, kind, role?, concept_key?, sentence?, dot_points?, off?, columns?,
- *                 lines: [{ id, cells, lesson_id?, piece_id?, tier?, open? }] }], week?, updated_at }
+ *                 lines: [{ id, cells, lesson_id?, also_lesson_ids?, piece_id?, tier?, open? }] }], week?, updated_at }
  *
- * The sheet is written on the unit page before teaching. A lesson ticks lines by setting lesson_id; an
- * unticked line waits. `open` marks a line from before lessons ticked (v1, no lesson): students already have it.
- *   boxes       { [line_id]: { box: 1..5, due: day, last: day } }
+ * The sheet is written on the unit page before teaching. Lessons tick lines: lesson_id is the first lesson
+ * that ticked a line, also_lesson_ids the others. An unticked line waits. `open` marks a line from before lessons ticked (v1, no lesson): students already have it.
+ *   boxes       { [line_id]: { box: 1..5, due: day, last: day, h: [{ d: day, ok }] } }
  */
 import { randomBytes } from 'node:crypto';
 
@@ -27,9 +27,12 @@ const ROLE_COLUMNS = {
 const ROLE_OF_NAME = { 'key ideas': 'ideas', vocabulary: 'vocab', 'key lines': 'key_lines', 'story order': 'story', 'facts and topics': 'facts' };
 /** Days a card waits in box 1 to 5. */
 export const GAPS = [1, 3, 7, 14, 28];
-export const DAILY_CARDS = 20;
+/** Most cards a student answers in a day, across every sitting. */
+export const DAILY_CARDS = 15;
 export const REVIEW_LIMIT = 40;
 const FRESH_DAYS = 7;
+const HISTORY_KEPT = 30;
+const HISTORY_SHOWN = 10;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const REF = /^[A-Za-z0-9_-]{1,120}$/;
 const PREFIX = { section: 'os_', column: 'oc_', line: 'ol_' };
@@ -225,6 +228,23 @@ function newLine(section, raw) {
  * One teacher change, applied to a copy of the organiser. Throws OrganiserError for anything
  * the sheet can't hold. Line, section and column ids are made here and never change after.
  */
+/** Every lesson that has ticked a line, the first one first. */
+export const lessonsOfLine = (line) => [...(line.lesson_id ? [line.lesson_id] : []), ...(line.also_lesson_ids ?? [])];
+
+function addLesson(line, id) {
+  if (lessonsOfLine(line).includes(id)) return;
+  if (!line.lesson_id) line.lesson_id = id;
+  else line.also_lesson_ids = [...(line.also_lesson_ids ?? []), id];
+}
+
+function removeLesson(line, id) {
+  const rest = lessonsOfLine(line).filter((x) => x !== id);
+  delete line.lesson_id;
+  delete line.also_lesson_ids;
+  if (rest[0]) line.lesson_id = rest[0];
+  if (rest.length > 1) line.also_lesson_ids = rest.slice(1);
+}
+
 export function applyChange(organiser, change) {
   const next = clone(upgradeOrganiser(organiser));
   if (!change || typeof change !== 'object' || Array.isArray(change)) reject(400, 'bad_request', 'Invalid request.');
@@ -279,7 +299,10 @@ export function applyChange(organiser, change) {
         else line.tier = tierOf(change.tier);
       }
       // Ticking or unticking in a lesson decides this line from now on.
-      if (change.lesson_id !== undefined) delete line.open;
+      if (change.lesson_id !== undefined || change.add_lesson_id !== undefined || change.remove_lesson_id !== undefined) delete line.open;
+      if (change.lesson_id === null || change.lesson_id === '') delete line.also_lesson_ids;
+      if (change.add_lesson_id !== undefined) addLesson(line, ref(change.add_lesson_id, 'lesson'));
+      if (change.remove_lesson_id !== undefined) removeLesson(line, ref(change.remove_lesson_id, 'lesson'));
       for (const [field, what] of [['lesson_id', 'lesson'], ['piece_id', 'piece']]) {
         if (change[field] === undefined) continue;
         if (change[field] === null || change[field] === '') delete line[field];
@@ -334,10 +357,10 @@ export function lineText(section, line) {
 
 /**
  * What a class may see. `releases` maps lesson id to { state: 'released', day } | { state: 'waiting' }
- * | { state: 'gone' } (see lessonReleases). A line goes out when a lesson that ticked it is released,
- * or when it is `open`. Sections with no released line are left out, so waiting text and its section
+ * | { state: 'gone' } (see lessonReleases). A line goes out on the first day a lesson that ticked it
+ * is released, or when it is `open`. Sections with no released line are left out, so waiting text and its section
  * names never leave the server. A section the teacher ticked off stays home too.
- * Lines carry lesson_id, piece_id and released_on for the server's own use: studentSheet strips them.
+ * Lines carry lesson_id, lesson_ids (those released), piece_id and released_on for the server's own use: studentSheet strips them.
  */
 export function releasedSheet(organiser, releases, today) {
   const sections = [];
@@ -345,19 +368,17 @@ export function releasedSheet(organiser, releases, today) {
     if (section.off) continue;
     const lines = [];
     for (const line of section.lines ?? []) {
-      let day = null;
-      if (line.lesson_id) {
-        const release = releases?.[line.lesson_id];
-        if (release?.state !== 'released') continue;
-        day = release.day ?? null;
-      } else if (!line.open) {
-        continue;
-      }
+      const ticked = lessonsOfLine(line);
+      const out = ticked.filter((id) => releases?.[id]?.state === 'released');
+      if (ticked.length ? !out.length : !line.open) continue;
+      const days = out.map((id) => releases[id].day).filter(Boolean).sort();
+      const day = days[0] ?? null;
       lines.push({
         id: line.id,
         cells: line.cells,
         fresh: day !== null && addDays(day, FRESH_DAYS) > today,
         ...(line.lesson_id ? { lesson_id: line.lesson_id } : {}),
+        ...(out.length ? { lesson_ids: out } : {}),
         ...(line.piece_id ? { piece_id: line.piece_id } : {}),
         ...(line.tier ? { tier: line.tier } : {}),
         ...(day ? { released_on: day } : {})
@@ -395,7 +416,7 @@ export function studentSheet(sheet) {
 
 /**
  * One card per released line of a table with a hidden and a shown column. `builds` maps a piece id
- * to the claim it builds. `from` is the first day the card can be served: the day after release.
+ * to the claim it builds.
  */
 export function buildCards(sections, builds = new Map()) {
   const cards = [];
@@ -422,8 +443,7 @@ export function buildCards(sections, builds = new Map()) {
         answer_label: columns[answerAt].label,
         answer,
         more,
-        ...(claim ? { builds: claim } : {}),
-        from: line.released_on ? addDays(line.released_on, 1) : ''
+        ...(claim ? { builds: claim } : {})
       });
     }
   }
@@ -431,58 +451,58 @@ export function buildCards(sections, builds = new Map()) {
 }
 
 /**
- * The Leitner box after an answer. A card moves up at most once a day: Got it again on the day it
- * last moved (a resend, or Got it on a repeat after Again) keeps its box.
+ * The Leitner box after an answer, and the card's history (one result a day, newest last). Not yet goes
+ * back to box 1 and comes back tomorrow, never the same day. Got it moves up one box, at most once a
+ * day: a resend keeps its box.
  */
 export function applyResult(entry, result, today) {
-  if (result === 'again') return { box: 1, due: today, last: today };
-  if (entry && entry.last === today) return { box: entry.box, due: addDays(today, gapOf(entry.box)), last: today };
+  const h = [...(entry?.h ?? []).filter((x) => x.d !== today), { d: today, ok: result === 'got' }].slice(-HISTORY_KEPT);
+  if (result === 'again') return { box: 1, due: addDays(today, 1), last: today, h };
+  if (entry && entry.last === today) return { box: entry.box, due: addDays(today, gapOf(entry.box)), last: today, h };
   const box = Math.min(GAPS.length, (entry?.box ?? 1) + 1);
-  return { box, due: addDays(today, gapOf(box)), last: today };
+  return { box, due: addDays(today, gapOf(box)), last: today, h };
 }
 
-const publicCard = ({ from, ...card }) => card;
+/** Only the lines of lessons this student has ticked off (and lines no lesson holds) make cards. */
+export function joinedSections(sections, done) {
+  return (sections ?? []).map((section) => ({
+    ...section,
+    lines: (section.lines ?? []).filter((line) => !line.lesson_ids?.length || line.lesson_ids.some((id) => done.has(id)))
+  }));
+}
 
 /**
- * Today's cards and when the next ones arrive. Due cards come oldest first, then new cards in
- * sheet order, up to the daily cap less what was already done today. A repeat (Again today, due
- * today) is never held back by the cap. Late cards just wait: nothing moves down.
+ * Today's set, how many cards sit in each box, and when the next ones come. Due cards come oldest first,
+ * then new cards in sheet order, up to DAILY_CARDS a day counting what was already answered today. A card
+ * answered today is never served again today. Late cards just wait: nothing moves down. A new card
+ * counts in box 1.
  */
 export function todaysCards(cards, boxes, today) {
-  const served = cards.filter((c) => c.from <= today);
-  const later = cards.filter((c) => c.from > today);
   const entry = (c) => boxes?.[c.line_id];
-  const doneToday = served.filter((c) => entry(c)?.last === today && entry(c).due > today).length;
-  const room = Math.max(0, DAILY_CARDS - doneToday);
-  const due = served
+  const room = Math.max(0, DAILY_CARDS - cards.filter((c) => entry(c)?.last === today).length);
+  const due = cards
     .map((c, order) => ({ c, order, e: entry(c) }))
-    .filter((x) => x.e && x.e.due <= today)
-    .sort((a, b) => a.e.due.localeCompare(b.e.due) || a.order - b.order);
-  const fresh = served.filter((c) => !entry(c));
+    .filter((x) => x.e && x.e.due <= today && x.e.last !== today)
+    .sort((a, b) => a.e.due.localeCompare(b.e.due) || a.order - b.order)
+    .map((x) => x.c);
+  const chosen = [...due, ...cards.filter((c) => !entry(c))].slice(0, room);
+  const taken = new Set(chosen);
 
-  const chosen = new Set();
-  let used = 0;
-  for (const { c, e } of due) {
-    const repeat = e.last === today;
-    if (!repeat && used >= room) continue;
-    chosen.add(c);
-    if (!repeat) used += 1;
-  }
-  for (const c of fresh) {
-    if (used >= room) break;
-    chosen.add(c);
-    used += 1;
-  }
-  // Keep due order for the cards that were due, then new ones in sheet order.
-  const ordered = [...due.map((x) => x.c), ...fresh].filter((c) => chosen.has(c));
+  const counts = GAPS.map(() => 0);
+  for (const c of cards) counts[Math.min(Math.max(entry(c)?.box ?? 1, 1), GAPS.length) - 1] += 1;
 
-  const upcoming = new Map();
-  const bump = (day) => upcoming.set(day, (upcoming.get(day) ?? 0) + 1);
   const tomorrow = addDays(today, 1);
-  for (const { c, e } of due) if (e.last !== today && !chosen.has(c)) bump(tomorrow);
-  for (const c of fresh) if (!chosen.has(c)) bump(tomorrow);
-  for (const c of served) if (entry(c) && entry(c).due > today) bump(entry(c).due);
-  for (const c of later) bump(c.from);
+  const upcoming = new Map();
+  for (const c of cards) {
+    if (taken.has(c)) continue;
+    const e = entry(c);
+    const day = !e || e.due <= tomorrow ? tomorrow : e.due;
+    upcoming.set(day, (upcoming.get(day) ?? 0) + 1);
+  }
   const date = [...upcoming.keys()].sort()[0];
-  return { cards: ordered.map(publicCard), next: date ? { date, count: upcoming.get(date) } : null };
+  return {
+    cards: chosen.map((c) => ({ ...c, box: entry(c)?.box ?? 1, history: (entry(c)?.h ?? []).slice(-HISTORY_SHOWN) })),
+    boxes: counts,
+    next: date ? { date, count: Math.min(DAILY_CARDS, upcoming.get(date)) } : null
+  };
 }

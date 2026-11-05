@@ -1,6 +1,6 @@
 import { apiGet, apiPost } from '@/api/client';
 import { deviceToken } from '@/quiz/dom';
-import type { OrganiserChange, OrganiserLoad, PracticeNext, ReviewResult, SuggestEstimate, SuggestProposal, TeacherOrganiser } from './types';
+import type { EndCardItem, OrganiserChange, OrganiserLoad, PracticeNext, ReviewResult, SuggestEstimate, SuggestProposal, TeacherOrganiser } from './types';
 
 const teacherPath = (unitId: string) => `/api/units/${encodeURIComponent(unitId)}/organiser`;
 const studentPath = (classId: string) => `/api/published/organiser/${encodeURIComponent(classId)}`;
@@ -23,5 +23,5 @@ export const studentOrganiserApi = {
   review: (classId: string, results: ReviewResult[]) =>
     apiPost<{ today: number; next: PracticeNext }>(studentPath(classId), { action: 'review', class_token: token(classId), results }),
   lesson: (classId: string, lessonId: string) =>
-    apiPost<{ lines: string[]; joining?: boolean }>(studentPath(classId), { action: 'lesson', class_token: token(classId), lesson_id: lessonId })
+    apiPost<{ items: EndCardItem[]; joining?: boolean; done?: boolean }>(studentPath(classId), { action: 'lesson', class_token: token(classId), lesson_id: lessonId })
 };

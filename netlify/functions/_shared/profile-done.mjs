@@ -11,7 +11,7 @@
  * done/ could vanish on the next load. The single record never lags.
  */
 import { isSafeId } from './class-examples.mjs';
-import { listBlobKeys } from './blobs-list.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
 import { deleteKey } from './teaching-blobs.mjs';
 
@@ -102,6 +102,20 @@ export async function listDone(store, classId, studentId, marks) {
     if (mark.partial && own && !own.partial) continue;
     out[lessonId] = { ...mark, ...(own ? { was: own } : {}) };
   }
+  return out;
+}
+
+/**
+ * Which of these lessons this student has finished. Reads each record directly, because a listing can lag
+ * a fresh tick by up to a minute and a student goes straight from the tick to their organiser.
+ */
+export async function doneAmong(store, classId, studentId, lessonIds) {
+  const marks = (await readTeacherMarks(store, classId))[studentId] ?? {};
+  const out = new Set();
+  await mapBounded([...new Set(lessonIds)].filter((id) => isSafeId(id)), 8, async (id) => {
+    const held = await read(store, doneKey(classId, studentId, id));
+    if ((held && !held.partial) || (marks[id] && !marks[id].partial)) out.add(id);
+  });
   return out;
 }
 
