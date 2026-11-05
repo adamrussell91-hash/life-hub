@@ -88,7 +88,7 @@ function readFound(family: MorphologyFamily, storage: Storage | null): string[] 
   try {
     const parsed: unknown = JSON.parse(storage.getItem(morphologyStorageKey(family)) ?? '[]');
     if (!Array.isArray(parsed)) return [];
-    const known = new Set(family.words.map((entry) => entry.word));
+    const known = new Set(buildableWords(family).map((entry) => entry.word));
     return parsed.filter((item): item is string => typeof item === 'string' && known.has(item));
   } catch {
     return [];
@@ -101,6 +101,15 @@ function writeFound(family: MorphologyFamily, storage: Storage | null, found: st
   } catch {
     /* private window or full storage: progress just does not persist */
   }
+}
+
+/**
+ * The words a student can build: each needs at least one prefix or suffix.
+ * The bare base (track in the track matrix) is already on the board, so it
+ * is never a word to find and never counts towards the total.
+ */
+export function buildableWords(family: MorphologyFamily): MorphologyWord[] {
+  return family.words.filter((entry) => entry.front || entry.prefix || entry.ending);
 }
 
 export function matchMorphologyWord(family: MorphologyFamily, selection: Selection): MorphologyWord | null {
@@ -125,7 +134,7 @@ export function createMorphemicMatrix(
   storage: Storage | null = browserStorage(),
   options: { start?: string } = {}
 ): HTMLElement {
-  const total = family.words.length;
+  const total = buildableWords(family).length;
   const startKey = options.start ? matrixWordIn(family, options.start) : null;
   const startWord = family.words.find((entry) => entry.word === startKey);
   const selection: Selection = {
@@ -325,7 +334,7 @@ export function createMorphologyToggle(
   button.setAttribute('aria-expanded', 'false');
   button.append(
     el('span', 'morph__toggle-label', 'Morphemic matrix'),
-    el('span', 'morph__toggle-meta', `${family.words.length} words`)
+    el('span', 'morph__toggle-meta', `${buildableWords(family).length} words`)
   );
   const panel = el('div', 'morph__panel');
   panel.hidden = true;
