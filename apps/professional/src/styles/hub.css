@@ -5135,9 +5135,8 @@
   border-color: var(--career-branch-4);
 }
 
-.career-future__dot--red {
-  background: var(--career-branch-1);
-  border-color: var(--career-branch-1);
+.career-future__dot--none {
+  background: var(--line);
 }
 
 .career-future__chips {

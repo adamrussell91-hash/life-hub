@@ -4,6 +4,7 @@ import { renderCareerView, selectCareerFutureInPlace } from '@/views/career';
 const BARE = 'future_00000000-0000-4000-8000-0000000000a1';
 const READY = 'future_00000000-0000-4000-8000-0000000000a2';
 const PARKED = 'future_00000000-0000-4000-8000-0000000000a3';
+const UNLINKED = 'future_00000000-0000-4000-8000-0000000000a4';
 const CARD = 'achievement_00000000-0000-4000-8000-0000000000b1';
 const OTHER_CARD = 'achievement_00000000-0000-4000-8000-0000000000b2';
 
@@ -266,6 +267,47 @@ it('a future with no criteria shows the box and no empty score or stones', async
   expect(slot.querySelector('.career-future__ring')).toBeNull();
   expect(slot.textContent).not.toContain('Stepping stones');
   expect(slot.textContent).not.toContain('Add criteria');
+});
+
+it('criteria with no linked cards read as not checked, never as 0%', async () => {
+  overview.futures.push(
+    future(UNLINKED, 'Head of Programs', {
+      lane_order: 3,
+      criteria: [{ id: 'fcrit_2', text: 'Runs programs', order: 0, source: 'ad' }]
+    })
+  );
+  try {
+    const canvas = await mountPage(`#/career/future/${UNLINKED}`);
+    const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+    expect(chip(canvas, 'Head of Programs').textContent).toContain('Not checked');
+    expect(slot.querySelector('.career-future__ring')).toBeNull();
+    expect(slot.textContent).toContain('Not checked yet');
+    expect(slot.textContent).not.toContain('0%');
+    expect(slot.querySelector('.career-future__dot--none')).not.toBeNull();
+  } finally {
+    overview.futures.pop();
+  }
+});
+
+it('a linked card still gets a score and a ring', async () => {
+  const canvas = await mountPage(`#/career/future/${READY}`);
+  const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+  expect(slot.querySelector('.career-future__ring')?.textContent).toMatch(/\d+%/);
+  expect(slot.textContent).not.toContain('Not checked yet');
+});
+
+it('a save that finishes after leaving the page does not draw Career over it', async () => {
+  const canvas = await mountPage(`#/career/future/${BARE}`);
+  const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+  paste(slot.querySelector<HTMLTextAreaElement>('.career-criteria-box__input')!, 'Runs programs');
+  button(slot, 'Save criteria').click();
+  const other = document.createElement('p');
+  canvas.replaceChildren(other); // the router drew another page
+
+  await vi.waitFor(() => expect(patches).toHaveLength(1));
+  await new Promise((r) => setTimeout(r, 20));
+  expect(canvas.firstElementChild).toBe(other);
+  expect(careerLoads).toBe(1);
 });
 
 it('a parked chip restores its future', async () => {

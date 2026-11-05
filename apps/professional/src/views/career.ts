@@ -265,6 +265,8 @@ export async function renderCareerView(
     route.name === 'career-future' && 'id' in route ? route.id : null;
 
   const reload = (reveal = false) => {
+    // A save can finish after Adam has left; never draw Career over another page.
+    if (!mounted || !canvas.contains(mounted.page)) return;
     void renderCareerView(canvas, { quiet: true, reveal });
   };
   // For callbacks that may pass their own arguments (a saved record).
