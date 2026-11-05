@@ -39,3 +39,41 @@ describe('deep understanding views', () => {
     expect(host.textContent).not.toContain('Search all');
   });
 });
+
+describe('pieces and the organiser', () => {
+  const tracked = { ...du, pieces: [{ id: 'kp_aa11bb', text: 'Old words in the piece.', tier: 'essential' as const }] };
+
+  it('the plan shows a piece with an organiser line as its short prompt, and opens to the words and the way to edit them', () => {
+    const edit = vi.fn();
+    const host = document.createElement('div');
+    mountDeepPlan(host, {
+      deep: [tracked], lessons, weeks: new Map([['L1', 1]]), scope, onOpen: vi.fn(), onNew: vi.fn(),
+      lines: new Map([['kp_aa11bb', { line_id: 'ol_1', prompt: 'What does a form do?', text: 'Words on the sheet.' }]]),
+      onEditInOrganiser: edit
+    });
+    expect(host.querySelector('.du-piece__name')?.textContent).toBe('What does a form do?');
+    expect(host.textContent).not.toContain('Words on the sheet.');
+    host.querySelector<HTMLButtonElement>('.du-piece__head')!.click();
+    expect(host.textContent).toContain('Words on the sheet.');
+    [...host.querySelectorAll('button')].find((b) => b.textContent === 'Edit in the organiser')!.click();
+    expect(edit).toHaveBeenCalledWith('kp_aa11bb');
+  });
+
+  it('a piece with no line keeps its full sentence', () => {
+    const host = document.createElement('div');
+    mountDeepPlan(host, { deep: [tracked], lessons, weeks: new Map(), scope, onOpen: vi.fn(), onNew: vi.fn() });
+    expect(host.querySelector('.du-piece__head')).toBeNull();
+    expect(host.textContent).toContain('Old words in the piece.');
+  });
+
+  it('Make one locks the words of a piece with a line, and leaves the others editable', () => {
+    const two = { ...du, pieces: [...tracked.pieces, { id: 'kp_cc22dd', text: 'Not on the sheet.', tier: 'strong' as const }] };
+    const host = document.createElement('div');
+    mountDeepEditor(host, {
+      du: two, all: [two], lessons, weeks: new Map(), scope, onChange: vi.fn(), onClose: vi.fn(),
+      lines: new Map([['kp_aa11bb', { line_id: 'ol_1', prompt: '', text: 'Old words in the piece.' }]])
+    });
+    const boxes = [...host.querySelectorAll<HTMLTextAreaElement>('[aria-label="Knowledge piece"]')];
+    expect(boxes.map((b) => b.readOnly)).toEqual([true, false]);
+  });
+});

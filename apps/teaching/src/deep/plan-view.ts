@@ -18,6 +18,7 @@ import {
   type Scope
 } from './editor';
 import { navigate } from '@/app/router';
+import type { PieceLine } from '@/organiser/editor-model';
 import {
   DEEP_LIMITS,
   newDuId,
@@ -40,10 +41,14 @@ export type DeepPlanOptions = {
   scope: Scope;
   onOpen: (duId: string) => void;
   onNew: () => void;
+  /** Each piece's line on the organiser, which holds its words. */
+  lines?: ReadonlyMap<string, PieceLine>;
+  onEditInOrganiser?: (pieceId: string) => void;
 };
 
 export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { update: (next: Partial<DeepPlanOptions>) => void; destroy: () => void } {
   let opts = options;
+  const openPieces = new Set<string>();
   let current: string | null = null;
   const root = h('div', 'du-root du-plan');
   host.replaceChildren(root);
@@ -163,12 +168,32 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
       pieces.append(h('div', `du-tier t-${tier}`, TIER_TITLE[tier]));
       for (const piece of rows) {
         const row = h('div', 'du-piece');
-        row.append(h('span', '', piece.text || 'Empty piece'));
+        const line = opts.lines?.get(piece.id);
+        const words = line?.text || piece.text || 'Empty piece';
+        const name = line?.prompt || words;
         const small = h('small');
         const taught = p.taught.get(piece.id) ?? [];
         const tested = p.tested.get(piece.id);
         small.textContent = `Taught ${taught.length ? taught.map((id) => lessonCode(opts.lessons, id)).join(' ') : 'not yet'} · Tested ${tested ? tested.lessons.map((id) => lessonCode(opts.lessons, id)).join(' ') : 'not yet'}`;
-        row.append(small);
+        if (line) {
+          const head = button('', 'du-piece__head', () => {
+            if (openPieces.has(piece.id)) openPieces.delete(piece.id);
+            else openPieces.add(piece.id);
+            render();
+          });
+          const on = openPieces.has(piece.id);
+          head.setAttribute('aria-expanded', String(on));
+          head.append(h('span', 'du-piece__name', name), small, h('span', 'du-piece__chev', on ? '▾' : '▸'));
+          row.append(head);
+          if (on) {
+            const more = h('div', 'du-piece__more');
+            if (name !== words) more.append(h('span', '', words));
+            if (opts.onEditInOrganiser) more.append(button('Edit in the organiser', 'du-link', () => opts.onEditInOrganiser?.(piece.id)));
+            row.append(more);
+          }
+        } else {
+          row.append(h('span', '', words), small);
+        }
         pieces.append(row);
       }
     }
@@ -219,6 +244,8 @@ export type DeepSectionOptions = {
   classes?: Array<{ id: string; label: string }>;
   scheduled?: ScheduledLesson[];
   onOpenLesson?: (lessonId: string) => void;
+  lines?: ReadonlyMap<string, PieceLine>;
+  onEditInOrganiser?: (pieceId: string) => void;
 };
 
 function mapTree(blocks: Block[], fn: (b: Block) => Block): Block[] {
@@ -239,13 +266,17 @@ const hasPiece = (blocks: Block[], pieceId: string): boolean => {
 };
 
 /** Plan / Make one / Monitoring on the unit page. */
-export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions): { destroy: () => void } {
+export function mountDeepSection(
+  host: HTMLElement,
+  options: DeepSectionOptions
+): { destroy: () => void; setLines: (lines: ReadonlyMap<string, PieceLine>) => void; setPieceText: (pieceId: string, text: string) => void } {
   const state = {
     deep: (options.unit.deep_understandings ?? []).map((d) => ({ ...d })) as DeepUnderstanding[],
     lessons: options.lessons.slice(),
     weeks: options.weeks,
     tab: 'plan' as Tab,
-    openId: null as string | null
+    openId: null as string | null,
+    lines: options.lines ?? (new Map() as ReadonlyMap<string, PieceLine>)
   };
   // Empty piece rows stay in the editor only: a piece needs text to be saved, planned or tracked.
   const written = (): DeepUnderstanding[] => state.deep.map((d) => ({ ...d, pieces: d.pieces.filter((p) => p.text.trim()) }));
@@ -273,6 +304,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
   root.append(tabs, body, status);
   host.replaceChildren(root);
   let editorHandle: ReturnType<typeof mountDeepEditor> | null = null;
+  let planHandle: ReturnType<typeof mountDeepPlan> | null = null;
 
   const like = (): LessonLike[] => state.lessons;
   const recompute = (): void => editorHandle?.update({ lessons: like(), weeks: state.weeks });
@@ -336,6 +368,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
     state.tab = tab;
     editorHandle?.destroy();
     editorHandle = null;
+    planHandle = null;
     tabs.replaceChildren();
     for (const [id, label] of [['plan', 'Plan'], ['make', 'Make one'], ['monitor', 'Monitoring']] as const) {
       const b = button(label, `du-tab${tab === id ? ' on' : ''}`, () => show(id));
@@ -344,7 +377,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
     }
     body.replaceChildren();
     if (tab === 'plan') {
-      mountDeepPlan(body, { deep: written(), lessons: like(), weeks: state.weeks, scope: options.scope, onOpen: openMake, onNew: newOne });
+      planHandle = mountDeepPlan(body, { deep: written(), lessons: like(), weeks: state.weeks, scope: options.scope, onOpen: openMake, onNew: newOne, lines: state.lines, onEditInOrganiser: options.onEditInOrganiser });
     } else if (tab === 'make') {
       const du = state.deep.find((d) => d.id === state.openId) ?? state.deep[0];
       if (!du) { newOne(); return; }
@@ -356,6 +389,7 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
       body.append(picks, mount);
       editorHandle = mountDeepEditor(mount, {
         du, all: state.deep, lessons: like(), weeks: state.weeks, scope: options.scope,
+        lines: state.lines, onEditInOrganiser: options.onEditInOrganiser,
         onChange: (next) => { state.deep = state.deep.map((d) => (d.id === next.id ? next : d)); schedule(); },
         onTagLessons: tagLessons,
         onPickTask: (step) => pickTask(du.id, step),
@@ -377,5 +411,21 @@ export function mountDeepSection(host: HTMLElement, options: DeepSectionOptions)
   }
   show('plan');
 
-  return { destroy() { clearTimeout(timer); root.remove(); } };
+  return {
+    destroy() { clearTimeout(timer); root.remove(); },
+    setLines(lines) {
+      state.lines = lines;
+      planHandle?.update({ lines });
+      editorHandle?.update({ lines });
+    },
+    /** The organiser saved a piece's words: keep them, and keep Make one from writing old words back. */
+    setPieceText(pieceId, text) {
+      const words = text.slice(0, DEEP_LIMITS.piece);
+      if (!state.deep.some((d) => d.pieces.some((p) => p.id === pieceId && p.text !== words))) return;
+      state.deep = state.deep.map((d) => ({ ...d, pieces: d.pieces.map((p) => (p.id === pieceId ? { ...p, text: words } : p)) }));
+      schedule();
+      planHandle?.update({ deep: written() });
+      if (state.tab === 'make' && !body.contains(document.activeElement)) show('make');
+    }
+  };
 }

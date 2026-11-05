@@ -1,4 +1,5 @@
 import { visitBlocks } from '@/blocks/walk-blocks';
+import type { PieceLine } from '@/organiser/editor-model';
 import type { Block } from '@/schemas/block';
 import { chainGaps, placements, planGaps, PRE_UNIT_WEEK } from './derive';
 import type { ScopeBullet, ScopePoint } from './scope';
@@ -97,6 +98,9 @@ export type DeepEditorOptions = {
   onPickTask?: (step: PlacedStep) => Promise<void>;
   onOpenLesson?: (lessonId: string) => void;
   onClose: () => void;
+  /** Pieces with a line on the organiser: their words are edited there. */
+  lines?: ReadonlyMap<string, PieceLine>;
+  onEditInOrganiser?: (pieceId: string) => void;
 };
 
 export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): { update: (next: Partial<DeepEditorOptions>) => void; destroy: () => void } {
@@ -286,7 +290,8 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     text.maxLength = DEEP_LIMITS.piece;
     text.placeholder = 'One fact or idea, in a sentence';
     text.setAttribute('aria-label', 'Knowledge piece');
-    text.readOnly = !own;
+    const line = opts.lines?.get(piece.id);
+    text.readOnly = !own || !!line;
     text.addEventListener('input', () => {
       commit({ ...du, pieces: du.pieces.map((x) => (x.id === piece.id ? { ...x, text: text.value } : x)) });
       refreshLive();
@@ -311,7 +316,13 @@ export function mountDeepEditor(host: HTMLElement, options: DeepEditorOptions): 
     } else if (opts.onOpenLesson && opts.lessons.length) {
       evd.append(button('Write items', 'du-wr', () => opts.onOpenLesson?.(taught[0] ?? opts.lessons[0]!.id)));
     } else evd.append(h('span', 'du-cnt', 'No items yet'));
-    row.append(seg, text, where, evd);
+    row.append(seg, text);
+    if (line) {
+      row.append(opts.onEditInOrganiser
+        ? button('Edit in the organiser', 'du-link', () => opts.onEditInOrganiser?.(piece.id))
+        : h('span', 'du-cnt', 'Edit these words in the organiser'));
+    }
+    row.append(where, evd);
     if (own) row.append(uPicker(piece));
     if (own) {
       const rm = button('Remove', 'du-link', () => {
