@@ -636,7 +636,7 @@ export function renderUnitPage(
     mountDeepSection(deepHost, {
       unit,
       lessons: deepLessons,
-      weeks: lessonWeeks(unit.lesson_ids, unitRows),
+      weeks: lessonWeeks(unit.lesson_ids, unitRows, new Set(deepLessons.filter((l) => l.pre_unit).map((l) => l.id))),
       scope: unitScope(deepLessons, alignment, alignment ? unitConceptKeysFor(curriculum, unit, alignment) : []),
       save: (deep) => patchUnit(unit.id, { deep_understandings: deep }),
       classes: curriculum.classes

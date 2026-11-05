@@ -21,6 +21,13 @@ describe('deep understanding views', () => {
     expect(onNew).toHaveBeenCalled();
   });
 
+  it('the plan heads a pre-unit lesson as Pre, ahead of week 1', () => {
+    const two = [{ id: 'P', title: 'Before', blocks: [] }, { id: 'L1', title: 'One', blocks: [] }] as never;
+    const host = document.createElement('div');
+    mountDeepPlan(host, { deep: [du], lessons: two, weeks: new Map([['P', 0], ['L1', 1]]), scope, onOpen: vi.fn(), onNew: vi.fn() });
+    expect([...host.querySelectorAll('.du-map thead th')].map((th) => th.textContent)).toEqual(['Deep understanding', 'Pre', 'Wk 1']);
+  });
+
   it('the editor lists only the unit’s scope and saves as you go', () => {
     const onChange = vi.fn();
     const host = document.createElement('div');

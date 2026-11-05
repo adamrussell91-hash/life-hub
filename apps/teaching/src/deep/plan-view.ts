@@ -5,7 +5,7 @@ import type { Block, Lesson, Unit } from '@/schemas';
 import type { ScheduledLesson } from '@/schemas/scheduled-lesson';
 import './deep.css';
 import { addEvidenceStep, evidenceSteps, piecesTaught, removeEvidenceStep, withPiecesTaught } from './block-tags';
-import { chainGaps, placements, planGaps, pointsOutsideDus } from './derive';
+import { chainGaps, placements, planGaps, pointsOutsideDus, PRE_UNIT_WEEK } from './derive';
 import {
   button,
   h,
@@ -105,7 +105,7 @@ export function mountDeepPlan(host: HTMLElement, options: DeepPlanOptions): { up
     const table = h('table', 'du-map');
     const hr = h('tr');
     hr.append(h('th', 'rowh', 'Deep understanding'));
-    for (const c of cols) hr.append(h('th', '', c == null ? 'Not dated' : `Wk ${c}`));
+    for (const c of cols) hr.append(h('th', '', c == null ? 'Not dated' : c === PRE_UNIT_WEEK ? 'Pre' : `Wk ${c}`));
     const thead = h('thead');
     thead.append(hr);
     table.append(thead);
