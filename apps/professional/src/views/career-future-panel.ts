@@ -4,6 +4,12 @@ import { searchEntities } from '@/api/entities';
 import { createTask, createUniversalLink } from '@/api/universal-links';
 import { careerCardRoute } from '@/app/router';
 import type { CareerFutureModel } from '@/domain/career-model';
+import {
+  reconcileCriteria,
+  readsAsAd,
+  splitCriteriaLines,
+  type SavedCriterion
+} from '@/domain/career-criteria-paste';
 import { branchColour } from '@/domain/career-river-geometry';
 
 type FutureModel = CareerFutureModel;
@@ -32,6 +38,145 @@ function formatFadingSince(iso: string | null | undefined): string {
   return d.toLocaleString('en-AU', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+type AnnDraft = {
+  title?: string;
+  where?: string | null;
+  aliases?: string[];
+  criteria?: Array<{ text: string; source?: string }>;
+  fallback?: boolean;
+};
+
+async function askAnn(title: string, description: string): Promise<AnnDraft> {
+  const result = (await draftFuture({ title, description })) as { draft?: AnnDraft };
+  return result.draft ?? {};
+}
+
+const BOX_HINT = 'Paste the job ad or the criteria, or type them. One per line.';
+
+/** The one box a role's criteria live in. Says how the paste reads as you go. */
+function criteriaBox(initial: string): {
+  root: HTMLElement;
+  input: HTMLTextAreaElement;
+  setText: (text: string) => void;
+  isDirty: () => boolean;
+} {
+  const root = el('div', 'career-criteria-box');
+  const input = el('textarea', 'career-criteria-box__input') as HTMLTextAreaElement;
+  input.rows = 9;
+  input.value = initial;
+  input.setAttribute('aria-label', 'What this role asks for');
+  const note = el('p', 'career-page__meta career-criteria-box__note');
+  const refresh = () => {
+    const text = input.value;
+    const count = splitCriteriaLines(text).length;
+    if (!count) note.textContent = '';
+    else if (readsAsAd(text)) note.textContent = 'Reads like a full ad. Ann picks out the criteria when you save.';
+    else note.textContent = count === 1 ? '1 criterion' : `${count} criteria`;
+  };
+  input.addEventListener('input', refresh);
+  refresh();
+  root.append(input, note);
+  return {
+    root,
+    input,
+    setText: (text) => {
+      input.value = text;
+      refresh();
+    },
+    isDirty: () => input.value.trim() !== initial.trim()
+  };
+}
+
+/** What the box will save. An ad goes through Ann first; a list stays word for word. */
+async function criteriaFromBox(
+  text: string,
+  title: string,
+  existing: FutureModel['criteria'],
+  onAnn: () => void
+): Promise<{ criteria: SavedCriterion[]; draft: AnnDraft | null }> {
+  if (!readsAsAd(text)) {
+    const lines = splitCriteriaLines(text).map((line) => ({ text: line }));
+    return { criteria: reconcileCriteria(lines, existing), draft: null };
+  }
+  onAnn();
+  const draft = await askAnn(title, text);
+  if (!draft.criteria?.length) throw new Error('Ann could not find any criteria. Your paste is still here.');
+  return { criteria: reconcileCriteria(draft.criteria, existing), draft };
+}
+
+/** Ann reads the box (or just the title, if it is empty) and fills it back in. */
+function annDraftButton(
+  box: ReturnType<typeof criteriaBox>,
+  status: HTMLElement,
+  title: () => string,
+  onDraft: (draft: AnnDraft) => void = () => {}
+): HTMLButtonElement {
+  const button = el('button', 'btn btn--ghost', 'Ask Ann to draft') as HTMLButtonElement;
+  button.type = 'button';
+  button.addEventListener('click', () => {
+    void (async () => {
+      button.disabled = true;
+      status.textContent = 'Ann is drafting…';
+      try {
+        const draft = await askAnn(title(), box.input.value);
+        const lines = (draft.criteria ?? []).map((c) => c.text);
+        if (lines.length) box.setText(lines.join('\n'));
+        onDraft(draft);
+        status.textContent = lines.length
+          ? `Ann drafted ${lines.length} criteria${draft.fallback ? ' offline' : ''}. Edit anything, then save.`
+          : 'Ann had nothing to add.';
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Could not draft. Try again.';
+      } finally {
+        button.disabled = false;
+      }
+    })();
+  });
+  return button;
+}
+
+/** The empty panel's one job: take the paste, right here, with no sheet to open. */
+function inlineCriteriaForm(future: FutureModel, onChanged: () => void): HTMLElement {
+  const form = el('div', 'career-future__criteria-empty');
+  form.append(
+    el(
+      'p',
+      'career-page__meta',
+      `${BOX_HINT} Each line is checked against your skill cards, so you can see how ready you are and what is missing.`
+    )
+  );
+  const box = criteriaBox('');
+  const status = el('p', 'career-page__meta');
+  status.setAttribute('role', 'status');
+  const save = el('button', 'btn btn--primary', 'Save criteria') as HTMLButtonElement;
+  save.type = 'button';
+  save.addEventListener('click', () => {
+    void (async () => {
+      if (!box.input.value.trim()) {
+        status.textContent = 'Paste or type what the role asks for first.';
+        box.input.focus();
+        return;
+      }
+      save.disabled = true;
+      status.textContent = 'Saving…';
+      try {
+        const { criteria } = await criteriaFromBox(box.input.value, future.title, future.criteria, () => {
+          status.textContent = 'Ann is picking out the criteria…';
+        });
+        await updateFuture(future.id, { criteria });
+        onChanged();
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Could not save. Your paste is still here.';
+        save.disabled = false;
+      }
+    })();
+  });
+  const actions = el('div', 'career-sheet__actions');
+  actions.append(save, annDraftButton(box, status, () => future.title));
+  form.append(box.root, status, actions);
+  return form;
+}
+
 /**
  * Detailed Future panel for the selected branch.
  */
@@ -40,9 +185,6 @@ export function renderFutureDetail(
   future: FutureModel,
   options: { onChanged: () => void; onClose?: () => void }
 ): void {
-  const editCriteria = () =>
-    openEditFutureSheet(document.body, future, options.onChanged, { focusCriteria: true });
-
   host.replaceChildren();
   const panel = el('section', 'career-page__panel career-page__future-detail');
   panel.style.background = 'var(--glass)';
@@ -59,19 +201,14 @@ export function renderFutureDetail(
   }
   head.append(titles);
 
-  const ring = el('div', 'career-future__ring');
-  ring.style.setProperty('--ring-color', branchColour(future.colour_slot));
-  ring.style.setProperty('--ring-pct', String(future.readiness ?? 0));
-  if (future.readiness == null) {
-    // "Add criteria" is an action here, not a score.
-    const add = el('button', 'career-future__ring-label career-future__ring-add', future.readiness_label);
-    add.type = 'button';
-    add.addEventListener('click', editCriteria);
-    ring.append(add);
-  } else {
+  // No criteria means no score, so no ring until there is something to measure.
+  if (future.readiness != null) {
+    const ring = el('div', 'career-future__ring');
+    ring.style.setProperty('--ring-color', branchColour(future.colour_slot));
+    ring.style.setProperty('--ring-pct', String(future.readiness));
     ring.append(el('span', 'career-future__ring-label', future.readiness_label));
+    head.append(ring);
   }
-  head.append(ring);
   if (options.onClose) {
     const close = el('button', 'btn btn--ghost career-future__close', 'Close') as HTMLButtonElement;
     close.type = 'button';
@@ -125,6 +262,15 @@ export function renderFutureDetail(
   }
 
   panel.append(el('h3', 'career-future__subhead', 'What this role asks for'));
+  if (future.criteria.length) {
+    panel.append(
+      el(
+        'p',
+        'career-page__meta',
+        'Green: your skill cards cover it. Amber: partly. Red: a gap, which you can make a stepping stone.'
+      )
+    );
+  }
   const criteriaList = el('ul', 'career-future__criteria');
   for (const criterion of [...future.criteria].sort((a, b) => a.order - b.order)) {
     const li = document.createElement('li');
@@ -166,26 +312,29 @@ export function renderFutureDetail(
           }
         })();
       });
-      li.append(make);
+      row.append(make);
     }
     criteriaList.append(li);
   }
-  if (!future.criteria.length) {
-    const empty = el('li', 'empty-state career-future__criteria-empty');
-    empty.append(el('p', null, 'No criteria yet. Readiness needs to know what the role asks for.'));
-    const add = el('button', 'btn btn--primary', 'Add criteria') as HTMLButtonElement;
-    add.type = 'button';
-    add.addEventListener('click', editCriteria);
-    empty.append(add);
-    criteriaList.append(empty);
+  if (future.criteria.length) {
+    panel.append(criteriaList);
+    const editCriteria = el('button', 'btn btn--secondary career-future__edit', 'Edit criteria') as HTMLButtonElement;
+    editCriteria.type = 'button';
+    editCriteria.addEventListener('click', () => {
+      openEditFutureSheet(document.body, future, options.onChanged, { focusCriteria: true });
+    });
+    panel.append(editCriteria);
+  } else {
+    panel.append(inlineCriteriaForm(future, options.onChanged));
   }
-  panel.append(criteriaList);
 
-  panel.append(el('h3', 'career-future__subhead', 'Stepping stones'));
-  const stonesList = el('ul', 'career-future__stones');
   const stones = future.stones ?? [];
-  if (!stones.length) {
-    stonesList.append(el('li', 'empty-state', 'No stepping stones yet.'));
+  const stonesList = el('ul', 'career-future__stones');
+  if (stones.length || future.criteria.length) {
+    panel.append(el('h3', 'career-future__subhead', 'Stepping stones'));
+  }
+  if (!stones.length && future.criteria.length) {
+    stonesList.append(el('li', 'empty-state', 'No stepping stones yet. Make one from any line you are missing.'));
   }
   for (const stone of stones) {
     const li = document.createElement('li');
@@ -262,9 +411,9 @@ export function renderFutureDetail(
     li.append(action);
     stonesList.append(li);
   }
-  panel.append(stonesList);
+  if (stones.length || future.criteria.length) panel.append(stonesList);
 
-  const edit = el('button', 'btn btn--ghost', 'Edit future') as HTMLButtonElement;
+  const edit = el('button', 'btn btn--ghost career-future__edit', 'Edit future') as HTMLButtonElement;
   edit.type = 'button';
   edit.addEventListener('click', () => {
     openEditFutureSheet(document.body, future, options.onChanged);
@@ -272,6 +421,33 @@ export function renderFutureDetail(
   panel.append(edit);
 
   host.append(panel);
+}
+
+/**
+ * Escape and clicking outside close a sheet, unless that would throw away what
+ * has been pasted. Cancel always closes.
+ */
+function sheetCloser(
+  sheet: HTMLElement,
+  isDirty: () => boolean,
+  warn: (message: string) => void
+): () => void {
+  const close = () => {
+    document.removeEventListener('keydown', onKey);
+    sheet.remove();
+  };
+  const closeIfClean = () => {
+    if (isDirty()) warn('Press Cancel to discard this, or Save to keep it.');
+    else close();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') closeIfClean();
+  };
+  document.addEventListener('keydown', onKey);
+  sheet.addEventListener('click', (event) => {
+    if (event.target === sheet) closeIfClean();
+  });
+  return close;
 }
 
 /**
@@ -285,12 +461,10 @@ export function openAddFutureSheet(
 ): void {
   const sheet = el('div', 'career-sheet');
   sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Add a future');
   const inner = el('div', 'career-sheet__inner');
   inner.append(el('h2', 'career-page__heading', 'Add a future'));
-  inner.append(
-    el('p', 'career-page__meta', 'Paste an ad or describe the role. Ann drafts the criteria — you edit and save.')
-  );
 
   const titleField = el('label', 'career-sheet__field', 'Role title');
   const titleInput = el('input') as HTMLInputElement;
@@ -298,56 +472,24 @@ export function openAddFutureSheet(
   titleInput.required = true;
   titleField.append(titleInput);
 
-  const descField = el('label', 'career-sheet__field', 'Ad or description');
-  const desc = el('textarea') as HTMLTextAreaElement;
-  desc.rows = 8;
-  descField.append(desc);
+  const asks = el('div', 'career-sheet__field');
+  asks.append(el('span', null, 'What this role asks for'));
+  asks.append(el('p', 'career-page__meta career-sheet__hint', BOX_HINT));
+  const box = criteriaBox('');
+  asks.append(box.root);
 
   const status = el('p', 'career-page__meta');
-  const criteriaHost = el('div', 'career-sheet__criteria');
+  status.setAttribute('role', 'status');
 
-  let draft: {
-    title: string;
-    where: string | null;
-    aliases: string[];
-    criteria: Array<{ id?: string; text: string; order: number; source: string }>;
-  } | null = null;
-
-  const draftBtn = el('button', 'btn btn--secondary', 'Ask Ann to draft') as HTMLButtonElement;
-  draftBtn.type = 'button';
-  draftBtn.addEventListener('click', () => {
-    void (async () => {
-      draftBtn.disabled = true;
-      status.textContent = 'Ann is drafting…';
-      try {
-        const result = (await draftFuture({
-          title: titleInput.value,
-          description: desc.value
-        })) as { draft: typeof draft };
-        draft = result.draft;
-        if (draft?.title) titleInput.value = draft.title;
-        criteriaHost.replaceChildren();
-        criteriaHost.append(el('h3', 'career-future__subhead', 'Criteria (edit before saving)'));
-        for (const c of draft?.criteria ?? []) {
-          const row = el('label', 'career-sheet__field');
-          const input = el('input') as HTMLInputElement;
-          input.type = 'text';
-          input.value = c.text;
-          input.dataset.source = c.source;
-          row.append(input);
-          criteriaHost.append(row);
-        }
-        status.textContent = draft && 'fallback' in (draft as object) && (draft as { fallback?: boolean }).fallback
-          ? 'Drafted offline (no model key). Edit freely.'
-          : 'Draft ready — edit anything, then save.';
-      } catch (error) {
-        status.textContent =
-          error instanceof Error ? error.message : 'Could not draft. Try again.';
-      } finally {
-        draftBtn.disabled = false;
-      }
-    })();
-  });
+  // Filled when Ann reads the paste; saved alongside the criteria.
+  let annDraft: AnnDraft | null = null;
+  const close = sheetCloser(
+    sheet,
+    () => box.isDirty() || Boolean(titleInput.value.trim()),
+    (message) => {
+      status.textContent = message;
+    }
+  );
 
   const save = el('button', 'btn btn--primary', 'Save future') as HTMLButtonElement;
   save.type = 'button';
@@ -355,19 +497,21 @@ export function openAddFutureSheet(
     void (async () => {
       save.disabled = true;
       try {
-        const criteriaInputs = [...criteriaHost.querySelectorAll('input')];
-        const criteria =
-          criteriaInputs.length > 0
-            ? criteriaInputs.map((input, index) => ({
-                text: input.value.trim(),
-                order: index,
-                source: (input.dataset.source as 'ad' | 'ann' | 'adam') || 'adam'
-              })).filter((c) => c.text)
-            : draft?.criteria ?? [];
+        const { criteria, draft } = await criteriaFromBox(box.input.value, titleInput.value.trim(), [], () => {
+          status.textContent = 'Ann is picking out the criteria…';
+        });
+        annDraft = draft ?? annDraft;
+        const title = titleInput.value.trim() || annDraft?.title?.trim();
+        if (!title) {
+          status.textContent = 'Give the role a title first.';
+          save.disabled = false;
+          titleInput.focus();
+          return;
+        }
         const created = (await createFuture({
-          title: titleInput.value.trim() || draft?.title,
-          where: draft?.where ?? null,
-          aliases: draft?.aliases ?? [],
+          title,
+          where: annDraft?.where ?? null,
+          aliases: annDraft?.aliases ?? [],
           criteria,
           status: 'active',
           colour_slot: (existingCount % 6) + 1,
@@ -376,11 +520,10 @@ export function openAddFutureSheet(
           suggested_reason: null,
           dismissed_until: null
         })) as { future: { id: string } };
-        root.removeChild(sheet);
+        close();
         onSaved(created.future.id);
       } catch (error) {
-        status.textContent =
-          error instanceof Error ? error.message : 'Could not save.';
+        status.textContent = error instanceof Error ? error.message : 'Could not save. Your paste is still here.';
         save.disabled = false;
       }
     })();
@@ -388,33 +531,22 @@ export function openAddFutureSheet(
 
   const cancel = el('button', 'btn btn--ghost', 'Cancel') as HTMLButtonElement;
   cancel.type = 'button';
-  cancel.addEventListener('click', () => root.removeChild(sheet));
+  cancel.addEventListener('click', close);
+
+  const draftBtn = annDraftButton(box, status, () => titleInput.value.trim(), (draft) => {
+    annDraft = draft;
+    if (draft.title && !titleInput.value.trim()) titleInput.value = draft.title;
+  });
 
   const actions = el('div', 'career-sheet__actions');
-  actions.append(draftBtn, save, cancel);
-  inner.append(titleField, descField, actions, status, criteriaHost);
+  actions.append(save, draftBtn, cancel);
+  inner.append(titleField, asks, status, actions);
   sheet.append(inner);
   root.append(sheet);
+  titleInput.focus();
 }
 
-function criterionRow(text: string, data: { id?: string; source: string }): HTMLElement {
-  const row = el('div', 'career-sheet__criterion');
-  const input = el('input') as HTMLInputElement;
-  input.type = 'text';
-  input.value = text;
-  input.placeholder = 'What the role asks for';
-  input.setAttribute('aria-label', 'Criterion');
-  if (data.id) input.dataset.id = data.id;
-  input.dataset.source = data.source;
-  const remove = el('button', 'btn btn--ghost career-sheet__remove', '×') as HTMLButtonElement;
-  remove.type = 'button';
-  remove.setAttribute('aria-label', 'Remove criterion');
-  remove.addEventListener('click', () => row.remove());
-  row.append(input, remove);
-  return row;
-}
-
-/** `focusCriteria`: opened from "Add criteria", so start in the criteria list. */
+/** `focusCriteria`: opened from "Edit criteria", so start in the criteria box. */
 export function openEditFutureSheet(
   root: HTMLElement,
   future: FutureModel,
@@ -427,18 +559,6 @@ export function openEditFutureSheet(
   sheet.setAttribute('aria-label', options.focusCriteria ? `Criteria for ${future.title}` : 'Edit future');
   const inner = el('div', 'career-sheet__inner');
   inner.append(el('h2', 'career-page__heading', options.focusCriteria ? future.title : 'Edit future'));
-
-  const close = () => {
-    document.removeEventListener('keydown', onKey);
-    sheet.remove();
-  };
-  const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') close();
-  };
-  document.addEventListener('keydown', onKey);
-  sheet.addEventListener('click', (event) => {
-    if (event.target === sheet) close();
-  });
 
   const titleField = el('label', 'career-sheet__field', 'Title');
   const titleInput = el('input') as HTMLInputElement;
@@ -463,65 +583,23 @@ export function openEditFutureSheet(
   colourInput.value = String(future.colour_slot);
   colourField.append(colourInput);
 
-  const criteriaSection = el('div', 'career-sheet__criteria');
-  criteriaSection.append(el('h3', 'career-future__subhead', 'What this role asks for'));
-  criteriaSection.append(
-    el('p', 'career-page__meta', 'One line per criterion. Readiness is how many your skill cards cover.')
+  const criteriaSection = el('div', 'career-sheet__field');
+  criteriaSection.append(el('span', null, 'What this role asks for'));
+  criteriaSection.append(el('p', 'career-page__meta career-sheet__hint', BOX_HINT));
+  const box = criteriaBox(
+    [...future.criteria]
+      .sort((a, b) => a.order - b.order)
+      .map((c) => c.text)
+      .join('\n')
   );
-  const rows = el('div', 'career-sheet__criteria-rows');
-  for (const c of [...future.criteria].sort((a, b) => a.order - b.order)) {
-    rows.append(criterionRow(c.text, { id: c.id, source: c.source }));
-  }
-  criteriaSection.append(rows);
+  criteriaSection.append(box.root);
 
   const status = el('p', 'career-page__meta');
   status.setAttribute('role', 'status');
 
-  const critActions = el('div', 'career-sheet__actions');
-  const addCrit = el('button', 'btn btn--secondary', 'Add criterion') as HTMLButtonElement;
-  addCrit.type = 'button';
-  addCrit.addEventListener('click', () => {
-    const row = criterionRow('', { source: 'adam' });
-    rows.append(row);
-    row.querySelector('input')?.focus();
+  const close = sheetCloser(sheet, box.isDirty, (message) => {
+    status.textContent = message;
   });
-  const draft = el('button', 'btn btn--ghost', 'Ask Ann to draft') as HTMLButtonElement;
-  draft.type = 'button';
-  draft.addEventListener('click', () => {
-    void (async () => {
-      draft.disabled = true;
-      status.textContent = 'Ann is drafting…';
-      try {
-        const result = (await draftFuture({
-          title: titleInput.value.trim() || future.title,
-          description: ''
-        })) as { draft?: { criteria?: Array<{ text: string; source?: string }>; fallback?: boolean } };
-        const have = new Set(
-          [...rows.querySelectorAll('input')].map((i) => i.value.trim().toLowerCase()).filter(Boolean)
-        );
-        const drafted = (result.draft?.criteria ?? []).filter(
-          (c) => c.text && !have.has(c.text.trim().toLowerCase())
-        );
-        if (drafted.length) {
-          // Drop blank rows so drafted lines aren't stranded under empty ones.
-          for (const input of [...rows.querySelectorAll('input')]) {
-            if (!input.value.trim()) input.closest('.career-sheet__criterion')?.remove();
-          }
-        }
-        for (const c of drafted) rows.append(criterionRow(c.text, { source: c.source || 'ann' }));
-        const added = drafted.length;
-        status.textContent = added
-          ? `Ann drafted ${added} criteria${result.draft?.fallback ? ' offline' : ''}. Edit anything, then save.`
-          : 'Ann had nothing new to add.';
-      } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'Could not draft. Try again.';
-      } finally {
-        draft.disabled = false;
-      }
-    })();
-  });
-  critActions.append(addCrit, draft);
-  criteriaSection.append(critActions);
 
   const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
   save.type = 'button';
@@ -529,16 +607,12 @@ export function openEditFutureSheet(
     void (async () => {
       save.disabled = true;
       try {
-        const criteria = [...rows.querySelectorAll('input')]
-          .map((input) => ({
-            id: input.dataset.id,
-            text: input.value.trim(),
-            source: (input.dataset.source as 'ad' | 'ann' | 'adam') || 'adam'
-          }))
-          .filter((c) => c.text)
-          .map((c, index) => ({ ...c, order: index }));
+        const title = titleInput.value.trim();
+        const { criteria } = await criteriaFromBox(box.input.value, title, future.criteria, () => {
+          status.textContent = 'Ann is picking out the criteria…';
+        });
         await updateFuture(future.id, {
-          title: titleInput.value.trim(),
+          title,
           where: whereInput.value.trim() || null,
           aliases: aliasesInput.value
             .split(',')
@@ -556,7 +630,7 @@ export function openEditFutureSheet(
         close();
         onSaved();
       } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'Could not save.';
+        status.textContent = error instanceof Error ? error.message : 'Could not save. Your paste is still here.';
         save.disabled = false;
       }
     })();
@@ -566,7 +640,7 @@ export function openEditFutureSheet(
   cancel.addEventListener('click', close);
 
   const actions = el('div', 'career-sheet__actions');
-  actions.append(save, cancel);
+  actions.append(save, annDraftButton(box, status, () => titleInput.value.trim() || future.title), cancel);
   if (options.focusCriteria) {
     // Criteria first; the rest of the future stays one tap away below.
     const more = el('details', 'career-sheet__more');
@@ -579,9 +653,5 @@ export function openEditFutureSheet(
   sheet.append(inner);
   root.append(sheet);
 
-  if (options.focusCriteria) {
-    if (!rows.childElementCount) rows.append(criterionRow('', { source: 'adam' }));
-    const firstEmpty = [...rows.querySelectorAll('input')].find((i) => !i.value.trim());
-    (firstEmpty ?? rows.querySelector('input'))?.focus();
-  }
+  if (options.focusCriteria) box.input.focus();
 }

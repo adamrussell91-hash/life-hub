@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFutureDraft } from '../../netlify/functions/_shared/career-future-draft.mjs';
+import { draftFutureFromAnn, parseFutureDraft } from '../../netlify/functions/_shared/career-future-draft.mjs';
 
 test('parseFutureDraft accepts Ann JSON with 3+ criteria', () => {
   const draft = parseFutureDraft(
@@ -30,4 +30,15 @@ test('parseFutureDraft rejects thin drafts', () => {
     }),
     null
   );
+});
+
+test('offline draft keeps a pasted paragraph instead of the stock list', async () => {
+  const sentence = 'The role leads whole-school assessment practice across every faculty. ';
+  const draft = await draftFutureFromAnn({ title: 'Lead', description: sentence.repeat(10) });
+  assert.equal(draft.fallback, true);
+  assert.ok(draft.criteria.length >= 1);
+  for (const c of draft.criteria) {
+    assert.match(c.text, /whole-school assessment/);
+    assert.equal(c.source, 'ad');
+  }
 });

@@ -398,8 +398,6 @@ export function mountCareerRiver(
     selectedFutureId?: string | null;
     onSelectFuture?: (id: string | null) => void;
     onAddFuture?: () => void;
-    /** A future with no criteria was picked: its label reads "Add criteria". */
-    onAddCriteria?: (id: string) => void;
     onRestoreFuture?: (id: string) => void;
   } = {}
 ): { destroy: () => void; setSelected: (id: string | null) => void } {
@@ -466,14 +464,6 @@ export function mountCareerRiver(
 
   /** Chip or branch click: toggles the locked selection. */
   function pickFuture(id: string): void {
-    const future = model.futures.find((f) => f.id === id);
-    if (future && !future.criteria.length) {
-      // Its label says "Add criteria", so a click always means that.
-      state!.locked = true;
-      if (state!.selectedId !== id) selectFuture(id, true);
-      options.onAddCriteria?.(id);
-      return;
-    }
     if (state!.locked && state!.selectedId === id) {
       state!.locked = false;
       selectFuture(null, true);
