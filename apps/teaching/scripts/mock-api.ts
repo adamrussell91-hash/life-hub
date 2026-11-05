@@ -103,6 +103,7 @@ import { createFeedbackCodesHandler } from '../../../netlify/functions/feedback-
 import { DEFAULT_FEEDBACK_CODES } from '../../../netlify/functions/_shared/feedback-codes.mjs';
 import { bankSource } from '../src/progress/wording';
 import { createClassPiecesHandler } from '../../../netlify/functions/class-pieces.mjs';
+import { createClassWritingHandler } from '../../../netlify/functions/class-writing.mjs';
 import { createToMarkHandler } from '../../../netlify/functions/to-mark.mjs';
 import { createPublishedProfileHandler } from '../../../netlify/functions/published-profile.mjs';
 import { createPublishedWorkHandler } from '../../../netlify/functions/published-work.mjs';
@@ -4066,6 +4067,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createClassDeepHandler(deps)
         : /^\/api\/classes\/[^/]+\/pieces$/.test(path)
       ? createClassPiecesHandler(deps)
+        : /^\/api\/classes\/[^/]+\/writing$/.test(path)
+      ? createClassWritingHandler(deps)
         : path === '/api/to-mark'
       ? createToMarkHandler(deps)
         : /^\/api\/published\/profile\/[^/]+$/.test(path)
@@ -4167,6 +4170,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
       /^\/api\/classes\/[^/]+\/deep$/.test(path) ||
       /^\/api\/classes\/[^/]+\/pieces$/.test(path) ||
+      /^\/api\/classes\/[^/]+\/writing$/.test(path) ||
       path === '/api/to-mark' ||
       /^\/api\/published\/profile\/[^/]+$/.test(path) ||
       /^\/api\/published\/work\/[^/]+$/.test(path) ||

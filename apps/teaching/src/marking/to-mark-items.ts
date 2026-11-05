@@ -26,7 +26,7 @@ export type QuizAnswer = {
 export type QuizQuestion = { id: string; kind: string; marks: number; prompt: string; quote?: string; guide?: string; model_answer?: string; answers: QuizAnswer[] };
 export type QuizLoad = { lesson_id: string; title: string; questions: QuizQuestion[] };
 
-export type FlowRow = { student_id?: string; initials: string; id?: string; ai_read?: boolean; has_transcript?: boolean; source?: 'lecture' | 'tutorial'; text?: string; scene_label?: string; draft?: number; sent_scope?: unknown };
+export type FlowRow = { student_id?: string; initials: string; id?: string; ai_read?: boolean; has_transcript?: boolean; source?: 'lecture' | 'tutorial'; text?: string; scene_label?: string; draft?: number; sent_scope?: unknown; title?: string };
 
 export type FlowItem = {
   key: string;
@@ -75,9 +75,10 @@ export function flowItems(tasks: readonly ToMarkTask[], quizzes: ReadonlyMap<str
     if (kind === 'quiz') out.push(...quizItems(task, quizzes.get(`${task.class_id}:${task.lesson_id}`)));
     else if (kind === 'ask') out.push({ ...base, key: `ask:${task.class_id}:${task.lesson_id}`, kind: 'ask', who: String(task.waiting), count: task.waiting });
     else {
-      const flowKind: FlowKind = kind === 'piece' ? 'writing' : kind;
+      const flowKind: FlowKind = kind === 'piece' || kind === 'added' ? 'writing' : kind;
       for (const row of (task.rows ?? []) as FlowRow[]) {
-        out.push({ ...base, key: `${kind}:${task.class_id}:${task.lesson_id}:${task.block_id ?? task.column_id ?? ''}:${row.id ?? row.student_id}`, kind: flowKind, who: row.initials, count: 1, row });
+        // Added writing is one item per class: each piece shows its own title.
+        out.push({ ...base, ...(kind === 'added' && row.title ? { group: `Added · ${row.title}` } : {}), key: `${kind}:${task.class_id}:${task.lesson_id}:${task.block_id ?? task.column_id ?? ''}:${row.id ?? row.student_id}`, kind: flowKind, who: row.initials, count: 1, row });
       }
     }
   }

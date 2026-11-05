@@ -7,12 +7,14 @@
  *   sprint   design sprint reflection handed in, no reflection mark yet
  *   handup   lecture or tutorial hand-up with no reply
  *   ask      sprint group question with no answer
+ *   added    writing the teacher added onto a student (added-writing.mjs), not returned yet
  *
  * Each item says how many are waiting, who, since when, and where to go to
  * deal with it. Waiting items come first, oldest first; linked Markbook tasks
  * with nothing waiting follow as "coming in".
  */
 import { piecesAction } from './piece-feedback.mjs';
+import { addedWritingAction } from './added-writing.mjs';
 import { readBook, classLessonIds } from './markbook.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
@@ -74,6 +76,20 @@ async function pieceItems(store, classId, book, base) {
     });
   }
   return items;
+}
+
+/** Writing the teacher added onto students: one item per class, a row per piece. */
+async function addedItems(store, classId, base) {
+  const { pieces } = await addedWritingAction(store, classId, { action: 'list' });
+  if (!pieces.length) return [];
+  return [{
+    ...base, kind: 'added', what: 'Writing you added', title: 'Added writing', lesson_id: '',
+    href: '/to-mark',
+    waiting: pieces.length,
+    who: pieces.map((p) => `${p.initials} · ${p.title}`),
+    rows: pieces.map((p) => ({ student_id: p.student_id, initials: p.initials, id: p.piece, title: p.title })),
+    oldest_at: oldest(pieces.map((p) => p.added_at))
+  }];
 }
 
 /** Quiz goes with written answers nobody (person or AI) has marked yet. */
@@ -203,13 +219,14 @@ export async function toMarkQueue(store, deps = {}) {
       ...recordItems(lectureUps, roster, lessonIds, claimed.lecture, base, { kind: 'handup', what: 'Lecture hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at, row: handupRow('lecture') }),
       ...recordItems(tutorialUps, roster, lessonIds, claimed.tutorial, base, { kind: 'handup', what: 'Tutorial hand-ups', waiting: (r) => r.status === 'open', group: oneGroup, at: (r) => r.at, row: handupRow('tutorial') })
     ];
-    const [pieces, quizzes, sprints, titled] = await Promise.all([
+    const [pieces, added, quizzes, sprints, titled] = await Promise.all([
       pieceItems(store, classId, book, base),
+      addedItems(store, classId, base),
       quizItems(store, roster, lessonIds, base),
       sprintItems(store, roster, book, lessonIds, base),
       mapBounded(records, 4, async (item) => ({ ...item, title: await lessonTitle(store, item.lesson_id) }))
     ]);
-    tasks.push(...pieces, ...quizzes, ...sprints, ...titled);
+    tasks.push(...pieces, ...added, ...quizzes, ...sprints, ...titled);
   }
   await markAiReads(store, tasks, new Set(aiReads));
   for (const t of tasks) t.late = Boolean(t.waiting && t.oldest_at) && now - Date.parse(t.oldest_at) >= LATE_DAYS * 86400000;

@@ -10,6 +10,7 @@ import { setPageName } from '@/app/page-title';
 import type { ReturnedItem } from '@/progress/types';
 import type { PiecePayload } from '@/student/returned-view';
 import { renderProfile, type ProfilePayload } from '@/student/profile-view';
+import { openAddWriting } from '@/marking/add-writing';
 
 export function mountTeacherStudentProfile(canvas: HTMLElement, classId: string, studentId: string): { dispose: () => void } {
   let disposed = false;
@@ -26,8 +27,19 @@ export function mountTeacherStudentProfile(canvas: HTMLElement, classId: string,
   });
   const body = el('div', 'pm-teacher__body');
   body.append(el('p', 'pm-empty', 'Loading their progress…'));
+  // Writing they gave you outside the app: added here, marked in To mark.
+  const add = el('button', 'btn btn--secondary pm-teacher__add', 'Add writing');
+  add.type = 'button';
+  add.title = 'Add writing this student gave you outside the app';
+  add.addEventListener('click', () => {
+    void openAddWriting({ classId, studentId }).then((added) => {
+      if (added && !disposed) navigate('/to-mark');
+    });
+  });
+  const bar = el('div', 'pm-teacher__bar');
+  bar.append(back, add);
   const page = el('div', 'pm-teacher');
-  page.append(back, body);
+  page.append(bar, body);
   canvas.replaceChildren(page);
 
   void call<ProfilePayload & { name: string }>('progress').then(

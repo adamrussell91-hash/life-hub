@@ -354,6 +354,8 @@
   min-width: 0;
 }
 
+.pm-teacher__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.pm-teacher__add { white-space: nowrap; }
 .pm-back {
   justify-self: start;
   font-size: var(--text-sm);
