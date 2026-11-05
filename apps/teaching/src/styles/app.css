@@ -2203,6 +2203,91 @@ a:hover {
   flex-shrink: 0;
 }
 
+/* A unit's lessons: one line each, like a table. */
+.lesson-rows__head,
+.lesson-rows__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem 5.5rem 5.5rem 5.5rem 2.25rem;
+  align-items: center;
+  column-gap: var(--space-3);
+  padding-inline: var(--space-3) var(--space-1);
+  font-family: var(--font-ui);
+}
+
+.lesson-rows__head {
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.lesson-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lesson-rows__row {
+  min-height: 2.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  transition: background-color 120ms ease;
+}
+
+.lesson-rows__row:hover {
+  background: color-mix(in srgb, var(--wave) 6%, transparent);
+}
+
+.lesson-rows__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-rows__row .page-options {
+  justify-self: end;
+}
+
+@media (max-width: 640px) {
+  .lesson-rows__head {
+    display: none;
+  }
+
+  /* Title on the first line, the rest as one quiet line beneath; the menu sits to the side. */
+  .lesson-rows__row {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    column-gap: var(--space-2);
+    min-height: 3rem;
+    padding-block: var(--space-1);
+    padding-inline: var(--space-2) 2.75rem;
+  }
+
+  .lesson-rows__title {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+
+  .lesson-rows__row .page-options {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .lesson-rows__row > [data-empty] {
+    display: none;
+  }
+}
+
 .resources-toolbar {
   display: flex;
   flex-wrap: wrap;

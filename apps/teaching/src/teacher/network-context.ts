@@ -189,11 +189,8 @@ export function unitFlowPeers(curriculum: CurriculumResponse, unit: Unit, lesson
     shown.splice(at < 0 ? shown.length : at + 1, 0, self);
   }
   const role = (l: Pick<Lesson, 'id' | 'route_role'>) => lessonRouteRole(unit, l);
-  const railAfter = (id: string) => content?.rail_stops.find((s) => s.lesson_id === id && s.kind !== 'stop')?.after_lesson_id;
   const byId = new Map(shown.map((l) => [l.id, l]));
-  // As on the map: each side lesson straight after the core lesson it branches off.
-  const isSide = (id: string) => { const r = role(byId.get(id)!); return Boolean(r && r !== 'core'); };
-  const { order } = hangSides(shown.map((l) => l.id), isSide, (id) => byId.get(id)!.branch_from ?? railAfter(id));
+  const order = withSidesHung(unit, shown).map((l) => l.id);
   return order.map((id) => {
     const l = byId.get(id)!;
     const r = role(l);
@@ -205,6 +202,28 @@ export function unitFlowPeers(curriculum: CurriculumResponse, unit: Unit, lesson
       ...(l.branch_from ? { branchFrom: l.branch_from } : {})
     };
   });
+}
+
+/** As on the map: each side lesson straight after the core lesson it branches off. */
+function withSidesHung<T extends Pick<Lesson, 'id' | 'route_role' | 'branch_from'>>(unit: Unit, lessons: readonly T[]): T[] {
+  const stops = unitMapContent(unit)?.rail_stops ?? [];
+  const byId = new Map(lessons.map((l) => [l.id, l]));
+  const isSide = (id: string) => {
+    const role = lessonRouteRole(unit, byId.get(id)!);
+    return Boolean(role && role !== 'core');
+  };
+  const branchFrom = (id: string) => byId.get(id)!.branch_from ?? stops.find((s) => s.lesson_id === id && s.kind !== 'stop')?.after_lesson_id;
+  return hangSides(lessons.map((l) => l.id), isSide, branchFrom).order.map((id) => byId.get(id)!);
+}
+
+/**
+ * Every lesson in a unit as it comes in the unit: the map's order with dated
+ * lessons by date, undated ones after the lesson before them, side lessons
+ * after the lesson they branch off. Lessons left off the map keep their place.
+ */
+export function unitLessonsInOrder(curriculum: CurriculumResponse, unit: Unit): ReturnType<typeof unitLessons> {
+  const ordered = placeByDate(orderStations(unitLessons(curriculum, unit), unitMapContent(unit)?.station_order), unitSchedule(curriculum, unit)?.dates);
+  return withSidesHung(unit, ordered);
 }
 
 /** A lesson's place on the route: its own role, else the support or extension stop on the unit map that names it. */
