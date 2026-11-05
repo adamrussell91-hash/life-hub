@@ -2276,17 +2276,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasCover = record.cover !== undefined;
     const hasOutcomeIds = record.outcome_ids !== undefined;
     const hasDeep = record.deep_understandings !== undefined;
+    const hasWalkthruTies = record.walkthru_ties !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds && !hasDeep) {
+    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds && !hasDeep && !hasWalkthruTies) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide title, description, blocks, lesson_ids, cover, outcome_ids, deep_understandings, and/or status'
+        'Provide title, description, blocks, lesson_ids, cover, outcome_ids, deep_understandings, walkthru_ties, and/or status'
       );
     }
 
@@ -2376,6 +2377,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     if (outcome_ids !== undefined) merged.outcome_ids = outcome_ids;
     if (hasDeep) merged.deep_understandings = record.deep_understandings;
+    if (hasWalkthruTies) merged.walkthru_ties = record.walkthru_ties;
 
     if (hasStatus) {
       try {
