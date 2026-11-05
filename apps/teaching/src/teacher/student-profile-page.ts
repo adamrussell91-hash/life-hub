@@ -6,6 +6,7 @@ import { apiPost } from '@/api/client';
 import { el, errorText } from '@/quiz/dom';
 import { navigate } from '@/app/router';
 import { withAppBase } from '@/app/base-path';
+import { setPageName } from '@/app/page-title';
 import type { ReturnedItem } from '@/progress/types';
 import type { PiecePayload } from '@/student/returned-view';
 import { renderProfile, type ProfilePayload } from '@/student/profile-view';
@@ -32,6 +33,7 @@ export function mountTeacherStudentProfile(canvas: HTMLElement, classId: string,
   void call<ProfilePayload & { name: string }>('progress').then(
     (payload) => {
       if (disposed) return;
+      setPageName(payload.name);
       body.replaceChildren(
         renderProfile(payload, {
           classId,

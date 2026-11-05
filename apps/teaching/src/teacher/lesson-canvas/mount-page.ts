@@ -60,6 +60,7 @@ import {
 } from '@/curriculum/pedagogical-mode';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
+import { setPageName } from '@/app/page-title';
 import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
@@ -1199,6 +1200,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     inputClassName: 'lesson-page__title',
     onPreview: (title) => {
       banner.update({ title });
+      setPageName(title);
       emitLesson({ ...lesson, title });
     }
   });

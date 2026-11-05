@@ -77,6 +77,8 @@ import {
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { currentAppPath } from './base-path';
 import { isClassSiteHost, isClassSiteStudentRoute, renderClassSiteDeadEnd } from './class-site';
+import { startPageLinks } from './page-links';
+import { namedByCurriculum, pageName, setPageName } from './page-title';
 import { navigate, start, type RouteMatch } from './router';
 import { mountOrganiserRun } from '@/organiser/run-view';
 import { renderPageHeader } from '@/teacher/page-header';
@@ -1235,7 +1237,20 @@ async function handleRoute(match: RouteMatch): Promise<void> {
     return;
   }
 
+  showPageName(match, token);
   renderRoute(match, token);
+}
+
+/** Names the tab now, then again once the curriculum can name a lesson, unit or class. */
+function showPageName(match: RouteMatch, token: number): void {
+  setPageName(pageName(match, peekCurriculum()));
+  if (!namedByCurriculum(match)) return;
+  void getCurriculum().then(
+    (curriculum) => {
+      if (token === renderToken) setPageName(pageName(match, curriculum));
+    },
+    () => undefined
+  );
 }
 
 async function init(): Promise<void> {
@@ -1267,6 +1282,7 @@ async function init(): Promise<void> {
   });
 
   startHubMotion(document);
+  startPageLinks();
 
   start((match) => {
     void handleRoute(match);

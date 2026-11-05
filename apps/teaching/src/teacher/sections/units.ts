@@ -45,6 +45,7 @@ import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
+import { setPageName } from '@/app/page-title';
 import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import {
   mountBlockCanvas,
@@ -570,6 +571,7 @@ export function renderUnitPage(
     ariaLabel: 'Unit name',
     onPreview: (title) => {
       banner.update({ title });
+      setPageName(title);
     },
     onSave: async (title) => {
       const saved = await patchUnit(unit.id, { title });
