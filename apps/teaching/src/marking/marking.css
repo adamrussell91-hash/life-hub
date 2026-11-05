@@ -146,11 +146,19 @@
 .rb-skill { display: grid; gap: 6px; min-width: 0; }
 .rb-skill__name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); overflow-wrap: anywhere; }
 .rb-reach { font-size: var(--text-xs, .75rem); color: var(--muted); }
-.rb-rungs { display: grid; grid-template-columns: 1fr 1fr 1fr 1.25fr 1fr; gap: 4px; }
-@container (max-width: 340px) { .rb-rungs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.rb-rung { min-width: 0; min-height: 44px; padding: 4px 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; font-size: .75rem; color: var(--ink); cursor: pointer; }
+.rb-rungs { display: grid; gap: 4px; }
+.rb-rung { --rb-shade: color-mix(in srgb, var(--navy) calc(var(--rb-step, 0) * 22%), var(--line)); position: relative; display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; min-width: 0; min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-left: 5px solid var(--rb-shade); border-radius: 8px; background: var(--paper); font: inherit; font-size: var(--text-sm); color: var(--ink); text-align: left; cursor: pointer; }
+.rb-rung__name { font-weight: 700; }
+.rb-rung__ican { color: var(--muted); overflow-wrap: anywhere; }
+.rb-rung__last { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--pastel-sage-ink, var(--navy)); background: var(--pastel-sage, var(--cotton)); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.rb-rung__last[hidden] { display: none; }
+.rb-rung.is-last { border-style: solid; box-shadow: inset 0 0 0 1px var(--rb-shade); }
+@container (max-width: 420px) { .rb-rung { grid-template-columns: minmax(0, 1fr) auto; } .rb-rung__ican { grid-column: 1 / -1; grid-row: 2; } }
 .rb-rung.is-ai, .rb-pill.is-ai { border: 2px dashed var(--pastel-lilac-ink); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
 .rb-rung.is-on { border-color: var(--navy); background: var(--navy); color: #fff; font-weight: 700; }
+.rb-rung.is-on .rb-rung__ican { color: #fff; opacity: .85; }
+.rb-climb { margin: 0; font-size: var(--text-sm); color: var(--ink); background: var(--cotton); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }
+.rb-climb:empty { display: none; }
 .rb-look { margin: 0; font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; }
 .rb-look:empty { display: none; }
 .rb-piece { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

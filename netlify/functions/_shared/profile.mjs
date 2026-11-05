@@ -14,7 +14,7 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor } from './profile-feedback.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, classSkillRungs } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
@@ -46,7 +46,7 @@ async function unitLessons(store, cls) {
 export async function profileAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
@@ -68,6 +68,11 @@ export async function profileAction(store, classId, body) {
   if (action === 'steps') {
     if (body.lesson_id !== undefined && !isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
     return stepsFor(store, classId, student.id);
+  }
+  // A Voice task's "where you are": one strand of this student's own skills.
+  if (action === 'skills') {
+    if (body.strand !== undefined && (typeof body.strand !== 'string' || !/^[a-z]{3,20}$/.test(body.strand))) reject(400, 'bad_request', 'Unknown strand.');
+    return skillsFor(store, classId, student.id, body.strand ?? null);
   }
   if (action === 'piece') return pieceFor(store, roster, student, body.item);
   if (action === 'seen') return markSeen(store, roster, student, body.item);
@@ -122,7 +127,13 @@ export async function teacherProfileAction(store, classId, body) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
-  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece', 'skill_rungs'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  // Where students sit on the skills continuum: one student (with student_id) or the whole class.
+  if (action === 'skill_rungs' && body.student_id === undefined) {
+    const rows = await classSkillRungs(store, classId, roster.students.map((s) => s.id));
+    const byId = new Map(roster.students.map((s) => [s.id, s]));
+    return { students: rows.map((r) => ({ id: r.id, name: byId.get(r.id)?.name ?? '', initials: byId.get(r.id)?.initials ?? '', rungs: r.rungs })) };
+  }
   if (action !== 'list') {
     if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id) || !roster.students.some((s) => s.id === body.student_id)) {
       reject(400, 'bad_request', 'Unknown student.');
@@ -131,6 +142,7 @@ export async function teacherProfileAction(store, classId, body) {
     if (action === 'progress') return { need: null, name: student.name, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
     if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
     if (action === 'piece') return pieceFor(store, roster, student, body.item);
+    if (action === 'skill_rungs') return { rungs: (await classSkillRungs(store, classId, [student.id]))[0]?.rungs ?? {} };
     const state = action === 'remove' ? 'clear' : body.state;
     if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
     if (action === 'remove') await removeDone(store, classId, body.student_id, body.lesson_id);

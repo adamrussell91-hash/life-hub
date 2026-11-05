@@ -82,3 +82,22 @@
   .skl__rung { grid-template-columns: minmax(0, 1fr); padding: var(--space-3) var(--space-4); }
   .skl__rung:nth-child(n) { margin-left: 0; }
 }
+
+/* Markbook Skills view: one sub-strand's ladder, with the class on its rungs. */
+.skc__status, .skc__hint { color: var(--muted); margin: 0; }
+.skc__ladder { display: grid; gap: var(--space-2); }
+.skc__rung { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); background: var(--warm-white); border: 1px solid var(--line); border-left: 6px solid var(--c); border-radius: 12px; min-width: 0; }
+.skc__rung.is-empty { opacity: .72; }
+.skc__head { display: grid; grid-template-columns: auto auto minmax(60px, 1fr); gap: var(--space-3); align-items: center; }
+.skc__name { margin: 0; font-family: var(--font-display); font-size: var(--text-md); }
+.skc__count { font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.skc__bar { height: 8px; border-radius: 999px; background: var(--cotton); position: relative; overflow: hidden; }
+.skc__bar::after { content: ''; position: absolute; inset: 0 auto 0 0; width: calc(var(--share) * 100%); background: var(--skl-p2); border-radius: inherit; }
+.skc__ican { margin: 0; font-size: var(--text-sm); color: var(--muted); max-width: 80ch; }
+.skc__who { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.skc__student { font: inherit; font-size: var(--text-sm); border: 1px solid var(--line); background: var(--paper, #fff); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 32px; cursor: pointer; }
+.skc__student:hover { border-color: var(--skl-p2); }
+.skc__none { background: var(--warm-white); border: 1px dashed var(--line); border-radius: 12px; padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
+.skc__none summary { cursor: pointer; font-weight: var(--weight-semibold); }
+.skc button:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+@container (max-width: 480px) { .skc__head { grid-template-columns: 1fr auto; } .skc__bar { grid-column: 1 / -1; } .skc__rung { padding: var(--space-3); } }

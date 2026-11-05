@@ -77,7 +77,7 @@ export function rubricTags(block: Pick<Block, 'settings'> | null | undefined, qu
   };
 }
 
-export type RubricRungRow = { id: LadderRung; name: string; i_can: string | null; indicators: Array<{ group: string; text: string; eg?: string }> };
+export type RubricRungRow = { id: LadderRung; name: string; i_can: string | null; indicators: Array<{ group: string; text: string; eg?: string }>; next_move?: string | null };
 export type RubricSkillRow = { ref: string; name: string; strand: string; rungs: RubricRungRow[] };
 export type RubricPieceRow = { id: string; text: string; tier: KnowledgePiece['tier'] | null };
 export type RubricStepRow = TaggedStep & { key: string; du_number: number; claim: string; fill: string };
@@ -97,7 +97,7 @@ export function rubricRows(tags: RubricTags, ctx: { continuum: SkillsContinuum |
       strand: strand?.name ?? '',
       rungs: RUNG_ORDER.map((id) => {
         const rung = id !== 'below' ? sub?.rungs[id] : undefined;
-        return { id, name: RUNG_NAME[id], i_can: rung?.i_can ?? null, indicators: rung?.indicators ?? [] };
+        return { id, name: RUNG_NAME[id], i_can: rung?.i_can ?? null, indicators: rung?.indicators ?? [], next_move: rung?.build?.next_move?.replace(/^Keep refining: /, '') ?? null };
       })
     };
   });

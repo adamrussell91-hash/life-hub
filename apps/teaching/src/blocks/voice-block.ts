@@ -55,6 +55,6 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
     root.append(el('p', 'pf-note block-secondary', 'Record your answer on your own device.'));
     return root;
   }
-  root.append(mode === 'teacher' ? mountVoiceTeacher(block, ctx.lessonId) : mountVoiceStudent(block, ctx.lessonId));
+  root.append(mode === 'teacher' ? mountVoiceTeacher(block, ctx.lessonId) : mountVoiceStudent(block, ctx.lessonId, ctx.classId));
   return root;
 }

@@ -39,6 +39,7 @@ import { loadAlignment } from '@/alignment/api';
 import { getLesson } from '@/teacher/lessons-library/api';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { loadSkills } from '@/skills/api';
+import { createClassSkills } from '@/skills/class-view';
 import type { SkillsContinuum } from '@/skills/schema';
 import '@/markbook/markbook.css';
 
@@ -85,8 +86,8 @@ async function lessonPieceBlocks(lessonId: string): Promise<{ id: string; label:
 }
 
 /** `grid` is the syllabus Grid; `marks` is Marks & progress, every lesson and marked column in one table. */
-type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks';
-const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks & progress']];
+type Mode = 'grid' | 'next' | 'detail' | 'history' | 'marks' | 'skills';
+const MODES: Array<[Mode, string]> = [['grid', 'Grid'], ['next', 'Next steps'], ['detail', 'Detail'], ['history', 'History'], ['marks', 'Marks & progress'], ['skills', 'Skills']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -168,6 +169,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     ...options.deepLens
   });
   const detailState = newDetailState();
+  const classSkills = createClassSkills(cls.id);
   const historyState = newHistoryState();
   /** Names for tags and codes, for Next steps and Detail; loaded once, after the markbook. */
   let ctx: InsightContext | null = null;
@@ -559,7 +561,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode !== 'marks') {
+    if (mode === 'skills') body.replaceChildren(classSkills.render(students, actions.openStudent));
+    else if (mode !== 'marks') {
       const context = ctx;
       if (!context) body.replaceChildren(el('p', 'mb__status', ctxError ?? 'Loading…'));
       else if (mode === 'grid')

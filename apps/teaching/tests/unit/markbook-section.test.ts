@@ -539,7 +539,7 @@ describe('markbook section', () => {
     mountMarkbook(host, cls, { api: fakeApi(view({ quizzes: [outcomeQuiz()] })), narrow: () => false, today: () => '2026-11-03' });
     await vi.waitFor(() => expect(host.querySelector('.mbg')).not.toBeNull());
     expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('true');
-    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks & progress']);
+    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks & progress', 'Skills']);
     host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="next"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-next')).not.toBeNull());
     host.remove();
