@@ -389,13 +389,14 @@ export function mountStudentLessonView(
       const lesson = lessonResult.value;
       const cls = classResult.value;
       const row = cls.schedule.find((entry) => entry.lesson_id === lessonId);
-      if (!row || !row.published) {
+      if (row && !row.published) {
         renderStatusError(content, 'Lesson not found.');
         return;
       }
 
       renderStudentChrome(header, { brand: cls.code || STUDENT_BRAND });
-      show(content, lesson, { cls });
+      // Side lessons stay off the class schedule, but a student's map still opens them here: same class, no neighbours.
+      show(content, lesson, row ? { cls } : { quizClassId: cls.id });
       mountExamples(content);
     });
   } else {

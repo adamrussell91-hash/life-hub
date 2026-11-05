@@ -211,7 +211,7 @@ describe('mountStudentLessonView', () => {
     );
   });
 
-  it('class-scoped shows not found when lesson not on schedule', async () => {
+  it('class-scoped opens a published side lesson that is off the schedule', async () => {
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) {
         return { ...publishedClass(), schedule: [] };
@@ -229,8 +229,9 @@ describe('mountStudentLessonView', () => {
     });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('Lesson not found');
+      expect(root.textContent).toContain(publishedLesson().title);
     });
+    expect(root.textContent).not.toContain('Lesson not found');
   });
 
   it('class-scoped shows not found when schedule row is unpublished', async () => {
