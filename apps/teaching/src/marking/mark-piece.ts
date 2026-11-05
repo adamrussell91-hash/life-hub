@@ -45,6 +45,21 @@ const STEPS = [['starting', 'Starting'], ['building', 'Building'], ['secure', 'S
 const RUNGS = [['capable', 'Capable'], ['skilled', 'Skilled'], ['accomplished', 'Accompl.'], ['excellent', 'Excellent']] as const;
 const first = (name: string) => name.split(' ')[0] ?? name;
 
+const MENU_GAP = 6;
+
+/** The part of the window `node` can actually be seen in, inside any scrolling box around it. */
+function visibleBand(node: HTMLElement): { top: number; bottom: number } {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let at: HTMLElement | null = node; at; at = at.parentElement) {
+    if (!/auto|scroll/.test(getComputedStyle(at).overflowY)) continue;
+    const r = at.getBoundingClientRect();
+    top = Math.max(top, r.top);
+    bottom = Math.min(bottom, r.bottom);
+  }
+  return { top, bottom };
+}
+
 /** A rough selection grows to the whole words it touches, so a highlight never stops mid-word. */
 export function wholeWords(text: string, r: { start: number; end: number } | null): { start: number; end: number } | null {
   if (!r) return null;
@@ -144,6 +159,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   const sheets = el('div', 'mk-sheets');
   const menu = el('div', 'mk-menu');
   menu.hidden = true;
+  const left = el('div', 'mk-left');
   const side = el('div', 'mk-side');
   const tally = el('div', 'mk-tally');
   const warn = el('p', 'mk-warn');
@@ -248,8 +264,21 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     paint();
   });
 
-  /** A small menu on an existing highlight: add a note, flip strength or growth, remove. */
-  function openMenu(tag: ShownTag): void {
+  /** Opens under the line that was clicked, or over it when there's no room below in the visible part of the page. */
+  function placeMenu(run: HTMLElement, y: number): void {
+    const box = left.getBoundingClientRect();
+    const lines = [...run.getClientRects()];
+    const line = lines.find((r) => y >= r.top && y <= r.bottom) ?? lines.at(-1) ?? run.getBoundingClientRect();
+    const seen = visibleBand(left);
+    const tall = menu.offsetHeight;
+    const over = line.bottom + MENU_GAP + tall > seen.bottom && line.top - MENU_GAP - tall >= seen.top;
+    menu.style.top = `${(over ? line.top - MENU_GAP - tall : line.bottom + MENU_GAP) - box.top + left.scrollTop}px`;
+    menu.style.left = `${Math.max(0, Math.min(line.left - box.left, left.clientWidth - menu.offsetWidth))}px`;
+    menu.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /** A small menu on an existing highlight, beside the words: add a note, flip strength or growth, remove. */
+  function openMenu(tag: ShownTag, run: HTMLElement, y: number): void {
     const c = codes.get(tag.code_id);
     menu.replaceChildren(el('b', 'mk-menu__title', `${c?.code ?? ''} ${c?.label ?? ''}${tag.positive ? ' (strength)' : ''}`));
     const note = el('input', 'mk-menu__note');
@@ -257,19 +286,29 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     note.value = tag.note ?? '';
     note.placeholder = 'Add a note for the student (optional)';
     note.setAttribute('aria-label', 'Note for the student');
-    note.addEventListener('change', () => {
+    // Kept as it's typed, so a shortcut that saves from inside the box still has the whole note.
+    note.addEventListener('input', () => {
       if (note.value.trim()) tag.note = note.value.trim();
       else delete tag.note;
     });
+    note.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === 'Escape') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        menu.hidden = true;
+      }
+    });
     if (tag.why) menu.append(el('p', 'mk-ai', tag.why));
-    if (tag.ai) {
-      menu.append(button('Keep it', 'primary', () => { delete tag.ai; delete tag.why; menu.hidden = true; paint(); }));
-    }
-    const flip = button(tag.positive ? 'Make it growth' : 'Make it a strength', 'secondary', () => { tag.positive = !tag.positive; menu.hidden = true; paint(); });
-    const remove = button(tag.ai ? 'Drop it' : 'Remove', 'secondary', () => { tags = tags.filter((t) => t !== tag); menu.hidden = true; paint(); });
-    const close = button('Done', 'ghost', () => { note.dispatchEvent(new Event('change')); menu.hidden = true; });
-    menu.append(note, flip, remove, close);
+    const actions = el('div', 'mk-menu__actions');
+    if (tag.ai) actions.append(button('Keep it', 'primary', () => { delete tag.ai; delete tag.why; paint(); }));
+    const flip = button(tag.positive ? 'Make it growth' : 'Make it a strength', 'secondary', () => { tag.positive = !tag.positive; paint(); });
+    const remove = button(tag.ai ? 'Drop it' : 'Remove', 'secondary', () => { tags = tags.filter((t) => t !== tag); paint(); });
+    const close = button('Done', 'ghost', () => { menu.hidden = true; });
+    actions.append(flip, remove, close);
+    menu.append(note, actions);
     menu.hidden = false;
+    placeMenu(run, y);
+    // Straight to typing, except on a touch screen where the keyboard would cover the words.
+    if (window.matchMedia?.('(hover: hover)').matches) note.focus({ preventScroll: true });
   }
 
   function draftPills(): HTMLElement | null {
@@ -311,6 +350,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   }
 
   function paint(): void {
+    menu.hidden = true;
     sheets.replaceChildren();
     const pills = draftPills();
     if (pills) sheets.append(pills);
@@ -354,7 +394,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
           if (!run) return;
           const at = Number(run.dataset.start);
           const tag = mine.find((t) => t.start <= at && t.end > at);
-          if (tag) openMenu(tag);
+          if (tag) openMenu(tag, run, e.clientY);
         });
         sheets.append(sheet);
         if (pick) sheets.append(pickCaption(d.student.initials, pickCode));
@@ -436,8 +476,12 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   if (o.embedded) root.append(palette);
   else root.append(bar, palette);
   const cols = el('div', `mk-cols${panel ? ' mk-cols--rubric' : ''}`);
-  const left = el('div');
   left.append(sheets, menu);
+  // Press anywhere else and the note box goes; the note is already kept.
+  root.addEventListener('pointerdown', (e) => {
+    const on = e.target as HTMLElement;
+    if (!menu.hidden && !menu.contains(on) && !on.closest('.pa-run--mark')) menu.hidden = true;
+  });
   cols.append(left, side);
   root.append(cols);
   paint();
