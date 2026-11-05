@@ -98,7 +98,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
   let printing = false;
   /** Folds that are open, by concept, line or dot-point id. */
   const open = new Set<string>();
-  let openedFirst = false;
   const localCells = new Map<string, string[]>();
   const localSentences = new Map<string, string>();
   const timers = new Map<string, number>();
@@ -216,11 +215,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         data = next;
         alignment = doc;
         mapKeys = doc ? unitConceptKeysFor(curriculum, unit, doc) : [];
-        if (!openedFirst) {
-          openedFirst = true;
-          const first = conceptRows()[0];
-          if (first) open.add(first.id);
-        }
         render();
       })
       .catch(() => {
@@ -676,7 +670,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const section = sectionOf('vocab');
     const id = 'card:vocab';
     const card = h('article', 'ko-concept ko-vocab');
-    card.style.setProperty('--c', 'var(--navy)');
     const top = h('div', 'ko-concept__row ko-vocab__row');
     const meta = h('div', 'ko-concept__meta');
     meta.append(h('span', 'ko-capsule', 'Vocabulary'), h('span', 'ko-count', plural(section?.lines.length ?? 0, 'word')));
