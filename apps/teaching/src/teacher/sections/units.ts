@@ -57,14 +57,14 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
-import { settleConceptLines, settleSkillLines, unitConceptKeysFor, unitNetworkContext } from '@/teacher/network-context';
+import { lessonRouteRole, settleConceptLines, settleSkillLines, unitConceptKeysFor, unitLessonsInOrder, unitNetworkContext, unitSchedule } from '@/teacher/network-context';
 import { loadAlignment } from '@/alignment/api';
 import { lessonWeeks } from '@/deep/derive';
 import { mountDeepSection } from '@/deep/plan-view';
 import { mountOrganiserSection } from '@/organiser/sheet-editor';
 import { unitScope } from '@/deep/scope';
 import { loadSkills } from '@/skills/api';
-import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
+import { firstTaughtDates } from '@/teacher/unit-lesson-order';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
@@ -758,10 +758,12 @@ export function renderUnitPage(
   });
 
   const scheduledRows = curriculum.scheduled_lessons ?? [];
-  const lessons = lessonsByDate(
-    curriculum.lessons.filter((lesson) => lesson.unit_id === unitId && isActiveLibraryStatus(lesson.status)),
-    scheduledRows
-  );
+  // In the unit's own order; anything the unit's list has lost sits at the end.
+  const unitOrder = new Map(unitLessonsInOrder(curriculum, unit).map((lesson, at) => [lesson.id, at]));
+  const lessons = curriculum.lessons
+    .filter((lesson) => lesson.unit_id === unitId && isActiveLibraryStatus(lesson.status))
+    .sort((a, b) => (unitOrder.get(a.id) ?? unitOrder.size) - (unitOrder.get(b.id) ?? unitOrder.size) || a.sequence - b.sequence);
+  const mapDates = unitSchedule(curriculum, unit)?.dates;
   const firstDates = firstTaughtDates(scheduledRows);
 
   if (lessons.length === 0) {
@@ -770,12 +772,21 @@ export function renderUnitPage(
     empty.textContent = 'No lessons in this unit yet.';
     lessonsSection.append(empty);
   } else {
+    const head = document.createElement('div');
+    head.className = 'lesson-rows__head';
+    head.setAttribute('aria-hidden', 'true');
+    for (const label of ['Lesson', 'Route', 'Date', 'Sessions', 'Status']) {
+      const cell = document.createElement('span');
+      cell.textContent = label;
+      head.append(cell);
+    }
+
     const list = document.createElement('ul');
-    list.className = 'lesson-list';
+    list.className = 'lesson-rows';
 
     for (const lesson of lessons) {
       const item = document.createElement('li');
-      item.className = 'lesson-list__item lesson-list__item--openable';
+      item.className = 'lesson-rows__row lesson-list__item--openable';
       item.tabIndex = 0;
       item.setAttribute('role', 'button');
       item.setAttribute('aria-label', `Expand ${lesson.title}`);
@@ -796,22 +807,18 @@ export function renderUnitPage(
         { onMutated: options.onMutated }
       );
 
-      const info = document.createElement('div');
-      info.className = 'lesson-list__info';
-
-      const title = document.createElement('p');
-      title.className = 'lesson-list__title';
-      title.textContent = lesson.title;
-
-      const meta = document.createElement('p');
-      meta.className = 'lesson-list__meta';
-      meta.textContent = lesson.published ? 'Published' : 'Draft';
-      const firstDate = firstDates.get(lesson.id);
-      if (firstDate) meta.textContent += ` · ${formatDisplayDate(firstDate)}`;
+      const cell = (name: string, text: string) => {
+        const el = document.createElement('span');
+        el.className = `lesson-rows__${name}`;
+        el.textContent = text;
+        if (!text) el.dataset.empty = '';
+        return el;
+      };
+      const title = cell('title', lesson.title);
+      title.classList.add('lesson-list__title');
+      const role = lessonRouteRole(unit, lesson);
+      const date = mapDates?.get(lesson.id)?.slice(0, 10) ?? firstDates.get(lesson.id);
       const sessions = sessionsPerClass(scheduledRows, lesson.id);
-      if (sessions > 1) meta.textContent += ` · taught over ${sessions} sessions`;
-
-      info.append(title, meta);
 
       const rowMenu = mountPageOptionsMenu(
         [
@@ -828,11 +835,21 @@ export function renderUnitPage(
       );
       rowDisposers.push(rowMenu.dispose);
 
-      item.append(info, rowMenu.el);
+      item.append(
+        title,
+        cell('route', role && role !== 'core' ? role[0]!.toUpperCase() + role.slice(1) : ''),
+        cell('date', date ? formatDisplayDate(date) : ''),
+        cell('sessions', sessions > 1 ? `${sessions} sessions` : ''),
+        cell('status', lesson.published ? 'Published' : 'Draft'),
+        rowMenu.el
+      );
       list.append(item);
     }
 
-    lessonsSection.append(list);
+    // One wrapper so the section's spacing doesn't split the heading row from its lines.
+    const table = document.createElement('div');
+    table.append(head, list);
+    lessonsSection.append(table);
   }
 
   root.append(coverHost, stripHost, deepHost, organiserHost, planSection, tagsHost, lessonsSection);

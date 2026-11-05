@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCoverageMap } from '@/network/coverage-map/model';
 import { buildFlow, hangSides, linkProblem } from '@/network/flow';
-import { lessonClassDates, lessonRouteRole, unitFlowPeers } from '@/teacher/network-context';
+import { lessonClassDates, lessonRouteRole, unitFlowPeers, unitLessonsInOrder } from '@/teacher/network-context';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Unit } from '@/schemas';
 
@@ -39,6 +39,14 @@ function setup() {
   } as unknown as CurriculumResponse;
   return { unit, curriculum };
 }
+
+describe('A unit lists its lessons as they come in the unit', () => {
+  it('keeps undated lessons in place, hangs side lessons, and keeps lessons off the map', () => {
+    const { unit, curriculum } = setup();
+    // b has no date and stays after a; the extension follows b, the lesson its stop names.
+    expect(unitLessonsInOrder(curriculum, unit).map((l) => l.id)).toEqual(['a', 'b', 'side', 'c', 'd', 'p1', 'p2']);
+  });
+});
 
 describe('Lesson Before and after follows the unit map', () => {
   it('orders lessons as the map does and leaves out lessons off the map', () => {
