@@ -189,7 +189,7 @@ describe('Next steps view', () => {
       repaint: () => {}
     });
     const card = node.querySelector('.mb-move--group')!;
-    expect(node.querySelectorAll('.mb-move__tutorial')).toHaveLength(1);
+    expect(node.querySelectorAll('.mb-next__fold .mb-move__tutorial')).toHaveLength(1);
     const btn = card.querySelector<HTMLButtonElement>('.mb-move__tutorial')!;
     expect(btn.textContent).toBe('Plan a tutorial');
     btn.click();

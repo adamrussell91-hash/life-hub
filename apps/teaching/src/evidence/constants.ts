@@ -74,3 +74,25 @@ export function rungShare(rung: unknown): number | null {
 
 /** The syllabus Grid: a student needs this many items on a row to get a colour. */
 export const GRID = { minItems: 1 } as const;
+
+/** Next steps' three answers: the biggest priorities, who needs support, who can be extended. */
+export const PRIORITY = {
+  /** Most priorities shown: more than this is a list, not a priority. */
+  max: 3,
+  /** A lesson this many days away counts as coming up. */
+  soonDays: 14,
+  /** The class median falling this far counts as urgent; a student falling this far is flagged. */
+  falling: 0.1,
+  /** Added to a priority's weight: it comes up in a lesson, an assessment, or it is falling. */
+  boost: { lesson: 0.5, assessment: 1, falling: 0.25 },
+  /** This few questions, and a priority says so. */
+  fewQuestions: 3,
+  /** A student averaging under this with a focus area needs support. */
+  supportBelow: 0.65,
+  /** A student falling, and still under this, also needs support. */
+  fallingBelow: 0.75,
+  /** A student averaging this, with a secure tag, can be extended. */
+  extendFrom: 0.75,
+  /** Tags named per student. */
+  tags: 2
+} as const;

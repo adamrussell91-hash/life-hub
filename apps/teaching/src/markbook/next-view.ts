@@ -6,6 +6,7 @@ import { byTag, type FocusPins } from '@/evidence/patterns';
 import { RUNG_NAME, rungOf } from '@/evidence/syllabus-grid';
 import { tagLabel } from '@/evidence/tags';
 import { activeMembers, overlapsSaved } from '@/evidence/groups';
+import { priorities, priorityWhy, studentCalls, type StudentCall, type UpcomingLesson } from '@/evidence/priorities';
 import type { Evidence } from '@/evidence/types';
 import { pct, sectionHead } from '@/evidence/views/parts';
 import type { SavedGroup } from './schema';
@@ -13,15 +14,16 @@ import type { MarkbookView, RosterStudent } from './types';
 import { formatDay } from './calc';
 
 /**
- * Next steps: what to teach next (decided per syllabus dot point, with the
- * weakest outcome and skill inside it), where the class stands against the
- * syllabus, and the students who need what.
+ * Next steps answers three questions, each with its reason: the biggest and
+ * most urgent priorities, who needs support with what, and who can be extended
+ * on what. Suggested and saved groups, the syllabus and the full student list
+ * sit in folds below.
  */
 
 export type SyllabusSort = 'weakest' | 'syllabus' | 'change';
 /** Kept by the markbook between redraws. */
-export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean; editingGroup: string | null; refocus: string | null };
-export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false, editingGroup: null, refocus: null });
+export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean; editingGroup: string | null; refocus: string | null; openFolds: Set<string>; showAllCalls: Set<string> };
+export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false, editingGroup: null, refocus: null, openFolds: new Set(), showAllCalls: new Set() });
 
 export type NextActions = {
   openStudent: (studentId: string) => void;
@@ -38,10 +40,16 @@ export type NextActions = {
   removeMember?: (groupId: string, student: string) => void;
   pins: (studentId: string) => FocusPins;
   repaint: () => void;
+  /** The class's dated lessons from today, so a priority can say what is coming. */
+  upcoming?: UpcomingLesson[];
+  /** YYYY-MM-DD; defaults to the device's date. */
+  today?: string;
 };
 
 /** Moves shown before "Show all". */
 const FIRST_MOVES = 6;
+/** Students shown per answer before "Show all". */
+const FIRST_CALLS = 6;
 
 const MOVE_TEXT: Record<Move['kind'], string> = { reteach: 'Reteach to the class', group: 'Pull a small group', move_on: 'Move on' };
 
@@ -174,6 +182,55 @@ function groupEditor(group: SavedGroup, active: string[], listed: RosterStudent[
   return form;
 }
 
+/** A closed section below the three answers; stays open across redraws. */
+function fold(key: string, title: string, state: NextState, ...children: HTMLElement[]): HTMLElement {
+  const details = el('details', 'mb-next__fold');
+  details.dataset.fold = key;
+  details.open = state.openFolds.has(key);
+  details.addEventListener('toggle', () => {
+    if (details.open) state.openFolds.add(key);
+    else state.openFolds.delete(key);
+  });
+  const body = el('div', 'mb-next__fold-body');
+  body.append(...children);
+  details.append(el('summary', 'mb-next__fold-title', title), body);
+  return details;
+}
+
+/** One answer: who, on what, and why. */
+function callList(key: string, title: string, lead: string, empty: string, calls: StudentCall[], nameOf: ReadonlyMap<string, string>, label: (tag: string) => string, state: NextState, actions: NextActions): HTMLElement {
+  const section = el('section', `mb-call mb-call--${key}`);
+  section.append(el('h3', 'mb-call__title', calls.length ? `${title} · ${calls.length}` : title));
+  if (!calls.length) {
+    section.append(el('p', 'mb__empty', empty));
+    return section;
+  }
+  const all = state.showAllCalls.has(key);
+  const list = el('ul', 'mb-call__list');
+  for (const call of all ? calls : calls.slice(0, FIRST_CALLS)) {
+    const item = el('li', 'mb-call__item');
+    const name = el('button', 'mb-call__name mb-patterns__name', nameOf.get(call.student) ?? 'Removed student');
+    name.type = 'button';
+    name.dataset.student = call.student;
+    name.addEventListener('click', () => actions.openStudent(call.student));
+    item.append(name, el('p', 'mb-call__what', `${lead} ${call.tags.map((t) => label(t.tag)).join(', ')}`), el('p', 'mb-call__why', call.why));
+    list.append(item);
+  }
+  section.append(list);
+  if (calls.length > FIRST_CALLS) {
+    const more = el('button', 'btn btn--ghost mb-call__more', all ? 'Show fewer' : `Show all ${calls.length}`);
+    more.type = 'button';
+    more.dataset.refocus = `calls:${key}`;
+    more.addEventListener('click', () => {
+      if (all) state.showAllCalls.delete(key);
+      else state.showAllCalls.add(key);
+      actions.repaint();
+    });
+    section.append(more);
+  }
+  return section;
+}
+
 export function renderNextSteps(view: MarkbookView, students: RosterStudent[], ctx: InsightContext, state: NextState, actions: NextActions): HTMLElement {
   const root = el('div', 'mb-next');
   const { evidence, sources } = classEvidence(view, ctx);
@@ -183,8 +240,47 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   const names = (ids: string[]): string => ids.map((id) => nameOf.get(id) ?? 'Removed student').join(', ');
   const kind = moveKind(evidence);
   const needs = needKind(evidence);
+  const listedIds = new Set(listed.map((s) => s.id));
+  const onRoster = evidence.filter((e) => listedIds.has(e.student));
 
-  // What to do next.
+  // The three answers.
+  const top = needs ? priorities(onRoster, sources, needs, { upcoming: actions.upcoming, lessonPoints: ctx.lessonPoints, today: actions.today ?? new Date().toISOString().slice(0, 10) }) : [];
+  const topHost = el('section', 'mb-pri');
+  topHost.append(el('h3', 'mb-call__title', 'Biggest priorities'));
+  if (!top.length) topHost.append(el('p', 'mb__empty', 'No clear priority yet. Tag quiz questions or task criteria, and it needs two or more questions from at least three students.'));
+  const topList = el('ol', 'mb-pri__list');
+  for (const p of top) {
+    const item = el('li', 'mb-pri__item');
+    item.dataset.tag = p.tag;
+    item.append(el('h4', 'mb-pri__tag', label(p.tag)), el('p', 'mb-pri__how', p.wholeClass ? 'Reteach to the class' : p.weak.length ? 'Reteach, with a small group for the students under half' : 'Revisit with the class'));
+    item.append(el('p', 'mb-pri__why', priorityWhy(p, formatDay).join(' ')));
+    if (p.weak.length) item.append(el('p', 'mb-pri__who', `Under half: ${names(p.weak)}`));
+    const tools = el('div', 'mb-move__tools');
+    if (p.weak.length && actions.followUp) {
+      const ann = el('button', 'btn btn--secondary mb-move__ann', 'Ann drafts follow-up');
+      ann.type = 'button';
+      ann.addEventListener('click', () => actions.followUp?.(p.tag, p.weak, onRoster));
+      tools.append(ann);
+    }
+    if (p.weak.length && !p.wholeClass && actions.planTutorial) {
+      const plan = el('button', 'btn btn--secondary mb-move__tutorial', 'Plan a tutorial');
+      plan.type = 'button';
+      plan.addEventListener('click', () => actions.planTutorial?.(p.tag, p.weak, onRoster));
+      tools.append(plan);
+    }
+    if (tools.children.length) item.append(tools);
+    topList.append(item);
+  }
+  if (top.length) topHost.append(topList);
+  const calls = needs ? studentCalls(onRoster, sources, listed.map((s) => s.id), needs, actions.pins, label) : { support: [], extend: [] };
+  const callsHost = el('div', 'mb-calls');
+  callsHost.append(
+    callList('support', 'Needs support', 'With', 'Nobody stands out as needing support on these marks.', calls.support, nameOf, label, state, actions),
+    callList('extend', 'Ready to extend', 'On', 'Nobody is high enough across their marks to extend yet.', calls.extend, nameOf, label, state, actions)
+  );
+  root.append(sectionHead('Next steps'), topHost, callsHost);
+
+  // Suggested groups, for when a group is what's wanted.
   const movesHost = el('div', 'mb-next__moves');
   const moves = kind ? nextMoves(evidence.filter((e) => nameOf.has(e.student)), kind) : [];
   if (!moves.length) {
@@ -275,7 +371,8 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     });
     movesHost.append(more);
   }
-  root.append(sectionHead('Next steps'), movesHost);
+  const groupParts: HTMLElement[] = [];
+  if (moves.length) groupParts.push(sectionHead('Suggested'), movesHost);
 
   if (saved.length) {
     const savedHost = el('section', 'mb-saved-list');
@@ -283,10 +380,12 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     for (const g of saved) {
       const card = el('article', 'mb-saved');
       card.dataset.group = g.id;
-      const active = activeMembers(g);
+      // Someone who has left the class is no longer in the group.
+      const active = activeMembers(g).filter((m) => listedIds.has(m));
+      const counted = g.members.filter((m) => m.left !== null || listedIds.has(m.student)).length;
       card.append(
         el('h4', 'mb-saved__name', g.name),
-        el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${g.members.length} still in`)
+        el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${counted} still in`)
       );
       // The open card lists them, each with its Remove.
       if (state.editingGroup !== g.id) card.append(el('p', 'mb-move__who', names(active)));
@@ -314,12 +413,17 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
       }
       savedHost.append(card);
     }
-    root.append(savedHost);
+    groupParts.push(savedHost);
     // A redraw replaces the card, so put focus back once the markbook has drawn it.
     const refocus = state.refocus;
     // Kept while the card is open: a save still on its way will redraw it again.
     if (!state.editingGroup) state.refocus = null;
     if (refocus) queueMicrotask(() => savedHost.querySelector<HTMLElement>(`[data-refocus="${refocus}"]`)?.focus());
+  }
+
+  if (groupParts.length) {
+    const bits = [saved.length ? `${saved.length} saved` : '', drawn.filter((m) => m.kind === 'group').length ? `${drawn.filter((m) => m.kind === 'group').length} suggested` : ''].filter(Boolean);
+    root.append(fold('groups', bits.length ? `Groups · ${bits.join(', ')}` : 'Suggested moves', state, ...groupParts));
   }
 
   // The syllabus, outcome by outcome.
@@ -371,10 +475,10 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     details.append(summary, parts);
     sylHost.append(details);
   }
-  root.append(
+  root.append(fold('syllabus', 'Syllabus', state,
     sectionHead('Syllabus', sorted.length > 1 ? pills<SyllabusSort>('Sort outcomes', [['weakest', 'Weakest'], ['syllabus', 'Syllabus order'], ['change', 'Biggest drop']], state.syllabusSort, (v) => { state.syllabusSort = v; actions.repaint(); }) : undefined),
     sylHost
-  );
+  ));
 
   // Students, most need first.
   const rows = needs ? sortStudents(studentRows(evidence, sources, listed.map((s) => s.id), needs, actions.pins), state.studentSort, (id) => nameOf.get(id) ?? '') : [];
@@ -400,9 +504,9 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     item.append(name, avg, chips);
     list.append(item);
   }
-  root.append(
+  root.append(fold('students', 'All students', state,
     sectionHead('Students', rows.length > 1 ? pills<StudentSort>('Sort students', [['need', 'Most need'], ['name', 'Name'], ['overall', 'Lowest average'], ['change', 'Biggest drop']], state.studentSort, (v) => { state.studentSort = v; actions.repaint(); }) : undefined),
     rows.length ? list : el('p', 'mb__empty', 'No tagged marks yet.')
-  );
+  ));
   return root;
 }
