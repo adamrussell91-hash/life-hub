@@ -21,7 +21,6 @@ import { RUNG_NAME } from '@/evidence/syllabus-grid';
 export type Lane = '1' | '2a' | '2b' | '3' | '4' | 'done';
 const LANES: Lane[] = ['1', '2a', '2b', '3', '4', 'done'];
 const NEXT: Record<'none' | Step, Lane> = { none: '1', '1': '2a', '2a': '2b', '2b': '3', '3': '4', '4': 'done' };
-const PLACED: PlacedStep[] = ['2a', '2b', '3', '4'];
 
 export type MonitorInput = {
   deep: DeepUnderstanding[];
@@ -68,6 +67,13 @@ export function buildMonitor(input: MonitorInput) {
     byDu.set(du.id, { lanes, circles, knowsNotUsed, doesntRemember, step1 });
   }
   return { byDu };
+}
+
+/** One row per piece, with everyone who needs it: the most students first, so the biggest reteach reads first. */
+export function studentsByPiece(rows: ReadonlyArray<{ student: string; pieces: readonly string[] }>): Array<{ piece: string; students: string[] }> {
+  const by = new Map<string, Set<string>>();
+  for (const r of rows) for (const piece of r.pieces) by.set(piece, (by.get(piece) ?? new Set()).add(r.student));
+  return [...by].map(([piece, students]) => ({ piece, students: [...students] })).sort((a, b) => b.students.length - a.students.length);
 }
 
 /** The paragraph a teacher can paste into a program or report. */
@@ -120,6 +126,9 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
   let sort: 'initials' | 'notUsed' = 'initials';
   let selected: string | null = null;
   let ready = new Map<string, PlacedStep[]>();
+  let markOpen = false;
+  let markTask: string | null = null;
+  const rowStatus = new Map<string, 'saved' | 'failed'>();
   let disposed = false;
   const today = todayInSydney();
 
@@ -160,15 +169,20 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
 
   const pieceText = (id: string): string => unitPieces().find((p) => p.id === id)?.text ?? id;
 
-  async function regroup(kind: 'redo' | 'regroup', students: string[], pieces: string[]): Promise<void> {
-    if (!classId || !students.length || !pieces.length) return;
+  async function regroup(kind: 'redo' | 'regroup', students: string[], pieces: string[]): Promise<boolean> {
+    if (!classId || !students.length || !pieces.length) return false;
     const tags = [...new Set(pieces)].map((p) => `kp:${p}`);
     const name = `${kind === 'redo' ? 'Redo' : 'Regroup'}: ${[...new Set(pieces)].slice(0, 2).map((p) => pieceText(p).slice(0, 36)).join(' · ')}`;
     try {
       await httpMarkbookApi.saveGroup(classId, { id: newGroupId(), name, tags, members: students.map((s) => ({ student: s, why: 'Deep understandings' })) }, today);
       message = `Saved "${name}" in the markbook groups.`;
-    } catch { message = 'Could not save that group.'; }
-    paint();
+      paint();
+      return true;
+    } catch {
+      message = 'Could not save that group.';
+      paint();
+      return false;
+    }
   }
 
   async function setStep(student: string, du: string, step: PlacedStep | null, hint: boolean): Promise<void> {
@@ -240,10 +254,12 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     }
     filt.append(h('span', 'fl', 'Sort'));
     filt.append(button('Initials', sort === 'initials' ? 'on' : '', () => { sort = 'initials'; paint(); }), button('Not used', sort === 'notUsed' ? 'on' : '', () => { sort = 'notUsed'; paint(); }));
-    where.append(filt, pipKey());
+    where.append(filt);
     const lanes = h('div', 'du-lanes');
+    const nobody: string[] = [];
     for (const lane of LANES) {
       if (filter !== 'all' && filter !== lane) continue;
+      if (filter === 'all' && !m.lanes[lane].length) { nobody.push(lane === 'done' ? 'Through' : `Step ${STEP_LABEL[lane]}`); continue; }
       const row = h('div', 'du-lane');
       const ln = h('div', 'du-ln');
       const title = h('b', '', LANE_NAME[lane]);
@@ -255,11 +271,8 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
         const chip = h('button', `du-sc${selected === s.id ? ' sel' : ''}`);
         chip.type = 'button';
         chip.append(h('b', '', s.initials));
-        const pips = h('span', 'du-pips');
-        const passedIdx = PLACED.indexOf(loaded.progress.steps[s.id]?.[du.id]?.step ?? ('' as PlacedStep));
-        PLACED.forEach((step, k) => pips.append(h('i', k <= passedIdx ? 'on' : '', STEP_LABEL[step])));
-        chip.title = passedIdx < 0 ? `${s.initials}: no step passed yet` : `${s.initials}: passed step ${STEP_LABEL[PLACED[passedIdx]!]}`;
-        chip.append(pips);
+        const passedStep = loaded.progress.steps[s.id]?.[du.id]?.step;
+        chip.title = passedStep ? `${s.initials}: passed step ${STEP_LABEL[passedStep]}` : `${s.initials}: no step passed yet`;
         if (s.since) chip.append(h('span', 'du-tag old', ageText(s.since, today)));
         if (s.notUsed) chip.append(h('span', 'du-tag nu', `${s.notUsed} not used`));
         const readySteps = ready.get(`${s.id}|${du.id}`) ?? [];
@@ -275,19 +288,22 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
       row.append(ln, sts);
       lanes.append(row);
     }
+    if (nobody.length) lanes.append(h('p', 'du-nobody', `Nobody yet: ${nobody.join(', ')}`));
     where.append(lanes);
     if (selected) where.append(detail(du, m, selected, pieces));
     root.append(where);
 
-    // groups
+    root.append(piecesTable(du, pieces, m));
+
+    // who needs what, one row per piece
     const groups = h('div', 'du-groups');
     groups.append(
-      groupBox('mem', "Doesn't remember yet", m.doesntRemember.map((r) => ({ student: r.student, pieces: r.pieces })), 'Add to a regroup', 'regroup'),
-      groupBox('use', 'Knows it, not using it', collapse(m.knowsNotUsed), 'Set a redo', 'redo')
+      groupBox('mem', "Doesn't remember yet", studentsByPiece(m.doesntRemember), 'Add to a regroup', 'regroup'),
+      groupBox('use', 'Knows it, not using it', studentsByPiece(collapse(m.knowsNotUsed)), 'Set a redo', 'redo')
     );
     root.append(groups);
 
-    root.append(markUse(du), piecesTable(du, pieces, m));
+    root.append(markUse(du));
   }
 
   const initialsOf = (id: string): string => loaded?.students.find((s) => s.id === id)?.initials ?? id;
@@ -297,12 +313,25 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     return [...by].map(([student, pieces]) => ({ student, pieces }));
   };
 
-  function groupBox(cls: string, title: string, rows: Array<{ student: string; pieces: string[] }>, doLabel: string, kind: 'redo' | 'regroup'): HTMLElement {
+  function groupBox(cls: string, title: string, rows: Array<{ piece: string; students: string[] }>, doLabel: string, kind: 'redo' | 'regroup'): HTMLElement {
     const box = h('div', `du-grp g-${cls}`);
     box.append(h('b', '', title));
     if (!rows.length) box.append(h('span', 'du-cnt', 'No one right now.'));
-    for (const r of rows) box.append(h('div', '', `${initialsOf(r.student)}: ${[...new Set(r.pieces)].map((p) => pieceText(p)).join('; ')}`));
-    if (rows.length) box.append(button(doLabel, 'do', () => void regroup(kind, rows.map((r) => r.student), rows.flatMap((r) => r.pieces))));
+    for (const r of rows) {
+      const row = h('div', 'du-pr');
+      row.append(h('p', 'du-pr__piece', pieceText(r.piece)));
+      const who = h('p', 'du-pr__who');
+      who.append(h('b', '', `${r.students.length} student${r.students.length === 1 ? '' : 's'}`), document.createTextNode(` ${r.students.map(initialsOf).join(' ')}`));
+      row.append(who);
+      const key = `${kind}|${r.piece}|${r.students.join(',')}`;
+      const status = rowStatus.get(key);
+      if (status === 'saved') row.append(h('span', 'du-pr__saved', 'Saved in the markbook groups'));
+      else {
+        row.append(button(doLabel, 'do', () => void regroup(kind, r.students, [r.piece]).then((ok) => { rowStatus.set(key, ok ? 'saved' : 'failed'); message = ''; paint(); })));
+        if (status === 'failed') row.append(h('span', 'du-pr__saved', 'Could not save. Try again.'));
+      }
+      box.append(row);
+    }
     return box;
   }
 
@@ -401,17 +430,6 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     return box;
   }
 
-  /** The step boxes on each name: one per evidence step, filled once passed. */
-  function pipKey(): HTMLElement {
-    const key = h('p', 'du-legend du-key');
-    const sample = h('span', 'du-pips');
-    PLACED.forEach((step, k) => sample.append(h('i', k < 2 ? 'on' : '', STEP_LABEL[step])));
-    const item = h('span');
-    item.append(sample, document.createTextNode(' Boxes on each name are steps 2A, 2B, 3 and 4. Filled = passed (here, 2A and 2B).'));
-    key.append(item);
-    return key;
-  }
-
   function markKey(): HTMLElement {
     const key = h('p', 'du-legend du-key');
     const one = (state: 'used' | 'missed' | 'blank', mark: string, text: string): HTMLElement => {
@@ -448,52 +466,59 @@ export function mountDeepMonitor(host: HTMLElement, options: MonitorOptions): { 
     return key;
   }
 
-  /** Mark which target pieces each student used in a writing task. */
+  /** By-hand piece ticks, folded away: To mark records these itself, so this is for work marked on paper. One task at a time. */
   function markUse(du: DeepUnderstanding): HTMLElement {
-    const sec = h('section', 'du-panel');
-    const hd = h('h4', '', 'Mark piece use ');
-    hd.append(info('Tap a square to mark a student used (tick), missed (open dash) or blank. Missed shows once the memory check is right.'));
-    sec.append(hd);
+    const sec = h('details', 'du-panel du-markuse');
+    sec.open = markOpen;
+    sec.addEventListener('toggle', () => { markOpen = sec.open; });
+    sec.append(h('summary', '', 'Mark pieces by hand'));
+    sec.append(h('p', 'du-sub', 'For work marked on paper. What you mark in To mark already reaches the circles above.'));
     const mine = new Set(piecesFor(du, options.deep).map((p) => p.id));
-    let any = false;
+    const tasks: Array<{ id: string; label: string; targets: string[] }> = [];
     for (const lesson of options.lessons) {
       visitBlocks(lesson.blocks ?? [], (b) => {
         const targets = targetPieces(b).filter((id) => mine.has(id));
-        if (!targets.length || !loaded) return;
-        any = true;
+        if (!targets.length) return;
         const c = b.content as Record<string, unknown> | undefined;
-        sec.append(h('h5', '', `${lessonCode(options.lessons, lesson.id)}: ${String(c?.title ?? c?.heading ?? 'Writing task')}`));
-        const scroll = h('div', 'du-scroll');
-        const table = h('table', 'du-kg');
-        const head = h('tr');
-        head.append(h('th', 'rowh', ''));
-        for (const id of targets) { head.append(h('th', '', pieceText(id))); }
-        table.append(head);
-        for (const s of loaded.students) {
-          const tr = h('tr');
-          tr.append(h('td', 'rowh', s.initials));
-          const tick = loaded.progress.writing[b.id]?.[s.id] ?? { used: [], missed: [], at: '' };
-          for (const id of targets) {
-            const state = tick.used.includes(id) ? 'used' : tick.missed.includes(id) ? 'missed' : 'blank';
-            const cell = h('td');
-            const btn = button(state === 'used' ? '✓' : state === 'missed' ? '–' : '', `du-three ${state}`, () => {
-              const nextState = state === 'blank' ? 'used' : state === 'used' ? 'missed' : 'blank';
-              const used = tick.used.filter((x) => x !== id).concat(nextState === 'used' ? [id] : []);
-              const missed = tick.missed.filter((x) => x !== id).concat(nextState === 'missed' ? [id] : []);
-              void setWriting(b.id, s.id, used, missed);
-            });
-            btn.setAttribute('aria-label', `${s.initials}, ${state}`);
-            cell.append(btn);
-            tr.append(cell);
-          }
-          table.append(tr);
-        }
-        scroll.append(table);
-        sec.append(scroll);
+        tasks.push({ id: b.id, label: `${lessonCode(options.lessons, lesson.id)}: ${String(c?.title ?? c?.heading ?? 'Writing task')}`, targets });
       });
     }
-    if (any) hd.after(markKey());
-    if (!any) sec.append(h('p', 'du-empty', 'No writing task has target pieces yet. Pick two or three pieces on a task in the lesson editor.'));
+    if (!tasks.length || !loaded) {
+      sec.append(h('p', 'du-empty', 'No writing task has target pieces yet. Pick two or three pieces on a task in the lesson editor.'));
+      return sec;
+    }
+    sec.append(markKey());
+    const task = tasks.find((t) => t.id === markTask) ?? tasks[0]!;
+    const picker = h('div', 'du-dutabs');
+    for (const t of tasks) picker.append(button(t.label, t.id === task.id ? 'on' : '', () => { markTask = t.id; paint(); }));
+    sec.append(picker);
+    const scroll = h('div', 'du-scroll');
+    const table = h('table', 'du-kg');
+    const head = h('tr');
+    head.append(h('th', 'rowh', ''));
+    for (const id of task.targets) head.append(h('th', '', pieceText(id)));
+    table.append(head);
+    for (const s of loaded.students) {
+      const tr = h('tr');
+      tr.append(h('td', 'rowh', s.initials));
+      const tick = loaded.progress.writing[task.id]?.[s.id] ?? { used: [], missed: [], at: '' };
+      for (const id of task.targets) {
+        const state = tick.used.includes(id) ? 'used' : tick.missed.includes(id) ? 'missed' : 'blank';
+        const cell = h('td');
+        const btn = button(state === 'used' ? '✓' : state === 'missed' ? '–' : '', `du-three ${state}`, () => {
+          const nextState = state === 'blank' ? 'used' : state === 'used' ? 'missed' : 'blank';
+          const used = tick.used.filter((x) => x !== id).concat(nextState === 'used' ? [id] : []);
+          const missed = tick.missed.filter((x) => x !== id).concat(nextState === 'missed' ? [id] : []);
+          void setWriting(task.id, s.id, used, missed);
+        });
+        btn.setAttribute('aria-label', `${s.initials}, ${state}`);
+        cell.append(btn);
+        tr.append(cell);
+      }
+      table.append(tr);
+    }
+    scroll.append(table);
+    sec.append(scroll);
     return sec;
   }
 

@@ -427,7 +427,8 @@ thead .mb-book__pin small { display: block; font-weight: var(--weight-regular, 4
 .mbg-deep { display: grid; gap: var(--space-3); min-width: 0; max-width: 100%; }
 .mbg-deep__units { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .mbg-deep__stage, .mbg-deep__monitor { min-width: 0; max-width: 100%; }
-.mbg-deep .du-sc, .mbg-deep .du-filt button, .mbg-deep .du-dutabs button, .mbg-deep .du-det button { min-height: 44px; }
+.mbg-deep .du-sc, .mbg-deep .du-filt button, .mbg-deep .du-dutabs button, .mbg-deep .du-det button, .mbg-deep .du-pr .do { min-height: 44px; }
+.mbg-deep .du-markuse > summary { min-height: 44px; display: flex; align-items: center; }
 .mbg__scroll { max-width: 100%; }
 .mbg-circle { display: inline-flex; align-items: center; justify-content: center; color: inherit; font-size: inherit; line-height: 1; }
 .mbg-circle .du-c, .mbg-circle__dot { display: inline-flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font-ui); color: #fff; }
