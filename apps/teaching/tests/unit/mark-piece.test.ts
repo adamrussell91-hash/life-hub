@@ -29,6 +29,56 @@ describe('mark piece', () => {
     expect(view.querySelector('[data-action="return"]')!.textContent).toBe('Return to Ava');
   });
 
+  describe('note box on a highlight', () => {
+    const tagged: MarkPieceData = { ...data, feedback: { tags: [{ code_id: 'ts', positive: false, part: 'answers', field: 'q1', start: 0, end: 11 }], comment: '', status: 'draft' } };
+    const rect = (top: number, bottom: number, left = 0) => ({ top, bottom, left, right: left + 100, width: 100, height: bottom - top, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    const open = (lineTop: number, tall: number, innerHeight = 800) => {
+      vi.stubGlobal('innerHeight', innerHeight);
+      const save = vi.fn().mockResolvedValue({});
+      const handle = openMarkPiece(tagged, { save, returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });
+      document.body.append(handle.el);
+      const left = handle.el.querySelector<HTMLElement>('.mk-left')!;
+      left.getBoundingClientRect = () => rect(100, 2000);
+      const menu = handle.el.querySelector<HTMLElement>('.mk-menu')!;
+      Object.defineProperty(menu, 'offsetHeight', { value: tall });
+      const run = handle.el.querySelector<HTMLElement>('.pa-run--mark')!;
+      run.getClientRects = () => [rect(lineTop, lineTop + 20, 40)] as unknown as DOMRectList;
+      run.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: lineTop + 10 }));
+      return { handle, save, menu, run, input: menu.querySelector<HTMLInputElement>('input')! };
+    };
+
+    it('opens under the clicked line, inside the sheet column', () => {
+      const { menu } = open(300, 150);
+      expect(menu.hidden).toBe(false);
+      expect(menu.parentElement!.classList.contains('mk-left')).toBe(true);
+      expect(menu.style.top).toBe('226px'); // line bottom 320 + gap 6 - column top 100
+    });
+
+    it('opens above the line when there is no room below', () => {
+      const { menu } = open(700, 150);
+      expect(menu.style.top).toBe('444px'); // line top 700 - gap 6 - height 150 - column top 100
+    });
+
+    it('keeps the note as it is typed, without needing Done', async () => {
+      const { handle, save, input } = open(300, 150);
+      input.value = 'Say what it does.';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await handle.save();
+      expect(save.mock.calls[0]![0].tags[0].note).toBe('Say what it does.');
+    });
+
+    it('closes on Enter and on a press elsewhere, and stays open for a press inside it', () => {
+      const { handle, menu, run, input } = open(300, 150);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(menu.hidden).toBe(true);
+      run.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: 310 }));
+      input.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(menu.hidden).toBe(false);
+      handle.el.querySelector('.mk-side')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(menu.hidden).toBe(true);
+    });
+  });
+
   it('shows the student’s own pick as a dashed layer under the teacher’s highlights', () => {
     const text = data.text.answers!.q1!;
     const withPick: MarkPieceData = {
