@@ -11,7 +11,8 @@
 }
 
 .cl-run [hidden],
-.cl-live[hidden] {
+.cl-live[hidden],
+.cl-editor__group[hidden] {
   display: none;
 }
 

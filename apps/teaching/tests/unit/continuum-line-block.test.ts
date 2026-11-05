@@ -63,6 +63,16 @@ describe('Continuum line block', () => {
     expect(publishBlockIssues([ready])).toBeNull();
   });
 
+  it('a return line publishes without its own stimulus, line or statements', () => {
+    const source = createBlock('continuum_line', 'cl1');
+    if (source.block_type !== 'continuum_line') throw new Error('Expected continuum_line');
+    const ready = { ...source, content: { ...source.content, statements: [{ id: 's1', text: 'It was a hot day.', snap: false }], stimulus: { kind: 'video', text: '', url: 'https://www.youtube.com/watch?v=abc123', alt_text: '' } } } as typeof source;
+    const back = createBlock('continuum_line', 'cl2');
+    if (back.block_type !== 'continuum_line') throw new Error('Expected continuum_line');
+    const returning = { ...back, content: { ...back.content, statements: [{ id: 'r1', text: '', snap: false }], returns_to: 'cl1' } } as typeof back;
+    expect(publishBlockIssues([ready, returning])).toBeNull();
+  });
+
   it('print shows the stimulus and a line per statement with room for a reason', () => {
     const block = createBlock('continuum_line', 'cl1');
     const filled = { ...block, content: { ...block.content, stimulus: { kind: 'text', text: 'Ben was sweating.', url: '', alt_text: '' }, statements: [{ id: 's1', text: 'It was a hot day.', snap: false }, { id: 's2', text: 'Ben owns a phone.', snap: true }] } } as typeof block;

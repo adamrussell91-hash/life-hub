@@ -228,7 +228,8 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
     const issue = hingeIssue(block.content);
     if (issue) return issue;
   }
-  if (block.block_type === 'continuum_line') {
+  // A return line takes its stimulus, line and statements from the line it returns to.
+  if (block.block_type === 'continuum_line' && !block.content.returns_to) {
     const c = block.content;
     if (!c.statements.some((s) => s.text.trim())) return 'Write at least one statement for this Continuum line';
     if (!c.scale.left.trim() || !c.scale.right.trim()) return 'Label both ends of this Continuum line';

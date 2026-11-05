@@ -7118,7 +7118,7 @@ function ownIssue(block, discernHosts) {
     const issue = hingeIssue(block.content);
     if (issue) return issue;
   }
-  if (block.block_type === "continuum_line") {
+  if (block.block_type === "continuum_line" && !block.content.returns_to) {
     const c = block.content;
     if (!c.statements.some((s2) => s2.text.trim())) return "Write at least one statement for this Continuum line";
     if (!c.scale.left.trim() || !c.scale.right.trim()) return "Label both ends of this Continuum line";
