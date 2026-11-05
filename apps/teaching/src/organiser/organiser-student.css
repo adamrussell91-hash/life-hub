@@ -105,8 +105,14 @@
 /* End of lesson */
 .kos-end { background: #fff; border: 1px solid rgba(23, 55, 94, 0.14); border-left: 4px solid var(--ko-wave, #376fb7); border-radius: 0.875rem; padding: 14px 16px; display: grid; gap: 10px; margin: 16px 0; color: #13233a; max-width: 100%; }
 .kos-end h3 { margin: 0; font-size: 16px; color: #17375e; }
-.kos-end__list { list-style: none; margin: 0; padding: 0; font-size: 14px; display: grid; gap: 8px; }
-.kos-end__from { display: block; font-size: 12px; font-weight: 600; color: var(--ko-muted, #6b7788); }
+.kos-end__group { border-top: 1px solid rgba(23, 55, 94, 0.14); padding-top: 6px; }
+.kos-end__from { min-height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #17375e; cursor: pointer; }
+.kos-end__from { list-style: none; gap: 8px; }
+.kos-end__from::-webkit-details-marker { display: none; }
+.kos-end__from::before { content: ""; width: 7px; height: 7px; border-right: 2px solid #6b7788; border-bottom: 2px solid #6b7788; transform: rotate(-45deg); transition: transform .15s; }
+.kos-end__group[open] > .kos-end__from::before { transform: rotate(45deg); }
+.kos-end__from:focus-visible { outline: 3px solid #376fb7; outline-offset: 1px; }
+.kos-end__list { margin: 2px 0 6px; padding-left: 18px; font-size: 14px; display: grid; gap: 6px; }
 .kos-root[hidden] { display: none; }
 
 /* Practice sits at the top of the organiser: today's set, then the five boxes. */
@@ -118,7 +124,7 @@
 .kos-box__gap { font-size: 11px; line-height: 1.2; color: var(--ko-muted); }
 
 /* Everything on the sheet starts closed. */
-.kos-fold__head { min-height: 40px; display: block; cursor: pointer; list-style: none; position: relative; padding-right: 24px; }
+.kos-fold__head { min-height: 40px; display: grid; align-content: center; cursor: pointer; list-style: none; position: relative; padding-right: 24px; }
 .kos-fold__head::-webkit-details-marker { display: none; }
 .kos-fold__head::after { content: ""; position: absolute; right: 6px; top: 8px; width: 8px; height: 8px; border-right: 2px solid var(--ko-muted); border-bottom: 2px solid var(--ko-muted); transform: rotate(45deg); transition: transform .15s; }
 .kos-fold[open] > .kos-fold__head::after { transform: rotate(-135deg); top: 12px; }

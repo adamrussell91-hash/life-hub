@@ -189,7 +189,8 @@ describe('lesson end card', () => {
     await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ items: [{ section: 'Perspective', text: 'Line one' }, { section: 'Vocabulary', text: 'Line two' }], joining: true }) } });
     expect(content.firstElementChild!.className).toBe('kos-end');
     expect(content.textContent).toContain('What to remember from this lesson');
-    expect(content.querySelector('.kos-end__from')!.textContent).toBe('Perspective');
+    expect(content.querySelector('.kos-end__from')!.textContent).toBe('Perspective (1)');
+    expect(content.querySelectorAll('details[open]')).toHaveLength(2);
     expect(content.textContent).toContain('Tick this lesson off below and they become practice cards.');
     expect(content.querySelector('a')!.getAttribute('href')).toContain('/s/classes/c1/profile?tab=organiser');
   });

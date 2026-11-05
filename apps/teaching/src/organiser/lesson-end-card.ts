@@ -5,6 +5,9 @@ import { studentOrganiserApi } from './api';
 import type { EndCardItem } from './types';
 import './organiser-student.css';
 
+/** Up to this many lines show open. */
+const OPEN_UP_TO = 5;
+
 export type EndCardOptions = {
   lessonId: string;
   classId: string;
@@ -46,13 +49,19 @@ export async function mountOrganiserEndCard(content: HTMLElement, options: EndCa
   card.setAttribute('aria-label', 'What to remember from this lesson');
   card.append(el('h3', undefined, 'What to remember from this lesson'));
   card.append(el('p', 'kos-hint', `${one ? 'This goes' : 'These go'} on your organiser, your sheet of what to know for this unit.`));
-  const ul = el('ul', 'kos-end__list');
-  for (const item of items) {
-    const li = el('li');
-    li.append(el('span', 'kos-end__from', item.section), el('span', undefined, item.text));
-    ul.append(li);
+  // Each part of the organiser once. A long list starts folded, so the card stays short.
+  const groups = new Map<string, string[]>();
+  for (const item of items) groups.set(item.section, [...(groups.get(item.section) ?? []), item.text]);
+  const folded = items.length > OPEN_UP_TO;
+  for (const [section, texts] of groups) {
+    const group = el('details', 'kos-end__group');
+    group.open = !folded;
+    group.append(el('summary', 'kos-end__from', `${section} (${texts.length})`));
+    const ul = el('ul', 'kos-end__list');
+    for (const text of texts) ul.append(el('li', undefined, text));
+    group.append(ul);
+    card.append(group);
   }
-  card.append(ul);
   if (joining) {
     const later = one ? 'It’s in your practice now.' : 'They’re in your practice now.';
     const ask = one ? 'it becomes a practice card' : 'they become practice cards';
