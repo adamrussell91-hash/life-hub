@@ -6,24 +6,26 @@ import { byTag, type FocusPins } from '@/evidence/patterns';
 import { RUNG_NAME, rungOf } from '@/evidence/syllabus-grid';
 import { tagLabel } from '@/evidence/tags';
 import { activeMembers, overlapsSaved } from '@/evidence/groups';
-import { priorities, priorityWhy, studentCalls, type StudentCall, type UpcomingLesson } from '@/evidence/priorities';
+import { notYetOnMany, priorities, priorityMove, priorityNotes, studentCalls, type Priority, type StudentCall, type UpcomingLesson } from '@/evidence/priorities';
 import type { Evidence } from '@/evidence/types';
+import { PRIORITY } from '@/evidence/constants';
 import { pct, sectionHead } from '@/evidence/views/parts';
 import type { SavedGroup } from './schema';
 import type { MarkbookView, RosterStudent } from './types';
 import { formatDay } from './calc';
 
 /**
- * Next steps answers three questions, each with its reason: the biggest and
- * most urgent priorities, who needs support with what, and who can be extended
- * on what. Suggested and saved groups, the syllabus and the full student list
- * sit in folds below.
+ * Next steps answers three questions: the biggest and most urgent priorities,
+ * who needs support with what, and who can be extended on what. Each priority
+ * shows its own set of groups, all on screen together, and pressing a student
+ * finds them in every set. Saved and suggested groups, the syllabus and the
+ * full student list sit in folds below.
  */
 
 export type SyllabusSort = 'weakest' | 'syllabus' | 'change';
 /** Kept by the markbook between redraws. */
-export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean; editingGroup: string | null; refocus: string | null; openFolds: Set<string>; showAllCalls: Set<string> };
-export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false, editingGroup: null, refocus: null, openFolds: new Set(), showAllCalls: new Set() });
+export type NextState = { syllabusSort: SyllabusSort; studentSort: StudentSort; openOutcomes: Set<string>; showAllMoves: boolean; editingGroup: string | null; refocus: string | null; openFolds: Set<string>; showAllCalls: Set<string>; picked: string | null };
+export const newNextState = (): NextState => ({ syllabusSort: 'weakest', studentSort: 'need', openOutcomes: new Set(), showAllMoves: false, editingGroup: null, refocus: null, openFolds: new Set(), showAllCalls: new Set(), picked: null });
 
 export type NextActions = {
   openStudent: (studentId: string) => void;
@@ -31,7 +33,7 @@ export type NextActions = {
   /** Small group cards: plan a tutorial for the students behind on one tag. */
   planTutorial?: (tag: string, students: string[], evidence: Evidence[]) => void;
   /** Save a suggested group so it can be targeted and tracked. */
-  saveGroup?: (tags: string[], students: string[]) => void;
+  saveGroup?: (tags: string[], students: string[], name?: string) => void;
   /** Add students the evidence now flags to a saved group. */
   addFlagged?: (groupId: string, students: string[]) => void;
   /** Edit a saved group: the three together turn on its Edit button. */
@@ -197,8 +199,8 @@ function fold(key: string, title: string, state: NextState, ...children: HTMLEle
   return details;
 }
 
-/** One answer: who, on what, and why. */
-function callList(key: string, title: string, lead: string, empty: string, calls: StudentCall[], nameOf: ReadonlyMap<string, string>, label: (tag: string) => string, state: NextState, actions: NextActions): HTMLElement {
+/** One answer as short rows: who, their average, and what on. The full reason sits on the row's tooltip. */
+function callList(key: 'support' | 'extend', title: string, empty: string, calls: StudentCall[], nameOf: ReadonlyMap<string, string>, label: (tag: string) => string, state: NextState, actions: NextActions): HTMLElement {
   const section = el('section', `mb-call mb-call--${key}`);
   section.append(el('h3', 'mb-call__title', calls.length ? `${title} · ${calls.length}` : title));
   if (!calls.length) {
@@ -209,11 +211,23 @@ function callList(key: string, title: string, lead: string, empty: string, calls
   const list = el('ul', 'mb-call__list');
   for (const call of all ? calls : calls.slice(0, FIRST_CALLS)) {
     const item = el('li', 'mb-call__item');
+    item.title = call.why;
     const name = el('button', 'mb-call__name mb-patterns__name', nameOf.get(call.student) ?? 'Removed student');
     name.type = 'button';
     name.dataset.student = call.student;
     name.addEventListener('click', () => actions.openStudent(call.student));
-    item.append(name, el('p', 'mb-call__what', `${lead} ${call.tags.map((t) => label(t.tag)).join(', ')}`), el('p', 'mb-call__why', call.why));
+    const avg = el('span', 'mb-call__avg', pct(call.mean));
+    if (call.change !== null && Math.abs(call.change) >= PRIORITY.falling) {
+      const arrow = el('span', `mb-who__trend ${call.change < 0 ? 'is-down' : 'is-up'}`, call.change < 0 ? '↓' : '↑');
+      arrow.setAttribute('aria-label', `${signed(call.change)} since their first`);
+      avg.append(arrow);
+    }
+    const chips = el('span', 'mb-who__chips');
+    for (const t of call.tags) {
+      const tone = key === 'extend' ? 'is-high' : t.mean !== null && t.mean < 0.5 ? 'is-low' : 'is-mid';
+      chips.append(el('span', `mb-who__chip ${tone}`, t.mean === null ? label(t.tag) : `${label(t.tag)} ${pct(t.mean)}`));
+    }
+    item.append(name, avg, chips);
     list.append(item);
   }
   section.append(list);
@@ -231,6 +245,140 @@ function callList(key: string, title: string, lead: string, empty: string, calls
   return section;
 }
 
+const COUNT_WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
+const BANDS_SHOWN = [['weak', 'Not yet'], ['developing', 'Developing'], ['secure', 'Secure']] as const;
+
+/** The priorities, each with its own groups, and the bar that follows one student through them all. */
+function prioritySets(top: Priority[], listed: RosterStudent[], saved: SavedGroup[], onRoster: Evidence[], label: (tag: string) => string, day: (date: string) => string, state: NextState, actions: NextActions): HTMLElement {
+  const host = el('section', 'mb-sets');
+  const byId = new Map(listed.map((s) => [s.id, s]));
+  const nameOf = (id: string): string => byId.get(id)?.name ?? 'Removed student';
+  const overlap = notYetOnMany(top);
+  const many = new Set(overlap?.students ?? []);
+  const bar = el('div', 'mb-sets__student');
+  bar.setAttribute('role', 'status');
+
+  const paintPick = (): void => {
+    host.classList.toggle('is-picking', state.picked !== null);
+    for (const t of host.querySelectorAll<HTMLElement>('.mb-tok')) {
+      const on = t.dataset.token === state.picked;
+      t.classList.toggle('is-picked', on);
+      t.setAttribute('aria-pressed', String(on));
+    }
+    bar.hidden = state.picked === null;
+    bar.replaceChildren();
+    const id = state.picked;
+    if (id === null) return;
+    const where = el('span', 'mb-sets__where');
+    for (const p of top) where.append(el('span', 'mb-sets__at', `${label(p.tag)}: ${p.weak.includes(id) ? 'Not yet' : p.developing.includes(id) ? 'Developing' : p.secure.includes(id) ? 'Secure' : 'Too few marks'}`));
+    const open = el('button', 'mb-sets__open', 'Open student');
+    open.type = 'button';
+    open.addEventListener('click', () => actions.openStudent(id));
+    bar.append(el('strong', 'mb-sets__who', nameOf(id)), where, open);
+  };
+
+  const token = (id: string): HTMLElement => {
+    const b = el('button', `mb-tok${many.has(id) ? ' is-many' : ''}`, byId.get(id)?.initials ?? '–');
+    b.type = 'button';
+    b.dataset.token = id;
+    b.title = nameOf(id);
+    b.setAttribute('aria-label', many.has(id) ? `${nameOf(id)}, Not yet on two or more` : nameOf(id));
+    b.addEventListener('click', () => {
+      state.picked = state.picked === id ? null : id;
+      paintPick();
+    });
+    return b;
+  };
+
+  const saveButton = (text: string, tags: string[], students: string[], name?: string): HTMLElement => {
+    if (overlapsSaved(students, tags, saved)) return el('span', 'mb-set__saved', 'Saved');
+    const b = el('button', 'mb-set__save', text);
+    b.type = 'button';
+    b.addEventListener('click', () => actions.saveGroup?.(tags, students, name));
+    return b;
+  };
+
+  const shared = top[0]?.next && top.every((p) => p.next?.id === top[0]!.next!.id) ? top[0].next : null;
+  const lead = el('div', 'mb-sets__lead');
+  const count = `${COUNT_WORD[top.length] ?? top.length} ${top.length === 1 ? 'priority' : 'priorities'}`;
+  lead.append(
+    el('h3', 'mb-sets__title', shared ? `${count} for ${shared.title}, ${day(shared.date)}` : count),
+    el('p', 'mb-sets__hint', top.length > 1 ? 'One set of groups for each. Press a student to find them in every set.' : 'Press a student to see where they sit.')
+  );
+
+  const cards = el('div', 'mb-sets__cards');
+  for (const p of top) {
+    const move = priorityMove(p);
+    const card = el('article', `mb-set mb-set--${move.kind}`);
+    card.dataset.tag = p.tag;
+    const titles = el('div', 'mb-set__titles');
+    titles.append(el('h4', 'mb-set__name', label(p.tag)), el('p', 'mb-set__how', move.text));
+    const top_ = el('div', 'mb-set__top');
+    top_.append(titles, el('span', 'mb-set__pct', pct(p.mean)));
+    card.append(top_, spreadBar({ weak: p.weak.length, developing: p.developing.length, secure: p.secure.length, none: 0 }));
+    const notes = priorityNotes(p, day, shared);
+    if (notes.length) card.append(el('p', 'mb-set__note', notes.join(' · ')));
+    for (const [band, title] of BANDS_SHOWN) {
+      const ids = p[band];
+      const pile = el('div', `mb-pile mb-pile--${band}`);
+      pile.dataset.band = band;
+      const head = el('div', 'mb-pile__head');
+      head.append(el('span', 'mb-pile__title', `${title} · ${ids.length}`));
+      if (ids.length && actions.saveGroup) head.append(saveButton('Save group', [p.tag], ids, `${label(p.tag)} · ${title}`));
+      pile.append(head);
+      if (ids.length) {
+        const row = el('div', 'mb-tokens');
+        row.append(...ids.map(token));
+        pile.append(row);
+      } else pile.append(el('p', 'mb-pile__empty', band === 'secure' ? 'Everyone is still building this one.' : 'Nobody here yet.'));
+      if (band === 'weak' && ids.length) {
+        const tools = el('div', 'mb-move__tools');
+        if (actions.followUp) {
+          const ann = el('button', 'btn btn--secondary mb-move__ann', 'Ann drafts follow-up');
+          ann.type = 'button';
+          ann.addEventListener('click', () => actions.followUp?.(p.tag, ids, onRoster));
+          tools.append(ann);
+        }
+        if (!p.wholeClass && actions.planTutorial) {
+          const plan = el('button', 'btn btn--secondary mb-move__tutorial', 'Plan a tutorial');
+          plan.type = 'button';
+          plan.addEventListener('click', () => actions.planTutorial?.(p.tag, ids, onRoster));
+          tools.append(plan);
+        }
+        if (tools.children.length) pile.append(tools);
+      }
+      card.append(pile);
+    }
+    const unmarked = listed.filter((s) => !p.weak.includes(s.id) && !p.developing.includes(s.id) && !p.secure.includes(s.id)).length;
+    if (unmarked) card.append(el('p', 'mb-set__note', `${unmarked} with too few marks to place`));
+    cards.append(card);
+  }
+  host.append(lead, cards, bar);
+
+  if (overlap) {
+    const strip = el('div', 'mb-overlap');
+    const text = el('p', 'mb-overlap__text');
+    const n = overlap.students.length;
+    text.append(el('strong', 'mb-overlap__title', n === 1 ? `${nameOf(overlap.students[0]!)} is Not yet on two or more` : `${n} students are Not yet on two or more`));
+    if (n > 1) text.append(document.createTextNode(`One group can cover them, working on ${label(overlap.first)} first.`));
+    const row = el('div', 'mb-tokens');
+    row.append(...overlap.students.map(token));
+    strip.append(text, row);
+    if (n > 1 && actions.saveGroup) {
+      if (overlapsSaved(overlap.students, overlap.tags, saved)) strip.append(el('span', 'mb-set__saved', 'Saved'));
+      else {
+        const save = el('button', 'btn btn--secondary mb-overlap__save', 'Save as one group');
+        save.type = 'button';
+        save.addEventListener('click', () => actions.saveGroup?.(overlap.tags, overlap.students));
+        strip.append(save);
+      }
+    }
+    host.append(strip);
+  }
+  paintPick();
+  return host;
+}
+
 export function renderNextSteps(view: MarkbookView, students: RosterStudent[], ctx: InsightContext, state: NextState, actions: NextActions): HTMLElement {
   const root = el('div', 'mb-next');
   const { evidence, sources } = classEvidence(view, ctx);
@@ -245,40 +393,20 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
 
   // The three answers.
   const top = needs ? priorities(onRoster, sources, needs, { upcoming: actions.upcoming, lessonPoints: ctx.lessonPoints, today: actions.today ?? new Date().toISOString().slice(0, 10) }) : [];
-  const topHost = el('section', 'mb-pri');
-  topHost.append(el('h3', 'mb-call__title', 'Biggest priorities'));
-  if (!top.length) topHost.append(el('p', 'mb__empty', 'No clear priority yet. Tag quiz questions or task criteria, and it needs two or more questions from at least three students.'));
-  const topList = el('ol', 'mb-pri__list');
-  for (const p of top) {
-    const item = el('li', 'mb-pri__item');
-    item.dataset.tag = p.tag;
-    item.append(el('h4', 'mb-pri__tag', label(p.tag)), el('p', 'mb-pri__how', p.wholeClass ? 'Reteach to the class' : p.weak.length ? 'Reteach, with a small group for the students under half' : 'Revisit with the class'));
-    item.append(el('p', 'mb-pri__why', priorityWhy(p, formatDay).join(' ')));
-    if (p.weak.length) item.append(el('p', 'mb-pri__who', `Under half: ${names(p.weak)}`));
-    const tools = el('div', 'mb-move__tools');
-    if (p.weak.length && actions.followUp) {
-      const ann = el('button', 'btn btn--secondary mb-move__ann', 'Ann drafts follow-up');
-      ann.type = 'button';
-      ann.addEventListener('click', () => actions.followUp?.(p.tag, p.weak, onRoster));
-      tools.append(ann);
-    }
-    if (p.weak.length && !p.wholeClass && actions.planTutorial) {
-      const plan = el('button', 'btn btn--secondary mb-move__tutorial', 'Plan a tutorial');
-      plan.type = 'button';
-      plan.addEventListener('click', () => actions.planTutorial?.(p.tag, p.weak, onRoster));
-      tools.append(plan);
-    }
-    if (tools.children.length) item.append(tools);
-    topList.append(item);
-  }
-  if (top.length) topHost.append(topList);
+  const today = actions.today ?? new Date().toISOString().slice(0, 10);
+  const day = (date: string): string => (date === today ? 'today' : formatDay(date));
+  const savedGroups = (view.markbook.groups ?? []).filter((g) => g.retired === null);
+  if (state.picked && !listedIds.has(state.picked)) state.picked = null;
+  const topHost = top.length
+    ? prioritySets(top, listed, savedGroups, onRoster, label, day, state, actions)
+    : el('p', 'mb__empty', 'No clear priority yet. Tag quiz questions or task criteria, and it needs two or more questions from at least three students.');
   const calls = needs ? studentCalls(onRoster, sources, listed.map((s) => s.id), needs, actions.pins, label) : { support: [], extend: [] };
   const callsHost = el('div', 'mb-calls');
   callsHost.append(
-    callList('support', 'Needs support', 'With', 'Nobody stands out as needing support on these marks.', calls.support, nameOf, label, state, actions),
-    callList('extend', 'Ready to extend', 'On', 'Nobody is high enough across their marks to extend yet.', calls.extend, nameOf, label, state, actions)
+    callList('support', 'Needs support', 'Nobody stands out as needing support on these marks.', calls.support, nameOf, label, state, actions),
+    callList('extend', 'Ready to extend', 'Nobody is high enough across their marks to extend yet.', calls.extend, nameOf, label, state, actions)
   );
-  root.append(sectionHead('Next steps'), topHost, callsHost);
+  root.append(topHost, callsHost);
 
   // Suggested groups, for when a group is what's wanted.
   const movesHost = el('div', 'mb-next__moves');
@@ -287,7 +415,7 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     movesHost.append(el('p', 'mb__empty', kind ? 'No clear move yet. A tag needs marks from at least three students on two or more questions.' : 'No tagged marks yet. Tag quiz questions or task criteria to see next steps.'));
   }
   // A suggestion that repeats a saved group is folded into that group, with its new students offered.
-  const saved = (view.markbook.groups ?? []).filter((g) => g.retired === null);
+  const saved = savedGroups;
   const repeats = new Map<string, string[]>();
   const drawn = moves.filter((m) => {
     if (m.kind !== 'group') return true;

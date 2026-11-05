@@ -161,6 +161,35 @@ const view = (shares: Record<string, number>): MarkbookView => ({
 const ctx: InsightContext = { table: null, skills: null, codes: [], outcomes: labels, lessonOutcomes: new Map([['l1', ['out:o3']]]) };
 
 describe('Next steps view', () => {
+  it('gives a priority its own groups, and a pressed student lights up wherever they are', () => {
+    const saveGroup = vi.fn();
+    const openStudent = vi.fn();
+    const state = newNextState();
+    const node = renderNextSteps(view({ a: 0, b: 0.2, c: 0.9, d: 1 }), students, ctx, state, { openStudent, saveGroup, pins: () => ({ pinned: [], dismissed: [] }), repaint: () => {} });
+    const card = node.querySelector<HTMLElement>('.mb-set[data-tag="fam:structural"]')!;
+    const pile = (band: string) => card.querySelector<HTMLElement>(`.mb-pile[data-band="${band}"]`)!;
+    expect([...pile('weak').querySelectorAll('.mb-tok')].map((t) => t.textContent)).toEqual(['A', 'B']);
+    expect([...pile('secure').querySelectorAll('.mb-tok')].map((t) => t.textContent)).toEqual(['C', 'D']);
+    expect(pile('developing').textContent).toContain('Nobody here yet.');
+
+    pile('weak').querySelector<HTMLButtonElement>('.mb-set__save')!.click();
+    expect(saveGroup).toHaveBeenCalledWith(['fam:structural'], ['a', 'b'], expect.stringMatching(/· Not yet$/));
+
+    const bar = node.querySelector<HTMLElement>('.mb-sets__student')!;
+    expect(bar.hidden).toBe(true);
+    pile('weak').querySelector<HTMLButtonElement>('[data-token="a"]')!.click();
+    expect(state.picked).toBe('a');
+    expect(bar.hidden).toBe(false);
+    expect(bar.textContent).toContain('Ann Ash');
+    expect(bar.textContent).toContain('Not yet');
+    expect(node.querySelectorAll('.mb-tok.is-picked[data-token="a"]').length).toBeGreaterThan(0);
+    expect(node.querySelectorAll('.mb-tok.is-picked:not([data-token="a"])').length).toBe(0);
+    bar.querySelector<HTMLButtonElement>('.mb-sets__open')!.click();
+    expect(openStudent).toHaveBeenCalledWith('a');
+    pile('weak').querySelector<HTMLButtonElement>('[data-token="a"]')!.click();
+    expect(bar.hidden).toBe(true);
+  });
+
   it('draws a reteach card whose Ann button gets the students not there yet', () => {
     const followUp = vi.fn();
     const node = renderNextSteps(view({ a: 0, b: 0.2, c: 0.9, d: 1 }), students, ctx, newNextState(), {
