@@ -35,6 +35,11 @@ export function draftFuture(body: Record<string, unknown>, options: { signal?: A
   return apiPost('/api/career-futures?action=draft', body, { signal: options.signal });
 }
 
+/** Ann's suggested answers per criterion. Saves nothing. */
+export function checkFuture(id: string, options: { signal?: AbortSignal } = {}) {
+  return apiPost(`/api/career-futures?action=check&id=${encodeURIComponent(id)}`, {}, { signal: options.signal });
+}
+
 export function updateFuture(
   id: string,
   body: Record<string, unknown>,

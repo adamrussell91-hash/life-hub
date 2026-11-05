@@ -1,5 +1,5 @@
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
-import { createFuture, createStone, draftFuture, updateFuture } from '@/api/career';
+import { checkFuture, createFuture, createStone, draftFuture, updateFuture } from '@/api/career';
 import { searchEntities } from '@/api/entities';
 import { createTask, createUniversalLink } from '@/api/universal-links';
 import { careerCardRoute } from '@/app/router';
@@ -25,7 +25,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function coverageDot(coverage: number): string {
+function coverageDot(coverage: number, status: string | undefined): string {
+  if (status === 'not_yet' && coverage < 0.5) return 'career-future__dot career-future__dot--gap';
   if (coverage >= 1) return 'career-future__dot career-future__dot--green';
   if (coverage >= 0.5) return 'career-future__dot career-future__dot--amber';
   return 'career-future__dot career-future__dot--none';
@@ -268,8 +269,8 @@ export function renderFutureDetail(
         'p',
         'career-page__meta',
         future.checked
-          ? 'Green: a skill card covers it. Amber: a card partly covers it. Empty: no card linked yet.'
-          : 'Not checked yet. No skill cards are linked to these lines, which says nothing about whether you meet them.'
+          ? 'Green: you have it. Amber: partly. Rose: not yet. Empty: no answer yet.'
+          : 'Not checked yet. Ann reads your Work history, skill cards and Central Node and suggests an answer for each line, for about 10c. Nothing counts until you confirm it.'
       )
     );
   }
@@ -278,7 +279,7 @@ export function renderFutureDetail(
     const li = document.createElement('li');
     li.className = 'career-future__criterion';
     const row = el('div', 'career-future__criterion-row');
-    row.append(el('span', coverageDot(criterion.coverage)));
+    row.append(el('span', coverageDot(criterion.coverage, criterion.met?.status)));
     row.append(el('span', 'career-future__criterion-text', criterion.text));
     li.append(row);
     if (criterion.supporting?.length) {
@@ -290,7 +291,9 @@ export function renderFutureDetail(
       }
       li.append(chips);
     }
-    if (criterion.coverage < 0.5) {
+    if (criterion.met?.evidence) li.append(el('p', 'career-page__meta career-future__evidence', criterion.met.evidence));
+    // Only an answered gap: an unanswered line says nothing about Adam.
+    if (criterion.coverage < 1 && (criterion.met?.status === 'not_yet' || criterion.met?.status === 'partly')) {
       const make = el('button', 'btn btn--ghost career-future__gap-btn', 'Make it a stepping stone') as HTMLButtonElement;
       make.type = 'button';
       make.addEventListener('click', () => {
@@ -320,12 +323,7 @@ export function renderFutureDetail(
   }
   if (future.criteria.length) {
     panel.append(criteriaList);
-    const editCriteria = el('button', 'btn btn--secondary career-future__edit', 'Edit criteria') as HTMLButtonElement;
-    editCriteria.type = 'button';
-    editCriteria.addEventListener('click', () => {
-      openEditFutureSheet(document.body, future, options.onChanged, { focusCriteria: true });
-    });
-    panel.append(editCriteria);
+    panel.append(checkActions(future, options.onChanged));
   } else {
     panel.append(inlineCriteriaForm(future, options.onChanged));
   }
@@ -336,7 +334,7 @@ export function renderFutureDetail(
     panel.append(el('h3', 'career-future__subhead', 'Stepping stones'));
   }
   if (!stones.length && future.criteria.length) {
-    stonesList.append(el('li', 'empty-state', 'No stepping stones yet. Make one from any line you are missing.'));
+    stonesList.append(el('li', 'empty-state', 'No stepping stones yet. Lines you mark Partly or Not yet can become one.'));
   }
   for (const stone of stones) {
     const li = document.createElement('li');
@@ -450,6 +448,170 @@ function sheetCloser(
     if (event.target === sheet) closeIfClean();
   });
   return close;
+}
+
+type MetStatus = 'have' | 'partly' | 'not_yet';
+type CheckSuggestion = { criterion_id: string; status: MetStatus | 'unknown'; evidence: string };
+type CheckResult = { suggestions?: CheckSuggestion[]; read_central_node?: boolean };
+
+const MET_CHOICES: Array<[MetStatus, string]> = [
+  ['have', 'Have it'],
+  ['partly', 'Partly'],
+  ['not_yet', 'Not yet']
+];
+
+/**
+ * One line per criterion, one tap each. Ann's answers arrive already chosen, so
+ * confirming her is one press of Save; nothing counts until then.
+ */
+function openCheckSheet(future: FutureModel, result: CheckResult | null, onSaved: () => void): void {
+  const sheet = el('div', 'career-sheet');
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-label', `Check ${future.title}`);
+  const inner = el('div', 'career-sheet__inner career-check');
+  inner.append(el('h2', 'career-page__heading', result ? 'Does this sound right?' : future.title));
+  inner.append(
+    el(
+      'p',
+      'career-page__meta career-sheet__hint',
+      result
+        ? `Ann read your Work history, skill cards${result.read_central_node ? ' and Central Node' : ''}. Change anything she got wrong, then save.`
+        : 'Tap the answer for each line. Tap it again to clear it.'
+    )
+  );
+  if (result && !result.read_central_node) {
+    inner.append(el('p', 'career-page__meta career-sheet__hint', 'Your Central Node did not load, so she may have missed things.'));
+  }
+
+  const suggested = new Map((result?.suggestions ?? []).map((s) => [s.criterion_id, s]));
+  const answers = new Map<string, { status: MetStatus; evidence: string } | null>();
+  const list = el('div', 'career-check__list');
+  let changed = Boolean(result);
+
+  for (const criterion of [...future.criteria].sort((a, b) => a.order - b.order)) {
+    const suggestion = suggested.get(criterion.id);
+    const fromAnn = suggestion && suggestion.status !== 'unknown' ? { status: suggestion.status, evidence: suggestion.evidence } : null;
+    const saved = criterion.met ? { status: criterion.met.status, evidence: criterion.met.evidence ?? '' } : null;
+    const initial = fromAnn ?? saved;
+    answers.set(criterion.id, initial);
+
+    const row = el('div', 'career-check__row');
+    row.append(el('p', 'career-check__text', criterion.text));
+    const reason = el('p', 'career-page__meta career-check__reason');
+    const showReason = () => {
+      const answer = answers.get(criterion.id);
+      if (answer?.evidence) reason.textContent = answer.evidence;
+      else if (!answer && result) reason.textContent = 'Ann found nothing on this. You will know.';
+      else reason.textContent = '';
+      reason.hidden = !reason.textContent;
+    };
+    const choices = el('div', 'career-check__choices');
+    const paint = () => {
+      for (const button of choices.querySelectorAll('button')) {
+        button.setAttribute('aria-pressed', String(button.dataset.status === answers.get(criterion.id)?.status));
+      }
+    };
+    for (const [status, label] of MET_CHOICES) {
+      const choice = el('button', 'career-check__choice', label) as HTMLButtonElement;
+      choice.type = 'button';
+      choice.dataset.status = status;
+      choice.addEventListener('click', () => {
+        // Ann's reason explains her answer, so it goes when the answer changes.
+        const same = answers.get(criterion.id)?.status === status;
+        answers.set(criterion.id, same ? null : { status, evidence: initial?.status === status ? initial.evidence : '' });
+        changed = true;
+        paint();
+        showReason();
+      });
+      choices.append(choice);
+    }
+    paint();
+    showReason();
+    row.append(reason, choices);
+    list.append(row);
+  }
+
+  const status = el('p', 'career-page__meta');
+  status.setAttribute('role', 'status');
+  const close = sheetCloser(sheet, () => changed, (message) => {
+    status.textContent = message;
+  });
+
+  const save = el('button', 'btn btn--primary', 'Save answers') as HTMLButtonElement;
+  save.type = 'button';
+  save.addEventListener('click', () => {
+    void (async () => {
+      save.disabled = true;
+      status.textContent = 'Saving…';
+      try {
+        await updateFuture(future.id, {
+          criteria: future.criteria.map((c) => ({
+            id: c.id,
+            text: c.text,
+            order: c.order,
+            source: c.source,
+            met: answers.get(c.id) ?? null
+          }))
+        });
+        close();
+        onSaved();
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Could not save. Your answers are still here.';
+        save.disabled = false;
+      }
+    })();
+  });
+  const cancel = el('button', 'btn btn--ghost', 'Cancel') as HTMLButtonElement;
+  cancel.type = 'button';
+  cancel.addEventListener('click', close);
+  const actions = el('div', 'career-sheet__actions');
+  actions.append(save, cancel);
+
+  inner.append(list, status, actions);
+  sheet.append(inner);
+  document.body.append(sheet);
+}
+
+/** Ask Ann, or answer the lines without her. */
+function checkActions(future: FutureModel, onChanged: () => void): HTMLElement {
+  const wrap = el('div', 'career-check__start');
+  const status = el('p', 'career-page__meta career-sheet__hint');
+  status.setAttribute('role', 'status');
+  const ask = el(
+    'button',
+    future.checked ? 'btn btn--secondary' : 'btn btn--primary',
+    future.checked ? 'Check again with Ann' : 'Ask Ann to check'
+  ) as HTMLButtonElement;
+  ask.type = 'button';
+  ask.addEventListener('click', () => {
+    void (async () => {
+      ask.disabled = true;
+      status.textContent = 'Ann is reading your record. This can take 20 seconds.';
+      try {
+        const result = (await checkFuture(future.id)) as CheckResult;
+        status.textContent = '';
+        ask.disabled = false;
+        // Adam may have moved on; don't open a sheet over another page.
+        if (ask.isConnected) openCheckSheet(future, result, onChanged);
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Ann could not check this. Try again.';
+        ask.disabled = false;
+      }
+    })();
+  });
+  const self = el('button', 'btn btn--ghost', future.checked ? 'Change answers' : 'Answer them myself') as HTMLButtonElement;
+  self.type = 'button';
+  self.addEventListener('click', () => openCheckSheet(future, null, onChanged));
+  const edit = el('button', 'btn btn--ghost', 'Edit criteria') as HTMLButtonElement;
+  edit.type = 'button';
+  edit.addEventListener('click', () => {
+    openEditFutureSheet(document.body, future, onChanged, { focusCriteria: true });
+  });
+  const buttons = el('div', 'career-sheet__actions');
+  buttons.append(ask, self, edit);
+  wrap.append(buttons, status);
+  return wrap;
 }
 
 /**

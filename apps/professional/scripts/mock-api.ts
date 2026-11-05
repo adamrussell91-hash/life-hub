@@ -264,6 +264,13 @@ let walkthruSuggestions: Array<Record<string, any>> = [
   }
 ];
 
+function withCriterionIds(criteria: unknown[]): unknown[] {
+  return criteria.map((c) => {
+    const item = c as Record<string, unknown>;
+    return { ...item, id: item.id ?? `fcrit_${randomUUID()}` };
+  });
+}
+
 export function createMockApi() {
   const people = new Map<string, PersonRecord>(
     (seedData.people as PersonRecord[]).map((p) => [p.id, { ...p }])
@@ -3170,6 +3177,21 @@ export function createMockApi() {
         colour_slot?: number;
         lane_order?: number;
       };
+      if (action === 'check') {
+        const future = futures.get(url.searchParams.get('id') ?? '');
+        const criteria = (future?.criteria ?? []) as Array<{ id: string }>;
+        return json(200, {
+          ok: true,
+          data: {
+            read_central_node: true,
+            suggestions: criteria.map((c, index) => ({
+              criterion_id: c.id,
+              status: index === 0 ? 'have' : index === 1 ? 'partly' : 'unknown',
+              evidence: index === 0 ? 'Mock: your Work history shows this.' : index === 1 ? 'Mock: one skill card touches on it.' : ''
+            }))
+          }
+        });
+      }
       if (action === 'draft') {
         return json(200, {
           ok: true,
@@ -3198,7 +3220,7 @@ export function createMockApi() {
         title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Untitled future',
         where: typeof input.where === 'string' ? input.where : null,
         status: 'active',
-        criteria: Array.isArray(input.criteria) ? input.criteria : [],
+        criteria: Array.isArray(input.criteria) ? withCriterionIds(input.criteria) : [],
         // Same contract as career-schema: the client picks slot and lane.
         colour_slot:
           Number.isInteger(input.colour_slot) && input.colour_slot! >= 1 && input.colour_slot! <= 6
@@ -3218,6 +3240,7 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'not_found', message: 'Future not found.' } });
       }
       const patch = (body ?? {}) as Record<string, unknown>;
+      if (Array.isArray(patch.criteria)) patch.criteria = withCriterionIds(patch.criteria);
       const future = { ...futures.get(id)!, ...patch, id, updated_at: new Date().toISOString() };
       futures.set(id, future);
       return json(200, { ok: true, data: { future } });

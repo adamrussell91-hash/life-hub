@@ -160,7 +160,15 @@ export function createCareerRepository(deps = {}) {
 
   async function updateFuture(id, patch) {
     const existing = await getFuture(id);
-    if (patch && 'criteria' in patch) patch = { ...patch, criteria: validateCriteriaInput(patch.criteria) };
+    if (patch && 'criteria' in patch) {
+      // Editing a line's words must not lose the answer Adam gave for it.
+      const saved = new Map(existing.criteria.map((c) => [c.id, c.met]));
+      const criteria = validateCriteriaInput(patch.criteria).map(({ met, ...criterion }) => {
+        const kept = met === undefined ? saved.get(criterion.id) : met;
+        return kept ? { ...criterion, met: kept } : criterion;
+      });
+      patch = { ...patch, criteria };
+    }
     const merged = { ...existing, ...patch, id: existing.id, schema_version: CAREER_SCHEMA_VERSION, updated_at: now() };
     const parsed = parseFutureRecord(merged);
     if (!parsed) throw validationError('invalid_future', 'Updated future is invalid.');

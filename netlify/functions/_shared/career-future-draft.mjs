@@ -9,7 +9,7 @@ import { futureDraftPrompt } from './career-prompts.mjs';
 const MODEL = 'claude-sonnet-5';
 const TIMEOUT_MS = 20000;
 
-function extractJson(raw) {
+export function extractJson(raw) {
   const trimmed = String(raw ?? '').trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = fenced?.[1]?.trim() ?? trimmed;

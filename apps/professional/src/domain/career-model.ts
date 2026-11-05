@@ -12,8 +12,17 @@ export function criterionCoverage(strength: string | null | undefined): number {
   return 0;
 }
 
+type CriterionMet = { status: 'have' | 'partly' | 'not_yet'; evidence?: string };
+
+/** A confirmed answer counts like a card: have=1, partly=0.5, not yet=0. */
+export function metCoverage(met: CriterionMet | null | undefined): number {
+  if (met?.status === 'have') return 1;
+  if (met?.status === 'partly') return 0.5;
+  return 0;
+}
+
 export function readinessPercent(
-  criteria: Array<{ id: string }> | null | undefined,
+  criteria: Array<{ id: string; met?: CriterionMet | null }> | null | undefined,
   supports: Array<{ criterion_ids?: string[]; strength?: string }> = []
 ): number | null {
   if (!criteria?.length) return null;
@@ -26,8 +35,10 @@ export function readinessPercent(
     }
   }
   const mean =
-    criteria.reduce((sum, criterion) => sum + (byCriterion.get(criterion.id) ?? 0), 0) /
-    criteria.length;
+    criteria.reduce(
+      (sum, criterion) => sum + Math.max(byCriterion.get(criterion.id) ?? 0, metCoverage(criterion.met)),
+      0
+    ) / criteria.length;
   return Math.round(100 * mean);
 }
 
@@ -118,7 +129,7 @@ export type CareerModelOverview = {
     suggested_reason?: string | null;
     lane_order: number;
     colour_slot: number;
-    criteria: Array<{ id: string; text: string; order: number; source: string }>;
+    criteria: Array<{ id: string; text: string; order: number; source: string; met?: CriterionMet | null }>;
     target_date?: string | null;
     aliases?: string[];
     created_at?: string;
@@ -200,6 +211,7 @@ export type CareerCriterionModel = {
   order: number;
   source: string;
   coverage: number;
+  met: CriterionMet | null;
   supporting: Array<{ id: string; title: string; strength: string }>;
 };
 
@@ -213,7 +225,7 @@ export type CareerFutureModel = {
   colour_slot: number;
   criteria: CareerCriterionModel[];
   readiness: number | null;
-  /** At least one skill card is linked to a criterion. Until then readiness means nothing. */
+  /** A card is linked or a line is answered. Until then readiness means nothing. */
   checked: boolean;
   readiness_label: string;
   arrival_date: string | null;
@@ -424,7 +436,7 @@ export function buildCareerModel(
       }
     }
     const criteriaModels = (future.criteria ?? []).map((c) => {
-      const coverage = byCriterion.get(c.id) ?? 0;
+      const coverage = Math.max(byCriterion.get(c.id) ?? 0, metCoverage(c.met));
       const supporting = (supportersByCriterion.get(c.id) ?? [])
         .sort((a, b) => criterionCoverage(b.strength) - criterionCoverage(a.strength))
         .slice(0, 2);
@@ -434,10 +446,11 @@ export function buildCareerModel(
         order: c.order,
         source: c.source,
         coverage,
+        met: c.met ?? null,
         supporting
       };
     });
-    const checked = criteriaModels.some((c) => c.coverage > 0);
+    const checked = criteriaModels.some((c) => c.coverage > 0 || c.met);
     const ownStones = stoneModels.filter(
       (s) => s.future_ids.includes(future.id) && !s.shared && !s.done
     );
