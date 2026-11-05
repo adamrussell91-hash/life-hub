@@ -48,10 +48,16 @@ const overview = {
 
 const originalFetch = globalThis.fetch;
 let patches: Array<{ url: string; body: Record<string, unknown> }> = [];
+let posts: Array<Record<string, unknown>> = [];
+let drafts: Array<Record<string, unknown>> = [];
+let draftFails = false;
 let careerLoads = 0;
 
 beforeEach(() => {
   patches = [];
+  posts = [];
+  drafts = [];
+  draftFails = false;
   careerLoads = 0;
   Element.prototype.scrollIntoView = vi.fn();
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -59,6 +65,18 @@ beforeEach(() => {
     if (init?.method === 'PATCH') {
       patches.push({ url, body: JSON.parse(String(init.body)) });
       return Response.json({ ok: true, data: { future: {} } });
+    }
+    if (init?.method === 'POST' && JSON.parse(String(init.body)).description !== undefined) {
+      drafts.push(JSON.parse(String(init.body)));
+      if (draftFails) return Response.json({ ok: false, error: { message: 'Try again' } }, { status: 500 });
+      return Response.json({
+        ok: true,
+        data: { draft: { criteria: [{ text: 'Whole-school leadership', source: 'ad' }] } }
+      });
+    }
+    if (init?.method === 'POST' && String(url).includes('futures')) {
+      posts.push(JSON.parse(String(init.body)));
+      return Response.json({ ok: true, data: { future: { id: BARE } } });
     }
     if (url.includes('/api/career-scan')) {
       return Response.json({ ok: true, data: { proposals: [] } });
@@ -93,28 +111,120 @@ const chip = (canvas: HTMLElement, startsWith: string) =>
     b.textContent?.startsWith(startsWith)
   )!;
 
-it('an Add criteria chip selects the future and opens criteria editing', async () => {
+const button = (host: ParentNode, label: string) =>
+  [...host.querySelectorAll('button')].find((b) => b.textContent === label)!;
+
+const paste = (box: HTMLTextAreaElement, text: string) => {
+  box.value = text;
+  box.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+it('an Add criteria chip opens the future with its paste box ready, no sheet', async () => {
   const canvas = await mountPage();
   const bare = chip(canvas, 'Director of Innovation');
   expect(bare.textContent).toContain('Add criteria');
 
   bare.click();
+  await vi.waitFor(() => expect(location.hash).toBe(`#/career/future/${BARE}`));
+  selectCareerFutureInPlace(canvas, BARE);
 
-  expect(location.hash).toBe(`#/career/future/${BARE}`);
-  const sheet = document.querySelector<HTMLElement>('[aria-label="Criteria for Director of Innovation"]');
-  expect(sheet).not.toBeNull();
-  const input = sheet!.querySelector<HTMLInputElement>('.career-sheet__criterion input')!;
-  expect(document.activeElement).toBe(input);
+  expect(document.querySelector('.career-sheet')).toBeNull();
+  const box = canvas.querySelector<HTMLTextAreaElement>('.career-criteria-box__input')!;
+  expect(document.activeElement).toBe(box);
+});
 
-  input.value = 'Leads digital strategy across the school';
-  [...sheet!.querySelectorAll('button')].find((b) => b.textContent === 'Save')!.click();
+it('a pasted list saves as one criterion per line, in one go', async () => {
+  const canvas = await mountPage(`#/career/future/${BARE}`);
+  const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+  const box = slot.querySelector<HTMLTextAreaElement>('.career-criteria-box__input')!;
+
+  paste(box, '- Leads digital strategy\n2. Runs staff training\n\n• Reports to the board');
+  expect(slot.textContent).toContain('3 criteria');
+  button(slot, 'Save criteria').click();
+
   await vi.waitFor(() => expect(patches).toHaveLength(1));
   expect(patches[0]!.url).toContain(encodeURIComponent(BARE));
-  expect(patches[0]!.body.criteria).toEqual([
-    { text: 'Leads digital strategy across the school', source: 'adam', order: 0 }
+  expect(patches[0]!.body).toEqual({
+    criteria: [
+      { text: 'Leads digital strategy', source: 'adam', order: 0 },
+      { text: 'Runs staff training', source: 'adam', order: 1 },
+      { text: 'Reports to the board', source: 'adam', order: 2 }
+    ]
+  });
+  await vi.waitFor(() => expect(careerLoads).toBe(2)); // quiet refresh
+});
+
+it('Save future keeps the paste: this was the bug', async () => {
+  const canvas = await mountPage();
+  button(canvas, 'Add a future').click();
+  const sheet = document.querySelector<HTMLElement>('[aria-label="Add a future"]')!;
+  sheet.querySelector<HTMLInputElement>('input')!.value = 'Head of Learning';
+  paste(sheet.querySelector<HTMLTextAreaElement>('textarea')!, 'Leads the program\nCoaches teachers');
+  button(sheet, 'Save future').click();
+
+  await vi.waitFor(() => expect(posts).toHaveLength(1));
+  expect(posts[0]!.title).toBe('Head of Learning');
+  expect(posts[0]!.criteria).toEqual([
+    { text: 'Leads the program', source: 'adam', order: 0 },
+    { text: 'Coaches teachers', source: 'adam', order: 1 }
   ]);
   await vi.waitFor(() => expect(document.querySelector('.career-sheet')).toBeNull());
-  await vi.waitFor(() => expect(careerLoads).toBe(2)); // quiet refresh
+});
+
+it('a whole ad goes to Ann on save, and a failure leaves the paste in the box', async () => {
+  const canvas = await mountPage(`#/career/future/${BARE}`);
+  const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+  const box = slot.querySelector<HTMLTextAreaElement>('.career-criteria-box__input')!;
+  const ad = 'We are seeking a leader for our school. '.repeat(15);
+  paste(box, ad);
+  expect(slot.textContent).toContain('Reads like a full ad');
+
+  draftFails = true;
+  button(slot, 'Save criteria').click();
+  await vi.waitFor(() => expect(drafts).toHaveLength(1));
+  await vi.waitFor(() => expect(button(slot, 'Save criteria').disabled).toBe(false));
+  expect(box.value).toBe(ad);
+  expect(patches).toHaveLength(0);
+
+  draftFails = false;
+  button(slot, 'Save criteria').click();
+  await vi.waitFor(() => expect(patches).toHaveLength(1));
+  expect(patches[0]!.body.criteria).toEqual([
+    { text: 'Whole-school leadership', source: 'ad', order: 0 }
+  ]);
+});
+
+it('Edit criteria shows every line in one box and keeps ids, so linked cards stay linked', async () => {
+  const canvas = await mountPage(`#/career/future/${READY}`);
+  const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
+  button(slot, 'Edit criteria').click();
+  const sheet = document.querySelector<HTMLElement>('[aria-label="Criteria for Head of Gifted"]')!;
+  const box = sheet.querySelector<HTMLTextAreaElement>('textarea')!;
+  expect(box.value).toBe('Whole-school policy');
+  expect(document.activeElement).toBe(box);
+
+  paste(box, 'Whole-school policy\nParent communication');
+  button(sheet, 'Save').click();
+  await vi.waitFor(() => expect(patches).toHaveLength(1));
+  expect(patches[0]!.body.criteria).toEqual([
+    { id: 'fcrit_1', text: 'Whole-school policy', source: 'ad', order: 0 },
+    { text: 'Parent communication', source: 'adam', order: 1 }
+  ]);
+});
+
+it('Escape and clicking outside will not throw away a paste', async () => {
+  const canvas = await mountPage();
+  button(canvas, 'Add a future').click();
+  const sheet = document.querySelector<HTMLElement>('[aria-label="Add a future"]')!;
+  paste(sheet.querySelector<HTMLTextAreaElement>('textarea')!, 'Leads the program');
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  sheet.click();
+  expect(document.querySelector('.career-sheet')).not.toBeNull();
+  expect(sheet.textContent).toContain('Press Cancel to discard');
+
+  button(sheet, 'Cancel').click();
+  expect(document.querySelector('.career-sheet')).toBeNull();
 });
 
 it('picking a future swaps the panel in place, without refetching the page', async () => {
@@ -149,13 +259,13 @@ it('falls back to a full render when the page is not on screen', async () => {
   expect(selectCareerFutureInPlace(canvas, 'future_unknown')).toBe(false);
 });
 
-it('the panel offers Add criteria when a future has none', async () => {
+it('a future with no criteria shows the box and no empty score or stones', async () => {
   const canvas = await mountPage(`#/career/future/${BARE}`);
   const slot = canvas.querySelector<HTMLElement>('.career-page__detail-slot')!;
-  const buttons = [...slot.querySelectorAll('button')].filter((b) => b.textContent === 'Add criteria');
-  expect(buttons).toHaveLength(2); // ring + empty list
-  buttons[1]!.click();
-  expect(document.querySelector('[aria-label="Criteria for Director of Innovation"]')).not.toBeNull();
+  expect(slot.querySelector('.career-criteria-box__input')).not.toBeNull();
+  expect(slot.querySelector('.career-future__ring')).toBeNull();
+  expect(slot.textContent).not.toContain('Stepping stones');
+  expect(slot.textContent).not.toContain('Add criteria');
 });
 
 it('a parked chip restores its future', async () => {

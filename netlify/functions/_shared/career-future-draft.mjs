@@ -24,8 +24,10 @@ function heuristicDraft(title, description) {
   const lines = text
     .split(/\n+/)
     .map((l) => l.replace(/^[-*•\d.)\s]+/, '').trim())
-    .filter((l) => l.length > 12 && l.length <= 500)
-    .slice(0, 8);
+    // A long paragraph becomes its sentences, so a paste is never swapped for the stock list.
+    .flatMap((l) => (l.length > 500 ? l.split(/(?<=[.!?;])\s+/) : [l]))
+    .filter((l) => l.length > 12)
+    .slice(0, 20);
   const criteria = (lines.length ? lines : [
     'Demonstrated leadership of teaching and learning practice',
     'Evidence of improving student outcomes for high-potential learners',
@@ -96,7 +98,7 @@ export async function draftFutureFromAnn({
 
   const body = {
     model: MODEL,
-    max_tokens: 1200,
+    max_tokens: 3000,
     messages: [
       {
         role: 'user',

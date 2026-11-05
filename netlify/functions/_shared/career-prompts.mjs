@@ -20,11 +20,12 @@ Return strict JSON only:
   "title": string,
   "where": string|null (≤ 200, school/system if stated),
   "aliases": string[] (≤ 8 role titles people use in employee_at),
-  "criteria": [{ "text": string ≤ 500, "source": "ad"|"ann" }] (5–8 items)
+  "criteria": [{ "text": string ≤ 500, "source": "ad"|"ann" }] (at most 20 items)
 }
 
 Rules:
-- Prefer criteria stated in the ad (source "ad"); fill gaps with Ann-sourced practical criteria (source "ann").
+- Every criterion the paste states becomes one item with source "ad", in its own words. Keep them all; do not merge or summarise them. Leave out sections about the school, pay and how to apply.
+- Only if the paste states fewer than 5, add practical criteria with source "ann" to reach 5.
 - No invented schools, salaries, or named people.
 - Australian English. No markdown.
 

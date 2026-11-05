@@ -12,7 +12,6 @@ import { mountCareerRiver } from '@/views/career-river';
 import { renderCareerEmployment } from '@/views/career-employment';
 import {
   openAddFutureSheet,
-  openEditFutureSheet,
   renderFutureDetail
 } from '@/views/career-future-panel';
 import { renderSkillsScanPanel } from '@/views/career-skills-scan';
@@ -76,6 +75,8 @@ function showSelection(view: MountedCareer, futureId: string | null, scroll: boo
     row.classList.toggle('is-selected', row.dataset.futureId === futureId);
   });
   if (future && scroll) {
+    // A future with no criteria was picked to add them: start in the box.
+    view.detailSlot.querySelector<HTMLTextAreaElement>('.career-criteria-box__input')?.focus({ preventScroll: true });
     requestAnimationFrame(() => {
       view.detailSlot.scrollIntoView({
         block: 'nearest',
@@ -95,11 +96,6 @@ export function selectCareerFutureInPlace(canvas: HTMLElement, futureId: string 
   if (futureId && !view.model.futures.some((f) => f.id === futureId)) return false;
   showSelection(view, futureId, true);
   return true;
-}
-
-function openCriteriaFor(model: CareerModel, futureId: string, onReload: () => void): void {
-  const future = model.futures.find((f) => f.id === futureId);
-  if (future) openEditFutureSheet(document.body, future, onReload, { focusCriteria: true });
 }
 
 function addFuture(model: CareerModel, onReload: (reveal?: boolean) => void): void {
@@ -131,7 +127,6 @@ function renderRiver(
   return mountCareerRiver(mount, model, {
     selectedFutureId,
     onAddFuture: () => addFuture(model, onReload),
-    onAddCriteria: (id) => openCriteriaFor(model, id, () => onReload()),
     onRestoreFuture: (id) => {
       const done = () => onReload();
       void updateFuture(id, { status: 'active' }).then(done, done);
