@@ -596,7 +596,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
             addMember: (groupId, student) => void writeGroups(() => api.addMembers(cls.id, groupId, [{ student, why: 'Added by teacher' }], today())),
             removeMember: (groupId, student) => void writeGroups(() => api.removeMember(cls.id, groupId, student, today())),
             pins: (id) => current.markbook.focus?.[id] ?? { pinned: [], dismissed: [] },
-            repaint: paint
+            repaint: paint,
+            today: today(),
+            upcoming: (options.progressLessons ?? []).flatMap((l) => (l.date && l.date >= today() ? [{ id: l.id, title: l.title, date: l.date, assessment: l.assessment }] : []))
           })
         );
       else if (mode === 'history')
