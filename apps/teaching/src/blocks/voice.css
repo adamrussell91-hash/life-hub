@@ -1097,3 +1097,11 @@
 }
 
 .voice-run--heard { background: var(--pastel-lilac) !important; }
+
+/* Before recording: where the student sits on Speaking, and the move to the next rung. */
+.voice-where { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-left: 5px solid var(--pastel-lilac-ink, #5a4a8c); border-radius: 12px; background: var(--paper, #fff); }
+.voice-where__title { margin: 0; font-size: var(--text-base); }
+.voice-where__row { display: grid; gap: var(--space-1); min-width: 0; }
+.voice-where__row + .voice-where__row { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.voice-where__name { margin: 0; font-weight: 600; }
+.voice-where__next { margin: 0; font-size: var(--text-sm); background: var(--pastel-lilac, #efeaf8); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }

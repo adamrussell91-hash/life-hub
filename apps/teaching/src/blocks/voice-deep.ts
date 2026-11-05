@@ -5,6 +5,7 @@ import { rubricTags, type Rubric } from '@/marking/rubric-model';
 import { mountRubricPanel, type RubricPanel, type RubricSetup } from '@/marking/rubric-panel';
 import { deepApi } from '@/deep/api';
 import { loadRubricSetup, passedOf, type RubricDeps } from '@/marking/rubric-setup';
+import { loadStudentRungs } from '@/skills/rungs-api';
 
 /**
  * The rubric on a Voice marking screen, in the dock under the player and codes.
@@ -54,9 +55,18 @@ export function mountVoiceDeep(block: Pick<Block, 'id' | 'settings'>, lessonId: 
   let setup: RubricSetup | null = null;
   let touched = false;
 
+  const paintLast = async (): Promise<void> => {
+    if (!panel || !setup?.rows.skills.length) return;
+    if (!current) { panel.setLast(null); return; }
+    const { studentId, classId } = current;
+    const rungs = await (deps.load?.rungs ?? loadStudentRungs)(classId, studentId).catch(() => null);
+    if (current?.studentId === studentId) panel.setLast(rungs);
+  };
+
   const paintWho = async (): Promise<void> => {
     if (!panel || !setup) return;
     panel.setNote(current ? '' : PICK_FIRST);
+    void paintLast();
     if (!current || !setup.unitId || !setup.rows.steps.length) {
       panel.setPassed(null, current?.studentId ?? null);
       return;

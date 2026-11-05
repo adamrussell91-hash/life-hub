@@ -226,6 +226,10 @@
 
 **W10 · Load filters what the next save writes back.** **Seen:** Travel journal (17/10/26): the default GET stripped soft-deleted rows, and the client saved the whole document back, so the first edit after any reload erased Trash for good. **Rule:** A client that saves whole documents loads the whole document (Trash included) and filters for display only. **Check:** soft-delete, reload, edit something else, then open Trash: the item is still there and restorable.
 
+**W11 · Native `append` prints "null".** **Seen:** Teaching markbook Skills view (05/11/26): `row.append(a, b, cond ? list : null)` drew the word "null" on every empty rung; the local `h()` helper skips falsy children but the DOM's own `append` stringifies them. **Rule:** Only the helper takes optional children; a direct `append` gets a filtered list. **Check:** a DOM test with an empty state asserts the text has no `null` or `undefined`.
+
+**W12 · A new class name already belongs to a sibling element.** **Seen:** Teaching rubric panel (05/11/26): the new next-move line used `.rb-next`, the class of the existing next-step textarea, so `querySelector('.rb-next')` found the paragraph and the next-step test failed. **Rule:** `grep` the component's prefix for a class before adding it. **Check:** the component's existing tests pass unchanged.
+
 ## P: Process and honesty
 
 **P1 · Ticking 100% without comparing to the mockup.** **Seen:** Goals v2 (13 items reopened); Medical v2 (34/34 claimed, 18 defects); Organisations #508 (C1, C2, D4 and P3 ticked while failing on every tile; the mockup diff left out the tile chart and timeline); Network Ecology miniworld (the Mycelium toggle only faded the terrain; the mockup's person↔person tie lines were never drawn, so confirmed ties were invisible). **Rule:** Before ticking any UI item, put your screenshot next to the mockup/brief section and write the differences into the ledger. **Check:** each ticked UI item has a "diff vs mockup: none" or listed-deviation line.

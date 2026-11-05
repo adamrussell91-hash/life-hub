@@ -2,6 +2,9 @@ import type { Block } from '@/schemas/block';
 import { button, el } from '@/blocks/peer-feedback-ui';
 import { mountFeedbackCodesEditor } from '@/blocks/feedback-codes-editor';
 import { GROUP_LABELS, type FeedbackCodeGroup } from '@/blocks/feedback-codes';
+import { taggedSkills, withTaggedSkills } from '@/deep/block-tags';
+import { loadSkills } from '@/skills/api';
+import type { SkillStrand } from '@/skills/schema';
 import { applyVoicePick, reciteParts, voicePick, SIDE_LABELS, VOICE_PICKS } from '@/blocks/voice-oracy';
 import '@/blocks/peer-feedback.css';
 import '@/blocks/peer-annotate.css';
@@ -73,6 +76,13 @@ export function createVoiceTaskFields(
 ): { el: HTMLElement; refresh: () => void } {
   const root = el('div', 'voice-editor');
   const dynamic = el('div', 'voice-editor__dynamic');
+
+  // The Speaking strand, once loaded: its sub-strands become the skills a speaking task can place students on.
+  let speaking: SkillStrand | null = null;
+  void loadSkills().then((c) => {
+    speaking = c?.strands?.find((x) => x.strand === 'speaking') ?? null;
+    if (speaking && root.isConnected) paint();
+  }, () => {});
 
   const update = (patch: Partial<Content>, repaint = false) => {
     const latest = getLatest();
@@ -233,8 +243,34 @@ export function createVoiceTaskFields(
       ...(mode === 'viva' ? [scaffoldEditor(content)] : []),
       ...(content.oracy === 'speech' || content.oracy === 'debate' ? [stemsField(content)] : []),
       ...(content.oracy === 'presentation' ? [el('p', 'pf-field__hint block-secondary', 'Slides stay in the student’s own tool. You mark from the audio and transcript.')] : []),
-      groups
+      groups,
+      ...(shown.includes('speaking') ? [speakingSkillsField()] : [])
     );
+  }
+
+  /**
+   * Which Speaking skills this task places students on. A tagged skill puts its
+   * ladder on the marking screen, so the rung you pick lands on the continuum.
+   */
+  function speakingSkillsField(): HTMLElement {
+    const block = getLatest();
+    const tagged = taggedSkills(block);
+    if (!speaking) return el('p', 'pf-field__hint block-secondary voice-editor__skills-wait', 'Speaking skills load from the skills continuum.');
+    const refs = speaking.sub_strands.map((s) => ({ value: `speaking.${s.id}`, label: s.name }));
+    const field = pillGroup('Speaking skills to place students on', refs, (ref) => tagged.includes(ref), (ref) => {
+      const latest = getLatest();
+      const now = taggedSkills(latest);
+      const next = now.includes(ref) ? now.filter((x) => x !== ref) : [...now, ref];
+      if (next.length > 3) return;
+      onChange(withTaggedSkills(latest, next));
+      paint();
+    });
+    field.classList.add('voice-editor__skills');
+    const speakingTagged = tagged.filter((r) => r.startsWith('speaking.')).length;
+    field.append(el('p', 'pf-field__hint block-secondary', speakingTagged
+      ? 'Marking shows these ladders, so you can place each student on a rung.'
+      : 'Pick at least one so marking shows the speaking ladder. Up to three skills per task.'));
+    return field;
   }
 
   return { el: root, refresh: paint };

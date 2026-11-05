@@ -26,6 +26,8 @@ export type RubricSetup = {
   bank?: NextStepBank | null;
   /** The student's current step on each deep understanding, where it could be read. */
   passed?: PassedSteps | null;
+  /** The student's rung on each skill from their last returned work, shown as "Last time". */
+  last?: Readonly<Record<string, string>> | null;
   unitId?: string | null;
 };
 export type PassedSteps = Readonly<Record<string, PlacedStep | null | undefined>>;
@@ -76,6 +78,8 @@ export type RubricPanel = {
   /** Sends the rubric with the next save even if unchanged, as when a take gets its student. */
   touch: () => void;
   setPassed: (passed: PassedSteps | null, studentId?: string | null) => void;
+  /** The student's rung on each skill from their last returned work, marked "Last time" on the ladder. Null clears it. */
+  setLast: (rungs: Readonly<Record<string, string>> | null) => void;
   /** A line at the top of the panel, such as "pick the student first". Empty clears it. */
   setNote: (text: string) => void;
   /** Repaints after the host's own change: tagged codes, criteria. */
@@ -126,6 +130,7 @@ export function mountRubricPanel(setup: RubricSetup, o: RubricPanelOptions = {})
   let handNext: { text: string; code_id?: string } | null = o.saved?.next_step ? { ...o.saved.next_step } : null;
   let passed: PassedSteps | null = setup.passed ?? null;
   let studentId = o.studentId ?? null;
+  let last: Readonly<Record<string, string>> | null = setup.last ?? null;
   const blocked = new Set<string>();
   let adding = false;
 
@@ -169,26 +174,38 @@ export function mountRubricPanel(setup: RubricSetup, o: RubricPanelOptions = {})
       const grid = el('div', 'rb-rungs');
       grid.setAttribute('role', 'group');
       grid.setAttribute('aria-label', `${skill.name}: rung`);
-      const buttons = skill.rungs.map((rung) => {
-        const b = el('button', 'rb-rung', rung.name);
+      // The ladder reads top down from Excellent, the way the continuum climbs, each rung with its "I can".
+      const buttons = skill.rungs.map((rung, i) => {
+        const b = el('button', 'rb-rung');
+        b.style.setProperty('--rb-step', String(i));
+        b.append(el('span', 'rb-rung__name', rung.name));
+        const ican = rung.id === 'below' ? 'Not yet at Capable' : rung.i_can?.trim() ?? '';
+        if (ican) b.append(el('span', 'rb-rung__ican', ican));
+        const lastTag = el('span', 'rb-rung__last', 'Last time');
+        lastTag.hidden = true;
+        b.append(lastTag);
         b.dataset.rung = `${skill.ref}:${rung.id}`;
         tap(b, () => {
           if (skills.get(skill.ref) === rung.id) skills.delete(skill.ref);
           else skills.set(skill.ref, rung.id);
           changed();
         });
-        grid.append(b);
-        return { b, rung };
+        grid.prepend(b);
+        return { b, rung, lastTag };
       });
       const look = el('p', 'rb-look');
-      row.append(name, grid, look);
+      const nextMove = el('p', 'rb-climb');
+      row.append(name, grid, look, nextMove);
       box.append(row);
       paintSkills.push(() => {
         const chosen = skills.get(skill.ref);
         const dashed = chosen ? null : ai?.skills?.[skill.ref] ?? null;
-        for (const { b, rung } of buttons) {
+        const was = last?.[skill.ref] ?? null;
+        for (const { b, rung, lastTag } of buttons) {
           const on = chosen === rung.id;
           const isAi = dashed === rung.id;
+          lastTag.hidden = was !== rung.id;
+          b.classList.toggle('is-last', was === rung.id);
           b.classList.toggle('is-on', on);
           b.classList.toggle('is-ai', isAi);
           b.setAttribute('aria-pressed', String(on));
@@ -197,6 +214,7 @@ export function mountRubricPanel(setup: RubricSetup, o: RubricPanelOptions = {})
         }
         const shown = chosen ?? dashed;
         look.textContent = lookFor(skill.rungs, shown);
+        nextMove.textContent = nextMoveLine(skill.rungs, shown);
       });
     }
     root.append(box);
@@ -493,12 +511,27 @@ export function mountRubricPanel(setup: RubricSetup, o: RubricPanelOptions = {})
       if (id !== undefined) studentId = id;
       sync();
     },
+    setLast: (rungs) => {
+      last = rungs;
+      sync();
+    },
     setNote: (text) => {
       note.textContent = text;
       note.hidden = !text;
     },
     refresh: sync
   };
+}
+
+/** What the student does to climb from the rung shown: that rung's next move, or Capable's "I can" from below. */
+function nextMoveLine(rungs: RubricRows['skills'][number]['rungs'], shown: LadderRung | null): string {
+  if (!shown) return '';
+  const at = rungs.findIndex((r) => r.id === shown);
+  const up = rungs[at + 1];
+  if (shown === RUNG_ORDER[0]) return up?.i_can ? `Next move, to Capable: ${up.i_can.trim()}` : '';
+  const move = rungs[at]?.next_move?.trim();
+  if (!move) return '';
+  return up ? `Next move, to ${up.name}: ${move}` : `Keep refining: ${move}`;
 }
 
 /** The "Look for" line for a rung. Below has no indicators of its own, so it points up at Capable's. */

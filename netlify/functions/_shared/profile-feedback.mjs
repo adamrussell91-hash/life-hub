@@ -114,6 +114,45 @@ export async function unseenFor(store, roster, student) {
   return rows.filter((r) => r?.status === 'returned' && r.kind !== 'assessment' && !r.seen_at).length + notes.filter((d) => !d.seen_at).length;
 }
 
+/**
+ * Skill rows grouped by strand, each with the student's rung now, the rung after
+ * it and that rung's next move. Only the lines each row needs leave the continuum.
+ */
+async function skillGroups(store, skillRows) {
+  if (!skillRows.length) return [];
+  const continuum = await readStoredSkills(store).catch(() => null);
+  const skills = [];
+  for (const row of skillRows) {
+    const ref = row.key.slice(6);
+    const [strandId, subId] = ref.split('.');
+    const strand = continuum?.strands.find((s) => s.strand === strandId);
+    const sub = strand?.sub_strands.find((s) => s.id === subId);
+    const counts = Object.fromEntries(RUNGS.map((r) => [r, row.cells.filter((c) => c === r).length]));
+    const nextRung = RUNGS[Math.max(1, RUNGS.indexOf(row.now) + 1)];
+    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null };
+    const group = skills.find((s) => s.strand === (strand?.name ?? strandId)) ?? (skills.push({ strand: strand?.name ?? strandId, strand_id: strandId, rows: [] }), skills.at(-1));
+    group.rows.push(entry);
+  }
+  return skills;
+}
+
+/**
+ * A student's skills on their own, for a task that is about to start: where they
+ * sit on each skill their returned work has placed, and the move to the next rung.
+ * Pass `strand` to keep one strand (a Voice task asks for speaking).
+ */
+export async function skillsFor(store, classId, studentId, strand = null) {
+  const pieces = (await studentPieces(store, classId, studentId)).slice(-CHART_MAX);
+  const rows = targetKeys(pieces).filter((k) => k.startsWith('skill:') && (!strand || k.startsWith(`skill:${strand}.`))).map((k) => targetRow(pieces, k));
+  return { need: null, skills: await skillGroups(store, rows) };
+}
+
+/** Each student's latest rung on every skill their returned work has placed: the teacher's class view and "last time" while marking. */
+export async function classSkillRungs(store, classId, studentIds) {
+  const rows = await mapBounded(studentIds, 4, async (id) => ({ id, rungs: rungsFrom(await studentPieces(store, classId, id)) }));
+  return rows;
+}
+
 export async function progressFor(store, roster, student) {
   const all = await studentPieces(store, roster.cls.id, student.id);
   const notes = await studentNotes(store, roster.cls.id, student.id);
@@ -132,19 +171,7 @@ export async function progressFor(store, roster, student) {
     else if (key.startsWith('con:')) concepts.push({ ...row, name: key.slice(4).replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()), sub: 'Concept', looks: looksFor(lastColumn(key), key, row.now) });
     else skillRows.push(row);
   }
-  const continuum = await readStoredSkills(store).catch(() => null);
-  const skills = [];
-  for (const row of skillRows) {
-    const ref = row.key.slice(6);
-    const [strandId, subId] = ref.split('.');
-    const strand = continuum?.strands.find((s) => s.strand === strandId);
-    const sub = strand?.sub_strands.find((s) => s.id === subId);
-    const counts = Object.fromEntries(RUNGS.map((r) => [r, row.cells.filter((c) => c === r).length]));
-    const nextRung = RUNGS[Math.max(1, RUNGS.indexOf(row.now) + 1)];
-    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null };
-    const group = skills.find((s) => s.strand === (strand?.name ?? strandId)) ?? (skills.push({ strand: strand?.name ?? strandId, rows: [] }), skills.at(-1));
-    group.rows.push(entry);
-  }
+  const skills = await skillGroups(store, skillRows);
   const grid = codeGrid(pieces, library).map((r) => ({ ...r, code: codes.get(r.code_id)?.code, label: codes.get(r.code_id)?.label, colour: codes.get(r.code_id)?.colour }));
   const next = nextSteps(pieces, library).map((n) => {
     const c = codes.get(n.code_id);

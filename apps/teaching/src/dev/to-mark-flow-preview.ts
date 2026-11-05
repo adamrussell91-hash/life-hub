@@ -25,7 +25,7 @@ const CHECKS = ['Names two poems and a form choice in each', 'Says how each form
 const block = {
   id: 'blk_viva', type: 'block', block_type: 'audio', variant: 'medium', visibility: 'all',
   content: { url: '', mode: 'respond', prompt: 'How is the hybrid nature of both form and identity in the poetry represented and used?' },
-  settings: { deep_step: { du: 'du_hybform', step: '3' }, deep_targets: ['kp_hf01', 'kp_hf02'], deep_checks: CHECKS, deep_skills: ['reading.technique'] }
+  settings: { deep_step: { du: 'du_hybform', step: '3' }, deep_targets: ['kp_hf01', 'kp_hf02'], deep_checks: CHECKS, deep_skills: ['speaking.delivery', 'reading.technique'] }
 };
 const unit = {
   deep_understandings: [{
@@ -41,8 +41,18 @@ const unit = {
   }]
 };
 const rung = (i_can: string, ...looks: string[]) => ({ i_can, indicators: looks.map((text) => ({ group: 'Reading', text })), build: { next_move: i_can } });
+const speakRung = (i_can: string, look: string, next: string) => ({ i_can, indicators: [{ group: 'Delivery', text: look }], build: { next_move: next } });
 const continuum = {
   strands: [
+    { strand: 'speaking', name: 'Speaking', sub_strands: [{
+      id: 'delivery', name: 'Delivery', outcomes: [], points: [],
+      rungs: {
+        capable: speakRung('Speak clearly enough to follow, with a few fillers.', 'Can be followed; fillers break some points.', 'Swap each filler for a short pause.'),
+        skilled: speakRung('Pause on purpose and stress the key word in each point.', 'Pauses land before key ideas.', 'Vary pace: slow down for the claim, speed up for the setup.'),
+        accomplished: speakRung('Use pace and pause to steer the listener through the argument.', 'Pace changes signal a new point.', 'Land the last line: slow, stressed, then stop.'),
+        excellent: speakRung('Sound like you are thinking aloud, in control and unhurried.', 'Delivery carries the meaning on its own.', 'Keep refining: Try it without notes.')
+      }
+    }] },
     { strand: 'reading', name: 'Reading', sub_strands: [{
       id: 'technique', name: 'Technique and effect', outcomes: [1], points: [{ area: 'area-one', point: 'R1', link: 'shared' }],
       rungs: {
@@ -149,6 +159,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (path.endsWith('/quiz')) return ok({ attempt: {} });
   if (path.endsWith('/lecture') || path.endsWith('/tutorial')) return ok({});
   if (path.startsWith('/api/classes/') && path.endsWith('/deep')) return ok({ steps: { st_js: { du_hybform: { step: '2b', at: '2026-10-30' } } }, writing: {} });
+  if (path === `/api/classes/${CLASS}/profile` && body.action === 'skill_rungs') {
+    const rungs: Record<string, Record<string, string>> = { st_js: { 'speaking.delivery': 'capable', 'reading.technique': 'skilled' }, st_rk: { 'speaking.delivery': 'skilled' }, st_ev: {} };
+    return ok(body.student_id ? { rungs: rungs[String(body.student_id)] ?? {} } : { students: roster.map((r) => ({ ...r, rungs: rungs[r.id] ?? {} })) });
+  }
   if (path.startsWith('/api/classes/')) return ok({ markbook: { marks: {} }, marks: {} });
   if (path === '/api/ai/jobs' || path.includes('/ai-jobs') || path.includes('ai/job')) {
     aiDone = true;

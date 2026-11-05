@@ -6,6 +6,7 @@ import type { DeepUnderstanding } from '@/deep/schema';
 import type { NextStepBank } from '@/quiz/core';
 import type { Block } from '@/schemas/block';
 import { loadSkills } from '@/skills/api';
+import { loadStudentRungs, type SkillRungs } from '@/skills/rungs-api';
 import type { SkillsContinuum } from '@/skills/schema';
 import { rubricRows, rubricTags, type RubricPieceRow } from './rubric-model';
 import type { PassedSteps, RubricSetup } from './rubric-panel';
@@ -24,6 +25,7 @@ export type RubricDeps = {
   continuum?: () => Promise<SkillsContinuum>;
   codes?: () => Promise<readonly FeedbackCode[]>;
   progress?: (classId: string, unitId: string) => Promise<{ steps: Record<string, Record<string, { step: string }>> }>;
+  rungs?: (classId: string, studentId: string) => Promise<SkillRungs>;
 };
 
 const realDeps: Required<RubricDeps> = {
@@ -31,7 +33,8 @@ const realDeps: Required<RubricDeps> = {
   unit: (id) => apiGet(`/api/units/${encodeURIComponent(id)}`),
   continuum: loadSkills,
   codes: loadFeedbackCodes,
-  progress: (classId, unitId) => deepApi.load(classId, unitId)
+  progress: (classId, unitId) => deepApi.load(classId, unitId),
+  rungs: loadStudentRungs
 };
 
 /** The block a piece of work sits in, and the item carrying its own tags: a quiz question, or a written task's questions read together. */
@@ -81,7 +84,10 @@ async function setupFor(tags: ReturnType<typeof rubricTags>, unitId: string | nu
     use.codes().catch(() => [] as readonly FeedbackCode[])
   ]);
   const deep = unit?.deep_understandings ?? [];
-  const progress = who && unitId && tags.steps.length ? await use.progress(who.classId, unitId).catch(() => null) : null;
+  const [progress, last] = await Promise.all([
+    who && unitId && tags.steps.length ? use.progress(who.classId, unitId).catch(() => null) : Promise.resolve(null),
+    who && tags.skills.length ? use.rungs(who.classId, who.studentId).catch(() => null) : Promise.resolve(null)
+  ]);
   const unitPieces: RubricPieceRow[] = deep.flatMap((d) => d.pieces.map((p) => ({ id: p.id, text: p.text, tier: p.tier })));
   return {
     rows: rubricRows(tags, { continuum, deep }),
@@ -91,6 +97,7 @@ async function setupFor(tags: ReturnType<typeof rubricTags>, unitId: string | nu
     codes,
     bank,
     passed: progress && who ? passedOf(progress, who.studentId) : null,
+    last,
     unitId
   };
 }

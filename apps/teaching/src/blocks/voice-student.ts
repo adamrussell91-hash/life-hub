@@ -6,6 +6,8 @@ import { audioUrl, cleanInitials, fetchMine, rememberInitials, submitTake, voice
 import { DEFAULT_VIVA_SECONDS, STUDENT_TIME_CHOICES } from '@/blocks/voice-block-editor';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
 import { SIDE_LABELS } from '@/blocks/voice-oracy';
+import { speakingRowsLoader, speakingWhere } from '@/blocks/voice-where';
+import type { SkillRow } from '@/progress/types';
 import { mountRecitePractice, reciteTextFold, type ReciteProgress } from '@/blocks/voice-recite';
 
 /**
@@ -43,7 +45,7 @@ export function speakingSeconds(block: VoiceBlock, plan: Plan): number | null {
   return c.mode === 'viva' ? DEFAULT_VIVA_SECONDS : null;
 }
 
-export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElement {
+export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?: string): HTMLElement {
   const isViva = block.content.mode === 'viva';
   const oracy = block.content.oracy;
   const scope = `${lessonId}:${block.id}`;
@@ -61,6 +63,9 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
   let takes: VoiceTake[] = [];
   let mine: MineState | null = null;
   let stopCurrent: (() => void) | null = null;
+  // A speaking task shows where the student sits on Speaking before they record. Codes off for speaking, no box.
+  const speakingTask = (block.content.code_groups ?? ['speaking']).includes('speaking');
+  let speakingRows: SkillRow[] = [];
 
   const showError = (text: string) => {
     alert.textContent = text;
@@ -217,6 +222,8 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
       );
       return view;
     }
+    const where = speakingTask ? speakingWhere(speakingRows) : null;
+    if (where) view.append(where);
     if (oracy === 'debate') view.append(sideRow());
     if (isViva) view.append(planEditor());
     const stems = stemChips();
@@ -547,10 +554,12 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
     }),
     takeStore()
       .list(scope)
-      .catch(() => [] as VoiceTake[])
-  ]).then(([state, saved]) => {
+      .catch(() => [] as VoiceTake[]),
+    speakingTask ? speakingRowsLoader(classId) : Promise.resolve([] as SkillRow[])
+  ]).then(([state, saved, rows]) => {
     mine = state;
     takes = saved;
+    speakingRows = rows;
     paint();
   });
   return root;
