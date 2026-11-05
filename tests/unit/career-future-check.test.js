@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkFutureWithAnn, parseFutureCheck } from '../../netlify/functions/_shared/career-future-check.mjs';
+import { callAnn } from '../../netlify/functions/_shared/career-future-draft.mjs';
+import {
+  careerAnnJobStatus,
+  clearCareerAnnJob,
+  runCareerAnnJob,
+  startCareerAnnJob
+} from '../../netlify/functions/_shared/career-ann-job.mjs';
 import { createCareerRepository } from '../../netlify/functions/_shared/career-repository.mjs';
 
 const A = 'fcrit_00000000-0000-4000-8000-00000000000a';
@@ -30,6 +37,68 @@ test('parse keeps known lines, and an odd status becomes unknown', () => {
     { criterion_id: B, status: 'unknown', evidence: '' }
   ]);
   assert.equal(parseFutureCheck('not json', future.criteria), null);
+});
+
+test('a busy model or dropped connection is retried, a bad request is not', async () => {
+  const replies = [
+    () => new Response('', { status: 529 }),
+    () => {
+      throw new Error('socket hang up');
+    },
+    () => Response.json({ content: [{ text: 'ok' }] })
+  ];
+  const waits = [];
+  const sleep = async (ms) => void waits.push(ms);
+  const json = await callAnn({}, { apiKey: 'test', fetchImpl: async () => replies.shift()(), sleep });
+  assert.equal(json.content[0].text, 'ok');
+  assert.deepEqual(waits, [2000, 8000]);
+
+  let calls = 0;
+  await assert.rejects(
+    callAnn({}, { apiKey: 'test', sleep, fetchImpl: async () => (calls++, new Response('', { status: 400 })) })
+  );
+  assert.equal(calls, 1);
+});
+
+test('the check job runs, keeps its answer until cleared, and reports a failure once', async () => {
+  const data = new Map();
+  const store = {
+    get: async (key) => data.get(key) ?? null,
+    setJSON: async (key, value) => void data.set(key, value),
+    delete: async (key) => void data.delete(key)
+  };
+  const { job_id } = await startCareerAnnJob(store, { kind: 'check', future_id: 'x' }, { invoke: async () => true });
+  assert.equal((await careerAnnJobStatus(store, job_id)).status, 'reading');
+  await runCareerAnnJob(store, job_id, { run: async (job) => ({ read: job.future_id }) });
+  await runCareerAnnJob(store, job_id, { run: async () => assert.fail('must only run once') });
+  assert.deepEqual(await careerAnnJobStatus(store, job_id), { status: 'done', result: { read: 'x' } });
+  assert.equal((await careerAnnJobStatus(store, job_id)).status, 'done');
+  await clearCareerAnnJob(store, job_id);
+  assert.equal((await careerAnnJobStatus(store, job_id)).status, 'failed');
+
+  const failed = await startCareerAnnJob(store, { kind: 'draft' }, { invoke: async () => true });
+  await runCareerAnnJob(store, failed.job_id, {
+    run: async () => {
+      throw new Error('No luck.');
+    }
+  });
+  assert.deepEqual(await careerAnnJobStatus(store, failed.job_id), { status: 'failed', message: 'No luck.' });
+  assert.equal(data.size, 0);
+
+  await assert.rejects(startCareerAnnJob(store, { kind: 'check' }, { invoke: async () => false }), { code: 'ann_unavailable' });
+  assert.equal(data.size, 0);
+});
+
+test('a running job is only given up on past the background function cap', async () => {
+  const data = new Map();
+  const store = {
+    get: async (key) => data.get(key) ?? null,
+    setJSON: async (key, value) => void data.set(key, value),
+    delete: async (key) => void data.delete(key)
+  };
+  const { job_id } = await startCareerAnnJob(store, { kind: 'check' }, { invoke: async () => true, now: () => 0 });
+  assert.equal((await careerAnnJobStatus(store, job_id, { now: () => 15 * 60_000 })).status, 'reading');
+  assert.equal((await careerAnnJobStatus(store, job_id, { now: () => 17 * 60_000 })).status, 'failed');
 });
 
 test('with no key Ann refuses, and never guesses', async () => {

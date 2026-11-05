@@ -1,5 +1,6 @@
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
-import { checkFuture, createFuture, createStone, draftFuture, updateFuture } from '@/api/career';
+import { createFuture, createStone, updateFuture } from '@/api/career';
+import { clearAnnJob, draftFuture, startFutureCheck, waitForAnnJob } from '@/api/career-ann-job';
 import { searchEntities } from '@/api/entities';
 import { createTask, createUniversalLink } from '@/api/universal-links';
 import { careerCardRoute } from '@/app/router';
@@ -48,7 +49,7 @@ type AnnDraft = {
 };
 
 async function askAnn(title: string, description: string): Promise<AnnDraft> {
-  const result = (await draftFuture({ title, description })) as { draft?: AnnDraft };
+  const result = await draftFuture<{ draft?: AnnDraft }>({ title, description });
   return result.draft ?? {};
 }
 
@@ -464,7 +465,12 @@ const MET_CHOICES: Array<[MetStatus, string]> = [
  * One line per criterion, one tap each. Ann's answers arrive already chosen, so
  * confirming her is one press of Save; nothing counts until then.
  */
-function openCheckSheet(future: FutureModel, result: CheckResult | null, onSaved: () => void): void {
+function openCheckSheet(
+  future: FutureModel,
+  result: CheckResult | null,
+  onSaved: () => void,
+  onDone: () => void = () => {}
+): void {
   const sheet = el('div', 'career-sheet');
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
@@ -534,9 +540,13 @@ function openCheckSheet(future: FutureModel, result: CheckResult | null, onSaved
 
   const status = el('p', 'career-page__meta');
   status.setAttribute('role', 'status');
-  const close = sheetCloser(sheet, () => changed, (message) => {
+  const closeSheet = sheetCloser(sheet, () => changed, (message) => {
     status.textContent = message;
   });
+  const close = () => {
+    closeSheet();
+    onDone();
+  };
 
   const save = el('button', 'btn btn--primary', 'Save answers') as HTMLButtonElement;
   save.type = 'button';
@@ -573,6 +583,28 @@ function openCheckSheet(future: FutureModel, result: CheckResult | null, onSaved
   document.body.append(sheet);
 }
 
+/** Survives a page reload, so Adam can leave while Ann works and find her answers after. */
+function checkJobKey(futureId: string): string {
+  return `career-ann-check:${futureId}`;
+}
+
+function savedCheckJob(futureId: string): string | null {
+  try {
+    return sessionStorage.getItem(checkJobKey(futureId));
+  } catch {
+    return null;
+  }
+}
+
+function rememberCheckJob(futureId: string, jobId: string | null): void {
+  try {
+    if (jobId) sessionStorage.setItem(checkJobKey(futureId), jobId);
+    else sessionStorage.removeItem(checkJobKey(futureId));
+  } catch {
+    /* Private mode: the wait still works until the page reloads. */
+  }
+}
+
 /** Ask Ann, or answer the lines without her. */
 function checkActions(future: FutureModel, onChanged: () => void): HTMLElement {
   const wrap = el('div', 'career-check__start');
@@ -584,22 +616,47 @@ function checkActions(future: FutureModel, onChanged: () => void): HTMLElement {
     future.checked ? 'Check again with Ann' : 'Ask Ann to check'
   ) as HTMLButtonElement;
   ask.type = 'button';
+
+  const waitForAnswers = (jobId: string) => {
+    ask.disabled = true;
+    status.textContent = 'Ann is reading your record. You can leave this page; her answers will be here when you come back.';
+    void waitForAnnJob<CheckResult>(jobId).then(
+      (result) => {
+        // Away from this panel: the job stays put, and coming back picks it up.
+        if (!ask.isConnected) return;
+        status.textContent = '';
+        ask.disabled = false;
+        if (document.querySelector('.career-check')) return;
+        openCheckSheet(future, result, onChanged, () => {
+          rememberCheckJob(future.id, null);
+          clearAnnJob(jobId);
+        });
+      },
+      (error) => {
+        rememberCheckJob(future.id, null);
+        if (!ask.isConnected) return;
+        status.textContent = error instanceof Error ? error.message : 'Ann could not finish. Try again.';
+        ask.disabled = false;
+      }
+    );
+  };
+
   ask.addEventListener('click', () => {
     void (async () => {
       ask.disabled = true;
-      status.textContent = 'Ann is reading your record. This can take 20 seconds.';
+      status.textContent = 'Starting Ann…';
       try {
-        const result = (await checkFuture(future.id)) as CheckResult;
-        status.textContent = '';
-        ask.disabled = false;
-        // Adam may have moved on; don't open a sheet over another page.
-        if (ask.isConnected) openCheckSheet(future, result, onChanged);
+        const jobId = await startFutureCheck(future.id);
+        rememberCheckJob(future.id, jobId);
+        waitForAnswers(jobId);
       } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'Ann could not check this. Try again.';
+        status.textContent = error instanceof Error ? error.message : 'Ann could not start. Try again.';
         ask.disabled = false;
       }
     })();
   });
+  const pendingJob = savedCheckJob(future.id);
+  if (pendingJob) waitForAnswers(pendingJob);
   const self = el('button', 'btn btn--ghost', future.checked ? 'Change answers' : 'Answer them myself') as HTMLButtonElement;
   self.type = 'button';
   self.addEventListener('click', () => openCheckSheet(future, null, onChanged));

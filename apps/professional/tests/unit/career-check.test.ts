@@ -28,23 +28,47 @@ const modelFor = (met: Array<Record<string, unknown> | undefined>) =>
 
 let patches: Array<Record<string, unknown>> = [];
 let checks = 0;
+let asks = 0;
+let cleared = 0;
+let readingAsks = 0;
+let jobFailure = '';
+const JOB = '00000000-0000-4000-8000-0000000000f1';
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
   patches = [];
   checks = 0;
+  asks = 0;
+  cleared = 0;
+  readingAsks = 0;
+  jobFailure = '';
+  sessionStorage.clear();
+  vi.useFakeTimers({ toFake: ['setTimeout'], shouldAdvanceTime: true, advanceTimeDelta: 500 });
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('action=check')) {
+    if (url.includes('action=check_start')) {
       checks += 1;
+      return Response.json({ ok: true, data: { job_id: JOB } });
+    }
+    if (url.includes('action=job_clear')) {
+      cleared += 1;
+      return Response.json({ ok: true, data: { cleared: true } });
+    }
+    if (url.includes('action=job_status')) {
+      asks += 1;
+      if (asks <= readingAsks) return Response.json({ ok: true, data: { status: 'reading' } });
+      if (jobFailure) return Response.json({ ok: true, data: { status: 'failed', message: jobFailure } });
       return Response.json({
         ok: true,
         data: {
-          read_central_node: true,
-          suggestions: [
-            { criterion_id: A, status: 'have', evidence: 'Six years in the role.' },
-            { criterion_id: B, status: 'unknown', evidence: '' }
-          ]
+          status: 'done',
+          result: {
+            read_central_node: true,
+            suggestions: [
+              { criterion_id: A, status: 'have', evidence: 'Six years in the role.' },
+              { criterion_id: B, status: 'unknown', evidence: '' }
+            ]
+          }
         }
       });
     }
@@ -54,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   globalThis.fetch = originalFetch;
   document.body.replaceChildren();
 });
@@ -82,7 +107,7 @@ it('Ann suggests, nothing saves until confirmed, and an unknown line stays open'
   renderFutureDetail(host, modelFor([]) as never, { onChanged });
 
   button(host, 'Ask Ann to check').click();
-  await vi.waitFor(() => expect(document.querySelector('.career-check')).not.toBeNull());
+  await vi.waitFor(() => expect(document.querySelector('.career-check')).not.toBeNull(), { timeout: 3000 });
   expect(checks).toBe(1);
   expect(patches).toHaveLength(0);
 
@@ -102,6 +127,51 @@ it('Ann suggests, nothing saves until confirmed, and an unknown line stays open'
   expect(saved[1]!.met).toEqual({ status: 'not_yet', evidence: '' });
   expect(saved[2]!.met).toBeNull();
   await vi.waitFor(() => expect(onChanged).toHaveBeenCalled());
+  expect(cleared).toBe(1);
+  expect(sessionStorage.length).toBe(0);
+});
+
+it('waits as long as Ann takes, far past the 20 seconds a request may wait', async () => {
+  readingAsks = 40; // two minutes of asking at one ask every three seconds
+  const host = document.createElement('div');
+  document.body.append(host);
+  renderFutureDetail(host, modelFor([]) as never, { onChanged: vi.fn() });
+  button(host, 'Ask Ann to check').click();
+  await vi.waitFor(() => expect(asks).toBeGreaterThan(0));
+  await vi.advanceTimersByTimeAsync(130_000);
+  await vi.waitFor(() => expect(document.querySelector('.career-check')).not.toBeNull());
+  expect(asks).toBeGreaterThan(40);
+  expect(host.textContent).not.toContain('too long');
+});
+
+it('leaving and coming back picks the same job up, with no second charge', async () => {
+  readingAsks = 2;
+  const first = document.createElement('div');
+  document.body.append(first);
+  renderFutureDetail(first, modelFor([]) as never, { onChanged: vi.fn() });
+  button(first, 'Ask Ann to check').click();
+  await vi.waitFor(() => expect(sessionStorage.length).toBe(1));
+  expect(first.textContent).toContain('You can leave this page');
+  first.remove(); // left the page
+
+  const back = document.createElement('div');
+  document.body.append(back);
+  renderFutureDetail(back, modelFor([]) as never, { onChanged: vi.fn() });
+  expect(button(back, 'Ask Ann to check').disabled).toBe(true);
+  await vi.advanceTimersByTimeAsync(12_000);
+  await vi.waitFor(() => expect(document.querySelectorAll('.career-check')).toHaveLength(1));
+  expect(checks).toBe(1);
+});
+
+it('a real failure says so and frees the button', async () => {
+  jobFailure = 'Ann couldn’t be reached after three tries.';
+  const host = document.createElement('div');
+  document.body.append(host);
+  renderFutureDetail(host, modelFor([]) as never, { onChanged: vi.fn() });
+  button(host, 'Ask Ann to check').click();
+  await vi.waitFor(() => expect(host.textContent).toContain('after three tries'));
+  expect(button(host, 'Ask Ann to check').disabled).toBe(false);
+  expect(sessionStorage.length).toBe(0);
 });
 
 it('changing Ann’s answer drops her reason, and marking yourself costs no call', async () => {

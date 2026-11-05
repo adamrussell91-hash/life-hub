@@ -264,6 +264,9 @@ let walkthruSuggestions: Array<Record<string, any>> = [
   }
 ];
 
+const ANN_JOB_MS = 25_000;
+const annJobs = new Map<string, { readyAt: number; result: unknown }>();
+
 function withCriterionIds(criteria: unknown[]): unknown[] {
   return criteria.map((c) => {
     const item = c as Record<string, unknown>;
@@ -3177,41 +3180,46 @@ export function createMockApi() {
         colour_slot?: number;
         lane_order?: number;
       };
-      if (action === 'check') {
-        const future = futures.get(url.searchParams.get('id') ?? '');
-        const criteria = (future?.criteria ?? []) as Array<{ id: string }>;
-        return json(200, {
-          ok: true,
-          data: {
-            read_central_node: true,
-            suggestions: criteria.map((c, index) => ({
-              criterion_id: c.id,
-              status: index === 0 ? 'have' : index === 1 ? 'partly' : 'unknown',
-              evidence: index === 0 ? 'Mock: your Work history shows this.' : index === 1 ? 'Mock: one skill card touches on it.' : ''
-            }))
-          }
-        });
-      }
-      if (action === 'draft') {
-        return json(200, {
-          ok: true,
-          data: {
-            draft: {
-              title: typeof input.title === 'string' ? input.title : 'Draft future',
-              where: typeof input.where === 'string' ? input.where : null,
-              // Mirrors the server's no-key fallback: starter criteria, marked Ann's.
-              criteria:
-                Array.isArray(input.criteria) && input.criteria.length
-                  ? input.criteria
-                  : [
+      if (action === 'check_start' || action === 'draft_start') {
+        // Like the real job, the answer takes longer than a page request may wait.
+        const jobId = randomUUID();
+        const draftInput = input as { title?: string; description?: string };
+        const criteria = (futures.get(url.searchParams.get('id') ?? '')?.criteria ?? []) as Array<{ id: string }>;
+        annJobs.set(jobId, {
+          readyAt: Date.now() + ANN_JOB_MS,
+          result:
+            action === 'draft_start'
+              ? {
+                  draft: {
+                    title: draftInput.title || 'Draft future',
+                    where: null,
+                    criteria: [
                       'Demonstrated leadership of teaching and learning practice',
                       'Capacity to lead policy, programs and staff development',
                       'Strong stakeholder communication with families and leaders'
                     ].map((text, order) => ({ text, order, source: 'ann' })),
-              fallback: true
-            }
-          }
+                    fallback: true
+                  }
+                }
+              : {
+                  read_central_node: true,
+                  suggestions: criteria.map((c, index) => ({
+                    criterion_id: c.id,
+                    status: index === 0 ? 'have' : index === 1 ? 'partly' : 'unknown',
+                    evidence: index === 0 ? 'Mock: your Work history shows this.' : index === 1 ? 'Mock: one skill card touches on it.' : ''
+                  }))
+                }
         });
+        return json(200, { ok: true, data: { job_id: jobId } });
+      }
+      if (action === 'job_status') {
+        const job = annJobs.get((body as { job_id?: string }).job_id ?? '');
+        if (!job) return json(200, { ok: true, data: { status: 'failed', message: 'Ann lost track of this. Try again.' } });
+        return json(200, { ok: true, data: Date.now() < job.readyAt ? { status: 'reading' } : { status: 'done', result: job.result } });
+      }
+      if (action === 'job_clear') {
+        annJobs.delete((body as { job_id?: string }).job_id ?? '');
+        return json(200, { ok: true, data: { cleared: true } });
       }
       const id = `fut_${randomUUID().slice(0, 8)}`;
       const nowIso = new Date().toISOString();

@@ -67,12 +67,19 @@ beforeEach(() => {
       patches.push({ url, body: JSON.parse(String(init.body)) });
       return Response.json({ ok: true, data: { future: {} } });
     }
-    if (init?.method === 'POST' && JSON.parse(String(init.body)).description !== undefined) {
-      drafts.push(JSON.parse(String(init.body)));
-      if (draftFails) return Response.json({ ok: false, error: { message: 'Try again' } }, { status: 500 });
+    if (url.includes('action=draft_start')) {
+      drafts.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, data: { job_id: 'job-1' } });
+    }
+    if (url.includes('action=job_clear')) return Response.json({ ok: true, data: { cleared: true } });
+    if (url.includes('action=job_status')) {
+      if (draftFails) return Response.json({ ok: true, data: { status: 'failed', message: 'Try again' } });
       return Response.json({
         ok: true,
-        data: { draft: { criteria: [{ text: 'Whole-school leadership', source: 'ad' }] } }
+        data: {
+          status: 'done',
+          result: { draft: { criteria: [{ text: 'Whole-school leadership', source: 'ad' }] } }
+        }
       });
     }
     if (init?.method === 'POST' && String(url).includes('futures')) {

@@ -4,13 +4,12 @@
  * There is no offline fallback, because a guessed answer is worse than none.
  */
 
-import { extractJson } from './career-future-draft.mjs';
+import { callAnn, extractJson } from './career-future-draft.mjs';
 import { futureCheckPrompt } from './career-prompts.mjs';
 import { MET_EVIDENCE_MAX, MET_STATUSES } from './career-schema.mjs';
 import { readPrivateFileBytes } from './private-data-file.mjs';
 
 const MODEL = 'claude-sonnet-5';
-const TIMEOUT_MS = 20000;
 const CENTRAL_NODE_PATH = 'central-node.md';
 
 function checkError(status, code, message) {
@@ -50,29 +49,21 @@ async function readCentralNode(env, fetchImpl) {
   }
 }
 
-export async function checkFutureWithAnn({ future, cards = [], roles = [], env, apiKey, fetchImpl = fetch } = {}) {
+export async function checkFutureWithAnn({ future, cards = [], roles = [], env, apiKey, fetchImpl = fetch, sleep } = {}) {
   if (!future?.criteria?.length) throw checkError(400, 'no_criteria', 'Add what the role asks for first.');
   if (!apiKey) throw checkError(503, 'ann_unavailable', 'Ann can’t be reached from here. Mark the lines yourself for now.');
 
   const centralNode = await readCentralNode(env, fetchImpl);
   const content = futureCheckPrompt({ title: future.title, criteria: future.criteria, cards, roles, centralNode });
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  let response;
+  let json;
   try {
-    response = await fetchImpl('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2000, messages: [{ role: 'user', content }] }),
-      signal: ctrl.signal
-    });
+    json = await callAnn(
+      { model: MODEL, max_tokens: 4000, messages: [{ role: 'user', content }] },
+      { apiKey, fetchImpl, sleep }
+    );
   } catch {
-    throw checkError(502, 'ann_unavailable', 'Ann took too long. Try again.');
-  } finally {
-    clearTimeout(timer);
+    throw checkError(502, 'ann_unavailable', 'Ann couldn’t be reached after three tries. Try again in a minute.');
   }
-  if (!response.ok) throw checkError(502, 'ann_unavailable', 'Ann couldn’t check this. Try again.');
-  const json = await response.json();
   const text = Array.isArray(json?.content) ? json.content.map((p) => p?.text ?? '').join('') : '';
   const suggestions = parseFutureCheck(text, future.criteria);
   if (!suggestions) throw checkError(502, 'ann_unreadable', 'Ann’s answer didn’t come through. Try again.');

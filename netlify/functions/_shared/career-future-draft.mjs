@@ -7,7 +7,11 @@ import { generateFutureCriterionId } from './career-schema.mjs';
 import { futureDraftPrompt } from './career-prompts.mjs';
 
 const MODEL = 'claude-sonnet-5';
-const TIMEOUT_MS = 20000;
+// Each try gets a very long leash. These run in a background job, so Ann takes as
+// long as she needs; this only stops a dead connection hanging the job for good.
+const ATTEMPT_LIMIT_MS = 5 * 60_000;
+const RETRY_WAITS_MS = [2000, 8000];
+const RETRYABLE = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
 
 export function extractJson(raw) {
   const trimmed = String(raw ?? '').trim();
@@ -87,47 +91,59 @@ export function parseFutureDraft(raw, { title } = {}) {
   }
 }
 
+/** One model call that shrugs off a busy model or a dropped connection. */
+export async function callAnn(body, { apiKey, fetchImpl = fetch, sleep = defaultSleep } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= RETRY_WAITS_MS.length; attempt += 1) {
+    if (attempt) await sleep(RETRY_WAITS_MS[attempt - 1]);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ATTEMPT_LIMIT_MS);
+    try {
+      const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal
+      });
+      if (response.ok) return await response.json();
+      lastError = new Error(`Model call failed (${response.status}).`);
+      if (!RETRYABLE.has(response.status)) throw Object.assign(lastError, { final: true });
+    } catch (error) {
+      if (error?.final) throw error;
+      lastError = error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError;
+}
+
+function defaultSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function draftFutureFromAnn({
   title,
   description,
   apiKey,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  sleep = defaultSleep
 } = {}) {
   const fallback = () => heuristicDraft(title, description);
   if (!apiKey) return fallback();
 
-  const body = {
-    model: MODEL,
-    max_tokens: 3000,
-    messages: [
-      {
-        role: 'user',
-        content: futureDraftPrompt({ title, description })
-      }
-    ]
-  };
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+    const json = await callAnn(
+      {
+        model: MODEL,
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: futureDraftPrompt({ title, description }) }]
       },
-      body: JSON.stringify(body),
-      signal: ctrl.signal
-    });
-    if (!response.ok) return fallback();
-    const json = await response.json();
-    const text = Array.isArray(json?.content)
-      ? json.content.map((p) => p?.text ?? '').join('')
-      : '';
+      { apiKey, fetchImpl, sleep }
+    );
+    const text = Array.isArray(json?.content) ? json.content.map((p) => p?.text ?? '').join('') : '';
     return parseFutureDraft(text, { title }) ?? fallback();
   } catch {
     return fallback();
-  } finally {
-    clearTimeout(timer);
   }
 }
