@@ -280,7 +280,7 @@ function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormConte
   if (r?.best_at.length) {
     const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
     const best = el('div', 'sdd-best');
-    best.append(el('h3', '', 'Strongest in each criterion'), el('p', 'sprint-note', 'Your group’s idea can borrow the best bits of the others. Add them as parts below.'));
+    best.append(el('h3', '', 'Strongest in each criterion'), el('p', 'sprint-note', 'Your group’s idea is the one with the most wins. Any idea listed here can lend its best bits: add them as parts in the next step.'));
     for (const b of r.best_at) {
       const p = el('p', 'sdd-best__row');
       p.append(el('b', '', `${crit.get(b.criterion) ?? b.criterion}:`), ` ${b.ideas.map((i) => `${label.get(i.id) ?? 'Idea'} · ${i.title}`).join(' and ')}`);
@@ -322,9 +322,10 @@ function task(n: number, title: string, note: string): { el: HTMLElement; done(o
 const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
 /**
- * Plan how the group builds its idea, in three tasks: the parts and who does
- * each (any member can edit; people are picked by initials), an optional
- * borrow from the other ideas, and who puts it together. Decide is done when
+ * Plan how the group builds its idea: the idea itself up top, what is left to
+ * do, the parts and who does each (any member can edit; people are picked by
+ * initials), who puts it together, then an optional fold for borrowing from
+ * the other ideas. Decide is done when
  * every part has someone, everyone has a part and, where the sprint asks for
  * one, the group has an assembler.
  */
@@ -339,6 +340,7 @@ function partsEditor(ctx: FormContext): HTMLElement {
   const err = el('p', 'sprint-submit__err');
   err.setAttribute('role', 'alert');
   let dirty = false;
+  const howOpen = new Set<string>();
   const saveNote = el('span', 'sprint-note sd-saved', '');
   const touched = () => { dirty = true; saveNote.textContent = 'Not saved yet.'; };
   const save = async (): Promise<boolean> => {
@@ -360,8 +362,16 @@ function partsEditor(ctx: FormContext): HTMLElement {
     return l;
   };
 
+  // The idea being planned, so the ideas offered for borrowing further down can't be taken for it.
+  if (s.chosen) {
+    const ours = el('div', 'sprint-chosen sd-ours');
+    ours.append(el('span', 'sd-ours__tag', 'Your group’s idea'), el('strong', '', s.chosen.title));
+    if (s.chosen.idea) ours.append(el('p', '', s.chosen.idea));
+    box.append(ours);
+  }
+
   // 1. The parts and who does each.
-  const t1 = task(1, 'List the parts and who does each', 'Everyone needs at least one part, and someone can take two. Say what each part must show and which criterion it serves.');
+  const t1 = task(1, 'List the parts and who does each', 'Everyone needs at least one part, and someone can take two.');
   const list = el('div', 'sd-parts');
   const paint = () => {
     list.replaceChildren(...parts.map((p, i) => {
@@ -374,21 +384,25 @@ function partsEditor(ctx: FormContext): HTMLElement {
       const crit = el('select', 'qz-input');
       crit.setAttribute('aria-label', 'Criterion it serves');
       crit.disabled = !ctx.editable;
-      crit.append(el('option', '', 'Criterion it serves'));
+      crit.append(el('option', '', 'Pick one'));
       (crit.firstChild as HTMLOptionElement).value = '';
       for (const c of ctx.sprint.criteria) { const o = el('option', '', c.text); o.value = c.id; crit.append(o); }
       crit.value = p.criterion;
       crit.addEventListener('change', () => { p.criterion = crit.value; touched(); });
-      top.append(name, crit);
       const shows = el('textarea', 'qz-input');
-      shows.rows = 3; shows.value = p.shows; shows.maxLength = 400; shows.placeholder = 'What someone will see or hear in this part';
+      shows.rows = 2; shows.value = p.shows; shows.maxLength = 400; shows.placeholder = 'What someone will see or hear in this part';
       shows.disabled = !ctx.editable;
       shows.addEventListener('input', () => { p.shows = shows.value; touched(); });
       const how = el('textarea', 'qz-input');
       how.rows = 2; how.value = p.how; how.maxLength = 400; how.placeholder = 'Tools, steps, what you’ll borrow';
+      how.setAttribute('aria-label', 'How we’ll make it');
       how.disabled = !ctx.editable;
       how.addEventListener('input', () => { p.how = how.value; touched(); });
-      const howField = label('How we’ll make it', how, 'optional');
+      // The optional box stays folded until someone wants it, or has written in it.
+      const howField = el('details', 'sd-part__how');
+      howField.open = !!p.how.trim() || howOpen.has(p.id);
+      howField.addEventListener('toggle', () => { if (howField.open) howOpen.add(p.id); else howOpen.delete(p.id); });
+      howField.append(el('summary', '', 'How we’ll make it (optional)'), how);
       if (tools.length && ctx.editable) {
         const row = el('div', 'sd-tools');
         row.append(el('span', 'sd-tools__label', 'Tools you have'));
@@ -407,7 +421,7 @@ function partsEditor(ctx: FormContext): HTMLElement {
         howField.append(row);
       }
       const foot = el('div', 'sd-part__foot');
-      foot.append(el('span', 'sd-part__label', 'Who'));
+      foot.append(el('span', 'sd-part__label', 'Who does it'));
       const now = live.find((x) => x.id === p.id);
       const who = el('div', 'sd-who');
       who.setAttribute('role', 'group');
@@ -429,46 +443,41 @@ function partsEditor(ctx: FormContext): HTMLElement {
       const remove = button('Remove', 'ghost', () => { parts.splice(i, 1); touched(); paint(); });
       remove.disabled = !ctx.editable;
       remove.classList.add('sd-part__remove');
-      foot.append(who, remove);
-      card.append(top, label('It must show', shows), howField, foot);
+      foot.append(who);
+      top.append(el('span', 'sd-part__num', String(i + 1)), name, remove);
+      const fields = el('div', 'sd-part__fields');
+      fields.append(label('It must show', shows), label('Criterion it serves', crit));
+      card.append(top, foot, fields, howField);
       return card;
     }));
   };
   paint();
   const unplaced = members.filter((m) => !live.some((p) => (p.assigned ?? []).includes(m.key)));
   const empty = live.filter((p) => !(p.assigned ?? []).length);
-  const needs = el('p', 'sd-needs', !live.length ? 'No parts saved yet.' : unplaced.length ? `${andList(unplaced.map((m) => (m.me ? `${m.initials} (you)` : m.initials)))} still ${unplaced.length === 1 ? 'needs' : 'need'} a part.` : 'Everyone has a part.');
-  const add = button('+ Part', 'secondary', () => { parts.push(newPart('New part')); touched(); paint(); });
+  const needs = el('p', `sd-needs${live.length && !unplaced.length ? ' is-ok' : ''}`, !live.length ? 'No parts saved yet.' : unplaced.length ? `${andList(unplaced.map((m) => (m.me ? `${m.initials} (you)` : m.initials)))} still ${unplaced.length === 1 ? 'needs' : 'need'} a part.` : 'Everyone has a part.');
+  const add = button('+ Add a part', 'secondary', () => { parts.push(newPart('New part')); touched(); paint(); });
   const saveBtn = button('Save parts', 'primary', () => void save());
   add.disabled = saveBtn.disabled = !ctx.editable;
   const actions = el('div', 'sd-actions');
   actions.append(add, saveBtn, saveNote);
   t1.el.append(list, needs, actions);
   t1.done(live.length > 0 && !empty.length && !unplaced.length);
-  box.append(t1.el);
+  // What finishes this step, at a glance.
+  const checks = el('ul', 'sd-checks');
+  checks.setAttribute('aria-label', 'What finishes this step');
+  const check = (text: string, on: boolean) => {
+    const li = el('li', on ? 'is-done' : '');
+    li.append(el('span', 'sd-checks__tick', on ? '✓' : ''), el('span', '', text), el('span', 'sd-sr', on ? ' (done)' : ' (still to do)'));
+    checks.append(li);
+  };
+  check('Every part has someone', live.length > 0 && !empty.length);
+  check('Everyone has a part', live.length > 0 && !unplaced.length);
+  if (s.assemble) check('Someone puts it together', !!s.assembler);
+  box.append(checks, t1.el);
 
-  // 2. Borrow a good bit (optional).
-  const best = (s.results?.best_at ?? []).flatMap((b) => b.ideas.filter((i) => i.id !== s.chosen?.id).map((i) => ({ ...i, criterion: b.criterion })));
-  if (best.length) {
-    const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
-    const t2 = task(2, 'Borrow a good bit (optional)', 'Your group rated these other ideas strongest for a criterion. Add the best bit as a part of your idea.');
-    t2.el.classList.add('sd-borrow');
-    for (const x of best) {
-      const row = el('div', 'sd-borrow__row');
-      const text = el('span', '');
-      text.append(el('b', '', `${crit.get(x.criterion) ?? ''}:`), ` “${x.title}”. ${x.idea}`);
-      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criterion }); touched(); paint(); });
-      go.disabled = !ctx.editable;
-      row.append(text, go);
-      t2.el.append(row);
-    }
-    t2.done(live.some((p) => p.text.startsWith('From "')));
-    box.append(t2.el);
-  }
-
-  // 3. Who puts it together.
+  // 2. Who puts it together.
   if (s.assemble) {
-    const t3 = task(best.length ? 3 : 2, 'Choose who puts it together', 'One person collects everyone’s parts in Prototype and uploads the finished prototype for the pitch. They still do their own part.');
+    const t3 = task(2, 'Choose who puts it together', 'One person collects everyone’s parts in Prototype and uploads the finished prototype for the pitch. They still do their own part.');
     t3.el.classList.add('sd-assembler');
     const who = el('div', 'sd-who');
     who.setAttribute('role', 'group');
@@ -488,6 +497,31 @@ function partsEditor(ctx: FormContext): HTMLElement {
     t3.el.append(who);
     t3.done(!!s.assembler);
     box.append(t3.el);
+  }
+
+  // Optional: borrow from the ideas the group didn't choose. Folded, and last, so it can't be taken for the plan.
+  // One row per idea, however many criteria it topped, and never the group's own.
+  const others = new Map<string, { id: string; title: string; idea: string; criteria: string[] }>();
+  for (const b of s.results?.best_at ?? []) for (const i of b.ideas) {
+    if (i.id === s.chosen?.id) continue;
+    const row = others.get(i.id) ?? { ...i, criteria: [] };
+    row.criteria.push(b.criterion);
+    others.set(i.id, row);
+  }
+  if (others.size) {
+    const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
+    const fold = el('details', 'sd-borrow');
+    fold.append(el('summary', '', 'Optional: borrow from an idea you didn’t choose'), el('p', 'sd-task__note', `You are building “${s.chosen?.title ?? ''}”. Your group rated these other ideas strongest for a criterion, so you can add their best bit as a part.`));
+    for (const x of others.values()) {
+      const row = el('div', 'sd-borrow__row');
+      const text = el('span', '');
+      text.append(`“${x.title}”. ${x.idea}`, el('span', 'sd-borrow__strong', `Strongest in ${andList(x.criteria.map((c) => crit.get(c) ?? c))}`));
+      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criteria[0] ?? '' }); touched(); paint(); });
+      go.disabled = !ctx.editable;
+      row.append(text, go);
+      fold.append(row);
+    }
+    box.append(fold);
   }
 
   // What is left before the plan can go in.

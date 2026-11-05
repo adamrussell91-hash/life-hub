@@ -115,11 +115,28 @@ describe('decide: parts', () => {
     const chip = [...f.el.querySelectorAll<HTMLButtonElement>('.sd-who .sprint-chip')].find((b) => b.textContent === 'AB (you)')!;
     chip.click();
     expect((c.client as unknown as { assign: ReturnType<typeof vi.fn> }).assign).toHaveBeenCalledWith('p1', ['m1']);
-    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('Why it matters: “Ash”. What if Ash?');
+    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('“Ash”. What if Ash?Strongest in Why it matters');
+    expect(f.el.querySelector('.sd-ours')?.textContent).toBe('Your group’s ideaBakerWhat if Baker?');
     [...f.el.querySelectorAll<HTMLButtonElement>('.sd-borrow button')][0]!.click();
     expect([...f.el.querySelectorAll<HTMLInputElement>('.sprint-parts input')].map((i) => i.value)).toContain('From "Ash"');
     const selects = [...f.el.querySelectorAll<HTMLSelectElement>('.sprint-parts select')];
     expect(selects.map((x) => x.value)).toEqual(['c1', 'c2', 'c2']);
+  });
+
+  it('an idea that tops every criterion but lost on wins is one borrow row, under the group’s own idea', () => {
+    const ash = { id: 'i1', title: 'Ash', idea: 'What if Ash?' };
+    const baker = { id: 'i3', title: 'Baker', idea: 'What if Baker?' };
+    const f = mountDecide(ctx(base({
+      votes_closed: true, chosen: baker,
+      results: { ranking: [], best_at: [{ criterion: 'c1', ideas: [ash, baker] }, { criterion: 'c2', ideas: [ash] }], unanimous: false },
+      members: [{ key: 'm1', initials: 'AB', me: true }], parts: []
+    })));
+    expect(f.el.querySelector('.sd-ours strong')?.textContent).toBe('Baker');
+    const rows = [...f.el.querySelectorAll('.sd-borrow__row')];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain('“Ash”');
+    expect(rows[0]?.querySelector('.sd-borrow__strong')?.textContent).toMatch(/^Strongest in .+ and Why it matters$/);
+    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain("You are building “Baker”.");
   });
 });
 
