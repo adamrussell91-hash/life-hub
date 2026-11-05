@@ -61,7 +61,7 @@ const sameTick = (a, b) => {
  * to store (a step that couldn't be passed yet stored unpassed), the deep progress
  * if it changed, and the steps blocked by order.
  */
-export async function recordRubric(store, { class_id: classId, student_id: studentId, piece, lesson_id: lessonId, title, column_id: columnId, attempt_id: attemptId, writing_key: writingKey, raw, prior, today }) {
+export async function recordRubric(store, { class_id: classId, student_id: studentId, piece, lesson_id: lessonId, unit_id: givenUnit, title, column_id: columnId, attempt_id: attemptId, writing_key: writingKey, raw, prior, today }) {
   const rubric = cleanRubric(raw);
   const at = new Date().toISOString();
   const skills = rubric?.skills ?? {};
@@ -73,8 +73,9 @@ export async function recordRubric(store, { class_id: classId, student_id: stude
   const writes = !sameTick(tick, writingTick(prior)) && isSafeId(writingKey);
   const passes = [rubric, prior].some((r) => Object.values(r?.steps ?? {}).some((s) => s.pass));
   if (!writes && !passes) return { rubric, deep: null, blocked: [] };
-  const draft = isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
-  const unitId = draft?.unit_id;
+  // Work with no lesson (writing the teacher added) names its unit itself.
+  const draft = !isSafeId(givenUnit) && isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
+  const unitId = isSafeId(givenUnit) ? givenUnit : draft?.unit_id;
   if (!isSafeId(unitId)) return { rubric, deep: null, blocked: [] };
 
   let deep = null;
@@ -91,7 +92,7 @@ export async function recordRubric(store, { class_id: classId, student_id: stude
 }
 
 /** A returned rubric as the student reads it, with names. Pass checks and missed pieces never leave here. */
-export async function rubricForStudent(store, rubric, lessonId) {
+export async function rubricForStudent(store, rubric, lessonId, givenUnit = null) {
   const view = studentRubric(rubric);
   if (!view) return null;
   const continuum = Object.keys(view.skills).length ? await readStoredSkills(store).catch(() => null) : null;
@@ -99,8 +100,9 @@ export async function rubricForStudent(store, rubric, lessonId) {
     const [strandId, subId] = ref.split('.');
     return continuum?.strands.find((s) => s.strand === strandId)?.sub_strands.find((s) => s.id === subId)?.name ?? ref;
   };
-  const draft = view.pieces_used.length && isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
-  const unit = isSafeId(draft?.unit_id) ? await read(store, unitKey(draft.unit_id)) : null;
+  const draft = view.pieces_used.length && !isSafeId(givenUnit) && isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
+  const unitId = view.pieces_used.length ? (isSafeId(givenUnit) ? givenUnit : draft?.unit_id) : null;
+  const unit = isSafeId(unitId) ? await read(store, unitKey(unitId)) : null;
   const pieces = (unit?.deep_understandings ?? []).flatMap((d) => d.pieces ?? []);
   return {
     skills: Object.entries(view.skills).map(([ref, rung]) => ({ ref, name: nameOf(ref), rung })),

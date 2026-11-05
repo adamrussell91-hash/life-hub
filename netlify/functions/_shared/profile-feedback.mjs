@@ -197,7 +197,7 @@ async function ownNote(store, roster, student, item) {
 }
 
 export async function pieceFor(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqrt]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     const doc = await ownNote(store, roster, student, item);
     return { id: item, kind: 'note', date: day(doc.returned_at), audio_url: doc.audio_key ? audioPath(doc.audio_key) : null, audio_deleted: Boolean(doc.audio_deleted_at), ...toPublishedFeedbackPayload(doc, null) };
@@ -229,7 +229,7 @@ export async function pieceFor(store, roster, student, item) {
     drafts: drafts.map((d) => ({ n: d.n, text: d.text, comment: d.comment ?? '', date: day(d.returned_at), tags: (d.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) })) })),
     ...(row.sent ? { sent: true } : {}),
     ...(stored?.redraft ? { redraft: { scope: stored.redraft.scope } } : {}),
-    ...(row.rubric ? { rubric: await rubricForStudent(store, row.rubric, row.lesson_id) } : {}),
+    ...(row.rubric ? { rubric: await rubricForStudent(store, row.rubric, row.lesson_id, row.unit_id ?? null) } : {}),
     ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
     codes: library.filter((c) => used.has(c.id)),
     rungs: rungsFrom(history),
@@ -243,7 +243,7 @@ export async function pieceFor(store, roster, student, item) {
 }
 
 export async function markSeen(store, roster, student, item) {
-  if (typeof item !== 'string' || !/^[wvnqr]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
+  if (typeof item !== 'string' || !/^[wvnqrt]:[A-Za-z0-9_:-]{1,200}$/.test(item)) reject(400, 'bad_item', 'That piece can’t be found.');
   if (item.startsWith('n:')) {
     await markNoteSeen(store, await ownNote(store, roster, student, item));
     return { ok: true };
