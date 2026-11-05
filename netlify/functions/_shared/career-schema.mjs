@@ -28,6 +28,8 @@ export const ALIAS_MAX = 120;
 export const MAX_ALIASES = 8;
 export const CRITERION_TEXT_MAX = 500;
 export const MAX_CRITERIA = 20;
+export const MET_STATUSES = new Set(['have', 'partly', 'not_yet']);
+export const MET_EVIDENCE_MAX = 300;
 export const SUGGESTED_REASON_MAX = 1000;
 export const STONE_LABEL_MAX = 200;
 export const MOVE_TEXT_MAX = 500;
@@ -154,6 +156,13 @@ function normalizeSkills(raw) {
   return out;
 }
 
+/** Adam's confirmed answer for one criterion. Anything else is no answer. */
+function parseMet(raw) {
+  if (!raw || typeof raw !== 'object' || !MET_STATUSES.has(raw.status)) return null;
+  const evidence = typeof raw.evidence === 'string' ? raw.evidence.trim().slice(0, MET_EVIDENCE_MAX) : '';
+  return { status: raw.status, evidence };
+}
+
 function parseCriteria(raw) {
   if (!Array.isArray(raw)) return null;
   if (raw.length > MAX_CRITERIA) return null;
@@ -166,7 +175,8 @@ function parseCriteria(raw) {
     if (!text || text.length > CRITERION_TEXT_MAX) return null;
     if (!Number.isInteger(item.order)) return null;
     if (!CRITERION_SOURCES.has(item.source)) return null;
-    out.push({ id: item.id, text, order: item.order, source: item.source });
+    const met = parseMet(item.met);
+    out.push({ id: item.id, text, order: item.order, source: item.source, ...(met ? { met } : {}) });
   }
   return out.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
@@ -358,7 +368,9 @@ export function validateCriteriaInput(list) {
       id: typeof item?.id === 'string' && FCRIT_ID.test(item.id) ? item.id : generateFutureCriterionId(),
       text,
       order: Number.isInteger(item?.order) ? item.order : index,
-      source
+      source,
+      // Left out means "keep the saved answer"; null or a bad one means no answer.
+      ...('met' in (item ?? {}) ? { met: parseMet(item.met) } : {})
     };
   });
 }
@@ -433,6 +445,13 @@ export function isSteppingStoneDone(stone, actionEndpoints = []) {
   return false;
 }
 
+/** A confirmed answer counts like a card: have=1, partly=0.5, not yet=0. */
+export function metCoverage(met) {
+  if (met?.status === 'have') return 1;
+  if (met?.status === 'partly') return 0.5;
+  return 0;
+}
+
 /** Criterion coverage: strong=1, some=0.5, else 0. */
 export function criterionCoverage(strength) {
   if (strength === 'strong') return 1;
@@ -452,7 +471,10 @@ export function readinessPercent(criteria, supports = []) {
     }
   }
   const mean =
-    criteria.reduce((sum, criterion) => sum + (byCriterion.get(criterion.id) ?? 0), 0) / criteria.length;
+    criteria.reduce(
+      (sum, criterion) => sum + Math.max(byCriterion.get(criterion.id) ?? 0, metCoverage(criterion.met)),
+      0
+    ) / criteria.length;
   return Math.round(100 * mean);
 }
 

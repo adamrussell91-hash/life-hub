@@ -35,6 +35,35 @@ ${JSON.stringify(String(description || '').slice(0, 8000))}
 `;
 }
 
+/** One suggested answer per criterion, from Adam's own record only. */
+export function futureCheckPrompt({ title, criteria, cards, roles, centralNode }) {
+  return `${annVoice()}
+
+Adam wants to know where he stands against this role. Read his record and suggest an answer for every criterion.
+Return strict JSON only:
+{ "suggestions": [{ "criterion_id": string, "status": "have"|"partly"|"not_yet"|"unknown", "evidence": string ≤ 160 }] }
+
+Rules:
+- "have": his record clearly shows it. "partly": it shows some of it. "not_yet": it clearly shows he lacks it.
+- "unknown": the record says nothing either way. A record that is silent is "unknown", never "not_yet".
+- Evidence names the specific record in one plain line, and is empty for "unknown". Invent nothing: no roles, dates or credentials beyond the record.
+- Judge each line on its own. Do not flatter. Adam confirms every answer. Australian English. No markdown.
+
+Role: ${JSON.stringify(title || '')}
+Criteria:
+${JSON.stringify(criteria.map((c) => ({ criterion_id: c.id, text: c.text })))}
+
+Work history:
+${JSON.stringify(roles)}
+
+Skill cards:
+${JSON.stringify(cards)}
+
+Central Node (his private notes about himself):
+${centralNode ? JSON.stringify(String(centralNode).slice(0, 40000)) : '(not available)'}
+`;
+}
+
 /** Weekly Skills scan — groups hub records into keep/bin proposals. */
 export function skillsScanPrompt({ sources, futures }) {
   return `${annVoice()}
