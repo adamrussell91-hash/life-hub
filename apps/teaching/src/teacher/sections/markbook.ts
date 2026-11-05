@@ -459,11 +459,11 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     }
   }
 
-  async function saveGroup(current: MarkbookView, context: InsightContext, tags: string[], students: string[]): Promise<void> {
+  async function saveGroup(current: MarkbookView, context: InsightContext, tags: string[], students: string[], name?: string): Promise<void> {
     const { evidence } = classEvidence(current, context);
     const label = (t: string) => tagLabel(t, context);
     const titles = sourceTitles(current);
-    const group = { id: newGroupId(), name: tags.map(label).join(' · '), tags, members: students.map((s) => ({ student: s, why: joinWhy(s, tags, evidence, titles, label) })) };
+    const group = { id: newGroupId(), name: name ?? tags.map(label).join(' · '), tags, members: students.map((s) => ({ student: s, why: joinWhy(s, tags, evidence, titles, label) })) };
     await writeGroups(() => api.saveGroup(cls.id, group, today()));
   }
 
@@ -547,7 +547,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
 
   function draw(current: MarkbookView, key: ReturnType<typeof focusKey>): void {
     const total = weightTotal(current.markbook);
-    warning.hidden = total === 100 || assessments(current.markbook).length === 0;
+    // Nothing weighted yet is not a mistake: only warn once weights are in use.
+    warning.hidden = total === 100 || total === 0 || assessments(current.markbook).length === 0;
     warning.textContent = `Assessment weights add to ${total}%, not 100%.`;
     for (const b of modes.querySelectorAll<HTMLButtonElement>('.mb__mode')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
     removedToggle.hidden = removedStudentIds(current).length === 0;
@@ -590,7 +591,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
             openStudent: actions.openStudent,
             followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
             planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
-            saveGroup: (tags, ids) => void saveGroup(current, context, tags, ids),
+            saveGroup: (tags, ids, name) => void saveGroup(current, context, tags, ids, name),
             addFlagged: (groupId, ids) => void addFlagged(current, context, groupId, ids),
             renameGroup: (groupId, name) => void writeGroups(() => api.renameGroup(cls.id, groupId, name)),
             addMember: (groupId, student) => void writeGroups(() => api.addMembers(cls.id, groupId, [{ student, why: 'Added by teacher' }], today())),

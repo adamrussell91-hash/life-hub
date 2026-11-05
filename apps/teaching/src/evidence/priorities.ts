@@ -17,8 +17,12 @@ export type Priority = {
   mean: number;
   /** Half or more of those assessed are weak: teach it to the class, not a group. */
   wholeClass: boolean;
-  /** Students under half on it. */
+  /** Students under half on it: the Not yet group. */
   weak: string[];
+  /** The Developing group. */
+  developing: string[];
+  /** The Secure group. */
+  secure: string[];
   /** Students under secure on it. */
   belowSecure: number;
   assessed: number;
@@ -70,6 +74,8 @@ export function priorities(
         mean: row.mean,
         wholeClass: assessed > 0 && row.groups.weak.length / assessed >= NEXT.reteachShare,
         weak: row.groups.weak,
+        developing: row.groups.developing,
+        secure: row.groups.secure,
         belowSecure: row.groups.weak.length + row.groups.developing.length,
         assessed,
         questions: row.questions,
@@ -84,13 +90,35 @@ export function priorities(
   return ranked.slice(0, PRIORITY.max).map(({ priority }) => priority);
 }
 
-/** Why it is a priority, in order: how many, how fast, how soon, how sure. */
-export function priorityWhy(p: Priority, day: (date: string) => string): string[] {
-  const out = [`${p.belowSecure} of ${p.assessed} students are below secure${p.weak.length ? `, ${p.weak.length} of them under half` : ''}. Class average ${pc(p.mean)}.`];
-  if (p.change !== null && p.change <= -PRIORITY.falling) out.push(`Down ${points(p.change)} since it was first checked.`);
-  if (p.next) out.push(`${p.next.assessment ? 'Assessed in' : 'Comes up in'} ${p.next.title}, ${day(p.next.date)}.`);
-  if (p.few) out.push(`Only ${p.questions} questions so far, so check it before reteaching.`);
+export type PriorityMove = { kind: 'reteach' | 'group' | 'revisit' | 'check'; text: string };
+
+/** What to do about a priority, in a few words. Thin evidence gets checked before anything else. */
+export function priorityMove(p: Priority): PriorityMove {
+  if (p.few) return { kind: 'check', text: `Check first: only ${p.questions} ${p.questions === 1 ? 'question' : 'questions'} so far` };
+  if (p.wholeClass || !p.secure.length) return { kind: 'reteach', text: 'Reteach to the class' };
+  if (p.weak.length) return { kind: 'group', text: 'Teach on, pull a small group' };
+  return { kind: 'revisit', text: 'Revisit with the class' };
+}
+
+/** The extra reasons a priority is urgent: falling, and coming up. `shared` is a lesson the page already names. */
+export function priorityNotes(p: Priority, day: (date: string) => string, shared: UpcomingLesson | null = null): string[] {
+  const out: string[] = [];
+  if (p.change !== null && p.change <= -PRIORITY.falling) out.push(`Down ${points(p.change)} since it was first checked`);
+  if (p.next && p.next.id !== shared?.id) out.push(`${p.next.assessment ? 'Assessed in' : 'Comes up in'} ${p.next.title}, ${day(p.next.date)}`);
   return out;
+}
+
+export type Overlap = { students: string[]; tags: string[]; first: string };
+
+/** Students in more than one Not yet group: one group can cover them, starting with the highest priority most of them share. */
+export function notYetOnMany(list: readonly Priority[]): Overlap | null {
+  const counts = new Map<string, number>();
+  for (const p of list) for (const s of p.weak) counts.set(s, (counts.get(s) ?? 0) + 1);
+  const students = [...counts].filter(([, n]) => n >= 2).map(([s]) => s);
+  if (!students.length) return null;
+  const shared = list.map((p) => ({ tag: p.tag, n: students.filter((s) => p.weak.includes(s)).length })).filter((x) => x.n);
+  const most = Math.max(...shared.map((x) => x.n));
+  return { students, tags: shared.map((x) => x.tag), first: shared.find((x) => x.n === most)!.tag };
 }
 
 export type StudentCall = { student: string; mean: number; change: number | null; tags: Array<{ tag: string; mean: number | null }>; why: string };
