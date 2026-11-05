@@ -40,17 +40,30 @@ export function placements(lessons: readonly LessonLike[], duId: string): Placem
   return out;
 }
 
-/** Week number per lesson (1 = the week of the earliest dated lesson, weeks start Monday); null when undated. */
-export function lessonWeeks(lessonIds: readonly string[], rows: ReadonlyArray<{ lesson_id: string; date: string }>): Map<string, number | null> {
+/** The week value of a lesson taught before the unit starts. */
+export const PRE_UNIT_WEEK = 0;
+
+/**
+ * Week number per lesson: 1 = the week of the earliest dated lesson in the unit proper, weeks start
+ * Monday, undated lessons are null. Pre-unit lessons are PRE_UNIT_WEEK and don't move week 1.
+ */
+export function lessonWeeks(
+  lessonIds: readonly string[],
+  rows: ReadonlyArray<{ lesson_id: string; date: string }>,
+  pre: ReadonlySet<string> = new Set()
+): Map<string, number | null> {
   const first = new Map<string, string>();
   for (const r of rows) if (!first.has(r.lesson_id) || r.date < first.get(r.lesson_id)!) first.set(r.lesson_id, r.date);
   const monday = (iso: string): number => {
     const d = new Date(`${iso}T00:00:00Z`);
     return d.getTime() - ((d.getUTCDay() + 6) % 7) * 86_400_000;
   };
-  const dates = [...first.values()].sort();
+  const dates = [...first].filter(([id]) => !pre.has(id)).map(([, date]) => date).sort();
   const start = dates.length ? monday(dates[0]!) : 0;
-  return new Map(lessonIds.map((id) => [id, first.has(id) ? Math.floor((monday(first.get(id)!) - start) / (7 * 86_400_000)) + 1 : null]));
+  return new Map(lessonIds.map((id) => {
+    if (pre.has(id)) return [id, PRE_UNIT_WEEK];
+    return [id, first.has(id) ? Math.floor((monday(first.get(id)!) - start) / (7 * 86_400_000)) + 1 : null];
+  }));
 }
 
 /** The peach warnings for one deep understanding on the plan. */

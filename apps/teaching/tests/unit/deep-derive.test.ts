@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { unitScope } from '@/deep/scope';
-import { lessonWeeks, placements, planGaps } from '@/deep/derive';
+import { lessonWeeks, placements, planGaps, PRE_UNIT_WEEK } from '@/deep/derive';
 import type { Alignment } from '@/alignment/schema';
 
 // Invented alignment, same shape as tests/unit/alignment.test.ts.
@@ -53,6 +53,21 @@ describe('lesson weeks', () => {
     expect(weeks.get('L1')).toBe(1);
     expect(weeks.get('L2')).toBe(2);
     expect(weeks.get('L3')).toBeNull();
+  });
+
+  it('a pre-unit lesson weeks earlier does not push the unit along', () => {
+    const weeks = lessonWeeks(['P', 'L1', 'L2'], [
+      { lesson_id: 'P', date: '2026-09-18' },
+      { lesson_id: 'L1', date: '2026-10-12' },
+      { lesson_id: 'L2', date: '2026-11-05' }
+    ], new Set(['P']));
+    expect(weeks.get('P')).toBe(PRE_UNIT_WEEK);
+    expect(weeks.get('L1')).toBe(1);
+    expect(weeks.get('L2')).toBe(4);
+  });
+
+  it('a pre-unit lesson with no date is still before the unit', () => {
+    expect(lessonWeeks(['P'], [], new Set(['P'])).get('P')).toBe(PRE_UNIT_WEEK);
   });
 });
 

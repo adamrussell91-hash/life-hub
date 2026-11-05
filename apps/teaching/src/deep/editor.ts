@@ -1,6 +1,6 @@
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block } from '@/schemas/block';
-import { chainGaps, placements, planGaps } from './derive';
+import { chainGaps, placements, planGaps, PRE_UNIT_WEEK } from './derive';
 import type { ScopeBullet, ScopePoint } from './scope';
 import {
   DEEP_LIMITS,
@@ -60,7 +60,7 @@ export const lessonCode = (lessons: readonly LessonLike[], id: string): string =
   const i = lessons.findIndex((l) => l.id === id);
   return i < 0 ? 'L?' : `L${i + 1}`;
 };
-export const weekLabel = (w: number | null | undefined): string => (w == null ? 'Not dated yet' : `Week ${w}`);
+export const weekLabel = (w: number | null | undefined): string => (w == null ? 'Not dated yet' : w === PRE_UNIT_WEEK ? 'Before the unit' : `Week ${w}`);
 const shortTitle = (t?: string): string => (t ?? '').trim() || 'Untitled lesson';
 
 export type WeekGroup = { week: number | null; rows: Array<{ lesson: LessonLike; code: string }> };
