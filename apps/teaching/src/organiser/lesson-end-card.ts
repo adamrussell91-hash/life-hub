@@ -1,7 +1,8 @@
-/** The card at the end of a lesson that added organiser lines. Adds nothing when there are none. */
+/** The card at the end of a lesson with organiser lines: what to remember, and what happens to it. Adds nothing when there are none. */
 import { el } from '@/quiz/dom';
 import { studentAnchor } from '@/student/shell';
 import { studentOrganiserApi } from './api';
+import type { EndCardItem } from './types';
 import './organiser-student.css';
 
 export type EndCardOptions = {
@@ -12,7 +13,7 @@ export type EndCardOptions = {
   /** Insert ahead of this node (the lesson footer) when it is still in `content`. */
   before?: Node | null;
   /** Test seam. */
-  api?: { lesson(classId: string, lessonId: string): Promise<{ lines: string[]; joining?: boolean }> };
+  api?: { lesson(classId: string, lessonId: string): Promise<{ items: EndCardItem[]; joining?: boolean; done?: boolean }> };
 };
 
 export async function mountOrganiserEndCard(content: HTMLElement, options: EndCardOptions): Promise<{ dispose(): void }> {
@@ -27,23 +28,32 @@ export async function mountOrganiserEndCard(content: HTMLElement, options: EndCa
       card = null;
     }
   };
-  let lines: string[] = [];
+  let items: EndCardItem[] = [];
   let joining = false;
+  let done = false;
   try {
     const found = await api.lesson(classId, lessonId);
-    lines = found.lines ?? [];
+    items = found.items ?? [];
     joining = !!found.joining;
+    done = !!found.done;
   } catch {
     return handle;
   }
-  if (disposed || !lines.length) return handle;
+  if (disposed || !items.length) return handle;
 
+  const one = items.length === 1;
   card = el('section', 'kos-end');
-  card.setAttribute('aria-label', 'From this lesson');
-  card.append(el('h3', undefined, `From this lesson: ${lines.length} ${joining ? 'new ' : ''}${lines.length === 1 ? 'line' : 'lines'}`));
-  const ul = el('ul');
-  for (const l of lines) ul.append(el('li', undefined, l));
-  card.append(ul, el('p', 'kos-hint', joining ? 'They join your practice tomorrow.' : 'You can find them on your organiser.'));
+  card.setAttribute('aria-label', 'What to remember from this lesson');
+  card.append(el('h3', undefined, 'What to remember from this lesson'));
+  card.append(el('p', 'kos-hint', `${one ? 'This goes' : 'These go'} on your organiser, your sheet of what to know for this unit.`));
+  const ul = el('ul', 'kos-end__list');
+  for (const item of items) {
+    const li = el('li');
+    li.append(el('span', 'kos-end__from', item.section), el('span', undefined, item.text));
+    ul.append(li);
+  }
+  card.append(ul);
+  if (joining) card.append(el('p', 'kos-hint', done ? 'It’s in your practice now, so you’ll get asked this on a later day.'.replace('It’s', one ? 'It’s' : 'They’re').replace('this', one ? 'this' : 'these') : `Tick this lesson off below and ${one ? 'it becomes a practice card' : 'they become practice cards'}.`));
   const path = `/s/classes/${encodeURIComponent(classId)}/profile?tab=organiser${from ? `&from=${encodeURIComponent(from)}` : ''}`;
   const open = studentAnchor(path, 'kos-btn kos-btn--primary', 'Open my organiser');
   open.style.display = 'inline-flex';

@@ -25,7 +25,7 @@ export function hasStarted(studentId, lessonId, { quizzes, work, done }) {
     || Boolean(work.find((w) => w.lesson_id === lessonId)?.students?.[studentId]);
 }
 
-function inTutorial(lesson, classId, studentId) {
+export function inTutorial(lesson, classId, studentId) {
   const t = lesson.pedagogical_mode === 'tutorial' ? lesson.tutorial : null;
   return t?.class_id === classId && (t.groups ?? []).some((g) => g?.students?.includes(studentId));
 }

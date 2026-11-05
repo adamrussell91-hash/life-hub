@@ -86,6 +86,13 @@
 /* Practice */
 .kos-card { background: var(--ko-card); border: 1px solid var(--ko-line); border-radius: var(--ko-r); padding: 20px; display: grid; gap: 12px; max-width: 560px; width: 100%; margin: 0 auto; }
 .kos-card__from { margin: 0; font-size: 12px; font-weight: 600; color: var(--ko-muted); }
+.kos-card__top { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-start; justify-content: space-between; }
+.kos-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.kos-hist__item { display: grid; justify-items: center; gap: 2px; }
+.kos-hist__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ko-success); }
+.kos-hist__item.is-miss .kos-hist__dot { background: #b3432f; }
+.kos-hist__day { font-size: 10px; line-height: 1; color: var(--ko-muted); white-space: nowrap; }
+.kos-btn--notyet { border-color: #b3432f; color: #8f3424; }
 .kos-card__cue { margin: 0; font-size: 18px; font-weight: 600; color: var(--ko-navy); line-height: 1.35; }
 .kos-card__answer { margin: 0; font-size: 16px; font-weight: 500; color: var(--ko-wave); }
 .kos-card__more { display: grid; gap: 2px; font-size: 13px; }
@@ -98,24 +105,46 @@
 /* End of lesson */
 .kos-end { background: #fff; border: 1px solid rgba(23, 55, 94, 0.14); border-left: 4px solid var(--ko-wave, #376fb7); border-radius: 0.875rem; padding: 14px 16px; display: grid; gap: 10px; margin: 16px 0; color: #13233a; max-width: 100%; }
 .kos-end h3 { margin: 0; font-size: 16px; color: #17375e; }
-.kos-end ul { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.kos-end__list { list-style: none; margin: 0; padding: 0; font-size: 14px; display: grid; gap: 8px; }
+.kos-end__from { display: block; font-size: 12px; font-weight: 600; color: var(--ko-muted, #6b7788); }
 .kos-root[hidden] { display: none; }
+
+/* Practice sits at the top of the organiser: today's set, then the five boxes. */
+.kos-leitner { display: grid; gap: 8px; min-width: 0; }
+.kos-boxes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.kos-box { background: #fff; border: 1px solid var(--ko-line); border-radius: 10px; padding: 8px 4px; display: grid; justify-items: center; gap: 1px; text-align: center; min-width: 0; }
+.kos-box__n { font-size: 20px; line-height: 1.15; color: var(--ko-navy); }
+.kos-box__name { font-size: 12px; font-weight: 600; color: var(--ko-navy); }
+.kos-box__gap { font-size: 11px; line-height: 1.2; color: var(--ko-muted); }
+
+/* Everything on the sheet starts closed. */
+.kos-fold__head { min-height: 40px; display: block; cursor: pointer; list-style: none; position: relative; padding-right: 24px; }
+.kos-fold__head::-webkit-details-marker { display: none; }
+.kos-fold__head::after { content: ""; position: absolute; right: 6px; top: 8px; width: 8px; height: 8px; border-right: 2px solid var(--ko-muted); border-bottom: 2px solid var(--ko-muted); transform: rotate(45deg); transition: transform .15s; }
+.kos-fold[open] > .kos-fold__head::after { transform: rotate(-135deg); top: 12px; }
+.kos-fold__head:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 2px; border-radius: 6px; }
+.kos-fold__name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.kos-fold__count { font-size: 12.5px; color: var(--ko-muted); }
 
 /* The organiser as it has grown: concept cards on the left, facts and words on the right. */
 .kos-sheet { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 12px; align-items: start; }
 .kos-column { display: grid; gap: 8px; min-width: 0; }
 .kos-concept { --c: var(--ko-wave); background: #fff; border: 1px solid var(--ko-line); border-left: 4px solid var(--c); border-radius: 12px; padding: 8px 12px 6px; min-width: 0; }
 .kos-capsule { background: var(--c); color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600; }
-.kos-concept__line { margin: 3px 0 0; font-weight: 550; color: var(--ko-navy); }
+.kos-concept__line { display: block; margin: 3px 0 0; font-weight: 550; color: var(--ko-navy); }
 .kos-stops { margin: 5px 0 2px 6px; padding-left: 22px; position: relative; }
 .kos-stops::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 6px; width: 3px; border-radius: 3px; background: var(--c); }
 .kos-stop { position: relative; padding: 4px 0; }
 .kos-stop::before { content: ""; position: absolute; left: -27px; top: 8px; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 3px solid var(--c); }
 .kos-stop.is-new::before { background: var(--c); }
 .kos-panel { background: #fff; border: 1px solid var(--ko-line); border-radius: 12px; padding: 8px 12px; min-width: 0; }
-.kos-panel__name { margin: 0 0 4px; font-size: 14.5px; color: var(--ko-navy); }
+.kos-panel__name { font-size: 14.5px; font-weight: 600; color: var(--ko-navy); }
 .kos-pair { padding: 4px 0; border-top: 1px solid var(--ko-line); overflow-wrap: anywhere; }
 .kos-pair b { color: var(--ko-navy); margin-right: 6px; }
+.kos-pair > summary { min-height: 32px; display: flex; align-items: center; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.kos-pair > summary::-webkit-details-marker { display: none; }
+.kos-pair > summary:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 1px; }
+.kos-pair__body { padding: 2px 0 6px; }
 .kos-tier { margin: 7px 0 2px; font-size: 11.5px; font-weight: 600; color: var(--ko-navy); }
 .kos-foot { display: flex; justify-content: flex-end; }
 .kos-quiet { background: none; border: 0; padding: 3px 7px; border-radius: 6px; font: inherit; font-size: 12.5px; color: var(--ko-muted); cursor: pointer; }

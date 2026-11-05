@@ -13,10 +13,12 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { claimFor, loadRoster } from './class-claims.mjs';
 import { workOwner } from './lesson-work.mjs';
 import { read } from './question-drop.mjs';
+import { inTutorial, isSideLesson } from './lesson-assign.mjs';
+import { doneAmong } from './profile-done.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { CLASS_PREFIX, SCHEDULED_LESSON_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import {
-  OrganiserError, REVIEW_LIMIT, applyChange, applyResult, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
+  OrganiserError, REVIEW_LIMIT, applyChange, applyResult, buildCards, joinedSections, lessonsOfLine, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
 } from './organiser-model.mjs';
 
 export { OrganiserError };
@@ -82,12 +84,12 @@ export async function lessonReleases(store, lessonIds, { classId = null, today, 
     const publishDay = typeof at === 'string' && !Number.isNaN(Date.parse(at)) ? sydneyDay(at) : null;
     const classDay = classId ? schedule.get(`${classId}|${id}`) ?? null : null;
     const day = [publishDay, classDay].filter(Boolean).sort().pop() ?? null;
-    out[id] = !day || day <= day0 ? { state: 'released', day } : { state: 'waiting' };
+    out[id] = !day || day <= day0 ? { state: 'released', day, lesson: draft } : { state: 'waiting' };
   });
   return out;
 }
 
-const lessonIdsOf = (organiser) => (organiser?.sections ?? []).flatMap((s) => s.lines.map((l) => l.lesson_id)).filter(Boolean);
+const lessonIdsOf = (organiser) => (organiser?.sections ?? []).flatMap((s) => s.lines.flatMap(lessonsOfLine));
 
 async function liveUnit(store, unitId) {
   const unit = isSafeId(unitId) ? await read(store, unitKey(unitId)) : null;
@@ -107,7 +109,8 @@ async function teacherStatus(store, unitId, organiser, today) {
   const status = {};
   for (const section of organiser.sections) {
     for (const line of section.lines) {
-      const states = line.lesson_id ? per.map((p) => p[line.lesson_id]?.state ?? 'gone') : [line.open ? 'released' : 'waiting'];
+      const ticked = lessonsOfLine(line);
+      const states = ticked.length ? per.flatMap((p) => ticked.map((id) => p[id]?.state ?? 'gone')) : [line.open ? 'released' : 'waiting'];
       status[line.id] = states.includes('released') ? 'released' : states.every((s) => s === 'gone') ? 'lesson_gone' : 'waiting';
     }
   }
@@ -151,8 +154,29 @@ export async function organiserTeacherAction(store, unitId, method, body = {}, {
 
 // ---- Student ---------------------------------------------------------------------------------
 
-/** The class's units that have a sheet, current first, with what the class may see of each. */
-async function classSheets(store, cls, today) {
+/**
+ * Who is looking: side lesson lines go only to students that lesson is for, and `done` (filled in by
+ * classSheets) holds the lessons they have ticked off. A class with no list has nobody to sort, so sees all.
+ */
+async function viewerOf(store, roster, student) {
+  const took = student ? (await read(store, `markbook/${roster.cls.id}`))?.took?.[student.id] : null;
+  return { student, took: new Set(took ?? []), done: new Set(), everyone: !roster.students.length };
+}
+
+/** A released side lesson counts as waiting for anyone it is not for. */
+function releasesFor(viewer, releases, unit, classId) {
+  if (viewer.everyone) return releases;
+  const out = {};
+  for (const [id, release] of Object.entries(releases)) {
+    const forThem = release.state !== 'released' || !isSideLesson(unit, release.lesson)
+      || (viewer.student && (viewer.took.has(id) || viewer.done.has(id) || inTutorial(release.lesson, classId, viewer.student.id)));
+    out[id] = forThem ? release : { state: 'waiting' };
+  }
+  return out;
+}
+
+/** The class's units that have a sheet, current first, with what this viewer may see of each. */
+async function classSheets(store, cls, today, viewer) {
   const dates = await scheduleDates(store, [cls.id]);
   const ids = [...new Set([cls.current_unit_id, ...(cls.active_unit_ids ?? [])])].filter((id) => isSafeId(id));
   const sheets = [];
@@ -161,8 +185,10 @@ async function classSheets(store, cls, today) {
     if (!unit) continue;
     const organiser = await read(store, organiserKey(unitId));
     if (!organiser?.sections?.length) continue;
-    const releases = await lessonReleases(store, lessonIdsOf(organiser), { classId: cls.id, today, dates });
-    const sheet = releasedSheet(organiser, releases, today);
+    const ticked = lessonIdsOf(organiser);
+    if (viewer.student) for (const id of await doneAmong(store, cls.id, viewer.student.id, ticked)) viewer.done.add(id);
+    const releases = await lessonReleases(store, ticked, { classId: cls.id, today, dates });
+    const sheet = releasedSheet(organiser, releasesFor(viewer, releases, unit, cls.id), today);
     // The claim a piece builds, for the back of a card.
     const builds = new Map();
     for (const du of unit.deep_understandings ?? []) {
@@ -173,11 +199,12 @@ async function classSheets(store, cls, today) {
   return sheets;
 }
 
-const allCards = (sheets) => sheets.flatMap((s) => buildCards(s.internal.sections, s.builds));
+/** A student's whole deck: the lines of the lessons they have ticked off. */
+const deck = (sheets, done) => sheets.flatMap((s) => buildCards(joinedSections(s.internal.sections, done), s.builds));
 
-function practiceFor(sheets, boxes, today) {
-  const { cards, next } = todaysCards(allCards(sheets), boxes, today);
-  return { today: cards.length, cards, next };
+function practiceFor(sheets, done, boxes, today) {
+  const { cards, next, boxes: counts } = todaysCards(deck(sheets, done), boxes, today);
+  return { today: cards.length, cards, next, boxes: counts };
 }
 
 async function readBoxes(store, cls, student) {
@@ -185,9 +212,9 @@ async function readBoxes(store, cls, student) {
   return { boxes: held.data?.boxes && typeof held.data.boxes === 'object' ? held.data.boxes : {}, etag: held.etag, exists: !!held.data };
 }
 
-async function review(store, roster, student, sheets, results, now, today) {
+async function review(store, roster, student, sheets, done, results, now, today) {
   const cls = roster.cls.id;
-  const eligible = new Set(allCards(sheets).map((c) => c.line_id));
+  const eligible = new Set(deck(sheets, done).map((c) => c.line_id));
   const known = new Set(sheets.flatMap((s) => s.all.sections.flatMap((x) => x.lines.map((l) => l.id))));
   const moves = results.filter((r) => r && typeof r.line_id === 'string' && eligible.has(r.line_id) && (r.result === 'got' || r.result === 'again'));
   const key = practiceKey(cls, workOwner(cls, student.id));
@@ -204,8 +231,8 @@ async function review(store, roster, student, sheets, results, now, today) {
     if (written?.modified !== false) break;
     if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
   }
-  const { cards, next } = todaysCards(allCards(sheets), boxes, today);
-  return { today: cards.length, next };
+  const { cards, next, boxes: counts } = todaysCards(deck(sheets, done), boxes, today);
+  return { today: cards.length, next, boxes: counts };
 }
 
 /**
@@ -220,26 +247,28 @@ export async function organiserStudentAction(store, classId, body, { now = new D
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const today = sydneyDay(now);
   const student = await claimFor(store, roster, body.class_token);
+  const viewer = await viewerOf(store, roster, student);
 
   if (action === 'review') {
     if (!student) reject(403, 'need_initials', 'Type your initials first.');
     if (!Array.isArray(body.results)) reject(400, 'bad_request', 'Invalid request.');
     if (body.results.length > REVIEW_LIMIT) reject(400, 'too_many', `Send up to ${REVIEW_LIMIT} answers at a time.`);
-    return review(store, roster, student, await classSheets(store, roster.cls, today), body.results, now, today);
+    const held = await classSheets(store, roster.cls, today, viewer);
+    return review(store, roster, student, held, viewer.done, body.results, now, today);
   }
 
-  const sheets = await classSheets(store, roster.cls, today);
+  const sheets = await classSheets(store, roster.cls, today, viewer);
   if (action === 'lesson') {
     if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
-    const mine = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_id === body.lesson_id && lineText(x, l)).map((l) => ({ line: l, section: x }))));
-    // Only a line that makes a card joins practice, and only a line released today is news.
-    const joining = mine.some(({ line, section }) => line.released_on === today && buildCards([{ ...section, lines: [line] }]).length > 0);
-    return { lines: mine.map(({ line, section }) => lineText(section, line)), joining };
+    const mine = sheets.flatMap((s) => s.internal.sections.flatMap((x) => x.lines.filter((l) => l.lesson_ids?.includes(body.lesson_id) && lineText(x, l)).map((l) => ({ line: l, section: x }))));
+    // Only a line that makes a card joins practice, and it joins when this student ticks the lesson off.
+    const joining = mine.some(({ line, section }) => buildCards([{ ...section, lines: [line] }]).length > 0);
+    return { items: mine.map(({ line, section }) => ({ section: section.name, text: lineText(section, line) })), joining, done: viewer.done.has(body.lesson_id) };
   }
 
   const need = student ? null : roster.students.length ? 'initials' : 'no_list';
   let practice = null;
-  if (student) practice = practiceFor(sheets, (await readBoxes(store, roster.cls.id, student)).boxes, today);
+  if (student) practice = practiceFor(sheets, viewer.done, (await readBoxes(store, roster.cls.id, student)).boxes, today);
   return {
     need,
     sheets: sheets.map((s) => ({ unit_id: s.unit_id, title: s.title, current: s.current, ...studentSheet(s.internal) })),

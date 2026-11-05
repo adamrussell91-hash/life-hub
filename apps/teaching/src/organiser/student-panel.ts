@@ -21,6 +21,8 @@ function weekday(date: string): string {
 }
 
 const minutesFor = (n: number): number => Math.max(1, Math.round((n * 2) / 3));
+/** How often each box comes round, as the server's GAPS. */
+const BOX_GAPS = ['every day', 'every 3 days', 'every week', 'every 2 weeks', 'every 4 weeks'];
 
 export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPanelOptions): HTMLElement {
   const root = el('div', 'kos-root');
@@ -66,12 +68,21 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
 
   const newMark = (line: SheetLine): HTMLElement[] => (line.fresh ? [el('span', 'kos-new', 'New')] : []);
 
+  /** What a closed fold says: how many lines, and how many are new. */
+  function foldCount(sec: SheetSection): HTMLElement {
+    const fresh = sec.lines.filter((l) => l.fresh).length;
+    return el('span', 'kos-fold__count', `${sec.lines.length} ${sec.lines.length === 1 ? 'line' : 'lines'}${fresh ? `, ${fresh} new` : ''}`);
+  }
+
   function conceptCard(sec: SheetSection, at: number): HTMLElement {
-    const card = el('article', 'kos-concept');
+    const card = el('details', 'kos-concept kos-fold');
     card.style.setProperty('--c', conceptColourAt(at));
     card.dataset.sec = sec.id;
-    card.append(el('span', 'kos-capsule', sec.name));
-    if (sec.sentence) card.append(el('p', 'kos-concept__line', sec.sentence));
+    const head = el('summary', 'kos-fold__head');
+    const name = el('span', 'kos-fold__name');
+    name.append(el('span', 'kos-capsule', sec.name), foldCount(sec));
+    head.append(name);
+    if (sec.sentence) head.append(el('span', 'kos-concept__line', sec.sentence));
     const stops = el('div', 'kos-stops');
     for (const line of sec.lines) {
       const stop = el('div', `kos-stop${line.fresh ? ' is-new' : ''}`, lineWords(sec, line).body);
@@ -80,19 +91,30 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
     }
     const foot = el('div', 'kos-foot');
     foot.append(testToggle(sec, card));
-    card.append(stops, foot);
+    card.append(head, stops, foot);
     return card;
   }
 
   function sidePanel(sec: SheetSection): HTMLElement {
-    const box = el('section', 'kos-panel');
+    const box = el('details', 'kos-panel kos-fold');
     box.dataset.sec = sec.id;
-    box.append(el('h3', 'kos-panel__name', sec.name));
+    const head = el('summary', 'kos-fold__head');
+    const name = el('span', 'kos-fold__name');
+    name.append(el('span', 'kos-panel__name', sec.name), foldCount(sec));
+    head.append(name);
+    box.append(head);
     const row = (line: SheetLine): HTMLElement => {
-      const { head, body } = lineWords(sec, line);
-      const pair = el('div', 'kos-pair');
-      if (head) pair.append(el('b', undefined, head));
-      pair.append(document.createTextNode(body), ...newMark(line));
+      const { head: word, body } = lineWords(sec, line);
+      if (!word) {
+        const plain = el('div', 'kos-pair');
+        plain.append(document.createTextNode(body), ...newMark(line));
+        return plain;
+      }
+      // A long list reads as short rows; the meaning opens under the word.
+      const pair = el('details', 'kos-pair');
+      const name = el('summary');
+      name.append(el('b', undefined, word), ...newMark(line));
+      pair.append(name, el('div', 'kos-pair__body', body));
       return pair;
     };
     if (sec.role === 'vocab') {
@@ -109,6 +131,38 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
     foot.append(testToggle(sec, box));
     box.append(foot);
     return box;
+  }
+
+  /** Today's set and how many cards sit in each Leitner box. */
+  function practiceBlock(prac: NonNullable<OrganiserLoad['practice']>): HTMLElement {
+    const block = el('section', 'kos-leitner');
+    block.setAttribute('aria-label', 'Practice');
+    const ready = prac.today > 0 && prac.cards.length > 0;
+    const bar = el('div', `kos-prac${ready ? '' : ' kos-prac--calm'}`);
+    const text = el('div');
+    text.append(
+      el('b', undefined, `Practise today: ${ready ? prac.today : 0}`),
+      el('span', undefined, ready ? `About ${minutesFor(prac.today)} ${minutesFor(prac.today) === 1 ? 'minute' : 'minutes'}. Ticking off a lesson adds its cards.` : nextCardsLine(prac.next))
+    );
+    bar.append(text);
+    if (ready) {
+      const start = el('button', 'kos-btn', 'Start');
+      start.type = 'button';
+      start.addEventListener('click', showPractice);
+      bar.append(start);
+    }
+    block.append(bar);
+    if (prac.boxes?.some((n) => n > 0)) {
+      const boxes = el('ol', 'kos-boxes');
+      prac.boxes.forEach((n, at) => {
+        const box = el('li', 'kos-box');
+        box.append(el('b', 'kos-box__n', String(n)), el('span', 'kos-box__name', `Box ${at + 1}`), el('span', 'kos-box__gap', BOX_GAPS[at] ?? ''));
+        box.setAttribute('aria-label', `Box ${at + 1}: ${n} ${n === 1 ? 'card' : 'cards'}, ${BOX_GAPS[at] ?? ''}`);
+        boxes.append(box);
+      });
+      block.append(boxes);
+    }
+    return block;
   }
 
   function showOverview(): void {
@@ -143,25 +197,7 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
       parts.push(banner);
     }
 
-    const prac = load.practice;
-    if (prac && load.need !== 'no_list') {
-      if (prac.today > 0 && prac.cards.length) {
-        const box = el('div', 'kos-prac');
-        const text = el('div');
-        text.append(el('b', undefined, `Practise: ${prac.today} today`), el('span', undefined, `About ${minutesFor(prac.today)} minutes. New lines join after each lesson.`));
-        const start = el('button', 'kos-btn', 'Start');
-        start.type = 'button';
-        start.addEventListener('click', showPractice);
-        box.append(text, start);
-        parts.push(box);
-      } else {
-        const box = el('div', 'kos-prac kos-prac--calm');
-        const text = el('div');
-        text.append(el('b', undefined, 'Practise: 0 today'), el('span', undefined, nextCardsLine(prac.next)));
-        box.append(text);
-        parts.push(box);
-      }
-    }
+    if (load.practice && load.need !== 'no_list') parts.push(practiceBlock(load.practice));
 
     const grid = el('div', 'kos-sheet');
     const left = el('div', 'kos-column');

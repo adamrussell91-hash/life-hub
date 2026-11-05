@@ -84,11 +84,9 @@ export type LessonRelevance = { pieces: readonly string[]; text: string };
 export function lineIsRelevant(
   section: Pick<OrganiserSection, 'kind' | 'columns' | 'role'>,
   line: OrganiserSection['lines'][number],
-  relevance: LessonRelevance,
-  claimedElsewhere: boolean
+  relevance: LessonRelevance
 ): boolean {
   if (line.piece_id && relevance.pieces.includes(line.piece_id)) return true;
-  if (claimedElsewhere) return false;
   const label = lineWords(section, line).head.toLowerCase();
   if (label.length < 3) return false;
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
