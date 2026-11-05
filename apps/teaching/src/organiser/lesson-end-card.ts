@@ -53,7 +53,11 @@ export async function mountOrganiserEndCard(content: HTMLElement, options: EndCa
     ul.append(li);
   }
   card.append(ul);
-  if (joining) card.append(el('p', 'kos-hint', done ? 'It’s in your practice now, so you’ll get asked this on a later day.'.replace('It’s', one ? 'It’s' : 'They’re').replace('this', one ? 'this' : 'these') : `Tick this lesson off below and ${one ? 'it becomes a practice card' : 'they become practice cards'}.`));
+  if (joining) {
+    const later = one ? 'It’s in your practice now.' : 'They’re in your practice now.';
+    const ask = one ? 'it becomes a practice card' : 'they become practice cards';
+    card.append(el('p', 'kos-hint', done ? later : `Tick this lesson off below and ${ask}.`));
+  }
   const path = `/s/classes/${encodeURIComponent(classId)}/profile?tab=organiser${from ? `&from=${encodeURIComponent(from)}` : ''}`;
   const open = studentAnchor(path, 'kos-btn kos-btn--primary', 'Open my organiser');
   open.style.display = 'inline-flex';

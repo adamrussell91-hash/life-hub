@@ -56,7 +56,7 @@ describe('organiser panel', () => {
   });
   it('shows the practice block with a count and the banner wording', () => {
     const p = renderOrganiserPanel(loadOf({ sheets: [sheet({ week: { section_id: 's1', section_name: 'Key ideas', due: '2026-11-13', reason: 'the Week 3 Review' } })] }), { classId: 'c1' });
-    expect(p.querySelector('.kos-prac b')!.textContent).toBe('Practise: 2 today');
+    expect(p.querySelector('.kos-prac b')!.textContent).toBe('Practise today: 2');
     expect(p.querySelector('.kos-set')!.textContent).toBe('This week: Key ideas, by Friday, for the Week 3 Review.');
     expect(p.querySelector('.kos-prac .kos-btn')!.textContent).toBe('Start');
   });
@@ -124,7 +124,7 @@ describe('practice', () => {
     byText(host, 'button', 'Show answer').click();
     click(host, `[data-result="${which}"]`);
   };
-  it('shows the back with builds, and Again brings the card round again', async () => {
+  it('shows the back with builds, and Not yet does not bring the card back today', async () => {
     const review = vi.fn().mockResolvedValue({ today: 1, next: { date: '2026-11-12', count: 3 } });
     const host = document.createElement('div');
     const h = mountPractice(host, { classId: 'c1', load: { today: 2, cards, next: null }, api: { review } });
@@ -135,11 +135,8 @@ describe('practice', () => {
     click(host, '[data-result="again"]');
     expect(host.textContent).toContain('Prompt B');
     answer(host, 'got');
-    expect(host.textContent).toContain('Prompt A');
-    expect(host.textContent).toContain('1 to go today');
-    answer(host, 'got');
     await h.settled();
-    expect(review.mock.calls.map((c) => c[1])).toEqual([[{ line_id: 'a', result: 'again' }], [{ line_id: 'b', result: 'got' }], [{ line_id: 'a', result: 'got' }]]);
+    expect(review.mock.calls.map((c) => c[1])).toEqual([[{ line_id: 'a', result: 'again' }], [{ line_id: 'b', result: 'got' }]]);
     expect(host.textContent).toContain('All done for today');
     expect(host.textContent).toContain('3 cards come on Thursday');
     expect(readPending('c1')).toEqual([]);
@@ -167,19 +164,38 @@ describe('practice', () => {
   });
 });
 
+describe('practice boxes and history', () => {
+  it('shows a count for each box at the top, and everything on the sheet starts closed', () => {
+    const p = renderOrganiserPanel(loadOf({ practice: { today: 2, cards, next: null, boxes: [4, 3, 2, 1, 0] } }), { classId: 'c1' });
+    expect([...p.querySelectorAll('.kos-box__n')].map((n) => n.textContent)).toEqual(['4', '3', '2', '1', '0']);
+    expect(p.querySelector('.kos-leitner')!.compareDocumentPosition(p.querySelector('.kos-sheet')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(p.querySelectorAll('details.kos-fold').length).toBeGreaterThan(0);
+    expect(p.querySelectorAll('details[open]')).toHaveLength(0);
+  });
+  it('shows green and red circles with dates on a card', () => {
+    const host = document.createElement('div');
+    mountPractice(host, { classId: 'c1', load: { today: 1, cards: [{ ...cards[0]!, box: 2, history: [{ d: '2026-11-03', ok: false }, { d: '2026-11-04', ok: true }] }], next: null }, api: { review: vi.fn() } });
+    expect(host.querySelector('.kos-card__from')!.textContent).toBe('Key ideas · Box 2');
+    expect([...host.querySelectorAll('.kos-hist__item')].map((n) => n.className.includes('is-got'))).toEqual([false, true]);
+    expect(host.querySelector('.kos-hist__day')!.textContent).toBe('3 Nov');
+  });
+});
+
 describe('lesson end card', () => {
   it('adds a card with a link to the organiser tab', async () => {
     const content = document.createElement('div');
     const footer = document.createElement('div');
     content.append(footer);
-    await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ lines: ['Line one', 'Line two'], joining: true }) } });
+    await mountOrganiserEndCard(content, { lessonId: 'l1', classId: 'c1', from: '/s/classes/c1/lessons/l1', before: footer, api: { lesson: async () => ({ items: [{ section: 'Perspective', text: 'Line one' }, { section: 'Vocabulary', text: 'Line two' }], joining: true }) } });
     expect(content.firstElementChild!.className).toBe('kos-end');
-    expect(content.textContent).toContain('From this lesson: 2 new lines');
+    expect(content.textContent).toContain('What to remember from this lesson');
+    expect(content.querySelector('.kos-end__from')!.textContent).toBe('Perspective');
+    expect(content.textContent).toContain('Tick this lesson off below and they become practice cards.');
     expect(content.querySelector('a')!.getAttribute('href')).toContain('/s/classes/c1/profile?tab=organiser');
   });
   it('adds nothing when there are no lines or the call fails', async () => {
     const a = document.createElement('div');
-    await mountOrganiserEndCard(a, { lessonId: 'l1', classId: 'c1', api: { lesson: async () => ({ lines: [] }) } });
+    await mountOrganiserEndCard(a, { lessonId: 'l1', classId: 'c1', api: { lesson: async () => ({ items: [] }) } });
     const b = document.createElement('div');
     await mountOrganiserEndCard(b, { lessonId: 'l1', classId: 'c1', api: { lesson: async () => Promise.reject(new Error('x')) } });
     expect(a.childElementCount + b.childElementCount).toBe(0);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 import { OrganiserError, organiserStudentAction, organiserTeacherAction } from '../../netlify/functions/_shared/organiser.mjs';
+import { recordDone } from '../../netlify/functions/_shared/profile-done.mjs';
 import { ORGANISER_LIMITS } from '../../netlify/functions/_shared/organiser-model.mjs';
 
 // Store with etags, so the teacher endpoint's compare-and-set is exercised.
@@ -58,6 +59,11 @@ async function fixture(extra = []) {
 
 const teacher = (store, body, method = 'POST') => organiserTeacherAction(store, 'unit1', method, body, { now: NOW });
 const student = (store, body) => organiserStudentAction(store, 'class1', body, { now: NOW });
+/** The claimed student ticks a lesson off. */
+const tickOff = async (store, ...lessons) => {
+  const roster = await loadRoster(store, 'class1');
+  for (const id of lessons) for (const s of roster.students) await recordDone(store, 'class1', s.id, id, 'tick');
+};
 
 async function seeded(store) {
   let out = await teacher(store, { op: 'add_section', name: 'Words', kind: 'table', columns: [{ label: 'Term' }, { label: 'Meaning', hide: true }] });
@@ -148,13 +154,13 @@ test('student load: only released lines; unreleased text is absent from the resp
   // The skipped row doesn't count as a date, so the undated lesson stays released.
   assert.deepEqual(sheet.sections[0].lines.map((l) => l.cells[0]), ['past term', SECRET.nodate, 'free term']);
   const sent = JSON.stringify(out);
-  for (const text of [SECRET.future, SECRET.unpub, SECRET.gone, 'x"', 'FUTURE']) assert.equal(sent.includes(text), false, text);
+  for (const text of [SECRET.future, SECRET.unpub, SECRET.gone, '"x"', 'FUTURE']) assert.equal(sent.includes(text), false, text);
 });
 
 test('student load: no piece or lesson ids, but the big idea rides on the card', async () => {
   const store = await fixture();
   const { lines } = await seeded(store);
-  // Day after release: the lesson was published 1 Nov, class date 3 Nov.
+  await tickOff(store, 'past');
   const out = await student(store, { action: 'load', class_token: token(1) });
   const sent = JSON.stringify(out);
   for (const id of ['kp_rain', '"past"', 'lesson_id', 'piece_id', 'released_on', 'unit_organisers']) assert.equal(sent.includes(id), false, id);
@@ -182,13 +188,49 @@ test('student load: no claim shows the sheet without practice; a class with no l
   assert.equal(none.sheets.length, 1);
 });
 
-test('student load: the line released today joins practice tomorrow, and is fresh', async () => {
+test('practice holds only lessons the student ticked off, as soon as they tick', async () => {
   const store = await fixture([row('r7', 'nodate', '2026-11-10')]);
   await seeded(store);
-  const out = await student(store, { action: 'load', class_token: token(1) });
+  let out = await student(store, { action: 'load', class_token: token(1) });
   assert.equal(out.sheets[0].sections[0].lines.find((l) => l.cells[0] === SECRET.nodate).fresh, true);
   assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), false);
-  assert.deepEqual(out.practice.next, { date: '2026-11-11', count: 1 });
+  await tickOff(store, 'nodate');
+  out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), true);
+  assert.equal(out.practice.boxes[0], out.practice.cards.length);
+});
+
+test('side lesson lines reach only the students that lesson is for', async () => {
+  const store = await fixture([...lesson('side', { route_role: 'support' })]);
+  let out = await teacher(store, { op: 'add_section', name: 'Words', kind: 'table', columns: [{ label: 'Term' }, { label: 'Meaning', hide: true }] });
+  await teacher(store, { op: 'add_lines', section_id: out.organiser.sections[0].id, lines: [{ cells: ['side term', 'side meaning'], lesson_id: 'side' }] });
+  assert.equal(JSON.stringify(await student(store, { action: 'load', class_token: token(1) })).includes('side term'), false);
+  assert.equal(JSON.stringify(await student(store, { action: 'load' })).includes('side term'), false);
+  const roster = await loadRoster(store, 'class1');
+  const claimed = roster.students[0].id;
+  store.data.set('markbook/class1', { took: { [claimed]: ['side'] } });
+  out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(JSON.stringify(out.sheets).includes('side term'), true);
+  assert.equal(JSON.stringify(await student(store, { action: 'load' })).includes('side term'), false);
+});
+
+test('several lessons can tick a line, and it goes out with the first one released', async () => {
+  const store = await fixture();
+  const { sid } = await seeded(store);
+  let out = await teacher(store, { op: 'add_lines', section_id: sid, lines: [{ cells: ['shared', 'both'], lesson_id: 'future' }] });
+  const line = out.organiser.sections[0].lines.at(-1);
+  assert.equal(out.status[line.id], 'waiting');
+  out = await teacher(store, { op: 'update_line', line_id: line.id, add_lesson_id: 'past' });
+  assert.equal(out.status[line.id], 'released');
+  assert.deepEqual([out.organiser.sections[0].lines.at(-1).lesson_id, out.organiser.sections[0].lines.at(-1).also_lesson_ids], ['future', ['past']]);
+  assert.ok((await student(store, { action: 'lesson', lesson_id: 'past' })).items.some((i) => i.text.startsWith('shared')));
+  assert.deepEqual((await student(store, { action: 'lesson', lesson_id: 'future' })).items, []);
+  out = await teacher(store, { op: 'update_line', line_id: line.id, remove_lesson_id: 'future' });
+  const moved = out.organiser.sections[0].lines.at(-1);
+  assert.deepEqual([moved.lesson_id, moved.also_lesson_ids], ['past', undefined]);
+  out = await teacher(store, { op: 'update_line', line_id: line.id, remove_lesson_id: 'past' });
+  assert.equal(out.organiser.sections[0].lines.at(-1).lesson_id, undefined);
+  assert.equal(out.status[line.id], 'waiting');
 });
 
 test('student load: a trashed unit gives nothing', async () => {
@@ -209,24 +251,24 @@ test('student load: the week banner appears with its section name and goes the d
   assert.equal(later.sheets[0].week, undefined);
 });
 
-test('review: needs a claim, moves boxes on the server, once a day', async () => {
+test('review: needs a claim, moves boxes on the server, once a day, and Not yet waits for tomorrow', async () => {
   const store = await fixture();
   const { lines } = await seeded(store);
+  await tickOff(store, 'past');
   const past = lines[0].id;
   await assert.rejects(student(store, { action: 'review', class_token: token(9), results: [{ line_id: past, result: 'got' }] }), (e) => e.status === 403 && e.code === 'need_initials');
 
   let out = await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'got' }] });
-  assert.equal(out.today, 2); // the other two released cards are left
+  const left = out.today;
   const key = [...store.data.keys()].find((k) => k.startsWith('organiser_practice/class1/'));
-  assert.deepEqual(store.data.get(key).boxes[past], { box: 2, due: '2026-11-13', last: '2026-11-10' });
+  assert.deepEqual(store.data.get(key).boxes[past], { box: 2, due: '2026-11-13', last: '2026-11-10', h: [{ d: '2026-11-10', ok: true }] });
   // A resend the same day changes nothing.
   await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'got' }] });
   assert.equal(store.data.get(key).boxes[past].box, 2);
-  // Again repeats it today; Got it on the repeat keeps box 1.
+  // Not yet sends it to box 1 for tomorrow; it does not come back today.
   out = await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'again' }] });
-  assert.equal(out.today, 3);
-  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'got' }] });
-  assert.deepEqual(store.data.get(key).boxes[past], { box: 1, due: '2026-11-11', last: '2026-11-10' });
+  assert.equal(out.today, left);
+  assert.deepEqual(store.data.get(key).boxes[past], { box: 1, due: '2026-11-11', last: '2026-11-10', h: [{ d: '2026-11-10', ok: false }] });
   assert.equal(JSON.stringify(store.data.get(key)).includes('past term'), false);
 });
 
@@ -249,6 +291,7 @@ test('review: unknown, unreleased and non-card line ids are ignored; 40 is the l
 test('review: a withdrawn line keeps its box; a deleted line drops out', async () => {
   const store = await fixture();
   const { lines } = await seeded(store);
+  await tickOff(store, 'past');
   await student(store, { action: 'review', class_token: token(1), results: [{ line_id: lines[0].id, result: 'got' }, { line_id: lines[3].id, result: 'got' }] });
   const key = [...store.data.keys()].find((k) => k.startsWith('organiser_practice/class1/'));
   // Unpublish the lesson: the line is withdrawn, not served, still boxed.
@@ -276,7 +319,7 @@ test('a line written on the sheet waits until a lesson ticks it, then goes out w
   assert.equal(out.status[line.id], 'released');
   const loaded = await student(store, {});
   assert.ok(loaded.sheets[0].sections[0].lines.some((l) => l.cells[0] === 'written ahead'));
-  assert.deepEqual((await student(store, { action: 'lesson', lesson_id: 'past' })).lines, ['past term: past meaning', 'written ahead: not yet']);
+  assert.deepEqual((await student(store, { action: 'lesson', lesson_id: 'past' })).items.map((i) => i.text), ['past term: past meaning', 'written ahead: not yet']);
 });
 
 test('a v1 sheet: lines with no lesson stay with students, and a tick then decides', async () => {
@@ -302,8 +345,10 @@ test('a v1 sheet: lines with no lesson stay with students, and a tick then decid
 test('lesson: what each released line from that lesson says, no claim needed', async () => {
   const store = await fixture();
   await seeded(store);
-  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { lines: ['past term: past meaning'], joining: false });
-  assert.deepEqual(await student(store, { action: 'lesson', lesson_id: 'future' }), { lines: [], joining: false });
+  assert.deepEqual(await student(store, { action: 'lesson', class_token: token(9), lesson_id: 'past' }), { items: [{ section: 'Words', text: 'past term: past meaning' }], joining: true, done: false });
+  assert.deepEqual(await student(store, { action: 'lesson', lesson_id: 'future' }), { items: [], joining: false, done: false });
+  await tickOff(store, 'past');
+  assert.equal((await student(store, { action: 'lesson', class_token: token(1), lesson_id: 'past' })).done, true);
   await assert.rejects(student(store, { action: 'lesson', lesson_id: '../x' }), (e) => e.status === 400);
 });
 
@@ -313,10 +358,11 @@ test('the daily cap and order reach the endpoint', async () => {
   const lines = Array.from({ length: 30 }, (_, i) => ({ cells: [`term ${i}`, `meaning ${i}`] }));
   out = await teacher(store, { op: 'add_lines', section_id: out.organiser.sections[0].id, lines: lines.slice(0, 30).map((l) => ({ ...l, lesson_id: 'nodate' })) });
   store.data.set('published/lessons/nodate', { lesson_id: 'nodate', unit_id: 'unit1', published_at: '2026-11-01T01:00:00Z' });
+  await tickOff(store, 'nodate');
   const load = await student(store, { action: 'load', class_token: token(1) });
-  assert.equal(load.practice.today, 20);
+  assert.equal(load.practice.today, 15);
   assert.equal(load.practice.cards[0].cue, 'term 0');
-  assert.deepEqual(load.practice.next, { date: '2026-11-11', count: 10 });
+  assert.deepEqual(load.practice.next, { date: '2026-11-11', count: 15 });
 });
 
 test('the student endpoint rejects bad bodies and unknown classes', async () => {

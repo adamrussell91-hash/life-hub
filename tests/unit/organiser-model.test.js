@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
+  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, joinedSections, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
 } from '../../netlify/functions/_shared/organiser-model.mjs';
 
 const T = '2026-11-10';
@@ -13,25 +13,27 @@ test('Sydney days and day arithmetic', () => {
   assert.equal(addDays('2026-03-01', -1), '2026-02-28');
 });
 
+const plain = ({ h: _h, ...rest }) => rest;
+
 test('each Leitner move', () => {
   assert.deepEqual(GAPS, [1, 3, 7, 14, 28]);
   // New card: Got it goes to box 2, due in 3 days.
-  assert.deepEqual(applyResult(undefined, 'got', T), { box: 2, due: '2026-11-13', last: T });
-  assert.deepEqual(applyResult({ box: 2, due: T, last: '2026-11-07' }, 'got', T), { box: 3, due: '2026-11-17', last: T });
-  assert.deepEqual(applyResult({ box: 3, due: T, last: '2026-11-03' }, 'got', T), { box: 4, due: '2026-11-24', last: T });
-  assert.deepEqual(applyResult({ box: 4, due: T, last: '2026-10-27' }, 'got', T), { box: 5, due: '2026-12-08', last: T });
-  // Again goes back to box 1 from anywhere, due today.
-  assert.deepEqual(applyResult(undefined, 'again', T), { box: 1, due: T, last: T });
-  assert.deepEqual(applyResult({ box: 4, due: T, last: '2026-11-01' }, 'again', T), { box: 1, due: T, last: T });
+  assert.deepEqual(plain(applyResult(undefined, 'got', T)), { box: 2, due: '2026-11-13', last: T });
+  assert.deepEqual(plain(applyResult({ box: 2, due: T, last: '2026-11-07' }, 'got', T)), { box: 3, due: '2026-11-17', last: T });
+  assert.deepEqual(plain(applyResult({ box: 3, due: T, last: '2026-11-03' }, 'got', T)), { box: 4, due: '2026-11-24', last: T });
+  assert.deepEqual(plain(applyResult({ box: 4, due: T, last: '2026-10-27' }, 'got', T)), { box: 5, due: '2026-12-08', last: T });
+  // Not yet goes back to box 1 from anywhere and comes back tomorrow, never today.
+  assert.deepEqual(plain(applyResult(undefined, 'again', T)), { box: 1, due: '2026-11-11', last: T });
+  assert.deepEqual(plain(applyResult({ box: 4, due: T, last: '2026-11-01' }, 'again', T)), { box: 1, due: '2026-11-11', last: T });
 });
 
 test('the top box stays at 5', () => {
-  assert.deepEqual(applyResult({ box: 5, due: T, last: '2026-10-01' }, 'got', T), { box: 5, due: '2026-12-08', last: T });
+  assert.deepEqual(plain(applyResult({ box: 5, due: T, last: '2026-10-01' }, 'got', T)), { box: 5, due: '2026-12-08', last: T });
 });
 
 test('Again then Got it keeps box 1, due tomorrow', () => {
   const again = applyResult({ box: 3, due: T, last: '2026-11-01' }, 'again', T);
-  assert.deepEqual(applyResult(again, 'got', T), { box: 1, due: '2026-11-11', last: T });
+  assert.deepEqual(plain(applyResult(again, 'got', T)), { box: 1, due: '2026-11-11', last: T });
 });
 
 test('a card moves up once a day: a resent Got it changes nothing', () => {
@@ -41,7 +43,7 @@ test('a card moves up once a day: a resent Got it changes nothing', () => {
 });
 
 test('late cards just wait and move up one box', () => {
-  assert.deepEqual(applyResult({ box: 2, due: '2026-10-01', last: '2026-09-28' }, 'got', T), { box: 3, due: '2026-11-17', last: T });
+  assert.deepEqual(plain(applyResult({ box: 2, due: '2026-10-01', last: '2026-09-28' }, 'got', T)), { box: 3, due: '2026-11-17', last: T });
 });
 
 const table = [{ id: 'c1', label: 'Term', hide: false }, { id: 'c2', label: 'Meaning', hide: true }, { id: 'c3', label: 'Example', hide: false }];
@@ -66,42 +68,62 @@ test('cards need a hidden and a shown column, and text on both sides', () => {
   assert.equal(buildCards([{ id: 's', name: 'L', kind: 'list', lines: [{ id: 'l', cells: ['x'] }] }]).length, 0);
 });
 
-test('a card joins the day after its release and carries its big idea', () => {
-  const sections = [{ id: 's', name: 'W', kind: 'table', columns: table, lines: [{ id: 'l', cells: ['a', 'b', 'c'], released_on: T, piece_id: 'kp_1' }] }];
+test('a card carries its big idea, its box and its history', () => {
+  const sections = [{ id: 's', name: 'W', kind: 'table', columns: table, lines: [{ id: 'l', cells: ['a', 'b', 'c'], piece_id: 'kp_1' }] }];
   const [card] = buildCards(sections, new Map([['kp_1', 'A big idea.']]));
-  assert.equal(card.from, '2026-11-11');
   assert.equal(card.builds, 'A big idea.');
-  assert.equal(todaysCards([card], {}, T).cards.length, 0);
-  assert.equal(todaysCards([card], {}, T).next.date, '2026-11-11');
-  const tomorrow = todaysCards([card], {}, '2026-11-11');
-  assert.equal(tomorrow.cards.length, 1);
-  assert.equal('from' in tomorrow.cards[0], false);
+  assert.equal(todaysCards([card], {}, T).cards[0].box, 1);
+  assert.deepEqual(todaysCards([card], {}, T).cards[0].history, []);
+  const yesterday = applyResult(undefined, 'again', '2026-11-09');
+  const [back] = todaysCards([card], { l: yesterday }, T).cards;
+  assert.deepEqual(back.history, [{ d: '2026-11-09', ok: false }]);
+  assert.equal(back.box, 1);
 });
 
-test('daily cap of 20: oldest due first, then new cards in sheet order', () => {
+test('the history keeps one result a day, newest last', () => {
+  const first = applyResult(undefined, 'got', '2026-11-09');
+  const second = applyResult(first, 'again', T);
+  assert.deepEqual(second.h, [{ d: '2026-11-09', ok: true }, { d: T, ok: false }]);
+  assert.deepEqual(applyResult(second, 'got', T).h, [{ d: '2026-11-09', ok: true }, { d: T, ok: true }]);
+});
+
+test('only lines of ticked-off lessons, and lines no lesson holds, make cards', () => {
+  const lines = [{ id: 'a', cells: ['a', 'b', ''], lesson_ids: ['done'] }, { id: 'b', cells: ['a', 'b', ''], lesson_ids: ['other'] }, { id: 'c', cells: ['a', 'b', ''], lesson_ids: ['other', 'done'] }, { id: 'd', cells: ['a', 'b', ''] }];
+  const cards = buildCards(joinedSections([{ id: 's', name: 'W', kind: 'table', columns: table, lines }], new Set(['done'])));
+  assert.deepEqual(cards.map((c) => c.line_id), ['a', 'c', 'd']);
+});
+
+test('daily set of 15: oldest due first, then new cards in sheet order', () => {
   const cards = cardsFor(30);
   const boxes = {
     l25: { box: 2, due: '2026-11-08', last: '2026-11-05' },
     l26: { box: 3, due: '2026-11-01', last: '2026-10-25' },
     l27: { box: 1, due: T, last: '2026-11-09' }
   };
-  const { cards: today, next } = todaysCards(cards, boxes, T);
-  assert.equal(today.length, 20);
+  const { cards: today, next, boxes: counts } = todaysCards(cards, boxes, T);
+  assert.equal(today.length, 15);
   assert.deepEqual(today.slice(0, 3).map((c) => c.line_id), ['l26', 'l25', 'l27']);
   assert.deepEqual(today.slice(3, 6).map((c) => c.line_id), ['l0', 'l1', 'l2']);
   assert.equal(next.date, '2026-11-11');
-  assert.equal(next.count, 10);
+  assert.equal(next.count, 15);
+  assert.deepEqual(counts, [28, 1, 1, 0, 0]);
 });
 
-test('cards already done today use up the cap; repeats do not', () => {
+test('next never promises more than a day\'s set', () => {
+  const { next } = todaysCards(cardsFor(100), {}, T);
+  assert.deepEqual(next, { date: '2026-11-11', count: 15 });
+});
+
+test('a card answered today never comes back today, and answers use up the 15', () => {
   const cards = cardsFor(30);
   const boxes = {};
-  for (let i = 0; i < 15; i += 1) boxes[`l${i}`] = { box: 2, due: '2026-11-13', last: T };
-  boxes.l15 = { box: 1, due: T, last: T };
+  for (let i = 0; i < 10; i += 1) boxes[`l${i}`] = { box: 2, due: '2026-11-13', last: T };
+  boxes.l10 = { box: 1, due: '2026-11-11', last: T };
+  // An older record: Again used to leave a card due the same day.
+  boxes.l11 = { box: 1, due: T, last: T };
   const { cards: today } = todaysCards(cards, boxes, T);
-  // 15 done leave room for 5, and the repeat comes on top of them.
-  assert.equal(today.length, 6);
-  assert.equal(today[0].line_id, 'l15');
+  assert.equal(today.length, 3);
+  assert.deepEqual(today.map((c) => c.line_id), ['l12', 'l13', 'l14']);
 });
 
 test('late cards come before new ones and nothing moves down for waiting', () => {

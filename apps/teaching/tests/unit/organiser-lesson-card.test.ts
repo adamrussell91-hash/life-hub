@@ -36,7 +36,7 @@ describe('lesson organiser card ticks', () => {
     vi.spyOn(organiserApi, 'estimateSuggest').mockResolvedValue({ estimate: { cost_aud: 0 } } as never);
   });
 
-  it('ticks only the lesson\'s own lines; a line in another lesson stays unticked and locked', async () => {
+  it('ticks the lesson\'s own lines; a line in another lesson stays free to tick', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     mountOrganiserCard(host, { lesson: { id: 'lesson_here', unit_id: 'unit_a' } });
@@ -48,8 +48,7 @@ describe('lesson organiser card ticks', () => {
     expect(box('mine').disabled).toBe(false);
 
     expect(box('other').checked).toBe(false);
-    expect(box('other').disabled).toBe(true);
-    expect(box('other').closest('.ko-pick')!.classList.contains('is-elsewhere')).toBe(true);
+    expect(box('other').disabled).toBe(false);
 
     expect(box('free').checked).toBe(false);
     expect(box('free').disabled).toBe(false);
@@ -74,20 +73,20 @@ describe('lesson organiser card ticks', () => {
     expect(onCard(host)).toEqual(['mine']);
   });
 
-  it('adds an unclaimed line whose word is in the lesson, whole words only', async () => {
+  it('adds a line whose word is in the lesson, whole words only', async () => {
     const { host } = await mount('We walk the estuary at dawn, past the meadows.');
     expect(onCard(host)).toEqual(['mine', 'word']);
   });
 
-  it('adds a line whose piece the lesson picked, greyed if another lesson holds it', async () => {
+  it('adds a line whose piece the lesson picked, tickable even if another lesson holds it', async () => {
     const { host } = await mount('', ['kp_tide']);
     expect(onCard(host)).toEqual(['mine', 'piece']);
-    expect(host.querySelector<HTMLInputElement>('input[data-line="piece"]')!.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('input[data-line="piece"]')!.disabled).toBe(false);
   });
 
-  it('leaves a word another lesson holds off the card', async () => {
+  it('adds a word in the lesson even if another lesson holds it', async () => {
     const { host } = await mount('A harbour in the lesson.');
-    expect(onCard(host)).toEqual(['mine']);
+    expect(onCard(host)).toEqual(['mine', 'other']);
   });
 
   it('keeps a line in place when it is unticked, so a slip can be undone', async () => {
