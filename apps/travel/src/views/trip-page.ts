@@ -96,6 +96,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   const titleBlock = document.createElement('div');
   const h1 = document.createElement('h1');
   h1.textContent = trip.title;
+  document.title = `${trip.title} · Travel`;
   const sub = document.createElement('p');
   sub.className = 'sub num';
   const today = dateInZone(new Date(), trip.home_tz);

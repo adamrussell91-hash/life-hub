@@ -891,6 +891,8 @@ export function createAppController(dependencies) {
       const title = root.querySelector('#page-title');
       if (eyebrow) eyebrow.textContent = titles.eyebrow;
       if (title) title.textContent = titles.title;
+      // In the app the root is the document itself.
+      (root.ownerDocument ?? root).title = `${titles.title} · Life Hub`;
     }
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();

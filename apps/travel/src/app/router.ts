@@ -59,6 +59,22 @@ export function parseRoute(hash: string = location.hash): Route {
   return { name: 'trips' };
 }
 
+/** The browser tab for a route. A trip page adds its own title once it has loaded. */
+export function tabTitle(route: Route): string {
+  switch (route.name) {
+    case 'trips':
+      return 'Trips · Travel';
+    case 'today':
+      return 'Today · Travel';
+    case 'atlas':
+      return 'Arches Atlas · Travel';
+    case 'journal':
+      return 'Journal · Travel';
+    case 'trip':
+      return 'Travel';
+  }
+}
+
 export function tripsRoute(): string {
   return '#/';
 }

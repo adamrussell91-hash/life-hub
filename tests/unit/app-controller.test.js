@@ -1173,6 +1173,15 @@ test('hashchange after sign-in opens Central Node', async () => {
   assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
 });
 
+test('the browser tab names the open section', async () => {
+  const state = harness();
+  await state.controller.start();
+  assert.equal(state.root.title, 'Home · Life Hub');
+  state.windowTarget.location.hash = '#central-node';
+  state.windowTarget.dispatchEvent(new Event('hashchange'));
+  assert.equal(state.root.title, 'Central Node · Life Hub');
+});
+
 test('clicking the Central Node nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
   const state = harness();
   await state.controller.start();

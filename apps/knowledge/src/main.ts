@@ -37,6 +37,7 @@ import {
 import { intakeBusyLabel, intakeReviewHtml } from "./tidy/intakeView";
 import { takeSignInQuery } from "./api/loginGate";
 import { isPageHash, pageHashForId, pageIdFromHash } from "./routing/pageHash";
+import { tabTitle } from "./routing/pageTitle";
 import { runCapture } from "./api/captureClient";
 import {
   adoptComposeVoiceWave,
@@ -2306,6 +2307,7 @@ function afterSignedInPaint() {
 }
 
 function render() {
+  document.title = tabTitle(view, activePage?.title);
   if (view !== "protocols" && protocolTeardown) {
     protocolTeardown();
     protocolTeardown = null;

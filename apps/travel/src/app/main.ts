@@ -20,7 +20,7 @@ import {
 } from '@/auth/gate';
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
-import { journalPatternOff, parseRoute } from '@/app/router';
+import { journalPatternOff, parseRoute, tabTitle } from '@/app/router';
 import { ensureJournal } from '@/api/journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 import type { JournalFixture } from '@/journal/types';
@@ -97,6 +97,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
   async function paint(options?: { refresh?: boolean }): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
+    document.title = tabTitle(route);
 
     if (route.name !== 'journal') {
       journalHandle?.destroy();
