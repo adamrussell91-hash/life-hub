@@ -169,7 +169,8 @@ describe('prototype form', () => {
       { id: 'p3', text: 'Map', shows: 'The streets', how: '', criterion: 'c2', claimed: 1, mine: false }
     ] });
     const f = mountPrototype(ctx(s, 'prototype'));
-    expect(f.el.querySelector('h2')?.textContent).toBe('Your parts');
+    expect(f.el.querySelector('h2')?.textContent).toBe('Build your prototype');
+    expect(f.el.textContent).toContain('Read your parts');
     expect([...f.el.querySelectorAll('.sprint-mypart__name')].map((h) => h.textContent)).toEqual(['Panel text', 'Artefacts']);
     expect(f.el.querySelector('.sprint-brief-part')?.textContent).toContain('Write it in Docs');
     expect(f.el.querySelector('.sprint-brief-part')?.textContent).not.toContain('The streets');
@@ -216,7 +217,7 @@ describe('prototype form', () => {
     expect(prototypeSignature(a)).toBe(prototypeSignature(b));
     const f = mountPrototype(ctx(a, 'prototype'));
     f.update!(b);
-    expect(f.el.querySelector('.sp-parts summary')?.textContent).toBe('Your group’s parts · 1 of 1 in');
+    expect(f.el.querySelector('.sp-parts__head')?.textContent).toBe('Your group’s parts · 1 of 1 in');
   });
 
   it('shows the part brief, upload, pitch file and the self-check', () => {
@@ -226,6 +227,23 @@ describe('prototype form', () => {
     expect(f.el.querySelector('input[type="file"]')).not.toBeNull();
     expect(f.el.querySelectorAll('.sprint-levels')).toHaveLength(2);
     expect(f.el.textContent).toContain('Pitch file');
+    expect(f.el.textContent).toContain('Choose the pitch file');
+    expect(f.el.textContent).not.toContain('Choose File');
+  });
+
+  it('an added file shows its name and can be removed', async () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [{ id: 'p1', text: 'Panel text', shows: 'The morning', criterion: 'c1', claimed: 1, mine: true }] });
+    const c = { ...ctx(s, 'prototype'), drafts: {} };
+    (c.client as unknown as { upload: unknown }).upload = vi.fn(async () => ({ id: 'f9', name: 'sketch.png', mime: 'image/png', size: 1, at: '', phase: 'prototype' }));
+    const f = mountPrototype(c);
+    const input = f.el.querySelector<HTMLInputElement>('[aria-label="Upload a PDF or picture"]')!;
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'sketch.png', { type: 'image/png' })], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(f.el.querySelector('.sprint-filelist')?.textContent).toContain('sketch.png'));
+    expect((c.drafts as { prototype?: { files: string[] } }).prototype?.files).toEqual(['f9']);
+    [...f.el.querySelectorAll<HTMLButtonElement>('.sprint-filelist button')].find((b) => b.textContent === 'Remove')!.click();
+    expect(f.el.querySelector('.sprint-filelist')?.childElementCount).toBe(0);
+    expect((c.drafts as { prototype?: { files: string[] } }).prototype?.files).toEqual([]);
   });
 
   it('a rebuilt form keeps what was typed and sends the waiting autosave', () => {
@@ -265,13 +283,20 @@ describe('assembler', () => {
 
   it('in Prototype everyone sees the group’s parts; only the assembler can upload the finished prototype', () => {
     const others = mountPrototype(ctx(base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts, members, assemble: true, assembler: { key: 'm2', initials: 'CD', me: false }, group_parts: groupParts }), 'prototype'));
-    expect(others.el.querySelector('.sp-parts summary')?.textContent).toBe('Your group’s parts · 1 of 2 in');
+    expect(others.el.querySelector('.sp-parts__head')?.textContent).toBe('Your group’s parts · 1 of 2 in');
     expect(others.el.querySelector('.sp-parts')?.textContent).toContain('The baker at dawn.');
     expect(others.el.querySelector('.sp-parts')?.textContent).toContain('Open list.pdf');
     expect(others.el.textContent).toContain('Waiting for CD to put it together.');
     expect(others.el.querySelector('[aria-label="Upload the finished prototype"]')).toBeNull();
+    expect(others.el.textContent).toContain('Check your part is in');
+    expect(others.el.textContent).toContain('CD puts the parts together. You don’t upload anything here');
     const assembler = mountPrototype(ctx(base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts, members, assemble: true, assembler: { key: 'm1', initials: 'AB', me: true }, group_parts: groupParts }), 'prototype'));
     expect(assembler.el.querySelector('[aria-label="Upload the finished prototype"]')).not.toBeNull();
     expect(assembler.el.textContent).toContain('You’re the assembler.');
+    expect(assembler.el.textContent).toContain('Put the prototype together');
+    expect([...assembler.el.querySelectorAll('.sprint-together .sd-task__title')].map((h) => h.textContent)).toEqual(['1Check every part is in', '2Upload the finished prototype', '3Add a cover poster']);
+    // The first job ticks once a groupmate's save brings the last part in.
+    assembler.update!(base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts, members, assemble: true, assembler: { key: 'm1', initials: 'AB', me: true }, group_parts: groupParts.map((r) => ({ ...r, in: true })) }));
+    expect(assembler.el.querySelector('.sprint-together .sd-tick')?.textContent).toBe('✓');
   });
 });
