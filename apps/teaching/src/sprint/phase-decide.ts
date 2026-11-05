@@ -1,7 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { duelProblems, partsProblems } from './checks';
 import { LATER_GUIDE } from './guidance';
-import { draftOf, slidify, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, slidify, stepify, submitBar, task, type FormContext, type PhaseForm } from './form-kit';
 import { duelsDone, pairKey, pairsOf, rankIdeas } from './rules';
 import type { Duel, Part, PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
@@ -296,26 +296,6 @@ function partsLocked(): HTMLElement {
   const box = el('div', 'sprint-parts');
   box.append(el('p', 'sprint-note sd-locked', 'This opens as soon as your teacher confirms your group’s idea. Then you list what the prototype needs and give each part to someone by their initials.'));
   return box;
-}
-
-/** One numbered task in the plan step, with a tick that fills in once it is done. */
-function task(n: number, title: string, note: string): { el: HTMLElement; done(on: boolean): void } {
-  const box = el('section', 'sd-task');
-  const h = el('h4', 'sd-task__title');
-  const tick = el('span', 'sd-tick', String(n));
-  tick.setAttribute('aria-hidden', 'true');
-  const state = el('span', 'sd-sr', '');
-  h.append(tick, el('span', '', title), state);
-  box.append(h);
-  if (note) box.append(el('p', 'sd-task__note', note));
-  return {
-    el: box,
-    done(on) {
-      tick.classList.toggle('is-done', on);
-      tick.textContent = on ? '✓' : String(n);
-      state.textContent = on ? ' (done)' : '';
-    }
-  };
 }
 
 /** "AB", "AB and CD", "AB, CD and EF". */

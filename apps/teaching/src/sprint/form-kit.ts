@@ -384,3 +384,46 @@ export function stepify(root: HTMLElement, steps: Array<{ pick: string; title: s
     body.append(...kids);
   });
 }
+
+/** One numbered task inside a step (Decide's plan, Prototype's put-together), with a tick that fills in once it is done. */
+export function task(n: number, title: string, note: string): { el: HTMLElement; done(on: boolean): void } {
+  const box = el('section', 'sd-task');
+  const h = el('h4', 'sd-task__title');
+  const tick = el('span', 'sd-tick', String(n));
+  tick.setAttribute('aria-hidden', 'true');
+  const state = el('span', 'sd-sr', '');
+  h.append(tick, el('span', '', title), state);
+  box.append(h);
+  if (note) box.append(el('p', 'sd-task__note', note));
+  return {
+    el: box,
+    done(on) {
+      tick.classList.toggle('is-done', on);
+      tick.textContent = on ? '✓' : String(n);
+      state.textContent = on ? ' (done)' : '';
+    }
+  };
+}
+
+/**
+ * A file picker that looks like the other buttons: a secondary button with the
+ * real file input inside it, so it reads "Add a picture or PDF", not the
+ * browser's "Choose File · No file chosen". The input keeps its own label for
+ * screen readers.
+ */
+export function filePick(o: { label: string; accept: string; ariaLabel: string; disabled: boolean; onFile(file: File): void }): { el: HTMLElement; input: HTMLInputElement } {
+  const wrap = el('label', 'btn btn--secondary sprint-file');
+  const input = el('input');
+  input.type = 'file';
+  input.accept = o.accept;
+  input.disabled = o.disabled;
+  input.setAttribute('aria-label', o.ariaLabel);
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) o.onFile(file);
+  });
+  wrap.classList.toggle('is-disabled', o.disabled);
+  wrap.append(input, el('span', '', o.label));
+  return { el: wrap, input };
+}

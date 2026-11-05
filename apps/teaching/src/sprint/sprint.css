@@ -698,3 +698,36 @@ body.spractice-open { overflow: hidden; }
 .sk-what dd:last-child { margin-bottom: 0; }
 .coach__scenario { font-size: 13px; color: var(--muted); margin-bottom: 6px !important; }
 .kit-warn { margin: 0 0 8px; font-size: 14px; color: #8a5a00; }
+
+/* Prototype: one clear thing per step. File pickers look like buttons, statuses read at a glance. */
+.sprint-file { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.sprint-file input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; }
+.sprint-file:focus-within { outline: 2px solid var(--navy); outline-offset: 2px; }
+.sprint-file.is-disabled { opacity: .5; cursor: not-allowed; }
+.sprint-file.is-disabled input { cursor: not-allowed; }
+.sprint-files { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); display: grid; gap: 6px; }
+.sprint-files .sprint-field__label, .sprint-files .sprint-note { margin: 0; }
+.sprint-files__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sprint-files__row > .qz-input { flex: 1 1 220px; min-width: 0; }
+.sprint-filelist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sprint-filelist:empty { display: none; }
+.sprint-filelist__item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--pastel-sage); color: var(--pastel-sage-ink); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.sprint-brief-part__line--key span { font-weight: 600; padding: 2px 8px; margin-left: -8px; border-radius: 8px; background: var(--pastel-gold); color: var(--pastel-gold-ink); justify-self: start; }
+.sprint-together { display: grid; gap: 4px; }
+.sprint-together > .sprint-note { margin: 0 0 4px; }
+.sprint-together .sd-task .sp-parts { margin: 4px 0 0; }
+.sprint-together .su-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.sprint-together .su-add .qz-input { flex: 1 1 220px; min-width: 0; }
+.sprint-status { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
+.sprint-status.is-done { color: var(--pastel-sage-ink); }
+.sprint-pitch h4 { margin: 0; font-size: 16px; }
+.sp-parts__head { margin: 0 0 4px; font-size: 15px; }
+.sp-part__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; }
+.sp-part__state { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.sp-part__state--in { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.sp-part__state--started { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.sp-part__links { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; overflow-wrap: anywhere; }
+.sprint-rate { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.sprint-rate:first-child { border-top: 0; padding-top: 0; }
+.sprint-rate__name { margin: 0; font-weight: 700; font-size: 16px; }
+.sprint-prototype .sprint-self { margin-top: 0; gap: 0; }

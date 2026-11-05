@@ -154,28 +154,40 @@ export const LATER_GUIDE = {
     stuck: ['Think about what the audience sees first, next and last.', 'Open “borrow from an idea you didn’t choose” for strong parts from the other ideas.']
   },
   part: {
-    doThis: 'Read your part: what it is, what it must show and which criterion it serves.',
+    doThis: 'Read what your part is and what it must show. That “must show” line is what you build in step 2.',
     why: 'Your part is one piece of your group’s prototype, so it has to fit with the others.',
-    example: ['Part: the order screen. It must show the pickup time. It serves: speed.'],
-    stuck: ['No part yet? Your group gives parts out in Decide. Ask them.']
+    example: ['Part: the order screen. It must show the pickup time. Criterion: speed.'],
+    stuck: ['No part yet? Your group gives parts out in Decide. Ask them.', 'Not sure what “must show” means? Ask the groupmate who wrote it.']
   },
   build: {
-    doThis: 'Write or build your part, then upload a picture, PDF or link if it helps.',
+    doThis: 'Make your part. Write it in the box, or make it somewhere else and add the file or link.',
     why: 'Making it real shows you what works and what you missed.',
-    example: ['A short description plus a sketch of the screen is enough to show your idea.'],
-    stuck: ['Start with the “must show” line and answer it first.', 'A rough sketch is fine. You can improve it later.']
+    example: ['A short description plus a photo of a sketch of the screen is enough to show your idea.'],
+    stuck: ['Start with the “must show” line and answer it first.', 'A rough sketch is fine. You can improve it before the deadline.']
   },
   share: {
-    doThis: 'See how your group’s parts are coming together and set the pitch file.',
+    doThis: 'Check your part says “In”. The assembler puts the parts together, so you don’t upload anything here.',
+    why: 'Your pitch shows the whole prototype, so the assembler needs every part.',
+    example: ['Your part says “Started”? Submit it on the last step and it changes to “In”.'],
+    stuck: ['Part missing? Message that groupmate.', 'Want to help? Offer the assembler a hand, but your own part comes first.']
+  },
+  assemble: {
+    doThis: 'Do the three jobs below in order. Each one ticks when it’s done.',
+    why: 'Your teacher opens one finished file at the pitch, so everyone’s parts need to be in it.',
+    example: ['Copy each part into one Canva or Slides file, then paste its link in job 2.'],
+    stuck: ['A part isn’t in yet? Message that groupmate, or use what they’ve saved so far.', 'Link won’t work? Set it so anyone with the link can view, or upload a PDF instead.']
+  },
+  pitch: {
+    doThis: 'Choose the file or link your group shows at the pitch, then add a cover poster.',
     why: 'Your pitch shows the whole prototype, not only your part.',
-    example: ['The assembler puts all the parts together and uploads one finished file.'],
-    stuck: ['Part missing? Message that groupmate.', 'Not the assembler? Your job is your own part.']
+    example: ['One person adds the group’s finished file in step 2, then taps “Use my file or link as the pitch file”.'],
+    stuck: ['Someone else already set it? Then you’re done here.', 'No file yet? Add one in step 2 first.']
   },
   check: {
-    doThis: 'Rate your part against each criterion and tick the requirements it meets.',
+    doThis: 'For each criterion, tap how strong your part is, then point to the bit that shows it.',
     why: 'Checking yourself first finds gaps before the pitch.',
-    example: ['If you chose “Not yet” for a criterion, fix it now or note what you’d change.'],
-    stuck: ['Be honest. The rating is for you and your group.', 'Point to the line in your part that proves each tick.']
+    example: ['If you tapped “Starting”, fix that bit now or say what you’d change.'],
+    stuck: ['Be honest. The rating is for you and your group.', 'Quote a line or name the part of your picture that proves it.']
   },
   feedback: {
     doThis: 'Read what other students said about your group’s idea.',
