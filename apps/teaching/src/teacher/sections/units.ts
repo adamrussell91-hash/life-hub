@@ -1,6 +1,5 @@
-import { renderPlanningPrompts, renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
+import { mountUnitWalkthrus } from '@/blocks/walkthru-note/unit-section';
 import { withStepNotes } from '@/blocks/walkthru-note/attach';
-import { steppedLens } from '@/blocks/lenses/registry';
 import { createBlock, UNIT_PLAN_BLOCK_GROUPS, pageBlockTypes } from '@/blocks/create-block';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
@@ -62,7 +61,9 @@ import { lessonRouteRole, settleConceptLines, settleSkillLines, unitConceptKeysF
 import { loadAlignment } from '@/alignment/api';
 import { lessonWeeks } from '@/deep/derive';
 import { mountDeepSection } from '@/deep/plan-view';
+import { pieceLines } from '@/organiser/editor-model';
 import { mountOrganiserSection } from '@/organiser/sheet-editor';
+import type { Organiser } from '@/organiser/types';
 import { unitScope } from '@/deep/scope';
 import { loadSkills } from '@/skills/api';
 import { firstTaughtDates } from '@/teacher/unit-lesson-order';
@@ -627,26 +628,37 @@ export function renderUnitPage(
   const deepHost = document.createElement('section');
   deepHost.className = 'unit-page__deep glass-panel';
   deepHost.dataset.unitSection = 'deep';
+  const unitLessons = Promise.all(unit.lesson_ids.map((id) => apiGet<Lesson>(`/api/lessons/${id}`).catch(() => null))).then((rows) =>
+    rows.filter((l): l is Lesson => !!l)
+  );
+  // The organiser holds a tracked piece's words, so it and Deep understandings keep each other current.
+  let deepSection: ReturnType<typeof mountDeepSection> | null = null;
+  let latestSheet: Organiser | null = null;
+  const wordsWaiting = new Map<string, string>();
   void (async () => {
-    const [deepLessons, alignment] = await Promise.all([
-      Promise.all(unit.lesson_ids.map((id) => apiGet<Lesson>(`/api/lessons/${id}`).catch(() => null))).then((rows) =>
-        rows.filter((l): l is Lesson => !!l)
-      ),
-      loadAlignment().catch(() => null)
-    ]);
+    const [deepLessons, alignment] = await Promise.all([unitLessons, loadAlignment().catch(() => null)]);
     const unitRows = (curriculum.scheduled_lessons ?? []).filter((r) => r.unit_id === unit.id);
-    mountDeepSection(deepHost, {
+    deepSection = mountDeepSection(deepHost, {
       unit,
       lessons: deepLessons,
       weeks: lessonWeeks(unit.lesson_ids, unitRows, new Set(deepLessons.filter((l) => l.pre_unit).map((l) => l.id))),
       scope: unitScope(deepLessons, alignment, alignment ? unitConceptKeysFor(curriculum, unit, alignment) : []),
-      save: (deep) => patchUnit(unit.id, { deep_understandings: deep }),
+      save: async (deep) => {
+        const saved = await patchUnit(unit.id, { deep_understandings: deep });
+        unit.deep_understandings = saved.deep_understandings;
+        organiser.refresh();
+        walkthrus.refresh();
+      },
+      lines: latestSheet ? pieceLines(latestSheet) : new Map(),
+      onEditInOrganiser: (pieceId) => organiser.openPiece(pieceId),
       classes: curriculum.classes
         .filter((c) => c.current_unit_id === unit.id || c.active_unit_ids.includes(unit.id))
         .map((c) => ({ id: c.id, label: c.display_name || c.code })),
       scheduled: unitRows,
       onOpenLesson: (id) => navigate(`/lessons/${id}`)
     });
+    for (const [pieceId, text] of wordsWaiting) deepSection.setPieceText(pieceId, text);
+    wordsWaiting.clear();
   })();
 
   const organiserHost = document.createElement('section');
@@ -658,15 +670,31 @@ export function renderUnitPage(
     classes: curriculum.classes
       .filter((c) => c.current_unit_id === unit.id || c.active_unit_ids.includes(unit.id))
       .map((c) => ({ id: c.id, label: c.display_name || c.code })),
-    curriculum
+    curriculum,
+    onSheet: (sheet) => {
+      latestSheet = sheet;
+      deepSection?.setLines(pieceLines(sheet));
+    },
+    onPieceText: (pieceId, text) => {
+      if (deepSection) deepSection.setPieceText(pieceId, text);
+      else wordsWaiting.set(pieceId, text);
+    }
   });
 
-  planSection.append(planHeading);
-  const planningPrompts = renderPlanningPrompts();
-  if (planningPrompts) planSection.append(planningPrompts);
-  const frameworks = renderFrameworkLenses((id) => planEditor.addFrameworkLens(id));
-  if (frameworks) planSection.append(frameworks);
-  planSection.append(planHost);
+  const walkthruHost = document.createElement('section');
+  walkthruHost.className = 'unit-page__walkthrus glass-panel';
+  walkthruHost.dataset.unitSection = 'walkthrus';
+  const walkthrus = mountUnitWalkthrus(walkthruHost, {
+    unit,
+    lessons: unitLessons,
+    save: async (ties) => {
+      const saved = await patchUnit(unit.id, { walkthru_ties: ties });
+      unit.walkthru_ties = saved.walkthru_ties;
+    },
+    onOpenLesson: (id) => navigate(`/lessons/${id}`)
+  });
+
+  planSection.append(planHeading, planHost);
 
   const tagsHost = document.createElement('div');
   tagsHost.className = 'unit-page__tags';
@@ -854,7 +882,7 @@ export function renderUnitPage(
     lessonsSection.append(table);
   }
 
-  root.append(coverHost, stripHost, deepHost, organiserHost, planSection, tagsHost, lessonsSection);
+  root.append(coverHost, stripHost, deepHost, organiserHost, walkthruHost, planSection, tagsHost, lessonsSection);
   canvas.append(root);
 
   return {
@@ -867,6 +895,7 @@ export function renderUnitPage(
       planEditor.dispose();
       outcomeStrip?.dispose();
       organiser.dispose();
+      walkthrus.dispose();
       disposed = true;
     }
   };
@@ -910,7 +939,7 @@ function mountUnitPlanEditor(
     curriculum: CurriculumResponse;
     onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
   }
-): { dispose: () => void; addFrameworkLens: (lensId: string) => boolean } {
+): { dispose: () => void } {
   let blocks = structuredClone(initialBlocks);
   let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
@@ -1152,18 +1181,6 @@ function mountUnitPlanEditor(
   });
 
   return {
-    /** A framework lens on the whole unit: a new plan block that carries the lens, at the end of the plan. */
-    addFrameworkLens(lensId) {
-      const lens = steppedLens(lensId);
-      if (!lens) return false;
-      const block = createBlock('rich_text', nextId());
-      const withIt = lens.write(block, { ...lens.create(block), focus: options.unit.title });
-      blocks = [...blocks, withIt];
-      revision += 1;
-      canvas.update(blocks);
-      scheduleSave();
-      return true;
-    },
     dispose: () => {
       assistant?.dispose();
       unitNotes.dispose();

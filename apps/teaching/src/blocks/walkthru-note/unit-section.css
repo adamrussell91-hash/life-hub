@@ -1,0 +1,64 @@
+/* WalkThrus in this unit: one row per technique in use. Book colours match the block strip. */
+.unit-page__walkthrus { min-width: 0; max-width: 100%; padding: var(--space-4, 16px) var(--space-5, 20px) var(--space-5, 20px); }
+.wtu { display: grid; gap: 10px; min-width: 0; color: var(--ink); }
+.wtu *, .wtu *::before { box-sizing: border-box; }
+.wtu__head { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; align-items: center; }
+.wtu__title { margin: 0; font-size: 20px; line-height: 1.25; color: var(--navy); }
+.wtu__link { border: 0; background: none; padding: 4px 2px; min-height: 32px; font: inherit; font-size: 13px; font-weight: 600; color: var(--wave); cursor: pointer; text-align: left; }
+.wtu__link:hover { text-decoration: underline; }
+.wtu__link--quiet { color: var(--muted); font-weight: 500; }
+.wtu__list { display: grid; gap: 8px; }
+.wtu__msg { margin: 0; font-size: 13px; color: var(--muted); }
+.wtu__msg--bad { color: var(--danger, #9b2c2c); }
+.wtu__empty { margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; font-size: 13.5px; color: var(--muted); }
+.wtu :is(button, select, textarea):focus-visible { outline: 3px solid var(--wave); outline-offset: 1px; }
+
+.wtu-row { border: 1px solid #f2c200; border-radius: 12px; background: #fff9db; overflow: hidden; }
+.wtu-row[data-set="2"] { border-color: #7cc7ea; background: #eaf6fd; }
+.wtu-row[data-set="3"] { border-color: #b5d36a; background: #f4f9e4; }
+.wtu-row__top { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 16px; gap: 10px; align-items: center; width: 100%; min-height: 56px; padding: 8px 12px; border: 0; background: none; color: #111; font: inherit; text-align: left; cursor: pointer; }
+.wtu-hex { display: grid; place-items: center; width: 44px; height: 38px; padding: 5px 9px; background: #f2c200; color: #111; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+.wtu-hex svg { display: block; width: 100%; height: 100%; }
+.wtu-row[data-set="2"] .wtu-hex { background: #2da8e0; }
+.wtu-row[data-set="3"] .wtu-hex { background: #9dc33b; }
+.wtu-row__name { display: block; font-weight: 650; }
+.wtu-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.wtu-chip { padding: 1px 7px; border-radius: 6px; background: #dceafa; color: var(--navy); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.wtu-chip--du { background: #dfe9e1; color: #3d6b4a; }
+.wtu-chip--organiser { background: #f6dd8f; color: #5f4b0c; }
+.wtu-row__count { font-size: 12px; color: #4c5563; text-align: right; white-space: nowrap; }
+.wtu-row__chev { color: var(--muted); font-size: 12px; }
+.wtu-row__body { padding: 2px 14px 10px 66px; background: #fff; border-top: 1px solid rgba(0, 0, 0, .06); }
+.wtu-use { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.wtu-use__where { min-width: 0; }
+.wtu-use__where .wtu__link { display: block; min-height: 0; padding: 0; }
+.wtu-use__name { font-weight: 600; color: var(--navy); }
+.wtu-use__where small { display: block; font-size: 12px; color: var(--muted); }
+.wtu-use__how { display: grid; gap: 2px; min-width: 0; }
+.wtu-use__field { display: block; width: 100%; padding: 0; border: 0; border-radius: 3px; background: none; color: inherit; font: inherit; line-height: 1.42; resize: none; overflow: hidden; }
+.wtu-use__field:hover { background: rgba(20, 43, 81, .05); }
+.wtu-use__field:focus { outline: 2px solid var(--wave); background: #fff; }
+.wtu-use__field::placeholder { color: #8b95a1; }
+.wtu-use__note { font-size: 12.5px; font-style: italic; color: #5b6470; }
+.wtu-use__right { display: flex; align-items: center; gap: 8px; }
+.wtu-state { padding: 1px 9px; border-radius: 999px; background: rgba(20, 43, 81, .05); color: var(--muted); font-size: 11.5px; font-weight: 650; white-space: nowrap; }
+.wtu-state--ran { background: #dfe9e1; color: #3d6b4a; }
+.wtu-state--partly { background: #f6ecc4; color: #7a6216; }
+.wtu-row__foot { display: flex; flex-wrap: wrap; gap: 0 16px; padding-top: 6px; }
+.wtu-steps { padding-top: 8px; }
+
+.wtu-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: end; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+.wtu-add label { display: grid; gap: 3px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.wtu-add select { width: 100%; min-height: 38px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 400; }
+
+@media (max-width: 760px) {
+  .wtu-row__top { grid-template-columns: 44px minmax(0, 1fr) 16px; }
+  .wtu-row__count { grid-column: 2; grid-row: 2; text-align: left; }
+  .wtu-row__chev { grid-column: 3; grid-row: 1 / span 2; }
+  .wtu-row__body { padding: 2px 12px 10px; }
+  .wtu-use { grid-template-columns: minmax(0, 1fr) auto; }
+  .wtu-use__how { grid-column: 1 / -1; grid-row: 2; }
+  .wtu__link { min-height: 40px; }
+  .wtu-add { grid-template-columns: minmax(0, 1fr); }
+}
+@media print { .unit-page__walkthrus { display: none; } }

@@ -4,7 +4,6 @@ import { filterBlocksForStudent } from '@/blocks/visibility';
 import { attachedTechniques, suggestedTechnique, withTechnique } from '@/blocks/walkthru-note/attach';
 import { blockQuestion } from '@/blocks/walkthru-note/badge';
 import type { Block } from '@/schemas/block';
-import { renderPlanningPrompts } from '@/blocks/walkthru-note/planning';
 
 const SENTINEL = 'JOT-SENTINEL-1357';
 
@@ -465,12 +464,3 @@ describe('suggestedTechnique', () => {
   });
 });
 
-describe('WalkThru book colour', () => {
-  it('marks each unit prompt with its book, so Book 2 prompts read blue and Book 3 green', () => {
-    const prompts = renderPlanningPrompts()!;
-    const sets = [...prompts.querySelectorAll<HTMLElement>('.tk-wt-badge')].map((badge) => badge.dataset.set);
-    expect(sets).toContain('1');
-    expect(sets).toContain('2');
-    expect(sets.filter((set) => set === '3')).toHaveLength(5);
-  });
-});

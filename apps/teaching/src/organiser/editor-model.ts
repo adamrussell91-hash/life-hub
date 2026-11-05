@@ -114,3 +114,19 @@ export function createSerialQueue(): { add: <T>(job: () => Promise<T>) => Promis
     }
   };
 }
+
+/** A tracked piece's line on the sheet: its short prompt and the words students learn. */
+export type PieceLine = { line_id: string; prompt: string; text: string };
+
+/** Each piece's line, first one wins. A piece with no line isn't in the map. */
+export function pieceLines(organiser: Pick<Organiser, 'sections'>): Map<string, PieceLine> {
+  const out = new Map<string, PieceLine>();
+  for (const section of organiser.sections) {
+    const { cue, answer } = columnSlots(section);
+    for (const line of section.lines) {
+      if (!line.piece_id || out.has(line.piece_id)) continue;
+      out.set(line.piece_id, { line_id: line.id, prompt: line.cells[cue]?.trim() ?? '', text: line.cells[answer]?.trim() ?? '' });
+    }
+  }
+  return out;
+}

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { STEPPED_LENSES, steppedLens } from '@/blocks/lenses/registry';
-import { PLANNING_FIELDS } from '@/blocks/walkthru-note/planning';
-import { techniqueById } from '../../../../packages/walkthrus/catalogue.mjs';
 
 const FRAMEWORKS = ['fw_rosenshine', 'fw_willingham', 'fw_marge', 'fw_wiliam', 'fw_berger'];
 
@@ -32,29 +30,8 @@ describe('framework lenses', () => {
   });
 });
 
-describe('unit planning prompts', () => {
-  it('every field points at a real technique', () => {
-    expect(PLANNING_FIELDS.length).toBe(20);
-    for (const field of PLANNING_FIELDS) expect(techniqueById(field.technique)).toBeTruthy();
-  });
-});
-
 import { withWalkthruNote } from '@/blocks/walkthru-note/add-note';
-import { renderFrameworkLenses } from '@/blocks/walkthru-note/planning';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
-
-describe('unit-level framework lenses', () => {
-  it('offers one button per framework (Willingham lives in Deep understandings) and adds the chosen lens', () => {
-    const added: string[] = [];
-    const host = renderFrameworkLenses((id) => { added.push(id); return true; })!;
-    const buttons = [...host.querySelectorAll('button')];
-    expect(buttons).toHaveLength(4);
-    expect(buttons.every((b) => /framework chapter/.test(b.title))).toBe(true);
-    buttons[1]!.click();
-    expect(added).toEqual(['fw_marge']);
-    expect(host.textContent).toContain('added at the end of the plan');
-  });
-});
 
 describe('WalkThru note on a lesson', () => {
   const lesson = { id: 'l1', blocks: [] as never[] };

@@ -23,14 +23,16 @@ import {
   type BringItem,
   type BringSource
 } from './bring-in';
+import { DEEP_LIMITS, type Tier } from '@/deep/schema';
 import { columnSlots, conceptColourAt, createSerialQueue, parsePaste } from './editor-model';
 import { printOrganiser } from './print';
-import type { OrganiserChange, OrganiserLine, OrganiserRole, OrganiserSection, TeacherOrganiser, VocabTier } from './types';
+import type { Organiser, OrganiserChange, OrganiserLine, OrganiserRole, OrganiserSection, TeacherOrganiser, VocabTier } from './types';
 
 /**
  * The whole sheet on the unit page, written before teaching: concepts with their sentence and key
- * ideas down the left; facts, words and any other sections down the right. Nothing here says when
- * a line goes out: a lesson ticks that (lesson-card.ts).
+ * ideas, then closed tiles for words, context and any other sections. Nothing here says when a line
+ * goes out: a lesson ticks that (lesson-card.ts). A tracked piece's words live here; saving a line
+ * with a piece hands its words to Deep understandings (onPieceText).
  * Edits wait ~600ms, then go to the server one at a time. Every reply replaces the state, but the
  * page is not redrawn while a field has focus.
  */
@@ -40,15 +42,21 @@ export interface OrganiserSectionOptions {
   lessons: Array<{ id: string; title: string; sequence: number }>;
   classes: Array<{ id: string; label: string }>;
   curriculum: CurriculumResponse;
+  /** Every time the sheet is loaded or changed. */
+  onSheet?: (organiser: Organiser) => void;
+  /** A piece's line was saved with these words. */
+  onPieceText?: (pieceId: string, text: string) => void;
 }
 
 const SAVE_DELAY_MS = 600;
 const TIER_WORDS: Record<VocabTier, string> = { 1: 'everyday', 2: 'across subjects', 3: 'this subject' };
 const CHEVRON = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5 3 8.500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const SIDE_ROLES: Array<{ role: OrganiserRole; name: string; add: string; optional?: boolean }> = [
-  { role: 'facts', name: 'Facts and topics', add: 'Add fact' },
-  { role: 'key_lines', name: 'Key lines', add: 'Add line', optional: true },
-  { role: 'story', name: 'Story order', add: 'Add step', optional: true }
+const OLD_FACTS_NAME = 'Facts and topics';
+const SIDE_ROLES: Array<{ role: OrganiserRole; name: string; add: string; unit: string; className: string; optional?: boolean }> = [
+  { role: 'vocab', name: 'Vocabulary', add: 'Add word', unit: 'word', className: 'ko-vocab' },
+  { role: 'facts', name: 'Context', add: 'Add topic', unit: 'topic', className: 'ko-context' },
+  { role: 'key_lines', name: 'Key lines', add: 'Add line', unit: 'line', className: 'ko-context', optional: true },
+  { role: 'story', name: 'Story order', add: 'Add step', unit: 'step', className: 'ko-context', optional: true }
 ];
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -77,7 +85,7 @@ const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' 
 /** One concept card: a section on the sheet, or a concept the unit map names that has no section yet. */
 type ConceptRow = { id: string; name: string; key?: string; section?: OrganiserSection; colour: string; bullets: AlignmentConcept['bullets'] };
 
-export function mountOrganiserSection(host: HTMLElement, options: OrganiserSectionOptions): { dispose(): void } {
+export function mountOrganiserSection(host: HTMLElement, options: OrganiserSectionOptions): { dispose(): void; openPiece(pieceId: string): void; refresh(): void } {
   const { unit, classes, curriculum } = options;
   const root = h('div', 'ko-root');
   host.append(root);
@@ -148,6 +156,7 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       .add(() => organiserApi.change(unit.id, change))
       .then((next) => {
         data = next;
+        options.onSheet?.(next.organiser);
         say('');
         after?.(next);
         softRender();
@@ -170,7 +179,17 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const sent = cells.slice();
     void send({ op: 'update_line', line_id: lineId, cells: sent }, () => {
       if (sameCells(localCells.get(lineId), sent)) localCells.delete(lineId);
+      handOnWords(lineId, sent);
     });
+  }
+
+  /** A tracked piece's words follow its line. A blanked line leaves the piece as it was. */
+  function handOnWords(lineId: string, cells: string[]): void {
+    const section = sections().find((s) => s.lines.some((l) => l.id === lineId));
+    const pieceId = section?.lines.find((l) => l.id === lineId)?.piece_id;
+    if (!section || !pieceId) return;
+    const text = cells[columnSlots(section).answer]?.trim();
+    if (text) options.onPieceText?.(pieceId, text);
   }
 
   function editLine(lineId: string, cells: string[]): void {
@@ -215,7 +234,11 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
         data = next;
         alignment = doc;
         mapKeys = doc ? unitConceptKeysFor(curriculum, unit, doc) : [];
+        options.onSheet?.(next.organiser);
         render();
+        // Sheets written before the rename catch up here, so students see the new name too.
+        const oldFacts = sectionOf('facts');
+        if (oldFacts?.name === OLD_FACTS_NAME) void send({ op: 'update_section', section_id: oldFacts.id, name: 'Context' });
       })
       .catch(() => {
         if (disposed) return;
@@ -400,12 +423,29 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
 
   // ---- concepts ----------------------------------------------------------------------------
 
+  /** Which deep understanding tracks this line's piece, and at what tier. */
+  function pieceMark(line: OrganiserLine): HTMLElement | null {
+    if (!line.piece_id) return null;
+    const deep = unit.deep_understandings ?? [];
+    const at = deep.findIndex((d) => d.pieces.some((p) => p.id === line.piece_id));
+    if (at === -1) return null;
+    const tier: Tier = deep[at]!.pieces.find((p) => p.id === line.piece_id)!.tier;
+    const mark = h('span', `ko-dumark ko-dumark--${tier}`, `DU ${at + 1} · ${tier}`);
+    mark.title = `Tracked in deep understanding ${at + 1}, ${tier}`;
+    return mark;
+  }
+
   function ideaRow(section: OrganiserSection, line: OrganiserLine): HTMLElement {
     const { answer, cue, rest } = columnSlots(section);
     const stop = h('div', 'ko-stop');
-    const row = h('div', 'ko-linerow');
+    stop.dataset.line = line.id;
+    const mark = pieceMark(line);
+    const row = h('div', `ko-linerow${mark ? ' ko-linerow--marked' : ''}`);
     const main = answer !== -1 ? answer : Math.max(cue, 0);
-    row.append(cellField(section, line, main, 'Key idea'), chevron(line.id, 'Prompt and example'));
+    const field = cellField(section, line, main, 'Key idea');
+    // A tracked piece has to fit where Deep understandings keeps it.
+    if (mark) field.maxLength = DEEP_LIMITS.piece;
+    row.append(field, ...(mark ? [mark] : []), chevron(line.id, 'Prompt and example'));
     const inner = h('div', 'ko-more__in');
     inner.append(...moreFields(section, line, [cue, ...rest].filter((i) => i !== -1 && i !== main)), lineTools(section, line));
     stop.append(row, fold(line.id, inner));
@@ -604,20 +644,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     }
   }
 
-  function sidePanel(name: string, add: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): HTMLElement {
-    const box = h('section', 'ko-panel');
-    box.dataset.panel = role ?? section?.id ?? '';
-    const head = h('div', 'ko-panel__head');
-    const tools = h('div', 'ko-panel__tools');
-    tools.append(...sideTools(name, add, role, section));
-    if (section && !role) tools.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
-    head.append(h('h3', 'ko-panel__name', name), tools);
-    box.append(head);
-    if (section) sideBody(section, box);
-    sideExtras(box, name, role, section);
-    return box;
-  }
-
   /** Add, Paste and Open all for a list of lines. */
   function sideTools(name: string, add: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): HTMLElement[] {
     const id = `side:${role ?? section?.id}`;
@@ -665,24 +691,25 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     if (section && panel?.kind === 'paste' && panel.at === section.id) box.append(pastePanel(section));
   }
 
-  /** Vocabulary under the concepts: closed to its count, and open like a concept card. */
-  function vocabCard(): HTMLElement {
-    const section = sectionOf('vocab');
-    const id = 'card:vocab';
-    const card = h('article', 'ko-concept ko-vocab');
-    const top = h('div', 'ko-concept__row ko-vocab__row');
+  /** A list under the concepts: closed to its name and count, and full width when open. */
+  function tile(name: string, add: string, unitWord: string, className: string, role: OrganiserRole | undefined, section: OrganiserSection | undefined): HTMLElement {
+    const id = `card:${role ?? section?.id}`;
+    const card = h('article', `ko-concept ko-tile ${className}${open.has(id) ? ' is-open' : ''}`);
+    const top = h('div', 'ko-concept__row ko-tile__row');
     const meta = h('div', 'ko-concept__meta');
-    meta.append(h('span', 'ko-capsule', 'Vocabulary'), h('span', 'ko-count', plural(section?.lines.length ?? 0, 'word')));
-    const more = chevron(id, 'Vocabulary');
+    meta.append(h('span', 'ko-capsule', name), h('span', 'ko-count', plural(section?.lines.length ?? 0, unitWord)));
+    const more = chevron(id, name);
+    more.addEventListener('click', () => card.classList.toggle('is-open', open.has(id)));
     meta.addEventListener('click', () => more.click());
     top.append(meta, more);
     card.append(top);
-    const body = h('div', 'ko-vocab__body');
-    body.dataset.panel = 'vocab';
+    const body = h('div', 'ko-tile__body');
+    body.dataset.panel = role ?? section?.id ?? '';
     if (section) sideBody(section, body);
-    sideExtras(body, 'Vocabulary', 'vocab', section);
+    sideExtras(body, name, role, section);
     const foot = h('div', 'ko-foot');
-    foot.append(...sideTools('Vocabulary', 'Add word', 'vocab', section));
+    foot.append(...sideTools(name, add, role, section));
+    if (section && !role) foot.append(quiet('Delete', () => removeSection(section), 'ko-quiet--danger'));
     card.append(fold(id, body, foot));
     return card;
   }
@@ -833,8 +860,8 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const rows: Array<[number, string]> = [
       [conceptRows().length, 'concepts'],
       [count('concept') + count('ideas'), 'key ideas'],
-      [count('facts'), 'facts'],
-      [count('vocab'), 'words']
+      [count('vocab'), 'words'],
+      [count('facts'), 'context']
     ];
     for (const [n, word] of rows) {
       const span = h('span');
@@ -913,7 +940,6 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
       return;
     }
 
-    const grid = h('div', 'ko-grid');
     const left = h('section', 'ko-column');
     const head = h('div', 'ko-panel__head');
     const tools = h('div', 'ko-panel__tools');
@@ -931,18 +957,16 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
     const loose = sectionOf('ideas');
     if (loose?.lines.length) left.append(looseIdeas(loose));
     for (const row of rows) left.append(conceptCard(row));
-    left.append(vocabCard());
 
-    const right = h('div', 'ko-column');
+    const tiles = h('div', 'ko-tiles');
     for (const spec of SIDE_ROLES) {
       const section = sectionOf(spec.role);
       if (spec.optional && (!section || section.off)) continue;
-      right.append(sidePanel(spec.name, spec.add, spec.role, section));
+      tiles.append(tile(spec.name, spec.add, spec.unit, spec.className, spec.role, section));
     }
-    for (const section of sections().filter((s) => !s.role)) right.append(sidePanel(section.name, 'Add line', undefined, section));
-
-    grid.append(left, right);
-    root.append(grid);
+    for (const section of sections().filter((s) => !s.role)) tiles.append(tile(section.name, 'Add line', 'line', 'ko-context', undefined, section));
+    left.append(tiles);
+    root.append(left);
     root.querySelectorAll<HTMLTextAreaElement>('textarea.ko-edit').forEach(fitField);
     const run = focusAfter;
     focusAfter = null;
@@ -963,7 +987,26 @@ export function mountOrganiserSection(host: HTMLElement, options: OrganiserSecti
 
   load();
 
+  /** Opens the concept holding a piece's line, brings it into view and puts the cursor in its words. */
+  function openPiece(pieceId: string): void {
+    const section = sections().find((s) => s.lines.some((l) => l.piece_id === pieceId));
+    const line = section?.lines.find((l) => l.piece_id === pieceId);
+    if (!section || !line) return;
+    const row = conceptRows().find((r) => r.section?.id === section.id);
+    open.add(row?.id ?? section.id);
+    render();
+    const stop = root.querySelector<HTMLElement>(`[data-line="${line.id}"]`);
+    if (!stop) return;
+    stop.classList.remove('ko-flash');
+    void stop.offsetWidth;
+    stop.classList.add('ko-flash');
+    stop.scrollIntoView({ block: 'center' });
+    stop.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
+  }
+
   return {
+    openPiece,
+    refresh: softRender,
     dispose() {
       // Edits still waiting for their delay go now, so leaving the page loses nothing.
       for (const lineId of [...localCells.keys()]) flushLine(lineId);
