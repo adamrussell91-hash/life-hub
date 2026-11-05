@@ -122,9 +122,9 @@ test('saving points every word and the phrase at one matrix, and a second build 
   assert.equal(await lookupMatrixWord(store, 'never-seen'), undefined);
 
   await updateMatrix(store, 'critic', { status: 'checked' });
-  const more = JSON.stringify({ head_word: 'criticism', has_matrix: true, base: 'critic', words: [w('critic', '', '', ''), w('critics', '', '', '-s'), w('criticism', '', '', '-ism')] });
+  const more = JSON.stringify({ head_word: 'criticism', has_matrix: true, base: 'critic', words: [w('critic', '', '', ''), w('critics', '', '', '-s'), w('criticism', '', '', '-ism'), w('criticisms', '', '', '-isms')] });
   const merged = await saveMatrixResult(store, 'criticism', parseMorphemicResult(more, 'criticism'));
-  assert.deepEqual(merged.words.map((entry) => entry.word), ['critic', 'critical', 'criticise', 'uncritical', 'hypercritical', 'critics', 'criticism']);
+  assert.deepEqual(merged.words.map((entry) => entry.word), ['critic', 'critical', 'criticise', 'uncritical', 'hypercritical', 'critics', 'criticism', 'criticisms']);
   assert.equal(merged.status, 'new', 'new words send it back for review');
 
   await saveMatrixResult(store, 'glow', { head_word: 'glow', matrix: null, dropped: [] });
@@ -214,4 +214,12 @@ test('student route only builds words that are in the published block', async ()
   await run(req('POST', '/api/published/word-help-run', { key: view.key }), {});
   const polled = (await (await handler(req('GET', `/api/published/morphemic/${LESSON}/${view.key}`), { params: { id: LESSON, key: view.key } })).json()).data;
   assert.equal(polled.result.matrix.base, 'critic');
+});
+
+test('parseMorphemicResult keeps the bare base but does not count it towards the minimum', () => {
+  const reply = (words) => JSON.stringify({ head_word: 'track', has_matrix: true, base: 'track', source: '', meaning: 'to follow a trail', words });
+  const short = parseMorphemicResult(reply([w('track', '', '', ''), w('tracker', '', '', '-er'), w('tracking', '', '', '-ing')]), 'track');
+  assert.equal(short.matrix, null);
+  const full = parseMorphemicResult(reply([w('track', '', '', ''), w('tracker', '', '', '-er'), w('tracking', '', '', '-ing'), w('trackless', '', '', '-less')]), 'track');
+  assert.deepEqual(full.matrix.words.map((entry) => entry.word), ['track', 'tracker', 'tracking', 'trackless']);
 });

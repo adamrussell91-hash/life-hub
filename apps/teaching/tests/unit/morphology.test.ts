@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { MORPHOLOGY_FAMILIES } from '@/data/morphology-families';
+import { MORPHOLOGY_FAMILIES, type MorphologyFamily } from '@/data/morphology-families';
 import { createMorphemicMatrix, findMorphology, morphologyStorageKey } from '@/blocks/morphology';
 import { buildWordCard, openWordCard, type WordHelpEntry } from '@/blocks/word-help';
 
@@ -212,5 +212,31 @@ describe('dictionary card', () => {
     expect(document.querySelectorAll('.word-card')).toHaveLength(1);
     document.querySelector<HTMLButtonElement>('.morph__toggle')!.click();
     expect(document.querySelector('.word-card .morph-matrix')).not.toBeNull();
+  });
+
+  it('never counts the bare base as a word to find', () => {
+    const word = (w: string, ending: string) => ({ word: w, front: '', prefix: '', ending, definition: `Meaning of ${w}.`, example: `An example with ${w}.` });
+    const track: MorphologyFamily = {
+      id: 'track',
+      base: 'track',
+      source: '',
+      meaning: 'to follow a trail',
+      fronts: [],
+      prefixes: [],
+      endings: [
+        { id: 'er', label: '-er' },
+        { id: 'ing', label: '-ing' },
+        { id: 'less', label: '-less' }
+      ],
+      words: [word('track', ''), word('tracker', 'er'), word('tracking', 'ing'), word('trackless', 'less')]
+    };
+    const matrix = createMorphemicMatrix(track, memoryStorage(), { start: 'track' });
+    expect(matrix.querySelector('.morph-matrix__count')?.textContent).toBe('0 of 3 found');
+    expect(matrix.querySelectorAll('.morph-matrix__pip')).toHaveLength(3);
+    press(matrix, '-er');
+    press(matrix, '-ing');
+    press(matrix, '-less');
+    expect(matrix.querySelector('.morph-matrix__count')?.textContent).toBe('3 of 3 found');
+    expect(matrix.querySelector<HTMLElement>('.morph-matrix__done')?.hidden).toBe(false);
   });
 });

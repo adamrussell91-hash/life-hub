@@ -57,7 +57,7 @@ export const MORPHEMIC_SYSTEM = `You build morphemic matrices for secondary scho
 A morphemic matrix is one base (a free or bound base) plus the prefixes and suffixes that attach to it, and the established English words they build.
 
 1. Choose the head word. For a single word, that is the word. For a phrase, pick the one word whose base has relatives worth building (in "critical attitudes", pick "critical").
-2. Decide whether the head word has a matrix. It has one when its base, with real prefixes and suffixes, builds at least three established words. Everyday words with no prefix or suffix to add (glow, cat, the) have no matrix.
+2. Decide whether the head word has a matrix. It has one when its base, with real prefixes and suffixes, builds at least three established words that each add a prefix or suffix (the bare base on its own does not count). Everyday words with no prefix or suffix to add (glow, cat, the) have no matrix.
 3. Build the matrix around the head word's base.
 
 Rules that matter more than anything else.
@@ -148,7 +148,10 @@ export function parseMorphemicResult(raw, word, isWord = isDictionaryWord) {
     words.push({ word: candidate, front: bare(p1), prefix: bare(p2), ending: bare(suffix), definition, example, labels: { front: p1, prefix: p2, ending: suffix } });
     if (words.length >= MAX_MATRIX_WORDS) break;
   }
-  if (words.length < MIN_MATRIX_WORDS) return { head_word: head, matrix: null, dropped };
+  // The bare base is kept so the word still opens its matrix, but it is not a
+  // word to build, so it does not count towards the minimum.
+  const built = words.filter((entry) => entry.front || entry.prefix || entry.ending);
+  if (built.length < MIN_MATRIX_WORDS) return { head_word: head, matrix: null, dropped };
   // Two prefix rows only when some word stacks two prefixes (un + ortho + dox); otherwise one Prefix row.
   if (!words.some((entry) => entry.front && entry.prefix)) {
     for (const entry of words) {
