@@ -305,3 +305,13 @@ describe('hashQuery', () => {
     expect(hashQuery().get('view')).toBe('orbit');
   });
 });
+
+describe('browser tab name', () => {
+  it('names the tab after the page, also when the header only updates its copy', () => {
+    const refs = renderHubShell(document.createElement('div'), { onLogout: vi.fn() });
+    renderPageHeader(refs, viewChrome('goals'));
+    expect(document.title).toBe('Goals · Tasks Hub');
+    renderPageHeader(refs, viewChrome('week'));
+    expect(document.title).toBe('Week · Tasks Hub');
+  });
+});

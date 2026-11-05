@@ -251,7 +251,14 @@ function createTitleRow(title: HTMLElement): HTMLElement {
 }
 
 /** Kit page header: uppercase eyebrow → h1 → optional supporting → actions. */
+/** The page's name first, so a row of tabs can be told apart. */
+export function tabTitle(title: string | undefined): string {
+  const name = title?.trim();
+  return name && name !== 'Loading…' ? `${name} · Professional Hub` : 'Professional Hub';
+}
+
 export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): void {
+  document.title = tabTitle(config.title);
   refs.pageHeader.classList.toggle('page-header--person', config.person === true);
   refs.pageHeader.replaceChildren();
   const copy = document.createElement('div');

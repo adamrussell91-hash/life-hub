@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderHubShell, renderPrimaryNav } from '@/shell/shell';
+import { renderHubShell, renderPageHeader, renderPrimaryNav, tabTitle } from '@/shell/shell';
 
 describe('professional rail hub switcher', () => {
   it('offers a Tasks Hub link from the rail', () => {
@@ -26,5 +26,19 @@ describe('professional rail hub switcher', () => {
     expect(calendar?.classList.contains('hub-rail__link--sub')).toBe(false);
     expect(refs.rail.querySelector('.hub-rail__link--sub')).toBeNull();
     expect(refs.railNav.textContent).toMatch(/Comms/);
+  });
+});
+
+describe('browser tab name', () => {
+  it('names the tab after the page heading', () => {
+    const refs = renderHubShell(document.createElement('div'));
+    renderPageHeader(refs, { eyebrow: 'Professional Hub', title: 'Meetings' });
+    expect(document.title).toBe('Meetings · Professional Hub');
+  });
+
+  it('shows the hub until a page has a name', () => {
+    expect(tabTitle('Loading…')).toBe('Professional Hub');
+    expect(tabTitle('')).toBe('Professional Hub');
+    expect(tabTitle(undefined)).toBe('Professional Hub');
   });
 });

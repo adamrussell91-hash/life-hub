@@ -701,7 +701,14 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
 }
 
 /** Kit page header: optional back → uppercase eyebrow → h1 → optional supporting → actions. */
+/** The page's name first, so a row of tabs can be told apart. */
+export function tabTitle(title: string | undefined): string {
+  const name = title?.trim();
+  return name && name !== 'Loading…' ? `${name} · Tasks Hub` : 'Tasks Hub';
+}
+
 export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): void {
+  document.title = tabTitle(config.title);
   refs.pageHeader.classList.remove('page-header--cover');
   if (syncPageHeaderCopy(refs, config)) return;
 

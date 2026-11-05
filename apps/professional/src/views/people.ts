@@ -4,6 +4,7 @@
  */
 
 import type { EntityOverview, PersonBrief } from '@/domain/types';
+import { tabTitle } from '@/shell/shell';
 import type { LedgerResponse, LinkProposal } from '@/api/people-directory';
 import {
   applyPeopleDedupe,
@@ -1453,6 +1454,8 @@ export async function renderPeoplePage(
   }
 
   async function paintSelection(): Promise<void> {
+    // A person opens in a panel on this page, so the tab follows the selection.
+    document.title = tabTitle((selectedId && findRow(selectedId)?.display_name) || 'People');
     mountPaneSkeleton();
     root.classList.toggle('people-page--person', Boolean(selectedId) && phone);
     root.classList.toggle('people-page--dir', !selectedId || !phone);
