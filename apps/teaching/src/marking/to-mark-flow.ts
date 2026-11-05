@@ -9,7 +9,8 @@ import { httpMarkbookApi } from '@/markbook/api';
 import { LEVEL_LABELS } from '@/sprint/schema';
 import { markId } from '@/sprint/marking';
 import { openMarkPiece, type MarkPieceActions, type MarkPieceData } from './mark-piece';
-import { loadRubricSetup } from './rubric-setup';
+import { loadRubricSetup, loadUnitRubricSetup } from './rubric-setup';
+import { openAddWriting, unitFromApp, writingApi, type AddedSettings } from './add-writing';
 import { runAiRead, type AiReadTarget } from './ai-read';
 import { FLOW_LABEL, aiReadCount, flowItems, flowLabel, isStacked, type FlowItem, type FlowKind, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
 import { ageText, loadQueue, type ToMarkTask } from './to-mark-view';
@@ -65,7 +66,26 @@ async function voiceCard(item: FlowItem, onGone: () => void): Promise<Card> {
   };
 }
 
+type AddedLoad = Omit<MarkPieceData, 'position' | 'column' | 'mark'> & { piece: string; title: string; unit_id: string; settings: AddedSettings };
+
+/** Writing the teacher added onto a student: marked like handed-in writing, with the rubric from its own unit and tags. */
+async function addedCard(item: FlowItem): Promise<Card> {
+  const { task, row } = item;
+  const api = writingApi(task.class_id);
+  const call = <T>(body: Record<string, unknown>) => api<T>({ student_id: row!.student_id, piece: row!.id, ...body });
+  const data = await call<AddedLoad>({ action: 'load' });
+  const rubric = await loadUnitRubricSetup({ unitId: data.unit_id, settings: data.settings as Block['settings'], who: { classId: task.class_id, studentId: row!.student_id! } }, { unit: unitFromApp });
+  const view = openMarkPiece({ ...data, column: noColumn(data.title), mark: null, position: { index: 0, total: 1 } }, {
+    save: (body) => call({ action: 'save', ...body }),
+    returnIt: () => call({ action: 'return' }),
+    takeBack: () => call({ action: 'take_back' }),
+    move: () => undefined
+  }, { embedded: true, rubric });
+  return { el: view.el, leave: () => void view.save(), finish: () => view.finish() };
+}
+
 async function pieceCard(item: FlowItem): Promise<Card> {
+  if (item.task.kind === 'added') return addedCard(item);
   const { task, row } = item;
   const call = <T>(body: Record<string, unknown>) => apiPost<T>(`/api/classes/${encodeURIComponent(task.class_id)}/pieces`, { column_id: task.column_id, student_id: row!.student_id, ...body });
   const data = await call<Omit<MarkPieceData, 'position'>>({ action: 'load' });
@@ -371,7 +391,10 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
   const count = el('span', 'tf-count');
   const queueToggle = el('button', 'tf-pill tf-queue-toggle', 'Queue');
   queueToggle.type = 'button';
-  headRow.append(el('h1', 'tf-title', 'To mark'), progress, count, queueToggle);
+  const addWriting = button('Add writing', 'secondary', () => void addPiece());
+  addWriting.classList.add('aw-add');
+  addWriting.title = 'Add writing a student gave you outside the app';
+  headRow.append(el('h1', 'tf-title', 'To mark'), progress, count, addWriting, queueToggle);
   const pills = el('div', 'tf-pills');
   const ai = el('div', 'tf-ai');
   head.append(headRow, pills, ai);
@@ -486,6 +509,21 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
   }
 
   const hasAiWork = (): boolean => [...data.quizzes.values()].some((q) => q.questions.some((x) => x.answers.some((a) => a.ai))) || data.tasks.some((t) => (t.rows as { ai_read?: boolean }[] | undefined)?.some((r) => r.ai_read));
+
+  /** Adds a student's writing, then opens it in the queue to mark. */
+  async function addPiece(): Promise<void> {
+    const added = await openAddWriting();
+    if (!added || disposed) return;
+    leaveCard();
+    cards.clear();
+    data = await load();
+    if (disposed) return;
+    items = flowItems(data.tasks, data.quizzes);
+    filter = 'all';
+    const found = items.findIndex((i) => i.row?.id === added.piece);
+    at = found >= 0 ? found : Math.max(0, items.findIndex((i) => !done.has(i.key)));
+    paint();
+  }
 
   async function readAll(): Promise<void> {
     const targets: AiReadTarget[] = [];

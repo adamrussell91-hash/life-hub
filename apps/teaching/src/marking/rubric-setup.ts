@@ -65,15 +65,23 @@ export async function loadRubricSetup(where: RubricWhere, deps: RubricDeps = {})
   if (!lesson) return null;
   const { block, item } = findWork(lesson.blocks ?? [], where);
   if (!block) return null;
-  const tags = rubricTags(block, item);
+  return setupFor(rubricTags(block, item), lesson.unit_id ?? null, where.who ?? null, item?.next_steps ?? null, use);
+}
+
+/** The rubric for work with no lesson (writing the teacher added): its unit and its own deep tags. */
+export async function loadUnitRubricSetup(where: { unitId: string; settings: Block['settings']; who?: RubricWhere['who'] }, deps: RubricDeps = {}): Promise<RubricSetup | null> {
+  return setupFor(rubricTags({ settings: where.settings }), where.unitId, where.who ?? null, null, { ...realDeps, ...deps });
+}
+
+async function setupFor(tags: ReturnType<typeof rubricTags>, unitId: string | null, who: RubricWhere['who'], bank: NextStepBank | null, use: Required<RubricDeps>): Promise<RubricSetup | null> {
   if (!tags.skills.length && !tags.pieces.length && !tags.steps.length) return null;
   const [unit, continuum, codes] = await Promise.all([
-    lesson.unit_id ? use.unit(lesson.unit_id).catch(() => null) : Promise.resolve(null),
+    unitId ? use.unit(unitId).catch(() => null) : Promise.resolve(null),
     tags.skills.length ? use.continuum().catch(() => null) : Promise.resolve(null),
     use.codes().catch(() => [] as readonly FeedbackCode[])
   ]);
   const deep = unit?.deep_understandings ?? [];
-  const progress = where.who && lesson.unit_id && tags.steps.length ? await use.progress(where.who.classId, lesson.unit_id).catch(() => null) : null;
+  const progress = who && unitId && tags.steps.length ? await use.progress(who.classId, unitId).catch(() => null) : null;
   const unitPieces: RubricPieceRow[] = deep.flatMap((d) => d.pieces.map((p) => ({ id: p.id, text: p.text, tier: p.tier })));
   return {
     rows: rubricRows(tags, { continuum, deep }),
@@ -81,8 +89,8 @@ export async function loadRubricSetup(where: RubricWhere, deps: RubricDeps = {})
     deep,
     continuum,
     codes,
-    bank: item?.next_steps ?? null,
-    passed: progress && where.who ? passedOf(progress, where.who.studentId) : null,
-    unitId: lesson.unit_id ?? null
+    bank,
+    passed: progress && who ? passedOf(progress, who.studentId) : null,
+    unitId
   };
 }

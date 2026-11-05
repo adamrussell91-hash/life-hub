@@ -3,7 +3,7 @@ import { navigate } from '@/app/router';
 import { apiGet } from '@/api/client';
 import './marking.css';
 
-export type ToMarkKind = 'piece' | 'quiz' | 'voice' | 'sprint' | 'handup' | 'ask';
+export type ToMarkKind = 'piece' | 'quiz' | 'voice' | 'sprint' | 'handup' | 'ask' | 'added';
 
 export type ToMarkTask = {
   kind?: ToMarkKind;
@@ -31,6 +31,7 @@ export type ToMarkTask = {
 
 const KIND_LABEL: Record<ToMarkKind, string> = {
   piece: 'Writing',
+  added: 'Writing',
   quiz: 'Quiz',
   voice: 'Voice',
   sprint: 'Sprint',
