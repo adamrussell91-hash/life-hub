@@ -4540,7 +4540,7 @@ function ownIssue(block, discernHosts) {
     const issue = hingeIssue(block.content);
     if (issue) return issue;
   }
-  if (block.block_type === "continuum_line") {
+  if (block.block_type === "continuum_line" && !block.content.returns_to) {
     const c = block.content;
     if (!c.statements.some((s) => s.text.trim())) return "Write at least one statement for this Continuum line";
     if (!c.scale.left.trim() || !c.scale.right.trim()) return "Label both ends of this Continuum line";
@@ -4889,6 +4889,12 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 
 // apps/teaching/src/schemas/unit.ts
 import { z as z19 } from "zod";
+var WalkthruTieSchema = z19.object({
+  technique: z19.string().min(1).max(120),
+  kind: z19.enum(["du", "organiser", "block"]),
+  ref: z19.string().min(1).max(240),
+  how: z19.string().max(200).optional()
+});
 var UnitSchema = z19.object({
   ...CommonFields,
   ...TrashFields,
@@ -4905,6 +4911,7 @@ var UnitSchema = z19.object({
   outcome_ids: z19.array(z19.string().min(1)).max(24).optional(),
   /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
   deep_understandings: z19.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
+  walkthru_ties: z19.array(WalkthruTieSchema).max(120).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
   kind: z19.enum(["program"]).optional(),
   source: SourceSchema.optional()
