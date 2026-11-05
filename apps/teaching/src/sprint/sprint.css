@@ -623,6 +623,10 @@ body.spractice-open { overflow: hidden; }
 .sd-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .sd-borrow__row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
 .sd-borrow__row:last-child { border-bottom: 0; }
+.sd-borrow__strong { display: block; margin-top: 2px; color: var(--muted); font-size: 14px; }
+.sd-ours { margin-bottom: 14px; }
+.sd-ours strong { display: block; }
+.sd-ours__tag { display: block; margin-bottom: 2px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .sd-status { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
 @media (max-width: 600px) {
   .sd-part__top { grid-template-columns: minmax(0, 1fr); }

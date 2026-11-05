@@ -280,7 +280,7 @@ function groupResult(s: SprintStatus, label: Map<string, string>, ctx: FormConte
   if (r?.best_at.length) {
     const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
     const best = el('div', 'sdd-best');
-    best.append(el('h3', '', 'Strongest in each criterion'), el('p', 'sprint-note', 'Your group’s idea can borrow the best bits of the others. Add them as parts below.'));
+    best.append(el('h3', '', 'Strongest in each criterion'), el('p', 'sprint-note', 'Your group’s idea is the one with the most wins. Any idea listed here can lend its best bits: add them as parts in the next step.'));
     for (const b of r.best_at) {
       const p = el('p', 'sdd-best__row');
       p.append(el('b', '', `${crit.get(b.criterion) ?? b.criterion}:`), ` ${b.ideas.map((i) => `${label.get(i.id) ?? 'Idea'} · ${i.title}`).join(' and ')}`);
@@ -359,6 +359,14 @@ function partsEditor(ctx: FormContext): HTMLElement {
     l.append(top, area);
     return l;
   };
+
+  // The idea being planned, so the ideas offered for borrowing further down can't be taken for it.
+  if (s.chosen) {
+    const ours = el('div', 'sprint-chosen sd-ours');
+    ours.append(el('span', 'sd-ours__tag', 'Your group’s idea'), el('strong', '', s.chosen.title));
+    if (s.chosen.idea) ours.append(el('p', '', s.chosen.idea));
+    box.append(ours);
+  }
 
   // 1. The parts and who does each.
   const t1 = task(1, 'List the parts and who does each', 'Everyone needs at least one part, and someone can take two. Say what each part must show and which criterion it serves.');
@@ -448,16 +456,24 @@ function partsEditor(ctx: FormContext): HTMLElement {
   box.append(t1.el);
 
   // 2. Borrow a good bit (optional).
-  const best = (s.results?.best_at ?? []).flatMap((b) => b.ideas.filter((i) => i.id !== s.chosen?.id).map((i) => ({ ...i, criterion: b.criterion })));
+  // One row per idea, however many criteria it topped, and never the group's own.
+  const others = new Map<string, { id: string; title: string; idea: string; criteria: string[] }>();
+  for (const b of s.results?.best_at ?? []) for (const i of b.ideas) {
+    if (i.id === s.chosen?.id) continue;
+    const row = others.get(i.id) ?? { ...i, criteria: [] };
+    row.criteria.push(b.criterion);
+    others.set(i.id, row);
+  }
+  const best = [...others.values()];
   if (best.length) {
     const crit = new Map(ctx.sprint.criteria.map((c) => [c.id, c.text]));
-    const t2 = task(2, 'Borrow a good bit (optional)', 'Your group rated these other ideas strongest for a criterion. Add the best bit as a part of your idea.');
+    const t2 = task(2, 'Borrow from another idea (optional)', `Your group is building “${s.chosen?.title ?? ''}”. Your group rated these other ideas strongest for a criterion, so you can add their best bit as a part.`);
     t2.el.classList.add('sd-borrow');
     for (const x of best) {
       const row = el('div', 'sd-borrow__row');
       const text = el('span', '');
-      text.append(el('b', '', `${crit.get(x.criterion) ?? ''}:`), ` “${x.title}”. ${x.idea}`);
-      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criterion }); touched(); paint(); });
+      text.append(`“${x.title}”. ${x.idea}`, el('span', 'sd-borrow__strong', `Strongest in ${andList(x.criteria.map((c) => crit.get(c) ?? c))}`));
+      const go = button('Add as a part', 'ghost', () => { parts.push({ ...newPart(`From "${x.title}"`, x.idea), criterion: x.criteria[0] ?? '' }); touched(); paint(); });
       go.disabled = !ctx.editable;
       row.append(text, go);
       t2.el.append(row);
