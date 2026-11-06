@@ -121,6 +121,46 @@ export function mergeCapture(visit, draft, photos = []) {
 
 const sameName = (a, b) =>
   String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// Names dishes from their own photos. The reader says which dish each photo
+// shows; when a menu was read with it the name is the menu's, and the menu's
+// ingredients come across. `sent` maps each image identifier sent to the
+// stored photo key it came from. Only dishes in `open` change: those with no
+// title yet, or still holding a name guessed before the menu was read.
+// Returns the visit and the ids of the dishes it named.
+export function nameDishPhotos(visit, drafts, sent, open) {
+  const next = structuredClone(visit),
+    named = [];
+  for (const raw of drafts)
+    for (const found of unshoutVisit(structuredClone(raw)).dishes || []) {
+      if (!String(found.title || "").trim()) continue;
+      const keys = (found.photo_ids || [])
+        .map((id) => sent.get(id))
+        .filter(Boolean);
+      const dish = next.dishes.find(
+        (d) =>
+          open.has(d.id) &&
+          !named.includes(d.id) &&
+          d.photos.some((p) => keys.includes(p.key)),
+      );
+      if (!dish) continue;
+      const renamed = !sameName(dish.title, found.title);
+      dish.title = found.title;
+      if (found.title_en) dish.title_en = found.title_en;
+      else delete dish.title_en;
+      if (!dish.cuisine && found.cuisine) dish.cuisine = found.cuisine;
+      if (!dish.tags.length && found.tags?.length) dish.tags = found.tags;
+      if (renamed && dish.ingredients && ingredientsFromMenu(next, dish)) {
+        dish.ingredients = "";
+        delete dish.ingredients_original;
+      }
+      if (!String(dish.ingredients || "").trim()) {
+        const menu = menuIngredientsFor(next, dish.title);
+        if (menu) Object.assign(dish, menu);
+      }
+      named.push(dish.id);
+    }
+  return { visit: next, named };
+}
 // The menu's words for a dish typed by name, so ingredients come across
 // even when the dish was not ticked from the list. Null when the menu has
 // no dish of that name or it lists no ingredients.
@@ -251,10 +291,18 @@ export function toggleMenuDish(visit, item) {
 export function captureBatches(images) {
   const menus = images.filter((i) => i.role === "menu");
   const dishes = images.filter((i) => i.role === "dish");
-  // Every page of a menu is read; with dish photos, the last page names them.
+  // Every page of a menu is read. With dish photos, the last pages travel
+  // with each batch so the dishes take the menu's names; earlier pages are
+  // read on their own so none of their items are lost.
   if (!dishes.length) return budgeted(menus);
-  const menu = menus.slice(-1);
-  const batches = [];
+  const menu = [];
+  for (const page of menus.toReversed()) {
+    const used = menu.reduce((n, i) => n + i.data.length, 0);
+    if (menu.length && (menu.length >= 2 || used + page.data.length > 1500000))
+      break;
+    menu.unshift(page);
+  }
+  const batches = budgeted(menus.slice(0, menus.length - menu.length));
   let batch = [...menu],
     size = menu.reduce((n, i) => n + i.data.length, 0);
   for (const image of dishes) {

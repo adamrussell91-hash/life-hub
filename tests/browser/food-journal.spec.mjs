@@ -214,6 +214,29 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {}, chec
           (x) => x.type === "text" && x.text.includes("Photo role: dish"),
         )?.text || "";
       const photoId = photoText.split("Photo identifier: ")[1];
+      const hasMenu = options.messages[0].content.some(
+        (x) => x.type === "text" && x.text.includes("Photo role: menu"),
+      );
+      // A dish photo alone gives a guessed name; with the menu, the menu's.
+      if (photoId)
+        return JSON.stringify({
+          title: hasMenu ? "Noodle dinner" : "",
+          venue: { name: hasMenu ? "Noodle Cafe" : "", address: "" },
+          menu_text: hasMenu ? "Pork gyoza $12" : "",
+          menu_items: hasMenu
+            ? [{ name: "Pork gyoza", description: "Pan fried", price: "$12" }]
+            : [],
+          dishes: [
+            {
+              title: hasMenu ? "PORK GYOZA" : "Dumplings",
+              cuisine: "Chinese",
+              meal_type: "Dinner",
+              tags: ["Dumplings"],
+              notes: "",
+              photo_ids: [photoId],
+            },
+          ],
+        });
       return JSON.stringify({
         title: "Noodle dinner",
         venue: { name: "Noodle Cafe", address: "Sydney" },
@@ -823,6 +846,46 @@ test("capture, private upload, menu text, backup and restore work through the re
     .click();
   await page.locator(".food-sheet").waitFor({ state: "detached" });
   assert.equal(read().visits.length, 2);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("a dish photo then a menu photo fill in the dish with nothing typed", async () => {
+  const { page, read, errors } = await pageFor(390);
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  const photo = {
+    name: "dish.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(JPEG, "base64"),
+  };
+  // The dish photo alone is read and names the dish.
+  await page.getByLabel("Dish photo", { exact: true }).setInputFiles(photo);
+  await page
+    .getByText("Filled in from your photos. Check it, then save.", { exact: true })
+    .waitFor();
+  const title = page.getByLabel("Dish title", { exact: true });
+  assert.equal(await title.inputValue(), "Dumplings");
+  // The menu then swaps in its own name and brings its ingredients across.
+  await goStep(page, 0);
+  await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
+  await page
+    .getByText("Filled in from your photos. Check it, then save.", { exact: true })
+    .waitFor();
+  await goStep(page, 1);
+  assert.equal(await title.count(), 1);
+  assert.equal(await title.inputValue(), "Pork Gyoza");
+  assert.equal(
+    await page.getByLabel("Ingredients", { exact: true }).inputValue(),
+    "Pan fried",
+  );
+  await saveVisit(page);
+  const saved = read().visits.at(-1);
+  assert.equal(saved.title, "Noodle dinner");
+  assert.equal(saved.venue.name, "Noodle Cafe");
+  assert.deepEqual(
+    saved.dishes.map((d) => [d.title, d.ingredients, d.cuisine, d.tags, d.photos.length]),
+    [["Pork Gyoza", "Pan fried", "Chinese", ["Dumplings"], 1]],
+  );
   assert.deepEqual(errors, []);
   await page.close();
 });
