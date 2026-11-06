@@ -350,13 +350,53 @@ function dishCard(ctx, session, card, excluded) {
 // Only Adam can rate, so a rating card suggests nothing: a score, half a
 // point more, or "Can't remember" so it is never asked again.
 let half = false;
+// A name fixed on the card, sent with its score. Kept by check id so a
+// repaint, or going back to the card, shows the fixed name.
+const renamed = new Map();
+function renameForm(ctx, check, dish, title) {
+  const toggle = ctx.button("Wrong name?", () => {
+    toggle.hidden = true;
+    form.hidden = false;
+    input.focus();
+  }, "ghost");
+  toggle.classList.add("fj-check__rename");
+  const form = el("form", "food-pair food-pair--end food-pair--keep");
+  form.hidden = true;
+  const wrap = el("div", "hub-field"),
+    label = el("label", "hub-label", "What was it?"),
+    input = el("input", "hub-input");
+  input.id = `fj-rename-${check.id}`;
+  label.htmlFor = input.id;
+  input.maxLength = 200;
+  input.autocomplete = "off";
+  input.value = renamed.get(check.id) || dish.title || "";
+  wrap.append(label, input);
+  const use = ctx.button("Use this name", () => {}, "secondary");
+  use.type = "submit";
+  form.append(wrap, use);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = input.value.trim();
+    if (!name) return input.focus();
+    if (name === (dish.title || "")) renamed.delete(check.id);
+    else renamed.set(check.id, name);
+    title.textContent = name;
+    form.hidden = true;
+    toggle.hidden = false;
+  });
+  return [toggle, form];
+}
 function rateCard(ctx, session, card) {
   const { check, dish, visit } = card;
   const body = el("div", "fj-check__body");
+  const title = el("h3", "fj-card__title fj-serif", renamed.get(check.id) || dish.title || "Untitled dish");
   body.append(
     el("p", "fj-kicker", [dateLine(visit), visit.venue?.name].filter(Boolean).join(" · ")),
-    el("h3", "fj-card__title fj-serif", dish.title || "Untitled dish"),
+    title,
+    ...renameForm(ctx, check, dish, title),
   );
+  const withName = (answer) =>
+    renamed.has(check.id) ? { ...answer, title: renamed.get(check.id) } : answer;
   const said = firstSentence(plainNotes(dish.notes || ""), 220);
   if (said) body.append(el("p", "fj-check__said fj-serif", said));
   const others = withoutDeleted(visit.dishes).filter((d) => d.id !== dish.id);
@@ -371,7 +411,7 @@ function rateCard(ctx, session, card) {
     const b = ctx.button("", () => {
       const rating = value(n);
       half = false;
-      session.answer(check, { pick: "rate", rating });
+      session.answer(check, withName({ pick: "rate", rating }));
     }, "secondary");
     b.classList.add("fj-check__pick", "fj-check__score");
     b.dataset.key = String(n);
@@ -399,7 +439,7 @@ function rateCard(ctx, session, card) {
   show();
   const unknown = choice(ctx, 0, "Can't remember", "It won't be asked again", "ghost", () => {
     half = false;
-    session.answer(check, { pick: "unknown" });
+    session.answer(check, withName({ pick: "unknown" }));
   });
   body.append(scores, unknown);
   const own = (dish.photos || []).slice(0, 3);
