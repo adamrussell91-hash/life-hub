@@ -2278,6 +2278,16 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
 .fj-check .fj-check__half {
   font-size: var(--text-sm, 0.875rem);
 }
+/* "Wrong name?" sits under the dish title, small and out of the way. */
+.fj-check .fj-check__rename {
+  justify-self: start;
+  min-height: 44px;
+  margin-top: calc(-1 * var(--space-2));
+}
+.fj-check__body form[hidden],
+.fj-check .fj-check__rename[hidden] {
+  display: none;
+}
 .fj-check .fj-check__half.is-active {
   background: var(--pastel-blue);
   border-color: var(--wave);

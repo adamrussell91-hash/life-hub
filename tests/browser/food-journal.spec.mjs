@@ -1806,6 +1806,11 @@ for (const width of [1440, 390])
     await four.click();
     await page.getByRole("heading", { name: "Tortilla" }).waitFor();
     assert.equal((await four.textContent()).trim(), "4", "the half resets for the next dish");
+    // A misnamed dish is fixed on the card and the fix rides with the answer.
+    await page.getByRole("button", { name: "Wrong name?" }).click();
+    await page.getByLabel("What was it?").fill("Fried cheese");
+    await page.getByRole("button", { name: "Use this name" }).click();
+    await page.getByRole("heading", { name: "Fried cheese" }).waitFor();
     await page.getByRole("button", { name: /Can't remember/ }).click();
     await page.getByText("Every dish has a rating.", { exact: false }).waitFor();
     await page.getByRole("tab", { name: "Timeline", exact: true }).click();
@@ -1815,6 +1820,7 @@ for (const width of [1440, 390])
     assert.equal(dish("dish_second").rating, 4.5);
     assert.equal(dish("dish_third").rating, null);
     assert.equal(dish("dish_third").rating_unknown, true);
+    assert.equal(dish("dish_third").title, "Fried cheese");
     assert.deepEqual(errors, []);
     await page.close();
   });
