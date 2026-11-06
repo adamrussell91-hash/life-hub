@@ -137,3 +137,29 @@ test('an AI-marked answer still waits in To mark, with its tags for the teacher 
   const seen = JSON.stringify(await quizAction(store, 'quiz1', { ...pip }));
   for (const leak of ['TAG-WHY', 'ESSAY-REASON']) assert.ok(!seen.includes(leak), `${leak} stays with the teacher`);
 });
+
+test('To mark shows the question itself: a gap passage with its key, a short answer’s accepted answers', async () => {
+  const gapQ = { kind: 'fill_gap', prompt: 'Fill the gaps.', marks: 2, passage: 'The [[river|creek]] rises over the [[road]].', ai_mark: true };
+  const quiz = { id: 'quiz2', title: 'Gap check', unit_id: 'unit1', pedagogical_mode: 'quiz', quiz: {}, blocks: [qBlock('qg', gapQ), qBlock('qa', saAi)] };
+  const store = storeFixture([
+    ['lessons/quiz2', quiz],
+    ['classes/class1', { id: 'class1', type: 'class', title: '8 English', students: [{ name: 'Pip Quill' }, { name: 'Wren Ashby' }] }]
+  ]);
+  const prepared = prepareQuizPublish(quiz, quiz.blocks);
+  assert.deepEqual(prepared.problems, []);
+  await storeQuizKey(store, 'quiz2', prepared.quiz);
+  await store.setJSON('published/lessons/quiz2', { blocks: prepared.blocks, pedagogical_mode: 'quiz', quiz: prepared.quiz.snapshot });
+  const parts = prepared.blocks.find((b) => b.id === 'qg').content.question.parts;
+  const [g1, g2] = parts.filter((p) => p.type === 'gap').map((p) => p.id);
+  await quizAction(store, 'quiz2', { ...wren, action: 'claim', initials: 'WA' });
+  await quizAction(store, 'quiz2', { ...wren, action: 'start' });
+  await quizAction(store, 'quiz2', { ...wren, action: 'submit', responses: { qg: { gaps: { [g1]: 'stream', [g2]: 'road' } }, qa: { text: 'the lover boy' } } });
+  const { quizAnswersToMark } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const { students } = await loadRoster(store, 'class1');
+  const found = await quizAnswersToMark(store, 'quiz2', 'class1', students);
+  const gap = found.questions.find((q) => q.id === 'qg');
+  assert.deepEqual(gap.passage, [{ text: 'The ' }, { gap: g1, answers: ['river', 'creek'] }, { text: ' rises over the ' }, { gap: g2, answers: ['road'] }, { text: '.' }]);
+  const sa = found.questions.find((q) => q.id === 'qa');
+  assert.deepEqual([sa.accepted, sa.looking_for], [['Romeo'], 'The young lover.']);
+});

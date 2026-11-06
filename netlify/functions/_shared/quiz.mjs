@@ -1179,6 +1179,7 @@ export async function quizAnswersToMark(store, lessonId, classId, students) {
           id: row.id, kind: key.kind, marks: key.marks, prompt: question.prompt ?? '', ...(question.quote ? { quote: question.quote } : {}),
           ...(key.answer?.type === 'manual' && key.answer.guide ? { guide: key.answer.guide } : {}),
           ...(key.answer?.type === 'manual' && key.answer.model_answer ? { model_answer: key.answer.model_answer } : {}),
+          ...questionShown(question, key),
           answers: []
         });
       }
@@ -1189,6 +1190,22 @@ export async function quizAnswersToMark(store, lessonId, classId, students) {
     }
   });
   return { lesson_id: lessonId, title: insight.title, questions: [...questions.values()] };
+}
+
+/**
+ * What the teacher needs to see to mark a stacked question: a gap passage with
+ * each gap's accepted answers, or a short answer's accepted answers and what
+ * it looks for. Without it the marking screen shows only "Fill the gaps."
+ */
+function questionShown(question, key) {
+  const a = key.answer;
+  if (key.kind === 'fill_gap' && Array.isArray(question.parts) && a?.type === 'gaps') {
+    return { passage: question.parts.map((part) => (part.type === 'gap' ? { gap: part.id, answers: [...(a.gaps[part.id] ?? [])] } : { text: part.text ?? '' })) };
+  }
+  if (a?.type === 'text') {
+    return { accepted: [...a.accepted], ...(key.looking_for ? { looking_for: key.looking_for } : {}) };
+  }
+  return {};
 }
 
 /** A question as the AI marker reads it (MarkingQuestion in answer-marking-jobs.ts): teaching text and the key, nothing about students. */

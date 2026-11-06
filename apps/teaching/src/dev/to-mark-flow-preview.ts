@@ -108,6 +108,14 @@ const quiz = () => ({
       answer(1, 'hell', aiDone ? { ai_ready: false, by: 'ai', awarded: 0, ai: { marks: 0, verdict: 'wrong', reason: 'Names an idea, no image.' } } : {}),
       answer(2, 'a vagabond walking', aiDone ? { ai_ready: false, ai: { marks: null, verdict: 'unsure', reason: 'Names a figure; the line’s image is the curve.' } } : {})
     ]),
+    {
+      ...question('q_gap', 'fill_gap', 3, 'Fill the gaps.', [
+        { ...answer(0, ''), response: { gaps: { g1: 'river', g2: 'the people', g3: 'surface' } } },
+        { ...answer(2, ''), response: { gaps: { g1: 'creek', g2: 'the communities', g3: '' } } }
+      ]),
+      passage: [{ text: 'The road follows the ' }, { gap: 'g1', answers: ['river', 'creek'] }, { text: ' and cuts through ' }, { gap: 'g2', answers: ['the communities'] }, { text: ', and the past keeps rising to the ' }, { gap: 'g3', answers: ['surface'] }, { text: '.' }]
+    },
+    { ...question('q_short2', 'short_answer', 1, 'Which word tells you the speaker is certain?', [answer(1, 'surely')]), accepted: ['clearly'], looking_for: 'The judging word in the critic’s claim.' },
     question('q_form', 'extended_response', 8, FORM_PROMPT, [answer(1, FORM_ANSWER, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 6, reason: 'Links the form to the idea, with two specific moments.' } } : {})]),
     question('q_written', 'extended_response', 4, 'Justify how the critic’s claims affirm or challenge a reader’s relationship with the past.', [
       answer(0, WRITTEN, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 3, reason: 'Uses a judging word and links to the poem. The link to the reader stays general.', feedback: 'You name a judging word and show what it does. Next, say what this asks of the reader.', tags: [{ code_id: 'comp_e', quote: 'Using “clearly” shows she is sure', why: 'Names the judging word and what it does' }, { code_id: 'comp_ar', quote: 'the past is still being dealt with now', why: 'Close to the question, but says no more about the reader' }] } } : {})
