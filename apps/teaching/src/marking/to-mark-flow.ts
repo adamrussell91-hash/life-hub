@@ -12,7 +12,7 @@ import { openMarkPiece, type MarkPieceActions, type MarkPieceData } from './mark
 import { loadRubricSetup, loadUnitRubricSetup } from './rubric-setup';
 import { openAddWriting, unitFromApp, writingApi, type AddedSettings } from './add-writing';
 import { runAiRead, type AiReadTarget } from './ai-read';
-import { FLOW_LABEL, aiReadCount, flowItems, flowLabel, isStacked, type FlowItem, type FlowKind, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
+import { FLOW_LABEL, aiReadCount, flowItems, flowLabel, isStacked, type FlowItem, type FlowKind, type PassagePart, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
 import { ageText, loadQueue, type ToMarkTask } from './to-mark-view';
 import './marking.css';
 
@@ -198,18 +198,62 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   };
 }
 
+const gapNumbers = (passage: PassagePart[]): Map<string, number> => {
+  const numbers = new Map<string, number>();
+  for (const part of passage) if ('gap' in part) numbers.set(part.gap, numbers.size + 1);
+  return numbers;
+};
+const fits = (given: string, accepted: string[]): boolean => accepted.some((x) => x.trim().toLowerCase() === given.trim().toLowerCase());
+
+/** The question itself above the stacked answers: the passage with numbered gaps and their answers, or the accepted answers. */
+function questionShown(question: QuizQuestion): HTMLElement {
+  const box = el('div', 'tf-question');
+  if (question.quote) box.append(el('p', 'tf-note', question.quote));
+  if (question.passage) {
+    const numbers = gapNumbers(question.passage);
+    const p = el('p', 'tf-passage');
+    for (const part of question.passage) {
+      if ('gap' in part) {
+        const gap = el('span', 'tf-gap');
+        gap.append(el('b', undefined, String(numbers.get(part.gap))), document.createTextNode(part.answers.join(' / ') || '?'));
+        p.append(gap);
+      } else p.append(document.createTextNode(part.text));
+    }
+    box.append(p);
+  }
+  if (question.accepted?.length) box.append(el('p', 'tf-key', `Accepted: ${question.accepted.join(' / ')}`));
+  if (question.looking_for) box.append(el('p', 'tf-key', `Looking for: ${question.looking_for}`));
+  if (question.model_answer) box.append(el('p', 'tf-key', `Model answer: ${question.model_answer}`));
+  return box;
+}
+
+/** One student's gap answers, numbered to match the passage; answers outside the key are flagged. */
+function gapAnswers(passage: PassagePart[], gaps: Record<string, string>): HTMLElement {
+  const p = el('p', 'tf-gapans');
+  const numbers = gapNumbers(passage);
+  for (const part of passage) {
+    if (!('gap' in part)) continue;
+    const given = gaps[part.gap] ?? '';
+    const chip = el('span', `tf-gap${given.trim() && fits(given, part.answers) ? '' : ' is-off'}`);
+    chip.append(el('b', undefined, String(numbers.get(part.gap))), document.createTextNode(given.trim() || '(blank)'));
+    p.append(chip);
+  }
+  return p;
+}
+
 function stackCard(item: FlowItem): Card {
   const question = item.question!;
   const { task } = item;
   const picks = new Map<string, number>();
   const box = el('div', 'tf-card');
+  const shown = questionShown(question);
   const paint = (): void => {
-    box.replaceChildren(el('h3', 'mk-side__title', `${question.answers.length} answers to one question. Tap to decide.`));
-    if (question.quote) box.append(el('p', 'tf-note', question.quote));
+    const n = question.answers.length;
+    box.replaceChildren(shown, el('h3', 'mk-side__title', `${n} ${n === 1 ? 'answer' : 'answers'} to this question. Tap to decide.`));
     for (const a of question.answers) {
       const row = el('div', 'tf-ans');
       row.append(el('span', 'tf-who', a.initials));
-      const p = el('p', undefined, answerText(a.response) || '(blank)');
+      const p = question.passage && a.response?.gaps ? gapAnswers(question.passage, a.response.gaps) : el('p', undefined, answerText(a.response) || '(blank)');
       if (a.ai) p.append(el('small', undefined, a.ai.reason));
       row.append(p);
       const ticks = el('div', 'tf-ticks');

@@ -23,7 +23,21 @@ export type QuizAnswer = {
   ai?: { marks: number | null; suggested?: number; reason: string; feedback?: string; tags?: { code_id: string; quote: string; why?: string }[] };
   comment?: string;
 };
-export type QuizQuestion = { id: string; kind: string; marks: number; prompt: string; quote?: string; guide?: string; model_answer?: string; answers: QuizAnswer[] };
+/** A gap passage piece: plain text, or a gap with its accepted answers. */
+export type PassagePart = { text: string } | { gap: string; answers: string[] };
+export type QuizQuestion = {
+  id: string;
+  kind: string;
+  marks: number;
+  prompt: string;
+  quote?: string;
+  guide?: string;
+  model_answer?: string;
+  passage?: PassagePart[];
+  accepted?: string[];
+  looking_for?: string;
+  answers: QuizAnswer[];
+};
 export type QuizLoad = { lesson_id: string; title: string; questions: QuizQuestion[] };
 
 export type FlowRow = { student_id?: string; initials: string; id?: string; ai_read?: boolean; has_transcript?: boolean; source?: 'lecture' | 'tutorial'; text?: string; scene_label?: string; draft?: number; sent_scope?: unknown; title?: string };
@@ -48,7 +62,9 @@ const short = (text: string, max = 60): string => (text.length > max ? `${text.s
 function quizItems(task: ToMarkTask, load: QuizLoad | undefined): FlowItem[] {
   const out: FlowItem[] = [];
   for (const question of load?.questions ?? []) {
-    const group = `${task.title} · ${short(question.prompt) || 'Question'}`;
+    // A gap question's prompt is usually just "Fill the gaps.", so the list names it by its passage.
+    const passage = question.passage?.map((part) => ('gap' in part ? '___' : part.text)).join('').trim();
+    const group = `${task.title} · ${short(passage || question.prompt) || 'Question'}`;
     if (isStacked(question.kind)) {
       out.push({ key: `quiz:${task.class_id}:${task.lesson_id}:${question.id}`, kind: 'quiz', who: String(question.answers.length), count: question.answers.length, task, group, question });
     } else {
