@@ -164,6 +164,26 @@ describe('renderApplicationNewView', () => {
           }
         });
       }
+      if (href.includes('/api/career-futures')) {
+        return Response.json({
+          ok: true,
+          data: {
+            futures: [
+              {
+                id: 'future_a',
+                title: 'Head of English',
+                where: 'Example School',
+                status: 'active',
+                criteria: [
+                  { id: 'fcrit_2', text: 'Leads a team', order: 1, source: 'ad' },
+                  { id: 'fcrit_1', text: 'Strong subject knowledge', order: 0, source: 'ad' }
+                ]
+              },
+              { id: 'future_b', title: 'Parked role', where: null, status: 'parked', criteria: [] }
+            ]
+          }
+        });
+      }
       if (href.includes('/api/applications') && init?.method === 'POST') {
         return Response.json({
           ok: true,
@@ -271,6 +291,61 @@ describe('renderApplicationNewView', () => {
         })
       ])
     );
+  });
+
+  it('starts from a chosen future: fills the title, links the organisation, carries criteria', async () => {
+    const canvas = document.createElement('div');
+    await renderApplicationNewView(canvas);
+    const select = canvas.querySelector('[aria-label="Start from a future"]') as HTMLSelectElement;
+    await vi.waitFor(() => expect(select.hidden).toBe(false));
+    const labels = [...select.options].map((o) => o.textContent);
+    expect(labels).toEqual(['None, start blank', 'Head of English · Example School']);
+
+    select.value = 'future_a';
+    select.dispatchEvent(new Event('change'));
+    const title = canvas.querySelector('[aria-label="Position title"]') as HTMLInputElement;
+    expect(title.value).toBe('Head of English');
+    const note = canvas.querySelector('.application-form__future-note') as HTMLElement;
+    await vi.waitFor(() => expect(note.textContent).toContain('Linked to Example School'));
+    expect(note.textContent).toContain('2 criteria come across');
+
+    const form = canvas.querySelector('form.application-form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => {
+      expect(
+        vi.mocked(fetch).mock.calls.some(
+          (call) => String(call[0]).includes('/api/applications') && call[1]?.method === 'POST'
+        )
+      ).toBe(true);
+    });
+    const createCall = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        (call) => String(call[0]).includes('/api/applications') && call[1]?.method === 'POST'
+      );
+    const body = JSON.parse(String(createCall?.[1]?.body));
+    expect(body.position_title).toBe('Head of English');
+    expect(body.selection_criteria).toEqual([
+      { criterion: 'Strong subject knowledge', order: 0, completed: false },
+      { criterion: 'Leads a team', order: 1, completed: false }
+    ]);
+    expect(body.links).toEqual([
+      expect.objectContaining({ target_ref: ORG_REF, relationship_type: 'applies_to' })
+    ]);
+  });
+
+  it('going back to blank clears what the future filled', async () => {
+    const canvas = document.createElement('div');
+    await renderApplicationNewView(canvas);
+    const select = canvas.querySelector('[aria-label="Start from a future"]') as HTMLSelectElement;
+    await vi.waitFor(() => expect(select.hidden).toBe(false));
+    select.value = 'future_a';
+    select.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(canvas.querySelectorAll('.entity-chip').length).toBe(1));
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    expect((canvas.querySelector('[aria-label="Position title"]') as HTMLInputElement).value).toBe('');
+    expect(canvas.querySelectorAll('.entity-chip').length).toBe(0);
   });
 });
 
@@ -684,4 +759,5 @@ describe('application detail editing controls', () => {
     expect(canvas.querySelector('[aria-label="Application contact"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Referee"]')).toBeTruthy();
   });
+
 });
