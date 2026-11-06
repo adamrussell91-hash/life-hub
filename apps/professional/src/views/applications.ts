@@ -14,6 +14,14 @@ import {
   updateApplication
 } from '@/api/applications';
 import { searchEntities } from '@/api/entities';
+import { listFutures } from '@/api/career';
+import {
+  applicableFutures,
+  applicationPrefillFromFuture,
+  futureOptionLabel,
+  type ApplicationPrefill,
+  type FutureRecord
+} from '@/domain/application-from-future';
 import { ApiClientError } from '@/api/client';
 import { applicationRoute } from '@/app/router';
 import { applicationRef } from '@/domain/ids';
@@ -336,6 +344,100 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
     }
   });
 
+  // Start from a future: one pick fills the title, the organisation and the
+  // criteria the future already holds. Everything stays editable.
+  const futureLabel = el('label', undefined, 'Start from a future');
+  const futureSelect = document.createElement('select');
+  futureSelect.setAttribute('aria-label', 'Start from a future');
+  const futureNote = el('p', 'application-form__status application-form__future-note');
+  futureLabel.hidden = true;
+  futureSelect.hidden = true;
+  futureNote.hidden = true;
+  let futures: FutureRecord[] = [];
+  let prefill: ApplicationPrefill | null = null;
+  let prefillOrgChipId: string | null = null;
+  let prefillTitle = '';
+
+  async function linkFutureOrganisation(where: string, pickId: string): Promise<boolean> {
+    try {
+      const result = await searchEntities(where, 'organisation');
+      if (futureSelect.value !== pickId) return true;
+      const wanted = where.toLowerCase();
+      const match = (result.groups.organisation ?? []).find(
+        (item) => item.display_label.trim().toLowerCase() === wanted
+      );
+      if (!match) return false;
+      const id = `pending:${match.ref}:applies_to`;
+      if (chipList.addPending({
+        id,
+        ref: match.ref,
+        label: `${match.display_label} (applies to)`,
+        relationshipType: 'applies_to',
+        state: 'pending',
+        href: match.href ?? null
+      })) {
+        prefillOrgChipId = id;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  futureSelect.addEventListener('change', () => {
+    if (prefillOrgChipId) {
+      chipList.removeById(prefillOrgChipId);
+      prefillOrgChipId = null;
+    }
+    const future = futures.find((f) => f.id === futureSelect.value);
+    if (!future) {
+      if (positionTitle.value === prefillTitle) positionTitle.value = '';
+      prefill = null;
+      prefillTitle = '';
+      futureNote.hidden = true;
+      return;
+    }
+    prefill = applicationPrefillFromFuture(future);
+    positionTitle.value = prefill.position_title;
+    prefillTitle = prefill.position_title;
+    const count = prefill.selection_criteria.length;
+    const criteriaText =
+      count === 0
+        ? 'This future has no criteria yet.'
+        : `Its ${count === 1 ? 'criterion comes' : `${count} criteria come`} across when you save.`;
+    futureNote.textContent = criteriaText;
+    futureNote.hidden = false;
+    const where = prefill.where;
+    if (where) {
+      const pickId = future.id;
+      void linkFutureOrganisation(where, pickId).then((linked) => {
+        if (futureSelect.value !== pickId) return;
+        futureNote.textContent = linked
+          ? `${criteriaText} Linked to ${where}.`
+          : `${criteriaText} No organisation called ${where} yet, so pick one below.`;
+      });
+    }
+  });
+
+  void listFutures()
+    .then((result) => {
+      futures = applicableFutures((result as { futures?: FutureRecord[] })?.futures);
+      if (!futures.length) return;
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'None, start blank';
+      futureSelect.append(none);
+      for (const future of futures) {
+        const option = document.createElement('option');
+        option.value = future.id;
+        option.textContent = futureOptionLabel(future);
+        futureSelect.append(option);
+      }
+      futureLabel.hidden = false;
+      futureSelect.hidden = false;
+    })
+    .catch(() => undefined);
+
   const status = el('p', 'application-form__status');
   status.hidden = true;
   const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
@@ -344,6 +446,9 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
   cancel.href = '#/career';
 
   form.append(
+    futureLabel,
+    futureSelect,
+    futureNote,
     el('label', undefined, 'Position title'),
     positionTitle,
     el('label', undefined, 'Advertisement title'),
@@ -416,6 +521,9 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
           summary: adSummary.value || null
         },
         closing_date: closingDate.value || null,
+        ...(prefill?.selection_criteria.length
+          ? { selection_criteria: prefill.selection_criteria }
+          : {}),
         links
       });
       window.location.hash = applicationRoute(result.application.id);
