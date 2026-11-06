@@ -338,3 +338,88 @@ test("the scheduled run does nothing with no answers and waits out a conflict", 
   assert.equal((await res.json()).data.retry, true);
   assert.equal((await readPending(store)).length, 1);
 });
+
+test("rating cards come from unrated dishes, newest first, and skip can't-remember ones", async () => {
+  const { openRatings, rateCheckId } = await import("../../apps/life/js/food-journal/quick-checks.js");
+  const old = visit("v1", { date: "2020-01-01" });
+  const recent = visit("v2", { date: "2026-05-01" });
+  const rated = visit("v3");
+  rated.dishes[0].rating = 4;
+  const forgotten = visit("v4");
+  forgotten.dishes[0].rating_unknown = true;
+  const cards = openRatings(journal(old, recent, rated, forgotten));
+  assert.deepEqual(cards.map((c) => c.dish.id), ["v2_dish", "v1_dish"]);
+  assert.equal(cards[0].check.id, rateCheckId("v2_dish"));
+  assert.deepEqual(
+    openRatings(journal(old, recent), new Set([rateCheckId("v2_dish")])).map((c) => c.dish.id),
+    ["v1_dish"],
+  );
+});
+
+test("rating answers: half steps, can't remember, never over a rating Adam gave", async () => {
+  const { rateCheckId } = await import("../../apps/life/js/food-journal/quick-checks.js");
+  const id = rateCheckId("v1_dish");
+  assert.equal(answerProblem({ check_id: id, pick: "rate", rating: 3.5 }), null);
+  assert.equal(answerProblem({ check_id: id, pick: "unknown" }), null);
+  assert.match(answerProblem({ check_id: id, pick: "rate", rating: 5.5 }), /half steps/);
+  assert.match(answerProblem({ check_id: id, pick: "rate", rating: "4" }), /half steps/);
+  assert.ok(answerProblem({ check_id: id, pick: "apply" }), "rating cards take ratings only");
+  assert.ok(answerProblem({ check_id: "chk_dish", pick: "rate", rating: 4 }), "batch checks take no rating");
+
+  const j = journal(visit("v1"), visit("v2"));
+  const first = applyAnswers(j, [], [
+    { check_id: id, pick: "rate", rating: 4.5 },
+    { check_id: rateCheckId("v2_dish"), pick: "unknown" },
+  ]);
+  assert.equal(first.changed, true);
+  assert.equal(first.journal.visits[0].dishes[0].rating, 4.5);
+  assert.equal(first.journal.visits[1].dishes[0].rating_unknown, true);
+  assert.equal(first.journal.visits[1].dishes[0].rating, null);
+  assert.deepEqual(first.results.map((r) => r.outcome), ["applied", "applied"]);
+  validateFoodJournal(first.journal);
+
+  const again = applyAnswers(first.journal, [], [{ check_id: id, pick: "rate", rating: 4.5 }]);
+  assert.equal(again.changed, false);
+  assert.equal(again.results[0].outcome, "applied");
+  const clash = applyAnswers(first.journal, [], [{ check_id: id, pick: "rate", rating: 2 }]);
+  assert.equal(clash.results[0].outcome, "held");
+  assert.equal(clash.journal.visits[0].dishes[0].rating, 4.5);
+  const gone = applyAnswers(j, [], [{ check_id: rateCheckId("missing"), pick: "rate", rating: 3 }]);
+  assert.equal(gone.results[0].outcome, "held");
+});
+
+test("batches cannot borrow rating card ids, and the API saves the rating", async () => {
+  const problems = batchProblems({ schema_version: 1, checks: [dishCheck({ id: "chk_rate_v1_dish" })] }, journal(visit("v1")));
+  assert.ok(problems.some((p) => /rating cards/.test(p)));
+  const store = memoryStore();
+  const handler = createFoodChecksHandler({
+    env: { LIFE_HUB_PASSPHRASE_HASH: "configured", SESSION_SECRET: "x".repeat(32) },
+    verifySessionToken: () => ({ valid: true }),
+    createFoodJournalRepository: () => memoryRepo(journal(visit("v1"))),
+    getCheckStore: async () => store,
+    readChecks: async () => [],
+  });
+  const res = await handler(
+    new Request("https://x.test/api/food-checks", {
+      method: "POST",
+      body: JSON.stringify({ action: "answer", answer: { check_id: "chk_rate_v1_dish", pick: "rate", rating: 3 } }),
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual((await readPending(store))[0], { check_id: "chk_rate_v1_dish", pick: "rate", rating: 3 });
+  const got = (await (await handler(new Request("https://x.test/api/food-checks"))).json()).data;
+  assert.deepEqual(got.waiting_ids, ["chk_rate_v1_dish"]);
+  assert.equal(got.stats.rate, 1);
+});
+
+test("cuisine rules: named cuisines win over plate types", async () => {
+  const { cuisineRuleFor } = await import("../../apps/life/js/food-journal/cuisine-rules.js");
+  const dish = (title, tags = []) => ({ title, tags });
+  assert.equal(cuisineRuleFor(dish("Chicken schnitzel"))?.cuisine, "Pub");
+  assert.equal(cuisineRuleFor(dish("Something", ["Eggs Benedict"]))?.cuisine, "Café");
+  assert.equal(cuisineRuleFor(dish("Thai fried chicken"))?.cuisine, "Thai");
+  assert.equal(cuisineRuleFor(dish("Tonkotsu ramen"))?.cuisine, "Japanese");
+  assert.equal(cuisineRuleFor(dish("Piemonte salad"))?.cuisine, undefined, "whole words only");
+  assert.equal(cuisineRuleFor(dish("Garden salad", ["salad"])), null);
+});

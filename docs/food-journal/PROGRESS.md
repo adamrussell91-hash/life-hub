@@ -144,3 +144,26 @@ Codex prepares answers for unsure venues and dishes with no cuisine or tags, fol
 - An answer never overwrites a record that changed after the check was prepared, or a venue Adam
   picked: it is held instead. Venue answers set `basis: picked`. Dish answers only fill blank
   cuisines and add tags, so they cannot flag a Brisket re-count.
+
+## 06/11/26 · Rate dishes, cuisine from rules, a Fix up count that falls
+
+Fix up showed every Day One import never marked done, so its count stayed put while
+Quick check filled the gaps.
+
+- **Fix up** now lists an import only while it still lacks something: an unsure venue,
+  a dish with no cuisine, no food tags, or no rating. Each card says what is missing.
+  Whatever fills them (Quick check, Rate dishes, the edit page) shrinks the count.
+- **Rate dishes** is a tab of its own: one unrated dish at a time, newest first, with
+  its photo. Tap 1 to 5 (keys 1–5); +½ (key H) adds half a point; "Can't remember"
+  (key 0) sets `rating_unknown` so the dish is never asked again. Cards are built from
+  the journal, so no batch is needed. Answers go through the Quick check store and
+  apply the same way, only onto a dish that is still unrated.
+- **Cuisine rules**: `scripts/food-checks/cuisine-rules.mjs` writes a batch of grouped
+  cuisine checks from food tags and dish names (`apps/life/js/food-journal/cuisine-rules.js`).
+  Named cuisines win (Ramen → Japanese); breakfast plates are Café, schnitzels, steaks
+  and pies Pub, burgers and fried chicken American. Adam still taps Yes per group and can
+  untick dishes. Dishes no rule covers are left for a Codex dish batch.
+
+Verification: Food unit tests and the Rate dishes browser test at 1440 and 390
+(score, half point, can't remember, journal saved). Safari, a real phone and the live
+apply run are unchecked.

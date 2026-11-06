@@ -2258,6 +2258,31 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
   text-align: left;
   white-space: normal;
 }
+/* Rate dishes: five scores and the half toggle in one row, thumb-sized. */
+.fj-check__scores {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 0.8fr);
+  gap: var(--space-2);
+  margin-block: var(--space-2);
+}
+.fj-check .fj-check__score,
+.fj-check .fj-check__half {
+  justify-content: center;
+  justify-items: center;
+  min-height: 56px;
+  padding-inline: 0;
+  text-align: center;
+  font-size: var(--text-lg, 1.125rem);
+  font-variant-numeric: tabular-nums;
+}
+.fj-check .fj-check__half {
+  font-size: var(--text-sm, 0.875rem);
+}
+.fj-check .fj-check__half.is-active {
+  background: var(--pastel-blue);
+  border-color: var(--wave);
+  color: var(--navy);
+}
 .fj-check__pick-main {
   display: flex;
   gap: var(--space-2);

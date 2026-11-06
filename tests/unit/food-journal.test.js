@@ -16,6 +16,7 @@ import {
   editorialBasis,
   needsEditorial,
   fixupQueue,
+  visitNeeds,
   applyFixup,
   firstSentence,
   noteBlocks,
@@ -770,6 +771,14 @@ test("editorial basis changes with the words, not the rating, and unfixed import
   const imported = { ...dated("2026-01-01", "Import", "", [["Thing", null]]), source_id: "dayone:x" };
   assert.equal(needsEditorial(imported), false);
   assert.deepEqual(fixupQueue({ ...emptyJournal(), visits: [imported, v] }).map((x) => x.title), ["Import"]);
+  // An import with nothing missing has left Fix up, however it was filled.
+  const filled = structuredClone(imported);
+  Object.assign(filled.dishes[0], { cuisine: "Thai", tags: ["Soup"], rating: 4 });
+  assert.deepEqual(fixupQueue({ ...emptyJournal(), visits: [filled] }), []);
+  assert.deepEqual(visitNeeds(imported), ["cuisine", "tags", "rating"]);
+  filled.dishes[0].rating = null;
+  filled.dishes[0].rating_unknown = true;
+  assert.deepEqual(visitNeeds(filled), [], "can't remember counts as answered");
   assert.equal(needsEditorial({ ...imported, reviewed: true }), true);
   assert.equal(firstSentence("## Title\nFirst line here. Second."), "First line here.");
 });
