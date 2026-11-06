@@ -2343,3 +2343,33 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
     display: none;
   }
 }
+
+.fj-world-map {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: min(64vh, 38rem);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fj-world-map-picker {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-4);
+}
+
+.fj-world-map-picker select {
+  width: 100%;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.fj-world-map-visits {
+  padding-inline-start: var(--space-4);
+}
+
+.fj-world-map-visits .btn {
+  min-height: 44px;
+  white-space: normal;
+  text-align: start;
+}

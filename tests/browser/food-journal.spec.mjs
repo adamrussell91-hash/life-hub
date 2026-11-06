@@ -1859,3 +1859,52 @@ for (const width of [1440, 390])
     assert.deepEqual(errors, []);
     await page.close();
   });
+
+test("world map opens a mapped venue's visits at phone width", async () => {
+  const { page, errors } = await pageFor(390, { seed(journal) {
+    const visit = journal.visits[0];
+    visit.venue = { ...visit.venue, lat: 0, lon: 0 };
+    journal.visits.push(
+      { ...newVisit(), title: "Second lunch", date: "2026-10-14", venue: visit.venue },
+      { ...newVisit(), title: "Unmapped lunch", date: "2026-10-15" },
+    );
+  } });
+  try {
+    await page.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/maplibre-gl@6\.16\.0\/dist\/maplibre-gl[^/]*\.mjs(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        path: new URL(`../../node_modules/maplibre-gl/dist/${new URL(route.request().url()).pathname.split("/").at(-1)}`, import.meta.url).pathname,
+        contentType: "text/javascript",
+        headers: { "Access-Control-Allow-Origin": "*" },
+      }));
+    await page.route("https://tiles.openfreemap.org/styles/liberty", (route) =>
+      route.fulfill({
+        json: { version: 8, sources: {}, layers: [] },
+        headers: { "Access-Control-Allow-Origin": "*" },
+      }));
+    await page.getByRole("tab", { name: "Map", exact: true }).click();
+    await page.getByRole("heading", { name: "World map" }).waitFor();
+    await page.getByLabel("World map of Food Journal venues").waitFor();
+    assert.equal(await page.getByText("2 mapped visits", { exact: true }).count(), 1);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    const picker = page.getByLabel("Find a venue");
+    const map = page.getByLabel("World map of Food Journal venues");
+    await page.waitForFunction(() => Boolean(document.querySelector(".maplibregl-canvas")));
+    for (let attempt = 0; attempt < 6 && await picker.inputValue() === ""; attempt++) {
+      await map.click();
+      await page.getByRole("button", { name: /Second lunch/ }).waitFor({ timeout: 600 }).catch(() => {});
+    }
+    assert.equal(await picker.inputValue(), "0");
+    await page.getByRole("button", { name: /Second lunch/ }).waitFor();
+    await page.getByRole("button", { name: /Tapas night/ }).click();
+    await page.getByRole("heading", { name: "Tapas night" }).waitFor();
+    await page.unroute("https://tiles.openfreemap.org/styles/liberty");
+    await page.route("https://tiles.openfreemap.org/styles/liberty", (route) => route.abort());
+    await page.getByRole("tab", { name: "Map", exact: true }).click();
+    await page.getByText("Map unavailable.", { exact: false }).waitFor();
+    await picker.selectOption({ label: "Cafe Test · Sydney" });
+    await page.getByRole("button", { name: /Second lunch/ }).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});

@@ -1,5 +1,6 @@
 export const MAP_PLACES_TYPE = 'map_places';
 export const DEFAULT_MAP_STYLE: string;
+export function loadHubMapLibre(): Promise<typeof import('maplibre-gl')>;
 
 export type HubPlace = {
   id: string;
