@@ -58,6 +58,7 @@ import {
   inspectPhoto,
   encodedPhoto,
   mergeCapture,
+  nameDishPhotos,
   captureBatches,
   toggleMenuDish,
   menuDishIndex,
@@ -1282,10 +1283,20 @@ export function createFoodJournalView({
     let repaintMenu = () => {};
     let dishList = null,
       menuImages = [],
+      // Menu pages chosen but not yet read.
+      unreadMenus = [],
+      // A small copy of each dish photo, by its stored key, for reading.
+      dishImages = new Map(),
+      // Dish id to the name read from its photo before any menu was read;
+      // a menu read later swaps in the menu's own name.
+      guessed = new Map(),
+      reading = null,
+      readAgain = false,
       photoGps = null,
       hereGps = null,
       dateEdited = false,
-      captureBusy = false,
+      // Uploads and reads under way; Save waits for them.
+      captureBusy = 0,
       brisketAfter = Boolean(sendToBrisket);
     const persistDraft = () => writeDraft(visit, baseVersion);
     const tags = knownTags(journal);
@@ -1332,7 +1343,7 @@ export function createFoodJournalView({
     // Uploads photos onto one dish. Their date and place fill in the visit.
     async function addPhotos(d, files) {
       const added = [];
-      captureBusy = true;
+      captureBusy++;
       save.disabled = true;
       s.error.textContent = "Adding photos.";
       try {
@@ -1349,14 +1360,25 @@ export function createFoodJournalView({
           photoCache.set(p.key, url);
           d.photos.push(p);
           added.push(p);
+          try {
+            const small = await compressPhoto(blob, 1000);
+            dishImages.set(p.key, {
+              role: "dish",
+              id: `dish_${crypto.randomUUID()}`,
+              mime: small.type,
+              data: await encodedPhoto(small),
+            });
+          } catch {
+            /* the photo is stored; it just is not read */
+          }
         }
         persistDraft();
         s.error.textContent = "";
       } catch (err) {
         s.error.textContent = err.message;
       } finally {
-        captureBusy = false;
-        save.disabled = false;
+        captureBusy--;
+        save.disabled = captureBusy > 0;
       }
       return added;
     }
@@ -1394,6 +1416,8 @@ export function createFoodJournalView({
         if (!s.isOpen()) return;
         step = 1;
         fields();
+        // The photo names the dish: from the menu when one is read.
+        void readPhotos();
       });
       dishPick.append(
         dishInput,
@@ -1919,8 +1943,9 @@ export function createFoodJournalView({
         return wrap;
       };
       for (const p of d.photos) photos.append(tile(p));
-      // Photos chosen here belong to this dish. They are not read, so they
-      // never add a dish; their date and place still fill in the visit.
+      // Photos chosen here belong to this dish and never add a dish. On a
+      // dish with no title yet they are read to name it; their date and
+      // place still fill in the visit.
       const add = el("label", "food-quick__pick food-quick__pick--small btn btn--ghost"),
         pick = el("input");
       pick.type = "file";
@@ -1934,6 +1959,7 @@ export function createFoodJournalView({
         if (!files.length) return;
         for (const p of await addPhotos(d, files)) photos.append(tile(p));
         set("photos", d.photos);
+        if (!d.title.trim()) void readPhotos();
       });
       photos.append(add);
 
@@ -2030,14 +2056,9 @@ export function createFoodJournalView({
     // A menu photo is read as soon as it is chosen: no separate extract step.
     async function readMenu(files) {
       if (!files.length) return;
-      if (captureBusy) {
-        s.error.textContent = "Still reading the last photos. Try again in a moment.";
-        return;
-      }
-      captureBusy = true;
+      captureBusy++;
       save.disabled = true;
       s.error.textContent = "Preparing photos.";
-      const added = [];
       try {
         for (const file of files) {
           if (menuImages.length >= 30)
@@ -2054,7 +2075,7 @@ export function createFoodJournalView({
             data: await encodedPhoto(blob),
           };
           menuImages.push(image);
-          added.push(image);
+          unreadMenus.push(image);
         }
         persistDraft();
         fields();
@@ -2062,29 +2083,108 @@ export function createFoodJournalView({
         s.error.textContent = err.message;
         return;
       } finally {
-        captureBusy = false;
-        save.disabled = false;
+        captureBusy--;
+        save.disabled = captureBusy > 0;
       }
-      captureBusy = true;
-      try {
-        const results = [];
-        for (const batch of captureBatches(added)) {
-          s.error.textContent = "Reading the menu. This takes a moment.";
-          results.push((await api.assist({ action: "capture", images: batch })).draft);
+      await readPhotos();
+    }
+    // Reads new menu pages and names dishes from their own photos, one read
+    // at a time: photos chosen during a read wait for the next one.
+    function readPhotos() {
+      if (reading) {
+        readAgain = true;
+        return reading;
+      }
+      captureBusy++;
+      save.disabled = true;
+      reading = (async () => {
+        do {
+          readAgain = false;
+          await readOnce();
+        } while (readAgain && s.isOpen());
+      })().finally(() => {
+        reading = null;
+        captureBusy--;
+        save.disabled = captureBusy > 0;
+      });
+      return reading;
+    }
+    // A dish is still to name while it has no title, or holds a name read
+    // from its photo alone and a menu has come since.
+    const toName = (d, newMenu) =>
+      d.photos.length > 0 &&
+      (!d.title.trim() || (newMenu && guessed.get(d.id) === d.title));
+    // The small copy of a dish photo, fetched back when the form was
+    // reopened from a draft and the copy is gone.
+    async function dishImage(key) {
+      if (!dishImages.has(key))
+        try {
+          const small = await compressPhoto(await api.photo(key), 1000);
+          dishImages.set(key, {
+            role: "dish",
+            id: `dish_${crypto.randomUUID()}`,
+            mime: small.type,
+            data: await encodedPhoto(small),
+          });
+        } catch {
+          return null;
         }
+      return dishImages.get(key);
+    }
+    async function readOnce() {
+      const menus = unreadMenus.splice(0);
+      const open = new Set(
+        visit.dishes.filter((d) => toName(d, menus.length > 0)).map((d) => d.id),
+      );
+      const sent = new Map(),
+        dishes = [];
+      for (const d of visit.dishes) {
+        if (!open.has(d.id)) continue;
+        for (const p of d.photos.slice(0, 2)) {
+          const image = await dishImage(p.key);
+          if (!image) continue;
+          sent.set(image.id, p.key);
+          dishes.push(image);
+        }
+      }
+      if (!menus.length && !dishes.length) return;
+      // With no new page, dishes take their names from the menu already read.
+      const context = menus.length ? menus : dishes.length ? menuImages.slice(-2) : [];
+      const withMenu = context.length > 0;
+      s.error.textContent = menus.length
+        ? "Reading the menu. This takes a moment."
+        : "Working out the dish. This takes a moment.";
+      try {
+        const drafts = [];
+        for (const batch of captureBatches([...context, ...dishes]))
+          drafts.push((await api.assist({ action: "capture", images: batch })).draft);
         if (!s.isOpen()) return;
-        for (const draft of results) visit = mergeCapture(visit, draft);
+        // Dishes read from photos are named in place, never added again.
+        for (const draft of drafts)
+          visit = mergeCapture(visit, sent.size ? { ...draft, dishes: [] } : draft);
+        // A title typed while the photos were read is kept.
+        const still = new Set(
+          visit.dishes.filter((d) => open.has(d.id) && toName(d, withMenu)).map((d) => d.id),
+        );
+        const result = nameDishPhotos(visit, drafts, sent, still);
+        visit = result.visit;
+        for (const id of result.named) {
+          const d = visit.dishes.find((x) => x.id === id);
+          if (withMenu) guessed.delete(id);
+          else guessed.set(id, d.title);
+        }
         persistDraft();
         // The menu's list is ticked on the food step.
-        if (visit.menu_items?.length) step = 1;
+        if (step === 0 && (result.named.length || visit.menu_items?.length))
+          step = 1;
         fields();
-        s.error.textContent = visit.menu_items?.length
-          ? "Tick what you had."
-          : "Check the details, then save.";
+        s.error.textContent = result.named.length
+          ? "Filled in from your photos. Check it, then save."
+          : visit.menu_items?.length
+            ? "Tick what you had."
+            : "Check the details, then save.";
       } catch (err) {
         s.error.textContent = `${err.message} You can still fill it in yourself.`;
-      } finally {
-        captureBusy = false;
       }
     }
     const back = button("Close", () => {

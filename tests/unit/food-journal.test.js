@@ -41,6 +41,7 @@ import {
   toggleMenuDish,
   menuDishIndex,
   captureBatches,
+  nameDishPhotos,
 } from "../../apps/life/js/food-journal/capture.js";
 import {
   validateFoodJournal,
@@ -1294,6 +1295,57 @@ test("older dishes with extras in notes are still found and unticked", () => {
   assert.equal(menuDishIndex(v, v.menu_items[0]), 0);
   const next = toggleMenuDish(v, v.menu_items[0]);
   assert.equal(next.dishes[0].notes, "Bacon, eggs");
+});
+test("with dish photos, earlier menu pages are read on their own and the last pages name the dishes", () => {
+  const menus = Array.from({ length: 4 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));
+  const dish = { role: "dish", id: "d0", data: "x".repeat(10) };
+  const batches = captureBatches([...menus, dish]);
+  assert.deepEqual(
+    batches.map((b) => b.map((i) => i.id)),
+    [["m0", "m1"], ["m2", "m3", "d0"]],
+  );
+});
+test("a dish photo names its dish from the menu and brings the ingredients across", () => {
+  const v = newVisit();
+  v.menu_items = [
+    { name: "Eggs benedict", description: "Poached eggs, ham, hollandaise", price: "$22", kind: "dish" },
+  ];
+  v.dishes[0].photos = [{ key: "food/photos/a.jpg" }];
+  const typed = { ...v.dishes[0], id: "dish_typed", title: "My own name", photos: [{ key: "food/photos/b.jpg" }] };
+  v.dishes.push(typed);
+  const draft = {
+    title: "",
+    venue: { name: "", address: "" },
+    dishes: [
+      { title: "EGGS BENEDICT", cuisine: "Cafe", meal_type: "Breakfast", tags: ["Eggs"], notes: "", photo_ids: ["img1"] },
+      { title: "Toast", cuisine: "", meal_type: "Breakfast", tags: [], notes: "", photo_ids: ["img2"] },
+    ],
+  };
+  const sent = new Map([["img1", "food/photos/a.jpg"], ["img2", "food/photos/b.jpg"]]);
+  const { visit, named } = nameDishPhotos(v, [draft], sent, new Set([v.dishes[0].id]));
+  assert.deepEqual(named, [v.dishes[0].id]);
+  const [dish, kept] = visit.dishes;
+  assert.equal(dish.title, "Eggs Benedict");
+  assert.equal(dish.ingredients, "Poached eggs, ham, hollandaise");
+  assert.equal(dish.cuisine, "Cafe");
+  assert.deepEqual(dish.tags, ["Eggs"]);
+  // A dish not open to naming keeps the title typed for it.
+  assert.equal(kept.title, "My own name");
+  assert.equal(visit.dishes.length, 2);
+});
+test("a name guessed from the photo gives way to the menu's, with the menu's ingredients", () => {
+  const v = newVisit();
+  v.menu_items = [
+    { name: "Smashed avo", description: "Feta, chilli, sourdough", price: "$19", kind: "dish" },
+    { name: "Avocado toast", description: "Lemon, sourdough", price: "$15", kind: "dish" },
+  ];
+  v.dishes[0].title = "Avocado toast";
+  v.dishes[0].ingredients = "Lemon, sourdough";
+  v.dishes[0].photos = [{ key: "food/photos/a.jpg" }];
+  const draft = { dishes: [{ title: "Smashed avo", tags: [], photo_ids: ["img1"] }] };
+  const { visit } = nameDishPhotos(v, [draft], new Map([["img1", "food/photos/a.jpg"]]), new Set([v.dishes[0].id]));
+  assert.equal(visit.dishes[0].title, "Smashed avo");
+  assert.equal(visit.dishes[0].ingredients, "Feta, chilli, sourdough");
 });
 test("every page of a menu is read when no dish photos are chosen", () => {
   const menus = Array.from({ length: 3 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));
