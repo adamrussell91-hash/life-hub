@@ -42,6 +42,52 @@ const sameDish = (before, dish) =>
   tagKey(before?.tags) === tagKey(dish?.tags);
 const settled = (visit) => visit?.venue?.match?.basis === "picked";
 
+// Rating cards need no batch: every live dish with no rating is one, newest
+// first. Only Adam can answer them, so nothing is suggested. "Can't remember"
+// is kept on the dish as rating_unknown, so it is never asked again.
+const RATE_PREFIX = "chk_rate_";
+export const rateCheckId = (dishId) => RATE_PREFIX + String(dishId);
+export const isRateCheck = (id) => String(id || "").startsWith(RATE_PREFIX);
+export const unrated = (dish) => dish?.rating == null && dish?.rating_unknown !== true;
+export const validRating = (n) =>
+  typeof n === "number" && Number.isInteger(n * 2) && n >= 1 && n <= 5;
+export function openRatings(journal, answered = new Set()) {
+  const cards = [];
+  const visits = withoutDeleted(journal.visits).sort((a, b) =>
+    String(b.date).localeCompare(String(a.date)),
+  );
+  for (const visit of visits)
+    for (const dish of withoutDeleted(visit.dishes || [])) {
+      if (!unrated(dish)) continue;
+      const id = rateCheckId(dish.id);
+      if (CHECK_ID.test(id) && !answered.has(id))
+        cards.push({ check: { id, kind: "rate" }, visit, dish });
+    }
+  return cards;
+}
+function findDish(journal, id) {
+  const dishId = id.slice(RATE_PREFIX.length);
+  for (const visit of withoutDeleted(journal.visits)) {
+    const dish = withoutDeleted(visit.dishes || []).find((d) => d.id === dishId);
+    if (dish) return dish;
+  }
+  return null;
+}
+// A rating lands only on a dish that is still unrated. Answered again with
+// the same value it counts as applied, so a rerun changes nothing.
+function applyRating(journal, answer) {
+  const dish = findDish(journal, answer.check_id);
+  if (!dish) return { applied: 0, held: 1, changed: false };
+  const want = answer.pick === "rate" ? answer.rating : null;
+  if (!unrated(dish)) {
+    const same = want == null ? dish.rating_unknown === true && dish.rating == null : dish.rating === want;
+    return same ? { applied: 1, held: 0, changed: false } : { applied: 0, held: 1, changed: false };
+  }
+  if (want == null) dish.rating_unknown = true;
+  else dish.rating = want;
+  return { applied: 1, held: 0, changed: true };
+}
+
 // What still needs an answer, and the live records behind each check. Members
 // that changed or were deleted drop out; a check with none left is not asked.
 export function openChecks(checks, journal, answered = new Set()) {
@@ -74,8 +120,12 @@ export function openChecks(checks, journal, answered = new Set()) {
 export function answerProblem(answer) {
   if (!answer || typeof answer !== "object") return "Answer is missing.";
   if (!CHECK_ID.test(answer.check_id || "")) return "Check is not recognised.";
-  if (!/^(suggestion|alt:[0-3]|keep|typed|apply|reject)$/.test(answer.pick || ""))
+  if (!/^(suggestion|alt:[0-3]|keep|typed|apply|reject|rate|unknown)$/.test(answer.pick || ""))
     return "Answer is not recognised.";
+  if ((answer.pick === "rate" || answer.pick === "unknown") !== isRateCheck(answer.check_id))
+    return "Answer is not recognised.";
+  if (answer.pick === "rate" && !validRating(answer.rating))
+    return "Rating must be 1 to 5, in half steps.";
   if (answer.pick === "typed") {
     const name = typeof answer.name === "string" ? answer.name.trim() : "";
     if (!name || name.length > 200) return "Type a venue under 200 characters.";
@@ -129,7 +179,11 @@ export function applyAnswers(journal, checks, answers) {
       results.push({ check_id: answer.check_id, pick: answer.pick, outcome: "rejected", applied, held });
       continue;
     }
-    if (check?.kind === "venue") {
+    if (isRateCheck(answer.check_id)) {
+      const r = applyRating(next, answer);
+      ({ applied, held } = r);
+      changed ||= r.changed;
+    } else if (check?.kind === "venue") {
       for (const member of check.visits) {
         if (exclude.has(member.id)) continue;
         const visit = liveVisit(next, member.id);
@@ -224,6 +278,7 @@ export function batchProblems(batch, journal, { takenIds = new Set() } = {}) {
     const where = check?.id || `check ${index + 1}`;
     if (!CHECK_ID.test(check?.id || "")) out.push(`${where}: id must look like chk_name.`);
     else if (ids.has(check.id)) out.push(`${where}: id is already used.`);
+    else if (isRateCheck(check.id)) out.push(`${where}: chk_rate_ ids belong to rating cards.`);
     ids.add(check?.id);
     const allowed = CHECK_KEYS[check?.kind];
     if (!allowed) {

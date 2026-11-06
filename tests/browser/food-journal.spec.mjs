@@ -1788,6 +1788,37 @@ const quickChecks = (journal) => {
   ];
 };
 for (const width of [1440, 390])
+  test(`rate dishes: a score, half a point, can't remember, ${width}`, async () => {
+    const { page, errors, read } = await pageFor(width, { seed: quickCheckSeed, checks: () => [] });
+    await page.getByRole("tab", { name: "Rate dishes (2)", exact: true }).click();
+    // Newest unrated dish first.
+    await page.getByRole("heading", { name: "Paella" }).waitFor();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      true,
+      "no sideways scroll",
+    );
+    const four = page.locator('.fj-check__score[data-key="4"]');
+    if (width > 720) await page.keyboard.press("h");
+    else await page.locator(".fj-check__half").click();
+    assert.equal((await four.textContent()).trim(), "4½");
+    assert.equal(await page.locator('.fj-check__score[data-key="5"]').isDisabled(), true, "no 5½");
+    await four.click();
+    await page.getByRole("heading", { name: "Tortilla" }).waitFor();
+    assert.equal((await four.textContent()).trim(), "4", "the half resets for the next dish");
+    await page.getByRole("button", { name: /Can't remember/ }).click();
+    await page.getByText("Every dish has a rating.", { exact: false }).waitFor();
+    await page.getByRole("tab", { name: "Timeline", exact: true }).click();
+    await page.getByRole("tab", { name: /Rate dishes/ }).waitFor({ state: "detached" });
+    const saved = read();
+    const dish = (id) => saved.visits.flatMap((v) => v.dishes).find((d) => d.id === id);
+    assert.equal(dish("dish_second").rating, 4.5);
+    assert.equal(dish("dish_third").rating, null);
+    assert.equal(dish("dish_third").rating_unknown, true);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+for (const width of [1440, 390])
   test(`quick check moves card to card and answers reach the journal, ${width}`, async () => {
     const { page, errors, read } = await pageFor(width, {
       media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },

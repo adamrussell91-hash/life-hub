@@ -40,6 +40,9 @@ export function createFoodChecksHandler(deps = {}) {
           {
             checks: checks.filter((c) => !answered.has(c.id)),
             waiting: pending.length,
+            // Rating cards are built from the journal, so the page needs to
+            // know which ones already have an answer on its way.
+            waiting_ids: pending.map((a) => a.check_id),
             stats: answerStats(done, pending),
           },
           PRIVATE_CACHE,
@@ -52,10 +55,11 @@ export function createFoodChecksHandler(deps = {}) {
         const problem = answerProblem(body.answer);
         if (problem)
           return errorResponse(400, "validation_error", problem, false, PRIVATE_CACHE);
-        const { check_id, pick, name, exclude } = body.answer;
+        const { check_id, pick, name, exclude, rating } = body.answer;
         await saveAnswer(store, {
           check_id,
           pick,
+          ...(pick === "rate" ? { rating } : {}),
           ...(pick === "typed" ? { name: name.trim() } : {}),
           ...(exclude?.length ? { exclude } : {}),
         });

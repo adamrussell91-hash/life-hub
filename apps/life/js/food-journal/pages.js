@@ -15,6 +15,7 @@ import {
   HASHTAG,
   venueHistory,
   fixupQueue,
+  visitNeeds,
   venueQueue,
   isImport,
 } from "./model.js";
@@ -687,6 +688,11 @@ function menuDish(ctx, visit, dish) {
   return li;
 }
 
+const NEED_WORDS = { venue: "the venue", cuisine: "cuisine", tags: "food tags", rating: "a rating" };
+function needsText(needs) {
+  const words = needs.map((n) => NEED_WORDS[n]);
+  return words.length > 1 ? `${words.slice(0, -1).join(", ")} and ${words.at(-1)}` : words[0] || "";
+}
 export function paintFixup(ctx, host, index) {
   const queue = fixupQueue(ctx.journal());
   const page = el("section", "fj-fixup");
@@ -697,7 +703,7 @@ export function paintFixup(ctx, host, index) {
       "p",
       "fj-meta",
       queue.length
-        ? `${queue.length} left. The AI splits each entry into dishes; you check them, rate and add photos. Your original text is kept.`
+        ? `${queue.length} still missing a venue, cuisine, tags or rating. The AI splits each entry into dishes; you check them, rate and add photos. Your original text is kept. Quick check and Rate dishes fill these too.`
         : "All imports are fixed up.",
     ),
   );
@@ -712,6 +718,7 @@ export function paintFixup(ctx, host, index) {
     kicker(`${weekday(visit.date)} ${formatDisplayDate(visit.date)}${visit.venue.name ? ` · ${visit.venue.name}` : ""}`),
     el("h3", "fj-card__title fj-serif", visit.title),
     el("p", "fj-fixup__original fj-serif", visit.notes),
+    el("p", "fj-meta", `Still needs: ${needsText(visitNeeds(visit))}`),
   );
   const photos = visit.import_media?.length || 0;
   if (photos)

@@ -146,6 +146,8 @@ export function validateFoodJournal(j) {
       brisketLink(d.brisket);
       if (d.order_again != null && typeof d.order_again !== "boolean")
         bad("Order again must be yes or no.");
+      if (d.rating_unknown != null && typeof d.rating_unknown !== "boolean")
+        bad("Rating unknown must be yes or no.");
       if (
         ![
           "Breakfast",

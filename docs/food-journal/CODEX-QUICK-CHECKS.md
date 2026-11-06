@@ -42,6 +42,12 @@ pass that file before Adam sees it.
 
 ---
 
+## Before a dish batch: run the cuisine rules
+
+Blank cuisines that a food tag or dish name already settles (Schnitzel, Ramen, Eggs Benedict)
+come from `scripts/food-checks/cuisine-rules.mjs`, with no research. Run it first, prove it with
+`check.mjs` and let Adam answer it; a Codex dish batch then covers only what no rule matched.
+
 ## Steps
 
 ### 1. Build the worklist

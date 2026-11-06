@@ -84,7 +84,7 @@ export async function runApply({ repo, store, readChecks, now = Date.now }) {
 
 // How often each kind of answer was given, for judging Codex's suggestions.
 export function answerStats(done, pending) {
-  const stats = { answered: 0, suggestion: 0, alternative: 0, typed: 0, keep: 0, apply: 0, reject: 0, held: 0 };
+  const stats = { answered: 0, suggestion: 0, alternative: 0, typed: 0, keep: 0, apply: 0, reject: 0, rate: 0, unknown: 0, held: 0 };
   const count = (pick) => {
     stats.answered++;
     const key = pick?.startsWith("alt:") ? "alternative" : pick;

@@ -855,7 +855,7 @@ export function createFoodJournalView({
     host?.scrollIntoView?.({ block: "start" });
   }
   function setMode(next) {
-    if (mode === "quick" && next !== "quick") void settleQuickChecks();
+    if ((mode === "quick" || mode === "rate") && next !== mode) void settleQuickChecks();
     mode = next;
     entryId = null;
     render();
@@ -1007,8 +1007,13 @@ export function createFoodJournalView({
     if (unsure) tabs.push(["venues", `Check venues (${unsure})`]);
     const checksLeft = loaded && quickChecks.loaded ? quickChecks.cards().length : 0;
     if (mode === "quick" && !checksLeft && !quickChecks.answeredNow) mode = "magazine";
-    if (checksLeft || quickChecks.answeredNow)
+    if (checksLeft || (mode === "quick" && quickChecks.answeredNow))
       tabs.push(["quick", `Quick check (${checksLeft})`]);
+    // Rating cards come from the journal itself, so they need no batch.
+    const toRate = loaded ? quickChecks.cards("rate").length : 0;
+    if (mode === "rate" && !toRate && !quickChecks.answeredNow) mode = "magazine";
+    if (toRate || (mode === "rate" && quickChecks.answeredNow))
+      tabs.push(["rate", `Rate dishes (${toRate})`]);
     for (const [id, label] of tabs) {
       const b = button(label, () => setMode(id), "ghost");
       b.className = "hub-pills__btn";
@@ -1080,8 +1085,8 @@ export function createFoodJournalView({
       paintVenueCheck(pageContext, host, venueIndex);
       return;
     }
-    if (mode === "quick") {
-      paintQuickCheck(pageContext, host, quickChecks);
+    if (mode === "quick" || mode === "rate") {
+      paintQuickCheck(pageContext, host, quickChecks, mode === "rate" ? "rate" : "checks");
       return;
     }
     if (mode === "recipes") {

@@ -630,8 +630,21 @@ export const needsEditorial = (visit) =>
 export function venueQueue(journal) {
   return liveVisits(journal).filter(venueUnsure);
 }
+// What a visit still lacks. Quick check, Rate dishes and the edit page all
+// fill these, so an import that has them all is fixed up however it got there.
+export function visitNeeds(visit) {
+  const dishes = withoutDeleted(visit.dishes || []);
+  const needs = [];
+  if (venueUnsure(visit)) needs.push("venue");
+  if (dishes.some((d) => !d.cuisine?.trim())) needs.push("cuisine");
+  if (dishes.some((d) => !d.tags?.length)) needs.push("tags");
+  if (dishes.some((d) => d.rating == null && d.rating_unknown !== true)) needs.push("rating");
+  return needs;
+}
 export function fixupQueue(journal) {
-  return liveVisits(journal).filter((v) => isImport(v) && !v.reviewed);
+  return liveVisits(journal).filter(
+    (v) => isImport(v) && !v.reviewed && visitNeeds(v).length > 0,
+  );
 }
 export function applyFixup(visit, draft) {
   const next = structuredClone(visit);

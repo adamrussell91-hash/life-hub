@@ -2,7 +2,7 @@ import { formatDisplayDate } from "../../../../packages/design-kit/js/format-dis
 import { withoutDeleted } from "../../../../packages/design-kit/js/record-liveness.js";
 import { firstSentence, plainNotes } from "./model.js";
 import { hasPoint, metresBetween } from "./venue-match.js";
-import { openChecks } from "./quick-checks.js";
+import { openChecks, openRatings } from "./quick-checks.js";
 
 // Quick check: one prepared answer at a time, moving on the moment it is
 // tapped. Answers go to their own small store through an outbox, so a slow
@@ -84,8 +84,11 @@ export function createQuickCheckSession({ api, storage, journal, onChange }) {
       flushing = false;
     }
   }
-  function cards() {
-    const open = openChecks(checks, journal(), answered);
+  // kind "rate" is the rating cards, built from the journal; anything else is
+  // the prepared checks.
+  function cards(kind = "checks") {
+    const open =
+      kind === "rate" ? openRatings(journal(), answered) : openChecks(checks, journal(), answered);
     const later = (card) => skipped.indexOf(card.check.id);
     return [
       ...open.filter((c) => later(c) < 0),
@@ -114,6 +117,7 @@ export function createQuickCheckSession({ api, storage, journal, onChange }) {
     async load() {
       const data = await api.checks();
       checks = data.checks;
+      for (const id of data.waiting_ids || []) answered.add(id);
       loaded = true;
       void flush();
       onChange();
@@ -343,22 +347,85 @@ function dishCard(ctx, session, card, excluded) {
   body.append(picks);
   return { body, visit: dishes[0].visit, photoVisits: dishes.map((d) => d.visit) };
 }
+// Only Adam can rate, so a rating card suggests nothing: a score, half a
+// point more, or "Can't remember" so it is never asked again.
+let half = false;
+function rateCard(ctx, session, card) {
+  const { check, dish, visit } = card;
+  const body = el("div", "fj-check__body");
+  body.append(
+    el("p", "fj-kicker", [dateLine(visit), visit.venue?.name].filter(Boolean).join(" · ")),
+    el("h3", "fj-card__title fj-serif", dish.title || "Untitled dish"),
+  );
+  const said = firstSentence(plainNotes(dish.notes || ""), 220);
+  if (said) body.append(el("p", "fj-check__said fj-serif", said));
+  const others = withoutDeleted(visit.dishes).filter((d) => d.id !== dish.id);
+  if (others.length)
+    body.append(el("p", "fj-meta", `Also had: ${others.map((d) => d.title).join(", ")}`));
+  const scores = el("div", "fj-check__scores");
+  scores.setAttribute("role", "group");
+  scores.setAttribute("aria-label", "Rating");
+  const value = (n) => (half && n < 5 ? n + 0.5 : n);
+  const buttons = [];
+  for (let n = 1; n <= 5; n++) {
+    const b = ctx.button("", () => {
+      const rating = value(n);
+      half = false;
+      session.answer(check, { pick: "rate", rating });
+    }, "secondary");
+    b.classList.add("fj-check__pick", "fj-check__score");
+    b.dataset.key = String(n);
+    buttons.push([n, b]);
+    scores.append(b);
+  }
+  const plus = ctx.button("+½", () => {
+    half = !half;
+    show();
+  }, "ghost");
+  plus.classList.add("fj-check__pick", "fj-check__half");
+  plus.dataset.key = "h";
+  plus.setAttribute("aria-label", "Add half a point");
+  scores.append(plus);
+  // The half toggle relabels the scores in place, so nothing repaints.
+  function show() {
+    for (const [n, b] of buttons) {
+      b.textContent = String(value(n)).replace(".5", "½");
+      b.disabled = half && n === 5;
+      b.setAttribute("aria-label", `${value(n)} out of 5`);
+    }
+    plus.classList.toggle("is-active", half);
+    plus.setAttribute("aria-pressed", String(half));
+  }
+  show();
+  const unknown = choice(ctx, 0, "Can't remember", "It won't be asked again", "ghost", () => {
+    half = false;
+    session.answer(check, { pick: "unknown" });
+  });
+  body.append(scores, unknown);
+  const own = (dish.photos || []).slice(0, 3);
+  return { body, visit, photoVisits: [visit], photos: own.length ? own : null };
+}
 
 let keys = null;
-export function paintQuickCheck(ctx, host, session) {
+export function paintQuickCheck(ctx, host, session, kind = "checks") {
   keys?.abort();
   keys = null;
-  const cards = session.cards();
+  const rating = kind === "rate";
+  const cards = session.cards(kind);
   const page = el("section", "fj-fixup fj-check");
   const head = el("header", "fj-fixup__head");
   head.append(
-    el("h2", "fj-section__title fj-serif", "Quick check"),
+    el("h2", "fj-section__title fj-serif", rating ? "Rate dishes" : "Quick check"),
     el(
       "p",
       "fj-meta",
       cards.length
-        ? `${cards.length} left. Answers save as you go, then reach the journal in the background.`
-        : "All done. Your answers are on their way to the journal.",
+        ? rating
+          ? `${cards.length} without a rating, newest first. Tap a score or press 1 to 5; H adds a half. Ratings save as you go.`
+          : `${cards.length} left. Answers save as you go, then reach the journal in the background.`
+        : rating
+          ? "Every dish has a rating. Your answers are on their way to the journal."
+          : "All done. Your answers are on their way to the journal.",
     ),
   );
   if (session.problem) {
@@ -376,10 +443,10 @@ export function paintQuickCheck(ctx, host, session) {
   }
   const card = cards[0];
   const excluded = session.excluded(card.check.id);
-  const built = (card.check.kind === "venue" ? venueCard : dishCard)(ctx, session, card, excluded);
+  const built = (rating ? rateCard : card.check.kind === "venue" ? venueCard : dishCard)(ctx, session, card, excluded);
   const article = el("article", "fj-card fj-card--outline fj-check__card");
   const photos = el("div", "fj-check__photos");
-  const shots = [...new Set(built.photoVisits)].map(firstPhoto).filter(Boolean);
+  const shots = built.photos || [...new Set(built.photoVisits)].map(firstPhoto).filter(Boolean);
   for (const photo of shots.slice(0, 6)) photos.append(ctx.photoNode(photo));
   photos.dataset.count = String(Math.min(shots.length, 6));
   if (shots.length) article.append(photos);
@@ -394,8 +461,8 @@ export function paintQuickCheck(ctx, host, session) {
   host.append(page);
   if (session.takeMoved()) article.scrollIntoView?.({ block: "start" });
   // Sign the next card's photo now so it is there when the answer lands.
-  const nextVisit = cards[1]?.visits?.[0]?.visit || cards[1]?.dishes?.[0]?.visit;
-  const nextPhoto = nextVisit && firstPhoto(nextVisit);
+  const nextVisit = cards[1]?.visits?.[0]?.visit || cards[1]?.dishes?.[0]?.visit || cards[1]?.visit;
+  const nextPhoto = cards[1]?.dish?.photos?.[0] || (nextVisit && firstPhoto(nextVisit));
   if (nextPhoto) ctx.photoNode(nextPhoto);
   // Number keys pick, S skips, B goes back. Typing in the box stays typing.
   keys = new AbortController();
@@ -407,7 +474,10 @@ export function paintQuickCheck(ctx, host, session) {
       if (e.target?.closest?.("input, textarea, select")) return;
       if (e.key === "s" || e.key === "S") skip.click();
       else if ((e.key === "b" || e.key === "B") && !backButton.disabled) backButton.click();
-      else page.querySelector(`.fj-check__pick[data-key="${CSS.escape(e.key)}"]`)?.click();
+      else {
+        const key = e.key === "." || e.key === "H" ? "h" : e.key;
+        page.querySelector(`.fj-check__pick[data-key="${CSS.escape(key)}"]`)?.click();
+      }
     },
     { signal: keys.signal },
   );
