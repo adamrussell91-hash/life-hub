@@ -201,3 +201,56 @@ The ad's own read and the weekly scan stay on their current model.
 L1, L2 (rows stay compact with the response collapsed to 3 lines until focused), S3 (opaque draft
 compare), V1, D5 (cost and count lines read aloud), I3 (empty store), I4 (actions on their own line),
 W1 (`apiGet`/`apiPost` only), W2.
+
+## Build contract (shared by the server and page work)
+
+**Application criterion** (`selection_criteria[]` in `application-schema.mjs`). New optional keys,
+all nullable, and old records still parse:
+- `word_limit`: int 25–2000.
+- `check`: `{ status: 'have'|'partly'|'not_yet'|'unknown', evidence: string ≤ 300, card_ids: string[] ≤ 6 (achievement ids), confirmed_at: ISO }`.
+- `response_source`: `'ann'|'adam'`.
+- `response_drafted_at`: ISO.
+- `response_pending`: string ≤ 16000. This is Ann's new draft, held while Adam's own edit stands.
+
+**Application** gets two new nullable keys, `cover_letter` and `cv`. Each is
+`{ text, source: 'ann'|'adam', drafted_at: ISO|null, updated_at: ISO, pending: string|null }`.
+`cover_letter.text` is at most 8000 characters; `cv.text` at most 16000.
+The page sets `source: 'adam'` (and `response_source: 'adam'`) whenever Adam saves his own text.
+
+**Ann jobs.** They use the existing job store and runner (`career-ann-job.mjs`, `/api/career-ann-run`).
+Polling stays `POST /api/career-futures?action=job_status` / `job_clear` (the client
+`waitForAnnJob`).
+- `POST /api/career-futures?action=app_check_start&id=<application_id>` with body `{}` returns
+  `{ job_id }`. The job's result is
+  `{ suggestions: [{ criterion_id, status, evidence, card_ids }], read_central_node: boolean }`.
+  It does not write anything.
+- `POST /api/career-futures?action=app_draft_start&id=<application_id>`, with body
+  `{ target: 'responses'|'cover_letter'|'cv', criterion_id?: string }` (`criterion_id` redrafts one
+  criterion), returns `{ job_id }`. The job **writes the drafts onto the application itself**:
+  - A criterion response is written when it is empty or `response_source === 'ann'`. Otherwise the
+    draft goes to `response_pending`. The same rule applies to `cover_letter` / `cv` `.pending`.
+  - The result is `{ application, drafted: string[] (criterion ids or target), skipped: [{ criterion_id, reason: 'not_checked'|'no_evidence' }], brackets: number }`.
+  - Only criteria whose `check.status` is `have` or `partly` are drafted.
+- Errors use the same `{ status: 'failed', message }` as the futures check.
+
+**Confirm.** `POST /api/applications?id=<application_id>&action=confirm-check`, with body
+`{ answers: [{ criterion_id, status, evidence, card_ids }] }`, returns `{ application }`. It:
+- writes `check` (with `confirmed_at = now`) on each named criterion;
+- replaces that criterion's `answers_criterion` links (achievement → application,
+  `criterion_id`, `strength: 'strong'` for have, `'some'` for partly, none otherwise).
+
+**Overview.** `applicationSummary` in `career-overview.mjs` adds
+`criteria: [{ id, check_status: string|null }]`, so the Career model can compute match % for each
+application.
+
+**Scan.** `POST /api/career-scan?action=history_estimate` with body
+`{ months: 6|12|24|36 }` returns `{ sources: n, batches: n, cost_aud: number, by_kind: { [kind]: n } }`.
+- `POST ?action=history_start` (same body) returns `{ status: 'running', batch: 0, batches }`.
+- `GET ?action=history_status` returns `{ status: 'idle'|'running'|'done'|'stopped'|'failed', batch, batches, proposals_added, message? }`.
+- `POST ?action=history_stop` returns that same status.
+- The scan state and each scan's list reply gain `read_kinds: string[]`, the kinds read on the last
+  run.
+- Cost constants: about A$0.08 per batch of 40 and per weekly scan.
+
+**Page costs shown.** Check about A$0.10; responses about A$0.15; cover letter about A$0.08; CV about
+A$0.10; Draft everything about A$0.35.
