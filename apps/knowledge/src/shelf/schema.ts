@@ -47,6 +47,26 @@ export const PlacementSchema = z.object({
 });
 export type Placement = z.infer<typeof PlacementSchema>;
 
+/** A book Adam wants to read. Lives apart from the shelf until he starts it. */
+export const WishSchema = z.object({
+  label: z.string(),
+  author: z.string().optional(),
+  why: z.string().optional(),
+  from: z.string().optional(),
+  added_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type Wish = z.infer<typeof WishSchema>;
+
+export type WishInput = {
+  label: string;
+  author?: string | null;
+  why?: string | null;
+  from?: string | null;
+  /** The old title, when an edit renames the wish. */
+  was?: string;
+};
+
 export const FactsJobSchema = z.object({
   status: z.enum(["none", "running", "done"]),
   total: z.number().optional(),
@@ -74,11 +94,11 @@ export const KindsJobSchema = z.object({
 });
 export type KindsJob = z.infer<typeof KindsJobSchema>;
 
-export type ShelfData = { books: ShelfBook[]; placements: Placement[]; factsJob?: FactsJob; kindsJob?: KindsJob };
+export type ShelfData = { books: ShelfBook[]; placements: Placement[]; wishlist?: Wish[]; factsJob?: FactsJob; kindsJob?: KindsJob };
 
 /** Drops malformed rows instead of failing the whole shelf. */
 export function parseShelfData(raw: unknown): ShelfData {
-  const value = (raw && typeof raw === "object" ? raw : {}) as { books?: unknown; placements?: unknown };
+  const value = (raw && typeof raw === "object" ? raw : {}) as { books?: unknown; placements?: unknown; wishlist?: unknown };
   const rows = <T>(list: unknown, schema: z.ZodType<T>) =>
     (Array.isArray(list) ? list : []).flatMap(item => {
       const parsed = schema.safeParse(item);
@@ -89,6 +109,7 @@ export function parseShelfData(raw: unknown): ShelfData {
   return {
     books: rows(value.books, ShelfBookSchema),
     placements: rows(value.placements, PlacementSchema),
+    wishlist: rows(value.wishlist, WishSchema),
     ...(job.success ? { factsJob: job.data } : {}),
     ...(kindsJob.success ? { kindsJob: kindsJob.data } : {}),
   };

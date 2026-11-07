@@ -3424,3 +3424,118 @@ body.is-map-expanded {
   .shelf-sheet__actions > span { display: none; }
   .shelf-sheet__actions .btn { min-height: 44px; white-space: normal; }
 }
+
+/* ── Wish list ───────────────────────────────────────────────────────── */
+
+.wish-list {
+  list-style: none;
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-4);
+}
+
+.wish-card {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
+  min-width: 0;
+}
+
+.wish-card__cover {
+  flex: none;
+  width: 4.5rem;
+  height: 6.75rem;
+  border-radius: 2px 4px 4px 2px;
+  object-fit: cover;
+  background: var(--c);
+  box-shadow: var(--elev-1);
+}
+
+.wish-card__cover--made {
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-2);
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--c-ink);
+  font-size: var(--text-2xs);
+  line-height: 1.25;
+}
+
+.wish-card__cover--made b {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wish-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.wish-card__title {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.wish-card__author,
+.wish-card__meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.wish-card__meta {
+  font-size: var(--text-xs);
+}
+
+.wish-card__why {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.wish-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.shelf-sheet .wish-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--warm-white);
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.shelf-sheet textarea.wish-why {
+  min-height: 5rem;
+  font-family: inherit;
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 720px) {
+  .shelf-sheet .wish-input,
+  .shelf-sheet textarea.wish-why { font-size: 16px; }
+}

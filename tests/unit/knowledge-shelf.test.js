@@ -108,3 +108,56 @@ test('Shelf can take a book record off the shelf', async () => {
   await assert.rejects(()=>saveBook(store,{label:'X',completed_on:'2027-01-01'},{now:NOW}),/future/);
   await assert.rejects(()=>saveBook(store,{label:'X',completed_on:'2026-99-99'},{now:NOW}),/completion date/);
 });
+
+test('Wish list adds, renames and removes books apart from the shelf', async () => {
+  const { saveWish, deleteWish } = await import('../../netlify/functions/_shared/knowledge-shelf.mjs');
+  const store = memoryStore();
+  const wish = await saveWish(store, { label: 'The Overstory', author: 'Richard Powers', why: 'Trees as characters', from: 'A podcast' }, { now: NOW });
+  assert.equal(wish.added_at, NOW);
+  assert.equal(wish.why, 'Trees as characters');
+  let shelf = await readShelf(store);
+  assert.equal(shelf.books.length, 0);
+  assert.equal(shelf.wishlist.length, 1);
+  const renamed = await saveWish(store, { was: 'The Overstory', label: 'The Overstory: A Novel', why: null }, { now: '2026-10-04T09:00:00.000Z' });
+  assert.equal(renamed.added_at, NOW);
+  assert.equal(renamed.author, 'Richard Powers');
+  assert.equal(renamed.why, undefined);
+  shelf = await readShelf(store);
+  assert.deepEqual(shelf.wishlist.map(w => w.label), ['The Overstory: A Novel']);
+  await saveWish(store, { label: 'Middlemarch' }, { now: NOW });
+  await assert.rejects(() => saveWish(store, { was: 'Middlemarch', label: 'the overstory: a novel' }), /already on the wish list/);
+  await assert.rejects(() => saveWish(store, { label: '  ' }), /title is required/);
+  assert.equal((await deleteWish(store, 'MIDDLEMARCH')).removed, true);
+  assert.equal((await readShelf(store)).wishlist.length, 1);
+});
+
+test('Starting a wish puts it on the shelf as reading now and off the wish list', async () => {
+  const store = memoryStore();
+  const { saveWish, startWish } = await import('../../netlify/functions/_shared/knowledge-shelf.mjs');
+  await saveWish(store, { label: 'Middlemarch', author: 'George Eliot' }, { now: NOW });
+  const book = await startWish(store, 'middlemarch', { now: NOW });
+  assert.equal(book.label, 'Middlemarch');
+  assert.equal(book.author, 'George Eliot');
+  assert.deepEqual(book.reading, { page: null, updated_at: NOW });
+  const shelf = await readShelf(store);
+  assert.equal(shelf.books.length, 1);
+  assert.equal(shelf.wishlist.length, 0);
+  await assert.rejects(() => startWish(store, 'Middlemarch'), /not on the wish list/);
+});
+
+test('Shelf API runs the wish ops', async () => {
+  const store = memoryStore();
+  const handler = createKnowledgeShelfHandler({ env, verifySessionToken: () => ({ valid: true }), getStore: async () => store, now: () => NOW });
+  const post = body => handler(new Request('https://example.test/api/knowledge/shelf', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+  }));
+  assert.equal((await post({ op: 'wish', wish: { label: 'Middlemarch' } })).status, 200);
+  assert.equal((await post({ op: 'wish', wish: { label: 'Bleak House' } })).status, 200);
+  assert.equal((await post({ op: 'wish', wish: {} })).status, 400);
+  assert.equal((await post({ op: 'wish-delete', label: 'Bleak House' })).status, 200);
+  assert.equal((await post({ op: 'wish-start', label: 'Nope' })).status, 404);
+  assert.equal((await post({ op: 'wish-start', label: 'Middlemarch' })).status, 200);
+  const read = await (await handler(new Request('https://example.test/api/knowledge/shelf'))).json();
+  assert.deepEqual(read.data.wishlist, []);
+  assert.equal(read.data.books[0].reading.page, null);
+});
