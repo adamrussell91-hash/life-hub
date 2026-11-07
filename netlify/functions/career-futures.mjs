@@ -9,6 +9,9 @@ import {
   startCareerAnnJob
 } from './_shared/career-ann-job.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { createApplicationRepository } from './_shared/application-repository.mjs';
+import { isValidApplicationId, isValidCriterionId } from './_shared/application-schema.mjs';
+import { DRAFT_TARGETS } from './_shared/career-application-ann.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/career-futures' };
@@ -61,6 +64,39 @@ export function createCareerFuturesHandler(deps = {}) {
             }
             await repo.getFuture(id); // A missing future fails here, not in the background.
             return withCors(okResponse(200, await startCareerAnnJob(store, { kind: 'check', future_id: id }, { invoke })), request, env);
+          }
+          if (action === 'app_check_start' || action === 'app_draft_start') {
+            const id = url.searchParams.get('id');
+            if (!id || !isValidApplicationId(id)) {
+              return withCors(errorResponse(400, 'invalid_application_id', 'id required.'), request, env);
+            }
+            const applications = (deps.createApplicationRepository ?? createApplicationRepository)({ store });
+            // A missing application fails here, not in the background.
+            const application = await applications.getApplication(id);
+            if (action === 'app_check_start') {
+              const job = { kind: 'app_check', application_id: id };
+              return withCors(okResponse(200, await startCareerAnnJob(store, job, { invoke })), request, env);
+            }
+            if (!DRAFT_TARGETS.has(body?.target)) {
+              return withCors(
+                errorResponse(400, 'invalid_target', 'target must be responses, cover_letter or cv.'),
+                request,
+                env
+              );
+            }
+            const criterionId = body.criterion_id ?? null;
+            if (criterionId !== null) {
+              const known = (application.selection_criteria ?? []).some((c) => c.id === criterionId);
+              if (body.target !== 'responses' || !isValidCriterionId(criterionId) || !known) {
+                return withCors(
+                  errorResponse(400, 'invalid_criterion_id', 'criterion_id is not a criterion of this application.'),
+                  request,
+                  env
+                );
+              }
+            }
+            const job = { kind: 'app_draft', application_id: id, target: body.target, criterion_id: criterionId };
+            return withCors(okResponse(200, await startCareerAnnJob(store, job, { invoke })), request, env);
           }
           if (action === 'job_status') {
             return withCors(okResponse(200, await careerAnnJobStatus(store, body.job_id)), request, env);

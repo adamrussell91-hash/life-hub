@@ -179,3 +179,68 @@ describe('skill cards with the same title', () => {
     expect(mentoring.future_ids).toEqual(['fut_1']);
   });
 });
+
+describe('application coverage (max of card link and confirmed check)', () => {
+  const APP = 'application_00000000-0000-4000-8000-000000000031';
+  const build = (criteria: Array<Record<string, unknown>>, links: Array<Record<string, unknown>> = []) =>
+    buildCareerModel({
+      applications: [
+        { id: APP, position_title: 'Head Teacher English', pipeline_status: 'drafting', selection_criteria: criteria as never }
+      ],
+      answers_criterion: links as never
+    }).applications[0]!;
+
+  it('reads Not checked, never 0%, until something has looked', () => {
+    const app = build([{ id: 'c1' }, { id: 'c2', check_status: null }]);
+    expect(app.checked).toBe(false);
+    expect(app.match_percent).toBeNull();
+    expect(app.match_label).toBeNull();
+    expect(app.criteria.map((c) => [c.coverage, c.label])).toEqual([
+      [null, 'Not checked'],
+      [null, 'Not checked']
+    ]);
+  });
+
+  it('takes the better of the strongest link and the check', () => {
+    const app = build(
+      [
+        { id: 'c1', check_status: 'partly', evidence: 'One class only' },
+        { id: 'c2', check_status: 'have' },
+        { id: 'c3', check_status: 'not_yet' },
+        { id: 'c4' }
+      ],
+      [
+        { application_id: APP, criterion_id: 'c1', strength: 'some' },
+        { application_id: APP, criterion_id: 'c3', strength: 'strong' }
+      ]
+    );
+    expect(app.criteria.map((c) => c.coverage)).toEqual([0.5, 1, 1, null]);
+    expect(app.criteria[0]!.label).toBe('Partly · One class only');
+    expect(app.criteria[3]!.label).toBe('Not checked');
+    expect(app.checked).toBe(true);
+    // (0.5 + 1 + 1 + 0) / 4
+    expect(app.match_percent).toBe(63);
+    expect(app.match_label).toBe('63%');
+  });
+
+  it('a confirmed Not yet is a real answer', () => {
+    const app = build([{ id: 'c1', check_status: 'not_yet' }]);
+    expect(app.criteria[0]!.coverage).toBe(0);
+    expect(app.criteria[0]!.label).toBe('Not yet');
+    expect(app.match_label).toBe('0%');
+  });
+
+  it('reads the overview’s criteria list too', () => {
+    const model = buildCareerModel({
+      applications: [
+        {
+          id: APP,
+          position_title: 'Head Teacher English',
+          pipeline_status: 'drafting',
+          criteria: [{ id: 'c1', check_status: 'have' }, { id: 'c2', check_status: null }]
+        }
+      ]
+    });
+    expect(model.applications[0]!.match_percent).toBe(50);
+  });
+});

@@ -58,3 +58,44 @@ export async function draftFuture<T>(body: { title: string; description: string 
   clearAnnJob(job_id);
   return result;
 }
+
+export type ApplicationCheckStatus = 'have' | 'partly' | 'not_yet' | 'unknown';
+export type ApplicationCheckSuggestion = {
+  criterion_id: string;
+  status: ApplicationCheckStatus;
+  evidence: string;
+  card_ids: string[];
+};
+export type ApplicationCheckResult = {
+  suggestions?: ApplicationCheckSuggestion[];
+  read_central_node?: boolean;
+};
+export type ApplicationDraftTarget = 'responses' | 'cover_letter' | 'cv';
+export type ApplicationDraftResult = {
+  application: import('@/domain/types').ApplicationRecord;
+  drafted: string[];
+  skipped: Array<{ criterion_id: string; reason: 'not_checked' | 'no_evidence' }>;
+  brackets: number;
+};
+
+/** Ann reads the criteria against Adam's record. Nothing is written until he confirms. */
+export async function startApplicationCheck(applicationId: string): Promise<string> {
+  const { job_id } = await apiPost<{ job_id: string }>(
+    `/api/career-futures?action=app_check_start&id=${encodeURIComponent(applicationId)}`,
+    {}
+  );
+  return job_id;
+}
+
+/** Ann drafts onto the application itself; anything Adam wrote waits as `pending`. */
+export async function startApplicationDraft(
+  applicationId: string,
+  target: ApplicationDraftTarget,
+  criterionId?: string
+): Promise<string> {
+  const { job_id } = await apiPost<{ job_id: string }>(
+    `/api/career-futures?action=app_draft_start&id=${encodeURIComponent(applicationId)}`,
+    criterionId ? { target, criterion_id: criterionId } : { target }
+  );
+  return job_id;
+}

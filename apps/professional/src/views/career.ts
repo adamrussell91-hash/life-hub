@@ -229,7 +229,7 @@ export async function renderCareerView(
     position_title: string;
     pipeline_status: string;
     closing_date?: string | null;
-    selection_criteria?: Array<{ id: string }>;
+    selection_criteria?: Array<{ id: string; check_status: string | null; evidence: string | null }>;
   }> = [];
   try {
     const listed = await listApplications();
@@ -238,7 +238,11 @@ export async function renderCareerView(
       position_title: a.position_title,
       pipeline_status: a.pipeline_status,
       closing_date: a.closing_date,
-      selection_criteria: a.selection_criteria?.map((c) => ({ id: c.id }))
+      selection_criteria: a.selection_criteria?.map((c) => ({
+        id: c.id,
+        check_status: c.check?.status ?? null,
+        evidence: c.check?.evidence ?? null
+      }))
     }));
   } catch {
     applicationRecords = [];

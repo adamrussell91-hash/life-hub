@@ -1,4 +1,16 @@
-import { listScanProposals, runCareerScan, keepScanProposal, binScanProposal } from '@/api/career';
+import {
+  binScanProposal,
+  estimateHistoryScan,
+  historyScanStatus,
+  keepScanProposal,
+  listScanProposals,
+  runCareerScan,
+  startHistoryScan,
+  stopHistoryScan,
+  type HistoryMonths,
+  type HistoryStatus
+} from '@/api/career';
+import { historyEstimateSentence } from '@/domain/career-application';
 import { careerFutureRoute } from '@/app/router';
 import type { CareerModel } from '@/domain/career-model';
 
@@ -58,6 +70,219 @@ function formatScanHeader(lastRunAt: string | null | undefined): string {
   return `Skills scan · ${when} · Ann read your hubs`;
 }
 
+/** Plain names for the record kinds the scan reads, in the order the panel lists them. */
+const KIND_LABELS: Array<[string, string]> = [
+  ['professional:meeting', 'meetings'],
+  ['professional:event', 'PD and events'],
+  ['professional:communication', 'communications'],
+  ['tasks:task', 'tasks'],
+  ['tasks:project', 'projects'],
+  ['tasks:goal', 'goals'],
+  ['teaching:unit', 'units'],
+  ['teaching:lesson', 'lessons'],
+  ['knowledge:page', 'Knowledge pages']
+];
+
+/** "Read: meetings, tasks, lessons." so a source the scan missed shows. */
+export function readKindsLine(kinds: string[] | null | undefined): string {
+  if (!Array.isArray(kinds)) return '';
+  if (!kinds.length) return 'Read: nothing on the last run.';
+  const known = KIND_LABELS.filter(([kind]) => kinds.includes(kind)).map(([, label]) => label);
+  const other = kinds.filter((kind) => !KIND_LABELS.some(([k]) => k === kind));
+  const labels = [...known, ...other.map((kind) => kind.split(':').pop() || kind)];
+  return `Read: ${labels.join(', ')}.`;
+}
+
+export function historyProgressLine(status: HistoryStatus): string {
+  const added = status.proposals_added ?? 0;
+  const proposals = added === 1 ? '1 new proposal' : `${added} new proposals`;
+  if (status.status === 'running') {
+    const at = Math.min(status.batches, Math.max(1, status.batch + 1));
+    return `Batch ${at} of ${status.batches}${added ? ` · ${proposals} so far` : ''}.`;
+  }
+  if (status.status === 'done') return `History scan finished: ${proposals}.`;
+  if (status.status === 'stopped') return `Stopped after batch ${status.batch} of ${status.batches}: ${proposals}.`;
+  if (status.status === 'failed') {
+    return `${status.message || 'The history scan stopped.'} Batches already read are saved (${proposals}).`;
+  }
+  return '';
+}
+
+const HISTORY_WINDOWS: Array<[HistoryMonths, string]> = [
+  [6, '6 months'],
+  [12, '1 year'],
+  [24, '2 years'],
+  [36, '3 years']
+];
+const HISTORY_POLL_MS = 3000;
+
+/** One poll for the whole page, however many times the panel redraws. */
+let historyPoll: Promise<HistoryStatus> | null = null;
+const historyListeners = new Set<(status: HistoryStatus) => void>();
+
+function pollHistory(pollMs = HISTORY_POLL_MS): Promise<HistoryStatus> {
+  if (historyPoll) return historyPoll;
+  historyPoll = (async () => {
+    // No clock: a history scan can take a while, and a dropped ask says nothing about it.
+    for (;;) {
+      let status: HistoryStatus | null = null;
+      try {
+        status = await historyScanStatus();
+      } catch {
+        status = null;
+      }
+      if (status) for (const listener of historyListeners) listener(status);
+      if (status && status.status !== 'running') return status;
+      if (!historyListeners.size) return status ?? { status: 'idle', batch: 0, batches: 0 };
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+  })().finally(() => {
+    historyPoll = null;
+  });
+  return historyPoll;
+}
+
+function historyBlock(onFinished: () => void): HTMLElement {
+  const block = el('div', 'career-scan__history');
+  block.append(el('h3', 'career-scan__title', 'Scan my history'));
+  block.append(
+    el('p', 'career-page__meta', 'Ann reads older records in batches and adds what she finds to the queue above.')
+  );
+  const controls = el('div', 'career-scan__actions');
+  const pick = el('select', 'career-scan__window') as HTMLSelectElement;
+  pick.setAttribute('aria-label', 'How far back');
+  for (const [months, label] of HISTORY_WINDOWS) {
+    const option = el('option', null, label) as HTMLOptionElement;
+    option.value = String(months);
+    pick.append(option);
+  }
+  pick.value = '12';
+  const count = el('button', 'btn btn--secondary', 'Count records') as HTMLButtonElement;
+  count.type = 'button';
+  controls.append(pick, count);
+
+  const confirm = el('div', 'career-scan__confirm');
+  confirm.hidden = true;
+  const sentence = el('p', 'career-page__meta');
+  const go = el('button', 'btn btn--primary', 'Go') as HTMLButtonElement;
+  go.type = 'button';
+  const cancel = el('button', 'btn btn--ghost', 'Cancel') as HTMLButtonElement;
+  cancel.type = 'button';
+  const confirmActions = el('div', 'career-scan__actions');
+  confirmActions.append(go, cancel);
+  confirm.append(sentence, confirmActions);
+
+  const progress = el('div', 'career-scan__confirm');
+  progress.hidden = true;
+  const progressLine = el('p', 'career-page__meta');
+  progressLine.setAttribute('role', 'status');
+  const stop = el('button', 'btn btn--ghost', 'Stop') as HTMLButtonElement;
+  stop.type = 'button';
+  const progressActions = el('div', 'career-scan__actions');
+  progressActions.append(stop);
+  progress.append(progressLine, progressActions);
+
+  const note = el('p', 'career-page__meta');
+  note.setAttribute('role', 'status');
+  note.hidden = true;
+  block.append(controls, confirm, progress, note);
+
+  const show = (status: HistoryStatus) => {
+    const running = status.status === 'running';
+    progress.hidden = !running;
+    controls.hidden = running;
+    if (running) {
+      confirm.hidden = true;
+      progressLine.textContent = historyProgressLine(status);
+      note.hidden = true;
+    } else {
+      note.textContent = historyProgressLine(status);
+      note.hidden = !note.textContent;
+    }
+  };
+  // A panel that was on the page and has gone (a redraw) stops listening.
+  const listener = (status: HistoryStatus) => {
+    if (block.isConnected) block.dataset.seen = '1';
+    else if (block.dataset.seen) {
+      historyListeners.delete(listener);
+      return;
+    }
+    show(status);
+  };
+  const follow = () => {
+    historyListeners.add(listener);
+    void pollHistory().then((final) => {
+      historyListeners.delete(listener);
+      if (final.status !== 'idle' && final.status !== 'running') onFinished();
+    });
+  };
+
+  count.addEventListener('click', () => {
+    void (async () => {
+      count.disabled = true;
+      note.hidden = true;
+      try {
+        const months = Number(pick.value) as HistoryMonths;
+        const estimate = await estimateHistoryScan(months);
+        sentence.textContent = historyEstimateSentence(estimate);
+        go.hidden = !estimate.sources;
+        confirm.hidden = false;
+        go.dataset.months = String(months);
+      } catch (error) {
+        note.textContent = error instanceof Error ? error.message : 'Could not count records. Try again.';
+        note.hidden = false;
+      } finally {
+        count.disabled = false;
+      }
+    })();
+  });
+  cancel.addEventListener('click', () => {
+    confirm.hidden = true;
+  });
+  go.addEventListener('click', () => {
+    void (async () => {
+      go.disabled = true;
+      try {
+        const status = await startHistoryScan(Number(go.dataset.months) as HistoryMonths);
+        confirm.hidden = true;
+        show(status);
+        follow();
+      } catch (error) {
+        note.textContent = error instanceof Error ? error.message : 'Could not start the history scan.';
+        note.hidden = false;
+      } finally {
+        go.disabled = false;
+      }
+    })();
+  });
+  stop.addEventListener('click', () => {
+    void (async () => {
+      stop.disabled = true;
+      try {
+        const status = await stopHistoryScan();
+        progressLine.textContent =
+          status.status === 'running' ? 'Stopping after this batch…' : historyProgressLine(status);
+      } catch {
+        progressLine.textContent = 'Could not stop it. Try again.';
+      } finally {
+        stop.disabled = false;
+      }
+    })();
+  });
+
+  // A scan already running (started before a reload) shows its progress straight away.
+  void historyScanStatus().then(
+    (status) => {
+      if (status.status === 'running') {
+        show(status);
+        follow();
+      }
+    },
+    () => {}
+  );
+  return block;
+}
+
 /**
  * Skills scan panel — pending proposals with Keep / Edit / Bin.
  */
@@ -80,6 +305,9 @@ export function renderSkillsScanPanel(
 
   const status = el('p', 'career-page__meta');
   panel.append(status);
+  const readLine = el('p', 'career-page__meta career-scan__read');
+  readLine.hidden = true;
+  panel.append(readLine);
 
   const list = el('div', 'career-scan__list');
   panel.append(list);
@@ -95,8 +323,11 @@ export function renderSkillsScanPanel(
         proposals?: ScanProposal[];
         pending_count?: number;
         next_scan_label?: string;
-        scan_state?: { last_run_at?: string | null };
+        scan_state?: { last_run_at?: string | null; read_kinds?: string[] };
+        read_kinds?: string[];
       };
+      readLine.textContent = readKindsLine(data.read_kinds ?? data.scan_state?.read_kinds);
+      readLine.hidden = !readLine.textContent;
       const proposals = data.proposals ?? [];
       if (data.scan_state?.last_run_at) {
         title.textContent = formatScanHeader(data.scan_state.last_run_at);
@@ -154,6 +385,8 @@ export function renderSkillsScanPanel(
       }
     })();
   });
+
+  panel.append(historyBlock(() => void load()));
 
   void load();
 }

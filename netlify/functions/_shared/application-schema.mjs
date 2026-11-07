@@ -77,6 +77,15 @@ export const REFLECTION_MAX = 16000;
 export const MAX_DOCUMENTS = 40;
 export const MAX_CRITERIA = 60;
 export const MAX_INTERVIEW_ROUNDS = 30;
+export const WORD_LIMIT_MIN = 25;
+export const WORD_LIMIT_MAX = 2000;
+export const CHECK_STATUSES = new Set(['have', 'partly', 'not_yet', 'unknown']);
+export const CHECK_EVIDENCE_MAX = 300;
+export const CHECK_CARD_IDS_MAX = 6;
+export const RESPONSE_SOURCES = new Set(['ann', 'adam']);
+export const COVER_LETTER_MAX = 8000;
+export const CV_MAX = 16000;
+const CARD_ID_PATTERN = /^achievement_[0-9a-f-]{36}$/;
 
 const APPLICATION_ID_PATTERN = /^application_[0-9a-f-]{36}$/;
 const DOCUMENT_ID_PATTERN = /^adoc_[0-9a-f-]{36}$/;
@@ -321,7 +330,81 @@ function validateDocumentsInput(raw) {
   });
 }
 
-const CRITERION_KEYS = new Set(['id', 'criterion', 'response', 'order', 'completed']);
+const CRITERION_KEYS = new Set([
+  'id',
+  'criterion',
+  'response',
+  'order',
+  'completed',
+  'word_limit',
+  'check',
+  'response_source',
+  'response_drafted_at',
+  'response_pending'
+]);
+
+const CHECK_KEYS = new Set(['status', 'evidence', 'card_ids', 'confirmed_at']);
+
+function isWordLimit(value) {
+  return Number.isInteger(value) && value >= WORD_LIMIT_MIN && value <= WORD_LIMIT_MAX;
+}
+
+export function isValidCardId(id) {
+  return typeof id === 'string' && CARD_ID_PATTERN.test(id);
+}
+
+/** A confirmed check answer. Returns null for anything malformed. */
+function parseCheck(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  for (const key of Object.keys(raw)) {
+    if (!CHECK_KEYS.has(key)) return null;
+  }
+  if (!CHECK_STATUSES.has(raw.status)) return null;
+  if (typeof raw.evidence !== 'string' || raw.evidence.length > CHECK_EVIDENCE_MAX) return null;
+  if (!Array.isArray(raw.card_ids) || raw.card_ids.length > CHECK_CARD_IDS_MAX) return null;
+  if (!raw.card_ids.every(isValidCardId)) return null;
+  if (!isIsoTimestamp(raw.confirmed_at)) return null;
+  return {
+    status: raw.status,
+    evidence: raw.evidence,
+    card_ids: [...raw.card_ids],
+    confirmed_at: raw.confirmed_at
+  };
+}
+
+export function validateCheckInput(raw, field = 'check') {
+  if (raw === null || raw === undefined) return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw validationError('invalid_check', `${field} must be an object or null.`);
+  }
+  for (const key of Object.keys(raw)) {
+    if (!CHECK_KEYS.has(key)) {
+      throw validationError('unknown_field', `Unknown ${field} field "${key}".`);
+    }
+  }
+  if (!CHECK_STATUSES.has(raw.status)) {
+    throw validationError('invalid_check_status', `${field}.status is not permitted.`);
+  }
+  const evidence = raw.evidence === undefined || raw.evidence === null ? '' : raw.evidence;
+  if (typeof evidence !== 'string') {
+    throw validationError('invalid_check_evidence', `${field}.evidence must be a string.`);
+  }
+  if (evidence.trim().length > CHECK_EVIDENCE_MAX) {
+    throw validationError('check_evidence_too_long', `${field}.evidence must be at most ${CHECK_EVIDENCE_MAX} characters.`);
+  }
+  const cardIds = raw.card_ids === undefined || raw.card_ids === null ? [] : raw.card_ids;
+  if (!Array.isArray(cardIds) || !cardIds.every(isValidCardId)) {
+    throw validationError('invalid_check_card_ids', `${field}.card_ids must be card ids.`);
+  }
+  const unique = [...new Set(cardIds)];
+  if (unique.length > CHECK_CARD_IDS_MAX) {
+    throw validationError('check_card_ids_too_many', `${field}.card_ids must have at most ${CHECK_CARD_IDS_MAX} entries.`);
+  }
+  if (!isIsoTimestamp(raw.confirmed_at)) {
+    throw validationError('invalid_check_confirmed_at', `${field}.confirmed_at must be ISO.`);
+  }
+  return { status: raw.status, evidence: evidence.trim(), card_ids: unique, confirmed_at: raw.confirmed_at };
+}
 
 function parseSelectionCriteria(raw) {
   if (!Array.isArray(raw)) return null;
@@ -337,12 +420,31 @@ function parseSelectionCriteria(raw) {
     if (entry.response != null && typeof entry.response !== 'string') return null;
     if (typeof entry.order !== 'number' || !Number.isFinite(entry.order)) return null;
     if (typeof entry.completed !== 'boolean') return null;
+    if (entry.word_limit != null && !isWordLimit(entry.word_limit)) return null;
+    let check = null;
+    if (entry.check != null) {
+      check = parseCheck(entry.check);
+      if (!check) return null;
+    }
+    if (entry.response_source != null && !RESPONSE_SOURCES.has(entry.response_source)) return null;
+    if (entry.response_drafted_at != null && !isIsoTimestamp(entry.response_drafted_at)) return null;
+    if (
+      entry.response_pending != null &&
+      (typeof entry.response_pending !== 'string' || entry.response_pending.length > CRITERION_RESPONSE_MAX)
+    ) {
+      return null;
+    }
     out.push({
       id: entry.id,
       criterion: entry.criterion,
       response: entry.response ?? null,
       order: entry.order,
-      completed: entry.completed
+      completed: entry.completed,
+      word_limit: entry.word_limit ?? null,
+      check,
+      response_source: entry.response_source ?? null,
+      response_drafted_at: entry.response_drafted_at ?? null,
+      response_pending: entry.response_pending ?? null
     });
   }
   return out;
@@ -379,6 +481,24 @@ function validateSelectionCriteriaInput(raw) {
     if (!isValidCriterionId(id)) {
       throw validationError('invalid_criterion_id', `selection_criteria[${index}].id must be acrit_<uuid>.`);
     }
+    if (entry.word_limit != null && !isWordLimit(entry.word_limit)) {
+      throw validationError(
+        'invalid_word_limit',
+        `selection_criteria[${index}].word_limit must be a whole number from ${WORD_LIMIT_MIN} to ${WORD_LIMIT_MAX}.`
+      );
+    }
+    if (entry.response_source != null && !RESPONSE_SOURCES.has(entry.response_source)) {
+      throw validationError(
+        'invalid_response_source',
+        `selection_criteria[${index}].response_source must be ann or adam.`
+      );
+    }
+    if (entry.response_drafted_at != null && !isIsoTimestamp(entry.response_drafted_at)) {
+      throw validationError(
+        'invalid_response_drafted_at',
+        `selection_criteria[${index}].response_drafted_at must be ISO.`
+      );
+    }
     return {
       id,
       criterion: trimBounded(entry.criterion, `selection_criteria[${index}].criterion`, CRITERION_MAX, {
@@ -386,9 +506,77 @@ function validateSelectionCriteriaInput(raw) {
       }),
       response: trimBounded(entry.response, `selection_criteria[${index}].response`, CRITERION_RESPONSE_MAX),
       order: entry.order,
-      completed: entry.completed
+      completed: entry.completed,
+      word_limit: entry.word_limit ?? null,
+      check: validateCheckInput(entry.check, `selection_criteria[${index}].check`),
+      response_source: entry.response_source ?? null,
+      response_drafted_at: entry.response_drafted_at ?? null,
+      response_pending: trimBounded(
+        entry.response_pending,
+        `selection_criteria[${index}].response_pending`,
+        CRITERION_RESPONSE_MAX
+      )
     };
   });
+}
+
+const WRITTEN_PIECE_KEYS = new Set(['text', 'source', 'drafted_at', 'updated_at', 'pending']);
+
+/** Stored cover letter / CV. Absent is null; malformed is undefined (record rejected). */
+function parseWrittenPiece(raw, max) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  for (const key of Object.keys(raw)) {
+    if (!WRITTEN_PIECE_KEYS.has(key)) return undefined;
+  }
+  if (typeof raw.text !== 'string' || raw.text.length > max) return undefined;
+  if (!RESPONSE_SOURCES.has(raw.source)) return undefined;
+  if (raw.drafted_at != null && !isIsoTimestamp(raw.drafted_at)) return undefined;
+  if (!isIsoTimestamp(raw.updated_at)) return undefined;
+  if (raw.pending != null && (typeof raw.pending !== 'string' || raw.pending.length > max)) return undefined;
+  return {
+    text: raw.text,
+    source: raw.source,
+    drafted_at: raw.drafted_at ?? null,
+    updated_at: raw.updated_at,
+    pending: raw.pending ?? null
+  };
+}
+
+function validateWrittenPieceInput(raw, field, max) {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw validationError(`invalid_${field}`, `${field} must be an object or null.`);
+  }
+  for (const key of Object.keys(raw)) {
+    if (!WRITTEN_PIECE_KEYS.has(key)) {
+      throw validationError('unknown_field', `Unknown ${field} field "${key}".`);
+    }
+  }
+  if (typeof raw.text !== 'string') {
+    throw validationError(`invalid_${field}_text`, `${field}.text must be a string.`);
+  }
+  const text = raw.text.trim();
+  if (text.length > max) {
+    throw validationError(`${field}_too_long`, `${field}.text must be at most ${max} characters.`);
+  }
+  const source = raw.source ?? 'adam';
+  if (!RESPONSE_SOURCES.has(source)) {
+    throw validationError(`invalid_${field}_source`, `${field}.source must be ann or adam.`);
+  }
+  if (raw.drafted_at != null && !isIsoTimestamp(raw.drafted_at)) {
+    throw validationError(`invalid_${field}_drafted_at`, `${field}.drafted_at must be ISO or null.`);
+  }
+  if (raw.updated_at != null && !isIsoTimestamp(raw.updated_at)) {
+    throw validationError(`invalid_${field}_updated_at`, `${field}.updated_at must be ISO.`);
+  }
+  return {
+    text,
+    source,
+    drafted_at: raw.drafted_at ?? null,
+    updated_at: raw.updated_at ?? new Date().toISOString(),
+    pending: trimBounded(raw.pending, `${field}.pending`, max)
+  };
 }
 
 const INTERVIEW_KEYS = new Set([
@@ -590,6 +778,8 @@ const STORED_KEYS = new Set([
   'interview_rounds',
   'outcome',
   'reflection',
+  'cover_letter',
+  'cv',
   'created_at',
   'updated_at'
 ]);
@@ -615,6 +805,10 @@ export function parseApplicationRecord(raw) {
   const outcome = parseOutcome(raw.outcome);
   if (!outcome) return null;
   if (raw.reflection != null && typeof raw.reflection !== 'string') return null;
+  const cover_letter = parseWrittenPiece(raw.cover_letter, COVER_LETTER_MAX);
+  if (cover_letter === undefined) return null;
+  const cv = parseWrittenPiece(raw.cv, CV_MAX);
+  if (cv === undefined) return null;
   if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
   return {
     schema_version: raw.schema_version,
@@ -628,6 +822,8 @@ export function parseApplicationRecord(raw) {
     interview_rounds,
     outcome,
     reflection: raw.reflection ?? null,
+    cover_letter,
+    cv,
     created_at: raw.created_at,
     updated_at: raw.updated_at
   };
@@ -685,7 +881,9 @@ const UPDATE_KEYS = new Set([
   'selection_criteria',
   'interview_rounds',
   'outcome',
-  'reflection'
+  'reflection',
+  'cover_letter',
+  'cv'
 ]);
 
 /**
@@ -734,6 +932,12 @@ export function validateApplicationFieldUpdate(input, existing = null) {
   if (input.reflection !== undefined) {
     patch.reflection = trimBounded(input.reflection, 'reflection', REFLECTION_MAX);
   }
+  if (input.cover_letter !== undefined) {
+    patch.cover_letter = validateWrittenPieceInput(input.cover_letter, 'cover_letter', COVER_LETTER_MAX);
+  }
+  if (input.cv !== undefined) {
+    patch.cv = validateWrittenPieceInput(input.cv, 'cv', CV_MAX);
+  }
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -769,6 +973,8 @@ export function projectApplication(record, incompleteLinks = null) {
     interview_rounds: record.interview_rounds ?? [],
     outcome: record.outcome ?? emptyOutcome(),
     reflection: record.reflection ?? null,
+    cover_letter: record.cover_letter ?? null,
+    cv: record.cv ?? null,
     created_at: record.created_at,
     updated_at: record.updated_at
   };

@@ -86,3 +86,35 @@ export function listCareerMoves(options: { signal?: AbortSignal } = {}) {
 export function getAchievement(id: string) {
   return apiGet<{ achievement: import('@/views/career-skill-form').SkillCard }>(`/api/career-achievements?id=${encodeURIComponent(id)}`);
 }
+
+export type HistoryMonths = 6 | 12 | 24 | 36;
+export type HistoryEstimate = {
+  sources: number;
+  batches: number;
+  cost_aud: number;
+  by_kind?: Record<string, number>;
+};
+export type HistoryStatus = {
+  status: 'idle' | 'running' | 'done' | 'stopped' | 'failed';
+  batch: number;
+  batches: number;
+  proposals_added?: number;
+  message?: string;
+};
+
+/** Counts what a history scan would read. No model call. */
+export function estimateHistoryScan(months: HistoryMonths) {
+  return apiPost<HistoryEstimate>('/api/career-scan?action=history_estimate', { months });
+}
+
+export function startHistoryScan(months: HistoryMonths) {
+  return apiPost<HistoryStatus>('/api/career-scan?action=history_start', { months });
+}
+
+export function historyScanStatus() {
+  return apiGet<HistoryStatus>('/api/career-scan?action=history_status');
+}
+
+export function stopHistoryScan() {
+  return apiPost<HistoryStatus>('/api/career-scan?action=history_stop', {});
+}

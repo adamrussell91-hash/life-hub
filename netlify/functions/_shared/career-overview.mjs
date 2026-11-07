@@ -30,7 +30,8 @@ function applicationSummary(record) {
     position_title: record.position_title,
     pipeline_status: record.pipeline_status,
     closing_date: record.closing_date ?? null,
-    updated_at: record.updated_at
+    updated_at: record.updated_at,
+    criteria: (record.selection_criteria ?? []).map((c) => ({ id: c.id, check_status: c.check?.status ?? null }))
   };
 }
 

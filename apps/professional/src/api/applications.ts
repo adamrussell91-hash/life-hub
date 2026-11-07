@@ -1,6 +1,7 @@
 import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
 import type {
   ApplicationDocument,
+  ApplicationDraftDocument,
   ApplicationPipelineStatus,
   ApplicationRecord,
   InterviewRound,
@@ -102,6 +103,8 @@ export function updateApplication(
       reason?: string | null;
     };
     reflection?: string | null;
+    cover_letter?: ApplicationDraftDocument | null;
+    cv?: ApplicationDraftDocument | null;
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ application: ApplicationRecord }> {
@@ -167,4 +170,21 @@ export function isApplicationTaskLinkIncompleteError(err: unknown): err is ApiCl
   data: { operation_id: string; task_id?: string | null };
 } {
   return err instanceof ApiClientError && err.code === 'professional_task_link_incomplete';
+}
+
+export type ConfirmCheckAnswer = {
+  criterion_id: string;
+  status: 'have' | 'partly' | 'not_yet' | 'unknown';
+  evidence: string;
+  card_ids: string[];
+};
+
+/** Saves Adam's confirmed answers and replaces each criterion's skill card links. */
+export function confirmApplicationCheck(
+  id: string,
+  answers: ConfirmCheckAnswer[],
+  options: { signal?: AbortSignal } = {}
+): Promise<{ application: ApplicationRecord }> {
+  const params = new URLSearchParams({ id, action: 'confirm-check' });
+  return apiPost(`/api/applications?${params.toString()}`, { answers }, { signal: options.signal });
 }
