@@ -7,6 +7,9 @@ export function scene(): string {
     <!-- N Seoul Tower -->
     <g fill="#e8eef6"><rect x="546" y="40" width="8" height="46"/><rect x="538" y="36" width="24" height="10" rx="3"/><rect x="549" y="6" width="2" height="30"/></g>
     <circle cx="550" cy="41" r="3" fill="#ff8fb1" class="a-blink"/>
+    <!-- Namsan cable car -->
+    <path d="M404 196L534 86" stroke="#c9d3e0" stroke-width="1.4"/>
+    <g class="a-cable"><g transform="translate(420,182.5)"><path d="M0 0v8" stroke="#c9d3e0" stroke-width="1.6"/><circle r="2.4" fill="#c9d3e0"/><rect x="-10" y="8" width="20" height="14" rx="3" fill="#e94e4e"/><rect x="-7" y="11" width="14" height="5" rx="1" fill="#fff3cf"/><rect x="-10" y="19" width="20" height="3" rx="1" fill="#f2c14e"/></g></g>
     <!-- hanok roof -->
     <g fill="#16223d"><path d="M60 150q140-30 280 0l-12 14q-128-24-256 0z"/><rect x="90" y="162" width="220" height="40"/><g fill="#d65a5a"><rect x="110" y="168" width="10" height="34"/><rect x="190" y="168" width="10" height="34"/><rect x="270" y="168" width="10" height="34"/></g></g>
     <path d="M0 200h800v30H0z" fill="#e8eef6"/>

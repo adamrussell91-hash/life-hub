@@ -476,6 +476,16 @@ details.tobook[open] summary::after { content: "Hide"; }
 .a-sway { animation: sway 4s ease-in-out infinite; transform-box: fill-box; transform-origin: bottom center; }
 .a-spin { animation: spin 40s linear infinite; transform-box: fill-box; transform-origin: center; }
 .a-blink { animation: blink 2s steps(2) infinite; }
+.a-wheel { animation: spin .7s linear infinite; transform-box: fill-box; transform-origin: center; }
+.a-wheel-rev { animation: spin .7s linear infinite reverse; transform-box: fill-box; transform-origin: center; }
+.a-ride { animation: ride .32s ease-in-out infinite alternate; }
+.a-rock { animation: rock 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+.a-puff-r { animation: puffR 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.a-flutter { animation: flutter .4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: left center; }
+.a-swish { animation: swish 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: top left; }
+.a-graze { animation: graze 6s ease-in-out infinite; transform-box: fill-box; transform-origin: right center; }
+.a-rod { animation: rod .7s linear infinite; }
+.a-cable { animation: cable 11s ease-in-out infinite alternate; }
 @keyframes drive { from { transform: translateX(-220px); } to { transform: translateX(1100px); } }
 @keyframes driveRev { from { transform: translateX(1100px); } to { transform: translateX(-260px); } }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -487,6 +497,14 @@ details.tobook[open] summary::after { content: "Hide"; }
 @keyframes sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2.5deg); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 0% { opacity: 1; } 100% { opacity: .35; } }
+@keyframes ride { from { transform: translateY(0); } to { transform: translateY(-1.2px); } }
+@keyframes rock { 0%,100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
+@keyframes puffR { 0% { transform: translate(0,0) scale(.4); opacity: .9; } 100% { transform: translate(30px,-36px) scale(1.5); opacity: 0; } }
+@keyframes flutter { from { transform: skewY(-8deg) scaleX(1); } to { transform: skewY(8deg) scaleX(.85); } }
+@keyframes swish { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
+@keyframes graze { 0%,55%,100% { transform: rotate(0); } 65%,85% { transform: rotate(-14deg); } }
+@keyframes rod { 0% { transform: translate(0,-2px); } 25% { transform: translate(2px,0); } 50% { transform: translate(0,2px); } 75% { transform: translate(-2px,0); } 100% { transform: translate(0,-2px); } }
+@keyframes cable { 0%,8% { transform: translate(0,0); } 92%,100% { transform: translate(90px,-76px); } }
 @keyframes pulse { 0% { r: 9; opacity: .35; } 100% { r: 26; opacity: 0; } }
 .me-ring { animation: pulse 1.8s ease-out infinite; }
 /* zoom */
