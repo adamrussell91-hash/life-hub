@@ -214,6 +214,32 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {}, chec
           (x) => x.type === "text" && x.text.includes("Photo role: dish"),
         )?.text || "";
       const photoId = photoText.split("Photo identifier: ")[1];
+      const hasMenu = options.messages[0].content.some(
+        (x) => x.type === "text" && x.text.includes("Photo role: menu"),
+      );
+      // A dish photo alone gives a guessed name; with the menu, the menu's.
+      if (photoId)
+        return JSON.stringify({
+          title: hasMenu ? "Noodle dinner" : "",
+          venue: { name: hasMenu ? "Noodle Cafe" : "", address: "" },
+          menu_text: hasMenu ? "Pork gyoza $12" : "",
+          menu_items: hasMenu
+            ? [
+                { name: "Soba noodles", description: "", price: "$18" },
+                { name: "Pork gyoza", description: "Pan fried", price: "$12" },
+              ]
+            : [],
+          dishes: [
+            {
+              title: hasMenu ? "PORK GYOZA" : "Dumplings",
+              cuisine: "Chinese",
+              meal_type: "Dinner",
+              tags: ["Dumplings"],
+              notes: "",
+              photo_ids: [photoId],
+            },
+          ],
+        });
       return JSON.stringify({
         title: "Noodle dinner",
         venue: { name: "Noodle Cafe", address: "Sydney" },
@@ -228,16 +254,8 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {}, chec
           },
           { name: "Extra egg", description: "", price: "$3", kind: "extra" },
         ],
-        dishes: [
-          {
-            title: "Soba noodles",
-            cuisine: "Japanese",
-            meal_type: "Dinner",
-            tags: ["Noodles"],
-            notes: "",
-            photo_ids: photoId ? [photoId] : [],
-          },
-        ],
+        // A menu alone names no dishes, as the capture prompt says.
+        dishes: [],
       });
     },
     client: {
@@ -823,6 +841,85 @@ test("capture, private upload, menu text, backup and restore work through the re
     .click();
   await page.locator(".food-sheet").waitFor({ state: "detached" });
   assert.equal(read().visits.length, 2);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("a menu photo chosen while the dish photo is still uploading is read, not dropped", async () => {
+  const { page, read, errors } = await pageFor(390);
+  // A phone takes a few seconds to convert and upload a dish photo.
+  await page.route("**/api/food-journal-media", async (route) => {
+    if (route.request().method() === "POST")
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  const photo = {
+    name: "dish.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(JPEG, "base64"),
+  };
+  await page.getByLabel("Dish photo", { exact: true }).setInputFiles(photo);
+  await page.getByText("Adding photos.", { exact: true }).waitFor();
+  await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
+  // The menu's list to tick comes up, and the dish is named from the menu.
+  const onMenu = page.getByRole("region", { name: "On the menu" });
+  await onMenu.getByRole("checkbox", { name: /Pork gyoza/ }).waitFor();
+  await page
+    .getByText("Filled in from your photos. Tick anything else you had.", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page.getByLabel("Dish title", { exact: true }).first().inputValue(),
+    "Pork Gyoza",
+  );
+  assert.equal(await onMenu.getByRole("checkbox", { name: /Pork gyoza/ }).isChecked(), true);
+  // Anything else on the menu still ticks on as its own dish.
+  await onMenu.getByRole("checkbox", { name: /Soba noodles/ }).check();
+  await saveVisit(page);
+  assert.deepEqual(
+    read().visits.at(-1).dishes.map((d) => [d.title, d.photos.length]),
+    [["Pork Gyoza", 1], ["Soba noodles", 0]],
+  );
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("a dish photo then a menu photo fill in the dish with nothing typed", async () => {
+  const { page, read, errors } = await pageFor(390);
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  const photo = {
+    name: "dish.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(JPEG, "base64"),
+  };
+  // The dish photo alone is read and names the dish.
+  await page.getByLabel("Dish photo", { exact: true }).setInputFiles(photo);
+  await page
+    .getByText("Filled in from your photos. Check it, then save.", { exact: true })
+    .waitFor();
+  const title = page.getByLabel("Dish title", { exact: true });
+  assert.equal(await title.inputValue(), "Dumplings");
+  // The menu then swaps in its own name and brings its ingredients across.
+  await goStep(page, 0);
+  await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
+  await page
+    .getByText("Filled in from your photos. Tick anything else you had.", { exact: true })
+    .waitFor();
+  await goStep(page, 1);
+  assert.equal(await title.count(), 1);
+  assert.equal(await title.inputValue(), "Pork Gyoza");
+  assert.equal(
+    await page.getByLabel("Ingredients", { exact: true }).inputValue(),
+    "Pan fried",
+  );
+  await saveVisit(page);
+  const saved = read().visits.at(-1);
+  assert.equal(saved.title, "Noodle dinner");
+  assert.equal(saved.venue.name, "Noodle Cafe");
+  assert.deepEqual(
+    saved.dishes.map((d) => [d.title, d.ingredients, d.cuisine, d.tags, d.photos.length]),
+    [["Pork Gyoza", "Pan fried", "Chinese", ["Dumplings"], 1]],
+  );
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -1806,6 +1903,11 @@ for (const width of [1440, 390])
     await four.click();
     await page.getByRole("heading", { name: "Tortilla" }).waitFor();
     assert.equal((await four.textContent()).trim(), "4", "the half resets for the next dish");
+    // A misnamed dish is fixed on the card and the fix rides with the answer.
+    await page.getByRole("button", { name: "Wrong name?" }).click();
+    await page.getByLabel("What was it?").fill("Fried cheese");
+    await page.getByRole("button", { name: "Use this name" }).click();
+    await page.getByRole("heading", { name: "Fried cheese" }).waitFor();
     await page.getByRole("button", { name: /Can't remember/ }).click();
     await page.getByText("Every dish has a rating.", { exact: false }).waitFor();
     await page.getByRole("tab", { name: "Timeline", exact: true }).click();
@@ -1815,6 +1917,7 @@ for (const width of [1440, 390])
     assert.equal(dish("dish_second").rating, 4.5);
     assert.equal(dish("dish_third").rating, null);
     assert.equal(dish("dish_third").rating_unknown, true);
+    assert.equal(dish("dish_third").title, "Fried cheese");
     assert.deepEqual(errors, []);
     await page.close();
   });

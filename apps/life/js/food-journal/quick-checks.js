@@ -85,6 +85,8 @@ function applyRating(journal, answer) {
   }
   if (want == null) dish.rating_unknown = true;
   else dish.rating = want;
+  // The card's "Wrong name?" fix travels with the score.
+  if (typeof answer.title === "string") dish.title = answer.title.trim();
   return { applied: 1, held: 0, changed: true };
 }
 
@@ -126,6 +128,11 @@ export function answerProblem(answer) {
     return "Answer is not recognised.";
   if (answer.pick === "rate" && !validRating(answer.rating))
     return "Rating must be 1 to 5, in half steps.";
+  if (answer.title !== undefined) {
+    const title = typeof answer.title === "string" ? answer.title.trim() : "";
+    if (!isRateCheck(answer.check_id) || !title || title.length > 200)
+      return "Type a dish name under 200 characters.";
+  }
   if (answer.pick === "typed") {
     const name = typeof answer.name === "string" ? answer.name.trim() : "";
     if (!name || name.length > 200) return "Type a venue under 200 characters.";

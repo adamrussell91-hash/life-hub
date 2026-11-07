@@ -55,12 +55,13 @@ export function createFoodChecksHandler(deps = {}) {
         const problem = answerProblem(body.answer);
         if (problem)
           return errorResponse(400, "validation_error", problem, false, PRIVATE_CACHE);
-        const { check_id, pick, name, exclude, rating } = body.answer;
+        const { check_id, pick, name, exclude, rating, title } = body.answer;
         await saveAnswer(store, {
           check_id,
           pick,
           ...(pick === "rate" ? { rating } : {}),
           ...(pick === "typed" ? { name: name.trim() } : {}),
+          ...(title !== undefined ? { title: title.trim() } : {}),
           ...(exclude?.length ? { exclude } : {}),
         });
         return okResponse(200, { saved: true }, PRIVATE_CACHE);

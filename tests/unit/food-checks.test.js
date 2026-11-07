@@ -388,6 +388,53 @@ test("rating answers: half steps, can't remember, never over a rating Adam gave"
   assert.equal(gone.results[0].outcome, "held");
 });
 
+test("a rating answer can rename a misnamed dish, only while it is still unrated", async () => {
+  const { rateCheckId } = await import("../../apps/life/js/food-journal/quick-checks.js");
+  const id = rateCheckId("v1_dish");
+  assert.equal(answerProblem({ check_id: id, pick: "rate", rating: 4, title: "Fried cheese" }), null);
+  assert.equal(answerProblem({ check_id: id, pick: "unknown", title: "Fried cheese" }), null);
+  assert.match(answerProblem({ check_id: id, pick: "rate", rating: 4, title: "  " }), /dish name/);
+  assert.match(answerProblem({ check_id: id, pick: "rate", rating: 4, title: "x".repeat(201) }), /dish name/);
+  assert.match(answerProblem({ check_id: id, pick: "rate", rating: 4, title: 7 }), /dish name/);
+  assert.ok(answerProblem({ check_id: "chk_dish", pick: "apply", title: "Fried cheese" }), "only rating cards rename");
+
+  const j = journal(visit("v1"), visit("v2"));
+  const done = applyAnswers(j, [], [
+    { check_id: id, pick: "rate", rating: 4, title: "  Fried cheese " },
+    { check_id: rateCheckId("v2_dish"), pick: "unknown", title: "Bean stew" },
+  ]);
+  assert.equal(done.changed, true);
+  assert.equal(done.journal.visits[0].dishes[0].title, "Fried cheese");
+  assert.equal(done.journal.visits[0].dishes[0].rating, 4);
+  assert.equal(done.journal.visits[1].dishes[0].title, "Bean stew");
+  validateFoodJournal(done.journal);
+
+  // Already rated elsewhere: the rename waits with the rating.
+  const rated = journal(visit("v1"));
+  rated.visits[0].dishes[0].rating = 2;
+  const held = applyAnswers(rated, [], [{ check_id: id, pick: "rate", rating: 4, title: "Fried cheese" }]);
+  assert.equal(held.results[0].outcome, "held");
+  assert.equal(held.journal.visits[0].dishes[0].title, "Soup");
+
+  const store = memoryStore();
+  const handler = createFoodChecksHandler({
+    env: { LIFE_HUB_PASSPHRASE_HASH: "configured", SESSION_SECRET: "x".repeat(32) },
+    verifySessionToken: () => ({ valid: true }),
+    createFoodJournalRepository: () => memoryRepo(journal(visit("v1"))),
+    getCheckStore: async () => store,
+    readChecks: async () => [],
+  });
+  const res = await handler(
+    new Request("https://x.test/api/food-checks", {
+      method: "POST",
+      body: JSON.stringify({ action: "answer", answer: { check_id: id, pick: "unknown", title: " Fried cheese " } }),
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual((await readPending(store))[0], { check_id: id, pick: "unknown", title: "Fried cheese" });
+});
+
 test("batches cannot borrow rating card ids, and the API saves the rating", async () => {
   const problems = batchProblems({ schema_version: 1, checks: [dishCheck({ id: "chk_rate_v1_dish" })] }, journal(visit("v1")));
   assert.ok(problems.some((p) => /rating cards/.test(p)));
