@@ -2179,7 +2179,9 @@ export function createFoodJournalView({
           step = 1;
         fields();
         s.error.textContent = result.named.length
-          ? "Filled in from your photos. Check it, then save."
+          ? visit.menu_items?.length
+            ? "Filled in from your photos. Tick anything else you had."
+            : "Filled in from your photos. Check it, then save."
           : visit.menu_items?.length
             ? "Tick what you had."
             : "Check the details, then save.";

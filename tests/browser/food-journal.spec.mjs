@@ -224,7 +224,10 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {}, chec
           venue: { name: hasMenu ? "Noodle Cafe" : "", address: "" },
           menu_text: hasMenu ? "Pork gyoza $12" : "",
           menu_items: hasMenu
-            ? [{ name: "Pork gyoza", description: "Pan fried", price: "$12" }]
+            ? [
+                { name: "Soba noodles", description: "", price: "$18" },
+                { name: "Pork gyoza", description: "Pan fried", price: "$12" },
+              ]
             : [],
           dishes: [
             {
@@ -251,16 +254,8 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {}, chec
           },
           { name: "Extra egg", description: "", price: "$3", kind: "extra" },
         ],
-        dishes: [
-          {
-            title: "Soba noodles",
-            cuisine: "Japanese",
-            meal_type: "Dinner",
-            tags: ["Noodles"],
-            notes: "",
-            photo_ids: photoId ? [photoId] : [],
-          },
-        ],
+        // A menu alone names no dishes, as the capture prompt says.
+        dishes: [],
       });
     },
     client: {
@@ -850,6 +845,45 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.close();
 });
 
+test("a menu photo chosen while the dish photo is still uploading is read, not dropped", async () => {
+  const { page, read, errors } = await pageFor(390);
+  // A phone takes a few seconds to convert and upload a dish photo.
+  await page.route("**/api/food-journal-media", async (route) => {
+    if (route.request().method() === "POST")
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  const photo = {
+    name: "dish.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(JPEG, "base64"),
+  };
+  await page.getByLabel("Dish photo", { exact: true }).setInputFiles(photo);
+  await page.getByText("Adding photos.", { exact: true }).waitFor();
+  await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
+  // The menu's list to tick comes up, and the dish is named from the menu.
+  const onMenu = page.getByRole("region", { name: "On the menu" });
+  await onMenu.getByRole("checkbox", { name: /Pork gyoza/ }).waitFor();
+  await page
+    .getByText("Filled in from your photos. Tick anything else you had.", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page.getByLabel("Dish title", { exact: true }).first().inputValue(),
+    "Pork Gyoza",
+  );
+  assert.equal(await onMenu.getByRole("checkbox", { name: /Pork gyoza/ }).isChecked(), true);
+  // Anything else on the menu still ticks on as its own dish.
+  await onMenu.getByRole("checkbox", { name: /Soba noodles/ }).check();
+  await saveVisit(page);
+  assert.deepEqual(
+    read().visits.at(-1).dishes.map((d) => [d.title, d.photos.length]),
+    [["Pork Gyoza", 1], ["Soba noodles", 0]],
+  );
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("a dish photo then a menu photo fill in the dish with nothing typed", async () => {
   const { page, read, errors } = await pageFor(390);
   await page.getByRole("button", { name: "Add visit", exact: true }).click();
@@ -869,7 +903,7 @@ test("a dish photo then a menu photo fill in the dish with nothing typed", async
   await goStep(page, 0);
   await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
   await page
-    .getByText("Filled in from your photos. Check it, then save.", { exact: true })
+    .getByText("Filled in from your photos. Tick anything else you had.", { exact: true })
     .waitFor();
   await goStep(page, 1);
   assert.equal(await title.count(), 1);
