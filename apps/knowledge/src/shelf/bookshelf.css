@@ -3458,21 +3458,13 @@ body.is-map-expanded {
 }
 
 .wish-card__cover--made {
-  display: flex;
-  align-items: flex-end;
-  padding: var(--space-2);
-  box-sizing: border-box;
-  overflow: hidden;
+  display: grid;
+  place-items: center;
   color: var(--c-ink);
-  font-size: var(--text-2xs);
-  line-height: 1.25;
-}
-
-.wish-card__cover--made b {
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-family: var(--font-display, inherit);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .wish-card__body {

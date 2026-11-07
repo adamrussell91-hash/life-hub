@@ -507,7 +507,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   function wishCardHtml(wish: WishModel) {
     const cover = wish.cover
       ? `<img class="wish-card__cover" src="${esc(wish.cover)}" alt="" loading="lazy" decoding="async" style="--c:${wish.swatch.fill}" />`
-      : `<span class="wish-card__cover wish-card__cover--made" style="--c:${wish.swatch.fill};--c-ink:${wish.swatch.ink}" aria-hidden="true"><b>${esc(wish.label)}</b></span>`;
+      : `<span class="wish-card__cover wish-card__cover--made" style="--c:${wish.swatch.fill};--c-ink:${wish.swatch.ink}" aria-hidden="true">${esc(Array.from(wish.label.replace(/^(the|a|an)\s+/i, "").trim())[0]?.toUpperCase() ?? "")}</span>`;
     const meta = [wish.from ? `From ${esc(wish.from)}` : "", esc(addedLabel(wish.added_at))].filter(Boolean).join(" · ");
     const main = wish.onShelf
       ? `<button class="btn btn--secondary" type="button" data-wish-open="${esc(wish.key)}">Open on shelf</button>`
