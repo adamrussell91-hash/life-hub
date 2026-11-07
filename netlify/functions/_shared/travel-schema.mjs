@@ -1,7 +1,7 @@
 const CURRENCIES = new Set([
   'AUD', 'MYR', 'TRY', 'GBP', 'EUR', 'KRW', 'CAD', 'USD', 'JPY', 'NZD', 'SGD'
 ]);
-const SCENES = new Set(['kul', 'ist', 'sco', 'lon', 'rom', 'sel', 'generic']);
+const SCENES = new Set(['kul', 'ist', 'sco', 'lon', 'rom', 'sel', 'sok', 'gng', 'gyj', 'bus', 'jej', 'icn', 'generic']);
 const STATUSES = new Set(['planned', 'booked', 'todo', 'idea']);
 const HOP_MODES = new Set(['walk', 'train', 'tram', 'bus', 'taxi', 'ferry']);
 const GUIDE_ICONS = new Set(['phone', 'transport', 'money', 'weather', 'paperwork']);

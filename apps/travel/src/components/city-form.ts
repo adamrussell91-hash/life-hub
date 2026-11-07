@@ -2,6 +2,7 @@ import type { City, Currency, Trip } from '@/types';
 import { patchTrip, searchPlaces } from '@/api/travel';
 import { ApiClientError } from '@/api/client';
 import { nextAccent } from '@/cities/palette';
+import { sceneForName } from '@/scenes';
 
 export interface CityFormOptions {
   trip: Trip;
@@ -230,7 +231,7 @@ export function renderCityForm(host: HTMLElement, options: CityFormOptions): voi
       start_date: start,
       end_date: end,
       title: titleInput.value.trim() || name,
-      scene: 'generic',
+      scene: sceneForName(name),
       accent: nextAccent(trip.cities.length),
       facts: [],
       center: { lat: centre.lat, lon: centre.lon },

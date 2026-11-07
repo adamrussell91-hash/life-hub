@@ -69,7 +69,7 @@ export async function renderPublicTrip(root: HTMLElement, token: string): Promis
 
     const scene = document.createElement('div');
     scene.className = 'scene';
-    scene.innerHTML = renderScene(city.scene, city.accent);
+    scene.innerHTML = renderScene(city.scene, city.accent, city.name);
     citySection.append(scene);
 
     const dates = daysForCity(trip as never, city.id);

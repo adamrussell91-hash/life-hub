@@ -55,7 +55,7 @@ export async function renderTodayView(canvas: HTMLElement, options: TodayOptions
 
   const scene = document.createElement('div');
   scene.className = 'scene';
-  scene.innerHTML = renderScene(city.scene, city.accent);
+  scene.innerHTML = renderScene(city.scene, city.accent, city.name);
   const titleDiv = document.createElement('div');
   titleDiv.className = 'title';
   const h2 = document.createElement('h2');

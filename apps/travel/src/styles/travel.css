@@ -486,6 +486,16 @@ details.tobook[open] summary::after { content: "Hide"; }
 .a-graze { animation: graze 6s ease-in-out infinite; transform-box: fill-box; transform-origin: right center; }
 .a-rod { animation: rod .7s linear infinite; }
 .a-cable { animation: cable 11s ease-in-out infinite alternate; }
+.a-beam { animation: beam 4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: left center; }
+.a-beam-l { transform-origin: right center; }
+.a-sunrise { animation: sunrise 14s ease-in-out infinite alternate; }
+.a-steam { animation: steam 2.2s ease-out infinite; }
+.a-burst { animation: burst 2.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.a-glow { animation: glow 6s linear infinite; }
+.a-glow-fill { animation: glowFill 6s linear infinite; }
+.a-trot { animation: trot .45s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: top center; }
+.a-trot2 { animation: trot .45s ease-in-out infinite alternate-reverse; transform-box: fill-box; transform-origin: top center; }
+.a-takeoff { animation: takeoff 12s ease-in infinite; }
 @keyframes drive { from { transform: translateX(-220px); } to { transform: translateX(1100px); } }
 @keyframes driveRev { from { transform: translateX(1100px); } to { transform: translateX(-260px); } }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -504,6 +514,14 @@ details.tobook[open] summary::after { content: "Hide"; }
 @keyframes swish { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
 @keyframes graze { 0%,55%,100% { transform: rotate(0); } 65%,85% { transform: rotate(-14deg); } }
 @keyframes rod { 0% { transform: translate(0,-2px); } 25% { transform: translate(2px,0); } 50% { transform: translate(0,2px); } 75% { transform: translate(-2px,0); } 100% { transform: translate(0,-2px); } }
+@keyframes beam { from { transform: rotate(-14deg); opacity: .5; } to { transform: rotate(14deg); opacity: 1; } }
+@keyframes sunrise { from { transform: translateY(14px); } to { transform: translateY(-16px); } }
+@keyframes steam { 0% { transform: translateY(4px); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-10px); opacity: 0; } }
+@keyframes burst { 0% { transform: scale(.2); opacity: 0; } 10% { opacity: 1; } 55% { transform: scale(1.15); opacity: 0; } 100% { transform: scale(1.15); opacity: 0; } }
+@keyframes glow { 0%,100% { stroke: #7fd3ff; } 33% { stroke: #ff8fd1; } 66% { stroke: #ffd36e; } }
+@keyframes glowFill { 0%,100% { fill: #7fd3ff; } 33% { fill: #ff8fd1; } 66% { fill: #ffd36e; } }
+@keyframes trot { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes takeoff { 0% { transform: translate(-200px,40px); } 100% { transform: translate(900px,-200px); } }
 @keyframes cable { 0%,8% { transform: translate(0,0); } 92%,100% { transform: translate(90px,-76px); } }
 @keyframes pulse { 0% { r: 9; opacity: .35; } 100% { r: 26; opacity: 0; } }
 .me-ring { animation: pulse 1.8s ease-out infinite; }
