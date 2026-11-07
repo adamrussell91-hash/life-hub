@@ -11,7 +11,7 @@ export const config = {
 export function createCareerScanTickScheduledHandler(deps = {}) {
   return async function careerScanTickScheduledHandler() {
     const env = deps.env ?? process.env;
-    const result = await runCareerScanPass({ ...deps, env, scheduled: true });
+    const result = await runCareerScanPass({ defaultReaders: true, ...deps, env, scheduled: true });
     return okResponse(202, result);
   };
 }

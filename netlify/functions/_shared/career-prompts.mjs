@@ -89,6 +89,8 @@ Rules:
 - source_refs must be a subset of the input refs. Drop any other.
 - witness_refs must be a subset of the input witness candidates.
 - future_matches must use only the provided future ids and criterion ids.
+- Each source has a kind (meeting, event, communication, task, project, goal, unit, lesson, page) and a short text. Use the text as evidence; do not invent detail beyond it.
+- Quiz hand-in counts are counts only. Never name or guess at students.
 - Prefer concrete STAR over fluff. Australian English.
 
 Futures:

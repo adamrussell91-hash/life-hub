@@ -8,6 +8,13 @@ import {
   keepScanProposal,
   runCareerScanPass
 } from './_shared/career-scan-service.mjs';
+import {
+  defaultInvokeCareerScanHistoryRun,
+  historyEstimate,
+  historyStart,
+  historyStatus,
+  historyStop
+} from './_shared/career-scan-history.mjs';
 
 export const config = { path: '/api/career-scan' };
 
@@ -24,7 +31,11 @@ export function createCareerScanHandler(deps = {}) {
       const { env, store } = context;
       const url = new URL(request.url);
       try {
+        const readDeps = { ...deps, env, professionalStore: store, defaultReaders: deps.defaultReaders ?? true };
         if (request.method === 'GET') {
+          if (url.searchParams.get('action') === 'history_status') {
+            return withCors(okResponse(200, await historyStatus(store)), request, env);
+          }
           const payload = await getScanPanelPayload(store, deps);
           return withCors(okResponse(200, payload), request, env);
         }
@@ -34,13 +45,26 @@ export function createCareerScanHandler(deps = {}) {
           const body = (await readJsonObject(request)).value ?? {};
           if (action === 'run-now') {
             const result = await runCareerScanPass({
-              ...deps,
-              env,
-              professionalStore: store,
+              ...readDeps,
               force: Boolean(body?.force)
             });
             const payload = await getScanPanelPayload(store, deps);
             return withCors(okResponse(200, { ...result, ...payload }), request, env);
+          }
+          if (action === 'history_estimate') {
+            return withCors(okResponse(200, await historyEstimate(readDeps, body)), request, env);
+          }
+          if (action === 'history_start') {
+            const result = await historyStart(readDeps, body, {
+              invoke: () => (deps.invokeHistoryRun ?? defaultInvokeCareerScanHistoryRun)(request, deps.fetchImpl)
+            });
+            return withCors(okResponse(200, result), request, env);
+          }
+          if (action === 'history_status') {
+            return withCors(okResponse(200, await historyStatus(store)), request, env);
+          }
+          if (action === 'history_stop') {
+            return withCors(okResponse(200, await historyStop(readDeps)), request, env);
           }
           if (action === 'bin') {
             const id = body?.id || url.searchParams.get('id');
