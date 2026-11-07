@@ -3,7 +3,7 @@ import { createMockApi } from '../../scripts/mock-api';
 
 describe('mock api career-scan', () => {
   it('returns an honest empty Skills scan panel instead of Unknown route', async () => {
-    const api = createMockApi();
+    const api = createMockApi({ careerDemo: false });
     await api.handle('POST', '/api/auth', { passphrase: 'professional-hub-local' });
 
     const scan = await api.handle('GET', '/api/career-scan');

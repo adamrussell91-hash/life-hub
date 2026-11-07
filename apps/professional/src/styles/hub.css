@@ -5444,6 +5444,43 @@ a.career-scan__source-chip:focus-visible {
   border-color: var(--ink);
 }
 
+.career-scan__history,
+.career-scan__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.career-scan__history {
+  padding-top: var(--space-3);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.career-scan__history .career-page__meta,
+.career-scan__confirm .career-page__meta {
+  margin: 0;
+}
+
+.career-scan__window {
+  font: inherit;
+  font-size: var(--text-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: inherit;
+  padding: 4px var(--space-2);
+}
+
+.career-scan__history[hidden],
+.career-scan__confirm[hidden],
+.career-scan__actions[hidden],
+.career-scan__read[hidden],
+.career-scan__history .btn[hidden] {
+  display: none;
+}
+
 .career-scan__title {
   margin: 0;
   font-size: var(--text-md);
@@ -5528,6 +5565,252 @@ a.career-scan__source-chip:focus-visible {
 .career-mirror__bar-fill {
   height: 100%;
   background: var(--career-branch-3);
+}
+
+/* Criteria Mirror: the application workspace, one column top to bottom. */
+.career-mirror {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.career-mirror > .career-page__section-head,
+.career-mirror > .career-page__meta {
+  margin: 0;
+}
+
+.career-mirror__section,
+.career-mirror__criteria {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.career-mirror__section .career-future__subhead,
+.career-mirror__criteria .career-future__subhead {
+  margin: 0;
+}
+
+.career-mirror__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Actions sit on their own line under what they act on (I4). */
+.career-mirror__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.career-mirror__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.career-mirror__confirm[hidden],
+.career-mirror__status[hidden] {
+  display: none;
+}
+
+.career-mirror__status,
+.career-mirror__confirm .career-page__meta {
+  margin: 0;
+}
+
+.career-mirror__row {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.career-mirror__criteria > .career-mirror__row:first-of-type {
+  border-top: 0;
+}
+
+.career-mirror__text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.career-mirror__meter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.career-mirror__meter .career-mirror__bar {
+  flex: 0 0 min(12rem, 35%);
+}
+
+.career-mirror__meter .career-mirror__pct {
+  margin-left: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.career-mirror__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.career-mirror__chip {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.career-mirror__suggest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.career-mirror__suggest-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.career-mirror__suggest-head .career-page__meta,
+.career-mirror__evidence {
+  margin: 0;
+}
+
+.career-mirror__evidence {
+  overflow-wrap: anywhere;
+}
+
+.career-mirror__pill {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.career-mirror__pill--have {
+  border-color: var(--career-branch-3);
+  color: var(--career-branch-3);
+}
+
+.career-mirror__pill--partly {
+  border-color: var(--career-branch-4);
+  color: var(--career-branch-4);
+}
+
+.career-mirror__pill--not_yet {
+  border-color: var(--career-branch-1);
+  color: var(--career-branch-1);
+}
+
+.career-mirror__pill--unknown {
+  color: var(--muted);
+}
+
+.career-mirror__pick,
+.career-mirror__limit-input {
+  font: inherit;
+  font-size: var(--text-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: inherit;
+  padding: 4px var(--space-2);
+}
+
+.career-mirror__limit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.career-mirror__limit-input {
+  width: 6rem;
+}
+
+/* Three lines until focused (L2); the focus handler opens it to its text. */
+.career-mirror__response {
+  width: 100%;
+  min-width: 0;
+  height: calc(4.5em + 2 * var(--space-2));
+  font: inherit;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: var(--space-2);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.career-mirror__count {
+  margin: 0;
+}
+
+.career-mirror__count--over {
+  color: var(--career-branch-4);
+  font-weight: 600;
+}
+
+.career-mirror__reason {
+  font-style: italic;
+}
+
+/* Ann's draft beside Adam's own: an opaque surface, never see-through (S3). */
+.career-mirror__pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--career-branch-4);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  backdrop-filter: none;
+  min-width: 0;
+}
+
+.career-mirror__pending .career-page__meta {
+  margin: 0;
+}
+
+.career-mirror__pending-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .career-app__feedback {

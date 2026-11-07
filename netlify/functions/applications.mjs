@@ -2,10 +2,19 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createApplicationRepository } from './_shared/application-repository.mjs';
-import { APPLICATION_PIPELINE_STATUSES, isValidApplicationId } from './_shared/application-schema.mjs';
+import {
+  APPLICATION_PIPELINE_STATUSES,
+  isValidApplicationId,
+  validateCheckInput
+} from './_shared/application-schema.mjs';
+import { randomUUID } from 'node:crypto';
+import { createAccessContext } from './_shared/entity-access.mjs';
+import { formatEntityRef } from './_shared/entity-ref.mjs';
+import { createUniversalLinkRepository as defaultCreateUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import {
+  resolveAchievement,
   resolveApplication,
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
@@ -47,6 +56,72 @@ function toErrorResponse(error) {
   return errorResponse(status, code, message, retryable, {}, data);
 }
 
+const LINK_STRENGTH = { have: 'strong', partly: 'some' };
+
+function badRequest(code, message) {
+  return Object.assign(new Error(message), { status: 400, code });
+}
+
+/** Validates the confirm body against the application's own criteria. */
+function readConfirmAnswers(body, application, confirmedAt) {
+  const answers = body?.answers;
+  if (!Array.isArray(answers) || !answers.length) {
+    throw badRequest('invalid_answers', 'answers must be a non-empty array.');
+  }
+  const known = new Set((application.selection_criteria ?? []).map((c) => c.id));
+  const byId = new Map();
+  answers.forEach((answer, index) => {
+    if (!answer || typeof answer !== 'object' || Array.isArray(answer)) {
+      throw badRequest('invalid_answer', `answers[${index}] must be an object.`);
+    }
+    for (const key of Object.keys(answer)) {
+      if (!['criterion_id', 'status', 'evidence', 'card_ids'].includes(key)) {
+        throw badRequest('unknown_field', `Unknown answers field "${key}".`);
+      }
+    }
+    if (!known.has(answer.criterion_id)) {
+      throw badRequest('invalid_criterion_id', `answers[${index}].criterion_id is not a criterion of this application.`);
+    }
+    const check = validateCheckInput(
+      { status: answer.status, evidence: answer.evidence ?? '', card_ids: answer.card_ids ?? [], confirmed_at: confirmedAt },
+      `answers[${index}]`
+    );
+    byId.set(answer.criterion_id, check);
+  });
+  return byId;
+}
+
+/**
+ * Replaces one criterion's answers_criterion links: every current link for it is
+ * suppressed, then each named card gets a fresh link. The context key carries the
+ * criterion plus a fresh nonce, so the same card can answer several criteria and a
+ * re-confirm never collides with a suppressed link.
+ */
+async function replaceCriterionLinks({ linkRepo, applicationRef, criterionId, check, existing }) {
+  const admin = createAccessContext({ workflow: 'administration' });
+  for (const entry of existing) {
+    if (entry.link.relationship_type !== 'answers_criterion') continue;
+    if (entry.link.metadata?.criterion_id !== criterionId) continue;
+    await linkRepo.suppressLink(entry.link.id, 'criterion_reconfirmed', admin);
+  }
+  const strength = LINK_STRENGTH[check.status];
+  if (!strength) return;
+  const life = createAccessContext({ workflow: 'life' });
+  const nonce = randomUUID();
+  for (const cardId of check.card_ids) {
+    await linkRepo.createLink(
+      {
+        source_ref: formatEntityRef({ namespace: 'professional', kind: 'achievement', id: cardId }),
+        target_ref: applicationRef,
+        relationship_type: 'answers_criterion',
+        context_key: `${criterionId}:${nonce}`,
+        metadata: { criterion_id: criterionId, strength }
+      },
+      life
+    );
+  }
+}
+
 function readId(url) {
   const id = url.searchParams.get('id');
   if (!id) {
@@ -82,6 +157,12 @@ export function createApplicationsHandler(deps = {}) {
         const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
         if (ref?.namespace === 'professional' && ref.kind === 'application') {
           return resolveApplication(ref.id, accessContext, {
+            ...options,
+            getStore: async () => store
+          });
+        }
+        if (ref?.namespace === 'professional' && ref.kind === 'achievement') {
+          return resolveAchievement(ref.id, accessContext, {
             ...options,
             getStore: async () => store
           });
@@ -185,6 +266,34 @@ export function createApplicationsHandler(deps = {}) {
             const result = await taskLinks.retry(operationId);
             const application = await repo.getApplication(id);
             return withCors(okResponse(200, { application, operation: result.operation }), request, env);
+          }
+          if (action === 'confirm-check') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            const current = await repo.getApplication(id);
+            const confirmedAt = applicationNow();
+            const checks = readConfirmAnswers(parsed.value, current, confirmedAt);
+            const linkRepo = (deps.createUniversalLinkRepository ?? defaultCreateUniversalLinkRepository)({
+              store: await getUniversalLinkStore(),
+              resolveEntity,
+              now: applicationNow
+            });
+            const applicationRef = formatEntityRef({ namespace: 'professional', kind: 'application', id });
+            const existing = await linkRepo.listIncoming(applicationRef, createAccessContext({ workflow: 'life' }));
+            // Links first: a failure here saves no check, and a retry suppresses
+            // whatever this attempt left behind.
+            for (const [criterionId, check] of checks) {
+              await replaceCriterionLinks({ linkRepo, applicationRef, criterionId, check, existing });
+            }
+            const latest = await repo.getApplication(id);
+            const application = await repo.updateApplication(id, {
+              selection_criteria: latest.selection_criteria.map((c) =>
+                checks.has(c.id) ? { ...c, check: checks.get(c.id) } : c
+              )
+            });
+            return withCors(okResponse(200, { application }), request, env);
           }
           if (action === 'transition') {
             const id = readId(url);

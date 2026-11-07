@@ -172,3 +172,88 @@ test('deriveApplicationOperationId is deterministic aop_ hex', () => {
   assert.equal(a, b);
   assert.match(a, /^aop_[0-9a-f]{32}$/);
 });
+
+const CARD_ID = 'achievement_00000000-0000-4000-8000-000000000041';
+
+function oldCriterion(overrides = {}) {
+  return { id: CRIT_ID, criterion: 'Leads curriculum change', response: 'Draft', order: 0, completed: false, ...overrides };
+}
+
+test('old application records without the prep keys still parse', () => {
+  const parsed = parseApplicationRecord(baseRecord({ selection_criteria: [oldCriterion()] }));
+  assert.ok(parsed);
+  assert.equal(parsed.cover_letter, null);
+  assert.equal(parsed.cv, null);
+  assert.deepEqual(parsed.selection_criteria[0], {
+    ...oldCriterion(),
+    word_limit: null,
+    check: null,
+    response_source: null,
+    response_drafted_at: null,
+    response_pending: null
+  });
+});
+
+test('stored criteria accept word limit, check and draft keys, and reject bad values', () => {
+  const check = { status: 'partly', evidence: 'Ran a reading program', card_ids: [CARD_ID], confirmed_at: '2026-11-01T00:00:00.000Z' };
+  const full = oldCriterion({
+    word_limit: 250,
+    check,
+    response_source: 'ann',
+    response_drafted_at: '2026-11-01T00:00:00.000Z',
+    response_pending: 'A newer draft'
+  });
+  const piece = { text: 'Dear panel', source: 'ann', drafted_at: null, updated_at: '2026-11-01T00:00:00.000Z', pending: null };
+  const parsed = parseApplicationRecord(baseRecord({ selection_criteria: [full], cover_letter: piece, cv: { ...piece, text: 'Profile' } }));
+  assert.ok(parsed);
+  assert.deepEqual(parsed.selection_criteria[0].check, check);
+  assert.equal(parsed.cover_letter.text, 'Dear panel');
+  for (const bad of [
+    { word_limit: 10 },
+    { word_limit: 2001 },
+    { word_limit: 250.5 },
+    { check: { ...check, status: 'maybe' } },
+    { check: { ...check, evidence: 'x'.repeat(301) } },
+    { check: { ...check, card_ids: Array(7).fill(CARD_ID) } },
+    { check: { ...check, card_ids: ['not-a-card'] } },
+    { check: { ...check, extra: 1 } },
+    { response_source: 'clare' },
+    { response_pending: 'x'.repeat(16001) },
+    { notes: 'unknown key' }
+  ]) {
+    assert.equal(parseApplicationRecord(baseRecord({ selection_criteria: [oldCriterion(bad)] })), null, JSON.stringify(Object.keys(bad)));
+  }
+  assert.equal(parseApplicationRecord(baseRecord({ cover_letter: { ...piece, text: 'x'.repeat(8001) } })), null);
+  assert.ok(parseApplicationRecord(baseRecord({ cv: { ...piece, text: 'x'.repeat(8001) } })));
+  assert.equal(parseApplicationRecord(baseRecord({ cv: { ...piece, source: 'clare' } })), null);
+  assert.equal(parseApplicationRecord(baseRecord({ cv: { ...piece, extra: true } })), null);
+});
+
+test('field update validates word_limit, check, cover letter and CV', () => {
+  const patch = validateApplicationFieldUpdate({
+    selection_criteria: [{ criterion: 'Leads change (250 words)', order: 0, completed: false, word_limit: 250 }],
+    cover_letter: { text: ' Dear panel ', source: 'adam' },
+    cv: null
+  });
+  assert.equal(patch.selection_criteria[0].word_limit, 250);
+  assert.equal(patch.selection_criteria[0].check, null);
+  assert.equal(patch.cover_letter.text, 'Dear panel');
+  assert.equal(patch.cover_letter.pending, null);
+  assert.ok(patch.cover_letter.updated_at);
+  assert.equal(patch.cv, null);
+  const crit = { criterion: 'x', order: 0, completed: false };
+  for (const [bad, code] of [
+    [{ word_limit: 5 }, 'invalid_word_limit'],
+    [{ notes: 'x' }, 'unknown_field'],
+    [{ evidence_refs: [] }, 'unknown_field'],
+    [{ check: { status: 'have', evidence: '', card_ids: [], confirmed_at: 'nope' } }, 'invalid_check_confirmed_at'],
+    [{ response_source: 'ann!' }, 'invalid_response_source']
+  ]) {
+    assert.throws(() => validateApplicationFieldUpdate({ selection_criteria: [{ ...crit, ...bad }] }), (e) => e.code === code);
+  }
+  assert.throws(
+    () => validateApplicationFieldUpdate({ cover_letter: { text: 'x'.repeat(8001) } }),
+    (e) => e.code === 'cover_letter_too_long'
+  );
+  assert.throws(() => validateApplicationFieldUpdate({ cv: { text: 'x', colour: 'red' } }), (e) => e.code === 'unknown_field');
+});

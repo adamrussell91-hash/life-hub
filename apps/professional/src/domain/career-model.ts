@@ -42,22 +42,70 @@ export function readinessPercent(
   return Math.round(100 * mean);
 }
 
-export function applicationMatchPercent(
-  selectionCriteria: Array<{ id: string }> | null | undefined,
-  answers: Array<{ criterion_id?: string; strength?: string }> = []
+type AppCriterionInput = {
+  id: string;
+  check_status?: string | null;
+  evidence?: string | null;
+};
+
+/** A confirmed check counts like a card: have=1, partly=0.5, anything else 0. */
+export function checkCoverage(status: string | null | undefined): number {
+  if (status === 'have') return 1;
+  if (status === 'partly') return 0.5;
+  return 0;
+}
+
+/**
+ * One criterion's coverage: the better of its strongest card link and its
+ * confirmed check. Null means nothing has looked at it yet ("Not checked").
+ */
+export function applicationCriterionCoverage(
+  checkStatus: string | null | undefined,
+  linkStrengths: Array<string | null | undefined> = []
 ): number | null {
-  if (!selectionCriteria?.length) return null;
-  const byCriterion = new Map<string, number>();
+  if (!checkStatus && !linkStrengths.length) return null;
+  const fromLinks = linkStrengths.reduce((max, strength) => Math.max(max, criterionCoverage(strength)), 0);
+  return Math.max(fromLinks, checkCoverage(checkStatus));
+}
+
+/** What the Mirror's bar says: Not checked, Partly · evidence, Not yet, or a %. */
+export function applicationCriterionLabel(
+  coverage: number | null,
+  status: string | null | undefined,
+  evidence?: string | null
+): string {
+  if (coverage == null) return 'Not checked';
+  if (coverage === 0.5 && status === 'partly') return evidence ? `Partly · ${evidence}` : 'Partly';
+  if (coverage === 0 && status === 'not_yet') return 'Not yet';
+  if (coverage === 0 && status === 'unknown') return 'Nothing in your record yet';
+  return `${Math.round(coverage * 100)}%`;
+}
+
+function linksByCriterion(answers: Array<{ criterion_id?: string | null; strength?: string | null }>) {
+  const byCriterion = new Map<string, Array<string | null | undefined>>();
   for (const link of answers) {
     const id = link.criterion_id;
     if (!id) continue;
-    const next = criterionCoverage(link.strength);
-    const prev = byCriterion.get(id) ?? 0;
-    if (next > prev) byCriterion.set(id, next);
+    const list = byCriterion.get(id) ?? [];
+    list.push(link.strength);
+    byCriterion.set(id, list);
   }
+  return byCriterion;
+}
+
+/** Mean coverage × 100; an unchecked criterion counts as 0 here, and the model says Not checked. */
+export function applicationMatchPercent(
+  selectionCriteria: Array<AppCriterionInput> | null | undefined,
+  answers: Array<{ criterion_id?: string | null; strength?: string | null }> = []
+): number | null {
+  if (!selectionCriteria?.length) return null;
+  const byCriterion = linksByCriterion(answers);
   const mean =
-    selectionCriteria.reduce((sum, criterion) => sum + (byCriterion.get(criterion.id) ?? 0), 0) /
-    selectionCriteria.length;
+    selectionCriteria.reduce(
+      (sum, criterion) =>
+        sum + (applicationCriterionCoverage(criterion.check_status, byCriterion.get(criterion.id) ?? []) ?? 0),
+      0
+    ) / selectionCriteria.length;
   return Math.round(100 * mean);
 }
 
@@ -146,7 +194,10 @@ export type CareerModelOverview = {
     position_title: string;
     pipeline_status: string;
     closing_date?: string | null;
-    selection_criteria?: Array<{ id: string }>;
+    /** From `listApplications`: each criterion's confirmed check status. */
+    selection_criteria?: Array<AppCriterionInput>;
+    /** From the career overview's `applicationSummary`. */
+    criteria?: Array<AppCriterionInput>;
   }>;
   supports_future?: Array<{
     source_id?: string;
@@ -246,6 +297,18 @@ export type CareerApplicationModel = {
   closing_date: string | null;
   match_percent: number | null;
   match_label: string | null;
+  /** Any criterion has a confirmed check or a card link. Until then the % means nothing. */
+  checked: boolean;
+  criteria: CareerApplicationCriterionModel[];
+};
+
+export type CareerApplicationCriterionModel = {
+  id: string;
+  /** Null: not checked yet. */
+  coverage: number | null;
+  status: string | null;
+  evidence: string | null;
+  label: string;
 };
 
 export type CareerTrunkItem = {
@@ -532,17 +595,34 @@ export function buildCareerModel(
     ? futureModels.filter((f) => f.split_date && f.split_date >= forkDate).length
     : 0;
 
-  const applicationModels = applications.map((app) => {
-    const criteria = app.selection_criteria ?? [];
+  const applicationModels: CareerApplicationModel[] = applications.map((app) => {
+    const criteria = app.criteria?.length ? app.criteria : app.selection_criteria ?? [];
     const answers = answersByApplication.get(app.id) ?? [];
-    const match = applicationMatchPercent(criteria, answers);
+    const links = linksByCriterion(answers);
+    const criterionModels = criteria.map((c) => {
+      const status = c.check_status ?? null;
+      const coverage = applicationCriterionCoverage(status, links.get(c.id) ?? []);
+      return {
+        id: c.id,
+        coverage,
+        status,
+        evidence: c.evidence ?? null,
+        label: applicationCriterionLabel(coverage, status, c.evidence)
+      };
+    });
+    const checked = criterionModels.some((c) => c.coverage != null);
+    const match = criterionModels.length
+      ? Math.round((100 * criterionModels.reduce((sum, c) => sum + (c.coverage ?? 0), 0)) / criterionModels.length)
+      : null;
     return {
       id: app.id,
       position_title: app.position_title,
       pipeline_status: app.pipeline_status,
       closing_date: app.closing_date ?? null,
-      match_percent: match,
-      match_label: match == null ? null : `${match}%`
+      match_percent: checked ? match : null,
+      match_label: checked && match != null ? `${match}%` : null,
+      checked,
+      criteria: criterionModels
     };
   });
 

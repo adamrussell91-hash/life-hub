@@ -518,12 +518,38 @@ export interface ApplicationDocument {
   status: ApplicationDocumentStatus;
 }
 
+export type CriterionCheckStatus = 'have' | 'partly' | 'not_yet' | 'unknown';
+
+/** Adam's confirmed answer to Ann's check. Only confirmed answers are stored. */
+export interface CriterionCheck {
+  status: CriterionCheckStatus;
+  evidence: string;
+  card_ids: string[];
+  confirmed_at: string;
+}
+
 export interface SelectionCriterion {
   id: string;
   criterion: string;
   response: string | null;
   order: number;
   completed: boolean;
+  /** 25–2000; the criterion text keeps its own limit wording. */
+  word_limit?: number | null;
+  check?: CriterionCheck | null;
+  response_source?: 'ann' | 'adam' | null;
+  response_drafted_at?: string | null;
+  /** Ann's new draft, held while Adam's own edit stands. */
+  response_pending?: string | null;
+}
+
+/** Cover letter and CV: Ann drafts, Adam's edits win. */
+export interface ApplicationDraftDocument {
+  text: string;
+  source: 'ann' | 'adam';
+  drafted_at: string | null;
+  updated_at: string;
+  pending: string | null;
 }
 
 export interface InterviewRound {
@@ -557,6 +583,8 @@ export interface ApplicationRecord {
   interview_rounds: InterviewRound[];
   outcome: ApplicationOutcome;
   reflection: string | null;
+  cover_letter?: ApplicationDraftDocument | null;
+  cv?: ApplicationDraftDocument | null;
   created_at: string;
   updated_at: string;
   /** Resolved from Universal Links (`applies_to`); never copied into Application JSON. */

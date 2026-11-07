@@ -4,6 +4,9 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { runCareerAnnJob } from './_shared/career-ann-job.mjs';
 import { checkFutureWithAnn } from './_shared/career-future-check.mjs';
 import { draftFutureFromAnn } from './_shared/career-future-draft.mjs';
+import { pickOwnWriting, checkApplicationWithAnn, draftApplicationWithAnn } from './_shared/career-application-ann.mjs';
+import { createAccessContext } from './_shared/entity-access.mjs';
+import { formatEntityRef } from './_shared/entity-ref.mjs';
 import { assembleCareerOverview } from './_shared/career-overview.mjs';
 import { createCareerRepository } from './_shared/career-repository.mjs';
 import { createApplicationRepository } from './_shared/application-repository.mjs';
@@ -38,8 +41,57 @@ async function readCareerRecord(store, env) {
     })),
     cards: (overview.achievements ?? [])
       .filter((card) => card.lifecycle_status !== 'deleted')
-      .map((card) => ({ title: card.title, when: card.occurred_on, skills: card.skills, star: card.star }))
+      .map((card) => ({ id: card.id, title: card.title, when: card.occurred_on, skills: card.skills, star: card.star }))
   };
+}
+
+/** The school or organisation the application is for, from its applies_to link. */
+async function readApplicationWhere(applicationId) {
+  try {
+    const links = createUniversalLinkRepository({
+      store: await defaultGetUniversalLinkStore(),
+      resolveEntity: defaultResolveEntity
+    });
+    const ref = formatEntityRef({ namespace: 'professional', kind: 'application', id: applicationId });
+    const outgoing = await links.listOutgoing(ref, createAccessContext({ workflow: 'life' }));
+    const hit = outgoing.find((entry) => entry.link.relationship_type === 'applies_to');
+    return hit?.endpoint?.display_label ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function runApplicationJob(job, store, env, apiKey, deps) {
+  const repo = (deps.createApplicationRepository ?? createApplicationRepository)({ store });
+  const application = await repo.getApplication(job.application_id);
+  const record = await (deps.readCareerRecord ?? readCareerRecord)(store, env);
+  const where = await (deps.readApplicationWhere ?? readApplicationWhere)(job.application_id);
+  if (job.kind === 'app_check') {
+    return (deps.checkApplicationWithAnn ?? checkApplicationWithAnn)({
+      application, where, ...record, env, apiKey, fetchImpl: deps.fetchImpl, sleep: deps.sleep
+    });
+  }
+  const result = await (deps.draftApplicationWithAnn ?? draftApplicationWithAnn)({
+    application,
+    target: job.target,
+    criterion_id: job.criterion_id ?? null,
+    where,
+    ...record,
+    ownWriting: pickOwnWriting(await repo.listApplications().catch(() => []), job.application_id),
+    env,
+    apiKey,
+    fetchImpl: deps.fetchImpl,
+    sleep: deps.sleep,
+    now: deps.draftNow
+  });
+  // Re-read before saving so an edit made while Ann wrote is kept: the overwrite
+  // rule runs again against the latest record.
+  let saved = application;
+  if (result.patch) {
+    const latest = await repo.getApplication(job.application_id);
+    saved = await repo.updateApplication(job.application_id, result.apply ? result.apply(latest) : result.patch);
+  }
+  return { application: saved, drafted: result.drafted, skipped: result.skipped, brackets: result.brackets };
 }
 
 export function careerAnnRunner(store, env, deps = {}) {
@@ -53,6 +105,9 @@ export function careerAnnRunner(store, env, deps = {}) {
         fetchImpl: deps.fetchImpl
       });
       return { draft };
+    }
+    if (job.kind === 'app_check' || job.kind === 'app_draft') {
+      return runApplicationJob(job, store, env, apiKey, deps);
     }
     const repo = createCareerRepository({ store });
     const future = await repo.getFuture(job.future_id);

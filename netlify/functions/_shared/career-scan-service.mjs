@@ -23,9 +23,11 @@ import { listBlobKeys, isIndexKey } from './blobs-list.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { skillsScanPrompt, spottedFuturePrompt } from './career-prompts.mjs';
+import { collectScanSources, defaultScanListers, SCAN_WINDOW_CAP_DAYS } from './career-scan-sources.mjs';
+
+export { collectScanSources, defaultScanListers };
 
 const RATE_LIMIT_MS = 10 * 60 * 1000;
-const WINDOW_CAP_DAYS = 21;
 const MODEL = 'claude-sonnet-5';
 
 /**
@@ -349,40 +351,84 @@ export async function keepScanProposal(deps, id) {
   return { proposal: next, achievement };
 }
 
-/**
- * Collect a thin source window from Professional store only.
- * Tasks/Teaching/Knowledge/Life sources need those stores — empty when unbound.
- */
-export async function collectScanSources(deps = {}) {
-  const store = deps.professionalStore;
-  const nowMs = Date.parse(deps.nowIso ?? new Date().toISOString());
-  const sinceMs = deps.since
-    ? Date.parse(deps.since)
-    : nowMs - WINDOW_CAP_DAYS * 86400000;
-  const sources = [];
-  const witnesses = new Set();
-  // Meetings / events with notes are the only Local Professional sources without extra stores.
-  // Full multi-hub gather lands when Tasks/Teaching/Knowledge blobs are bound in this pass.
-  if (deps.listMeetings) {
-    for (const meeting of await deps.listMeetings()) {
-      const at = meeting.occurred_on || meeting.starts_at || meeting.updated_at;
-      const t = at ? Date.parse(at) : NaN;
-      if (!Number.isFinite(t) || t < sinceMs) continue;
-      if (!meeting.notes && !meeting.summary) continue;
-      const ref = formatEntityRef({
-        namespace: 'professional',
-        kind: 'meeting',
-        id: meeting.id
-      });
-      sources.push({
-        ref,
-        kind: 'meeting',
-        title: meeting.title || 'Meeting',
-        date: typeof at === 'string' ? at.slice(0, 10) : null
-      });
+const LISTER_KEYS = [
+  'listMeetings', 'listEvents', 'listCommunications', 'listTasks', 'listProjects',
+  'listGoals', 'listUnits', 'listLessons', 'listScheduledLessons', 'countQuizResults', 'listKnowledge'
+];
+
+/** Listers for a pass: real defaults when `defaultReaders` is set, with any injected dep winning. */
+export function resolveScanListers(deps, env, professionalStore) {
+  const base = deps.defaultReaders
+    ? defaultScanListers({ ...deps, env, professionalStore })
+    : {};
+  const out = { ...base };
+  for (const key of LISTER_KEYS) if (typeof deps[key] === 'function') out[key] = deps[key];
+  return out;
+}
+
+/** Ask the model to group sources into proposals. Never throws: { drafted, failed, message }. */
+export async function draftScanProposals({ sources, witness_refs = [], futures = [], env, fetchImpl }) {
+  const apiKey = typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
+  if (!apiKey) return { drafted: [], failed: true, message: 'Ann is not connected.' };
+  try {
+    const body = {
+      model: MODEL,
+      max_tokens: 2500,
+      messages: [
+        {
+          role: 'user',
+          content: skillsScanPrompt({
+            sources: sources.map((s) => ({ ...s, witness_candidates: witness_refs })),
+            futures: futures.map((f) => ({ id: f.id, title: f.title, criteria: f.criteria }))
+          })
+        }
+      ]
+    };
+    const response = await (fetchImpl ?? fetch)('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) return { drafted: [], failed: true, message: 'Ann could not read this batch.' };
+    const json = await response.json();
+    const text = Array.isArray(json?.content) ? json.content.map((p) => p?.text ?? '').join('') : '';
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      const parsed = JSON.parse(text.slice(start, end + 1));
+      return { drafted: Array.isArray(parsed.proposals) ? parsed.proposals : [], failed: false };
+    }
+    return { drafted: [], failed: false };
+  } catch {
+    return { drafted: [], failed: true, message: 'Ann could not read this batch.' };
+  }
+}
+
+/** Validate and save drafted proposals (source-ref hash + title fold dedupe). Returns the saved records. */
+export async function saveScanDrafts({ store, careerRepo, drafted, sources, witness_refs = [], futures = [], nowIso }) {
+  const allowedRefs = new Set([...sources.map((s) => s.ref), ...witness_refs]);
+  const takenTitles = new Set([
+    ...(await careerRepo.listAchievements())
+      .filter((a) => a.lifecycle_status === 'active')
+      .map((a) => skillTitleKey(a.title)),
+    ...(await listScanProposals(store, { status: 'pending' })).map((p) => skillTitleKey(p.title))
+  ]);
+  const sourceDates = new Map(sources.map((s) => [s.ref, s.date ? String(s.date).slice(0, 10) : null]));
+  const saved = [];
+  for (const raw of drafted) {
+    const shaped = validateProposalShape(raw, allowedRefs, futures, sourceDates, nowIso);
+    if (!shaped) continue;
+    const result = await persistProposal(store, shaped, nowIso, takenTitles);
+    if (!result.skipped) {
+      saved.push(result.record);
+      takenTitles.add(skillTitleKey(shaped.title));
     }
   }
-  return { sources, witness_refs: [...witnesses] };
+  return saved;
 }
 
 export async function runCareerScanPass(deps = {}) {
@@ -412,86 +458,26 @@ export async function runCareerScanPass(deps = {}) {
 
   const careerRepo = createCareerRepository({ store, now: () => nowIso });
   const futures = await careerRepo.listFutures();
-  const { sources, witness_refs } = await collectScanSources({
-    ...deps,
-    professionalStore: store,
+  const nowMs0 = Date.parse(nowIso);
+  const sinceMs = Math.max(
+    state.last_success_at ? Date.parse(state.last_success_at) || 0 : 0,
+    nowMs0 - SCAN_WINDOW_CAP_DAYS * 86400000
+  );
+  const { sources, witness_refs, read_kinds } = await collectScanSources({
+    ...resolveScanListers(deps, env, store),
     nowIso,
-    since: state.last_success_at ?? null
+    since: new Date(sinceMs).toISOString()
   });
-
-  const allowedRefs = new Set([
-    ...sources.map((s) => s.ref),
-    ...witness_refs
-  ]);
 
   let drafted = [];
   const apiKey = typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
   if (sources.length && apiKey && !deps.skipModel) {
-    try {
-      const body = {
-        model: MODEL,
-        max_tokens: 2500,
-        messages: [
-          {
-            role: 'user',
-            content: skillsScanPrompt({
-              sources: sources.map((s) => ({ ...s, witness_candidates: witness_refs })),
-              futures: futures.map((f) => ({
-                id: f.id,
-                title: f.title,
-                criteria: f.criteria
-              }))
-            })
-          }
-        ]
-      };
-      const response = await (deps.fetchImpl ?? fetch)('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) {
-        const json = await response.json();
-        const text = Array.isArray(json?.content)
-          ? json.content.map((p) => p?.text ?? '').join('')
-          : '';
-        const start = text.indexOf('{');
-        const end = text.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-          const parsed = JSON.parse(text.slice(start, end + 1));
-          drafted = Array.isArray(parsed.proposals) ? parsed.proposals : [];
-        }
-      }
-    } catch {
-      drafted = [];
-    }
+    drafted = (await draftScanProposals({ sources, witness_refs, futures, env, fetchImpl: deps.fetchImpl })).drafted;
   } else if (sources.length && deps.heuristicProposals) {
     drafted = deps.heuristicProposals(sources, futures);
   }
 
-  // Titles already in the ledger or waiting in the scan never come back as
-  // a second card; the same title twice in one batch keeps the first.
-  const takenTitles = new Set([
-    ...(await careerRepo.listAchievements())
-      .filter((a) => a.lifecycle_status === 'active')
-      .map((a) => skillTitleKey(a.title)),
-    ...(await listScanProposals(store, { status: 'pending' })).map((p) => skillTitleKey(p.title))
-  ]);
-  const sourceDates = new Map(sources.map((s) => [s.ref, s.date ? String(s.date).slice(0, 10) : null]));
-  const saved = [];
-  for (const raw of drafted) {
-    const shaped = validateProposalShape(raw, allowedRefs, futures, sourceDates, nowIso);
-    if (!shaped) continue;
-    const result = await persistProposal(store, shaped, nowIso, takenTitles);
-    if (!result.skipped) {
-      saved.push(result.record);
-      takenTitles.add(skillTitleKey(shaped.title));
-    }
-  }
+  const saved = await saveScanDrafts({ store, careerRepo, drafted, sources, witness_refs, futures, nowIso });
 
   const weekKey = isoWeekKey(nowValue instanceof Date ? nowValue : new Date(nowIso));
   const nextState = {
@@ -500,7 +486,8 @@ export async function runCareerScanPass(deps = {}) {
     last_success_at: nowIso,
     last_success_week: deps.scheduled ? weekKey : state.last_success_week ?? null,
     last_source_count: sources.length,
-    last_saved_count: saved.length
+    last_saved_count: saved.length,
+    read_kinds
   };
   await setJSON(store, CAREER_SCAN_STATE_KEY, nextState);
 
@@ -582,6 +569,7 @@ export async function runCareerScanPass(deps = {}) {
     pending_count: pending.length,
     spotted_future: spotted,
     scan_state: nextState,
+    read_kinds,
     next_scan_label: nextSundayLabel(nowValue instanceof Date ? nowValue : new Date(nowIso))
   };
 }
@@ -631,6 +619,7 @@ export async function getScanPanelPayload(store, deps = {}) {
   return {
     proposals,
     scan_state: state,
+    read_kinds: Array.isArray(state.read_kinds) ? state.read_kinds : [],
     pending_count: proposals.length,
     next_scan_label: nextSundayLabel()
   };

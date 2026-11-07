@@ -265,7 +265,9 @@ let walkthruSuggestions: Array<Record<string, any>> = [
 ];
 
 const ANN_JOB_MS = 25_000;
-const annJobs = new Map<string, { readyAt: number; result: unknown }>();
+const annJobs = new Map<string, { readyAt: number; result: unknown; apply?: () => unknown }>();
+/** Application check and draft jobs: short enough to walk, long enough to see the waiting line. */
+const APP_JOB_MS = 4_000;
 
 function withCriterionIds(criteria: unknown[]): unknown[] {
   return criteria.map((c) => {
@@ -274,7 +276,8 @@ function withCriterionIds(criteria: unknown[]): unknown[] {
   });
 }
 
-export function createMockApi() {
+export function createMockApi(options: { careerDemo?: boolean } = {}) {
+  const careerDemo = options.careerDemo ?? true;
   const people = new Map<string, PersonRecord>(
     (seedData.people as PersonRecord[]).map((p) => [p.id, { ...p }])
   );
@@ -325,10 +328,139 @@ export function createMockApi() {
   const stones = new Map<string, Record<string, unknown>>();
   const scanProposals = new Map<string, Record<string, unknown>>();
   const careerMoves = new Map<string, Record<string, unknown>>();
-  let scanState: { last_run_at: string | null; last_success_week: string | null } = {
+  let scanState: { last_run_at: string | null; last_success_week: string | null; read_kinds?: string[] } = {
     last_run_at: null,
     last_success_week: null
   };
+  /** answers_criterion links (achievement → application), written by confirm-check. */
+  let answersCriterion: Array<{ source_id: string; application_id: string; target_id: string; criterion_id: string; strength: string }> = [];
+  let historyScan: { status: 'idle' | 'running' | 'done' | 'stopped' | 'failed'; batch: number; batches: number; proposals_added: number; startedAt: number; stopAsked: boolean } = {
+    status: 'idle',
+    batch: 0,
+    batches: 0,
+    proposals_added: 0,
+    startedAt: 0,
+    stopAsked: false
+  };
+  const HISTORY_BATCH_MS = 3_000;
+
+  // Career application prep demo: invented school, role and skill cards only (public repo).
+  if (careerDemo) {
+    const seededAt = '2026-11-01T09:00:00.000Z';
+    for (const card of [
+      { id: 'achievement_demo_reading', title: 'Rebuilt the Year 9 reading program', occurred_on: '2026-05-20' },
+      { id: 'achievement_demo_feedback', title: 'Led staff PL on written feedback', occurred_on: '2026-08-12' }
+    ]) {
+      achievements.set(card.id, {
+        schema_version: 1,
+        ...card,
+        date_precision: 'month',
+        skills: [],
+        star: {
+          situation: 'Year 9 results at Bellbird Creek High had stalled.',
+          task: 'Lift reading across four classes.',
+          action: 'Planned a shared sequence and met the team fortnightly.',
+          result: 'Most students moved up a band by Term 4.'
+        },
+        origin: 'manual',
+        lifecycle_status: 'active',
+        apst: ['6.3'],
+        created_at: seededAt,
+        updated_at: seededAt
+      });
+    }
+    applications.set('application_demo_head_teacher', {
+      schema_version: 1,
+      id: 'application_demo_head_teacher',
+      position_title: 'Head Teacher English',
+      advertisement: {
+        title: 'Head Teacher English, Bellbird Creek High School',
+        url: null,
+        source: null,
+        summary:
+          '1. Demonstrated leadership of a faculty team (250 words)\n2. Expert knowledge of the English syllabus, max 300 words\n3. Experience leading staff professional learning (1 page)\n4. Commitment to student wellbeing',
+        captured_at: seededAt
+      },
+      closing_date: '2026-11-28',
+      pipeline_status: 'drafting',
+      documents: [],
+      selection_criteria: [
+        { id: 'acrit_demo_1', criterion: 'Demonstrated leadership of a faculty team (250 words)', response: 'I led a team of six through a new Stage 5 program.', order: 1, completed: false, word_limit: 250, response_source: 'adam', check: null },
+        { id: 'acrit_demo_2', criterion: 'Expert knowledge of the English syllabus, max 300 words', response: null, order: 2, completed: false, word_limit: 300, check: null },
+        { id: 'acrit_demo_3', criterion: 'Experience leading staff professional learning (1 page)', response: null, order: 3, completed: false, word_limit: 500, check: null },
+        { id: 'acrit_demo_4', criterion: 'Commitment to student wellbeing', response: null, order: 4, completed: false, word_limit: null, check: null }
+      ],
+      interview_rounds: [],
+      outcome: { status: 'none', date: null, offer_details: null, reason: null },
+      reflection: null,
+      cover_letter: null,
+      cv: null,
+      created_at: seededAt,
+      updated_at: seededAt,
+      incomplete_links: null
+    });
+  }
+
+  type MockCriterion = Record<string, unknown> & { id: string; criterion: string; check?: Record<string, unknown> & { status?: string } | null };
+
+  /** What the real app_draft job does, in miniature: Adam's own text is never overwritten. */
+  function applyApplicationDraft(appId: string, target: string, criterionId: string | null) {
+    const application = applications.get(appId)!;
+    const now = new Date().toISOString();
+    const drafted: string[] = [];
+    const skipped: Array<{ criterion_id: string; reason: string }> = [];
+    let brackets = 0;
+    if (target === 'responses') {
+      const criteria = (application.selection_criteria as MockCriterion[]) ?? [];
+      for (const c of criteria) {
+        if (criterionId && c.id !== criterionId) continue;
+        const status = c.check?.status;
+        if (status !== 'have' && status !== 'partly') {
+          skipped.push({ criterion_id: c.id, reason: status ? 'no_evidence' : 'not_checked' });
+          continue;
+        }
+        const text =
+          `I lead this work in my faculty at Bellbird Creek High. ${status === 'have' ? 'I planned a shared reading sequence for Year 9 and met the team each fortnight.' : 'I have started this with one class and a colleague.'} ` +
+          'Most students moved up a band by Term 4, and the team now plans units together.';
+        if (!c.response || c.response_source === 'ann') {
+          c.response = text;
+          c.response_source = 'ann';
+          c.response_pending = null;
+        } else {
+          c.response_pending = text;
+        }
+        c.response_drafted_at = now;
+        drafted.push(c.id);
+      }
+    } else {
+      const doc = application[target] as { text?: string; source?: string; drafted_at?: string | null } | null;
+      const text =
+        target === 'cv'
+          ? 'Profile\nEnglish teacher who leads faculty programs and staff learning.\n\nRoles\nClassroom teacher, Bellbird Creek High School\n- Rebuilt the Year 9 reading program\n- Led staff PL on written feedback\n\nQualifications\n[add: teaching registration number]\n[add: first aid expiry]\n\nReferees\nAvailable on request'
+          : 'Dear Principal,\n\nI am applying for the Head Teacher English role at Bellbird Creek High School. I rebuilt our Year 9 reading program and led staff learning on written feedback. [add: why this school]\n\nYours sincerely';
+      brackets = (text.match(/\[add:[^\]]*\]/g) ?? []).length;
+      if (!doc?.text || doc.source === 'ann') {
+        application[target] = { text, source: 'ann', drafted_at: now, updated_at: now, pending: null };
+      } else {
+        application[target] = { ...doc, pending: text, drafted_at: now };
+      }
+      drafted.push(target);
+    }
+    application.updated_at = now;
+    return { application, drafted, skipped, brackets };
+  }
+
+  function historyNow() {
+    if (historyScan.status === 'running') {
+      const done = Math.min(historyScan.batches, Math.floor((Date.now() - historyScan.startedAt) / HISTORY_BATCH_MS));
+      historyScan.batch = done;
+      historyScan.proposals_added = done * 2;
+      if (historyScan.stopAsked && done > 0) historyScan.status = 'stopped';
+      else if (done >= historyScan.batches) historyScan.status = 'done';
+    }
+    const { status, batch, batches, proposals_added } = historyScan;
+    return { status, batch, batches, proposals_added };
+  }
 
   function nextSundayLabel(from = new Date()): string {
     const d = new Date(from);
@@ -348,6 +480,7 @@ export function createMockApi() {
     return {
       proposals,
       scan_state: scanState,
+      read_kinds: scanState.read_kinds ?? [],
       pending_count: proposals.length,
       next_scan_label: nextSundayLabel()
     };
@@ -2814,6 +2947,38 @@ export function createMockApi() {
         application.incomplete_links = null;
         return json(200, { ok: true, data: { application, links: [], retried: true } });
       }
+      if (action === 'confirm-check' && id && applications.has(id)) {
+        const application = applications.get(id)!;
+        const answers = ((body as { answers?: unknown[] })?.answers ?? []) as Array<{
+          criterion_id: string;
+          status: string;
+          evidence?: string;
+          card_ids?: string[];
+        }>;
+        const now = new Date().toISOString();
+        const criteria = (application.selection_criteria as MockCriterion[]) ?? [];
+        for (const answer of answers) {
+          const criterion = criteria.find((c) => c.id === answer.criterion_id);
+          if (!criterion || !['have', 'partly', 'not_yet', 'unknown'].includes(answer.status)) continue;
+          const cardIds = (answer.card_ids ?? []).filter((cardId) => achievements.has(cardId)).slice(0, 6);
+          criterion.check = {
+            status: answer.status,
+            evidence: String(answer.evidence ?? '').slice(0, 300),
+            card_ids: cardIds,
+            confirmed_at: now
+          };
+          // Re-confirming replaces this criterion's links.
+          answersCriterion = answersCriterion.filter((l) => !(l.application_id === id && l.criterion_id === criterion.id));
+          const strength = answer.status === 'have' ? 'strong' : answer.status === 'partly' ? 'some' : null;
+          if (strength) {
+            for (const cardId of cardIds) {
+              answersCriterion.push({ source_id: cardId, application_id: id, target_id: id, criterion_id: criterion.id, strength });
+            }
+          }
+        }
+        application.updated_at = now;
+        return json(200, { ok: true, data: { application } });
+      }
       if (action === 'transition' && id && applications.has(id)) {
         const application = applications.get(id)!;
         const next = (body as { pipeline_status?: string })?.pipeline_status;
@@ -2930,7 +3095,9 @@ export function createMockApi() {
         'selection_criteria',
         'interview_rounds',
         'outcome',
-        'reflection'
+        'reflection',
+        'cover_letter',
+        'cv'
       ]) {
         if (patch[key] !== undefined) {
           if (key === 'documents' && Array.isArray(patch.documents)) {
@@ -3059,7 +3226,7 @@ export function createMockApi() {
           futures: [...futures.values()],
           stones: [...stones.values()],
           supports_future: [],
-          answers_criterion: [],
+          answers_criterion: answersCriterion,
           stone_for: [],
           stone_actions: [],
           scan: {
@@ -3071,15 +3238,46 @@ export function createMockApi() {
     }
 
     if (path === '/api/career-scan' && method === 'GET') {
+      if (url.searchParams.get('action') === 'history_status') return json(200, { ok: true, data: historyNow() });
       return json(200, { ok: true, data: scanPanelPayload() });
     }
 
     if (path === '/api/career-scan' && method === 'POST') {
       const action = url.searchParams.get('action') || 'run-now';
+      if (action === 'history_estimate' || action === 'history_start') {
+        const months = Number((body as { months?: number })?.months);
+        if (![6, 12, 24, 36].includes(months)) {
+          return json(400, { ok: false, error: { code: 'invalid_months', message: 'Pick 6, 12, 24 or 36 months.' } });
+        }
+        // Invented counts: about 34 records a month.
+        const sources = Math.round(months * 34.3);
+        const batches = Math.ceil(sources / 40);
+        if (action === 'history_estimate') {
+          return json(200, {
+            ok: true,
+            data: {
+              sources,
+              batches,
+              cost_aud: Math.round(batches * 0.08 * 100) / 100,
+              by_kind: { 'professional:meeting': Math.round(sources * 0.3), 'tasks:task': Math.round(sources * 0.5), 'teaching:lesson': sources - Math.round(sources * 0.3) - Math.round(sources * 0.5) }
+            }
+          });
+        }
+        if (historyNow().status === 'running') {
+          return json(409, { ok: false, error: { code: 'history_running', message: 'A history scan is already running.' } });
+        }
+        historyScan = { status: 'running', batch: 0, batches, proposals_added: 0, startedAt: Date.now(), stopAsked: false };
+        return json(200, { ok: true, data: { status: 'running', batch: 0, batches } });
+      }
+      if (action === 'history_stop') {
+        if (historyScan.status === 'running') historyScan.stopAsked = true;
+        return json(200, { ok: true, data: historyNow() });
+      }
       if (action === 'run-now') {
         scanState = {
           last_run_at: new Date().toISOString(),
-          last_success_week: scanState.last_success_week
+          last_success_week: scanState.last_success_week,
+          read_kinds: ['professional:meeting', 'professional:event', 'tasks:task', 'teaching:lesson']
         };
         return json(200, {
           ok: true,
@@ -3212,10 +3410,55 @@ export function createMockApi() {
         });
         return json(200, { ok: true, data: { job_id: jobId } });
       }
+      if (action === 'app_check_start' || action === 'app_draft_start') {
+        const appId = url.searchParams.get('id') ?? '';
+        const application = applications.get(appId);
+        if (!application) {
+          return json(404, { ok: false, error: { code: 'application_not_found', message: 'Application not found.' } });
+        }
+        const jobId = randomUUID();
+        if (action === 'app_check_start') {
+          const criteria = (application.selection_criteria as MockCriterion[]) ?? [];
+          const cards = [...achievements.keys()];
+          const plan: Array<[string, string, string[]]> = [
+            ['have', 'You rebuilt the Year 9 reading program and led the team through it.', cards.slice(0, 1)],
+            ['partly', 'One skill card touches on syllabus work; nothing yet on Stage 6.', cards.slice(1, 2)],
+            ['not_yet', 'Nothing in your record shows staff learning you led across the school.', []],
+            ['unknown', '', []]
+          ];
+          annJobs.set(jobId, {
+            readyAt: Date.now() + APP_JOB_MS,
+            result: {
+              read_central_node: true,
+              suggestions: criteria.map((c, index) => {
+                const [status, evidence, card_ids] = plan[index % plan.length]!;
+                return { criterion_id: c.id, status, evidence, card_ids };
+              })
+            }
+          });
+        } else {
+          const input = (body ?? {}) as { target?: string; criterion_id?: string };
+          const target = input.target ?? '';
+          if (!['responses', 'cover_letter', 'cv'].includes(target)) {
+            return json(400, { ok: false, error: { code: 'invalid_target', message: 'Pick responses, cover_letter or cv.' } });
+          }
+          annJobs.set(jobId, {
+            readyAt: Date.now() + APP_JOB_MS,
+            result: null,
+            apply: () => applyApplicationDraft(appId, target, input.criterion_id ?? null)
+          });
+        }
+        return json(200, { ok: true, data: { job_id: jobId } });
+      }
       if (action === 'job_status') {
         const job = annJobs.get((body as { job_id?: string }).job_id ?? '');
         if (!job) return json(200, { ok: true, data: { status: 'failed', message: 'Ann lost track of this. Try again.' } });
-        return json(200, { ok: true, data: Date.now() < job.readyAt ? { status: 'reading' } : { status: 'done', result: job.result } });
+        if (Date.now() < job.readyAt) return json(200, { ok: true, data: { status: 'reading' } });
+        if (job.apply) {
+          job.result = job.apply();
+          job.apply = undefined;
+        }
+        return json(200, { ok: true, data: { status: 'done', result: job.result } });
       }
       if (action === 'job_clear') {
         annJobs.delete((body as { job_id?: string }).job_id ?? '');
