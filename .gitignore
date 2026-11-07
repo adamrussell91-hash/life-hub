@@ -32,3 +32,6 @@ apps/*/.ua/
 # Gear Shifter contact sheet build output: rebuild with the build-gear-shifter-contact-sheet script.
 /docs/mockups/gear-shifter/contact-sheet.js
 /docs/mockups/gear-shifter/contact-sheet.css
+
+# Claude Code per-user settings: may hold approved commands containing secrets. Never commit.
+.claude/settings.local.json
