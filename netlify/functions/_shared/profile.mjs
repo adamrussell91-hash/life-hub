@@ -18,6 +18,8 @@ import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skil
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
+import { deleteTeacherNote, saveTeacherNote, teacherNotes } from './teacher-notes.mjs';
+import { teacherHabits } from './teacher-habits.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -121,13 +123,14 @@ async function profileFor(store, roster, student) {
 /**
  * Teacher: every student's done records; marking one complete, partial or clearing it; and one
  * student's progress page exactly as they see it (`progress`, `returned`, `piece`). The teacher's
- * reads never mark a piece seen.
+ * reads never mark a piece seen. Also the teacher-only Over time reads: private notes (`notes`,
+ * `note_save`, `note_delete`) and `habits`. None of these is in the student's profileAction.
  */
-export async function teacherProfileAction(store, classId, body) {
+export async function teacherProfileAction(store, classId, body, { now = new Date() } = {}) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
-  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece', 'skill_rungs'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece', 'skill_rungs', 'notes', 'note_save', 'note_delete', 'habits'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   // Where students sit on the skills continuum: one student (with student_id) or the whole class.
   if (action === 'skill_rungs' && body.student_id === undefined) {
     const rows = await classSkillRungs(store, classId, roster.students.map((s) => s.id));
@@ -143,6 +146,10 @@ export async function teacherProfileAction(store, classId, body) {
     if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
     if (action === 'piece') return pieceFor(store, roster, student, body.item);
     if (action === 'skill_rungs') return { rungs: (await classSkillRungs(store, classId, [student.id]))[0]?.rungs ?? {} };
+    if (action === 'notes') return teacherNotes(store, roster.cls.id, student.id);
+    if (action === 'note_save') return saveTeacherNote(store, roster.cls.id, student.id, body.note, { now });
+    if (action === 'note_delete') return deleteTeacherNote(store, roster.cls.id, student.id, body.note_id);
+    if (action === 'habits') return teacherHabits(store, roster.cls.id, student.id, { now });
     const state = action === 'remove' ? 'clear' : body.state;
     if (!['complete', 'partial', 'clear'].includes(state)) reject(400, 'bad_request', 'Mark it complete, partial or clear.');
     if (action === 'remove') await removeDone(store, classId, body.student_id, body.lesson_id);
