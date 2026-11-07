@@ -96,3 +96,24 @@ export const PRIORITY = {
   /** Tags named per student. */
   tags: 2
 } as const;
+
+/**
+ * The teacher-only Over time tab on a student's page. Scores are whole percents.
+ * These copy the Next steps guesses: check them against a real class.
+ */
+export const OVER_TIME = {
+  /** A tag at or above this now is Secure. */
+  secure: 75,
+  /** Under this now, or down by `down` or more from first to latest, is Needs work. */
+  needsWork: 55,
+  down: 8,
+  /** Rising or Slipping needs this much change from first to latest. */
+  move: 8,
+  /** Stuck: this many pieces or more, all inside a band this wide, all under `needsWork`. */
+  stuckPieces: 3,
+  stuckBand: 10,
+  /** Stuck: the same named mix-up this many times or more. */
+  stuckMixUps: 3,
+  /** A knowledge piece counts towards a deep understanding's tier at this share or more (0–1). */
+  pieceHeld: 0.75
+} as const;

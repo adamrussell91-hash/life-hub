@@ -18,7 +18,7 @@ import { doneAmong } from './profile-done.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { CLASS_PREFIX, SCHEDULED_LESSON_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import {
-  OrganiserError, REVIEW_LIMIT, applyChange, applyResult, buildCards, joinedSections, lessonsOfLine, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
+  OrganiserError, REVIEW_LIMIT, addDays, applyChange, applyResult, buildCards, joinedSections, lessonsOfLine, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
 } from './organiser-model.mjs';
 
 export { OrganiserError };
@@ -210,6 +210,49 @@ function practiceFor(sheets, done, boxes, today) {
 async function readBoxes(store, cls, student) {
   const held = await readWithEtag(store, practiceKey(cls, workOwner(cls, student.id)));
   return { boxes: held.data?.boxes && typeof held.data.boxes === 'object' ? held.data.boxes : {}, etag: held.etag, exists: !!held.data };
+}
+
+/** The Monday (Sydney calendar) of the week a Sydney day falls in. */
+export function weekStart(day) {
+  const back = (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7;
+  return addDays(day, -back);
+}
+
+/**
+ * The teacher's read of one student's practice: days in a row with answers (ending today or
+ * yesterday), the average box, and right of seen per Sydney week from each card's kept history.
+ * Null when the student has never practised. Reads only; never writes.
+ */
+export async function organiserHabits(store, classId, studentId, { now = new Date() } = {}) {
+  const held = await read(store, practiceKey(classId, workOwner(classId, studentId)));
+  if (!held) return null;
+  const entries = Object.values(held.boxes && typeof held.boxes === 'object' ? held.boxes : {}).filter((e) => e && typeof e === 'object');
+  const days = new Set();
+  const weeks = new Map();
+  let boxSum = 0;
+  let boxed = 0;
+  for (const e of entries) {
+    if (Number.isFinite(e.box)) { boxSum += e.box; boxed += 1; }
+    if (typeof e.last === 'string' && DAY.test(e.last)) days.add(e.last.slice(0, 10));
+    for (const h of Array.isArray(e.h) ? e.h : []) {
+      if (typeof h?.d !== 'string' || !DAY.test(h.d)) continue;
+      const d = h.d.slice(0, 10);
+      days.add(d);
+      const w = weeks.get(weekStart(d)) ?? { right: 0, seen: 0 };
+      w.seen += 1;
+      if (h.ok) w.right += 1;
+      weeks.set(weekStart(d), w);
+    }
+  }
+  const today = sydneyDay(now);
+  let day = days.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (days.has(day)) { streak += 1; day = addDays(day, -1); }
+  return {
+    streak,
+    avg_box: boxed ? Math.round((boxSum / boxed) * 10) / 10 : null,
+    weekly: [...weeks].sort(([a], [b]) => a.localeCompare(b)).map(([week_start, w]) => ({ week_start, ...w }))
+  };
 }
 
 async function review(store, roster, student, sheets, done, results, now, today) {

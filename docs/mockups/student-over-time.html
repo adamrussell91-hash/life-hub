@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student page: Over time (teacher only) mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #13233a; --navy: #17375e; --wave: #376fb7; --muted: #6b7788;
+  --paper: #fbf8f2; --line: rgba(23,55,94,.10);
+  --pastel-blue: #dceafa; --sage: #dfe9e1; --sage-ink: #3d6b4a;
+  --peach: #f8e1cf; --peach-ink: #8a5420; --gold: #f6ecc4; --gold-ink: #7a6216;
+  --lilac: #e7e2f5; --lilac-ink: #5a4a8c; --rose: #f6dede; --rose-ink: #9a3b3b;
+  --r-sm: .875rem; --r-md: 1.25rem;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6dd; color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+.note { max-width: 1320px; margin: 14px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+.stage { max-width: 1320px; margin: 0 auto; padding: 16px; display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.desk { flex: 1 1 760px; min-width: 0; }
+.desk .screen { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(19,35,58,.12); overflow: hidden; }
+.phone { flex: 0 0 390px; max-width: 100%; }
+.phone .screen { width: 390px; max-width: 100%; height: 860px; overflow-y: auto; background: var(--paper); border-radius: 36px; border: 10px solid #1d2633; box-shadow: 0 10px 30px rgba(19,35,58,.18); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: var(--navy); }
+.chrome .dot { width: 26px; height: 26px; border-radius: 8px; background: #fff; }
+.chrome b { color: #fff; font-size: 14px; }
+.chrome span { color: rgba(255,255,255,.7); font-size: 13px; margin-left: auto; }
+.page { padding: 22px 28px 40px; max-width: 64rem; margin: 0 auto; }
+.phone .page { padding: 16px 14px 32px; }
+.crumb { font-size: 13px; color: var(--muted); }
+.crumb a { color: var(--wave); text-decoration: none; }
+.head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+h1.pt { margin: 0; font-size: 28px; color: var(--navy); letter-spacing: -.01em; }
+.phone h1.pt { font-size: 24px; }
+.who { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.tabs { display: flex; gap: 2px; margin: 14px 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tab { position: relative; border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); padding: 10px 14px; min-height: 44px; white-space: nowrap; cursor: pointer; }
+.tab.on { color: var(--navy); } .tab.on::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px; background: var(--wave); }
+.tab .lock { font-size: 11px; font-weight: 700; background: var(--navy); color: #fff; border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+.private { display: flex; gap: 10px; align-items: center; margin: 14px 0 0; padding: 9px 14px; border-radius: var(--r-sm); background: var(--navy); color: #fff; font-size: 13px; }
+.private b { font-weight: 600; }
+.range { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 0; align-items: center; }
+.range span { font-size: 13px; color: var(--muted); margin-right: 4px; }
+.pill { font: inherit; font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 6px 13px; min-height: 36px; cursor: pointer; }
+.pill.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+h2.sec { margin: 28px 0 4px; font-size: 18px; color: var(--navy); }
+.sec-sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; }
+.phone .panel { padding: 14px; }
+
+/* What's changed */
+.moves { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 16px; }
+.move { background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--wave); border-radius: var(--r-sm); padding: 12px 14px; }
+.move.up { border-left-color: var(--sage-ink); } .move.down { border-left-color: var(--rose-ink); } .move.stuck { border-left-color: var(--gold-ink); }
+.move .k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.move.up .k { color: var(--sage-ink); } .move.down .k { color: var(--rose-ink); } .move.stuck .k { color: var(--gold-ink); }
+.move .t { font-weight: 600; color: var(--navy); margin: 2px 0; line-height: 1.35; }
+.move .w { font-size: 13px; color: var(--muted); }
+
+/* Big trend */
+.trend svg { width: 100%; height: auto; display: block; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.legend .ev { width: 9px; height: 9px; border-radius: 50%; }
+
+/* Tag table */
+.kinds { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.sortrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.group-h { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; color: var(--muted); margin: 16px 0 6px; }
+.rows { border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; overflow: hidden; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 132px 56px 64px 70px; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); cursor: pointer; }
+.row:first-child { border-top: 0; }
+.row:hover { background: #f7f5ef; }
+.row .name { font-weight: 600; color: var(--navy); font-size: 14px; line-height: 1.3; }
+.row .name small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.row .now { font-weight: 700; text-align: right; }
+.row .chg { font-size: 13px; font-weight: 600; text-align: right; }
+.row .cls { font-size: 12px; color: var(--muted); text-align: right; }
+.hdr { cursor: default; background: #f4f1e8 !important; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 7px 14px; }
+.hdr > * { text-align: right; } .hdr > :first-child { text-align: left; }
+.pos { color: var(--sage-ink); } .neg { color: var(--rose-ink); } .flat { color: var(--muted); }
+.band { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+.b-secure { background: var(--sage); color: var(--sage-ink); } .b-grow { background: var(--pastel-blue); color: var(--navy); }
+.b-gap { background: var(--peach); color: var(--peach-ink); } .b-new { background: var(--lilac); color: var(--lilac-ink); }
+.detail { display: none; padding: 4px 14px 14px; background: #faf8f3; border-top: 1px dashed var(--line); }
+.detail.open { display: block; }
+.evlist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.evlist li { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; font-size: 13px; align-items: baseline; }
+.evlist .d { color: var(--muted); font-variant-numeric: tabular-nums; }
+.evlist .s { color: var(--ink); }
+.evlist .s em { font-style: normal; color: var(--muted); }
+.evlist .m { font-weight: 700; }
+.detail .act { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.detail .act button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--wave); font-weight: 600; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+
+/* phone row */
+.phone .row { grid-template-columns: minmax(0, 1fr) 84px 44px; gap: 8px; padding: 10px 12px; }
+.phone .row .chg, .phone .row .cls, .phone .hdr .chg, .phone .hdr .cls { display: none; }
+.phone .row .name small .pc { display: inline; }
+.pc { display: none; }
+
+/* Writing + speaking */
+.two { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.codes { display: grid; gap: 8px; }
+.code-row { display: grid; grid-template-columns: 120px 1fr 40px; gap: 10px; align-items: center; font-size: 13px; }
+.code-row .lab b { font-weight: 700; font-size: 11px; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+.dots { display: flex; gap: 4px; }
+.dots span { width: 16px; height: 16px; border-radius: 5px; background: #eee9dc; }
+.dots .s { background: #9cc5a7; } .dots .n { background: #e9b38a; } .dots .x { background: #eee9dc; }
+.code-row .tr { text-align: right; font-weight: 600; }
+.piece-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.piece-list li { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.piece-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.piece-list b { color: var(--navy); font-weight: 600; }
+.piece-list small { color: var(--muted); display: block; }
+.tick { font-weight: 700; } .tick.ok { color: var(--sage-ink); } .tick.part { color: var(--gold-ink); }
+
+/* DU ladder */
+.du { display: grid; gap: 10px; }
+.du-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 12px; align-items: center; }
+.phone .du-row { grid-template-columns: 1fr; gap: 4px; }
+.du-row .n { font-size: 14px; font-weight: 600; color: var(--navy); line-height: 1.3; }
+.du-row .n small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.ladder { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.ladder span { height: 22px; border-radius: 6px; background: #eee9dc; font-size: 11px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 600; }
+.ladder .on { background: var(--wave); color: #fff; } .ladder .was { background: var(--pastel-blue); color: var(--navy); }
+
+/* Habits */
+.habits { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.hab { background: #fff; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; }
+.hab .v { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+.hab .l { font-size: 13px; color: var(--muted); }
+.hab svg { display: block; margin-top: 6px; }
+
+/* Notes */
+.notes { display: grid; gap: 8px; }
+.notes textarea { width: 100%; min-height: 60px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; background: #fff; resize: vertical; }
+.nlist { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 10px; }
+.nlist li { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 14px; }
+.nlist .d { color: var(--muted); font-size: 13px; }
+.nlist .tagged { font-size: 11px; font-weight: 700; color: var(--lilac-ink); background: var(--lilac); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+.annot { position: relative; margin: 26px 0 0; padding: 12px 14px; border-radius: var(--r-sm); border: 2px dashed #c9a43a; background: #fffbe9; font-size: 13px; }
+.annot b { color: var(--gold-ink); }
+</style>
+</head>
+<body>
+<p class="note">Mockup only, invented student and data. Same page you get from a name click today (the student's own view). The new <b>Over time</b> tab is teacher only: students never see it, and it never appears on their login. Click a kind, a sort, or any row.</p>
+<div class="stage">
+  <div class="desk"><p class="label">Desktop</p><div class="screen" id="desk"></div></div>
+  <div class="phone"><p class="label">390px</p><div class="screen" id="phone"></div></div>
+</div>
+
+<script>
+// ---------- invented data ----------
+const WEEKS = ['T3 W6','T3 W7','T3 W8','T3 W9','T3 W10','T4 W1','T4 W2','T4 W3','T4 W4','T4 W5'];
+const ME   = [58, 61, 55, 63, 66, 64, 70, 68, 74, 77];
+const CLS  = [62, 63, 61, 64, 65, 66, 67, 66, 69, 70];
+const EVENTS = [
+  { w: 1, kind: 'quiz', label: 'Week 7 quiz' },
+  { w: 3, kind: 'writing', label: 'Essay 1 returned' },
+  { w: 4, kind: 'viva', label: 'Viva 1' },
+  { w: 6, kind: 'quiz', label: 'Week 3 Review' },
+  { w: 7, kind: 'sprint', label: 'Design sprint' },
+  { w: 8, kind: 'writing', label: 'Redraft returned' },
+  { w: 9, kind: 'quiz', label: 'Monthly Review 1' },
+];
+const EVC = { quiz: '#376fb7', writing: '#c9822f', viva: '#5a4a8c', sprint: '#3d6b4a' };
+
+// kind, tag label, sub, history (null = no evidence that week), class latest, evidence
+const TAGS = [
+  { kind: 'dp', name: 'Analyses how language and form shape meaning', sub: 'Syllabus dot point · EN12-2', h: [50,null,55,60,null,62,68,null,72,78], cls: 69,
+    ev: [['3 Nov','Monthly Review 1','Q4, Q9, Q12','8/10'],['27 Oct','Redraft','paragraph 2 marked','Strong'],['20 Oct','Week 3 Review','Q2, Q6','3/4'],['15 Sep','Essay 1','body paragraphs','Developing']] },
+  { kind: 'dp', name: 'Evaluates how context shapes a text', sub: 'Syllabus dot point · EN12-6', h: [70,null,66,null,58,null,55,null,52,50], cls: 64,
+    ev: [['3 Nov','Monthly Review 1','Q14','1/3'],['20 Oct','Week 3 Review','Q11','0/2'],['8 Sep','Week 7 quiz','Q3, Q5','2/2']] },
+  { kind: 'dp', name: 'Crafts a sustained interpretation', sub: 'Syllabus dot point · EN12-4', h: [null,null,48,null,52,null,null,61,null,66], cls: 60,
+    ev: [['27 Oct','Redraft','whole piece','Strong'],['15 Sep','Essay 1','thesis + links','Developing']] },
+  { kind: 'out', name: 'EN12-1 Responds to texts with precision', sub: 'Outcome', h: [60,62,58,64,66,65,70,69,73,76], cls: 70,
+    ev: [['3 Nov','Monthly Review 1','6 questions','76%'],['20 Oct','Week 3 Review','5 questions','70%']] },
+  { kind: 'skill', name: 'Inference', sub: 'Thinking skill', h: [55,58,null,60,64,null,70,73,null,80], cls: 66,
+    ev: [['27 Oct','Live round','hinge Q','right'],['13 Oct','Viva 1','checklist line 3','met']] },
+  { kind: 'skill', name: 'Comparison', sub: 'Thinking skill', h: [null,null,null,null,50,null,null,null,null,52], cls: 61,
+    ev: [['3 Nov','Monthly Review 1','Q17','1/2'],['22 Sep','Essay 1','link sentence','Developing']] },
+  { kind: 'fam', name: 'Imagery', sub: 'Technique family · 4 techniques', h: [62,66,64,70,72,71,75,null,80,82], cls: 72,
+    ev: [['3 Nov','Monthly Review 1','metaphor, symbol','4/4'],['20 Oct','Week 3 Review','simile','2/2']] },
+  { kind: 'tech', name: 'Juxtaposition', sub: 'Technique · Structure', h: [null,40,null,45,null,null,null,null,48,46], cls: 63,
+    ev: [['3 Nov','Monthly Review 1','named "contrast" (mix-up)','0/1'],['20 Oct','Week 3 Review','spot the technique','missed'],['8 Sep','Week 7 quiz','Q8','1/2']] },
+  { kind: 'tech', name: 'Enjambment', sub: 'Technique · Form', h: [null,null,null,null,null,null,null,null,70,null], cls: 58,
+    ev: [['3 Nov','Monthly Review 1','Q7','new, 1 question']] },
+  { kind: 'du', name: 'Place holds memory', sub: 'Deep understanding · Wagan Watson unit', h: [null,null,null,null,null,40,55,null,65,72], cls: 58,
+    ev: [['3 Nov','Monthly Review 1','piece: Strong','Strong'],['27 Oct','Redraft','used in thesis','Strong'],['13 Oct','Viva 1','named, not used','Essential']] },
+  { kind: 'vocab', name: 'Unit vocabulary', sub: 'Knowledge organiser · Leitner', h: [null,null,null,null,null,30,42,55,61,68], cls: 51,
+    ev: [['5 Nov','Organiser','15 cards, 12 right','box 3 avg'],['29 Oct','Organiser','15 cards, 9 right','box 2 avg']] },
+];
+const KINDS = [['all','Everything'],['dp','Syllabus'],['out','Outcomes'],['skill','Thinking skills'],['fam','Families'],['tech','Techniques'],['du','Deep understandings'],['vocab','Vocabulary']];
+const GROUPNAME = Object.fromEntries(KINDS);
+
+// ---------- helpers ----------
+const last = (h) => { for (let i = h.length - 1; i >= 0; i--) if (h[i] != null) return h[i]; return null; };
+const first = (h) => h.find((v) => v != null);
+const count = (h) => h.filter((v) => v != null).length;
+const change = (h) => count(h) < 2 ? null : last(h) - first(h);
+function band(t) {
+  const n = count(t.h), now = last(t.h);
+  if (n < 2) return ['b-new', 'New'];
+  if (now >= 75) return ['b-secure', 'Secure'];
+  if (change(t.h) <= -8 || now < 55) return ['b-gap', 'Needs work'];
+  return ['b-grow', 'Growing'];
+}
+function spark(h, w, ht, cls) {
+  const pts = h.map((v, i) => v == null ? null : [ (i / (h.length - 1)) * (w - 6) + 3, ht - 3 - ((v - 30) / 60) * (ht - 6) ]);
+  const real = pts.filter(Boolean);
+  const path = real.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const cy = ht - 3 - ((cls - 30) / 60) * (ht - 6);
+  const c = (change(h) ?? 0) >= 0 ? '#376fb7' : '#9a3b3b';
+  return `<svg width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}" aria-hidden="true">
+    <line x1="0" x2="${w}" y1="${cy}" y2="${cy}" stroke="#b9b3a3" stroke-dasharray="3 3" stroke-width="1"/>
+    <path d="${path}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${real.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="2.4" fill="${c}"/>`).join('')}
+  </svg>`;
+}
+function bigTrend(phone) {
+  const W = phone ? 340 : 860, H = phone ? 200 : 230, L = 34, R = 10, T = 26, B = 28;
+  const x = (i) => L + (i / (WEEKS.length - 1)) * (W - L - R);
+  const y = (v) => T + (1 - (v - 40) / 50) * (H - T - B);
+  const line = (arr) => arr.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+  const grid = [50, 60, 70, 80, 90].map((g) => `<line x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}" stroke="#eee9dc"/><text x="${L - 6}" y="${y(g) + 4}" font-size="10" fill="#6b7788" text-anchor="end">${g}</text>`).join('');
+  const labels = WEEKS.map((w, i) => (phone && i % 2) ? '' : `<text x="${x(i)}" y="${H - 8}" font-size="10" fill="#6b7788" text-anchor="middle">${w}</text>`).join('');
+  const ev = EVENTS.map((e) => `<g><title>${e.label}</title><line x1="${x(e.w)}" x2="${x(e.w)}" y1="${T - 8}" y2="${H - B}" stroke="${EVC[e.kind]}" stroke-opacity=".18" stroke-width="1"/><circle cx="${x(e.w)}" cy="${T - 12}" r="5" fill="${EVC[e.kind]}"/></g>`).join('');
+  const term = `<line x1="${(x(4) + x(5)) / 2}" x2="${(x(4) + x(5)) / 2}" y1="${T}" y2="${H - B}" stroke="#b9b3a3" stroke-dasharray="2 4"/><text x="${(x(4) + x(5)) / 2 + 4}" y="${T + 10}" font-size="10" fill="#6b7788">holidays</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly score across all tagged work, rising from 58 to 77 per cent; class from 62 to 70">
+    ${grid}${term}${ev}
+    <path d="${line(CLS)}" fill="none" stroke="#b9b3a3" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="${line(ME)}" fill="none" stroke="#17375e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    ${ME.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="#17375e"><title>${WEEKS[i]}: ${v}%</title></circle>`).join('')}
+    <text x="${x(9) - 4}" y="${y(77) - 10}" font-size="12" font-weight="700" fill="#17375e" text-anchor="end">77%</text>
+    ${labels}
+  </svg>`;
+}
+function miniBars(vals, w = 120, h = 28, c = '#376fb7') {
+  const bw = w / vals.length - 3, mx = Math.max(...vals);
+  return `<svg width="${w}" height="${h}" aria-hidden="true">${vals.map((v, i) => `<rect x="${i * (bw + 3)}" y="${h - (v / mx) * h}" width="${bw}" height="${(v / mx) * h}" rx="2" fill="${c}" opacity="${0.4 + 0.6 * (i / vals.length)}"/>`).join('')}</svg>`;
+}
+
+// ---------- page ----------
+const state = { desk: { kind: 'all', sort: 'change', range: 'Year', open: null }, phone: { kind: 'all', sort: 'change', range: 'Year', open: null } };
+
+function rowsHTML(id, phone) {
+  const s = state[id];
+  let list = TAGS.filter((t) => s.kind === 'all' || t.kind === s.kind);
+  const sorts = {
+    change: (a, b) => Math.abs(change(b.h) ?? 0) - Math.abs(change(a.h) ?? 0),
+    weakest: (a, b) => last(a.h) - last(b.h),
+    recent: (a, b) => b.h.findLastIndex((v) => v != null) - a.h.findLastIndex((v) => v != null),
+  };
+  list = [...list].sort(sorts[s.sort]);
+  const groups = s.kind === 'all' && s.sort === 'change' ? null : null;
+  const head = `<div class="row hdr"><div>Tag</div><div>Over time</div><div>Now</div><div class="chg">Change</div><div class="cls">Class</div></div>`;
+  const body = list.map((t) => {
+    const ch = change(t.h); const [bc, bl] = band(t); const key = id + t.name;
+    const chTxt = ch == null ? '<span class="flat">1 piece</span>' : `<span class="${ch > 0 ? 'pos' : ch < 0 ? 'neg' : 'flat'}">${ch > 0 ? '+' : ''}${ch}</span>`;
+    return `<div class="row" data-open="${key}">
+        <div class="name">${t.name}<span class="band ${bc}">${bl}</span><small>${t.sub} · ${count(t.h)} pieces<span class="pc"> · ${ch == null ? 'one piece' : (ch > 0 ? '+' : '') + ch} · class ${t.cls}%</span></small></div>
+        <div>${spark(t.h, phone ? 84 : 132, 30, t.cls)}</div>
+        <div class="now">${last(t.h)}%</div>
+        <div class="chg">${chTxt}</div>
+        <div class="cls">${t.cls}%</div>
+      </div>
+      <div class="detail ${s.open === key ? 'open' : ''}">
+        <ul class="evlist">${t.ev.map((e) => `<li><span class="d">${e[0]}</span><span class="s">${e[1]} <em>· ${e[2]}</em></span><span class="m">${e[3]}</span></li>`).join('')}</ul>
+        <div class="act"><button>Make it a next step</button><button>Add to a group</button><button>Open the tag</button></div>
+      </div>`;
+  }).join('');
+  return `<div class="rows">${head}${body}</div>`;
+}
+
+function page(id) {
+  const phone = id === 'phone'; const s = state[id];
+  return `
+  <div class="chrome"><div class="dot"></div><b>Teaching</b><span>12ENA9</span></div>
+  <div class="page">
+    <div class="crumb"><a href="#">Markbook</a> › 12ENA9</div>
+    <div class="head"><h1 class="pt">Jordan Pell</h1></div>
+    <p class="who">12ENA9 · Year 12 English Advanced · 24 lessons this year · 6 side lessons</p>
+    <div class="tabs">
+      <button class="tab">My progress</button>
+      <button class="tab">Returned work</button>
+      <button class="tab">Pieces</button>
+      <button class="tab on">Over time<span class="lock">Only you</span></button>
+    </div>
+    <div class="private"><b>Only you see this tab.</b> Jordan sees the other three, never this one.</div>
+
+    <div class="range"><span>Show</span>${['Unit','Term','Year'].map((r) => `<button class="pill ${s.range === r ? 'on' : ''}" data-range="${r}">${r}</button>`).join('')}</div>
+
+    <div class="moves">
+      <div class="move up"><div class="k">Rising</div><div class="t">Inference, 55% → 80%</div><div class="w">Since Viva 1. Seven pieces, five of them quiz items.</div></div>
+      <div class="move down"><div class="k">Slipping</div><div class="t">Context, 70% → 50%</div><div class="w">Fell on each of the last four tagged questions. Class sits at 64%.</div></div>
+      <div class="move stuck"><div class="k">Stuck</div><div class="t">Juxtaposition, 40–48%</div><div class="w">Named "contrast" three times. Same mix-up since Week 7.</div></div>
+    </div>
+
+    <h2 class="sec">Everything tagged, week by week</h2>
+    <p class="sec-sub">Latest attempt at every tagged quiz item, marked piece, viva line and organiser card. Dashed line is the class.</p>
+    <div class="panel trend">${bigTrend(phone)}
+      <div class="legend"><span><i style="background:#17375e"></i>Jordan</span><span><i style="background:#b9b3a3"></i>Class</span>
+      ${Object.entries(EVC).map(([k, c]) => `<span><i class="ev" style="background:${c}"></i>${k === 'quiz' ? 'Quiz' : k === 'writing' ? 'Writing returned' : k === 'viva' ? 'Viva' : 'Sprint'}</span>`).join('')}</div>
+    </div>
+
+    <h2 class="sec">Every tag</h2>
+    <p class="sec-sub">Click a row to see the work behind it.</p>
+    <div class="kinds">${KINDS.map(([k, l]) => `<button class="pill ${s.kind === k ? 'on' : ''}" data-kind="${k}">${l}</button>`).join('')}</div>
+    <div class="sortrow">Sort by ${[['change','Biggest change'],['weakest','Weakest now'],['recent','Most recent']].map(([k, l]) => `<button class="pill ${s.sort === k ? 'on' : ''}" data-sort="${k}">${l}</button>`).join('')}</div>
+    ${rowsHTML(id, phone)}
+
+    <h2 class="sec">Deep understandings</h2>
+    <p class="sec-sub">Where Jordan's best piece sits now. Pale blue is where it started.</p>
+    <div class="panel du">
+      <div class="du-row"><div class="n">Place holds memory<small>Viva 1 → Redraft → Monthly Review 1</small></div><div class="ladder"><span class="was">Essential</span><span class="on">Strong</span><span>Sophisticated</span></div></div>
+      <div class="du-row"><div class="n">Voice is a kind of land claim<small>Week 3 Review only</small></div><div class="ladder"><span class="on">Essential</span><span>Strong</span><span>Sophisticated</span></div></div>
+      <div class="du-row"><div class="n">Form carries the argument<small>Not tested yet · taught in 4 lessons</small></div><div class="ladder"><span>Essential</span><span>Strong</span><span>Sophisticated</span></div></div>
+    </div>
+
+    <h2 class="sec">Writing and speaking</h2>
+    <p class="sec-sub">Your marking codes on each returned piece, oldest on the left. Green is a strength, orange a next step.</p>
+    <div class="two">
+      <div class="panel codes">
+        ${[['TH','Thesis',['n','n','s','s'],'+2'],['EV','Evidence',['n','s','s','s'],'+1'],['AN','Analysis',['n','n','n','s'],'+1'],['CX','Context',['s','n','n','n'],'−1'],['EX','Expression',['s','s','x','s'],'=']].map(([c, l, d, t]) => `<div class="code-row"><div class="lab"><b class="c-blue" style="background:var(--pastel-blue);color:var(--navy)">${c}</b>${l}</div><div class="dots">${d.map((v) => `<span class="${v}"></span>`).join('')}</div><div class="tr ${t.startsWith('+') ? 'pos' : t.startsWith('−') ? 'neg' : 'flat'}">${t}</div></div>`).join('')}
+      </div>
+      <div class="panel">
+        <ul class="piece-list">
+          <li><div><b>Redraft, section 2</b><small>27 Oct · next step: "Name the context, then tie it to a choice" · acted on</small></div><span class="tick ok">Strong</span></li>
+          <li><div><b>Viva 1</b><small>13 Oct · checklist 5 of 7 · missed: context, comparison</small></div><span class="tick part">5/7</span></li>
+          <li><div><b>Essay 1</b><small>15 Sep · next step: "One idea per paragraph" · acted on in redraft</small></div><span class="tick part">Developing</span></li>
+          <li><div><b>Design sprint pitch</b><small>24 Oct · group of 4 · Jordan built part 2</small></div><span class="tick ok">Met</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 class="sec">Habits</h2>
+    <div class="habits">
+      <div class="hab"><div class="v">9 of 10</div><div class="l">quizzes done on time</div>${miniBars([1,1,1,0,1,1,1,1,1,1], 110, 22)}</div>
+      <div class="hab"><div class="v">4 days</div><div class="l">organiser streak · avg box 3</div>${miniBars([0,0,0,0,0,2,3,5,6,8], 110, 22, '#c9a43a')}</div>
+      <div class="hab"><div class="v">2 of 3</div><div class="l">next steps acted on</div>${miniBars([0,1,1], 60, 22, '#3d6b4a')}</div>
+      <div class="hab"><div class="v">2</div><div class="l">redrafts handed in</div>${miniBars([1,1], 40, 22, '#5a4a8c')}</div>
+    </div>
+
+    <h2 class="sec">My notes</h2>
+    <p class="sec-sub">Private jottings. Pick a tag and the note sits on that tag's timeline too.</p>
+    <div class="panel notes">
+      <textarea placeholder="What did you notice? e.g. Asked a sharp question about the ending today"></textarea>
+      <ul class="nlist">
+        <li><span class="d">4 Nov</span><span>Talked through context in the Monthly Review. Knows the facts, doesn't link them to choices.<span class="tagged">Context</span></span></li>
+        <li><span class="d">24 Oct</span><span>Led the group in the sprint. Quiet in whole-class, confident in fours.</span></li>
+        <li><span class="d">13 Oct</span><span>Viva: named "memory" but couldn't show it in a line.<span class="tagged">Place holds memory</span></span></li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+function render(id) {
+  const el = document.getElementById(id);
+  const top = el.scrollTop; el.innerHTML = page(id); el.scrollTop = top;
+  el.querySelectorAll('[data-kind]').forEach((b) => b.onclick = () => { state[id].kind = b.dataset.kind; render(id); });
+  el.querySelectorAll('[data-sort]').forEach((b) => b.onclick = () => { state[id].sort = b.dataset.sort; render(id); });
+  el.querySelectorAll('[data-range]').forEach((b) => b.onclick = () => { state[id].range = b.dataset.range; render(id); });
+  el.querySelectorAll('[data-open]').forEach((r) => r.onclick = () => { state[id].open = state[id].open === r.dataset.open ? null : r.dataset.open; render(id); });
+}
+render('desk'); render('phone');
+</script>
+</body>
+</html>

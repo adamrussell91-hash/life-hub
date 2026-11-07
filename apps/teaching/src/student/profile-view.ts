@@ -58,8 +58,10 @@ export type RenderProfileOptions = {
   organiser?: OrganiserLoad | null;
   /** Reload the organiser and redraw on its tab. */
   reloadOrganiser?: () => void;
-  /** `organiser` lands on the Organiser tab. */
+  /** `organiser` lands on the Organiser tab; `over-time` on Over time (teacher only). */
   tab?: string;
+  /** Teacher only: builds the Over time tab's panel, the first time it opens. Ignored without `teacher`. */
+  overTime?: () => HTMLElement;
 };
 
 function seeHow(r?: { url: string; title?: string; kind: string; start?: number }): HTMLElement | null {
@@ -192,8 +194,10 @@ function renderInitials(options: RenderProfileOptions): HTMLElement {
   return card;
 }
 
-type TabId = 'progress' | 'returned' | 'organiser';
-function tabs(unseen: number, start: TabId, panels: { progress: HTMLElement; returned?: HTMLElement; organiser?: HTMLElement }, onReturned: () => void): HTMLElement {
+type TabId = 'progress' | 'returned' | 'organiser' | 'over-time';
+type Panels = { progress: HTMLElement; returned?: HTMLElement; organiser?: HTMLElement; 'over-time'?: HTMLElement };
+/** `onSelect` runs on every pick after the first, so a teacher's URL can follow the tab. */
+function tabs(unseen: number, start: TabId, panels: Panels, onReturned: () => void, extra: { onOverTime?: () => void; onSelect?: (id: TabId) => void } = {}): HTMLElement {
   const bar = el('div', 'pg-tabs');
   bar.setAttribute('role', 'tablist');
   const make = (id: TabId, label: string, badge = 0): HTMLButtonElement => {
@@ -203,11 +207,14 @@ function tabs(unseen: number, start: TabId, panels: { progress: HTMLElement; ret
     tab.dataset.tab = id;
     tab.append(label);
     if (badge > 0) tab.append(el('span', 'pg-tab__badge', String(badge)));
+    if (id === 'over-time') tab.append(el('span', 'pg-tab__lock', 'Only you'));
     return tab;
   };
   const all: Array<[TabId, HTMLButtonElement]> = [['progress', make('progress', 'My progress')]];
   if (panels.returned) all.push(['returned', make('returned', 'Returned work', unseen)]);
   if (panels.organiser) all.push(['organiser', make('organiser', 'Organiser')]);
+  if (panels['over-time']) all.push(['over-time', make('over-time', 'Over time')]);
+  let first = true;
   const select = (id: TabId): void => {
     for (const [tid, t] of all) {
       const on = tid === id;
@@ -217,6 +224,14 @@ function tabs(unseen: number, start: TabId, panels: { progress: HTMLElement; ret
       if (panel) panel.hidden = !on;
     }
     if (id === 'returned') onReturned();
+    if (id === 'over-time') {
+      extra.onOverTime?.();
+      // On a phone the fourth tab sits past the edge: bring it into the bar's view.
+      const tab = all.find(([tid]) => tid === id)?.[1];
+      if (tab && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => (bar.scrollLeft = Math.max(0, tab.offsetLeft - 16)));
+    }
+    if (!first) extra.onSelect?.(id);
+    first = false;
   };
   for (const [tid, t] of all) {
     t.addEventListener('click', () => select(tid));
@@ -287,7 +302,8 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
   const organiserPanel = organiser ? organizerPanelFor(organiser, options) : null;
   const wantOrganiser = options.tab === 'organiser' && !!organiserPanel;
-  if (!hasReturned && !organiserPanel) {
+  const over = overTimeTab(options);
+  if (!hasReturned && !organiserPanel && !over) {
     // The teacher knows nothing is returned yet; only the student needs telling.
     if (!options.teacher) root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'));
     root.append(map);
@@ -296,6 +312,12 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   const progress = el('div', 'pg-panel');
   progress.setAttribute('role', 'tabpanel');
   if (!hasReturned) {
+    if (over) {
+      // Only a teacher gets here with nothing returned: the overview is the map, then Over time.
+      progress.append(map);
+      root.append(tabs(0, over.start ?? 'progress', { progress, 'over-time': over.panel }, () => undefined, over.hooks), progress, over.panel);
+      return root;
+    }
     progress.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'), map);
     root.append(tabs(0, wantOrganiser ? 'organiser' : 'progress', { progress, organiser: organiserPanel! }, () => undefined), progress, organiserPanel!);
     return root;
@@ -315,16 +337,53 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   const load = returnedPanel(returned, options);
   root.append(
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
-    tabs(payload.unseen ?? 0, wantOrganiser ? 'organiser' : payload.unseen && !options.teacher ? 'returned' : 'progress', { progress, returned, ...(organiserPanel ? { organiser: organiserPanel } : {}) }, () => {
-      if (loaded) return;
-      loaded = true;
-      load();
-    }),
+    tabs(
+      payload.unseen ?? 0,
+      over?.start ?? (wantOrganiser ? 'organiser' : payload.unseen && !options.teacher ? 'returned' : 'progress'),
+      { progress, returned, ...(organiserPanel ? { organiser: organiserPanel } : {}), ...(over ? { 'over-time': over.panel } : {}) },
+      () => {
+        if (loaded) return;
+        loaded = true;
+        load();
+      },
+      over?.hooks
+    ),
     progress,
     returned,
-    ...(organiserPanel ? [organiserPanel] : [])
+    ...(organiserPanel ? [organiserPanel] : []),
+    ...(over ? [over.panel] : [])
   );
   return root;
+}
+
+/**
+ * The teacher-only Over time tab: built only with both `teacher` and `overTime`, mounted the
+ * first time it opens. Its tab follows the URL (`?tab=over-time`), and every pick after the first
+ * rewrites `tab` in place so a refresh keeps the teacher where they were.
+ */
+function overTimeTab(options: RenderProfileOptions): { panel: HTMLElement; start: TabId | null; hooks: { onOverTime: () => void; onSelect: (id: TabId) => void } } | null {
+  if (!options.teacher || !options.overTime) return null;
+  const build = options.overTime;
+  const panel = el('div', 'pg-panel pg-panel--over-time');
+  panel.setAttribute('role', 'tabpanel');
+  let mounted = false;
+  return {
+    panel,
+    start: options.tab === 'over-time' ? 'over-time' : null,
+    hooks: {
+      onOverTime: () => {
+        if (mounted) return;
+        mounted = true;
+        panel.replaceChildren(build());
+      },
+      onSelect: (id) => {
+        const url = new URL(window.location.href);
+        if (id === 'progress') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', id);
+        window.history.replaceState(window.history.state, '', url.toString());
+      }
+    }
+  };
 }
 
 export type MountStudentProfileViewOptions = { root: HTMLElement; classId: string; isStale?: () => boolean };

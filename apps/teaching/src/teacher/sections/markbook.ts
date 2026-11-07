@@ -8,7 +8,7 @@ import { el } from '@/quiz/dom';
 import type { AssessmentColumn, AssessmentMark, Column, Markbook } from '@/markbook/schema';
 import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
-import type { Evidence } from '@/evidence/types';
+import type { Evidence, TagKind } from '@/evidence/types';
 import { openFollowUpPlan } from '@/evidence/follow-up';
 import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
@@ -51,6 +51,8 @@ type Options = {
   narrow?: () => boolean;
   /** Test seam for today's date, YYYY-MM-DD. */
   today?: () => string;
+  /** The kind of tag Detail opens on (from a student's Over time tab). */
+  detailKind?: TagKind;
   /** The view the markbook opens on. Defaults to the syllabus Grid. */
   /** 'progress' is the old name for Marks & progress. */
   view?: Mode | 'progress';
@@ -169,6 +171,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     ...options.deepLens
   });
   const detailState = newDetailState();
+  if (options.detailKind) detailState.kind = options.detailKind;
   const classSkills = createClassSkills(cls.id);
   const historyState = newHistoryState();
   /** Names for tags and codes, for Next steps and Detail; loaded once, after the markbook. */
