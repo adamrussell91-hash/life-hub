@@ -1,16 +1,19 @@
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { defaultGetShelfStore, deleteBook, readShelf, saveBook, savePlacements } from './_shared/knowledge-shelf.mjs';
+import { defaultGetShelfStore, deleteBook, deleteWish, readShelf, saveBook, savePlacements, saveWish, startWish } from './_shared/knowledge-shelf.mjs';
 import { checkFactsJob, readFactsJob, startFactsJob } from './_shared/knowledge-shelf-facts.mjs';
 import { checkKindsJob, gradeOneKind, readKindsJob, startKindsJob } from './_shared/knowledge-shelf-kinds.mjs';
 
 export const config = { path: '/api/knowledge/shelf' };
 
-// GET  → { books, placements }
+// GET  → { books, placements, wishlist }
 // POST { op: "book", book }            upsert one book's facts
 // POST { op: "place", placements: [] } merge note placements (page, stance, kind, gaps, themes, lastOpened)
 // POST { op: "book-delete", label }     take a book's own record off the shelf
+// POST { op: "wish", wish }            add or edit a wish-list book (wish.was renames)
+// POST { op: "wish-delete", label }     take a book off the wish list
+// POST { op: "wish-start", label }      move a wish onto the shelf as reading now
 // POST { op: "facts-start", books: [] } Claude estimates facts for these titles (one Message Batch)
 // POST { op: "facts-check" }           check the batch; applies results once it has ended
 // POST { op: "kinds-start", ids?, regrade?, onlyKind? } Claude grades book-note kinds (one Message Batch)
@@ -44,6 +47,15 @@ export function createKnowledgeShelfHandler(deps = {}) {
       if (body.op === 'book-delete') {
         return withCors(okResponse(200, await deleteBook(store, body.label)), request, env);
       }
+      if (body.op === 'wish') {
+        return withCors(okResponse(200, { wish: await saveWish(store, body.wish, { now }) }), request, env);
+      }
+      if (body.op === 'wish-delete') {
+        return withCors(okResponse(200, await deleteWish(store, body.label)), request, env);
+      }
+      if (body.op === 'wish-start') {
+        return withCors(okResponse(200, { book: await startWish(store, body.label, { now }) }), request, env);
+      }
       if (body.op === 'place') {
         return withCors(okResponse(200, { placements: await savePlacements(store, body.placements, { now }) }), request, env);
       }
@@ -68,7 +80,7 @@ export function createKnowledgeShelfHandler(deps = {}) {
       if (body.op === 'kind') {
         return withCors(okResponse(200, { placement: await gradeOneKind(store, body.pageId, claude, { regrade: body.regrade === true }) }), request, env);
       }
-      return withCors(errorResponse(400, 'validation_error', 'op must be "book", "book-delete", "place", "facts-start", "facts-check", "kinds-start", "kinds-check" or "kind".', false), request, env);
+      return withCors(errorResponse(400, 'validation_error', 'op must be "book", "book-delete", "wish", "wish-delete", "wish-start", "place", "facts-start", "facts-check", "kinds-start", "kinds-check" or "kind".', false), request, env);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 502;
       const code = typeof error?.code === 'string' ? error.code : 'shelf_unavailable';

@@ -1,6 +1,7 @@
 import "./bookshelf.css";
 import type { PageManifestEntry } from "../domain/page";
-import { checkBookFacts, deleteBookRecord, getShelf, saveBookFacts, savePlacements, startBookFacts } from "./client";
+import { checkBookFacts, deleteBookRecord, deleteWish, getShelf, saveBookFacts, savePlacements, saveWish, startBookFacts, startWish } from "./client";
+import { addedLabel, buildWishlist, type WishModel } from "./wishlist";
 import { CARD_HEIGHT, COVER_SET_GAP, coverWidth, layoutDescent, orderedLinks, packCovers, packShelf, type CoverBox } from "./layout";
 import { openCover, snapshotBooks, turnBooks } from "./turn";
 import { buildShelf, findBook, matchShelf, type BookModel, type BookNote } from "./model";
@@ -47,12 +48,12 @@ function readFace(): Face {
   }
 }
 
-type Room = "shelf" | "islands" | "wireless";
+type Room = "shelf" | "islands" | "wireless" | "wishlist";
 
 function readRoom(): Room {
   try {
     const stored = localStorage.getItem(ROOM_KEY);
-    return stored === "wireless" || stored === "islands" ? stored : "shelf";
+    return stored === "wireless" || stored === "islands" || stored === "wishlist" ? stored : "shelf";
   } catch {
     return "shelf";
   }
@@ -429,10 +430,10 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   }
 
   function roomPillsHtml() {
-    if (!books.length) return "";
+    if (!books.length && !data.wishlist?.length) return "";
     const pill = (value: Room, label: string) =>
       `<button class="hub-pills__btn${room === value ? " is-active" : ""}" type="button" data-room="${value}" aria-pressed="${room === value}">${label}</button>`;
-    return `<div class="hub-pills shelf-rooms" role="group" aria-label="View">${pill("shelf", "Shelf")}${pill("islands", "Islands")}${pill("wireless", "Wireless")}</div>`;
+    return `<div class="hub-pills shelf-rooms" role="group" aria-label="View">${pill("shelf", "Shelf")}${pill("islands", "Islands")}${pill("wireless", "Wireless")}${pill("wishlist", "Wish list")}</div>`;
   }
 
   function bindRooms() {
@@ -462,6 +463,181 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     bindRooms();
     wireless.setBooks(books);
     wireless.mount(host.querySelector<HTMLElement>("[data-wireless]")!);
+  }
+
+  // ── Wish list ──────────────────────────────────────────────────────
+
+  function wishes(): WishModel[] {
+    return buildWishlist(data.wishlist, books.map(book => book.key));
+  }
+
+  function paintWishlist() {
+    const list = wishes();
+    const count = list.length;
+    const supporting = !loaded
+      ? "Taking the books down…"
+      : count
+        ? `${count} ${count === 1 ? "book" : "books"} you want to read. Start one and it moves onto the shelf as reading now.`
+        : "Books you want to read, kept off the shelf until you start them.";
+    host.innerHTML = `<div class="shelf-root">
+      ${ctx.header(esc(supporting))}
+      <div class="shelf-tools">
+        ${roomPillsHtml()}
+        <span class="shelf-tools__break" aria-hidden="true"></span>
+        ${loaded && !loadError ? `<button class="btn btn--primary" type="button" data-add-wish>Add to wish list</button>` : ""}
+      </div>
+      ${loadError ? `<p class="shelf-sheet__error" role="alert">${esc(loadError)}</p>` : ""}
+      ${loaded && !count && !loadError ? `<div class="shelf-empty"><p class="shelf-eyebrow">Nothing on the wish list yet</p>
+        <p>Add a book someone recommended, one a podcast mentioned, or one you saw in a shop. Note why you want it, so you remember when you come back.</p></div>` : ""}
+      ${count ? `<ul class="wish-list">${list.map(wishCardHtml).join("")}</ul>` : ""}
+    </div>`;
+    bindRooms();
+    host.querySelector<HTMLButtonElement>("[data-add-wish]")?.addEventListener("click", () => openWishSheet());
+    host.querySelectorAll<HTMLButtonElement>("[data-wish-edit]").forEach(button => {
+      button.onclick = () => openWishSheet(list.find(wish => wish.key === button.dataset.wishEdit));
+    });
+    host.querySelectorAll<HTMLButtonElement>("[data-wish-start]").forEach(button => {
+      button.onclick = () => void beginWish(button, list.find(wish => wish.key === button.dataset.wishStart)!);
+    });
+    host.querySelectorAll<HTMLButtonElement>("[data-wish-open]").forEach(button => {
+      button.onclick = () => go(button.dataset.wishOpen);
+    });
+  }
+
+  function wishCardHtml(wish: WishModel) {
+    const cover = wish.cover
+      ? `<img class="wish-card__cover" src="${esc(wish.cover)}" alt="" loading="lazy" decoding="async" style="--c:${wish.swatch.fill}" />`
+      : `<span class="wish-card__cover wish-card__cover--made" style="--c:${wish.swatch.fill};--c-ink:${wish.swatch.ink}" aria-hidden="true">${esc(Array.from(wish.label.replace(/^(the|a|an)\s+/i, "").trim())[0]?.toUpperCase() ?? "")}</span>`;
+    const meta = [wish.from ? `From ${esc(wish.from)}` : "", esc(addedLabel(wish.added_at))].filter(Boolean).join(" · ");
+    const main = wish.onShelf
+      ? `<button class="btn btn--secondary" type="button" data-wish-open="${esc(wish.key)}">Open on shelf</button>`
+      : `<button class="btn btn--secondary" type="button" data-wish-start="${esc(wish.key)}">Start reading</button>`;
+    return `<li class="wish-card">
+      ${cover}
+      <div class="wish-card__body">
+        <h3 class="wish-card__title">${esc(wish.label)}</h3>
+        ${wish.author ? `<p class="wish-card__author">${esc(wish.author)}</p>` : ""}
+        ${wish.why ? `<p class="wish-card__why">${esc(wish.why)}</p>` : ""}
+        ${meta ? `<p class="wish-card__meta">${meta}</p>` : ""}
+        ${wish.onShelf ? `<p class="wish-card__meta">Already on your shelf.</p>` : ""}
+        <div class="wish-card__actions">
+          ${main}
+          <button class="btn btn--ghost" type="button" data-wish-edit="${esc(wish.key)}" aria-label="Edit ${esc(wish.label)}">Edit</button>
+        </div>
+      </div>
+    </li>`;
+  }
+
+  async function beginWish(button: HTMLButtonElement, wish: WishModel) {
+    button.disabled = true;
+    try {
+      const book = await startWish(wish.label);
+      data = {
+        ...data,
+        books: [...data.books.filter(item => item.label.toLowerCase() !== book.label.toLowerCase()), book],
+        wishlist: (data.wishlist ?? []).filter(item => item.label.toLowerCase() !== wish.key),
+      };
+      rebuild();
+      paint();
+      toast(`${wish.label} is on the shelf, under Reading now.`, 4000);
+    } catch (error) {
+      button.disabled = false;
+      toast(error instanceof Error ? error.message : "Could not start the book.");
+    }
+  }
+
+  /** Add a wish, or edit one (and remove it from there). */
+  function openWishSheet(wish?: WishModel) {
+    const field = (id: string, label: string, value = "", placeholder = "") =>
+      `<label>${label}<input type="text" id="${id}" autocomplete="off" value="${esc(value)}" placeholder="${esc(placeholder)}" class="wish-input" /></label>`;
+    const { sheet, close } = openSheet(`
+      <p class="shelf-eyebrow">Wish list</p>
+      <h2>${wish ? "Edit wish" : "Add to wish list"}</h2>
+      <div class="shelf-sheet__grid">
+        ${field("wish-title", "Title", wish?.label)}
+        ${field("wish-author", "Author (optional)", wish?.author)}
+      </div>
+      <label>Why you want to read it (optional)<textarea id="wish-why" class="wish-why" rows="3">${esc(wish?.why ?? "")}</textarea></label>
+      <div style="margin-top:var(--space-4)">${field("wish-from", "Where you heard of it (optional)", wish?.from, "A friend, a podcast, a footnote…")}</div>
+      <p class="shelf-sheet__error" data-error role="alert" hidden></p>
+      ${wish ? `<div class="shelf-remove" data-remove-panel hidden>
+        <p class="shelf-eyebrow">Remove from wish list</p>
+        <p>${esc(wish.label)} comes off the wish list. Nothing on the shelf changes.</p>
+        <div class="shelf-sheet__row shelf-sheet__row--end">
+          <button class="btn btn--ghost" type="button" data-remove-cancel>Keep it</button>
+          <button class="btn btn--high-sea" type="button" data-remove-confirm>Remove</button>
+        </div>
+      </div>` : ""}
+      <div class="shelf-sheet__row">
+        ${wish ? `<button class="btn btn--ghost" type="button" data-remove-open>Remove from wish list</button>` : ""}
+        <span style="flex:1"></span>
+        <button class="btn btn--ghost" type="button" data-cancel>Cancel</button>
+        <button class="btn btn--primary" type="button" data-save>${wish ? "Save" : "Add"}</button>
+      </div>`, wish ? `Edit ${wish.label}` : "Add to wish list");
+    const error = sheet.querySelector<HTMLElement>("[data-error]")!;
+    const fail = (message: string) => {
+      error.textContent = message;
+      error.hidden = false;
+    };
+    const value = (id: string) => sheet.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!.value.replace(/\s+/g, " ").trim();
+    sheet.querySelector<HTMLButtonElement>("[data-cancel]")!.onclick = close;
+    const save = async (button: HTMLButtonElement) => {
+      const label = value("wish-title");
+      if (!label) return fail("Give the book a title.");
+      const key = label.toLowerCase();
+      const clash = (data.wishlist ?? []).find(item => item.label.replace(/\s+/g, " ").trim().toLowerCase() === key);
+      if (clash && key !== wish?.key) return fail(`“${clash.label}” is already on the wish list.`);
+      if (!wish && books.some(book => book.key === key)) return fail(`“${label}” is already on your shelf.`);
+      button.disabled = true;
+      try {
+        const saved = await saveWish({
+          label,
+          author: value("wish-author") || null,
+          why: value("wish-why") || null,
+          from: value("wish-from") || null,
+          ...(wish && wish.label !== label ? { was: wish.label } : {}),
+        });
+        const drop = new Set([key, wish?.key].filter(Boolean));
+        data = { ...data, wishlist: [...(data.wishlist ?? []).filter(item => !drop.has(item.label.replace(/\s+/g, " ").trim().toLowerCase())), saved] };
+        close();
+        paint();
+        toast(wish ? "Saved." : `${saved.label} is on the wish list.`);
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "Could not save the wish.");
+        button.disabled = false;
+      }
+    };
+    sheet.querySelector<HTMLButtonElement>("[data-save]")!.onclick = event => void save(event.currentTarget as HTMLButtonElement);
+    sheet.querySelectorAll<HTMLInputElement>("input").forEach(input => {
+      input.onkeydown = event => {
+        if (event.key === "Enter") void save(sheet.querySelector<HTMLButtonElement>("[data-save]")!);
+      };
+    });
+    if (wish) {
+      const panel = sheet.querySelector<HTMLElement>("[data-remove-panel]")!;
+      sheet.querySelector<HTMLButtonElement>("[data-remove-open]")!.onclick = () => {
+        panel.hidden = false;
+        panel.scrollIntoView({ block: "nearest" });
+      };
+      sheet.querySelector<HTMLButtonElement>("[data-remove-cancel]")!.onclick = () => {
+        panel.hidden = true;
+      };
+      sheet.querySelector<HTMLButtonElement>("[data-remove-confirm]")!.onclick = async event => {
+        const button = event.currentTarget as HTMLButtonElement;
+        button.disabled = true;
+        try {
+          await deleteWish(wish.label);
+          data = { ...data, wishlist: (data.wishlist ?? []).filter(item => item.label.toLowerCase() !== wish.key) };
+          close();
+          paint();
+          toast(`${wish.label} is off the wish list.`);
+        } catch (err) {
+          fail(err instanceof Error ? err.message : "Could not remove the wish.");
+          button.disabled = false;
+        }
+      };
+    }
+    sheet.querySelector<HTMLInputElement>("#wish-title")!.focus();
   }
 
   /** The book you last opened from the islands, so coming back lands on it. */
@@ -501,6 +677,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
   function paintShelf() {
     archTeardown?.();
     archTeardown = null;
+    if (room === "wishlist") return paintWishlist();
     if (room === "wireless" && books.length) return paintWireless();
     if (room === "islands" && books.length) return paintIslands();
     const searching = query.trim().length > 0;

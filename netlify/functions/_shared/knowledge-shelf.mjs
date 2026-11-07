@@ -6,6 +6,8 @@
 export const KNOWLEDGE_SHELF_STORE = 'knowledge-shelf';
 export const BOOKS_KEY = 'books';
 export const PLACEMENTS_KEY = 'placements';
+export const WISHLIST_KEY = 'wishlist';
+export const MAX_WISHES = 500;
 
 export const SHELF_STANCES = ['supports', 'complicates', 'extends'];
 /** Mirror of ShelfKindSchema in apps/knowledge/src/shelf/schema.ts — keep in sync (V4). */
@@ -151,8 +153,8 @@ export function cleanPlacement(raw) {
 }
 
 export async function readShelf(store) {
-  const [books, placements] = await Promise.all([getJSON(store, BOOKS_KEY), getJSON(store, PLACEMENTS_KEY)]);
-  return { books: Object.values(books), placements: Object.values(placements) };
+  const [books, placements, wishlist] = await Promise.all([getJSON(store, BOOKS_KEY), getJSON(store, PLACEMENTS_KEY), getJSON(store, WISHLIST_KEY)]);
+  return { books: Object.values(books), placements: Object.values(placements), wishlist: Object.values(wishlist) };
 }
 
 export async function saveBook(store, raw, { now = new Date().toISOString() } = {}) {
@@ -203,4 +205,58 @@ export async function deleteBook(store, label) {
   delete books[key];
   await setJSON(store, BOOKS_KEY, books);
   return { label, removed: existed };
+}
+
+// ── Wish list ─────────────────────────────────────────────────────────
+// Books Adam wants to read. Kept apart from `books` so a wish never shows on the
+// shelf; "Start reading" moves it across (a book record with reading set).
+
+export function cleanWish(raw) {
+  if (!raw || typeof raw !== 'object') throw invalid('A wish must be an object.');
+  const label = text(raw.label, 200);
+  if (!label) throw invalid('A book title is required.');
+  return {
+    label,
+    author: text(raw.author, 200),
+    why: text(raw.why, 600),
+    from: text(raw.from, 200),
+  };
+}
+
+/** Adds or edits a wish. `was` names the old title when a wish is renamed. */
+export async function saveWish(store, raw, { now = new Date().toISOString() } = {}) {
+  const patch = cleanWish(raw);
+  const key = shelfBookKey(patch.label);
+  const wishes = await getJSON(store, WISHLIST_KEY);
+  const wasKey = raw.was ? shelfBookKey(text(raw.was, 200) ?? '') : key;
+  const current = wishes[wasKey] ?? wishes[key];
+  if (!current && Object.keys(wishes).length >= MAX_WISHES) throw invalid(`The wish list holds at most ${MAX_WISHES} books.`);
+  if (wasKey !== key && wishes[key]) throw invalid(`“${wishes[key].label}” is already on the wish list.`);
+  const next = merge({ ...(current ?? { added_at: now }) }, patch);
+  next.updated_at = now;
+  delete wishes[wasKey];
+  wishes[key] = next;
+  await setJSON(store, WISHLIST_KEY, wishes);
+  return next;
+}
+
+export async function deleteWish(store, label) {
+  const key = shelfBookKey(text(label, 200) ?? '');
+  const wishes = await getJSON(store, WISHLIST_KEY);
+  const existed = Boolean(wishes[key]);
+  delete wishes[key];
+  await setJSON(store, WISHLIST_KEY, wishes);
+  return { label, removed: existed };
+}
+
+/** Moves a wish onto the shelf as a book you're reading, then takes it off the wish list. */
+export async function startWish(store, label, { now = new Date().toISOString() } = {}) {
+  const key = shelfBookKey(text(label, 200) ?? '');
+  const wishes = await getJSON(store, WISHLIST_KEY);
+  const wish = wishes[key];
+  if (!wish) throw Object.assign(new Error('That book is not on the wish list.'), { status: 404, code: 'not_found' });
+  const book = await saveBook(store, { label: wish.label, ...(wish.author ? { author: wish.author } : {}), reading: true }, { now });
+  delete wishes[key];
+  await setJSON(store, WISHLIST_KEY, wishes);
+  return book;
 }

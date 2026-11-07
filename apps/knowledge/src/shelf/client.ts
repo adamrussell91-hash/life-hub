@@ -13,6 +13,8 @@ import {
   type PlacementInput,
   type ShelfBook,
   type ShelfData,
+  type Wish,
+  type WishInput,
 } from "./schema";
 
 const LOCAL_KEY = "knowledge-hub:shelf-preview-v1";
@@ -39,7 +41,7 @@ function readLocal(): ShelfData {
   try {
     return parseShelfData(JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}"));
   } catch {
-    return { books: [], placements: [] };
+    return { books: [], placements: [], wishlist: [] };
   }
 }
 
@@ -127,4 +129,41 @@ export async function checkBookKinds(): Promise<KindsJob> {
 export async function gradeKind(pageId: string, regrade = false): Promise<Placement> {
   if (USE_LOCAL_DATA) throw new Error("Grading kinds needs the live hub; local preview can't call Claude.");
   return (await post<{ placement: Placement }>({ op: "kind", pageId, ...(regrade ? { regrade } : {}) })).placement;
+}
+
+/** Adds or edits a wish-list book. */
+export async function saveWish(input: WishInput): Promise<Wish> {
+  if (!USE_LOCAL_DATA) return (await post<{ wish: Wish }>({ op: "wish", wish: input })).wish;
+  const data = readLocal();
+  const list = data.wishlist ?? [];
+  const key = bookKey(input.label);
+  const was = bookKey(input.was ?? input.label);
+  const current = list.find(wish => bookKey(wish.label) === was);
+  if (was !== key && list.some(wish => bookKey(wish.label) === key)) throw new Error(`“${input.label}” is already on the wish list.`);
+  const now = new Date().toISOString();
+  const { was: _was, ...fields } = input;
+  const next = strip({ added_at: now, ...current, ...fields, updated_at: now }) as Wish;
+  data.wishlist = [...list.filter(wish => bookKey(wish.label) !== was && bookKey(wish.label) !== key), next];
+  writeLocal(data);
+  return next;
+}
+
+export async function deleteWish(label: string): Promise<void> {
+  if (!USE_LOCAL_DATA) {
+    await post<unknown>({ op: "wish-delete", label });
+    return;
+  }
+  const data = readLocal();
+  data.wishlist = (data.wishlist ?? []).filter(wish => bookKey(wish.label) !== bookKey(label));
+  writeLocal(data);
+}
+
+/** Moves a wish onto the shelf as a book you're reading now. */
+export async function startWish(label: string): Promise<ShelfBook> {
+  if (!USE_LOCAL_DATA) return (await post<{ book: ShelfBook }>({ op: "wish-start", label })).book;
+  const wish = readLocal().wishlist?.find(item => bookKey(item.label) === bookKey(label));
+  if (!wish) throw new Error("That book is not on the wish list.");
+  const book = await saveBookFacts({ label: wish.label, ...(wish.author ? { author: wish.author } : {}), reading: true });
+  await deleteWish(label);
+  return book;
 }
