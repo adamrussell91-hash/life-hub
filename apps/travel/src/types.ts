@@ -12,7 +12,7 @@ export type Currency =
   | 'JPY'
   | 'NZD'
   | 'SGD';
-export type SceneId = 'kul' | 'ist' | 'sco' | 'lon' | 'rom' | 'sel' | 'generic';
+export type SceneId = 'kul' | 'ist' | 'sco' | 'lon' | 'rom' | 'sel' | 'sok' | 'gng' | 'gyj' | 'bus' | 'jej' | 'icn' | 'generic';
 export type Status = 'planned' | 'booked' | 'todo' | 'idea';
 export type HopMode = 'walk' | 'train' | 'tram' | 'bus' | 'taxi' | 'ferry';
 export type GuideIcon = 'phone' | 'transport' | 'money' | 'weather' | 'paperwork';

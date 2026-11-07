@@ -234,7 +234,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
 
     const scene = document.createElement('div');
     scene.className = 'scene';
-    scene.innerHTML = renderScene(city.scene, city.accent);
+    scene.innerHTML = renderScene(city.scene, city.accent, city.name);
     const titleDiv = document.createElement('div');
     titleDiv.className = 'title';
     const eyebrow = document.createElement('p');
