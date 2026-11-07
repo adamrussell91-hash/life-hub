@@ -144,7 +144,7 @@ export async function mountHubPlacesMap(container, payload, opts = {}) {
 
   const maplibregl = opts.loadMapLibre
     ? await opts.loadMapLibre()
-    : await defaultLoadMapLibre();
+    : await loadHubMapLibre();
   if (!maplibregl?.Map) return null;
 
   ensureMapCss();
@@ -243,7 +243,8 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;');
 }
 
-async function defaultLoadMapLibre() {
+export async function loadHubMapLibre() {
+  ensureMapCss();
   const mod = await import('https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.mjs');
   return mod.default || mod;
 }

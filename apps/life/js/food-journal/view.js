@@ -7,6 +7,7 @@ import {
 } from "../../../../packages/design-kit/js/hub-list.js";
 import { showHubToast } from "../../../../packages/design-kit/js/hub-feedback.js";
 import { withoutDeleted } from "../../../../packages/design-kit/js/record-liveness.js";
+import { paintWorldMap } from "./world-map.js";
 import { isAtlasDoor, openAtlas } from "./atlas-door.js";
 import {
   createViewOnMap,
@@ -1001,6 +1002,7 @@ export function createFoodJournalView({
     const tabs = [
       ["magazine", "Magazine"],
       ["timeline", "Timeline"],
+      ["map", "Map"],
       ["menu", "Custom Menu"],
       ["recipes", loaded ? `Recipes (${bookRecipes(journal).length})` : "Recipes"],
     ];
@@ -1092,6 +1094,10 @@ export function createFoodJournalView({
     }
     if (mode === "recipes") {
       paintRecipeBook(pageContext, host);
+      return;
+    }
+    if (mode === "map") {
+      paintWorldMap(pageContext, host);
       return;
     }
     if (mode === "timeline") {
