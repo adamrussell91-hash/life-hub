@@ -1,3 +1,5 @@
+import { wheel } from '@/scenes/parts';
+
 /** Scene SVG from travel-planner.html mockup. Note: CHOCO/CHOO CHOO font may later change to Archivo. */
 export function scene(): string {
   return `<svg class="art" viewBox="0 0 800 230" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
@@ -14,7 +16,17 @@ export function scene(): string {
     <path d="M0 40q100 30 200 0t200 0t200 0t200 0" fill="none" stroke="#e8eef6" stroke-width="1.2" opacity=".6"/>
     <g class="a-blink" fill="#ffd36e"><circle cx="50" cy="52" r="3"/><circle cx="150" cy="52" r="3"/><circle cx="250" cy="52" r="3"/><circle cx="350" cy="52" r="3"/><circle cx="450" cy="52" r="3"/><circle cx="550" cy="52" r="3"/><circle cx="650" cy="52" r="3"/><circle cx="750" cy="52" r="3"/></g>
     <!-- bus -->
-    <g class="a-drive" style="animation-duration:12s"><g transform="translate(0,150)"><rect x="0" y="0" width="120" height="52" rx="6" fill="#d7263d"/><rect x="0" y="24" width="120" height="3" fill="#a81c2f"/><g fill="#f6e7a8"><rect x="8" y="6" width="18" height="13" rx="2"/><rect x="32" y="6" width="18" height="13" rx="2"/><rect x="56" y="6" width="18" height="13" rx="2"/><rect x="80" y="6" width="18" height="13" rx="2"/><rect x="8" y="31" width="18" height="12" rx="2"/><rect x="32" y="31" width="18" height="12" rx="2"/><rect x="56" y="31" width="18" height="12" rx="2"/></g><rect x="100" y="30" width="16" height="20" fill="#1b2740"/><circle cx="24" cy="54" r="8" fill="#111"/><circle cx="96" cy="54" r="8" fill="#111"/></g></g>
+    <g class="a-drive" style="animation-duration:12s"><g transform="translate(0,146)">
+      <g class="a-ride">
+        <rect x="0" y="0" width="120" height="52" rx="7" fill="#d7263d"/><rect x="0" y="24" width="120" height="3" fill="#a81c2f"/><rect x="0" y="46" width="120" height="6" rx="2" fill="#a81c2f"/>
+        <g fill="#f6e7a8"><rect x="8" y="6" width="18" height="13" rx="2"/><rect x="32" y="6" width="18" height="13" rx="2"/><rect x="56" y="6" width="18" height="13" rx="2"/><rect x="80" y="6" width="18" height="13" rx="2"/><rect x="104" y="6" width="12" height="13" rx="2"/><rect x="8" y="31" width="18" height="12" rx="2"/><rect x="32" y="31" width="18" height="12" rx="2"/><rect x="56" y="31" width="18" height="12" rx="2"/></g>
+        <path d="M104 30h12q4 0 4 4v10h-16z" fill="#bfe0f2" opacity=".9"/>
+        <rect x="82" y="30" width="16" height="16" fill="#1b2740"/><rect x="89.5" y="30" width="1" height="16" fill="#d7263d"/>
+        <rect x="60" y="20" width="22" height="3.5" rx="1" fill="#f6e7a8" opacity=".9"/>
+        <circle cx="118" cy="48" r="2.5" fill="#fff6c2"/>
+      </g>
+      ${wheel(24, 56, 8)}${wheel(96, 56, 8)}
+    </g></g>
     <g class="a-fall" stroke="#c9d3e0" stroke-width="1.5" opacity=".5"><path d="M80 0v10M200 30v10M320 10v10M440 40v10M560 5v10M680 25v10M140 60v10M500 70v10M740 80v10"/></g>
   </svg>`;
 }
