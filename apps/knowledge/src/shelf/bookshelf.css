@@ -3493,6 +3493,26 @@ body.is-map-expanded {
   font-size: var(--text-xs);
 }
 
+.wish-card__free {
+  align-self: flex-start;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--sage, #dfe9df);
+  color: var(--sage-ink, #2f5a3a);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wish-card__where {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--sage-ink, #2f5a3a);
+  overflow-wrap: anywhere;
+}
+
+.wish-card__where a { color: inherit; }
+
 .wish-card__why {
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);

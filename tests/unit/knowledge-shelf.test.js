@@ -125,6 +125,9 @@ test('Wish list adds, renames and removes books apart from the shelf', async () 
   shelf = await readShelf(store);
   assert.deepEqual(shelf.wishlist.map(w => w.label), ['The Overstory: A Novel']);
   await saveWish(store, { label: 'Middlemarch' }, { now: NOW });
+  const free = await saveWish(store, { label: 'Middlemarch', free: '  Project Gutenberg  https://www.gutenberg.org/ebooks/145 ' }, { now: NOW });
+  assert.equal(free.free, 'Project Gutenberg https://www.gutenberg.org/ebooks/145');
+  assert.equal((await saveWish(store, { label: 'Middlemarch', free: null }, { now: NOW })).free, undefined);
   await assert.rejects(() => saveWish(store, { was: 'Middlemarch', label: 'the overstory: a novel' }), /already on the wish list/);
   await assert.rejects(() => saveWish(store, { label: '  ' }), /title is required/);
   assert.equal((await deleteWish(store, 'MIDDLEMARCH')).removed, true);

@@ -471,9 +471,20 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     return buildWishlist(data.wishlist, books.map(book => book.key));
   }
 
+  /** Wish list shows only the books that are free to read online. */
+  let wishFreeOnly = false;
+
   function paintWishlist() {
-    const list = wishes();
-    const count = list.length;
+    const all = wishes();
+    const freeCount = all.filter(wish => wish.free).length;
+    if (!freeCount) wishFreeOnly = false;
+    const list = wishFreeOnly ? all.filter(wish => wish.free) : all;
+    const count = all.length;
+    const freePill = (on: boolean, label: string) =>
+      `<button class="hub-pills__btn${wishFreeOnly === on ? " is-active" : ""}" type="button" data-wish-free="${on}" aria-pressed="${wishFreeOnly === on}">${label}</button>`;
+    const filter = freeCount
+      ? `<div class="hub-pills wish-filter" role="group" aria-label="Which books">${freePill(false, "All")}${freePill(true, `Free to read (${freeCount})`)}</div>`
+      : "";
     const supporting = !loaded
       ? "Taking the books down…"
       : count
@@ -483,6 +494,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       ${ctx.header(esc(supporting))}
       <div class="shelf-tools">
         ${roomPillsHtml()}
+        ${filter}
         <span class="shelf-tools__break" aria-hidden="true"></span>
         ${loaded && !loadError ? `<button class="btn btn--primary" type="button" data-add-wish>Add to wish list</button>` : ""}
       </div>
@@ -492,6 +504,12 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       ${count ? `<ul class="wish-list">${list.map(wishCardHtml).join("")}</ul>` : ""}
     </div>`;
     bindRooms();
+    host.querySelectorAll<HTMLButtonElement>("[data-wish-free]").forEach(button => {
+      button.onclick = () => {
+        wishFreeOnly = button.dataset.wishFree === "true";
+        paintWishlist();
+      };
+    });
     host.querySelector<HTMLButtonElement>("[data-add-wish]")?.addEventListener("click", () => openWishSheet());
     host.querySelectorAll<HTMLButtonElement>("[data-wish-edit]").forEach(button => {
       button.onclick = () => openWishSheet(list.find(wish => wish.key === button.dataset.wishEdit));
@@ -515,9 +533,11 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
     return `<li class="wish-card">
       ${cover}
       <div class="wish-card__body">
+        ${wish.free ? `<span class="wish-card__free">Free to read</span>` : ""}
         <h3 class="wish-card__title">${esc(wish.label)}</h3>
         ${wish.author ? `<p class="wish-card__author">${esc(wish.author)}</p>` : ""}
         ${wish.why ? `<p class="wish-card__why">${esc(wish.why)}</p>` : ""}
+        ${wish.free ? `<p class="wish-card__where">Read it free at ${linkify(wish.free)}</p>` : ""}
         ${meta ? `<p class="wish-card__meta">${meta}</p>` : ""}
         ${wish.onShelf ? `<p class="wish-card__meta">Already on your shelf.</p>` : ""}
         <div class="wish-card__actions">
@@ -526,6 +546,13 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
         </div>
       </div>
     </li>`;
+  }
+
+  /** Escapes text and turns any web address in it into a link. */
+  function linkify(text: string) {
+    return text.split(/(https?:\/\/[^\s]+)/).map((part, i) => i % 2
+      ? `<a href="${esc(part)}" target="_blank" rel="noopener noreferrer">${esc(part.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>`
+      : esc(part)).join("");
   }
 
   async function beginWish(button: HTMLButtonElement, wish: WishModel) {
@@ -559,6 +586,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
       </div>
       <label>Why you want to read it (optional)<textarea id="wish-why" class="wish-why" rows="3">${esc(wish?.why ?? "")}</textarea></label>
       <div style="margin-top:var(--space-4)">${field("wish-from", "Where you heard of it (optional)", wish?.from, "A friend, a podcast, a footnote…")}</div>
+      <div style="margin-top:var(--space-4)">${field("wish-free", "Free to read online at (optional)", wish?.free, "Project Gutenberg https://…")}</div>
       <p class="shelf-sheet__error" data-error role="alert" hidden></p>
       ${wish ? `<div class="shelf-remove" data-remove-panel hidden>
         <p class="shelf-eyebrow">Remove from wish list</p>
@@ -595,6 +623,7 @@ export function mountBookshelf(host: HTMLElement, ctx: BookshelfContext): () => 
           author: value("wish-author") || null,
           why: value("wish-why") || null,
           from: value("wish-from") || null,
+          free: value("wish-free") || null,
           ...(wish && wish.label !== label ? { was: wish.label } : {}),
         });
         const drop = new Set([key, wish?.key].filter(Boolean));

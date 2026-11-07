@@ -220,6 +220,7 @@ export function cleanWish(raw) {
     author: text(raw.author, 200),
     why: text(raw.why, 600),
     from: text(raw.from, 200),
+    free: text(raw.free, 300),
   };
 }
 
