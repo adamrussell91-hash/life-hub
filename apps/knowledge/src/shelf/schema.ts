@@ -53,6 +53,8 @@ export const WishSchema = z.object({
   author: z.string().optional(),
   why: z.string().optional(),
   from: z.string().optional(),
+  /** Where to read it free online, when it is (open access, public domain). */
+  free: z.string().optional(),
   added_at: z.string().optional(),
   updated_at: z.string().optional(),
 });
@@ -63,6 +65,7 @@ export type WishInput = {
   author?: string | null;
   why?: string | null;
   from?: string | null;
+  free?: string | null;
   /** The old title, when an edit renames the wish. */
   was?: string;
 };
