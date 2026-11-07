@@ -11,6 +11,7 @@ import type { ReturnedItem } from '@/progress/types';
 import type { PiecePayload } from '@/student/returned-view';
 import { renderProfile, type ProfilePayload } from '@/student/profile-view';
 import { openAddWriting } from '@/marking/add-writing';
+import { mountOverTime } from './over-time-view';
 
 export function mountTeacherStudentProfile(canvas: HTMLElement, classId: string, studentId: string): { dispose: () => void } {
   let disposed = false;
@@ -46,12 +47,16 @@ export function mountTeacherStudentProfile(canvas: HTMLElement, classId: string,
     (payload) => {
       if (disposed) return;
       setPageName(payload.name);
+      const loadReturned = (): Promise<ReturnedItem[]> => call<{ items: ReturnedItem[] }>('returned').then((r) => r.items);
       body.replaceChildren(
         renderProfile(payload, {
           classId,
           teacher: { name: payload.name },
-          loadReturned: () => call<{ items: ReturnedItem[] }>('returned').then((r) => r.items),
-          loadPiece: (id) => call<PiecePayload>('piece', { item: id })
+          tab: new URLSearchParams(window.location.search).get('tab') ?? undefined,
+          loadReturned,
+          loadPiece: (id) => call<PiecePayload>('piece', { item: id }),
+          // Teacher only, built the first time the tab opens; reuses the codes and pieces already loaded.
+          overTime: () => mountOverTime({ classId, studentId, name: payload.name, codes: payload.codes, pieces: payload.pieces, loadReturned })
         })
       );
     },

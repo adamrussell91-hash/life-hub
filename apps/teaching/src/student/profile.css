@@ -60,6 +60,28 @@
   background: var(--wave);
 }
 
+/* Teacher only: the Over time tab's lock. Four tabs scroll sideways inside the bar on a phone. */
+.pg-tabs:has(.pg-tab__lock) {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pg-tabs:has(.pg-tab__lock) .pg-tab {
+  white-space: nowrap;
+}
+
+.pg-tab__lock {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--navy);
+  color: #fff;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-bold);
+  vertical-align: 1px;
+}
+
 .pg-tab__badge {
   display: inline-block;
   min-width: 18px;

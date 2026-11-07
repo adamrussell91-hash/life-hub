@@ -143,7 +143,10 @@ import { createContinuumHandler } from '../../../netlify/functions/continuum-lin
 import { createPublishedContinuumHandler } from '../../../netlify/functions/published-continuum-line.mjs';
 import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedback.mjs';
 import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
-import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
+import { prepareQuizPublish, storeQuizKey, quizAction } from '../../../netlify/functions/_shared/quiz.mjs';
+import { claimInitials, loadRoster } from '../../../netlify/functions/_shared/class-claims.mjs';
+import { workOwner } from '../../../netlify/functions/_shared/lesson-work.mjs';
+import { addDays, sydneyDay as organiserDay } from '../../../netlify/functions/_shared/organiser-model.mjs';
 import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
 import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/_shared/case-study.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
@@ -909,6 +912,199 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   seedStudentProgress();
+
+  /**
+   * Over time walk, dev only: nine weekly quizzes for 12ENGADV2 across Term 3 and Term 4 (holiday gap
+   * between), tagged with outcomes, a skill, knowledge pieces and techniques, run through the real
+   * quiz Functions so the Markbook reads them like any hand-in. Ava rises on anaphora, slips on
+   * metaphor and stays stuck on one knowledge piece; the rest of the class gives the class line.
+   * Ava also gets two returned next steps, a redraft, organiser reviews and two private notes.
+   * Walk: teacher `/classes/class_2026_12engadv2/students/st_ava?tab=over-time`. All invented.
+   */
+  async function seedOverTime(): Promise<void> {
+    if (process.env.VITEST) return;
+    const classId = 'class_2026_12engadv2';
+    const unit = options.seed.units[0] as { id: string } | undefined;
+    if (!unit || !store.getJSON(classKey(classId))) return;
+    const fbs = functionBlobStore();
+    const stamp = '2026-08-10T09:00:00.000Z';
+
+    // One deep understanding on the unit, so kp tags have names (only when the unit has none yet).
+    const pieces = [
+      { id: 'kp_otlight', text: 'The lighthouse stands for duty that outlasts the keeper.', tier: 'essential' },
+      { id: 'kp_otstorm', text: 'Storms mark each turn in the keeper’s choices.', tier: 'essential' },
+      { id: 'kp_otvoice', text: 'The narrator’s distance makes the ending feel inevitable.', tier: 'strong' },
+      { id: 'kp_otlog', text: 'The logbook entries show time passing without change.', tier: 'strong' }
+    ];
+    const storedUnit = store.getJSON<Record<string, unknown>>(unitKey(unit.id));
+    if (storedUnit && !(storedUnit.deep_understandings as unknown[] | undefined)?.length) {
+      store.setJSON(unitKey(unit.id), {
+        ...storedUnit,
+        deep_understandings: [{ id: 'du_otduty', claim: 'Duty can keep a person going after its purpose is gone.', why: '', dot_points: [], concept_bullets: [], pieces, shared_piece_ids: [], steps: [] }]
+      });
+    }
+
+    const shared = { type: 'block', variant: 'medium', visibility: 'student_teacher', layout: {}, print: {}, settings: {}, created_at: stamp, updated_at: stamp, schema_version: 1 };
+    const mc = (id: string, prompt: string, right: string, wrong: string, tags: Record<string, string[]>) => ({
+      ...shared, id: `block_${id}`, block_type: 'quiz_question',
+      content: { question: { id, kind: 'multiple_choice', prompt, marks: 1, options: [{ id: 'a', text: right }, { id: 'b', text: wrong }], correct: ['a'], ...tags } }
+    });
+    const qt = (id: string, quote: string, right: [string, string], wrong: [string, string]) => ({
+      ...shared, id: `block_${id}`, block_type: 'quiz_question',
+      content: { question: { id, kind: 'quote_technique', prompt: 'Which technique is this?', quote, marks: 1, outcomes: ['EA12-1'], options: [{ id: 'a', text: right[0], technique_id: right[1] }, { id: 'b', text: wrong[0], technique_id: wrong[1] }], correct: ['a'] } }
+    });
+    // Monday-week quiz days: six in Term 3, then three in Term 4 after the holidays.
+    const days = ['2026-08-18', '2026-08-25', '2026-09-01', '2026-09-08', '2026-09-15', '2026-09-22', '2026-10-14', '2026-10-21', '2026-10-28'];
+    const people = ['st_ava', 'st_noah', 'st_ella', 'st_jack', 'st_mia', 'st_liam', 'st_zoe', 'st_sam'];
+    // Ava's answers per quiz (1 right, 0 wrong) for each question slot.
+    const ava: Record<string, number[]> = {
+      thesis: [0, 1, 0, 1, 1, 1, 1, 1, 1],
+      evidence: [1, 1, 1, 0, 1, 1, 0, 1, 1],
+      storm: [0, 0, 0, 0, 1, 0, 0, 0, 0],
+      anaphora: [0, 0, 0, 1, 0, 1, 1, 1, 1],
+      metaphor: [1, 1, 1, 1, 1, 0, 0, 0, 0],
+      voice: [0, 1, 1, 0, 1, 1, 1, 0, 1]
+    };
+    const slots = ['thesis', 'evidence', 'storm', 'anaphora', 'metaphor', 'voice'] as const;
+    // Everyone else: a fixed pattern, right about two times in three.
+    const others = (sid: string, quiz: number, slot: number) => ((sid.length * 7 + quiz * 5 + slot * 3) % 10) < 7;
+
+    const roster = await loadRoster(fbs, classId);
+    if (!roster) return;
+    // Seed-only claims so the real quiz Functions take the hand-ins; they are removed again below,
+    // so a walker can still claim AN on their own device.
+    const claimPrefix = `class-claims/${classId}/`;
+    const heldBefore = new Set(store.listKeys(claimPrefix));
+    const tokens = new Map<string, string>();
+    for (const [i, student] of (roster.students as Array<{ id: string; initials: string }>).entries()) {
+      const token = `e${(i + 1).toString(16).repeat(48)}`.slice(0, 48);
+      try {
+        await claimInitials(fbs, roster, token, student.initials);
+        tokens.set(student.id, token);
+      } catch {
+        // Initials someone already holds: that student just sits these quizzes out.
+      }
+    }
+
+    for (const [n, day] of days.entries()) {
+      const lessonId = `lesson_ot_quiz${n + 1}`;
+      if (store.getJSON(draftLessonKey(lessonId))) continue;
+      const blocks = [
+        { ...shared, id: `block_ot${n}_h`, block_type: 'heading', variant: 'page', content: { text: `Weekly check ${n + 1}` } },
+        mc(`ot${n}thesis`, 'Which sentence states a position on the keeper’s choice?', 'The keeper stays because duty is all he has left.', 'The keeper lives in a lighthouse.', { outcomes: ['EA12-1'], skills: ['arguing.thesis'] }),
+        mc(`ot${n}evidence`, 'Which quotation best supports “the keeper is isolated”?', '“No boat has come since spring.”', '“The lamp is lit at dusk.”', { outcomes: ['EA12-2'], pieces: ['kp_otlight'] }),
+        mc(`ot${n}storm`, 'What does each storm in the novel mark?', 'A turn in the keeper’s choices.', 'A change of season only.', { pieces: ['kp_otstorm'] }),
+        qt(`ot${n}anaphora`, '“We watch the sea, we watch the sky, we watch the dark.”', ['Anaphora', 'anaphora'], ['Epistrophe', 'epistrophe']),
+        qt(`ot${n}metaphor`, '“The lamp is the keeper’s heartbeat.”', ['Metaphor', 'metaphor'], ['Simile', 'simile']),
+        mc(`ot${n}voice`, 'Why does the ending feel inevitable?', 'The narrator keeps a calm distance from the keeper.', 'The ending is a surprise twist.', { skills: ['arguing.thesis'], pieces: ['kp_otvoice'] })
+      ];
+      const lesson = {
+        id: lessonId, type: 'lesson', title: `Weekly check ${n + 1}`, slug: `weekly_check_${n + 1}`, unit_id: unit.id, sequence: 900 + n,
+        pedagogical_mode: 'quiz', quiz: {}, blocks, status: 'active', created_at: stamp, updated_at: stamp, schema_version: 1, tags: [], syllabus_outcomes: [], outcome_ids: []
+      };
+      const prepared = prepareQuizPublish(lesson, blocks);
+      if (prepared.problems.length || !prepared.quiz) {
+        console.warn('Over time seed: quiz not ready', lessonId, prepared.problems);
+        continue;
+      }
+      store.setJSON(draftLessonKey(lessonId), { ...lesson, published_at: stamp });
+      store.setJSON(publishedLessonKey(lessonId), { ...toPublishedLesson(lesson as unknown as Lesson, stamp), blocks: prepared.blocks, pedagogical_mode: 'quiz', quiz: prepared.quiz.snapshot });
+      await storeQuizKey(fbs, lessonId, prepared.quiz);
+      store.setJSON(scheduledLessonKey(`sched_ot_quiz${n + 1}`), {
+        id: `sched_ot_quiz${n + 1}`, type: 'scheduled_lesson', class_id: classId, lesson_id: lessonId, unit_id: unit.id,
+        date: day, schedule_order: 2, delivery_status: 'planned', created_at: stamp, updated_at: stamp, schema_version: 1
+      });
+      seedIds.scheduled_lessons.push(`sched_ot_quiz${n + 1}`);
+      // Questions are keyed by block id; option ids are rewritten on publish, so read them from the key.
+      const record = prepared.quiz.record as unknown as { questions: Record<string, { question: { options?: Array<{ id: string }> }; key: { answer?: { ids?: string[] } } }> };
+      const optionId = (qid: string, right: boolean) => {
+        const entry = record.questions[qid];
+        const ids = entry?.key.answer?.ids ?? [];
+        return (right ? ids[0] : entry?.question.options?.find((o) => !ids.includes(o.id))?.id) ?? '';
+      };
+      for (const sid of people) {
+        const token = tokens.get(sid);
+        if (!token) continue;
+        const me = { class_id: classId, class_token: token };
+        const responses = Object.fromEntries(slots.map((slot, i) => {
+          const qid = `block_ot${n}${slot}`;
+          const right = sid === 'st_ava' ? ava[slot]![n] === 1 : others(sid, n, i);
+          return [qid, { selected: [optionId(qid, right)] }];
+        }));
+        try {
+          await quizAction(fbs, lessonId, { ...me, action: 'start' });
+          await quizAction(fbs, lessonId, { ...me, action: 'submit', responses });
+        } catch (error) {
+          console.warn('Over time seed: hand-in failed', lessonId, sid, error);
+        }
+      }
+      // Back-date each hand-in to its quiz day.
+      for (const key of store.listKeys(`quiz/${lessonId}/results/`)) {
+        const row = store.getJSON<Record<string, unknown>>(key);
+        if (row) store.setJSON(key, { ...row, submitted_at: `${day}T01:20:00.000Z` });
+      }
+      for (const key of store.listKeys(`quiz/${lessonId}/attempts/`)) {
+        const row = store.getJSON<Record<string, unknown>>(key);
+        if (row) store.setJSON(key, { ...row, started_at: `${day}T01:00:00.000Z` });
+      }
+      for (const key of store.listKeys(`quiz/${lessonId}/evidence/`)) store.delete(key);
+    }
+    for (const key of store.listKeys(claimPrefix)) if (!heldBefore.has(key)) store.delete(key);
+
+    // Two returned next steps on Ava's written pieces, and a redraft of the third piece.
+    const progressLesson = 'lesson_progress_para';
+    const pieceKeyOf = (block: string) => `piece_feedback/${classId}/st_ava/w:${progressLesson}:${block}`;
+    const withStep = (block: string, text: string) => {
+      const row = store.getJSON<Record<string, unknown>>(pieceKeyOf(block));
+      if (row && !row.rubric) store.setJSON(pieceKeyOf(block), { ...row, rubric: { skills: {}, pieces: {}, steps: {}, next_step: { text, code_id: 'comp_ts' } } });
+    };
+    withStep('block_p2', 'Open each paragraph with the claim you will prove.');
+    const third = store.getJSON<Record<string, unknown>>(pieceKeyOf('block_p3'));
+    if (third && !third.draft) {
+      const handin = store.getJSON<Record<string, unknown>>(`work_handins/${progressLesson}/block_p3/st_ava`);
+      store.setJSON(`work_drafts/${progressLesson}/block_p3/st_ava/1`, {
+        text: (handin?.text as Record<string, unknown>) ?? {}, tags: third.tags ?? [], comment: third.comment ?? '', scope: 'whole', steps: {},
+        rubric: { skills: {}, pieces: {}, steps: {}, next_step: { text: 'Say what the pause does to the reader.', code_id: 'comp_as' } },
+        handed_in_at: handin?.handed_in_at ?? '2026-09-29T00:30:00.000Z', returned_at: third.returned_at, seen_at: third.returned_at
+      });
+      if (handin) store.setJSON(`work_handins/${progressLesson}/block_p3/st_ava`, { ...handin, handed_in_at: '2026-10-02T00:30:00.000Z', draft: 2 });
+      store.setJSON(pieceKeyOf('block_p3'), { ...third, draft: 2, earlier_tags: third.tags ?? [], returned_at: '2026-10-03T06:00:00.000Z', updated_at: '2026-10-03T06:00:00.000Z' });
+    }
+    withStep('block_p4', 'Choose the shortest quotation that proves the point.');
+
+    // Organiser practice: Leitner boxes with a few weeks of history ending today, so the streak shows.
+    const today = organiserDay(new Date());
+    const owner = workOwner(classId, 'st_ava');
+    const practiceKey = `organiser_practice/${classId}/${owner}`;
+    if (!store.getJSON(practiceKey)) {
+      const lines = ['ol_otline01', 'ol_otline02', 'ol_otline03', 'ol_otline04', 'ol_otline05', 'ol_otline06'];
+      const boxes: Record<string, unknown> = {};
+      lines.forEach((id, i) => {
+        // Ava practises most days; a few misses early on, steadier lately.
+        const h = Array.from({ length: 30 }, (_, back) => back)
+          .filter((back) => back < 5 || (back + i) % 3 !== 0)
+          .map((back) => ({ d: addDays(today, -back * (1 + (i % 2))), ok: back < 7 ? (back + i) % 4 !== 0 : (back + i) % 2 === 0 }))
+          .filter((x, j, all) => all.findIndex((y) => y.d === x.d) === j)
+          .sort((a, b) => a.d.localeCompare(b.d))
+          .slice(-30);
+        boxes[id] = { box: 1 + (i % 5), due: addDays(today, 1 + i), last: h.at(-1)?.d ?? today, h };
+      });
+      store.setJSON(practiceKey, { boxes, at: new Date().toISOString() });
+    }
+
+    // Two private notes from the teacher.
+    const notesKey = `teacher-notes/${classId}/st_ava.json`;
+    if (!store.getJSON(notesKey)) {
+      store.setJSON(notesKey, {
+        notes: [
+          { id: 'tn_otnote1', at: '2026-09-16T05:00:00.000Z', text: 'Strong in discussion, but anaphora and epistrophe keep swapping on paper. Try the hand signal.', tag: 'tech:anaphora' },
+          { id: 'tn_otnote2', at: '2026-10-22T05:00:00.000Z', text: 'Asked good questions about the ending today. Check the storm piece again before the essay.' }
+        ]
+      });
+    }
+  }
+
+  const overTimeReady = seedOverTime().catch((error) => console.warn('Over time seed failed', error));
 
   function sign(payload: string): string {
     return createHmac('sha256', sessionSecret).update(payload).digest('base64url');
@@ -4139,6 +4335,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     cookie: string | null | undefined,
     body: unknown
   ): Promise<MockResponse> {
+    await overTimeReady;
     const qIndex = pathWithQuery.indexOf('?');
     const path = qIndex >= 0 ? pathWithQuery.slice(0, qIndex) : pathWithQuery;
     const search = qIndex >= 0 ? pathWithQuery.slice(qIndex + 1) : '';

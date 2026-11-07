@@ -1,3 +1,4 @@
+import { kindOf } from '@/evidence/tags';
 import { teacherPreviewUrl } from '@/teacher/public-link';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
@@ -372,8 +373,12 @@ export function renderClassPage(
   markbookHost.className = 'class-page__markbook-host';
   // The unit page's Monitoring tab links here with ?progress=du&unit=…, to open the second lens.
   const progressLink = new URLSearchParams(window.location.search);
-  if (progressLink.get('progress') === 'du') window.setTimeout(() => markbookHost.scrollIntoView?.({ block: 'start' }), 0);
+  // A student's Over time tab links here with ?mb=detail&kind=…, to open Detail on that kind of tag.
+  const markbookView = progressLink.get('mb') === 'detail' ? 'detail' : undefined;
+  const detailKind = kindOf(`${progressLink.get('kind') ?? ''}:x`) ?? undefined;
+  if (progressLink.get('progress') === 'du' || markbookView) window.setTimeout(() => markbookHost.scrollIntoView?.({ block: 'start' }), 0);
   disposers.push(mountMarkbook(markbookHost, pageClass, {
+    ...(markbookView ? { view: markbookView, detailKind } : {}),
     deepUnits: activeUnits,
     currentUnitId: currentActiveUnitId,
     scheduled: classScheduled,
