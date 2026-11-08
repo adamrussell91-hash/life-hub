@@ -10,6 +10,7 @@ import { notYetOnMany, priorities, priorityMove, priorityNotes, studentCalls, ty
 import type { Evidence } from '@/evidence/types';
 import { PRIORITY } from '@/evidence/constants';
 import { pct, sectionHead } from '@/evidence/views/parts';
+import { agreement, closeCalls, closeText, gainText, groupGain, trustLines, type CloseCall } from '@/evidence/trust';
 import type { SavedGroup } from './schema';
 import type { MarkbookView, RosterStudent } from './types';
 import { formatDay } from './calc';
@@ -247,9 +248,28 @@ function callList(key: 'support' | 'extend', title: string, empty: string, calls
 
 const COUNT_WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
 const BANDS_SHOWN = [['weak', 'Not yet'], ['developing', 'Developing'], ['secure', 'Secure']] as const;
+const BAND_NAME = { weak: 'Not yet', developing: 'Developing', secure: 'Secure' } as const;
+
+/** How much to trust these groups: marks agreeing, quizzes against marked work, close calls. */
+function trustPanel(evidence: Evidence[], titleOf: (source: string) => string, close: { count: number; placed: number }): HTMLElement {
+  const host = el('section', 'mb-trust');
+  host.setAttribute('aria-label', 'How much to trust these groups');
+  host.append(el('h3', 'mb-trust__title', 'How much to trust these groups'));
+  const list = el('dl', 'mb-trust__list');
+  for (const line of trustLines(evidence, titleOf, close)) {
+    const row = el('div', `mb-trust__row is-${line.tone}`);
+    row.dataset.trust = line.key;
+    const term = el('dt', 'mb-trust__term');
+    term.append(el('span', 'mb-trust__dot'), document.createTextNode(line.title));
+    row.append(term, el('dd', 'mb-trust__text', line.text));
+    list.append(row);
+  }
+  host.append(list);
+  return host;
+}
 
 /** The priorities, each with its own groups, and the bar that follows one student through them all. */
-function prioritySets(top: Priority[], listed: RosterStudent[], saved: SavedGroup[], onRoster: Evidence[], label: (tag: string) => string, day: (date: string) => string, state: NextState, actions: NextActions): HTMLElement {
+function prioritySets(top: Priority[], close: ReadonlyMap<string, ReadonlyMap<string, CloseCall>>, listed: RosterStudent[], saved: SavedGroup[], onRoster: Evidence[], label: (tag: string) => string, day: (date: string) => string, state: NextState, actions: NextActions): HTMLElement {
   const host = el('section', 'mb-sets');
   const byId = new Map(listed.map((s) => [s.id, s]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? 'Removed student';
@@ -270,19 +290,24 @@ function prioritySets(top: Priority[], listed: RosterStudent[], saved: SavedGrou
     const id = state.picked;
     if (id === null) return;
     const where = el('span', 'mb-sets__where');
-    for (const p of top) where.append(el('span', 'mb-sets__at', `${label(p.tag)}: ${p.weak.includes(id) ? 'Not yet' : p.developing.includes(id) ? 'Developing' : p.secure.includes(id) ? 'Secure' : 'Too few marks'}`));
+    for (const p of top) {
+      const near = close.get(p.tag)?.get(id);
+      const at = p.weak.includes(id) ? 'Not yet' : p.developing.includes(id) ? 'Developing' : p.secure.includes(id) ? 'Secure' : 'Too few marks';
+      where.append(el('span', 'mb-sets__at', `${label(p.tag)}: ${at}${near ? ` (${closeText(near, BAND_NAME)})` : ''}`));
+    }
     const open = el('button', 'mb-sets__open', 'Open student');
     open.type = 'button';
     open.addEventListener('click', () => actions.openStudent(id));
     bar.append(el('strong', 'mb-sets__who', nameOf(id)), where, open);
   };
 
-  const token = (id: string): HTMLElement => {
-    const b = el('button', `mb-tok${many.has(id) ? ' is-many' : ''}`, byId.get(id)?.initials ?? '–');
+  const token = (id: string, near?: CloseCall): HTMLElement => {
+    const b = el('button', `mb-tok${many.has(id) ? ' is-many' : ''}${near ? ' is-close' : ''}`, byId.get(id)?.initials ?? '–');
     b.type = 'button';
     b.dataset.token = id;
-    b.title = nameOf(id);
-    b.setAttribute('aria-label', many.has(id) ? `${nameOf(id)}, Not yet on two or more` : nameOf(id));
+    const notes = [many.has(id) ? 'Not yet on two or more' : '', near ? closeText(near, BAND_NAME) : ''].filter(Boolean);
+    b.title = [nameOf(id), ...notes].join(' · ');
+    b.setAttribute('aria-label', [nameOf(id), ...notes].join(', '));
     b.addEventListener('click', () => {
       state.picked = state.picked === id ? null : id;
       paintPick();
@@ -328,7 +353,7 @@ function prioritySets(top: Priority[], listed: RosterStudent[], saved: SavedGrou
       pile.append(head);
       if (ids.length) {
         const row = el('div', 'mb-tokens');
-        row.append(...ids.map(token));
+        row.append(...ids.map((id) => token(id, close.get(p.tag)?.get(id))));
         pile.append(row);
       } else pile.append(el('p', 'mb-pile__empty', band === 'secure' ? 'Everyone is still building this one.' : 'Nobody here yet.'));
       if (band === 'weak' && ids.length) {
@@ -362,7 +387,7 @@ function prioritySets(top: Priority[], listed: RosterStudent[], saved: SavedGrou
     text.append(el('strong', 'mb-overlap__title', n === 1 ? `${nameOf(overlap.students[0]!)} is Not yet on two or more` : `${n} students are Not yet on two or more`));
     if (n > 1) text.append(document.createTextNode(`One group can cover them, working on ${label(overlap.first)} first.`));
     const row = el('div', 'mb-tokens');
-    row.append(...overlap.students.map(token));
+    row.append(...overlap.students.map((id) => token(id)));
     strip.append(text, row);
     if (n > 1 && actions.saveGroup) {
       if (overlapsSaved(overlap.students, overlap.tags, saved)) strip.append(el('span', 'mb-set__saved', 'Saved'));
@@ -397,8 +422,14 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   const day = (date: string): string => (date === today ? 'today' : formatDay(date));
   const savedGroups = (view.markbook.groups ?? []).filter((g) => g.retired === null);
   if (state.picked && !listedIds.has(state.picked)) state.picked = null;
+  // One close-call model for the tokens, the picked-student bar and the trust panel.
+  const close = new Map(top.map((p) => [p.tag, closeCalls(onRoster, p.tag)]));
+  const placed = top.reduce((n, p) => n + p.weak.length + p.developing.length + p.secure.length, 0);
+  const closeCount = [...close.values()].reduce((n, m) => n + m.size, 0);
+  const titleOf = (source: string): string => sources.find((s) => s.source === source)?.title ?? 'One piece';
+  if (onRoster.length) root.append(trustPanel(onRoster, titleOf, { count: closeCount, placed }));
   const topHost = top.length
-    ? prioritySets(top, listed, savedGroups, onRoster, label, day, state, actions)
+    ? prioritySets(top, close, listed, savedGroups, onRoster, label, day, state, actions)
     : el('p', 'mb__empty', 'No clear priority yet. Tag quiz questions or task criteria, and it needs two or more questions from at least three students.');
   const calls = needs ? studentCalls(onRoster, sources, listed.map((s) => s.id), needs, actions.pins, label) : { support: [], extend: [] };
   const callsHost = el('div', 'mb-calls');
@@ -505,6 +536,7 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   if (saved.length) {
     const savedHost = el('section', 'mb-saved-list');
     savedHost.append(sectionHead('Saved groups'), el('p', 'mb__empty', 'Students leave a group as their marks show they’re secure.'));
+    const reliability = agreement(onRoster).r;
     for (const g of saved) {
       const card = el('article', 'mb-saved');
       card.dataset.group = g.id;
@@ -515,6 +547,8 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
         el('h4', 'mb-saved__name', g.name),
         el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${counted} still in`)
       );
+      const gain = groupGain(g, onRoster, reliability);
+      if (gain) card.append(el('p', 'mb-move__meta mb-saved__gain', gainText(gain)));
       // The open card lists them, each with its Remove.
       if (state.editingGroup !== g.id) card.append(el('p', 'mb-move__who', names(active)));
       const extra = repeats.get(g.id) ?? [];

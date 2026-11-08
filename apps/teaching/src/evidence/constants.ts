@@ -40,6 +40,27 @@ export const FLAGS = {
   guessMin: 2
 } as const;
 
+/**
+ * How much to trust the groups on Next steps. Agreement is a rank correlation
+ * (Spearman, -1 to 1): 0.6 and up is the usual bar for marks agreeing well.
+ */
+export const TRUST = {
+  /** Students marked on both sides before an agreement figure is shown. */
+  minStudents: 5,
+  /** At or above: the marks agree well. */
+  agree: 0.6,
+  /** At or above (and under `agree`): they partly agree. Under it: they don't. */
+  partly: 0.3,
+  /** A quiz or task agreeing with the rest under this is named as the odd one out. */
+  odd: 0.2,
+  /** How far scores carry over from one piece to the next when the class has too few marks to say. */
+  fallbackReliability: 0.5,
+  /** Gain past the usual bounce smaller than this (0–1) counts as no clear gain. */
+  gainNoise: 0.05,
+  /** Members with marks before and after joining needed to judge a group's gain. */
+  groupMembers: 2
+} as const;
+
 export const ITEM = {
   alphaMinAttempts: 5,
   alphaMinItems: 3,
