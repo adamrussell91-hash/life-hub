@@ -58,6 +58,9 @@ if (new URLSearchParams(location.search).has('seed')) {
 }
 
 let lastBlob: Blob | null = null;
+// ?timed=1: a time-pressure run the fake server remembers until the teacher clears it.
+let startedAt: number | null = null;
+let startedInitials = '';
 const deep: { steps: Record<string, Record<string, { step: string; at: string }>>; writing: Record<string, Record<string, { used: string[]; missed: string[]; at: string }>> } = {
   steps: { st_js: { du_demo01: { step: '2b', at: '2026-10-30' } } },
   writing: {}
@@ -83,6 +86,14 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (path.startsWith('/api/published/voice/')) {
     const body = JSON.parse(String(init?.body ?? '{}'));
+    const begun = () => ({ submitted: false, started: true, started_at: new Date(startedAt!).toISOString(), elapsed_s: (Date.now() - startedAt!) / 1000, initials: startedInitials });
+    if (body.action === 'start' && !submission) {
+      if (startedAt !== null) return ok(begun());
+      startedAt = Date.now();
+      startedInitials = String(body.initials);
+      return ok({ ...begun(), fresh: true });
+    }
+    if (body.action === 'mine' && !submission && startedAt !== null) return ok(begun());
     if (body.action === 'submit') {
       const now = new Date();
       submission = {
@@ -108,7 +119,16 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (path.startsWith('/api/voice/')) {
     const parts = path.split('/').slice(3);
-    if (parts.length === 2) return ok({ submissions: submission ? [{ ...submission, tag_count: submission.tags.length }] : [], transcribing: false });
+    if (parts.length === 2)
+      return ok({
+        submissions: submission ? [{ ...submission, tag_count: submission.tags.length }] : [],
+        started: !submission && startedAt !== null ? [{ id: `st_${'a1b2c3'.repeat(4)}`, initials: startedInitials, started_at: new Date(startedAt).toISOString(), device_hash: 'a1b2c3' }] : [],
+        transcribing: false
+      });
+    if (method === 'DELETE' && parts[2]?.startsWith('st_')) {
+      startedAt = null;
+      return ok({ cleared: parts[2] });
+    }
     if (parts[3] === 'return') {
       submission!.status = 'returned';
       return ok(submission);
@@ -120,6 +140,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     }
     if (method === 'DELETE') {
       submission = null;
+      startedAt = null;
       return ok({});
     }
     return ok(submission);
@@ -150,19 +171,26 @@ const ORACY_PREVIEW: Record<string, Record<string, unknown>> = {
   recite: { mode: 'respond', oracy: 'recite', recite_text: 'Tyger Tyger, burning bright,\nIn the forests of the night;\n\nWhat immortal hand or eye,\nCould frame thy fearful symmetry?' }
 };
 
+const params = new URLSearchParams(location.search);
+// ?timed=1 turns on time pressure (short times for walking); ?followup=1 adds follow-ups.
+const timedPreview = params.has('timed') ? { pressure: { enabled: true, prep_s: 15, countdown_s: 5, grace_s: 6 } } : {};
+const followPreview = params.has('followup')
+  ? { follow_up: { enabled: true, count: Number(params.get('followup')) || 1, think_s: 4, answer_s: 10, questions: ['Which single line best proves your point?', 'What would someone who disagrees say?', 'How does this connect to another text you studied?'] } }
+  : {};
+
 const block = BlockSchema.parse({
   id: 'viva1',
   type: 'block',
   block_type: 'audio',
   variant: 'medium',
   visibility: 'student_teacher',
-  content: (previewOracy && ORACY_PREVIEW[previewOracy] ? { url: '', ...ORACY_PREVIEW[previewOracy] } : {
+  content: { ...timedPreview, ...followPreview, ...(previewOracy && ORACY_PREVIEW[previewOracy] ? { url: '', ...ORACY_PREVIEW[previewOracy] } : {
     url: '',
     mode: 'viva',
     prompt: 'Explain how the composer represents the human experience of isolation.',
     time_limit_s: 30,
     scaffold: [{ label: 'Concept', weight: 1 }, { label: 'Evidence and technique', weight: 2 }, { label: 'Link back', weight: 1 }]
-  }),
+  }) as Record<string, unknown> },
   settings: {
     deep_step: { du: 'du_demo01', step: '3' },
     deep_targets: ['kp_demo01', 'kp_demo02'],
@@ -175,7 +203,12 @@ const block = BlockSchema.parse({
 
 const mount = document.getElementById('mount')!;
 const nav = document.createElement('p');
-nav.innerHTML = '<a href="?view=student">Student</a> · <a href="?view=teacher">Teacher</a> · <a href="?view=editor">Editor</a>';
+const keep = (v: string) => {
+  const q = new URLSearchParams(location.search);
+  q.set('view', v);
+  return `?${q}`;
+};
+nav.innerHTML = `<a href="${keep('student')}">Student</a> · <a href="${keep('teacher')}">Teacher</a> · <a href="${keep('editor')}">Editor</a>`;
 const view = new URLSearchParams(location.search).get('view') === 'teacher' ? 'teacher' : 'student';
 (window as unknown as { voiceRerender: (v: 'student' | 'teacher') => void }).voiceRerender = (v) => {
   mount.replaceChildren(nav, renderBlock(block, v, { lessonId: 'lesson_demo' }));

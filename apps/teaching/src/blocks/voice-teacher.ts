@@ -1,5 +1,5 @@
 import type { Block } from '@/schemas/block';
-import { isFollowUpPoint } from '@/blocks/voice-timed';
+import { followUpList, isFollowUpPoint } from '@/blocks/voice-timed';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/api/client';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { button, el, errorText, readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
@@ -461,7 +461,13 @@ export function mountVoiceTeacher(
     const left = el('div', 'voice-mark__transcript');
     const paperHost = el('div', 'pa-paper-host pa-paper-host--read voice-mark__paper');
     const review = el('div', 'voice-review');
-    left.append(review, paperHost);
+    left.append(review);
+    const asked = followUpList(record.points, (t) => {
+      seek(t);
+      void audio.play().catch(() => undefined);
+    });
+    if (asked) left.append(asked);
+    left.append(paperHost);
     const notes = el('div', 'voice-mark__notes');
     work.append(left, notes);
     screen.append(work);

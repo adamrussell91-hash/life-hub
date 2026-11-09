@@ -87,8 +87,9 @@ describe('a timed task on the lesson page', () => {
     document.body.append(student);
     expect(student.textContent).not.toContain('poem end in silence');
     expect(student.querySelector('.voice-sand')).not.toBeNull();
-    expect(student.textContent).toContain('The question appears when you start prepping.');
     await vi.waitFor(() => expect(student.textContent).toContain('Start prepping'));
+    expect(student.textContent).toContain('The question appears when you press Start prepping');
+    expect(student.textContent).not.toContain('poem end in silence');
     expect(student.textContent).toContain('45 s to prepare');
     student.remove();
 

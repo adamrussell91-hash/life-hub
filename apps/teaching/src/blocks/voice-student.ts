@@ -475,17 +475,24 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
     return view;
   }
 
+  /** Takes recorded during this timed run (not an earlier run's, or practice from before it was timed). */
+  function runTakes(): VoiceTake[] {
+    const since = mine && !mine.submitted && mine.started_at ? Date.parse(mine.started_at) : NaN;
+    return Number.isFinite(since) ? takes.filter((t) => Date.parse(t.recorded_at) >= since) : [];
+  }
+
   /** The run began and no take reached the teacher: send one kept here, or ask the teacher. */
   function timedLocked(): HTMLElement {
     question?.reveal();
     const view = el('div', 'voice-timed');
-    if (takes.length) {
+    const kept = runTakes();
+    if (kept.length) {
       view.append(
         el('p', 'voice-timed__title', 'Your take didn’t send'),
         el('p', 'block-secondary', 'It is still on this device. Send it now.')
       );
       const list = el('ol', 'voice-takes');
-      takes.slice(0, 1).forEach((t, i) => list.append(takeRow(t, i)));
+      kept.slice(0, 1).forEach((t, i) => list.append(takeRow(t, i)));
       view.append(list);
       return view;
     }
@@ -800,9 +807,8 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
     bar.append(fill);
     bar.hidden = true;
     const actions = el('div', 'pf-actions');
+    // Done joins only once answering starts: nothing to finish while thinking.
     const done = button('Done', 'primary', () => onDone());
-    done.hidden = true;
-    actions.append(done);
     box.append(label, text, state, big, bar, actions);
     let onDone = () => undefined as void;
     let shown = -1;
@@ -827,7 +833,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
         box.classList.toggle('voice-rec--warn', left <= WARN_BEFORE_S);
         bar.hidden = false;
         fill.style.width = `${Math.min(100, (1 - left / of) * 100)}%`;
-        done.hidden = false;
+        if (!done.isConnected) actions.append(done);
       }
     };
   }
@@ -888,9 +894,9 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
       grace(left, of) {
         box.classList.add('voice-rec--grace');
         recLabel.textContent = 'Time’s up: finish your sentence';
+        next.remove();
         time.textContent = `${Math.ceil(left)} s`;
         totalFill.style.width = `${Math.min(100, (left / of) * 100)}%`;
-        next.hidden = true;
         stop.textContent = followUps ? 'Done' : 'Send now';
       },
       paint(t, current) {
@@ -947,7 +953,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
         return;
       }
       const at = phaseAt(pressure, (mine.elapsed_s ?? 0) + (performance.now() - mineAt) / 1000);
-      body.replaceChildren(at.phase === 'prep' && !takes.length ? timedResume(pressure, at.left, mine.initials ?? voiceDevice().initials ?? '') : timedLocked());
+      body.replaceChildren(at.phase === 'prep' && !runTakes().length ? timedResume(pressure, at.left, mine.initials ?? voiceDevice().initials ?? '') : timedLocked());
       return;
     }
     body.replaceChildren(practiceView());

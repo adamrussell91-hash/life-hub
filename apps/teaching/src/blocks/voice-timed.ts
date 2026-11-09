@@ -79,3 +79,39 @@ export function phaseAt(pressure: Pressure, elapsed: number): TimedPhase {
   const left = pressure.prep_s - elapsed;
   return left > 1 ? { phase: 'prep', left } : { phase: 'over' };
 }
+
+/**
+ * The follow-up questions a take answered, in order, so whoever reads the
+ * transcript knows what each answer was to. `onJump` makes each a button
+ * that plays from where its answer starts. Null when there were none.
+ */
+export function followUpList(points: ReadonlyArray<{ label: string; t: number }>, onJump?: (t: number) => void): HTMLElement | null {
+  const asked = points.filter(isFollowUpPoint);
+  if (!asked.length) return null;
+  const box = document.createElement('section');
+  box.className = 'voice-follow-list';
+  const title = document.createElement('p');
+  title.className = 'voice-follow-list__title';
+  title.textContent = asked.length === 1 ? 'Follow-up question' : 'Follow-up questions';
+  const list = document.createElement('ol');
+  list.className = 'voice-follow-list__items';
+  for (const point of asked) {
+    const item = document.createElement('li');
+    const text = point.label.slice(FOLLOW_UP_PREFIX.length);
+    const at = `${Math.floor(point.t / 60)}:${String(Math.floor(point.t % 60)).padStart(2, '0')}`;
+    if (onJump) {
+      const jump = document.createElement('button');
+      jump.type = 'button';
+      jump.className = 'voice-follow-list__jump';
+      jump.textContent = `${at} · ${text}`;
+      jump.title = 'Play from this answer';
+      jump.addEventListener('click', () => onJump(point.t));
+      item.append(jump);
+    } else {
+      item.textContent = `${at} · ${text}`;
+    }
+    list.append(item);
+  }
+  box.append(title, list);
+  return box;
+}

@@ -39,7 +39,6 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
   }
   const questionHolder = el('div', 'voice-question');
   questionHolder.append(card);
-  if (hidden) questionHolder.append(el('p', 'voice-sand__note block-secondary', 'The question appears when you start prepping.'));
   head.append(questionHolder);
   const question: QuestionSlot = {
     reveal: () => {
@@ -48,7 +47,6 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
       real.classList.add('voice-sand-reveal');
       card.replaceWith(real);
       card = real;
-      questionHolder.querySelector('.voice-sand__note')?.remove();
     }
   };
   const seconds = speakingSeconds(block, { points: [] });
@@ -58,7 +56,8 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
     isViva && !pressure ? 'Plan your dot points first' : null,
     followUps ? (followUps.count === 1 ? 'Then a follow-up question' : `Then ${followUps.count} follow-up questions`) : null
   ].filter(Boolean);
-  if (facts.length) head.append(el('p', 'voice-facts block-secondary', facts.join(' · ')));
+  // A hidden timed task spells out its timings in the run itself.
+  if (facts.length && !hidden) head.append(el('p', 'voice-facts block-secondary', facts.join(' · ')));
   root.append(head);
 
   if (mode === 'print') {
