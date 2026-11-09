@@ -258,13 +258,18 @@ export async function stepsFor(store, classId, studentId) {
   return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs), directive: writingDirective(pieces, codes, rungs) };
 }
 
-export async function returnedFor(store, roster, student) {
+/** Returned pieces and notes, newest first, each with when the student first opened it (or null). */
+export async function returnedRows(store, roster, student) {
   const pieces = await studentPieces(store, roster.cls.id, student.id);
-  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))], ...(p.redraft ? { redraft: p.redraft } : {}) } }));
+  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, seen_at: p.seen_at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))], ...(p.redraft ? { redraft: p.redraft } : {}) } }));
   for (const doc of await studentNotes(store, roster.cls.id, student.id)) {
-    rows.push({ at: doc.returned_at, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), new: !doc.seen_at, codes: [] } });
+    rows.push({ at: doc.returned_at, seen_at: doc.seen_at ?? null, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), new: !doc.seen_at, codes: [] } });
   }
-  return { items: rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).map((r) => r.item) };
+  return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+}
+
+export async function returnedFor(store, roster, student) {
+  return { items: (await returnedRows(store, roster, student)).map((r) => r.item) };
 }
 
 /** A note that was returned to this student, or a refusal. */

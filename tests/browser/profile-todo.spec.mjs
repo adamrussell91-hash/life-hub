@@ -29,7 +29,7 @@ const data = new Map([
   ['published/lessons/l1', { id: 'l1', blocks: [] }],
   ['published/lessons/l2', { id: 'l2', blocks: [qset('q2', 'Paragraph', ['a'])] }],
   ['published/lessons/l3', { id: 'l3', blocks: [qset('w1', 'Warm-up questions', ['a', 'b']), qset('w2', 'Who is speaking?', ['a', 'b', 'c']), qset('w3', 'Exit ticket', ['a'])] }],
-  ['published/lessons/l4', { id: 'l4', blocks: [] }],
+  ['published/lessons/l4', { id: 'l4', blocks: [{ id: 'cd2', type: 'block', block_type: 'countdown', visibility: 'student_teacher', content: { title: 'Sprint step 2: first draft', due_date: day(3), due_time: '09:00', set_date: day(-2), note: '' } }] }],
   ['published/lessons/l5', { id: 'l5', blocks: [{ id: 'cd', type: 'block', block_type: 'countdown', visibility: 'student_teacher', content: { title: 'Poem task: your own ghost poem', due_date: day(12), due_time: '15:00', set_date: day(-14), note: '' } }] }]
 ]);
 const store = {
@@ -64,8 +64,8 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await context.route(`${origin}/api/**`, async (route) => {
       const req = route.request();
-      // The organiser is its own endpoint: a set of 8 cards due today.
-      if (req.url().includes('/published/organiser/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: { need: null, sheets: [], practice: { today: 8, cards: [], next: null, answered: 0 } } }) });
+      // The organiser is its own endpoint; this class has no organiser.
+      if (req.url().includes('/published/organiser/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: { need: null, sheets: [], practice: null } }) });
       const response = await handler(new Request(req.url(), { method: req.method(), headers: { ...req.headers(), origin }, body: req.postData() }));
       await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
   });
@@ -80,12 +80,16 @@ try {
     const panel = p.getByRole('complementary', { name: 'Your to do list' });
     await panel.waitFor();
     const text = await panel.textContent();
-    for (const want of ['Assessment task', 'Poem task: your own ghost poem', 'From your teacher', 'Bring a printed copy', 'Practise your organiser', '8 cards', 'Close reading', 'With your teacher', 'Speaker and voice', '1 of 3 activities done', 'Who is speaking?', 'Sound and rhythm']) {
+    for (const want of ['Assessment task', 'Poem task: your own ghost poem', 'From your teacher', 'Bring a printed copy', 'Sprint step 2: first draft', 'Due soon', 'Ghost poem', 'Done today', 'Close reading', 'With your teacher', 'Speaker and voice', '1 of 3 activities done', 'Who is speaking?', 'Sound and rhythm']) {
       assert.ok(text.includes(want), `panel shows "${want}"`);
     }
     assert.ok(!text.includes('Private reminder'), 'teacher-only announcements stay out');
-    assert.ok(!text.includes('Ghost poem'), 'a done lesson is not on the list');
-    assert.match(await panel.getByRole('timer').getAttribute('aria-label'), /^1[12] days, \d+ hours and \d+ minutes left$/);
+    assert.ok(!text.includes('Practise your organiser'), 'no organiser, no Today row');
+    // Two countdowns stack, soonest first: the sprint step, then the assessment.
+    const timers = await panel.getByRole('timer').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    assert.equal(timers.length, 2);
+    assert.match(timers[0], /^[23] days, /);
+    assert.match(timers[1], /^1[12] days, /);
     assert.match(await panel.getByRole('link', { name: 'Carry on: Speaker and voice' }).getAttribute('href'), /\/s\/classes\/class1\/lessons\/l3$/);
     assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
 

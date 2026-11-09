@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
-import { OrganiserError, organiserStudentAction, organiserTeacherAction } from '../../netlify/functions/_shared/organiser.mjs';
+import { OrganiserError, organiserStudentAction, organiserTeacherAction, practiceToday } from '../../netlify/functions/_shared/organiser.mjs';
 import { recordDone } from '../../netlify/functions/_shared/profile-done.mjs';
 import { ORGANISER_LIMITS } from '../../netlify/functions/_shared/organiser-model.mjs';
 
@@ -370,4 +370,17 @@ test('the student endpoint rejects bad bodies and unknown classes', async () => 
   await assert.rejects(student(store, null), (e) => e.status === 400);
   await assert.rejects(student(store, { action: 'wipe' }), (e) => e.code === 'bad_action');
   await assert.rejects(organiserStudentAction(store, 'nope', { action: 'load' }, { now: NOW }), (e) => e.status === 404);
+});
+
+test('practiceToday gives the To do panel the same numbers as the student load: left today and answered today', async () => {
+  const store = await fixture();
+  await seeded(store);
+  await tickOff(store, 'past');
+  const roster = await loadRoster(store, 'class1');
+  const bob = roster.students.find((s) => s.initials === 'BB');
+  const load = await student(store, { action: 'load', class_token: token(1) });
+  assert.ok(load.practice.today > 0);
+  assert.deepEqual(await practiceToday(store, roster, bob, { now: NOW }), { today: load.practice.today, answered: 0 });
+  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: load.practice.cards[0].line_id, result: 'got' }] });
+  assert.deepEqual(await practiceToday(store, roster, bob, { now: NOW }), { today: load.practice.today - 1, answered: 1 });
 });
