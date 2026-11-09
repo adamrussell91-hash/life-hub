@@ -5,6 +5,7 @@ import {
   type PeopleDirectoryResponse
 } from '@/api/people-directory';
 import { listMeetings } from '@/api/meetings';
+import { headStart } from '@/app/head-start';
 import { listUniversalLinksForEntities } from '@/api/universal-links';
 import type { MeetingRecord } from '@/domain/types';
 import { meetingRoute, personRoute } from '@/app/router';
@@ -193,20 +194,23 @@ export async function renderMentoringView(canvas: HTMLElement, options: Mentorin
 
   // A full people scan takes seconds. Paint first from this session's last
   // directory or the server's saved copy of the last scan, then repaint if
-  // the fresh scan changes anything (a role just set, say).
+  // the fresh scan changes anything (a role just set, say). The scan starts
+  // once the saved copy is back (or after 1.5s): sent together, the second
+  // request often waits seconds on a server starting cold, and the quick
+  // paint with it.
   let live: PeopleDirectoryResponse | null = null;
   let liveError: unknown = null;
-  const liveLoad = fetchPeopleDirectory().then(
+  const quick = peekPeopleDirectory();
+  const quickLoad: Promise<PeopleDirectoryResponse | null> = quick
+    ? Promise.resolve(quick)
+    : fetchPeopleDirectorySnapshot().catch(() => null);
+  const liveLoad = headStart(quickLoad).then(() => fetchPeopleDirectory()).then(
     (directory) => (live = directory),
     (err: unknown) => {
       liveError = err;
       return null;
     }
   );
-  const quick = peekPeopleDirectory();
-  const quickLoad: Promise<PeopleDirectoryResponse | null> = quick
-    ? Promise.resolve(quick)
-    : fetchPeopleDirectorySnapshot().catch(() => null);
   const links: LinkCache = new Map();
 
   async function cardsFrom(directory: PeopleDirectoryResponse, meetings: MeetingRecord[]): Promise<MentoringCard[]> {

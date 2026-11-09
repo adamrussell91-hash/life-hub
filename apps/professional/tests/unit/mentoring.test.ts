@@ -224,6 +224,21 @@ describe('renderMentoringView', () => {
     expect(vi.mocked(listUniversalLinksForEntities).mock.calls.flatMap(([refs]) => refs).filter((ref) => ref === mentee.ref)).toHaveLength(1);
   });
 
+  it('starts the fresh scan only after the saved copy is back', async () => {
+    let finishSnapshot: (value: Awaited<ReturnType<typeof fetchPeopleDirectorySnapshot>>) => void = () => {};
+    vi.mocked(fetchPeopleDirectorySnapshot).mockReturnValue(new Promise((resolve) => (finishSnapshot = resolve)));
+    vi.mocked(fetchPeopleDirectory).mockResolvedValue({ people: [mentee], organisations: [], counts: { people: 1, organisations: 0 } });
+    const canvas = document.createElement('main');
+    const done = renderMentoringView(canvas, { now: () => NOW });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fetchPeopleDirectory).not.toHaveBeenCalled();
+    finishSnapshot(null);
+    await done;
+    expect(fetchPeopleDirectory).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('.mentor-card[data-person-id="person_a"]')).not.toBeNull();
+  });
+
   it('keeps the saved copy on screen when the fresh scan fails', async () => {
     vi.mocked(fetchPeopleDirectory).mockRejectedValue(new Error('scan failed'));
     vi.mocked(fetchPeopleDirectorySnapshot).mockResolvedValue({

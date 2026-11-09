@@ -79,6 +79,7 @@ import { fetchObservations } from '@/api/observations';
 import { renderRolesEditor } from '@/components/person-roles-editor';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { renderProfessionalProfileSummary, renderProfessionalProfileTab } from '@/components/professional-profile';
+import { headStart } from '@/app/head-start';
 
 export interface PeoplePageOptions {
   selectedId?: string | null;
@@ -2120,8 +2121,10 @@ export async function renderPeoplePage(
     let snapshotAt: string | null = null;
     // First open of a session waits on a full scan, so paint the server's
     // saved copy of the last scan meanwhile. The fresh scan still replaces it.
+    // It starts once the saved copy is back (or after 1.5s): sent together,
+    // the second request often waits seconds on a server starting cold.
     if (!directory) {
-      void fetchPeopleDirectorySnapshot()
+      const saved = fetchPeopleDirectorySnapshot()
         .then((snapshot) => {
           if (!snapshot || !live() || directory) return;
           directory = snapshot;
@@ -2130,6 +2133,8 @@ export async function renderPeoplePage(
           renderDirectory();
         })
         .catch(() => {});
+      await headStart(saved);
+      if (!live()) return;
     }
     try {
       const result = await fetchPeopleDirectory({fresh:true});
