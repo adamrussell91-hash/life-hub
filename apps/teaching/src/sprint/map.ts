@@ -210,8 +210,11 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
         cell.tabIndex = 0;
         cell.setAttribute('aria-label', `${g.name}, ${PHASE_LABELS[key]}`);
         for (const st of g.students) {
-          const d = el('i', `dot ${DOT[st.phases[key]]}`);
-          d.title = `${st.name}: ${STATE_TEXT[st.phases[key]]}`;
+          // A teacher tick counts as done on the map, whatever the app holds.
+          const ticked = (key === 'prototype' || key === 'test') && !!st.ticked?.[key];
+          const done = st.phases[key] === 'in' || st.phases[key] === 'late';
+          const d = el('i', `dot ${ticked && !done ? DOT.in : DOT[st.phases[key]]}${ticked ? ' dot--ticked' : ''}`);
+          d.title = `${st.name}: ${ticked && !done ? 'ticked off by you' : STATE_TEXT[st.phases[key]]}${ticked && done ? ', ticked off by you' : ''}`;
           cell.append(d);
         }
         const b = badge(g, key);

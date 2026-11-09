@@ -118,4 +118,42 @@ describe('group board', () => {
     [...host.querySelectorAll<HTMLButtonElement>('.smap-confirm button')].find((b) => b.textContent === 'Bring it back')!.click();
     expect(bringBack).toHaveBeenCalledWith('st_cy', 'sketch');
   });
+
+  it('ticks a student off for Prototype by hand and counts them as done', async () => {
+    const students = [
+      { id: 'st_ann', name: 'Ann Bell', voted: true, phases: { understand: 'in', sketch: 'in', decide: 'in', prototype: 'none', test: 'none' }, saved_at: {}, ticked: { prototype: '2026-11-09T01:00:00.000Z' } },
+      { id: 'st_cy', name: 'Cy Dale', voted: true, phases: { understand: 'in', sketch: 'in', decide: 'in', prototype: 'draft', test: 'none' }, saved_at: {} }
+    ];
+    const data = { ...board(), awaiting: null, chosen: 'i4', progress: progress(['understand', 'sketch', 'decide', 'prototype'], { students }) } as unknown as GroupBoard;
+    const tick = vi.fn(async () => ({}));
+    const { host } = await mount(data, { tick });
+    expect(host.querySelector('.sboard__sub')!.textContent).toContain('In Prototype · 1 of 2 done');
+    const [ann, cy] = [...host.querySelectorAll('.sboard__who tbody tr')];
+    expect(ann!.querySelector('td.is-now .sboard__state')!.textContent).toBe('Ticked off');
+    expect(ann!.querySelector<HTMLInputElement>('td.is-now .sboard__tick input')!.checked).toBe(true);
+    expect(ann!.querySelector('td.is-past .sboard__tick')).toBeNull();
+    const box = cy!.querySelector<HTMLInputElement>('td.is-now .sboard__tick input')!;
+    expect(box.checked).toBe(false);
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    expect(tick).toHaveBeenCalledWith('st_cy', 'prototype', true);
+  });
+
+  it('shows every part of each peer feedback card: levels, both lines and the class tally', async () => {
+    const round = { status: 'closed', entries: [
+      { student_id: 'st_ed', name: 'Ed Fox', levels: { c1: 3 }, worked: 'The map was clear.', next: 'Add a key.', about: 'c1', flagged: false, status: 'ok' },
+      { student_id: 'st_gus', name: 'Gus Hay', levels: { c1: 2 }, worked: 'Bad word here.', next: 'Try again.', about: '', flagged: true, status: 'held' }
+    ] };
+    const data = { ...board(), awaiting: null, progress: progress(['understand', 'sketch', 'decide', 'prototype', 'test']), round } as unknown as GroupBoard;
+    const { host } = await mount(data);
+    expect(tabOn(host)).toBe('Test and marking');
+    const cards = [...host.querySelectorAll('.sboard__feedback')];
+    expect(cards).toHaveLength(2);
+    expect(cards[0]!.querySelector('.sboard__levels')!.textContent).toBe('A long criterion name in fullStrong');
+    expect(cards[0]!.textContent).toContain('What workedThe map was clear.');
+    expect(cards[0]!.textContent).toContain('Try nextAdd a key.');
+    expect(cards[0]!.textContent).toContain('About: A long criterion name in full');
+    expect(cards[1]!.textContent).toContain('Held');
+    expect(host.querySelector('.sprint-tally__bar')!.getAttribute('aria-label')).toBe('A long criterion name in full: Starting 0, Showing 1, Strong 1');
+  });
 });

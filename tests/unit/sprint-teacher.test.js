@@ -312,3 +312,19 @@ test('another go at Decide takes them off the finished list so voting waits for 
   assert.deepEqual(after.voted, []);
   assert.deepEqual(after.in.decide, []);
 });
+
+test('the teacher ticks a student off for Prototype or Test by hand; their work and what opens next stay as they are', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  let s = await teach(store, 'tick', { student_id: 'st_ann', phase: 'prototype', on: true });
+  const ann = () => s.groups[0].students.find((x) => x.id === 'st_ann');
+  assert.equal(ann().ticked.prototype, '2026-11-01T00:00:00.000Z');
+  assert.equal(ann().phases.prototype, 'none');
+  assert.deepEqual(s.groups[0].open, ['understand']);
+  const b = await teach(store, 'board', { group_id: s.groups[0].id });
+  assert.ok(b.progress.students.find((x) => x.id === 'st_ann').ticked.prototype);
+  s = await teach(store, 'tick', { student_id: 'st_ann', phase: 'prototype', on: false });
+  assert.deepEqual(ann().ticked, {});
+  await assert.rejects(teach(store, 'tick', { student_id: 'st_ann', phase: 'sketch', on: true }), { code: 'bad_phase' });
+  await assert.rejects(teach(store, 'tick', { student_id: 'st_nobody', phase: 'test', on: true }), { code: 'not_found' });
+});

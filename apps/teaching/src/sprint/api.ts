@@ -146,7 +146,9 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
 
 // ---------------------------------------------------------------- teacher
 
-export type MapStudent = { id: string; initials: string; name: string; phases: Record<SprintPhaseKey, 'none' | 'draft' | 'in' | 'late'>; opened: Record<SprintPhaseKey, boolean> };
+/** Prototype and Test can be ticked off by the teacher by hand, beside whatever the student handed in. */
+export type TickPhase = 'prototype' | 'test';
+export type MapStudent = { id: string; initials: string; name: string; phases: Record<SprintPhaseKey, 'none' | 'draft' | 'in' | 'late'>; opened: Record<SprintPhaseKey, boolean>; /** When the teacher ticked them off, by phase. */ ticked?: Partial<Record<TickPhase, string>> };
 export type MapGroup = { id: string; name: string; students: MapStudent[]; open: SprintPhaseKey[]; awaiting: { kind: 'question' | 'idea'; tie: boolean; empty: boolean } | null; chosen: boolean; question: string | null; /** Questions the group sent that have no answer yet. */ asked?: number };
 export type SprintSummary = {
   groups: MapGroup[];
@@ -166,7 +168,7 @@ export type GroupBoard = {
   progress?: {
     open: SprintPhaseKey[];
     phases: Array<{ key: SprintPhaseKey; due_date: string; due_time: string }>;
-    students: Array<{ id: string; name: string; voted: boolean; phases: MapStudent['phases']; saved_at: Partial<Record<SprintPhaseKey, string>>; earlier?: Partial<Record<SprintPhaseKey, number>> }>;
+    students: Array<{ id: string; name: string; voted: boolean; phases: MapStudent['phases']; ticked?: MapStudent['ticked']; saved_at: Partial<Record<SprintPhaseKey, string>>; earlier?: Partial<Record<SprintPhaseKey, number>> }>;
   };
   awaiting: MapGroup['awaiting'];
   voted?: { done: string[]; waiting: string[] };
@@ -200,6 +202,8 @@ export type SprintTeacherApi = {
   anotherGo(studentId: string, phase: SprintPhaseKey): Promise<SprintSummary>;
   /** Put back the work most recently set aside; anything newer is set aside instead. */
   bringBack(studentId: string, phase: SprintPhaseKey): Promise<SprintSummary>;
+  /** Tick a student off for Prototype or Test by hand, or take the tick away. Their work stays as it is. */
+  tick(studentId: string, phase: TickPhase, on: boolean): Promise<SprintSummary>;
   extend(input: { scope: 'class' | 'group' | 'student'; id?: string; phase: SprintPhaseKey; due_date: string; due_time: string }): Promise<SprintSummary>;
   confirm(groupId: string, kind: 'question' | 'idea', id: string): Promise<SprintSummary>;
   spotlight(studentId: string, phase: SprintPhaseKey, field: string): Promise<SprintSummary>;
@@ -225,6 +229,7 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
     unlock: (studentId) => call('unlock', { student_id: studentId }),
     anotherGo: (studentId, phase) => call('another_go', { student_id: studentId, phase }),
     bringBack: (studentId, phase) => call('bring_back', { student_id: studentId, phase }),
+    tick: (studentId, phase, on) => call('tick', { student_id: studentId, phase, on }),
     extend: (input) => call('extend', input),
     confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
     spotlight: (studentId, phase, field) => call('spotlight', { student_id: studentId, phase, field }),
@@ -301,11 +306,10 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         endClass: (phase, lockHours) => call('end_class', { phase, lock_hours: lockHours }),
         reopenClass: (phase) => call('reopen_class', { phase }),
         liftLock: () => call('lift_lock'),
-    reopenClass: (phase) => call('reopen_class', { phase }),
-    liftLock: () => call('lift_lock'),
         unlock: (studentId) => call('unlock', { student_id: studentId }),
         anotherGo: (studentId, phase) => call('another_go', { student_id: studentId, phase }),
         bringBack: (studentId, phase) => call('bring_back', { student_id: studentId, phase }),
+        tick: (studentId, phase, on) => call('tick', { student_id: studentId, phase, on }),
         extend: (input) => call('extend', input),
         confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
         spotlight: (studentId, phase, field) => call('spotlight', { student_id: studentId, phase, field }),
