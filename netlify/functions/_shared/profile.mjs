@@ -20,6 +20,8 @@ import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
 import { deleteTeacherNote, saveTeacherNote, teacherNotes } from './teacher-notes.mjs';
 import { teacherHabits } from './teacher-habits.mjs';
+import { todoFor } from './profile-todo.mjs';
+import { sydneyDay } from './organiser-model.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -34,18 +36,21 @@ async function unitLessons(store, cls) {
     if (found && !isDeletedRecord(found)) { unit = found; break; }
   }
   const lessons = [];
+  /** Each lesson's published copy, by id: the To do panel reads its countdowns and question sets. */
+  const published = new Map();
   for (const id of unit?.lesson_ids ?? []) {
     if (!isSafeId(id)) continue;
-    const [lesson, published] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
+    const [lesson, copy] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
     // Students only ever see lessons that are published and not trashed.
-    if (!lesson || !published || !lesson.title || isDeletedRecord(lesson)) continue;
+    if (!lesson || !copy || !lesson.title || isDeletedRecord(lesson)) continue;
     const role = routeRoleOf(unit, lesson);
     lessons.push(role ? { ...lesson, route_role: role } : lesson);
+    published.set(id, copy);
   }
-  return { unit, lessons };
+  return { unit, lessons, published };
 }
 
-export async function profileAction(store, classId, body) {
+export async function profileAction(store, classId, body, { now = new Date() } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
   if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
@@ -64,7 +69,12 @@ export async function profileAction(store, classId, body) {
     const record = (await listDone(store, classId, student.id))[body.lesson_id];
     return { need: null, initials: student.initials, ticked: !!record && !record.partial };
   }
-  if (action === 'progress') return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
+  if (action === 'progress') {
+    // Only the student's own page carries the To do panel; the teacher's read of it does not.
+    const state = await unitState(store, roster, student);
+    const todo = await todoFor(store, roster, student, { ...state, today: sydneyDay(now) });
+    return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: await mapPayload(store, roster, state), todo };
+  }
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
   // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
   if (action === 'steps') {
@@ -112,16 +122,24 @@ export function mapRows(lessons, view, done, studentId) {
   });
 }
 
-async function profileFor(store, roster, student) {
+/** The student's own unit: their lessons, the map's rows, each lesson's published copy and the markbook load. */
+async function unitState(store, roster, student) {
   const classId = roster.cls.id;
-  const { unit, lessons: unitList } = await unitLessons(store, roster.cls);
+  const { unit, lessons: unitList, published } = await unitLessons(store, roster.cls);
   const view = await markbookAction(store, classId, { action: 'load', skip_done: true });
   const done = await listDone(store, classId, student.id);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
   const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
-  const rows = mapRows(lessons, view, done, student.id);
+  return { unit, lessons, published, view, rows: mapRows(lessons, view, done, student.id) };
+}
+
+async function mapPayload(store, roster, { unit, lessons, rows }) {
   const next = rows.find((r) => r.role === 'core' && !r.done)?.id ?? null;
-  return { need: null, initials: student.initials, map: { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) } };
+  return { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) };
+}
+
+async function profileFor(store, roster, student) {
+  return { need: null, initials: student.initials, map: await mapPayload(store, roster, await unitState(store, roster, student)) };
 }
 
 /**

@@ -203,8 +203,8 @@ async function classSheets(store, cls, today, viewer) {
 const deck = (sheets, done) => sheets.flatMap((s) => buildCards(joinedSections(s.internal.sections, done), s.builds));
 
 function practiceFor(sheets, done, boxes, today) {
-  const { cards, next, boxes: counts } = todaysCards(deck(sheets, done), boxes, today);
-  return { today: cards.length, cards, next, boxes: counts };
+  const { cards, next, boxes: counts, answered } = todaysCards(deck(sheets, done), boxes, today);
+  return { today: cards.length, cards, next, boxes: counts, answered };
 }
 
 async function readBoxes(store, cls, student) {
