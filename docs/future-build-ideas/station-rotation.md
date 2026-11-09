@@ -2,7 +2,7 @@
 
 A lesson type where students move around a **map of stations**, carrying something from each into a **finale** built outside the stations. One lesson type covers everything from a simple timed carousel to a full breakout mystery, because every variant is a setting on the same four parts.
 
-Concept doc only. Nothing builds from here until Adam names a slice. Mockup: [station-rotation/mockup.html](station-rotation/mockup.html).
+Promoted to build on 9 Nov 2026: the brief is [station-rotation/build-design.md](station-rotation/build-design.md). v1 is self-paced only. Mockup: [station-rotation/mockup.html](station-rotation/mockup.html).
 
 ## Adam's asks
 
@@ -249,7 +249,6 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 
 ## Open questions
 
-- **Bell mode in v1**, or self-paced only (with the teacher station's "call group")?
 - **Finale**: its own build inside this lesson type, or a handoff to the Design Sprint or Case Study?
 - **Gates in bell mode** (lean, not decided: carry over. The student's work at the gate is saved, the station shows as unfinished on their map, and the rotation grid keeps a catch-up slot near the end. A student who has already missed the gate twice is in a teacher-station group anyway. This only matters if bell mode is in v1): if the bell goes while a student is still at a gate, does the station carry over, or go straight to the teacher-station group?
 - **Devices**: one per student, or one per group at some stations?
