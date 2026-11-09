@@ -150,3 +150,22 @@ test('initials with a number for a double-up stay apart', async () => {
   await add(store, { initials: 'tt2' });
   assert.deepEqual((await teacher(store, 'GET')).items.map((item) => item.initials).sort(), ['TT', 'TT2']);
 });
+
+test('each writer gets their own anonymous token, in order of their first item; students never see initials', async () => {
+  const store = storeFixture();
+  const first = await add(store, { initials: 'ab' });
+  assert.equal(first.item.symbol, '0-0');
+  await new Promise((r) => setTimeout(r, 2));
+  const second = await add(store, { initials: 'cd' });
+  assert.equal(second.item.symbol, '1-0');
+  await new Promise((r) => setTimeout(r, 2));
+  const again = await add(store, { initials: 'ab' });
+  assert.equal(again.item.symbol, '0-0');
+
+  const student = await knowledgeAction(store, 'unit1', 'GET', null);
+  assert.deepEqual(student.items.map((i) => i.symbol), ['0-0', '1-0', '0-0']);
+  assert.ok(student.items.every((i) => !('initials' in i)));
+
+  const teacher = await knowledgeAction(store, 'unit1', 'GET', null, { teacher: true });
+  assert.deepEqual(teacher.items.map((i) => [i.initials, i.symbol]), [['AB', '0-0'], ['CD', '1-0'], ['AB', '0-0']]);
+});

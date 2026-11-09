@@ -14563,6 +14563,16 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-weight: 600;
 }
 
+.block-anthology__card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.block-anthology__card-head .block-anthology__card-title {
+  margin: 0;
+}
+
 .block-anthology__card--class .block-anthology__card-quote {
   font-size: 0.98rem;
 }

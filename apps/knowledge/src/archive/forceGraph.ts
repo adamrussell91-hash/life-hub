@@ -107,7 +107,18 @@ export type ForceGraphOptions = {
   labelZoom?: { topics: number; notes: number };
   /** Show All only: notes drawn as hollow rings (a second kind of note, such as class additions). */
   ringFor?: (pageId: string) => boolean;
+  /**
+   * Show All only: notes drawn as a labelled bubble instead of a dot, at a fixed size on screen.
+   * `text` writes initials on a disc in the note's colour; `path` (a 24×24 SVG path) draws a
+   * white shape on a `fill` disc ringed in the note's colour. Wins over `ringFor`.
+   */
+  badgeFor?: (pageId: string) => GraphBadge | null;
 };
+
+export type GraphBadge = { text: string } | { path: string; fill: string };
+
+/** Badge radius in screen pixels. */
+const BADGE_PX = 9;
 
 function curve(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
   const mx = (x1 + x2) / 2;
@@ -509,7 +520,10 @@ export function mountForceGraph(
       const dy = (node.y ?? 0) - y;
       const dist = Math.hypot(dx, dy);
       const minPx = node.kind === "major" ? (showAllMode ? 14 : 6) : node.kind === "minor" ? 4 : 2.4;
-      const hitR = canvasRadius(node.r, view.k, options.variant === "showAll" ? minPx : 1.6);
+      const badged = showAllMode && node.pageId && options.badgeFor?.(node.pageId);
+      const hitR = badged
+        ? BADGE_PX / view.k
+        : canvasRadius(node.r, view.k, options.variant === "showAll" ? minPx : 1.6);
       const pad = node.kind === "major" ? 8 : node.kind === "minor" ? 6 : 4;
       if (dist <= hitR + pad && dist < best) {
         best = dist;
@@ -720,6 +734,44 @@ export function mountForceGraph(
 
 
   /** Topic colour lifted toward white (dark field) or deepened (light field). */
+  /** A badged note: initials on a theme-coloured disc, or a token (white shape on its colour) ringed in the theme colour. */
+  function drawBadge(node: GraphNodeDatum, badge: GraphBadge, hot: boolean, alpha: number, dark: boolean) {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    const r = BADGE_PX / view.k;
+    const accent = hot ? (dark ? "#ffd2a8" : "#a8501a") : node.color;
+    ctx.globalAlpha = Math.max(alpha, 0);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if ("text" in badge) {
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.lineWidth = 1.5 / view.k;
+      ctx.strokeStyle = dark ? "rgba(3, 5, 10, 0.9)" : "#ffffff";
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      const size = (badge.text.length > 2 ? 6.5 : 8) / view.k;
+      ctx.font = `700 ${size}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(badge.text, x, y + 0.5 / view.k);
+      return;
+    }
+    ctx.fillStyle = badge.fill;
+    ctx.fill();
+    ctx.lineWidth = 2.4 / view.k;
+    ctx.strokeStyle = accent;
+    ctx.stroke();
+    if (typeof Path2D === "undefined") return;
+    const span = r * 1.3;
+    ctx.save();
+    ctx.translate(x - span / 2, y - span / 2);
+    ctx.scale(span / 24, span / 24);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill(new Path2D(badge.path));
+    ctx.restore();
+  }
+
   function tint(hex: string, amount: number) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex);
     if (!m) return hex;
@@ -848,6 +900,8 @@ export function mountForceGraph(
     }
 
     // Notes: small cell bodies; well-linked ones get a soft glow (dark) or wash (light).
+    // Badged notes are drawn last, above the fibres, so they read as tokens on the map.
+    const badges: Array<{ node: GraphNodeDatum; badge: GraphBadge; hot: boolean; alpha: number }> = [];
     for (const node of simNodes) {
       if (node.kind !== "leaf" || node.x == null || node.y == null) continue;
       if (!onScreen(node.x, node.y)) continue;
@@ -871,6 +925,11 @@ export function mountForceGraph(
         ctx.fill();
       }
       const bodyR = (((hot ? 2.6 : 0.9 + Math.min(degree, 10) * 0.18) * 1.1) / view.k) * grown;
+      const badge = node.pageId ? options.badgeFor?.(node.pageId) : null;
+      if (badge) {
+        badges.push({ node, badge, hot, alpha: fade * grown });
+        continue;
+      }
       const ring = Boolean(node.pageId && options.ringFor?.(node.pageId));
       ctx.globalAlpha = (hot ? 1 : dark ? 0.85 : 0.75) * fade;
       ctx.beginPath();
@@ -897,6 +956,7 @@ export function mountForceGraph(
     }
     drawSignals(map, dark);
     ctx.globalCompositeOperation = "source-over";
+    for (const entry of badges) drawBadge(entry.node, entry.badge, entry.hot, entry.alpha, dark);
     ctx.globalAlpha = 1;
 
     const ink = dark ? "#f4efe6" : "#13233a";

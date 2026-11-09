@@ -15,11 +15,32 @@ import {
   type KnowledgeItem
 } from '@/blocks/anthology-knowledge';
 import { lessonCollectionHref } from '@/blocks/collection-resolve';
+import { identityName, token, tokenParts } from '@/blocks/peer-feedback-ui';
+import '@/blocks/peer-feedback.css';
 import { rememberInitials, voiceDevice } from '@/blocks/voice-client';
 import { INITIALS_PATTERN, normaliseInitials } from '@/schemas/student-initials';
 import type { AnthologyView, Block } from '@/schemas/block';
 import type { DockTool } from '../../../knowledge/src/archive/showAllDock';
 import type { GraphMount } from '../../../knowledge/src/archive/forceGraphBehavior';
+import type { GraphBadge } from '../../../knowledge/src/archive/forceGraph';
+
+/** A CSS colour (possibly `var(--x)`) as the canvas can paint it. */
+function canvasColour(colour: string, host: Element): string {
+  const name = /^var\((--[\w-]+)\)$/.exec(colour)?.[1];
+  if (!name) return colour;
+  return getComputedStyle(host).getPropertyValue(name).trim() || '#424860';
+}
+
+/**
+ * How a class addition sits on the map: the teacher sees the writer's initials, students see
+ * the writer's anonymous token. Without either it falls back to a plain ring.
+ */
+export function knowledgeBadge(item: KnowledgeItem, teacher: boolean, host: Element): GraphBadge | null {
+  if (teacher && item.initials) return { text: item.initials };
+  if (!item.symbol) return null;
+  const parts = tokenParts(item.symbol);
+  return { path: parts.path, fill: canvasColour(parts.fill, host) };
+}
 
 export type AnthologyViewMode = 'teacher' | 'student' | 'print';
 
@@ -175,7 +196,16 @@ function knowledgeCard(item: KnowledgeItem, onModerate?: (action: Moderation) =>
   const quote = document.createElement('p');
   quote.className = 'block-anthology__card-quote';
   quote.textContent = `“${item.quote}”`;
-  card.append(title, quote);
+  if (item.symbol) {
+    const head = document.createElement('div');
+    head.className = 'block-anthology__card-head';
+    const mark = token(item.symbol, 'sm');
+    mark.title = identityName(item.symbol);
+    head.append(mark, title);
+    card.append(head, quote);
+  } else {
+    card.append(title, quote);
+  }
   if (item.info) {
     const info = document.createElement('p');
     info.className = 'block-anthology__card-note';
@@ -630,7 +660,11 @@ export function buildAnthologyView(
             tools: ANTHOLOGY_TOOLS,
             theme: 'light',
             labelZoom: { topics: 0, notes: 1.6 },
-            ringFor: isKnowledgeNoteId
+            ringFor: isKnowledgeNoteId,
+            badgeFor: (id) => {
+              const item = knowledgeById.get(id);
+              return item ? knowledgeBadge(item, Boolean(knowledgeApi?.teacher), stage) : null;
+            }
           }
         );
       });

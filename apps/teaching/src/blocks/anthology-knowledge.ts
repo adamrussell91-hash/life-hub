@@ -15,6 +15,8 @@ export type KnowledgeItem = {
   themes: string[];
   concepts: string[];
   created_at: string;
+  /** The writer's anonymous token ("colour-shape", as in peer feedback). */
+  symbol?: string;
   /** Teacher only. */
   initials?: string;
   /** Teacher only. */
