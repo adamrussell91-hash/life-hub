@@ -5,13 +5,33 @@ import { createAccessContext } from './_shared/entity-access.mjs';
 import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
+import { mapBounded } from './_shared/blobs-list.mjs';
 
 export const config = { path: '/api/universal-links' };
 
 // Exactly one of these may be present on a GET request (implementation
 // programme: "Reject ambiguous GET requests containing more than one
 // selector. Reject GET requests with no selector.").
-const SELECTORS = ['source_ref', 'target_ref', 'entity_ref', 'id'];
+// `entity_refs` is `entity_ref` for several entities in one request: a page
+// listing a few people would otherwise make one call each, and parallel
+// calls can each land on a cold function.
+const SELECTORS = ['source_ref', 'target_ref', 'entity_ref', 'entity_refs', 'id'];
+const MAX_BATCH_REFS = 50;
+const BATCH_CONCURRENCY = 8;
+
+function readBatchRefs(value) {
+  const refs = [...new Set(String(value ?? '').split(',').map((ref) => ref.trim()).filter(Boolean))];
+  if (!refs.length) {
+    throw Object.assign(new Error('entity_refs needs at least one ref.'), { status: 400, code: 'missing_selector' });
+  }
+  if (refs.length > MAX_BATCH_REFS) {
+    throw Object.assign(new Error(`entity_refs takes at most ${MAX_BATCH_REFS} refs.`), {
+      status: 400,
+      code: 'too_many_refs'
+    });
+  }
+  return refs;
+}
 
 // Request-body fields that must never expand access, whether or not the
 // caller intended them to. `createAccessContext` never reads request
@@ -107,6 +127,19 @@ export function createUniversalLinksHandler(deps = {}) {
         if (selector === 'target_ref') {
           const links = await repo.listIncoming(value, accessContext);
           return withCors(okResponse(200, { links }), request, env);
+        }
+        if (selector === 'entity_refs') {
+          const refs = readBatchRefs(value);
+          // One entity's failure (a bad ref, a deleted person) is reported
+          // against that ref and never fails the others.
+          const pairs = await mapBounded(refs, BATCH_CONCURRENCY, async (ref) => {
+            try {
+              return [ref, await repo.listForEntity(ref, accessContext)];
+            } catch (error) {
+              return [ref, { error: typeof error?.code === 'string' ? error.code : 'internal_error' }];
+            }
+          });
+          return withCors(okResponse(200, { results: Object.fromEntries(pairs) }), request, env);
         }
         const result = await repo.listForEntity(value, accessContext);
         return withCors(okResponse(200, result), request, env);
