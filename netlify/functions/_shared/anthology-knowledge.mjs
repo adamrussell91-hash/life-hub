@@ -113,11 +113,25 @@ async function allItems(store, unit) {
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id.localeCompare(b.id));
 }
 
-const forStudents = ({ id, title, quote, info, themes, concepts, created_at }) => ({
-  id, title, quote, info, themes, concepts, created_at
+/**
+ * Each writer's anonymous token (the peer feedback set: six colours by six shapes, as "colour-shape").
+ * Writers take tokens in the order of their first item, colours first, so no two share one
+ * until there are 36 of them. Students see the token; only the teacher sees the initials.
+ */
+export function tokenOrder(items) {
+  const order = new Map();
+  for (const item of items) if (item.initials && !order.has(item.initials)) order.set(item.initials, order.size);
+  return order;
+}
+export const tokenFor = (index) => `${index % 6}-${Math.floor(index / 6) % 6}`;
+
+const withToken = (order) => (item) => ({ ...item, symbol: tokenFor(order.get(item.initials) ?? 0) });
+
+const forStudents = ({ id, title, quote, info, themes, concepts, created_at, symbol }) => ({
+  id, title, quote, info, themes, concepts, created_at, symbol
 });
-const forTeacher = ({ id, title, quote, info, themes, concepts, created_at, initials, status }) => ({
-  id, title, quote, info, themes, concepts, created_at, initials, status
+const forTeacher = ({ id, title, quote, info, themes, concepts, created_at, initials, status, symbol }) => ({
+  id, title, quote, info, themes, concepts, created_at, initials, status, symbol
 });
 
 async function addItem(store, unit, live, body) {
@@ -150,7 +164,9 @@ async function addItem(store, unit, live, body) {
   };
   const saved = await store.setJSON(itemKey(unit, id), item, { onlyIfNew: true });
   if (saved?.modified === false) reject(409, 'retry', 'Please send it again.');
-  return { item: forStudents({ id, ...item }), status: statusOf(item, null) };
+  const order = tokenOrder(existing);
+  const symbol = tokenFor(order.get(initials) ?? order.size);
+  return { item: forStudents({ id, ...item, symbol }), status: statusOf(item, null) };
 }
 
 async function moderate(store, unit, body) {
@@ -172,10 +188,11 @@ export async function knowledgeAction(store, unit, method, body, opts = {}) {
   const live = await liveUnit(store, unit);
   if (method === 'GET') {
     const items = await allItems(store, unit);
+    const tagged = items.map(withToken(tokenOrder(items)));
     return {
       items: opts.teacher
-        ? items.map(forTeacher)
-        : items.filter((item) => item.status === 'shown').map(forStudents)
+        ? tagged.map(forTeacher)
+        : tagged.filter((item) => item.status === 'shown').map(forStudents)
     };
   }
   const action = body?.action;

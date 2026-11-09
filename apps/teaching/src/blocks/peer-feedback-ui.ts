@@ -32,6 +32,12 @@ export function identityName(id: string): string {
   return `${COLOURS[c]?.name ?? ''} ${SHAPES[s]?.name ?? ''}`.trim();
 }
 
+/** A token's parts, for drawing it somewhere other than the DOM (a canvas). `fill` is a CSS colour. */
+export function tokenParts(id: string): { name: string; fill: string; path: string } {
+  const [c, s] = parts(id);
+  return { name: identityName(id), fill: COLOURS[c]?.fill ?? 'var(--orca)', path: SHAPES[s]?.path ?? '' };
+}
+
 export function token(id: string, size: 'sm' | 'md' | 'lg' = 'md'): HTMLElement {
   const [c, s] = parts(id);
   const node = el('span', `pf-token pf-token--${size}`);
