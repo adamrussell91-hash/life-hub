@@ -24,7 +24,8 @@ import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
-import { searchPickerPeople } from '@/lib/person-picker';
+import { readNewPersonChoice, resetPickerDirectory, searchPickerPeopleOrNew, type NewPersonChoice } from '@/lib/person-picker';
+import { createEntity } from '@/api/entities';
 import { utcIsoToWallLocal, wallLocalToUtcIso } from '@/lib/wall-time';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { LedgerItem, MeetingDecision, MeetingRecord, MinutesItemNote } from '@/domain/types';
@@ -144,6 +145,32 @@ async function loadSelfRow(): Promise<RoomDirectoryRow | null> {
   } catch {
     return null;
   }
+}
+
+/** A just-added student, until the next directory scan lists them. */
+function provisionalRow(ref: string, name: string): DirectoryPersonRow {
+  const now = new Date().toISOString();
+  return {
+    id: ref.split(':').pop() ?? ref,
+    person_type: 'student',
+    ref,
+    display_name: name,
+    initials: initialsFor(name),
+    role_line: 'Student',
+    relationship_roles: [{ role: 'student', label: 'Student', current: true }],
+    organisation: null,
+    organisations: [],
+    warmth: 0,
+    warmth_band: 'warm',
+    relationship_state: '',
+    relationship_reasons: [],
+    open_item_count: 0,
+    you_owe_count: 0,
+    they_owe_count: 0,
+    next_label: null,
+    created_at: now,
+    updated_at: now
+  };
 }
 
 async function loadDirectory(): Promise<DirectoryPersonRow[]> {
@@ -471,13 +498,17 @@ export async function renderMeetingPage(
       allowedKinds: ['person'],
       emptyText: 'No matching people.',
       mode: 'field',
-      search: (query, signal) => searchPickerPeople(query, signal),
-      onSelect: async (item) => {
-        if (isSelfAttendee({ ref: item.ref, name: item.display_label }, selfRow) || attendees.some((attendee) => attendee.ref === item.ref)) {
+      search: (query, signal) => searchPickerPeopleOrNew(query, signal),
+      onSelect: async (picked0) => {
+        let item = picked0;
+        const choice = readNewPersonChoice(item.ref);
+        if (!choice && (isSelfAttendee({ ref: item.ref, name: item.display_label }, selfRow) || attendees.some((attendee) => attendee.ref === item.ref))) {
           input.value = '';
           return;
         }
         try {
+          status.hidden = true;
+          if (choice) item = { ...item, ...(await createNewPerson(choice)) };
           const picked = role.get() || null;
           const { link } = await createUniversalLink({
             source_ref: meetingRef,
@@ -490,6 +521,7 @@ export async function renderMeetingPage(
           attendees = [...attendees, { linkId: link.id, ref: item.ref, role: picked, name: item.display_label, organisationRef: null }];
           people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
           paintRoom();
+          if (choice) void refreshDirectory();
         } catch (err) {
           status.hidden = false;
           status.textContent = err instanceof ApiClientError ? err.message : 'Could not add them.';
@@ -499,6 +531,45 @@ export async function renderMeetingPage(
     // Choice first, then the field: the same order as the task panels.
     wrap.append(role.root, input, picker.root, status);
     return wrap;
+  }
+
+  const newStudents = new Map<string, DirectoryPersonRow>();
+
+  /** Makes the person (and, for a student, the Student relationship) before they join the room. */
+  async function createNewPerson(choice: NewPersonChoice): Promise<{ ref: string; display_label: string }> {
+    const person = await createEntity({ kind: 'person', display_name: choice.name });
+    if (choice.student) {
+      const selfRef = selfRow?.ref ?? (await fetchSelfPerson()).self?.ref ?? null;
+      if (selfRef) {
+        await createUniversalLink({
+          source_ref: selfRef,
+          target_ref: person.ref,
+          relationship_type: 'professional_relationship',
+          role: 'student',
+          valid_from: new Date().toISOString()
+        });
+      }
+      // Shown as a student at once, before the directory catches up.
+      newStudents.set(person.ref, provisionalRow(person.ref, choice.name));
+      directory = [...directory, newStudents.get(person.ref)!];
+    }
+    resetPickerDirectory();
+    return { ref: person.ref, display_label: person.display_name ?? choice.name };
+  }
+
+  async function refreshDirectory(): Promise<void> {
+    try {
+      const fresh = await fetchPeopleDirectory({ fresh: true });
+      const rows = [...fresh.people, ...(fresh.students ?? [])];
+      // A scan that hasn't picked up the Student relationship yet keeps the provisional row.
+      directory = [
+        ...rows.filter((row) => !newStudents.has(row.ref) || row.person_type === 'student'),
+        ...[...newStudents.values()].filter((row) => !rows.some((r) => r.ref === row.ref && r.person_type === 'student'))
+      ];
+      paintRoom();
+    } catch {
+      // The provisional row stays until the next load.
+    }
   }
 
   async function refreshTaskLinks(): Promise<void> {

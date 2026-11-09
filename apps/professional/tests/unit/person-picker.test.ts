@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { labelPeopleHits } from '@/lib/person-picker';
+import { labelPeopleHits, newPersonRows, readNewPersonChoice } from '@/lib/person-picker';
 import type { DirectoryPersonRow } from '@/api/people-directory';
 
 function person(ref: string, name: string, extra: Partial<DirectoryPersonRow> = {}): DirectoryPersonRow {
@@ -56,5 +56,31 @@ describe('labelPeopleHits', () => {
     const rows = labelPeopleHits([hit('shared:person:copy', 'Jo Tan'), hit('shared:person:real', 'Jo Tan')], directory);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.ref).toBe('shared:person:real');
+  });
+});
+
+describe('newPersonRows', () => {
+  const real = (name: string) => ({ ref: `shared:person:${name}`, kind: 'person' as const, display_label: name, supporting_label: null, href: null });
+
+  it('offers a new person and a new student when nobody has that exact name', () => {
+    const rows = newPersonRows('  Jo   Quillan ', [real('Joan Quillan')]);
+    expect(rows.map((row) => row.display_label)).toEqual([
+      'Add “Jo Quillan” as a new person',
+      'Add “Jo Quillan” as a new student'
+    ]);
+    expect(rows.map((row) => readNewPersonChoice(row.ref))).toEqual([
+      { name: 'Jo Quillan', student: false },
+      { name: 'Jo Quillan', student: true }
+    ]);
+  });
+
+  it('offers nothing when the name is already there or too short', () => {
+    expect(newPersonRows('joan quillan', [real('Joan Quillan')])).toEqual([]);
+    expect(newPersonRows('J', [])).toEqual([]);
+  });
+
+  it('reads real refs as no choice', () => {
+    expect(readNewPersonChoice('shared:person:abc')).toBeNull();
+    expect(readNewPersonChoice('new:other:Jo')).toBeNull();
   });
 });

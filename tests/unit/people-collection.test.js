@@ -396,3 +396,36 @@ for (const lifecycleStatus of ['deleted', 'deidentified']) {
     assert.ok(await store.get(`entities/person/${removedId}`), 'the suppression marker must still block import fallback');
   });
 }
+
+test('a Communications student adopted into Blobs still loads with includeStudents', async () => {
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  const env = { GITHUB_TOKEN: 'token' };
+  const fetchImpl = githubFetch({
+    people: [
+      { legacy_id: 'leg-adopted', display_name: 'Pia Quellwater', original_category: STUDENT_ORIGINAL_CATEGORY },
+      { legacy_id: 'leg-plain', display_name: 'Rory Vantage', original_category: STUDENT_ORIGINAL_CATEGORY },
+      { legacy_id: 'leg-removed', display_name: 'Sol Removed', original_category: STUDENT_ORIGINAL_CATEGORY }
+    ],
+    organisations: [],
+    relationships: []
+  });
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
+  const { createIdentityRepository } = await import('../../netlify/functions/_shared/identity-repository.mjs');
+  const { getGithubPerson } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
+  const adoptedId = derivePersonId('leg-adopted');
+  const repo = createIdentityRepository({ store, github: { env, fetchImpl } });
+  await repo.adoptImportedIdentity({ kind: 'person', record: await getGithubPerson(adoptedId, { env, fetchImpl }) });
+  // A same-name Blob copy with its own id must not show twice.
+  await makePerson(store, { display_name: 'Pia Quellwater' });
+  await makePerson(store, { id: derivePersonId('leg-removed'), display_name: 'Sol Removed', lifecycle_status: 'deleted' });
+
+  const network = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
+  assert.deepEqual(network, [], 'students never join the colleague network');
+
+  const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl, includeStudents: true });
+  const names = result.map((row) => row.person.display_name).sort();
+  assert.deepEqual(names, ['Pia Quellwater', 'Rory Vantage']);
+  assert.ok(result.every((row) => isImportedStudentPerson(row.person)));
+  assert.equal(result.find((row) => row.person.display_name === 'Pia Quellwater').person.id, adoptedId);
+});
