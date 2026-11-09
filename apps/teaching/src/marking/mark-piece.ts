@@ -96,8 +96,20 @@ export type MarkPieceHandle = {
   rubric: RubricPanel | null;
 };
 
+/** The same code on the same words: a second copy of a tag, which only ever doubles the tally. */
+const sameTag = (a: Omit<Tag, 'positive'>, b: Omit<Tag, 'positive'>): boolean =>
+  a.code_id === b.code_id && a.part === b.part && a.field === b.field && a.start === b.start && a.end === b.end;
+
 export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): MarkPieceHandle {
-  let tags: ShownTag[] = [...(d.feedback?.tags ?? []), ...(o.suggested ?? []).map((t) => ({ ...t, positive: false, ai: true }))];
+  let tags: ShownTag[] = [];
+  /** Puts a code on the words, unless that code is already there; an AI copy waiting there is kept instead. */
+  const addTag = (t: ShownTag): void => {
+    const there = tags.find((x) => sameTag(x, t));
+    if (!there) tags.push(t);
+    else if (there.ai && !t.ai) { delete there.ai; delete there.why; }
+  };
+  for (const t of d.feedback?.tags ?? []) addTag({ ...t });
+  for (const t of o.suggested ?? []) addTag({ ...t, positive: false, ai: true });
   const steps: Record<string, string> = { ...(d.mark?.steps ?? {}) };
   let armed: { id: string; positive: boolean } | null = null;
   let status = d.feedback?.status ?? 'draft';
@@ -138,7 +150,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   const pressCode = (id: string, positive: boolean): void => {
     onSelection();
     if (selected) {
-      tags.push({ code_id: id, positive, ...selected });
+      addTag({ code_id: id, positive, ...selected });
       selected = null;
       window.getSelection()?.removeAllRanges();
     } else armed = armed?.id === id ? null : { id, positive };
@@ -259,28 +271,60 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       return;
     }
     if (!armed) return;
-    tags.push({ code_id: armed.id, positive: armed.positive, ...sel });
+    addTag({ code_id: armed.id, positive: armed.positive, ...sel });
+    // These words are tagged now, so a quick press of another code arms it rather than tagging them again.
+    selected = null;
+    window.clearTimeout(clearSelected);
     justTagged = true;
     paint();
   });
 
+  function hideMenu(): void {
+    menu.hidden = true;
+    left.style.minHeight = '';
+  }
+
   /** Opens under the line that was clicked, or over it when there's no room below in the visible part of the page. */
   function placeMenu(run: HTMLElement, y: number): void {
+    // Measured at its own height, so switching codes in an open menu doesn't keep the old growth.
+    left.style.minHeight = '';
     const box = left.getBoundingClientRect();
     const lines = [...run.getClientRects()];
     const line = lines.find((r) => y >= r.top && y <= r.bottom) ?? lines.at(-1) ?? run.getBoundingClientRect();
     const seen = visibleBand(left);
     const tall = menu.offsetHeight;
     const over = line.bottom + MENU_GAP + tall > seen.bottom && line.top - MENU_GAP - tall >= seen.top;
-    menu.style.top = `${(over ? line.top - MENU_GAP - tall : line.bottom + MENU_GAP) - box.top + left.scrollTop}px`;
+    const top = (over ? line.top - MENU_GAP - tall : line.bottom + MENU_GAP) - box.top + left.scrollTop;
+    menu.style.top = `${top}px`;
+    // Short writing makes a short column, which would cut the menu off at its buttons: it grows while the menu is open.
+    const need = top + tall + MENU_GAP;
+    left.style.minHeight = need > left.clientHeight ? `${Math.ceil(need)}px` : '';
     menu.style.left = `${Math.max(0, Math.min(line.left - box.left, left.clientWidth - menu.offsetWidth))}px`;
     menu.scrollIntoView?.({ block: 'nearest' });
   }
 
-  /** A small menu on an existing highlight, beside the words: add a note, flip strength or growth, remove. */
-  function openMenu(tag: ShownTag, run: HTMLElement, y: number): void {
+  /**
+   * A small menu on an existing highlight, beside the words: add a note, flip strength or growth, remove.
+   * Words carrying several codes list them all at the top, so each one can be reached and removed.
+   */
+  function openMenu(stack: ShownTag[], tag: ShownTag, run: HTMLElement, y: number): void {
     const c = codes.get(tag.code_id);
-    menu.replaceChildren(el('b', 'mk-menu__title', `${c?.code ?? ''} ${c?.label ?? ''}${tag.positive ? ' (strength)' : ''}`));
+    menu.replaceChildren();
+    if (stack.length > 1) {
+      const picks = el('div', 'mk-menu__picks');
+      picks.setAttribute('aria-label', 'Codes on these words');
+      for (const t of stack) {
+        const tc = codes.get(t.code_id);
+        const b = el('button', `mk-menu__pick mk-menu__pick--${tc?.colour ?? 'blue'}`, tc?.code ?? '?');
+        b.type = 'button';
+        b.title = `${tc?.code ?? ''} ${tc?.label ?? ''}${t.positive ? ' (strength)' : ''}`;
+        b.setAttribute('aria-pressed', String(t === tag));
+        b.addEventListener('click', () => openMenu(stack, t, run, y));
+        picks.append(b);
+      }
+      menu.append(picks);
+    }
+    menu.append(el('b', 'mk-menu__title', `${c?.code ?? ''} ${c?.label ?? ''}${tag.positive ? ' (strength)' : ''}`));
     const note = el('input', 'mk-menu__note');
     note.type = 'text';
     note.value = tag.note ?? '';
@@ -294,7 +338,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     note.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === 'Escape') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        menu.hidden = true;
+        hideMenu();
       }
     });
     if (tag.why) menu.append(el('p', 'mk-ai', tag.why));
@@ -302,13 +346,30 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     if (tag.ai) actions.append(button('Keep it', 'primary', () => { delete tag.ai; delete tag.why; paint(); }));
     const flip = button(tag.positive ? 'Make it growth' : 'Make it a strength', 'secondary', () => { tag.positive = !tag.positive; paint(); });
     const remove = button(tag.ai ? 'Drop it' : 'Remove', 'secondary', () => { tags = tags.filter((t) => t !== tag); paint(); });
-    const close = button('Done', 'ghost', () => { menu.hidden = true; });
+    const close = button('Done', 'ghost', () => { hideMenu(); });
     actions.append(flip, remove, close);
     menu.append(note, actions);
     menu.hidden = false;
     placeMenu(run, y);
     // Straight to typing, except on a touch screen where the keyboard would cover the words.
     if (window.matchMedia?.('(hover: hover)').matches) note.focus({ preventScroll: true });
+  }
+
+  /**
+   * A highlight draws two codes' colours at most, so words carrying more say how many more ("+1"),
+   * once at the end of each stretch, rather than a new code going on and seeming to vanish.
+   */
+  function markStacks(sheet: HTMLElement, mine: ShownTag[]): void {
+    const runs = [...sheet.querySelectorAll<HTMLElement>('.pa-run--mark')];
+    const more = runs.map((run) => {
+      const [a, b] = [Number(run.dataset.start), Number(run.dataset.end)];
+      return Math.max(0, mine.filter((t) => t.start < b && t.end > a).length - 2);
+    });
+    runs.forEach((run, i) => {
+      const next = runs[i + 1];
+      const joined = next && next.dataset.start === run.dataset.end;
+      if (more[i]! > 0 && !(joined && more[i + 1] === more[i])) run.dataset.more = `+${more[i]}`;
+    });
   }
 
   function draftPills(): HTMLElement | null {
@@ -350,7 +411,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   }
 
   function paint(): void {
-    menu.hidden = true;
+    hideMenu();
     sheets.replaceChildren();
     const pills = draftPills();
     if (pills) sheets.append(pills);
@@ -393,9 +454,11 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
           const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark');
           if (!run) return;
           const at = Number(run.dataset.start);
-          const tag = mine.find((t) => t.start <= at && t.end > at);
-          if (tag) openMenu(tag, run, e.clientY);
+          const stack = mine.filter((t) => t.start <= at && t.end > at);
+          // The newest code on the words first: it's the one just put there.
+          if (stack.length) openMenu(stack, stack.at(-1)!, run, e.clientY);
         });
+        markStacks(sheet, mine);
         sheets.append(sheet);
         if (pick) sheets.append(pickCaption(d.student.initials, pickCode));
       }
@@ -480,7 +543,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   // Press anywhere else and the note box goes; the note is already kept.
   root.addEventListener('pointerdown', (e) => {
     const on = e.target as HTMLElement;
-    if (!menu.hidden && !menu.contains(on) && !on.closest('.pa-run--mark')) menu.hidden = true;
+    if (!menu.hidden && !menu.contains(on) && !on.closest('.pa-run--mark')) hideMenu();
   });
   cols.append(left, side);
   root.append(cols);

@@ -59,6 +59,20 @@ describe('mark piece', () => {
       expect(menu.style.top).toBe('444px'); // line top 700 - gap 6 - height 150 - column top 100
     });
 
+    it('grows a short column so the whole menu fits, and shrinks it back when the menu goes', () => {
+      const { handle, menu } = open(110, 200);
+      const left = handle.el.querySelector<HTMLElement>('.mk-left')!;
+      expect(left.style.minHeight).toBe('242px');
+      // Measured afresh each time it opens, never against the height it already added.
+      Object.defineProperty(left, 'clientHeight', { configurable: true, get: () => (left.style.minHeight ? 242 : 40) });
+      handle.el.querySelector<HTMLElement>('.pa-run--mark')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: 120 }));
+      expect(left.style.minHeight).toBe('242px');
+      [...menu.querySelectorAll('button')].find((b) => b.textContent === 'Done')!.click();
+      expect(menu.hidden).toBe(true);
+      expect(left.style.minHeight).toBe('');
+      handle.el.remove();
+    });
+
     it('keeps the note as it is typed, without needing Done', async () => {
       const { handle, save, input } = open(300, 150);
       input.value = 'Say what it does.';
@@ -153,6 +167,95 @@ describe('mark piece: select, then code', () => {
     expect(el.querySelector('.mk-tally')!.textContent).toContain('TS 1');
     await save();
     expect(a.save.mock.calls[1]![0].tags[0]).toEqual({ code_id: 'ts', positive: false, part: 'answers', field: 'q1', start: 0, end: 34 });
+    el.remove();
+  });
+});
+
+describe('mark piece: several codes on the same words', () => {
+  const three: MarkPieceData = {
+    ...data,
+    codes: [
+      { id: 'ts', code: 'TS', label: 'Topic sentence', colour: 'peach', group: 'composition', descriptor: '' },
+      { id: 'ev', code: 'EV', label: 'Evidence', colour: 'sage', group: 'composition', descriptor: '' },
+      { id: 'an', code: 'AN', label: 'Analysis', colour: 'blue', group: 'composition', descriptor: '' }
+    ],
+    recent_codes: []
+  };
+  const act = () => ({ save: vi.fn().mockResolvedValue({}), returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });
+  const pick = (node: Text, start: number, end: number) => vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, anchorNode: node, anchorOffset: start, focusNode: node, focusOffset: end, removeAllRanges: () => undefined } as unknown as Selection);
+  const press = (el: HTMLElement, id: string) => (el.querySelector(`[data-code="${id}"]`) as HTMLButtonElement).click();
+  const firstWords = (el: HTMLElement) => el.querySelector('.pa-run')!.firstChild as Text;
+  const menuButton = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('.mk-menu button')].find((b) => b.textContent?.trim() === label)!;
+  afterEach(() => vi.restoreAllMocks());
+
+  it('shows a third code on words that already carry two', () => {
+    const { el } = openMarkPiece(three, act(), { embedded: true });
+    document.body.append(el);
+    for (const id of ['ts', 'ev', 'an']) { pick(firstWords(el), 0, 6); press(el, id); }
+    const run = el.querySelector<HTMLElement>('.pa-run--mark')!;
+    expect(run.dataset.more).toBe('+1');
+    el.remove();
+  });
+
+  it('pressing the same code on the same words again adds no second copy', async () => {
+    const a = act();
+    const { el, save } = openMarkPiece(three, a, { embedded: true });
+    document.body.append(el);
+    pick(firstWords(el), 0, 6); press(el, 'an');
+    pick(firstWords(el), 0, 6); press(el, 'an');
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('AN 1');
+    await save();
+    expect(a.save.mock.calls[0]![0].tags).toHaveLength(1);
+    el.remove();
+  });
+
+  it('a stale selection does not tag the same words twice when a code is armed', () => {
+    const { el } = openMarkPiece(three, act(), { embedded: true });
+    document.body.append(el);
+    press(el, 'ev'); // nothing selected: arms EV
+    // Selecting while armed tags straight away; the words leave the selection.
+    pick(firstWords(el), 0, 6);
+    document.dispatchEvent(new Event('selectionchange'));
+    el.dispatchEvent(new CustomEvent('pm:select', { detail: { part: 'answers', field: 'q1', start: 0, end: 6 } }));
+    vi.restoreAllMocks();
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: true, anchorNode: null, focusNode: null, removeAllRanges: () => undefined } as unknown as Selection);
+    press(el, 'ts'); // a quick press straight after must arm TS, not tag the old words
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('EV 1');
+    el.remove();
+  });
+
+  it('the menu on stacked words picks between their codes and removes the one chosen', async () => {
+    const a = act();
+    const { el, save } = openMarkPiece(three, a, { embedded: true });
+    document.body.append(el);
+    for (const id of ['ts', 'ev', 'an']) { pick(firstWords(el), 0, 6); press(el, id); }
+    vi.restoreAllMocks();
+    el.querySelector<HTMLElement>('.pa-run--mark')!.click();
+    const menu = el.querySelector<HTMLElement>('.mk-menu')!;
+    expect(menu.hidden).toBe(false);
+    // Opens on the newest code, with the others one tap away.
+    expect(menu.querySelector('.mk-menu__title')!.textContent).toContain('AN');
+    expect([...menu.querySelectorAll('.mk-menu__pick')].map((b) => b.textContent)).toEqual(['TS', 'EV', 'AN']);
+    menuButton(el, 'Remove').click();
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('TS 1 · EV 1');
+    el.querySelector<HTMLElement>('.pa-run--mark')!.click();
+    [...el.querySelectorAll<HTMLButtonElement>('.mk-menu__pick')].find((b) => b.textContent === 'TS')!.click();
+    expect(el.querySelector('.mk-menu__title')!.textContent).toContain('TS');
+    menuButton(el, 'Remove').click();
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('EV 1');
+    await save();
+    expect(a.save.mock.calls[0]![0].tags.map((t: { code_id: string }) => t.code_id)).toEqual(['ev']);
+    el.remove();
+  });
+
+  it('drops copies that were already saved twice', async () => {
+    const a = act();
+    const t = { code_id: 'an', positive: false, part: 'answers', field: 'q1', start: 0, end: 6 };
+    const { el, save } = openMarkPiece({ ...three, feedback: { tags: [t, { ...t }], comment: '', status: 'draft' } }, a, { embedded: true });
+    document.body.append(el);
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('AN 1');
+    await save();
+    expect(a.save.mock.calls[0]![0].tags).toHaveLength(1);
     el.remove();
   });
 });
