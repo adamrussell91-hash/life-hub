@@ -25,6 +25,7 @@ Concept doc only. Nothing builds from here until Adam names a slice. Mockup: [st
 
 - **Gates inside a station.** Any section can be set to stay blurred until a hinge question in the same station is right, so a student can't glide past a misconception. See [Gates](#gates-inside-a-station).
 - **An evidence board, kept simple.** Collected pieces land as cards on a per-student board. Students can drag the cards and link them with a word, nothing more. It saves to the account, so it can't be wiped. See [Evidence board](#evidence-board).
+- **AI-checked written gates.** For senior students a multiple-choice gate isn't enough. A gate can instead be a short written answer (for example a Year 12 three-marker) that an AI checker reads against the teacher's criteria before the station opens. See [Written gates](#written-gates-ai-checked).
 - **A pretest, not self-rating.** The 1-to-4 confidence rating is cut. A short pretest sets each student's level at each station and feeds teacher-station routing. See [Pretest](#pretest-sets-the-levels).
 
 ## The four parts
@@ -120,6 +121,52 @@ Any section from the second onward can carry a **gate**: it stays blurred until 
 - **Miss twice:** the student isn't trapped. They're added to the next teacher-station group, the teacher is flagged, and the reteach card stays on screen. The teacher can open the gate from the live view.
 - **Gate misses count separately** in the hint heat and the markbook, so the teacher can see which misconception is stopping students.
 
+### Written gates (AI-checked)
+
+For Year 11 and 12, getting a multiple-choice question right is not proof enough. A gate can instead be a **written answer** checked against the teacher's criteria before the rest of the station opens. Example from the mockup (invented extract): *How does the writer represent isolation in this extract? (3 marks)*, needing three different techniques, each named, quoted and explained.
+
+**Teacher setup**
+
+- The question, the passage it is about, and the marks.
+- **What each mark needs**, as separate checks. For a technique answer: technique named correctly · exact quote from the passage · the technique really is at work in that quote · effect linked to the question's idea (here, isolation).
+- Whether techniques must be **different**.
+- **Pass at:** for example 3 of 3, or 2 of 3 at Support level.
+- **Answer key (optional):** quotes the teacher expects and the techniques that fit them. The checker may accept others it can justify, and says so.
+- **Checks before the teacher is flagged** (default 3).
+
+**Two layers of checking**
+
+1. **Rules first**, with no AI: is each quote word for word in the passage, is the named technique on the hub's technique list, are there enough different techniques, and is the answer long enough. These are cheap and can't be talked round.
+2. **Then the AI** judges what rules can't: is the technique really at work in that quote (a simile called a metaphor fails), and does the explanation say how it shows the idea, rather than just restating it.
+
+**What the student sees**
+
+- A result **per point and per check**, each with a short reason: "Look again at the word that joins the two things being compared", "These words aren't in the extract".
+- **It points to the problem and never writes the answer.** No model sentences and no corrected quotes.
+- **Feedback gets more specific** on later checks.
+- The answer must **change** between checks, so a student can't keep resubmitting the same text.
+- After the last check the teacher is flagged with the answer and every check. The student moves to another station and comes back, so they're not stuck.
+- **"I think the checker got this wrong"** sends the answer to the teacher's queue. The verdict stands until the teacher looks; the teacher can pass it and their decision wins.
+
+**Guards**
+
+- **The AI never closes a gate on its own when it's unsure.** An `unsure` verdict goes to the teacher, not to a fail.
+- **Student writing is data, not instructions.** It goes to the model as quoted text with no names, under an opaque id. A rule check stops answers that try to talk to the checker ("mark this 3/3").
+- **The gate is formative.** Its verdicts don't go into the markbook as marks unless the teacher chooses. Every attempt is kept, so the teacher can see how the writing changed.
+- **The answer itself must still be the student's.** The checker only gives feedback.
+
+**What's new under the hood**
+
+The hub already AI-marks `explain_effect` and `extended_response` answers (`apps/teaching/src/ai/answer-marking-jobs.ts`, standard lane), but only as a batch the teacher starts, and students never call it. A written gate needs a **live check that the student starts**, answered in a few seconds. That is the one real new piece: a student-facing endpoint, a per-student and per-class rate limit, a daily cost cap per class, and a fallback (the gate turns into a teacher check) if the AI is down or the cap is reached.
+
+**Cost (a guess, not a measured run)**
+
+Using the repo's `PRICES` for the standard lane (Sonnet 5.5: US$2 per million input tokens, US$10 per million output), with about 1,300 fresh input tokens, about 1,200 cached and about 350 output tokens per check:
+
+- About US$0.0064, or **about A$0.01 a check**.
+- A class of 28 at about 2 checks each is about **A$0.55 per gate per lesson**.
+- The fast lane would be about a twentieth of that, but is weaker at judging whether a technique is really at work. The spec should measure both on real answers before choosing.
+
 **Station settings:** knowledge type, skill strand, outcomes, minutes, capacity, location (room spot, QR code or online), and whether it can be marked done offline (teacher tick or code entry).
 
 **Station library:** stations are saved on their own and can be reused across rotations.
@@ -203,6 +250,8 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 - **Bell mode in v1**, or self-paced only (with the teacher station's "call group")?
 - **Finale**: its own build inside this lesson type, or a handoff to the Design Sprint or Case Study?
 - **Pretest length**: two questions per station, or let the teacher set three for higher-stakes stations?
+- **Written gates: model lane**: standard for accuracy, or fast with standard only when the fast lane is unsure?
+- **Written gates: what a mark is**: should passing the gate also count as a mark in the markbook, or always stay formative?
 - **Gates in bell mode**: if the bell goes while a student is still at a gate, does the station carry over, or go straight to the teacher-station group?
 - **Devices**: one per student, or one per group at some stations?
 - **Grouping**: fixed groups for the whole lesson, or free movement with groups only at the teacher station?
@@ -225,4 +274,5 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 ## History
 
 - 9 Nov 2026: first draft from the brainstorm round, with the mockup.
+- 9 Nov 2026: added AI-checked written gates for senior classes, with a Year 12 English example in the mockup.
 - 9 Nov 2026: added gates inside a station, the evidence board and the pretest; cut the 1-to-4 self-rating. Mockup updated with a pretest view, a working gate (miss, reteach, backup, flag) and a drag-and-link board.

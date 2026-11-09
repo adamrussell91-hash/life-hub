@@ -239,6 +239,24 @@ p { margin: 0 0 10px; }
 .growth__row { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 4.5rem; gap: 8px; align-items: center; font-size: var(--text-sm); }
 .growth__row span:last-child { font-size: var(--text-xs); color: var(--muted); text-align: right; }
 
+/* written gate */
+.extract { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-md); line-height: 1.7; }
+.checking { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: var(--text-sm); color: var(--muted); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--wave); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.wg-score { margin: 12px 0 8px; font-size: var(--text-sm); }
+.wg-point { border: 1px solid var(--line); border-left: 4px solid var(--high-sea); border-radius: var(--radius-xs); background: #fff; padding: 10px 12px; margin-bottom: 8px; }
+.wg-point[data-pass="true"] { border-left-color: var(--success); }
+.wg-point__head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--text-sm); }
+.wg-point__head .chip { margin-left: auto; }
+.wg-checks { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: var(--text-sm); }
+.wg-checks li[data-ok="true"] { color: var(--success); }
+.wg-checks li[data-ok="false"] { color: var(--danger); }
+.wg-checks li span { display: block; color: var(--ink); padding-left: 16px; }
+.setup { display: grid; gap: 8px; font-size: var(--text-sm); }
+.setup b { display: block; font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
 /* ---------- narrow ---------- */
 @media (max-width: 860px) {
   .grid--side, .grid--2 { grid-template-columns: 1fr; }
@@ -267,6 +285,7 @@ p { margin: 0 0 10px; }
     <button data-view="pretest">Student: pretest</button>
     <button data-view="map">Student: map</button>
     <button data-view="station">Student: station</button>
+    <button data-view="written">Student: written gate</button>
     <button data-view="live">Teacher: live</button>
     <button data-view="finale">Student: finale</button>
   </div>
@@ -505,6 +524,74 @@ p { margin: 0 0 10px; }
         <p class="small">Try the hints first. Then put up a hand and you'll join the queue.</p>
         <button class="btn btn--small" id="handBtn">Hand up</button>
         <p class="feedback" id="fb-hand"></p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ======================= WRITTEN GATE (Y12) ======================= -->
+<section class="view" id="view-written" hidden>
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <div>
+      <p class="eyebrow">Example in another subject · 12 English · Station 2 of a rotation on representation</p>
+      <h2>Close reading: the extract</h2>
+    </div>
+    <div class="seg" id="wgSide"><button data-side="student" aria-pressed="true">Student</button><button data-side="teacher">Teacher setup</button></div>
+  </div>
+  <div class="grid grid--side">
+    <div class="grid">
+      <div class="sect sect--goal">
+        <div class="sect__head"><span class="sect__title">The extract</span><span class="small muted">invented for this mockup</span></div>
+        <p class="extract" id="extract"></p>
+      </div>
+
+      <div class="sect sect--gate" id="wg">
+        <div class="sect__head"><span class="sect__title">Check before you go on · 3 marks</span><span class="chip chip--gold">Opens the rest</span></div>
+        <p><b>How does the writer represent isolation in this extract?</b></p>
+        <p class="small muted">Use three different techniques. For each: name it, quote the exact words, and explain how it shows isolation.</p>
+        <textarea class="ta" rows="7" id="wgText"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn btn--primary btn--small" id="wgCheck">Check my writing</button>
+          <span class="small muted" id="wgTries">3 checks before your teacher steps in</span>
+          <button class="btn btn--small" id="wgDemo" style="margin-left:auto">Demo: write a strong answer</button>
+        </div>
+        <div id="wgResult" aria-live="polite"></div>
+      </div>
+
+      <div class="gated" id="wgGated" data-open="false">
+        <div class="gated__veil"><span>🔒 Opens when all three points pass</span></div>
+        <div class="gated__inner" inert>
+          <div class="sect"><div class="sect__head"><span class="sect__title">Extend it to 6 marks</span></div><p class="small">Now link two of your techniques: how do they work together?</p><textarea class="ta" rows="3"></textarea></div>
+          <div class="sect"><div class="sect__head"><span class="sect__title">Exit check</span></div><p class="small">…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="grid">
+      <div class="panel" id="wgStudentAside">
+        <p class="eyebrow">What the checker looks at</p>
+        <ul class="done-list">
+          <li>Three <b>different</b> techniques</li>
+          <li>Each quote is <b>word for word</b> from the extract</li>
+          <li>Each technique is <b>really at work</b> in that quote</li>
+          <li>Each explanation links to <b>isolation</b></li>
+        </ul>
+        <p class="small muted" style="margin:10px 0 0">It tells you which point needs work and why. It won't rewrite your answer.</p>
+      </div>
+      <div class="panel" id="wgTeacherAside" hidden>
+        <p class="eyebrow">Gate setup</p>
+        <div class="setup">
+          <div><b>Kind</b>Written answer, AI-checked</div>
+          <div><b>Marks</b>3 · one per technique</div>
+          <div><b>Each mark needs</b>Technique named correctly · exact quote · effect linked to the idea</div>
+          <div><b>The idea</b>isolation</div>
+          <div><b>Different techniques</b>Yes</div>
+          <div><b>Pass at</b>3 of 3 <span class="muted">(Support level: 2 of 3)</span></div>
+          <div><b>Checks before you're flagged</b>3</div>
+          <div><b>Answer key</b>Optional. Quotes you expect and the techniques that fit them. The checker can accept others it can justify.</div>
+          <div><b>Feedback</b>Points to the problem; never writes the answer</div>
+          <div><b>Cost</b>About A$0.01 a check · about A$0.55 for a class of 28 (estimate)</div>
+        </div>
       </div>
     </aside>
   </div>
@@ -971,6 +1058,88 @@ $$('#mapTabs button').forEach(b => b.onclick = () => {
   renderBoard();
 });
 
+// written gate: the real check is an AI call; this mockup fakes it with simple rules
+const EXTRACT = 'The house kept its silence like a held breath. Each morning she set two cups on the table and poured one. Outside, the wind combed the paddocks flat, and the road ran out to the horizon and did not come back. She talked to the radio. The radio did not talk to her. Somewhere a dog barked, then thought better of it. Alone, alone, the kettle sighed.';
+const KEY = [
+  ['like a held breath', ['simile']], ['two cups', ['symbolism', 'symbol']], ['poured one', ['symbolism', 'symbol']],
+  ['combed the paddocks', ['personification', 'imagery']], ['did not come back', ['personification']],
+  ['thought better of it', ['personification']], ['kettle sighed', ['personification']], ['alone, alone', ['repetition']],
+  ['talked to the radio', ['antithesis', 'juxtaposition', 'chiasmus', 'parallelism']], ['did not talk to her', ['antithesis', 'juxtaposition', 'chiasmus', 'parallelism']],
+];
+const TECHS = ['simile', 'metaphor', 'personification', 'imagery', 'symbolism', 'symbol', 'repetition', 'antithesis', 'juxtaposition', 'chiasmus', 'parallelism', 'alliteration', 'onomatopoeia', 'hyperbole'];
+const THEME = /isolat|alone|lonel|solitar|absen|empty|emptiness|distance|silence|cut off|disconnect|no one/i;
+const EFFECT = /suggest|convey|emphasi|reinforc|reflect|highlight|show|evoke|capture|underscor/i;
+const DRAFT = 'The writer uses a metaphor in "like a held breath" to show that the house is tense. Personification in "the wind combed the paddocks flat" suggests the landscape is vast and empty, emphasising how isolated she is. The writer also uses repetition in "alone again, alone" which shows she is lonely.';
+const STRONG = 'The simile "like a held breath" suggests the house is suspended in silence, as if waiting for company that never arrives, which emphasises her isolation. The symbolism of the "two cups" with only one "poured" conveys an absence: she still sets a place for someone who is gone, so her loneliness is built into her routine. Finally, the antithesis of "She talked to the radio. The radio did not talk to her." highlights that her attempts at connection go nowhere, reinforcing how cut off she is.';
+const norm = t => t.toLowerCase().replace(/[“”"’']/g, '').replace(/\s+/g, ' ').trim();
+const wg = { tries: 0, max: 3, last: '', open: false };
+function checkWriting(text) {
+  // keep quoted words whole: full stops inside quotation marks don't end a sentence
+  const held = [];
+  const masked = text.replace(/["“][^"”]*["”]/g, m => `\u0000${held.push(m) - 1}\u0000`);
+  const sentences = masked.split(/(?<=[.!?])\s+(?=[A-Z\u0000])/).map(t => t.replace(/\u0000(\d+)\u0000/g, (_, i) => held[+i]));
+  const points = [];
+  sentences.forEach(sen => {
+    const quotes = [...sen.matchAll(/["“]([^"”]+)["”]/g)].map(m => m[1]);
+    if (!quotes.length) return;
+    const tech = TECHS.find(t => new RegExp('\\b' + t, 'i').test(sen));
+    if (points.length && !tech) { points[points.length - 1].quotes.push(...quotes); return; }
+    points.push({ sen, tech, quotes });
+  });
+  const seen = new Set();
+  return points.slice(0, 3).map(p => {
+    const found = p.quotes.every(q => norm(EXTRACT).includes(norm(q)));
+    const keyHit = KEY.filter(([frag]) => p.quotes.some(q => norm(q).includes(frag) || frag.includes(norm(q))));
+    const fits = keyHit.some(([, ts]) => ts.includes(p.tech));
+    const better = keyHit.length ? keyHit[0][1][0] : null;
+    const repeat = p.tech && seen.has(p.tech); if (p.tech) seen.add(p.tech === 'symbol' ? 'symbolism' : p.tech);
+    const linked = EFFECT.test(p.sen) && THEME.test(p.sen);
+    const checks = [
+      { ok: !!p.tech, label: 'Technique named', why: 'Name the technique you are pointing to.' },
+      { ok: found, label: 'Exact quote', why: 'These words aren\'t in the extract. Check the exact wording.' },
+      { ok: found && fits && !repeat, label: 'Technique fits the quote', why: repeat ? 'You have already used this technique. The question asks for three different ones.' : (found && better ? (better === 'simile' ? 'Look again at the word that joins the two things being compared.' : 'Look again at how this quote works. Is that the best name for it?') : 'Fix the quote first.') },
+      { ok: linked, label: 'Effect linked to isolation', why: EFFECT.test(p.sen) ? 'You explain an effect, but not how it shows isolation.' : 'Say what effect this has, and how it shows isolation.' },
+    ];
+    return { quote: p.quotes[0], tech: p.tech, checks, pass: checks.every(c => c.ok) };
+  });
+}
+function renderWritten() {
+  $('#extract').textContent = EXTRACT;
+  if (!$('#wgText').value) $('#wgText').value = DRAFT;
+  $('#wgGated').dataset.open = wg.open;
+  const inner = $('#wgGated .gated__inner'); if (wg.open) inner.removeAttribute('inert'); else inner.setAttribute('inert', '');
+  $('#wg').dataset.state = wg.open ? 'open' : '';
+}
+$('#wgCheck').onclick = () => {
+  const text = $('#wgText').value;
+  if (norm(text) === norm(wg.last)) { $('#wgResult').innerHTML = '<div class="reteach">Change your answer before checking again.</div>'; return; }
+  wg.last = text; wg.tries++;
+  $('#wgCheck').disabled = true;
+  $('#wgResult').innerHTML = '<div class="checking"><span class="spin" aria-hidden="true"></span>Checking your three points…</div>';
+  setTimeout(() => {
+    $('#wgCheck').disabled = false;
+    const pts = checkWriting(text), passed = pts.filter(p => p.pass).length;
+    while (pts.length < 3) pts.push(null);
+    wg.open = passed >= 3;
+    const left = wg.max - wg.tries;
+    $('#wgTries').textContent = wg.open ? 'Passed' : left > 0 ? `${left} check${left > 1 ? 's' : ''} left before your teacher steps in` : 'Your teacher has been flagged';
+    $('#wgResult').innerHTML = `<div class="wg-score"><b>${passed} of 3</b> points pass${wg.open ? ' · the rest of the station is open' : ''}</div>` + pts.map((p, i) => p ? `
+      <div class="wg-point" data-pass="${p.pass}">
+        <div class="wg-point__head"><b>Point ${i + 1}</b> <span class="muted">${p.tech || 'no technique named'} · "${p.quote}"</span><span class="chip ${p.pass ? 'chip--sage' : 'chip--peach'}">${p.pass ? '✓ Pass' : 'Needs work'}</span></div>
+        <ul class="wg-checks">${p.checks.map(c => `<li data-ok="${c.ok}">${c.ok ? '✓' : '✗'} ${c.label}${c.ok ? '' : `<span>${c.why}</span>`}</li>`).join('')}</ul>
+      </div>` : `<div class="wg-point" data-pass="false"><div class="wg-point__head"><b>Point ${i + 1}</b> <span class="muted">missing</span><span class="chip chip--peach">Needs work</span></div><p class="small" style="margin:6px 0 0">Add a third technique, with a quote in quotation marks.</p></div>`).join('')
+      + (!wg.open && left <= 0 ? '<div class="reteach"><b>Your teacher can see your answer and every check.</b> Head to another station; this one will be here when you come back.</div>' : '')
+      + (!wg.open ? '<button class="btn btn--small" id="wgAppeal" style="margin-top:8px">I think the checker got this wrong</button><span class="small muted" id="wgAppealNote"></span>' : '');
+    const ap = $('#wgAppeal'); if (ap) ap.onclick = () => $('#wgAppealNote').textContent = '  Sent to your teacher with your answer. The checker\'s verdict stays until they look.';
+    renderWritten();
+  }, 1100);
+};
+$('#wgDemo').onclick = () => { $('#wgText').value = STRONG; };
+$$('#wgSide button').forEach(b => b.onclick = () => {
+  $$('#wgSide button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  $('#wgStudentAside').hidden = b.dataset.side !== 'student'; $('#wgTeacherAside').hidden = b.dataset.side !== 'teacher';
+});
+
 // teacher live
 const KIDS = ['AM', 'LW', 'TB', 'NP', 'JK', 'RL', 'IS', 'TR', 'MC', 'ED', 'OF', 'PG', 'SH', 'ZY', 'KQ', 'BV', 'CD', 'UN', 'GA', 'HF', 'WE', 'XO'];
 function renderLive() {
@@ -1019,7 +1188,7 @@ function renderCalib() {
       <span>${sc}/2 → ${ex === null ? 'not yet' : 'passed'}</span></div>`;
   }).join('');
 }
-function renderAll() { renderDial(); renderRows(); renderPretest(); renderMap(); renderPassport(); renderLevel(); renderGate(); renderBoard(); renderLive(); renderCalib(); }
+function renderAll() { renderDial(); renderRows(); renderPretest(); renderMap(); renderPassport(); renderLevel(); renderGate(); renderBoard(); renderLive(); renderCalib(); renderWritten(); }
 renderAll();
 </script>
 </body>
