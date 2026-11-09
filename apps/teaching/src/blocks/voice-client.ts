@@ -30,7 +30,16 @@ export type VoiceTag = {
 export type WhisperTranscript = Record<string, unknown> & { text?: string };
 
 export type MineState =
-  | { submitted: false }
+  | {
+      submitted: false;
+      /** A time-pressure run this device (or student) has begun. `elapsed_s` is the server's count. */
+      started?: true;
+      started_at?: string;
+      elapsed_s?: number;
+      initials?: string;
+      /** This call began the run. */
+      fresh?: true;
+    }
   | {
       submitted: true;
       initials: string;
@@ -89,6 +98,17 @@ export function fetchMine(lessonId: string, blockId: string, classId?: string | 
   return apiPost<MineState>(endpoint(lessonId, blockId), {
     action: 'mine',
     token: voiceDevice().token,
+    ...(cls ? { class_id: cls, class_token: deviceToken(`class:${cls}`) } : {})
+  });
+}
+
+/** Begins a time-pressure run: the server notes it once, so the question can't be seen twice. */
+export function startTimed(lessonId: string, blockId: string, initials: string, classId?: string | null): Promise<MineState> {
+  const cls = classId ?? voiceClass;
+  return apiPost<MineState>(endpoint(lessonId, blockId), {
+    action: 'start',
+    token: voiceDevice().token,
+    initials,
     ...(cls ? { class_id: cls, class_token: deviceToken(`class:${cls}`) } : {})
   });
 }

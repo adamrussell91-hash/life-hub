@@ -6,6 +6,7 @@ import { taggedSkills, withTaggedSkills } from '@/deep/block-tags';
 import { loadSkills } from '@/skills/api';
 import type { SkillStrand } from '@/skills/schema';
 import { applyVoicePick, reciteParts, voicePick, SIDE_LABELS, VOICE_PICKS } from '@/blocks/voice-oracy';
+import { FOLLOW_UP_DEFAULTS, PRESSURE_DEFAULTS, PRESSURE_SPEAKING_DEFAULT } from '@/blocks/voice-timed';
 import '@/blocks/peer-feedback.css';
 import '@/blocks/peer-annotate.css';
 import '@/blocks/voice.css';
@@ -50,6 +51,31 @@ function pillGroup<T>(label: string, options: Array<{ value: T; label: string }>
     group.append(b);
   }
   wrap.append(group);
+  return wrap;
+}
+
+/** A whole number of seconds, kept inside its range when the teacher leaves the box. */
+function secondsField(label: string, value: number, min: number, max: number, hint: string, onSet: (v: number) => void): HTMLElement {
+  const wrap = el('div', 'pf-field voice-editor__seconds');
+  const id = `voice-s-${Math.random().toString(36).slice(2, 8)}`;
+  const lab = el('label', 'pf-field__label', label);
+  lab.htmlFor = id;
+  const input = el('input', 'pa-input');
+  input.id = id;
+  input.type = 'number';
+  input.inputMode = 'numeric';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = '1';
+  input.value = String(value);
+  input.style.maxWidth = '7rem';
+  input.addEventListener('change', () => {
+    const n = Math.round(Number(input.value));
+    const clamped = Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : value;
+    input.value = String(clamped);
+    onSet(clamped);
+  });
+  wrap.append(lab, input, el('p', 'pf-field__hint block-secondary', `${hint} ${min}–${max} s.`));
   return wrap;
 }
 
@@ -221,7 +247,9 @@ export function createVoiceTaskFields(
     question.placeholder = field?.placeholder ?? 'e.g. How does the composer represent the human experience of isolation?';
     const mode = content.mode ?? 'listen';
     const timeValue = content.student_chooses_time ? -1 : (content.time_limit_s ?? (mode === 'viva' ? DEFAULT_VIVA_SECONDS : 0));
-    const times = mode === 'respond' ? [{ value: 0, label: 'No limit' }, ...TIMES] : TIMES;
+    const timedOn = content.pressure?.enabled === true && content.oracy !== 'recite';
+    // A timed run needs a fixed speaking time: no "no limit", no student choice.
+    const times = timedOn ? TIMES.filter((t) => t.value > 0) : mode === 'respond' ? [{ value: 0, label: 'No limit' }, ...TIMES] : TIMES;
     const time = pillGroup('Speaking time', times, (v) => v === timeValue, (v) => {
       if (v === -1) update({ student_chooses_time: true, time_limit_s: undefined }, true);
       else update({ student_chooses_time: undefined, time_limit_s: v || undefined }, true);
@@ -243,9 +271,87 @@ export function createVoiceTaskFields(
       ...(mode === 'viva' ? [scaffoldEditor(content)] : []),
       ...(content.oracy === 'speech' || content.oracy === 'debate' ? [stemsField(content)] : []),
       ...(content.oracy === 'presentation' ? [el('p', 'pf-field__hint block-secondary', 'Slides stay in the student’s own tool. You mark from the audio and transcript.')] : []),
+      ...(content.oracy === 'recite' ? [] : [pressureField(content)]),
+      followUpField(content),
       groups,
       ...(shown.includes('speaking') ? [speakingSkillsField()] : [])
     );
+  }
+
+  /** Time pressure: one locked run with the question hidden until prep begins. */
+  function pressureField(content: Content): HTMLElement {
+    const p = content.pressure;
+    const on = p?.enabled === true;
+    const box = el('section', 'voice-editor__timed');
+    const toggle = pillGroup('Time pressure', [{ value: false, label: 'Off' }, { value: true, label: 'On' }], (v) => v === on, (v) => {
+      const next: Partial<Content> = { pressure: { ...PRESSURE_DEFAULTS, ...(p ?? {}), enabled: v } };
+      if (v && (content.student_chooses_time || !content.time_limit_s)) {
+        next.student_chooses_time = undefined;
+        next.time_limit_s = content.time_limit_s || PRESSURE_SPEAKING_DEFAULT;
+      }
+      update(next, true);
+    });
+    toggle.append(el('p', 'pf-field__hint block-secondary', on
+      ? 'One go. The question stays hidden until the student presses Start prepping, then prep, a big countdown, the speaking time and a grace period, and the take sends itself. A reload doesn’t restart it: you can let a student start again from the submissions list.'
+      : 'Students practise as many takes as they like and send their best.'));
+    box.append(toggle);
+    if (!on) return box;
+    const set = (patch: Partial<NonNullable<Content['pressure']>>) => update({ pressure: { ...PRESSURE_DEFAULTS, ...getLatest().content.pressure!, ...patch } });
+    box.append(
+      secondsField('Prep time (s)', p.prep_s ?? PRESSURE_DEFAULTS.prep_s, 10, 600, 'Question showing, dot points to jot.', (v) => set({ prep_s: v })),
+      secondsField('“About to speak” countdown (s)', p.countdown_s ?? PRESSURE_DEFAULTS.countdown_s, 3, 30, 'Big numbers before recording starts.', (v) => set({ countdown_s: v })),
+      secondsField('Grace period (s)', p.grace_s ?? PRESSURE_DEFAULTS.grace_s, 0, 30, 'After the speaking time: recording carries on so they can finish their sentence and press Send.', (v) => set({ grace_s: v }))
+    );
+    return box;
+  }
+
+  /** Follow-ups: questions from a bank, drawn at random after the main answer. */
+  function followUpField(content: Content): HTMLElement {
+    const f = content.follow_up;
+    const on = f?.enabled === true;
+    const box = el('section', 'voice-editor__timed');
+    const base = () => ({ enabled: false, ...FOLLOW_UP_DEFAULTS, questions: [] as string[], ...(getLatest().content.follow_up ?? {}) });
+    const toggle = pillGroup('Follow-up questions', [{ value: false, label: 'Off' }, { value: true, label: 'On' }], (v) => v === on, (v) => update({ follow_up: { ...base(), enabled: v } }, true));
+    toggle.append(el('p', 'pf-field__hint block-secondary', on
+      ? 'After the main answer, a question from your bank pops up. A short think (recording paused), then a timed answer, recorded onto the same take and marked with it.'
+      : 'Add questions students answer on the spot after their main answer.'));
+    box.append(toggle);
+    if (!on) return box;
+    const bank = (f.questions ?? []).filter((q) => q.trim());
+    const set = (patch: Partial<NonNullable<Content['follow_up']>>, repaint = false) => update({ follow_up: { ...base(), ...patch } }, repaint);
+
+    const bankWrap = el('div', 'pf-field');
+    const bankLabel = el('label', 'pf-field__label', 'Question bank');
+    bankLabel.htmlFor = `voice-bank-${getLatest().id}`;
+    const area = el('textarea', 'pa-input voice-editor__bank');
+    area.id = bankLabel.htmlFor;
+    area.rows = 6;
+    area.value = (f.questions ?? []).join('\n');
+    area.placeholder = 'Which line best proves your point, and why?\nWhat would someone who disagrees say?\nHow does this connect to another text we studied?';
+    const bankHint = el('p', 'pf-field__hint block-secondary');
+    const paintHint = (n: number) => {
+      bankHint.textContent = `One question per line, up to 40. ${n} question${n === 1 ? '' : 's'}${n ? '. Each take draws at random, never the same one twice in a take.' : '.'}`;
+    };
+    paintHint(bank.length);
+    area.addEventListener('input', () => {
+      const questions = area.value.split('\n').map((q) => q.slice(0, 300)).slice(0, 40);
+      set({ questions });
+      paintHint(questions.filter((q) => q.trim()).length);
+    });
+    area.addEventListener('change', () => paint());
+    bankWrap.append(bankLabel, area, bankHint);
+
+    const count = f.count ?? FOLLOW_UP_DEFAULTS.count;
+    const counts = pillGroup('Questions per take', [1, 2, 3].map((n) => ({ value: n, label: String(n) })), (n) => n === count, (n) => set({ count: n }, true));
+    if (bank.length && count > bank.length) counts.append(el('p', 'pf-field__hint block-secondary', `Only ${bank.length} in the bank, so students get ${bank.length}.`));
+
+    box.append(
+      bankWrap,
+      counts,
+      secondsField('Think time (s)', f.think_s ?? FOLLOW_UP_DEFAULTS.think_s, 3, 60, 'The question shows, recording paused.', (v) => set({ think_s: v })),
+      secondsField('Answer time (s)', f.answer_s ?? FOLLOW_UP_DEFAULTS.answer_s, 10, 180, 'Recording stops and moves on at the end.', (v) => set({ answer_s: v }))
+    );
+    return box;
   }
 
   /**
