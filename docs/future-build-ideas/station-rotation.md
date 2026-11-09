@@ -69,8 +69,8 @@ The hub already uses `guided / standard / open` (Design Sprint `support`), so it
 
 The opening **pretest** replaces self-rating. Students are poor judges of what they know, and a pretest gives real evidence.
 
-- **Two questions per station**, about five or six minutes in all, not marked. The teacher can set three per station.
-- **Score to level:** 0 of 2 → Support, 1 → Core, 2 → Extend. The level shows on each station on the map and on the station card ("Core: you got 1 of 2 on the pretest"). Under Standard and Open control, students can change it; the change is logged.
+- **Three questions per station** (decided 9 Nov), about eight minutes for five stations, not marked.
+- **Score to level:** 0 or 1 of 3 → Support, 2 → Core, 3 → Extend. The level shows on each station on the map and on the station card ("Core: you got 1 of 2 on the pretest"). Under Standard and Open control, students can change it; the change is logged.
 - **Teacher-station routing:** a teacher can tag a pretest question as a key misconception. Missing it puts the student in a teacher-station group.
 - **Feedback straight after each answer.** Answering before learning helps later learning even when the answer is wrong (the pretesting effect: Richland, Kornell & Kao, 2009), and the effect is stronger when the right answer is shown.
 - **Growth at the finale:** the finale compares each station's pretest score with its exit check, in place of the confidence-versus-result chart.
@@ -251,8 +251,7 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 
 - **Bell mode in v1**, or self-paced only (with the teacher station's "call group")?
 - **Finale**: its own build inside this lesson type, or a handoff to the Design Sprint or Case Study?
-- **Pretest length**: two questions per station, or let the teacher set three for higher-stakes stations?
-- **Gates in bell mode**: if the bell goes while a student is still at a gate, does the station carry over, or go straight to the teacher-station group?
+- **Gates in bell mode** (lean, not decided: carry over. The student's work at the gate is saved, the station shows as unfinished on their map, and the rotation grid keeps a catch-up slot near the end. A student who has already missed the gate twice is in a teacher-station group anyway. This only matters if bell mode is in v1): if the bell goes while a student is still at a gate, does the station carry over, or go straight to the teacher-station group?
 - **Devices**: one per student, or one per group at some stations?
 - **Grouping**: fixed groups for the whole lesson, or free movement with groups only at the teacher station?
 
@@ -274,6 +273,7 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 ## History
 
 - 9 Nov 2026: first draft from the brainstorm round, with the mockup.
+- 9 Nov 2026: pretest set at three questions per station.
 - 9 Nov 2026: decided written gates use the stronger model and all gates stay practice.
 - 9 Nov 2026: added AI-checked written gates for senior classes, with a Year 12 English example in the mockup.
 - 9 Nov 2026: added gates inside a station, the evidence board and the pretest; cut the 1-to-4 self-rating. Mockup updated with a pretest view, a working gate (miss, reteach, backup, flag) and a drag-and-link board.

@@ -335,7 +335,7 @@ p { margin: 0 0 10px; }
           <select><option selected>Self-paced (call groups to the teacher station)</option><option>Bell (generate a rotation grid)</option></select>
         </label>
         <label class="field"><span>Routing</span>
-          <select><option selected>Pretest: 2 questions per station, sets each level</option><option>Last quiz on this unit</option><option>Teacher picks</option></select>
+          <select><option selected>Pretest: 3 questions per station, sets each level</option><option>Last quiz on this unit</option><option>Teacher picks</option></select>
         </label>
         <label class="field"><span>Evidence</span>
           <select><option selected>Evidence board (arrange and link)</option><option>Passport list</option></select>
@@ -364,9 +364,9 @@ p { margin: 0 0 10px; }
 <section class="view" id="view-pretest" hidden>
   <div class="grid grid--side">
     <div class="panel">
-      <p class="eyebrow">Before the stations · about 6 minutes · not marked</p>
+      <p class="eyebrow">Before the stations · about 8 minutes · not marked</p>
       <h2>Pretest</h2>
-      <p class="small muted">Two questions per station. Getting things wrong now helps you learn them later, so just have a go. Your answers set your level at each station.</p>
+      <p class="small muted">Three questions per station. Getting things wrong now helps you learn them later, so just have a go. Your answers set your level at each station.</p>
       <div class="pt-progress" aria-hidden="true"><span id="ptBar"></span></div>
       <p class="small muted" id="ptCount"></p>
       <div id="ptCard"></div>
@@ -517,7 +517,7 @@ p { margin: 0 0 10px; }
         <p class="eyebrow">This station</p>
         <p class="small" style="margin:0 0 6px"><b>12 min</b> · 4 seats · Back bench, or scan the QR code</p>
         <div class="chips" style="margin:0"><span class="chip chip--sage">Procedures and skills</span><span class="chip chip--lilac">Data and evidence</span></div>
-        <p class="small" style="margin:10px 0 0">Your level here is <b>Core</b>: you got 1 of 2 on the pretest. You can change it.</p>
+        <p class="small" style="margin:10px 0 0">Your level here is <b>Core</b>: you got 2 of 3 on the pretest. You can change it.</p>
       </div>
       <div class="panel">
         <p class="eyebrow">Need a hand?</p>
@@ -780,8 +780,8 @@ function renderRows() {
     </div>`).join('');
   $$('#stnRows select').forEach((sel, i) => sel.onchange = () => { STATIONS[i].kind = sel.value; STATIONS[i].mode = MODE_FOR[sel.value]; renderRows(); });
 
-  const parts = [['Opening brief', 5, 'var(--pastel-lilac-ink)'], ['Pretest', 6, 'var(--wave)'],
-    ...STATIONS.filter(s => !s.teacher).map(s => [s.title, s.min, 'var(--navy-2)']), ['Moves (5 × 1 min)', 5, 'var(--shore)'], ['Finale', 15, 'var(--success)']];
+  const parts = [['Opening brief', 5, 'var(--pastel-lilac-ink)'], ['Pretest', 8, 'var(--wave)'],
+    ...STATIONS.filter(s => !s.teacher).map(s => [s.title, s.min, 'var(--navy-2)']), ['Moves (5 × 1 min)', 5, 'var(--shore)'], ['Finale', 12, 'var(--success)']];
   const total = parts.reduce((a, p) => a + p[1], 0), lesson = 80;
   $('#budget').innerHTML = parts.map(p => `<span style="width:${p[1] / Math.max(total, lesson) * 100}%;background:${p[2]};border-right:2px solid #fff" title="${p[0]}"></span>`).join('');
   $('#budgetText').innerHTML = total <= lesson
@@ -890,16 +890,21 @@ $('#handBtn').onclick = () => $('#fb-hand').textContent = "You're third in the q
 const PRETEST = [
   { st: 1, q: 'Coral turns white in hot water. This is called…', o: ['Bleaching', 'Spawning', 'Erosion'], a: 0 },
   { st: 1, q: 'Coral gets most of its food from…', o: ['Fish it catches', 'Algae living inside it', 'Sand'], a: 1 },
+  { st: 1, q: 'Bleached coral is…', o: ['Dead', 'Alive but starving', 'Covered in sand'], a: 1 },
   { st: 2, q: 'Parrotfish eat algae. If they leave, the algae…', o: ['Spreads', 'Dies', 'Stays the same'], a: 0 },
   { st: 2, q: 'In a food web, an arrow points…', o: ['From the eater to the eaten', 'From the eaten to the eater', 'Either way'], a: 1 },
+  { st: 2, q: 'Which of these is a grazer on a reef?', o: ['Parrotfish', 'Shark', 'Coral'], a: 0 },
   { st: 3, q: 'On a line graph, a dashed line across usually shows…', o: ['A limit or threshold', 'An error', 'The average'], a: 0 },
   { st: 3, q: 'A graph rises from 25° to 30° over five months. That is about…', o: ['1° per month', '5° per month', '0.5° per month'], a: 0 },
+  { st: 3, q: 'Three dots sit above the dashed line. That means…', o: ['Three readings above the limit', 'One reading above it', 'The limit has moved'], a: 0 },
   { st: 4, q: 'Overfishing grazing fish would most likely…', o: ['Help coral recover', 'Slow coral recovery', 'Make no difference'], a: 1 },
   { st: 4, q: 'A cause that makes an existing problem worse is a…', o: ['Starting cause', 'Contributing pressure', 'Result'], a: 1 },
+  { st: 4, q: 'Which evidence would show fishing slowed recovery?', o: ['Fewer grazing fish where fishing is allowed', 'A hotter summer', 'More tourists'], a: 0 },
   { st: 5, q: 'A marine park mostly limits…', o: ['Swimming', 'Fishing and anchoring', 'Boat colours'], a: 1 },
   { st: 5, q: 'A stakeholder is…', o: ['Anyone affected by a decision', 'Only the government', 'A type of coral'], a: 0 },
+  { st: 5, q: 'A strong position on a rule…', o: ['Gives a reason and weighs who is affected', 'Is the loudest one', 'Agrees with everyone'], a: 0 },
 ];
-const LEVELS = ['support', 'core', 'extend'];
+const LEVELS = ['support', 'support', 'core', 'extend'];
 const LEVEL_NAME = { support: 'Support', core: 'Core', extend: 'Extend' };
 function ptScore(st) {
   const qs = PRETEST.map((q, i) => [q, i]).filter(([q]) => q.st === st);
@@ -928,10 +933,10 @@ function renderPretest() {
   }
   $('#ptLevels').innerHTML = STATIONS.filter(s => !s.teacher).map(s => {
     const sc = ptScore(s.id);
-    return `<div class="lvl-row"><span>${s.id}. ${s.title}${sc === null ? '' : ` <span class="muted">· ${sc}/2</span>`}</span>${lvlChip(s.id)}</div>`;
-  }).join('') + `<p class="small muted" style="margin:10px 0 0">0 of 2 → Support · 1 → Core · 2 → Extend. Missing the bleaching question also puts you in a teacher-station group.</p>`;
+    return `<div class="lvl-row"><span>${s.id}. ${s.title}${sc === null ? '' : ` <span class="muted">· ${sc}/3</span>`}</span>${lvlChip(s.id)}</div>`;
+  }).join('') + `<p class="small muted" style="margin:10px 0 0">0 or 1 of 3 → Support · 2 → Core · 3 → Extend. Missing the bleaching question also puts you in a teacher-station group.</p>`;
 }
-const DEMO_PT = [0, 1, 0, 0, 0, 2, 0, 0, 1, 0]; // gives Extend, Core, Core, Support, Core
+const DEMO_PT = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1]; // gives Extend, Core, Core, Support, Core
 
 // the hinge gate inside a station
 const GATE = {
@@ -1185,9 +1190,9 @@ function renderCalib() {
     const sc = ptScore(s.id) ?? DEMO_PT.filter((v, i) => PRETEST[i].st === s.id && v === PRETEST[i].a).length;
     const ex = exit[s.id];
     return `<div class="growth__row"><span>${s.id}. ${s.title}</span><span class="bars">
-      <span class="bar bar--c" style="width:${sc / 2 * 100}%;min-width:4px"></span>
+      <span class="bar bar--c" style="width:${sc / 3 * 100}%;min-width:4px"></span>
       <span class="bar bar--r" style="width:${ex === null ? 0 : 100}%;min-width:4px;${ex === null ? 'background:var(--shore)' : ''}"></span></span>
-      <span>${sc}/2 → ${ex === null ? 'not yet' : 'passed'}</span></div>`;
+      <span>${sc}/3 → ${ex === null ? 'not yet' : 'passed'}</span></div>`;
   }).join('');
 }
 function renderAll() { renderDial(); renderRows(); renderPretest(); renderMap(); renderPassport(); renderLevel(); renderGate(); renderBoard(); renderLive(); renderCalib(); renderWritten(); }
