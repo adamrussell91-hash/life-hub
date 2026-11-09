@@ -3,8 +3,9 @@ import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { LEVEL_LABELS, PHASE_LABELS, SPRINT_PHASES, type SprintPhaseKey } from './schema';
 import { mountMarking } from './marking';
+import { feedbackTally } from './phase-test';
 import { pairKey, pairsOf, phaseDue } from './rules';
-import type { GalleryIdea, GroupBoard, SprintTeacherApi } from './api';
+import type { GalleryIdea, GroupBoard, SprintTeacherApi, TickPhase } from './api';
 
 type Tab = 'understand' | 'ideas' | 'build' | 'test';
 type Student = NonNullable<GroupBoard['progress']>['students'][number];
@@ -13,6 +14,8 @@ type IdeaSet = GroupBoard['gallery'][number];
 const TABS: ReadonlyArray<readonly [Tab, string]> = [['understand', 'Understand'], ['ideas', 'Sketch and Decide'], ['build', 'Prototype'], ['test', 'Test and marking']];
 const TAB_OF: Record<SprintPhaseKey, Tab> = { understand: 'understand', sketch: 'ideas', decide: 'ideas', prototype: 'build', test: 'test' };
 const HEAT_WORDS = ['no one yet', 'sometimes', 'often', 'most often'] as const;
+const isTick = (k: SprintPhaseKey): k is TickPhase => k === 'prototype' || k === 'test';
+const tickedIn = (s: Student, k: SprintPhaseKey) => isTick(k) && !!s.ticked?.[k];
 
 const savedWhen = (iso: string | undefined, now = new Date()): string => {
   if (!iso) return '';
@@ -68,7 +71,8 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
       if (done) { paintState('go', `${done} of ${pairs.length} match-ups`); return cell; }
     }
     const state = s.phases[key];
-    if (state === 'in') paintState('in', 'Handed in');
+    if (tickedIn(s, key) && state !== 'in' && state !== 'late') paintState('in', 'Ticked off', state === 'draft' ? 'Saved in the app, not handed in' : undefined);
+    else if (state === 'in') paintState('in', 'Handed in');
     else if (state === 'late') paintState('in', 'Handed in late');
     else if (state === 'draft') { const when = savedWhen(s.saved_at[key]); paintState('go', 'Saved, not handed in', when ? `Last saved ${when}` : undefined); }
     else paintState('not', 'Not started');
@@ -109,6 +113,18 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
 
   const askBringBack = (s: Student, key: SprintPhaseKey) => askBox(`Bring back ${s.name}’s earlier ${PHASE_LABELS[key]} work?`, [s.phases[key] === 'none' ? 'It goes back just as it was.' : 'It goes back just as it was, and what they’ve written since is set aside in its place.'], 'Bring it back', () => void act(o.api.bringBack(s.id, key)));
 
+  /** Your own check-off for Prototype or Test, for work made or shown away from the app. */
+  function tickBox(s: Student, k: TickPhase): HTMLElement {
+    const label = el('label', 'sboard__tick');
+    const box = el('input');
+    box.type = 'checkbox';
+    box.checked = !!s.ticked?.[k];
+    box.addEventListener('change', () => { box.disabled = true; void act(o.api.tick(s.id, k, box.checked)); });
+    label.append(box, ` Ticked off`);
+    label.title = `Tick ${s.name} off for ${PHASE_LABELS[k]} yourself. Their work in the app stays as it is.`;
+    return label;
+  }
+
   function whoTable(b: GroupBoard): HTMLElement | null {
     const p = b.progress;
     if (!p?.students.length) return null;
@@ -127,6 +143,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
       for (const k of shown) {
         const td = el('td', k === now ? 'is-now' : 'is-past');
         td.append(statusCell(b, s, k));
+        if (isTick(k)) td.append(tickBox(s, k));
         if (s.phases[k] !== 'none') td.append(againLink('Give another go', () => askAnotherGo(b, s, k)));
         if (s.earlier?.[k]) td.append(againLink('Bring back earlier work', () => askBringBack(s, k)));
         row.append(td);
@@ -143,7 +160,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const students = b.progress.students;
     const count = now === 'decide'
       ? `${students.filter((s) => s.voted).length} of ${students.length} finished the head-to-heads`
-      : `${students.filter((s) => s.phases[now] === 'in' || s.phases[now] === 'late').length} of ${students.length} handed in`;
+      : `${students.filter((s) => s.phases[now] === 'in' || s.phases[now] === 'late' || tickedIn(s, now)).length} of ${students.length} ${isTick(now) ? 'done' : 'handed in'}`;
     const due = b.progress.phases.find((x) => x.key === now);
     const closes = due?.due_date ? `closes ${formatDueDay(due.due_date)}, ${formatDueTime(due.due_time || '23:59')}` : '';
     return [`In ${PHASE_LABELS[now]}`, count, closes].filter(Boolean).join(' · ');
@@ -370,6 +387,48 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     return pane;
   }
 
+  const ROUND_WORDS = { open: 'open', closed: 'closed, not released', released: 'released to the group' } as const;
+
+  /** Everything the class gave this group: the levels as the group sees them, then each person's full card. */
+  function feedbackBlock(b: GroupBoard, round: NonNullable<GroupBoard['round']>): HTMLElement {
+    const n = round.entries.length;
+    const rd = heading(`Pitch feedback (${ROUND_WORDS[round.status] ?? round.status})`, n ? `${n} ${n === 1 ? 'classmate' : 'classmates'} gave feedback. Names show to you only.` : 'No feedback is in yet.');
+    const counted = round.entries.filter((e) => e.status !== 'removed');
+    if (counted.length && crit().length) {
+      const levels: Record<string, [number, number, number]> = {};
+      for (const c of crit()) {
+        const row: [number, number, number] = [0, 0, 0];
+        for (const e of counted) { const lv = e.levels[c.id]; if (lv) row[lv - 1] += 1; }
+        levels[c.id] = row;
+      }
+      rd.append(el('h4', '', 'Levels from the class'), feedbackTally(crit(), levels));
+    }
+    const critText = new Map(crit().map((c) => [c.id, c.text]));
+    for (const e of round.entries) {
+      const card = el('article', `sboard__feedback${e.status === 'removed' ? ' is-removed' : ''}`);
+      const body = el('div');
+      const who = el('strong', '', e.name);
+      if (e.status === 'held') who.append(el('span', 'pill pill--wait', 'Held: check it before releasing'));
+      if (e.status === 'removed') who.append(el('span', 'pill', 'Removed'));
+      body.append(who);
+      const dl = el('dl', 'sboard__levels');
+      for (const c of crit()) {
+        const lv = e.levels[c.id];
+        dl.append(el('dt', '', c.text), el('dd', lv ? '' : 'sboard__waiting', lv ? LEVEL_LABELS[lv - 1] : 'No level'));
+      }
+      if (crit().length) body.append(dl);
+      if (e.worked) body.append(el('span', 'sprint-said__tag', 'What worked'), el('p', '', e.worked));
+      if (e.next) body.append(el('span', 'sprint-said__tag sprint-said__tag--next', 'Try next'), el('p', '', e.next));
+      if (e.about && critText.has(e.about)) body.append(el('p', 'sprint-note', `About: ${critText.get(e.about)}`));
+      const acts = el('div', 'sboard__acts');
+      if (e.status === 'held') acts.append(button('Release', 'secondary', () => void act(o.api.moderate(b.group.id, e.student_id, 'released'))));
+      if (e.status !== 'removed') acts.append(button('Remove', 'ghost', () => void act(o.api.moderate(b.group.id, e.student_id, 'removed'))));
+      card.append(body, acts);
+      rd.append(card);
+    }
+    return rd;
+  }
+
   function testPane(b: GroupBoard): HTMLElement {
     const pane = el('div', 'sboard__pane');
     const mark = heading('Marking');
@@ -382,20 +441,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
       if (markNow) { markNow = false; startMarking(); requestAnimationFrame(() => mark.scrollIntoView({ behavior: 'smooth', block: 'start' })); }
     }
     pane.append(mark);
-    if (b.round) {
-      const rd = heading(`Pitch feedback (${b.round.status})`);
-      for (const e of b.round.entries) {
-        const r = el('div', 'sboard__feedback');
-        const text = el('div');
-        text.append(el('strong', '', `${e.name}${e.flagged ? ' · held' : ''}`), el('p', 'sprint-note', crit().map((c) => `${c.text}: ${LEVEL_LABELS[(e.levels[c.id] ?? 1) - 1]}`).join(' · ')), el('p', '', `${e.worked} ${e.next}`));
-        const acts = el('div', 'sboard__acts');
-        if (e.status === 'held') acts.append(button('Release', 'secondary', () => void act(o.api.moderate(b.group.id, e.student_id, 'released'))));
-        if (e.status !== 'removed') acts.append(button('Remove', 'ghost', () => void act(o.api.moderate(b.group.id, e.student_id, 'removed'))));
-        r.append(text, acts);
-        rd.append(r);
-      }
-      pane.append(rd);
-    }
+    if (b.round) pane.append(feedbackBlock(b, b.round));
     return pane;
   }
 

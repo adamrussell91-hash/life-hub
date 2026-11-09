@@ -6,6 +6,33 @@ import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type
 import { LEVEL_LABELS, type FeedbackEntry, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
+/** Each criterion's levels from the class as one stacked bar: what a group sees, and what the teacher sees on its board. */
+export function feedbackTally(criteria: ReadonlyArray<{ id: string; text: string }>, levels: Record<string, [number, number, number]>): HTMLElement {
+  const tally = el('div', 'sprint-tally');
+  const key = el('div', 'sprint-tally__key');
+  LEVEL_LABELS.forEach((l, i) => { const k = el('span'); k.append(el('i', '', ''), l); k.firstElementChild!.setAttribute('data-level', String(i + 1)); key.append(k); });
+  tally.append(key);
+  for (const c of criteria) {
+    const counts = levels[c.id] ?? [0, 0, 0];
+    const total = counts[0] + counts[1] + counts[2];
+    const row = el('div', 'sprint-tally__row');
+    const bar = el('div', 'sprint-tally__bar');
+    bar.setAttribute('aria-label', `${c.text}: ${LEVEL_LABELS.map((l, i) => `${l} ${counts[i]}`).join(', ')}`);
+    counts.forEach((k, i) => {
+      if (!k) return;
+      const seg = el('i', '', String(k));
+      seg.dataset.level = String(i + 1);
+      seg.style.flexGrow = String(k);
+      seg.title = `${LEVEL_LABELS[i]}: ${k}`;
+      bar.append(seg);
+    });
+    if (!total) bar.append(el('span', 'sprint-note', 'No levels yet'));
+    row.append(el('b', '', c.text), bar);
+    tally.append(row);
+  }
+  return tally;
+}
+
 /** Test: the pitch is live in class; this is the reflection on what the group's feedback showed. */
 export function mountTest(ctx: FormContext): PhaseForm {
   const s = ctx.status;
@@ -20,28 +47,7 @@ export function mountTest(ctx: FormContext): PhaseForm {
   else {
     const n = s.received.lines.length;
     got.append(el('p', 'sprint-note', n ? `${n} ${n === 1 ? 'classmate' : 'classmates'} gave your group feedback. Names stay hidden.` : 'No written feedback came in this time.'));
-    const tally = el('div', 'sprint-tally');
-    const key = el('div', 'sprint-tally__key');
-    LEVEL_LABELS.forEach((l, i) => { const k = el('span'); k.append(el('i', '', ''), l); k.firstElementChild!.setAttribute('data-level', String(i + 1)); key.append(k); });
-    tally.append(key);
-    for (const c of ctx.sprint.criteria) {
-      const counts = s.received.levels[c.id] ?? [0, 0, 0];
-      const total = counts[0] + counts[1] + counts[2];
-      const row = el('div', 'sprint-tally__row');
-      const bar = el('div', 'sprint-tally__bar');
-      bar.setAttribute('aria-label', `${c.text}: ${LEVEL_LABELS.map((l, i) => `${l} ${counts[i]}`).join(', ')}`);
-      counts.forEach((k, i) => {
-        if (!k) return;
-        const seg = el('i', '', String(k));
-        seg.dataset.level = String(i + 1);
-        seg.style.flexGrow = String(k);
-        seg.title = `${LEVEL_LABELS[i]}: ${k}`;
-        bar.append(seg);
-      });
-      if (!total) bar.append(el('span', 'sprint-note', 'No levels yet'));
-      row.append(el('b', '', c.text), bar);
-      tally.append(row);
-    }
+    const tally = feedbackTally(ctx.sprint.criteria, s.received.levels);
     got.append(tally);
     if (n) {
       const cards = el('div', 'sprint-said');

@@ -13,6 +13,7 @@
  *   sprint/{lesson}/files/{student}/{id}      bytes, metadata { contentType }
  *   sprint/{lesson}/filemeta/{student}/{id}   { name, mime, size, at, phase }
  *   sprint/{lesson}/rounds/{group}            { status, opened_at, closed_at, entries: { [student]: { levels, worked, next, about, flagged, status } } }
+ *   sprint/{lesson}/ticks                     { [student]: { prototype?: iso, test?: iso } }   the teacher's own check-offs
  *   sprint/{lesson}/stage                     { running: group|null, spotlight: { text, label } | null }
  */
 export const sprintKeys = (lesson) => ({
@@ -28,7 +29,8 @@ export const sprintKeys = (lesson) => ({
   fileMetaPrefix: (student) => `sprint/${lesson}/filemeta/${student}/`,
   fileOwner: (id) => `sprint/${lesson}/fileowner/${id}`,
   round: (group) => `sprint/${lesson}/rounds/${group}`,
-  stage: `sprint/${lesson}/stage`
+  stage: `sprint/${lesson}/stage`,
+  ticks: `sprint/${lesson}/ticks`
 });
 
 export const emptyGroup = () => ({ in: {}, question: null, chosen: null, awaiting: null, votes_closed_at: null, parts: [], claims: {}, pitch: null, cover: null, audience: null, ask_added: [], ask_picked: [], ask_sent: [], answers: {}, assembler: null });

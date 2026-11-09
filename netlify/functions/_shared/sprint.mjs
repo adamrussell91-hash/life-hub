@@ -934,7 +934,9 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
 // Names show here only; anything put up for students goes through stage, nameless.
 // ---------------------------------------------------------------------------
 
-const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'reopen_class', 'lift_lock', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer', 'another_go', 'bring_back'];
+const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'reopen_class', 'lift_lock', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer', 'another_go', 'bring_back', 'tick'];
+/** Phases the teacher can tick a student off by hand: work that is often made or handed over away from the app. */
+export const TICK_PHASES = ['prototype', 'test'];
 
 async function teacherContext(store, lessonId) {
   const { config } = await loadSprint(store, lessonId);
@@ -943,8 +945,12 @@ async function teacherContext(store, lessonId) {
   const extend = (await read(store, k.extend)) ?? {};
   const roster = await rosterOf(store, config.class_id);
   const byId = new Map(list(roster?.students).map((s) => [s.id, s]));
-  return { config, k, lockRec, extend, byId };
+  const ticks = (await read(store, k.ticks)) ?? {};
+  return { config, k, lockRec, extend, byId, ticks };
 }
+
+/** The phases the teacher has ticked this student off for, with when. */
+const tickedOf = (ticks, studentId) => Object.fromEntries(TICK_PHASES.filter((p) => ticks[studentId]?.[p]).map((p) => [p, ticks[studentId][p]]));
 
 /** One student's state in each phase, and when each draft was last saved. */
 async function studentProgress(store, k, owner) {
@@ -961,7 +967,7 @@ async function studentProgress(store, k, owner) {
 }
 
 async function teacherSummary(store, lessonId) {
-  const { config, k, lockRec, extend, byId } = await teacherContext(store, lessonId);
+  const { config, k, lockRec, extend, byId, ticks } = await teacherContext(store, lessonId);
   const now = clock();
   const groups = [];
   for (const g of config.groups) {
@@ -973,7 +979,7 @@ async function teacherSummary(store, lessonId) {
       // Who has opened each phase: End class part uses it to say who was there.
       const seen = (await read(store, k.seen(owner))) ?? {};
       const opened = Object.fromEntries(PHASES.map((key) => [key, !!seen[key]]));
-      return { id, initials: byId.get(id)?.initials ?? '–', name: byId.get(id)?.name ?? 'Removed student', phases, opened };
+      return { id, initials: byId.get(id)?.initials ?? '–', name: byId.get(id)?.name ?? 'Removed student', phases, opened, ticked: tickedOf(ticks, id) };
     }));
     groups.push({ id: g.id, name: g.name, students, open, awaiting: state.awaiting ?? null, chosen: !!state.chosen, question: state.question?.text ?? null, asked: list(state.ask_sent).filter((q) => !state.answers?.[q.id]).length });
   }
@@ -984,7 +990,7 @@ async function teacherSummary(store, lessonId) {
 }
 
 async function teacherBoard(store, lessonId, groupId) {
-  const { config, k, lockRec, extend, byId } = await teacherContext(store, lessonId);
+  const { config, k, lockRec, extend, byId, ticks } = await teacherContext(store, lessonId);
   const g = config.groups.find((x) => x.id === groupId);
   if (!g) reject(404, 'not_found', 'That group is gone.');
   const state = await resolveGroup(store, lessonId, config, g, await groupState(store, k, g.id), lockRec, extend, clock());
@@ -1004,7 +1010,7 @@ async function teacherBoard(store, lessonId, groupId) {
   const progress = {
     open: openPhases(dates, factsFor(g, state, lockRec), clock()),
     phases: dates.map((p) => ({ key: p.key, due_date: p.due_date, due_time: p.due_time })),
-    students: await Promise.all(g.students.map(async (id) => ({ id, name: name(id), voted: list(state.voted).includes(id), ...(await studentProgress(store, k, ownerOf(config.class_id, id))) })))
+    students: await Promise.all(g.students.map(async (id) => ({ id, name: name(id), voted: list(state.voted).includes(id), ticked: tickedOf(ticks, id), ...(await studentProgress(store, k, ownerOf(config.class_id, id))) })))
   };
   return {
     group: { id: g.id, name: g.name },
@@ -1149,6 +1155,16 @@ export async function sprintTeacherAction(store, lessonId, body) {
   }
   if (action === 'another_go') await anotherGo(store, lessonId, config, body.student_id, body.phase);
   if (action === 'bring_back') await bringBack(store, lessonId, config, body.student_id, body.phase);
+  if (action === 'tick') {
+    // A teacher's own check-off. It sits beside the student's work and never changes it or what opens next.
+    if (!TICK_PHASES.includes(body.phase)) reject(400, 'bad_phase', 'Only Prototype and Test can be ticked off.');
+    if (!config.groups.some((g) => g.students.includes(body.student_id))) reject(404, 'not_found', 'That student isn’t in this sprint.');
+    const ticks = (await read(store, k.ticks)) ?? {};
+    const mine = { ...(ticks[body.student_id] ?? {}) };
+    if (body.on === false) delete mine[body.phase];
+    else mine[body.phase] = iso(now);
+    await store.setJSON(k.ticks, { ...ticks, [body.student_id]: mine });
+  }
   if (action === 'lift_lock') {
     const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
     if (rec.lock) await store.setJSON(k.lock, { ...rec, lock: null });

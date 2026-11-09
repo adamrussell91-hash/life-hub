@@ -187,7 +187,16 @@
 .sboard__question { font-weight: 600; }
 .sboard__answer .qz-input { width: 100%; resize: vertical; }
 .sboard__feedback { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.sboard__feedback > div:first-child { flex: 1 1 260px; }
+.sboard__feedback > div:first-child { flex: 1 1 260px; display: grid; gap: 6px; justify-items: start; }
+.sboard__feedback > div:first-child > p { margin: 0; }
+.sboard__feedback strong { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sboard__feedback.is-removed { opacity: .55; }
+.sboard__levels { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 14px; }
+.sboard__levels dt { color: var(--muted); }
+.sboard__levels dd { margin: 0; font-weight: 600; }
+.sboard__tick { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 14px; cursor: pointer; }
+.sboard__tick input { width: 18px; height: 18px; margin: 0; }
+.smap .dot--ticked { box-shadow: 0 0 0 2px var(--paper, #fff), 0 0 0 3px #2f6b4f; }
 @media (max-width: 640px) {
   .sboard { padding: 18px 14px; }
   /* Phone: the student and where they are now; earlier phases are in their tabs. */
