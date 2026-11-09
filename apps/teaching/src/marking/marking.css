@@ -19,6 +19,16 @@
 .mk-menu { position: absolute; z-index: 5; box-sizing: border-box; width: min(28rem, 100%); display: grid; gap: var(--space-2); padding: var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: 0 8px 24px color-mix(in srgb, var(--navy) 18%, transparent); }
 .mk-menu__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .mk-menu[hidden] { display: none; }
+/* Words carrying several codes: each one a tap away, the one being changed filled in. */
+.mk-menu__picks { display: flex; flex-wrap: wrap; gap: var(--space-1, 4px); }
+.mk-menu__pick { --pick: var(--pastel-blue-ink); min-height: 44px; min-width: 44px; padding: 0 var(--space-2); font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--pick); background: var(--paper); border: 2px solid var(--pick); border-radius: var(--radius-full); cursor: pointer; }
+.mk-menu__pick--peach { --pick: var(--pastel-peach-ink); }
+.mk-menu__pick--sage { --pick: var(--pastel-sage-ink); }
+.mk-menu__pick--gold { --pick: var(--pastel-gold-ink); }
+.mk-menu__pick--lilac { --pick: var(--pastel-lilac-ink); }
+.mk-menu__pick[aria-pressed='true'] { color: var(--paper); background: var(--pick); }
+/* A highlight shows two codes' colours; more on the same words say how many more. */
+.mk-sheets .pa-run--mark[data-more]::after { content: attr(data-more); display: inline-block; margin-left: 2px; padding: 0 5px; font-size: .7em; font-weight: 700; line-height: 1.5; vertical-align: super; color: var(--paper); background: var(--ink); border-radius: var(--radius-full); user-select: none; }
 .mk-menu__note { min-height: 44px; font: inherit; font-size: 16px; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-xs); }
 .mk-side { display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .mk-side__title { margin: 0; font-size: var(--text-xs, .75rem); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
