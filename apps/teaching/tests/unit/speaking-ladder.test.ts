@@ -10,7 +10,8 @@ import { rubricRows } from '@/marking/rubric-model';
 import { mountRubricPanel, type RubricSetup } from '@/marking/rubric-panel';
 import { loadRubricSetup } from '@/marking/rubric-setup';
 import { classLadder, createClassSkills } from '@/skills/class-view';
-import { speakingRowsLoader, speakingWhere } from '@/blocks/voice-where';
+import { speakingWhere } from '@/blocks/voice-where';
+import { voiceStartLoader } from '@/blocks/voice-last-time';
 import { createVoiceTaskFields } from '@/blocks/voice-block-editor';
 import { resetSkillsCacheForTests } from '@/skills/api';
 import type { SkillRow } from '@/progress/types';
@@ -130,10 +131,12 @@ describe('student: before the next speaking task', () => {
 
   it('shows nothing with no rows, no class or no initials', async () => {
     expect(speakingWhere([])).toBeNull();
-    expect(await speakingRowsLoader(undefined)).toEqual([]);
-    expect(await speakingRowsLoader('c1', async () => ({ need: 'initials' }))).toEqual([]);
-    expect(await speakingRowsLoader('c1', async () => { throw new Error('x'); })).toEqual([]);
-    expect(await speakingRowsLoader('c1', async () => ({ need: null, skills: [{ strand: 'Speaking', rows: [row] }] }))).toEqual([row]);
+    const want = { speaking: true, vivas: false };
+    const rows = async (classId: string | undefined, call: Parameters<typeof voiceStartLoader>[3]) => (await voiceStartLoader(classId, 'l1', want, call)).rows;
+    expect(await rows(undefined, undefined)).toEqual([]);
+    expect(await rows('c1', async () => ({ need: 'initials' }))).toEqual([]);
+    expect(await rows('c1', async () => { throw new Error('x'); })).toEqual([]);
+    expect(await rows('c1', async () => ({ need: null, skills: [{ rows: [row] }] }))).toEqual([row]);
   });
 });
 

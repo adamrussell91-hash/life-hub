@@ -2,7 +2,6 @@ import { el } from '@/blocks/peer-feedback-ui';
 import { skillPath } from '@/progress/skill-path';
 import { placeName } from '@/progress/story-text';
 import type { SkillRow } from '@/progress/types';
-import { loadOwnSkills, type OwnSkills } from '@/skills/rungs-api';
 import '@/progress/progress.css';
 
 /**
@@ -26,13 +25,4 @@ export function speakingWhere(rows: readonly SkillRow[]): HTMLElement | null {
     box.append(row);
   }
   return box;
-}
-
-/** Fetches the student's speaking rows once. Resolves to none for a device with no initials, or on any error. */
-export function speakingRowsLoader(classId: string | undefined, call: (classId: string) => Promise<OwnSkills> = (id) => loadOwnSkills(id, 'speaking')): Promise<SkillRow[]> {
-  if (!classId) return Promise.resolve([]);
-  return call(classId).then(
-    (r) => (r.need === 'initials' ? [] : (r.skills ?? []).flatMap((g) => g.rows)),
-    () => []
-  );
 }

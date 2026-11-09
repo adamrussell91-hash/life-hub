@@ -134,6 +134,8 @@ export async function submitTake(input: {
   initials: string;
   points: Array<{ label: string; t: number }>;
   side?: 'proposing' | 'opposing';
+  /** The focus the student ticked to work on this time. */
+  goal?: string;
   onProgress?: (sent: number, total: number) => void;
 }): Promise<MineState> {
   const { token } = voiceDevice();
@@ -163,7 +165,8 @@ export async function submitTake(input: {
       mime: input.mime,
       duration_s: input.duration_s,
       points: input.points,
-      ...(input.side ? { side: input.side } : {})
+      ...(input.side ? { side: input.side } : {}),
+      ...(input.goal ? { goal: input.goal } : {})
     })
   );
 }

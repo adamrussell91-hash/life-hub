@@ -252,6 +252,7 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
     audio_delete_after: deleteAfter,
     points: cleanPoints(body.points, duration),
     ...(side ? { side } : {}),
+    ...(goalText(body.goal) ? { goal: goalText(body.goal) } : {}),
     transcript: null,
     transcript_status: 'pending',
     transcribe_attempts: 0,
@@ -325,6 +326,11 @@ export async function readVoiceAudio(store, audioKey) {
 }
 
 /* ── Teacher ───────────────────────────────────────────────────────── */
+
+/** The "this time I'll work on" line a student ticked before recording: their last focus, kept short. */
+export function goalText(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+}
 
 function teacherRow(record) {
   return {

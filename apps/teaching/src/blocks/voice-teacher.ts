@@ -65,6 +65,8 @@ type Submission = Omit<Row, 'tag_count'> & {
   prompt: string;
   points: Array<{ label: string; t: number }>;
   side?: 'proposing' | 'opposing';
+  /** What the student ticked to work on this time, from their last viva. */
+  goal?: string;
   transcript: WhisperTranscript | null;
   transcript_error?: string;
   tags: MarkTag[];
@@ -277,6 +279,11 @@ export function mountVoiceTeacher(
     saveState.setAttribute('role', 'status');
     top.append(saveState);
     screen.append(top);
+    if (record.goal) {
+      const goal = el('p', 'voice-mark__goal');
+      goal.append(el('b', undefined, 'Working on this time: '), record.goal);
+      screen.append(goal);
+    }
     if (block.content.oracy === 'recite') screen.append(reciteTextFold(block.content.recite_text, 'Text'));
 
     // Whose take this is. A device that claimed its initials in the class page is matched already.
