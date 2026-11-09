@@ -7,7 +7,7 @@ import { DEFAULT_VIVA_SECONDS, STUDENT_TIME_CHOICES } from '@/blocks/voice-block
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
 import { SIDE_LABELS } from '@/blocks/voice-oracy';
 import { speakingWhere } from '@/blocks/voice-where';
-import { goalTick, lastFocus, lastTimeCard, voiceStartLoader, type VivaHistory } from '@/blocks/voice-last-time';
+import { goalTick, vivaDoThis, vivaStep, voiceStartLoader, type VivaHistory } from '@/blocks/voice-last-time';
 import type { SkillRow } from '@/progress/types';
 import { mountRecitePractice, reciteTextFold, type ReciteProgress } from '@/blocks/voice-recite';
 
@@ -69,7 +69,11 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
   let speakingRows: SkillRow[] = [];
   // A viva: the student's last returned viva and the codes that keep coming back.
   let vivas: VivaHistory | null = null;
-  const goalLine = () => lastFocus(vivas)?.line ?? null;
+  // Only a step to work on goes in the tick: "keep doing this" is a reminder.
+  const goalLine = () => {
+    const step = vivaStep(vivas);
+    return step?.why?.kind === 'do' ? step.line : null;
+  };
 
   const showError = (text: string) => {
     alert.textContent = text;
@@ -226,7 +230,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
       );
       return view;
     }
-    const lastTime = isViva ? lastTimeCard(vivas, classId, block.id) : null;
+    const lastTime = isViva ? vivaDoThis(vivas, classId) : null;
     if (lastTime) view.append(lastTime);
     const where = speakingTask ? speakingWhere(speakingRows) : null;
     if (where) view.append(where);

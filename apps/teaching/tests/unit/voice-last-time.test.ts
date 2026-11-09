@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { goalTick, lastFocus, lastTimeCard, trendFor, voiceStartLoader, type VivaHistory } from '@/blocks/voice-last-time';
+import { describe, expect, it, vi } from 'vitest';
+import { goalTick, vivaDoThis, vivaStep, voiceStartLoader, type VivaHistory } from '@/blocks/voice-last-time';
 import type { FeedbackCode } from '@/blocks/feedback-codes';
 
 const code = (id: string, label: string): FeedbackCode => ({ id, code: id.toUpperCase(), label, group: 'viva', criterion: null, colour: 'peach', descriptor: `${label}: say what it does to the reader.` });
@@ -16,61 +16,40 @@ const history = (over: Partial<VivaHistory> = {}): VivaHistory => ({
   ...over
 });
 
-beforeEach(() => localStorage.clear());
-
-describe('trend words', () => {
-  it('says how each code has gone, oldest to newest', () => {
-    expect(trendFor(['need', 'need', 'need', 'need'])).toBe('every time');
-    expect(trendFor(['need', 'need', null, null])).toBe('gone the last 2');
-    expect(trendFor(['need', 'need', 'need', null])).toBe('not last time');
-    expect(trendFor([null, 'strength', 'strength', 'strength'])).toBe('a strength');
-    expect(trendFor([null, null, null, 'need'])).toBe('new last time');
-    expect(trendFor(['need', null, 'need', 'need'])).toBe('3 of 4');
-    expect(trendFor([null, 'strength', 'need', 'strength'])).toBe('a strength last time');
+describe('the viva Do this', () => {
+  it('the code flagged last time and in most recent vivas, with how often', () => {
+    const step = vivaStep(history(), '/r')!;
+    expect(step).toMatchObject({ code_id: 'ar', code: 'AR', line: 'Analysis – relevance: say what it does to the reader.', why: { kind: 'do', hits: 4, of: 4, unit: 'viva', href: '/r' } });
   });
-});
 
-describe('last focus', () => {
-  it('uses the teacher’s chosen next step first, else the commonest code', () => {
-    expect(lastFocus(history())?.code?.id).toBe('ar');
+  it('the teacher’s own next step comes first, with no chip', () => {
     const chosen = history({ last: { ...history().last!, next_step: 'Name the effect.' } });
-    expect(lastFocus(chosen)).toEqual({ code: null, line: 'Name the effect.' });
-    expect(lastFocus(null)).toBeNull();
-  });
-});
-
-describe('the Last time card', () => {
-  it('starts folded: one quiet line with the focus, the rest hidden', () => {
-    const card = lastTimeCard(history(), 'c1', 'b1')!;
-    const toggle = card.querySelector<HTMLButtonElement>('.voice-last__toggle')!;
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(card.querySelector<HTMLElement>('.voice-last__panel')!.hidden).toBe(true);
-    expect(card.querySelector('.voice-last__peek')!.textContent).toContain('say what it does');
-    expect(toggle.textContent).toContain('Show');
+    const box = vivaDoThis(chosen, 'c1')!;
+    expect(box.querySelector('.ns-line__text')!.textContent).toBe('Name the effect.');
+    expect(box.querySelector('.ns-line__why')!.textContent).toBe('Your teacher’s next step from your last viva · See last time');
+    expect(box.querySelector('.pg-code')).toBeNull();
   });
 
-  it('opens to the focus, comment, pattern and link, and remembers that on the device', () => {
-    const card = lastTimeCard(history(), 'c1', 'b1')!;
-    card.querySelector<HTMLButtonElement>('.voice-last__toggle')!.click();
-    const panel = card.querySelector<HTMLElement>('.voice-last__panel')!;
-    expect(panel.hidden).toBe(false);
-    expect(panel.textContent).toContain('From your viva on 30 Oct · The opening image');
-    expect(panel.textContent).toContain('“Push to the effect.”');
-    const rows = [...panel.querySelectorAll('.voice-last__row')].map((r) => r.textContent);
-    expect(rows[0]).toContain('every time');
-    expect(rows[1]).toContain('gone the last 2');
-    expect(rows[2]).toContain('a strength');
-    expect(panel.querySelectorAll('.voice-last__dot--need')).toHaveLength(6);
-    expect(panel.querySelector('.voice-last__link')!.textContent).toBe('See all 4 returned vivas');
-    expect(lastTimeCard(history(), 'c1', 'b2')!.querySelector('.voice-last__toggle')!.getAttribute('aria-expanded')).toBe('true');
+  it('renders as the same bold box as a writing box, saying vivas', () => {
+    const box = vivaDoThis(history(), 'c1')!;
+    expect(box.classList.contains('ns-line')).toBe(true);
+    expect(box.querySelector('.ns-line__label')!.textContent).toBe('Do this');
+    expect(box.querySelector('.ns-line__why')!.textContent).toBe('AR flagged in your last 4 vivas · See last time');
+    expect(box.querySelector('a')!.getAttribute('href')).toBe('/s/classes/c1/profile?tab=returned');
   });
 
-  it('shows no pattern after a single viva, and no card before any', () => {
-    const one = history({ count: 1, pattern: [{ code_id: 'ar', marks: ['need'] }] });
-    const card = lastTimeCard(one, 'c1', 'b1')!;
-    expect(card.querySelector('.voice-last__pattern')).toBeNull();
-    expect(card.querySelector('.voice-last__link')!.textContent).toBe('See it in Returned work');
-    expect(lastTimeCard(history({ last: null }), 'c1', 'b1')).toBeNull();
+  it('nothing flagged last time and a code gone from the last two: keep doing this', () => {
+    const clean = history({ last: { ...history().last!, tags: [{ code_id: 'ev', positive: true }] }, pattern: [{ code_id: 'fw', marks: ['need', 'need', null, null] }] });
+    const step = vivaStep(clean)!;
+    expect(step).toMatchObject({ code_id: 'fw', why: { kind: 'keep', hits: 2 } });
+    expect(vivaDoThis(clean, 'c1')!.classList.contains('ns-line--keep')).toBe(true);
+  });
+
+  it('no viva back, or nothing to say, gives no line', () => {
+    expect(vivaStep(null)).toBeNull();
+    expect(vivaStep(history({ last: null }))).toBeNull();
+    const one = history({ last: { ...history().last!, tags: [] }, pattern: [{ code_id: 'ar', marks: [null] }] });
+    expect(vivaStep(one)).toBeNull();
   });
 });
 
