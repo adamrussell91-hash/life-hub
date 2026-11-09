@@ -1190,6 +1190,9 @@ function renderCalib() {
 }
 function renderAll() { renderDial(); renderRows(); renderPretest(); renderMap(); renderPassport(); renderLevel(); renderGate(); renderBoard(); renderLive(); renderCalib(); renderWritten(); }
 renderAll();
+// open a view straight from the address, e.g. mockup.html#written
+const startView = location.hash.slice(1);
+if (document.getElementById('view-' + startView)) show(startView);
 </script>
 </body>
 </html>
