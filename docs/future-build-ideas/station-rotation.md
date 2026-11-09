@@ -21,12 +21,18 @@ Concept doc only. Nothing builds from here until Adam names a slice. Mockup: [st
 - **Modes are matched to the kind of knowledge, not to the student.** Different forms of knowledge are learned best through different pedagogical modes. This is not meshing or learning styles. See [Knowledge type picks the mode](#knowledge-type-picks-the-mode).
 - Next step: the mockup.
 
+## Decisions (9 Nov, second round)
+
+- **Gates inside a station.** Any section can be set to stay blurred until a hinge question in the same station is right, so a student can't glide past a misconception. See [Gates](#gates-inside-a-station).
+- **An evidence board, kept simple.** Collected pieces land as cards on a per-student board. Students can drag the cards and link them with a word, nothing more. It saves to the account, so it can't be wiped. See [Evidence board](#evidence-board).
+- **A pretest, not self-rating.** The 1-to-4 confidence rating is cut. A short pretest sets each student's level at each station and feeds teacher-station routing. See [Pretest](#pretest-sets-the-levels).
+
 ## The four parts
 
 | Part | What it is | Settings |
 |---|---|---|
 | **Map** | The stations and how they link | Station cards, links (unlocks), capacity, time, location (room spot or QR) |
-| **Path rules** | Which routes are allowed | Fixed order · free order, all · choose N of M · must-do plus may-do · unlocks (C opens after A) · teacher-assigned from an entry check |
+| **Path rules** | Which routes are allowed | Fixed order · free order, all · choose N of M · must-do plus may-do · unlocks (C opens after A) · teacher-assigned from the pretest |
 | **Collector** | What students carry out of each station | A **piece** (content the finale uses) and, optionally, a **token** (a code or key for the story) |
 | **Finale** | The build outside the stations | Final lock (breakout only), the build, debrief, calibration |
 
@@ -40,7 +46,7 @@ Presets fill in the settings; the teacher can change anything afterwards.
 |---|---|---|---|---|
 | Carousel | Fixed order, all | Bell | Pieces | Debrief |
 | Choice board | Must-do plus may-do | Self-paced | Pieces | Build |
-| Teacher-led rotation | Teacher-assigned from entry check | Bell | Pieces | Debrief |
+| Teacher-led rotation | Teacher-assigned from the pretest | Bell | Pieces | Debrief |
 | Jigsaw | Split across the group, then share | Either | Pieces, one per member | Group build needs every piece |
 | Breakout | Free order, all, plus unlocks if wanted | Self-paced | Pieces plus tokens | Final lock, then build |
 
@@ -56,11 +62,22 @@ The hub already uses `guided / standard / open` (Design Sprint `support`), so it
 
 **The dial fades.** Heavy guidance helps novices and gets in the way of stronger students (the expertise reversal effect). So the dial can move per student as the evidence comes in. For example, clearing the Extend level at two stations unlocks route choice for the rest. The teacher can always override.
 
+## Pretest sets the levels
+
+The opening **pretest** replaces self-rating. Students are poor judges of what they know, and a pretest gives real evidence.
+
+- **Two questions per station**, about five or six minutes in all, not marked. The teacher can set three per station.
+- **Score to level:** 0 of 2 → Support, 1 → Core, 2 → Extend. The level shows on each station on the map and on the station card ("Core: you got 1 of 2 on the pretest"). Under Standard and Open control, students can change it; the change is logged.
+- **Teacher-station routing:** a teacher can tag a pretest question as a key misconception. Missing it puts the student in a teacher-station group.
+- **Feedback straight after each answer.** Answering before learning helps later learning even when the answer is wrong (the pretesting effect: Richland, Kornell & Kao, 2009), and the effect is stronger when the right answer is shown.
+- **Growth at the finale:** the finale compares each station's pretest score with its exit check, in place of the confidence-versus-result chart.
+- **Fallbacks:** if a student misses the pretest, levels come from the last quiz on the unit, or default to Core.
+
 ## Informed choice, not free choice
 
 Novices choose badly. They pick whatever feels fluent and easy, so they avoid the desirable difficulty they most need. Choice helps motivation, but the gains peak at about three to five meaningful options and fade with more (Patall, Cooper & Robinson, 2008).
 
-- The map shows a **recommended** station and level for each student, based on the entry check or past results.
+- The map shows a **recommended** station, and each station shows the student's **level from the pretest**.
 - Students can override; the override is logged and shown to the teacher.
 - In choose-N mode, default the number of options shown to five or fewer.
 
@@ -82,7 +99,7 @@ The aim is the right mode for the content, for every student. Coverage still mat
 
 Every station uses the **same card layout**, so students only learn it once and each switch costs little:
 
-1. **Arrival recall**: one question from the station the student has just left (spaced retrieval inside the lesson).
+1. **Arrival recall**: one question from a station the student has already done (spaced retrieval inside the lesson).
 2. **Goal**: one line.
 3. **Steps**: built from existing blocks (a station is a section).
 4. **Levels**: Support · Core · Extend, the same three words the Lens blocks use.
@@ -91,6 +108,18 @@ Every station uses the **same card layout**, so students only learn it once and 
 7. **Exit check**: one or two questions, scored. This is individual even in group work.
 8. **Collect**: the piece (and token) this station produces.
 
+### Gates inside a station
+
+Any section from the second onward can carry a **gate**: it stays blurred until a hinge question earlier in the station is answered correctly. The point is the one Adam gave: if a student hasn't grasped that bleaching means starving, not dead, they can't move on and glide past it.
+
+- **It reuses the hinge question block** (`hinge_question`), which already has a `gate` flag, an `independent` pace with a reason and one retry, and a `backup` question.
+- **Per section, the teacher picks:** open, blurred (the student sees there is more, but can't read or use it) or hidden.
+- **Distractors are the misconceptions.** Each wrong option names the mix-up it reveals ("white coral is not dead coral").
+- **A reason is required** (a few words) so a lucky guess can't pass on its own; the teacher sees the reasons.
+- **Miss once:** a short reteach card naming the misconception, then a **different** backup question, so the student can't pass by elimination.
+- **Miss twice:** the student isn't trapped. They're added to the next teacher-station group, the teacher is flagged, and the reteach card stays on screen. The teacher can open the gate from the live view.
+- **Gate misses count separately** in the hint heat and the markbook, so the teacher can see which misconception is stopping students.
+
 **Station settings:** knowledge type, skill strand, outcomes, minutes, capacity, location (room spot, QR code or online), and whether it can be marked done offline (teacher tick or code entry).
 
 **Station library:** stations are saved on their own and can be reused across rotations.
@@ -98,27 +127,39 @@ Every station uses the **same card layout**, so students only learn it once and 
 ### The teacher station (v1)
 
 - Counts as a station on the map, in the same card layout, using the `with_teacher` block.
-- **Routing:** the entry check (or an earlier quiz) puts students into the teacher station's groups. Students who need reteaching come first, and extension students come last.
+- **Routing:** the pretest (or an earlier quiz) puts students into the teacher station's groups. Students who need reteaching come first, and extension students come last.
 - **Bell mode:** the rotation grid builds the teacher station's groups into the schedule.
 - **Self-paced mode:** the teacher **calls** a group. The called students see "Come to the teacher station" on the map, with a gentle pulse, and their current station is paused, not lost.
-- **Teacher's station view:** who is in this group, why they were routed here (which entry-check items they missed), a short script or misconception list, and quick ticks for "got it" or "needs more". A "needs more" tick can add a follow-up to their passport.
+- **Teacher's station view:** who is in this group, why they were routed here (which pretest items they missed), a short script or misconception list, and quick ticks for "got it" or "needs more". A "needs more" tick can add a follow-up to their passport.
 
 ## Collector: pieces and tokens
 
-- A **piece** is content the finale actually uses: a finding, a worked answer, a sketch, a claim with evidence. Pieces live in a per-student **passport**.
+- A **piece** is content the finale actually uses: a finding, a worked answer, a sketch, a claim with evidence. Pieces live in a per-student **passport**, and on the **evidence board** (below) when the teacher turns it on.
 - A **token** (a code, a key) is for motivation and drama only.
 - **The token is earned by the learning.** The code shows only after the Core-level exit check passes, so it can't be guessed or shortcut.
 - **The final lock needs the stations combined.** It is a question that can only be answered by integrating the pieces ("which factor started the chain?"), not a cipher made from letter counts.
 - **Keep the story thin.** Vivid but irrelevant story detail can pull attention away from the content (the seductive details effect, Harp & Mayer, 1998). The story frames the stations and the reveal; it does not compete with them.
 - **Rewards should tell students how they're doing, not control them.** Points or badges felt as controlling can undermine intrinsic motivation (Deci, Koestner & Ryan, 1999). Tokens mark progress; nothing is ranked.
 
+## Evidence board
+
+Adam's worry was complexity, and work wiped after a day or two. So this is deliberately **not** the freeform whiteboard:
+
+- **Cards only.** Each collected piece arrives as a card. Students can't draw, type loose notes or add shapes.
+- **Two actions:** drag to arrange, and tap one card then another to **link** them with a word from a short list the teacher sets ("causes", "makes worse", "is evidence for", "slows recovery of").
+- **Saved to the student's account**, on the server, with each change. It is not stored on the device, so changing devices, clearing the browser or coming back days later doesn't lose it. A "Saved" line shows each save.
+- **Phone:** dragging is fiddly, so the board becomes a list of cards plus an "Add a link" row (card, word, card).
+- **Under the hood** it is the concept map's canvas mode (nodes with x and y, labelled edges), already in the schema, rather than a new drawing tool.
+- **It feeds the finale:** the board, links and all, opens in the build. Linking the pieces is the integration the final lock asks for.
+- **Optional:** a setting chooses between the evidence board and a plain passport list.
+
 ## Planning and reflection
 
 Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built into the lesson type:
 
-- **Plan (start):** the student drags out a route and rates confidence for each station (1 to 4).
-- **Monitor (during):** the passport shows progress against the plan; hints opened and exit-check results show per station.
-- **Evaluate (finale):** confidence compared with exit-check results (calibration), plus "why did you choose that order, and would you choose it again?".
+- **Plan (start):** the pretest sets the levels; the student picks a route under Standard or Open control.
+- **Monitor (during):** the passport shows progress; hints opened, gate misses and exit-check results show per station.
+- **Evaluate (finale):** pretest compared with exit check for each station, plus "why did you choose that order, and would you choose it again?".
 
 ## Jigsaw variant
 
@@ -161,7 +202,8 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 
 - **Bell mode in v1**, or self-paced only (with the teacher station's "call group")?
 - **Finale**: its own build inside this lesson type, or a handoff to the Design Sprint or Case Study?
-- **Routing source**: an entry check built into the lesson, earlier quiz data, or both?
+- **Pretest length**: two questions per station, or let the teacher set three for higher-stakes stations?
+- **Gates in bell mode**: if the bell goes while a student is still at a gate, does the station carry over, or go straight to the teacher-station group?
 - **Devices**: one per student, or one per group at some stations?
 - **Grouping**: fixed groups for the whole lesson, or free movement with groups only at the teacher station?
 
@@ -174,6 +216,7 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 - Kalyuga, S. (2007). Expertise reversal effect and its implications for learner-tailored instruction. *Educational Psychology Review*.
 - Kapur, M. (2016). Examining productive failure, productive success, unproductive failure, and unproductive success in learning. *Educational Psychologist*.
 - Koedinger, K. R., Corbett, A. T. & Perfetti, C. (2012). The Knowledge-Learning-Instruction framework. *Cognitive Science*.
+- Richland, L. E., Kornell, N. & Kao, L. S. (2009). The pretesting effect: do unsuccessful retrieval attempts enhance learning? *Journal of Experimental Psychology: Applied*.
 - Patall, E. A., Cooper, H. & Robinson, J. C. (2008). The effects of choice on intrinsic motivation and related outcomes: a meta-analysis. *Psychological Bulletin*.
 - Roediger, H. L. & Karpicke, J. D. (2006). Test-enhanced learning. *Psychological Science*.
 - Rohrer, D. & Taylor, K. (2007). The shuffling of mathematics problems improves learning. *Instructional Science*.
@@ -182,3 +225,4 @@ Plan, monitor, evaluate (Zimmerman's cycle of self-regulated learning), built in
 ## History
 
 - 9 Nov 2026: first draft from the brainstorm round, with the mockup.
+- 9 Nov 2026: added gates inside a station, the evidence board and the pretest; cut the 1-to-4 self-rating. Mockup updated with a pretest view, a working gate (miss, reteach, backup, flag) and a drag-and-link board.
