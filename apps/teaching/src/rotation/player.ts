@@ -65,6 +65,8 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
   let poll = 0;
   let disposed = false;
   let mapMsg = '';
+  /** The lock's last answer, kept here so a repaint keeps the message. */
+  let lockWrong: string | null = null;
   const drafts: { pretest: Record<string, QuizResponse>; build: string | null; debrief: Record<string, string> } = { pretest: {}, build: null, debrief: {} };
   const sigs: Record<string, string> = {};
 
@@ -420,14 +422,16 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
         const b = el('button', 'rot-opt', opt.text);
         b.type = 'button';
         b.disabled = !!f.lock_passed;
+        if (lockWrong === opt.id) b.dataset.res = 'wrong';
         b.addEventListener('click', () => void act(() => client!.lock(opt.id), b).then((next) => {
           if (!next?.lock) return;
-          b.dataset.res = next.lock.right ? 'right' : 'wrong';
-          fb.textContent = next.lock.right ? 'Open. Now build your answer.' : 'Not that one. Look at how your pieces link, then try again.';
+          lockWrong = next.lock.right ? null : opt.id;
+          sigs.finale = '';
+          paint();
         }));
         opts.append(b);
       }
-      if (f.lock_passed) fb.textContent = 'Open.';
+      fb.textContent = f.lock_passed ? 'Open. Now build your answer.' : lockWrong ? 'Not that one. Look at how your pieces link, then try again.' : '';
       lock.append(opts, fb);
       left.append(lock);
     }
@@ -537,7 +541,9 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     }
     right.append(debrief);
     const wrap = el('div', 'rot-grid');
-    wrap.append(back, grid);
+    const top = el('div', 'rot-row');
+    top.append(back);
+    wrap.append(top, grid);
     body.replaceChildren(wrap);
   }
 

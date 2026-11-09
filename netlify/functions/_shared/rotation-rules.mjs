@@ -198,6 +198,14 @@ function techniquesNamed(point, names) {
   }
   return found;
 }
+function acceptedTechniqueNames(names, extra = []) {
+  const out = new Set([...names, ...extra].map((n) => n.trim()).filter(Boolean));
+  for (const n of names) {
+    const words = n.trim().split(/\s+/);
+    if (words.length > 1 && words[words.length - 1].length > 4) out.add(words[words.length - 1]);
+  }
+  return [...out];
+}
 function ruleCheck(gate, text, names) {
   const points = splitPoints(text).slice(0, Math.max(gate.marks, 1) + 2).map((p) => ({ ...p, techniques: techniquesNamed(p.text, names) }));
   const results = [];
@@ -354,6 +362,7 @@ export {
   MOVE_MINUTES,
   PRETEST_SECONDS,
   REASON_WORDS,
+  acceptedTechniqueNames,
   addressesMarker,
   capReached,
   cleanReason,

@@ -544,7 +544,7 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     if (['passed', 'unlocked'].includes(g.state)) reject(409, 'open', 'This gate is already open.');
     const level = levelInfo(config, work, s.id).level;
     const outcome = await (deps.checkWriting ?? teacherOnly)({ store, lessonId, classId: who.classId, gate, level, gateState: g, text: body.text });
-    const attempt = { ...outcome.attempt, at: now() };
+    const attempt = { at: now(), ...outcome.attempt };
     const written = [...list(g.written), attempt];
     const counted = written.filter((a) => a.counted !== false).length;
     const nextState = attempt.outcome === 'passed' ? 'passed' : attempt.outcome === 'teacher' || counted >= gate.max_checks ? 'flagged' : 'open';

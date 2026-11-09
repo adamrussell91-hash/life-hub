@@ -26,7 +26,7 @@
 import { randomBytes } from 'node:crypto';
 import { reject, read } from './question-drop.mjs';
 import { LITERARY_TECHNIQUE_NAMES } from './literary-technique-names.mjs';
-import { AI_CHECKS, addressesMarker, capReached, cleanReason, combineWriting, parseVerdicts, pointsForModel, ruleCheck, sameText, writingFeedback } from './rotation-rules.mjs';
+import { AI_CHECKS, acceptedTechniqueNames, addressesMarker, capReached, cleanReason, combineWriting, parseVerdicts, pointsForModel, ruleCheck, sameText, writingFeedback } from './rotation-rules.mjs';
 import { TEACHING_AI_MODELS, estimateCostUsd, textOf, usdToAud } from './teaching-ai-runtime.mjs';
 import { rotationKeys } from './rotation.mjs';
 
@@ -99,7 +99,7 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
     if (last && sameText(last.text, text)) reject(409, 'unchanged', 'Change your answer before checking it again.');
     if (last && now() - Date.parse(last.at) < RATE_MS) reject(429, 'too_soon', 'Give it a moment, then check again.');
     const attemptNo = counted + 1;
-    const base = { text: text.trim(), rules: [], verdicts: [], feedback: [], points: [] };
+    const base = { text: text.trim(), at: new Date(now()).toISOString(), rules: [], verdicts: [], feedback: [], points: [] };
 
     if (await spentToday(store, lessonId, classId).then((aud) => capReached(aud, gate.daily_cap_aud))) {
       return { attempt: { ...base, outcome: 'teacher', counted: false, capped: true }, message: 'The checker has done its checks for today. Your teacher will look at this one.' };
@@ -108,7 +108,8 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
       return { attempt: { ...base, outcome: 'teacher', counted: false, flagged_text: true }, message: 'Your teacher will look at this one.' };
     }
 
-    const check = ruleCheck(gate, text, names);
+    const accepted = acceptedTechniqueNames(names, list(gate.answer_key).flatMap((k) => list(k.techniques)));
+    const check = ruleCheck(gate, text, accepted);
     const aiChecks = AI_CHECKS.filter((c) => gate.checks.includes(c));
     const forModel = aiChecks.length ? pointsForModel(check, gate.marks) : [];
     let verdicts = [];
@@ -136,7 +137,7 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
       const parsed = parseVerdicts(textOf(reply ?? {}), expected);
       verdicts = parsed.verdicts.map((v) => {
         if (v.verdict !== 'fail' || !v.reason) return v;
-        const cleaned = cleanReason(v.reason, { used: check.points[v.point]?.techniques ?? [], names, passage: gate.passage, studentText: text, modelAnswer: gate.model_answer });
+        const cleaned = cleanReason(v.reason, { used: check.points[v.point]?.techniques ?? [], names: accepted, passage: gate.passage, studentText: text, modelAnswer: gate.model_answer });
         if (cleaned.stripped) stripped += 1;
         else reasons[`${v.point}:${v.check}`] = cleaned.reason;
         const { reason: _r, ...rest } = v;

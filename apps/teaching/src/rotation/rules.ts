@@ -261,6 +261,21 @@ export function techniquesNamed(point: string, names: readonly string[]): string
   return found;
 }
 
+/**
+ * The names a student may use: the class list, the teacher's answer-key
+ * techniques, and the head word of a multi-word name ("Repetition" from
+ * "Incremental Repetition", "Imagery" from "Visual Imagery"), since students
+ * name the family as often as the kind.
+ */
+export function acceptedTechniqueNames(names: readonly string[], extra: readonly string[] = []): string[] {
+  const out = new Set<string>([...names, ...extra].map((n) => n.trim()).filter(Boolean));
+  for (const n of names) {
+    const words = n.trim().split(/\s+/);
+    if (words.length > 1 && words[words.length - 1]!.length > 4) out.add(words[words.length - 1]!);
+  }
+  return [...out];
+}
+
 export type RuleResult = { point: number; check: WrittenCheck; ok: boolean; reason?: string };
 export type RuleCheck = { points: WritingPoint[]; results: RuleResult[]; problems: string[] };
 

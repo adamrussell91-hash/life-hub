@@ -273,3 +273,33 @@ test('the student endpoint is on the public route list', async () => {
   assert.equal(isPublicStudentApi('POST', '/api/published/rotation/rot1'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/rotation/rot1'), false);
 });
+
+test('written gate through the student endpoint: not yet, appeal, then pass; the teacher sees each check', async () => {
+  const { createWritingChecker } = await import('../../netlify/functions/_shared/rotation-writing.mjs');
+  const { store } = await setup();
+  let verdict = 'fail';
+  const complete = async (request) => {
+    const ids = [...request.messages[0].content.matchAll(/<point id="([^"]+)"/g)].map((m) => m[1]);
+    const verdicts = ids.flatMap((id) => ['technique_fits', 'effect_linked'].map((check) => ({ id, check, verdict, ...(verdict === 'fail' ? { reason: 'Say how it shows the idea.' } : {}) })));
+    return { content: [{ type: 'text', text: JSON.stringify({ verdicts }) }], usage: { input_tokens: 10, output_tokens: 10 } };
+  };
+  let t = Date.parse('2026-11-09T10:00:00Z');
+  const deps = { checkWriting: createWritingChecker({ complete, names: ['Repetition', 'Personification'], now: () => t }) };
+  await claim(store, 1);
+  const text = 'Repetition in "nothing, nothing, nothing" shows isolation.\n\nPersonification in "Its single eye turned" shows isolation.';
+  let s = await act(store, 1, 'check_writing', { station: 's3', text }, deps);
+  assert.equal(s.gates.s3.state, 'open');
+  assert.equal(s.gates.s3.checks_left, 2);
+  assert.equal(s.gates.s3.last.outcome, 'not_yet');
+  s = await act(store, 1, 'appeal', { station: 's3' }, deps);
+  assert.ok(s.gates.s3.appeal_at);
+  let board = await teach(store, 'board');
+  assert.equal(board.writing[0].appeal, true);
+  assert.equal(board.writing[0].attempts[0].text, text);
+  verdict = 'pass';
+  t += 60_000;
+  s = await act(store, 1, 'check_writing', { station: 's3', text: `${text} It is lonely.` }, deps);
+  assert.equal(s.gates.s3.state, 'passed');
+  // Gates never write a mark: nothing under quiz/ or a markbook key.
+  assert.ok(![...store.data.keys()].some((k) => k.startsWith('quiz/') || k.includes('markbook')));
+});
