@@ -165,11 +165,18 @@ export async function loadAllPeopleWithRelationships({
   // Cheap Blob pass: person JSON only. listForEntity waits until after
   // identity dedupe so discarded twins never hit the membership scan.
   // Also drop Blob twins of Communications students before dedupe / scan.
+  // A student adopted into Blobs (edited, or linked to a meeting) keeps its
+  // id, so the GitHub row below is skipped as already stored: keep the stored
+  // record aside for the Students list instead of losing it both ways.
+  const nativeStudents = new Map();
   const nativeStubs = (
     await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
       const record = await readProfessionalPerson(id, parsePersonRecord(await getJSON(store, personKey(id))), github);
       if (!record) return null;
-      if (isNetworkExcludedPerson(record, studentIds, studentNameKeys)) return null;
+      if (isNetworkExcludedPerson(record, studentIds, studentNameKeys)) {
+        if (isImportedStudentPerson(record) || studentIds.has(id)) nativeStudents.set(id, record);
+        return null;
+      }
       const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
       return { person: { ...record, ref }, relationships: [], _source: 'blob' };
     })
@@ -227,7 +234,15 @@ export async function loadAllPeopleWithRelationships({
   // they can never displace or merge with a colleague. Every other caller
   // keeps the adults-only network.
   if (includeStudents) {
-    const studentRows = await mapBounded(githubStudents, PEOPLE_BATCH_SIZE, async (record) => {
+    // Stored copy first (it carries edits); a stored id with no readable
+    // student record is a removal marker and stays out.
+    const studentRecords = [
+      ...githubStudents
+        .map((record) => (nativeIds.has(record.id) ? nativeStudents.get(record.id) ?? null : record))
+        .filter(Boolean),
+      ...[...nativeStudents.values()].filter((record) => !studentIds.has(record.id))
+    ];
+    const studentRows = await mapBounded(studentRecords, PEOPLE_BATCH_SIZE, async (record) => {
       const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id: record.id });
       const relationships = [];
       for (const { link, otherRef, direction } of await listGithubRelationshipEntries('person', record.id, github)) {
@@ -236,7 +251,7 @@ export async function loadAllPeopleWithRelationships({
       }
       return { person: { ...record, ref }, relationships, _source: 'github' };
     });
-    survivors.push(...studentRows.filter((row) => !nativeIds.has(row.person.id) && !isDeletedRecord(row.person)));
+    survivors.push(...studentRows.filter((row) => !isDeletedRecord(row.person)));
   }
 
   return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {

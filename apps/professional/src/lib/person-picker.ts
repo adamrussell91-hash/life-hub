@@ -81,3 +81,48 @@ export async function searchPickerPeople(
   ]);
   return { groups: { person: labelPeopleHits(result.groups.person ?? [], directory) } };
 }
+
+/** What a "new person" row in the picker will create. */
+export type NewPersonChoice = { name: string; student: boolean };
+
+const NEW_PREFIX = 'new:';
+
+/**
+ * Two rows that create someone from the typed name: an ordinary person and a
+ * student. Offered whenever no existing row carries exactly that name, so a
+ * near match ("Jo" → "Joan") never hides the way to add a new Jo.
+ */
+export function newPersonRows(query: string, rows: PickerPerson[]): PickerPerson[] {
+  const name = query.trim().replace(/\s+/g, ' ');
+  if (name.length < 2) return [];
+  if (rows.some((row) => nameKey(row.display_label) === nameKey(name))) return [];
+  const make = (student: boolean): PickerPerson => ({
+    ref: `${NEW_PREFIX}${student ? 'student' : 'person'}:${name}`,
+    kind: 'person',
+    display_label: `Add “${name}” as a new ${student ? 'student' : 'person'}`,
+    supporting_label: 'Not in People yet',
+    href: null
+  });
+  return [make(false), make(true)];
+}
+
+/** The choice behind a row from `newPersonRows`, or null for a real person. */
+export function readNewPersonChoice(ref: string): NewPersonChoice | null {
+  if (!ref.startsWith(NEW_PREFIX)) return null;
+  const rest = ref.slice(NEW_PREFIX.length);
+  const split = rest.indexOf(':');
+  const type = rest.slice(0, split);
+  const name = rest.slice(split + 1).trim();
+  if (split < 0 || !name || (type !== 'person' && type !== 'student')) return null;
+  return { name, student: type === 'student' };
+}
+
+/** `searchPickerPeople`, plus the two "add someone new" rows. */
+export async function searchPickerPeopleOrNew(
+  query: string,
+  signal?: AbortSignal
+): Promise<{ groups: { person: PickerPerson[] } }> {
+  const result = await searchPickerPeople(query, signal);
+  const people = result.groups.person;
+  return { groups: { person: [...people, ...newPersonRows(query, people)] } };
+}
