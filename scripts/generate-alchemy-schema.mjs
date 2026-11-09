@@ -61,6 +61,18 @@ await build({
   banner: {js:'// Generated from apps/teaching/src/case-study/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
 await build({
+  entryPoints: ['apps/teaching/src/rotation/schema.ts'],
+  outfile: 'netlify/functions/_shared/rotation-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/rotation/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/rotation/rules.ts'],
+  outfile: 'netlify/functions/_shared/rotation-rules.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/rotation/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
   entryPoints: ['apps/teaching/src/sprint/schema.ts'],
   outfile: 'netlify/functions/_shared/sprint-schema.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],

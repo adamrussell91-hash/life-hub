@@ -2910,6 +2910,10 @@ var SectionBlockObjectSchema = z13.object({
     case_part: z13.string().max(40).optional(),
     /** Case Study: this top-level section holds the Outcome's blocks, shown to students once the outcome is out. */
     case_outcome: z13.boolean().optional(),
+    /** Station Rotation: this top-level section holds one station's blocks (by station id). */
+    rotation_station: z13.string().max(40).optional(),
+    /** Station Rotation: this top-level section holds the finale's own blocks. */
+    rotation_finale: z13.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
@@ -5740,21 +5744,21 @@ var AI_TOOLS = [
     }
   }
 ];
-function parseToolProposal(name, input) {
-  if (name === "propose_replace_block") {
+function parseToolProposal(name2, input) {
+  if (name2 === "propose_replace_block") {
     const parsed = ProposeReplaceBlockSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     const block = { ...parsed.data.block, id: parsed.data.block_id };
     return { kind: "replace_block", block_id: parsed.data.block_id, block };
   }
-  if (name === "propose_replace_blocks") {
+  if (name2 === "propose_replace_blocks") {
     const parsed = ProposeReplaceBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     const ids = parsed.data.blocks.map((block) => block.id);
     if (new Set(ids).size !== ids.length) return { error: "Each replacement needs a different block id." };
     return { kind: "replace_blocks", blocks: parsed.data.blocks };
   }
-  if (name === "propose_replace_section") {
+  if (name2 === "propose_replace_section") {
     const parsed = ProposeReplaceSectionSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     if (parsed.data.section.block_type !== "section") {
@@ -5763,7 +5767,7 @@ function parseToolProposal(name, input) {
     const section = { ...parsed.data.section, id: parsed.data.section_id };
     return { kind: "replace_section", section_id: parsed.data.section_id, section };
   }
-  if (name === "propose_replace_lesson") {
+  if (name2 === "propose_replace_lesson") {
     const parsed = ProposeReplaceLessonSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     if (countBlocksInTree(parsed.data.blocks) > 48) {
@@ -5777,7 +5781,7 @@ function parseToolProposal(name, input) {
       ...parsed.data.set_mode ? { set_mode: parsed.data.set_mode } : {}
     };
   }
-  if (name === "propose_insert_blocks") {
+  if (name2 === "propose_insert_blocks") {
     const parsed = ProposeInsertBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     if (countBlocksInTree(parsed.data.blocks) > 48) {
@@ -5791,12 +5795,12 @@ function parseToolProposal(name, input) {
       ...parsed.data.set_mode ? { set_mode: parsed.data.set_mode } : {}
     };
   }
-  if (name === "propose_delete_blocks") {
+  if (name2 === "propose_delete_blocks") {
     const parsed = ProposeDeleteBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     return { kind: "delete_blocks", ids: parsed.data.ids };
   }
-  if (name === "propose_reorder_blocks") {
+  if (name2 === "propose_reorder_blocks") {
     const parsed = ProposeReorderBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     return {
@@ -5805,19 +5809,19 @@ function parseToolProposal(name, input) {
       ordered_ids: parsed.data.ordered_ids
     };
   }
-  if (name === "propose_update_case") {
+  if (name2 === "propose_update_case") {
     const parsed = ProposeUpdateCaseSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     const issue = caseIdIssue(parsed.data.case);
     if (issue) return { error: issue };
     return { kind: "update_case", case: parsed.data.case };
   }
-  if (name === "review_only") {
+  if (name2 === "review_only") {
     const parsed = ReviewOnlySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
     return { kind: "review_only", summary: parsed.data.summary };
   }
-  return { error: `Unknown tool: ${name}` };
+  return { error: `Unknown tool: ${name2}` };
 }
 
 // apps/teaching/src/ai/block-tree.ts
@@ -6218,7 +6222,7 @@ function buildAiStaticPrompt(input) {
 }
 function lessonForAgent(lesson) {
   if (!lesson.tutorial) return lesson;
-  const groups = lesson.tutorial.groups.map(({ id, name, why, goal, gap_type }) => ({ id, name, why, goal, gap_type }));
+  const groups = lesson.tutorial.groups.map(({ id, name: name2, why, goal, gap_type }) => ({ id, name: name2, why, goal, gap_type }));
   const tag = lesson.tutorial.tag ? { tag: lesson.tutorial.tag } : {};
   return { ...lesson, tutorial: { ...tag, groups } };
 }
@@ -6484,7 +6488,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z20 } from "zod";
+import { z as z21 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z17 } from "zod";
@@ -6703,11 +6707,242 @@ function caseIssues(lesson) {
   return out;
 }
 
-// apps/teaching/src/schemas/source.ts
+// apps/teaching/src/rotation/schema.ts
 import { z as z19 } from "zod";
-var SourceSchema = z19.object({
-  system: z19.literal("notion"),
-  page_id: z19.string().min(1).max(64),
+var ROTATION_KINDS = ["facts", "concepts", "procedures", "analysis", "perspectives", "teacher"];
+var ROTATION_DIALS = ["guided", "standard", "open"];
+var ROTATION_PATHS = ["fixed", "free_all", "choose_n", "must_may", "unlocks"];
+var ROTATION_FALLBACKS = ["choose_n_minus_1", "skip_finale_build", "none"];
+var ROTATION_ROLES = ["recall", "goal", "step", "hint", "gate", "after", "done", "exit"];
+var DEFAULT_LINK_WORDS = ["causes", "makes worse", "is evidence for", "slows recovery of"];
+var DEFAULT_FINALE_FORMATS = ["One-page brief", "Annotated diagram", "Two-minute talk"];
+var DEFAULT_DEBRIEF = ["Why did you choose that order? Would you choose it again?", "Which piece changed your explanation the most?"];
+var Id3 = z19.string().regex(/^[a-z0-9_-]{1,40}$/);
+var WRITTEN_CHECKS = ["technique_named", "exact_quote", "technique_fits", "effect_linked"];
+var WrittenGateSchema = z19.object({
+  prompt: z19.string().max(600).default(""),
+  passage: z19.string().max(4e3).default(""),
+  /** One mark per point. */
+  marks: z19.number().int().min(1).max(6).default(3),
+  /** What each effect must link to: "isolation". */
+  idea: z19.string().max(120).default(""),
+  checks: z19.array(z19.enum(WRITTEN_CHECKS)).max(4).default(["technique_named", "exact_quote", "technique_fits", "effect_linked"]),
+  different_techniques: z19.boolean().default(true),
+  pass_at: z19.number().int().min(1).max(6).default(3),
+  pass_at_support: z19.number().int().min(1).max(6).optional(),
+  /** Optional: quotes the teacher expects and the techniques that fit them. The checker may accept others it can justify. */
+  answer_key: z19.array(z19.object({ quote: z19.string().max(400), techniques: z19.array(z19.string().max(80)).max(6) })).max(12).optional(),
+  max_checks: z19.number().int().min(1).max(6).default(3),
+  /** Teacher only; never sent to students or to the checker. */
+  model_answer: z19.string().max(3e3).optional(),
+  /** Daily cap per class in A$. At the cap, written gates become teacher checks for the rest of the day. */
+  daily_cap_aud: z19.number().min(0).max(50).default(3)
+});
+var StationSchema = z19.object({
+  id: Id3,
+  title: z19.string().max(120).default(""),
+  kind: z19.enum(ROTATION_KINDS).default("concepts"),
+  strand: z19.string().max(40).optional(),
+  outcomes: z19.array(z19.string().max(200)).max(6).default([]),
+  minutes: z19.number().int().min(1).max(90).default(10),
+  seats: z19.number().int().min(1).max(40).default(6),
+  /** "Back bench". A QR code links to the station. */
+  location: z19.string().max(80).optional(),
+  must_do: z19.boolean().optional(),
+  unlock_after: z19.array(Id3).max(8).optional(),
+  /** One letter or a short code, breakout only. */
+  token: z19.string().max(4).optional(),
+  /** The evidence card text this station produces. */
+  piece: z19.string().max(300).default(""),
+  /** Marks an offline station done. */
+  offline_code: z19.string().max(20).optional(),
+  /** Map position, 0 to 100 each way. Absent: laid out automatically. */
+  x: z19.number().min(0).max(100).optional(),
+  y: z19.number().min(0).max(100).optional(),
+  /** The station's gate, when it is a written answer. A hinge gate is a block in the section instead. */
+  written_gate: WrittenGateSchema.optional(),
+  /** Teacher station only: what to say to a group sent here, per misconception. */
+  script: z19.string().max(600).optional()
+});
+var PretestItemSchema = z19.object({
+  id: Id3,
+  station: Id3,
+  /** Saved half-written while drafting; publish runs the full check. */
+  question: QuizQuestionDraftSchema,
+  /** Missing it routes the student to the teacher station. */
+  misconception: z19.boolean().optional()
+});
+var LockOptionSchema = z19.object({ id: Id3, text: z19.string().max(300) });
+var LockQuestionSchema = z19.object({
+  prompt: z19.string().max(500).default(""),
+  options: z19.array(LockOptionSchema).max(5).default([]),
+  correct_id: z19.string().max(40).default("")
+});
+var RotationFinaleSchema = z19.object({
+  lock: LockQuestionSchema.optional(),
+  /** The build: what students write, with their board's cards and links in place. */
+  build_prompt: z19.string().max(400).default("Write your recommendation, using your evidence."),
+  formats: z19.array(z19.string().max(60)).max(5).default([...DEFAULT_FINALE_FORMATS]),
+  debrief: z19.array(z19.string().max(300)).max(4).default([...DEFAULT_DEBRIEF])
+});
+var RotationSettingsSchema = z19.object({
+  class_id: z19.string().max(64).default(""),
+  dial: z19.enum(ROTATION_DIALS).default("standard"),
+  /** Extend passed at two stations opens route choice. */
+  fade_dial: z19.boolean().default(true),
+  path: z19.enum(ROTATION_PATHS).default("free_all"),
+  choose_n: z19.number().int().min(1).max(8).optional(),
+  evidence: z19.enum(["board", "list"]).default("board"),
+  link_words: z19.array(z19.string().min(1).max(40)).min(2).max(6).default([...DEFAULT_LINK_WORDS]),
+  stations: z19.array(StationSchema).max(9).default([]),
+  pretest: z19.array(PretestItemSchema).max(30).default([]),
+  finale: RotationFinaleSchema.default({ build_prompt: "Write your recommendation, using your evidence.", formats: [...DEFAULT_FINALE_FORMATS], debrief: [...DEFAULT_DEBRIEF] }),
+  /** Breakout framing; optional. */
+  story: z19.object({ title: z19.string().max(120), intro: z19.string().max(800) }).optional(),
+  behind_fallback: z19.enum(ROTATION_FALLBACKS).default("choose_n_minus_1"),
+  /** Lesson length when it isn't scheduled; the timetable's wins when it is. */
+  minutes: z19.number().int().min(10).max(240).optional()
+});
+var PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
+var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({
+  written_gate: PublicWrittenGateSchema.optional(),
+  has_offline_code: z19.boolean().optional()
+});
+var PublicRotationSchema = z19.object({
+  dial: z19.enum(ROTATION_DIALS),
+  fade_dial: z19.boolean(),
+  path: z19.enum(ROTATION_PATHS),
+  choose_n: z19.number().int().optional(),
+  evidence: z19.enum(["board", "list"]),
+  link_words: z19.array(z19.string()),
+  stations: z19.array(PublicStationSchema),
+  finale: z19.object({
+    lock: z19.object({ prompt: z19.string(), options: z19.array(LockOptionSchema) }).optional(),
+    build_prompt: z19.string(),
+    formats: z19.array(z19.string()),
+    debrief: z19.array(z19.string())
+  }),
+  story: z19.object({ title: z19.string(), intro: z19.string() }).optional(),
+  behind_fallback: z19.enum(ROTATION_FALLBACKS),
+  pretest_count: z19.number().int()
+});
+
+// apps/teaching/src/rotation/rules.ts
+function unlockProblems(stations) {
+  const ids = new Set(stations.map((s2) => s2.id));
+  const out = [];
+  for (const s2 of stations) {
+    if ((s2.unlock_after ?? []).some((id) => !ids.has(id))) out.push(`${s2.title || "A station"} opens after a station that is no longer in the lesson.`);
+    if ((s2.unlock_after ?? []).includes(s2.id)) out.push(`${s2.title || "A station"} can\u2019t open after itself.`);
+  }
+  const after = new Map(stations.map((s2) => [s2.id, (s2.unlock_after ?? []).filter((id) => ids.has(id) && id !== s2.id)]));
+  const state = /* @__PURE__ */ new Map();
+  let loop = false;
+  const visit = (id) => {
+    if (state.get(id) === "done" || loop) return;
+    if (state.get(id) === "seen") {
+      loop = true;
+      return;
+    }
+    state.set(id, "seen");
+    for (const next of after.get(id) ?? []) visit(next);
+    state.set(id, "done");
+  };
+  for (const s2 of stations) visit(s2.id);
+  if (loop) out.push("The unlocks go round in a loop, so some stations would never open.");
+  return out;
+}
+
+// apps/teaching/src/rotation/model.ts
+var MAX_STATIONS = 8;
+var PRETEST_PER_STATION = 3;
+var MAX_HINTS = 3;
+var rotationStationOf = (b) => b.block_type === "section" && typeof b.content.rotation_station === "string" ? b.content.rotation_station : void 0;
+var findStationSection = (blocks, stationId) => blocks.find((b) => rotationStationOf(b) === stationId);
+var sectionBlocks = (section) => section?.block_type === "section" ? section.content.blocks : [];
+var settingOf = (b, key) => b.settings?.[key];
+function roleOf(b) {
+  const role = settingOf(b, "rotation_role");
+  return typeof role === "string" && ROTATION_ROLES.includes(role) ? role : "step";
+}
+var isHingeGate = (b) => b.block_type === "hinge_question" && roleOf(b) === "gate";
+var filled2 = (s2) => !!s2 && s2.trim().length > 0;
+var textOf = (b) => {
+  if (b.block_type === "rich_text") return String(b.content.html ?? "").replace(/<[^>]+>/g, " ").trim();
+  return "x";
+};
+var name = (s2) => s2.title.trim() || "A station";
+function rotationIssues(lesson) {
+  const r = lesson.rotation;
+  if (!r) return ["Set up the rotation: add stations, a pretest and a class."];
+  const out = [];
+  const learning = r.stations.filter((s2) => s2.kind !== "teacher");
+  const teachers = r.stations.filter((s2) => s2.kind === "teacher");
+  if (!filled2(r.class_id)) out.push("Pick the class this rotation is for.");
+  if (learning.length < 2) out.push("Add at least 2 stations.");
+  if (learning.length > MAX_STATIONS) out.push(`A rotation can have at most ${MAX_STATIONS} stations, plus one teacher station.`);
+  if (teachers.length > 1) out.push("Keep to one teacher station.");
+  for (const s2 of r.stations) {
+    if (!filled2(s2.title)) out.push("Every station needs a title.");
+    const section = findStationSection(lesson.blocks, s2.id);
+    if (!section) {
+      out.push(`${name(s2)} has no content yet. Open it with Edit.`);
+      continue;
+    }
+    if (s2.kind === "teacher") continue;
+    const blocks = sectionBlocks(section);
+    const goal = blocks.find((b) => roleOf(b) === "goal");
+    if (!goal || !textOf(goal)) out.push(`${name(s2)} needs a goal.`);
+    const exits = blocks.filter((b) => roleOf(b) === "exit" && b.block_type === "quiz_question");
+    if (exits.length === 0) out.push(`${name(s2)} needs an exit check question.`);
+    if (exits.length > 2) out.push(`${name(s2)} has more than two exit check questions.`);
+    if (blocks.filter((b) => roleOf(b) === "hint").length > MAX_HINTS) out.push(`${name(s2)} has more than ${MAX_HINTS} hints.`);
+    for (const b of blocks) {
+      if (b.block_type !== "quiz_question") continue;
+      if (!QuizQuestionSchema.safeParse(b.content.question).success) {
+        out.push(`A question at ${name(s2)} isn\u2019t finished.`);
+        break;
+      }
+    }
+    const hinges = blocks.filter(isHingeGate);
+    const gates = hinges.length + (s2.written_gate ? 1 : 0);
+    if (gates > 1) out.push(`${name(s2)} has more than one gate. Keep one.`);
+    if (gates === 0 && blocks.some((b) => roleOf(b) === "after")) out.push(`${name(s2)} has steps after a gate, but no gate.`);
+    for (const h of hinges) {
+      if (h.block_type !== "hinge_question") continue;
+      const c = h.content;
+      if (!filled2(c.prompt) || c.options.length < 2 || !c.options.some((o) => o.id === c.correct_id)) out.push(`The gate at ${name(s2)} needs a question, options and a right answer.`);
+    }
+    if (blocks.some((b) => b.block_type === "quiz_question" && roleOf(b) === "gate")) out.push(`A gate at ${name(s2)} must be a hinge question or a written answer.`);
+    const g = s2.written_gate ? WrittenGateSchema.parse(s2.written_gate) : null;
+    if (g) {
+      if (!filled2(g.passage)) out.push(`The written gate at ${name(s2)} needs a passage.`);
+      if (!filled2(g.prompt)) out.push(`The written gate at ${name(s2)} needs a question.`);
+      if (!filled2(g.idea)) out.push(`The written gate at ${name(s2)} needs the idea each point links to.`);
+      if (g.checks.length === 0) out.push(`The written gate at ${name(s2)} needs at least one check.`);
+      if (g.pass_at > g.marks || (g.pass_at_support ?? 0) > g.marks) out.push(`The written gate at ${name(s2)} can\u2019t pass at more marks than it has.`);
+    }
+    const asked = r.pretest.filter((p) => p.station === s2.id);
+    if (asked.length !== PRETEST_PER_STATION) out.push(`${name(s2)} needs exactly ${PRETEST_PER_STATION} pretest questions (it has ${asked.length}).`);
+    else if (asked.some((p) => !QuizQuestionSchema.safeParse(p.question).success)) out.push(`A pretest question for ${name(s2)} isn\u2019t finished.`);
+  }
+  const orphans = r.pretest.filter((p) => !learning.some((s2) => s2.id === p.station));
+  if (orphans.length) out.push("Some pretest questions belong to a station that is no longer in the lesson.");
+  if (r.path === "choose_n" && (!r.choose_n || r.choose_n >= learning.length)) out.push("\u201CChoose some\u201D needs a number smaller than the number of stations.");
+  if (r.path === "must_may" && !learning.some((s2) => s2.must_do)) out.push("Tick at least one must-do station.");
+  if (r.path === "unlocks") out.push(...unlockProblems(r.stations));
+  if (r.stations.some((s2) => filled2(s2.token))) {
+    const lock = r.finale.lock;
+    if (!lock || !filled2(lock.prompt) || lock.options.length < 2 || !lock.options.some((o) => o.id === lock.correct_id)) out.push("A breakout with letters needs a lock question with a right answer (Finale).");
+  }
+  return [...new Set(out)];
+}
+
+// apps/teaching/src/schemas/source.ts
+import { z as z20 } from "zod";
+var SourceSchema = z20.object({
+  system: z20.literal("notion"),
+  page_id: z20.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -6864,10 +7099,10 @@ function sanitizeSvgMarkup(markup) {
     }
     const attrs = [];
     for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith("on")) continue;
-      if (!ALLOWED_ATTRS.has(name)) continue;
-      if ((name === "href" || name === "xlink:href") && !isSafeHref(attr.value)) continue;
+      const name2 = attr.name.toLowerCase();
+      if (name2.startsWith("on")) continue;
+      if (!ALLOWED_ATTRS.has(name2)) continue;
+      if ((name2 === "href" || name2 === "xlink:href") && !isSafeHref(attr.value)) continue;
       if (!isSafeUrlAttrValue(attr.value)) continue;
       attrs.push(`${attr.name}="${escapeAttr(attr.value)}"`);
     }
@@ -7385,22 +7620,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z20.object({
+var LessonSchema = z21.object({
   ...CommonFields,
   ...TrashFields,
-  type: z20.literal("lesson"),
-  unit_id: z20.string().min(1),
-  sequence: z20.number().int(),
-  blocks: z20.array(BlockSchema),
+  type: z21.literal("lesson"),
+  unit_id: z21.string().min(1),
+  sequence: z21.number().int(),
+  blocks: z21.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z20.array(z20.string().min(1).max(40)).max(24).optional(),
-  author_id: z20.string().min(1).optional(),
-  review_status: z20.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z20.array(z20.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z20.array(z20.string().min(1).max(64)).max(24).optional(),
+  tags: z21.array(z21.string().min(1).max(40)).max(24).optional(),
+  author_id: z21.string().min(1).optional(),
+  review_status: z21.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z21.array(z21.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z21.array(z21.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z20.array(LineStopSchema).max(16).optional(),
+  line_stops: z21.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -7412,26 +7647,26 @@ var LessonSchema = z20.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z20.string().min(1).max(64).nullable().optional(),
+  branch_from: z21.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z20.boolean().nullable().optional(),
+  pre_unit: z21.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z20.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z21.array(DotPointRefSchema).max(20).optional(),
   /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
-  focus_pieces: z20.array(PieceIdSchema).max(24).optional(),
+  focus_pieces: z21.array(PieceIdSchema).max(24).optional(),
   /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
-  focus_skills: z20.array(z20.string().regex(SkillRefPattern)).max(12).optional(),
+  focus_skills: z21.array(z21.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z20.array(z20.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z21.array(z21.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z20.boolean().optional(),
+  feedback_off: z21.boolean().optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z20.object({
-    on: z20.boolean().optional(),
-    skip: z20.array(z20.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z20.boolean().optional()
+  end_questions: z21.object({
+    on: z21.boolean().optional(),
+    skip: z21.array(z21.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z21.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -7441,12 +7676,14 @@ var LessonSchema = z20.object({
   sprint: SprintSettingsSchema.optional(),
   /** Case Study lessons only: purpose, documents, decision, outcome and the unseen case. */
   case: CaseSettingsSchema.optional(),
+  /** Station Rotation lessons only: stations, pretest, path, dial, evidence board and finale. */
+  rotation: RotationSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z20.ZodIssueCode.custom,
+      code: z21.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -7458,7 +7695,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z20.ZodIssueCode.custom,
+        code: z21.ZodIssueCode.custom,
         message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -7466,22 +7703,27 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["case"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "station_rotation") {
+    for (const message of rotationIssues(lesson)) {
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["rotation"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z20.ZodIssueCode.custom,
+      code: z21.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -7857,7 +8099,7 @@ function estimateFor(kind, model, input, codes, boxes) {
   const cost_usd = estimateCostUsd(model, { input_tokens, output_tokens });
   return { kind, model, boxes, codes, lines: codes * RUNG_ORDER.length, input_tokens, output_tokens, cost_usd, cost_aud: usdToAud(cost_usd) };
 }
-function textOf(reply) {
+function textOf2(reply) {
   return (Array.isArray(reply.content) ? reply.content : []).filter((b) => b.type === "text" && typeof b.text === "string").map((b) => b.text).join("").trim();
 }
 function usageOf(reply, model) {
@@ -7884,7 +8126,7 @@ async function ask(run, tier, system, user, maxTokens) {
     tools: [],
     messages: [{ role: "user", content: user }]
   });
-  return { text: textOf(reply), usage: usageOf(reply, model), stop: reply.stop_reason };
+  return { text: textOf2(reply), usage: usageOf(reply, model), stop: reply.stop_reason };
 }
 var maxTokensFor = (codes) => Math.min(32e3, 1e3 + codes * OUTPUT_TOKENS_PER_CODE * 2);
 function estimateNextStepsFill(input) {
@@ -7925,7 +8167,7 @@ async function runNextStepsFill(input) {
     return fail(error instanceof Error ? error.message : "The model request failed.");
   }
   const flagged = [];
-  const filled2 = boxes.map((b, i) => {
+  const filled3 = boxes.map((b, i) => {
     const next_steps = { ...b.bank };
     for (const c of b.codes) {
       const ladder = c.ladder ?? [];
@@ -7935,14 +8177,14 @@ async function runNextStepsFill(input) {
     }
     return { block_id: b.block_id, index: b.index, question: b.question, skills: b.skills, next_steps };
   });
-  return { status: "done", boxes: filled2, flagged, usage, cost_usd: totalCost(usage) };
+  return { status: "done", boxes: filled3, flagged, usage, cost_usd: totalCost(usage) };
 }
 var sameSkills = (a, b) => [...a].sort().join("|") === [...b].sort().join("|");
-function applyFilledBoxes(lesson, filled2) {
+function applyFilledBoxes(lesson, filled3) {
   const copy = structuredClone(lesson);
   let applied = 0;
   let skipped = 0;
-  for (const f of filled2) {
+  for (const f of filled3) {
     const q = questionAt(copy.blocks, f);
     if (!q || questionText(q) !== f.question || !sameSkills(q.skills ?? [], f.skills)) {
       skipped += 1;
@@ -8205,7 +8447,7 @@ async function runAnswerMarking(input) {
       });
       const turn = usageOf(reply, model);
       usage.push(turn);
-      marks.push(...readMarkingReply(textOf(reply), call.question, call.answers, turn.model));
+      marks.push(...readMarkingReply(textOf2(reply), call.question, call.answers, turn.model));
     } catch (error) {
       failed += 1;
       lastError = error instanceof Error ? error.message : "The model request failed.";
@@ -8307,7 +8549,7 @@ async function runVoiceRead(input) {
       });
       const turn = usageOf(reply, model);
       usage.push(turn);
-      reads.push(...readReadingReply(textOf(reply), input.question, call, turn.model));
+      reads.push(...readReadingReply(textOf2(reply), input.question, call, turn.model));
     } catch (error) {
       failed += 1;
       lastError = error instanceof Error ? error.message : "The model request failed.";
@@ -8437,9 +8679,9 @@ function safeValidate(proposal, pack) {
   }
 }
 var MEDIA_PREFIX = "Media not in search pack: ";
-function checkProposalCall(name, input, lesson, sightings) {
-  const parsed = parseToolProposal(name, input);
-  if ("error" in parsed) return `${name}: ${truncate2(parsed.error)}`;
+function checkProposalCall(name2, input, lesson, sightings) {
+  const parsed = parseToolProposal(name2, input);
+  if ("error" in parsed) return `${name2}: ${truncate2(parsed.error)}`;
   const checked = safeValidate(parsed, packOf(sightings));
   const quiz = quizProposalIssues(parsed, lesson, { tagLists: sightings?.tagLists });
   const publish = checked.ok || quiz.length > 0 && /^Quiz question \d+:/.test(checked.error) ? [] : [checked.error.startsWith(MEDIA_PREFIX) ? `Links and media must be ones already in the lesson or that came up in your searches or tool results. Remove these links and name the source in words instead: ${checked.error.slice(MEDIA_PREFIX.length)}` : checked.error];
@@ -8458,7 +8700,7 @@ function anchorIssues(proposal, lesson) {
 function truncate2(error) {
   return error.length > 2e3 ? `${error.slice(0, 2e3)}\u2026` : error;
 }
-function textOf2(content) {
+function textOf3(content) {
   return content.filter((block) => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("").trim();
 }
 function messageOf(input) {
@@ -8543,7 +8785,7 @@ async function runLessonAiJob(input) {
     });
     const content = Array.isArray(reply.content) ? reply.content : [];
     for (const block of content) if (block.type.endsWith("tool_result")) sight(block);
-    const text2 = textOf2(content);
+    const text2 = textOf3(content);
     if (text2) lastText = text2;
     if (reply.stop_reason === "refusal") return fail("The model declined this request.");
     if (reply.stop_reason === "max_tokens") {
@@ -8708,7 +8950,7 @@ export {
   runNextStepsFill,
   runVoiceRead,
   settleEntry,
-  textOf,
+  textOf2 as textOf,
   totalCost,
   usageOf,
   usdToAud,

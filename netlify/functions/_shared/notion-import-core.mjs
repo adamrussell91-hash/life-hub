@@ -417,9 +417,9 @@ function fileName(data, url) {
     return "file";
   }
 }
-function mediaUrl(st, ref, node, url, hosted, name, purpose) {
+function mediaUrl(st, ref, node, url, hosted, name2, purpose) {
   if (!hosted) return url;
-  st.media.push({ ref, page_id: st.page_id, notion_block_id: node?.id ?? null, url, name, purpose });
+  st.media.push({ ref, page_id: st.page_id, notion_block_id: node?.id ?? null, url, name: name2, purpose });
   return `${MEDIA_PLACEHOLDER_PREFIX}${ref}`;
 }
 function warnNoFile(n, st) {
@@ -432,8 +432,8 @@ function mediaFile(n, st, purpose) {
     warnNoFile(n, st);
     return null;
   }
-  const name = fileName(n.data, f.url);
-  return { url: mediaUrl(st, n.id, n, f.url, f.hosted, name, purpose), name, hosted: f.hosted };
+  const name2 = fileName(n.data, f.url);
+  return { url: mediaUrl(st, n.id, n, f.url, f.hosted, name2, purpose), name: name2, hosted: f.hosted };
 }
 var FULL_HTML = /<(html|body|script)\b/i;
 function mapLeaf(n, st) {
@@ -492,8 +492,8 @@ function mapLeaf(n, st) {
     }
     case "file": {
       const raw = fileUrl(d);
-      const name = raw ? fileName(d, raw.url) : "";
-      const isHtml = /\.html?$/i.test(name);
+      const name2 = raw ? fileName(d, raw.url) : "";
+      const isHtml = /\.html?$/i.test(name2);
       if (raw && !raw.hosted && isHtml) {
         warn(st, n, "flattened", "External HTML file kept as a link embed; only uploaded files can run as an interactive.");
         return [makeBlock("embed", id(), { url: raw.url, provider: "generic", title: plainText(d.caption) || void 0 }, now)];
@@ -926,7 +926,7 @@ function buildImportPlan(tree, ctx) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z18 } from "zod";
+import { z as z19 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z } from "zod";
@@ -3749,6 +3749,10 @@ var SectionBlockObjectSchema = z13.object({
     case_part: z13.string().max(40).optional(),
     /** Case Study: this top-level section holds the Outcome's blocks, shown to students once the outcome is out. */
     case_outcome: z13.boolean().optional(),
+    /** Station Rotation: this top-level section holds one station's blocks (by station id). */
+    rotation_station: z13.string().max(40).optional(),
+    /** Station Rotation: this top-level section holds the finale's own blocks. */
+    rotation_finale: z13.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),
@@ -4078,22 +4082,253 @@ function caseIssues(lesson) {
   return out;
 }
 
-// apps/teaching/src/schemas/cover.ts
+// apps/teaching/src/rotation/schema.ts
 import { z as z16 } from "zod";
-var CoverSchema = z16.object({
-  url: z16.string().min(1).optional(),
-  media_id: z16.string().min(1).optional(),
-  alt_text: z16.string().optional()
+var ROTATION_KINDS = ["facts", "concepts", "procedures", "analysis", "perspectives", "teacher"];
+var ROTATION_DIALS = ["guided", "standard", "open"];
+var ROTATION_PATHS = ["fixed", "free_all", "choose_n", "must_may", "unlocks"];
+var ROTATION_FALLBACKS = ["choose_n_minus_1", "skip_finale_build", "none"];
+var ROTATION_ROLES = ["recall", "goal", "step", "hint", "gate", "after", "done", "exit"];
+var DEFAULT_LINK_WORDS = ["causes", "makes worse", "is evidence for", "slows recovery of"];
+var DEFAULT_FINALE_FORMATS = ["One-page brief", "Annotated diagram", "Two-minute talk"];
+var DEFAULT_DEBRIEF = ["Why did you choose that order? Would you choose it again?", "Which piece changed your explanation the most?"];
+var Id3 = z16.string().regex(/^[a-z0-9_-]{1,40}$/);
+var WRITTEN_CHECKS = ["technique_named", "exact_quote", "technique_fits", "effect_linked"];
+var WrittenGateSchema = z16.object({
+  prompt: z16.string().max(600).default(""),
+  passage: z16.string().max(4e3).default(""),
+  /** One mark per point. */
+  marks: z16.number().int().min(1).max(6).default(3),
+  /** What each effect must link to: "isolation". */
+  idea: z16.string().max(120).default(""),
+  checks: z16.array(z16.enum(WRITTEN_CHECKS)).max(4).default(["technique_named", "exact_quote", "technique_fits", "effect_linked"]),
+  different_techniques: z16.boolean().default(true),
+  pass_at: z16.number().int().min(1).max(6).default(3),
+  pass_at_support: z16.number().int().min(1).max(6).optional(),
+  /** Optional: quotes the teacher expects and the techniques that fit them. The checker may accept others it can justify. */
+  answer_key: z16.array(z16.object({ quote: z16.string().max(400), techniques: z16.array(z16.string().max(80)).max(6) })).max(12).optional(),
+  max_checks: z16.number().int().min(1).max(6).default(3),
+  /** Teacher only; never sent to students or to the checker. */
+  model_answer: z16.string().max(3e3).optional(),
+  /** Daily cap per class in A$. At the cap, written gates become teacher checks for the rest of the day. */
+  daily_cap_aud: z16.number().min(0).max(50).default(3)
+});
+var StationSchema = z16.object({
+  id: Id3,
+  title: z16.string().max(120).default(""),
+  kind: z16.enum(ROTATION_KINDS).default("concepts"),
+  strand: z16.string().max(40).optional(),
+  outcomes: z16.array(z16.string().max(200)).max(6).default([]),
+  minutes: z16.number().int().min(1).max(90).default(10),
+  seats: z16.number().int().min(1).max(40).default(6),
+  /** "Back bench". A QR code links to the station. */
+  location: z16.string().max(80).optional(),
+  must_do: z16.boolean().optional(),
+  unlock_after: z16.array(Id3).max(8).optional(),
+  /** One letter or a short code, breakout only. */
+  token: z16.string().max(4).optional(),
+  /** The evidence card text this station produces. */
+  piece: z16.string().max(300).default(""),
+  /** Marks an offline station done. */
+  offline_code: z16.string().max(20).optional(),
+  /** Map position, 0 to 100 each way. Absent: laid out automatically. */
+  x: z16.number().min(0).max(100).optional(),
+  y: z16.number().min(0).max(100).optional(),
+  /** The station's gate, when it is a written answer. A hinge gate is a block in the section instead. */
+  written_gate: WrittenGateSchema.optional(),
+  /** Teacher station only: what to say to a group sent here, per misconception. */
+  script: z16.string().max(600).optional()
+});
+var PretestItemSchema = z16.object({
+  id: Id3,
+  station: Id3,
+  /** Saved half-written while drafting; publish runs the full check. */
+  question: QuizQuestionDraftSchema,
+  /** Missing it routes the student to the teacher station. */
+  misconception: z16.boolean().optional()
+});
+var LockOptionSchema = z16.object({ id: Id3, text: z16.string().max(300) });
+var LockQuestionSchema = z16.object({
+  prompt: z16.string().max(500).default(""),
+  options: z16.array(LockOptionSchema).max(5).default([]),
+  correct_id: z16.string().max(40).default("")
+});
+var RotationFinaleSchema = z16.object({
+  lock: LockQuestionSchema.optional(),
+  /** The build: what students write, with their board's cards and links in place. */
+  build_prompt: z16.string().max(400).default("Write your recommendation, using your evidence."),
+  formats: z16.array(z16.string().max(60)).max(5).default([...DEFAULT_FINALE_FORMATS]),
+  debrief: z16.array(z16.string().max(300)).max(4).default([...DEFAULT_DEBRIEF])
+});
+var RotationSettingsSchema = z16.object({
+  class_id: z16.string().max(64).default(""),
+  dial: z16.enum(ROTATION_DIALS).default("standard"),
+  /** Extend passed at two stations opens route choice. */
+  fade_dial: z16.boolean().default(true),
+  path: z16.enum(ROTATION_PATHS).default("free_all"),
+  choose_n: z16.number().int().min(1).max(8).optional(),
+  evidence: z16.enum(["board", "list"]).default("board"),
+  link_words: z16.array(z16.string().min(1).max(40)).min(2).max(6).default([...DEFAULT_LINK_WORDS]),
+  stations: z16.array(StationSchema).max(9).default([]),
+  pretest: z16.array(PretestItemSchema).max(30).default([]),
+  finale: RotationFinaleSchema.default({ build_prompt: "Write your recommendation, using your evidence.", formats: [...DEFAULT_FINALE_FORMATS], debrief: [...DEFAULT_DEBRIEF] }),
+  /** Breakout framing; optional. */
+  story: z16.object({ title: z16.string().max(120), intro: z16.string().max(800) }).optional(),
+  behind_fallback: z16.enum(ROTATION_FALLBACKS).default("choose_n_minus_1"),
+  /** Lesson length when it isn't scheduled; the timetable's wins when it is. */
+  minutes: z16.number().int().min(10).max(240).optional()
+});
+var PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
+var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({
+  written_gate: PublicWrittenGateSchema.optional(),
+  has_offline_code: z16.boolean().optional()
+});
+var PublicRotationSchema = z16.object({
+  dial: z16.enum(ROTATION_DIALS),
+  fade_dial: z16.boolean(),
+  path: z16.enum(ROTATION_PATHS),
+  choose_n: z16.number().int().optional(),
+  evidence: z16.enum(["board", "list"]),
+  link_words: z16.array(z16.string()),
+  stations: z16.array(PublicStationSchema),
+  finale: z16.object({
+    lock: z16.object({ prompt: z16.string(), options: z16.array(LockOptionSchema) }).optional(),
+    build_prompt: z16.string(),
+    formats: z16.array(z16.string()),
+    debrief: z16.array(z16.string())
+  }),
+  story: z16.object({ title: z16.string(), intro: z16.string() }).optional(),
+  behind_fallback: z16.enum(ROTATION_FALLBACKS),
+  pretest_count: z16.number().int()
+});
+
+// apps/teaching/src/rotation/rules.ts
+function unlockProblems(stations) {
+  const ids = new Set(stations.map((s) => s.id));
+  const out = [];
+  for (const s of stations) {
+    if ((s.unlock_after ?? []).some((id) => !ids.has(id))) out.push(`${s.title || "A station"} opens after a station that is no longer in the lesson.`);
+    if ((s.unlock_after ?? []).includes(s.id)) out.push(`${s.title || "A station"} can\u2019t open after itself.`);
+  }
+  const after = new Map(stations.map((s) => [s.id, (s.unlock_after ?? []).filter((id) => ids.has(id) && id !== s.id)]));
+  const state = /* @__PURE__ */ new Map();
+  let loop = false;
+  const visit = (id) => {
+    if (state.get(id) === "done" || loop) return;
+    if (state.get(id) === "seen") {
+      loop = true;
+      return;
+    }
+    state.set(id, "seen");
+    for (const next of after.get(id) ?? []) visit(next);
+    state.set(id, "done");
+  };
+  for (const s of stations) visit(s.id);
+  if (loop) out.push("The unlocks go round in a loop, so some stations would never open.");
+  return out;
+}
+
+// apps/teaching/src/rotation/model.ts
+var MAX_STATIONS = 8;
+var PRETEST_PER_STATION = 3;
+var MAX_HINTS = 3;
+var rotationStationOf = (b) => b.block_type === "section" && typeof b.content.rotation_station === "string" ? b.content.rotation_station : void 0;
+var findStationSection = (blocks, stationId) => blocks.find((b) => rotationStationOf(b) === stationId);
+var sectionBlocks = (section) => section?.block_type === "section" ? section.content.blocks : [];
+var settingOf = (b, key) => b.settings?.[key];
+function roleOf(b) {
+  const role = settingOf(b, "rotation_role");
+  return typeof role === "string" && ROTATION_ROLES.includes(role) ? role : "step";
+}
+var isHingeGate = (b) => b.block_type === "hinge_question" && roleOf(b) === "gate";
+var filled2 = (s) => !!s && s.trim().length > 0;
+var textOf = (b) => {
+  if (b.block_type === "rich_text") return String(b.content.html ?? "").replace(/<[^>]+>/g, " ").trim();
+  return "x";
+};
+var name = (s) => s.title.trim() || "A station";
+function rotationIssues(lesson) {
+  const r = lesson.rotation;
+  if (!r) return ["Set up the rotation: add stations, a pretest and a class."];
+  const out = [];
+  const learning = r.stations.filter((s) => s.kind !== "teacher");
+  const teachers = r.stations.filter((s) => s.kind === "teacher");
+  if (!filled2(r.class_id)) out.push("Pick the class this rotation is for.");
+  if (learning.length < 2) out.push("Add at least 2 stations.");
+  if (learning.length > MAX_STATIONS) out.push(`A rotation can have at most ${MAX_STATIONS} stations, plus one teacher station.`);
+  if (teachers.length > 1) out.push("Keep to one teacher station.");
+  for (const s of r.stations) {
+    if (!filled2(s.title)) out.push("Every station needs a title.");
+    const section = findStationSection(lesson.blocks, s.id);
+    if (!section) {
+      out.push(`${name(s)} has no content yet. Open it with Edit.`);
+      continue;
+    }
+    if (s.kind === "teacher") continue;
+    const blocks = sectionBlocks(section);
+    const goal = blocks.find((b) => roleOf(b) === "goal");
+    if (!goal || !textOf(goal)) out.push(`${name(s)} needs a goal.`);
+    const exits = blocks.filter((b) => roleOf(b) === "exit" && b.block_type === "quiz_question");
+    if (exits.length === 0) out.push(`${name(s)} needs an exit check question.`);
+    if (exits.length > 2) out.push(`${name(s)} has more than two exit check questions.`);
+    if (blocks.filter((b) => roleOf(b) === "hint").length > MAX_HINTS) out.push(`${name(s)} has more than ${MAX_HINTS} hints.`);
+    for (const b of blocks) {
+      if (b.block_type !== "quiz_question") continue;
+      if (!QuizQuestionSchema.safeParse(b.content.question).success) {
+        out.push(`A question at ${name(s)} isn\u2019t finished.`);
+        break;
+      }
+    }
+    const hinges = blocks.filter(isHingeGate);
+    const gates = hinges.length + (s.written_gate ? 1 : 0);
+    if (gates > 1) out.push(`${name(s)} has more than one gate. Keep one.`);
+    if (gates === 0 && blocks.some((b) => roleOf(b) === "after")) out.push(`${name(s)} has steps after a gate, but no gate.`);
+    for (const h of hinges) {
+      if (h.block_type !== "hinge_question") continue;
+      const c = h.content;
+      if (!filled2(c.prompt) || c.options.length < 2 || !c.options.some((o) => o.id === c.correct_id)) out.push(`The gate at ${name(s)} needs a question, options and a right answer.`);
+    }
+    if (blocks.some((b) => b.block_type === "quiz_question" && roleOf(b) === "gate")) out.push(`A gate at ${name(s)} must be a hinge question or a written answer.`);
+    const g = s.written_gate ? WrittenGateSchema.parse(s.written_gate) : null;
+    if (g) {
+      if (!filled2(g.passage)) out.push(`The written gate at ${name(s)} needs a passage.`);
+      if (!filled2(g.prompt)) out.push(`The written gate at ${name(s)} needs a question.`);
+      if (!filled2(g.idea)) out.push(`The written gate at ${name(s)} needs the idea each point links to.`);
+      if (g.checks.length === 0) out.push(`The written gate at ${name(s)} needs at least one check.`);
+      if (g.pass_at > g.marks || (g.pass_at_support ?? 0) > g.marks) out.push(`The written gate at ${name(s)} can\u2019t pass at more marks than it has.`);
+    }
+    const asked = r.pretest.filter((p) => p.station === s.id);
+    if (asked.length !== PRETEST_PER_STATION) out.push(`${name(s)} needs exactly ${PRETEST_PER_STATION} pretest questions (it has ${asked.length}).`);
+    else if (asked.some((p) => !QuizQuestionSchema.safeParse(p.question).success)) out.push(`A pretest question for ${name(s)} isn\u2019t finished.`);
+  }
+  const orphans = r.pretest.filter((p) => !learning.some((s) => s.id === p.station));
+  if (orphans.length) out.push("Some pretest questions belong to a station that is no longer in the lesson.");
+  if (r.path === "choose_n" && (!r.choose_n || r.choose_n >= learning.length)) out.push("\u201CChoose some\u201D needs a number smaller than the number of stations.");
+  if (r.path === "must_may" && !learning.some((s) => s.must_do)) out.push("Tick at least one must-do station.");
+  if (r.path === "unlocks") out.push(...unlockProblems(r.stations));
+  if (r.stations.some((s) => filled2(s.token))) {
+    const lock = r.finale.lock;
+    if (!lock || !filled2(lock.prompt) || lock.options.length < 2 || !lock.options.some((o) => o.id === lock.correct_id)) out.push("A breakout with letters needs a lock question with a right answer (Finale).");
+  }
+  return [...new Set(out)];
+}
+
+// apps/teaching/src/schemas/cover.ts
+import { z as z17 } from "zod";
+var CoverSchema = z17.object({
+  url: z17.string().min(1).optional(),
+  media_id: z17.string().min(1).optional(),
+  alt_text: z17.string().optional()
 }).superRefine((cover, ctx) => {
   if (!cover.url && !cover.media_id) {
     ctx.addIssue({
-      code: z16.ZodIssueCode.custom,
+      code: z17.ZodIssueCode.custom,
       message: "Cover needs a url and/or media_id"
     });
   }
   if (cover.url !== void 0 && !isHttpUrl(cover.url)) {
     ctx.addIssue({
-      code: z16.ZodIssueCode.custom,
+      code: z17.ZodIssueCode.custom,
       path: ["url"],
       message: "Cover url must be http(s)"
     });
@@ -4102,10 +4337,10 @@ var CoverSchema = z16.object({
 var CoverPatchSchema = CoverSchema.nullable();
 
 // apps/teaching/src/schemas/source.ts
-import { z as z17 } from "zod";
-var SourceSchema = z17.object({
-  system: z17.literal("notion"),
-  page_id: z17.string().min(1).max(64),
+import { z as z18 } from "zod";
+var SourceSchema = z18.object({
+  system: z18.literal("notion"),
+  page_id: z18.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -4262,10 +4497,10 @@ function sanitizeSvgMarkup(markup) {
     }
     const attrs = [];
     for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith("on")) continue;
-      if (!ALLOWED_ATTRS.has(name)) continue;
-      if ((name === "href" || name === "xlink:href") && !isSafeHref(attr.value)) continue;
+      const name2 = attr.name.toLowerCase();
+      if (name2.startsWith("on")) continue;
+      if (!ALLOWED_ATTRS.has(name2)) continue;
+      if ((name2 === "href" || name2 === "xlink:href") && !isSafeHref(attr.value)) continue;
       if (!isSafeUrlAttrValue(attr.value)) continue;
       attrs.push(`${attr.name}="${escapeAttr(attr.value)}"`);
     }
@@ -4807,22 +5042,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z18.object({
+var LessonSchema = z19.object({
   ...CommonFields,
   ...TrashFields,
-  type: z18.literal("lesson"),
-  unit_id: z18.string().min(1),
-  sequence: z18.number().int(),
-  blocks: z18.array(BlockSchema),
+  type: z19.literal("lesson"),
+  unit_id: z19.string().min(1),
+  sequence: z19.number().int(),
+  blocks: z19.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z18.array(z18.string().min(1).max(40)).max(24).optional(),
-  author_id: z18.string().min(1).optional(),
-  review_status: z18.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z18.array(z18.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z18.array(z18.string().min(1).max(64)).max(24).optional(),
+  tags: z19.array(z19.string().min(1).max(40)).max(24).optional(),
+  author_id: z19.string().min(1).optional(),
+  review_status: z19.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z19.array(z19.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z19.array(z19.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z18.array(LineStopSchema).max(16).optional(),
+  line_stops: z19.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -4834,26 +5069,26 @@ var LessonSchema = z18.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z18.string().min(1).max(64).nullable().optional(),
+  branch_from: z19.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z18.boolean().nullable().optional(),
+  pre_unit: z19.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z18.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z19.array(DotPointRefSchema).max(20).optional(),
   /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
-  focus_pieces: z18.array(PieceIdSchema).max(24).optional(),
+  focus_pieces: z19.array(PieceIdSchema).max(24).optional(),
   /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
-  focus_skills: z18.array(z18.string().regex(SkillRefPattern)).max(12).optional(),
+  focus_skills: z19.array(z19.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z18.array(z18.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z19.array(z19.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z18.boolean().optional(),
+  feedback_off: z19.boolean().optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z18.object({
-    on: z18.boolean().optional(),
-    skip: z18.array(z18.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z18.boolean().optional()
+  end_questions: z19.object({
+    on: z19.boolean().optional(),
+    skip: z19.array(z19.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z19.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -4863,12 +5098,14 @@ var LessonSchema = z18.object({
   sprint: SprintSettingsSchema.optional(),
   /** Case Study lessons only: purpose, documents, decision, outcome and the unseen case. */
   case: CaseSettingsSchema.optional(),
+  /** Station Rotation lessons only: stations, pretest, path, dial, evidence board and finale. */
+  rotation: RotationSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z18.ZodIssueCode.custom,
+      code: z19.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -4880,7 +5117,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z18.ZodIssueCode.custom,
+        code: z19.ZodIssueCode.custom,
         message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -4888,22 +5125,27 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z18.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["case"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "station_rotation") {
+    for (const message of rotationIssues(lesson)) {
+      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["rotation"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z18.ZodIssueCode.custom,
+      code: z19.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -4911,37 +5153,37 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/schemas/unit.ts
-import { z as z19 } from "zod";
-var WalkthruTieSchema = z19.object({
-  technique: z19.string().min(1).max(120),
-  kind: z19.enum(["du", "organiser", "block"]),
-  ref: z19.string().min(1).max(240),
-  how: z19.string().max(200).optional()
+import { z as z20 } from "zod";
+var WalkthruTieSchema = z20.object({
+  technique: z20.string().min(1).max(120),
+  kind: z20.enum(["du", "organiser", "block"]),
+  ref: z20.string().min(1).max(240),
+  how: z20.string().max(200).optional()
 });
-var UnitSchema = z19.object({
+var UnitSchema = z20.object({
   ...CommonFields,
   ...TrashFields,
-  type: z19.literal("unit"),
-  year_id: z19.string().min(1),
-  subject_id: z19.string().min(1),
-  lesson_ids: z19.array(z19.string().min(1)),
-  primary_term: z19.number().int().positive().optional(),
-  start_date: z19.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z19.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  description: z19.string().optional(),
+  type: z20.literal("unit"),
+  year_id: z20.string().min(1),
+  subject_id: z20.string().min(1),
+  lesson_ids: z20.array(z20.string().min(1)),
+  primary_term: z20.number().int().positive().optional(),
+  start_date: z20.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z20.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z20.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z19.array(BlockSchema).optional(),
-  outcome_ids: z19.array(z19.string().min(1)).max(24).optional(),
+  blocks: z20.array(BlockSchema).optional(),
+  outcome_ids: z20.array(z20.string().min(1)).max(24).optional(),
   /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
-  deep_understandings: z19.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
-  walkthru_ties: z19.array(WalkthruTieSchema).max(120).optional(),
+  deep_understandings: z20.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
+  walkthru_ties: z20.array(WalkthruTieSchema).max(120).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
-  kind: z19.enum(["program"]).optional(),
+  kind: z20.enum(["program"]).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/class.ts
-import { z as z20 } from "zod";
+import { z as z21 } from "zod";
 
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
@@ -4986,74 +5228,74 @@ function validateTimetable(input) {
 }
 
 // apps/teaching/src/schemas/class.ts
-var ClassTimetableSchema = z20.unknown().transform((value, ctx) => {
+var ClassTimetableSchema = z21.unknown().transform((value, ctx) => {
   try {
     return validateTimetable(value);
   } catch (error) {
-    ctx.addIssue({ code: z20.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
-    return z20.NEVER;
+    ctx.addIssue({ code: z21.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
+    return z21.NEVER;
   }
 });
-var ClassHomepageSchema = z20.object({
-  announcements: z20.array(BlockSchema),
-  resources: z20.array(BlockSchema),
-  custom: z20.array(BlockSchema)
+var ClassHomepageSchema = z21.object({
+  announcements: z21.array(BlockSchema),
+  resources: z21.array(BlockSchema),
+  custom: z21.array(BlockSchema)
 });
-var ClassStudentSchema = z20.object({
-  name: z20.string().min(1).max(80),
-  skip_picker: z20.boolean().default(false),
+var ClassStudentSchema = z21.object({
+  name: z21.string().min(1).max(80),
+  skip_picker: z21.boolean().default(false),
   /** Never changes once saved, so renames keep a student's quiz results. */
-  id: z20.string().regex(STUDENT_ID_PATTERN).optional(),
+  id: z21.string().regex(STUDENT_ID_PATTERN).optional(),
   /** What the student types to take a quiz. Unique within the class. */
-  initials: z20.string().regex(INITIALS_PATTERN).optional()
+  initials: z21.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
-var ClassSchema = z20.object({
+var ClassSchema = z21.object({
   ...CommonFields,
   ...TrashFields,
-  type: z20.literal("class"),
-  code: z20.string().min(1),
-  display_name: z20.string().min(1).optional(),
-  academic_year: z20.number().int(),
-  year_id: z20.string().min(1),
-  subject_id: z20.string().min(1),
-  active_unit_ids: z20.array(z20.string().min(1)),
-  current_unit_id: z20.string().min(1).optional(),
-  current_scheduled_lesson_id: z20.string().min(1).optional(),
-  meeting_days: z20.array(z20.number().int().min(1).max(7)).optional(),
+  type: z21.literal("class"),
+  code: z21.string().min(1),
+  display_name: z21.string().min(1).optional(),
+  academic_year: z21.number().int(),
+  year_id: z21.string().min(1),
+  subject_id: z21.string().min(1),
+  active_unit_ids: z21.array(z21.string().min(1)),
+  current_unit_id: z21.string().min(1).optional(),
+  current_scheduled_lesson_id: z21.string().min(1).optional(),
+  meeting_days: z21.array(z21.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z20.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  students: z21.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/subject.ts
-import { z as z21 } from "zod";
-var SubjectSchema = z21.object({
+import { z as z22 } from "zod";
+var SubjectSchema = z22.object({
   ...CommonFields,
-  type: z21.literal("subject"),
-  display_title: z21.string().min(1),
-  scope_id: z21.string().min(1).optional(),
-  unit_ids: z21.array(z21.string().min(1)),
-  outcome_ids: z21.array(z21.string().min(1)),
-  class_ids: z21.array(z21.string().min(1)),
+  type: z22.literal("subject"),
+  display_title: z22.string().min(1),
+  scope_id: z22.string().min(1).optional(),
+  unit_ids: z22.array(z22.string().min(1)),
+  outcome_ids: z22.array(z22.string().min(1)),
+  class_ids: z22.array(z22.string().min(1)),
   /** Curriculum network lines, in map column order: trains, metro, light rail. */
-  network_lines: z21.array(NetworkLineSchema).max(24).optional(),
+  network_lines: z22.array(NetworkLineSchema).max(24).optional(),
   /** Drag offsets on the year network, keyed by unit id. */
   network_nudges: NetworkNudgesSchema.optional()
 });
 
 // apps/teaching/src/schemas/document.ts
-import { z as z22 } from "zod";
-var DocumentKindSchema = z22.enum(["syllabus"]);
-var DocumentSchema = z22.object({
+import { z as z23 } from "zod";
+var DocumentKindSchema = z23.enum(["syllabus"]);
+var DocumentSchema = z23.object({
   ...CommonFields,
   ...TrashFields,
-  type: z22.literal("document"),
+  type: z23.literal("document"),
   kind: DocumentKindSchema,
-  subject_id: z22.string().min(1),
-  blocks: z22.array(BlockSchema),
+  subject_id: z23.string().min(1),
+  blocks: z23.array(BlockSchema),
   cover: CoverSchema.optional(),
   source: SourceSchema.optional()
 });
