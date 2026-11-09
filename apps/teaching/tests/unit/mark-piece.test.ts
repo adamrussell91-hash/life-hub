@@ -259,3 +259,40 @@ describe('mark piece: several codes on the same words', () => {
     el.remove();
   });
 });
+
+describe('mark piece: double-click on a highlight', () => {
+  const two: MarkPieceData = {
+    ...data,
+    codes: [
+      { id: 'ts', code: 'TS', label: 'Topic sentence', colour: 'peach', group: 'composition', descriptor: '' },
+      { id: 'ev', code: 'EV', label: 'Evidence', colour: 'sage', group: 'composition', descriptor: '' }
+    ],
+    recent_codes: [],
+    feedback: { tags: [{ code_id: 'ts', positive: false, part: 'answers', field: 'q1', start: 0, end: 11 }], comment: '', status: 'draft' }
+  };
+  const act = () => ({ save: vi.fn().mockResolvedValue({}), returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('selects the word for another code instead of opening the menu, so a number key tags it', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const { el } = openMarkPiece(two, act(), { embedded: true });
+    document.body.append(el);
+    const run = el.querySelector<HTMLElement>('.pa-run--mark')!;
+    run.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    const menu = el.querySelector<HTMLElement>('.mk-menu')!;
+    expect(menu.hidden).toBe(false);
+    // The second click of the double-click: the browser has selected the word.
+    const node = run.firstChild as Text;
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: true, anchorNode: null, focusNode: null, removeAllRanges: () => undefined } as unknown as Selection);
+    run.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement?.classList.contains('mk-menu__note')).toBe(false);
+    vi.restoreAllMocks();
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, anchorNode: node, anchorOffset: 0, focusNode: node, focusOffset: 6, removeAllRanges: () => undefined } as unknown as Selection);
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2' }));
+    expect(el.querySelector('.mk-tally')!.textContent).toBe('TS 1 · EV 1');
+    expect(el.querySelector<HTMLInputElement>('.mk-menu__note')?.value ?? '').toBe('');
+    vi.unstubAllGlobals();
+    el.remove();
+  });
+});

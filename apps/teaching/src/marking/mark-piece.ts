@@ -450,6 +450,13 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
         });
         sheet.addEventListener('click', (e) => {
           if (justTagged) { justTagged = false; return; }
+          // A double-click on a highlight selects the word for another code: the menu the first click
+          // opened goes, so its note box stops taking the number keys meant for a code.
+          if (e.detail > 1) {
+            if ((document.activeElement as HTMLElement | null)?.closest('.mk-menu')) (document.activeElement as HTMLElement).blur();
+            hideMenu();
+            return;
+          }
           if (window.getSelection()?.isCollapsed === false) return;
           const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark');
           if (!run) return;
