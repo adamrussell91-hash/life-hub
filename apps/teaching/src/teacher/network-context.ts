@@ -234,13 +234,17 @@ export function lessonRouteRole(unit: Unit, lesson: Pick<Lesson, 'id' | 'route_r
 }
 
 /** The classes that teach a unit, with this lesson's first date in each. */
-export function lessonClassDates(curriculum: CurriculumResponse, unit: Unit, lessonId: string): Array<{ id: string; name: string; date?: string }> {
+export function lessonClassDates(curriculum: CurriculumResponse, unit: Unit, lessonId: string): Array<{ id: string; name: string; date?: string; minutes?: number }> {
   return unitClasses(curriculum, unit).map((c) => {
-    const dates = curriculum.scheduled_lessons
+    const rows = curriculum.scheduled_lessons
       .filter((row) => row.class_id === c.id && row.lesson_id === lessonId && row.delivery_status !== 'skipped')
-      .map((row) => row.date)
-      .sort();
-    return dates[0] ? { ...c, date: dates[0] } : c;
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const first = rows[0];
+    if (!first) return c;
+    // The lesson's length from the timetable, when it has times (a Station Rotation's time budget uses it).
+    const mins = (t?: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : NaN);
+    const length = mins(first.end_time) - mins(first.start_time);
+    return { ...c, date: first.date, ...(Number.isFinite(length) && length > 0 ? { minutes: length } : {}) };
   });
 }
 
