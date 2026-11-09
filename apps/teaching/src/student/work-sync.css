@@ -43,3 +43,16 @@
 .ws-handin__note { margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .ws-handin__link { display: inline-flex; align-items: center; min-height: 36px; color: var(--wave); font-weight: 600; }
 .ws-handin .btn { min-height: 44px; }
+
+/* A returned block: the teacher's feedback in place of the empty box and its Hand in bar. */
+.ws-is-returned .block-question-set__question > :not(.block-question-set__prompt) { display: none; }
+.ws-back { display: grid; gap: var(--space-3); min-width: 0; margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
+.ws-back__head { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; justify-content: space-between; }
+.ws-back__title { margin: 0; font-weight: 600; }
+.ws-back__when { font-weight: 400; color: var(--muted); }
+.ws-back__new { margin-inline-start: var(--space-2); padding: 0 var(--space-2); border-radius: 999px; background: var(--wave); color: var(--paper); font-size: var(--text-xs); font-weight: 600; vertical-align: middle; }
+.ws-back .btn { min-height: 44px; }
+.ws-back__body { min-width: 0; }
+.ws-back__body[hidden] { display: none; }
+.ws-back__loading, .ws-back__error { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.ws-back__error { color: var(--danger); }

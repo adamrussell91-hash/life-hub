@@ -284,3 +284,79 @@ describe('mountWorkSync: the lesson footer’s handle', () => {
     sync.dispose();
   });
 });
+
+describe('mountWorkSync: a block the teacher has returned', () => {
+  const piece = {
+    id: 'w:lesson1:qset1', kind: 'written', title: 'The crash', date: '5 Nov', comment: 'Open with your argument.',
+    text: { answers: { q1: 'The town grows. It changes.' } },
+    tags: [{ code_id: 'comp_ts', part: 'answers', field: 'q1', start: 0, end: 15, positive: false, code: 'TS', label: 'Topic sentence', colour: 'lilac', action: 'Open with a claim.' }],
+    criteria: [], codes: [], rungs: {}
+  };
+  const returnedCall = (isNew: boolean): WorkCall => async () => ({
+    need: null, initials: 'BB', handin_blocks: ['qset1'], returned: { qset1: { item: 'w:lesson1:qset1', at: '2026-11-05T06:00:00.000Z', new: isNew } }
+  });
+  const lessonWith = (): { root: HTMLElement; block: HTMLElement } => {
+    const root = host();
+    const block = Object.assign(document.createElement('div'), { className: 'block' });
+    block.dataset.blockId = 'qset1';
+    root.append(block);
+    return { root, block };
+  };
+
+  it('shows the marked words and comment in the block, with no Hand in bar, and marks a new one opened', async () => {
+    const { root, block } = lessonWith();
+    const asked: string[] = [];
+    const feedback = async (action: 'piece' | 'seen', item: string) => {
+      asked.push(`${action}:${item}`);
+      return action === 'piece' ? piece : {};
+    };
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call: returnedCall(true), feedback, delayMs: 5 });
+    await vi.waitFor(() => expect(block.querySelector('.pg-piece--inline')).not.toBeNull());
+    expect(block.classList.contains('ws-is-returned')).toBe(true);
+    expect(block.querySelector('.ws-handin')).toBeNull();
+    expect(block.querySelector('.ws-back__title')!.textContent).toContain('Marked and returned');
+    expect(block.querySelector('.ws-back__new')).not.toBeNull();
+    expect(block.querySelector('.pg-back')).toBeNull();
+    expect(block.textContent).toContain('Open with your argument.');
+    expect(block.querySelector('.pa-run--mark')).not.toBeNull();
+    await vi.waitFor(() => expect(asked).toEqual(['piece:w:lesson1:qset1', 'seen:w:lesson1:qset1']));
+    handle.dispose();
+  });
+
+  it('folds the feedback away and back', async () => {
+    const { root, block } = lessonWith();
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call: returnedCall(false), feedback: async () => piece, delayMs: 5 });
+    await vi.waitFor(() => expect(block.querySelector('.pg-piece--inline')).not.toBeNull());
+    const toggle = block.querySelector<HTMLButtonElement>('.ws-back__head button')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    toggle.click();
+    expect(block.querySelector<HTMLElement>('.ws-back__body')!.hidden).toBe(true);
+    expect(toggle.textContent).toBe('Show feedback');
+    handle.dispose();
+  });
+
+  it('points at Returned work when the feedback will not load', async () => {
+    const { root, block } = lessonWith();
+    const feedback = async () => { throw new ApiClientError({ code: 'network_error', message: 'Couldn’t reach the server.' }); };
+    const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call: returnedCall(false), feedback, delayMs: 5 });
+    await vi.waitFor(() => expect(block.querySelector('.ws-back__error')).not.toBeNull());
+    expect(block.querySelector('.ws-back__error a')!.getAttribute('href')).toContain('/s/classes/class1/profile');
+    handle.dispose();
+  });
+
+  it('the footer neither counts nor hands in a returned block', async () => {
+    localStorage.setItem(answersKey, JSON.stringify({ q1: 'One' }));
+    const sent: string[] = [];
+    const base = returnedCall(false);
+    const call: WorkCall = async (action, extra) => {
+      sent.push(action);
+      return base(action, extra);
+    };
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call, feedback: async () => piece, delayMs: 0 });
+    await settle();
+    expect(sync.progress()).toEqual({ written: 1, toHandIn: 0 });
+    expect(await sync.handInAll()).toBe(true);
+    expect(sent).not.toContain('handin');
+    sync.dispose();
+  });
+});

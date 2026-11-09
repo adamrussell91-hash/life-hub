@@ -17,9 +17,21 @@ import './work-sync.css';
  * the lesson's player (sprint, case study, tutorial, lecture) asks itself.
  */
 
-type Reply = { need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string; redrafts?: Record<string, 'asked' | 'with_teacher'> };
+/** A marked block that is back with the student: the piece its feedback opens by, when, and whether it's unopened. */
+export type ReturnedBlock = { item: string; at: string | null; new: boolean };
+type Reply = {
+  need: 'initials' | null; initials?: string; anonymous?: true; saved?: true; handin_blocks?: string[]; handed_in_at?: string;
+  redrafts?: Record<string, 'asked' | 'with_teacher'>; returned?: Record<string, ReturnedBlock>;
+};
+/** The progress page's calls for one returned piece: its feedback, and marking it opened. */
+export type FeedbackCall = (action: 'piece' | 'seen', item: string) => Promise<unknown>;
 export type WorkCall = (action: 'status' | 'claim' | 'save' | 'handin', extra?: Record<string, unknown>) => Promise<Reply>;
-export type WorkSyncOptions = { lessonId: string; classId: string; /** Replaces the network in tests. */ call?: WorkCall; delayMs?: number; retryMs?: number };
+export type WorkSyncOptions = {
+  lessonId: string; classId: string;
+  /** Replace the network in tests. */
+  call?: WorkCall; feedback?: FeedbackCall;
+  delayMs?: number; retryMs?: number;
+};
 export type WorkSyncHandle = {
   dispose(): void;
   /** Sends what is waiting now. */
@@ -70,6 +82,11 @@ export function writtenFields(value: unknown): Record<string, string> {
   return out;
 }
 
+function feedbackCall(classId: string): FeedbackCall {
+  return (action, item) =>
+    apiPost(`/api/published/profile/${encodeURIComponent(classId)}`, { action, item, class_token: deviceToken(`class:${classId}`) });
+}
+
 function networkCall(lessonId: string, classId: string): WorkCall {
   return (action, extra = {}) =>
     apiPost<Reply>(`/api/published/work/${encodeURIComponent(lessonId)}`, { action, class_id: classId, class_token: deviceToken(`class:${classId}`), ...extra });
@@ -94,6 +111,7 @@ function heldParts(lessonId: string): Array<[string, unknown]> {
 export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): WorkSyncHandle {
   const { lessonId, classId } = options;
   const call = options.call ?? networkCall(lessonId, classId);
+  const feedback = options.feedback ?? feedbackCall(classId);
   const delay = options.delayMs ?? 1500;
   const retry = options.retryMs ?? 10_000;
   /** unknown until the server answers; off when nothing can be recorded (no list, no class). */
@@ -118,16 +136,64 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
   let marked: string[] = [];
   /** Marked blocks with a redraft out. They're rewritten on the progress page, so nothing hands in from here. */
   let redrafts: NonNullable<Reply['redrafts']> = {};
+  /** Marked blocks the teacher has returned. Their feedback shows in the block, and nothing hands in. */
+  let returned: NonNullable<Reply['returned']> = {};
 
-  /** A Hand in bar under each block the class's Markbook marks. */
-  function showHandIn(blockIds: string[] | undefined, states?: Reply['redrafts']): void {
+  /** A Hand in bar under each block the class's Markbook marks; the teacher's feedback under each one returned. */
+  function showHandIn(blockIds: string[] | undefined, states?: Reply['redrafts'], back?: Reply['returned']): void {
     marked = blockIds ?? [];
     redrafts = states ?? {};
+    returned = back ?? {};
     for (const id of blockIds ?? []) {
       const block = [...host.querySelectorAll<HTMLElement>('[data-block-id]')].find((b) => b.dataset.blockId === id);
-      if (!block || block.querySelector(':scope > .ws-handin')) continue;
-      block.append(handInBar(id));
+      if (!block || block.querySelector(':scope > .ws-handin, :scope > .ws-back')) continue;
+      const piece = !redrafts[id] ? returned[id] : undefined;
+      if (piece) {
+        // The marked words show with the feedback, so the empty box and its step go.
+        block.classList.add('ws-is-returned');
+        block.append(backPanel(piece));
+      } else block.append(handInBar(id));
     }
+  }
+
+  /** The teacher's feedback on a returned block, as Returned work shows it, open in the lesson. */
+  function backPanel(piece: ReturnedBlock): HTMLElement {
+    const panel = el('section', 'ws-back');
+    panel.setAttribute('aria-label', 'Feedback from your teacher');
+    const head = el('div', 'ws-back__head');
+    const when = piece.at ? new Date(piece.at).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+    const title = el('p', 'ws-back__title', 'Marked and returned');
+    if (when) title.append(el('span', 'ws-back__when', ` · ${when}`));
+    if (piece.new) title.append(el('span', 'ws-back__new', 'New'));
+    const body = el('div', 'ws-back__body');
+    body.id = `ws-back-${piece.item.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+    const toggle = button('Hide feedback', 'secondary', () => {
+      body.hidden = !body.hidden;
+      toggle.textContent = body.hidden ? 'Show feedback' : 'Hide feedback';
+      toggle.setAttribute('aria-expanded', String(!body.hidden));
+    });
+    toggle.setAttribute('aria-controls', body.id);
+    toggle.setAttribute('aria-expanded', 'true');
+    head.append(title, toggle);
+    body.append(el('p', 'ws-back__loading', 'Loading your feedback…'));
+    panel.append(head, body);
+    void Promise.all([feedback('piece', piece.item), import('@/student/returned-view')]).then(
+      ([payload, view]) => {
+        if (disposed) return;
+        body.replaceChildren(view.pieceView(payload as Parameters<typeof view.pieceView>[0], () => undefined, { inline: true }));
+        if (piece.new) {
+          piece.new = false;
+          void feedback('seen', piece.item).catch(() => undefined);
+        }
+      },
+      (error: unknown) => {
+        if (disposed) return;
+        const note = el('p', 'ws-back__error', `${errorText(error)} `);
+        note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work'));
+        body.replaceChildren(note);
+      }
+    );
+    return panel;
   }
 
   function handInBar(blockId: string): HTMLElement {
@@ -188,7 +254,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
         (reply) => {
           state = 'ready';
           bar.hidden = true;
-          showHandIn(reply.handin_blocks, reply.redrafts);
+          showHandIn(reply.handin_blocks, reply.redrafts, reply.returned);
           for (const [key, value] of heldParts(lessonId)) queue(key, value);
           void flush();
         },
@@ -219,7 +285,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       } else {
         state = 'ready';
         bar.hidden = true;
-        showHandIn(reply.handin_blocks, reply.redrafts);
+        showHandIn(reply.handin_blocks, reply.redrafts, reply.returned);
       }
     } catch (error) {
       // A lesson or class the server doesn't know can't take work; a dropped connection tries again later.
@@ -297,7 +363,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     flush,
     progress() {
       const counts = writtenByBlock();
-      return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => !redrafts[id] && (counts.get(id) ?? 0) > 0).length };
+      return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => !redrafts[id] && !returned[id] && (counts.get(id) ?? 0) > 0).length };
     },
     async handInAll() {
       // Initials may have just been claimed by the footer or the quiz: look again before giving up.
@@ -307,7 +373,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       if (pending.size) return false;
       const counts = writtenByBlock();
       let ok = true;
-      for (const id of marked.filter((m) => !redrafts[m])) {
+      for (const id of marked.filter((m) => !redrafts[m] && !returned[m])) {
         if (!(counts.get(id) ?? 0)) continue;
         try {
           await call('handin', { block_id: id });

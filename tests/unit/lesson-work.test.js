@@ -183,3 +183,20 @@ test('hand in is refused while a redraft is out, and status says why', async () 
   store.data.set(key, { status: 'returned', redraft: { scope: 'whole' } });
   assert.deepEqual((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).redrafts, { qset1: 'asked' });
 });
+
+test('status names the marked blocks that are back with the student, and whether they have opened the feedback', async () => {
+  const { store, bob } = await setup();
+  linkColumn(store);
+  await workAction(store, 'lesson1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  assert.equal((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).returned, undefined);
+  const key = `piece_feedback/class1/${bob.id}/w:lesson1:qset1`;
+  store.data.set(key, { status: 'returned', returned_at: '2026-11-05T06:00:00.000Z' });
+  assert.deepEqual((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).returned, { qset1: { item: 'w:lesson1:qset1', at: '2026-11-05T06:00:00.000Z', new: true } });
+  store.data.set(key, { status: 'returned', returned_at: '2026-11-05T06:00:00.000Z', seen_at: '2026-11-06T00:00:00.000Z' });
+  assert.equal((await workAction(store, 'lesson1', { ...bobDevice, action: 'status' })).returned.qset1.new, false);
+  // A redraft out is not "returned": the redraft note shows instead.
+  store.data.set(key, { status: 'returned', redraft: { scope: 'whole' } });
+  const status = await workAction(store, 'lesson1', { ...bobDevice, action: 'status' });
+  assert.equal(status.returned, undefined);
+  assert.deepEqual(status.redrafts, { qset1: 'asked' });
+});

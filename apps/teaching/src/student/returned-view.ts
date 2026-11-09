@@ -120,14 +120,20 @@ function sideBoxes(p: PiecePayload, comment = p.comment): HTMLElement {
 }
 
 /** A student's page passes these so an ask can be acted on; without them it's only a note, as a teacher sees it. */
-export type PieceViewOptions = { redraft?: RedraftApi; onSent?: () => void };
+export type PieceViewOptions = {
+  redraft?: RedraftApi; onSent?: () => void;
+  /** Inside the lesson block it came from: no way back, and the block already names it. */
+  inline?: boolean;
+};
 
 export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: PieceViewOptions = {}): HTMLElement {
-  const root = el('section', 'pg-piece');
-  const back = el('button', 'pg-back', '← Returned work');
-  back.type = 'button';
-  back.addEventListener('click', onBack);
-  root.append(back, el('h2', 'pg-piece__title', p.title), el('p', 'pm-key', `Returned ${p.date}`));
+  const root = el('section', `pg-piece${o.inline ? ' pg-piece--inline' : ''}`);
+  if (!o.inline) {
+    const back = el('button', 'pg-back', '← Returned work');
+    back.type = 'button';
+    back.addEventListener('click', onBack);
+    root.append(back, el('h2', 'pg-piece__title', p.title), el('p', 'pm-key', `Returned ${p.date}`));
+  }
   if ('body_html' in p) {
     const body = el('div', 'student-feedback__body');
     body.innerHTML = sanitizeRichTextHtml(p.body_html);

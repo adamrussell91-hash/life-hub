@@ -110,15 +110,22 @@ function cleanStepFields(block, index, fields, answers) {
   return { pick: JSON.stringify(pick) };
 }
 
-/** Marked blocks with a redraft out: 'asked' while the student rewrites, 'with_teacher' once it's sent. */
-async function redraftStates(store, classId, studentId, lessonId, marked) {
-  const states = {};
+/**
+ * Where each marked block stands for this student. `redrafts`: 'asked' while they
+ * rewrite, 'with_teacher' once it's sent. `returned`: marked and back with them,
+ * the piece id their feedback opens by, when, and whether they've opened it yet.
+ */
+async function markedStates(store, classId, studentId, lessonId, marked) {
+  const redrafts = {};
+  const returned = {};
   for (const id of marked) {
-    const row = await read(store, `piece_feedback/${classId}/${studentId}/${pieceId(lessonId, id)}`);
-    if (row?.redraft) states[id] = 'asked';
-    else if (row?.draft > 1 && row.status !== 'returned') states[id] = 'with_teacher';
+    const item = pieceId(lessonId, id);
+    const row = await read(store, `piece_feedback/${classId}/${studentId}/${item}`);
+    if (row?.redraft) redrafts[id] = 'asked';
+    else if (row?.draft > 1 && row.status !== 'returned') redrafts[id] = 'with_teacher';
+    else if (row?.status === 'returned') returned[id] = { item, at: row.returned_at ?? null, new: !row.seen_at };
   }
-  return states;
+  return { redrafts, returned };
 }
 
 export async function workAction(store, lessonId, body) {
@@ -143,8 +150,13 @@ export async function workAction(store, lessonId, body) {
   const identity = { need: null, initials: student.initials };
   const marked = await handinBlocks(store, roster.cls.id, lessonId);
   if (action === 'status' || action === 'claim') {
-    const redrafts = marked.length ? await redraftStates(store, roster.cls.id, student.id, lessonId, marked) : {};
-    return { ...identity, ...(marked.length ? { handin_blocks: marked } : {}), ...(Object.keys(redrafts).length ? { redrafts } : {}) };
+    const { redrafts, returned } = marked.length ? await markedStates(store, roster.cls.id, student.id, lessonId, marked) : { redrafts: {}, returned: {} };
+    return {
+      ...identity,
+      ...(marked.length ? { handin_blocks: marked } : {}),
+      ...(Object.keys(redrafts).length ? { redrafts } : {}),
+      ...(Object.keys(returned).length ? { returned } : {})
+    };
   }
 
   if (action === 'handin') {
