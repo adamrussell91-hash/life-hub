@@ -252,8 +252,11 @@ export function createAesthetics(doc, {
       weatherEl.hidden = !caption;
     }
     const wrap = $('#aes-today-bottle');
-    wrap.querySelector('.aes-photo')?.remove();
-    wrap.prepend(bottle(f, 120, true));
+    const shown = wrap.querySelector('.aes-photo');
+    if (shown?.dataset.fragrance !== f.name) {
+      shown?.remove();
+      wrap.prepend(bottle(f, 120, true));
+    }
     wrap.setAttribute('aria-label', `Spray ${f.name}`);
     $('#aes-today-name').textContent = f.name;
     $('#aes-today-by').textContent = `${f.brand} · ${FAMILY_LABELS[f.family]}`;

@@ -616,7 +616,7 @@
   .aes-wrist__art .aes-watch { width: 7.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .aes-wear__bottle, .aes-shelf__bottle .aes-photo, .aes-piece { transition: none; }
+  .aes-wear__bottle, .aes-shelf__bottle .aes-photo, .aes-photo img, .aes-piece { transition: none; }
   .aes-wheel__family,
   .aes-wheel__dot,
   .aes-wheel__wedge,
@@ -631,6 +631,8 @@
 /* Bottle photography: identical square frames at every scale; never crop the bottle. */
 .aes-photo { display: inline-flex; flex: none; align-items: center; justify-content: center; aspect-ratio: 1; max-width: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; vertical-align: middle; }
 .aes-photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.aes-photo--loading img { opacity: 0; }
+.aes-photo img { transition: opacity 180ms ease-out; }
 .aes-photo--fallback { background: var(--cotton); color: var(--muted); }
 .aes-photo--fallback svg { width: 60%; height: 60%; fill: none; stroke: currentColor; stroke-width: 2; }
 .aes-wear__bottle > .aes-photo { width: 100% !important; border-radius: var(--radius-md); }
