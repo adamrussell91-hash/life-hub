@@ -88,7 +88,7 @@ describe('mountNextStep', () => {
     mountNextStep({ input, step: Promise.resolve(step), onPick });
     await flush();
     const host = input.parentElement as HTMLElement;
-    expect(host.querySelector('.ns-line')?.textContent).toContain('Next step: Open with your idea.');
+    expect(host.querySelector('.ns-line')?.textContent).toContain('Do thisOpen with your idea.');
     buttonNamed(host, 'Done').click();
     expect(host.querySelector('.ns-prompt')?.textContent).toContain('Where did you take this step?');
     expect(buttonNamed(host, 'Save').disabled).toBe(true);

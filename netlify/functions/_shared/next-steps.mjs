@@ -69,3 +69,45 @@ export function cleanStepPick(raw, answer, max = 4000) {
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || start >= end || end > limit) return null;
   return { code_id: raw.code_id, line, start, end };
 }
+
+/** How many returned pieces of writing the "Do this" line looks back over. */
+export const DIRECTIVE_WINDOW = 4;
+const NOT_WRITING = new Set(['viva', 'assessment', 'note']);
+const DIRECTIVE_COLOURS = new Set(['blue', 'sage', 'peach', 'gold', 'lilac']);
+
+/** A code's step at the student's rung: its ladder line, else its own descriptor. */
+export function codeStep(code, rungs = {}) {
+  const line = code?.ladder?.[rungIndex(code.skill ? rungs[code.skill] : null)];
+  return String(line ?? '').trim() || String(code?.descriptor ?? '').trim();
+}
+
+/**
+ * The one thing a writing box tells a student to do, from their last few
+ * returned pieces of writing (oldest first). "do": of the codes flagged in
+ * their latest piece, the one flagged in most of the window. "keep": nothing
+ * flagged in the latest piece, and a code flagged earlier has gone from the
+ * last two. Null when there is nothing to say.
+ */
+export function writingDirective(pieces, codesById, rungs = {}) {
+  const recent = pieces.filter((p) => !NOT_WRITING.has(p.kind)).slice(-DIRECTIVE_WINDOW);
+  if (!recent.length) return null;
+  const needs = (p) => new Set((p.tags ?? []).filter((t) => !t.positive && codeStep(codesById.get(t.code_id), rungs)).map((t) => t.code_id));
+  const hits = (id) => recent.filter((p) => needs(p).has(id)).length;
+  const out = (kind, id, item) => {
+    const code = codesById.get(id);
+    return { kind, code_id: id, code: code.code, colour: DIRECTIVE_COLOURS.has(code.colour) ? code.colour : 'peach', line: codeStep(code, rungs), hits: hits(id), of: recent.length, item };
+  };
+  const latest = recent.at(-1);
+  const now = [...needs(latest)];
+  if (now.length) {
+    const count = (id) => (latest.tags ?? []).filter((t) => t.code_id === id && !t.positive).length;
+    return out('do', now.sort((a, b) => hits(b) - hits(a) || count(b) - count(a))[0], latest.id);
+  }
+  if (recent.length < 3) return null;
+  const lastTwo = recent.slice(-2);
+  const earlier = recent.slice(0, -2);
+  const gone = [...new Set(earlier.flatMap((p) => [...needs(p)]))].filter((id) => !lastTwo.some((p) => needs(p).has(id)));
+  if (!gone.length) return null;
+  const id = gone.sort((a, b) => hits(b) - hits(a))[0];
+  return out('keep', id, earlier.filter((p) => needs(p).has(id)).at(-1).id);
+}

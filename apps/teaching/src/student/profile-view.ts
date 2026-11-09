@@ -339,7 +339,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
     tabs(
       payload.unseen ?? 0,
-      over?.start ?? (wantOrganiser ? 'organiser' : payload.unseen && !options.teacher ? 'returned' : 'progress'),
+      over?.start ?? (wantOrganiser ? 'organiser' : (payload.unseen && !options.teacher) || options.tab === 'returned' ? 'returned' : 'progress'),
       { progress, returned, ...(organiserPanel ? { organiser: organiserPanel } : {}), ...(over ? { 'over-time': over.panel } : {}) },
       () => {
         if (loaded) return;

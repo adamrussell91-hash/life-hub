@@ -17,7 +17,11 @@ import '@/styles/next-step.css';
 export type StepCode = { id: string; code: string; colour: string; hits: number };
 /** The `steps` profile reply, by `strand.sub`. */
 export type StepSkills = Record<string, { rung: string | null; codes: StepCode[] }>;
-export type NextStep = { code_id: string; code: string; colour: string; line: string };
+/** Why a step is there: flagged in the student's recent writing ("do"), or gone from it ("keep"). */
+export type StepWhy = { kind: 'do' | 'keep'; hits: number; of: number; href?: string };
+export type NextStep = { code_id: string; code: string; colour: string; line: string; why?: StepWhy };
+/** The `steps` reply's one directive, from the student's last few returned pieces of writing. */
+export type Directive = { kind: 'do' | 'keep'; code_id: string; code: string; colour: string; line: string; hits: number; of: number; item: string };
 export type StepPick = { code_id: string; line: string; start: number; end: number } | { code_id: string; line: string; skipped: true };
 /** What a writing box carries for its step. */
 export type StepItem = { skills?: string[]; next_steps?: NextStepBank };
@@ -85,7 +89,24 @@ export function readStepPick(raw: unknown): StepPick | null {
   return Number.isInteger(p.start) && Number.isInteger(p.end) ? { code_id: p.code_id, line: p.line, start: p.start as number, end: p.end as number } : null;
 }
 
-type StepsReply = { need: 'initials' | null; skills?: StepSkills };
+type StepsReply = { need: 'initials' | null; skills?: StepSkills; directive?: Directive | null };
+type Loaded = { skills: StepSkills; directive: Directive | null };
+
+/**
+ * The step a box shows. The directive from recent writing comes first, in the
+ * box's own bank wording when the bank covers that code. With no directive,
+ * the bank's step as before. Any box gets the directive, bank or not.
+ */
+export function stepForBox(item: StepItem, loaded: Loaded | null, href?: string): NextStep | null {
+  if (!loaded) return null;
+  const d = loaded.directive;
+  if (d) {
+    const rung = item.skills?.map((k) => loaded.skills[k]?.rung).find((r) => r !== undefined) ?? null;
+    const own = d.kind === 'do' ? (item.next_steps?.[d.code_id]?.lines[rungIndex(rung)] ?? '').trim() : '';
+    return { code_id: d.code_id, code: d.code, colour: COLOURS.has(d.colour) ? d.colour : 'peach', line: own || d.line, why: { kind: d.kind, hits: d.hits, of: d.of, ...(href ? { href } : {}) } };
+  }
+  return chooseStep(item, loaded.skills);
+}
 
 /**
  * Asks the class profile for this student's codes and rungs, once per lesson
@@ -95,18 +116,19 @@ type StepsReply = { need: 'initials' | null; skills?: StepSkills };
  */
 export function stepsLoader(classId: string, lessonId: string, call?: () => Promise<StepsReply>): StepFor {
   const ask = call ?? (() => apiPost<StepsReply>(`/api/published/profile/${encodeURIComponent(classId)}`, { action: 'steps', lesson_id: lessonId, class_token: deviceToken(`class:${classId}`) }));
-  let skills: Promise<StepSkills | null> | null = null;
+  let skills: Promise<Loaded | null> | null = null;
+  const href = `/s/classes/${encodeURIComponent(classId)}/profile?tab=returned`;
   let claimed = false;
   let askedAt = 0;
   const fixed = new Map<string, Promise<NextStep | null>>();
-  const load = (): Promise<StepSkills | null> => {
+  const load = (): Promise<Loaded | null> => {
     if (!skills || (!claimed && Date.now() - askedAt > 5000)) {
       askedAt = Date.now();
       skills = ask().then(
         (r) => {
           if (r.need === 'initials') return null;
           claimed = true;
-          return r.skills ?? {};
+          return { skills: r.skills ?? {}, directive: r.directive ?? null };
         },
         () => null
       );
@@ -116,8 +138,7 @@ export function stepsLoader(classId: string, lessonId: string, call?: () => Prom
   return (item, key) => {
     const held = fixed.get(key);
     if (held) return held;
-    if (!item.skills?.length || !item.next_steps || !Object.keys(item.next_steps).length) return Promise.resolve(null);
-    const step = load().then((s) => chooseStep(item, s));
+    const step = load().then((s) => stepForBox(item, s, href));
     fixed.set(key, step);
     // A box drawn before the initials claim may find its step on a later draw.
     void step.then(() => {
@@ -150,6 +171,41 @@ function tickIcon(): SVGSVGElement {
   return svg;
 }
 
+function arrowIcon(keep: boolean): HTMLElement {
+  const wrap = el('span', 'ns-line__arrow');
+  wrap.setAttribute('aria-hidden', 'true');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', keep ? 'M5 12.5l4.5 4.5L19 7.5' : 'M4 12h15M13 6l6 6-6 6');
+  svg.append(path);
+  wrap.append(svg);
+  return wrap;
+}
+
+/** "[AS] flagged in your last 4 pieces · See last time", or how long it has been gone. */
+export function whyLine(step: NextStep): HTMLElement | null {
+  const why = step.why;
+  if (!why) return null;
+  const p = el('span', 'ns-line__why');
+  const pieces = (n: number) => (n === 1 ? 'piece' : 'pieces');
+  const words =
+    why.kind === 'keep'
+      ? ` not flagged in your last 2 ${pieces(2)}`
+      : why.hits === 1
+        ? ' flagged in your last piece'
+        : why.hits === why.of
+          ? ` flagged in your last ${why.of} ${pieces(why.of)}`
+          : ` flagged in ${why.hits} of your last ${why.of} ${pieces(why.of)}`;
+  p.append(chip(step), document.createTextNode(words));
+  if (why.href && why.kind === 'do') {
+    const a = el('a', 'ns-line__link', 'See last time');
+    a.href = why.href;
+    p.append(document.createTextNode(' · '), a);
+  }
+  return p;
+}
+
 function chip(step: NextStep): HTMLElement {
   return el('span', `pg-code pg-code--${step.colour}`, step.code);
 }
@@ -177,7 +233,9 @@ export function mountNextStep(options: MountNextStepOptions): void {
   const save = button('Save', 'primary', () => keep(chosen ? { code_id: step!.code_id, line: step!.line, start: chosen.start, end: chosen.end } : null));
   const skip = button('Not this time', 'ghost', () => keep(step ? { code_id: step.code_id, line: step.line, skipped: true } : null));
   input.classList.add('ns-host');
-  input.before(line);
+  // Above the box's "Your response" label when it has one, so the label stays with the box.
+  const label = input.previousElementSibling;
+  (label?.classList.contains('block-question-set__answer-label') ? label : input).before(line);
   input.after(prompt, read, tick, foot);
 
   const writing = () => line.classList.toggle('ns-line--writing', !!input.value.trim());
@@ -189,10 +247,13 @@ export function mountNextStep(options: MountNextStepOptions): void {
   function paintLine(): void {
     line.hidden = !step || mode === 'pick';
     if (!step) return;
-    line.className = `ns-line ns--${step.colour}`;
-    line.replaceChildren(chip(step), el('span', 'ns-line__text'));
-    const text = line.lastElementChild as HTMLElement;
-    text.append(el('b', 'ns-line__label', 'Next step:'), document.createTextNode(` ${step.line}`));
+    const keep = step.why?.kind === 'keep';
+    line.className = `ns-line ns--${step.colour}${keep ? ' ns-line--keep' : ''}`;
+    const main = el('span', 'ns-line__main');
+    main.append(el('span', 'ns-line__label', keep ? 'Keep doing this' : 'Do this'), el('span', 'ns-line__text', step.line));
+    const why = whyLine(step);
+    if (why) main.append(why);
+    line.replaceChildren(arrowIcon(keep), main);
     writing();
   }
 
@@ -267,7 +328,8 @@ export function mountNextStep(options: MountNextStepOptions): void {
   function finish(): void {
     if (!input.value.trim()) return;
     const sentences = splitSentences(input.value);
-    if (!step) {
+    // "Keep doing this" is a reminder, not a step to find.
+    if (!step || step.why?.kind === 'keep') {
       mode = 'read';
       paint();
       return;
