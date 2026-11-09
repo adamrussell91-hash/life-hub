@@ -178,6 +178,34 @@ test('GET by id, source_ref, target_ref, and entity_ref all resolve through the 
   assert.equal(entityBody.incoming.length, 0);
 });
 
+test('GET entity_refs reads several entities in one request, each on its own', async () => {
+  const store = memoryStore();
+  const handler = createUniversalLinksHandler(baseDeps({ getContentStore: async () => store }));
+  const body = { source_ref: TASK_REF, target_ref: PERSON_REF, relationship_type: 'collaborator' };
+  await handler(request({ method: 'POST', body }));
+
+  const refs = [TASK_REF, PERSON_REF, 'not-a-ref', TASK_REF].map(encodeURIComponent).join(',');
+  const response = await handler(request({ url: `https://api.adam-russell.com/api/universal-links?entity_refs=${refs}` }));
+  assert.equal(response.status, 200);
+  const { results } = (await response.json()).data;
+  assert.deepEqual(Object.keys(results), [TASK_REF, PERSON_REF, 'not-a-ref']);
+  assert.equal(results[TASK_REF].outgoing.length, 1);
+  assert.equal(results[PERSON_REF].incoming.length, 1);
+  assert.equal(typeof results['not-a-ref'].error, 'string');
+});
+
+test('GET entity_refs refuses an empty list, too many refs, or a second selector', async () => {
+  const handler = createUniversalLinksHandler(baseDeps());
+  const base = 'https://api.adam-russell.com/api/universal-links';
+  const empty = await handler(request({ url: `${base}?entity_refs=` }));
+  assert.equal(empty.status, 400);
+  const many = Array.from({ length: 51 }, (_, i) => encodeURIComponent(`shared:person:person_${i}`)).join(',');
+  const tooMany = await handler(request({ url: `${base}?entity_refs=${many}` }));
+  assert.equal((await tooMany.json()).error.code, 'too_many_refs');
+  const both = await handler(request({ url: `${base}?entity_refs=${encodeURIComponent(TASK_REF)}&entity_ref=${encodeURIComponent(TASK_REF)}` }));
+  assert.equal((await both.json()).error.code, 'ambiguous_selector');
+});
+
 test('PATCH action=end ends a period link', async () => {
   const store = memoryStore();
   const deps = baseDeps({ getContentStore: async () => store });
