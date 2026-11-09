@@ -266,3 +266,4 @@ Checks for this feature from [docs/CURSOR-UI-FAILURES.md](../../CURSOR-UI-FAILUR
 ## History
 
 - 9 Nov 2026: written from the concept doc and mockup after Adam promoted it to build.
+- 9 Nov 2026: built in one PR. What was built, the decisions taken while building and what is left: [docs/station-rotation/README.md](../../station-rotation/README.md). Cost figures are still the estimate.

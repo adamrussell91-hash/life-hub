@@ -2770,6 +2770,10 @@ var SectionBlockObjectSchema = z12.object({
     case_part: z12.string().max(40).optional(),
     /** Case Study: this top-level section holds the Outcome's blocks, shown to students once the outcome is out. */
     case_outcome: z12.boolean().optional(),
+    /** Station Rotation: this top-level section holds one station's blocks (by station id). */
+    rotation_station: z12.string().max(40).optional(),
+    /** Station Rotation: this top-level section holds the finale's own blocks. */
+    rotation_finale: z12.boolean().optional(),
     /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
     group_set: GroupSetSchema.optional()
   }),

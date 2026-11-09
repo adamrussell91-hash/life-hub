@@ -99,6 +99,12 @@ import { mountCaseBoard, type CaseBoardHandle } from '@/case-study/board';
 import { caseTeacherApi } from '@/case-study/api';
 import { casePartOf, findCasePartSection, isCaseBriefSection, isCaseOutcomeSection, seedCase } from '@/case-study/model';
 import { inCaseTab, withCaseBriefSection, withCaseOutcomeSection, withCasePartSection } from '@/case-study/editor-tabs';
+import { mountRotationEditor, type RotationEditorHandle } from '@/rotation/editor';
+import { mountRotationLive, type RotationLiveHandle } from '@/rotation/live';
+import { rotationTeacherApi } from '@/rotation/api';
+import { findStationSection, isRotationFinale } from '@/rotation/model';
+import { seedRotation, withRotationSections } from '@/rotation/seed';
+import { inRotationTab, tabOfBlock, tabStation } from '@/rotation/editor-tabs';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -186,7 +192,7 @@ export type MountLessonPageOptions = {
   linesBefore?: ReadonlySet<string>;
   onFlowPeer?: (lessonId: string, after: string[]) => Promise<void>;
   /** The classes that teach the unit, with this lesson's date in each. */
-  flowClasses?: Array<{ id: string; name: string; date?: string }>;
+  flowClasses?: Array<{ id: string; name: string; date?: string; minutes?: number }>;
   /** The lesson's route when it has none of its own: a support or extension stop on the unit map. */
   flowRole?: LessonRouteRole;
   /** Dates this lesson for a class; resolves to the unit's lessons in their new order. */
@@ -1229,6 +1235,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncTutorialPanel();
     syncSprintPanel();
     syncCasePanel();
+    syncRotationPanel();
     syncFooterNote();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
@@ -1245,6 +1252,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   /** A Quiz always has the panel; any other lesson that runs quiz questions gets it once it holds a question or group set. */
   function showsQuizPanel(): boolean {
     if (resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz') return true;
+    // A station rotation's pretest and exit checks run in its own player, marked by its own endpoint.
+    if (resolvePedagogicalMode(lesson.pedagogical_mode) === 'station_rotation') return false;
     if (!quizRunsIn(lesson.pedagogical_mode)) return false;
     let found = false;
     visitBlocks(lesson.blocks, (block) => {
@@ -1392,6 +1401,13 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }
   /** On a group's tab, new blocks go at the end of that group's tab section, so they stay in view. */
   function tutorialInsertTarget(): { parent: DropParent; index: number } | null {
+    // On a station rotation's station or Finale tab, new blocks land in that section.
+    if (rotationEditor) {
+      const tab = rotationEditor.tabs.current();
+      const stationId = tabStation(tab);
+      const section = stationId ? findStationSection(lesson.blocks, stationId) : tab === 'finale' ? lesson.blocks.find(isRotationFinale) : undefined;
+      if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+    }
     // On a case study's Brief tab, new blocks land in the Brief section.
     if (caseEditor?.tabs.current() === 'brief') {
       if (!lesson.blocks.some(isCaseBriefSection)) {
@@ -1580,6 +1596,59 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     caseHost.hidden = !isCase;
   }
 
+  // A lesson set to Station Rotation gets the build tabs, and the live view once published.
+  const rotationHost = document.createElement('div');
+  rotationHost.className = 'lesson-page__rotation';
+  let rotationEditor: RotationEditorHandle | null = null;
+  let rotationLive: RotationLiveHandle | null = null;
+  /** The canvas shows on every tab but Pretest, filtered to that tab's section. */
+  function showRotationCanvas(): void {
+    if (!rotationEditor) return;
+    canvasHost.hidden = rotationEditor.tabs.current() === 'pretest';
+  }
+  function syncRotationPanel(): void {
+    const isRotation = resolvePedagogicalMode(lesson.pedagogical_mode) === 'station_rotation';
+    if (isRotation && !lesson.rotation) emitLesson({ ...lesson, rotation: seedRotation(options.flowClasses?.[0]?.id ?? '', options.idFactory) });
+    // Every station needs a section for its blocks, and the finale one; emitLesson only records the lesson, so redraw the canvas.
+    if (isRotation && lesson.rotation) {
+      const blocks = withRotationSections(lesson.blocks, lesson.rotation, options.idFactory);
+      if (blocks !== lesson.blocks) {
+        emitLesson({ ...lesson, blocks });
+        canvas.update(lesson.blocks, media);
+      }
+    }
+    if (isRotation && !rotationEditor) {
+      rotationEditor = mountRotationEditor({
+        getLesson: () => lesson,
+        emitLesson,
+        redrawCanvas: () => canvas.update(lesson.blocks, media),
+        classes: options.flowClasses ?? [],
+        idFactory: options.idFactory,
+        onTab: () => {
+          showRotationCanvas();
+          canvas.clearSelection();
+          canvas.update(lesson.blocks, media);
+        }
+      });
+      rotationHost.append(rotationEditor.root);
+    } else if (!isRotation && rotationEditor) {
+      rotationLive?.dispose();
+      rotationLive = null;
+      rotationEditor.dispose();
+      rotationEditor = null;
+      rotationHost.replaceChildren();
+      canvasHost.hidden = false;
+    }
+    // The live view needs a published rotation; it appears on the first publish too.
+    if (isRotation && rotationEditor && !rotationLive && lesson.published_at) {
+      rotationLive = mountRotationLive({ api: rotationTeacherApi(lesson.id), getLesson: () => lesson, classes: options.flowClasses ?? [] });
+      rotationHost.prepend(rotationLive.root);
+      void rotationLive.refresh();
+    }
+    showRotationCanvas();
+    rotationHost.hidden = !isRotation;
+  }
+
   if (showPageMenu) root.append(chrome);
   // Students end every lesson on the footer (lesson-footer.ts), so no block is needed for it.
   const footerNote = document.createElement('p');
@@ -1591,7 +1660,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         : 'Students see Previous, a tick to finish, and Next under every lesson.';
   }
   syncFooterNote();
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, canvasHost, footerNote);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, rotationHost, canvasHost, footerNote);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1652,6 +1721,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       if (tutorialTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inTab(block, tutorialTabs.current());
       if (sprintTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inSprintTab(block, sprintTabs.current());
       if (caseEditor && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inCaseTab(block, caseEditor.tabs.current());
+      if (rotationEditor && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inRotationTab(block, rotationEditor.tabs.current());
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
@@ -1689,7 +1759,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncTutorialPanel();
   syncSprintPanel();
   syncCasePanel();
-  if (tutorialTabs || sprintTabs || caseEditor) canvas.update(lesson.blocks, media);
+  syncRotationPanel();
+  if (tutorialTabs || sprintTabs || caseEditor || rotationEditor) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
   const syllabus = mountLessonSyllabus(document.createElement('div'));
@@ -1815,6 +1886,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       syncTutorialPanel();
     syncSprintPanel();
       syncCasePanel();
+      syncRotationPanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1835,12 +1907,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       lesson = { ...lesson, published_at: at };
       syncSprintPanel();
       syncCasePanel();
+      syncRotationPanel();
     },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
       // A publish issue on another tutorial tab: open that tab first.
       const target = blockId ? rootOf(blockId) : undefined;
       if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
       if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(isGuidesSection(target) ? 'guides' : phaseOfSection(target) ?? 'brief');
+      if (rotationEditor && target && !inRotationTab(target, rotationEditor.tabs.current())) rotationEditor.tabs.set(tabOfBlock(target));
       if (caseEditor && target && !inCaseTab(target, caseEditor.tabs.current())) caseEditor.tabs.set(isCaseBriefSection(target) ? 'brief' : casePartOf(target) ? 'case' : isCaseOutcomeSection(target) ? 'outcome' : 'decide');
       canvas.revealPublishBlock(blockId, errorIds);
     },
@@ -1868,6 +1942,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();
+      rotationLive?.dispose();
       root.remove();
     }
   };

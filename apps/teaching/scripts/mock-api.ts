@@ -116,6 +116,8 @@ import { createPublishedTutorialHandler } from '../../../netlify/functions/publi
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createPublishedCaseHandler } from '../../../netlify/functions/published-case.mjs';
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
+import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
+import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
 import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
 import { createOrganiserHandler } from '../../../netlify/functions/organiser.mjs';
@@ -149,6 +151,9 @@ import { workOwner } from '../../../netlify/functions/_shared/lesson-work.mjs';
 import { addDays, sydneyDay as organiserDay } from '../../../netlify/functions/_shared/organiser-model.mjs';
 import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
 import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/_shared/case-study.mjs';
+import { prepareRotationPublish, storeRotationConfig } from '../../../netlify/functions/_shared/rotation.mjs';
+import { mockWritingChecker } from './mock-rotation-writing';
+import { rotationLesson, ROTATION_ROSTER } from '../../../tests/unit/helpers/rotation-fixture.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -722,6 +727,41 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   seedGroupSetQuiz();
 
   /**
+   * A walkable Station Rotation, dev walk and browser test: an invented Year 8 class and the invented
+   * reef lesson from the test fixture, published and scheduled. All invented.
+   * Walk: teacher `/lessons/lesson_rotation_reef`, student `/s/classes/class_2026_08sci/lessons/lesson_rotation_reef` (initials AB).
+   */
+  function seedStationRotation(): void {
+    if (process.env.VITEST) return;
+    const unit = options.seed.units[0] as { id: string; lesson_ids: string[] } | undefined;
+    const template = options.seed.classes[0] as Record<string, unknown> | undefined;
+    if (!unit || !template) return;
+    const classId = 'class_2026_08sci';
+    const lessonId = 'lesson_rotation_reef';
+    const stamp = '2026-11-02T09:00:00.000Z';
+    store.setJSON(classKey(classId), {
+      ...template, id: classId, code: '8SCI', title: 'Year 8 Science', slug: '8sci', display_name: '8SCI',
+      students: ROTATION_ROSTER.map((r) => ({ id: r.id, name: r.name, skip_picker: false })), current_scheduled_lesson_id: undefined
+    });
+    seedIds.classes.push(classId);
+    const lesson = { ...rotationLesson({ class_id: classId }), id: lessonId, slug: 'reef_rescue', unit_id: unit.id, sequence: unit.lesson_ids.length + 1, tags: [], syllabus_outcomes: [], outcome_ids: [] };
+    // The fixture's HTML is plain; the DOM sanitiser isn't loaded at seed time.
+    const studentBlocks = filterBlocksForStudent(lesson.blocks as unknown as Block[]);
+    const pub = prepareRotationPublish(lesson, studentBlocks);
+    if (pub.problems.length || !pub.snapshot) { console.error('rotation seed', pub.problems); return; }
+    void storeRotationConfig(functionBlobStore(), lessonId, pub.config);
+    store.setJSON(draftLessonKey(lessonId), { ...lesson, published_at: stamp });
+    store.setJSON(publishedLessonKey(lessonId), { lesson_id: lessonId, title: lesson.title, unit_id: unit.id, blocks: pub.snapshot.blocks, published_at: stamp, schema_version: 1, pedagogical_mode: 'station_rotation', rotation: pub.snapshot.rotation });
+    store.setJSON(unitKey(unit.id), { ...(store.getJSON<Record<string, unknown>>(unitKey(unit.id)) ?? unit), lesson_ids: [...((store.getJSON<{ lesson_ids?: string[] }>(unitKey(unit.id)) ?? unit).lesson_ids ?? []), lessonId] });
+    seedIds.lessons.push(lessonId);
+    store.setJSON(scheduledLessonKey('sched_rotation_reef'), {
+      id: 'sched_rotation_reef', type: 'scheduled_lesson', class_id: classId, lesson_id: lessonId, unit_id: unit.id,
+      date: '2026-11-10', start_time: '09:00', end_time: '10:00', schedule_order: 1, delivery_status: 'planned', created_at: stamp, updated_at: stamp, schema_version: 1
+    });
+    seedIds.scheduled_lessons.push('sched_rotation_reef');
+  }
+
+  /**
    * A walkable student progress case, dev walk only: a second class of invented students with five
    * returned written pieces each, a sixth waiting for feedback from three of them, a linked Markbook
    * task per piece, and a small skills continuum. The real Functions read all of it from the mock store.
@@ -912,6 +952,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   seedStudentProgress();
+  seedStationRotation();
 
   /**
    * Over time walk, dev only: nine weekly quizzes for 12ENGADV2 across Term 3 and Term 4 (holiday gap
@@ -1703,8 +1744,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
     const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
 
+    // A station rotation splits its own questions and keeps keys, hinge answers and the pretest server-side, as the real publish does.
+    const rotation = parsed.data.pedagogical_mode === 'station_rotation' ? prepareRotationPublish(parsed.data, studentBlocks) : null;
+    if (rotation?.problems.length) return errorResponse(400, 'validation_error', rotation.problems[0]);
+    if (rotation) await storeRotationConfig(functionBlobStore(), id, rotation.config);
     // Quiz answers are split off and stored apart, exactly as the real publish does.
-    const quizPublish = prepareQuizPublish(parsed.data, studentBlocks);
+    const quizPublish = rotation ? { problems: [] as string[], quiz: null, blocks: rotation.snapshot.blocks } : prepareQuizPublish(parsed.data, studentBlocks);
     if (quizPublish.problems.length > 0) {
       return errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`);
     }
@@ -1721,7 +1766,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       blocks: quizPublish.blocks,
       ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(parsed.data.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' as const } : {}) } : {}),
       ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
-      ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {})
+      ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {}),
+      ...(rotation ? { pedagogical_mode: 'station_rotation', rotation: rotation.snapshot.rotation } : {})
     });
 
     try {
@@ -4213,6 +4259,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createTutorialHandler(deps)
       : path.startsWith('/api/published/tutorial/')
         ? createPublishedTutorialHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/rotation$/.test(path)
+        ? createRotationHandler(deps)
+      : path.startsWith('/api/published/rotation/')
+        ? createPublishedRotationHandler({ ...deps, checkWriting: mockWritingChecker })
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
       : /^\/api\/units\/[^/]+\/organiser$/.test(path)
@@ -4380,6 +4430,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/rotation$/.test(path) ||
+      /^\/api\/published\/rotation\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/organiser$/.test(path) ||
       /^\/api\/published\/organiser\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path) ||

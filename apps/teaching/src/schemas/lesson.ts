@@ -11,6 +11,8 @@ import { tutorialIssues } from '../tutorial/model';
 import { sprintIssues } from '../sprint/model';
 import { CaseSettingsSchema } from '../case-study/schema';
 import { caseIssues } from '../case-study/model';
+import { RotationSettingsSchema } from '../rotation/schema';
+import { rotationIssues } from '../rotation/model';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 import {
@@ -83,6 +85,8 @@ export const LessonSchema = z.object({
   sprint: SprintSettingsSchema.optional(),
   /** Case Study lessons only: purpose, documents, decision, outcome and the unseen case. */
   case: CaseSettingsSchema.optional(),
+  /** Station Rotation lessons only: stations, pretest, path, dial, evidence board and finale. */
+  rotation: RotationSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 
@@ -121,6 +125,11 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
   if (lesson.pedagogical_mode === 'case_study') {
     for (const message of caseIssues(lesson)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['case'] });
+    }
+  }
+  if (lesson.pedagogical_mode === 'station_rotation') {
+    for (const message of rotationIssues(lesson)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['rotation'] });
     }
   }
   // Tutorials use the lecture publish rules: gates and side paths.
