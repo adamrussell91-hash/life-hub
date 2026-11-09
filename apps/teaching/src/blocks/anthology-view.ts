@@ -56,6 +56,14 @@ export type BuildAnthologyViewOptions = {
 /** The Show All tools that suit a unit's notes. Grow, Recall, Sharpen and Recent read a note's history. */
 const ANTHOLOGY_TOOLS: readonly DockTool[] = ['spark', 'path', 'walk', 'bridges'];
 
+/** What each tool does on a unit's map, in students' words (the "i" in the map's tool row). */
+const ANTHOLOGY_TOOL_HINTS: Partial<Record<DockTool, string>> = {
+  spark: 'Type an idea or a question. The notes that match it light up, so you can see which poems and themes speak to it.',
+  path: 'Pick two notes, from two poems. A signal runs between them through the notes that link them: a chain of evidence you can follow.',
+  walk: 'Start from one note and follow a slow signal to the notes linked to it, one step at a time.',
+  bridges: 'Shows the notes that join themes together, and the themes that nothing joins yet.'
+};
+
 function noteHref(item: AnthologyItem): string {
   return `${lessonCollectionHref(item.lesson_id)}#note=${encodeURIComponent(item.annotation_id)}`;
 }
@@ -658,6 +666,7 @@ export function buildAnthologyView(
               return item ? `${item.note} ${item.themes.join(' ')} ${item.concepts.join(' ')}` : '';
             },
             tools: ANTHOLOGY_TOOLS,
+            toolHints: ANTHOLOGY_TOOL_HINTS,
             theme: 'light',
             labelZoom: { topics: 0, notes: 1.6 },
             ringFor: isKnowledgeNoteId,

@@ -26,7 +26,19 @@ export type Dock = {
   setTop: (px: number) => void;
 };
 
-export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void, only?: readonly DockTool[]): Dock {
+export type DockOptions = {
+  /** Plain words for what each tool does here, in place of the Knowledge Hub's own hints. */
+  hints?: Partial<Record<DockTool, string>>;
+  /** Add an "i" button that opens a short guide to the tools in the row. */
+  guide?: boolean;
+};
+
+export function createDock(
+  host: HTMLElement,
+  onTool: (tool: DockTool) => void,
+  only?: readonly DockTool[],
+  dockOptions: DockOptions = {},
+): Dock {
   const root = document.createElement("div");
   root.className = "neural-dock";
   const reveal = el("button", { type: "button", class: "neural-dock__reveal", "data-dock-reveal": "", text: "Tools", "aria-label": "Show map tools", "aria-expanded": "false" });
@@ -56,7 +68,7 @@ export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void, 
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = tool.label;
-    button.title = tool.hint;
+    button.title = dockOptions.hints?.[tool.id] ?? tool.hint;
     button.dataset.dockTool = tool.id;
     button.setAttribute("aria-pressed", "false");
     button.addEventListener("click", () => onTool(tool.id));
@@ -66,7 +78,33 @@ export function createDock(host: HTMLElement, onTool: (tool: DockTool) => void, 
   const panel = document.createElement("div");
   panel.className = "neural-dock__panel";
   panel.hidden = true;
-  body.append(row, panel);
+  body.append(row);
+  if (dockOptions.guide && buttons.size) {
+    const guide = el("div", { class: "neural-dock__guide", id: `neural-dock-guide-${Math.random().toString(36).slice(2, 8)}` });
+    guide.hidden = true;
+    const list = el("dl", { class: "neural-dock__guide-list" });
+    for (const tool of DOCK_TOOLS) {
+      if (!buttons.has(tool.id)) continue;
+      list.append(el("dt", { text: tool.label }), el("dd", { text: dockOptions.hints?.[tool.id] ?? tool.hint }));
+    }
+    guide.append(list);
+    const info = el("button", {
+      type: "button",
+      class: "neural-dock__info",
+      text: "i",
+      "aria-label": "What the map tools do",
+      "aria-expanded": "false",
+      "aria-controls": guide.id,
+    });
+    info.addEventListener("click", () => {
+      guide.hidden = !guide.hidden;
+      info.setAttribute("aria-expanded", String(!guide.hidden));
+      info.classList.toggle("is-active", !guide.hidden);
+    });
+    row.appendChild(info);
+    body.append(guide);
+  }
+  body.append(panel);
   root.append(reveal, body);
   host.appendChild(root);
   return {

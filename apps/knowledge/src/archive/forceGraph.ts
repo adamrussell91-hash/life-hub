@@ -113,6 +113,8 @@ export type ForceGraphOptions = {
    * white shape on a `fill` disc ringed in the note's colour. Wins over `ringFor`.
    */
   badgeFor?: (pageId: string) => GraphBadge | null;
+  /** Show All only: plain words for what each dock tool does, and an "i" guide to them in the dock. */
+  toolHints?: Partial<Record<DockTool, string>>;
 };
 
 export type GraphBadge = { text: string } | { path: string; fill: string };
@@ -1335,7 +1337,7 @@ export function mountForceGraph(
     ctx.restore();
   }
 
-  const dock: Dock | null = showAllMode ? createDock(host, chooseTool, options.tools) : null;
+  const dock: Dock | null = showAllMode ? createDock(host, chooseTool, options.tools, { hints: options.toolHints, guide: Boolean(options.toolHints) }) : null;
   // Atlas-style ± / Fit. Wheel and pinch stay the fine control; buttons step like shelf Atlas.
   const zoomMin = 0.04;
   const zoomMax = 24;
