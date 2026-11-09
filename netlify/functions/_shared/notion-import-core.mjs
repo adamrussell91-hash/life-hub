@@ -2440,7 +2440,30 @@ var AudioBlockSchema = z13.object({
     oracy: z13.enum(["speech", "debate", "presentation", "recite"]).optional(),
     side: z13.enum(["proposing", "opposing"]).optional(),
     stems: z13.array(z13.string().max(120)).max(12).optional(),
-    recite_text: z13.string().max(8e3).optional()
+    recite_text: z13.string().max(8e3).optional(),
+    /**
+     * Time pressure: one locked run. The question stays hidden until the student
+     * starts prepping; then prep time, a big "about to speak" countdown, the
+     * speaking time, and a grace period before the take sends itself.
+     */
+    pressure: z13.object({
+      enabled: z13.boolean().default(false),
+      prep_s: z13.number().int().min(10).max(600).default(60),
+      countdown_s: z13.number().int().min(3).max(30).default(10),
+      grace_s: z13.number().int().min(0).max(30).default(10)
+    }).optional(),
+    /**
+     * Follow-ups: after the main answer, questions drawn at random from the
+     * teacher's bank. Each gets a short think, then a timed answer, recorded
+     * onto the same take so it is marked with it.
+     */
+    follow_up: z13.object({
+      enabled: z13.boolean().default(false),
+      questions: z13.array(z13.string().max(300)).max(40).default([]),
+      count: z13.number().int().min(1).max(3).default(1),
+      think_s: z13.number().int().min(3).max(60).default(10),
+      answer_s: z13.number().int().min(10).max(180).default(30)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

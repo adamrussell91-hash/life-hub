@@ -1,11 +1,11 @@
 /**
  * Student side of the Voice block (no accounts; see _shared/voice-submissions.mjs).
  *
- *   POST /api/published/voice/:lesson/:block        JSON { action: 'mine' | 'submit', token, … }
+ *   POST /api/published/voice/:lesson/:block        JSON { action: 'mine' | 'start' | 'submit', token, … }
  *   POST /api/published/voice/:lesson/:block/part   multipart { token, upload_id, index, file }
  */
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
-import { readMine, storeVoicePart, submitVoice, VoiceError, MAX_PART_BYTES } from './_shared/voice-submissions.mjs';
+import { readMine, startVoice, storeVoicePart, submitVoice, VoiceError, MAX_PART_BYTES } from './_shared/voice-submissions.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
 
 export const config = {
@@ -43,8 +43,10 @@ export function createPublishedVoiceHandler(deps = {}) {
       const result =
         body.action === 'submit'
           ? await submitVoice(store, lesson, block, body, deps)
-          : body.action === 'mine'
-            ? await readMine(store, lesson, block, body.token, { class_id: body.class_id, class_token: body.class_token })
+          : body.action === 'start'
+            ? await startVoice(store, lesson, block, body, deps)
+            : body.action === 'mine'
+            ? await readMine(store, lesson, block, body.token, { class_id: body.class_id, class_token: body.class_token }, deps)
             : (() => {
                 throw new VoiceError(400, 'bad_action', 'Unknown action.');
               })();

@@ -6,13 +6,17 @@ import {
   dueStamp,
   getVoiceSubmission,
   hashToken,
+  clearVoiceStart,
+  listVoiceStarts,
   listVoiceSubmissions,
+  maxSecondsFor,
   processVoiceTranscriptions,
   readMine,
   returnVoiceSubmission,
   saveVoiceMarking,
   storeVoicePart,
   submitVoice,
+  startVoice,
   sweepVoiceAudio,
   uploadPrefix,
   voiceKeys,
@@ -330,4 +334,109 @@ test('a take from before the owner index is found by initials once, then indexed
   assert.deepEqual(store.data.get(`voice_owner/lesson1/viva1/class1/${noah.id}`), { id: row.id });
   await deleteVoiceSubmission(store, 'lesson1', 'viva1', row.id);
   assert.equal(store.data.has(`voice_owner/lesson1/viva1/class1/${noah.id}`), false);
+});
+
+
+/* ── Time pressure and follow-ups ─────────────────────────────────── */
+
+const timed = {
+  ...block,
+  content: {
+    ...block.content,
+    time_limit_s: 60,
+    pressure: { enabled: true, prep_s: 60, countdown_s: 10, grace_s: 10 },
+    follow_up: { enabled: true, questions: ['Why that line?', 'What would a critic say?', ' '], count: 3, think_s: 10, answer_s: 30 }
+  }
+};
+
+test('a take may run for the speaking time plus grace and every follow-up answer it can draw', () => {
+  assert.equal(maxSecondsFor(block), 90 + 15);
+  // 60 speaking + 10 grace + 2 follow-ups (only two real questions) × 30 + slack.
+  assert.equal(maxSecondsFor(timed), 60 + 10 + 60 + 15);
+  const off = { ...timed, content: { ...timed.content, pressure: { ...timed.content.pressure, enabled: false }, follow_up: { ...timed.content.follow_up, enabled: false } } };
+  assert.equal(maxSecondsFor(off), 60 + 15);
+  // Recite never runs under pressure.
+  assert.equal(maxSecondsFor({ ...timed, content: { ...timed.content, oracy: 'recite', follow_up: undefined } }), 60 + 15);
+});
+
+test('pressure and follow-up settings parse with their defaults; follow-up points keep their whole question', async () => {
+  const parsed = BlockSchema.parse({ ...block, content: { ...block.content, pressure: { enabled: true }, follow_up: { enabled: true } } });
+  assert.deepEqual(parsed.content.pressure, { enabled: true, prep_s: 60, countdown_s: 10, grace_s: 10 });
+  assert.deepEqual(parsed.content.follow_up, { enabled: true, questions: [], count: 1, think_s: 10, answer_s: 30 });
+  const store = memoryStore(lessonSeed(timed));
+  const question = `Follow-up: ${'Why does the speaker turn back to the harbour at the end? '.repeat(4).trim()}`;
+  const points = [...Array(8)].map((_, i) => ({ label: `Point ${i + 1}`, t: i * 5 }));
+  await submit(store, TOKEN, { duration_s: 120, points: [...points, { label: question, t: 70 }, { label: 'Follow-up: Why?', t: 100 }] });
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  const record = store.data.get(voiceKeys.submission('lesson1', 'viva1', row.id));
+  assert.equal(record.points.length, 10);
+  assert.equal(record.points[8].label, question);
+});
+
+test('a timed run starts once: a reload or a second look finds it begun, timed by the server', async () => {
+  const store = memoryStore(lessonSeed(timed));
+  let now = NOW;
+  const deps = { now: () => now };
+  const first = await startVoice(store, 'lesson1', 'viva1', { token: TOKEN, initials: 'js' }, deps);
+  assert.deepEqual(first, { submitted: false, started: true, started_at: new Date(NOW).toISOString(), elapsed_s: 0, initials: 'JS', fresh: true });
+  now += 42_500;
+  const again = await startVoice(store, 'lesson1', 'viva1', { token: TOKEN, initials: 'JS' }, deps);
+  assert.equal(again.fresh, undefined);
+  assert.equal(again.elapsed_s, 42.5);
+  const mine = await readMine(store, 'lesson1', 'viva1', TOKEN, {}, deps);
+  assert.equal(mine.started, true);
+  assert.equal(mine.elapsed_s, 42.5);
+  // Starting needs initials, and only a timed block starts.
+  await assert.rejects(startVoice(store, 'lesson1', 'viva1', { token: OTHER, initials: 'J' }, deps), (e) => e.code === 'bad_initials');
+  await assert.rejects(startVoice(memoryStore(lessonSeed()), 'lesson1', 'viva1', { token: TOKEN, initials: 'JS' }, deps), (e) => e.code === 'not_timed');
+  // Without pressure, a begun run isn't reported.
+  assert.deepEqual(await readMine(memoryStore([...lessonSeed(), [voiceKeys.start('lesson1', 'viva1', hashToken(TOKEN)), { started_at: 'x' }]]), 'lesson1', 'viva1', TOKEN), { submitted: false });
+});
+
+test('a class student who began on one device finds it begun on another', async () => {
+  const { claimInitials, loadRoster, releaseClaim } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = memoryStore([...lessonSeed(timed), ...classSeed()]);
+  const roster = await loadRoster(store, 'class1');
+  const [ava] = roster.students;
+  const LAPTOP = 'c'.repeat(48);
+  await claimInitials(store, roster, TOKEN, ava.initials);
+  await startVoice(store, 'lesson1', 'viva1', { token: TOKEN, initials: 'AN', class_id: 'class1', class_token: TOKEN }, { now: () => NOW });
+  await releaseClaim(store, 'class1', ava.id);
+  await claimInitials(store, roster, LAPTOP, ava.initials);
+  const other = await startVoice(store, 'lesson1', 'viva1', { token: LAPTOP, initials: 'AN', class_id: 'class1', class_token: LAPTOP }, { now: () => NOW + 5000 });
+  assert.equal(other.fresh, undefined);
+  assert.equal(other.elapsed_s, 5);
+  assert.equal([...store.data.keys()].filter((k) => k.startsWith('voice_starts/')).length, 1);
+});
+
+test('the teacher sees runs begun with nothing sent, and can let the student go again', async () => {
+  const store = memoryStore(lessonSeed(timed));
+  await startVoice(store, 'lesson1', 'viva1', { token: TOKEN, initials: 'JS' }, { now: () => NOW });
+  await startVoice(store, 'lesson1', 'viva1', { token: OTHER, initials: 'RK' }, { now: () => NOW });
+  await submit(store, OTHER, { initials: 'RK', duration_s: 60 });
+  const started = await listVoiceStarts(store, 'lesson1', 'viva1');
+  assert.deepEqual(started.map((r) => r.initials), ['JS']);
+  assert.match(started[0].id, /^st_[a-f0-9]{24}$/);
+  await clearVoiceStart(store, 'lesson1', 'viva1', started[0].id);
+  assert.deepEqual(await listVoiceStarts(store, 'lesson1', 'viva1'), []);
+  assert.equal((await startVoice(store, 'lesson1', 'viva1', { token: TOKEN, initials: 'JS' }, { now: () => NOW })).fresh, true);
+  await assert.rejects(clearVoiceStart(store, 'lesson1', 'viva1', 'st_nope'), (e) => e.code === 'not_found');
+  // Deleting a sent take frees its run too.
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  await deleteVoiceSubmission(store, 'lesson1', 'viva1', row.id);
+  assert.equal(store.data.has(voiceKeys.start('lesson1', 'viva1', hashToken(OTHER))), false);
+});
+
+test('the routes start a run and list begun runs for the teacher', async () => {
+  const store = memoryStore(lessonSeed(timed));
+  const studentHandler = createPublishedVoiceHandler({ env: { SITE_ORIGIN: ORIGIN }, getContentStore: async () => store, now: () => NOW });
+  const res = await studentHandler(new Request(`${ORIGIN}/api/published/voice/lesson1/viva1`, { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'start', token: TOKEN, initials: 'JS' }) }), {});
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.data.fresh, true);
+  const teacher = createVoiceSubmissionsHandler({ env: operatorEnv, now: operatorNow, getContentStore: async () => store, invokeRun: async () => false });
+  const list = await (await teacher(operatorRequest('/api/voice/lesson1/viva1'), {})).json();
+  assert.equal(list.data.started.length, 1);
+  const cleared = await teacher(operatorRequest(`/api/voice/lesson1/viva1/${list.data.started[0].id}`, 'DELETE'), {});
+  assert.equal(cleared.status, 200);
 });
