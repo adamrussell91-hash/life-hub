@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptedTechniqueNames,
   addressesMarker,
   capReached,
   cleanReason,
@@ -236,5 +237,13 @@ describe('combining and feedback', () => {
     expect(capReached(2.99, 3)).toBe(false);
     expect(capReached(3, 3)).toBe(true);
     expect(capReached(0, 0)).toBe(true);
+  });
+});
+
+describe('technique names', () => {
+  it('accepts the family word of a multi-word technique and the answer key', () => {
+    const names = acceptedTechniqueNames(['Incremental Repetition', 'Visual Imagery', 'Pun'], ['Motif']);
+    expect(names).toEqual(expect.arrayContaining(['Repetition', 'Imagery', 'Motif', 'Pun']));
+    expect(techniquesNamed('The repetition in "nothing" shows it', names)).toEqual(['Repetition']);
   });
 });
