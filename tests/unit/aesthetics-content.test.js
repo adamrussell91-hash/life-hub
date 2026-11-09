@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { createAesthetics } from '../../apps/life/js/app/aesthetics/render-aesthetics.js';
-import { fragrancePhotoUrl } from '../../apps/life/js/app/aesthetics/fragrance-photos.js';
+import { createFragrancePhoto, fragrancePhotoUrl } from '../../apps/life/js/app/aesthetics/fragrance-photos.js';
 import { FRAGRANCES, REFERENCE_FRAGRANCES, setFragranceSource } from '../../apps/life/js/app/aesthetics/fragrance-library.js';
 
 // The real library is private; tests run on a small synthetic fixture.
@@ -137,4 +137,16 @@ test('every collection and reference photo resolves to a compact bundled WebP ex
   }
   assert.equal(fragrancePhotoUrl('vanilla, cardamom'), null);
   assert.equal(fragrancePhotoUrl('constructor'), null);
+});
+
+test('a bottle photo that has loaded once paints straight away on later renders', () => {
+  const doc = new Window().document;
+  const first = createFragrancePhoto(doc, 'Neon');
+  assert.ok(first.classList.contains('aes-photo--loading'), 'first paint fades in rather than popping');
+  first.querySelector('img').dispatchEvent(new doc.defaultView.Event('load'));
+  assert.ok(!first.classList.contains('aes-photo--loading'));
+  const again = createFragrancePhoto(doc, 'Neon');
+  assert.ok(!again.classList.contains('aes-photo--loading'));
+  assert.equal(again.querySelector('img').decoding, 'sync');
+  assert.equal(again.querySelector('img').loading, 'eager');
 });

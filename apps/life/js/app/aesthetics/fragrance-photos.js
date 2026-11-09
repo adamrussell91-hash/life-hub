@@ -247,13 +247,18 @@ export function fragrancePhotoUrl(name) {
   return photo ? new URL(`../../../assets/fragrances/${photo.file}`, import.meta.url).href : null;
 }
 
+/** URLs this page has already loaded, so a re-render paints them in the same frame. */
+const loadedPhotos = new Set();
+
 /** Decorative next to the fragrance name. Reserve the same frame on missing/failed images. */
 export function createFragrancePhoto(doc, name, { width = 72, eager = false } = {}) {
   const frame = doc.createElement('span');
   frame.className = 'aes-photo';
   frame.style.width = `${width}px`;
+  frame.dataset.fragrance = name;
   frame.setAttribute('aria-hidden', 'true');
   const fallback = () => {
+    frame.classList.remove('aes-photo--loading');
     frame.classList.add('aes-photo--fallback');
     const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 64 64');
@@ -269,9 +274,20 @@ export function createFragrancePhoto(doc, name, { width = 72, eager = false } = 
   img.alt = '';
   img.width = 512;
   img.height = 512;
-  img.loading = eager ? 'eager' : 'lazy';
-  img.decoding = 'async';
   img.addEventListener('error', fallback, { once: true });
+  if (loadedPhotos.has(src)) {
+    // Already in memory: decode with the rest of the frame so the swap never shows an empty box.
+    img.loading = 'eager';
+    img.decoding = 'sync';
+  } else {
+    img.loading = eager ? 'eager' : 'lazy';
+    img.decoding = 'async';
+    frame.classList.add('aes-photo--loading');
+    img.addEventListener('load', () => {
+      loadedPhotos.add(src);
+      frame.classList.remove('aes-photo--loading');
+    }, { once: true });
+  }
   img.src = src;
   frame.append(img);
   return frame;
