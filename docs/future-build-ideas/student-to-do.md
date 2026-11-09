@@ -46,6 +46,19 @@ Most of this is a new read in the `progress` action plus a renderer. The two gen
 - Should the countdown cover more than one assessment if two overlap?
 - Should the student be able to hide a finished item?
 
+## Built (9 November 2026)
+
+Adam asked for the build straight after the mockup. Calls made on the open questions, all easy to change:
+
+- **Started** means saved writing or a quiz go, not an "opened" event. **Activities** are the lesson's question sets. Reading-only blocks are not counted.
+- **Countdown** reads the countdown blocks in the unit's published lessons and shows the soonest one still due. Only one is shown.
+- **Announcements**: text, callout and heading blocks only, newest three. Images and boards stay on the class page.
+- **Teacher view**: no panel. The server leaves it out of the teacher's payload.
+- **Done items** drop off at once rather than staying ticked. Organiser practice shows "Done for today" once the set is finished.
+
+Code: `netlify/functions/_shared/profile-todo.mjs`, `apps/teaching/src/student/todo-panel.ts`.
+
 ## History
 
 - 9 November 2026: first draft and mockup.
+- 9 November 2026: built, with the calls above.

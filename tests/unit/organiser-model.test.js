@@ -359,3 +359,12 @@ test('lineText: a key idea says what to know, others say both sides', () => {
   assert.equal(lineText({ kind: 'table', role: 'vocab', columns }, { cells: ['Hubris', 'Pride'] }), 'Hubris: Pride');
   assert.equal(lineText({ kind: 'sequence' }, { cells: ['A step'] }), 'A step');
 });
+
+test('answered counts the cards already done today, so a page can tell done from nothing due', () => {
+  const cards = cardsFor(3);
+  assert.equal(todaysCards(cards, {}, T).answered, 0);
+  const boxes = { l0: { box: 2, due: '2026-11-12', last: T }, l1: { box: 1, due: '2026-11-11', last: T }, l2: { box: 2, due: '2026-11-12', last: '2026-11-08' } };
+  const out = todaysCards(cards, boxes, T);
+  assert.equal(out.answered, 2);
+  assert.equal(out.cards.length, 0);
+});

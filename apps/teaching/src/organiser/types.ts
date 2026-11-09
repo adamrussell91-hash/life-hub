@@ -60,7 +60,8 @@ export type PracticeCard = {
   builds?: string;
 };
 export type PracticeNext = { date: string; count: number } | null;
-export type PracticeLoad = { today: number; cards: PracticeCard[]; next: PracticeNext; boxes?: number[] };
+/** `answered`: cards already answered today. */
+export type PracticeLoad = { today: number; cards: PracticeCard[]; next: PracticeNext; boxes?: number[]; answered?: number };
 export type OrganiserLoad = { need: null | 'initials' | 'no_list'; sheets: Sheet[]; practice: PracticeLoad | null };
 export type ReviewResult = { line_id: string; result: 'got' | 'again' };
 

@@ -503,6 +503,8 @@ export function todaysCards(cards, boxes, today) {
   return {
     cards: chosen.map((c) => ({ ...c, box: entry(c)?.box ?? 1, history: (entry(c)?.h ?? []).slice(-HISTORY_SHOWN) })),
     boxes: counts,
-    next: date ? { date, count: Math.min(DAILY_CARDS, upcoming.get(date)) } : null
+    next: date ? { date, count: Math.min(DAILY_CARDS, upcoming.get(date)) } : null,
+    // Cards already answered today, so a page can tell "done for today" from "nothing due".
+    answered: cards.filter((c) => entry(c)?.last === today).length
   };
 }

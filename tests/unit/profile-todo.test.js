@@ -1,0 +1,143 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
+import { profileAction, teacherProfileAction } from '../../netlify/functions/_shared/profile.mjs';
+import { piecesAction } from '../../netlify/functions/_shared/piece-feedback.mjs';
+import { workOwner } from '../../netlify/functions/_shared/lesson-work.mjs';
+import { activitiesOf, announcementsFrom, countdownFrom, plainText } from '../../netlify/functions/_shared/profile-todo.mjs';
+
+function storeFixture(entries = []) {
+  const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
+  return {
+    data,
+    async get(key) { return structuredClone(data.get(key) ?? null); },
+    async getWithMetadata(key) { return data.has(key) ? { data: structuredClone(data.get(key)), etag: 'e' } : null; },
+    async setJSON(key, value, options) {
+      if (options?.onlyIfNew && data.has(key)) return { modified: false };
+      data.set(key, structuredClone(value)); return { modified: true };
+    },
+    async delete(key) { data.delete(key); },
+    async list({ prefix }) { return { blobs: [...data.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) }; }
+  };
+}
+
+const DEVICE = 'a'.repeat(48);
+const OTHER = 'b'.repeat(48);
+const NOW = new Date('2026-11-09T01:00:00Z'); // Monday 9 Nov, midday in Sydney
+const qset = (id, title, qs, extra = {}) => ({ id, type: 'block', block_type: 'question_set', visibility: 'student_teacher', content: { title, questions: qs.map((q) => ({ id: q, prompt: `Prompt ${q}` })) }, ...extra });
+const countdown = (id, due_date, extra = {}) => ({ id, type: 'block', block_type: 'countdown', visibility: 'student_teacher', content: { title: '', due_date, due_time: '15:00', set_date: '2026-11-01', note: '', ...extra } });
+const column = { id: 'column001', kind: 'assessment', title: 'Ghost poem draft', date: '2026-11-05', weight: 0, criteria: [{ id: 'crit0001', label: 'Craft', max: 10, outcomes: ['out_a'], concepts: [] }], piece: { lesson_id: 'l1', block_id: 'q1' } };
+
+function lessonEntries(id, title, blocks, extra = {}) {
+  return [[`lessons/${id}`, { id, title, ...extra }], [`published/lessons/${id}`, { id, title, blocks }]];
+}
+
+async function setup({ announcements = [], columns = [] } = {}) {
+  const store = storeFixture([
+    ['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', current_unit_id: 'unit1', students: [{ name: 'Ana Ames' }, { name: 'Ben Bolt' }], homepage: { announcements, resources: [], custom: [] } }],
+    ['units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1', 'l2', 'l3', 'l4'] }],
+    ['markbook/class1', { columns, marks: {}, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] }],
+    ['feedback_codes/library', { codes: [{ id: 'ts', code: 'TS', label: 'Topic sentence', group: 'composition', criterion: 1, colour: 'peach', descriptor: 'Open with the claim.' }] }],
+    ...lessonEntries('l1', 'Ghost poem', [qset('q1', 'Draft', ['a'])]),
+    ...lessonEntries('l2', 'Speaker and voice', [qset('q2', 'Warm-up', ['a', 'b']), qset('q3', '', ['a']), { id: 'sec', type: 'block', block_type: 'section', visibility: 'teacher_only', content: { blocks: [qset('q9', 'Teacher copy', ['a'])] } }]),
+    ...lessonEntries('l3', 'Sound and rhythm', []),
+    ...lessonEntries('l4', 'Poem task', [countdown('cd1', '2026-11-21')], { pedagogical_mode: 'assessment' })
+  ]);
+  const roster = await loadRoster(store, 'class1');
+  const [ana, ben] = roster.students;
+  await claimInitials(store, roster, DEVICE, ana.initials);
+  await claimInitials(store, roster, OTHER, ben.initials);
+  const write = (lesson, student, blocks) => store.data.set(`work/${lesson}/${workOwner('class1', student.id)}`, { blocks, at: '2026-11-08T00:00:00Z', class_id: 'class1', student_id: student.id });
+  const progress = (device = DEVICE) => profileAction(store, 'class1', { action: 'progress', class_token: device }, { now: NOW });
+  return { store, ana, ben, write, progress };
+}
+
+test('plainText strips tags, decodes entities and collapses spaces', () => {
+  assert.equal(plainText('<p>Bring a <b>printed</b> draft&nbsp;on Thursday.</p><p>Library &amp; quiet room open.</p>'), 'Bring a printed draft on Thursday. Library & quiet room open.');
+  assert.equal(plainText(null), '');
+});
+
+test('announcements: text blocks only, teacher-only ones left out, newest first, clipped', () => {
+  const out = announcementsFrom({ homepage: { announcements: [
+    { id: 'a1', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>Older note</p>' }, created_at: '2026-11-02T00:00:00Z' },
+    { id: 'a2', block_type: 'callout', visibility: 'student_teacher', content: { title: 'Thursday', body: 'Bring your draft.' }, created_at: '2026-11-08T00:00:00Z' },
+    { id: 'a3', block_type: 'rich_text', visibility: 'teacher_only', content: { html: '<p>Private</p>' }, created_at: '2026-11-09T00:00:00Z' },
+    { id: 'a4', block_type: 'image', visibility: 'student_teacher', content: { url: 'x' } },
+    { id: 'a5', block_type: 'rich_text', visibility: 'student_teacher', content: { html: `<p>${'x'.repeat(400)}</p>` } }
+  ] } });
+  assert.deepEqual(out.map((a) => a.id), ['a2', 'a1', 'a5']);
+  assert.equal(out[0].text, 'Thursday: Bring your draft.');
+  assert.ok(out[2].text.length <= 280 && out[2].text.endsWith('…'));
+});
+
+test('countdown: the soonest task still due; past and teacher-only ones are skipped', () => {
+  const lessons = [{ id: 'x', title: 'Essay' }, { id: 'y', title: 'Poem task' }];
+  const published = new Map([
+    ['x', { blocks: [countdown('c1', '2026-11-01'), { ...countdown('c2', '2026-11-12'), visibility: 'teacher_only' }] }],
+    ['y', { blocks: [countdown('c3', '2026-11-30'), countdown('c4', '2026-11-20', { title: 'Your own poem' })] }]
+  ]);
+  assert.deepEqual(countdownFrom(lessons, published, '2026-11-09'), { title: 'Your own poem', lesson_id: 'y', due_date: '2026-11-20', due_time: '15:00', set_date: '2026-11-01' });
+  assert.equal(countdownFrom(lessons, published, '2026-12-01'), null);
+});
+
+test('activities: every question answered, or anything written in a format or lens, counts as done', () => {
+  const lesson = { blocks: [qset('q1', 'Warm-up', ['a', 'b']), qset('q2', '', ['a']), qset('q3', 'Chart', ['a'])] };
+  const out = activitiesOf(lesson, { q1: { answers: { a: 'yes', b: ' ' } }, q3: { 'format.reasoning_chart': { c: 'x' } } });
+  assert.deepEqual(out, [{ id: 'q1', title: 'Warm-up', done: false }, { id: 'q2', title: 'Questions (1)', done: false }, { id: 'q3', title: 'Chart', done: true }]);
+});
+
+test('progress carries the student’s own To do: started lessons, what is left, countdown and announcements', async () => {
+  const { write, ana, ben, progress } = await setup({ announcements: [{ id: 'n1', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>Bring your draft.</p>' }, created_at: '2026-11-09T00:00:00Z' }] });
+  write('l2', ana, { q2: { answers: { a: 'one', b: 'two' } } });
+  write('l3', ben, { x: { answers: { a: 'Ben only' } } });
+  const { todo } = await progress();
+  assert.deepEqual(todo.started, [{ lesson_id: 'l2', title: 'Speaker and voice', activities: [{ id: 'q2', title: 'Warm-up', done: true }, { id: 'q3', title: 'Questions (1)', done: false }] }]);
+  assert.deepEqual(todo.todo.map((t) => [t.id, t.kind]), [['l1', 'lesson'], ['l3', 'lesson'], ['l4', 'assessment']], 'Ben’s writing does not start l3 for Ana');
+  assert.equal(todo.countdown.lesson_id, 'l4');
+  assert.deepEqual(todo.announcements.map((a) => a.text), ['Bring your draft.']);
+  assert.deepEqual([todo.back, todo.waiting, todo.more], [[], [], 0]);
+  assert.ok(!JSON.stringify(todo).includes('Teacher copy'), 'teacher-only blocks never count as activities');
+});
+
+test('a done lesson leaves the list', async () => {
+  const { store, progress } = await setup();
+  await profileAction(store, 'class1', { action: 'done', class_token: DEVICE, lesson_id: 'l1' });
+  const { todo } = await progress();
+  assert.ok(!todo.todo.some((t) => t.id === 'l1'));
+});
+
+test('a handed-in piece waits with the teacher, then comes back new, or as a redraft', async () => {
+  const { store, ana, progress } = await setup({ columns: [column] });
+  store.data.set(`work_handins/l1/q1/${ana.id}`, { class_id: 'class1', student_id: ana.id, text: { answers: { a: 'My poem' } }, handed_in_at: '2026-11-06T00:00:00Z' });
+  let { todo } = await progress();
+  assert.deepEqual(todo.waiting, [{ title: 'Ghost poem draft', lesson_id: 'l1', at: '2026-11-06T00:00:00Z' }]);
+  assert.deepEqual(todo.back, []);
+
+  const teacher = (action, extra = {}) => piecesAction(store, 'class1', { action, column_id: 'column001', student_id: ana.id, ...extra });
+  await teacher('save', { tags: [{ code_id: 'ts', positive: false, part: 'answers', field: 'a', start: 0, end: 2 }], comment: 'Good start.' });
+  await teacher('return');
+  ({ todo } = await progress());
+  assert.deepEqual(todo.waiting, []);
+  assert.deepEqual(todo.back.map((b) => [b.id, b.state]), [['w:l1:q1', 'new']]);
+
+  await profileAction(store, 'class1', { action: 'seen', class_token: DEVICE, item: 'w:l1:q1' });
+  ({ todo } = await progress());
+  assert.deepEqual(todo.back, [], 'an opened piece drops off');
+});
+
+test('a redraft the teacher asks for shows as Have another go', async () => {
+  const { store, ana, progress } = await setup({ columns: [column] });
+  store.data.set(`work_handins/l1/q1/${ana.id}`, { class_id: 'class1', student_id: ana.id, text: { answers: { a: 'My poem' } }, handed_in_at: '2026-11-06T00:00:00Z' });
+  const teacher = (action, extra = {}) => piecesAction(store, 'class1', { action, column_id: 'column001', student_id: ana.id, ...extra });
+  await teacher('save', { tags: [], comment: 'Try again.' });
+  await teacher('return', { redraft: { scope: 'whole' } });
+  const { todo } = await progress();
+  assert.deepEqual(todo.back.map((b) => b.state), ['redraft']);
+  assert.deepEqual(todo.waiting, []);
+});
+
+test('the teacher’s read of a student’s page carries no To do', async () => {
+  const { store, ana } = await setup();
+  const out = await teacherProfileAction(store, 'class1', { action: 'progress', student_id: ana.id });
+  assert.equal(out.todo, undefined);
+});

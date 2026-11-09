@@ -2,7 +2,8 @@
  * Student progress page `/s/classes/:id/profile`. noindex.
  *
  * Two tabs: My progress (next steps, where each outcome and concept sits over time, skills,
- * the codes teachers keep writing, and the unit map) and Returned work (feedback on each piece).
+ * the codes teachers keep writing, and the unit map with the student's To do panel beside it)
+ * and Returned work (feedback on each piece).
  * Steps and stories come from the server already worded; the page never shows a mark or a score.
  */
 import { apiPost } from '@/api/client';
@@ -23,6 +24,7 @@ import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import type { RedraftApi } from '@/student/redraft-editor';
+import { renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -38,7 +40,7 @@ export type ProfileUnit = {
 };
 type ProfileMap = { lessons: ProfileLesson[]; next: string | null; unit: ProfileUnit | null };
 /** The `progress` action's payload, or the bare initials prompt. */
-export type ProfilePayload = Partial<Omit<ProgressPayload, 'need' | 'map'>> & { need: 'initials' | null; map?: ProfileMap };
+export type ProfilePayload = Partial<Omit<ProgressPayload, 'need' | 'map'>> & { need: 'initials' | null; map?: ProfileMap; todo?: TodoPayload };
 
 export type RenderProfileOptions = {
   classId: string;
@@ -176,6 +178,17 @@ function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HT
   return section;
 }
 
+/**
+ * The student's own To do panel beside the map. A teacher looking at the page never gets one:
+ * the server leaves it out of their payload, and this checks again.
+ */
+function withTodo(map: HTMLElement, payload: ProfilePayload, options: RenderProfileOptions): HTMLElement {
+  if (options.teacher || !payload.todo) return map;
+  const area = el('div', 'pm-unit');
+  area.append(map, renderTodoPanel(payload.todo, { classId: options.classId, practice: options.organiser?.practice ?? null }));
+  return area;
+}
+
 function renderInitials(options: RenderProfileOptions): HTMLElement {
   const card = el('section', 'pm-claim');
   card.append(el('h2', 'pm-claim__title', 'Who are you?'));
@@ -298,7 +311,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     root.append(el('h1', 'pm-title', 'Your progress'));
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
   }
-  const map = renderMap(payload.map, options.classId);
+  const map = withTodo(renderMap(payload.map, options.classId), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
   const organiserPanel = organiser ? organizerPanelFor(organiser, options) : null;
   const wantOrganiser = options.tab === 'organiser' && !!organiserPanel;

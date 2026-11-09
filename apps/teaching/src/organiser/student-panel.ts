@@ -20,7 +20,8 @@ function weekday(date: string): string {
   return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' });
 }
 
-const minutesFor = (n: number): number => Math.max(1, Math.round((n * 2) / 3));
+/** Rough minutes for a practice set: about 40 seconds a card. */
+export const minutesFor = (n: number): number => Math.max(1, Math.round((n * 2) / 3));
 /** How often each box comes round, as the server's GAPS. */
 const BOX_GAPS = ['every day', 'every 3 days', 'every week', 'every 2 weeks', 'every 4 weeks'];
 
