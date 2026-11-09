@@ -80,6 +80,7 @@ export function checkEstimateAud(): number {
 
 /** Teacher editor for a Station Rotation. Settings live in `lesson.rotation`; station content in its sections. */
 export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHandle {
+  const current = (): RotationSettings => RotationSettingsSchema.parse(o.getLesson().rotation ?? {});
   const root = el('section', 'rot rot-edit');
   const body = el('div', 'rot-grid');
   const tabs = createRotationTabs({
@@ -89,7 +90,6 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
   root.append(tabs.root, body);
   let confirmDelete: string | null = null;
 
-  const current = (): RotationSettings => RotationSettingsSchema.parse(o.getLesson().rotation ?? {});
   /** Settings change. `repaint` redraws the panel (structural changes); typing doesn't, so focus stays. */
   const put = (change: (draft: RotationSettings) => void, repaint = false): void => {
     const draft = structuredClone(current());
@@ -151,7 +151,8 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     return s;
   };
   const field = (label: string, control: HTMLElement, hint?: string): HTMLElement => {
-    const f = el('label', 'rot-field');
+    // A div, not a label: some controls (check lists) hold labels of their own. Each control carries its own aria-label.
+    const f = el('div', 'rot-field');
     f.append(el('span', '', label), control);
     if (hint) f.append(el('small', 'rot-note', hint));
     return f;

@@ -100,6 +100,8 @@ import { caseTeacherApi } from '@/case-study/api';
 import { casePartOf, findCasePartSection, isCaseBriefSection, isCaseOutcomeSection, seedCase } from '@/case-study/model';
 import { inCaseTab, withCaseBriefSection, withCaseOutcomeSection, withCasePartSection } from '@/case-study/editor-tabs';
 import { mountRotationEditor, type RotationEditorHandle } from '@/rotation/editor';
+import { mountRotationLive, type RotationLiveHandle } from '@/rotation/live';
+import { rotationTeacherApi } from '@/rotation/api';
 import { findStationSection, isRotationFinale } from '@/rotation/model';
 import { seedRotation, withRotationSections } from '@/rotation/seed';
 import { inRotationTab, tabOfBlock, tabStation } from '@/rotation/editor-tabs';
@@ -1598,6 +1600,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const rotationHost = document.createElement('div');
   rotationHost.className = 'lesson-page__rotation';
   let rotationEditor: RotationEditorHandle | null = null;
+  let rotationLive: RotationLiveHandle | null = null;
   /** The canvas shows on every tab but Pretest, filtered to that tab's section. */
   function showRotationCanvas(): void {
     if (!rotationEditor) return;
@@ -1629,10 +1632,18 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       });
       rotationHost.append(rotationEditor.root);
     } else if (!isRotation && rotationEditor) {
+      rotationLive?.dispose();
+      rotationLive = null;
       rotationEditor.dispose();
       rotationEditor = null;
       rotationHost.replaceChildren();
       canvasHost.hidden = false;
+    }
+    // The live view needs a published rotation; it appears on the first publish too.
+    if (isRotation && rotationEditor && !rotationLive && lesson.published_at) {
+      rotationLive = mountRotationLive({ api: rotationTeacherApi(lesson.id), getLesson: () => lesson, classes: options.flowClasses ?? [] });
+      rotationHost.prepend(rotationLive.root);
+      void rotationLive.refresh();
     }
     showRotationCanvas();
     rotationHost.hidden = !isRotation;
@@ -1931,6 +1942,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();
+      rotationLive?.dispose();
       root.remove();
     }
   };
