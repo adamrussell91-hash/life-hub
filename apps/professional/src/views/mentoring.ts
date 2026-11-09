@@ -5,7 +5,7 @@ import {
   type PeopleDirectoryResponse
 } from '@/api/people-directory';
 import { listMeetings } from '@/api/meetings';
-import { listUniversalLinksForEntity } from '@/api/universal-links';
+import { listUniversalLinksForEntities } from '@/api/universal-links';
 import type { MeetingRecord } from '@/domain/types';
 import { meetingRoute, personRoute } from '@/app/router';
 import { decisionLabel } from '@/guides/coaching-sheet';
@@ -32,8 +32,8 @@ export interface MentoringViewOptions {
 }
 
 const MEETING_PREFIX = 'professional:meeting:';
-/** Link reads run a few at a time so a long list never floods the API. */
-const LINK_CONCURRENCY = 4;
+/** The server reads at most this many people's links per request. */
+const LINK_BATCH = 50;
 type LinkCache = Map<string, Set<string> | null>;
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -48,31 +48,35 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 /**
- * Meetings linked to each person, from the person's own link list. The full
- * person overview carries the same meetings but also builds a timeline and
- * reads workplaces, several times slower. `cache` keeps answers between the
- * quick paint and the refreshed one so no person is asked twice.
+ * Meetings linked to each person, from the people's own link lists, in one
+ * request per 50 people. The full person overview carries the same meetings
+ * but also builds a timeline and reads workplaces, several times slower, and
+ * one call per person can each wake a cold server. `cache` keeps answers
+ * between the quick paint and the refreshed one so no person is asked twice.
  */
 async function linkedMeetingIds(refs: string[], cache: LinkCache): Promise<Map<string, Set<string>>> {
   const todo = refs.filter((ref) => !cache.has(ref));
-  let cursor = 0;
-  async function worker(): Promise<void> {
-    while (cursor < todo.length) {
-      const ref = todo[cursor++]!;
-      try {
-        const { outgoing = [], incoming = [] } = await listUniversalLinksForEntity(ref);
-        const ids = [...outgoing, ...incoming]
-          .map((entry) => entry.endpoint?.ref ?? '')
+  for (let start = 0; start < todo.length; start += LINK_BATCH) {
+    const chunk = todo.slice(start, start + LINK_BATCH);
+    try {
+      const { results } = await listUniversalLinksForEntities(chunk);
+      for (const ref of chunk) {
+        const entry = results?.[ref];
+        if (!entry || entry.error) {
+          // A person whose links fail still gets a card; it just shows no linked sessions.
+          cache.set(ref, null);
+          continue;
+        }
+        const ids = [...(entry.outgoing ?? []), ...(entry.incoming ?? [])]
+          .map((link) => link.endpoint?.ref ?? '')
           .filter((value) => value.startsWith(MEETING_PREFIX))
           .map((value) => value.slice(MEETING_PREFIX.length));
         cache.set(ref, new Set(ids));
-      } catch {
-        // A person whose links fail still gets a card; it just shows no linked sessions.
-        cache.set(ref, null);
       }
+    } catch {
+      for (const ref of chunk) cache.set(ref, null);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(LINK_CONCURRENCY, todo.length) }, worker));
   const out = new Map<string, Set<string>>();
   for (const ref of refs) {
     const ids = cache.get(ref);

@@ -30,6 +30,19 @@ export function listUniversalLinksForEntity(
   return apiGet(`/api/universal-links?${params.toString()}`, { signal: options.signal });
 }
 
+export type UniversalLinksBatchEntry =
+  | { outgoing: UniversalLinkEntry[]; incoming: UniversalLinkEntry[]; error?: undefined }
+  | { error: string; outgoing?: undefined; incoming?: undefined };
+
+/** Links for several entities in one request (at most 50 refs); a ref that fails carries `error`. */
+export function listUniversalLinksForEntities(
+  entityRefs: string[],
+  options: { signal?: AbortSignal } = {}
+): Promise<{ results: Record<string, UniversalLinksBatchEntry> }> {
+  const params = new URLSearchParams({ entity_refs: entityRefs.join(',') });
+  return apiGet(`/api/universal-links?${params.toString()}`, { signal: options.signal });
+}
+
 export function createUniversalLink(
   body: {
     source_ref: string;
