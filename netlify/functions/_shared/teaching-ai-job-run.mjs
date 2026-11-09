@@ -128,7 +128,7 @@ export function createNoteToolRunner({ store, env, fetchImpl = fetch, signal, le
   };
 }
 
-async function appendUsageLog(store, entry) {
+export async function appendUsageLog(store, entry) {
   try {
     const log = (await getJSON(store, AI_USAGE_LOG_KEY)) ?? { entries: [] };
     const entries = [...(Array.isArray(log.entries) ? log.entries : []), entry].slice(-USAGE_LOG_LIMIT);

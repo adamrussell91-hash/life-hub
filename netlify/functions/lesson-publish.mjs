@@ -23,6 +23,7 @@ import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs'
 import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
 import { prepareTutorialPublish, storeTutorialTabs } from './_shared/tutorial.mjs';
 import { prepareCasePublish, storeCaseConfig } from './_shared/case-study.mjs';
+import { prepareRotationPublish, storeRotationConfig } from './_shared/rotation.mjs';
 import { prepareSprintPublish, sprintPublishProblems, storeSprintConfig } from './_shared/sprint.mjs';
 import { SprintSettingsSchema } from './_shared/sprint-schema.mjs';
 
@@ -238,6 +239,28 @@ export function createLessonPublishHandler(deps = {}) {
         ...(draft.feedback_off === true ? { feedback_off: true } : {}),
         pedagogical_mode: 'case_study',
         case: study.snapshot
+      });
+      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
+    }
+
+    // A station rotation: station blocks go public with their questions split; keys, hinge answers, the pretest and the lock answer are stored apart (rotation.mjs).
+    if (draft.pedagogical_mode === 'station_rotation') {
+      const rotation = prepareRotationPublish(draft, publishBlocks);
+      if (rotation.problems.length > 0) return withCors(errorResponse(400, 'validation_error', rotation.problems[0], false), request, env);
+      await storeRotationConfig(store, id, rotation.config);
+      await setJSON(store, publishedLessonKey(id), {
+        lesson_id: id,
+        title,
+        unit_id,
+        blocks: sanitizeBlocksDeep(rotation.snapshot.blocks),
+        published_at: publishedAt,
+        schema_version: 1,
+        ...(draft.cover ? { cover: draft.cover } : {}),
+        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+        pedagogical_mode: 'station_rotation',
+        rotation: rotation.snapshot.rotation
       });
       await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
       return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
