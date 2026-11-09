@@ -1,15 +1,14 @@
 import { apiPost } from '@/api/client';
 import { el } from '@/blocks/peer-feedback-ui';
-import { STRENGTH_COLOUR, codeInk, codeText, focusStep, type FeedbackCode } from '@/blocks/feedback-codes';
+import { focusStep, type FeedbackCode } from '@/blocks/feedback-codes';
 import { deviceToken } from '@/quiz/dom';
 import type { SkillRow } from '@/progress/types';
-import { studentAnchor } from '@/student/shell';
+import { doThisBox, type NextStep } from '@/student/next-step';
 
 /**
- * Before a new viva: a folded "Last time" card with the focus from the
- * student's last returned viva, your comment, and which codes keep coming
- * back across their last few. Closed by default so it sits quietly above
- * the dot points; the student opens it when they want it.
+ * Before a new viva: one bold "Do this" line from the student's returned
+ * vivas, the same as a writing box, and a "This time I'll work on" tick
+ * under the dot points that the teacher sees when marking.
  */
 
 export type PatternMark = 'need' | 'strength' | null;
@@ -53,134 +52,46 @@ export function voiceStartLoader(
   );
 }
 
-/** The one thing to work on from the last viva: the teacher's chosen next step, else the commonest code's step. */
-export function lastFocus(history: VivaHistory | null): { code: FeedbackCode | null; line: string } | null {
-  const last = history?.last;
-  if (!last) return null;
-  if (last.next_step?.trim()) return { code: null, line: last.next_step.trim() };
-  const found = focusStep(last.tags, history?.codes ?? []);
-  return found ? { code: found.code, line: found.line } : null;
-}
+const STEP_COLOURS = new Set(['blue', 'sage', 'peach', 'gold', 'lilac']);
 
-/** The newest viva this code showed up in: a need or a strength. */
-export function latestMark(marks: readonly PatternMark[]): PatternMark {
-  for (let i = marks.length - 1; i >= 0; i -= 1) if (marks[i]) return marks[i]!;
-  return null;
-}
-
-/** A short word on how a code has gone across the vivas, oldest to newest. */
-export function trendFor(marks: readonly PatternMark[]): string {
-  const n = marks.length;
-  const needs = marks.filter((m) => m === 'need').length;
-  const strengths = marks.filter((m) => m === 'strength').length;
-  if (needs === 0) return strengths > 1 ? 'a strength' : 'a strength last time';
-  if (n > 1 && needs === n) return 'every time';
-  if (latestMark(marks) === 'strength') return 'a strength last time';
-  const lastNeed = marks.lastIndexOf('need');
-  const clear = n - 1 - lastNeed;
-  if (clear >= 2) return `gone the last ${clear}`;
-  if (clear === 1) return 'not last time';
-  return needs === 1 ? 'new last time' : `${needs} of ${n}`;
-}
-
-function chip(code: FeedbackCode, positive: boolean): HTMLElement {
-  const c = el('span', 'fc-chip', codeText(code, positive));
-  c.style.setProperty('--fc-ink', codeInk(positive ? STRENGTH_COLOUR : code.colour));
-  if (positive) c.classList.add('fc-chip--strength');
-  return c;
-}
-
-function patternList(history: VivaHistory): HTMLElement | null {
-  const n = history.pattern[0]?.marks.length ?? 0;
-  if (n < 2 || !history.pattern.length) return null;
-  const byId = new Map((history.codes ?? []).map((c) => [c.id, c]));
-  const box = el('div', 'voice-last__pattern');
-  box.append(el('p', 'voice-last__sub', `Across your last ${n} vivas, oldest to newest`));
-  const list = el('ul', 'voice-last__rows');
-  for (const row of history.pattern) {
-    const code = byId.get(row.code_id);
-    if (!code) continue;
-    const strength = latestMark(row.marks) === 'strength';
-    const item = el('li', 'voice-last__row');
-    const dots = el('span', 'voice-last__dots');
-    const hits = row.marks.filter(Boolean).length;
-    dots.setAttribute('aria-label', `In ${hits} of ${n}`);
-    for (const m of row.marks) dots.append(el('span', m ? `voice-last__dot voice-last__dot--${m}` : 'voice-last__dot'));
-    const trend = trendFor(row.marks);
-    item.append(chip(code, strength), el('span', 'voice-last__label', code.label), dots, el('span', `voice-last__trend${trend.startsWith('gone') || trend.startsWith('a strength') ? ' voice-last__trend--good' : ''}`, trend));
-    list.append(item);
-  }
-  if (!list.childElementCount) return null;
-  box.append(list);
-  return box;
-}
-
-const OPEN_KEY = 'voice:last-time:open';
-const readOpen = (): boolean => {
-  try {
-    return localStorage.getItem(OPEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-const writeOpen = (open: boolean): void => {
-  try {
-    localStorage.setItem(OPEN_KEY, open ? '1' : '0');
-  } catch {
-    /* private window: the fold just starts closed */
-  }
-};
-
-/** The folded card. Null when the student has no returned viva yet. */
-export function lastTimeCard(history: VivaHistory | null, classId: string | undefined, id: string): HTMLElement | null {
+/**
+ * The one thing a viva block tells the student to do, the same rule as a
+ * writing box: the teacher's own next step from the last viva first; else, of
+ * the codes flagged in the last viva, the one flagged in most of the recent
+ * ones; else, with nothing flagged last time, a code gone from the last two
+ * ("keep doing this"). Null with no viva back.
+ */
+export function vivaStep(history: VivaHistory | null, href?: string): NextStep | null {
   const last = history?.last;
   if (!history || !last) return null;
-  const focus = lastFocus(history);
-  const box = el('section', 'voice-last');
-  const panelId = `voice-last-${id}`;
-  const toggle = el('button', 'voice-last__toggle');
-  toggle.type = 'button';
-  toggle.setAttribute('aria-controls', panelId);
-  const head = el('span', 'voice-last__head');
-  head.append(el('span', 'voice-last__title', 'Last time'));
-  if (focus?.code) head.append(chip(focus.code, false));
-  const peek = el('span', 'voice-last__peek', focus?.line ?? 'Your teacher’s feedback on your last viva');
-  const word = el('span', 'voice-last__word');
-  toggle.append(head, peek, word);
-
-  const panel = el('div', 'voice-last__panel');
-  panel.id = panelId;
-  panel.append(el('p', 'voice-last__when', `From your viva on ${last.date} · ${last.title}`));
-  if (focus) {
-    const line = el('p', 'voice-last__focus');
-    if (focus.code) line.append(chip(focus.code, false));
-    line.append(el('span', undefined, focus.line));
-    panel.append(line);
-  }
-  if (last.comment) {
-    const say = el('p', 'voice-last__comment');
-    say.append(el('b', undefined, 'Your teacher: '), `“${last.comment}”`);
-    panel.append(say);
-  }
-  const pattern = patternList(history);
-  if (pattern) panel.append(pattern);
-  if (classId) panel.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'voice-last__link', history.count > 1 ? `See all ${history.count} returned vivas` : 'See it in Returned work'));
-
-  const set = (open: boolean) => {
-    toggle.setAttribute('aria-expanded', String(open));
-    panel.hidden = !open;
-    peek.hidden = open;
-    word.textContent = open ? 'Hide' : 'Show';
-    box.classList.toggle('voice-last--open', open);
+  const codes = history.codes ?? [];
+  const link = href ? { href } : {};
+  const n = history.pattern[0]?.marks.length || 1;
+  if (last.next_step?.trim()) return { code_id: '', code: '', colour: 'peach', line: last.next_step.trim(), why: { kind: 'do', hits: 0, of: n, unit: 'viva', ...link } };
+  const needs = (marks: readonly PatternMark[]) => marks.filter((m) => m === 'need').length;
+  const needHits = (id: string) => needs(history.pattern.find((r) => r.code_id === id)?.marks ?? ['need']);
+  const stepFor = (id: string) => focusStep([{ code_id: id, positive: false }], codes);
+  const flagged = [...new Set(last.tags.filter((t) => !t.positive).map((t) => t.code_id))].filter((id) => stepFor(id));
+  const count = (id: string) => last.tags.filter((t) => t.code_id === id && !t.positive).length;
+  const make = (id: string, kind: 'do' | 'keep', hits: number): NextStep => {
+    const found = stepFor(id)!;
+    return { code_id: id, code: found.code.code, colour: STEP_COLOURS.has(found.code.colour) ? found.code.colour : 'peach', line: found.line, why: { kind, hits, of: n, unit: 'viva', ...link } };
   };
-  set(readOpen());
-  toggle.addEventListener('click', () => {
-    const open = toggle.getAttribute('aria-expanded') !== 'true';
-    set(open);
-    writeOpen(open);
-  });
-  box.append(toggle, panel);
-  return box;
+  if (flagged.length) {
+    const id = flagged.sort((a, b) => needHits(b) - needHits(a) || count(b) - count(a))[0]!;
+    return make(id, 'do', needHits(id));
+  }
+  if (n < 3) return null;
+  const gone = history.pattern.filter((r) => r.marks.slice(0, -2).includes('need') && !r.marks.slice(-2).includes('need') && stepFor(r.code_id));
+  if (!gone.length) return null;
+  const row = gone.sort((a, b) => needs(b.marks) - needs(a.marks))[0]!;
+  return make(row.code_id, 'keep', needs(row.marks));
+}
+
+/** The Do this line above a viva's dot points, matching the writing boxes. Null with no viva back. */
+export function vivaDoThis(history: VivaHistory | null, classId: string | undefined): HTMLElement | null {
+  const step = vivaStep(history, classId ? `/s/classes/${encodeURIComponent(classId)}/profile?tab=returned` : undefined);
+  return step ? doThisBox(step) : null;
 }
 
 /** "This time I'll work on…" under the dot points: a tick the student owns, sent with their take. */
