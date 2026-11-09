@@ -18,7 +18,15 @@ export type StepCode = { id: string; code: string; colour: string; hits: number 
 /** The `steps` profile reply, by `strand.sub`. */
 export type StepSkills = Record<string, { rung: string | null; codes: StepCode[] }>;
 /** Why a step is there: flagged in the student's recent writing ("do"), or gone from it ("keep"). */
-export type StepWhy = { kind: 'do' | 'keep'; hits: number; of: number; href?: string };
+export type StepWhy = {
+  kind: 'do' | 'keep';
+  /** Pieces (or vivas) it was flagged in; 0 for a next step the teacher wrote. */
+  hits: number;
+  of: number;
+  href?: string;
+  /** What the student handed in: writing by default. */
+  unit?: 'piece' | 'viva';
+};
 export type NextStep = { code_id: string; code: string; colour: string; line: string; why?: StepWhy };
 /** The `steps` reply's one directive, from the student's last few returned pieces of writing. */
 export type Directive = { kind: 'do' | 'keep'; code_id: string; code: string; colour: string; line: string; hits: number; of: number; item: string };
@@ -183,21 +191,43 @@ function arrowIcon(keep: boolean): HTMLElement {
   return wrap;
 }
 
+/** Fills `box` as the Do this line: arrow, "Do this" (or green "Keep doing this"), the step, and why. */
+function fillDoThis(box: HTMLElement, step: NextStep): void {
+  const keep = step.why?.kind === 'keep';
+  box.className = `ns-line ns--${step.colour}${keep ? ' ns-line--keep' : ''}`;
+  const main = el('span', 'ns-line__main');
+  main.append(el('span', 'ns-line__label', keep ? 'Keep doing this' : 'Do this'), el('span', 'ns-line__text', step.line));
+  const why = whyLine(step);
+  if (why) main.append(why);
+  box.replaceChildren(arrowIcon(keep), main);
+}
+
+/** The Do this line on its own, for a block with no writing box (a viva). */
+export function doThisBox(step: NextStep): HTMLElement {
+  const box = el('p', 'ns-line');
+  fillDoThis(box, step);
+  return box;
+}
+
 /** "[AS] flagged in your last 4 pieces · See last time", or how long it has been gone. */
 export function whyLine(step: NextStep): HTMLElement | null {
   const why = step.why;
   if (!why) return null;
   const p = el('span', 'ns-line__why');
-  const pieces = (n: number) => (n === 1 ? 'piece' : 'pieces');
+  const unit = why.unit ?? 'piece';
+  const pieces = (n: number) => (n === 1 ? unit : `${unit}s`);
   const words =
     why.kind === 'keep'
       ? ` not flagged in your last 2 ${pieces(2)}`
-      : why.hits === 1
-        ? ' flagged in your last piece'
-        : why.hits === why.of
-          ? ` flagged in your last ${why.of} ${pieces(why.of)}`
-          : ` flagged in ${why.hits} of your last ${why.of} ${pieces(why.of)}`;
-  p.append(chip(step), document.createTextNode(words));
+      : why.hits === 0
+        ? `Your teacher’s next step from your last ${unit}`
+        : why.hits === 1
+          ? ` flagged in your last ${unit}`
+          : why.hits === why.of
+            ? ` flagged in your last ${why.of} ${pieces(why.of)}`
+            : ` flagged in ${why.hits} of your last ${why.of} ${pieces(why.of)}`;
+  if (step.code) p.append(chip(step));
+  p.append(document.createTextNode(step.code ? words : words.trimStart()));
   if (why.href && why.kind === 'do') {
     const a = el('a', 'ns-line__link', 'See last time');
     a.href = why.href;
@@ -247,13 +277,7 @@ export function mountNextStep(options: MountNextStepOptions): void {
   function paintLine(): void {
     line.hidden = !step || mode === 'pick';
     if (!step) return;
-    const keep = step.why?.kind === 'keep';
-    line.className = `ns-line ns--${step.colour}${keep ? ' ns-line--keep' : ''}`;
-    const main = el('span', 'ns-line__main');
-    main.append(el('span', 'ns-line__label', keep ? 'Keep doing this' : 'Do this'), el('span', 'ns-line__text', step.line));
-    const why = whyLine(step);
-    if (why) main.append(why);
-    line.replaceChildren(arrowIcon(keep), main);
+    fillDoThis(line, step);
     writing();
   }
 
