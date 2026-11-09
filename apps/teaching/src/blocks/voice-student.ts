@@ -6,7 +6,8 @@ import { audioUrl, cleanInitials, fetchMine, rememberInitials, submitTake, voice
 import { DEFAULT_VIVA_SECONDS, STUDENT_TIME_CHOICES } from '@/blocks/voice-block-editor';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
 import { SIDE_LABELS } from '@/blocks/voice-oracy';
-import { speakingRowsLoader, speakingWhere } from '@/blocks/voice-where';
+import { speakingWhere } from '@/blocks/voice-where';
+import { goalTick, lastFocus, lastTimeCard, voiceStartLoader, type VivaHistory } from '@/blocks/voice-last-time';
 import type { SkillRow } from '@/progress/types';
 import { mountRecitePractice, reciteTextFold, type ReciteProgress } from '@/blocks/voice-recite';
 
@@ -18,7 +19,7 @@ import { mountRecitePractice, reciteTextFold, type ReciteProgress } from '@/bloc
 
 type VoiceBlock = Extract<Block, { block_type: 'audio' }>;
 type Side = NonNullable<VoiceBlock['content']['side']>;
-type Plan = { points: string[]; seconds?: number; side?: Side; recite?: ReciteProgress };
+type Plan = { points: string[]; seconds?: number; side?: Side; recite?: ReciteProgress; goal?: boolean };
 
 const COUNTDOWN = [3, 2, 1];
 const WARN_BEFORE_S = 10;
@@ -66,6 +67,9 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
   // A speaking task shows where the student sits on Speaking before they record. Codes off for speaking, no box.
   const speakingTask = (block.content.code_groups ?? ['speaking']).includes('speaking');
   let speakingRows: SkillRow[] = [];
+  // A viva: the student's last returned viva and the codes that keep coming back.
+  let vivas: VivaHistory | null = null;
+  const goalLine = () => lastFocus(vivas)?.line ?? null;
 
   const showError = (text: string) => {
     alert.textContent = text;
@@ -222,10 +226,20 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
       );
       return view;
     }
+    const lastTime = isViva ? lastTimeCard(vivas, classId, block.id) : null;
+    if (lastTime) view.append(lastTime);
     const where = speakingTask ? speakingWhere(speakingRows) : null;
     if (where) view.append(where);
     if (oracy === 'debate') view.append(sideRow());
     if (isViva) view.append(planEditor());
+    const goal = isViva ? goalLine() : null;
+    if (goal)
+      view.append(
+        goalTick(goal, Boolean(plan.goal), (ticked) => {
+          plan.goal = ticked;
+          savePlan();
+        }, block.id)
+      );
     const stems = stemChips();
     if (stems) view.append(stems);
     if (oracy === 'recite') {
@@ -302,6 +316,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
           initials: typed,
           points: take.points,
           ...(oracy === 'debate' ? { side: side() } : {}),
+          ...(plan.goal && goalLine() ? { goal: goalLine()! } : {}),
           onProgress: (sent, total) => {
             if (total > 1) status.textContent = `Sending… ${sent} of ${total}`;
           }
@@ -555,11 +570,12 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
     takeStore()
       .list(scope)
       .catch(() => [] as VoiceTake[]),
-    speakingTask ? speakingRowsLoader(classId) : Promise.resolve([] as SkillRow[])
-  ]).then(([state, saved, rows]) => {
+    voiceStartLoader(classId, lessonId, { speaking: speakingTask, vivas: isViva })
+  ]).then(([state, saved, start]) => {
     mine = state;
     takes = saved;
-    speakingRows = rows;
+    speakingRows = start.rows;
+    vivas = start.vivas;
     paint();
   });
   return root;

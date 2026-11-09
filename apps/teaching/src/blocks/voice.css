@@ -1105,3 +1105,40 @@
 .voice-where__row + .voice-where__row { border-top: 1px solid var(--line); padding-top: var(--space-2); }
 .voice-where__name { margin: 0; font-weight: 600; }
 .voice-where__next { margin: 0; font-size: var(--text-sm); background: var(--pastel-lilac, #efeaf8); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }
+
+/* Last time: a folded card above a new viva's dot points. Quiet until opened. */
+.voice-last { border: 1px solid var(--line); border-left: 4px solid var(--pastel-gold-ink); border-radius: 12px; background: var(--paper, #fff); min-width: 0; }
+.voice-last--open { background: var(--pastel-gold); }
+.voice-last__toggle { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px; padding: 8px var(--space-3); border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 12px; min-width: 0; }
+.voice-last__toggle:focus-visible { outline: 2px solid var(--wave, #376fb7); outline-offset: 2px; }
+.voice-last__head { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.voice-last__title { font-weight: 600; color: var(--pastel-gold-ink); }
+.voice-last__peek { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--muted, #6b7788); }
+.voice-last__word { flex: none; margin-left: auto; font-size: var(--text-sm); font-weight: 600; color: var(--wave, #376fb7); }
+.voice-last__panel { display: grid; gap: var(--space-2); padding: 0 var(--space-3) var(--space-2); min-width: 0; }
+.voice-last__panel[hidden], .voice-last__peek[hidden], .voice-last--open .voice-last__head .fc-chip { display: none; }
+.voice-last__when { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
+.voice-last__focus { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.voice-last__focus .fc-chip { flex: none; margin-top: 2px; }
+.voice-last__comment { margin: 0; font-style: italic; overflow-wrap: anywhere; }
+.voice-last__comment b { font-style: normal; color: var(--pastel-gold-ink); font-weight: 600; }
+.voice-last__pattern { border-top: 1px dashed var(--line); padding-top: var(--space-2); }
+.voice-last__sub { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--pastel-gold-ink); }
+.voice-last__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.voice-last__row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px var(--space-2); min-width: 0; }
+.voice-last__label { flex: 1 1 10rem; min-width: 0; font-size: var(--text-sm); }
+.voice-last__dots { display: inline-flex; gap: 4px; flex: none; }
+.voice-last__dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--paper, #fff); }
+.voice-last__dot--need { background: var(--pastel-peach-ink, #8a5420); border-color: var(--pastel-peach-ink, #8a5420); }
+.voice-last__dot--strength { background: var(--pastel-sage-ink); border-color: var(--pastel-sage-ink); }
+.voice-last__trend { flex: none; font-size: var(--text-xs, 12px); color: var(--muted, #6b7788); }
+.voice-last__trend--good { color: var(--pastel-sage-ink); font-weight: 600; }
+.voice-last__link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--text-sm); font-weight: 600; }
+
+.voice-goal { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1.5px dashed var(--pastel-gold-ink); border-radius: 10px; cursor: pointer; min-width: 0; }
+.voice-goal__box { flex: none; width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--pastel-gold-ink); }
+.voice-goal__text { min-width: 0; overflow-wrap: anywhere; font-size: var(--text-sm); }
+.voice-goal__text b { color: var(--pastel-gold-ink); }
+
+.voice-mark__goal { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--pastel-gold); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.voice-mark__goal b { color: var(--pastel-gold-ink); }

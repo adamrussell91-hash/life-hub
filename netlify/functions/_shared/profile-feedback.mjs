@@ -16,7 +16,7 @@ import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from '.
 import { stepsBySkill } from './next-steps.mjs';
 import { audioPath, mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
-import { rubricPlaces } from './rubric-model.mjs';
+import { rubricPlaces, studentRubric } from './rubric-model.mjs';
 import { rubricForStudent } from './rubric.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
@@ -145,6 +145,57 @@ export async function skillsFor(store, classId, studentId, strand = null) {
   const pieces = (await studentPieces(store, classId, studentId)).slice(-CHART_MAX);
   const rows = targetKeys(pieces).filter((k) => k.startsWith('skill:') && (!strand || k.startsWith(`skill:${strand}.`))).map((k) => targetRow(pieces, k));
   return { need: null, skills: await skillGroups(store, rows) };
+}
+
+/** How many returned vivas the pattern looks across. */
+export const VIVA_PATTERN = 4;
+const PATTERN_ROWS = 5;
+
+/**
+ * Before a new viva: the student's last returned viva (its focus, the teacher's
+ * next step and comment) and, across their last few, which codes keep coming
+ * back. Leaves out the lesson they are in. Their own takes only.
+ */
+export async function vivaHistoryFor(store, classId, studentId, skipLesson = null) {
+  const keys = await listBlobKeys(store, piecePrefix(classId, studentId));
+  const pieces = (await mapBounded(keys, 8, (k) => read(store, k))).filter((r) => r?.kind === 'viva' && r.status === 'returned' && r.lesson_id && r.lesson_id !== skipLesson);
+  const takes = (await mapBounded(pieces, 4, async (p) => (await vivaTakes(store, p.lesson_id, studentId)).map((t) => ({ ...t, lesson_id: p.lesson_id, title: p.title || 'Viva practice' })))).flat();
+  takes.sort((a, b) => String(a.returned_at ?? a.submitted_at).localeCompare(String(b.returned_at ?? b.submitted_at)));
+  const recent = takes.slice(-VIVA_PATTERN);
+  if (!recent.length) return { last: null, pattern: [], count: 0 };
+  const confirmed = (t) => (t.tags ?? []).filter((x) => x.confirmed !== false);
+  const library = await readFeedbackCodes(store);
+  const codes = new Map(library.map((c) => [c.id, c]));
+  const newest = recent.at(-1);
+  const rows = new Map();
+  recent.forEach((take, i) => {
+    for (const tag of confirmed(take)) {
+      if (!codes.has(tag.code_id)) continue;
+      const row = rows.get(tag.code_id) ?? { code_id: tag.code_id, marks: recent.map(() => null) };
+      row.marks[i] = tag.positive && row.marks[i] !== 'need' ? 'strength' : 'need';
+      rows.set(tag.code_id, row);
+    }
+  });
+  const needs = (r) => r.marks.filter((m) => m === 'need').length;
+  const strengths = (r) => r.marks.filter((m) => m === 'strength').length;
+  const lastHit = (r) => r.marks.findLastIndex((m) => m);
+  const pattern = [...rows.values()]
+    .sort((a, b) => needs(b) - needs(a) || strengths(b) - strengths(a) || lastHit(b) - lastHit(a))
+    .slice(0, PATTERN_ROWS);
+  const used = new Set([...pattern.map((r) => r.code_id), ...confirmed(newest).map((t) => t.code_id)]);
+  return {
+    count: takes.length,
+    last: {
+      lesson_id: newest.lesson_id,
+      title: newest.title,
+      date: day(newest.returned_at ?? newest.submitted_at),
+      comment: String(newest.comment ?? '').trim(),
+      next_step: studentRubric(newest.rubric)?.next_step ?? null,
+      tags: confirmed(newest).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) }))
+    },
+    pattern,
+    codes: library.filter((c) => used.has(c.id))
+  };
 }
 
 /** Each student's latest rung on every skill their returned work has placed: the teacher's class view and "last time" while marking. */

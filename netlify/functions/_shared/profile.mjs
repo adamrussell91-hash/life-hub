@@ -14,7 +14,7 @@ import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
 import { markbookAction } from './markbook.mjs';
-import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, classSkillRungs } from './profile-feedback.mjs';
+import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, vivaHistoryFor, classSkillRungs } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
 import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
@@ -74,7 +74,11 @@ export async function profileAction(store, classId, body) {
   // A Voice task's "where you are": one strand of this student's own skills.
   if (action === 'skills') {
     if (body.strand !== undefined && (typeof body.strand !== 'string' || !/^[a-z]{3,20}$/.test(body.strand))) reject(400, 'bad_request', 'Unknown strand.');
-    return skillsFor(store, classId, student.id, body.strand ?? null);
+    const skills = await skillsFor(store, classId, student.id, body.strand ?? null);
+    // A viva block also asks for the student's last viva and the pattern across their recent ones.
+    if (body.vivas !== true) return skills;
+    if (body.lesson_id !== undefined && !isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    return { ...skills, vivas: await vivaHistoryFor(store, classId, student.id, body.lesson_id ?? null) };
   }
   if (action === 'piece') return pieceFor(store, roster, student, body.item);
   if (action === 'seen') return markSeen(store, roster, student, body.item);
