@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student to do: mockup</title>
+<!-- Concept mockup only. Invented student and class. Sits beside "Your unit" on the student progress page. -->
+<style>
+  :root {
+    --paper: #fbf8f2; --card: #fffdf9; --ink: #13233a; --navy: #1d3a63; --muted: #6b7788;
+    --line: rgba(23, 55, 94, 0.12); --blue: #2f6db5; --blue-soft: #e4eef9;
+    --gold: #c9971c; --gold-soft: #fbf1d6; --sage: #4f7a5a; --sage-soft: #e5efe6;
+    --peach: #c4683b; --peach-soft: #fbe7dc; --lilac-soft: #eee9f6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 Inter, ui-sans-serif, system-ui, sans-serif; }
+  .bar { padding: 14px 44px; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13px; color: var(--navy); }
+  main { max-width: 1352px; margin: 0 auto; padding: 28px 44px 60px; }
+  h1 { font-size: 30px; margin: 0 0 6px; color: var(--navy); }
+  .who { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .tabs > span { padding: 8px 12px; font-weight: 600; color: var(--muted); }
+  .tabs > .on { color: var(--navy); border-bottom: 3px solid var(--blue); }
+  .badge { display: inline-flex; align-items: center; justify-content: center; flex: none; line-height: 1; width: 18px; height: 18px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 11px; margin-left: 6px; }
+  .skip { color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 10px; padding: 14px 18px; margin-bottom: 26px; }
+  h2 { font-size: 20px; color: var(--navy); margin: 0 0 14px; }
+
+  .unit { display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: 40px; align-items: start; }
+
+  /* Simplified copy of the real unit map, for placement only. */
+  .map { font-size: 14px; }
+  .map .heads { display: flex; gap: 22px; margin: 0 0 6px 290px; font-size: 12px; font-weight: 700; color: var(--blue); }
+  .map .row { display: grid; grid-template-columns: 44px 26px 210px 1fr; align-items: center; height: 34px; }
+  .map .row.next { background: #f1ede4; border-radius: 4px; }
+  .map .wk { color: var(--muted); font-size: 12px; }
+  .map .stn { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #b9c0ca; background: var(--paper); }
+  .map .stn.done { background: var(--blue); border-color: var(--blue); }
+  .map .stn.ring { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-soft); }
+  .map .stn.sq { border-radius: 2px; }
+  .map .stn.dia { border-radius: 2px; transform: rotate(45deg); width: 10px; height: 10px; }
+  .map .tag { background: var(--gold); color: #fff; font-size: 11px; font-weight: 700; border-radius: 3px; padding: 1px 5px; margin-right: 6px; }
+  .map .lines { display: flex; gap: 34px; padding-left: 10px; color: #b9c0ca; font-size: 11px; }
+  .map .key { color: var(--muted); font-size: 12px; margin-top: 18px; max-width: 520px; }
+
+  /* The new panel. */
+  .todo { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 8px; }
+  .todo h3 { margin: 0 0 2px; font-size: 17px; color: var(--navy); }
+  .todo .sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  .count { border-radius: 10px; background: var(--navy); color: #fff; padding: 14px 16px; margin-bottom: 16px; }
+  .count .t { font-size: 12px; opacity: .8; text-transform: uppercase; letter-spacing: .06em; }
+  .count .name { font-weight: 700; font-size: 15px; margin: 2px 0 10px; }
+  .count .clock { display: flex; gap: 10px; }
+  .count .clock div { background: rgba(255,255,255,.12); border-radius: 8px; padding: 6px 10px; text-align: center; min-width: 58px; }
+  .count .clock b { display: block; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .count .clock small { font-size: 11px; opacity: .8; }
+  .count .due { font-size: 12px; opacity: .85; margin-top: 10px; }
+  .count .track { height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); margin-top: 6px; }
+  .count .track i { display: block; height: 100%; width: 58%; border-radius: 3px; background: var(--gold); }
+
+  .grp { border-top: 1px solid var(--line); padding: 12px 0 10px; }
+  .grp > b { display: block; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .item { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 6px 0; }
+  .item .box { width: 16px; height: 16px; border: 2px solid #b9c0ca; border-radius: 4px; margin-top: 2px; }
+  .item .box.tick { background: var(--sage); border-color: var(--sage); position: relative; }
+  .item .box.tick::after { content: ""; position: absolute; left: 4px; top: 0; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .item .dot { width: 10px; height: 10px; border-radius: 50%; margin: 5px 0 0 3px; }
+  .item .what { font-weight: 600; font-size: 14px; }
+  .item .what.done { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+  .item .more { color: var(--muted); font-size: 12px; }
+  .item .go { font-size: 12px; font-weight: 600; color: var(--blue); white-space: nowrap; padding-top: 2px; }
+  .pill { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .pill.new { background: var(--blue-soft); color: var(--blue); }
+  .pill.again { background: var(--peach-soft); color: var(--peach); }
+  .pill.wait { background: #eef0f3; color: var(--muted); }
+  .ann { background: var(--gold-soft); border-left: 3px solid var(--gold); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; }
+  .ann small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .sub-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+  .sub-list li { padding: 2px 0; }
+  .sub-list li::before { content: "○ "; color: #b9c0ca; }
+  .sub-list li.ok::before { content: "● "; color: var(--sage); }
+  .meter { display: inline-block; width: 70px; height: 5px; background: #eef0f3; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+  .meter i { display: block; height: 100%; background: var(--blue); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="bar">Classroom</div>
+<main>
+  <h1>Your progress</h1>
+  <p class="who">ZK on this device.</p>
+  <div class="tabs"><span class="on">My progress</span><span>Returned work<span class="badge">1</span></span></div>
+  <div class="skip">… Your next steps, Where your learning is, Your skills, What your feedback keeps saying (unchanged) …</div>
+
+  <h2>Your unit</h2>
+  <section class="unit">
+    <div class="map" aria-label="Unit map (simplified copy)">
+      <div class="heads"><span>Syllabus</span><span>Concepts</span></div>
+      <div class="row"><span class="wk">Wk1</span><span class="stn done"></span><span>Ghost poem</span><span class="lines">● ●</span></div>
+      <div class="row"><span class="wk"></span><span class="stn dia done"></span><span>Imagery quiz</span><span class="lines">●</span></div>
+      <div class="row"><span class="wk">Wk2</span><span class="stn done"></span><span>Close reading</span><span class="lines">●</span></div>
+      <div class="row next"><span class="wk"></span><span class="stn ring"></span><span><span class="tag">Next up</span>Speaker and voice</span><span class="lines">○ ○</span></div>
+      <div class="row"><span class="wk">Wk3</span><span class="stn"></span><span>Sound and rhythm</span><span class="lines">○</span></div>
+      <div class="row"><span class="wk"></span><span class="stn dia"></span><span>Voice quiz</span><span class="lines">○</span></div>
+      <div class="row"><span class="wk">Wk4</span><span class="stn"></span><span>Drafting your poem</span><span class="lines">○ ○</span></div>
+      <div class="row"><span class="wk"></span><span class="stn sq"></span><span>Poem task</span><span class="lines"></span></div>
+      <p class="key">Grey: not done yet. Colour: done. Gold ring: next up. Diamond: quiz. Square: assessment.</p>
+    </div>
+
+    <aside class="todo" aria-label="Your to do list">
+      <h3>To do</h3>
+      <p class="sub">Updated as you work. Ticks come from what you’ve done, not from you ticking.</p>
+
+      <div class="count" role="timer" aria-label="Poem task due in 12 days">
+        <div class="t">Assessment task</div>
+        <div class="name">Poem task: your own ghost poem</div>
+        <div class="clock">
+          <div><b>12</b><small>days</small></div>
+          <div><b>04</b><small>hours</small></div>
+          <div><b>37</b><small>mins</small></div>
+        </div>
+        <div class="due">Due Friday 21 November, 3:00 pm</div>
+        <div class="track"><i></i></div>
+      </div>
+
+      <div class="grp">
+        <b>From your teacher</b>
+        <div class="ann">Bring a printed copy of your draft on Thursday. We’ll swap and give feedback in pairs.<small>Today</small></div>
+        <div class="ann">Library is open at lunch this week if you want a quiet space to write.<small>Monday</small></div>
+      </div>
+
+      <div class="grp">
+        <b>Today</b>
+        <div class="item"><span class="box"></span><span><div class="what">Practise your organiser</div><div class="more">8 cards · about 3 minutes</div></span><a class="go">Practise →</a></div>
+      </div>
+
+      <div class="grp">
+        <b>Back to you</b>
+        <div class="item"><span class="dot" style="background:var(--blue)"></span><span><div class="what">Imagery quiz<span class="pill new">New</span></div><div class="more">Feedback is back. Have a read.</div></span><a class="go">Open →</a></div>
+        <div class="item"><span class="dot" style="background:var(--peach)"></span><span><div class="what">Close reading<span class="pill again">Have another go</span></div><div class="more">Your teacher asked for a second go at paragraph 2.</div></span><a class="go">Redraft →</a></div>
+        <div class="item"><span class="dot" style="background:#b9c0ca"></span><span><div class="what">Ghost poem<span class="pill wait">With your teacher</span></div><div class="more">Handed in Tuesday. Feedback not back yet.</div></span><span></span></div>
+      </div>
+
+      <div class="grp">
+        <b>Keep going</b>
+        <div class="item"><span class="box"></span><span>
+          <div class="what">Speaker and voice</div>
+          <div class="more"><span class="meter"><i style="width:40%"></i></span>Started yesterday · 2 of 5 activities</div>
+          <ul class="sub-list"><li class="ok">Warm-up questions</li><li class="ok">Read the poem</li><li>Who is speaking? (3 questions)</li><li>Lens: tone</li><li>Exit ticket</li></ul>
+        </span><a class="go">Carry on →</a></div>
+      </div>
+
+      <div class="grp">
+        <b>Still to do</b>
+        <div class="item"><span class="box tick"></span><span><div class="what done">Close reading</div></span><span></span></div>
+        <div class="item"><span class="box"></span><span><div class="what">Sound and rhythm</div><div class="more">Week 3</div></span><a class="go">Open →</a></div>
+        <div class="item"><span class="box"></span><span><div class="what">Voice quiz</div><div class="more">Week 3</div></span><a class="go">Open →</a></div>
+      </div>
+    </aside>
+  </section>
+</main>
+</body>
+</html>
