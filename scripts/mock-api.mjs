@@ -770,6 +770,23 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/aesthetics/notes') {
+      if (!readSession(request)) return unauthenticated(response);
+      const notes = taskData.get('meta/aesthetics_notes') ?? {};
+      if (request.method === 'POST') {
+        const body = await readJson(request);
+        if (typeof body?.id !== 'string' || typeof body?.text !== 'string') return json(response, 400, { ok: false, error: { code: 'invalid_request' } }, PRIVATE_HEADERS), true;
+        const text = body.text.trim();
+        if (text) notes[body.id] = { text, updatedAt: new Date(clock.now()).toISOString() };
+        else delete notes[body.id];
+        taskData.set('meta/aesthetics_notes', notes);
+        json(response, 200, { ok: true, data: { notes, note: notes[body.id] ?? null } }, PRIVATE_HEADERS);
+        return true;
+      }
+      json(response, 200, { ok: true, data: { notes } }, PRIVATE_HEADERS);
+      return true;
+    }
+
     if (url.pathname === '/api/watch-radar') {
       if (!readSession(request)) return unauthenticated(response);
       const targets = taskData.get('meta/watch_radar_targets') ?? {};

@@ -1,5 +1,5 @@
 import { createFragrancePhoto, FRAGRANCE_PHOTOS } from './fragrance-photos.js';
-import { SOURCE_FRAGRANCES, STYLE_NOTE } from './fragrance-library.js';
+import { FRAGRANCES, SOURCE_FRAGRANCES, STYLE_NOTE } from './fragrance-library.js';
 import { formatDisplayDate } from '../../../../../packages/design-kit/js/format-display-date.js';
 
 const FIELDS = [
@@ -12,8 +12,41 @@ const FIELDS = [
   ['Parfumo URL', 'Parfumo / product link']
 ];
 
-/** Render the complete imported material with native disclosures and safe text nodes. */
-export function renderSourceReference(doc) {
+const STATUS_ORDER = ['Owned', 'Sampling', 'Wishlist', 'Retired'];
+const SORTS = [
+  ['name', 'Name A–Z'],
+  ['rating', 'Rating, highest first'],
+  ['added', 'Newest first'],
+  ['brand', 'Brand A–Z'],
+  ['status', 'Status']
+];
+const NOTE_MAX = 4000;
+
+/** Library view state survives re-renders within the page. */
+const views = new WeakMap();
+function viewFor(doc) {
+  if (!views.has(doc)) views.set(doc, { filter: 'all', sort: 'name', notes: {}, notesStatus: 'idle', render: null });
+  return views.get(doc);
+}
+
+/** Open one library record, clearing a filter that hides it. */
+export function revealLibraryRecord(doc, id) {
+  const view = viewFor(doc);
+  let record = doc.querySelector(`#aes-library [data-fragrance-id="${id}"]`);
+  if (!record && view.render) {
+    view.filter = 'all';
+    view.render();
+    record = doc.querySelector(`#aes-library [data-fragrance-id="${id}"]`);
+  }
+  return record;
+}
+
+/**
+ * Render the complete imported material with native disclosures and safe text nodes.
+ * `notesApi` ({ load, save }) adds a personal note box to each record; without it the box is hidden.
+ */
+export function renderSourceReference(doc, { notesApi = null } = {}) {
+  const view = viewFor(doc);
   const el = (tag, text, className) => {
     const node = doc.createElement(tag);
     if (text != null) node.textContent = text;
@@ -100,42 +133,187 @@ export function renderSourceReference(doc) {
     return node;
   }
   const library = doc.querySelector('#aes-library');
-  if (library) {
-    const sorted = [...SOURCE_FRAGRANCES].sort((a, b) => a.properties.Fragrance.localeCompare(b.properties.Fragrance));
-    library.replaceChildren(...sorted.map(record => {
-      const p = record.properties;
-      const details = el('details', null, 'aes-record');
-      details.dataset.fragranceId = record.id;
-      const summary = el('summary');
-      summary.className = 'aes-record__summary';
-      const label = el('span', null, 'aes-record__label');
-      label.append(el('strong', p.Fragrance), el('span', `${String(p.Brand ?? '').replace(/\\([\[\]])/g, '$1')} · ${p.Status}`, 'aes-meta'));
-      summary.append(createFragrancePhoto(doc, p.Fragrance, { width: 48 }), label);
-      const body = el('div', null, 'aes-record__body');
-      const fields = el('dl', null, 'aes-record__fields');
-      for (const [key, label] of FIELDS) fields.append(el('dt', label), fieldValue(record, key));
-      const photo = el('div', null, 'aes-record__photo');
-      photo.append(createFragrancePhoto(doc, p.Fragrance, { width: 160 }));
-      const source = Object.hasOwn(FRAGRANCE_PHOTOS, p.Fragrance) && FRAGRANCE_PHOTOS[p.Fragrance].source;
-      if (source) photo.append(link('Photo source', source));
-      body.append(photo, fields, el('h4', 'Full review'));
-      const review = el('div', null, 'aes-source-prose');
-      review.dataset.sourceField = 'Review';
-      markdown(review, p.Review || 'Not recorded');
-      body.append(review);
-      if (record.content) {
-        body.append(el('h4', 'Page notes'));
-        const notes = el('div', null, 'aes-source-prose');
-        markdown(notes, record.content);
-        body.append(notes);
+  const meta = new Map(FRAGRANCES.map(f => [f.id, f]));
+  const name = record => record.properties.Fragrance;
+  const brand = record => String(record.properties.Brand ?? '').replace(/\\([\[\]])/g, '$1');
+  const filters = () => {
+    const statuses = [...new Set(SOURCE_FRAGRANCES.map(r => r.properties.Status).filter(Boolean))]
+      .sort((a, b) => (STATUS_ORDER.indexOf(a) + 1 || 99) - (STATUS_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+    return [
+      ['all', 'All', () => true],
+      ...statuses.map(st => [`status:${st}`, st, r => r.properties.Status === st]),
+      ['loved', 'Loved', r => meta.get(r.id)?.loved === true],
+      ['hated', 'Not for me', r => meta.get(r.id)?.hated === true],
+      ['noted', 'With my notes', r => Boolean(view.notes[r.id]?.text)]
+    ];
+  };
+  const comparators = {
+    name: (a, b) => name(a).localeCompare(name(b)),
+    brand: (a, b) => brand(a).localeCompare(brand(b)) || name(a).localeCompare(name(b)),
+    rating: (a, b) => (b.properties.Rating ?? -1) - (a.properties.Rating ?? -1) || name(a).localeCompare(name(b)),
+    added: (a, b) => String(b.properties.Added ?? '').localeCompare(String(a.properties.Added ?? '')) || name(a).localeCompare(name(b)),
+    status: (a, b) => ((STATUS_ORDER.indexOf(a.properties.Status) + 1 || 99) - (STATUS_ORDER.indexOf(b.properties.Status) + 1 || 99)) || name(a).localeCompare(name(b))
+  };
+
+  function noteBox(record) {
+    const box = el('div', null, 'aes-note');
+    box.dataset.noteFor = record.id;
+    const id = `aes-note-${record.id}`;
+    const label = el('label', 'My notes', 'aes-note__label');
+    label.htmlFor = id;
+    const area = el('textarea', null, 'aes-input aes-note__text');
+    area.id = id;
+    area.rows = 3;
+    area.maxLength = NOTE_MAX;
+    area.placeholder = 'How it wore, who noticed, what to layer it with…';
+    area.value = view.notes[record.id]?.text ?? '';
+    const save = el('button', 'Save note', 'aes-btn');
+    save.type = 'button';
+    const status = el('span', null, 'aes-meta aes-note__status');
+    status.setAttribute('aria-live', 'polite');
+    const stamp = () => {
+      const at = view.notes[record.id]?.updatedAt;
+      status.textContent = at ? `Saved ${formatDisplayDate(at)}` : '';
+    };
+    stamp();
+    const sync = () => { save.disabled = area.value.trim() === (view.notes[record.id]?.text ?? ''); };
+    sync();
+    area.addEventListener('input', () => { area.dataset.dirty = 'true'; sync(); if (status.dataset.state !== 'saving') status.textContent = ''; });
+    save.addEventListener('click', async () => {
+      save.disabled = true;
+      status.dataset.state = 'saving';
+      status.textContent = 'Saving…';
+      try {
+        const note = await notesApi.save(record.id, area.value);
+        if (note) view.notes[record.id] = note; else delete view.notes[record.id];
+        delete area.dataset.dirty;
+        area.value = note?.text ?? '';
+        delete status.dataset.state;
+        stamp();
+        if (!note) status.textContent = 'Note cleared';
+        renderControls();
+      } catch (error) {
+        delete status.dataset.state;
+        status.textContent = error?.code === 'write_conflict' ? 'Changed elsewhere. Save again.' : 'Couldn’t save. Try again.';
       }
-      const provenance = el('p', null, 'aes-meta');
-      provenance.textContent = `Last edited ${formatDisplayDate(record.lastEditedAt)}`;
-      provenance.title = record.lastEditedAt;
-      body.append(provenance);
-      details.append(summary, body);
-      return details;
-    }));
+      sync();
+    });
+    const row = el('div', null, 'aes-note__row');
+    row.append(save, status);
+    box.append(label, area, row);
+    return box;
+  }
+
+  function recordNode(record) {
+    const p = record.properties;
+    const details = el('details', null, 'aes-record');
+    details.dataset.fragranceId = record.id;
+    const summary = el('summary');
+    summary.className = 'aes-record__summary';
+    const label = el('span', null, 'aes-record__label');
+    const flags = [meta.get(record.id)?.loved ? 'loved' : null, meta.get(record.id)?.hated ? 'not for me' : null, view.notes[record.id]?.text ? 'noted' : null].filter(Boolean);
+    label.append(el('strong', p.Fragrance), el('span', [brand(record), p.Status, ...flags].filter(Boolean).join(' · '), 'aes-meta'));
+    summary.append(createFragrancePhoto(doc, p.Fragrance, { width: 48 }), label);
+    const body = el('div', null, 'aes-record__body');
+    const fields = el('dl', null, 'aes-record__fields');
+    for (const [key, label] of FIELDS) fields.append(el('dt', label), fieldValue(record, key));
+    const photo = el('div', null, 'aes-record__photo');
+    photo.append(createFragrancePhoto(doc, p.Fragrance, { width: 160 }));
+    const source = Object.hasOwn(FRAGRANCE_PHOTOS, p.Fragrance) && FRAGRANCE_PHOTOS[p.Fragrance].source;
+    if (source) photo.append(link('Photo source', source));
+    body.append(photo);
+    if (notesApi) body.append(noteBox(record));
+    body.append(fields, el('h4', 'Full review'));
+    const review = el('div', null, 'aes-source-prose');
+    review.dataset.sourceField = 'Review';
+    markdown(review, p.Review || 'Not recorded');
+    body.append(review);
+    if (record.content) {
+      body.append(el('h4', 'Page notes'));
+      const notes = el('div', null, 'aes-source-prose');
+      markdown(notes, record.content);
+      body.append(notes);
+    }
+    const provenance = el('p', null, 'aes-meta');
+    provenance.textContent = `Last edited ${formatDisplayDate(record.lastEditedAt)}`;
+    provenance.title = record.lastEditedAt;
+    body.append(provenance);
+    details.append(summary, body);
+    return details;
+  }
+
+  function renderControls() {
+    const host = doc.querySelector('#aes-library-controls');
+    if (!host) return;
+    const all = filters();
+    if (!all.some(([key]) => key === view.filter)) view.filter = 'all';
+    const pills = el('div', null, 'hub-pills hub-pills--loose aes-chips');
+    pills.setAttribute('role', 'group');
+    pills.setAttribute('aria-label', 'Show');
+    for (const [key, text, test] of all) {
+      const count = SOURCE_FRAGRANCES.filter(test).length;
+      if (key === 'noted' && !notesApi) continue;
+      if (!count && key !== 'all' && key !== view.filter) continue;
+      const b = el('button', `${text} ${count}`, 'hub-pills__btn');
+      b.type = 'button';
+      b.dataset.libraryFilter = key;
+      b.setAttribute('aria-pressed', String(view.filter === key));
+      b.addEventListener('click', () => { view.filter = key; renderLibrary(); });
+      pills.append(b);
+    }
+    const sortLabel = el('label', null, 'aes-library__sort');
+    sortLabel.append(el('span', 'Sort', 'aes-meta'));
+    const select = el('select', null, 'aes-input');
+    select.id = 'aes-library-sort';
+    for (const [value, text] of SORTS) {
+      const o = el('option', text);
+      o.value = value;
+      select.append(o);
+    }
+    select.value = view.sort;
+    select.addEventListener('change', () => { view.sort = select.value; renderLibrary(); });
+    sortLabel.append(select);
+    host.replaceChildren(pills, sortLabel);
+  }
+
+  function renderLibrary() {
+    if (!library) return;
+    renderControls();
+    const test = filters().find(([key]) => key === view.filter)?.[2] ?? (() => true);
+    const shown = SOURCE_FRAGRANCES.filter(test).sort(comparators[view.sort] ?? comparators.name);
+    const open = new Set([...library.querySelectorAll('details[open]')].map(d => d.dataset.fragranceId));
+    const nodes = shown.map(record => {
+      const node = recordNode(record);
+      if (open.has(record.id)) node.open = true;
+      return node;
+    });
+    library.replaceChildren(...(nodes.length ? nodes : [el('p', 'Nothing here yet.', 'aes-meta')]));
+    const count = doc.querySelector('#aes-library-count');
+    if (count) count.textContent = shown.length === SOURCE_FRAGRANCES.length
+      ? `All ${SOURCE_FRAGRANCES.length} records, with full reviews, recorded note pyramids, prices, dates and page notes. Unset fields show “Not recorded”.`
+      : `Showing ${shown.length} of ${SOURCE_FRAGRANCES.length} records.`;
+  }
+
+  view.render = renderLibrary;
+  renderLibrary();
+  if (library && notesApi && view.notesStatus === 'idle') {
+    view.notesStatus = 'loading';
+    notesApi.load().then(notes => {
+      view.notes = notes ?? {};
+      view.notesStatus = 'ready';
+      // Fill boxes the user hasn't started typing in; keep everything else as it is.
+      for (const box of library.querySelectorAll('[data-note-for]')) {
+        const area = box.querySelector('textarea');
+        if (area.dataset.dirty) continue;
+        box.replaceWith(noteBox({ id: box.dataset.noteFor }));
+      }
+      renderControls();
+      for (const details of library.querySelectorAll('details[data-fragrance-id]')) {
+        const record = SOURCE_FRAGRANCES.find(r => r.id === details.dataset.fragranceId);
+        const line = details.querySelector('.aes-record__label .aes-meta');
+        if (record && line) line.textContent = [brand(record), record.properties.Status, meta.get(record.id)?.loved ? 'loved' : null, meta.get(record.id)?.hated ? 'not for me' : null, view.notes[record.id]?.text ? 'noted' : null].filter(Boolean).join(' · ');
+      }
+    }, () => { view.notesStatus = 'idle'; });
   }
   const style = doc.querySelector('#aes-style-notes');
   if (style && !STYLE_NOTE) {
