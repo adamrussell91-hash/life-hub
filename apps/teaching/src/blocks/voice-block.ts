@@ -2,7 +2,8 @@ import type { Block } from '@/schemas/block';
 import type { RenderContext, RenderMode } from '@/blocks/render';
 import { el } from '@/blocks/peer-feedback-ui';
 import { taskCard } from '@/blocks/peer-feedback-task';
-import { mountVoiceStudent, speakingSeconds } from '@/blocks/voice-student';
+import { mountVoiceStudent, speakingSeconds, type QuestionSlot } from '@/blocks/voice-student';
+import { followUpsOf, pressureOf, sandText } from '@/blocks/voice-timed';
 import { mountVoiceTeacher } from '@/blocks/voice-teacher';
 import { durationLabel } from '@/blocks/voice-pacing';
 import { ORACY_LABELS } from '@/blocks/voice-oracy';
@@ -26,13 +27,37 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
   const head = el('header', 'pf-head');
   head.append(el('h3', 'pf-eyebrow block-eyebrow', oracy ? ORACY_LABELS[oracy] : isViva ? 'Viva practice' : 'Spoken response'));
   const prompt = block.content.prompt?.trim();
-  head.append(taskCard(prompt || (oracy === 'recite' ? 'Recite this from memory.' : 'Record a spoken answer.')));
+  const questionText = prompt || (oracy === 'recite' ? 'Recite this from memory.' : 'Record a spoken answer.');
+  const pressure = pressureOf(block);
+  const followUps = followUpsOf(block);
+  // A timed task keeps its question off the page (letters in its shape, drifting like sand) until the run begins.
+  const hidden = Boolean(pressure) && mode !== 'print' && (mode !== 'teacher' || Boolean(ctx.display));
+  let card = taskCard(hidden ? sandText(questionText) : questionText);
+  if (hidden) {
+    card.classList.add('voice-sand');
+    card.setAttribute('aria-hidden', 'true');
+  }
+  const questionHolder = el('div', 'voice-question');
+  questionHolder.append(card);
+  head.append(questionHolder);
+  const question: QuestionSlot = {
+    reveal: () => {
+      if (!card.classList.contains('voice-sand')) return;
+      const real = taskCard(questionText);
+      real.classList.add('voice-sand-reveal');
+      card.replaceWith(real);
+      card = real;
+    }
+  };
   const seconds = speakingSeconds(block, { points: [] });
   const facts = [
-    block.content.student_chooses_time ? 'You choose 60 s, 90 s or 2 min' : seconds ? (oracy === 'recite' && !block.content.time_limit_s ? `Up to ${durationLabel(seconds)}` : `Speak for ${durationLabel(seconds)}`) : null,
-    isViva ? 'Plan your dot points first' : null
+    pressure ? `Timed: ${durationLabel(pressure.prep_s)} to prepare, one go` : null,
+    block.content.student_chooses_time && !pressure ? 'You choose 60 s, 90 s or 2 min' : seconds ? (oracy === 'recite' && !block.content.time_limit_s ? `Up to ${durationLabel(seconds)}` : `Speak for ${durationLabel(seconds)}`) : null,
+    isViva && !pressure ? 'Plan your dot points first' : null,
+    followUps ? (followUps.count === 1 ? 'Then a follow-up question' : `Then ${followUps.count} follow-up questions`) : null
   ].filter(Boolean);
-  if (facts.length) head.append(el('p', 'voice-facts block-secondary', facts.join(' · ')));
+  // A hidden timed task spells out its timings in the run itself.
+  if (facts.length && !hidden) head.append(el('p', 'voice-facts block-secondary', facts.join(' · ')));
   root.append(head);
 
   if (mode === 'print') {
@@ -55,6 +80,6 @@ export function renderVoiceTask(block: VoiceBlock, mode: RenderMode, ctx: Render
     root.append(el('p', 'pf-note block-secondary', 'Record your answer on your own device.'));
     return root;
   }
-  root.append(mode === 'teacher' ? mountVoiceTeacher(block, ctx.lessonId) : mountVoiceStudent(block, ctx.lessonId, ctx.classId));
+  root.append(mode === 'teacher' ? mountVoiceTeacher(block, ctx.lessonId) : mountVoiceStudent(block, ctx.lessonId, ctx.classId, question));
   return root;
 }

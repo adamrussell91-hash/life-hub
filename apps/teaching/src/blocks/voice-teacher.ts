@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { followUpList, isFollowUpPoint } from '@/blocks/voice-timed';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/api/client';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { button, el, errorText, readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
@@ -58,6 +59,8 @@ type Row = {
   audio_delete_after: string;
   tag_count: number;
 };
+/** A timed run a student began with nothing sent: a reload, a closed page or a lost take. */
+type StartedRow = { id: string; initials: string; started_at: string; device_hash: string };
 type MarkTag = VoiceTag & { source: 'tap' | 'suggested'; confirmed: boolean };
 type Submission = Omit<Row, 'tag_count'> & {
   /** The classes this lesson belongs to, with their lists. */
@@ -138,6 +141,7 @@ export function mountVoiceTeacher(
   root.append(body, alert);
 
   let rows: Row[] = [];
+  let started: StartedRow[] = [];
   let filter: Status | 'all' = 'all';
   let polls = 0;
   let pollTimer = 0;
@@ -153,8 +157,9 @@ export function mountVoiceTeacher(
   async function loadInbox(): Promise<void> {
     window.clearTimeout(pollTimer);
     try {
-      const data = await apiGet<{ submissions: Row[] }>(base(lessonId, block.id));
+      const data = await apiGet<{ submissions: Row[]; started?: StartedRow[] }>(base(lessonId, block.id));
       rows = data.submissions;
+      started = data.started ?? [];
       alert.hidden = true;
     } catch (error) {
       showError(error);
@@ -217,7 +222,42 @@ export function mountVoiceTeacher(
       list.append(item);
     }
     view.append(list);
+    if (started.length) view.append(startedList());
     body.replaceChildren(view);
+  }
+
+  /** Timed runs begun with nothing sent. Letting a student go again shows them the question afresh. */
+  function startedList(): HTMLElement {
+    const box = el('section', 'voice-inbox__started');
+    box.append(
+      el('p', 'voice-inbox__title', 'Started, nothing sent'),
+      el('p', 'block-secondary', 'These students began the timed task but no take arrived (a reload, a closed page or no microphone).')
+    );
+    const list = el('ul', 'voice-inbox__rows');
+    for (const s of started) {
+      const item = el('li', 'voice-inbox__row voice-inbox__row--started');
+      item.append(
+        el('span', 'voice-inbox__who', s.initials),
+        el('span', 'voice-inbox__meta block-secondary', `Started ${shortWhen(s.started_at)} · #${s.device_hash}`),
+        button('Let them start again', 'secondary', async () => {
+          const ok = await askConfirmCard({
+            title: `Let ${s.initials} start again?`,
+            supporting: 'They get a fresh run of the timed task, question and all.',
+            confirmLabel: 'Let them start again'
+          });
+          if (!ok) return;
+          try {
+            await apiDelete(`${base(lessonId, block.id)}/${encodeURIComponent(s.id)}`);
+            await loadInbox();
+          } catch (error) {
+            showError(error);
+          }
+        })
+      );
+      list.append(item);
+    }
+    box.append(list);
+    return box;
   }
 
   /* ── Marking ─────────────────────────────────────────────────────── */
@@ -421,7 +461,13 @@ export function mountVoiceTeacher(
     const left = el('div', 'voice-mark__transcript');
     const paperHost = el('div', 'pa-paper-host pa-paper-host--read voice-mark__paper');
     const review = el('div', 'voice-review');
-    left.append(review, paperHost);
+    left.append(review);
+    const asked = followUpList(record.points, (t) => {
+      seek(t);
+      void audio.play().catch(() => undefined);
+    });
+    if (asked) left.append(asked);
+    left.append(paperHost);
     const notes = el('div', 'voice-mark__notes');
     work.append(left, notes);
     screen.append(work);
@@ -879,11 +925,14 @@ export function mountVoiceTeacher(
       if (confirmed().length) children.push(summaryList(confirmed(), library, words));
       const facts: string[] = [];
       const limit = block.content.time_limit_s;
-      facts.push(limit ? `${Math.round(record.duration_s)} s of ${limit} s` : `${Math.round(record.duration_s)} s`);
-      if (record.points.length) {
-        const used = new Set(confirmed().map((t) => pointIndexAt(record.points, t.t)));
-        facts.push(`${record.points.length} point${record.points.length === 1 ? '' : 's'} reached${used.size ? ` · tags in point${used.size === 1 ? '' : 's'} ${[...used].sort().map((i) => i + 1).join(', ')}` : ''}`);
+      const followUps = record.points.filter(isFollowUpPoint).length;
+      const dotPoints = record.points.length - followUps;
+      facts.push(limit && !followUps ? `${Math.round(record.duration_s)} s of ${limit} s` : `${Math.round(record.duration_s)} s`);
+      if (dotPoints) {
+        const used = new Set(confirmed().map((t) => pointIndexAt(record.points, t.t)).filter((i) => i >= 0 && i < dotPoints));
+        facts.push(`${dotPoints} point${dotPoints === 1 ? '' : 's'} reached${used.size ? ` · tags in point${used.size === 1 ? '' : 's'} ${[...used].sort().map((i) => i + 1).join(', ')}` : ''}`);
       }
+      if (followUps) facts.push(`${followUps} follow-up${followUps === 1 ? '' : 's'} answered`);
       children.push(el('p', 'block-secondary', facts.join(' · ')));
       summary.replaceChildren(...children);
     }

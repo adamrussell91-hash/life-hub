@@ -1,17 +1,19 @@
 /**
  * Teacher side of the Voice block: the submissions inbox and marking.
  *
- *   GET    /api/voice/:lesson/:block                    inbox rows (and kicks transcription)
+ *   GET    /api/voice/:lesson/:block                    inbox rows, timed runs begun with nothing sent (and kicks transcription)
  *   GET    /api/voice/:lesson/:block/:id                one submission, transcript and tags
  *   PUT    /api/voice/:lesson/:block/:id                save tags, comment, initials
- *   DELETE /api/voice/:lesson/:block/:id                remove it; the student may submit again
+ *   DELETE /api/voice/:lesson/:block/:id                remove it (or a begun timed run, st_…); the student may go again
  *   POST   /api/voice/:lesson/:block/:id/return         send the feedback to the student
  *   POST   /api/voice/:lesson/:block/:id/retranscribe   try Whisper again
  */
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import {
+  clearVoiceStart,
   deleteVoiceSubmission,
   getVoiceSubmission,
+  listVoiceStarts,
   listVoiceSubmissions,
   requeueTranscription,
   returnVoiceSubmission,
@@ -57,12 +59,12 @@ export function createVoiceSubmissionsHandler(deps = {}) {
       }
       if (!id) {
         if (request.method !== 'GET') return withCors(methodNotAllowed('GET, OPTIONS'), request, env);
-        const submissions = await listVoiceSubmissions(store, lesson, block);
+        const [submissions, started] = await Promise.all([listVoiceSubmissions(store, lesson, block), listVoiceStarts(store, lesson, block)]);
         let transcribing = false;
         if (submissions.some((s) => s.transcript_status === 'pending')) {
           transcribing = await (deps.invokeRun ?? defaultInvokeVoiceRun)(request, lesson, block).catch(() => false);
         }
-        return respond(200, { submissions, transcribing });
+        return respond(200, { submissions, started, transcribing });
       }
       if (action === 'return' && request.method === 'POST') return respond(200, await returnVoiceSubmission(store, lesson, block, id, deps));
       if (action === 'retranscribe' && request.method === 'POST') {
@@ -72,7 +74,7 @@ export function createVoiceSubmissionsHandler(deps = {}) {
       }
       if (action) return withCors(errorResponse(404, 'not_found', 'Not found.', false), request, env);
       if (request.method === 'GET') return respond(200, await getVoiceSubmission(store, lesson, block, id));
-      if (request.method === 'DELETE') return respond(200, await deleteVoiceSubmission(store, lesson, block, id));
+      if (request.method === 'DELETE') return respond(200, id.startsWith('st_') ? await clearVoiceStart(store, lesson, block, id) : await deleteVoiceSubmission(store, lesson, block, id));
       if (request.method === 'PUT') {
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);

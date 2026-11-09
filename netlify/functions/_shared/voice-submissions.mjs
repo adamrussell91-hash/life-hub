@@ -37,7 +37,10 @@ export const MAX_PART_BYTES = 4.5 * 1024 * 1024;
 export const MAX_PARTS = 4;
 export const MAX_TAGS = 300;
 export const MAX_TRANSCRIBE_ATTEMPTS = 3;
-const MAX_POINT_TEXT = 120;
+/** A point's label; a follow-up point carries its whole question. */
+const MAX_POINT_TEXT = 320;
+/** Up to 8 dot points plus 3 follow-ups. */
+const MAX_POINTS = 12;
 const MAX_NOTE = 400;
 const MAX_COMMENT = 4000;
 const VOICE_MIME = new Set(['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg', 'audio/wav']);
@@ -72,7 +75,12 @@ export const voiceKeys = {
   /** The AI's read of a take (To mark): teacher only, so it sits beside the record students read. */
   aiRead: (lesson, block, id) => `voice_ai/${lesson}/${block}/${id}`,
   /** A student's take for a block, so any device they claim their initials on finds it. `{ id }`, or `{ id: null }` for none. */
-  owner: (lesson, block, classId, studentId) => `voice_owner/${lesson}/${block}/${classId}/${studentId}`
+  owner: (lesson, block, classId, studentId) => `voice_owner/${lesson}/${block}/${classId}/${studentId}`,
+  /** A time-pressure run a device began: create-only, so the question can't be seen twice. Deleting the take (or this) frees it. */
+  start: (lesson, block, deviceHash) => `voice_starts/${lesson}/${block}/${deviceHash}`,
+  starts: (lesson, block) => `voice_starts/${lesson}/${block}/`,
+  /** The device a class student began their timed run on, so a second device can't start again. `{ device_hash }`. */
+  startOwner: (lesson, block, classId, studentId) => `voice_start_owner/${lesson}/${block}/${classId}/${studentId}`
 };
 
 /** 2026-11-18T03:04:05Z → 202611180304; sorts as text. */
@@ -115,10 +123,32 @@ export async function assertLiveVoiceBlock(store, lesson, block) {
   return live;
 }
 
+/** Time pressure is on: one locked run. Recite shows its text, so it never runs under pressure. */
+export function pressureOn(block) {
+  return block.content?.pressure?.enabled === true && block.content?.oracy !== 'recite';
+}
+
+/** The follow-up questions a take can draw, or none when follow-ups are off. */
+export function followUpQuestions(block) {
+  const f = block.content?.follow_up;
+  if (!f?.enabled) return [];
+  return (f.questions ?? []).map((q) => String(q ?? '').trim()).filter(Boolean);
+}
+
+/** Seconds of follow-up answers a take may hold (the recording pauses while the student thinks). */
+export function followUpSeconds(block) {
+  const bank = followUpQuestions(block);
+  if (!bank.length) return 0;
+  const count = Math.min(3, Math.max(1, Number(block.content.follow_up.count) || 1), bank.length);
+  return count * Math.min(180, Number(block.content.follow_up.answer_s) || 30);
+}
+
 /** Seconds a recording may run for this block, plus slack for the countdown and stop. */
 export function maxSecondsFor(block) {
-  const limit = block.content?.student_chooses_time ? 120 : Number(block.content?.time_limit_s) || (block.content?.mode === 'viva' ? 90 : MAX_VOICE_SECONDS);
-  return Math.min(MAX_VOICE_SECONDS, limit) + 15;
+  const pressure = pressureOn(block);
+  const limit = block.content?.student_chooses_time && !pressure ? 120 : Number(block.content?.time_limit_s) || (block.content?.mode === 'viva' || pressure ? 90 : MAX_VOICE_SECONDS);
+  const grace = pressure ? Math.min(30, Number(block.content.pressure.grace_s ?? 10)) : 0;
+  return Math.min(MAX_VOICE_SECONDS, limit) + grace + followUpSeconds(block) + 15;
 }
 
 export function cleanInitials(value) {
@@ -138,7 +168,7 @@ function sideFor(block, raw) {
 
 function cleanPoints(raw, duration) {
   if (!Array.isArray(raw)) return [];
-  return raw.slice(0, 8).map((p) => ({
+  return raw.slice(0, MAX_POINTS).map((p) => ({
     label: typeof p?.label === 'string' ? p.label.trim().slice(0, MAX_POINT_TEXT) : '',
     t: Math.max(0, Math.min(duration, Number(p?.t) || 0))
   }));
@@ -299,21 +329,86 @@ export async function mineView(store, record) {
   };
 }
 
-/**
- * A device's own take, or, when the device has claimed the student's class
- * initials, that student's take from whichever device sent it.
- */
-export async function readMine(store, lesson, block, token, who = {}) {
-  await assertLiveVoiceBlock(store, lesson, block);
-  const claimed = await claimedStudent(store, who.class_id, who.class_token);
+/** The submission a device (or the class student it has claimed) already sent, or null. */
+async function existingTake(store, lesson, block, deviceHash, claimed) {
   if (claimed) {
     const take = await studentTake(store, lesson, block, claimed.roster.cls.id, claimed.student.id);
-    if (take) return mineView(store, take);
+    if (take) return take;
   }
-  if (!validToken(token)) return { submitted: false };
-  const claim = await read(store, voiceKeys.claim(lesson, block, hashToken(token)));
-  if (!claim?.id) return { submitted: false };
-  return mineView(store, await read(store, voiceKeys.submission(lesson, block, claim.id)));
+  if (!deviceHash) return null;
+  const claim = await read(store, voiceKeys.claim(lesson, block, deviceHash));
+  return claim?.id ? read(store, voiceKeys.submission(lesson, block, claim.id)) : null;
+}
+
+/** A timed run this device, or the student on any device, has already begun. */
+async function existingStart(store, lesson, block, deviceHash, claimed) {
+  if (claimed) {
+    const owner = await read(store, voiceKeys.startOwner(lesson, block, claimed.roster.cls.id, claimed.student.id));
+    if (owner?.device_hash) {
+      const start = await read(store, voiceKeys.start(lesson, block, owner.device_hash));
+      if (start) return start;
+    }
+  }
+  return deviceHash ? read(store, voiceKeys.start(lesson, block, deviceHash)) : null;
+}
+
+/** What a device sees of a run it began: the server's clock decides how far in it is. */
+function startView(start, nowMs, fresh = false) {
+  return {
+    submitted: false,
+    started: true,
+    started_at: start.started_at,
+    elapsed_s: Math.max(0, Math.round((nowMs - Date.parse(start.started_at)) / 100) / 10),
+    initials: start.initials,
+    ...(fresh ? { fresh: true } : {})
+  };
+}
+
+/**
+ * A device's own take, or, when the device has claimed the student's class
+ * initials, that student's take from whichever device sent it. On a time
+ * pressure block, a run begun with nothing sent says so.
+ */
+export async function readMine(store, lesson, block, token, who = {}, deps = {}) {
+  const live = await assertLiveVoiceBlock(store, lesson, block);
+  const claimed = await claimedStudent(store, who.class_id, who.class_token);
+  const deviceHash = validToken(token) ? hashToken(token) : null;
+  const take = await existingTake(store, lesson, block, deviceHash, claimed);
+  if (take) return mineView(store, take);
+  if (pressureOn(live)) {
+    const start = await existingStart(store, lesson, block, deviceHash, claimed);
+    if (start) return startView(start, deps.now ? deps.now() : Date.now());
+  }
+  return { submitted: false };
+}
+
+/**
+ * Begins a time-pressure run: the moment the question shows. Create-only, so
+ * a reload or a second device finds the run already begun instead of a fresh
+ * look at the question. The teacher frees it to let the student start again.
+ */
+export async function startVoice(store, lesson, block, body, deps = {}) {
+  const live = await assertLiveVoiceBlock(store, lesson, block);
+  if (!pressureOn(live)) reject(400, 'not_timed', 'This task isn’t timed.');
+  if (!validToken(body.token)) reject(400, 'bad_token', 'Reload the page and try again.');
+  const deviceHash = hashToken(body.token);
+  const initials = cleanInitials(body.initials);
+  const claimed = await claimedStudent(store, body.class_id, body.class_token);
+  const nowMs = deps.now ? deps.now() : Date.now();
+  const take = await existingTake(store, lesson, block, deviceHash, claimed);
+  if (take) return mineView(store, take);
+  const begun = await existingStart(store, lesson, block, deviceHash, claimed);
+  if (begun) return startView(begun, nowMs);
+  const start = {
+    started_at: new Date(nowMs).toISOString(),
+    initials,
+    device_hash: deviceHash,
+    ...(claimed ? { class_id: claimed.roster.cls.id, student_id: claimed.student.id } : {})
+  };
+  const took = await store.setJSON(voiceKeys.start(lesson, block, deviceHash), start, { onlyIfNew: true });
+  if (took && took.modified === false) return startView(await read(store, voiceKeys.start(lesson, block, deviceHash)), nowMs);
+  if (claimed) await store.setJSON(voiceKeys.startOwner(lesson, block, claimed.roster.cls.id, claimed.student.id), { device_hash: deviceHash });
+  return startView(start, nowMs, true);
 }
 
 export function audioPath(audioKey) {
@@ -359,6 +454,40 @@ export async function listVoiceSubmissions(store, lesson, block) {
   const keys = await listBlobKeys(store, voiceKeys.submissions(lesson, block));
   const records = (await Promise.all(keys.map((key) => read(store, key)))).filter(Boolean);
   return records.sort((a, b) => a.submitted_at.localeCompare(b.submitted_at)).map(teacherRow);
+}
+
+/** Timed runs begun with nothing sent: the student reloaded, closed the page or lost the take. */
+export async function listVoiceStarts(store, lesson, block) {
+  if (!isSafeId(lesson) || !isSafeId(block)) reject(404, 'not_found', 'Not found.');
+  const keys = await listBlobKeys(store, voiceKeys.starts(lesson, block));
+  const rows = [];
+  for (const key of keys) {
+    const start = await read(store, key);
+    if (!start?.device_hash) continue;
+    if ((await read(store, voiceKeys.claim(lesson, block, start.device_hash)))?.id) continue;
+    if (start.class_id && start.student_id && (await read(store, voiceKeys.owner(lesson, block, start.class_id, start.student_id)))?.id) continue;
+    rows.push({ id: `st_${start.device_hash.slice(0, 24)}`, initials: start.initials, started_at: start.started_at, class_id: start.class_id ?? null, student_id: start.student_id ?? null, device_hash: start.device_hash.slice(0, 6) });
+  }
+  return rows.sort((a, b) => a.started_at.localeCompare(b.started_at));
+}
+
+async function dropStart(store, lesson, block, deviceHash) {
+  const start = await read(store, voiceKeys.start(lesson, block, deviceHash));
+  if (start?.class_id && start.student_id) {
+    const ownerKey = voiceKeys.startOwner(lesson, block, start.class_id, start.student_id);
+    if ((await read(store, ownerKey))?.device_hash === deviceHash) await store.delete(ownerKey).catch(() => undefined);
+  }
+  await store.delete(voiceKeys.start(lesson, block, deviceHash)).catch(() => undefined);
+}
+
+/** Lets a student begin their timed run again (`st_` + the device hash's first 24 characters). */
+export async function clearVoiceStart(store, lesson, block, id) {
+  if (!isSafeId(lesson) || !isSafeId(block) || !/^st_[a-f0-9]{24}$/.test(String(id))) reject(404, 'not_found', 'Not found.');
+  const prefix = id.slice(3);
+  const key = (await listBlobKeys(store, voiceKeys.starts(lesson, block))).find((k) => k.slice(voiceKeys.starts(lesson, block).length).startsWith(prefix));
+  if (!key) reject(404, 'not_found', 'That run has already been cleared.');
+  await dropStart(store, lesson, block, key.slice(voiceKeys.starts(lesson, block).length));
+  return { cleared: id };
 }
 
 async function readSubmission(store, lesson, block, id) {
@@ -473,6 +602,7 @@ export async function deleteVoiceSubmission(store, lesson, block, id) {
   if (record.audio_key) await store.delete(voiceKeys.audio(record.audio_key)).catch(() => undefined);
   await Promise.all([
     store.delete(voiceKeys.claim(lesson, block, record.device_hash)),
+    dropStart(store, lesson, block, record.device_hash),
     ...(record.class_id && record.student_id ? [store.delete(voiceKeys.owner(lesson, block, record.class_id, record.student_id)).catch(() => undefined)] : []),
     store.delete(voiceKeys.queue(lesson, block, id)).catch(() => undefined),
     store.delete(voiceKeys.aiRead(lesson, block, id)).catch(() => undefined),

@@ -1,4 +1,5 @@
 import { button, el } from '@/blocks/peer-feedback-ui';
+import { followUpList } from '@/blocks/voice-timed';
 import { paper, type Mark } from '@/blocks/peer-annotate';
 import {
   STRENGTH_COLOUR,
@@ -209,6 +210,8 @@ export function renderVoiceFeedback(state: Returned, options: { title?: string; 
   }
 
   const work = el('div', 'voice-feedback__work');
+  const asked = followUpList(points);
+  if (asked) work.append(asked);
   if (words.length) work.append(paperHost);
   else if (player) work.append(el('p', 'block-secondary', 'Play the recording to hear it.'));
   if (tags.length) {
