@@ -44,7 +44,7 @@ export function createPublishedVoiceHandler(deps = {}) {
         body.action === 'submit'
           ? await submitVoice(store, lesson, block, body, deps)
           : body.action === 'mine'
-            ? await readMine(store, lesson, block, body.token)
+            ? await readMine(store, lesson, block, body.token, { class_id: body.class_id, class_token: body.class_token })
             : (() => {
                 throw new VoiceError(400, 'bad_action', 'Unknown action.');
               })();

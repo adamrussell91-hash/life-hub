@@ -548,7 +548,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
 
   body.append(el('p', 'block-secondary', 'Loading…'));
   void Promise.all([
-    fetchMine(lessonId, block.id).catch((error) => {
+    fetchMine(lessonId, block.id, classId).catch((error) => {
       showError(errorText(error));
       return { submitted: false } as MineState;
     }),

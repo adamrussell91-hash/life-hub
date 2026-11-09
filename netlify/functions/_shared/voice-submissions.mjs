@@ -70,7 +70,9 @@ export const voiceKeys = {
   queuePrefix: (lesson, block) => (lesson ? `voice_transcribe_queue/${lesson}/${block}/` : 'voice_transcribe_queue/'),
   due: (stamp, lesson, block, id) => `voice_audio_due/${stamp}/${lesson}/${block}/${id}`,
   /** The AI's read of a take (To mark): teacher only, so it sits beside the record students read. */
-  aiRead: (lesson, block, id) => `voice_ai/${lesson}/${block}/${id}`
+  aiRead: (lesson, block, id) => `voice_ai/${lesson}/${block}/${id}`,
+  /** A student's take for a block, so any device they claim their initials on finds it. `{ id }`, or `{ id: null }` for none. */
+  owner: (lesson, block, classId, studentId) => `voice_owner/${lesson}/${block}/${classId}/${studentId}`
 };
 
 /** 2026-11-18T03:04:05Z → 202611180304; sorts as text. */
@@ -144,6 +146,28 @@ function cleanPoints(raw, duration) {
 
 /* ── Students ──────────────────────────────────────────────────────── */
 
+/** The class student a device has claimed initials as, or null. */
+async function claimedStudent(store, classId, classToken) {
+  const roster = typeof classId === 'string' ? await loadRoster(store, classId) : null;
+  const student = roster ? await claimFor(store, roster, classToken) : null;
+  return student ? { roster, student } : null;
+}
+
+/**
+ * A student's take for this block, whichever device sent it. The owner index
+ * answers; a take from before the index is found once by a scan, then indexed.
+ */
+async function studentTake(store, lesson, block, classId, studentId) {
+  const key = voiceKeys.owner(lesson, block, classId, studentId);
+  const kept = await read(store, key);
+  if (kept) return kept.id ? read(store, voiceKeys.submission(lesson, block, kept.id)) : null;
+  const keys = await listBlobKeys(store, voiceKeys.submissions(lesson, block));
+  const records = (await Promise.all(keys.map((k) => read(store, k)))).filter((r) => r?.class_id === classId && r.student_id === studentId);
+  const take = records.sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))[0] ?? null;
+  await store.setJSON(key, { id: take?.id ?? null });
+  return take;
+}
+
 export async function storeVoicePart(store, lesson, block, { token, upload_id, index, bytes }) {
   await assertLiveVoiceBlock(store, lesson, block);
   if (!validToken(token)) reject(400, 'bad_token', 'Reload the page and try again.');
@@ -182,8 +206,9 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
   const deviceHash = hashToken(body.token);
   const initials = cleanInitials(body.initials);
   // A device that has claimed its initials in the class page says who this take belongs to.
-  const roster = typeof body.class_id === 'string' ? await loadRoster(store, body.class_id) : null;
-  const owner = roster ? await claimFor(store, roster, body.class_token) : null;
+  const claimed = await claimedStudent(store, body.class_id, body.class_token);
+  const roster = claimed?.roster ?? null;
+  const owner = claimed?.student ?? null;
   const parts = Number(body.parts);
   if (!Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS) reject(400, 'bad_parts', 'Reload the page and try again.');
   if (!isUploadIdFor(body.upload_id, deviceHash)) reject(400, 'bad_upload', 'Reload the page and try again.');
@@ -199,10 +224,12 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
   const claimKey = voiceKeys.claim(lesson, block, deviceHash);
   const existing = await read(store, claimKey);
   if (existing?.id) reject(409, 'already_submitted', 'You have already sent a take for this task.');
+  // One take per student too, so a second device can't send another.
+  if (owner && (await studentTake(store, lesson, block, roster.cls.id, owner.id))) reject(409, 'already_submitted', 'You have already sent a take for this task.');
 
   const bytes = await joinParts(store, body.upload_id, parts);
-  const claimed = await store.setJSON(claimKey, { id }, { onlyIfNew: true });
-  if (claimed && claimed.modified === false) reject(409, 'already_submitted', 'You have already sent a take for this task.');
+  const took = await store.setJSON(claimKey, { id }, { onlyIfNew: true });
+  if (took && took.modified === false) reject(409, 'already_submitted', 'You have already sent a take for this task.');
 
   const audioKey = randomBytes(18).toString('hex');
   await store.set(voiceKeys.audio(audioKey), bytes, { metadata: { contentType: mime } });
@@ -234,6 +261,7 @@ export async function submitVoice(store, lesson, block, body, deps = {}) {
     updated_at: submittedAt
   };
   await store.setJSON(voiceKeys.submission(lesson, block, id), record);
+  if (owner) await store.setJSON(voiceKeys.owner(lesson, block, roster.cls.id, owner.id), { id });
   await store.setJSON(voiceKeys.queue(lesson, block, id), {});
   await store.setJSON(voiceKeys.due(dueStamp(deleteAfter), lesson, block, id), {});
   for (let i = 0; i < parts; i += 1) await store.delete(voiceKeys.part(body.upload_id, i)).catch(() => undefined);
@@ -270,8 +298,17 @@ export async function mineView(store, record) {
   };
 }
 
-export async function readMine(store, lesson, block, token) {
+/**
+ * A device's own take, or, when the device has claimed the student's class
+ * initials, that student's take from whichever device sent it.
+ */
+export async function readMine(store, lesson, block, token, who = {}) {
   await assertLiveVoiceBlock(store, lesson, block);
+  const claimed = await claimedStudent(store, who.class_id, who.class_token);
+  if (claimed) {
+    const take = await studentTake(store, lesson, block, claimed.roster.cls.id, claimed.student.id);
+    if (take) return mineView(store, take);
+  }
   if (!validToken(token)) return { submitted: false };
   const claim = await read(store, voiceKeys.claim(lesson, block, hashToken(token)));
   if (!claim?.id) return { submitted: false };
@@ -384,6 +421,9 @@ export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}
     next.class_id = roster.cls.id;
     next.student_id = body.student_id;
   }
+  // Who the take belongs to moved: each student's index follows.
+  const was = record.class_id && record.student_id ? voiceKeys.owner(lesson, block, record.class_id, record.student_id) : null;
+  const now = next.class_id && next.student_id ? voiceKeys.owner(lesson, block, next.class_id, next.student_id) : null;
   if (body.fillers_suggested === true) next.fillers_suggested = true;
   let saved = { deep: null, blocked: [] };
   if (body.rubric !== undefined) {
@@ -397,6 +437,10 @@ export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}
   if (record.status === 'new' && marked) next.status = 'marked';
   next.updated_at = new Date(deps.now ? deps.now() : Date.now()).toISOString();
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
+  if (was !== now) {
+    if (was) await store.delete(was).catch(() => undefined);
+    if (now) await store.setJSON(now, { id });
+  }
   return { ...teacherRecord(next), ...(saved.deep ? { deep: saved.deep } : {}), ...(saved.blocked.length ? { blocked: saved.blocked } : {}) };
 }
 
@@ -423,6 +467,7 @@ export async function deleteVoiceSubmission(store, lesson, block, id) {
   if (record.audio_key) await store.delete(voiceKeys.audio(record.audio_key)).catch(() => undefined);
   await Promise.all([
     store.delete(voiceKeys.claim(lesson, block, record.device_hash)),
+    ...(record.class_id && record.student_id ? [store.delete(voiceKeys.owner(lesson, block, record.class_id, record.student_id)).catch(() => undefined)] : []),
     store.delete(voiceKeys.queue(lesson, block, id)).catch(() => undefined),
     store.delete(voiceKeys.aiRead(lesson, block, id)).catch(() => undefined),
     store.delete(voiceKeys.due(dueStamp(record.audio_delete_after), lesson, block, id)).catch(() => undefined)
