@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDock } from "./showAllDock";
 import { nodeDrawState, linkDrawState } from "./forceGraphBehavior";
 import type { GraphNodeDatum } from "./keywordGraph";
@@ -42,4 +42,25 @@ it("allows Escape to reach the graph when the ordinary tools are visible", () =>
   host.querySelector(".neural-dock")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   window.removeEventListener("keydown", handler);
   expect(reachedGraph).toBe(true);
+});
+
+describe("dock guide", () => {
+  it("adds an i button that opens a guide in the given words, for the tools on show only", () => {
+    const host = document.createElement("div");
+    const dock = createDock(host, () => {}, ["spark", "path"], { hints: { spark: "Light up matching notes." }, guide: true });
+    const info = dock.root.querySelector<HTMLButtonElement>(".neural-dock__info")!;
+    const guide = dock.root.querySelector<HTMLElement>(".neural-dock__guide")!;
+    expect(guide.hidden).toBe(true);
+    info.click();
+    expect(guide.hidden).toBe(false);
+    expect(info.getAttribute("aria-expanded")).toBe("true");
+    expect([...guide.querySelectorAll("dt")].map(n => n.textContent)).toEqual(["Spark", "Path"]);
+    expect(guide.querySelector("dd")!.textContent).toBe("Light up matching notes.");
+    expect(dock.root.querySelector<HTMLButtonElement>('[data-dock-tool="spark"]')!.title).toBe("Light up matching notes.");
+  });
+
+  it("has no guide unless asked", () => {
+    const dock = createDock(document.createElement("div"), () => {});
+    expect(dock.root.querySelector(".neural-dock__info")).toBeNull();
+  });
 });

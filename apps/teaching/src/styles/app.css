@@ -14257,25 +14257,29 @@ body.is-lesson-builder-full-page .hub-utilities {
   box-shadow: var(--elev-2);
 }
 
+/* The dock spans the top of the map: tools in a row on the left, the zoom stack in the right corner. */
 .block-anthology .neural-dock {
   position: absolute;
+  left: var(--space-3);
   right: var(--space-3);
-  top: 0;
+  top: var(--space-3) !important;
   z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-2);
-  max-width: min(460px, calc(100% - 2 * var(--space-3)));
   pointer-events: none;
 }
 
 .block-anthology .neural-dock__body {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-2);
-  width: 100%;
+  padding-right: 58px;
+}
+
+.block-anthology .neural-dock__body > .graph-zoom {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .block-anthology .neural-dock__reveal {
@@ -14285,7 +14289,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-anthology .neural-dock__row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 4px;
   pointer-events: auto;
 }
@@ -14326,6 +14330,53 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-anthology .neural-dock__panel[hidden] {
   display: none;
+}
+
+.block-anthology .neural-dock__row .neural-dock__info {
+  width: 30px;
+  padding: 0;
+  font: italic 700 14px/1 Georgia, 'Times New Roman', serif;
+}
+
+.block-anthology .neural-dock__row .neural-dock__info.is-active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fbf8f2;
+}
+
+.block-anthology .neural-dock__guide {
+  width: min(340px, 100%);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(251, 248, 242, 0.96);
+  box-shadow: var(--elev-1);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: auto;
+}
+
+.block-anthology .neural-dock__guide[hidden] {
+  display: none;
+}
+
+.block-anthology .neural-dock__guide-list {
+  display: grid;
+  gap: 2px var(--space-2);
+  margin: 0;
+}
+
+.block-anthology .neural-dock__guide-list dt {
+  font-weight: 700;
+}
+
+.block-anthology .neural-dock__guide-list dd {
+  margin: 0 0 var(--space-2);
+}
+
+.block-anthology .neural-dock__guide-list dd:last-child {
+  margin-bottom: 0;
 }
 
 .block-anthology .neural-dock__note,
