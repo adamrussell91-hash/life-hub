@@ -21,7 +21,6 @@ import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
 import { deleteTeacherNote, saveTeacherNote, teacherNotes } from './teacher-notes.mjs';
 import { teacherHabits } from './teacher-habits.mjs';
 import { todoFor } from './profile-todo.mjs';
-import { sydneyDay } from './organiser-model.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -69,12 +68,7 @@ export async function profileAction(store, classId, body, { now = new Date() } =
     const record = (await listDone(store, classId, student.id))[body.lesson_id];
     return { need: null, initials: student.initials, ticked: !!record && !record.partial };
   }
-  if (action === 'progress') {
-    // Only the student's own page carries the To do panel; the teacher's read of it does not.
-    const state = await unitState(store, roster, student);
-    const todo = await todoFor(store, roster, student, { ...state, today: sydneyDay(now) });
-    return { need: null, initials: student.initials, ...(await progressFor(store, roster, student)), map: await mapPayload(store, roster, state), todo };
-  }
+  if (action === 'progress') return progressPage(store, roster, student, now);
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
   // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
   if (action === 'steps') {
@@ -130,7 +124,18 @@ async function unitState(store, roster, student) {
   const done = await listDone(store, classId, student.id);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
   const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
-  return { unit, lessons, published, view, rows: mapRows(lessons, view, done, student.id) };
+  return { unit, lessons, published, view, done, rows: mapRows(lessons, view, done, student.id) };
+}
+
+/** The My progress payload: feedback, the map and the To do panel beside it. The teacher's read gets the same. */
+async function progressPage(store, roster, student, now) {
+  const state = await unitState(store, roster, student);
+  const [progress, map, todo] = await Promise.all([
+    progressFor(store, roster, student),
+    mapPayload(store, roster, state),
+    todoFor(store, roster, student, { ...state, now })
+  ]);
+  return { need: null, initials: student.initials, ...progress, map, todo };
 }
 
 async function mapPayload(store, roster, { unit, lessons, rows }) {
@@ -164,7 +169,7 @@ export async function teacherProfileAction(store, classId, body, { now = new Dat
       reject(400, 'bad_request', 'Unknown student.');
     }
     const student = roster.students.find((s) => s.id === body.student_id);
-    if (action === 'progress') return { need: null, name: student.name, initials: student.initials, ...(await progressFor(store, roster, student)), map: (await profileFor(store, roster, student)).map };
+    if (action === 'progress') return { name: student.name, ...(await progressPage(store, roster, student, now)) };
     if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
     if (action === 'piece') return pieceFor(store, roster, student, body.item);
     if (action === 'skill_rungs') return { rungs: (await classSkillRungs(store, classId, [student.id]))[0]?.rungs ?? {} };

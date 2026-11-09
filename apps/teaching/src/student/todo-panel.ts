@@ -1,28 +1,32 @@
 /**
- * The To do panel beside the unit map on a student's own progress page. The server works out
- * every item from what the student has done (profile-todo.mjs); this only draws it. Nothing here
- * is ticked by hand. Organiser practice for today comes from the organiser load the page already has.
+ * The To do panel beside the unit map on a student's progress page, and on the teacher's view of
+ * it. The server works out every item from what the student has done (profile-todo.mjs); this only
+ * draws it. Nothing here is ticked by hand. A finished item stays ticked for the rest of that day.
  */
 import { el } from '@/quiz/dom';
 import { studentAnchor } from '@/student/shell';
-import type { PracticeLoad } from '@/organiser/types';
 import { minutesFor } from '@/organiser/student-panel';
 import './todo-panel.css';
 
 export type TodoActivity = { id: string; title: string; done: boolean };
+export type TodoCountdown = { title: string; lesson_id: string; assessment: boolean; due_date: string; due_time: string; set_date: string };
 export type TodoPayload = {
-  countdown: { title: string; lesson_id: string; due_date: string; due_time: string; set_date: string } | null;
+  countdowns: TodoCountdown[];
   announcements: { id: string; text: string; at: string | null }[];
-  back: { id: string; kind: string; title: string; date: string; state: 'new' | 'redraft' }[];
+  /** Organiser cards left today and already answered today; null when there is nothing either way. */
+  practice: { today: number; answered: number } | null;
+  /** `read`: opened today, so it shows ticked until the day ends. */
+  back: { id: string; kind: string; title: string; date: string; state: 'new' | 'redraft' | 'read' }[];
   waiting: { title: string; lesson_id: string; at: string }[];
   started: { lesson_id: string; title: string; activities: TodoActivity[] }[];
-  todo: { id: string; title: string; kind: 'lesson' | 'quiz' | 'assessment' }[];
+  /** `done`: finished today, ticked until the day ends. */
+  todo: { id: string; title: string; kind: 'lesson' | 'quiz' | 'assessment'; done: boolean }[];
   more: number;
 };
 export type TodoOptions = {
   classId: string;
-  /** Today's organiser practice; the Today row shows only when there is one. */
-  practice?: PracticeLoad | null;
+  /** The teacher looking at a student's page: same list, no Practise link (the organiser tab is the student's). */
+  teacher?: boolean;
   /** Clock for tests. */
   now?: () => Date;
 };
@@ -30,7 +34,7 @@ export type TodoOptions = {
 const lessonHref = (classId: string, lessonId: string): string => `/s/classes/${encodeURIComponent(classId)}/lessons/${encodeURIComponent(lessonId)}`;
 
 /** The due moment, in the device's own time zone. No time means the end of the day. */
-export function dueAt(c: NonNullable<TodoPayload['countdown']>): Date {
+export function dueAt(c: TodoCountdown): Date {
   return new Date(`${c.due_date}T${c.due_time || '23:59'}:00`);
 }
 
@@ -78,11 +82,11 @@ function unit(n: number, label: string): HTMLElement {
   return cell;
 }
 
-function countdown(c: NonNullable<TodoPayload['countdown']>, classId: string, now: () => Date): HTMLElement | null {
+function countdown(c: TodoCountdown, classId: string, now: () => Date): HTMLElement | null {
   const due = dueAt(c);
   if (Number.isNaN(due.getTime()) || remaining(due, now()).past) return null;
   const box = studentAnchor(lessonHref(classId, c.lesson_id), 'td-count');
-  box.append(el('span', 'td-count__kicker', 'Assessment task'), el('span', 'td-count__name', c.title));
+  box.append(el('span', 'td-count__kicker', c.assessment ? 'Assessment task' : 'Due soon'), el('span', 'td-count__name', c.title));
   const cells = el('div', 'td-count__clock');
   cells.setAttribute('role', 'timer');
   const when = el('span', 'td-count__due', `Due ${DAY_FORMAT.format(due)}${c.due_time ? `, ${clock(c.due_time)}` : ''}`);
@@ -158,12 +162,15 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
   const now = options.now ?? (() => new Date());
   const panel = el('aside', 'td-panel');
   panel.setAttribute('aria-label', 'Your to do list');
-  panel.append(el('h3', 'td-panel__title', 'To do'), el('p', 'td-panel__sub', 'Updated as you work. Things tick off when you do them.'));
+  panel.append(el('h3', 'td-panel__title', 'To do'), el('p', 'td-panel__sub', options.teacher ? 'Their list, as they see it. It ticks off as they work.' : 'Updated as you work. Things tick off when you do them.'));
   let any = false;
 
-  const count = todo.countdown ? countdown(todo.countdown, options.classId, now) : null;
-  if (count) {
-    panel.append(count);
+  // Two countdowns at once (an assessment and a sprint step, say) stack, soonest first.
+  const counts = todo.countdowns.map((c) => countdown(c, options.classId, now)).filter((c): c is HTMLElement => c !== null);
+  if (counts.length) {
+    const stack = el('div', 'td-counts');
+    stack.append(...counts);
+    panel.append(stack);
     any = true;
   }
 
@@ -180,12 +187,13 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
     any = true;
   }
 
-  const prac = options.practice;
-  if (prac && (prac.today > 0 || (prac.answered ?? 0) > 0)) {
+  const prac = todo.practice;
+  if (prac && (prac.today > 0 || prac.answered > 0)) {
     const g = group('Today');
     if (prac.today > 0) {
       const minutes = minutesFor(prac.today);
-      g.append(item('box', 'Practise your organiser', `${prac.today} ${prac.today === 1 ? 'card' : 'cards'} · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`, tabLink('Practise →', 'organiser', 'Practise your organiser')));
+      const note = `${prac.today} ${prac.today === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+      g.append(item('box', 'Practise your organiser', note, options.teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser')));
     } else g.append(item('tick', 'Practise your organiser', 'Done for today'));
     panel.append(g);
     any = true;
@@ -194,7 +202,8 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
   if (todo.back.length || todo.waiting.length) {
     const g = group('Back to you');
     for (const b of todo.back) {
-      if (b.state === 'redraft') g.append(item('redraft', b.title, 'Your teacher asked for another go.', tabLink('Redraft →', 'returned', `Redraft ${b.title}`), ['again', 'Have another go']));
+      if (b.state === 'read') g.append(item('tick', b.title, 'Feedback read today.'));
+      else if (b.state === 'redraft') g.append(item('redraft', b.title, 'Your teacher asked for another go.', tabLink('Redraft →', 'returned', `Redraft ${b.title}`), ['again', 'Have another go']));
       else g.append(item('new', b.title, 'Feedback is back. Have a read.', tabLink('Open →', 'returned', `Open feedback on ${b.title}`), ['new', 'New']));
     }
     for (const w of todo.waiting) {
@@ -233,7 +242,10 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
 
   if (todo.todo.length) {
     const g = group('Still to do');
-    for (const t of todo.todo) g.append(item('box', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(options.classId, t.id, 'Open →', t.title)));
+    for (const t of todo.todo) {
+      if (t.done) g.append(item('tick', t.title, 'Done today'));
+      else g.append(item('box', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(options.classId, t.id, 'Open →', t.title)));
+    }
     if (todo.more > 0) g.append(el('p', 'td-more', `And ${todo.more} more on the map.`));
     panel.append(g);
     any = true;

@@ -4,7 +4,7 @@ import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class
 import { profileAction, teacherProfileAction } from '../../netlify/functions/_shared/profile.mjs';
 import { piecesAction } from '../../netlify/functions/_shared/piece-feedback.mjs';
 import { workOwner } from '../../netlify/functions/_shared/lesson-work.mjs';
-import { activitiesOf, announcementsFrom, countdownFrom, plainText } from '../../netlify/functions/_shared/profile-todo.mjs';
+import { activitiesOf, announcementsFrom, countdownsFrom, plainText } from '../../netlify/functions/_shared/profile-todo.mjs';
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -48,7 +48,7 @@ async function setup({ announcements = [], columns = [] } = {}) {
   await claimInitials(store, roster, DEVICE, ana.initials);
   await claimInitials(store, roster, OTHER, ben.initials);
   const write = (lesson, student, blocks) => store.data.set(`work/${lesson}/${workOwner('class1', student.id)}`, { blocks, at: '2026-11-08T00:00:00Z', class_id: 'class1', student_id: student.id });
-  const progress = (device = DEVICE) => profileAction(store, 'class1', { action: 'progress', class_token: device }, { now: NOW });
+  const progress = (device = DEVICE, now = NOW) => profileAction(store, 'class1', { action: 'progress', class_token: device }, { now });
   return { store, ana, ben, write, progress };
 }
 
@@ -70,14 +70,17 @@ test('announcements: text blocks only, teacher-only ones left out, newest first,
   assert.ok(out[2].text.length <= 280 && out[2].text.endsWith('…'));
 });
 
-test('countdown: the soonest task still due; past and teacher-only ones are skipped', () => {
-  const lessons = [{ id: 'x', title: 'Essay' }, { id: 'y', title: 'Poem task' }];
+test('countdowns: every one still due, soonest first, so two at once stack; past and teacher-only ones are skipped', () => {
+  const lessons = [{ id: 'x', title: 'Sprint step 2' }, { id: 'y', title: 'Poem task', pedagogical_mode: 'assessment' }];
   const published = new Map([
-    ['x', { blocks: [countdown('c1', '2026-11-01'), { ...countdown('c2', '2026-11-12'), visibility: 'teacher_only' }] }],
-    ['y', { blocks: [countdown('c3', '2026-11-30'), countdown('c4', '2026-11-20', { title: 'Your own poem' })] }]
+    ['x', { blocks: [countdown('c1', '2026-11-01'), { ...countdown('c2', '2026-11-12'), visibility: 'teacher_only' }, countdown('c5', '2026-11-13')] }],
+    ['y', { blocks: [countdown('c4', '2026-11-20', { title: 'Your own poem' })] }]
   ]);
-  assert.deepEqual(countdownFrom(lessons, published, '2026-11-09'), { title: 'Your own poem', lesson_id: 'y', due_date: '2026-11-20', due_time: '15:00', set_date: '2026-11-01' });
-  assert.equal(countdownFrom(lessons, published, '2026-12-01'), null);
+  assert.deepEqual(countdownsFrom(lessons, published, '2026-11-09'), [
+    { title: 'Sprint step 2', lesson_id: 'x', assessment: false, due_date: '2026-11-13', due_time: '15:00', set_date: '2026-11-01' },
+    { title: 'Your own poem', lesson_id: 'y', assessment: true, due_date: '2026-11-20', due_time: '15:00', set_date: '2026-11-01' }
+  ]);
+  assert.deepEqual(countdownsFrom(lessons, published, '2026-12-01'), []);
 });
 
 test('activities: every question answered, or anything written in a format or lens, counts as done', () => {
@@ -92,18 +95,21 @@ test('progress carries the student’s own To do: started lessons, what is left,
   write('l3', ben, { x: { answers: { a: 'Ben only' } } });
   const { todo } = await progress();
   assert.deepEqual(todo.started, [{ lesson_id: 'l2', title: 'Speaker and voice', activities: [{ id: 'q2', title: 'Warm-up', done: true }, { id: 'q3', title: 'Questions (1)', done: false }] }]);
-  assert.deepEqual(todo.todo.map((t) => [t.id, t.kind]), [['l1', 'lesson'], ['l3', 'lesson'], ['l4', 'assessment']], 'Ben’s writing does not start l3 for Ana');
-  assert.equal(todo.countdown.lesson_id, 'l4');
+  assert.deepEqual(todo.todo.map((t) => [t.id, t.kind, t.done]), [['l1', 'lesson', false], ['l3', 'lesson', false], ['l4', 'assessment', false]], 'Ben’s writing does not start l3 for Ana');
+  assert.deepEqual(todo.countdowns.map((c) => [c.lesson_id, c.assessment]), [['l4', true]]);
+  assert.equal(todo.practice, null, 'no organiser released, so no Today row');
   assert.deepEqual(todo.announcements.map((a) => a.text), ['Bring your draft.']);
   assert.deepEqual([todo.back, todo.waiting, todo.more], [[], [], 0]);
   assert.ok(!JSON.stringify(todo).includes('Teacher copy'), 'teacher-only blocks never count as activities');
 });
 
-test('a done lesson leaves the list', async () => {
+test('a lesson done today stays ticked until the day ends, then drops off', async () => {
   const { store, progress } = await setup();
   await profileAction(store, 'class1', { action: 'done', class_token: DEVICE, lesson_id: 'l1' });
-  const { todo } = await progress();
-  assert.ok(!todo.todo.some((t) => t.id === 'l1'));
+  const today = (await progress(DEVICE, new Date())).todo;
+  assert.deepEqual(today.todo.find((t) => t.id === 'l1'), { id: 'l1', title: 'Ghost poem', kind: 'lesson', done: true });
+  const tomorrow = (await progress(DEVICE, new Date(Date.now() + 86_400_000))).todo;
+  assert.ok(!tomorrow.todo.some((t) => t.id === 'l1'));
 });
 
 test('a handed-in piece waits with the teacher, then comes back new, or as a redraft', async () => {
@@ -121,8 +127,10 @@ test('a handed-in piece waits with the teacher, then comes back new, or as a red
   assert.deepEqual(todo.back.map((b) => [b.id, b.state]), [['w:l1:q1', 'new']]);
 
   await profileAction(store, 'class1', { action: 'seen', class_token: DEVICE, item: 'w:l1:q1' });
-  ({ todo } = await progress());
-  assert.deepEqual(todo.back, [], 'an opened piece drops off');
+  ({ todo } = await progress(DEVICE, new Date()));
+  assert.deepEqual(todo.back.map((b) => b.state), ['read'], 'opened today: ticked for the rest of the day');
+  ({ todo } = await progress(DEVICE, new Date(Date.now() + 86_400_000)));
+  assert.deepEqual(todo.back, [], 'and gone the next day');
 });
 
 test('a redraft the teacher asks for shows as Have another go', async () => {
@@ -136,8 +144,10 @@ test('a redraft the teacher asks for shows as Have another go', async () => {
   assert.deepEqual(todo.waiting, []);
 });
 
-test('the teacher’s read of a student’s page carries no To do', async () => {
-  const { store, ana } = await setup();
-  const out = await teacherProfileAction(store, 'class1', { action: 'progress', student_id: ana.id });
-  assert.equal(out.todo, undefined);
+test('the teacher’s read of a student’s page carries the same To do', async () => {
+  const { store, ana, write, progress } = await setup();
+  write('l2', ana, { q2: { answers: { a: 'one', b: 'two' } } });
+  const out = await teacherProfileAction(store, 'class1', { action: 'progress', student_id: ana.id }, { now: NOW });
+  assert.equal(out.name, 'Ana Ames');
+  assert.deepEqual(out.todo, (await progress()).todo);
 });

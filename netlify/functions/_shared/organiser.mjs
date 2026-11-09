@@ -219,6 +219,19 @@ export function weekStart(day) {
 }
 
 /**
+ * Today's practice for one student, as their organiser load would give it: cards still to do today
+ * and cards already answered today. Null when nothing has been released to them. Reads only.
+ */
+export async function practiceToday(store, roster, student, { now = new Date() } = {}) {
+  const today = sydneyDay(now);
+  const viewer = await viewerOf(store, roster, student);
+  const sheets = await classSheets(store, roster.cls, today, viewer);
+  if (!sheets.length) return null;
+  const { today: due, answered } = practiceFor(sheets, viewer.done, (await readBoxes(store, roster.cls.id, student)).boxes, today);
+  return { today: due, answered };
+}
+
+/**
  * The teacher's read of one student's practice: days in a row with answers (ending today or
  * yesterday), the average box, and right of seen per Sydney week from each card's kept history.
  * Null when the student has never practised. Reads only; never writes.

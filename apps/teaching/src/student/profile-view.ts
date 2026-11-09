@@ -178,14 +178,11 @@ function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HT
   return section;
 }
 
-/**
- * The student's own To do panel beside the map. A teacher looking at the page never gets one:
- * the server leaves it out of their payload, and this checks again.
- */
+/** The To do panel beside the map: on the student's own page and on the teacher's view of it. */
 function withTodo(map: HTMLElement, payload: ProfilePayload, options: RenderProfileOptions): HTMLElement {
-  if (options.teacher || !payload.todo) return map;
+  if (!payload.todo) return map;
   const area = el('div', 'pm-unit');
-  area.append(map, renderTodoPanel(payload.todo, { classId: options.classId, practice: options.organiser?.practice ?? null }));
+  area.append(map, renderTodoPanel(payload.todo, { classId: options.classId, teacher: !!options.teacher }));
   return area;
 }
 

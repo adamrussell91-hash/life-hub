@@ -48,17 +48,21 @@ Most of this is a new read in the `progress` action plus a renderer. The two gen
 
 ## Built (9 November 2026)
 
-Adam asked for the build straight after the mockup. Calls made on the open questions, all easy to change:
+Adam asked for the build straight after the mockup, then settled the open questions:
+
+- **Teacher view**: the teacher sees the same panel on a student's page, without the Practise link.
+- **Done items** stay ticked for the rest of that Sydney day, then drop off. This covers lessons done, feedback opened and organiser practice.
+- **Countdowns**: there is never more than one assessment, but any countdown still due shows (a design sprint step, for example), stacked soonest first. A non-assessment one is headed "Due soon".
+
+Calls made in the build:
 
 - **Started** means saved writing or a quiz go, not an "opened" event. **Activities** are the lesson's question sets. Reading-only blocks are not counted.
-- **Countdown** reads the countdown blocks in the unit's published lessons and shows the soonest one still due. Only one is shown.
 - **Announcements**: text, callout and heading blocks only, newest three. Images and boards stay on the class page.
-- **Teacher view**: no panel. The server leaves it out of the teacher's payload.
-- **Done items** drop off at once rather than staying ticked. Organiser practice shows "Done for today" once the set is finished.
+- **Organiser practice** is read on the server (`practiceToday`), so the teacher's view gets it too.
 
 Code: `netlify/functions/_shared/profile-todo.mjs`, `apps/teaching/src/student/todo-panel.ts`.
 
 ## History
 
 - 9 November 2026: first draft and mockup.
-- 9 November 2026: built, with the calls above.
+- 9 November 2026: built. Teacher view, ticked-for-the-day and stacked countdowns added on Adam's answers.
