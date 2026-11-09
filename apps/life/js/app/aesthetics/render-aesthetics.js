@@ -10,7 +10,7 @@
 import { FAMILY_LABELS, FRAGRANCES, REFERENCE_FRAGRANCES, setFragranceSource } from './fragrance-library.js';
 import { createFragrancePhoto, fragrancePhotoUrl } from './fragrance-photos.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
-import { renderSourceReference } from './render-source-reference.js';
+import { renderSourceReference, revealLibraryRecord } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
 import { setWatchSource } from './watch-model.js';
 import { dressForWeather, readGarmentPhoto, SLOTS, slotLabel, styleAround } from './outfit-model.js';
@@ -91,7 +91,8 @@ export function createAesthetics(doc, {
   watchRadarApi = null,
   weatherApi = loadSydneyWeather,
   sessionStorage = globalThis.sessionStorage,
-  sourceApi = null
+  sourceApi = null,
+  notesApi = null
 } = {}) {
   const $ = sel => doc.querySelector(sel);
   const reduceMotion = () => matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
@@ -394,7 +395,7 @@ export function createAesthetics(doc, {
       f.quote ? el('p', { class: 'aes-quote', text: `“${f.quote}”` }) : el('p', { class: 'aes-meta', text: listOf(f.notes.slice(0, 6)) }),
       f.tryAt && f.status === 'Wishlist' ? el('p', { class: 'aes-meta', text: `Try it at: ${f.tryAt}` }) : null,
       el('button', { type: 'button', class: 'aes-btn', onclick: () => {
-        const record = doc.querySelector(`#aes-library [data-fragrance-id="${f.id}"]`);
+        const record = revealLibraryRecord(doc, f.id);
         if (record) { record.open = true; record.scrollIntoView?.({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' }); record.querySelector('summary')?.focus(); }
       } }, 'Full record')));
   }
@@ -886,7 +887,7 @@ export function createAesthetics(doc, {
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
     renderWheel();
-    renderSourceReference(doc);
+    renderSourceReference(doc, { notesApi });
   }
 
   let sourceLoad = null;
