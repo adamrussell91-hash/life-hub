@@ -283,3 +283,51 @@ test('saving marks keeps each tag on its word when the words sit inside segments
   assert.equal(transcriptWordCount({ text: 'a b' }), 2);
   assert.equal(transcriptWordCount(null), 0);
 });
+
+test('a student sees their take, and its feedback, on a new device once their initials are claimed there', async () => {
+  const { claimInitials, loadRoster, releaseClaim } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = memoryStore([...lessonSeed(), ...classSeed()]);
+  const roster = await loadRoster(store, 'class1');
+  const [ava, noah] = roster.students;
+  await claimInitials(store, roster, TOKEN, ava.initials);
+  await submit(store, TOKEN, { class_id: 'class1', class_token: TOKEN });
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  await saveVoiceMarking(store, 'lesson1', 'viva1', row.id, { comment: 'Name the line.' });
+  await returnVoiceSubmission(store, 'lesson1', 'viva1', row.id, { now: () => NOW });
+  // A second device: nothing by device, but Ava's initials find her returned take.
+  const LAPTOP = 'c'.repeat(48);
+  assert.equal((await readMine(store, 'lesson1', 'viva1', LAPTOP)).submitted, false);
+  // Initials sit on one device: the teacher releases them, the student claims on the laptop.
+  await releaseClaim(store, 'class1', ava.id);
+  await claimInitials(store, roster, LAPTOP, ava.initials);
+  const mine = await readMine(store, 'lesson1', 'viva1', LAPTOP, { class_id: 'class1', class_token: LAPTOP });
+  assert.equal(mine.status, 'returned');
+  assert.equal(mine.comment, 'Name the line.');
+  // And it can't send a second take.
+  await assert.rejects(submit(store, LAPTOP, { class_id: 'class1', class_token: LAPTOP }), /already sent a take/);
+  // Noah's device shows only Noah's (none).
+  await claimInitials(store, roster, OTHER, noah.initials);
+  assert.equal((await readMine(store, 'lesson1', 'viva1', OTHER, { class_id: 'class1', class_token: OTHER })).submitted, false);
+});
+
+test('a take from before the owner index is found by initials once, then indexed; reassigning and deleting move the index', async () => {
+  const { claimInitials, loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = memoryStore([...lessonSeed(), ...classSeed()]);
+  const roster = await loadRoster(store, 'class1');
+  const [ava, noah] = roster.students;
+  await submit(store);
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  await saveVoiceMarking(store, 'lesson1', 'viva1', row.id, { class_id: 'class1', student_id: ava.id });
+  // As an older take would be: assigned, with no index entry.
+  store.data.delete(`voice_owner/lesson1/viva1/class1/${ava.id}`);
+  const LAPTOP = 'c'.repeat(48);
+  await claimInitials(store, roster, LAPTOP, ava.initials);
+  assert.equal((await readMine(store, 'lesson1', 'viva1', LAPTOP, { class_id: 'class1', class_token: LAPTOP })).submitted, true);
+  assert.deepEqual(store.data.get(`voice_owner/lesson1/viva1/class1/${ava.id}`), { id: row.id });
+  // The teacher says it's Noah's: Ava's index clears, Noah's points at it.
+  await saveVoiceMarking(store, 'lesson1', 'viva1', row.id, { class_id: 'class1', student_id: noah.id });
+  assert.equal(store.data.has(`voice_owner/lesson1/viva1/class1/${ava.id}`), false);
+  assert.deepEqual(store.data.get(`voice_owner/lesson1/viva1/class1/${noah.id}`), { id: row.id });
+  await deleteVoiceSubmission(store, 'lesson1', 'viva1', row.id);
+  assert.equal(store.data.has(`voice_owner/lesson1/viva1/class1/${noah.id}`), false);
+});

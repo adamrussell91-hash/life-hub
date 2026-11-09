@@ -83,8 +83,14 @@ export function audioUrl(path: string): string {
 
 const endpoint = (lessonId: string, blockId: string) => `/api/published/voice/${encodeURIComponent(lessonId)}/${encodeURIComponent(blockId)}`;
 
-export function fetchMine(lessonId: string, blockId: string): Promise<MineState> {
-  return apiPost<MineState>(endpoint(lessonId, blockId), { action: 'mine', token: voiceDevice().token });
+export function fetchMine(lessonId: string, blockId: string, classId?: string | null): Promise<MineState> {
+  // With the class initials claimed, the student's take shows on any device they use.
+  const cls = classId ?? voiceClass;
+  return apiPost<MineState>(endpoint(lessonId, blockId), {
+    action: 'mine',
+    token: voiceDevice().token,
+    ...(cls ? { class_id: cls, class_token: deviceToken(`class:${cls}`) } : {})
+  });
 }
 
 async function withRetry<T>(job: () => Promise<T>, tries = 3): Promise<T> {
