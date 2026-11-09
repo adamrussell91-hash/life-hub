@@ -1,6 +1,12 @@
-import { fetchPeopleDirectory } from '@/api/people-directory';
+import {
+  fetchPeopleDirectory,
+  fetchPeopleDirectorySnapshot,
+  peekPeopleDirectory,
+  type PeopleDirectoryResponse
+} from '@/api/people-directory';
 import { listMeetings } from '@/api/meetings';
-import { fetchEntityOverview } from '@/api/entities';
+import { listUniversalLinksForEntity } from '@/api/universal-links';
+import type { MeetingRecord } from '@/domain/types';
 import { meetingRoute, personRoute } from '@/app/router';
 import { decisionLabel } from '@/guides/coaching-sheet';
 import {
@@ -26,8 +32,9 @@ export interface MentoringViewOptions {
 }
 
 const MEETING_PREFIX = 'professional:meeting:';
-/** Overview reads run a few at a time so a long list never floods the API. */
-const OVERVIEW_CONCURRENCY = 4;
+/** Link reads run a few at a time so a long list never floods the API. */
+const LINK_CONCURRENCY = 4;
+type LinkCache = Map<string, Set<string> | null>;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -40,25 +47,37 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-async function linkedMeetingIds(refs: string[]): Promise<Map<string, Set<string>>> {
-  const out = new Map<string, Set<string>>();
+/**
+ * Meetings linked to each person, from the person's own link list. The full
+ * person overview carries the same meetings but also builds a timeline and
+ * reads workplaces, several times slower. `cache` keeps answers between the
+ * quick paint and the refreshed one so no person is asked twice.
+ */
+async function linkedMeetingIds(refs: string[], cache: LinkCache): Promise<Map<string, Set<string>>> {
+  const todo = refs.filter((ref) => !cache.has(ref));
   let cursor = 0;
   async function worker(): Promise<void> {
-    while (cursor < refs.length) {
-      const ref = refs[cursor++]!;
+    while (cursor < todo.length) {
+      const ref = todo[cursor++]!;
       try {
-        const overview = await fetchEntityOverview(ref);
-        const ids = (overview.linked_records.meetings ?? [])
-          .map((endpoint) => endpoint.ref)
+        const { outgoing = [], incoming = [] } = await listUniversalLinksForEntity(ref);
+        const ids = [...outgoing, ...incoming]
+          .map((entry) => entry.endpoint?.ref ?? '')
           .filter((value) => value.startsWith(MEETING_PREFIX))
           .map((value) => value.slice(MEETING_PREFIX.length));
-        out.set(ref, new Set(ids));
+        cache.set(ref, new Set(ids));
       } catch {
-        // A person whose overview fails still gets a card; it just shows no linked sessions.
+        // A person whose links fail still gets a card; it just shows no linked sessions.
+        cache.set(ref, null);
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(OVERVIEW_CONCURRENCY, refs.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(LINK_CONCURRENCY, todo.length) }, worker));
+  const out = new Map<string, Set<string>>();
+  for (const ref of refs) {
+    const ids = cache.get(ref);
+    if (ids) out.set(ref, ids);
+  }
   return out;
 }
 
@@ -168,21 +187,56 @@ export async function renderMentoringView(canvas: HTMLElement, options: Mentorin
   const now = options.now?.() ?? new Date();
   showViewLoading(canvas, 'Loading mentoring…');
 
+  // A full people scan takes seconds. Paint first from this session's last
+  // directory or the server's saved copy of the last scan, then repaint if
+  // the fresh scan changes anything (a role just set, say).
+  let live: PeopleDirectoryResponse | null = null;
+  let liveError: unknown = null;
+  const liveLoad = fetchPeopleDirectory().then(
+    (directory) => (live = directory),
+    (err: unknown) => {
+      liveError = err;
+      return null;
+    }
+  );
+  const quick = peekPeopleDirectory();
+  const quickLoad: Promise<PeopleDirectoryResponse | null> = quick
+    ? Promise.resolve(quick)
+    : fetchPeopleDirectorySnapshot().catch(() => null);
+  const links: LinkCache = new Map();
+
+  async function cardsFrom(directory: PeopleDirectoryResponse, meetings: MeetingRecord[]): Promise<MentoringCard[]> {
+    const people = [...directory.people, ...(directory.students ?? [])];
+    const relevant = mentoringPeople(people, meetings);
+    const linkedMeetings = await linkedMeetingIds(relevant.map((row) => row.ref), links);
+    return buildMentoringCards({ people: relevant, meetings, linkedMeetings, now });
+  }
+
+  let meetings: MeetingRecord[];
+  let first: PeopleDirectoryResponse | null;
   let cards: MentoringCard[];
   try {
-    const [directory, meetingList] = await Promise.all([fetchPeopleDirectory(), listMeetings()]);
-    const people = [...directory.people, ...(directory.students ?? [])];
-    const meetings = meetingList.meetings;
-    const relevant = mentoringPeople(people, meetings);
-    const linkedMeetings = await linkedMeetingIds(relevant.map((row) => row.ref));
-    cards = buildMentoringCards({ people: relevant, meetings, linkedMeetings, now });
+    meetings = (await listMeetings()).meetings;
+    first = live ?? (await quickLoad) ?? (await liveLoad);
+    if (!first) throw liveError ?? new Error('People failed to load.');
+    cards = await cardsFrom(first, meetings);
   } catch (err) {
     if (!isCurrent()) return;
     renderLoadError(canvas, err, () => void renderMentoringView(canvas, options));
     return;
   }
   if (!isCurrent()) return;
+  paintMentoring(canvas, cards, now);
+  if (first === live) return;
 
+  const fresh = await liveLoad;
+  if (!fresh || !isCurrent()) return; // a failed refresh keeps the saved copy on screen
+  const freshCards = await cardsFrom(fresh, meetings);
+  if (!isCurrent() || JSON.stringify(freshCards) === JSON.stringify(cards)) return;
+  paintMentoring(canvas, freshCards, now);
+}
+
+function paintMentoring(canvas: HTMLElement, cards: MentoringCard[], now: Date): void {
   canvas.replaceChildren();
   const page = el('div', 'mentoring-page');
   const supported = cards.filter((card) => card.kind !== 'mentor');

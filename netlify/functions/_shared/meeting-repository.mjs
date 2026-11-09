@@ -18,6 +18,9 @@ import { mapBounded } from './blobs-list.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import {
+  MEETING_INDEX_PREFIX,
+  MEETING_OPERATION_PREFIX,
+  MEETING_PREFIX,
   getJSON,
   listMeetingIndexKeys,
   meetingIndexKey,
@@ -37,6 +40,9 @@ import {
 } from './professional-entity-links.mjs';
 
 const LIST_BATCH_SIZE = 10;
+// Outside every meetings/ prefix so no meeting listing ever sees it.
+const MEETING_LIST_CACHE_KEY = 'meeting-list-cache/v1';
+const MEETING_LIST_CACHE_VERSION = 1;
 // One meeting read just after a save must see that save, or an edit writes the old record back.
 const STRONG = { consistency: 'strong' };
 
@@ -104,22 +110,109 @@ export function createMeetingRepository(deps = {}) {
     return projectMeeting(record, simplifyIncomplete(journal));
   }
 
+  // The list used to read every meeting and its link journal one by one
+  // (hundreds of reads, seconds per page). A saved copy keeps each meeting
+  // with the etags it was read at; the store's key listing carries current
+  // etags, so only meetings that changed since are read again. Any writer,
+  // here or elsewhere, changes an etag, so the copy cannot go stale. A store
+  // whose listing gives no etags reads everything, as before.
+  // Changed items are read strongly: an eventual read could return the old
+  // body under the new etag and the copy would keep it.
+  async function listEtags(prefix) {
+    const etags = new Map();
+    let cursor;
+    for (let page = 0; page < 50; page += 1) {
+      const result = await professionalStore.list({ prefix, ...(cursor ? { cursor } : {}) });
+      const blobs = Array.isArray(result?.blobs) ? result.blobs : [];
+      for (const blob of blobs) {
+        if (typeof blob?.key === 'string' && blob.key) {
+          etags.set(blob.key, typeof blob.etag === 'string' && blob.etag ? blob.etag : null);
+        }
+      }
+      cursor = result?.next_cursor || result?.cursor || '';
+      if (!cursor || blobs.length === 0) break;
+    }
+    return etags;
+  }
+
+  async function readSavedList() {
+    try {
+      const saved = await getJSON(professionalStore, MEETING_LIST_CACHE_KEY);
+      return saved?.version === MEETING_LIST_CACHE_VERSION && saved.entries && typeof saved.entries === 'object'
+        ? saved.entries
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
   async function listMeetings() {
-    const indexKeys = await listMeetingIndexKeys(professionalStore);
+    const [indexKeys, recordEtags, operationEtags, saved] = await Promise.all([
+      listMeetingIndexKeys(professionalStore),
+      listEtags(MEETING_PREFIX),
+      listEtags(MEETING_OPERATION_PREFIX),
+      readSavedList()
+    ]);
     const ids = [
       ...new Set(
         indexKeys
-          .map((key) => key.slice('meetings/index/'.length))
+          .map((key) => key.slice(MEETING_INDEX_PREFIX.length))
           .filter((id) => isValidMeetingId(id))
       )
     ];
-    const records = (
-      await mapBounded(ids, LIST_BATCH_SIZE, async (id) => parseMeetingRecord(await getJSON(professionalStore, meetingKey(id))))
-    ).filter(Boolean);
-    records.sort(compareMeetingsSoonestFirst);
-    return mapBounded(records, LIST_BATCH_SIZE, async (record) =>
-      projectMeeting(record, simplifyIncomplete(await loadOpenJournalForMeeting(record.id)))
-    );
+    const same = (etag, savedEtag) => Boolean(etag) && etag === savedEtag;
+    let changed = ids.length !== Object.keys(saved).length;
+    const entries = await mapBounded(ids, LIST_BATCH_SIZE, async (id) => {
+      const before = saved[id] ?? null;
+      const recordEtag = recordEtags.get(meetingKey(id)) ?? null;
+      const pointerKey = `${MEETING_OPERATION_PREFIX}by-meeting/${id}`;
+      const pointerEtag = operationEtags.get(pointerKey) ?? null;
+
+      const record = before && same(recordEtag, before.recordEtag)
+        ? before.record
+        : parseMeetingRecord(await getJSON(professionalStore, meetingKey(id), STRONG));
+
+      let operationId = null;
+      if (operationEtags.has(pointerKey)) {
+        operationId = before && same(pointerEtag, before.pointerEtag)
+          ? before.operationId
+          : (await getJSON(professionalStore, pointerKey, STRONG))?.operation_id ?? null;
+      }
+      let journal = null;
+      let journalEtag = null;
+      if (operationId) {
+        let journalKey = null;
+        try { journalKey = meetingOperationKey(operationId); } catch { journalKey = null; }
+        journalEtag = journalKey ? operationEtags.get(journalKey) ?? null : null;
+        journal = before && before.operationId === operationId && same(journalEtag, before.journalEtag)
+          ? before.journal
+          : journalKey ? await getJSON(professionalStore, journalKey, STRONG) : null;
+      }
+      if (
+        !before ||
+        !same(recordEtag, before.recordEtag) ||
+        before.pointerEtag !== pointerEtag ||
+        before.operationId !== operationId ||
+        before.journalEtag !== journalEtag
+      ) changed = true;
+      return [id, { recordEtag, record: record ?? null, pointerEtag, operationId, journalEtag, journal: journal ?? null }];
+    });
+
+    // Only a listing with etags can tell a later call what changed.
+    if (changed && entries.every(([, entry]) => entry.recordEtag)) {
+      try {
+        await setJSON(professionalStore, MEETING_LIST_CACHE_KEY, {
+          version: MEETING_LIST_CACHE_VERSION,
+          entries: Object.fromEntries(entries)
+        });
+      } catch {
+        // The saved copy only speeds the next list; a failed write costs nothing else.
+      }
+    }
+
+    const rows = entries.filter(([, entry]) => entry.record);
+    rows.sort(([, a], [, b]) => compareMeetingsSoonestFirst(a.record, b.record));
+    return rows.map(([, entry]) => projectMeeting(entry.record, simplifyIncomplete(entry.journal)));
   }
 
   // Attendee names for calendar chips. Only meetings inside the calendar

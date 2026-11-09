@@ -5,13 +5,17 @@ import type { CoachingSheet } from '@/guides/coaching-sheet';
 import { buildMentoringCards, mentoringPeople, relativeDays } from '@/domain/mentoring-model';
 import { parseRoute, railHighlightFor } from '@/app/router';
 
-vi.mock('@/api/people-directory', () => ({ fetchPeopleDirectory: vi.fn() }));
+vi.mock('@/api/people-directory', () => ({
+  fetchPeopleDirectory: vi.fn(),
+  fetchPeopleDirectorySnapshot: vi.fn(),
+  peekPeopleDirectory: vi.fn()
+}));
 vi.mock('@/api/meetings', () => ({ listMeetings: vi.fn() }));
-vi.mock('@/api/entities', () => ({ fetchEntityOverview: vi.fn() }));
+vi.mock('@/api/universal-links', () => ({ listUniversalLinksForEntity: vi.fn() }));
 
-import { fetchPeopleDirectory } from '@/api/people-directory';
+import { fetchPeopleDirectory, fetchPeopleDirectorySnapshot, peekPeopleDirectory } from '@/api/people-directory';
 import { listMeetings } from '@/api/meetings';
-import { fetchEntityOverview } from '@/api/entities';
+import { listUniversalLinksForEntity } from '@/api/universal-links';
 import { renderMentoringView } from '@/views/mentoring';
 
 const NOW = new Date('2026-10-28T09:00:00.000Z');
@@ -144,22 +148,21 @@ describe('mentoring route', () => {
 
 describe('renderMentoringView', () => {
   beforeEach(() => {
-    vi.mocked(fetchEntityOverview).mockImplementation(async (ref: string) => ({
-      entity: {} as never,
-      current_relationships: [],
-      historical_relationships: [],
-      timeline: [],
-      linked_records: {
-        tasks: [],
-        communications: [],
-        organisations: [],
-        people: [],
-        meetings:
-          ref === mentee.ref
-            ? [{ ref: 'professional:meeting:m_next', kind: 'meeting', display_label: '', supporting_label: null, href: null, lifecycle_status: null, visibility: 'private' }]
-            : []
-      }
+    vi.mocked(listUniversalLinksForEntity).mockImplementation(async (ref: string) => ({
+      outgoing:
+        ref === mentee.ref
+          ? [
+              {
+                link: { id: 'l1', source_ref: ref, target_ref: 'professional:meeting:m_next', relationship_type: 'attended', status: 'current' },
+                endpoint: { ref: 'professional:meeting:m_next', kind: 'meeting', display_label: '' },
+                direction: 'outgoing' as const
+              }
+            ]
+          : [],
+      incoming: []
     }));
+    vi.mocked(fetchPeopleDirectorySnapshot).mockResolvedValue(null);
+    vi.mocked(peekPeopleDirectory).mockReturnValue(null);
     vi.mocked(listMeetings).mockResolvedValue({ meetings: [meeting('m_next', '2026-11-04T00:00:00.000Z')] });
   });
 
@@ -181,7 +184,7 @@ describe('renderMentoringView', () => {
     expect(card.querySelector('a[href="#/meeting/m_next"]')).not.toBeNull();
     expect(canvas.querySelector('.mentor-card[data-person-id="person_e"]')).toBeNull();
     expect(canvas.querySelector('.mentor-card[data-person-id="person_b"] .mentor-card__nudge')?.textContent).toBe('No sessions on record yet');
-    expect(fetchEntityOverview).toHaveBeenCalledTimes(2);
+    expect(listUniversalLinksForEntity).toHaveBeenCalledTimes(2);
   });
 
   it('explains how to add someone when there are no relationships', async () => {
@@ -190,5 +193,47 @@ describe('renderMentoringView', () => {
     await renderMentoringView(canvas, { now: () => NOW });
     expect(canvas.querySelector('.mentoring-empty')?.textContent).toMatch(/Mentor or Mentee/);
     expect(canvas.querySelector('.mentor-card')).toBeNull();
+  });
+
+  it('paints from the saved people copy, then repaints when the fresh scan adds someone', async () => {
+    let finishScan: (value: Awaited<ReturnType<typeof fetchPeopleDirectory>>) => void = () => {};
+    vi.mocked(fetchPeopleDirectory).mockReturnValue(new Promise((resolve) => (finishScan = resolve)));
+    vi.mocked(fetchPeopleDirectorySnapshot).mockResolvedValue({
+      as_of: '2026-10-28T08:00:00.000Z',
+      people: [mentee, stranger],
+      organisations: [],
+      counts: { people: 2, organisations: 0 }
+    });
+    const canvas = document.createElement('main');
+    const done = renderMentoringView(canvas, { now: () => NOW });
+    await vi.waitFor(() => expect(canvas.querySelector('.mentor-card[data-person-id="person_a"]')).not.toBeNull());
+    expect(canvas.querySelector('.mentor-card[data-person-id="person_b"]')).toBeNull();
+
+    finishScan({ people: [mentee, mentor, stranger], organisations: [], counts: { people: 3, organisations: 0 } });
+    await done;
+    expect(canvas.querySelector('.mentor-card[data-person-id="person_b"]')).not.toBeNull();
+    // The mentee's links were read once, for the first paint, and reused.
+    expect(vi.mocked(listUniversalLinksForEntity).mock.calls.filter(([ref]) => ref === mentee.ref)).toHaveLength(1);
+  });
+
+  it('keeps the saved copy on screen when the fresh scan fails', async () => {
+    vi.mocked(fetchPeopleDirectory).mockRejectedValue(new Error('scan failed'));
+    vi.mocked(fetchPeopleDirectorySnapshot).mockResolvedValue({
+      as_of: '2026-10-28T08:00:00.000Z',
+      people: [mentee],
+      organisations: [],
+      counts: { people: 1, organisations: 0 }
+    });
+    const canvas = document.createElement('main');
+    await renderMentoringView(canvas, { now: () => NOW });
+    expect(canvas.querySelector('.mentor-card[data-person-id="person_a"]')).not.toBeNull();
+  });
+
+  it('shows the load error when there is neither a saved copy nor a fresh scan', async () => {
+    vi.mocked(fetchPeopleDirectory).mockRejectedValue(new Error('scan failed'));
+    const canvas = document.createElement('main');
+    await renderMentoringView(canvas, { now: () => NOW });
+    expect(canvas.querySelector('.mentor-card')).toBeNull();
+    expect(canvas.textContent).toMatch(/scan failed|couldn|try again/i);
   });
 });
