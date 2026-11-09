@@ -1,7 +1,7 @@
 import { apiPost } from '@/api/client';
 import type { Block } from '@/schemas/block';
 import type { RenderContext, RenderMode } from '@/blocks/render';
-import { loadActivityState, saveActivityState, shuffleArray, storageKey } from '@/blocks/learning-activity';
+import { shuffleArray } from '@/blocks/learning-activity';
 import { button, el, errorText, isNotPublished, notLivePanel } from '@/blocks/peer-feedback-ui';
 import { poller } from '@/blocks/brainstorm/shared';
 import { deviceToken } from '@/quiz/dom';
@@ -23,16 +23,10 @@ type StudentState = { mine: string | null; others: string[]; criteria: Criterion
 type TeacherWhy = { id: string; text: string; flagged: boolean; visible: boolean };
 type TeacherState = { whys: TeacherWhy[]; suggestions: Array<{ id: string; text: string; flagged: boolean }>; criteria: Criterion[] };
 type Line = { text: string; mine?: boolean };
-type Check = 'not_yet' | 'partly' | 'fully';
 
 const MAX_WHY = 120;
 const MAX_CRITERION = 120;
 const MAX_SUGGESTIONS = 3;
-const CHECKS: Array<{ value: Check; label: string }> = [
-  { value: 'not_yet', label: 'Not yet' },
-  { value: 'partly', label: 'Partly' },
-  { value: 'fully', label: 'Fully' }
-];
 const HOLD_MS = 4500;
 const FADE_MS = 1100;
 /** Students read slowly and there may be a whole class of them, so they ask less often. */
@@ -92,30 +86,9 @@ export function fadeLines(mine: string | null, others: string[], shuffle: (items
   return [{ text: mine, mine: true }, ...(mixed.length > 1 ? mixed : [])];
 }
 
-function checkRow(criterion: Criterion, saved: Partial<Record<string, Check>>, onPick: (id: string, value: Check | null) => void): HTMLElement {
-  const row = el('div', 'whw__checks');
-  row.setAttribute('role', 'group');
-  row.setAttribute('aria-label', `How far along: ${criterion.text}`);
-  for (const option of CHECKS) {
-    const pill = el('button', 'whw__check', option.label);
-    pill.type = 'button';
-    pill.setAttribute('aria-pressed', String(saved[criterion.id] === option.value));
-    pill.addEventListener('click', () => {
-      const off = saved[criterion.id] === option.value;
-      onPick(criterion.id, off ? null : option.value);
-      row.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
-      if (!off) pill.setAttribute('aria-pressed', 'true');
-    });
-    row.append(pill);
-  }
-  return row;
-}
-
 function mountStudent(block: OutcomesBlock, lessonId: string, parts: Parts): void {
   const endpoint = `/api/published/why/${encodeURIComponent(lessonId)}/${encodeURIComponent(block.id)}`;
   const deviceKey = deviceToken(`why:${lessonId}`);
-  const checksKey = `${storageKey(lessonId, block.id)}.checks`;
-  const checks = loadActivityState<Partial<Record<string, Check>>>(checksKey) ?? {};
   const alert = el('p', 'pf-alert');
   alert.setAttribute('role', 'alert');
   alert.hidden = true;
@@ -150,18 +123,7 @@ function mountStudent(block: OutcomesBlock, lessonId: string, parts: Parts): voi
     if (key === paintedHow.key) return;
     paintedHow.key = key;
     parts.how.replaceChildren(
-      ...items.map((criterion) => {
-        const li = el('li', 'whw__item whw__item--check');
-        li.append(
-          el('span', 'whw__item-text', criterion.text),
-          checkRow(criterion, checks, (id, value) => {
-            if (value) checks[id] = value;
-            else delete checks[id];
-            saveActivityState(checksKey, checks);
-          })
-        );
-        return li;
-      })
+      ...items.map((criterion) => el('li', 'whw__item', criterion.text))
     );
   }
 

@@ -61,38 +61,6 @@
   height: 1.5px;
   background: var(--navy-2);
 }
-.whw__item--check {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px 14px;
-}
-.whw__item-text { flex: 1 1 14rem; min-width: 0; }
-/* Text sits level with the pills, and the dash stays on its first line when it wraps. */
-.whw__item--check { --whw-text-top: 7px; align-items: flex-start; }
-.whw__item--check .whw__item-text { padding-top: var(--whw-text-top); }
-.whw__item--check::before { top: calc(var(--whw-text-top) + 0.62em); }
-
-.whw__checks { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); background: var(--shore); }
-.whw__check {
-  min-height: 32px;
-  padding: 3px 11px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: none;
-  color: var(--navy);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.whw__check[aria-pressed='true'] { background: var(--navy); color: #fff; font-weight: var(--weight-semibold); }
-.whw__check:focus-visible { outline: 2px solid var(--navy-2); outline-offset: 1px; }
-@media (pointer: coarse) {
-  .whw__check { min-height: 44px; }
-  .whw__item--check { --whw-text-top: 13px; }
-}
-
 .whw__how-extra { margin-bottom: 12px; }
 .whw__how-extra:empty { display: none; }
 .whw__suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
