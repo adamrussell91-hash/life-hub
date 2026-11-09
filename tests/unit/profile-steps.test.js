@@ -65,7 +65,7 @@ test('steps with a claim and no returned pieces is empty', async () => {
   const { store, mia } = await setup({ pieces: false });
   await profileAction(store, 'class1', { action: 'claim', initials: mia.initials, ...device });
   const out = await profileAction(store, 'class1', { action: 'steps', lesson_id: 'lesson1', ...device });
-  assert.deepEqual(out, { need: null, skills: {} });
+  assert.deepEqual(out, { need: null, skills: {}, directive: null });
 });
 
 test('steps returns each skill’s rung and its linked repeating code', async () => {
@@ -77,7 +77,11 @@ test('steps returns each skill’s rung and its linked repeating code', async ()
     skills: {
       'arguing.thesis': { rung: 'skilled', codes: [{ id: 'ts', code: 'TS', colour: 'lilac', hits: 2 }] },
       'reading.inference': { rung: 'accomplished', codes: [] }
-    }
+    },
+    directive: out.directive
   });
+  // The repeating code in the latest piece is the one thing to do.
+  assert.equal(out.directive?.code_id, 'ts');
+  assert.equal(out.directive?.kind, 'do');
   await assert.rejects(profileAction(store, 'class1', { action: 'steps', lesson_id: '../x', ...device }), (e) => e.status === 400);
 });

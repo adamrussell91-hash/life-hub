@@ -13,7 +13,7 @@ import { studentNotes, markNoteSeen, feedbackDocKey, toPublishedFeedbackPayload 
 import { getJSON } from './teaching-blobs.mjs';
 import { stepForShare, rungForShare, lowerOf, stepName, STEPS, RUNGS } from './progress-steps.mjs';
 import { targetKeys, targetRow, codeGrid, nextSteps, ranked, CHART_MAX } from './progress-patterns.mjs';
-import { stepsBySkill } from './next-steps.mjs';
+import { stepsBySkill, writingDirective } from './next-steps.mjs';
 import { audioPath, mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { rubricPlaces, studentRubric } from './rubric-model.mjs';
@@ -255,7 +255,7 @@ export async function stepsFor(store, classId, studentId) {
   const library = await readFeedbackCodes(store);
   const rungs = rungsFrom(pieces);
   const codes = new Map(library.map((c) => [c.id, c]));
-  return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs) };
+  return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs), directive: writingDirective(pieces, codes, rungs) };
 }
 
 export async function returnedFor(store, roster, student) {
