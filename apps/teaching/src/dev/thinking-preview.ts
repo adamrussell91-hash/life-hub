@@ -99,7 +99,7 @@ function sample(kind: string): Block {
     const b = createChoiceBoard('prev_choice');
     const labels = ['Retell the poem in six lines', 'Map the tide images', 'Rewrite the ending', 'Find three verbs of time', 'Compare two stanzas', 'Write the daughter’s letter', 'Explain the title', 'Argue for the key line', 'Design a cover with a quote'];
     const kinds = ['Write', 'Analyse', 'Create'];
-    return { ...b, content: { ...b.content, choice: { pick: 3, columns: 3, rule: 'each_column' }, tabs: b.content.tabs.map((t, i) => ({ ...t, label: labels[i]!, kind: kinds[i % 3]!, blocks: [{ ...(createBlock('question_set', `prev_q${i}`) as Block), content: { questions: [{ id: `prev_q${i}_1`, prompt: `${labels[i]}.`, kind: 'short_answer', response_space: 'medium' }] } } as Block] })) } };
+    return { ...b, content: { ...b.content, choice: { pick: 3, columns: 3, rule: 'each_column' }, tabs: b.content.tabs.map((t, i) => ({ ...t, label: labels[i]!, kind: kinds[i % 3]!, blocks: [{ ...(createBlock('question_set', `prev_q${i}`) as Block), content: { questions: [{ id: `prev_q${i}_1`, prompt: `${labels[i]}.`, kind: 'short_answer', response_space: 'medium' }] } } as Block] })) } } as Block;
   }
   const formats: Record<string, [string, Record<string, unknown>[]]> = {
     combining: ['sentence_combining', [

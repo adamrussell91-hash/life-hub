@@ -21,7 +21,8 @@ const OPTIONAL: Partial<Record<NewBlockType, Record<string, string>>> = {
   card_stack: { title: 'Card stack title' },
   collection: { title: 'Collection title' },
   countdown: { title: 'Countdown title', note: 'Countdown note' },
-  explainer: { title: 'Explainer title' }
+  explainer: { title: 'Explainer title' },
+  comparative_judgement: { title: 'Comparative judgement title' }
 };
 
 function fill(value: unknown, key: string, path: string): unknown {

@@ -200,6 +200,18 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
         // A draft recording and unused tray notes stay with the teacher.
         return stripExplainerForStudent(block);
       }
+      if (block.block_type === 'comparative_judgement') {
+        // Calibration picks and reasons, anchors, weights and the mark scale are the teacher's alone.
+        // Keep in step with apps/teaching/src/blocks/visibility.ts.
+        const { anchors: _anchors, teacher_weight: _weight, downweight_misfits: _misfits, out_of: _outOf, ...content } = block.content ?? {};
+        return {
+          ...block,
+          content: {
+            ...content,
+            calibration: (Array.isArray(content.calibration) ? content.calibration : []).map(c => ({ id: c?.id, left: c?.left, right: c?.right }))
+          }
+        };
+      }
       if (block.block_type === 'hinge_question') {
         // The right answer, misconception notes, answer tiers, move-on marks and back-up question are the teacher's alone.
         const { correct_id: _right, move_on: _move, reteach: _reteach, backup: _backup, ...content } = block.content ?? {};

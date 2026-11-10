@@ -50,6 +50,7 @@ export const BlockTypeSchema = z.enum([
   'brainstorm',
   'hinge_question',
   'explainer',
+  'comparative_judgement',
   'continuum_line',
   'diamond_nine',
   'venn',
@@ -1929,6 +1930,53 @@ export const ExplainerBlockSchema = z.object({
 });
 export type ExplainerBlock = z.infer<typeof ExplainerBlockSchema>;
 
+/**
+ * Comparative judgement: students and the teacher pick the stronger of two
+ * anonymised answers to one written question; a Bradley–Terry fit turns the
+ * picks into a scale. The maths and the pool live on the server
+ * (netlify/functions/_shared/comparative-judgement.mjs, cj-maths.mjs).
+ * Calibration picks and reasons, anchors and weights are the teacher's alone.
+ */
+export const CJ_DEFAULT_CRITERION = 'Which answer is stronger overall?';
+export const CJ_DEFAULT_CHIPS = ['Precise quote', 'Clear argument', 'Analyses effect'];
+export const CjSourceSchema = z.object({
+  /** '' = this lesson. */
+  lesson_id: z.string().max(80).default(''),
+  block_id: z.string().max(80).default(''),
+  question_id: z.string().max(80).default('')
+});
+export const CjCalibrationSchema = z.object({
+  id: z.string().min(1).max(60),
+  left: z.string().max(4000).default(''),
+  right: z.string().max(4000).default(''),
+  better: z.enum(['left', 'right']).default('left'),
+  reason: z.string().max(300).default('')
+});
+export const CjAnchorSchema = z.object({
+  id: z.string().min(1).max(60),
+  text: z.string().max(4000).default(''),
+  mark: z.number().min(0).max(100).nullable().default(null)
+});
+export const ComparativeJudgementBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('comparative_judgement'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().max(200).optional(),
+    source: CjSourceSchema.default({ lesson_id: '', block_id: '', question_id: '' }),
+    criterion: z.string().max(300).default(CJ_DEFAULT_CRITERION),
+    chips: z.array(z.string().max(40)).max(8).default(CJ_DEFAULT_CHIPS),
+    calibration: z.array(CjCalibrationSchema).max(3).default([]),
+    anchors: z.array(CjAnchorSchema).max(6).default([]),
+    per_student: z.number().int().min(4).max(20).default(8),
+    show_third: z.boolean().default(false),
+    teacher_weight: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
+    downweight_misfits: z.boolean().default(true),
+    out_of: z.number().min(1).max(100).default(20)
+  }), ...blockLayout, ...blockTimestamps
+});
+export type ComparativeJudgementBlock = z.infer<typeof ComparativeJudgementBlockSchema>;
+
 /** Events run in time order and none sits past the end of the recording. */
 export function refineExplainerRecording(
   block: z.infer<typeof ExplainerBlockSchema>,
@@ -2058,6 +2106,7 @@ const leafBlockSchemas = [
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ExplainerBlockSchema,
+  ComparativeJudgementBlockSchema,
   ContinuumLineBlockSchema,
   DiamondNineBlockSchema,
   VennBlockSchema,

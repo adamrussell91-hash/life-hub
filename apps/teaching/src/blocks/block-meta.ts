@@ -36,6 +36,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   brainstorm: 'Gather quick answers from the class and show them together on one board.',
   hinge_question: 'A quick check at the turning point of a lesson. Each wrong answer names a misconception, so you know whether to move on.',
   explainer: 'Record yourself talking through a text while you mark it up. Students replay your voice and marks together.',
+  comparative_judgement: 'Students pick the stronger of two anonymous answers from the class. Builds a fair ranking, shared standards and talk about quality.',
   continuum_line: 'Students place a statement on a line and defend it. Hidden until you reveal.',
   diamond_nine: 'Students rank nine cards in a diamond, give reasons, then see where the class disagrees most and rank again.',
   venn: 'Students compare two or three texts in a Venn, tag each point surface or deep, and write one synthesis sentence.',
@@ -91,7 +92,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'tabs:choice': 'A grid of tasks at three levels. Students pick some, say why, and rate each one when they finish.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "continuum_line", "diamond_nine", "venn", "tabs:choice", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "comparative_judgement", "continuum_line", "diamond_nine", "venn", "tabs:choice", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {

@@ -9,6 +9,7 @@ import { createWhatHowWhyFields } from '@/blocks/what-how-why-editor';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createExplainerEditor } from '@/blocks/explainer';
+import { createComparativeJudgementEditor } from '@/blocks/comparative-judgement';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createDiamondNineEditor } from '@/blocks/diamond-nine';
 import { createVennEditor } from '@/blocks/venn';
@@ -3557,6 +3558,8 @@ function createBlockEditorFields(
       return createHingeQuestionEditor(block, onChange);
     case 'explainer':
       return createExplainerEditor(block, onChange, { lessonId: context.lessonId });
+    case 'comparative_judgement':
+      return createComparativeJudgementEditor(block, onChange, { lessonId: context.lessonId, getLessonBlocks: context.getLessonBlocks, unitLessons: context.unitLessons });
     case 'continuum_line':
       return createContinuumLineEditor(block, onChange, context.getLessonBlocks);
     case 'diamond_nine':

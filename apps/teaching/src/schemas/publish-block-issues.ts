@@ -27,6 +27,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   explainer: 'Explainer',
+  comparative_judgement: 'Comparative judgement',
   continuum_line: 'Continuum line',
   diamond_nine: 'Diamond 9',
   venn: 'Two-text Venn',
@@ -70,12 +71,23 @@ export function listPublishBlockIssues(blocks: Block[], options: PublishBlockIss
 
 /**
  * Things to check that do not stop publishing: an Explainer with no published
- * recording shows students the text only.
+ * recording shows students the text only; a Comparative judgement with no
+ * question picked has no answers to judge.
  */
 export function listPublishBlockWarnings(blocks: Block[]): PublishBlockIssue[] {
   const typeOrder = collectTypeOrder(blocks);
   const warnings: PublishBlockIssue[] = [];
   visitBlocks(blocks, (block) => {
+    if (block.block_type === 'comparative_judgement') {
+      const { source, calibration } = block.content;
+      const message = !source.block_id || !source.question_id
+        ? 'No question picked, so there are no answers to judge'
+        : calibration.some((c) => !c.left.trim() || !c.right.trim())
+          ? 'A practice pair has an empty answer'
+          : null;
+      if (message) warnings.push({ blockId: block.id, blockType: block.block_type, label: locateBlock(block, [], typeOrder), message });
+      return;
+    }
     if (block.block_type !== 'explainer') return;
     const rec = block.content.recording;
     const message = !rec

@@ -369,6 +369,7 @@ describe('blockRegistry', () => {
       'code',
       'collection',
       'columns',
+      'comparative_judgement',
       'concept_features',
       'concept_map',
       'continuum_line',
