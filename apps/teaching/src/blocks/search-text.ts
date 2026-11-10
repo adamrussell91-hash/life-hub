@@ -96,6 +96,16 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'brainstorm':
       push(parts, c.question);
       break;
+    case 'explainer': {
+      const ex = c as { title?: string; text?: unknown; recording?: { events?: Array<{ kind?: string; html?: string; prompt?: string }> } };
+      push(parts, ex.title);
+      walkStrings(ex.text, parts);
+      for (const ev of ex.recording?.events ?? []) {
+        if (ev.kind === 'note') push(parts, htmlToPlainText(String(ev.html ?? '')));
+        if (ev.kind === 'pause') push(parts, ev.prompt);
+      }
+      break;
+    }
     case 'hinge_question':
       push(parts, c.prompt);
       for (const o of (c.options as Array<{ text?: string }> | undefined) ?? []) push(parts, o.text);

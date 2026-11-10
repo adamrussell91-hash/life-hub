@@ -58,6 +58,19 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
         }
       };
     }
+    if (block.block_type === 'explainer') {
+      const rec = block.content.recording;
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          tray: block.content.tray.map((note) => ({ ...note, html: sanitizeRichTextHtml(note.html) })),
+          ...(rec
+            ? { recording: { ...rec, events: rec.events.map((ev) => (ev.kind === 'note' ? { ...ev, html: sanitizeRichTextHtml(ev.html) } : ev)) } }
+            : {})
+        }
+      };
+    }
     if (block.block_type === 'diagram' && block.content.svg_markup != null) {
       return {
         ...block,

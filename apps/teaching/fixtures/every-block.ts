@@ -20,7 +20,8 @@ const OPTIONAL: Partial<Record<NewBlockType, Record<string, string>>> = {
   quote: { attribution: 'Quote attribution', source: 'Quote source', reference: 'Quote reference' },
   card_stack: { title: 'Card stack title' },
   collection: { title: 'Collection title' },
-  countdown: { title: 'Countdown title', note: 'Countdown note' }
+  countdown: { title: 'Countdown title', note: 'Countdown note' },
+  explainer: { title: 'Explainer title' }
 };
 
 function fill(value: unknown, key: string, path: string): unknown {

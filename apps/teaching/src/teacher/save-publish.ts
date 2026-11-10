@@ -7,6 +7,8 @@ import {
   collectRestrictedDriveMediaWarnings,
   formatPublishMediaWarnings
 } from '@/teacher/publish-media-warnings';
+import { formatPublishBlockIssue, listPublishBlockWarnings } from '@/schemas/publish-block-issues';
+import type { Block } from '@/schemas/block';
 
 /** Checkpoint reasons the lesson PUT endpoint accepts alongside a draft body. */
 export type LessonPutCheckpointReason = Extract<
@@ -338,11 +340,13 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
     try {
       if (options.getPublishMediaContext) {
         const ctx = await options.getPublishMediaContext();
-        const warnings = collectRestrictedDriveMediaWarnings(ctx);
+        const media = collectRestrictedDriveMediaWarnings(ctx);
+        const blockWarnings = Array.isArray(ctx.blocks) ? listPublishBlockWarnings(ctx.blocks as Block[]).map(formatPublishBlockIssue) : [];
+        const warnings = [...media, ...blockWarnings];
         if (warnings.length > 0) {
           const proceed = await askConfirmCard({
             eyebrow: 'Publish',
-            title: 'Restricted Drive media detected',
+            title: media.length > 0 ? 'Restricted Drive media detected' : 'Check before publishing',
             supporting: `${formatPublishMediaWarnings(warnings)} Publish anyway?`,
             confirmLabel: 'Publish anyway',
             discardLabel: 'Cancel'

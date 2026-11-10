@@ -1,6 +1,7 @@
 import { DEEP_SETTING_KEYS } from '@/deep/block-tags';
 import { THINK_ALOUD_KEY } from '@/blocks/think-aloud';
 import { studentTechniqueScan } from '@/blocks/technique-scan';
+import { stripExplainerForStudent } from '@/blocks/explainer/publish';
 import type { Block } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -193,6 +194,10 @@ function filterBlocksForStudentInner(
         // A lecture scene's script is the teacher's notes; students get the transcript once it is recorded.
         const { script: _script, ...content } = block.content;
         return { ...block, content } as Block;
+      }
+      if (block.block_type === 'explainer') {
+        // A draft recording and unused tray notes stay with the teacher.
+        return stripExplainerForStudent(block);
       }
       if (block.block_type === 'hinge_question') {
         // The right answer, misconception notes, answer tiers, move-on marks and back-up question are the teacher's alone.

@@ -196,6 +196,10 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
         const { script: _script, ...content } = block.content ?? {};
         return { ...block, content };
       }
+      if (block.block_type === 'explainer') {
+        // A draft recording and unused tray notes stay with the teacher.
+        return stripExplainerForStudent(block);
+      }
       if (block.block_type === 'hinge_question') {
         // The right answer, misconception notes, answer tiers, move-on marks and back-up question are the teacher's alone.
         const { correct_id: _right, move_on: _move, reteach: _reteach, backup: _backup, ...content } = block.content ?? {};
@@ -222,6 +226,28 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
       }
       return block;
     });
+}
+
+/**
+ * Explainer: a draft recording stays with the teacher, and tray notes no event
+ * used are dropped. Keep in step with apps/teaching/src/blocks/explainer/publish.ts.
+ */
+export function stripExplainerForStudent(block) {
+  const content = block?.content ?? {};
+  const rec = content.recording && typeof content.recording === 'object' && content.recording.status !== 'draft' ? content.recording : undefined;
+  const used = new Set();
+  for (const ev of Array.isArray(rec?.events) ? rec.events : []) {
+    if (ev?.kind === 'note' && ev.tray_id) used.add(ev.tray_id);
+  }
+  const { recording: _recording, ...rest } = content;
+  return {
+    ...block,
+    content: {
+      ...rest,
+      tray: (Array.isArray(content.tray) ? content.tray : []).filter(note => used.has(note?.id)),
+      ...(rec ? { recording: rec } : {})
+    }
+  };
 }
 
 /**
@@ -333,6 +359,26 @@ export function sanitizeBlocksDeep(blocks) {
           ...block.content,
           annotations,
           voice_tracks
+        }
+      };
+    }
+    if (block.block_type === 'explainer') {
+      const rec = block.content?.recording;
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          tray: (Array.isArray(block.content?.tray) ? block.content.tray : []).map(note => ({ ...note, html: sanitizeRichTextHtml(note?.html) })),
+          ...(rec && typeof rec === 'object'
+            ? {
+                recording: {
+                  ...rec,
+                  events: (Array.isArray(rec.events) ? rec.events : []).map(ev =>
+                    ev?.kind === 'note' ? { ...ev, html: sanitizeRichTextHtml(ev.html) } : ev
+                  )
+                }
+              }
+            : {})
         }
       };
     }

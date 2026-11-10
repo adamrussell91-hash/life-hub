@@ -237,3 +237,50 @@ test('new Teaching ids carry 64 random bits from the CSPRNG', () => {
   assert.equal(ids.size, 200);
   for (const id of ids) assert.match(id, /^media_[a-z0-9]+_[0-9a-f]{16}$/);
 });
+
+function explainerBlock(status) {
+  const anchor = { granularity: 'phrase', stanza: 'stanza_1', line: 'line_1', start: 4, end: 10, quote: { exact: 'harbour' } };
+  return {
+    id: 'ex1',
+    type: 'block',
+    block_type: 'explainer',
+    visibility: 'student_teacher',
+    content: {
+      layout: 'text',
+      text: { kind: 'prose', stanzas: [{ id: 'stanza_1', lines: [{ id: 'line_1', text: 'The harbour fills with light.' }] }] },
+      tray: [
+        { id: 'tray_used', html: '<p onclick="x()">Used</p>' },
+        { id: 'tray_spare', html: '<p>Spare</p>' }
+      ],
+      recording: {
+        status,
+        clips: [{ url: '/a.webm', mime: 'audio/webm', start_s: 0, duration_s: 5 }],
+        duration_s: 5,
+        events: [
+          { id: 'n1', t: 1, kind: 'note', anchor, html: '<p>Note<script>bad()</script></p>', tray_id: 'tray_used' },
+          { id: 'p1', t: 2, kind: 'pause', prompt: 'Think' }
+        ]
+      }
+    }
+  };
+}
+
+test('filterBlocksForStudent keeps a published explainer recording and only the tray notes it used', () => {
+  const [block] = filterBlocksForStudent([{ type: 'block', block_type: 'section', id: 's1', visibility: 'student_teacher', content: { blocks: [explainerBlock('published')] } }])[0].content.blocks;
+  assert.equal(block.content.recording.events.length, 2);
+  assert.deepEqual(block.content.tray.map(n => n.id), ['tray_used']);
+});
+
+test('filterBlocksForStudent drops a draft explainer recording and the whole tray', () => {
+  const [block] = filterBlocksForStudent([explainerBlock('draft')]);
+  assert.equal(block.content.recording, undefined);
+  assert.deepEqual(block.content.tray, []);
+  assert.equal(block.content.text.stanzas.length, 1);
+});
+
+test('sanitizeBlocksDeep cleans explainer tray and note html', () => {
+  const [block] = sanitizeBlocksDeep([explainerBlock('published')]);
+  assert.doesNotMatch(block.content.tray[0].html, /onclick/);
+  assert.doesNotMatch(block.content.recording.events[0].html, /script/);
+  assert.equal(block.content.recording.events[1].prompt, 'Think');
+});
