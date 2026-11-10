@@ -116,3 +116,73 @@ export function cleanPoint(value: unknown, count: number): VennPoint | null {
     ...(v.preload === true ? { preload: true } : {})
   };
 }
+
+/* ── View helpers (added for the Venn view) ─────────────────────────── */
+
+export const MAX_POINTS = 30;
+
+/** What a student keeps for one Venn: the points and the synthesis sentence (null until they edit it). */
+export type VennState = { points: VennPoint[]; synthesis: string | null };
+
+export function textCount(texts: readonly unknown[]): number {
+  return texts.length >= 3 ? 3 : 2;
+}
+
+/** Gaps in words a student can act on, naming each text by its label. */
+export function pointGapsLabelled(point: VennPoint, labels: readonly string[]): string[] {
+  return pointGaps(point).map((gap) => {
+    const m = /^Say how text ([ABC]) treats it$/.exec(gap);
+    return m ? `Say how ${textLabel(m[1]!.toLowerCase() as TextKey, labels)} treats it` : gap;
+  });
+}
+
+/**
+ * The teacher's frame with the text letters swapped for the labels:
+ * "where A …, B …" becomes "where The Tide Clock …, Salt Roads …". A capital
+ * A followed by a lower-case word is an article and stays.
+ */
+export function fillFrame(frame: string, labels: readonly string[]): string {
+  return frame.replace(/\b([ABC])\b(?!\s+[a-z])/g, (whole, letter: string) => {
+    const label = labels[TEXT_KEYS.indexOf(letter.toLowerCase() as TextKey)]?.trim();
+    return label || whole;
+  });
+}
+
+/**
+ * The student's points with the teacher's preload merged in: every preload
+ * point is there once (text from the teacher), ones the teacher removed go,
+ * and the student's placements and notes stay.
+ */
+export function withPreload(points: readonly VennPoint[], preload: ReadonlyArray<{ id: string; text: string }>): VennPoint[] {
+  const live = preload.filter((p) => p.text.trim());
+  const ids = new Set(live.map((p) => p.id));
+  const kept = points.filter((p) => !p.preload || ids.has(p.id)).map((p) => {
+    const source = p.preload ? live.find((x) => x.id === p.id) : undefined;
+    return source ? { ...p, text: source.text } : p;
+  });
+  const have = new Set(kept.map((p) => p.id));
+  const added = live.filter((p) => !have.has(p.id)).map((p): VennPoint => ({
+    id: p.id, text: p.text, region: null, depth: null, quotes: {}, differs: {}, preload: true
+  }));
+  return [...added, ...kept];
+}
+
+/** Saved state from storage or the server: known fields only. */
+export function cleanState(value: unknown, count: number): VennState {
+  const v = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const points = Array.isArray(v.points)
+    ? v.points.map((p) => cleanPoint(p, count)).filter((p): p is VennPoint => !!p).slice(0, MAX_POINTS + 12)
+    : [];
+  return { points, synthesis: typeof v.synthesis === 'string' ? v.synthesis : null };
+}
+
+/** Quotes and differs only for the texts in the point's region, so a moved point sends no stale notes. */
+export function trimToRegion(point: VennPoint): VennPoint {
+  const keys = point.region ? regionTexts(point.region) : [];
+  const pick = (rec: Partial<Record<TextKey, string>>) => {
+    const out: Partial<Record<TextKey, string>> = {};
+    for (const k of keys) if (rec[k]?.trim()) out[k] = rec[k]!;
+    return out;
+  };
+  return { ...point, quotes: pick(point.quotes), differs: isShared(point.region) ? pick(point.differs) : {} };
+}

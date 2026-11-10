@@ -18,6 +18,7 @@ import { swapBlock } from '@/blocks/swap-block';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import type { Block } from '@/schemas/block';
 import { createHubTabStrip } from '../../design-kit/js/hub-list.js';
+import { CHOICE_TILES_MAX, createChoiceSettingsEditor, createChoiceTileFields } from '@/blocks/choice-board/editor';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -347,9 +348,13 @@ export function createTabsEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__tabs';
   let seq = 0;
+  const isChoice = (): boolean => getLatest().content.style === 'choice';
+  // Choice board settings: shown only while the panels are a choice board; rebuilt with the strip.
+  let choiceSettings: ReturnType<typeof createChoiceSettingsEditor> | null = null;
 
   function emitTabs(tabs: Tab[]): void {
     onChange({ ...getLatest(), content: { ...getLatest().content, tabs } });
+    choiceSettings?.refresh();
   }
 
   function patchTab(tabId: string, blocks: Block[]): void {
@@ -361,73 +366,116 @@ export function createTabsEditor(
     );
   }
 
-  const strip = createHubTabStrip<Tab>({
-    tabs: block.content.tabs,
-    active: preferredPanelIndex(block.id, block.content.tabs.length),
-    onActiveChange: (index) => rememberTabsPanel(getLatest().id, index),
-    label: 'Tabs',
-    min: TABS_MIN,
-    max: TABS_MAX,
-    minReason: 'A tabs block needs at least two tabs. Delete the whole block from its ··· menu instead.',
-    maxReason: 'A tabs block holds up to eight tabs.',
-    read: () => getLatest().content.tabs,
-    onChange: emitTabs,
-    getLabel: (tab) => tab.label,
-    setLabel: (tab, label) => ({ ...tab, label }),
-    countChildren: (tab) => tab.blocks.length,
-    create: (index) => ({
-      id: `${getLatest().id}_t${index + 1}_${Date.now().toString(36)}${(seq += 1)}`,
-      label: '',
-      blocks: []
-    }),
-    duplicate: (tab) => {
-      const id = `${getLatest().id}_t${Date.now().toString(36)}${(seq += 1)}`;
-      let n = 0;
-      return {
-        id,
-        label: tab.label ? `${tab.label} copy` : '',
-        blocks: tab.blocks.map((child) =>
-          cloneBlockWithNewIds(child, () => `${id}_n${(n += 1)}`)
-        ) as Tab['blocks']
-      };
-    },
-    renderPanel: (tab) =>
-      createNestedBlocksEditor({
-        blocks: tab.blocks,
-        allowedTypes: TAB_CHILD_TYPES,
-        context,
-        label: `Blocks in ${tab.label || 'this tab'}`,
-        empty: {
-          title: `${tab.label ? `“${tab.label}”` : 'This tab'} is empty`,
-          detail: ' Add the first block. Students won’t see an empty tab.'
-        },
-        read: () => getLatest().content.tabs.find((t) => t.id === tab.id)?.blocks ?? [],
-        idFactory: () => `${tab.id}_b`,
-        moveParent: () => {
-          const latest = getLatest();
-          const tabIndex = latest.content.tabs.findIndex((t) => t.id === tab.id);
-          return tabIndex < 0 ? null : { kind: 'tab', id: latest.id, tabIndex };
-        },
-        onChange: (next) => patchTab(tab.id, next)
-      })
-  });
+  function patchTile(tabId: string, patch: Partial<Pick<Tab, 'tier' | 'kind'>>): void {
+    const latest = getLatest();
+    emitTabs(latest.content.tabs.map((t) => (t.id === tabId ? { ...t, ...patch } : t)));
+  }
+
+  function buildStrip(): { el: HTMLElement } {
+    const choice = isChoice();
+    const max = choice ? CHOICE_TILES_MAX : TABS_MAX;
+    return createHubTabStrip<Tab>({
+      tabs: getLatest().content.tabs,
+      active: preferredPanelIndex(getLatest().id, getLatest().content.tabs.length),
+      onActiveChange: (index) => rememberTabsPanel(getLatest().id, index),
+      label: choice ? 'Tiles' : 'Tabs',
+      min: TABS_MIN,
+      max,
+      minReason: 'A tabs block needs at least two tabs. Delete the whole block from its ··· menu instead.',
+      maxReason: choice ? 'A choice board holds up to nine tiles.' : 'A tabs block holds up to eight tabs.',
+      read: () => getLatest().content.tabs,
+      onChange: emitTabs,
+      getLabel: (tab) => tab.label,
+      setLabel: (tab, label) => ({ ...tab, label }),
+      countChildren: (tab) => tab.blocks.length,
+      create: (index) => ({
+        id: `${getLatest().id}_t${index + 1}_${Date.now().toString(36)}${(seq += 1)}`,
+        label: '',
+        blocks: [],
+        ...(isChoice() ? { tier: ((index % 3) + 1) as 1 | 2 | 3 } : {})
+      }),
+      duplicate: (tab) => {
+        const id = `${getLatest().id}_t${Date.now().toString(36)}${(seq += 1)}`;
+        let n = 0;
+        return {
+          ...tab,
+          id,
+          label: tab.label ? `${tab.label} copy` : '',
+          blocks: tab.blocks.map((child) =>
+            cloneBlockWithNewIds(child, () => `${id}_n${(n += 1)}`)
+          ) as Tab['blocks']
+        };
+      },
+      renderPanel: (tab) => {
+        const nested = createNestedBlocksEditor({
+          blocks: tab.blocks,
+          allowedTypes: TAB_CHILD_TYPES,
+          context,
+          label: `Blocks in ${tab.label || 'this tab'}`,
+          empty: {
+            title: `${tab.label ? `“${tab.label}”` : 'This tab'} is empty`,
+            detail: ' Add the first block. Students won’t see an empty tab.'
+          },
+          read: () => getLatest().content.tabs.find((t) => t.id === tab.id)?.blocks ?? [],
+          idFactory: () => `${tab.id}_b`,
+          moveParent: () => {
+            const latest = getLatest();
+            const tabIndex = latest.content.tabs.findIndex((t) => t.id === tab.id);
+            return tabIndex < 0 ? null : { kind: 'tab', id: latest.id, tabIndex };
+          },
+          onChange: (next) => patchTab(tab.id, next)
+        });
+        if (!isChoice()) return nested;
+        const current = getLatest().content.tabs.find((t) => t.id === tab.id) ?? tab;
+        const wrap = document.createElement('div');
+        wrap.className = 'block-editor__choice-tile';
+        wrap.append(createChoiceTileFields(current, (patch) => patchTile(tab.id, patch)), nested);
+        return wrap;
+      }
+    });
+  }
+
+  const choiceHost = document.createElement('div');
+  choiceHost.className = 'block-editor__choice';
+  const stripHost = document.createElement('div');
+  stripHost.className = 'block-editor__tabs-strip';
+
+  function mountStyleParts(): void {
+    if (isChoice()) {
+      choiceSettings = createChoiceSettingsEditor(getLatest, (choice) => {
+        const latest = getLatest();
+        onChange({ ...latest, content: { ...latest.content, choice } });
+      });
+      choiceHost.replaceChildren(choiceSettings.el);
+    } else {
+      choiceSettings = null;
+      choiceHost.replaceChildren();
+    }
+    choiceHost.hidden = !choiceSettings;
+    stripHost.replaceChildren(buildStrip().el);
+  }
 
   const styleFilter = createEditorFilter({
     key: 'Show as',
     value: block.content.style ?? 'tabs',
     options: [
       { value: 'tabs', label: 'Tabs' },
-      { value: 'folds', label: 'Fold-outs' }
+      { value: 'folds', label: 'Fold-outs' },
+      { value: 'choice', label: 'Choice board' }
     ],
     className: 'block-editor__tabs-style',
     ariaLabel: 'Show panels as',
     defaultValue: 'tabs',
     onChange: (value) => {
       const latest = getLatest();
-      onChange({ ...latest, content: { ...latest.content, style: value === 'folds' ? 'folds' : 'tabs' } });
+      const style = value === 'folds' || value === 'choice' ? value : 'tabs';
+      // Spread content so the choice settings (and tile levels) survive a switch away and back.
+      onChange({ ...latest, content: { ...latest.content, style } });
+      mountStyleParts();
     }
   });
 
-  fields.append(styleFilter.el, strip.el);
+  mountStyleParts();
+  fields.append(styleFilter.el, choiceHost, stripHost);
   return editorShell(block, onChange, fields, getLatest);
 }

@@ -1,0 +1,658 @@
+/* Diamond 9 block. Fields, panels, switches and print lines come from peer-feedback.css. */
+
+.d9,
+.d9-student,
+.d9-student__body,
+.d9-round,
+.d9-class,
+.d9-teacher,
+.d9-teacher__body,
+.d9-preview,
+.d9-print {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.d9 [hidden] {
+  display: none !important;
+}
+
+.d9-criterion {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+}
+
+.d9-criterion strong {
+  font-weight: var(--weight-bold);
+}
+
+.d9-howto {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.d9-status:empty {
+  display: none;
+}
+
+.d9-status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--marine);
+}
+
+.d9-initials .pf-field__input {
+  max-width: 8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────── */
+
+.d9-letter {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: var(--radius-full);
+}
+
+.d9-letter--wild {
+  background: var(--wave);
+}
+
+.d9-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug, 1.3);
+  text-align: left;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button.d9-card {
+  cursor: grab;
+}
+
+button.d9-card:hover {
+  border-color: var(--wave);
+}
+
+button.d9-card:focus-visible,
+.d9-slot__empty:focus-visible {
+  outline: 3px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.d9-card[aria-pressed='true'] {
+  border-color: var(--wave);
+  box-shadow: 0 0 0 3px var(--wave);
+}
+
+.d9-card--lifted {
+  opacity: 0.35;
+}
+
+.d9-card--still {
+  box-shadow: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.d9-card__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.d9-card__quote {
+  font-style: italic;
+}
+
+.d9-card__source,
+.d9-card__caption {
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.d9-card__image {
+  display: block;
+  width: 100%;
+  max-height: 6rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+.d9-ghost {
+  position: fixed;
+  z-index: 1000;
+  max-width: 12rem;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  box-shadow: var(--elev-2, var(--elev-1));
+  opacity: 0.95;
+}
+
+.d9-move {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.4rem;
+  padding: 0 0.4rem;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  line-height: 1.25rem;
+  color: var(--paper);
+  background: var(--muted);
+  border-radius: var(--radius-full);
+}
+
+.d9-move--up {
+  background: var(--success);
+}
+
+.d9-move--down {
+  background: var(--high-sea-ink);
+}
+
+/* ── Tray ─────────────────────────────────────────────────────────── */
+
+.d9-tray__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.d9-tray {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-2);
+  min-height: 3.5rem;
+  padding: var(--space-3);
+  background: var(--shore);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.d9-tray.d9-over {
+  border-color: var(--wave);
+  border-style: solid;
+}
+
+.d9-tray__done {
+  grid-column: 1 / -1;
+  margin: 0;
+  align-self: center;
+}
+
+/* ── Diamond ──────────────────────────────────────────────────────── */
+
+.d9-diamond-wrap {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  width: 100%;
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.d9-end {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted);
+}
+
+.d9-diamond {
+  --d9-gap: var(--space-2);
+  display: grid;
+  gap: var(--d9-gap);
+  width: 100%;
+}
+
+.d9-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--d9-gap);
+}
+
+.d9-slot {
+  display: grid;
+  flex: 0 0 calc((100% - 2 * var(--d9-gap)) / 3);
+  max-width: 13rem;
+  min-width: 0;
+  min-height: 4.5rem;
+}
+
+.d9-slot--empty {
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--shore);
+}
+
+.d9-slot.d9-over {
+  outline: 3px solid var(--wave);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.d9-slot > .d9-card {
+  width: 100%;
+  height: 100%;
+}
+
+.d9-slot > .d9-card .d9-card__text,
+.d9-slot > .d9-card .d9-card__quote {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.d9-slot__empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--wave);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.d9-slot--print {
+  min-height: 5rem;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reasons, checklist, send ─────────────────────────────────────── */
+
+.d9-reasons {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.d9-reason .d9-card {
+  justify-self: start;
+}
+
+.d9-wild__summary {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--marine);
+  cursor: pointer;
+}
+
+.d9-wild__form {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  margin-top: var(--space-3);
+}
+
+.d9-wild__form .pf-field__input {
+  width: 100%;
+}
+
+.d9-send {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.d9-checklist {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.d9-ready {
+  margin: 0;
+  color: var(--success);
+}
+
+.d9-round--locked,
+.d9-class,
+.d9-round--rerank,
+.d9-round--second {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.d9-round__title {
+  margin: 0;
+}
+
+.d9-said {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.d9-said dt {
+  font-weight: var(--weight-semibold);
+}
+
+.d9-said dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.d9-summary {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--shore);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.d9-summary__list {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+/* ── Class view ───────────────────────────────────────────────────── */
+
+.d9-class__head,
+.d9-teacher__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.d9-count {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.d9-contested,
+.d9-shift__list,
+.d9-wildcards__list,
+.d9-preview__cards {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.d9-contested__item,
+.d9-shift__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 14rem);
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+}
+
+.d9-strip-wrap {
+  display: grid;
+  gap: 2px;
+}
+
+.d9-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.d9-strip__cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-end;
+  justify-content: center;
+  gap: 2px;
+  min-height: 1.75rem;
+  padding: 3px;
+  background: var(--shore);
+  border-radius: var(--radius-sm);
+}
+
+.d9-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--wave);
+  border-radius: var(--radius-full);
+}
+
+.d9-strip__more {
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.d9-strip__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.d9-outliers {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+  border-left: 3px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.d9-outlier {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.d9-outlier__who {
+  font-weight: var(--weight-bold);
+}
+
+.d9-outlier__row {
+  color: var(--muted);
+}
+
+.d9-outlier__reason {
+  overflow-wrap: anywhere;
+}
+
+.d9-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-5);
+}
+
+.d9-panel {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.d9-wildcards__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ── Display: the class's screen ──────────────────────────────────── */
+
+.d9-reveal {
+  justify-self: start;
+}
+
+.d9--display .d9-reveal {
+  min-height: 3.5rem;
+  padding-inline: var(--space-6);
+  font-size: var(--text-lg, 1.25rem);
+}
+
+.d9--display .d9-criterion {
+  font-size: var(--text-2xl, 1.75rem);
+}
+
+.d9--display .d9-card {
+  font-size: var(--text-md);
+}
+
+.d9--display .d9-letter {
+  width: 2rem;
+  height: 2rem;
+  font-size: var(--text-sm);
+}
+
+.d9--display .d9-slot {
+  min-height: 6rem;
+}
+
+.d9--display .d9-diamond-wrap {
+  max-width: 52rem;
+}
+
+.d9--display .d9-outliers,
+.d9--display .d9-count {
+  font-size: var(--text-md);
+}
+
+.d9--display .d9-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* ── Editor ───────────────────────────────────────────────────────── */
+
+.d9-editor {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.d9-editor__group,
+.d9-editor__cards,
+.d9-editor__fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.d9-editor__card {
+  display: grid;
+  grid-template-columns: 1.5rem 8rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.d9-editor__card > .d9-letter {
+  margin-top: 1.9rem;
+}
+
+.d9-editor__count {
+  font-weight: var(--weight-regular);
+}
+
+/* ── Print ────────────────────────────────────────────────────────── */
+
+.d9-print__cards {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.d9-print__card {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.d9-print__second {
+  font-weight: var(--weight-semibold);
+}
+
+@media print {
+  .d9-letter {
+    color: var(--ink);
+    background: none;
+    border: 1px solid var(--ink);
+  }
+}
+
+/* ── Phones ───────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .d9-diamond {
+    --d9-gap: var(--space-1);
+  }
+
+  .d9-slot {
+    min-height: 3.75rem;
+  }
+
+  .d9-slot > .d9-card {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-2xs);
+  }
+
+  .d9-slot > .d9-card .d9-letter {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .d9-slot > .d9-card .d9-card__source,
+  .d9-slot > .d9-card .d9-card__caption {
+    display: none;
+  }
+
+  .d9-tray {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .d9-contested__item,
+  .d9-shift__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .d9-editor__card {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+  }
+
+  .d9-editor__fields {
+    grid-column: 2;
+  }
+}

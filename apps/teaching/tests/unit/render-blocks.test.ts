@@ -376,6 +376,7 @@ describe('blockRegistry', () => {
       'curriculum_lines',
       'definition',
       'diagram',
+      'diamond_nine',
       'discern_confirm',
       'divider',
       'done',
@@ -414,6 +415,7 @@ describe('blockRegistry', () => {
       'toolkit_skill',
       'toolkit_tool',
       'toolkit_value',
+      'venn',
       'video',
       'whiteboard',
       'with_teacher'

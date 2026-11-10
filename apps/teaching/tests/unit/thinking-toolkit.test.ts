@@ -183,7 +183,7 @@ describe('Thinking Toolkit blocks', () => {
     expect(labels.indexOf('Thinking Toolkit')).toBeLessThan(labels.indexOf('Learning'));
     expect(BLOCK_GROUPS.find((group) => group.label === 'Thinking Toolkit')?.types).toEqual([
       'thinking_intentions', 'thinking_move',
-      'question_quadrant', 'concept_features', 'continuum_line', 'thinking_reflection'
+      'question_quadrant', 'concept_features', 'continuum_line', 'diamond_nine', 'thinking_reflection'
     ]);
     expect(BLOCK_GROUPS.find((group) => group.label === 'Basic')?.types).toContain('teacher_note');
     expect(HOMEPAGE_BLOCK_GROUPS.some((group) => group.label === 'Thinking Toolkit')).toBe(false);

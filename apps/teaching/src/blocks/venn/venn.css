@@ -1,0 +1,616 @@
+/* Two-text Venn. Shared pieces (fields, panels, switches, print lines) come from peer-feedback.css. */
+
+.venn {
+  --venn-a: var(--wave);
+  --venn-a-wash: var(--pastel-blue);
+  --venn-b: var(--pastel-peach-ink);
+  --venn-b-wash: var(--pastel-peach);
+  --venn-c: var(--pastel-sage-ink);
+  --venn-c-wash: var(--pastel-sage);
+}
+
+.venn-student,
+.venn-board,
+.venn-teacher,
+.venn-preview,
+.venn-full,
+.venn-print,
+.venn-form,
+.venn-form__notes {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.venn-texts {
+  overflow-wrap: anywhere;
+}
+
+.venn [hidden] {
+  display: none !important;
+}
+
+.venn-initials__input {
+  max-width: 8rem;
+  text-transform: uppercase;
+}
+
+/* ── The drawn Venn ─────────────────────────────────────────────────── */
+
+.venn-diagram {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  margin-inline: auto;
+  aspect-ratio: var(--venn-ratio, 3 / 2);
+}
+
+.venn-diagram--large {
+  max-width: 44rem;
+}
+
+.venn-diagram__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.venn-circle {
+  stroke-width: 2;
+  fill-opacity: 0.45;
+  mix-blend-mode: multiply;
+}
+
+.venn-circle--a { fill: var(--venn-a-wash); stroke: var(--venn-a); }
+.venn-circle--b { fill: var(--venn-b-wash); stroke: var(--venn-b); }
+.venn-circle--c { fill: var(--venn-c-wash); stroke: var(--venn-c); }
+
+.venn-letter {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.venn-letter--a { fill: var(--venn-a); }
+.venn-letter--b { fill: var(--venn-b); }
+.venn-letter--c { fill: var(--venn-c); }
+
+.venn-spot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-grid;
+  justify-items: center;
+  gap: 0;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  line-height: 1.1;
+}
+
+button.venn-spot {
+  cursor: pointer;
+}
+
+button.venn-spot:hover {
+  border-color: var(--ink);
+}
+
+button.venn-spot:focus-visible,
+.venn-choice:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.venn-spot[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.venn-spot__count {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.venn-diagram--large .venn-spot__count {
+  font-size: var(--text-xl, 1.5rem);
+}
+
+.venn-spot__tag {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+}
+
+.venn-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.venn-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.venn-legend__letter {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: var(--text-xs);
+  color: var(--paper);
+  background: var(--venn-a);
+  border-radius: var(--radius-full);
+}
+
+.venn-legend__item--b .venn-legend__letter,
+.venn-legend__letter--b { background: var(--venn-b); }
+.venn-legend__item--c .venn-legend__letter,
+.venn-legend__letter--c { background: var(--venn-c); }
+
+/* ── Depth tally and nudge ──────────────────────────────────────────── */
+
+.venn-board__depth {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+}
+
+.venn-tally {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.venn-tally__dot {
+  color: var(--muted);
+}
+
+.venn-depth {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  border-radius: var(--radius-full);
+}
+
+.venn-depth--deep {
+  color: var(--pastel-lilac-ink);
+  background: var(--pastel-lilac);
+}
+
+.venn-depth--surface {
+  color: var(--pastel-gold-ink);
+  background: var(--pastel-gold);
+}
+
+.venn-nudge {
+  max-width: 36rem;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--pastel-lilac);
+  border-left: 3px solid var(--pastel-lilac-ink);
+  border-radius: var(--radius-md);
+}
+
+/* ── Synthesis ──────────────────────────────────────────────────────── */
+
+.venn-synthesis {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 36rem;
+  margin-inline: auto;
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+.venn-frame {
+  margin: 0;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* ── Tray, choices, form ────────────────────────────────────────────── */
+
+.venn-tray {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.venn-tray__title {
+  margin: 0;
+}
+
+.venn-tray__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.venn-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.venn-choice {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.venn-choice[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.venn-form {
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--wave);
+  border-radius: var(--radius-md);
+}
+
+.venn-form__given {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+}
+
+.venn-add__open {
+  justify-self: start;
+}
+
+/* ── Region columns and point cards ─────────────────────────────────── */
+
+.venn-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.venn-columns--three {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.venn-columns--picked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.venn-columns__all {
+  justify-self: start;
+}
+
+.venn-column {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--venn-a-wash) 35%, transparent);
+  border-top: 3px solid var(--venn-a);
+  border-radius: var(--radius-md);
+  scroll-margin-top: var(--space-6);
+}
+
+.venn-column--b { background: color-mix(in srgb, var(--venn-b-wash) 35%, transparent); border-top-color: var(--venn-b); }
+.venn-column--c { background: color-mix(in srgb, var(--venn-c-wash) 35%, transparent); border-top-color: var(--venn-c); }
+.venn-column--shared { background: var(--sand, var(--paper)); border-top-color: var(--ink); }
+
+.venn-column__head {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.venn-column__tag {
+  display: inline-block;
+  padding: 0 var(--space-1);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-caps);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.venn-point {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.venn-point--open {
+  border-style: dashed;
+}
+
+.venn-point__top {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.venn-point__text {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.venn-point__notes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.venn-point__notes dt {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.venn-point__notes dd {
+  margin: 0 0 var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.venn-point__quote {
+  font-style: italic;
+}
+
+.venn-point__gaps {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.venn-point__gaps-mark {
+  flex: none;
+  padding: 0 var(--space-2);
+  font-weight: var(--weight-semibold);
+  color: var(--wave);
+  border: 1px solid var(--wave);
+  border-radius: var(--radius-full);
+  height: fit-content;
+}
+
+.venn-point__gaps ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.venn-point__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.venn-status {
+  min-height: 1.25em;
+  margin: 0;
+}
+
+/* ── Teacher ────────────────────────────────────────────────────────── */
+
+.venn-teacher__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.venn-teacher__head h4 {
+  margin: 0;
+}
+
+.venn-summary {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.venn-summary .venn-tally {
+  justify-content: start;
+}
+
+.venn-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.venn-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.venn-row__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.venn-row__who {
+  min-width: 2.5rem;
+}
+
+.venn-row__counts,
+.venn-row__done {
+  color: var(--muted);
+}
+
+.venn-row__synthesis,
+.venn-full__synthesis {
+  margin: 0;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.venn-full__synthesis {
+  max-width: 40rem;
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-md);
+  background: var(--paper);
+  border-left: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+}
+
+.venn-row__more summary {
+  width: fit-content;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.venn-row__more[open] > .venn-full {
+  margin-top: var(--space-3);
+}
+
+.venn-spotlight {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.venn-spotlight__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.venn-spotlight__who {
+  font-weight: var(--weight-semibold);
+}
+
+.venn-teacher--display .venn-spotlight {
+  border: 0;
+  padding: 0;
+}
+
+.venn-teacher--display .venn-point__text {
+  font-size: var(--text-md);
+}
+
+.venn-preview__preload {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+/* ── Print ──────────────────────────────────────────────────────────── */
+
+.venn-print__regions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.venn-print__regions.venn-columns--three {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.venn-print__region {
+  display: grid;
+  gap: var(--space-1);
+  break-inside: avoid;
+}
+
+.venn-print__box {
+  height: 5rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+}
+
+.venn-print__synthesis {
+  display: grid;
+  gap: var(--space-2);
+  break-inside: avoid;
+}
+
+.venn-print .venn-spot {
+  background: var(--paper);
+}
+
+@media print {
+  .venn-circle {
+    fill: none;
+    stroke: #000;
+  }
+}
+
+/* ── Phones ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .venn-columns,
+  .venn-columns--three,
+  .venn-print__regions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .venn-spot {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 2px var(--space-1);
+  }
+
+  .venn-spot__count {
+    font-size: var(--text-sm);
+  }
+}

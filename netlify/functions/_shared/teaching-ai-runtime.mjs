@@ -1218,6 +1218,8 @@ var BlockTypeSchema = z13.enum([
   "hinge_question",
   "explainer",
   "continuum_line",
+  "diamond_nine",
+  "venn",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -1685,6 +1687,18 @@ var QuestionItemSchema = z13.object({
   logic: LogicSchema.optional(),
   /** Short answer only: the answer a student can check their own against. */
   model_answer: z13.string().optional(),
+  /**
+   * Sentence-level formats: the sentences or notes students work from. Sentence combining: the kernel
+   * sentences to join. Appositive: the sentence with the noun to rename. Expansion: the kernel. Note to
+   * topic sentence: the fragment notes, one per line.
+   */
+  kernels: z13.array(z13.string().max(400)).max(8).optional(),
+  /** Sentence combining: the joining word the combined sentence must use. Absent means any. */
+  conjunction: z13.string().max(20).optional(),
+  /** Sentence expansion: the question words the student answers in the expanded sentence. */
+  question_words: z13.array(z13.enum(["who", "what", "when", "where", "why", "how"])).max(6).optional(),
+  /** Sentence-level formats: the partial frame a middle item starts from. Absent means the first part of the model answer. */
+  frame: z13.string().max(400).optional(),
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z13.enum(["reveal", "confidence"]).optional(),
   /** Success criteria the student ticks off against their answer. */
@@ -1742,6 +1756,57 @@ var ContinuumLineBlockSchema = z13.object({
     mode: z13.enum(["opinion", "predict"]).optional(),
     /** A return line: the id of an earlier continuum line in the lesson. It runs that line's stimulus, scale and statements again, and shows each student where they first put their symbol. */
     returns_to: z13.string().min(1).max(64).optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DiamondCardSchema = z13.object({
+  id: z13.string().min(1).max(64),
+  kind: z13.enum(["text", "quote", "image"]).default("text"),
+  text: z13.string().max(300).default(""),
+  /** Quote: who said it, or where it comes from. */
+  source: z13.string().max(120).optional(),
+  url: z13.string().max(2e3).optional(),
+  alt_text: z13.string().max(300).optional()
+});
+var DiamondNineBlockSchema = z13.object({
+  id: z13.string().min(1),
+  type: z13.literal("block"),
+  block_type: z13.literal("diamond_nine"),
+  variant: z13.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z13.object({
+    title: z13.string().max(200).default(""),
+    /** What the diamond ranks by, e.g. "Most significant to the text's meaning". */
+    criterion: z13.string().max(200).default(""),
+    /** A second pass ranks the same cards by this. Empty means no second pass. */
+    second_criterion: z13.string().max(200).default(""),
+    cards: z13.array(DiamondCardSchema).max(9).default([]),
+    /** A student may swap one card for their own. */
+    wildcard: z13.boolean().default(true),
+    /** Offer Because, but, so as a frame for the reasons. */
+    frame: z13.boolean().default(false),
+    /** After submitting, students can rank again and say what changed their mind. */
+    rerank: z13.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var VennBlockSchema = z13.object({
+  id: z13.string().min(1),
+  type: z13.literal("block"),
+  block_type: z13.literal("venn"),
+  variant: z13.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z13.object({
+    prompt: z13.string().max(600).default(""),
+    texts: z13.array(z13.object({ label: z13.string().max(80).default("") })).min(2).max(3).default([{ label: "" }, { label: "" }]),
+    /** Points students sort into the circles before adding their own. */
+    preload: z13.array(z13.object({ id: z13.string().min(1).max(64), text: z13.string().max(300).default("") })).max(12).default([]),
+    /** The centre's synthesis sentence frame. */
+    synthesis_frame: z13.string().max(300).default("Both \u2026 explore \u2026, but where A \u2026, B \u2026"),
+    /** Suggest a deep point when surface points outnumber deep ones. */
+    nudge: z13.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1990,7 +2055,23 @@ var QuestionSetBlockSchema = z13.object({
     title: z13.string().optional(),
     questions: z13.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z13.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so", "reasoning_chart"]).optional(),
+    format: z13.enum([
+      "standard",
+      "human_experience_table",
+      "anchor_bridge",
+      "question_levels",
+      "because_but_so",
+      "reasoning_chart",
+      "sentence_combining",
+      "appositive",
+      "sentence_expansion",
+      "note_to_topic"
+    ]).optional(),
+    /** Sentence-level formats: worked-example fading (absent means on) and an optional word limit. */
+    sentence: z13.object({
+      fade: z13.boolean().default(true),
+      word_limit: z13.number().int().min(3).max(80).optional()
+    }).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z13.object({
       rows: z13.number().int().min(3).max(5).default(3),
@@ -2871,6 +2952,8 @@ var leafBlockSchemas = [
   HingeQuestionBlockSchema,
   ExplainerBlockSchema,
   ContinuumLineBlockSchema,
+  DiamondNineBlockSchema,
+  VennBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2972,11 +3055,24 @@ var TabsBlockSchema = z13.object({
       z13.object({
         id: z13.string().min(1),
         label: z13.string(),
-        blocks: z13.array(TabChildBlockSchema)
+        blocks: z13.array(TabChildBlockSchema),
+        /** Choice board: the tile's level, 1 Core, 2 Stretch, 3 Challenge. */
+        tier: z13.number().int().min(1).max(3).optional(),
+        /** Choice board: the kind of task, e.g. Write, Analyse, Create. */
+        kind: z13.string().max(40).optional()
       })
-    ).min(2).max(8),
-    /** Absent means tabs; folds shows each panel as a fold-out. */
-    style: z13.enum(["tabs", "folds"]).optional()
+    ).min(2).max(9),
+    /** Absent means tabs; folds shows each panel as a fold-out; choice shows them as a choice board. */
+    style: z13.enum(["tabs", "folds", "choice"]).optional(),
+    /** Choice board settings, kept when switching style away and back. */
+    choice: z13.object({
+      /** How many tiles each student picks. */
+      pick: z13.number().int().min(1).max(9).default(3),
+      /** Tiles per row. */
+      columns: z13.number().int().min(2).max(4).default(3),
+      /** each_column: at least one pick in every column. line: a full row, column or diagonal (3 × 3 only). */
+      rule: z13.enum(["none", "each_column", "line"]).default("none")
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -4690,6 +4786,8 @@ var NEW_BLOCK_TYPES = [
   "hinge_question",
   "explainer",
   "continuum_line",
+  "diamond_nine",
+  "venn",
   "quiz_question",
   "question_set",
   "flashcards",
@@ -4761,6 +4859,8 @@ var NEW_BLOCK_LABEL = {
   hinge_question: "Hinge question",
   explainer: "Explainer",
   continuum_line: "Continuum line",
+  diamond_nine: "Diamond 9",
+  venn: "Two-text Venn",
   quiz_question: "Question",
   question_set: "Question",
   flashcards: "Flashcards",
@@ -4810,7 +4910,8 @@ var INSERT_MENU_LABEL = {
   "embed:google_maps": "Map",
   "embed:google_slides": "Slides",
   "embed:google_docs": "Document",
-  "embed:pdf": "PDF"
+  "embed:pdf": "PDF",
+  "tabs:choice": "Choice board"
 };
 var BLOCK_GROUPS = [
   {
@@ -4845,6 +4946,7 @@ var BLOCK_GROUPS = [
       "question_quadrant",
       "concept_features",
       "continuum_line",
+      "diamond_nine",
       "thinking_reflection"
     ]
   },
@@ -4868,7 +4970,7 @@ var BLOCK_GROUPS = [
   {
     label: "Visualisation",
     // One Map entry: its editor switches between a tree (mind map) and a network (concept map).
-    types: ["chart", "timeline", "equation", "diagram", "mind_map", "curriculum_lines", "whiteboard"]
+    types: ["chart", "timeline", "equation", "diagram", "mind_map", "venn", "curriculum_lines", "whiteboard"]
   },
   {
     label: "Layout",
@@ -4896,6 +4998,7 @@ var TOOLKIT_GROUP_TYPES = [
   "question_quadrant",
   "concept_features",
   "continuum_line",
+  "diamond_nine",
   "thinking_reflection",
   "analogy_types",
   "analogy_close_reading",
@@ -4926,6 +5029,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   "outcomes",
   "annotation",
   "explainer",
+  "venn",
   "anthology"
 ]);
 var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
@@ -4935,7 +5039,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "with_teacher", "faded_example", "outcomes", "annotation", "explainer", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "done", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "with_teacher", "faded_example", "outcomes", "annotation", "explainer", "venn", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -5242,6 +5346,24 @@ function createBlock(type, id) {
         statements: [{ id: `${id}_s1`, text: "", snap: false }],
         pace: "teacher",
         replace: true
+      } };
+    case "diamond_nine":
+      return { ...shared, block_type: "diamond_nine", variant: "medium", content: {
+        title: "",
+        criterion: "",
+        second_criterion: "",
+        cards: Array.from({ length: 9 }, (_, i) => ({ id: `${id}_c${i + 1}`, kind: "text", text: "" })),
+        wildcard: true,
+        frame: false,
+        rerank: true
+      } };
+    case "venn":
+      return { ...shared, block_type: "venn", variant: "medium", content: {
+        prompt: "",
+        texts: [{ label: "" }, { label: "" }],
+        preload: [],
+        synthesis_frame: "Both \u2026 explore \u2026, but where A \u2026, B \u2026",
+        nudge: true
       } };
     case "question_drop":
       return { ...shared, block_type: "question_drop", variant: "medium", content: {
@@ -7370,6 +7492,8 @@ var KIND_LABEL = {
   hinge_question: "Hinge question",
   explainer: "Explainer",
   continuum_line: "Continuum line",
+  diamond_nine: "Diamond 9",
+  venn: "Two-text Venn",
   curriculum_lines: "Curriculum lines",
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
@@ -7529,6 +7653,15 @@ function ownIssue(block, discernHosts) {
   }
   if (block.block_type === "collection") {
     return "Collection blocks can only be used on class homepages";
+  }
+  if (block.block_type === "diamond_nine") {
+    const ready = block.content.cards.filter((c) => c.kind === "image" ? c.url?.trim() : c.text.trim()).length;
+    if (ready < 9) return `Diamond 9 needs nine cards; ${ready} have words or a picture`;
+    if (!block.content.criterion.trim()) return "Diamond 9 needs a criterion to rank by";
+  }
+  if (block.block_type === "tabs" && block.content.style === "choice") {
+    const pick = block.content.choice?.pick ?? 3;
+    if (pick > block.content.tabs.length) return `This choice board asks for ${pick} picks but has ${block.content.tabs.length} tiles`;
   }
   if (block.block_type === "question_drop" && !block.content.target_quiz_id) {
     return "Choose the quiz this Question drop feeds into";

@@ -64,3 +64,18 @@ export function limitStatus(text: string, limit: number | undefined): { words: n
   const words = wordCount(text);
   return { words, over: !!limit && words > limit };
 }
+
+/** "who", "when", "why" → "who, when and why". */
+export function listWords(words: readonly string[]): string {
+  const list = words.map((w) => w.trim()).filter(Boolean);
+  if (list.length <= 1) return list[0] ?? '';
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+/** What a frame item's box starts with: the frame minus its closing ellipsis, ready to type on from. */
+export function frameStart(frame: string): string {
+  const text = frame.trim();
+  if (!text) return '';
+  const open = text.replace(/\s*(…|\.\.\.)$/, '');
+  return open === text ? text : `${open} `;
+}
