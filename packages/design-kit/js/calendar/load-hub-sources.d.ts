@@ -9,6 +9,7 @@ export type HubSourceStatusRow = {
 };
 
 export type HubSourceLoader = {
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   loadAll(): Promise<unknown[]>;
   retry(sourceId: string): Promise<void>;
   getEvents(): unknown[];
