@@ -160,7 +160,7 @@ The map is a new pure-data package, `packages/thinking-map/`. It has no AI.
     - a step that needs reading → Cartographers
     - an open "what could we even do" step → Fates
     - a closed thread → Witness
-- **Review gate.** The new links are drafted, then shown to Adam as a readable table for review before PR 2 starts.
+- **Review.** The new links are drafted, then published as a readable table for Adam to review with the PR.
 
 **Shortlist.** Built from the signals plus the current step's links, about 8 options. The guide may only choose from the shortlist. Anything else is dropped.
 
@@ -229,7 +229,7 @@ The guide writes `question`, for example "Choose between A, B and C for step 3".
 ## 6. Costs, errors, tests, build order
 
 ### Running costs
-- **Guide.** Each triage or check-in is one small Haiku call. The real per-call cost is measured in PR 1 before the guide ships. The target is under A$0.01 per check-in.
+- **Guide.** Each triage or check-in is one small Haiku call. The real per-call cost is measured in Phase 1, before the guide ships. The target is under A$0.01 per check-in.
 - **Protocols.** These are unchanged and shown before every run.
 - **Spend line.** The front door shows a "guide spend this month" line.
 
@@ -259,8 +259,11 @@ The guide writes `question`, for example "Choose between A, B and C for step 3".
 This touches `apps/tasks`, so the full Tasks suite runs at `pre-pr-check`.
 
 ### Build order
-- **PR 0: rename the five Book tools** to Wayfinder, Change Navigator, Team Builder, Conversation Guide and Thought Starter. Only the names on screen change. The ids, prefixes and package folders stay the same.
-- **PR 1: map, threads and detours.**
+
+The whole build ships as **one PR** on `claude/thinking-threads-spec`, with the phases below as commits. It is built in a few large chunks, and `pre-pr-check` runs once at the end. The table of new map links is published for Adam to review alongside the PR; it is not a stop partway through the build.
+
+- **Phase 0: rename the five Book tools** to Wayfinder, Change Navigator, Team Builder, Conversation Guide and Thought Starter. Only the names on screen change. The ids, prefixes and package folders stay the same.
+- **Phase 1: map, threads and detours.**
   - measure the guide and protocol costs
   - the `thinking-map` package, plus the table of new links for Adam to review
   - the thread store and API
@@ -271,20 +274,20 @@ This touches `apps/tasks`, so the full Tasks suite runs at `pre-pr-check`.
   - the packet adapters
   - the Thought Starter detour
   - a manual **Detour to…** menu, so detours work before the guide exists
-- **PR 2: the guide.**
+- **Phase 2: the guide.**
   - triage and the front door page
   - joint check-ins
   - **Where next?**
   - route logging
   - the spend line
-- **PR 3: protocols.**
+- **Phase 3: protocols.**
   - the shared protocol screen
   - protocol detours with the cost on the button
   - the `origin` field
   - the Past runs tag
   - Witness at close
 
-A build cost estimate in A$, anchored to past builds of similar size, comes with the implementation plan.
+The implementation plan compares the build size with a real past build (Problem Solver). It gives no invented A$ figure.
 
 ## Out of scope
 - A merged single engine, or rewriting the copied Book-engine commit and review code.
