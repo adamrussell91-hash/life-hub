@@ -122,19 +122,19 @@ async function backFor(store, roster, student, today) {
 
 /** Handed-in pieces still with the teacher: no feedback yet, or a sent redraft. */
 async function waitingFor(store, classId, student, columns) {
-  const out = [];
-  for (const column of columns) {
-    if (column.kind !== 'assessment' || !column.piece?.lesson_id || !column.piece?.block_id) continue;
+  const pieces = columns.filter((column) => column.kind === 'assessment' && column.piece?.lesson_id && column.piece?.block_id);
+  const found = await Promise.all(pieces.map(async (column) => {
     const { lesson_id, block_id } = column.piece;
     const [handin, row] = await Promise.all([
       read(store, handinKey(lesson_id, block_id, student.id)),
       read(store, `piece_feedback/${classId}/${student.id}/${pieceId(lesson_id, block_id)}`)
     ]);
-    if (!handin?.handed_in_at || handin.student_id !== student.id) continue;
+    if (!handin?.handed_in_at || handin.student_id !== student.id) return null;
     // Returned, or a redraft asked for: those show under Back to you instead.
-    if (row?.redraft || row?.status === 'returned') continue;
-    out.push({ title: clip(String(column.title ?? 'Your work'), 120), lesson_id, at: handin.handed_in_at });
-  }
+    if (row?.redraft || row?.status === 'returned') return null;
+    return { title: clip(String(column.title ?? 'Your work'), 120), lesson_id, at: handin.handed_in_at };
+  }));
+  const out = found.filter(Boolean);
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, TODO_LIMITS.waiting);
 }
 

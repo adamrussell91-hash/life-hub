@@ -71,12 +71,16 @@ export async function studentPieces(store, classId, studentId) {
   const columns = new Map(book.columns.map((c) => [c.id, c]));
   const pieces = [];
   const keys = await listBlobKeys(store, piecePrefix(classId, studentId));
-  for (const [key, stored] of await mapBounded(keys, 8, async (k) => [k, await read(store, k)])) {
+  // Each piece, its last sent draft and a viva's takes load side by side.
+  const loaded = await mapBounded(keys, 8, async (k) => {
+    const stored = await read(store, k);
     const row = await shownRow(store, stored, studentId);
+    return [k, stored, row, row?.kind === 'viva' ? await vivaTakes(store, row.lesson_id, studentId) : []];
+  });
+  for (const [key, stored, row, takes] of loaded) {
     if (!row) continue;
     const id = key.slice(piecePrefix(classId, studentId).length);
     const column = columns.get(row.column_id);
-    const takes = row.kind === 'viva' ? await vivaTakes(store, row.lesson_id, studentId) : [];
     const tags = row.kind === 'viva' ? vivaTags(takes) : unionTags(stored);
     // A rung tapped on a rubric says where the student sits on that skill.
     const places = { ...(column ? placesFor(column, shownMark(book.marks?.[column.id]?.[studentId], row)) : {}), ...rubricPlaces(row.rubric), ...vivaPlaces(takes) };
@@ -205,20 +209,24 @@ export async function classSkillRungs(store, classId, studentIds) {
 }
 
 export async function progressFor(store, roster, student) {
-  const all = await studentPieces(store, roster.cls.id, student.id);
-  const notes = await studentNotes(store, roster.cls.id, student.id);
+  const [all, notes, library, { book }] = await Promise.all([
+    studentPieces(store, roster.cls.id, student.id),
+    studentNotes(store, roster.cls.id, student.id),
+    readFeedbackCodes(store),
+    readBook(store, roster.cls.id)
+  ]);
   const backToRead = all.filter((p) => p.kind !== 'assessment');
   const pieces = all.slice(-CHART_MAX);
-  const library = await readFeedbackCodes(store);
   const codes = new Map(library.map((c) => [c.id, c]));
-  const { book } = await readBook(store, roster.cls.id);
   const lastColumn = (key) => [...book.columns].reverse().find((c) => c.kind === 'assessment' && c.criteria.some((x) => (x.outcomes ?? []).includes(key.slice(4)) || (x.concepts ?? []).includes(key.slice(4))));
   const outcomes = [];
   const concepts = [];
   const skillRows = [];
-  for (const key of targetKeys(pieces)) {
+  const keys = targetKeys(pieces);
+  const names = new Map(await Promise.all(keys.filter((k) => k.startsWith('out:')).map(async (k) => [k, await outcomeName(store, k.slice(4))])));
+  for (const key of keys) {
     const row = targetRow(pieces, key);
-    if (key.startsWith('out:')) outcomes.push({ ...row, ...(await outcomeName(store, key.slice(4))), looks: looksFor(lastColumn(key), key, row.now) });
+    if (key.startsWith('out:')) outcomes.push({ ...row, ...names.get(key), looks: looksFor(lastColumn(key), key, row.now) });
     else if (key.startsWith('con:')) concepts.push({ ...row, name: key.slice(4).replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()), sub: 'Concept', looks: looksFor(lastColumn(key), key, row.now) });
     else skillRows.push(row);
   }

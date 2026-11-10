@@ -112,7 +112,7 @@ export async function classLessonIds(store, roster) {
 /** Each lesson's written work, saved as students on the list typed it. */
 export async function workColumns(store, roster, lessonIds) {
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 4, (lessonId) => classWork(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, 8, (lessonId) => classWork(store, lessonId, roster.cls.id, ids));
   return found.filter(Boolean).map((w) => ({
     kind: 'work',
     id: `work:${w.lesson_id}`,
@@ -129,7 +129,7 @@ export async function quizColumns(store, roster, book, lessonIds) {
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 4, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, 8, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
   return found
     // A quiz shows once someone handed in, or has answers saved on a go they haven't handed in.
     .filter((q) => q && (Object.keys(q.scores).length || q.saved))
