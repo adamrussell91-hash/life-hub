@@ -10,6 +10,11 @@ import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderHingeQuestion } from '@/blocks/hinge-question';
 import { renderExplainer } from '@/blocks/explainer';
 import { renderContinuumLine } from '@/blocks/continuum-line';
+import { renderDiamondNine } from '@/blocks/diamond-nine';
+import { renderVenn } from '@/blocks/venn';
+import { renderChoiceBoard } from '@/blocks/choice-board';
+import { renderSentenceFormat } from '@/blocks/formats/sentence-formats';
+import { isSentenceFormat } from '@/blocks/formats/sentence-model';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderNoteCue } from '@/blocks/note-cue';
@@ -849,6 +854,7 @@ export function renderQuestionSetBlock(
   if (block.content.format === 'question_levels') return wrapBlock(renderQuestionLevels(block, mode, ctx), block, mode);
   if (block.content.format === 'because_but_so') return wrapBlock(renderBecauseButSo(block, mode, ctx), block, mode);
   if (block.content.format === 'reasoning_chart') return wrapBlock(renderReasoningChartFormat(block, mode, ctx), block, mode);
+  if (isSentenceFormat(block.content.format)) return wrapBlock(renderSentenceFormat(block, mode, ctx), block, mode);
   const wrap = document.createElement('div');
   wrap.className = 'block-question-set';
 
@@ -1342,6 +1348,10 @@ export function renderTabsBlock(
   mode: RenderMode,
   ctx: RenderContext = {}
 ): HTMLElement {
+  if (block.content.style === 'choice') {
+    return wrapBlock(renderChoiceBoard(block, mode, ctx, (child) => renderBlock(child, mode, ctx)), block, mode);
+  }
+
   const root = document.createElement('div');
   root.className = 'block-tabs';
 
@@ -2808,6 +2818,10 @@ function renderBlockContent(
       return wrapBlock(renderExplainer(block, mode), block, mode);
     case 'continuum_line':
       return wrapBlock(renderContinuumLine(block, mode, ctx), block, mode);
+    case 'diamond_nine':
+      return wrapBlock(renderDiamondNine(block, mode, ctx), block, mode);
+    case 'venn':
+      return wrapBlock(renderVenn(block, mode, ctx), block, mode);
     case 'curriculum_lines':
       return wrapBlock(renderCurriculumLines(block, mode, ctx), block, mode);
     case 'discern_confirm':

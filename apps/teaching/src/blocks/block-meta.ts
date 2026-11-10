@@ -1,5 +1,6 @@
 import {
   BLOCK_GROUPS,
+  CHOICE_BOARD_VALUE,
   EMBED_INSERT_PRESETS,
   INSERT_MENU_LABEL,
   createFromInsertMenu,
@@ -36,6 +37,8 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   hinge_question: 'A quick check at the turning point of a lesson. Each wrong answer names a misconception, so you know whether to move on.',
   explainer: 'Record yourself talking through a text while you mark it up. Students replay your voice and marks together.',
   continuum_line: 'Students place a statement on a line and defend it. Hidden until you reveal.',
+  diamond_nine: 'Students rank nine cards in a diamond, give reasons, then see where the class disagrees most and rank again.',
+  venn: 'Students compare two or three texts in a Venn, tag each point surface or deep, and write one synthesis sentence.',
   curriculum_lines: 'Map the unit as a transit map: strands of learning, lesson stations and the assessment.',
   done: 'Students tap to mark the lesson finished.',
   question_drop: 'Students write their own question for a quiz in this unit. You approve each one before it joins the quiz.',
@@ -84,10 +87,11 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:google_maps': 'Embed an interactive Google Map at a location.',
   'embed:google_slides': 'Embed a Google Slides presentation inline.',
   'embed:google_docs': 'Embed a Google Document for reading in place.',
-  'embed:pdf': 'Embed a PDF document for inline viewing.'
+  'embed:pdf': 'Embed a PDF document for inline viewing.',
+  'tabs:choice': 'A grid of tasks at three levels. Students pick some, say why, and rate each one when they finish.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "continuum_line", "diamond_nine", "venn", "tabs:choice", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {
@@ -101,6 +105,7 @@ export function blockInsertValue(block: Block): InsertMenuValue {
     const preset = EMBED_INSERT_PRESETS.find((p) => p.provider === provider);
     if (preset) return preset.value;
   }
+  if (block.block_type === 'tabs' && block.content.style === 'choice') return CHOICE_BOARD_VALUE;
   return block.block_type as InsertMenuValue;
 }
 
@@ -128,7 +133,10 @@ export function createBlockTypeLabel(block: Block): HTMLElement {
 function pickerGroups(allowed: readonly NewBlockType[]) {
   return BLOCK_GROUPS.map((group) => ({
     label: group.label,
-    options: expandGroupTypesForMenu(group.types.filter((t) => allowed.includes(t))).map((value) => ({
+    // A choice board is a Panels block, so only lists that take Panels offer it.
+    options: expandGroupTypesForMenu(group.types.filter((t) => allowed.includes(t)))
+      .filter((value) => value !== CHOICE_BOARD_VALUE || allowed.includes('tabs'))
+      .map((value) => ({
       value,
       label: INSERT_MENU_LABEL[value],
       description: INSERT_MENU_DESCRIPTION[value],

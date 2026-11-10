@@ -133,6 +133,8 @@ import { createClassProfileHandler } from '../../../netlify/functions/class-prof
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
+import { createPublishedThinkingHandler } from '../../../netlify/functions/published-thinking.mjs';
+import { createLessonThinkingHandler } from '../../../netlify/functions/lesson-thinking.mjs';
 import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
 import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
 import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
@@ -4299,6 +4301,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/thinking$/.test(path)
+      ? createLessonThinkingHandler(deps)
+      : path.startsWith('/api/published/thinking/')
+        ? createPublishedThinkingHandler(deps)
       : path.startsWith('/api/outcomes/')
       ? createOutcomeHandler(deps)
       : path === '/api/feedback-codes'
@@ -4442,6 +4448,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
       /^\/api\/published\/discern\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/thinking$/.test(path) ||
+      /^\/api\/published\/thinking\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
       /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||

@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NEW_BLOCK_TYPES, EMBED_INSERT_PRESETS } from '@/blocks/create-block';
+import { NEW_BLOCK_TYPES, EMBED_INSERT_PRESETS, CHOICE_BOARD_VALUE } from '@/blocks/create-block';
 import { blockIconSrc } from '@/blocks/block-meta';
 
 const publicDir = resolve(process.cwd(), 'public');
-const offered = [...NEW_BLOCK_TYPES, ...EMBED_INSERT_PRESETS.map(p => p.value)];
+const offered = [...NEW_BLOCK_TYPES, ...EMBED_INSERT_PRESETS.map(p => p.value), CHOICE_BOARD_VALUE];
 
 describe('block icon coverage', () => {
   it('serves a real asset for every Teaching block and provider', () => {

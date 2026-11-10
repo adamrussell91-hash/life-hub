@@ -110,6 +110,26 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.prompt);
       for (const o of (c.options as Array<{ text?: string }> | undefined) ?? []) push(parts, o.text);
       break;
+    case 'diamond_nine': {
+      const d = c as { title?: string; criterion?: string; second_criterion?: string; cards?: Array<{ text?: string; source?: string; alt_text?: string }> };
+      push(parts, d.title);
+      push(parts, d.criterion);
+      push(parts, d.second_criterion);
+      for (const card of d.cards ?? []) {
+        push(parts, card.text);
+        push(parts, card.source);
+        push(parts, card.alt_text);
+      }
+      break;
+    }
+    case 'venn': {
+      const v = c as { prompt?: string; texts?: Array<{ label?: string }>; preload?: Array<{ text?: string }>; synthesis_frame?: string };
+      push(parts, v.prompt);
+      for (const t of v.texts ?? []) push(parts, t.label);
+      for (const p of v.preload ?? []) push(parts, p.text);
+      push(parts, v.synthesis_frame);
+      break;
+    }
     case 'continuum_line': {
       const line = c as { stimulus?: { text?: string }; scale?: { left?: string; right?: string }; statements?: Array<{ text?: string }> };
       push(parts, line.stimulus?.text);
@@ -179,9 +199,10 @@ function extractBlock(block: Block, parts: string[]): void {
       break;
     }
     case 'tabs': {
-      const panels = (c.tabs as Array<{ label?: string; blocks?: Block[] }> | undefined) ?? [];
+      const panels = (c.tabs as Array<{ label?: string; kind?: string; blocks?: Block[] }> | undefined) ?? [];
       for (const panel of panels) {
         push(parts, panel.label);
+        push(parts, panel.kind);
         extractBlocks(panel.blocks ?? [], parts);
       }
       break;

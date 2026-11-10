@@ -10,6 +10,8 @@ import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createExplainerEditor } from '@/blocks/explainer';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
+import { createDiamondNineEditor } from '@/blocks/diamond-nine';
+import { createVennEditor } from '@/blocks/venn';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
@@ -3430,6 +3432,10 @@ function createBlockEditorFields(
       return createExplainerEditor(block, onChange, { lessonId: context.lessonId });
     case 'continuum_line':
       return createContinuumLineEditor(block, onChange, context.getLessonBlocks);
+    case 'diamond_nine':
+      return createDiamondNineEditor(block, onChange);
+    case 'venn':
+      return createVennEditor(block, onChange);
     case 'curriculum_lines':
       return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
