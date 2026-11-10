@@ -192,10 +192,21 @@ const PROMPTS = {
   full: { build: buildCoachPrompt, read: parse }
 };
 
+/**
+ * A thread detour: the session answers one question for another tool's step, so the coach works
+ * toward that answer and ends at the last working step (Review belongs to the home tool).
+ */
+export function withThreadDetour(prompt, session) {
+  const detour = session?.threadDetour;
+  if (!detour) return prompt;
+  const line = `THREAD DETOUR: this session was sent from another tool to answer one question${detour.question ? `: ${detour.question}` : ''}. Its opening carries a drafted frame: show it, ask the person to confirm or change each part, and record only what they confirm. Work toward that answer, then close at the last working step; there is no Review in a detour. Do not propose tasks.`;
+  return { ...prompt, user: `${prompt.user}\n\n${line}` };
+}
+
 export function createModelCoach(model) {
   return async function modelCoach(session) {
     const { build, read } = PROMPTS[session.kind] ?? PROMPTS.full;
-    const prompt = build(session);
+    const prompt = withThreadDetour(build(session), session);
     const first = await model({ ...prompt, maxTokens: 900 });
     let result = read(session, first);
     if (!result.ok) result = read(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
