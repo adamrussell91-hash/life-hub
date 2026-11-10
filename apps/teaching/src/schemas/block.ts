@@ -49,6 +49,7 @@ export const BlockTypeSchema = z.enum([
   'done',
   'brainstorm',
   'hinge_question',
+  'explainer',
   'continuum_line',
   'curriculum_lines',
   'quiz_question',
@@ -1701,6 +1702,192 @@ export function refineAnnotationVoiceTracks(
 export const AnnotationBlockSchema =
   AnnotationBlockObjectSchema.superRefine(refineAnnotationVoiceTracks);
 
+/**
+ * Explainer: a recorded teacher demonstration. The teacher's voice is stored
+ * as audio clips; every mark, note and pointer move is a timed event that the
+ * player folds over the text at time t. Teacher-made, so students store nothing.
+ */
+export const EXPLAINER_MAX_SECONDS = 600;
+export const ExplainerMarkStyleSchema = z.enum(['highlight', 'underline', 'box', 'bracket', 'strike']);
+export type ExplainerMarkStyle = z.infer<typeof ExplainerMarkStyleSchema>;
+
+const explainerEventBase = {
+  id: z.string().min(1).max(60),
+  t: z.number().min(0)
+};
+
+export const ExplainerMarkEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('mark'),
+  style: ExplainerMarkStyleSchema,
+  colour: AnnotationColourSchema.optional(),
+  anchor: AnnotationAnchorSchema
+});
+export const ExplainerNoteEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('note'),
+  anchor: AnnotationAnchorSchema,
+  html: z.string().max(4000).default(''),
+  tray_id: z.string().max(60).optional()
+});
+export const ExplainerEraseEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('erase'),
+  target: z.string().min(1).max(60)
+});
+/** Text pane samples are [t, wordIndex]; board samples (phase 2) are [t, x, y]. */
+export const ExplainerPointerEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('pointer'),
+  pane: z.enum(['text', 'board']),
+  samples: z
+    .array(z.union([z.tuple([z.number(), z.number()]), z.tuple([z.number(), z.number(), z.number()])]))
+    .max(20000)
+    .default([])
+});
+export const ExplainerPauseEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('pause'),
+  prompt: z.string().max(500).default('')
+});
+
+/** One Excalidraw element, stored as Excalidraw saved it. */
+export const ExplainerBoardElementSchema = z.looseObject({
+  id: z.string().min(1).max(80),
+  type: z.string().min(1).max(40),
+  version: z.number().optional(),
+  isDeleted: z.boolean().optional()
+});
+export type ExplainerBoardElement = z.infer<typeof ExplainerBoardElementSchema>;
+
+/** Board elements changed on release: new, moved, restyled or deleted (isDeleted). */
+export const ExplainerBoardEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('board'),
+  elements: z.array(ExplainerBoardElementSchema).max(500).default([])
+});
+/** One pen stroke, replayed point by point: offsets[i] is when points[i] was drawn, from t. */
+export const ExplainerStrokeEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('stroke'),
+  element: ExplainerBoardElementSchema,
+  offsets: z.array(z.number().min(0)).max(20000).default([])
+});
+/** Words sent from the text to the board as a text box. */
+export const ExplainerSendEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('send'),
+  anchor: AnnotationAnchorSchema,
+  element: ExplainerBoardElementSchema
+});
+
+export const ExplainerEventSchema = z.discriminatedUnion('kind', [
+  ExplainerMarkEventSchema,
+  ExplainerNoteEventSchema,
+  ExplainerEraseEventSchema,
+  ExplainerPointerEventSchema,
+  ExplainerPauseEventSchema,
+  ExplainerBoardEventSchema,
+  ExplainerStrokeEventSchema,
+  ExplainerSendEventSchema
+]);
+export type ExplainerEvent = z.infer<typeof ExplainerEventSchema>;
+
+export const ExplainerClipSchema = z.object({
+  media_id: z.string().optional(),
+  url: z.string().min(1),
+  mime: z.string().min(1),
+  start_s: z.number().min(0),
+  duration_s: z.number().min(0)
+});
+export type ExplainerClip = z.infer<typeof ExplainerClipSchema>;
+
+export const ExplainerTranscriptSchema = z.object({
+  words: z.array(AnnotationVoiceWordSchema),
+  timing: z.enum(['word', 'segment', 'estimated'])
+});
+export type ExplainerTranscript = z.infer<typeof ExplainerTranscriptSchema>;
+
+export const ExplainerRecordingSchema = z.object({
+  status: z.enum(['draft', 'published']).default('draft'),
+  clips: z.array(ExplainerClipSchema).max(200).default([]),
+  duration_s: z.number().min(0).max(EXPLAINER_MAX_SECONDS),
+  transcript: ExplainerTranscriptSchema.optional(),
+  events: z.array(ExplainerEventSchema).max(5000).default([])
+});
+export type ExplainerRecording = z.infer<typeof ExplainerRecordingSchema>;
+
+export const ExplainerTrayNoteSchema = z.object({
+  id: z.string().min(1).max(60),
+  html: z.string().max(4000).default('')
+});
+export type ExplainerTrayNote = z.infer<typeof ExplainerTrayNoteSchema>;
+
+export const ExplainerBoardSceneSchema = z.object({
+  format: z.literal('excalidraw'),
+  version: z.literal(1),
+  elements: z.array(ExplainerBoardElementSchema).max(2000).default([]),
+  appState: z.object({ viewBackgroundColor: z.string().max(40).optional() }).default({}),
+  files: z.record(z.string(), z.unknown()).default({})
+});
+export type ExplainerBoardScene = z.infer<typeof ExplainerBoardSceneSchema>;
+
+export const ExplainerLayoutSchema = z.enum(['text', 'board', 'both']);
+export type ExplainerLayout = z.infer<typeof ExplainerLayoutSchema>;
+
+export const ExplainerBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('explainer'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().max(200).optional(),
+    layout: ExplainerLayoutSchema.default('text'),
+    text: AnnotationTextSchema.optional(),
+    tray: z.array(ExplainerTrayNoteSchema).max(60).default([]),
+    /** The board's starting picture (an Excalidraw scene), drawn before recording. */
+    board_start: ExplainerBoardSceneSchema.optional(),
+    recording: ExplainerRecordingSchema.optional()
+  }), ...blockLayout, ...blockTimestamps
+});
+export type ExplainerBlock = z.infer<typeof ExplainerBlockSchema>;
+
+/** Events run in time order and none sits past the end of the recording. */
+export function refineExplainerRecording(
+  block: z.infer<typeof ExplainerBlockSchema>,
+  ctx: z.RefinementCtx
+): void {
+  const rec = block.content.recording;
+  if (!rec) return;
+  let prev = 0;
+  for (const [index, ev] of rec.events.entries()) {
+    if (ev.t < prev) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'explainer events must be sorted by t',
+        path: ['content', 'recording', 'events', index, 't']
+      });
+    }
+    if (ev.t > rec.duration_s + 1e-6) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'explainer event is after the end of the recording',
+        path: ['content', 'recording', 'events', index, 't']
+      });
+    }
+    if (ev.kind === 'stroke') {
+      const points = (ev.element as { points?: unknown }).points;
+      if (Array.isArray(points) && points.length !== ev.offsets.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'a stroke needs one time offset for each point',
+          path: ['content', 'recording', 'events', index, 'offsets']
+        });
+      }
+    }
+    prev = Math.max(prev, ev.t);
+  }
+}
+
 export type AnnotationBlock = z.infer<typeof AnnotationBlockObjectSchema>;
 export type AnnotationItem = z.infer<typeof AnnotationItemSchema>;
 export type AnnotationLayer = z.infer<typeof AnnotationLayerSchema>;
@@ -1792,6 +1979,7 @@ const leafBlockSchemas = [
   DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
+  ExplainerBlockSchema,
   ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
@@ -2048,6 +2236,9 @@ export const BlockSchema = z.lazy(() =>
       }
       if (block.block_type === 'annotation') {
         refineAnnotationVoiceTracks(block, ctx);
+      }
+      if (block.block_type === 'explainer') {
+        refineExplainerRecording(block, ctx);
       }
     })
 );

@@ -26,6 +26,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   done: 'Done',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
+  explainer: 'Explainer',
   continuum_line: 'Continuum line',
   curriculum_lines: 'Curriculum lines',
   discern_confirm: 'Discern Confirm',
@@ -63,6 +64,26 @@ export function listPublishBlockIssues(blocks: Block[], options: PublishBlockIss
   visitBlocks(blocks, (block) => { if (block.discern) discernHosts.add(block.id); });
   walk(blocks, [], typeOrder, issues, discernHosts, options.lecture === true);
   return issues;
+}
+
+/**
+ * Things to check that do not stop publishing: an Explainer with no published
+ * recording shows students the text only.
+ */
+export function listPublishBlockWarnings(blocks: Block[]): PublishBlockIssue[] {
+  const typeOrder = collectTypeOrder(blocks);
+  const warnings: PublishBlockIssue[] = [];
+  visitBlocks(blocks, (block) => {
+    if (block.block_type !== 'explainer') return;
+    const rec = block.content.recording;
+    const message = !rec
+      ? 'No recording yet, so students see the text only'
+      : rec.status === 'draft'
+        ? 'The recording is still a draft, so students see the text only'
+        : null;
+    if (message) warnings.push({ blockId: block.id, blockType: block.block_type, label: locateBlock(block, [], typeOrder), message });
+  });
+  return warnings;
 }
 
 function collectTypeOrder(blocks: Block[]): Map<string, string[]> {

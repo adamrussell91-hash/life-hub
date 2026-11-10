@@ -1,0 +1,550 @@
+/* Explainer block: text pane, ink, player, recorder and timeline. Colours come from the annotation ink classes. */
+
+.block-explainer {
+  --ink-base: var(--ink, #1b1c22);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.block-explainer__head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.block-explainer__title {
+  margin: 0;
+}
+
+.block-explainer__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-muted, var(--muted));
+}
+
+/* Panes: one text pane now; the board joins beside it (phase 2). */
+.block-explainer__panes {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.block-explainer__stage {
+  position: relative;
+  min-width: 0;
+}
+
+/* Text pane */
+.block-explainer__text {
+  --ink-base: var(--ink, #1b1c22);
+  position: relative;
+  padding-inline-start: 18px;
+  min-width: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.block-explainer__text.is-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+  column-gap: var(--space-6);
+}
+
+.block-explainer__lines {
+  position: relative;
+  z-index: 1;
+  font-size: var(--text-md, 1.0625rem);
+  line-height: 1.9;
+  color: var(--ink);
+}
+
+.block-explainer__stanza + .block-explainer__stanza {
+  margin-top: 0.9em;
+}
+
+.block-explainer__line {
+  margin: 0;
+}
+
+.block-explainer__lines--verse .block-explainer__line {
+  white-space: pre-wrap;
+}
+
+.block-explainer__word {
+  border-radius: 2px;
+}
+
+.block-explainer__ink {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.block-explainer__ink path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.block-explainer__ink .block-explainer__band {
+  fill: var(--ink-band);
+  stroke: none;
+}
+
+.block-explainer__ink .block-explainer__selection {
+  fill: color-mix(in srgb, var(--wave) 22%, transparent);
+  stroke: none;
+}
+
+.block-explainer__stroke {
+  stroke: var(--ink-c);
+  stroke-width: 2;
+}
+
+.block-explainer__stroke--strike {
+  stroke-width: 2.5;
+}
+
+.block-explainer__stroke--note {
+  stroke-dasharray: 3 3;
+  stroke-width: 1.5;
+}
+
+/* The lines and ink stack in the first column; notes stand in the second. */
+.block-explainer__text.is-wide .block-explainer__lines {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.block-explainer__notes {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.block-explainer__text.is-wide .block-explainer__notes {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  display: block;
+  margin-top: 0;
+}
+
+.block-explainer__note {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--navy);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--ink);
+  animation: block-explainer-in 180ms ease-out;
+}
+
+.block-explainer__note p {
+  margin: 0;
+}
+
+.block-explainer__text.is-wide .block-explainer__note {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.block-explainer__pointer {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) 80%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 18%, transparent);
+  pointer-events: none;
+  transition: left 90ms linear, top 90ms linear;
+}
+
+.block-explainer__pointer[hidden] {
+  display: none;
+}
+
+@keyframes block-explainer-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-explainer__note { animation: none; }
+  .block-explainer__pointer { transition: none; }
+}
+
+/* Player */
+.block-explainer__player {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.block-explainer__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.block-explainer__clock {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--ink-muted, var(--muted));
+}
+
+.block-explainer__scrub {
+  position: relative;
+  flex: 1 1 12rem;
+  min-width: 8rem;
+}
+
+.block-explainer__scrubber {
+  width: 100%;
+}
+
+.block-explainer__tick {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 10px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--high-sea-ink, var(--ink));
+  pointer-events: none;
+}
+
+.block-explainer__speeds {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.block-explainer__speed[aria-pressed='true'],
+.block-explainer__cc[aria-pressed='true'],
+.block-explainer__tool[aria-pressed='true'],
+.block-explainer-editor__status-btn[aria-pressed='true'],
+.block-explainer-editor__kind [aria-pressed='true'],
+.block-explainer__chip[aria-pressed='true'] {
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+}
+
+.block-explainer__captions {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--navy);
+  color: var(--on-dark, #fff);
+  font-size: var(--text-sm);
+  min-height: 2.4em;
+}
+
+.block-explainer__captions[hidden] {
+  display: none;
+}
+
+.block-explainer__captions .is-current {
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+}
+
+.block-explainer__pause-card {
+  position: absolute;
+  inset: var(--space-4) auto auto 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  width: min(26rem, calc(100% - 2 * var(--space-4)));
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--elev-3, var(--shadow));
+}
+
+.block-explainer__pause-card[hidden] {
+  display: none;
+}
+
+.block-explainer__pause-eyebrow {
+  margin: 0;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps, 0.06em);
+  text-transform: uppercase;
+  color: var(--high-sea-ink, var(--muted));
+}
+
+.block-explainer__pause-prompt {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.block-explainer__print-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: var(--text-sm);
+}
+
+/* Recorder */
+.block-explainer__recorder {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.block-explainer__recorder.is-recording {
+  border-color: var(--danger);
+}
+
+.block-explainer__rec-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.block-explainer__rec-status {
+  margin: 0;
+}
+
+.block-explainer__tools,
+.block-explainer__rec-actions,
+.block-explainer__tray-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.block-explainer__tools[hidden],
+.block-explainer__note-panel[hidden],
+.block-explainer__countdown[hidden] {
+  display: none;
+}
+
+.block-explainer__swatches {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.block-explainer__swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--ink-band);
+  cursor: pointer;
+}
+
+.block-explainer__swatch[aria-pressed='true'] {
+  border-color: var(--ink);
+}
+
+.block-explainer__note-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.block-explainer__chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-explainer__typed-note {
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+}
+
+.block-explainer__recorder.is-recording .block-explainer__text {
+  cursor: text;
+}
+
+.block-explainer__recorder[data-tool='pointer'] .block-explainer__text {
+  cursor: crosshair;
+}
+
+.block-explainer__countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  font-size: 4rem;
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+}
+
+/* Editor */
+.block-explainer-editor,
+.block-explainer-editor__setup,
+.block-explainer-editor__recording,
+.block-explainer-editor__tray {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-explainer-editor__setup[hidden] {
+  display: none;
+}
+
+.block-explainer-editor__source,
+.block-explainer-editor__title,
+.block-explainer-editor__tray-input {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2);
+}
+
+.block-explainer-editor__tray-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.block-explainer-editor__tray-row,
+.block-explainer-editor__status,
+.block-explainer-editor__kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.block-explainer-editor__tray-row input {
+  flex: 1 1 12rem;
+}
+
+/* Timeline */
+.block-explainer__timeline {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.block-explainer__timeline-title {
+  margin: 0;
+}
+
+.block-explainer__events {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.block-explainer__event {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.block-explainer__event-row,
+.block-explainer__event-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.block-explainer__event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.block-explainer__event-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.block-explainer__event-slide {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+}
+
+.block-explainer__event-note,
+.block-explainer__event-prompt {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+}
+
+/* Board pane: Excalidraw inline. Text and board share the width 50/50 and stack below 900px. */
+.block-explainer__panes[data-layout='both'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .block-explainer__panes[data-layout='both'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.block-explainer__board {
+  position: relative;
+  min-width: 0;
+  height: 480px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #fff;
+}
+
+.block-explainer__board-host {
+  position: absolute;
+  inset: 0;
+}
+
+/* Playing: the board follows the recording, so it takes no input until paused. */
+.block-explainer__board.is-locked .block-explainer__board-host {
+  pointer-events: none;
+}
+
+.block-explainer__board-loading {
+  position: absolute;
+  inset: auto 0 50% 0;
+  text-align: center;
+}
+
+.block-explainer__pointer--board {
+  z-index: 5;
+}
+
+.block-explainer-editor__start {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Buttons set their own display; hidden ones must still hide. */
+.block-explainer [hidden],
+.block-explainer__recorder [hidden],
+.block-explainer__player [hidden],
+.block-explainer-editor [hidden] {
+  display: none !important;
+}

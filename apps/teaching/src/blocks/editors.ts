@@ -8,6 +8,7 @@ import { createDoneEditor } from '@/blocks/done';
 import { createWhatHowWhyFields } from '@/blocks/what-how-why-editor';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createHingeQuestionEditor } from '@/blocks/hinge-question';
+import { createExplainerEditor } from '@/blocks/explainer';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
@@ -3425,6 +3426,8 @@ function createBlockEditorFields(
       return createBrainstormEditor(block, onChange);
     case 'hinge_question':
       return createHingeQuestionEditor(block, onChange);
+    case 'explainer':
+      return createExplainerEditor(block, onChange, { lessonId: context.lessonId });
     case 'continuum_line':
       return createContinuumLineEditor(block, onChange, context.getLessonBlocks);
     case 'curriculum_lines':

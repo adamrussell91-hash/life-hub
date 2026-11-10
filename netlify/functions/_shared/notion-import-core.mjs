@@ -2055,6 +2055,7 @@ var BlockTypeSchema = z13.enum([
   "done",
   "brainstorm",
   "hinge_question",
+  "explainer",
   "continuum_line",
   "curriculum_lines",
   "quiz_question",
@@ -3482,6 +3483,155 @@ function refineAnnotationVoiceTracks(block, ctx) {
   }
 }
 var AnnotationBlockSchema = AnnotationBlockObjectSchema.superRefine(refineAnnotationVoiceTracks);
+var EXPLAINER_MAX_SECONDS = 600;
+var ExplainerMarkStyleSchema = z13.enum(["highlight", "underline", "box", "bracket", "strike"]);
+var explainerEventBase = {
+  id: z13.string().min(1).max(60),
+  t: z13.number().min(0)
+};
+var ExplainerMarkEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("mark"),
+  style: ExplainerMarkStyleSchema,
+  colour: AnnotationColourSchema.optional(),
+  anchor: AnnotationAnchorSchema
+});
+var ExplainerNoteEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("note"),
+  anchor: AnnotationAnchorSchema,
+  html: z13.string().max(4e3).default(""),
+  tray_id: z13.string().max(60).optional()
+});
+var ExplainerEraseEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("erase"),
+  target: z13.string().min(1).max(60)
+});
+var ExplainerPointerEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("pointer"),
+  pane: z13.enum(["text", "board"]),
+  samples: z13.array(z13.union([z13.tuple([z13.number(), z13.number()]), z13.tuple([z13.number(), z13.number(), z13.number()])])).max(2e4).default([])
+});
+var ExplainerPauseEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("pause"),
+  prompt: z13.string().max(500).default("")
+});
+var ExplainerBoardElementSchema = z13.looseObject({
+  id: z13.string().min(1).max(80),
+  type: z13.string().min(1).max(40),
+  version: z13.number().optional(),
+  isDeleted: z13.boolean().optional()
+});
+var ExplainerBoardEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("board"),
+  elements: z13.array(ExplainerBoardElementSchema).max(500).default([])
+});
+var ExplainerStrokeEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("stroke"),
+  element: ExplainerBoardElementSchema,
+  offsets: z13.array(z13.number().min(0)).max(2e4).default([])
+});
+var ExplainerSendEventSchema = z13.object({
+  ...explainerEventBase,
+  kind: z13.literal("send"),
+  anchor: AnnotationAnchorSchema,
+  element: ExplainerBoardElementSchema
+});
+var ExplainerEventSchema = z13.discriminatedUnion("kind", [
+  ExplainerMarkEventSchema,
+  ExplainerNoteEventSchema,
+  ExplainerEraseEventSchema,
+  ExplainerPointerEventSchema,
+  ExplainerPauseEventSchema,
+  ExplainerBoardEventSchema,
+  ExplainerStrokeEventSchema,
+  ExplainerSendEventSchema
+]);
+var ExplainerClipSchema = z13.object({
+  media_id: z13.string().optional(),
+  url: z13.string().min(1),
+  mime: z13.string().min(1),
+  start_s: z13.number().min(0),
+  duration_s: z13.number().min(0)
+});
+var ExplainerTranscriptSchema = z13.object({
+  words: z13.array(AnnotationVoiceWordSchema),
+  timing: z13.enum(["word", "segment", "estimated"])
+});
+var ExplainerRecordingSchema = z13.object({
+  status: z13.enum(["draft", "published"]).default("draft"),
+  clips: z13.array(ExplainerClipSchema).max(200).default([]),
+  duration_s: z13.number().min(0).max(EXPLAINER_MAX_SECONDS),
+  transcript: ExplainerTranscriptSchema.optional(),
+  events: z13.array(ExplainerEventSchema).max(5e3).default([])
+});
+var ExplainerTrayNoteSchema = z13.object({
+  id: z13.string().min(1).max(60),
+  html: z13.string().max(4e3).default("")
+});
+var ExplainerBoardSceneSchema = z13.object({
+  format: z13.literal("excalidraw"),
+  version: z13.literal(1),
+  elements: z13.array(ExplainerBoardElementSchema).max(2e3).default([]),
+  appState: z13.object({ viewBackgroundColor: z13.string().max(40).optional() }).default({}),
+  files: z13.record(z13.string(), z13.unknown()).default({})
+});
+var ExplainerLayoutSchema = z13.enum(["text", "board", "both"]);
+var ExplainerBlockSchema = z13.object({
+  id: z13.string().min(1),
+  type: z13.literal("block"),
+  block_type: z13.literal("explainer"),
+  variant: z13.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z13.object({
+    title: z13.string().max(200).optional(),
+    layout: ExplainerLayoutSchema.default("text"),
+    text: AnnotationTextSchema.optional(),
+    tray: z13.array(ExplainerTrayNoteSchema).max(60).default([]),
+    /** The board's starting picture (an Excalidraw scene), drawn before recording. */
+    board_start: ExplainerBoardSceneSchema.optional(),
+    recording: ExplainerRecordingSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+function refineExplainerRecording(block, ctx) {
+  const rec = block.content.recording;
+  if (!rec) return;
+  let prev = 0;
+  for (const [index, ev] of rec.events.entries()) {
+    if (ev.t < prev) {
+      ctx.addIssue({
+        code: z13.ZodIssueCode.custom,
+        message: "explainer events must be sorted by t",
+        path: ["content", "recording", "events", index, "t"]
+      });
+    }
+    if (ev.t > rec.duration_s + 1e-6) {
+      ctx.addIssue({
+        code: z13.ZodIssueCode.custom,
+        message: "explainer event is after the end of the recording",
+        path: ["content", "recording", "events", index, "t"]
+      });
+    }
+    if (ev.kind === "stroke") {
+      const points = ev.element.points;
+      if (Array.isArray(points) && points.length !== ev.offsets.length) {
+        ctx.addIssue({
+          code: z13.ZodIssueCode.custom,
+          message: "a stroke needs one time offset for each point",
+          path: ["content", "recording", "events", index, "offsets"]
+        });
+      }
+    }
+    prev = Math.max(prev, ev.t);
+  }
+}
 function toolkitBlockSchema(blockType, content) {
   return z13.object({
     id: z13.string().min(1),
@@ -3558,6 +3708,7 @@ var leafBlockSchemas = [
   DoneBlockSchema,
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
+  ExplainerBlockSchema,
   ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
@@ -3785,6 +3936,9 @@ var BlockSchema = z13.lazy(
     }
     if (block.block_type === "annotation") {
       refineAnnotationVoiceTracks(block, ctx);
+    }
+    if (block.block_type === "explainer") {
+      refineExplainerRecording(block, ctx);
     }
   })
 );
@@ -4631,6 +4785,7 @@ var KIND_LABEL = {
   done: "Done",
   brainstorm: "Brainstorm",
   hinge_question: "Hinge question",
+  explainer: "Explainer",
   continuum_line: "Continuum line",
   curriculum_lines: "Curriculum lines",
   discern_confirm: "Discern Confirm",

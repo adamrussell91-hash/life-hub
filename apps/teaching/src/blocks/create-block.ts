@@ -46,6 +46,7 @@ export const NEW_BLOCK_TYPES = [
   'done',
   'brainstorm',
   'hinge_question',
+  'explainer',
   'continuum_line',
   'quiz_question',
   'question_set',
@@ -119,6 +120,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   done: 'Done',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
+  explainer: 'Explainer',
   continuum_line: 'Continuum line',
   quiz_question: 'Question',
   question_set: 'Question',
@@ -247,7 +249,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'quiz_question', 'question_set', 'question_drop', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'quiz_question', 'question_set', 'question_drop', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation', 'explainer']
   },
   {
     label: 'Visualisation',
@@ -315,6 +317,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   'faded_example',
   'outcomes',
   'annotation',
+  'explainer',
   'anthology'
 ]);
 
@@ -329,7 +332,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', 'explainer', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -661,6 +664,12 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'hinge_question':
       return { ...shared, block_type: 'hinge_question', variant: 'medium', content: {
         prompt: '', options: starterHingeOptions(id), correct_id: '', seconds: 60, move_on: 80, reteach: 50
+      } };
+    case 'explainer':
+      return { ...shared, block_type: 'explainer', variant: 'large', content: {
+        layout: 'text',
+        text: { kind: 'prose', stanzas: [{ id: `${id}_stanza_1`, lines: [{ id: `${id}_line_1`, text: '' }] }] },
+        tray: []
       } };
     case 'continuum_line':
       return { ...shared, block_type: 'continuum_line', variant: 'medium', content: {

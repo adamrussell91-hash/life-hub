@@ -12,7 +12,7 @@ describe('layouts offer only what their page offers', () => {
 
   it('a homepage section has no live lesson activities', () => {
     const homepage = pageBlockTypes(HOMEPAGE_BLOCK_GROUPS);
-    for (const t of ['quiz_question', 'brainstorm', 'hinge_question', 'done', 'peer_feedback']) expect(homepage.has(t)).toBe(false);
+    for (const t of ['quiz_question', 'brainstorm', 'hinge_question', 'explainer', 'done', 'peer_feedback']) expect(homepage.has(t)).toBe(false);
     expect(homepage.has('question_set')).toBe(true);
   });
 

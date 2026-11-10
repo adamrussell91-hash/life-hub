@@ -53,7 +53,7 @@ function formatElapsed(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function pickMime(): string | undefined {
+export function pickMime(): string | undefined {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
     return undefined;

@@ -44,6 +44,12 @@ export function bandPath(r: InkRect): string {
   return `M${x1} ${y1} H${x2} V${y2} H${x1} Z`;
 }
 
+/** A straight line through the middle of the words: crossed out. */
+export function strikePath(r: InkRect): string {
+  const y = snap(r.y + r.h * 0.55);
+  return `M${snap(r.x - 1)} ${y} H${snap(r.x + r.w + 1)}`;
+}
+
 export function bracketPath(top: number, bottom: number, x: number, arm = 6): string {
   return `M${snap(x + arm)} ${snap(top)} H${snap(x)} V${snap(bottom)} H${snap(x + arm)}`;
 }

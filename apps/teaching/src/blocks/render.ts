@@ -8,6 +8,7 @@ import { renderDone } from '@/blocks/done';
 import { mountNextStep, readStepPick, type StepFor } from '@/student/next-step';
 import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderHingeQuestion } from '@/blocks/hinge-question';
+import { renderExplainer } from '@/blocks/explainer';
 import { renderContinuumLine } from '@/blocks/continuum-line';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
@@ -2803,6 +2804,8 @@ function renderBlockContent(
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
     case 'hinge_question':
       return wrapBlock(renderHingeQuestion(block, mode, ctx), block, mode);
+    case 'explainer':
+      return wrapBlock(renderExplainer(block, mode), block, mode);
     case 'continuum_line':
       return wrapBlock(renderContinuumLine(block, mode, ctx), block, mode);
     case 'curriculum_lines':

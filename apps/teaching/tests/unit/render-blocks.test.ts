@@ -381,6 +381,7 @@ describe('blockRegistry', () => {
       'done',
       'embed',
       'equation',
+      'explainer',
       'faded_example',
       'flashcards',
       'fluid_analogy',
