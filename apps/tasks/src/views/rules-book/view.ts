@@ -42,7 +42,7 @@ let poll: AbortController | null = null;
 let canvasNow: { destroy(): void } | null = null;
 let unsubscribeNow: Array<() => void> = [];
 
-const ORIGIN: TaskOrigin = { name: 'Rules Book', source: 'rules_book', tag: 'rules-book', noun: 'session', review: 'the experiment for "%s" went, then open it in the Rules Book to see what happened and whether the rule still fits' };
+const ORIGIN: TaskOrigin = { name: 'Wayfinder', source: 'rules_book', tag: 'rules-book', noun: 'session', review: 'the experiment for "%s" went, then open it in Wayfinder to see what happened and whether the rule still fits' };
 
 /** The rules Explore offers, in catalogue order (the shelf). */
 const shelfTools = (): string[] => toolsForPlanStep('rules_book', 'explore') as string[];
@@ -541,6 +541,6 @@ export async function renderRulesBookView(canvas: HTMLElement): Promise<void> {
     if (id) await renderSession(canvas, id);
     else await renderList(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderRulesBookView(canvas), 'Could not load the Rules Book');
+    renderLoadError(canvas, err, () => void renderRulesBookView(canvas), 'Could not load Wayfinder');
   }
 }

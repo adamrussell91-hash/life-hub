@@ -71,11 +71,11 @@ export const RUNWAY_TOOLS: Record<RunwayTool, RunwayToolInfo> = {
   problem_solver: { name: 'Problem Solver', hash: '#/problem-solver', glyph: '?', when: 'It isn’t moving and you’re not sure why', kind: 'full' },
   decision_maker: { name: 'Decision Maker', hash: '#/decision-maker', glyph: '⑂', when: 'There’s a fork to settle first', kind: 'decision' },
   gear_shifter: { name: 'Gear Shifter', hash: '#/gear-shifter', glyph: '⚙', when: 'It feels too big to start', kind: 'shift' },
-  communication_book: { name: 'Communication Book', hash: '#/communication-book', glyph: '❝', when: 'It hinges on a conversation', kind: 'talk' },
-  collaboration_book: { name: 'Collaboration Book', hash: '#/collaboration-book', glyph: '⧉', when: 'It depends on working with others', kind: 'collab' },
-  change_book: { name: 'Change Book', hash: '#/change-book', glyph: '↻', when: 'It changes how things are done', kind: 'change' },
-  rules_book: { name: 'Rules Book', hash: '#/rules-book', glyph: '§', when: 'You need a rule of thumb for it', kind: 'rules' },
-  question_book: { name: 'Question Book', hash: '#/question-book', glyph: '¿', when: 'You need to think it through privately', kind: null }
+  communication_book: { name: 'Conversation Guide', hash: '#/communication-book', glyph: '❝', when: 'It hinges on a conversation', kind: 'talk' },
+  collaboration_book: { name: 'Team Builder', hash: '#/collaboration-book', glyph: '⧉', when: 'It depends on working with others', kind: 'collab' },
+  change_book: { name: 'Change Navigator', hash: '#/change-book', glyph: '↻', when: 'It changes how things are done', kind: 'change' },
+  rules_book: { name: 'Wayfinder', hash: '#/rules-book', glyph: '§', when: 'You need a rule of thumb for it', kind: 'rules' },
+  question_book: { name: 'Thought Starter', hash: '#/question-book', glyph: '¿', when: 'You need to think it through privately', kind: null }
 };
 
 export type RunwayGroupId = 'needs_you' | 'in_air' | 'on_ground' | 'landed';

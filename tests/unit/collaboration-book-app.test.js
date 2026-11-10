@@ -46,5 +46,5 @@ test('a collab list row has no main model until one is worked', () => {
 });
 
 test('the Collaboration Book’s tasks carry a known source', () => {
-  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'collaboration_book' && source.label === 'collaboration book'));
+  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'collaboration_book' && source.label === 'team builder'));
 });

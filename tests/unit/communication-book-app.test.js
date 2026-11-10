@@ -46,5 +46,5 @@ test('a talk list row has no main model until one is worked', () => {
 });
 
 test('the Communication Book’s tasks carry a known source', () => {
-  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'communication_book' && source.label === 'communication book'));
+  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'communication_book' && source.label === 'conversation guide'));
 });

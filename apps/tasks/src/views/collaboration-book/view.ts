@@ -42,7 +42,7 @@ let poll: AbortController | null = null;
 let canvasNow: { destroy(): void } | null = null;
 let unsubscribeNow: Array<() => void> = [];
 
-const ORIGIN: TaskOrigin = { name: 'Collaboration Book', source: 'collaboration_book', tag: 'collaboration-book', noun: 'session', review: 'the experiment for "%s" went, then open it in the Collaboration Book to see what happened and whether the conditions changed' };
+const ORIGIN: TaskOrigin = { name: 'Team Builder', source: 'collaboration_book', tag: 'collaboration-book', noun: 'session', review: 'the experiment for "%s" went, then open it in Team Builder to see what happened and whether the conditions changed' };
 
 /** The models Explore offers, in catalogue order (the shelf). */
 const shelfTools = (): string[] => toolsForPlanStep('collaboration_book', 'explore') as string[];
@@ -547,6 +547,6 @@ export async function renderCollaborationBookView(canvas: HTMLElement): Promise<
     if (id) await renderSession(canvas, id);
     else await renderList(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderCollaborationBookView(canvas), 'Could not load the Collaboration Book');
+    renderLoadError(canvas, err, () => void renderCollaborationBookView(canvas), 'Could not load Team Builder');
   }
 }

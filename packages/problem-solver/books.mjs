@@ -50,7 +50,7 @@ export const BOOK_KINDS = Object.freeze({
     placeKey: 'group',
     parsePlace: parseGroups,
     record: Object.freeze({ tool: RULES_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The check time set in the experiment.', basisRule: 'The experiment rests on what a rule showed' }),
-    reason: 'The Rules Book works from The Rules Book.'
+    reason: 'Wayfinder works from The Rules Book.'
   }),
   change: Object.freeze({
     model: CHANGE_BOOK_MODEL,
@@ -58,7 +58,7 @@ export const BOOK_KINDS = Object.freeze({
     placeKey: 'group',
     parsePlace: parseChangeGroups,
     record: Object.freeze({ tool: CHANGE_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The review date set for the step.', basisRule: 'The step rests on what a model showed' }),
-    reason: 'Change Book works from The Change Book.'
+    reason: 'Change Navigator works from The Change Book.'
   }),
   collab: Object.freeze({
     model: COLLABORATION_BOOK_MODEL,
@@ -66,7 +66,7 @@ export const BOOK_KINDS = Object.freeze({
     placeKey: 'group',
     parsePlace: parseCollabGroups,
     record: Object.freeze({ tool: COLLAB_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The date set to come back to the experiment.', basisRule: 'The experiment rests on what a model showed' }),
-    reason: 'Collaboration Book works from The Collaboration Book.'
+    reason: 'Team Builder works from The Collaboration Book.'
   }),
   talk: Object.freeze({
     model: COMMUNICATION_BOOK_MODEL,
@@ -74,7 +74,7 @@ export const BOOK_KINDS = Object.freeze({
     placeKey: 'group',
     parsePlace: parseCommGroups,
     record: Object.freeze({ tool: COMM_COMMIT_ID, basisSlot: 'rests_on', dateSlot: 'check_back', dateReason: 'The date set to come back to the next conversation.', basisRule: 'The next conversation rests on what a model showed' }),
-    reason: 'Communication Book works from The Communication Book.'
+    reason: 'Conversation Guide works from The Communication Book.'
   })
 });
 

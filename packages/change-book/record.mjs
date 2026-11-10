@@ -73,7 +73,7 @@ export function composeActionRecord(session) {
     ['learnings', 'How it went', (session.learnings ?? []).map((item) => `${session.model ? stepName(session.model.id, item.step) : item.step}: ${item.text}`)]
   ];
   const sections = raw.map(([key, heading, lines]) => ({ key, heading, lines: lines.filter(Boolean) })).filter((section) => section.lines.length);
-  return { title: `Change Book: ${session.title}`, version: 1, sections };
+  return { title: `Change Navigator: ${session.title}`, version: 1, sections };
 }
 
 /** What the record card offers now, or null: `write`, `update` or `graphic`. Only change sessions have one. */

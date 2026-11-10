@@ -132,7 +132,7 @@ test('Review waits for the date, then opens the review; a walk to the end offers
   let s = await agreed();
   const offer = actionOffer(s);
   assert.equal(offer.kind, 'write');
-  assert.match(offer.file.title, /^Communication Book: /);
+  assert.match(offer.file.title, /^Conversation Guide: /);
   assert.ok(offer.file.sections.some((section) => section.key === 'wanted' && section.lines[0].includes('on its merits')));
   assert.ok(offer.file.sections.some((section) => section.key === 'owner'));
   s = linkCaseFile(s, { target: { kind: 'task', id: 'task-page' }, version: 1, title: offer.file.title, sections: offer.digests, graphic: true }, deps);

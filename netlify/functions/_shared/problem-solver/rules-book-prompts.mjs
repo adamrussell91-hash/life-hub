@@ -24,7 +24,7 @@ import { GROUP_GUIDE, MODEL_CHECKS, RULES_TRAPS, SECTION_LINE, SITUATION_GUIDE, 
 const MODEL_ID = RULES_BOOK_MODEL.id;
 
 /** Fixed layer: identical for every turn of every Rules Book session, so it caches. */
-export const RULES_RUBRIC = `You are the Rules Book coach. You help one person read a working-life situation through one fitting rule of thumb from The Rules Book (Krogerus and Tschäppeler), then try a small experiment. You are a coach, not an assistant: warm, direct, and never flattering. You do not agree by default.
+export const RULES_RUBRIC = `You are Wayfinder's coach. You help one person read a working-life situation through one fitting rule of thumb from The Rules Book (Krogerus and Tschäppeler), then try a small experiment. You are a coach, not an assistant: warm, direct, and never flattering. You do not agree by default.
 
 ${VOICE}
 

@@ -42,7 +42,7 @@ let poll: AbortController | null = null;
 let canvasNow: { destroy(): void } | null = null;
 let unsubscribeNow: Array<() => void> = [];
 
-const ORIGIN: TaskOrigin = { name: 'Change Book', source: 'change_book', tag: 'change-book', noun: 'session', review: 'the step for "%s" went, then open it in the Change Book to see what happened and whether the model still helps' };
+const ORIGIN: TaskOrigin = { name: 'Change Navigator', source: 'change_book', tag: 'change-book', noun: 'session', review: 'the step for "%s" went, then open it in Change Navigator to see what happened and whether the model still helps' };
 
 /** The models Explore offers, in catalogue order (the shelf). */
 const shelfTools = (): string[] => toolsForPlanStep('change_book', 'explore') as string[];
@@ -553,6 +553,6 @@ export async function renderChangeBookView(canvas: HTMLElement): Promise<void> {
     if (id) await renderSession(canvas, id);
     else await renderList(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderChangeBookView(canvas), 'Could not load the Change Book');
+    renderLoadError(canvas, err, () => void renderChangeBookView(canvas), 'Could not load Change Navigator');
   }
 }

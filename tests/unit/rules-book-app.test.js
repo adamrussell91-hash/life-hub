@@ -45,5 +45,5 @@ test('a rules list row has no main rule until one is worked', () => {
 });
 
 test('the Rules Book’s tasks carry a known source', () => {
-  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'rules_book' && source.label === 'rules book'));
+  assert.ok(DEFAULT_TASK_PROPERTY_CONFIG.sources.some((source) => source.id === 'rules_book' && source.label === 'wayfinder'));
 });

@@ -43,7 +43,7 @@ let poll: AbortController | null = null;
 let canvasNow: { destroy(): void } | null = null;
 let unsubscribeNow: Array<() => void> = [];
 
-const ORIGIN: TaskOrigin = { name: 'Communication Book', source: 'communication_book', tag: 'communication-book', noun: 'session', review: 'the next conversation for "%s" went, then open it in the Communication Book to see what was said and how it landed' };
+const ORIGIN: TaskOrigin = { name: 'Conversation Guide', source: 'communication_book', tag: 'communication-book', noun: 'session', review: 'the next conversation for "%s" went, then open it in Conversation Guide to see what was said and how it landed' };
 
 /** The models Explore offers, in catalogue order (the shelf). */
 const shelfTools = (): string[] => toolsForPlanStep('communication_book', 'explore') as string[];
@@ -557,6 +557,6 @@ export async function renderCommunicationBookView(canvas: HTMLElement): Promise<
     if (id) await renderSession(canvas, id);
     else await renderList(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderCommunicationBookView(canvas), 'Could not load the Communication Book');
+    renderLoadError(canvas, err, () => void renderCommunicationBookView(canvas), 'Could not load Conversation Guide');
   }
 }
