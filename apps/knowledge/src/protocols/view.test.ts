@@ -173,7 +173,8 @@ describe("protocol conversation view", () => {
   });
 
   it("keeps a single change handler so Past runs ticks, the filter and mode hints all work", async () => {
-    const { default: source } = await import("./view.ts?raw");
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("../../packages/protocol-view/view.ts", "utf8");
     expect(source.match(/host\.onchange\s*=/g)).toHaveLength(1);
   });
 

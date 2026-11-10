@@ -41,6 +41,8 @@ export function sessionIndexRow(value) {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     completedAt: value.completedAt || null,
+    origin: value.origin ?? null,
+    usage: value.usage ?? null,
     title: value.summary?.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
     summary: typeof value.summary?.summary === 'string'
       ? value.summary.summary

@@ -1,8 +1,9 @@
 import { catalog } from './_shared/cognitive-controller.mjs';
 import { ID_RE } from './_shared/cognitive-controller.mjs';
+import { protocolCostMedians } from './_shared/cognitive-costs.mjs';
 import { createCognitiveService } from './_shared/cognitive-service.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
-import { createAnthropicClient } from './_shared/anthropic-client.mjs';
+import { createAnthropicClient, DEFAULT_MODEL } from './_shared/anthropic-client.mjs';
 import { gatherContext, topicSearchTerms, readCentralNodeMarkdown } from './_shared/cognitive-context.mjs';
 import { writeCentralNodeMarkdown } from './_shared/cognitive-writeback.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
@@ -27,6 +28,7 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
   if (!apiKey) throw Object.assign(new Error('AI provider is not configured.'), { code: 'provider_unavailable' });
   const client = createAnthropicClient({ apiKey, fetchImpl });
   let text = '';
+  const usage = { model: DEFAULT_MODEL, input: 0, output: 0 };
   try {
     for await (const event of client.streamMessage({
       system: prompt.system,
@@ -35,13 +37,20 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
       maxTokens: Number(prompt.maxTokens) > 0
         ? Math.min(8192, Number(prompt.maxTokens))
         : Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
-    })) if (event.type === 'text') text += event.delta ?? '';
+    })) {
+      if (event.type === 'text') text += event.delta ?? '';
+      else if (event.type === 'usage') {
+        // Cache reads and writes count as plain input here: a small overestimate, never an under one.
+        usage.input += (event.inputTokens || 0) + (event.cacheReadTokens || 0) + (event.cacheWriteTokens || 0);
+        usage.output += event.outputTokens || 0;
+      }
+    }
   } catch (error) {
     // Sonnet 5 rejects the client's max_tokens assistant-prefill continuation.
     // Keep a complete first-round voice if we already have one.
     if (!text.trim()) throw error;
   }
-  return { text, evidenceIds: [] };
+  return { text, evidenceIds: [], usage };
 }
 
 const STOP = new Set(['about','after','again','also','and','any','are','because','been','before','being','between','but','can','could','for','from','has','have','here','how','into','its','just','like','may','might','more','most','need','not','only','other','our','out','over','really','same','should','some','stay','such','than','that','the','their','them','then','there','they','this','through','too','under','very','want','was','were','what','when','where','whether','which','while','who','why','will','with','would','you','your']);
@@ -165,8 +174,13 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
     const { env } = context;
     if (request.method === 'GET') {
       const url = new URL(request.url);
-      if (!url.searchParams.has('sessionId') && !url.searchParams.has('list')) return withCors(okResponse(200, { catalog }), request, env);
+      if (!url.searchParams.has('sessionId') && !url.searchParams.has('list') && !url.searchParams.has('costs')) return withCors(okResponse(200, { catalog }), request, env);
       try {
+        if (url.searchParams.has('costs')) {
+          const store = deps.getStore ? await deps.getStore(env) : await defaultGetCognitiveStore(env);
+          if (!store) return withCors(okResponse(200, { costs: {} }), request, env);
+          return withCors(okResponse(200, { costs: await protocolCostMedians(store, owner(env)) }), request, env);
+        }
         const service = await serviceFor(env, deps);
         if (url.searchParams.has('list')) {
           await service.purgeIncompleteOnce(owner(env));

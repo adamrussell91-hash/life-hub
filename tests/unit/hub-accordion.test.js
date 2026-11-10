@@ -132,7 +132,7 @@ test('desktop hub switchers stay directly with each hub navigation', async () =>
 });
 
 test('Knowledge protocol ambience is clipped to the canvas and cannot wash over the rail', async () => {
-  const css = await readFile(new URL('../../apps/knowledge/src/protocols/style.css', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../packages/protocol-view/style.css', import.meta.url), 'utf8');
   assert.match(css, /\.protocols-root\s*\{[^}]*overflow-x:\s*clip/s);
 });
 

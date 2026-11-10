@@ -140,3 +140,4 @@
 .protocol-summary p:last-child { margin-bottom:0; }
 @media (prefers-reduced-motion:reduce) { .protocol-bg__layer { transition:none; } }
 @media (max-width:720px){ .protocol-past__open{ grid-template-columns:1fr 1fr; } }
+.protocol-past__thread { font-size:var(--text-sm); color:var(--navy); text-decoration:underline; padding:var(--space-1) var(--space-2); }
