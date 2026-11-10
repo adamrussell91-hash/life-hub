@@ -119,6 +119,12 @@
 .tf-ans p { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
 .tf-ans small { display: block; color: var(--pastel-lilac-ink); font-style: italic; }
 .tf-ticks { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tf-tick--again { margin-left: 6px; padding: 0 10px; width: auto; }
+.tf-again-note { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--text-sm); padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: inherit; }
+.tf-again-line { display: flex; gap: var(--space-2); align-items: center; font-size: var(--text-sm); font-weight: 600; min-height: 44px; }
+.tf-first { opacity: .75; }
+.tf-first p { margin: 0 0 var(--space-1); font-size: var(--text-sm); overflow-wrap: anywhere; }
+small.tf-first { display: block; color: var(--muted); font-style: normal; }
 .tf-tick { min-width: 36px; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; font-weight: 700; color: var(--navy); cursor: pointer; }
 .tf-tick.is-ai { border-style: dashed; border-color: var(--pastel-lilac-ink); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
 .tf-tick.is-on { background: var(--pastel-sage-ink); border-color: var(--pastel-sage-ink); color: #fff; }
@@ -131,9 +137,10 @@
 .tf-gapans { display: flex; flex-wrap: wrap; gap: 4px; }
 .tf-gapans .tf-gap { margin: 0; background: transparent; border: 1px solid var(--line); color: var(--navy); font-weight: 500; }
 .tf-gapans .tf-gap.is-off { border-color: var(--pastel-peach-ink); background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+/* On a phone the marks and Again sit under the answer, so the words keep the width. */
 @media (max-width: 600px) {
-  .tf-ans:has(.tf-gapans) { grid-template-columns: 40px minmax(0, 1fr); }
-  .tf-ans:has(.tf-gapans) .tf-ticks { grid-column: 2; }
+  .tf-ans { grid-template-columns: 40px minmax(0, 1fr); }
+  .tf-ans .tf-ticks { grid-column: 2; }
 }
 .tf-bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--line); background: var(--paper); }
 .tf-bar .tf-go { margin-left: auto; }

@@ -203,7 +203,7 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
     const g = group('Back to you');
     for (const b of todo.back) {
       if (b.state === 'read') g.append(item('tick', b.title, 'Feedback read today.'));
-      else if (b.state === 'redraft') g.append(item('redraft', b.title, 'Your teacher asked for another go.', tabLink('Redraft →', 'returned', `Redraft ${b.title}`), ['again', 'Have another go']));
+      else if (b.state === 'redraft') g.append(item('redraft', b.title, 'Your teacher asked for another go.', b.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${b.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${b.title}`), ['again', 'Have another go']));
       else g.append(item('new', b.title, 'Feedback is back. Have a read.', tabLink('Open →', 'returned', `Open feedback on ${b.title}`), ['new', 'New']));
     }
     for (const w of todo.waiting) {

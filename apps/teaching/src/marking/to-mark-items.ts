@@ -22,6 +22,8 @@ export type QuizAnswer = {
   ai_ready?: boolean;
   ai?: { marks: number | null; suggested?: number; reason: string; feedback?: string; tags?: { code_id: string; quote: string; why?: string }[] };
   comment?: string;
+  /** Asked for another go: `sent` once the new answer is back, with the first one. */
+  again?: { state: 'asked' | 'sent'; asked_at: string; sent_at?: string; comment: string; first?: QuizResponse };
 };
 /** A gap passage piece: plain text, or a gap with its accepted answers. */
 export type PassagePart = { text: string } | { gap: string; answers: string[] };
@@ -69,7 +71,7 @@ function quizItems(task: ToMarkTask, load: QuizLoad | undefined): FlowItem[] {
       out.push({ key: `quiz:${task.class_id}:${task.lesson_id}:${question.id}`, kind: 'quiz', who: String(question.answers.length), count: question.answers.length, task, group, question });
     } else {
       for (const answer of question.answers) {
-        out.push({ key: `answer:${answer.attempt_id}:${question.id}`, kind: 'quiz', who: answer.initials, count: 1, task, group, question, answer });
+        out.push({ key: `answer:${answer.attempt_id}:${question.id}`, kind: 'quiz', who: answer.again?.state === 'sent' ? `${answer.initials} · Another go` : answer.initials, count: 1, task, group, question, answer });
       }
     }
   }

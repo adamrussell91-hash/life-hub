@@ -2,7 +2,7 @@
  * Everything waiting on the teacher, across every class:
  *
  *   piece    Markbook task linked to a lesson block (handed-in writing)
- *   quiz     quiz go with written answers still to mark (tutorial exit checks too)
+ *   quiz     quiz go with written answers still to mark (tutorial exit checks too), and answers asked again
  *   voice    Voice block recording not yet returned
  *   sprint   design sprint reflection handed in, no reflection mark yet
  *   handup   lecture or tutorial hand-up with no reply
@@ -102,11 +102,14 @@ async function quizItems(store, roster, lessonIds, base) {
     if (!q) continue;
     // An answer only the AI has marked still waits: it suggests, the teacher decides.
     const waiting = Object.entries(q.scores).filter(([, s]) => s.pending > 0 || s.ai_review > 0);
-    if (!waiting.length) continue;
+    // Answers sent back for another go, not back yet.
+    const asked = Object.entries(q.scores).flatMap(([id, s]) => (s.asked_again ?? []).map((x) => ({ initials: initials.get(id) ?? '–', asked_at: x.asked_at })));
+    if (!waiting.length && !asked.length) continue;
     items.push({
       ...base, kind: 'quiz', what: 'Quiz answers to mark', title: q.title, lesson_id: q.lesson_id, href: lessonPath(q.lesson_id),
       waiting: waiting.length, handed_in: Object.keys(q.scores).length, answers: waiting.reduce((n, [, s]) => n + s.pending + (s.ai_review ?? 0), 0),
-      who: waiting.map(([id]) => initials.get(id)).filter(Boolean), oldest_at: oldest(waiting.map(([, s]) => s.submitted_at))
+      who: waiting.map(([id]) => initials.get(id)).filter(Boolean), oldest_at: oldest(waiting.map(([, s]) => s.submitted_at)),
+      ...(asked.length ? { asked } : {})
     });
   }
   return items;

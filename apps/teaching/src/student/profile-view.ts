@@ -271,7 +271,7 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () =>
   const open = (id: string, wasNew = false): void => {
     void options.loadPiece?.(id).then(
       (piece) => {
-        const redraft = id.startsWith('w:') && 'redraft' in piece && piece.redraft ? options.redraft?.(id) : undefined;
+        const redraft = /^[wq]:/.test(id) && 'redraft' in piece && piece.redraft ? options.redraft?.(id) : undefined;
         panel.replaceChildren(pieceView(piece, showList, redraft ? { redraft, onSent: () => open(id) } : {}));
         options.markSeen?.(id);
         if (wasNew) dropBadge(panel.closest('.pm-profile'));
@@ -453,7 +453,17 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
         loadPiece: (id) => call<PiecePayload | NotePayload>('piece', { item: id }),
         markSeen: (id) => void call('seen', { item: id }).catch(() => undefined),
         redraft: (item) => {
-          const [, lessonId = '', blockId = ''] = item.split(':');
+          const [kind, lessonId = '', blockId = ''] = item.split(':');
+          // A quiz answer asked again: its question, through the quiz.
+          if (kind === 'q') {
+            const quiz = <T>(action: string, extra: Record<string, unknown> = {}): Promise<T> =>
+              apiPost<T>(`/api/published/quiz/${encodeURIComponent(lessonId)}`, { action, question_id: blockId, class_id: classId, class_token: deviceToken(`class:${classId}`), ...extra });
+            return {
+              load: () => quiz('again_load'),
+              save: (part, field, text) => quiz('again_save', { part, field, text }),
+              send: () => quiz('again_send')
+            };
+          }
           const work = <T>(action: string, extra: Record<string, unknown> = {}): Promise<T> =>
             apiPost<T>(`/api/published/work/${encodeURIComponent(lessonId)}`, { action, block_id: blockId, class_id: classId, class_token: deviceToken(`class:${classId}`), ...extra });
           return {

@@ -98,6 +98,8 @@ type Row = {
   step?: StepPick;
   /** Which mark counts: the teacher's, the AI's or the automatic one. Null while waiting. */
   by?: 'teacher' | 'ai' | 'auto' | null;
+  /** Another go asked for this answer; `sent` once the new one is back, and `first` was the answer before. */
+  again?: { state: 'asked' | 'sent'; asked_at: string; sent_at?: string; comment: string; first?: QuizResponse | null };
   /** The AI's mark, for the teacher only. Marks are null when it wasn't sure. */
   ai?: { marks: number | null; suggested?: number; reason: string; feedback?: string };
   /** The teacher's comment for the student. */
@@ -948,6 +950,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const sureWrong = q.confidence['3'][0] - q.confidence['3'][1];
     if (sureWrong > 0) notes.push(`${sureWrong} ${sureWrong === 1 ? 'was' : 'were'} sure but didn’t get full marks`);
     if (notes.length) box.append(el('p', 'qz-note block-secondary', notes.join(' · ')));
+    if (q.total > q.answered && (AI_MARK_KINDS as readonly string[]).includes(q.key.kind)) box.append(askBlank(q));
     if ('options' in q.question && q.key.answer.type === 'choice') {
       const right = new Set(q.key.answer.ids);
       const picksTotal = Object.values(q.picks).reduce((a, b) => a + b, 0);
@@ -964,6 +967,35 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const answers = answerTallyView(q.answers, meter);
     if (answers) box.append(answers);
     return box.childElementCount ? box : null;
+  }
+
+  /** Sends this question back to everyone on a class list who left it blank, with one comment. */
+  function askBlank(q: QuestionStats): HTMLElement {
+    const box = el('div', 'qz-again');
+    const note = textArea('', QUIZ_LIMITS.note, 2, 'What to tell them. They see it with the question.');
+    note.hidden = true;
+    const status = el('p', 'qz-note block-secondary');
+    status.setAttribute('role', 'status');
+    const send = button('Ask the blank ones again', 'ghost', async function () {
+      if (note.hidden) {
+        note.hidden = false;
+        this.textContent = 'Send to them';
+        note.focus();
+        return;
+      }
+      this.disabled = true;
+      try {
+        const { asked } = await post<{ asked: number }>({ action: 'again_blank', question_id: q.id, comment: note.value, ...(insightClass ? { class_id: insightClass } : {}) });
+        note.hidden = true;
+        this.remove();
+        status.textContent = asked ? `Asked ${asked === 1 ? '1 student' : `${asked} students`} for another go. It’s in their To do.` : 'Nobody on a class list left this blank, or they’ve already been asked.';
+      } catch (error) {
+        showError(error);
+        this.disabled = false;
+      }
+    });
+    box.append(note, send, status);
+    return box;
   }
 
   function questionStat(q: QuestionStats): HTMLElement {
@@ -1090,6 +1122,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       if (comment) item.append(labelled('Comment for the student (optional)', comment, 'Students see it once results are released.'));
       markRow.append(labelled(`Marks out of ${formatMarks(r.mark.max)}`, input), save);
       item.append(markRow);
+      // Another go at a typed answer: it goes to the student's To do with the comment above.
+      if ((AI_MARK_KINDS as readonly string[]).includes(r.key.kind) && a.student) item.append(againRow(a, r, comment, wrap));
       const accept = acceptButton(r, answerText);
       if (accept) item.append(accept);
       // Saving the current mark with codes turns an automatic mark into a teacher mark of the same value.
@@ -1149,6 +1183,33 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       wrap.append(item);
     });
     return wrap;
+  }
+
+  /** Ask for another go at one answer, or take the ask back while it's still with the student. */
+  function againRow(a: AttemptDetail, r: Row, comment: HTMLTextAreaElement | null, wrap: HTMLElement): HTMLElement {
+    const box = el('div', 'qz-again');
+    const act = (body: Record<string, unknown>) => async function (this: HTMLButtonElement) {
+      this.disabled = true;
+      try {
+        const res = await inOrder(() => post<{ attempt: AttemptDetail }>({ attempt_id: a.id, question_id: r.id, ...body }));
+        wrap.replaceWith(attemptView(res.attempt));
+      } catch (error) {
+        showError(error);
+        this.disabled = false;
+      }
+    };
+    const day = (at: string) => new Date(at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    if (r.again?.state === 'asked') {
+      box.append(el('p', 'qz-note block-secondary', `Asked for another go on ${day(r.again.asked_at)}. Their mark stays until the new answer is back.`), button('Take back', 'ghost', act({ action: 'again_cancel' })));
+      return box;
+    }
+    if (r.again?.state === 'sent') {
+      const first = r.again.first;
+      const words = first && 'gaps' in first ? Object.values(first.gaps ?? {}).join(' · ') : first && 'text' in first ? first.text : '';
+      box.append(el('p', 'qz-note block-secondary', `Another go, sent ${day(r.again.sent_at ?? r.again.asked_at)}. First answer: ${words || '(blank)'}`));
+    }
+    box.append(button('Ask for another go', 'ghost', act({ action: 'again_ask', comment: comment?.value ?? '' })));
+    return box;
   }
 
   /** The AI's note on a row: a tag and its reason, for the teacher only. */

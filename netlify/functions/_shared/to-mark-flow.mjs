@@ -104,7 +104,9 @@ export async function toMarkAction(store, body) {
     kind: 'answer', title, lesson_id: lessonId, column_id: null,
     text, tags: cleanTags(body.tags, text, library), comment: typeof body.comment === 'string' ? body.comment.trim().slice(0, MAX_COMMENT) : '',
     ...(saved.rubric ? { rubric: saved.rubric } : {}),
-    status: 'returned', returned_at: kept?.returned_at ?? now, updated_at: now, ...(kept?.seen_at ? { seen_at: kept.seen_at } : {})
+    // A new answer the student sent back comes back to them as fresh feedback.
+    status: 'returned', returned_at: kept?.sent ? now : kept?.returned_at ?? now, updated_at: now, ...(kept?.seen_at && !kept.sent ? { seen_at: kept.seen_at } : {}),
+    ...(kept?.redraft ? { redraft: kept.redraft } : {})
   };
   await store.setJSON(key, next);
   // An answer's rungs are read into its quiz's evidence, so a saved copy goes stale.

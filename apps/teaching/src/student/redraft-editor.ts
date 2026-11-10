@@ -11,7 +11,7 @@ export type RedraftApi = {
 
 const SAVE_AFTER = 800;
 
-export function redraftEditor(api: RedraftApi, onSent: () => void): HTMLElement {
+export function redraftEditor(api: RedraftApi, onSent: () => void, sendLabel = 'Send my redraft'): HTMLElement {
   const root = el('div', 'pg-redraft');
   const status = el('p', 'pg-redraft__status');
   status.setAttribute('role', 'status');
@@ -67,7 +67,7 @@ export function redraftEditor(api: RedraftApi, onSent: () => void): HTMLElement 
         root.append(box(scope.part, scope.field, working[scope.part]?.[scope.field] ?? value.slice(scope.start, scope.end), 'Your redraft of this section'));
         if (after) root.append(el('span', 'pg-redraft__locked', after));
       }
-      const send = button('Send my redraft', 'primary', () => {
+      const send = button(sendLabel, 'primary', () => {
         send.disabled = true;
         status.textContent = '';
         void flush().then(() => api.send()).then(onSent, (e: unknown) => {

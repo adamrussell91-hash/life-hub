@@ -36,6 +36,14 @@ const quizPost = <T>(lessonId: string, body: Record<string, unknown>) => apiPost
 const flowPost = <T>(body: Record<string, unknown>) => apiPost<T>('/api/to-mark', body);
 const answerText = (r: QuizResponse): string => (r?.gaps ? Object.values(r.gaps).join(' · ') : r?.text ?? '');
 
+/** A sent-back answer's first go and what was said about it, faded beside the new one. */
+function firstGo(again: NonNullable<QuizAnswer['again']>): HTMLElement {
+  const box = el('div', 'tf-first');
+  box.append(el('h3', 'mk-side__title', 'Another go. Their first answer'), el('p', undefined, answerText(again.first ?? null) || '(blank)'));
+  if (again.comment) box.append(el('p', 'tf-note', `You said: ${again.comment}`));
+  return box;
+}
+
 function errorLine(): { line: HTMLElement; show: (e: unknown) => void } {
   const line = el('p', 'tf-error');
   line.setAttribute('role', 'alert');
@@ -145,6 +153,13 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   // A tagged question's mark sits in its rubric, suggested from the rungs.
   if (!rubric) aside.append(el('h3', 'mk-side__title', 'Mark'), ticks);
   if (answer.ai) aside.append(el('p', 'mk-ai', `AI suggests ${fromAi ?? 'no mark'}: ${answer.ai.reason} Return keeps it unless you ${rubric ? 'change it' : 'press another'}.`));
+  if (answer.again?.state === 'sent') aside.append(firstGo(answer.again));
+  // Another go: the mark stands until their new answer comes back, then that one is marked.
+  const againBox = el('label', 'tf-again-line');
+  const againOn = el('input');
+  againOn.type = 'checkbox';
+  againBox.append(againOn, document.createTextNode(' Ask for another go at this question'));
+  aside.append(againBox, el('p', 'tf-note', 'Your comment goes with it. Their mark stays until the new answer is back.'));
   if (question.guide) aside.append(el('p', 'tf-note', `How to mark it: ${question.guide}`));
   if (question.model_answer) aside.append(el('p', 'tf-note', `Model answer: ${question.model_answer}`));
 
@@ -181,13 +196,14 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   return {
     el: box,
     finish: async () => {
-      const score = (view.rubric ? view.rubric.mark() : mark) ?? fromAi;
+      const score = (view.rubric ? view.rubric.mark() : mark) ?? fromAi ?? (againOn.checked ? 0 : null);
       if (score === null) { show('Pick a mark first.'); return false; }
       await view.save();
       await quizPost(task.lesson_id, { action: 'mark', attempt_id: answer.attempt_id, question_id: question.id, score, comment: sent.comment });
       const fields = sent.rubric !== undefined ? { rubric: sent.rubric, attempt_id: answer.attempt_id, ...(sent.today ? { today: sent.today } : {}) } : {};
       try {
         const reply = await flowPost({ action: 'answer_save', class_id: task.class_id, student_id: answer.student_id, piece, lesson_id: task.lesson_id, title: task.title, text: parts, tags: sent.tags, comment: sent.comment, ...fields });
+        if (againOn.checked) await quizPost(task.lesson_id, { action: 'again_ask', attempt_id: answer.attempt_id, question_id: question.id, comment: sent.comment });
         // A step that stayed practice holds the flow here once, so the teacher reads why.
         return !view.rubric?.applyReply(reply);
       } catch (error) {
@@ -245,6 +261,12 @@ function stackCard(item: FlowItem): Card {
   const question = item.question!;
   const { task } = item;
   const picks = new Map<string, number>();
+  /** Answers to send back for another go, with one comment for all of them. */
+  const again = new Set<string>();
+  const againNote = el('textarea', 'tf-again-note');
+  againNote.rows = 2;
+  againNote.placeholder = 'What to tell them. They see it with the question.';
+  againNote.setAttribute('aria-label', 'Comment for the students you’re asking again');
   const box = el('div', 'tf-card');
   const shown = questionShown(question);
   const paint = (): void => {
@@ -254,6 +276,7 @@ function stackCard(item: FlowItem): Card {
       const row = el('div', 'tf-ans');
       row.append(el('span', 'tf-who', a.initials));
       const p = question.passage && a.response?.gaps ? gapAnswers(question.passage, a.response.gaps) : el('p', undefined, answerText(a.response) || '(blank)');
+      if (a.again?.state === 'sent') p.append(el('small', 'tf-first', `Another go. First answer: ${answerText(a.again.first ?? null) || '(blank)'}`));
       if (a.ai) p.append(el('small', undefined, a.ai.reason));
       row.append(p);
       const ticks = el('div', 'tf-ticks');
@@ -269,6 +292,14 @@ function stackCard(item: FlowItem): Card {
         b.addEventListener('click', () => { picks.set(a.attempt_id, value); paint(); });
         ticks.append(b);
       }
+      const asked = again.has(a.attempt_id);
+      const redo = el('button', `tf-tick tf-tick--again${asked ? ' is-on' : ''}`, 'Again');
+      redo.type = 'button';
+      redo.title = 'Ask for another go';
+      redo.setAttribute('aria-label', `${a.initials}: ask for another go`);
+      redo.setAttribute('aria-pressed', String(asked));
+      redo.addEventListener('click', () => { if (asked) again.delete(a.attempt_id); else again.add(a.attempt_id); paint(); });
+      ticks.append(redo);
       row.append(ticks);
       box.append(row);
     }
@@ -278,6 +309,7 @@ function stackCard(item: FlowItem): Card {
         paint();
       }));
     }
+    if (again.size) box.append(el('h3', 'mk-side__title', `Another go for ${again.size === 1 ? '1 student' : `${again.size} students`}`), againNote);
     box.append(line);
   };
   const { line, show } = errorLine();
@@ -288,7 +320,12 @@ function stackCard(item: FlowItem): Card {
       for (const a of question.answers.filter((x) => picks.has(x.attempt_id))) {
         await quizPost(task.lesson_id, { action: 'mark', attempt_id: a.attempt_id, question_id: question.id, score: picks.get(a.attempt_id) });
       }
-      const left = question.answers.filter((a) => !picks.has(a.attempt_id));
+      // An unmarked answer sent back gets 0 for now; its new answer replaces it.
+      for (const id of again) await quizPost(task.lesson_id, { action: 'again_ask', attempt_id: id, question_id: question.id, comment: againNote.value });
+      const left = question.answers.filter((a) => !picks.has(a.attempt_id) && !again.has(a.attempt_id));
+      // Those are sent: the comment box is for the next ones.
+      again.clear();
+      againNote.value = '';
       if (left.length) {
         question.answers = left;
         show(`Saved. ${left.length === 1 ? '1 answer is' : `${left.length} answers are`} still undecided.`);
@@ -618,7 +655,7 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
       queue.append(g);
     }
     for (const t of data.tasks) {
-      if (t.asked?.length) queue.append(el('p', 'tf-note', `${t.title}: redraft asked, still with ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
+      if (t.asked?.length) queue.append(el('p', 'tf-note', `${t.title}: ${t.kind === 'quiz' ? 'asked again' : 'redraft asked'}, still with ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
     }
   }
 
