@@ -44,7 +44,7 @@ export async function renderQuestionBookView(canvas: HTMLElement): Promise<void>
     if (chapter) await renderChapter(canvas, chapter);
     else await renderShelf(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderQuestionBookView(canvas), 'Could not load the Question Book');
+    renderLoadError(canvas, err, () => void renderQuestionBookView(canvas), 'Could not load Thought Starter');
   }
 }
 
@@ -113,7 +113,7 @@ async function renderShelf(canvas: HTMLElement): Promise<void> {
   const page = el('div', 'qb-page qb-scope qb-shelf');
   const head = el('header', 'qb-head');
   const mark = el('div', 'qb-head__mark');
-  mark.append(bookEmblem(), wordmark(null), el('h1', 'qb-head__title', 'The Question Book'));
+  mark.append(bookEmblem(), wordmark(null), el('h1', 'qb-head__title', 'Thought Starter'));
   head.append(mark);
   head.append(el('p', 'qb-intro', 'A private notebook of questions about your life. Answer what you like, in any order; it saves as you go.'));
   page.append(head, rulesCard());
@@ -142,7 +142,7 @@ async function renderShelf(canvas: HTMLElement): Promise<void> {
 
 function chapterHeader(data: QbChapter, count: HTMLElement): HTMLElement {
   const head = el('header', 'qb-chead');
-  const back = el('a', 'qb-back', '← The Question Book');
+  const back = el('a', 'qb-back', '← Thought Starter');
   back.href = HOME;
   const emblem = chapterEmblem(data.chapter.id);
   emblem.classList.add('qb-chead__emblem');

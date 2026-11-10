@@ -35,7 +35,8 @@ export async function completeMessage({
   messages,
   signal,
   thinking = { type: 'disabled' },
-  outputConfig = null
+  outputConfig = null,
+  onUsage = null
 } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
@@ -83,6 +84,10 @@ export async function completeMessage({
     throw new AnthropicClientError('anthropic_invalid_response', true);
   }
 
+  // Optional: the caller logs token usage (e.g. the thinking guide's spend line).
+  if (typeof onUsage === 'function' && json?.usage) {
+    try { onUsage(json.usage); } catch { /* usage logging never fails the call */ }
+  }
   if (!Array.isArray(json?.content)) return '';
   return json.content
     .map(part => (typeof part?.text === 'string' ? part.text : ''))

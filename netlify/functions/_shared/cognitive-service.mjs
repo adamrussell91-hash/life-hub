@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { act, advance, createSession, fault, publicSession } from './cognitive-controller.mjs';
 import { INCOMPLETE_PROTOCOL_PURGE_MARKER, isIncompleteProtocolRun } from './cognitive-store.mjs';
 import { summariseCompletedSession, writeBackRetryable, writeProtocolCentralNodeLines } from './cognitive-writeback.mjs';
+import { landDetour as defaultLandDetour, markDetour as defaultMarkDetour } from './thinking-threads/land.mjs';
 import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import {
   HORIZON_MIN_DAYS,
@@ -12,6 +13,18 @@ import {
 } from './cognitive-horizon.mjs';
 
 export { HORIZON_MIN_DAYS, lastCompletedRun, horizonNextReviewDue };
+
+/** Token usage summed per model: { calls, byModel: { [model]: { input, output } } }. */
+export function addUsage(total, usage) {
+  if (!usage || typeof usage !== 'object') return total;
+  const model = typeof usage.model === 'string' && usage.model ? usage.model : 'unknown';
+  const row = (total.byModel[model] ??= { input: 0, output: 0 });
+  row.input += Math.max(0, Number(usage.input) || 0);
+  row.output += Math.max(0, Number(usage.output) || 0);
+  total.calls += 1;
+  return total;
+}
+const usageOf = (session) => ({ calls: session?.usage?.calls ?? 0, byModel: structuredClone(session?.usage?.byModel ?? {}) });
 
 const LEASE_MS = 90_000;
 
@@ -29,8 +42,23 @@ function failed(session, error) {
   return next;
 }
 
-export function createCognitiveService({ store, model, retrieve, now = Date.now, writeCentralNode, readCentralNode, env = {}, fetchImpl = fetch } = {}) {
-  if (!store || !model || !retrieve) throw new TypeError('Cognitive service dependencies are required.');
+export function createCognitiveService({ store, model: rawModel, retrieve, now = Date.now, writeCentralNode, readCentralNode, env = {}, fetchImpl = fetch, landDetour = defaultLandDetour, markDetour = defaultMarkDetour } = {}) {
+  if (!store || !rawModel || !retrieve) throw new TypeError('Cognitive service dependencies are required.');
+  // Every model call's token usage is summed onto the running session (`usage`), which the
+  // cost figures read. `sink` is the tally of the run in progress; outside a run calls go uncounted.
+  let sink = null;
+  const model = async (prompt) => {
+    const result = await rawModel(prompt);
+    if (sink && result?.usage) addUsage(sink, result.usage);
+    return result;
+  };
+  /** A thread-linked run reached an end: land its packet, or tell the thread it stopped. Never throws. */
+  async function settle(before, after) {
+    if (!after?.origin?.threadId || before?.status === after.status) return;
+    if (after.status === 'completed') await landDetour(env, after, { tool: 'knowledge-protocols' });
+    else if (after.status === 'failed' && before?.status !== 'failed') await markDetour(env, after, 'failed');
+    else if (after.status === 'cancelled') await markDetour(env, after, 'removed');
+  }
   async function read(owner, id) {
     const row = await store.read(owner, id);
     if (!row) throw notFound();
@@ -139,6 +167,8 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         stage: value.stage,
         updatedAt: value.updatedAt,
         createdAt: value.createdAt,
+        origin: value.origin ?? null,
+        usage: value.usage ?? null,
         title: value.summary?.title || value.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
         summary: value.summary || (typeof value.summary === 'string' ? value.summary : null) || null
       }));
@@ -147,8 +177,10 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
       // Adam's own delete from Past runs: session body and index row go together.
       const deleted = [];
       for (const id of ids) {
-        if (!(await store.read(owner, id))) continue;
+        const row = await store.read(owner, id);
+        if (!row) continue;
         await store.delete(owner, id);
+        if (row.value.origin?.threadId) await markDetour(env, row.value, 'removed');
         deleted.push(id);
       }
       return { deleted };
@@ -190,14 +222,20 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
       let next = act(row.value, input);
       next.requests[input.requestId] = { action: input.action, text: input.text };
       next = await finishIfCompleted(next);
-      try { return publicSession((await commit(owner, input.sessionId, next, row.etag)).value); }
+      try {
+        const written = await commit(owner, input.sessionId, next, row.etag);
+        await settle(row.value, written.value);
+        return publicSession(written.value);
+      }
       catch (error) {
         // A runner commit landed between read and write. Pause and cancel re-apply to the latest state.
         if (error?.code !== 'revision_conflict' || !['pause', 'cancel'].includes(input.action)) throw error;
         const latest = await read(owner, input.sessionId);
         const retried = act(latest.value, { ...input, revision: latest.value.revision });
         retried.requests[input.requestId] = { action: input.action, text: input.text };
-        return publicSession((await commit(owner, input.sessionId, retried, latest.etag)).value);
+        const written = await commit(owner, input.sessionId, retried, latest.etag);
+        await settle(latest.value, written.value);
+        return publicSession(written.value);
       }
     },
     async run(owner, id) {
@@ -212,6 +250,8 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
       const lease = await store.write(owner, id, claimed, row.etag);
       if (!lease) return publicSession((await read(owner, id)).value);
       let latest = lease;
+      const tally = usageOf(row.value);
+      sink = tally;
       try {
         let advanced = await advance(latest.value, {
           model,
@@ -220,6 +260,7 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
             const check = await store.read(owner, id);
             if (!check || check.value.lease?.id !== leaseId || check.value.status === 'cancelled') throw fault(409, 'run_cancelled', 'Run was cancelled.');
             progress.lease = check.value.lease;
+            progress.usage = structuredClone(tally);
             latest = await commit(owner, id, progress, check.etag);
           }
         });
@@ -227,11 +268,20 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         if (!check || check.value.lease?.id !== leaseId || check.value.status === 'cancelled') return publicSession(check?.value ?? latest.value);
         advanced.lease = null;
         advanced = await finishIfCompleted(advanced);
-        return publicSession((await commit(owner, id, advanced, check.etag)).value);
+        advanced.usage = structuredClone(tally);
+        const written = await commit(owner, id, advanced, check.etag);
+        sink = null;
+        await settle(row.value, written.value);
+        return publicSession(written.value);
       } catch (error) {
+        sink = null;
         const check = await store.read(owner, id);
         if (!check || check.value.status === 'cancelled') return publicSession(check?.value ?? latest.value);
-        return publicSession((await commit(owner, id, failed(check.value, error), check.etag)).value);
+        const written = await commit(owner, id, { ...failed(check.value, error), usage: structuredClone(tally) }, check.etag);
+        await settle({ status: 'running' }, written.value);
+        return publicSession(written.value);
+      } finally {
+        sink = null;
       }
     }
   };

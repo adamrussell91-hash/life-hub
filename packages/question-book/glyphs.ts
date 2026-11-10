@@ -48,6 +48,6 @@ export function bookEmblem(label: string | null = null): HTMLSpanElement {
   return holder('qb-emblem qb-emblem--book', BOOK_SVG, label);
 }
 
-export function wordmark(label: string | null = 'The Question Book'): HTMLSpanElement {
+export function wordmark(label: string | null = 'Thought Starter'): HTMLSpanElement {
   return holder('qb-emblem qb-emblem--wordmark', WORDMARK_SVG, label);
 }

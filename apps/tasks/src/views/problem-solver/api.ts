@@ -2,7 +2,7 @@ import { apiGet, apiPost } from '@/api/client';
 import type { PsAction, PsModelId, PsSession, PsSummary } from '../../../../../packages/problem-solver/types';
 
 /** A session linked to a task or project: by its links, a confirmed task, or its review task. */
-export type PsLinkedSession = { id: string; title: string; phase: string; model: PsModelId | null; role: 'link' | 'task' | 'review' };
+export type PsLinkedSession = { id: string; title: string; phase: string; model: PsModelId | null; role: 'link' | 'task' | 'review' | 'thread' | 'detour'; threadId?: string | null };
 
 export type SessionApi = ReturnType<typeof createSessionApi>;
 
@@ -15,7 +15,7 @@ export function createSessionApi(base: string) {
   const api = {
     list: () => apiGet<{ sessions: PsSummary[] }>(`${base}?list=1`).then((r) => r.sessions),
     get: (id: string) => apiGet<{ session: PsSession }>(`${base}?id=${encodeURIComponent(id)}`).then((r) => r.session),
-    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'talk' | 'start'; startModel?: string }) =>
+    create: (body: { text: string; title?: string; links?: PsSession['links']; threadId?: string; kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'talk' | 'start'; startModel?: string }) =>
       apiPost<{ session: PsSession }>(base, { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
     act: (session: PsSession, action: PsAction, text?: string) =>
       apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),

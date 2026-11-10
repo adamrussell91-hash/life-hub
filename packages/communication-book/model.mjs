@@ -7,7 +7,7 @@
 // Commit settles the next conversation and Review closes the loop.
 export const COMMUNICATION_BOOK_MODEL = Object.freeze({
   id: 'communication_book',
-  name: 'Communication Book',
+  name: 'Conversation Guide',
   steps: Object.freeze([
     Object.freeze({ id: 'explore', name: 'Work a model', detail: 'Choose the model that fits the exchange and work its chart on one real example' }),
     Object.freeze({ id: 'commit', name: 'Commit', detail: 'Commit to the next conversation, with who takes it and a date to come back to it' }),

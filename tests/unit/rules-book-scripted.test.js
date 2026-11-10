@@ -125,7 +125,7 @@ test('Review waits for the check time, then opens the review; a walk to the end 
   let s = await committed();
   const offer = actionOffer(s);
   assert.equal(offer.kind, 'write');
-  assert.match(offer.file.title, /^Rules Book: /);
+  assert.match(offer.file.title, /^Wayfinder: /);
   s = linkCaseFile(s, { target: { kind: 'task', id: 'task-page' }, version: 1, title: offer.file.title, sections: offer.digests, graphic: true }, deps);
   s = setReviewTask(s, { taskId: 'task-check', due: '2026-11-05' }, deps);
   s = await step(moveOn(s, deps));

@@ -103,11 +103,17 @@ export type PsSession = {
   frameSeeds: PsFrameSeeds | DmQuickSeeds | GtStartSeeds | null;
   taskSnapshot: PsTaskSnapshot | null;
   detour: PsDetour | null;
+  /** The thinking thread this session belongs to (every session has one, quiet or listed). */
+  threadId?: string | null;
+  /** Set when this session is a thread detour: the home step it left from and the one question it answers. */
+  threadDetour?: PsThreadDetour | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'talk' | 'start'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
+export type PsThreadDetour = { threadId: string; fromSessionId: string; fromStepId: string | null; question: string };
+
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'rules' | 'change' | 'collab' | 'talk' | 'start'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; threadId?: string | null; threadDetour?: boolean; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
 
 export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'quick_answer' | 'quick_again' | 'quick_check' | 'start_answer' | 'start_again' | 'start_check' | 'escalate';
 

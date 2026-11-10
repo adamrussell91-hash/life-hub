@@ -2,7 +2,7 @@ import "../../../packages/zod-jitless.js";
 import "../../../packages/stale-chunk-reload.js";
 import "./tokens.css";
 import "./style.css";
-import "./protocols/style.css";
+import "../../../packages/protocol-view/style.css";
 import "../design-kit/entity-links.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { mountRailCollapse } from "../design-kit/js/hub-rail-collapse.js";

@@ -48,10 +48,10 @@ export const DEFAULT_TASK_PROPERTY_CONFIG: TaskPropertyConfig = {
     { id: 'problem_solver', label: 'problem solver' },
     { id: 'decision_maker', label: 'decision maker' },
     { id: 'gear_shifter', label: 'gear shifter' },
-    { id: 'rules_book', label: 'rules book' },
-    { id: 'change_book', label: 'change book' },
-    { id: 'collaboration_book', label: 'collaboration book' },
-    { id: 'communication_book', label: 'communication book' }
+    { id: 'rules_book', label: 'wayfinder' },
+    { id: 'change_book', label: 'change navigator' },
+    { id: 'collaboration_book', label: 'team builder' },
+    { id: 'communication_book', label: 'conversation guide' }
   ],
   tags: []
 };

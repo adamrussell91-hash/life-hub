@@ -75,7 +75,13 @@ function plan(id,mode,intake){
  const depth=TRIBUNAL_WORDS[mode]??B.tribunal;
  return [...clarify,...['inverter','scaler','context-shifter'].map(v=>step(v,undefined,null,{maxBursts:1,burstWords:depth})),step('controller','convergence',null,{maxBursts:1,burstWords:425})];
 }
-export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},requestId}){
+const ORIGIN_KEYS=['threadId','sessionId','stepId'];
+/** A thinking thread's link on a protocol run: strings only, kept short. Anything else is dropped. */
+export function cleanOrigin(origin){
+ if(!origin||typeof origin!=='object'||Array.isArray(origin)||typeof origin.threadId!=='string'||!origin.threadId.trim())return null;
+ return Object.fromEntries(ORIGIN_KEYS.map(k=>[k,typeof origin[k]==='string'&&origin[k].trim()?origin[k].trim().slice(0,120):null]));
+}
+export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},requestId,origin,userContext}){
  const def=catalog.find(d=>d.id===protocolId);if(!def)throw fault(400,'validation_error','Unknown protocol.');
  if(!ID_RE.test(id)||!ID_RE.test(requestId||''))throw fault(400,'validation_error','Valid session and request IDs required.');
  if(!intake||typeof intake!=='object'||Array.isArray(intake))throw fault(400,'validation_error','Intake must be an object.');
@@ -85,6 +91,8 @@ export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},r
  if(protocolId==='cartographers'&&['direct','interrogation'].includes(mode)&&!data.sources)throw fault(400,'validation_error','Supplied source text is required in this mode.');
  if(protocolId==='refinery'&&data.inputType==='draft'&&!data.draft)throw fault(400,'validation_error','Draft text is required.');
  const now=stamp();const s={id,owner,protocolId,mode,intake:data,revision:0,status:'queued',stage:'intake',speaker:null,transcript:[],evidence:[],evidenceStatus:'Evidence retrieval pending.',checkpoint:null,allowedActions:['pause','cancel'],error:null,createdAt:now,updatedAt:now,steps:plan(protocolId,mode,data),cursor:0,burst:0,reopens:0,continueBurst:false,filterCaution:null,requests:{},dialogueCounts:{},answered:{},retrieved:false};
+ const from=cleanOrigin(origin);if(from)s.origin=from;
+ const ctx=typeof userContext==='string'?userContext.trim().slice(0,4000):'';if(ctx)s.userContext=ctx;
  return refresh(s);
 }
 function add(s,role,speaker,stage,text,evidenceIds=[],extra={}){if(s.transcript.length>=MAX_TURNS)throw fault(413,'session_limit','Session reached its 500-turn limit.');s.transcript.push({id:randomUUID(),role,speaker,stage,text,createdAt:stamp(),evidenceIds,...extra});}
@@ -117,7 +125,7 @@ function refresh(s){
  if(s.protocolId==='mirror'&&['waiting','completed'].includes(s.status)&&!s.allowedActions.includes('correct'))s.allowedActions.push('correct');
  s.updatedAt=stamp();if(Buffer.byteLength(JSON.stringify(s))>MAX_BYTES)throw fault(413,'session_limit','Session storage limit reached. Download this session and start a new one.');return s;
 }
-export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','completedAt','summary','writeBack','lastReviewDate','cadenceUnknown'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
+export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','completedAt','summary','writeBack','lastReviewDate','cadenceUnknown','origin','usage'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
 function nextDialogue(s,candidate){
  const voices=['principle','consequence','virtue'],max=s.mode==='extended'?24:12,total=Object.values(s.dialogueCounts).reduce((a,b)=>a+b,0);
  if(total>=max&&canFinish(s))return step('controller','map','reflection',{maxBursts:1,burstWords:425});
@@ -264,7 +272,7 @@ export function buildPrompt(s,currentStep){
  // No live search inside a voice turn: each re-ask repeated the search and stalled Refinery for minutes.
  // Web findings arrive once, at retrieval, as knownContext.
  const register=speakerRegister(s,speaker,stage,{finalBurst});
- const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling. No desired future was given in this run: never call anything "the stated future", even if the brief or knownContext hints at ambitions.':'',s.protocolId==='mirror'&&s.mode==='deep'&&speaker!=='controller'?'Deep mode: give each claim a confidence (high, moderate or low) inside the sentence.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':''].filter(Boolean).join('\n');
+ const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.'+(s.userContext&&!isolated?' threadSoFar is what the person has already worked out in other tools on this same problem; treat it as background they have told you, and do not repeat it back.':''),register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling. No desired future was given in this run: never call anything "the stated future", even if the brief or knownContext hints at ambitions.':'',s.protocolId==='mirror'&&s.mode==='deep'&&speaker!=='controller'?'Deep mode: give each claim a confidence (high, moderate or low) inside the sentence.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':''].filter(Boolean).join('\n');
  const originalInput=isolated||s.protocolId==='tribunal'?{...s.intake}:s.intake;
  const lastReviewDate=s.lastReviewDate||s.intake?.lastReviewDate;
  const frequencyJustification=s.intake?.frequencyJustification;
@@ -272,7 +280,7 @@ export function buildPrompt(s,currentStep){
   ...(lastReviewDate?{lastReviewDate}:{}),
   ...(frequencyJustification?{frequencyJustification}:{})
  }:null;
- return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,finalBurst,tools:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
+ return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,finalBurst,tools:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated&&s.userContext?{threadSoFar:s.userContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
 // Voices are prompted for JSON; the provider adapter streams that payload as text.
 // Models often put literal newlines inside strings, which JSON.parse rejects.

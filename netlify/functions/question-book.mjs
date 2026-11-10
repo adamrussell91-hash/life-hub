@@ -33,7 +33,7 @@ export function createQuestionBookHandler(deps = {}) {
     } catch {
       cognitive = null;
     }
-    if (!cognitive) return withCors(errorResponse(503, 'store_unbound', 'Question Book storage is not configured.', true), request, env);
+    if (!cognitive) return withCors(errorResponse(503, 'store_unbound', 'Thought Starter storage is not configured.', true), request, env);
     const store = ownerDocs(cognitive, owner(env));
     loadSource ??= createQuestionSource({ env, fetchImpl: deps.fetchImpl ?? fetch, now: deps.now ?? Date.now });
     const now = deps.now ?? Date.now;
@@ -46,6 +46,14 @@ export function createQuestionBookHandler(deps = {}) {
         return ok(await notice(store, loadSource, await request.json(), { env, now, complete: deps.completeMessage, modelFetch: deps.modelFetch, newId: deps.newId }));
       }
       if (request.method === 'GET') {
+        // Page chips ask every tool for its sessions linked to a task, project or thread. Thought
+        // Starter keeps a notebook, not sessions (its detours live on the thread), so none link.
+        if (url.searchParams.has('linked')) {
+          if (!/^(task|project|thread):.{1,200}$/.test(url.searchParams.get('linked') ?? '')) {
+            return withCors(errorResponse(400, 'validation_error', 'linked must be task:<id>, project:<id> or thread:<id>.', false), request, env);
+          }
+          return ok({ sessions: [] });
+        }
         const chapter = url.searchParams.get('chapter');
         const history = url.searchParams.get('history');
         if (chapter && history) return ok(await readHistory(store, loadSource, chapter, history));

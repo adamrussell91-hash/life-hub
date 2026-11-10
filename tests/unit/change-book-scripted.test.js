@@ -132,7 +132,7 @@ test('Review waits for the review date, then opens the review; a walk to the end
   let s = await committed();
   const offer = actionOffer(s);
   assert.equal(offer.kind, 'write');
-  assert.match(offer.file.title, /^Change Book: /);
+  assert.match(offer.file.title, /^Change Navigator: /);
   assert.ok(offer.file.sections.some((section) => section.key === 'stay' && section.lines[0].includes('Saturday')));
   assert.ok(offer.file.sections.some((section) => section.key === 'affected'));
   s = linkCaseFile(s, { target: { kind: 'task', id: 'task-page' }, version: 1, title: offer.file.title, sections: offer.digests, graphic: true }, deps);

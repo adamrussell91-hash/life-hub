@@ -12,6 +12,8 @@ import '../../../../../packages/communication-book/communication-book.css';
 import '../problem-solver/problem-solver-view.css';
 import './communication-book-view.css';
 import { el } from '@/views/hub-kit';
+import '../thinking/thinking.css';
+import { mountSessionThread, type SessionThread } from '../thinking/session-hooks';
 import { hashQuery } from '@/shell/shell';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { tasksApi } from '@/services/client-api';
@@ -39,11 +41,13 @@ import { mountCommCanvas, type CmbRunScores } from './canvas';
 import { recordBlocks } from './record-blocks';
 
 let poll: AbortController | null = null;
+/** The open session's thinking-thread strip, landing block and joint watcher. */
+let threadNow: SessionThread | null = null;
 /** The open session's canvas and Tasks listeners, dropped when the page changes. */
 let canvasNow: { destroy(): void } | null = null;
 let unsubscribeNow: Array<() => void> = [];
 
-const ORIGIN: TaskOrigin = { name: 'Communication Book', source: 'communication_book', tag: 'communication-book', noun: 'session', review: 'the next conversation for "%s" went, then open it in the Communication Book to see what was said and how it landed' };
+const ORIGIN: TaskOrigin = { name: 'Conversation Guide', source: 'communication_book', tag: 'communication-book', noun: 'session', review: 'the next conversation for "%s" went, then open it in Conversation Guide to see what was said and how it landed' };
 
 /** The models Explore offers, in catalogue order (the shelf). */
 const shelfTools = (): string[] => toolsForPlanStep('communication_book', 'explore') as string[];
@@ -390,12 +394,14 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     dismissCaseFile: (key) => confirmed('dismiss_case_file', { key })
   }, { fallbackFocus: () => coach.el.querySelector('textarea'), paper: { offer: (s) => actionOffer(s) as PsRecordOffer | null, noun: 'record', strictNames: false } });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el, look: CMB_LOOK });
+  const thread = mountSessionThread({ say: (text) => act('say', text) });
+  threadNow = thread;
   const coachHost = el('div', 'ps-coach-host cmb-coach-host');
   coachHost.append(createChecks(), coach.el);
   board.append(bench, coachHost);
   const entry = reviewEntry(session, hashQuery().get('step'));
   const banner = entry ? reviewBanner(entry, () => void reviews.startReview(), stepName(session.model!.id, entry.step), 'session') : null;
-  page.append(back, title, track.el, ...(banner ? [banner] : []), board);
+  page.append(back, title, track.el, thread.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCommCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
   canvasNow = diagram;
@@ -418,6 +424,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     cards.update(session);
     review.update(session);
     reviews.onRender(session);
+    thread.update(session);
   };
 
   const sync = syncFor(session, render, () => page.isConnected);
@@ -543,6 +550,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
 export function unmountCommunicationBookView(): void {
   poll?.abort();
   poll = null;
+  threadNow?.destroy();
+  threadNow = null;
   canvasNow?.destroy();
   canvasNow = null;
   for (const off of unsubscribeNow) off();
@@ -557,6 +566,6 @@ export async function renderCommunicationBookView(canvas: HTMLElement): Promise<
     if (id) await renderSession(canvas, id);
     else await renderList(canvas);
   } catch (err) {
-    renderLoadError(canvas, err, () => void renderCommunicationBookView(canvas), 'Could not load the Communication Book');
+    renderLoadError(canvas, err, () => void renderCommunicationBookView(canvas), 'Could not load Conversation Guide');
   }
 }

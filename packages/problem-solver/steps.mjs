@@ -201,12 +201,25 @@ export function chosenOption(session) {
 }
 
 /**
+ * The step a thread detour finishes on: the first that settles or acts (Decide, Act, Agree,
+ * Commit or Shift: a step whose tools include decide or implement, or that serves Implement).
+ * Falls back to the plan's last required step.
+ */
+export function detourEndStep(modelId) {
+  const plan = stepPlan(modelId);
+  const end = plan.find((s) => s.book.includes('decide') || s.book.includes('implement') || s.serves === 'implement');
+  return (end ?? plan.filter((s) => !s.extra).at(-1) ?? plan.at(-1)).step;
+}
+
+/**
  * Where Move on goes from the session's current step: back from a reopened step
  * (`detour`), back to where a late review began (`reviewState.returnTo`), otherwise
  * the next plan step. Null means the session finishes.
  */
 export function nextPhase(session) {
   if (!session.model) return null;
+  // A thread detour ends at its model's last working step: Review (and anything after) belongs to home.
+  if (session.threadDetour && session.phase === detourEndStep(session.model.id)) return null;
   if (session.detour && session.detour.to === session.phase) return session.detour.from;
   const review = session.reviewState;
   if (review?.status === 'reviewing' && review.returnTo && session.phase === planStepForBook(session.model.id, 'improve')) {

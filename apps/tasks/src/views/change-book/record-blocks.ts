@@ -32,7 +32,7 @@ export function recordBlocks(offer: PsRecordOffer, opts: { sessionId: string; da
   const write = offer.kind === 'write';
   const title = write ? offer.file.title : `Update: ${reviseName(offer.file.title, { version: offer.version, date: opts.date })}`;
   const sections = offer.file.sections.filter((s) => write || offer.changed.includes(s.key));
-  const back = `<a href="#/change-book?id=${encodeURIComponent(opts.sessionId)}">Open this session in the Change Book</a>`;
+  const back = `<a href="#/change-book?id=${encodeURIComponent(opts.sessionId)}">Open this session in Change Navigator</a>`;
   const caption = (offer.provenance as unknown as ChangeProvenance).caption;
   return [
     heading(title, write ? 'section' : 'subsection'),

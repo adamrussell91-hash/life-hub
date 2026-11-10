@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   acceptSuggestion, applyCoachTurn, archive, confirmTask, createSession, dismissReview, startReview, taskStatus, dismissSuggestion, dismissTask,
-  keepAnyway, linkCaseFile, dismissCaseFile, moveOn, rename, rescoreRadar, say, score, setReviewTask, summaryRow
+  keepAnyway, linkCaseFile, dismissCaseFile, moveOn, rename, rescoreRadar, say, score, setReviewTask, summaryRow, cleanThreadDetour
 } from './session.mjs';
 import { applyLightningTurn, createLightningSession, escalateLightning, lightningAgain, lightningAnswer } from './lightning-session.mjs';
 import { applyQuickTurn, createQuickSession, escalateQuick, quickAgain, quickAnswer, quickCheck } from './quick-session.mjs';
@@ -29,7 +29,14 @@ const FLOWS = {
 };
 const flowOf = (session) => FLOWS[session.kind] ?? null;
 
-export function createProblemSolverService({ store, coach, kinds = ['full', 'lightning'], now = () => new Date().toISOString(), newId = randomUUID }) {
+/**
+ * `threads` (optional) ties sessions to thinking threads:
+ *   quiet(owner, session) -> threadId | null   a direct start makes a quiet thread (home session)
+ *   landed(session)                           a detour recorded its last step: land its packet
+ *   removed(session)                          a detour was archived: its home step stops waiting
+ * Every hook is best-effort; a failure never blocks the session's own write.
+ */
+export function createProblemSolverService({ store, coach, kinds = ['full', 'lightning'], now = () => new Date().toISOString(), newId = randomUUID, threads = null }) {
   const deps = { now, newId };
 
   const isStale = (s) => s.runner.status === 'running' && Date.parse(now()) > (s.runner.leaseUntil ?? 0);
@@ -98,6 +105,7 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
     if (!flow) throw httpError(409, 'action_not_allowed', 'Only a quick route goes on to a full session.');
     const fullId = ID_RE.test(String(body.requestId ?? '')) ? String(body.requestId) : newId();
     const { full, run } = flow.escalate(value, fullId, deps);
+    if (value.threadId) full.threadId = value.threadId;
     const written = await store.write(owner, full.id, { ...full, requestIds: [] }, null);
     if (!written && !(await store.read(owner, full.id))) throw httpError(409, 'conflict', 'This problem changed elsewhere. Reloaded the latest.');
     const next = { ...run, revision: value.revision + 1, requestIds: [...value.requestIds, String(body.requestId ?? '')].filter(Boolean).slice(-REQUEST_IDS_KEPT) };
@@ -109,15 +117,16 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
 
     /** Sessions that link to, created, or review a task or project, for the chips on its page. */
     async linked(owner, ref) {
-      const match = /^(task|project):(.{1,200})$/.exec(String(ref ?? ''));
-      if (!match) throw httpError(400, 'validation_error', 'linked must be task:<id> or project:<id>.');
+      const match = /^(task|project|thread):(.{1,200})$/.exec(String(ref ?? ''));
+      if (!match) throw httpError(400, 'validation_error', 'linked must be task:<id>, project:<id> or thread:<id>.');
       const [, kind, id] = match;
       const rows = await listRows(owner, { limit: 500 });
       return rows.filter((row) => row.status !== 'archived').flatMap((row) => {
-        const role = kind === 'task' && row.reviewTaskId === id ? 'review'
+        const role = kind === 'thread' ? (row.threadId === id ? (row.threadDetour ? 'detour' : 'thread') : null)
+          : kind === 'task' && row.reviewTaskId === id ? 'review'
           : kind === 'task' && (row.taskIds ?? []).includes(id) ? 'task'
             : (row.links ?? []).some((l) => l.kind === kind && l.id === id) ? 'link' : null;
-        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role }] : [];
+        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role, threadId: row.threadId ?? null }] : [];
       });
     },
 
@@ -128,11 +137,19 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
     async create(owner, body) {
       const kind = body.kind ?? kinds[0];
       if (!kinds.includes(kind)) throw httpError(400, 'validation_error', `This tool does not start ${kind} sessions.`);
+      const threadDetour = cleanThreadDetour(body.detour ?? null);
+      if (threadDetour && FLOWS[kind]) throw httpError(400, 'validation_error', 'A detour runs as a full session.');
+      const threadId = typeof body.threadId === 'string' && body.threadId.trim() ? body.threadId.trim().slice(0, 200) : threadDetour?.threadId ?? null;
       const make = FLOWS[kind]?.create ?? ((input, d) => createSession({ ...input, kind }, d));
-      const session = make({ title: body.title, text: body.text, links: Array.isArray(body.links) ? body.links : [], startModel: body.startModel ?? null }, deps);
+      const session = make({ title: body.title, text: body.text, links: Array.isArray(body.links) ? body.links : [], startModel: body.startModel ?? null, threadId, threadDetour }, deps);
       session.requestIds = body.requestId ? [String(body.requestId)] : [];
-      if (!ID_RE.test(String(body.requestId ?? ''))) return save(owner, session, null);
-      session.id = String(body.requestId);
+      const keyed = ID_RE.test(String(body.requestId ?? ''));
+      if (keyed) session.id = String(body.requestId);
+      session.threadId = threadId;
+      if (!threadId && threads?.quiet && !(keyed && (await store.read(owner, session.id)))) {
+        try { session.threadId = (await threads.quiet(owner, session)) ?? null; } catch { session.threadId = null; }
+      }
+      if (!keyed) return save(owner, session, null);
       const written = await store.write(owner, session.id, session, null);
       if (written) return written.value;
       const existing = await store.read(owner, session.id);
@@ -157,7 +174,15 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
       const next = act(value, body);
       next.revision = value.revision + 1;
       next.requestIds = [...value.requestIds, String(body.requestId ?? '')].filter(Boolean).slice(-REQUEST_IDS_KEPT);
-      return save(owner, next, etag);
+      const saved = await save(owner, next, etag);
+      if (saved.threadDetour && threads) {
+        // A detour that just recorded its last step lands; one archived stops its home step waiting.
+        try {
+          if (value.phase !== 'finished' && saved.phase === 'finished') await threads.landed?.(saved);
+          else if (value.status !== 'archived' && saved.status === 'archived') await threads.removed?.(saved);
+        } catch { /* the thread catches up when the person lands it by hand */ }
+      }
+      return saved;
     },
 
     async run(owner, id) {

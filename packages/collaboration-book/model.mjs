@@ -7,7 +7,7 @@
 // Review closes the loop.
 export const COLLABORATION_BOOK_MODEL = Object.freeze({
   id: 'collaboration_book',
-  name: 'Collaboration Book',
+  name: 'Team Builder',
   steps: Object.freeze([
     Object.freeze({ id: 'explore', name: 'Work a model', detail: 'Choose the model that fits the team situation and work its chart together' }),
     Object.freeze({ id: 'commit', name: 'Agree', detail: 'Agree one experiment with an owner and a date to come back to it' }),

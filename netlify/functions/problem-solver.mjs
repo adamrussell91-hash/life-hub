@@ -5,6 +5,7 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { defaultGetProblemStore } from './_shared/problem-solver/store.mjs';
 import { createProblemSolverService } from './_shared/problem-solver/service.mjs';
 import { anthropicModel, createModelCoach } from './_shared/problem-solver/coach.mjs';
+import { engineThreadHooks, toolOfPrefix } from './_shared/thinking-threads/engine-hooks.mjs';
 
 export const config = { path: '/api/problem-solver' };
 
@@ -16,7 +17,12 @@ export async function problemSolverServiceFor(env, deps = {}) {
   const store = deps.getStore ? await deps.getStore(env) : await defaultGetProblemStore(env, deps.prefix);
   if (!store) throw Object.assign(new Error('Problem Solver storage is not configured.'), { status: 503, code: 'store_unbound' });
   const coach = deps.coach ?? createModelCoach(anthropicModel(env, deps.fetchImpl ?? fetch));
-  return createProblemSolverService({ store, coach, ...(deps.kinds ? { kinds: deps.kinds } : {}) });
+  // Thinking threads: tests that bring their own store bring their own hooks (or none).
+  let threads = deps.threads ?? null;
+  if (deps.threads === undefined && !deps.getStore) {
+    try { threads = await engineThreadHooks(env, toolOfPrefix(deps.prefix)); } catch { threads = null; }
+  }
+  return createProblemSolverService({ store, coach, threads, ...(deps.kinds ? { kinds: deps.kinds } : {}) });
 }
 
 export async function defaultInvokeRun(request, id, env, fetchImpl = fetch, runPath = '/api/problem-solver/run') {

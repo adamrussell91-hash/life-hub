@@ -6,7 +6,7 @@
 // and Review close the loop.
 export const RULES_BOOK_MODEL = Object.freeze({
   id: 'rules_book',
-  name: 'Rules Book',
+  name: 'Wayfinder',
   steps: Object.freeze([
     Object.freeze({ id: 'explore', name: 'Apply a rule', detail: 'Choose the rule that fits and work its chart' }),
     Object.freeze({ id: 'commit', name: 'Act', detail: 'Set one small experiment with a check time' }),

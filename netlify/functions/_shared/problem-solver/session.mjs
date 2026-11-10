@@ -120,7 +120,27 @@ function replaceRun(session, run) {
 /** A model a book session starts from (picked on the shelf), when it is one Explore offers. */
 const shelfModel = (kind, model) => (bookOf(kind) && typeof model === 'string' && toolsForPlanStep(bookOf(kind).model.id, 'explore').includes(model) ? model : null);
 
-export function createSession({ title = '', text, links = [], kind = 'full', startModel = null }, deps) {
+/** A thread detour as a session keeps it: which thread, the home step it left from, and its one question. */
+export function cleanThreadDetour(raw) {
+  if (raw == null) return null;
+  const id = (value) => (typeof value === 'string' && value.trim() && value.length <= 200 ? value.trim() : null);
+  if (typeof raw !== 'object' || Array.isArray(raw) || !id(raw.threadId) || !id(raw.fromSessionId)) throw fail(400, 'validation_error', 'A detour needs its thread and the session it left from.');
+  const frame = raw.frameDraft && typeof raw.frameDraft === 'object' && !Array.isArray(raw.frameDraft)
+    ? Object.fromEntries(Object.entries(raw.frameDraft).filter(([key, value]) => /^[A-Za-z_]{1,24}$/.test(key) && typeof value === 'string').map(([key, value]) => [key, value.slice(0, 600)]))
+    : null;
+  return {
+    threadId: id(raw.threadId),
+    fromSessionId: id(raw.fromSessionId),
+    fromStepId: id(raw.fromStepId),
+    question: typeof raw.question === 'string' ? raw.question.trim().slice(0, 400) : '',
+    ...(frame ? { frameDraft: frame } : {})
+  };
+}
+
+/** True for a session sent out from a thread to answer one question (it skips Review and writes no page record). */
+export const isThreadDetour = (session) => Boolean(session?.threadDetour);
+
+export function createSession({ title = '', text, links = [], kind = 'full', startModel = null, threadId = null, threadDetour = null }, deps) {
   if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
   const at = deps.now();
   const clean = String(text ?? '').trim();
@@ -154,6 +174,8 @@ export function createSession({ title = '', text, links = [], kind = 'full', sta
     lightning: null,
     escalatedFrom: null,
     frameSeeds: null,
+    threadId: typeof threadId === 'string' && threadId ? threadId : threadDetour?.threadId ?? null,
+    threadDetour: threadDetour ?? null,
     ...(shelfModel(kind, startModel) ? { startModel } : {}),
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
@@ -234,7 +256,7 @@ function recordPlaced(session, run, nodeId, refs, deps) {
     const basis = resolveBasis(session, refs);
     return basis.length ? { ...session, basis: { ...(session.basis ?? {}), [nodeId]: basis } } : session;
   }
-  const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed';
+  const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed' && !isThreadDetour(session);
   if (name === record.dateSlot && open && afterToday(node.text, deps)) {
     return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: record.dateReason, status: 'proposed' } };
   }
@@ -292,7 +314,8 @@ export function applyCoachTurn(session, turn, deps) {
     }
   }
 
-  if (mode !== 'boundary' && currentStep(next)) {
+  // A thread detour suggests actions in its packet only: no task proposals, no review of its own.
+  if (mode !== 'boundary' && currentStep(next) && !isThreadDetour(next)) {
     next = addProposals(next, turn.proposeTasks, deps);
     // A review the person set aside stays aside; a date that is not after today is no review.
     const reviewOpen = !next.reviewTaskId && next.reviewProposal?.status !== 'dismissed';
@@ -347,7 +370,7 @@ export function moveOn(session, deps, options = {}) {
   const status = kept ? 'done' : waitingForReview(session) ? 'waiting' : 'skipped';
   const nextId = nextPhase(session);
   let next = withStep({ ...session, suggestion: null, pendingKeep: null }, leaving, { runs, status });
-  if (inBook(session, leaving, 'implement') && status === 'done' && !session.reviewTaskId && !session.reviewProposal) {
+  if (inBook(session, leaving, 'implement') && status === 'done' && !session.reviewTaskId && !session.reviewProposal && !isThreadDetour(session)) {
     next = { ...next, reviewProposal: { title: reviewTitle(session), due: addDays(deps.now(), REVIEW_AFTER_DAYS), reason: 'A first look at how the plan is going.', status: 'proposed' } };
   }
   // Back from a reopened step: the detour is over.
@@ -554,8 +577,8 @@ function cleanDigests(raw) {
 
 const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
 
-/** A session that writes a page record: Problem Solver's case file (a Document step) or a book's record (books.mjs). */
-const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || bookOf(session.kind)?.record));
+/** A session that writes a page record: Problem Solver's case file (a Document step) or a book's record (books.mjs). A thread detour never does: the home record lists it under Detours. */
+const keepsRecord = (session) => !isThreadDetour(session) && Boolean(session.model && (planStepForBook(session.model.id, 'document') || bookOf(session.kind)?.record));
 
 /**
  * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
@@ -639,6 +662,8 @@ export function summaryRow(session) {
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
     escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? session.start?.escalatedTo ?? null,
+    threadId: session.threadId ?? null,
+    threadDetour: Boolean(session.threadDetour),
     // A quick decision's row says how its latest round came out.
     ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
     // A book session's medal shows the model or technique its record leans on most.

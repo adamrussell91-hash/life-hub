@@ -63,6 +63,7 @@ export type HubViewId =
   | 'programs'
   | 'properties'
   | 'term-dates'
+  | 'think'
   | 'problem-solver'
   | 'decision-maker'
   | 'gear-shifter'
@@ -127,14 +128,15 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tools',
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
+      { id: 'think', label: 'Think it through', href: '#/think' },
       { id: 'problem-solver', label: 'Problem Solver', href: '#/problem-solver' },
       { id: 'decision-maker', label: 'Decision Maker', href: '#/decision-maker' },
       { id: 'gear-shifter', label: 'Gear Shifter', href: '#/gear-shifter' },
-      { id: 'rules-book', label: 'Rules Book', href: '#/rules-book' },
-      { id: 'change-book', label: 'Change Book', href: '#/change-book' },
-      { id: 'collaboration-book', label: 'Collaboration Book', href: '#/collaboration-book' },
-      { id: 'communication-book', label: 'Communication Book', href: '#/communication-book' },
-      { id: 'question-book', label: 'Question Book', href: '#/question-book' },
+      { id: 'rules-book', label: 'Wayfinder', href: '#/rules-book' },
+      { id: 'change-book', label: 'Change Navigator', href: '#/change-book' },
+      { id: 'collaboration-book', label: 'Team Builder', href: '#/collaboration-book' },
+      { id: 'communication-book', label: 'Conversation Guide', href: '#/communication-book' },
+      { id: 'question-book', label: 'Thought Starter', href: '#/question-book' },
       { id: 'line', label: 'Personal line', href: '#/line' },
       { id: 'search', label: 'Search', href: '#/search' },
       { id: 'properties', label: 'Properties', href: '#/properties' },

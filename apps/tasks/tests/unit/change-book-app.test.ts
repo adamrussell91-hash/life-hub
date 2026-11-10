@@ -334,7 +334,7 @@ describe('review entry and record blocks', () => {
     const offer = actionOffer(session) as PsRecordOffer;
     expect(offer.kind).toBe('write');
     const blocks = recordBlocks(offer, { sessionId: session.id, date: '2026-10-27' });
-    expect(blocks[0]).toMatchObject({ block_type: 'heading', id: recordBlockId(session.id, 1, 1), content: { text: `Change Book: ${session.title}` } });
+    expect(blocks[0]).toMatchObject({ block_type: 'heading', id: recordBlockId(session.id, 1, 1), content: { text: `Change Navigator: ${session.title}` } });
     expect(blocks.length).toBe(offer.file.sections.length + 2);
     const last = JSON.stringify(blocks.at(-1));
     expect(last).toContain('Worked with The Change Book');

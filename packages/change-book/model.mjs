@@ -7,7 +7,7 @@
 // sets the step and Review closes the loop.
 export const CHANGE_BOOK_MODEL = Object.freeze({
   id: 'change_book',
-  name: 'Change Book',
+  name: 'Change Navigator',
   steps: Object.freeze([
     Object.freeze({ id: 'explore', name: 'Apply a model', detail: 'Choose the model that fits and work one concrete example on its chart' }),
     Object.freeze({ id: 'commit', name: 'Act', detail: 'Choose one small, reversible step with a review date' }),

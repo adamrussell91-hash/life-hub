@@ -16,3 +16,24 @@
 .ps-linkchip--gt .ps-linkchip__dot i:nth-child(1) { background: #2b7de9; }
 .ps-linkchip--gt .ps-linkchip__dot i:nth-child(2) { background: #ea4f2a; }
 .ps-linkchip--gt .ps-linkchip__dot i:nth-child(3) { background: #f5a623; }
+/* The other five tools' chips: each takes its cover's colours. */
+.ps-linkchip--rb .ps-linkchip__dot i:nth-child(1) { background: #3a3a9a; }
+.ps-linkchip--rb .ps-linkchip__dot i:nth-child(2) { background: #fcea24; }
+.ps-linkchip--rb .ps-linkchip__dot i:nth-child(3) { display: none; }
+.ps-linkchip--ch .ps-linkchip__dot i:nth-child(1) { background: #084953; }
+.ps-linkchip--ch .ps-linkchip__dot i:nth-child(2) { background: #af6e41; }
+.ps-linkchip--ch .ps-linkchip__dot i:nth-child(3) { display: none; }
+.ps-linkchip--cb .ps-linkchip__dot i:nth-child(1) { background: #613fad; }
+.ps-linkchip--cb .ps-linkchip__dot i:nth-child(2) { background: #007d97; }
+.ps-linkchip--cb .ps-linkchip__dot i:nth-child(3) { background: #a06400; }
+.ps-linkchip--cm .ps-linkchip__dot i:nth-child(1) { background: #aa914e; }
+.ps-linkchip--cm .ps-linkchip__dot i:nth-child(2) { background: #96938f; }
+.ps-linkchip--cm .ps-linkchip__dot i:nth-child(3) { display: none; }
+.ps-linkchip--qb .ps-linkchip__dot i:nth-child(1) { background: #3d66cf; }
+.ps-linkchip--qb .ps-linkchip__dot i:nth-child(2) { background: #d73c2c; }
+.ps-linkchip--qb .ps-linkchip__dot i:nth-child(3) { background: #e9b92f; }
+/* A thread's chip: three linked dots in the hub's own navy and sea colours. */
+.ps-linkchip--thread .ps-linkchip__dot i:nth-child(1) { background: var(--navy, #17375e); }
+.ps-linkchip--thread .ps-linkchip__dot i:nth-child(2) { background: var(--wave, #376fb7); }
+.ps-linkchip--thread .ps-linkchip__dot i:nth-child(3) { background: var(--high-sea, #f68620); }
+.ps-linkchip { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
