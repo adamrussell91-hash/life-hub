@@ -69,6 +69,36 @@ export function wholeWords(text: string, r: { start: number; end: number } | nul
   return { start, end };
 }
 
+/**
+ * Where a selection point falls in a sheet's text. A drag often starts or ends on the space between
+ * sentences, past a paragraph's end, or at the start of the next paragraph: none of those sit inside
+ * a run, so the point snaps to the nearest run edge rather than the whole selection being dropped.
+ */
+export function pointIn(sheet: HTMLElement, node: Node, offset: number): number | null {
+  const exact = offsetOf(node, offset);
+  if (exact !== null && sheet.contains(node)) return exact;
+  const runs = [...sheet.querySelectorAll<HTMLElement>('.pa-run')];
+  if (!runs.length) return null;
+  const at = document.createRange();
+  try { at.setStart(node, offset); } catch { return null; }
+  // The end of the last run before the point, or the start of the first run when the point comes first.
+  let found: number | null = null;
+  for (const run of runs) {
+    if (at.comparePoint(run, run.childNodes.length) <= 0) found = Number(run.dataset.end);
+    else break;
+  }
+  return found ?? Number(runs[0]!.dataset.start);
+}
+
+/** The words a selection covers in one sheet, grown to whole words; null when it covers none. */
+export function selectionIn(sheet: HTMLElement, text: string, s: Selection): { start: number; end: number } | null {
+  if (s.isCollapsed || !s.anchorNode || !s.focusNode) return null;
+  const a = pointIn(sheet, s.anchorNode, s.anchorOffset);
+  const b = pointIn(sheet, s.focusNode, s.focusOffset);
+  if (a === null || b === null) return null;
+  return wholeWords(text, trimRange(text, Math.min(a, b), Math.max(a, b)));
+}
+
 /** How the To mark flow embeds this screen: its own bar replaces ours, and `aside` tops the side column in place of a rubric. */
 export type MarkPieceOptions = {
   embedded?: boolean;
@@ -439,11 +469,8 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
         }
         sheet.addEventListener('mouseup', () => {
           const s = window.getSelection();
-          if (!s || s.isCollapsed || !s.anchorNode || !s.focusNode) return;
-          const a = offsetOf(s.anchorNode, s.anchorOffset);
-          const b = offsetOf(s.focusNode, s.focusOffset);
-          if (a === null || b === null) return;
-          const range = wholeWords(text, trimRange(text, Math.min(a, b), Math.max(a, b)));
+          if (!s || s.isCollapsed) return;
+          const range = selectionIn(sheet, text, s);
           if (range) root.dispatchEvent(new CustomEvent('pm:select', { detail: { part, field, ...range } }));
           // With no code armed the words stay selected, waiting for one.
           if (armed) s.removeAllRanges();
@@ -523,12 +550,13 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       clearSelected = window.setTimeout(() => { selected = null; }, 500);
       return;
     }
-    const sheet = (s.anchorNode.parentElement ?? null)?.closest<HTMLElement>('.mk-sheets [data-part]');
+    // The sheet the drag started in, or the one it ended in when it started outside any.
+    const sheetOf = (n: Node): HTMLElement | null =>
+      (n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement)?.closest<HTMLElement>('.mk-sheets [data-part]') ?? null;
+    const sheet = sheetOf(s.anchorNode) ?? sheetOf(s.focusNode);
     const text = sheet ? d.text[sheet.dataset.part!]?.[sheet.dataset.field!] : undefined;
-    const a = offsetOf(s.anchorNode, s.anchorOffset);
-    const b = offsetOf(s.focusNode, s.focusOffset);
-    if (!sheet || text === undefined || a === null || b === null) return;
-    const range = wholeWords(text, trimRange(text, Math.min(a, b), Math.max(a, b)));
+    if (!sheet || text === undefined) return;
+        const range = selectionIn(sheet, text, s);
     if (!range) return;
     window.clearTimeout(clearSelected);
     selected = { part: sheet.dataset.part!, field: sheet.dataset.field!, ...range };
