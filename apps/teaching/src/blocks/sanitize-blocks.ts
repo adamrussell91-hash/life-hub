@@ -36,6 +36,16 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
         content: { html: sanitizeRichTextHtml(block.content.html) }
       };
     }
+    if (block.block_type === 'diamond_nine') {
+      // A picture card keeps its address only when it is a safe one.
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          cards: block.content.cards.map((card) => (card.url && !isSafeHref(card.url) ? { ...card, url: '' } : card))
+        }
+      };
+    }
     if (block.block_type === 'annotation') {
       return {
         ...block,

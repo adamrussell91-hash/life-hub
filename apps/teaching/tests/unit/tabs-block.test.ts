@@ -205,12 +205,12 @@ describe('tabs block schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects more than 8 tabs', () => {
+  it('rejects more than 9 tabs (a 3 × 3 choice board is the most)', () => {
     const result = BlockSchema.safeParse({
       ...base,
       id: 'tabs1',
       block_type: 'tabs',
-      content: { tabs: emptyTabs(9) }
+      content: { tabs: emptyTabs(10) }
     });
     expect(result.success).toBe(false);
   });

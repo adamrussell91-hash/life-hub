@@ -50,6 +50,8 @@ export const NEW_BLOCK_TYPES = [
   'explainer',
   'comparative_judgement',
   'continuum_line',
+  'diamond_nine',
+  'venn',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -125,6 +127,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   explainer: 'Explainer',
   comparative_judgement: 'Comparative judgement',
   continuum_line: 'Continuum line',
+  diamond_nine: 'Diamond 9',
+  venn: 'Two-text Venn',
   quiz_question: 'Question',
   question_set: 'Question',
   flashcards: 'Flashcards',
@@ -178,14 +182,17 @@ export const EMBED_INSERT_PRESETS = [
 ] as const;
 
 export type EmbedInsertValue = (typeof EMBED_INSERT_PRESETS)[number]['value'];
-export type InsertMenuValue = NewBlockType | EmbedInsertValue;
+/** Panels shown as a choice board: its own menu entry, still a Panels block underneath. */
+export const CHOICE_BOARD_VALUE = 'tabs:choice' as const;
+export type InsertMenuValue = NewBlockType | EmbedInsertValue | typeof CHOICE_BOARD_VALUE;
 
 export const INSERT_MENU_LABEL: Record<InsertMenuValue, string> = {
   ...NEW_BLOCK_LABEL,
   'embed:google_maps': 'Map',
   'embed:google_slides': 'Slides',
   'embed:google_docs': 'Document',
-  'embed:pdf': 'PDF'
+  'embed:pdf': 'PDF',
+  'tabs:choice': 'Choice board'
 };
 
 export function expandGroupTypesForMenu(
@@ -197,6 +204,8 @@ export function expandGroupTypesForMenu(
     if (t === 'embed') {
       for (const preset of EMBED_INSERT_PRESETS) out.push(preset.value);
     }
+    // Choice board follows the lesson-only Learning activities, so pages without them (homepage, unit plan, Tasks) never offer it.
+    if (t === 'explainer') out.push(CHOICE_BOARD_VALUE);
   }
   return out;
 }
@@ -234,6 +243,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'question_quadrant',
       'concept_features',
       'continuum_line',
+      'diamond_nine',
       'thinking_reflection'
     ]
   },
@@ -257,7 +267,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   {
     label: 'Visualisation',
     // One Map entry: its editor switches between a tree (mind map) and a network (concept map).
-    types: ['chart', 'timeline', 'equation', 'diagram', 'mind_map', 'curriculum_lines', 'whiteboard']
+    types: ['chart', 'timeline', 'equation', 'diagram', 'mind_map', 'venn', 'curriculum_lines', 'whiteboard']
   },
   {
     label: 'Layout',
@@ -290,6 +300,7 @@ const TOOLKIT_GROUP_TYPES = [
   'question_quadrant',
   'concept_features',
   'continuum_line',
+  'diamond_nine',
   'thinking_reflection',
   'analogy_types',
   'analogy_close_reading',
@@ -321,6 +332,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   'outcomes',
   'annotation',
   'explainer',
+  'venn',
   'comparative_judgement',
   'anthology'
 ]);
@@ -336,7 +348,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', 'explainer', 'comparative_judgement', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', 'explainer', 'venn', 'comparative_judgement', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -424,11 +436,26 @@ export function createWhiteboardWithStarter(
   return starter ? { ...block, content: { ...block.content, starter } } : block;
 }
 
+/** A Panels block shown as a choice board: nine tiles in three levels, pick three. */
+export function createChoiceBoard(id: string): TabsBlock {
+  return {
+    ...sharedBlockFields(id),
+    block_type: 'tabs',
+    variant: 'medium',
+    content: {
+      style: 'choice',
+      choice: { pick: 3, columns: 3, rule: 'none' },
+      tabs: Array.from({ length: 9 }, (_, i) => ({ id: `${id}_t${i + 1}`, label: '', blocks: [], tier: (i % 3) + 1 }))
+    }
+  };
+}
+
 export function createFromInsertMenu(value: string, id: string): Block {
   const preset = EMBED_INSERT_PRESETS.find((p) => p.value === value);
   if (preset) {
     return createEmbedBlock(id, preset.provider);
   }
+  if (value === CHOICE_BOARD_VALUE) return createChoiceBoard(id);
   return createBlock(value as NewBlockType, id);
 }
 
@@ -694,6 +721,17 @@ export function createBlock(type: NewBlockType, id: string): Block {
         scale: { left: 'Implied', right: 'Not implied', stops: [] },
         statements: [{ id: `${id}_s1`, text: '', snap: false }],
         pace: 'teacher', replace: true
+      } };
+    case 'diamond_nine':
+      return { ...shared, block_type: 'diamond_nine', variant: 'medium', content: {
+        title: '', criterion: '', second_criterion: '',
+        cards: Array.from({ length: 9 }, (_, i) => ({ id: `${id}_c${i + 1}`, kind: 'text' as const, text: '' })),
+        wildcard: true, frame: false, rerank: true
+      } };
+    case 'venn':
+      return { ...shared, block_type: 'venn', variant: 'medium', content: {
+        prompt: '', texts: [{ label: '' }, { label: '' }], preload: [],
+        synthesis_frame: 'Both … explore …, but where A …, B …', nudge: true
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
@@ -997,7 +1035,9 @@ export function cloneBlockWithNewIds(
     };
   } else if (cloned.block_type === 'tabs') {
     cloned.content = {
+      ...cloned.content,
       tabs: cloned.content.tabs.map((panel) => ({
+        ...panel,
         id: nextId(),
         label: panel.label,
         blocks: panel.blocks.map((child) =>

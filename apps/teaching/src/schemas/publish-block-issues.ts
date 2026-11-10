@@ -29,6 +29,8 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   explainer: 'Explainer',
   comparative_judgement: 'Comparative judgement',
   continuum_line: 'Continuum line',
+  diamond_nine: 'Diamond 9',
+  venn: 'Two-text Venn',
   curriculum_lines: 'Curriculum lines',
   discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
@@ -250,6 +252,15 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   }
   if (block.block_type === 'collection') {
     return 'Collection blocks can only be used on class homepages';
+  }
+  if (block.block_type === 'diamond_nine') {
+    const ready = block.content.cards.filter((c) => (c.kind === 'image' ? c.url?.trim() : c.text.trim())).length;
+    if (ready < 9) return `Diamond 9 needs nine cards; ${ready} have words or a picture`;
+    if (!block.content.criterion.trim()) return 'Diamond 9 needs a criterion to rank by';
+  }
+  if (block.block_type === 'tabs' && block.content.style === 'choice') {
+    const pick = block.content.choice?.pick ?? 3;
+    if (pick > block.content.tabs.length) return `This choice board asks for ${pick} picks but has ${block.content.tabs.length} tiles`;
   }
   if (block.block_type === 'question_drop' && !block.content.target_quiz_id) {
     return 'Choose the quiz this Question drop feeds into';

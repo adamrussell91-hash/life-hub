@@ -1075,6 +1075,8 @@ var BlockTypeSchema = z12.enum([
   "explainer",
   "comparative_judgement",
   "continuum_line",
+  "diamond_nine",
+  "venn",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -1542,6 +1544,18 @@ var QuestionItemSchema = z12.object({
   logic: LogicSchema.optional(),
   /** Short answer only: the answer a student can check their own against. */
   model_answer: z12.string().optional(),
+  /**
+   * Sentence-level formats: the sentences or notes students work from. Sentence combining: the kernel
+   * sentences to join. Appositive: the sentence with the noun to rename. Expansion: the kernel. Note to
+   * topic sentence: the fragment notes, one per line.
+   */
+  kernels: z12.array(z12.string().max(400)).max(8).optional(),
+  /** Sentence combining: the joining word the combined sentence must use. Absent means any. */
+  conjunction: z12.string().max(20).optional(),
+  /** Sentence expansion: the question words the student answers in the expanded sentence. */
+  question_words: z12.array(z12.enum(["who", "what", "when", "where", "why", "how"])).max(6).optional(),
+  /** Sentence-level formats: the partial frame a middle item starts from. Absent means the first part of the model answer. */
+  frame: z12.string().max(400).optional(),
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z12.enum(["reveal", "confidence"]).optional(),
   /** Success criteria the student ticks off against their answer. */
@@ -1599,6 +1613,57 @@ var ContinuumLineBlockSchema = z12.object({
     mode: z12.enum(["opinion", "predict"]).optional(),
     /** A return line: the id of an earlier continuum line in the lesson. It runs that line's stimulus, scale and statements again, and shows each student where they first put their symbol. */
     returns_to: z12.string().min(1).max(64).optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var DiamondCardSchema = z12.object({
+  id: z12.string().min(1).max(64),
+  kind: z12.enum(["text", "quote", "image"]).default("text"),
+  text: z12.string().max(300).default(""),
+  /** Quote: who said it, or where it comes from. */
+  source: z12.string().max(120).optional(),
+  url: z12.string().max(2e3).optional(),
+  alt_text: z12.string().max(300).optional()
+});
+var DiamondNineBlockSchema = z12.object({
+  id: z12.string().min(1),
+  type: z12.literal("block"),
+  block_type: z12.literal("diamond_nine"),
+  variant: z12.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z12.object({
+    title: z12.string().max(200).default(""),
+    /** What the diamond ranks by, e.g. "Most significant to the text's meaning". */
+    criterion: z12.string().max(200).default(""),
+    /** A second pass ranks the same cards by this. Empty means no second pass. */
+    second_criterion: z12.string().max(200).default(""),
+    cards: z12.array(DiamondCardSchema).max(9).default([]),
+    /** A student may swap one card for their own. */
+    wildcard: z12.boolean().default(true),
+    /** Offer Because, but, so as a frame for the reasons. */
+    frame: z12.boolean().default(false),
+    /** After submitting, students can rank again and say what changed their mind. */
+    rerank: z12.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var VennBlockSchema = z12.object({
+  id: z12.string().min(1),
+  type: z12.literal("block"),
+  block_type: z12.literal("venn"),
+  variant: z12.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z12.object({
+    prompt: z12.string().max(600).default(""),
+    texts: z12.array(z12.object({ label: z12.string().max(80).default("") })).min(2).max(3).default([{ label: "" }, { label: "" }]),
+    /** Points students sort into the circles before adding their own. */
+    preload: z12.array(z12.object({ id: z12.string().min(1).max(64), text: z12.string().max(300).default("") })).max(12).default([]),
+    /** The centre's synthesis sentence frame. */
+    synthesis_frame: z12.string().max(300).default("Both \u2026 explore \u2026, but where A \u2026, B \u2026"),
+    /** Suggest a deep point when surface points outnumber deep ones. */
+    nudge: z12.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1850,7 +1915,23 @@ var QuestionSetBlockSchema = z12.object({
     title: z12.string().optional(),
     questions: z12.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z12.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so", "reasoning_chart"]).optional(),
+    format: z12.enum([
+      "standard",
+      "human_experience_table",
+      "anchor_bridge",
+      "question_levels",
+      "because_but_so",
+      "reasoning_chart",
+      "sentence_combining",
+      "appositive",
+      "sentence_expansion",
+      "note_to_topic"
+    ]).optional(),
+    /** Sentence-level formats: worked-example fading (absent means on) and an optional word limit. */
+    sentence: z12.object({
+      fade: z12.boolean().default(true),
+      word_limit: z12.number().int().min(3).max(80).optional()
+    }).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z12.object({
       rows: z12.number().int().min(3).max(5).default(3),
@@ -2775,6 +2856,8 @@ var leafBlockSchemas = [
   ExplainerBlockSchema,
   ComparativeJudgementBlockSchema,
   ContinuumLineBlockSchema,
+  DiamondNineBlockSchema,
+  VennBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2876,11 +2959,24 @@ var TabsBlockSchema = z12.object({
       z12.object({
         id: z12.string().min(1),
         label: z12.string(),
-        blocks: z12.array(TabChildBlockSchema)
+        blocks: z12.array(TabChildBlockSchema),
+        /** Choice board: the tile's level, 1 Core, 2 Stretch, 3 Challenge. */
+        tier: z12.number().int().min(1).max(3).optional(),
+        /** Choice board: the kind of task, e.g. Write, Analyse, Create. */
+        kind: z12.string().max(40).optional()
       })
-    ).min(2).max(8),
-    /** Absent means tabs; folds shows each panel as a fold-out. */
-    style: z12.enum(["tabs", "folds"]).optional()
+    ).min(2).max(9),
+    /** Absent means tabs; folds shows each panel as a fold-out; choice shows them as a choice board. */
+    style: z12.enum(["tabs", "folds", "choice"]).optional(),
+    /** Choice board settings, kept when switching style away and back. */
+    choice: z12.object({
+      /** How many tiles each student picks. */
+      pick: z12.number().int().min(1).max(9).default(3),
+      /** Tiles per row. */
+      columns: z12.number().int().min(2).max(4).default(3),
+      /** each_column: at least one pick in every column. line: a full row, column or diagonal (3 × 3 only). */
+      rule: z12.enum(["none", "each_column", "line"]).default("none")
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3099,6 +3195,8 @@ export {
   DefinitionBlockSchema,
   DiagramBlockSchema,
   DiagramSourceSchema,
+  DiamondCardSchema,
+  DiamondNineBlockSchema,
   DiscernConfirmBlockSchema,
   DividerBlockSchema,
   DoneBlockSchema,
@@ -3198,6 +3296,7 @@ export {
   ToolkitSkillBlockSchema,
   ToolkitToolBlockSchema,
   ToolkitValueBlockSchema,
+  VennBlockSchema,
   VideoBlockSchema,
   VideoProviderSchema,
   VisibilitySchema,

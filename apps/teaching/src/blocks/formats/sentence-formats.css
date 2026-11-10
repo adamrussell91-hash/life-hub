@@ -1,0 +1,61 @@
+/* Sentence-level formats on the Question block (Writing Revolution). */
+.block-sentence__limit { margin: 0 0 var(--space-2); font-family: var(--font-ui); font-size: var(--text-sm); }
+.block-sentence__item { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.block-sentence__item > * { margin: 0; }
+.block-sentence__material { display: flex; flex-direction: column; gap: var(--space-2); }
+.block-sentence__kernels,
+.block-sentence__notes {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  margin: 0; padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + 1.25rem);
+  border-left: 3px solid var(--wave); background: var(--paper); border-radius: var(--radius-xs);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--ink);
+}
+.block-sentence__notes { list-style: '– '; font-style: italic; }
+.block-sentence__kernel--single {
+  margin: 0; padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--wave); background: var(--paper); border-radius: var(--radius-xs);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--ink);
+}
+.block-sentence__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.block-sentence__chip {
+  padding: 2px var(--space-2); border: 1px solid var(--wave); border-radius: var(--radius-full);
+  background: var(--pastel-blue); color: var(--navy); font-family: var(--font-ui); font-size: var(--text-xs);
+  font-weight: var(--weight-semibold); text-transform: capitalize;
+}
+.block-sentence__task { margin: 0; font-family: var(--font-ui); font-size: var(--text-sm); }
+.block-sentence__worked {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border: 1px dashed var(--wave); border-radius: var(--radius-sm); background: #fff;
+}
+.block-sentence__worked > * { margin: 0; }
+.block-sentence__worked-answer { color: var(--navy); font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+.block-sentence__arrow { color: var(--wave); }
+.block-sentence__stage {
+  align-self: flex-start; padding: 2px var(--space-2); border-radius: var(--radius-full);
+  background: var(--pastel-peach, var(--glass)); color: var(--pastel-peach-ink, var(--ink));
+  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--weight-semibold);
+}
+.block-sentence__frame-label { margin: 0; }
+.block-sentence__helper { margin: 0; font-family: var(--font-ui); font-size: var(--text-xs); }
+.block-sentence__helper--over { color: var(--pastel-peach-ink, var(--navy)); font-weight: var(--weight-semibold); }
+.block-sentence .block-question-set__model-btn { align-self: flex-start; }
+.block-sentence .block-question-set__model-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Editor: these formats are always written, so kind, space and the model-opens choice step aside. */
+.block-editor__fields[data-sentence='true'] .block-editor__question-kind,
+.block-editor__fields[data-sentence='true'] .block-editor__question-response-space,
+.block-editor__fields[data-sentence='true'] .block-editor__question-model-check,
+.block-editor__fields[data-sentence='true'] .block-editor__question-options { display: none; }
+.block-editor__sentence-words { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.block-editor__sentence-word {
+  min-height: 32px; padding: 2px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-full);
+  background: transparent; color: var(--muted); font: inherit; font-size: var(--text-sm); cursor: pointer; text-transform: capitalize;
+}
+.block-editor__sentence-word[aria-pressed='true'] { background: var(--pastel-blue); border-color: var(--wave); color: var(--navy); }
+.block-editor__sentence-word:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.block-editor__sentence-limit { max-width: 8rem; }
+
+@media print {
+  .block-sentence__worked { border-style: solid; }
+  .block-sentence__kernels, .block-sentence__notes, .block-sentence__kernel--single { background: none; }
+}

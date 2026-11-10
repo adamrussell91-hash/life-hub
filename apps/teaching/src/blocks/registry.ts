@@ -97,6 +97,8 @@ import { renderHingeQuestion, createHingeQuestionEditor } from '@/blocks/hinge-q
 import { renderExplainer, createExplainerEditor } from '@/blocks/explainer';
 import { renderComparativeJudgement, createComparativeJudgementEditor } from '@/blocks/comparative-judgement';
 import { renderContinuumLine, createContinuumLineEditor } from '@/blocks/continuum-line';
+import { renderDiamondNine, createDiamondNineEditor } from '@/blocks/diamond-nine';
+import { renderVenn, createVennEditor } from '@/blocks/venn';
 import { renderCurriculumLines, createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import type { Block } from '@/schemas/block';
@@ -213,6 +215,8 @@ export const blockRegistry: {
   explainer: { render: renderExplainer, createEditor: createExplainerEditor },
   comparative_judgement: { render: renderComparativeJudgement, createEditor: (block, onChange) => createComparativeJudgementEditor(block, onChange) },
   continuum_line: { render: renderContinuumLine, createEditor: createContinuumLineEditor },
+  diamond_nine: { render: renderDiamondNine, createEditor: createDiamondNineEditor },
+  venn: { render: renderVenn, createEditor: createVennEditor },
   curriculum_lines: { render: renderCurriculumLines, createEditor: (block, onChange) => createCurriculumLinesEditor(block, onChange) },
   done: { render: renderDone, createEditor: (block, onChange) => createDoneEditor(block, onChange) },
   question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },

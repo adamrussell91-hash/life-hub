@@ -1,4 +1,4 @@
-import { createBlock, NEW_BLOCK_TYPES, type NewBlockType } from '@/blocks/create-block';
+import { createBlock, createChoiceBoard, NEW_BLOCK_TYPES, type NewBlockType } from '@/blocks/create-block';
 import { BlockSchema, type Block } from '@/schemas/block';
 
 /**
@@ -11,7 +11,7 @@ const TEXT_KEYS = new Set([
   'title', 'label', 'prompt', 'question', 'body', 'text', 'term', 'definition', 'front', 'back',
   'description', 'when', 'eyebrow', 'quote', 'attribution', 'source', 'reference', 'note', 'caption',
   'answer', 'guide', 'focus', 'task', 'example', 'teacher_note', 'concept', 'weak', 'strong',
-  'strength_prompt', 'suggestion_prompt', 'alt_text', 'subtitle', 'summary', 'name'
+  'strength_prompt', 'suggestion_prompt', 'alt_text', 'subtitle', 'summary', 'name', 'criterion', 'second_criterion'
 ]);
 const HTML_KEYS = new Set(['html']);
 /** Optional author fields that defaults leave out entirely. */
@@ -50,6 +50,33 @@ export function everyBlockFixture(type: NewBlockType): Block {
   return BlockSchema.safeParse(filled).success ? filled : base;
 }
 
+/** Shapes that share a block type with another entry: the choice board (Panels) and the sentence-level Question formats. */
+export function everyVariantFixtures(): Block[] {
+  const board = createChoiceBoard('every_choice_board');
+  const filled = {
+    ...board,
+    content: {
+      ...board.content,
+      tabs: board.content.tabs.map((tab, i) => ({ ...tab, label: `Choice tile ${i + 1}`, kind: i % 2 ? 'Write' : 'Analyse' }))
+    }
+  } as Block;
+  const sentence = (format: string, extra: Record<string, unknown>): Block => {
+    const base = createBlock('question_set', `every_${format}`) as Extract<Block, { block_type: 'question_set' }>;
+    const items = [1, 2, 3].map((n) => ({
+      id: `every_${format}_q${n}`, prompt: `${format} item ${n} filler`, kind: 'short_answer' as const,
+      model_answer: `${format} model answer ${n} filler for reading.`, ...extra
+    }));
+    return { ...base, content: { ...base.content, format, questions: items, sentence: { fade: true, word_limit: 25 } } } as Block;
+  };
+  return [
+    filled,
+    sentence('sentence_combining', { kernels: ['Kernel one filler.', 'Kernel two filler.'], conjunction: 'although' }),
+    sentence('appositive', { kernels: ['Appositive sentence filler.'] }),
+    sentence('sentence_expansion', { kernels: ['Kernel filler.'], question_words: ['when', 'why'] }),
+    sentence('note_to_topic', { kernels: ['note one filler', 'note two filler'] })
+  ].map((block) => (BlockSchema.safeParse(block).success ? block : (() => { throw new Error(`Bad fixture ${block.id}`); })()));
+}
+
 export function everyBlockFixtures(): Block[] {
-  return NEW_BLOCK_TYPES.map(everyBlockFixture);
+  return [...NEW_BLOCK_TYPES.map(everyBlockFixture), ...everyVariantFixtures()];
 }

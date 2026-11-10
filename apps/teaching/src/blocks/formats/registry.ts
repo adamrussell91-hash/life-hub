@@ -30,6 +30,22 @@ export const BLOCK_FORMATS: Partial<Record<Block['block_type'], FormatEntry[]>> 
     {
       id: 'reasoning_chart', label: 'Reasoning chart',
       hint: 'Each question gets a deductive, inductive or abductive chart students build step by step, then a sentence frame to write it up.'
+    },
+    {
+      id: 'sentence_combining', label: 'Sentence combining',
+      hint: 'Write two or three short sentences from the text for students to join into one. Pick a joining word to practise, add a model answer, and the first item becomes a worked example.'
+    },
+    {
+      id: 'appositive', label: 'Appositives',
+      hint: 'Write a sentence from the text with a noun students can rename, like a character or place. Add a model answer; the first item becomes a worked example.'
+    },
+    {
+      id: 'sentence_expansion', label: 'Sentence expansion',
+      hint: 'Write a short kernel sentence about the text and pick the question words students answer to expand it. Add a model answer; the first item becomes a worked example.'
+    },
+    {
+      id: 'note_to_topic', label: 'Note to topic sentence',
+      hint: 'Write short notes on the text, one per line, for students to turn into one topic sentence. Add a model answer; the first item becomes a worked example.'
     }
   ],
   peer_feedback: [

@@ -52,6 +52,8 @@ export const BlockTypeSchema = z.enum([
   'explainer',
   'comparative_judgement',
   'continuum_line',
+  'diamond_nine',
+  'venn',
   'curriculum_lines',
   'quiz_question',
   'question_set',
@@ -582,6 +584,18 @@ export const QuestionItemSchema = z.object({
   logic: LogicSchema.optional(),
   /** Short answer only: the answer a student can check their own against. */
   model_answer: z.string().optional(),
+  /**
+   * Sentence-level formats: the sentences or notes students work from. Sentence combining: the kernel
+   * sentences to join. Appositive: the sentence with the noun to rename. Expansion: the kernel. Note to
+   * topic sentence: the fragment notes, one per line.
+   */
+  kernels: z.array(z.string().max(400)).max(8).optional(),
+  /** Sentence combining: the joining word the combined sentence must use. Absent means any. */
+  conjunction: z.string().max(20).optional(),
+  /** Sentence expansion: the question words the student answers in the expanded sentence. */
+  question_words: z.array(z.enum(['who', 'what', 'when', 'where', 'why', 'how'])).max(6).optional(),
+  /** Sentence-level formats: the partial frame a middle item starts from. Absent means the first part of the model answer. */
+  frame: z.string().max(400).optional(),
   /** How the model answer opens: straight away, or after the student rates their confidence 1 to 5. Absent means straight away. */
   model_check: z.enum(['reveal', 'confidence']).optional(),
   /** Success criteria the student ticks off against their answer. */
@@ -640,6 +654,62 @@ export const ContinuumLineBlockSchema = z.object({
     mode: z.enum(['opinion', 'predict']).optional(),
     /** A return line: the id of an earlier continuum line in the lesson. It runs that line's stimulus, scale and statements again, and shows each student where they first put their symbol. */
     returns_to: z.string().min(1).max(64).optional()
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Diamond 9: nine cards ranked 1-2-3-2-1 against a criterion. Students rank
+ * alone first, give reasons for the top and bottom card, can re-rank after the
+ * discussion and rank again against a second criterion. Responses live in the
+ * thinking store (netlify/functions/_shared/thinking-responses.mjs).
+ */
+export const DiamondCardSchema = z.object({
+  id: z.string().min(1).max(64),
+  kind: z.enum(['text', 'quote', 'image']).default('text'),
+  text: z.string().max(300).default(''),
+  /** Quote: who said it, or where it comes from. */
+  source: z.string().max(120).optional(),
+  url: z.string().max(2000).optional(),
+  alt_text: z.string().max(300).optional()
+});
+export const DiamondNineBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('diamond_nine'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().max(200).default(''),
+    /** What the diamond ranks by, e.g. "Most significant to the text's meaning". */
+    criterion: z.string().max(200).default(''),
+    /** A second pass ranks the same cards by this. Empty means no second pass. */
+    second_criterion: z.string().max(200).default(''),
+    cards: z.array(DiamondCardSchema).max(9).default([]),
+    /** A student may swap one card for their own. */
+    wildcard: z.boolean().default(true),
+    /** Offer Because, but, so as a frame for the reasons. */
+    frame: z.boolean().default(false),
+    /** After submitting, students can rank again and say what changed their mind. */
+    rerank: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Two-text Venn: points in A only, B only (C only) and the overlaps, each tagged
+ * surface or deep; overlap points say how each text treats them differently.
+ */
+export const VennBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('venn'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    prompt: z.string().max(600).default(''),
+    texts: z.array(z.object({ label: z.string().max(80).default('') })).min(2).max(3)
+      .default([{ label: '' }, { label: '' }]),
+    /** Points students sort into the circles before adding their own. */
+    preload: z.array(z.object({ id: z.string().min(1).max(64), text: z.string().max(300).default('') })).max(12).default([]),
+    /** The centre's synthesis sentence frame. */
+    synthesis_frame: z.string().max(300).default('Both … explore …, but where A …, B …'),
+    /** Suggest a deep point when surface points outnumber deep ones. */
+    nudge: z.boolean().default(true)
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -927,7 +997,15 @@ export const QuestionSetBlockSchema = z.object({
     title: z.string().optional(),
     questions: z.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so', 'reasoning_chart']).optional(),
+    format: z.enum([
+      'standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so', 'reasoning_chart',
+      'sentence_combining', 'appositive', 'sentence_expansion', 'note_to_topic'
+    ]).optional(),
+    /** Sentence-level formats: worked-example fading (absent means on) and an optional word limit. */
+    sentence: z.object({
+      fade: z.boolean().default(true),
+      word_limit: z.number().int().min(3).max(80).optional()
+    }).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z.object({
       rows: z.number().int().min(3).max(5).default(3),
@@ -2030,6 +2108,8 @@ const leafBlockSchemas = [
   ExplainerBlockSchema,
   ComparativeJudgementBlockSchema,
   ContinuumLineBlockSchema,
+  DiamondNineBlockSchema,
+  VennBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2141,13 +2221,26 @@ export const TabsBlockSchema = z.object({
         z.object({
           id: z.string().min(1),
           label: z.string(),
-          blocks: z.array(TabChildBlockSchema)
+          blocks: z.array(TabChildBlockSchema),
+          /** Choice board: the tile's level, 1 Core, 2 Stretch, 3 Challenge. */
+          tier: z.number().int().min(1).max(3).optional(),
+          /** Choice board: the kind of task, e.g. Write, Analyse, Create. */
+          kind: z.string().max(40).optional()
         })
       )
       .min(2)
-      .max(8),
-    /** Absent means tabs; folds shows each panel as a fold-out. */
-    style: z.enum(['tabs', 'folds']).optional()
+      .max(9),
+    /** Absent means tabs; folds shows each panel as a fold-out; choice shows them as a choice board. */
+    style: z.enum(['tabs', 'folds', 'choice']).optional(),
+    /** Choice board settings, kept when switching style away and back. */
+    choice: z.object({
+      /** How many tiles each student picks. */
+      pick: z.number().int().min(1).max(9).default(3),
+      /** Tiles per row. */
+      columns: z.number().int().min(2).max(4).default(3),
+      /** each_column: at least one pick in every column. line: a full row, column or diagonal (3 × 3 only). */
+      rule: z.enum(['none', 'each_column', 'line']).default('none')
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

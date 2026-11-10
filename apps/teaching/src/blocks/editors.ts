@@ -11,6 +11,8 @@ import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createExplainerEditor } from '@/blocks/explainer';
 import { createComparativeJudgementEditor } from '@/blocks/comparative-judgement';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
+import { createDiamondNineEditor } from '@/blocks/diamond-nine';
+import { createVennEditor } from '@/blocks/venn';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
@@ -21,6 +23,7 @@ import { mountChipPicker } from '@/skills/chip-picker';
 import type { NextStepBank } from '@/quiz/core';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { createFormatField, withFormat } from '@/blocks/formats/registry';
+import { isSentenceFormat, JOINING_WORDS, QUESTION_WORDS, type QuestionWord, type SentenceFormat } from '@/blocks/formats/sentence-model';
 import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
 import { LOGIC_LABELS, type LogicSetting } from '@/blocks/reasoning/content';
 import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
@@ -1702,6 +1705,14 @@ function createWrittenTypeField(getLatest: () => Extract<Block, { block_type: 'q
   return labelled('Question type', select);
 }
 
+/** The material field's label in each sentence-level format. */
+const SENTENCE_KERNEL_LABELS: Record<SentenceFormat, string> = {
+  sentence_combining: 'Kernel sentences, one per line',
+  appositive: 'Sentence with the noun to rename',
+  sentence_expansion: 'Kernel sentence',
+  note_to_topic: 'Notes, one per line'
+};
+
 export function createQuestionSetEditor(
   block: Extract<Block, { block_type: 'question_set' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>,
@@ -1722,6 +1733,10 @@ export function createQuestionSetEditor(
     checklist?: Array<{ id: string; label: string }>;
     skills?: string[];
     next_steps?: NextStepBank;
+    kernels?: string[];
+    conjunction?: string;
+    question_words?: QuestionWord[];
+    frame?: string;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1748,7 +1763,11 @@ export function createQuestionSetEditor(
     model_check: q.model_check,
     checklist: q.checklist ? q.checklist.map((item) => ({ ...item })) : undefined,
     skills: q.skills ? [...q.skills] : undefined,
-    next_steps: q.next_steps ? structuredClone(q.next_steps) : undefined
+    next_steps: q.next_steps ? structuredClone(q.next_steps) : undefined,
+    kernels: q.kernels ? [...q.kernels] : undefined,
+    conjunction: q.conjunction,
+    question_words: q.question_words ? [...q.question_words] : undefined,
+    frame: q.frame
   }));
   // The code library, for each question's next-steps bank; loaded once for the set.
   let codeLibrary: FeedbackCode[] | null = null;
@@ -1766,6 +1785,8 @@ export function createQuestionSetEditor(
 
   const emitChange = () => {
     const latest = getLatest();
+    // Sentence-level formats are always written, so the model answer stays whatever the kind.
+    const sentence = isSentenceFormat(latest.content.format);
     onChange({
       ...latest,
       content: {
@@ -1782,14 +1803,19 @@ export function createQuestionSetEditor(
             : {}),
           ...(q.level ? { level: q.level } : {}),
           ...(q.logic ? { logic: q.logic } : {}),
-          ...(q.kind === 'short_answer' && q.model_answer?.trim() ? { model_answer: q.model_answer } : {}),
+          ...((q.kind === 'short_answer' || sentence) && q.model_answer?.trim() ? { model_answer: q.model_answer } : {}),
           ...(q.kind === 'short_answer' && q.model_answer?.trim() && q.model_check === 'confidence' ? { model_check: 'confidence' as const } : {}),
           ...(q.checklist?.some((item) => item.label.trim())
             ? { checklist: q.checklist.filter((item) => item.label.trim()).slice(0, 12) }
             : {}),
           // Skills and the bank belong to written answers only.
           ...(q.kind === 'short_answer' && q.skills?.length ? { skills: q.skills.slice(0, 4) } : {}),
-          ...(q.kind === 'short_answer' && q.skills?.length && q.next_steps && Object.keys(q.next_steps).length ? { next_steps: q.next_steps } : {})
+          ...(q.kind === 'short_answer' && q.skills?.length && q.next_steps && Object.keys(q.next_steps).length ? { next_steps: q.next_steps } : {}),
+          // Sentence-level material, kept whatever the format so switching away and back loses nothing.
+          ...(q.kernels?.some((k) => k.trim()) ? { kernels: q.kernels.map((k) => k.trim()).filter(Boolean).slice(0, 8) } : {}),
+          ...(q.conjunction?.trim() ? { conjunction: q.conjunction.trim() } : {}),
+          ...(q.question_words?.length ? { question_words: [...q.question_words] } : {}),
+          ...(q.frame?.trim() ? { frame: q.frame } : {})
         }))
       }
     });
@@ -1801,6 +1827,8 @@ export function createQuestionSetEditor(
       .map((line) => line.trim())
       .filter(Boolean);
 
+  // Each question's sentence fields repaint when the format changes.
+  const sentenceFields = new Map<string, (format: string) => void>();
   const list = createHubList<QuestionDraft>({
     items: questions,
     noun: 'question',
@@ -1811,7 +1839,10 @@ export function createQuestionSetEditor(
     min: 1,
     minReason: 'A question set needs at least one question.',
     create: () => ({ id: itemId('q'), prompt: '', kind: 'short_answer', response_space: 'medium' }),
-    duplicate: (q) => ({ ...q, id: itemId('q'), options: q.options ? [...q.options] : undefined }),
+    duplicate: (q) => ({
+      ...q, id: itemId('q'), options: q.options ? [...q.options] : undefined,
+      kernels: q.kernels ? [...q.kernels] : undefined, question_words: q.question_words ? [...q.question_words] : undefined
+    }),
     onChange: (next) => {
       questions = next;
       emitChange();
@@ -1961,10 +1992,74 @@ export function createQuestionSetEditor(
         onChange: (value) => ctx.update({ ...ctx.current, logic: value === 'choice' ? undefined : value as LogicSetting })
       });
 
+      // Sentence-level formats: the material, the joining word or question words, and a frame.
+      const sentence = document.createElement('div');
+      sentence.className = 'block-editor__sentence';
+      const kernels = editorField(
+        'block-editor__question-kernels',
+        (question.kernels ?? []).join('\n'),
+        '',
+        '',
+        (value) => ctx.update({ ...ctx.current, kernels: value.split('\n').map((line) => line.trim()).filter(Boolean) }),
+        'textarea',
+        3
+      );
+      const conjunction = createChoice({
+        key: 'Joining word',
+        value: question.conjunction ?? 'any',
+        options: [{ value: 'any', label: 'Any' }, ...JOINING_WORDS.map((word) => ({ value: word, label: word }))],
+        className: 'block-editor__question-conjunction',
+        ariaLabel: `Question ${n} joining word`,
+        onChange: (value) => ctx.update({ ...ctx.current, conjunction: value === 'any' ? undefined : value })
+      });
+      const words = document.createElement('div');
+      words.className = 'block-editor__sentence-words';
+      words.setAttribute('role', 'group');
+      words.setAttribute('aria-label', `Question ${n} question words to answer`);
+      for (const word of QUESTION_WORDS) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'block-editor__sentence-word';
+        chip.textContent = word;
+        chip.dataset.word = word;
+        chip.setAttribute('aria-pressed', String(!!question.question_words?.includes(word)));
+        chip.addEventListener('click', () => {
+          const current = new Set(ctx.current.question_words ?? []);
+          if (current.has(word)) current.delete(word);
+          else current.add(word);
+          const next = QUESTION_WORDS.filter((w) => current.has(w));
+          chip.setAttribute('aria-pressed', String(current.has(word)));
+          ctx.update({ ...ctx.current, question_words: next.length ? next : undefined });
+        });
+        words.append(chip);
+      }
+      const frame = editorField(
+        'block-editor__question-frame',
+        question.frame ?? '',
+        'Partial frame for a middle item; leave blank to use the start of the model answer',
+        `Question ${n} frame`,
+        (value) => ctx.update({ ...ctx.current, frame: value }),
+        'text'
+      );
+      sentence.append(kernels, conjunction.el, words, frame);
+      const paintSentence = (format: string) => {
+        const on = isSentenceFormat(format);
+        sentence.hidden = !on;
+        modelAnswer.hidden = on ? false : ctx.current.kind !== 'short_answer';
+        conjunction.el.hidden = format !== 'sentence_combining';
+        words.hidden = format !== 'sentence_expansion';
+        const label = on ? SENTENCE_KERNEL_LABELS[format as SentenceFormat] : 'Kernel sentences';
+        kernels.placeholder = label;
+        kernels.setAttribute('aria-label', `Question ${n} ${label.toLowerCase()}`);
+        prompt.placeholder = on ? 'Instruction (optional)' : 'Question';
+      };
+      sentenceFields.set(question.id, paintSentence);
+      paintSentence(getLatest().content.format ?? 'standard');
+
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
       settings.append(level.el, kind.el, responseSpace.el, logic.el);
-      return fragmentOf(prompt, settings, options, modelAnswer, modelCheck.el, checklist, skillsField, bank.el);
+      return fragmentOf(prompt, sentence, settings, options, modelAnswer, modelCheck.el, checklist, skillsField, bank.el);
     }
   });
   list.el.classList.add('block-editor__questions');
@@ -2019,11 +2114,45 @@ export function createQuestionSetEditor(
     onChange: (value) => setReasoning({ student_level: value === 'yes' })
   });
   reasoningSettings.append(reasoningLevel.el, studentLevel.el);
+  // Sentence-level settings: fading and an optional word limit, shown only for those formats.
+  const sentenceSettings = document.createElement('div');
+  sentenceSettings.className = 'block-editor__inline-settings block-editor__sentence-settings';
+  const setSentence = (patch: { fade?: boolean; word_limit?: number | undefined }) => {
+    const latest = getLatest();
+    const sentence = { fade: true, ...latest.content.sentence, ...patch };
+    if (sentence.word_limit === undefined) delete sentence.word_limit;
+    onChange({ ...latest, content: { ...latest.content, sentence } });
+  };
+  const fade = createChoice({
+    key: 'Fade the scaffolding',
+    value: block.content.sentence?.fade === false ? 'off' : 'on',
+    options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
+    className: 'block-editor__sentence-fade',
+    ariaLabel: 'Fade the scaffolding',
+    onChange: (value) => setSentence({ fade: value === 'on' })
+  });
+  const wordLimit = editorField(
+    'block-editor__sentence-limit',
+    block.content.sentence?.word_limit ? String(block.content.sentence.word_limit) : '',
+    'Word limit',
+    'Word limit (blank for none)',
+    (value) => {
+      const number = Math.round(Number(value));
+      setSentence({ word_limit: value.trim() && Number.isFinite(number) ? Math.min(80, Math.max(3, number)) : undefined });
+    },
+    'number'
+  ) as HTMLInputElement;
+  wordLimit.min = '3';
+  wordLimit.max = '80';
+  sentenceSettings.append(fade.el, wordLimit);
 
   const showTableSettings = (format: string) => {
     tableSettings.hidden = format !== 'human_experience_table';
     reasoningSettings.hidden = format !== 'reasoning_chart';
+    sentenceSettings.hidden = !isSentenceFormat(format);
     fields.dataset.format = format;
+    fields.dataset.sentence = String(isSentenceFormat(format));
+    for (const paint of sentenceFields.values()) paint(format);
     fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
   };
   showTableSettings(block.content.format ?? 'standard');
@@ -2037,7 +2166,7 @@ export function createQuestionSetEditor(
 
   // One Question block: where the lesson runs a quiz, the type list also offers the quiz kinds.
   const typeField = context.quizRuns?.() ? createWrittenTypeField(getLatest, (next) => swapBlock(next, onChange as BlockChangeHandler, context)) : null;
-  fields.append(...(typeField ? [typeField] : []), ...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
+  fields.append(...(typeField ? [typeField] : []), ...(format ? [format] : []), tableSettings, reasoningSettings, sentenceSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -3433,6 +3562,10 @@ function createBlockEditorFields(
       return createComparativeJudgementEditor(block, onChange, { lessonId: context.lessonId, getLessonBlocks: context.getLessonBlocks, unitLessons: context.unitLessons });
     case 'continuum_line':
       return createContinuumLineEditor(block, onChange, context.getLessonBlocks);
+    case 'diamond_nine':
+      return createDiamondNineEditor(block, onChange);
+    case 'venn':
+      return createVennEditor(block, onChange);
     case 'curriculum_lines':
       return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
