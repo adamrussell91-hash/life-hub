@@ -33,6 +33,10 @@ import { createDoubleLoopView } from '../../../../../packages/problem-solver/ren
 import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
 import { createFiveCsView } from '../../../../../packages/problem-solver/render/five-cs';
 import { createKnowledgeManagementView } from '../../../../../packages/problem-solver/render/knowledge-management';
+import { createImpactEffortView } from '../../../../../packages/problem-solver/render/impact-effort';
+import { createStakeholderMapView } from '../../../../../packages/problem-solver/render/stakeholder-map';
+import { createAssumptionsMapView } from '../../../../../packages/problem-solver/render/assumptions-map';
+import { createRoseThornBudView } from '../../../../../packages/problem-solver/render/rose-thorn-bud';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -87,7 +91,11 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   double_loop: () => createDoubleLoopView(),
   feedback_matrix: () => createFeedbackMatrixView(),
   five_cs: () => createFiveCsView(),
-  knowledge_management: () => createKnowledgeManagementView()
+  knowledge_management: () => createKnowledgeManagementView(),
+  impact_effort: () => createImpactEffortView(),
+  stakeholder_map: () => createStakeholderMapView(),
+  assumptions_map: () => createAssumptionsMapView(),
+  rose_thorn_bud: () => createRoseThornBudView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

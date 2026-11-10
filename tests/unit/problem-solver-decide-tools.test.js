@@ -14,8 +14,8 @@ const put = (run, slot, extra = {}) => placeNode(run, { id: `c${(n += 1)}`, slot
 const idOf = (run, slot) => run.nodes.find((x) => x.slot === slot).id;
 const link = (run, from, to, kind) => addEdge(run, { from: idOf(run, from), to: idOf(run, to), kind });
 
-test('decide step lists its four tools in order', () => {
-  assert.deepEqual(toolsForBookStep('decide'), ['decision_matrix', 'swot', 'morphological', 'pareto']);
+test('decide step lists its five tools in order', () => {
+  assert.deepEqual(toolsForBookStep('decide'), ['decision_matrix', 'swot', 'morphological', 'pareto', 'impact_effort']);
 });
 
 test('every Decide tool, and only Decide tools, end with the choice slot and a Choose step', () => {
