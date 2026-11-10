@@ -5,12 +5,16 @@
 // suggestions. `reuse` names the Problem Solver or Decision Maker tool a variant is built on;
 // `merged` lists the cut-down entries folded into a parent. Every other id starts with `rb_`.
 
-/** The four source groups, in the book's order. `route` is the id a session stores. */
+/**
+ * The four source groups, in the book's order, then Ways of Seeing: a fifth section of our own
+ * (general mental models, not from the book). `route` is the id a session stores.
+ */
 export const SECTIONS = Object.freeze([
   Object.freeze({ key: 'workplace', title: 'How to Survive Meetings, Deadlines and Other Workplace Adventures', route: 'workplace' }),
   Object.freeze({ key: 'change', title: 'When You’re Convinced You Should Be Doing Everything Differently', route: 'change' }),
   Object.freeze({ key: 'people', title: 'Understanding Yourself (and Others) Better', route: 'people' }),
-  Object.freeze({ key: 'life', title: 'How to Handle Life’s Big Questions', route: 'life' })
+  Object.freeze({ key: 'life', title: 'How to Handle Life’s Big Questions', route: 'life' }),
+  Object.freeze({ key: 'models', title: 'Ways of Seeing', route: 'models' })
 ]);
 
 /** Chart families: the shared Decision Book families. */
@@ -49,7 +53,14 @@ export const CATALOGUE = Object.freeze([
   r('life', 'rb_occam', 'Occam’s Razor', 'list', 'worksheet', { seeAlso: [], pairsWell: ['five_whys'], reuse: null, merged: [] }),
   r('life', 'rb_korzybski', 'Korzybski’s Law', 'list', 'worksheet', { seeAlso: [], pairsWell: ['perspective_shift', 'double_loop'], reuse: null, merged: ['rb_box', 'rb_brach', 'rb_instrument'] }),
   r('life', 'rb_one_step', 'The One-Step-Closer Rule', 'list', 'worksheet', { seeAlso: [], pairsWell: ['rb_wiio'], reuse: 'dm_conflict', merged: [] }),
-  r('life', 'rb_ten_ten_ten', 'The 10-10-10 Method', 'path', 'worksheet', { seeAlso: [], pairsWell: ['dm_consequences'], reuse: null, merged: [] })
+  r('life', 'rb_ten_ten_ten', 'The 10-10-10 Method', 'path', 'worksheet', { seeAlso: [], pairsWell: ['dm_consequences'], reuse: null, merged: [] }),
+  // Ways of Seeing: ours, in our own words (tools/models.mjs).
+  r('models', 'rb_first_principles', 'First Principles', 'list', 'worksheet', { seeAlso: [], pairsWell: ['problem_reduction', 'rb_occam'], reuse: null, merged: [] }),
+  r('models', 'rb_second_order', 'Second-Order Thinking', 'path', 'worksheet', { seeAlso: [], pairsWell: ['causal_map', 'rb_unintended'], reuse: null, merged: [] }),
+  r('models', 'rb_hanlon', 'Hanlon’s Razor', 'list', 'lens', { seeAlso: [], pairsWell: ['cb_ladder', 'rb_occam'], reuse: null, merged: [] }),
+  r('models', 'rb_circle_competence', 'Circle of Competence', 'list', 'worksheet', { seeAlso: [], pairsWell: ['gt_circle_of_competence', 'dm_johari'], reuse: null, merged: [] }),
+  r('models', 'rb_probabilistic', 'Probabilistic Thinking', 'list', 'worksheet', { seeAlso: [], pairsWell: ['dm_record', 'dm_black_swan'], reuse: null, merged: [] }),
+  r('models', 'rb_scout', 'Scout Mindset', 'list', 'worksheet', { seeAlso: [], pairsWell: ['rb_korzybski', 'cm_listening'], reuse: null, merged: [] })
 ]);
 
 const BY_ID = new Map(CATALOGUE.map((e) => [e.id, e]));
