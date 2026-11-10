@@ -2,7 +2,7 @@
 
 Uses Tracey Tokuhama-Espinosa's Mind, Brain and Education (MBE) science, the evidence where psychology, education and neuroscience agree, in the Teaching Hub. Her principles are not added as one more framework. They sit underneath the tools that already exist and point out when a lesson, unit or class is missing a condition for learning.
 
-This is a concept doc, not a build brief. Nothing is built from it until Adam names a slice.
+This started as a concept doc. On 10 Nov 2026 Adam asked for all three ideas to be built; see **Built** below for what shipped and the defaults chosen for the open questions.
 
 ## Adam's asks (10 Nov 2026)
 
@@ -97,6 +97,39 @@ Check her exact wording and numbering against the books before any of this text 
 | Lens levels | `schemas/lens.ts` | Where the suggestion lands |
 | Timetable sessions | `schedule/timetable.d.ts` (`TimetableSession`: date, period, times) | Late-day and end-of-week notes |
 
+## Built (10 Nov 2026)
+
+All three ideas, in `apps/teaching/src/conditions/`:
+
+| Piece | File | Where it shows |
+|---|---|---|
+| Lesson conditions (pure) | `lesson-conditions.ts` | |
+| Spacing plan (pure) | `spacing.ts` | |
+| Readiness groups and timetable notes (pure) | `readiness.ts` | |
+| Conditions panel | `conditions-panel.ts`, `conditions.css` | **Conditions** chip in the lesson's meta row, beside Feedback; the panel opens above the canvas |
+| Unit spacing list | `spacing-panel.ts` | Under the coverage panel on the unit map (teacher view) |
+| Page wiring | `page-context.ts` | Lesson editor passes the unit's schedule, classes and markbook loader |
+
+- **Suggest a block** and **Suggest retrieval** send a message to the lesson agent through a new `ask()` on the AI panel. The answer arrives as a normal proposal, so nothing changes without Accept.
+- **Not for this lesson** saves to a new teacher-only lesson field, `conditions_off`. It is not copied to published lessons.
+- The lesson panel's **Bring back** section lists the dot points the unit's spacing plan places in this lesson.
+- **Readiness** loads a class's markbook only when the teacher taps **Groups for …**. Names show only on the teacher page.
+- Tests: `apps/teaching/tests/unit/learning-conditions.test.ts`.
+
+### Defaults chosen for the open questions
+
+| Question | Default in the build | Where to change it |
+|---|---|---|
+| Chunking threshold | More than 3 content blocks in a row, or more than 600 words, with no check between | `MAX_CONTENT_RUN`, `MAX_CONTENT_WORDS` in `lesson-conditions.ts` |
+| Spacing gaps | Next dated lesson, the first lesson 7+ days on, the last teaching lesson before the next assessment. Teaching a point again 3+ days later counts as spaced | `WEEK_GAP_DAYS`, `SPACED_AFTER_DAYS` in `spacing.ts` |
+| Spacing scope | Within one unit, using the class with the most dated lessons | `unitSchedule` in `teacher/network-context.ts` |
+| Weak and secure | The markbook's own bands (`BANDS` in `evidence/constants.ts`): below 50% support, 80%+ extend, at least 2 marked items | `readiness.ts` |
+| Tiring slots | Starts at 13:30 or later, starts 12:45–13:29 (after lunch), or a Friday | `LATE_START`, `AFTER_LUNCH` in `readiness.ts` |
+| Mobile | The panel stacks into one column on its own width (container query), so it also works beside the open chat | `conditions.css` |
+| Quiz and assessment lessons | The lesson conditions do not apply; spacing and readiness still show | `conditionsApply` |
+
+Still open: whether the agent grounding text (evidence levels, neuromyth guard) should follow, and whether retrieval suggestions should rank by the class's weakest points.
+
 ## Must not
 
 - No score, ranking or "MBE compliance" number for a lesson, unit or teacher.
@@ -117,4 +150,5 @@ Check her exact wording and numbering against the books before any of this text 
 
 ## History
 
+- 10 Nov 2026: built all three ideas (see Built); defaults recorded for the open questions.
 - 10 Nov 2026: created from a Claude Code conversation about Tokuhama-Espinosa's MBE principles. Adam kept the lesson check, unit spacing and readiness ideas, and set aside the agent grounding text.

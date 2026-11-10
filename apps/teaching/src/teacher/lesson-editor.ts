@@ -6,6 +6,7 @@ import { navigate } from '@/app/router';
 import { withAppBase } from '@/app/base-path';
 import { apiGet, apiPatch, apiPost, ApiClientError } from '@/api/client';
 import { subjectUsesAlignment } from '@/alignment/model';
+import { conditionsContext } from '@/conditions/page-context';
 import { isCurriculumLinesV2 } from '@/schemas/block';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
@@ -282,6 +283,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.focus_pieces) lesson.focus_pieces = next.focus_pieces;
       if (next.focus_skills) lesson.focus_skills = next.focus_skills;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
+      // Saves merge into the stored lesson, so clearing sends an empty list.
+      if (next.conditions_off) lesson.conditions_off = next.conditions_off;
       if (next.end_questions) lesson.end_questions = next.end_questions;
       if (next.quiz) {
         lesson.quiz = next.quiz;
@@ -760,6 +763,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         setChatShelved(false);
         void aiPanel?.followOpenJob();
       },
+      // Learning conditions: Suggest goes to the lesson agent as the teacher's message, so changes stay proposals.
+      conditions: conditionsContext(curriculum, curriculum.units.find((entry) => entry.id === lesson.unit_id), lesson.id, (message) => {
+        setChatShelved(false);
+        aiPanel?.ask(message);
+      }),
       onSelect: (blockId) => {
         selectedBlockId = blockId;
         syncAiSelection();

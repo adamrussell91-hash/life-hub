@@ -33,6 +33,8 @@ export interface AiPanelHandle {
   isWorking(): boolean;
   /** Picks up a job started outside the chat (a page tool) and shows it like a chat turn. */
   followOpenJob(): Promise<void>;
+  /** Sends a page tool's message (e.g. Learning conditions' Suggest a block) as the teacher's turn; while busy, leaves it in the box. */
+  ask(text: string): void;
   dispose(): void;
 }
 
@@ -996,6 +998,14 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     },
     followOpenJob() {
       return busy ? Promise.resolve() : resumeOpenJob();
+    },
+    ask(text) {
+      if (busy) {
+        input.value = text;
+        input.focus();
+        return;
+      }
+      void sendMessage(text);
     },
     dispose() {
       abort?.abort();

@@ -7887,6 +7887,8 @@ var LessonSchema = z21.object({
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
   feedback_off: z21.boolean().optional(),
+  /** Learning conditions the teacher set aside for this lesson (src/conditions). Teacher-only. */
+  conditions_off: z21.array(z21.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
   end_questions: z21.object({
     on: z21.boolean().optional(),
