@@ -189,20 +189,31 @@ function modelCheck(): HTMLElement {
   return box;
 }
 
+/**
+ * Every shelf in catalogue order: the book's four parts (each a placement group), then Ways of
+ * Seeing, our own section, which is not a part of life a session is placed in.
+ */
+function shelves(): { key: string; id: string; label: string; title: string; ours: boolean }[] {
+  return SECTIONS.map((s) => {
+    const group = GROUPS.find((g) => g.section === s.key);
+    return { key: s.key, id: group?.id ?? s.key, label: group?.label ?? s.title, title: s.title, ours: !group };
+  });
+}
+
 /** One line per group: what its rules are for, in our words. */
 function groupShelves(onStart: (rule: string) => void): HTMLElement {
   const offered = new Set(shelfTools());
   const wrap = el('div', 'rb-sections');
-  GROUPS.forEach((group, k) => {
-    const s = SECTIONS.find((item) => item.key === group.section)!;
+  shelves().forEach((group, k) => {
+    const s = { key: group.key, title: group.title };
     const entries = CATALOGUE.filter((e) => e.section === s.key && offered.has(e.id));
     const box = el('details', 'rb-sect') as HTMLDetailsElement;
     box.open = true;
     const summary = el('summary', 'rb-sect__head');
     const mark = el('span', 'rb-sect__mark');
-    mark.append(sectionEmblem(s.key), el('span', 'rb-sect__stn', `Part ${k + 1}`));
+    mark.append(sectionEmblem(s.key), el('span', 'rb-sect__stn', group.ours ? 'Ours' : `Part ${k + 1}`));
     const text = el('span', 'rb-sect__text');
-    text.append(el('span', 'rb-sect__title', s.title), el('span', 'rb-sect__line', `${groupLine(group.id)} ${entries.length} rules.`));
+    text.append(el('span', 'rb-sect__title', s.title), el('span', 'rb-sect__line', `${groupLine(group.id)} ${entries.length} ${group.ours ? 'models' : 'rules'}.`));
     summary.append(mark, text);
     const shelf = el('ul', 'ps-shelf rb-shelf');
     for (const e of entries) {
@@ -257,7 +268,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
     section('Your work', sessions.length ? 'Each badge is the rule in use, or the book until one is chosen.' : 'Nothing yet. Start with the moment you keep going over.', list),
     section('How a session builds', 'One rule per session, tried as an experiment. The coach chooses from the book; you can always pick from the shelf instead.', buildSteps()),
     section('Two checks, every time', 'Rules of thumb are lenses, never laws. These two questions run through every session.', modelCheck()),
-    section('The four parts', 'The book’s four parts. Start from any rule to open a session already on it.', groupShelves((rule) => {
+    section('The shelves', 'The book’s four parts, then Ways of Seeing: six general models of our own. Start from any one to open a session already on it.', groupShelves((rule) => {
       start.startFrom(rule);
       toStart();
     }))
@@ -293,8 +304,8 @@ function createShelf(onPick: (rule: string) => void) {
   const summary = el('summary', 'rb-session-shelf__head', 'Pick a rule from the shelf');
   const offered = new Set(shelfTools());
   const body = el('div', 'rb-session-shelf__body');
-  for (const group of GROUPS) {
-    const s = SECTIONS.find((item) => item.key === group.section)!;
+  for (const group of shelves()) {
+    const s = { key: group.key };
     const wrap = el('div', 'rb-session-shelf__group');
     wrap.dataset.group = group.id;
     const list = el('ul', 'rb-session-shelf__list');

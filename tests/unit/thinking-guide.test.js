@@ -2,7 +2,8 @@
 // The guide with a mocked model: triage (start, likely, alternative; one question at most; map
 // fallback), check-ins (carry on by default, suggest only from the shortlist and never a declined
 // option, hand over only from a detour, digest rewritten at `returned`), timeouts and bad JSON
-// fall back quietly, spend logged per call, and the API. Invented situations only.
+// fall back quietly, spend logged per call, snare cautions at two joints, and the API. Invented
+// situations only.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
@@ -130,6 +131,57 @@ test('check-in at returned rewrites the digest in the same write; failures carry
   assert.equal(after.revision, 1);
   assert.deepEqual(await guide.checkIn({ threadId: t.id, joint: 'step_done', sessionId: 'home-1' }), { verdict: 'carry_on', fallback: true });
   assert.deepEqual(await guide.checkIn({ threadId: t.id, joint: 'step_done', sessionId: 'home-1' }), { verdict: 'carry_on', fallback: true });
+});
+
+const SUNK = { title: 'Weigh', text: 'We have already spent two years on the pottery course, so we cannot stop now.' };
+
+test('caution: kept for a snare that was sent, with title and check from the data, never in the route', async () => {
+  const { guide, threads, prompts } = setup([{ verdict: 'carry_on', caution: { snareId: 'sn_sunk_cost', line: 'Two years already spent is carrying the case for staying.' } }]);
+  const t = await seedThread(threads);
+  const out = await guide.checkIn({ threadId: t.id, joint: 'before_commit', sessionId: 'home-1', stepId: 'weigh', latestStep: SUNK });
+  assert.deepEqual(out, {
+    verdict: 'carry_on',
+    caution: { snareId: 'sn_sunk_cost', title: 'Sunk cost', line: 'Two years already spent is carrying the case for staying.', check: 'If I were starting today, with nothing spent, would I choose this?' }
+  });
+  assert.match(prompts[0].user, /SNARES TO WATCH:\n- sn_sunk_cost \| Sunk cost \| You keep going/);
+  assert.match(prompts[0].user, /"caution": \{"snareId"/);
+  assert.equal((await threads.get('me', t.id)).route.length, 0, 'a caution is not recorded');
+});
+
+test('caution: rides alongside a suggestion; an unknown or unsent snare is dropped; none is fine', async () => {
+  const { guide, threads } = setup([
+    { verdict: 'suggest', optionId: 'tool:rules-book', reason: 'A rule of thumb may show it.', why: 'Read the moment first.', caution: { snareId: 'sn_sunk_cost', line: 'The years spent lead the case.' } },
+    { verdict: 'carry_on', caution: { snareId: 'sn_made_up', line: 'x' } },
+    { verdict: 'carry_on', caution: { snareId: 'sn_gamblers', line: 'Not in the list sent.' } },
+    { verdict: 'carry_on', caution: { snareId: 'sn_sunk_cost', line: '  ' } },
+    { verdict: 'carry_on' }
+  ]);
+  const t = await seedThread(threads);
+  const first = await guide.checkIn({ threadId: t.id, joint: 'before_commit', sessionId: 'home-1', stepId: 'weigh', latestStep: SUNK });
+  assert.equal(first.verdict, 'suggest');
+  assert.equal(first.caution.snareId, 'sn_sunk_cost');
+  assert.deepEqual((await threads.get('me', t.id)).route.map((r) => Object.keys(r).includes('caution')), [false]);
+  for (let i = 0; i < 4; i += 1) {
+    assert.deepEqual(await guide.checkIn({ threadId: t.id, joint: 'before_commit', sessionId: 'home-1', stepId: 'other', latestStep: SUNK }), { verdict: 'carry_on' });
+  }
+});
+
+test('caution: only at before_commit and returned; other joints send no snares and keep none', async () => {
+  const caution = { snareId: 'sn_sunk_cost', line: 'The years spent lead the case.' };
+  const { guide, threads, prompts } = setup([
+    { verdict: 'carry_on', caution },
+    { verdict: 'carry_on', caution },
+    { verdict: 'carry_on', caution }
+  ]);
+  const t = await seedThread(threads);
+  assert.deepEqual(await guide.checkIn({ threadId: t.id, joint: 'step_done', sessionId: 'home-1', latestStep: SUNK }), { verdict: 'carry_on' });
+  assert.doesNotMatch(prompts[0].user, /SNARES TO WATCH/);
+  assert.deepEqual(await guide.checkIn({ threadId: t.id, joint: 'framed', sessionId: 'home-1', latestStep: SUNK }), { verdict: 'carry_on' });
+  assert.doesNotMatch(prompts[1].user, /SNARES TO WATCH/);
+  const back = await guide.checkIn({ threadId: t.id, joint: 'returned', sessionId: 'home-1', latestStep: SUNK });
+  assert.equal(back.caution.title, 'Sunk cost');
+  assert.match(prompts[2].user, /SNARES TO WATCH/);
+  assert.ok((prompts[2].user.match(/^- sn_/gm) ?? []).length <= 6, 'six snares at most');
 });
 
 test('spend: each call is logged per Sydney month in A$', async () => {

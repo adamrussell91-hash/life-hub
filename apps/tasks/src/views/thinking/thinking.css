@@ -112,3 +112,13 @@
   .tt-tl__item--detour { margin-left: 10px; padding-left: 8px; }
   .tt-card__actions .btn, .tt-card__rest .btn { flex: 1 1 auto; }
 }
+
+.tt-door__browse { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; color: var(--accent, var(--navy)); font-size: var(--text-sm, 0.8125rem); }
+
+/* A snare caution: one quiet line under (or instead of) a check-in card. */
+.tt-caution { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; min-width: 0; padding-top: 8px; border-top: 1px dashed var(--line); font-size: var(--text-sm, 0.8125rem); color: var(--ink-muted, var(--muted)); }
+.tt-caution__text { margin: 0; grid-column: 1; overflow-wrap: anywhere; }
+.tt-caution__ask { grid-column: 1; }
+.tt-caution__ask summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.tt-caution__ask p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.tt-caution__dismiss { grid-column: 2; grid-row: 1 / span 2; }

@@ -12,8 +12,8 @@ const put = (run, slot, extra = {}) => placeNode(run, { id: `n${(n += 1)}`, slot
 const idOf = (run, slot) => run.nodes.find((x) => x.slot === slot).id;
 const link = (run, from, to, kind) => addEdge(run, { from: idOf(run, from), to: idOf(run, to), kind });
 
-test('analyse step lists its six tools in order', () => {
-  assert.deepEqual(toolsForBookStep('analyse'), ['causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement']);
+test('analyse step lists its seven tools in order', () => {
+  assert.deepEqual(toolsForBookStep('analyse'), ['causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'assumptions_map']);
 });
 
 test('causal map: problem first; causes and influences; links only toward causes or the problem; complete when every cause leads somewhere', () => {

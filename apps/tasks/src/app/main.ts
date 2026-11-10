@@ -177,6 +177,11 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       problemSolverUnmount = think.unmountThinkView;
       return think.renderThinkView(canvas);
     }
+    case 'think-library': {
+      const library = await import('@/views/thinking/library');
+      problemSolverUnmount = library.unmountLibraryView;
+      return library.renderLibraryView(canvas);
+    }
     case 'problem-solver': {
       const problemSolver = await import('@/views/problem-solver/view');
       problemSolverUnmount = problemSolver.unmountProblemSolverView;

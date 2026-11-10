@@ -8,7 +8,7 @@ import { loadProtocolCosts } from '../../../../../packages/protocol-view/cost.mj
 import { mountProtocolDetour, runLabel, timeEstimate, witnessDraft } from './protocol-detour';
 import { guideApi, threadsApi } from './api';
 import { isProtocolOption, modeLabel, option, optionLabel, protocolName, toolName } from './map';
-import type { Joint, LatestStep, ProtocolDraft, Thread, Verdict } from './types';
+import type { Caution, Joint, LatestStep, ProtocolDraft, Thread, Verdict } from './types';
 
 export type JointContext = {
   threadId: string;
@@ -300,6 +300,38 @@ export function endCard(ctx: JointContext, verdict: Verdict | null): HTMLElement
 }
 
 /**
+ * One quiet, dismissible line when the guide saw a snare in the work: "Watch for: {title}." and
+ * what looks like it, with the check folded under "Ask yourself". It never blocks anything.
+ */
+export function cautionLine(caution: Caution): HTMLElement {
+  const box = el('aside', 'tt-caution');
+  box.setAttribute('aria-label', 'A caution');
+  const text = el('p', 'tt-caution__text');
+  text.append(el('strong', '', `Watch for: ${caution.title}.`), document.createTextNode(` ${caution.line}`));
+  const ask = el('details', 'tt-caution__ask');
+  ask.append(el('summary', '', 'Ask yourself'), el('p', '', caution.check));
+  const dismiss = button('Dismiss', 'ghost', () => box.remove());
+  dismiss.classList.add('tt-caution__dismiss');
+  dismiss.setAttribute('aria-label', `Dismiss the caution about ${caution.title}`);
+  box.append(text, ask, dismiss);
+  return box;
+}
+
+/** Add the caution line under the card on screen, or alone when a carry-on shows no card. */
+function showCaution(host: HTMLElement | null, caution: Caution | undefined): void {
+  if (!caution) return;
+  const target = host ?? slot;
+  if (!target) return;
+  const line = cautionLine(caution);
+  if (current && current.host === target) current.card.append(line);
+  else {
+    const card = el('section', 'tt-card tt-card--quiet');
+    card.append(line);
+    show(host, card);
+  }
+}
+
+/**
  * Ask the guide at a joint and show what it says. Resolves to the verdict, or null when the
  * check failed. `carry_on` shows nothing (the strip ticks); `suggest` and `hand_over` show a
  * card; `recorded` always shows the end card.
@@ -325,6 +357,7 @@ export async function fireJoint(options: FireOptions): Promise<Verdict | null> {
     show(host, endCard(ctx, verdict));
     return verdict;
   }
+  const caution = verdict.caution;
   if (verdict.verdict === 'suggest' && verdict.optionId) {
     show(host, suggestionCard(ctx, { optionId: verdict.optionId, reason: verdict.reason, why: verdict.why }));
   } else if (verdict.verdict === 'hand_over') {
@@ -333,9 +366,13 @@ export async function fireJoint(options: FireOptions): Promise<Verdict | null> {
     const card = el('section', 'tt-card tt-card--quiet');
     card.append(el('p', 'tt-card__reason', 'Nothing to change. Carry on.'));
     show(host, card);
-    setTimeout(() => {
-      if (current?.card === card) clearCard();
-    }, 4000);
+    // A caution keeps the card until it is dismissed.
+    if (!caution) {
+      setTimeout(() => {
+        if (current?.card === card) clearCard();
+      }, 4000);
+    }
   }
+  showCaution(host, caution);
   return verdict;
 }

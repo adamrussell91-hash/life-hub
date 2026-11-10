@@ -127,7 +127,8 @@ const GROUP_LINES: Record<string, string> = {
   workplace: 'Time, deadlines, meetings, teams and the commitments you take on.',
   change: 'A change, an idea or a new way of working, and what it might set off.',
   people: 'Yourself, a colleague or a manager, and how you read each other.',
-  life: 'A bigger choice, or an explanation that has set harder than the facts.'
+  life: 'A bigger choice, or an explanation that has set harder than the facts.',
+  models: 'General ways of seeing, useful anywhere: ours, not the book’s.'
 };
 
 export type GroupsView = { el: HTMLElement; update(session: PsSession): void };

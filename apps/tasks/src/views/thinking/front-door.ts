@@ -55,7 +55,9 @@ export async function renderFrontDoor(canvas: HTMLElement): Promise<void> {
   row.append(go);
   const result = el('div', 'tt-door__result');
   result.setAttribute('aria-live', 'polite');
-  form.append(box, status, row);
+  const browse = el('a', 'tt-door__browse', 'Browse all tools') as HTMLAnchorElement;
+  browse.href = '#/think-library';
+  form.append(box, status, row, browse);
 
   const spend = el('p', 'tt-door__spend');
   page.append(form, result, threadsHost, spend);

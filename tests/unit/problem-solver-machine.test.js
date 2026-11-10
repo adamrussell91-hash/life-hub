@@ -27,7 +27,7 @@ test('registry lists every tool in order: the toolkit, Decision Maker’s models
   const rest = TOOL_IDS.slice(0, -books - gear.length);
   assert.deepEqual(rest.slice(-Object.keys(DECISION_TOOLS).length - 1, -1), Object.keys(DECISION_TOOLS));
   assert.equal(rest.at(-1), 'dm_record');
-  assert.deepEqual(TOOL_IDS.filter((id) => !/^(dm|gt|rb|ch|cb|cm)_/.test(id)), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management']);
+  assert.deepEqual(TOOL_IDS.filter((id) => !/^(dm|gt|rb|ch|cb|cm)_/.test(id)), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management', 'impact_effort', 'stakeholder_map', 'assumptions_map', 'rose_thorn_bud']);
   assert.throws(() => toolDef('nope'), /Unknown tool/);
 });
 

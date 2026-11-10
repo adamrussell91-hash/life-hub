@@ -1,7 +1,7 @@
 // tests/unit/rules-book-catalogue.test.js
 // The Rules Book's catalogue: the book's four parts and its 30 kept entries (11, 7, 7 and 5),
-// every link resolving, the two variants naming real tools, the glyph set matching, and the
-// group placement parser.
+// then Ways of Seeing (our six models), every link resolving, the two variants naming real
+// tools, the glyph set matching, and the group placement parser.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
@@ -9,17 +9,27 @@ import { CATALOGUE, SECTIONS, entriesInSection, entry } from '../../packages/rul
 import { GROUPS, GROUP_IDS, groupSections, parseGroups } from '../../packages/rules-book/route.mjs';
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 
-test('four parts in the book’s order, each with a route id', () => {
-  assert.deepEqual(SECTIONS.map((s) => s.key), ['workplace', 'change', 'people', 'life']);
+test('four parts in the book’s order, then Ways of Seeing, each with a route id', () => {
+  assert.deepEqual(SECTIONS.map((s) => s.key), ['workplace', 'change', 'people', 'life', 'models']);
   for (const s of SECTIONS) assert.equal(s.route, s.key);
+  assert.equal(SECTIONS.at(-1).title, 'Ways of Seeing');
 });
 
-test('30 kept entries in groups of 11, 7, 7 and 5; ids unique and prefixed rb_', () => {
-  assert.equal(CATALOGUE.length, 30);
-  assert.equal(new Set(CATALOGUE.map((e) => e.id)).size, 30);
-  assert.deepEqual(SECTIONS.map((s) => entriesInSection(s.key).length), [11, 7, 7, 5]);
+test('36 entries in groups of 11, 7, 7, 5 and 6; ids unique and prefixed rb_', () => {
+  assert.equal(CATALOGUE.length, 36);
+  assert.equal(new Set(CATALOGUE.map((e) => e.id)).size, 36);
+  assert.deepEqual(SECTIONS.map((s) => entriesInSection(s.key).length), [11, 7, 7, 5, 6]);
   for (const e of CATALOGUE) assert.match(e.id, /^rb_[a-z_]+$/);
-  assert.equal(CATALOGUE.filter((e) => e.tier === 'lens').length + CATALOGUE.filter((e) => e.tier === 'worksheet').length, 30);
+  assert.equal(CATALOGUE.filter((e) => e.tier === 'lens').length + CATALOGUE.filter((e) => e.tier === 'worksheet').length, 36);
+});
+
+test('Ways of Seeing: the six models, each a tool linking out to another thinking tool', () => {
+  const models = ['rb_first_principles', 'rb_second_order', 'rb_hanlon', 'rb_circle_competence', 'rb_probabilistic', 'rb_scout'];
+  assert.deepEqual(entriesInSection('models').map((e) => e.id), models);
+  for (const id of models) {
+    assert.ok(TOOLS[id], id);
+    assert.ok(entry(id).pairsWell.some((other) => !other.startsWith('rb_')), `${id} pairs outside Wayfinder`);
+  }
 });
 
 test('no page numbers or chapter ranges live in the catalogue', () => {
@@ -52,9 +62,9 @@ test('the two variants reuse Problem Solver’s Pareto and the Decision Book’s
   for (const e of CATALOGUE.filter((x) => !x.reuse)) assert.ok(families.has(e.family), `${e.id}: ${e.family}`);
 });
 
-test('the placement parser keeps up to two known groups, in the book’s order', () => {
+test('the placement parser keeps up to two known groups, in the book’s order; Ways of Seeing is not a placement', () => {
   assert.deepEqual(GROUP_IDS, ['workplace', 'change', 'people', 'life']);
-  assert.deepEqual([...GROUPS.map((g) => g.section)].sort(), SECTIONS.map((s) => s.key).sort());
+  assert.deepEqual([...GROUPS.map((g) => g.section)].sort(), SECTIONS.filter((s) => s.key !== 'models').map((s) => s.key).sort());
   assert.deepEqual(parseGroups('people+workplace'), ['workplace', 'people']);
   assert.deepEqual(parseGroups('life, change and people'), ['change', 'people']);
   assert.deepEqual(parseGroups('nowhere'), []);
@@ -65,7 +75,7 @@ test('the placement parser keeps up to two known groups, in the book’s order',
 const dir = (sub) => new URL(`../../packages/rules-book/glyphs/${sub}/`, import.meta.url);
 const names = async (sub) => (await readdir(dir(sub))).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
 
-test('an emblem per entry (the two variants drawn for the Rules Book), four parts, three identity marks', async () => {
+test('an emblem per entry (the two variants drawn for the Rules Book), five sections, three identity marks', async () => {
   assert.deepEqual(await names('models'), CATALOGUE.map((e) => e.id).sort());
   assert.deepEqual(await names('sections'), SECTIONS.map((s) => s.key).sort());
   assert.deepEqual(await names('identity'), ['book-emblem', 'book-emblem-mono', 'wordmark']);

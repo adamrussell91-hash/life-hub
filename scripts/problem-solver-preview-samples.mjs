@@ -743,6 +743,51 @@ SAMPLES['eisenhower:next'] = {
   proposed: ['e3']
 };
 
+// Impact vs Effort: a small bakery choosing what to try before the busy season. Quick wins can
+// become tasks (one linked, one waiting on a proposal).
+SAMPLES.impact_effort = {
+  ...run('impact_effort', [
+    node('i1', 'item:1', 'Put a price board outside the front window.', 'Price board', { tag: 'quick_win' }),
+    node('i2', 'item:2', 'Offer a loyalty card on the till.', 'Loyalty card', { tag: 'quick_win' }),
+    node('i3', 'item:3', 'Start an online ordering page for weekend boxes.', 'Online ordering', { tag: 'big_bet' }),
+    node('i4', 'item:4', 'Rearrange the shelf of tins.', 'Rearrange tins', { tag: 'fill_in' }),
+    node('i5', 'item:5', 'Redesign the bags with a new logo.', 'New bag logo', { tag: 'drop' })
+  ]),
+  tasks: [{ nodeId: 'i1', taskId: 'task-sample-i1', status: 'open' }],
+  proposed: ['i2']
+};
+
+// Stakeholder map: a school fete committee, people by role.
+SAMPLES.stakeholder_map = run('stakeholder_map', [
+  node('s1', 'item:1', 'The principal signs off the use of the oval.', 'Principal', { tag: 'manage_closely' }),
+  node('s2', 'item:2', 'The council events officer approves road closures.', 'Events officer', { tag: 'keep_satisfied' }),
+  node('s3', 'item:3', 'Parent helpers who run the stalls.', 'Parent helpers', { tag: 'keep_informed' }),
+  node('s4', 'item:4', 'Neighbours on the street behind the school.', 'Neighbours', { tag: 'monitor' })
+]);
+
+// Assumptions map: a plan to start a walking group. "Test first" items can become tasks.
+SAMPLES.assumptions_map = {
+  ...run('assumptions_map', [
+    node('a1', 'item:1', 'Enough people are free on weekday mornings.', 'Free on mornings', { tag: 'test_first' }),
+    node('a2', 'item:2', 'The park path is open all year.', 'Path open', { tag: 'act_on' }),
+    node('a3', 'item:3', 'People will bring their own water.', 'Own water', { tag: 'watch' }),
+    node('a4', 'item:4', 'The local paper will list the group.', 'Paper listing', { tag: 'park' })
+  ]),
+  tasks: [],
+  proposed: ['a1']
+};
+
+// Rose, Thorn, Bud: a look back at a term of a book club.
+SAMPLES.rose_thorn_bud = {
+  ...run('rose_thorn_bud', [
+    node('r1', 'item:1', 'Members arrive having read the chapter.', 'Chapters read', { tag: 'rose' }),
+    node('r2', 'item:2', 'Meetings run over time.', 'Running over', { tag: 'thorn' }),
+    node('r3', 'item:3', 'A short reading by a member at the start could set the tone.', 'Opening reading', { tag: 'bud' })
+  ]),
+  tasks: [],
+  proposed: []
+};
+
 // After action review: a community garden's first seed swap, reviewed the week after. The swap
 // ran out of tables and seed packets ran short by midday; the learning is the longest answer.
 // One contested node. after_action_review:next shortens what was learned, so the gauge morphs.

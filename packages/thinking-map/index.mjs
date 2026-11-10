@@ -5,7 +5,8 @@
 // data, no AI. The guide may only choose from `shortlist`.
 //
 // Option ids: `tool:<toolId>`, `protocol:<protocolId>`, `ps:<modelId>`, and every catalogue
-// model or chapter under its own id (`dm_record`-style ids are never renamed).
+// model or chapter under its own id (`dm_record`-style ids are never renamed). Every option has a
+// family (families.mjs; null for tool-level options). Snares (snares.mjs) are not options.
 import { MODELS, MODEL_IDS } from '../problem-solver/models.mjs';
 import { TOOLS as PS_TOOLS } from '../problem-solver/tools/index.mjs';
 import { CATALOGUE as DECISION_CATALOGUE } from '../decision-book/catalogue.mjs';
@@ -21,8 +22,10 @@ import {
   SIGNAL_KEYWORDS, TOOL_SIGNALS, TOOL_WHEN
 } from './signals.mjs';
 import { NEW_LINKS } from './links.mjs';
+import { FAMILIES, familyOf } from './families.mjs';
+import { SNARES, getSnare, snaresFor } from './snares.mjs';
 
-export { NEW_LINKS };
+export { NEW_LINKS, FAMILIES, SNARES, getSnare, snaresFor };
 
 export const SIGNALS = Object.freeze([...SIGNAL_IDS]);
 
@@ -93,18 +96,28 @@ function build() {
   }
 
   const ids = new Set(raw.map((o) => o.id));
-  // A catalogue link to a Problem Solver toolkit tool (kanban, smart…) that is not itself an
-  // option goes to Problem Solver as a whole. Anything else unknown is kept, so mapProblems flags it.
-  const resolve = (target) => (ids.has(target) ? target : PS_TOOLS[target] ? 'tool:problem-solver' : target);
+  // A catalogue link to a registered tool that is not itself an option goes to its tool as a
+  // whole: a book's own tool (dm_record) to that book, a Problem Solver toolkit tool (kanban,
+  // smart…) to Problem Solver. Anything else unknown is kept, so mapProblems flags it.
+  const resolve = (target) => {
+    if (ids.has(target)) return target;
+    if (!PS_TOOLS[target]) return target;
+    const book = BOOK_PREFIX[String(target).slice(0, 3)];
+    return book ? `tool:${book}` : 'tool:problem-solver';
+  };
   const extra = new Map();
   for (const link of NEW_LINKS) extra.set(link.from, [...(extra.get(link.from) ?? []), link.to]);
 
   return raw.map(({ rawLinks, ...option }) => Object.freeze({
     ...option,
+    family: familyOf(option),
     signals: Object.freeze(uniq(option.signals)),
     links: Object.freeze(uniq([...rawLinks.map(resolve), ...(extra.get(option.id) ?? [])]).filter((to) => to !== option.id))
   }));
 }
+
+/** Id prefixes of the tools that were books, for links to a book's own tool. */
+const BOOK_PREFIX = Object.freeze({ dm_: 'decision-book', gt_: 'get-things-done', rb_: 'rules-book', ch_: 'change-book', cb_: 'collaboration-book', cm_: 'communication-book' });
 
 /** A model the registry has no `when` line for (should never happen; mapProblems flags it). */
 const ID_WHEN_FALLBACK = '';
@@ -169,10 +182,15 @@ export function signalsFromText(text) {
   return SIGNALS.filter((s) => SIGNAL_KEYWORDS[s]?.test(clean));
 }
 
+/** Protocols that need not counter any snare: they open or direct thinking rather than test it. */
+const SNARE_FREE_PROTOCOLS = Object.freeze(['fates', 'horizon']);
+
 /**
  * Integrity problems, [] when the map is sound: duplicate ids, a missing `when` or signal, an
  * unknown signal, a link to no option, a protocol reachable from fewer than two tools, a tool
- * with no links in or out.
+ * with no links in or out, an option without a family; and for snares, an id that is not unique
+ * or not `sn_`, a missing `when` or `check`, no valid signal, a counter that is not an option,
+ * and a protocol (other than Fates and Horizon) that counters no snare.
  */
 export function mapProblems() {
   const problems = [];
@@ -185,6 +203,26 @@ export function mapProblems() {
     if (!o.signals.length) problems.push(`${o.id} has no signal`);
     for (const s of o.signals) if (!SIGNALS.includes(s)) problems.push(`${o.id} has unknown signal ${s}`);
     for (const to of o.links) if (!getOption(to)) problems.push(`${o.id} links to unknown ${to}`);
+    if (o.kind === 'tool' ? o.family !== null : !FAMILIES.includes(o.family) || o.family === 'snare') problems.push(`${o.id} has family ${o.family}`);
+  }
+  const snareIds = new Set();
+  for (const snare of SNARES) {
+    if (snareIds.has(snare.id)) problems.push(`duplicate snare ${snare.id}`);
+    snareIds.add(snare.id);
+    if (!/^sn_[a-z_]+$/.test(snare.id)) problems.push(`snare ${snare.id} needs the sn_ prefix`);
+    if (seen.has(snare.id)) problems.push(`snare ${snare.id} is also an option`);
+    if (!snare.title || !String(snare.title).trim()) problems.push(`${snare.id} has no title`);
+    if (!snare.when || !String(snare.when).trim()) problems.push(`${snare.id} has no when line`);
+    if (!snare.check || !String(snare.check).trim()) problems.push(`${snare.id} has no check`);
+    if (!snare.signals.some((s) => SIGNALS.includes(s))) problems.push(`${snare.id} has no valid signal`);
+    for (const s of snare.signals) if (!SIGNALS.includes(s)) problems.push(`${snare.id} has unknown signal ${s}`);
+    if (!snare.counters.length || snare.counters.length > 3) problems.push(`${snare.id} has ${snare.counters.length} counters`);
+    for (const c of snare.counters) if (!getOption(c)) problems.push(`${snare.id} counters unknown ${c}`);
+    if (!(snare.tells instanceof RegExp)) problems.push(`${snare.id} has no tells`);
+  }
+  for (const p of PROTOCOLS) {
+    if (SNARE_FREE_PROTOCOLS.includes(p.id)) continue;
+    if (!SNARES.some((snare) => snare.counters.includes(`protocol:${p.id}`))) problems.push(`protocol:${p.id} counters no snare`);
   }
   for (const link of NEW_LINKS) {
     if (!getOption(link.from)) problems.push(`new link from unknown ${link.from}`);

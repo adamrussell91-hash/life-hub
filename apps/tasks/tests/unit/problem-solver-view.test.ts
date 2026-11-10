@@ -363,7 +363,7 @@ describe('canvas scores', () => {
 });
 
 describe('landing tool shelf', () => {
-  it('groups tools by book step, with the six Analyse tools together', async () => {
+  it('groups tools by book step, with the seven Analyse tools together', async () => {
     const { toolShelf } = await import('@/views/problem-solver/view');
     const shelf = toolShelf();
     const steps = [...shelf.querySelectorAll<HTMLElement>('[data-step]')].map((group) => group.dataset.step);
@@ -371,7 +371,7 @@ describe('landing tool shelf', () => {
     const analyse = shelf.querySelector('[data-step="analyse"]')!;
     expect(analyse.querySelector('h3')!.textContent).toBe('Analyse');
     const names = [...analyse.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
-    expect(names).toEqual(['Causal map', 'Perspective shift', 'Radial tree', 'Force field analysis', 'From…to exploration', 'Intent statement']);
+    expect(names).toEqual(['Causal map', 'Perspective shift', 'Radial tree', 'Force field analysis', 'From…to exploration', 'Intent statement', 'Assumptions map']);
     expect(shelf.querySelector('[data-step="contradiction"]')).toBeNull();
   });
 
@@ -385,17 +385,17 @@ describe('landing tool shelf', () => {
     expect(implement.querySelectorAll('.ps-emblem svg')).toHaveLength(4);
   });
 
-  it('shelves the three Improve tools, each with its own emblem', async () => {
+  it('shelves the four Improve tools, each with its own emblem', async () => {
     const { toolShelf } = await import('@/views/problem-solver/view');
     const { EMBLEM_SVG } = await import('../../../../packages/problem-solver/glyphs');
     const improve = toolShelf().querySelector('[data-step="improve"]')!;
     expect(improve.querySelector('h3')!.textContent).toBe('Improve');
     const names = [...improve.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
-    expect(names).toEqual(expect.arrayContaining(['After action review', 'Double-loop learning', 'Feedback matrix']));
-    expect(names).toHaveLength(3);
-    expect(improve.querySelectorAll('.ps-emblem svg')).toHaveLength(3);
-    const emblems = new Set([EMBLEM_SVG.after_action_review, EMBLEM_SVG.double_loop, EMBLEM_SVG.feedback_matrix, EMBLEM_SVG.eisenhower]);
-    expect(emblems.size).toBe(4);
+    expect(names).toEqual(expect.arrayContaining(['After action review', 'Double-loop learning', 'Feedback matrix', 'Rose, Thorn, Bud']));
+    expect(names).toHaveLength(4);
+    expect(improve.querySelectorAll('.ps-emblem svg')).toHaveLength(4);
+    const emblems = new Set([EMBLEM_SVG.after_action_review, EMBLEM_SVG.double_loop, EMBLEM_SVG.feedback_matrix, EMBLEM_SVG.rose_thorn_bud, EMBLEM_SVG.eisenhower]);
+    expect(emblems.size).toBe(5);
   });
 
   it('shelves the two Document tools, each with its own emblem', async () => {

@@ -31,6 +31,10 @@ import { doubleLoop } from './double-loop.mjs';
 import { feedbackMatrix } from './feedback-matrix.mjs';
 import { fiveCs } from './five-cs.mjs';
 import { knowledgeManagement } from './knowledge-management.mjs';
+import { impactEffort } from './impact-effort.mjs';
+import { stakeholderMap } from './stakeholder-map.mjs';
+import { assumptionsMap } from './assumptions-map.mjs';
+import { roseThornBud } from './rose-thorn-bud.mjs';
 import { DECISION_TOOLS } from '../../decision-book/models/index.mjs';
 import { dmRecord } from '../../decision-book/tools/record.mjs';
 import { GEAR_TOOLS } from '../../get-things-done/tools/index.mjs';
@@ -83,6 +87,10 @@ export const TOOLS = {
   feedback_matrix: feedbackMatrix,
   five_cs: fiveCs,
   knowledge_management: knowledgeManagement,
+  impact_effort: impactEffort,
+  stakeholder_map: stakeholderMap,
+  assumptions_map: assumptionsMap,
+  rose_thorn_bud: roseThornBud,
   // Decision Maker's models (step explore, not a toolkit step, so Problem Solver never lists them).
   ...DECISION_TOOLS,
   // Decision Maker's Decide step (step settle, likewise not a toolkit step).

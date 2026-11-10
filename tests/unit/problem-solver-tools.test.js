@@ -77,8 +77,8 @@ test('every toolkit tool names its book step and at least two failure modes', ()
   }
 });
 
-test('v1 tools are all Define tools', () => {
-  assert.deepEqual(toolsForBookStep('define'), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart']);
+test('Define tools are the v1 tools, then the stakeholder map', () => {
+  assert.deepEqual(toolsForBookStep('define'), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'stakeholder_map']);
 });
 
 test('contradiction: improving, worsening, then the statement', () => {

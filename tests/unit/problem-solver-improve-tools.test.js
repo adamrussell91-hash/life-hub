@@ -12,8 +12,8 @@ const put = (run, slot, extra = {}) => placeNode(run, { id: `v${(n += 1)}`, slot
 const idOf = (run, slot) => run.nodes.find((x) => x.slot === slot).id;
 const link = (run, from, to, kind) => addEdge(run, { from: idOf(run, from), to: idOf(run, to), kind });
 
-test('improve step lists its three tools in order', () => {
-  assert.deepEqual(toolsForBookStep('improve'), ['after_action_review', 'double_loop', 'feedback_matrix']);
+test('improve step lists its four tools in order', () => {
+  assert.deepEqual(toolsForBookStep('improve'), ['after_action_review', 'double_loop', 'feedback_matrix', 'rose_thorn_bud']);
 });
 
 test('after action review: four answers in order; the coach is told how full "learned" must be', () => {

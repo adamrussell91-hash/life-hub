@@ -6,6 +6,7 @@ import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs'
 import { workThrough } from '../../../../packages/decision-book/work-through.mjs';
 import { RULE_TOOLS } from '../../../../packages/rules-book/tools/index.mjs';
 import { createRulesChartForTool } from '../../../../packages/rules-book/render/charts';
+import { ENTRY_SVG } from '../../../../packages/rules-book/glyphs';
 import { actionOffer } from '../../../../packages/rules-book/record.mjs';
 import { applyCoachTurn, createSession, say } from '../../../../netlify/functions/_shared/problem-solver/session.mjs';
 import { scriptedCoach } from '../../../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
@@ -80,9 +81,15 @@ describe('landing', () => {
     expect(cards[1].querySelector('.ps-prob__meta')!.textContent).toContain('Question 2 of 3');
   });
 
-  it('shows the four parts in the book’s order, every Explore rule once, with the variants named', async () => {
+  it('shows the four parts in the book’s order, then Ways of Seeing, every Explore rule once, with the variants named', async () => {
     const page = await landing();
-    expect([...page.querySelectorAll('.rb-sect__line')].map((t) => t.textContent!.match(/(\d+) rules\.$/)![1])).toEqual(['11', '7', '7', '5']);
+    expect([...page.querySelectorAll('.rb-sect__line')].map((t) => t.textContent!.match(/(\d+) (?:rules|models)\.$/)![1])).toEqual(['11', '7', '7', '5', '6']);
+    expect([...page.querySelectorAll('.rb-sect__stn')].map((t) => t.textContent)).toEqual(['Part 1', 'Part 2', 'Part 3', 'Part 4', 'Ours']);
+    expect([...page.querySelectorAll('.rb-sect__title')].at(-1)!.textContent).toBe('Ways of Seeing');
+    for (const id of ['rb_first_principles', 'rb_second_order', 'rb_hanlon', 'rb_circle_competence', 'rb_probabilistic', 'rb_scout']) {
+      expect(ENTRY_SVG[id], id).toMatch(/^<svg/);
+      expect(page.querySelector(`[data-tool="${id}"] .rb-emblem svg`), id).not.toBeNull();
+    }
     const ids = [...page.querySelectorAll<HTMLElement>('.rb-shelf__tool')].map((item) => item.dataset.tool);
     expect(ids.sort()).toEqual([...toolsForPlanStep('rules_book', 'explore')].sort());
     expect(page.querySelector('[data-tool="rb_pareto"]')!.textContent).toContain('from Problem Solver');
