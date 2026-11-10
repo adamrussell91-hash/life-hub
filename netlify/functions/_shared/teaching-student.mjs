@@ -364,20 +364,25 @@ export function sanitizeBlocksDeep(blocks) {
     }
     if (block.block_type === 'explainer') {
       const rec = block.content?.recording;
+      const start = block.content?.board_start;
+      // Board elements can carry a link; keep it only when it is a safe one.
+      const safeElement = el => (el && typeof el === 'object' && el.link != null && !(typeof el.link === 'string' && isSafeUrl(el.link)) ? { ...el, link: null } : el);
+      const safeEvent = ev => {
+        if (ev?.kind === 'note') return { ...ev, html: sanitizeRichTextHtml(ev.html) };
+        if (ev?.kind === 'board') return { ...ev, elements: (Array.isArray(ev.elements) ? ev.elements : []).map(safeElement) };
+        if (ev?.kind === 'stroke' || ev?.kind === 'send') return { ...ev, element: safeElement(ev.element) };
+        return ev;
+      };
       return {
         ...block,
         content: {
           ...block.content,
           tray: (Array.isArray(block.content?.tray) ? block.content.tray : []).map(note => ({ ...note, html: sanitizeRichTextHtml(note?.html) })),
+          ...(start && typeof start === 'object'
+            ? { board_start: { ...start, elements: (Array.isArray(start.elements) ? start.elements : []).map(safeElement) } }
+            : {}),
           ...(rec && typeof rec === 'object'
-            ? {
-                recording: {
-                  ...rec,
-                  events: (Array.isArray(rec.events) ? rec.events : []).map(ev =>
-                    ev?.kind === 'note' ? { ...ev, html: sanitizeRichTextHtml(ev.html) } : ev
-                  )
-                }
-              }
+            ? { recording: { ...rec, events: (Array.isArray(rec.events) ? rec.events : []).map(safeEvent) } }
             : {})
         }
       };

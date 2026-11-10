@@ -11,6 +11,7 @@ import {
   EXPLAINER_MAX_SECONDS,
   type AnnotationColour,
   type ExplainerBlock,
+  type ExplainerBoardElement,
   type ExplainerClip,
   type ExplainerEvent,
   type ExplainerMarkStyle,
@@ -22,7 +23,7 @@ import { stateAt } from './fold';
 import { createPanes, formatClock } from './player';
 import { anchorFromWords } from './words';
 
-export type RecorderTool = ExplainerMarkStyle | 'note' | 'pointer' | 'erase';
+export type RecorderTool = ExplainerMarkStyle | 'note' | 'pointer' | 'erase' | 'send';
 
 export const TOOL_LABEL: Record<RecorderTool, string> = {
   highlight: 'Highlight',
@@ -32,7 +33,8 @@ export const TOOL_LABEL: Record<RecorderTool, string> = {
   strike: 'Cross out',
   note: 'Note',
   pointer: 'Pointer',
-  erase: 'Eraser'
+  erase: 'Eraser',
+  send: 'Send to board'
 };
 
 /** Highlighter colours from the annotation palette. */
@@ -82,15 +84,26 @@ export class TakeEvents {
 
   /** About 15 samples a second, and only when the word changes. */
   pointerSample(t: number, word: number): void {
+    this.sample('text', t, [word]);
+  }
+
+  /** The board pointer in scene coordinates, about 15 samples a second. */
+  boardSample(t: number, x: number, y: number): void {
+    this.sample('board', t, [x, y]);
+  }
+
+  private sample(pane: 'text' | 'board', t: number, at: number[]): void {
+    if (this.pointer && this.pointer.pane !== pane) this.endPointer(t);
     if (!this.pointer) {
-      this.pointer = { id: eventId('pointer'), t: round2(t), kind: 'pointer', pane: 'text', samples: [[0, word]] };
+      this.pointer = { id: eventId('pointer'), t: round2(t), kind: 'pointer', pane, samples: [[0, ...at] as [number, number]] };
       this.events.push(this.pointer);
       this.lastSampleAt = t;
       return;
     }
     const last = this.pointer.samples[this.pointer.samples.length - 1]!;
-    if (last[1] === word || t - this.lastSampleAt < 1 / 15) return;
-    this.pointer.samples.push([round2(t - this.pointer.t), word]);
+    const same = at.every((v, i) => last[i + 1] === v);
+    if (same || t - this.lastSampleAt < 1 / 15) return;
+    this.pointer.samples.push([round2(t - this.pointer.t), ...at] as [number, number]);
     this.lastSampleAt = t;
   }
 
@@ -98,11 +111,72 @@ export class TakeEvents {
     if (this.pointer && t !== undefined) {
       const last = this.pointer.samples[this.pointer.samples.length - 1]!;
       const off = round2(t - this.pointer.t);
-      // Hold the dot on its last word until the pointer is put down.
-      if (off > last[0]) this.pointer.samples.push([off, last[1]]);
+      // Hold the dot where it was until the pointer is put down.
+      if (off > last[0]) this.pointer.samples.push([off, ...last.slice(1)] as [number, number]);
     }
     this.pointer = null;
   }
+}
+
+/**
+ * Board changes become events. A pen stroke in progress is timed point by
+ * point; on release, a new stroke becomes a `stroke` event at the time it
+ * began, and every other change a `board` event now.
+ */
+export class BoardCapture {
+  private known = new Map<string, number>();
+  private strokes = new Map<string, { t0: number; offsets: number[] }>();
+
+  constructor(elements: readonly ExplainerBoardElement[]) {
+    this.reset(elements);
+  }
+
+  reset(elements: readonly ExplainerBoardElement[]): void {
+    this.known = new Map(elements.map((e) => [e.id, e.version ?? 0]));
+  }
+
+  /** Called on every board change while recording. */
+  onChange(newElement: { id: string; type: string; points?: unknown[] } | null | undefined, t: number): void {
+    if (!newElement || newElement.type !== 'freedraw' || !Array.isArray(newElement.points)) return;
+    let s = this.strokes.get(newElement.id);
+    if (!s) {
+      s = { t0: round2(t), offsets: [] };
+      this.strokes.set(newElement.id, s);
+    }
+    while (s.offsets.length < newElement.points.length) s.offsets.push(round2(Math.max(0, t - s.t0)));
+  }
+
+  /** Mark an element as already recorded (Send to board). */
+  note(el: ExplainerBoardElement): void {
+    this.known.set(el.id, el.version ?? 0);
+  }
+
+  /** Diff the board against what is already recorded. */
+  commit(elements: readonly ExplainerBoardElement[], t: number): ExplainerEvent[] {
+    const changed: ExplainerBoardElement[] = [];
+    const out: ExplainerEvent[] = [];
+    for (const el of elements) {
+      const seen = this.known.get(el.id);
+      if (seen === (el.version ?? 0)) continue;
+      const stroke = this.strokes.get(el.id);
+      const points = (el as { points?: unknown[] }).points;
+      if (stroke && seen === undefined && !el.isDeleted && el.type === 'freedraw' && Array.isArray(points)) {
+        const offsets = points.map((_, i) => stroke.offsets[Math.min(i, stroke.offsets.length - 1)] ?? 0);
+        out.push({ id: eventId('stroke'), t: stroke.t0, kind: 'stroke', element: plain(el), offsets });
+      } else if (!(seen === undefined && el.isDeleted)) {
+        changed.push(plain(el));
+      }
+      this.known.set(el.id, el.version ?? 0);
+      this.strokes.delete(el.id);
+    }
+    if (changed.length) out.push({ id: eventId('board'), t: round2(t), kind: 'board', elements: changed });
+    return out;
+  }
+}
+
+/** Excalidraw elements are frozen objects; store a plain copy. */
+function plain(el: ExplainerBoardElement): ExplainerBoardElement {
+  return JSON.parse(JSON.stringify(el)) as ExplainerBoardElement;
 }
 
 async function transcribe(jobId: string, duration_s: number, waitMs: number): Promise<ExplainerTranscript | null> {
@@ -145,7 +219,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   tools.setAttribute('aria-label', 'Recording tools');
   let tool: RecorderTool = 'highlight';
   let colour: AnnotationColour = 'sand';
-  const toolBtns = (Object.keys(TOOL_LABEL) as RecorderTool[]).map((key) => {
+  const TEXT_TOOLS: RecorderTool[] = ['highlight', 'underline', 'box', 'bracket', 'strike', 'note', 'erase'];
+  const offered = (Object.keys(TOOL_LABEL) as RecorderTool[]).filter((key) =>
+    content.layout === 'board' ? !TEXT_TOOLS.includes(key) && key !== 'send' : key !== 'send' || content.layout === 'both'
+  );
+  const toolBtns = offered.map((key) => {
     const b = btn(TOOL_LABEL[key], 'btn--ghost block-explainer__tool', () => pickTool(key));
     b.dataset.tool = key;
     tools.append(b);
@@ -157,7 +235,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   const swatchBtns = HIGHLIGHT_COLOURS.map((c) => {
     const b = btn('', 'block-explainer__swatch', () => {
       colour = c;
-      pickTool('highlight');
+      pickTool(layout === 'board' ? 'pointer' : 'highlight');
     });
     b.dataset.colour = c;
     b.classList.add(`block-annotation__ink--${c}`);
@@ -196,7 +274,36 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   typed.setAttribute('aria-label', 'Typed note');
   notePanel.append(el('p', 'block-explainer__hint', 'Pick a note, then select the words it belongs to.'), chips, typed);
 
-  const { el: panes, text } = createPanes(block);
+  const layout = content.layout ?? 'text';
+  const startState = stateAt(content, startAt);
+  let capture: BoardCapture | null = null;
+  const view = createPanes(block, {
+    editableBoard: true,
+    boardElements: startState.board,
+    onBoardChange: ({ appState }) => {
+      if (recording && capture) capture.onChange(appState.newElement, now());
+    }
+  });
+  const { el: panes, text } = view;
+  const board = view.board;
+  const commitBoard = () => {
+    if (!board || !capture || !started) return;
+    for (const ev of capture.commit(board.getElements(), now())) take.push(ev);
+  };
+  if (board) {
+    board.setInteractive(false);
+    // Excalidraw finishes an edit on release; diff the board just after.
+    board.el.addEventListener('pointerup', () => setTimeout(commitBoard, 0), true);
+    board.el.addEventListener('keyup', () => setTimeout(commitBoard, 0), true);
+    board.el.addEventListener('pointermove', (e) => {
+      if (!recording || tool !== 'pointer') return;
+      const at = board.sceneCoords(e.clientX, e.clientY);
+      if (at) take.boardSample(now(), at.x, at.y);
+    }, true);
+    board.el.addEventListener('pointerleave', () => {
+      if (tool === 'pointer' && recording) take.endPointer(now());
+    });
+  }
   const stage = el('div', 'block-explainer__stage block-explainer__stage--recording');
   stage.append(panes);
   const countdown = el('div', 'block-explainer__countdown');
@@ -222,6 +329,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   function pickTool(next: RecorderTool): void {
     if (tool === 'pointer' && next !== 'pointer') take.endPointer(recording ? now() : undefined);
     tool = next;
+    // The board's laser follows the pointer tool; board drawing uses Excalidraw's own tools.
+    view.board?.setTool(next === 'pointer' ? 'laser' : 'selection');
     for (const b of toolBtns) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
     for (const b of swatchBtns) b.setAttribute('aria-pressed', String(tool === 'highlight' && b.dataset.colour === colour));
     notePanel.hidden = tool !== 'note';
@@ -256,7 +365,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   function repaint(selection: [number, number] | null = null): void {
     const t = now();
     const shifted = take.events.map((ev) => ({ ...ev, t: ev.t + startAt }));
-    text.paint(stateAt({ recording: { status: 'draft', clips: [], duration_s: EXPLAINER_MAX_SECONDS, events: [...before, ...shifted] } }, startAt + t), { selection });
+    view.paint(stateAt({ board_start: content.board_start, recording: { status: 'draft', clips: [], duration_s: EXPLAINER_MAX_SECONDS, events: [...before, ...shifted] } }, startAt + t), { selection });
   }
 
   function openClip(): void {
@@ -333,6 +442,10 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
       if (disposed) return;
     }
     countdown.hidden = true;
+    if (board) {
+      capture = new BoardCapture(board.getElements());
+      board.setInteractive(true);
+    }
     openClip();
     holdBtn.hidden = false;
     stopBtn.hidden = false;
@@ -344,6 +457,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   async function hold(): Promise<void> {
     if (!recording) return;
     take.endPointer(now());
+    commitBoard();
+    board?.setInteractive(false);
     await closeClip();
     holdBtn.textContent = 'Resume';
     root.classList.remove('is-recording');
@@ -352,6 +467,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   async function resume(): Promise<void> {
     if (recording || !started || finishing) return;
+    board?.setInteractive(true);
     openClip();
     holdBtn.textContent = 'Pause';
     root.classList.add('is-recording');
@@ -362,6 +478,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     if (finishing) return;
     finishing = true;
     take.endPointer(recording ? now() : undefined);
+    if (recording) commitBoard();
+    board?.setInteractive(false);
     if (recording) await closeClip();
     window.clearTimeout(timer);
     for (const track of stream?.getTracks() ?? []) track.stop();
@@ -422,7 +540,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   // Marking the text with the pointer (mouse, pen or touch).
   let dragFrom: number | null = null;
   let dragTo: number | null = null;
-  panes.addEventListener('pointerdown', (e) => {
+  text.el.addEventListener('pointerdown', (e) => {
     if (!recording) return;
     const w = text.wordAtPoint(e.clientX, e.clientY);
     if (w == null) return;
@@ -439,13 +557,13 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     dragFrom = w;
     dragTo = w;
     try {
-      panes.setPointerCapture(e.pointerId);
+      text.el.setPointerCapture(e.pointerId);
     } catch {
       /* synthetic events */
     }
     repaint([w, w]);
   });
-  panes.addEventListener('pointermove', (e) => {
+  text.el.addEventListener('pointermove', (e) => {
     if (!recording) return;
     const w = text.wordAtPoint(e.clientX, e.clientY);
     if (tool === 'pointer') {
@@ -460,7 +578,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
       repaint([dragFrom, w]);
     }
   });
-  panes.addEventListener('pointerleave', () => {
+  text.el.addEventListener('pointerleave', () => {
     if (tool === 'pointer' && recording) take.endPointer(now());
   });
   const endDrag = () => {
@@ -480,13 +598,20 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
         take.push({ id: eventId('note'), t, kind: 'note', anchor, html: `<p>${escapeHtml(typedText)}</p>` });
         typed.value = '';
       } else flash('Pick a note or type one first.');
+    } else if (tool === 'send') {
+      const added = board?.addText(anchor.quote.exact);
+      if (added) {
+        const copy = JSON.parse(JSON.stringify(added)) as ExplainerBoardElement;
+        capture?.note(copy);
+        take.push({ id: eventId('send'), t, kind: 'send', anchor, element: copy });
+      }
     } else if (tool !== 'pointer' && tool !== 'erase') {
       take.push({ id: eventId('mark'), t, kind: 'mark', style: tool, ...(tool === 'highlight' ? { colour } : {}), anchor });
     }
     repaint();
   };
-  panes.addEventListener('pointerup', endDrag);
-  panes.addEventListener('pointercancel', endDrag);
+  text.el.addEventListener('pointerup', endDrag);
+  text.el.addEventListener('pointercancel', endDrag);
 
   requestAnimationFrame(() => repaint());
 
@@ -499,7 +624,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
       /* ignore */
     }
     for (const track of stream?.getTracks() ?? []) track.stop();
-    text.dispose();
+    view.dispose();
   }
 
   return { el: root, dispose };

@@ -2,13 +2,14 @@ import { renderBlock } from '@/blocks/render';
 import { createExplainerEditor } from '@/blocks/explainer';
 import { filterBlocksForStudent } from '@/blocks/visibility';
 import type { Block, ExplainerBlock } from '@/schemas/block';
-import { sampleExplainer } from './explainer-sample';
+import { sampleBoardExplainer, sampleExplainer } from './explainer-sample';
 import '../styles/app.css';
 
 /**
  * Explainer preview with an in-page fake server and a fake microphone (a
  * quiet tone), so record → upload → captions → timeline → play runs without
- * Netlify. ?view=editor (default), ?view=teacher or ?view=student. Invented text only.
+ * Netlify. ?view=editor (default), ?view=teacher or ?view=student. The sample has text
+ * and a board side by side; ?text=1 is the text-only sample. Invented text only.
  */
 
 /** A short quiet tone as a WAV, so the sample clips have real audio to play. */
@@ -81,7 +82,7 @@ if (navigator.mediaDevices) {
 
 const params = new URLSearchParams(location.search);
 const view = params.get('view') === 'student' ? 'student' : params.get('view') === 'teacher' ? 'teacher' : 'editor';
-let block: ExplainerBlock = sampleExplainer({ status: params.has('draft') ? 'draft' : 'published', urls: [toneUrl(22, 220), toneUrl(18, 330)] });
+let block: ExplainerBlock = (params.has('text') ? sampleExplainer : sampleBoardExplainer)({ status: params.has('draft') ? 'draft' : 'published', urls: [toneUrl(22, 220), toneUrl(18, 330)] });
 
 const mount = document.getElementById('mount')!;
 const nav = document.createElement('p');
@@ -93,7 +94,7 @@ const link = (v: string) => {
 nav.innerHTML = `<a href="${link('editor')}">Editor</a> · <a href="${link('teacher')}">Teacher</a> · <a href="${link('student')}">Student</a> · <a href="?view=editor&amp;blank=1">Blank editor</a>`;
 
 if (params.has('blank')) {
-  block = { ...block, content: { layout: 'text', tray: block.content.tray, text: block.content.text, title: 'A new explainer' } };
+  block = { ...block, content: { layout: block.content.layout, tray: block.content.tray, text: block.content.text, board_start: block.content.board_start, title: 'A new explainer' } };
 }
 
 if (view === 'editor') {
@@ -101,7 +102,7 @@ if (view === 'editor') {
   panel.style.cssText = 'font-size:11px;max-height:12rem;overflow:auto;background:#f4f4f4;padding:8px';
   const editor = createExplainerEditor(block, (next) => {
     block = next;
-    panel.textContent = JSON.stringify(next.content.recording?.events.map((e) => [e.t, e.kind, e.id]) ?? [], null, 0);
+    panel.textContent = JSON.stringify(next.content.recording?.events.map((e) => [e.t, e.kind, e.id, e.kind === 'board' ? e.elements.map((x) => `${x.type}:${x.id}`).join(' ') : '']) ?? [], null, 0);
   }, { lessonId: 'lesson_demo', countdownMs: 400, transcribeWaitMs: 3000 });
   mount.replaceChildren(nav, editor, panel);
 } else {

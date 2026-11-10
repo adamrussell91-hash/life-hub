@@ -3,6 +3,7 @@
  * re-recording from a point both produce a clip list; the player chains them.
  * Pure: no DOM.
  */
+import { partialStroke } from './fold';
 import { EXPLAINER_MAX_SECONDS, type ExplainerClip, type ExplainerEvent, type ExplainerRecording, type ExplainerTranscript } from '@/schemas/block';
 
 /** The clip playing at t and how far into it. Past the end: the last clip at its end. Empty list: index -1. */
@@ -30,11 +31,17 @@ function shiftEvent(ev: ExplainerEvent, by: number): ExplainerEvent {
   return { ...ev, t: round(ev.t + by) };
 }
 
-/** Pointer samples past t0 belong to the replaced part. */
-function trimEvent(ev: ExplainerEvent, t0: number): ExplainerEvent {
-  if (ev.kind !== 'pointer') return ev;
+/** Pointer samples and stroke points past t0 belong to the replaced part. */
+function trimEvent(ev: ExplainerEvent, t0: number): ExplainerEvent | null {
   const keep = t0 - ev.t;
-  return { ...ev, samples: ev.samples.filter((s) => s[0] <= keep) };
+  if (ev.kind === 'pointer') return { ...ev, samples: ev.samples.filter((s) => s[0] <= keep) };
+  if (ev.kind === 'stroke') {
+    const element = partialStroke(ev.element, ev.offsets, keep);
+    if (!element) return null;
+    const n = ((element as { points?: unknown[] }).points ?? []).length;
+    return { ...ev, element, offsets: ev.offsets.slice(0, n || ev.offsets.length) };
+  }
+  return ev;
 }
 
 const TIMING_RANK = { word: 0, segment: 1, estimated: 2 } as const;
@@ -69,7 +76,7 @@ export function spliceRecording(rec: ExplainerRecording, t0: number, take: Expla
   }
   for (const c of take.clips) clips.push({ ...c, start_s: round(c.start_s + at) });
   const events = [
-    ...rec.events.filter((ev) => ev.t <= at).map((ev) => trimEvent(ev, at)),
+    ...rec.events.filter((ev) => ev.t <= at).map((ev) => trimEvent(ev, at)).filter((ev): ev is ExplainerEvent => ev !== null),
     ...take.events.map((ev) => shiftEvent(ev, at))
   ];
   const duration_s = Math.min(EXPLAINER_MAX_SECONDS, round(at + take.duration_s));

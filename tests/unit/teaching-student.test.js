@@ -284,3 +284,12 @@ test('sanitizeBlocksDeep cleans explainer tray and note html', () => {
   assert.doesNotMatch(block.content.recording.events[0].html, /script/);
   assert.equal(block.content.recording.events[1].prompt, 'Think');
 });
+
+test('sanitizeBlocksDeep drops unsafe explainer board links and keeps board events for students', () => {
+  const block = explainerBlock('published');
+  block.content.board_start = { format: 'excalidraw', version: 1, elements: [{ id: 'b1', type: 'rectangle', link: 'javascript:alert(1)' }], appState: {}, files: {} };
+  block.content.recording.events.push({ id: 's1', t: 3, kind: 'stroke', element: { id: 'p1', type: 'freedraw', points: [[0, 0]], link: 'https://example.org' }, offsets: [0] });
+  const [clean] = sanitizeBlocksDeep(filterBlocksForStudent([block]));
+  assert.equal(clean.content.board_start.elements[0].link, null);
+  assert.equal(clean.content.recording.events.at(-1).element.link, 'https://example.org');
+});

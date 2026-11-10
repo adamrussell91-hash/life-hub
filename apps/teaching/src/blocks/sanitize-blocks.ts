@@ -1,7 +1,7 @@
-import { sanitizeRichTextHtml } from './sanitize';
+import { isSafeHref, sanitizeRichTextHtml } from './sanitize';
 import { sanitizeSvgMarkup } from './sanitize-svg';
 import { sanitizeAnnotationLineHtml } from './annotation-line-format';
-import type { AnnotationAnchor, Block } from '../schemas/block';
+import type { AnnotationAnchor, Block, ExplainerBoardElement, ExplainerEvent } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
@@ -12,6 +12,20 @@ function sanitizeAnchorNoteHtml(anchor: AnnotationAnchor): AnnotationAnchor {
     return { ...anchor, note_html: undefined };
   }
   return { ...anchor, note_html: sanitizeRichTextHtml(anchor.note_html) };
+}
+
+/** Board elements can carry a link; keep it only when it is a safe one. */
+function safeBoardElement(el: ExplainerBoardElement): ExplainerBoardElement {
+  const link = (el as { link?: unknown }).link;
+  if (link == null || (typeof link === 'string' && isSafeHref(link))) return el;
+  return { ...el, link: null };
+}
+
+function safeExplainerEvent(ev: ExplainerEvent): ExplainerEvent {
+  if (ev.kind === 'note') return { ...ev, html: sanitizeRichTextHtml(ev.html) };
+  if (ev.kind === 'board') return { ...ev, elements: ev.elements.map(safeBoardElement) };
+  if (ev.kind === 'stroke' || ev.kind === 'send') return { ...ev, element: safeBoardElement(ev.element) };
+  return ev;
 }
 
 export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
@@ -60,14 +74,14 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
     }
     if (block.block_type === 'explainer') {
       const rec = block.content.recording;
+      const start = block.content.board_start;
       return {
         ...block,
         content: {
           ...block.content,
           tray: block.content.tray.map((note) => ({ ...note, html: sanitizeRichTextHtml(note.html) })),
-          ...(rec
-            ? { recording: { ...rec, events: rec.events.map((ev) => (ev.kind === 'note' ? { ...ev, html: sanitizeRichTextHtml(ev.html) } : ev)) } }
-            : {})
+          ...(start ? { board_start: { ...start, elements: start.elements.map(safeBoardElement) } } : {}),
+          ...(rec ? { recording: { ...rec, events: rec.events.map(safeExplainerEvent) } } : {})
         }
       };
     }

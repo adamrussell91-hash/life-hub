@@ -7,6 +7,8 @@ import type { ExplainerBlock } from '@/schemas/block';
 import { clipAt } from './clips';
 import { nextPauseAfter, pauseTicks, stateAt, type PauseEvent } from './fold';
 import { createTextPane, type TextPane } from './text-pane';
+import { mountBoard, type BoardHandle } from './board-runtime';
+import type { ExplainerState } from './fold';
 
 export const SPEEDS = [1, 1.25, 1.5] as const;
 
@@ -40,21 +42,72 @@ function btn(label: string, cls: string, onClick: () => void): HTMLButtonElement
   return b;
 }
 
-/** The panes for the block's layout. Phase 1 has the text pane; phase 2 adds the board beside it. */
-export function createPanes(block: Pick<ExplainerBlock, 'content'>): { el: HTMLElement; text: TextPane } {
+export type Panes = {
+  el: HTMLElement;
+  text: TextPane;
+  /** The board, when the layout has one. */
+  board: BoardHandle | null;
+  /** Draw a state on both panes; the board only redraws when its picture changed. */
+  paint: (state: ExplainerState, opts?: { selection?: [number, number] | null }) => void;
+  dispose: () => void;
+};
+
+/** The panes for the block's layout: text, board, or both side by side. */
+export function createPanes(
+  block: Pick<ExplainerBlock, 'content'>,
+  opts: {
+    editableBoard?: boolean;
+    /** The board's first picture; default the starting picture. */
+    boardElements?: ExplainerState['board'];
+    onBoardChange?: Parameters<typeof mountBoard>[0]['onChange'];
+  } = {}
+): Panes {
+  const layout = block.content.layout ?? 'text';
   const panes = el('div', 'block-explainer__panes');
-  panes.dataset.layout = block.content.layout ?? 'text';
+  panes.dataset.layout = layout;
   const text = createTextPane(block.content.text);
-  panes.append(text.el);
-  return { el: panes, text };
+  if (layout !== 'board') panes.append(text.el);
+  let board: BoardHandle | null = null;
+  if (layout !== 'text') {
+    const start = opts.boardElements ?? stateAt({ board_start: block.content.board_start }, 0).board;
+    board = mountBoard({
+      elements: start,
+      files: block.content.board_start?.files,
+      background: block.content.board_start?.appState?.viewBackgroundColor,
+      editable: opts.editableBoard === true,
+      onChange: opts.onBoardChange
+    });
+    panes.append(board.el);
+  }
+  let boardKey = '';
+  return {
+    el: panes,
+    text,
+    board,
+    paint: (state, paintOpts) => {
+      if (layout !== 'board') text.paint(state, paintOpts);
+      if (!board) return;
+      const key = `${state.board.length}:${state.boardTick}`;
+      if (key !== boardKey && !opts.editableBoard) {
+        boardKey = key;
+        board.setElements(state.board);
+      }
+      const p = state.pointer;
+      board.showPointer(p && p.pane === 'board' ? { x: p.x, y: p.y } : null);
+    },
+    dispose: () => {
+      text.dispose();
+      board?.dispose();
+    }
+  };
 }
 
 /** The text with every mark at its final place: no recording, or nothing to play yet. */
 export function renderExplainerStatic(block: Pick<ExplainerBlock, 'content'>, upTo = Infinity): HTMLElement {
-  const { el: panes, text } = createPanes(block);
+  const panes = createPanes(block);
   const state = stateAt(block.content, upTo);
-  requestAnimationFrame(() => text.paint({ ...state, pointer: null }));
-  return panes;
+  requestAnimationFrame(() => panes.paint({ ...state, pointer: null }));
+  return panes.el;
 }
 
 export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opts: { autoplay?: boolean } = {}): ExplainerPlayer {
@@ -63,7 +116,8 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
   const duration = rec.duration_s;
   const events = rec.events;
   const root = el('div', 'block-explainer__player');
-  const { el: panes, text } = createPanes(block);
+  const view = createPanes(block);
+  const { el: panes } = view;
   const stage = el('div', 'block-explainer__stage');
   stage.append(panes);
 
@@ -190,10 +244,10 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
     const evCount = events.findIndex((ev) => ev.t > time);
     const state = stateAt(content, time);
     const p = state.pointer;
-    const key = `${evCount}|${p ? (p.pane === 'text' ? p.word : `${p.x},${p.y}`) : '-'}`;
+    const key = `${evCount}|${state.boardTick}|${p ? (p.pane === 'text' ? p.word : `${p.x},${p.y}`) : '-'}`;
     if (key !== paintedKey) {
       paintedKey = key;
-      text.paint(state);
+      view.paint(state);
     }
     scrub.value = String(time);
     clock.textContent = `${formatClock(time)} / ${formatClock(duration)}`;
@@ -280,6 +334,9 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
       lastT = -0.001;
     }
     isPlaying = true;
+    // Pan and zoom are for pauses; play puts the board back where it was.
+    view.board?.setInteractive(false);
+    view.board?.snapBack();
     wallBase = t;
     wallAt = now();
     startAudioAt(t);
@@ -291,6 +348,7 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
   function pause(): void {
     if (isPlaying) t = Math.min(duration, Math.max(0, clockTime()));
     isPlaying = false;
+    view.board?.setInteractive(true);
     cancelAnimationFrame(raf);
     stopAudio();
     syncButton();
@@ -333,7 +391,7 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
     dispose: () => {
       disposed = true;
       pause();
-      text.dispose();
+      view.dispose();
     }
   };
 }

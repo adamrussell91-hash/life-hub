@@ -39,9 +39,19 @@ export function eventLabel(ev: ExplainerEvent, all: readonly ExplainerEvent[] = 
       return `Erase · ${target && target.kind !== 'erase' ? eventLabel(target) : 'a mark'}`;
     }
     case 'pointer':
-      return `Pointer · ${ev.samples.length} ${ev.samples.length === 1 ? 'word' : 'moves'}`;
+      return `${ev.pane === 'board' ? 'Board pointer' : 'Pointer'} · ${ev.samples.length} ${ev.samples.length === 1 ? 'spot' : 'moves'}`;
     case 'pause':
       return 'Pause point';
+    case 'board': {
+      const gone = ev.elements.filter((e) => e.isDeleted).length;
+      const kept = ev.elements.length - gone;
+      const parts = [kept ? `${kept} ${kept === 1 ? 'shape' : 'shapes'} drawn or moved` : '', gone ? `${gone} removed` : ''].filter(Boolean);
+      return `Board · ${parts.join(', ') || 'change'}`;
+    }
+    case 'stroke':
+      return 'Pen stroke';
+    case 'send':
+      return `Sent to board · ${anchorWords(ev.anchor)}`;
   }
 }
 

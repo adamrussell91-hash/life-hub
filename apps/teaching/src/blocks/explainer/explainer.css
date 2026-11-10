@@ -493,3 +493,58 @@
   box-sizing: border-box;
   padding: var(--space-1) var(--space-2);
 }
+
+/* Board pane: Excalidraw inline. Text and board share the width 50/50 and stack below 900px. */
+.block-explainer__panes[data-layout='both'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .block-explainer__panes[data-layout='both'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.block-explainer__board {
+  position: relative;
+  min-width: 0;
+  height: 480px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #fff;
+}
+
+.block-explainer__board-host {
+  position: absolute;
+  inset: 0;
+}
+
+/* Playing: the board follows the recording, so it takes no input until paused. */
+.block-explainer__board.is-locked .block-explainer__board-host {
+  pointer-events: none;
+}
+
+.block-explainer__board-loading {
+  position: absolute;
+  inset: auto 0 50% 0;
+  text-align: center;
+}
+
+.block-explainer__pointer--board {
+  z-index: 5;
+}
+
+.block-explainer-editor__start {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Buttons set their own display; hidden ones must still hide. */
+.block-explainer [hidden],
+.block-explainer__recorder [hidden],
+.block-explainer__player [hidden],
+.block-explainer-editor [hidden] {
+  display: none !important;
+}

@@ -78,3 +78,44 @@ export function sampleExplainer(options: { status?: 'draft' | 'published'; urls?
   };
   return BlockSchema.parse(block) as ExplainerBlock;
 }
+
+const base = (id: string, type: string, x: number, y: number, w: number, h: number, version = 1) => ({
+  id, type, x, y, width: w, height: h, angle: 0, strokeColor: '#1e1e1e', backgroundColor: 'transparent', fillStyle: 'solid',
+  strokeWidth: 2, strokeStyle: 'solid', roughness: 1, opacity: 100, groupIds: [], frameId: null, roundness: null,
+  seed: 7, version, versionNonce: version, isDeleted: false, boundElements: null, updated: 1, link: null, locked: false, index: null
+});
+const box = (id: string, x: number, y: number, version = 1) => base(id, 'rectangle', x, y, 220, 120, version);
+const label = (id: string, text: string, x: number, y: number, version = 1) => ({
+  ...base(id, 'text', x, y, text.length * 10, 25, version), text, originalText: text, fontSize: 20, fontFamily: 5,
+  textAlign: 'left', verticalAlign: 'top', containerId: null, autoResize: true, lineHeight: 1.25
+});
+
+/** The sample with a board beside the text: a starting picture, a sent quote, a pen stroke, a move and a delete. */
+export function sampleBoardExplainer(options: { status?: 'draft' | 'published'; urls?: [string, string] } = {}): ExplainerBlock {
+  const block = sampleExplainer(options);
+  const text = block.content.text!;
+  const words = tokenise(text);
+  const [a, b] = phrase(words, 'memory as a tide');
+  const points: Array<[number, number]> = Array.from({ length: 12 }, (_, i) => [i * 15, Math.round(Math.sin(i / 2) * 20)]);
+  const strokeEl = {
+    ...base('pen_1', 'freedraw', 20, 170, 165, 40), points, pressures: [], simulatePressure: true, lastCommittedPoint: null
+  };
+  const extra: ExplainerEvent[] = [
+    { id: 'ev_send', t: 3, kind: 'send', anchor: anchorFromWords(text, a, b, words)!, element: label('sent_1', 'memory as a tide', 20, 40) },
+    { id: 'ev_pen', t: 6, kind: 'stroke', element: strokeEl, offsets: points.map((_, i) => Math.round(i * 0.1 * 100) / 100) },
+    { id: 'ev_bptr', t: 10, kind: 'pointer', pane: 'board', samples: [[0, 100, 60], [0.5, 300, 60], [1, 330, 90]] },
+    { id: 'ev_move', t: 18, kind: 'board', elements: [label('sent_1', 'memory as a tide', 40, 220, 2)] },
+    { id: 'ev_del', t: 26, kind: 'board', elements: [{ ...box('box_b', 260, 0, 2), isDeleted: true }] }
+  ];
+  const rec = block.content.recording!;
+  const events = [...rec.events, ...extra].map((ev, i) => ({ ev, i })).sort((x, y) => x.ev.t - y.ev.t || x.i - y.i).map((x) => x.ev);
+  return BlockSchema.parse({
+    ...block,
+    content: {
+      ...block.content,
+      layout: 'both',
+      board_start: { format: 'excalidraw', version: 1, elements: [box('box_a', 0, 0), box('box_b', 260, 0)], appState: {}, files: {} },
+      recording: { ...rec, events }
+    }
+  }) as ExplainerBlock;
+}

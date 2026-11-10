@@ -4,7 +4,8 @@
  */
 import { parseAnnotationSource, serializeAnnotationSource } from '@/blocks/annotation-text';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
-import type { ExplainerBlock, ExplainerRecording } from '@/schemas/block';
+import type { ExplainerBlock, ExplainerBoardElement, ExplainerRecording } from '@/schemas/block';
+import { mountBoard, type BoardHandle } from './board-runtime';
 import { spliceRecording, type ExplainerTake } from './clips';
 import { mountExplainerPlayer, type ExplainerPlayer } from './player';
 import { mountExplainerRecorder, type ExplainerRecorderHandle } from './recorder';
@@ -66,8 +67,8 @@ export function createExplainerEditor(
   layout.id = layoutId;
   for (const [value, label, ready] of [
     ['text', 'Text only', true],
-    ['board', 'Board only (coming soon)', false],
-    ['both', 'Text and board (coming soon)', false]
+    ['board', 'Board only', true],
+    ['both', 'Text and board side by side', true]
   ] as const) {
     const o = el('option', '', label);
     o.value = value;
@@ -75,7 +76,11 @@ export function createExplainerEditor(
     layout.append(o);
   }
   layout.value = current.content.layout ?? 'text';
-  layout.addEventListener('change', () => commit({ layout: layout.value as ExplainerBlock['content']['layout'] }));
+  layout.addEventListener('change', () => {
+    commit({ layout: layout.value as ExplainerBlock['content']['layout'] });
+    paintStartBoard();
+    if (!recorder) paintRecording();
+  });
 
   const kindRow = el('div', 'block-explainer-editor__kind');
   kindRow.setAttribute('role', 'group');
@@ -138,7 +143,44 @@ export function createExplainerEditor(
   paintTray();
   tray.append(trayHead, trayHint, trayList, addNote);
 
-  setup.append(titleLab, title, layoutLab, layout, sourceLab, kindRow, source, textHint, tray);
+  // The board's starting picture, drawn before recording (e.g. empty boxes to fill).
+  const startArea = el('div', 'block-explainer-editor__start');
+  let startBoard: BoardHandle | null = null;
+  function paintStartBoard(): void {
+    startBoard?.dispose();
+    startBoard = null;
+    startArea.replaceChildren();
+    if ((current.content.layout ?? 'text') === 'text') return;
+    const locked = Boolean(current.content.recording);
+    startArea.append(
+      el('p', 'pf-field__label', 'Starting picture'),
+      el(
+        'p',
+        'block-explainer__hint',
+        locked ? 'Record again to change the starting picture: the recording draws on top of it.' : 'Draw what the board shows before you start talking.'
+      )
+    );
+    const scene = current.content.board_start;
+    startBoard = mountBoard({
+      elements: (scene?.elements ?? []).filter((e) => !e.isDeleted),
+      files: scene?.files,
+      background: scene?.appState?.viewBackgroundColor,
+      editable: !locked,
+      onChange: locked
+        ? undefined
+        : ({ elements, appState }) => {
+            if (appState.newElement) return;
+            const live = elements.filter((e) => !e.isDeleted).map((e) => JSON.parse(JSON.stringify(e)) as ExplainerBoardElement);
+            const before = JSON.stringify(current.content.board_start?.elements ?? []);
+            if (JSON.stringify(live) === before) return;
+            commit({ board_start: { format: 'excalidraw', version: 1, elements: live, appState: {}, files: startBoard?.getFiles() ?? {} } });
+          }
+    });
+    startArea.append(startBoard.el);
+  }
+  paintStartBoard();
+
+  setup.append(titleLab, title, layoutLab, layout, sourceLab, kindRow, source, textHint, tray, startArea);
 
   // Recording.
   const recArea = el('div', 'block-explainer-editor__recording');
@@ -158,6 +200,7 @@ export function createExplainerEditor(
         recorder?.dispose();
         recorder = null;
         commit({ recording: applyTake(current.content.recording, take, startAt) });
+        paintStartBoard();
         paintRecording();
       },
       onCancel: () => {
@@ -189,7 +232,8 @@ export function createExplainerEditor(
     const rec = current.content.recording;
     recArea.replaceChildren();
     if (!rec) {
-      const hasText = (current.content.text?.stanzas ?? []).some((s) => s.lines.some((l) => l.text.trim()));
+      const hasText =
+        current.content.layout === 'board' || (current.content.text?.stanzas ?? []).some((s) => s.lines.some((l) => l.text.trim()));
       const record = btn('Record', 'btn--primary block-explainer-editor__record', () => void askRecord(0));
       record.disabled = !hasText;
       recArea.append(el('p', 'block-explainer__hint', hasText ? 'Record your voice while you mark the text. Up to 10 minutes.' : 'Paste the text first, then record.'), record);

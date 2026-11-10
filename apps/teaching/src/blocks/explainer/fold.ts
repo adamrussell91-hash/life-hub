@@ -3,7 +3,7 @@
  * One pure function serves playback, scrubbing and the static end copy, so
  * playing through to t always matches jumping to t.
  */
-import type { AnnotationColour, ExplainerBlock, ExplainerEvent, ExplainerMarkStyle } from '@/schemas/block';
+import type { AnnotationColour, ExplainerBlock, ExplainerBoardElement, ExplainerEvent, ExplainerMarkStyle } from '@/schemas/block';
 import type { AnnotationAnchor } from '@/schemas/block';
 
 export type ExplainerContent = ExplainerBlock['content'];
@@ -22,9 +22,29 @@ export type ExplainerState = {
   pointer: ShownPointer | null;
   /** Pause points already passed (t ≤ time). */
   pauseIds: string[];
-  /** Phase 2: the board's elements at time t. */
-  board: null;
+  /** The board's live elements at time t, in drawing order. */
+  board: ExplainerBoardElement[];
+  /** Changes whenever the board picture changes (a stroke point, an edit), so the player knows to redraw. */
+  boardTick: number;
 };
+
+/** A stroke drawn up to `rel` seconds after it began: its first points, or null before the first. */
+export function partialStroke(element: ExplainerBoardElement, offsets: readonly number[], rel: number): ExplainerBoardElement | null {
+  const points = (element as { points?: unknown[] }).points;
+  if (!Array.isArray(points)) return rel >= 0 ? element : null;
+  let n = 0;
+  while (n < offsets.length && offsets[n]! <= rel) n += 1;
+  if (n === 0) return null;
+  if (n >= points.length) return element;
+  const pressures = (element as { pressures?: unknown[] }).pressures;
+  return {
+    ...element,
+    points: points.slice(0, n),
+    ...(Array.isArray(pressures) && pressures.length ? { pressures: pressures.slice(0, n) } : {}),
+    // A new version each step, so the board redraws it.
+    version: (element.version ?? 1) * 100000 + n
+  };
+}
 
 /** The pointer fades this long after its last sample. */
 export const POINTER_LINGER_S = 1.2;
@@ -45,8 +65,16 @@ export function pointerAt(ev: PointerEvent, time: number): ShownPointer | null {
   return { pane: 'text', word: hit[1] };
 }
 
-export function stateAt(content: Pick<ExplainerContent, 'recording'>, time: number): ExplainerState {
+export function stateAt(content: Partial<Pick<ExplainerContent, 'recording' | 'board_start'>>, time: number): ExplainerState {
   const events = content.recording?.events ?? [];
+  const board = new Map<string, ExplainerBoardElement>();
+  for (const el of content.board_start?.elements ?? []) if (!el.isDeleted) board.set(el.id, el);
+  let boardTick = 0;
+  const put = (el: ExplainerBoardElement) => {
+    boardTick += 1;
+    if (el.isDeleted) board.delete(el.id);
+    else board.set(el.id, el);
+  };
   const marks = new Map<string, ShownMark>();
   const notes = new Map<string, ShownNote>();
   const pauseIds: string[] = [];
@@ -71,9 +99,23 @@ export function stateAt(content: Pick<ExplainerContent, 'recording'>, time: numb
       case 'pause':
         pauseIds.push(ev.id);
         break;
+      case 'board':
+        for (const el of ev.elements) put(el);
+        break;
+      case 'send':
+        put(ev.element);
+        break;
+      case 'stroke': {
+        const el = partialStroke(ev.element, ev.offsets, time - ev.t);
+        if (el) {
+          put(el);
+          boardTick += (el as { points?: unknown[] }).points?.length ?? 0;
+        }
+        break;
+      }
     }
   }
-  return { marks: [...marks.values()], notes: [...notes.values()], pointer, pauseIds, board: null };
+  return { marks: [...marks.values()], notes: [...notes.values()], pointer, pauseIds, board: [...board.values()], boardTick };
 }
 
 /** The first pause point strictly after t. */

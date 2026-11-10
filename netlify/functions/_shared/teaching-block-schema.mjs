@@ -2540,12 +2540,38 @@ var ExplainerPauseEventSchema = z12.object({
   kind: z12.literal("pause"),
   prompt: z12.string().max(500).default("")
 });
+var ExplainerBoardElementSchema = z12.looseObject({
+  id: z12.string().min(1).max(80),
+  type: z12.string().min(1).max(40),
+  version: z12.number().optional(),
+  isDeleted: z12.boolean().optional()
+});
+var ExplainerBoardEventSchema = z12.object({
+  ...explainerEventBase,
+  kind: z12.literal("board"),
+  elements: z12.array(ExplainerBoardElementSchema).max(500).default([])
+});
+var ExplainerStrokeEventSchema = z12.object({
+  ...explainerEventBase,
+  kind: z12.literal("stroke"),
+  element: ExplainerBoardElementSchema,
+  offsets: z12.array(z12.number().min(0)).max(2e4).default([])
+});
+var ExplainerSendEventSchema = z12.object({
+  ...explainerEventBase,
+  kind: z12.literal("send"),
+  anchor: AnnotationAnchorSchema,
+  element: ExplainerBoardElementSchema
+});
 var ExplainerEventSchema = z12.discriminatedUnion("kind", [
   ExplainerMarkEventSchema,
   ExplainerNoteEventSchema,
   ExplainerEraseEventSchema,
   ExplainerPointerEventSchema,
-  ExplainerPauseEventSchema
+  ExplainerPauseEventSchema,
+  ExplainerBoardEventSchema,
+  ExplainerStrokeEventSchema,
+  ExplainerSendEventSchema
 ]);
 var ExplainerClipSchema = z12.object({
   media_id: z12.string().optional(),
@@ -2569,6 +2595,13 @@ var ExplainerTrayNoteSchema = z12.object({
   id: z12.string().min(1).max(60),
   html: z12.string().max(4e3).default("")
 });
+var ExplainerBoardSceneSchema = z12.object({
+  format: z12.literal("excalidraw"),
+  version: z12.literal(1),
+  elements: z12.array(ExplainerBoardElementSchema).max(2e3).default([]),
+  appState: z12.object({ viewBackgroundColor: z12.string().max(40).optional() }).default({}),
+  files: z12.record(z12.string(), z12.unknown()).default({})
+});
 var ExplainerLayoutSchema = z12.enum(["text", "board", "both"]);
 var ExplainerBlockSchema = z12.object({
   id: z12.string().min(1),
@@ -2581,8 +2614,8 @@ var ExplainerBlockSchema = z12.object({
     layout: ExplainerLayoutSchema.default("text"),
     text: AnnotationTextSchema.optional(),
     tray: z12.array(ExplainerTrayNoteSchema).max(60).default([]),
-    /** Phase 2: the board's starting picture (an Excalidraw scene). */
-    board_start: z12.unknown().optional(),
+    /** The board's starting picture (an Excalidraw scene), drawn before recording. */
+    board_start: ExplainerBoardSceneSchema.optional(),
     recording: ExplainerRecordingSchema.optional()
   }),
   ...blockLayout,
@@ -2606,6 +2639,16 @@ function refineExplainerRecording(block, ctx) {
         message: "explainer event is after the end of the recording",
         path: ["content", "recording", "events", index, "t"]
       });
+    }
+    if (ev.kind === "stroke") {
+      const points = ev.element.points;
+      if (Array.isArray(points) && points.length !== ev.offsets.length) {
+        ctx.addIssue({
+          code: z12.ZodIssueCode.custom,
+          message: "a stroke needs one time offset for each point",
+          path: ["content", "recording", "events", index, "offsets"]
+        });
+      }
     }
     prev = Math.max(prev, ev.t);
   }
@@ -3015,6 +3058,9 @@ export {
   EmbedProviderSchema,
   EquationBlockSchema,
   ExplainerBlockSchema,
+  ExplainerBoardElementSchema,
+  ExplainerBoardEventSchema,
+  ExplainerBoardSceneSchema,
   ExplainerClipSchema,
   ExplainerEraseEventSchema,
   ExplainerEventSchema,
@@ -3025,6 +3071,8 @@ export {
   ExplainerPauseEventSchema,
   ExplainerPointerEventSchema,
   ExplainerRecordingSchema,
+  ExplainerSendEventSchema,
+  ExplainerStrokeEventSchema,
   ExplainerTranscriptSchema,
   ExplainerTrayNoteSchema,
   FadedExampleBlockSchema,

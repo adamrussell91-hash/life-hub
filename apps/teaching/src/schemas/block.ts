@@ -1751,13 +1751,45 @@ export const ExplainerPauseEventSchema = z.object({
   prompt: z.string().max(500).default('')
 });
 
-/** Phase 2 adds `board`, `stroke` and `send` to this union. */
+/** One Excalidraw element, stored as Excalidraw saved it. */
+export const ExplainerBoardElementSchema = z.looseObject({
+  id: z.string().min(1).max(80),
+  type: z.string().min(1).max(40),
+  version: z.number().optional(),
+  isDeleted: z.boolean().optional()
+});
+export type ExplainerBoardElement = z.infer<typeof ExplainerBoardElementSchema>;
+
+/** Board elements changed on release: new, moved, restyled or deleted (isDeleted). */
+export const ExplainerBoardEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('board'),
+  elements: z.array(ExplainerBoardElementSchema).max(500).default([])
+});
+/** One pen stroke, replayed point by point: offsets[i] is when points[i] was drawn, from t. */
+export const ExplainerStrokeEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('stroke'),
+  element: ExplainerBoardElementSchema,
+  offsets: z.array(z.number().min(0)).max(20000).default([])
+});
+/** Words sent from the text to the board as a text box. */
+export const ExplainerSendEventSchema = z.object({
+  ...explainerEventBase,
+  kind: z.literal('send'),
+  anchor: AnnotationAnchorSchema,
+  element: ExplainerBoardElementSchema
+});
+
 export const ExplainerEventSchema = z.discriminatedUnion('kind', [
   ExplainerMarkEventSchema,
   ExplainerNoteEventSchema,
   ExplainerEraseEventSchema,
   ExplainerPointerEventSchema,
-  ExplainerPauseEventSchema
+  ExplainerPauseEventSchema,
+  ExplainerBoardEventSchema,
+  ExplainerStrokeEventSchema,
+  ExplainerSendEventSchema
 ]);
 export type ExplainerEvent = z.infer<typeof ExplainerEventSchema>;
 
@@ -1791,6 +1823,15 @@ export const ExplainerTrayNoteSchema = z.object({
 });
 export type ExplainerTrayNote = z.infer<typeof ExplainerTrayNoteSchema>;
 
+export const ExplainerBoardSceneSchema = z.object({
+  format: z.literal('excalidraw'),
+  version: z.literal(1),
+  elements: z.array(ExplainerBoardElementSchema).max(2000).default([]),
+  appState: z.object({ viewBackgroundColor: z.string().max(40).optional() }).default({}),
+  files: z.record(z.string(), z.unknown()).default({})
+});
+export type ExplainerBoardScene = z.infer<typeof ExplainerBoardSceneSchema>;
+
 export const ExplainerLayoutSchema = z.enum(['text', 'board', 'both']);
 export type ExplainerLayout = z.infer<typeof ExplainerLayoutSchema>;
 
@@ -1803,8 +1844,8 @@ export const ExplainerBlockSchema = z.object({
     layout: ExplainerLayoutSchema.default('text'),
     text: AnnotationTextSchema.optional(),
     tray: z.array(ExplainerTrayNoteSchema).max(60).default([]),
-    /** Phase 2: the board's starting picture (an Excalidraw scene). */
-    board_start: z.unknown().optional(),
+    /** The board's starting picture (an Excalidraw scene), drawn before recording. */
+    board_start: ExplainerBoardSceneSchema.optional(),
     recording: ExplainerRecordingSchema.optional()
   }), ...blockLayout, ...blockTimestamps
 });
@@ -1832,6 +1873,16 @@ export function refineExplainerRecording(
         message: 'explainer event is after the end of the recording',
         path: ['content', 'recording', 'events', index, 't']
       });
+    }
+    if (ev.kind === 'stroke') {
+      const points = (ev.element as { points?: unknown }).points;
+      if (Array.isArray(points) && points.length !== ev.offsets.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'a stroke needs one time offset for each point',
+          path: ['content', 'recording', 'events', index, 'offsets']
+        });
+      }
     }
     prev = Math.max(prev, ev.t);
   }
