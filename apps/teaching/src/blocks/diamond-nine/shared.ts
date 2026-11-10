@@ -17,6 +17,11 @@ export function imageSrc(card: DiamondCard): string | null {
   return url && isSafeHref(url) ? url : null;
 }
 
+/** A quotation without the marks a teacher may have typed round it; the card adds its own. */
+export function bareQuote(text: string): string {
+  return text.trim().replace(/^["“‘']+|["”’']+$/g, '').trim();
+}
+
 /** A card students can rank: words for text and quotes, a safe link for a picture. */
 export function cardReady(card: DiamondCard): boolean {
   return card.kind === 'image' ? !!imageSrc(card) : !!card.text.trim();
@@ -40,7 +45,7 @@ export function cardText(card: DiamondCard): string {
   if (card.kind === 'image') return (card.alt_text ?? '').trim() || card.text.trim() || 'Picture';
   if (card.kind === 'quote') {
     const source = (card.source ?? '').trim();
-    return `“${card.text.trim()}”${source ? ` (${source})` : ''}`;
+    return `“${bareQuote(card.text)}”${source ? ` (${source})` : ''}`;
   }
   return card.text.trim();
 }
@@ -64,7 +69,7 @@ export function cardFace(card: DiamondCard, letter: string): DocumentFragment {
     const caption = card.text.trim() || (card.alt_text ?? '').trim();
     if (caption) body.append(el('span', 'd9-card__caption', caption));
   } else if (card.kind === 'quote') {
-    body.append(el('q', 'd9-card__quote', card.text.trim()));
+    body.append(el('q', 'd9-card__quote', bareQuote(card.text)));
     if ((card.source ?? '').trim()) body.append(el('span', 'd9-card__source', card.source!.trim()));
   } else {
     body.append(el('span', 'd9-card__text', card.text.trim()));

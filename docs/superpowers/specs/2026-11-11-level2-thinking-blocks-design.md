@@ -18,7 +18,7 @@ Nine cards (text, quotation or picture) ranked in a 1-2-3-2-1 diamond against a 
 
 | Feature | Decision | Research reason |
 |---|---|---|
-| Rank alone first | The class view stays hidden on the student's screen until they submit. The teacher's own screen shows counts only while the round is open. | Conformity (Asch). Seeing the room's answer first pulls judgements towards it and removes the disagreement the discussion needs. |
+| Rank alone first | The class view stays hidden on the student's screen until they submit. The teacher's own screen shows the class view as diamonds arrive; the Display (which the class can see) shows only the count until the teacher presses Reveal. | Conformity (Asch). Seeing the room's answer first pulls judgements towards it and removes the disagreement the discussion needs. |
 | Reasons for the top and bottom card | Required before submitting. Because / But / So is offered as an optional frame (a toggle, off by default). | Elaborative interrogation (Pressley; Dunlosky et al. 2013): asking "why is this true?" improves retention and understanding more than ranking alone. The ends of the diamond are where judgement is sharpest, so that is where the reason is asked. |
 | Wildcard | Optional (teacher setting). The student can swap one card for their own and must rank it like any other. | The generation effect (Slamecka & Graf): material a learner produces is remembered better than material they read. |
 | Consensus and contested cards | Each card's row (0 = top, 4 = bottom) is averaged; spread is the standard deviation of its rows. The most contested cards are the three with the highest spread among cards placed by at least three students. | Cognitive conflict (Piaget; Limón 2001): discussion pays off where students really disagree, so the board points the teacher at those cards and not the ones everyone agrees on. |
@@ -26,7 +26,7 @@ Nine cards (text, quotation or picture) ranked in a 1-2-3-2-1 diamond against a 
 | Re-rank | After submitting, the student can rank again ("After the discussion"). Each card shows how far it moved. A card that moved two rows or more asks "What changed your mind?" before they can finish. | Belief revision and metacognition: naming what changed a judgement consolidates the change (conceptual change research; Chi's self-explanation work). |
 | Second criterion | Optional. A second pass ranks the same cards against another criterion, starting from the student's first layout. The teacher view shows both consensus diamonds and the cards that shifted most. | Varying the criterion shows that a ranking depends on it, a step towards evaluative thinking (and a contrasting-cases move). |
 | Re-rank gate | No teacher gate: the button sits under the student's submitted diamond and says it is for after the discussion. | A gate needs live server state and polling. The teacher tells the class when, as they do with any re-place round. Recorded as a possible follow-up. |
-| Touch and keyboard | Tap a card, then tap a slot (tap-to-place). Pointer drag works for mouse, pen and touch. Every card and slot is a button, so keyboard works too. | Phones are the student device in class. |
+| Touch and keyboard | Tap a card, then tap a slot (tap-to-place). Pointer drag works for mouse and pen; on touch, tapping places cards so the page still scrolls. Every card and slot is a button, so keyboard works too. | Phones are the student device in class. |
 | Print | The empty diamond, the cards lettered A to I, the criterion, and lines for the two reasons. | Paper lessons. |
 
 ## 2. Two-text Venn (`venn`, Visualisation menu)
@@ -75,6 +75,14 @@ New written formats on `question_set`, not new blocks, following the Writing Rev
 | Model after writing | Items 2 onwards show "Check against the model" only once the student has written something, as the Question block's model answer does. | Generate first, then compare (write-before-reveal). |
 | Joining word check | A live note says when the required joining word is in the sentence. | Immediate, specific feedback on the one feature being practised. |
 | Markbook | Answers save as the format's written part (`format.<id>`), which the existing work path sends to the teacher and the Markbook. | Nothing new to mark against. |
+
+## Calls made during the build
+
+- **Diamond 9.** Only the top and bottom reasons are sent, so an outlier's reason shows where they put a contested card at an end. A wildcard is left out of the class consensus. After the first send, both the re-rank and the second criterion are offered, re-rank first. Students have a "See the latest" button, which resends their own diamond to fetch the newest class layouts (there is no student read).
+- **Venn.** The Display has no remote control from the teacher's screen: it opens at Student 1 and the teacher steps through with arrows. Student numbers follow arrival order. The synthesis keeps following the teacher's frame until the student edits it. A student can add up to 30 points.
+- **Choice board.** A pick that would put the rule out of reach is refused straight away, with what to pick instead. Opened tasks sit under the grid, at full width, and the reason stays in the tile. Finishing a task also locks its pick. Phones show two tiles a row (one at 360px or narrower).
+- **Sentence formats.** A frame item's box starts with the frame and counts as written only once it changes. The word limit is per sentence. The teacher view calls the last stage "On their own". The frame field shows on every item, because stages depend on position.
+- **Initials** are optional everywhere; a response without them shows "—" to the teacher.
 
 ## Out of scope
 
