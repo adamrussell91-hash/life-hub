@@ -887,10 +887,15 @@ async function writingSummaries(store, k, device, n, record, responses) {
 /** How many handed-in answers have something worth a look. */
 const flaggedAnswers = (result) => Object.values(result?.writing ?? {}).filter((w) => w?.flags?.length).length;
 
-/** The sweep runs at most once a minute per quiz, however often insight is read. */
+/**
+ * The sweep runs at most once a minute per quiz, however often insight is read. An open quiz
+ * with no timer has nothing it could hand in (only a deadline or closing does that), so it is
+ * skipped. `swept` is the marker when the caller has already read it.
+ */
 const SWEEP_EVERY_MS = 60_000;
-async function sweepStale(store, k, lessonId, record, closed, now) {
-  const last = Date.parse((await read(store, k.swept))?.at ?? '');
+async function sweepStale(store, k, lessonId, record, closed, now, swept) {
+  if (!closed && !resolveQuizSettings(record.settings).timer_minutes) return;
+  const last = Date.parse((swept === undefined ? await read(store, k.swept) : swept)?.at ?? '');
   if (Number.isFinite(last) && now - last < SWEEP_EVERY_MS) return;
   await store.setJSON(k.swept, { at: new Date(now).toISOString() });
   await handInStale(store, k, lessonId, record, closed, now).catch((error) => console.warn('quiz sweep failed', error));
@@ -1604,17 +1609,20 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
   }
   const { draft, record, settings, k } = loaded;
   const cls = typeof classId === 'string' && isSafeId(classId) ? classId : null;
-  const [roster, state, saved, stampRow, flags, kin] = await Promise.all([
+  // The sweep's and live round's markers come in the same round as everything else.
+  const [roster, state, saved, stampRow, flags, kin, swept, live] = await Promise.all([
     cls ? loadRoster(store, cls) : null,
     closedState(store, k, settings, now),
     read(store, k.insight(cls ?? 'all')),
     read(store, k.stamp),
     family ? read(store, k.flags) : null,
-    family ? unitFamily(store, draft, lessonId) : { siblings: [], followUps: [] }
+    family ? unitFamily(store, draft, lessonId) : { siblings: [], followUps: [] },
+    read(store, k.swept),
+    read(store, k.live).catch(() => null)
   ]);
   const fallback = lessonOutcomes(draft);
-  await sweepStale(store, k, lessonId, record, state.closed, now);
-  await foldFinishedLive(store, k, lessonId, record);
+  await sweepStale(store, k, lessonId, record, state.closed, now, swept);
+  await foldFinishedLive(store, k, lessonId, record, live);
   const stamp = (await read(store, k.stamp))?.at ?? stampRow?.at ?? null;
   // A class with no list stays anonymous, so its insight covers every latest attempt.
   const listed = cls && roster?.students.length ? roster : null;
@@ -1625,7 +1633,9 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     body = await buildInsight(store, k, lessonId, record, fallback, listed ? cls : null, listed);
     const settled = stamp === null || now - Date.parse(stamp) > INSIGHT_SETTLE_MS;
     const known = cls === null || !!roster;
-    if (known && settled && state.closed && body.attempts.every((a) => a.pending === 0)) {
+    // Open quizzes are saved too: every hand-in, mark, clear and live fold moves the stamp,
+    // so a copy is only ever used while nothing it holds has changed.
+    if (known && settled) {
       // A change landing while this was built makes the copy stale before it's saved: skip it.
       const again = (await read(store, k.stamp))?.at ?? null;
       if (again === stamp) {
@@ -1789,9 +1799,9 @@ async function foldLiveRound(store, k, lessonId, record, live) {
 }
 
 /** Brings a finished round into the results. Never in the way of the page reading them. */
-async function foldFinishedLive(store, k, lessonId, record) {
+async function foldFinishedLive(store, k, lessonId, record, prefetched) {
   try {
-    const live = await read(store, k.live);
+    const live = prefetched === undefined ? await read(store, k.live) : prefetched;
     if (live?.session && liveFinished(live)) await foldLiveRound(store, k, lessonId, record, live);
   } catch (error) {
     console.warn('live round fold failed', error);

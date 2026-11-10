@@ -794,7 +794,7 @@ test('insight: evidence per answer; a closed, fully marked quiz is saved until s
   assert.equal(open.attempts.length, 1);
   assert.ok(open.students.length >= 2, 'the whole class list comes back');
   assert.equal(open.attempts[0].rows.find((r) => r.id === 'qb').items[0].share, 0);
-  assert.equal(store.data.has('quiz/quiz1/evidence/class1'), false, 'open quizzes are not saved');
+  assert.equal(store.data.has('quiz/quiz1/evidence/class1'), false, 'nothing is saved while the stamp is under a minute old');
 
   ageStamp(store);
   const closed = await quizTeacherAction(store, 'quiz1', { action: 'close', class_id: 'class1' });
@@ -1195,4 +1195,43 @@ test('Results shows what the class answered on every question kind', async () =>
   assert.deepEqual(answers.ord.groups.map(g => [g.label, g.rows[0].text, g.rows[0].right]), [['Position 1', 'Second', false], ['Position 2', 'First', false], ['Position 3', 'Third', true]]);
   assert.equal(answers.wr.written[0].text, 'Romeo');
   assert.deepEqual(answers.wr.written[0].awarded, 1);
+});
+
+test('insight: an open quiz is saved once settled, and a new hand-in makes the copy stale', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' } } });
+  // A stamp younger than a minute could still be catching up, so nothing is saved yet.
+  await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(store.data.has('quiz/quiz1/evidence/class1'), false);
+
+  ageStamp(store);
+  const built = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(built.closed, false);
+  assert.equal(built.saved, false);
+  assert.ok(store.data.has('quiz/quiz1/evidence/class1'), 'an open quiz is saved once nothing has changed for a minute');
+  const reused = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(reused.saved, true);
+  assert.deepEqual(reused.attempts, built.attempts);
+
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'submit', responses: { qb: { text: 'Juliet' } } });
+  const after = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(after.saved, false, 'the hand-in moved the stamp');
+  assert.equal(after.attempts.length, 2);
+});
+
+test('insight: an open quiz with no timer skips the hand-in sweep; a timed one still sweeps', async () => {
+  const untimed = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  await publishQuiz(untimed);
+  await quizTeacherAction(untimed, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(untimed.data.has('quiz/quiz1/swept'), false, 'nothing could be handed in, so nothing is swept');
+
+  const timed = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)], quizSettings: { timer_minutes: 10 } }));
+  await publishQuiz(timed);
+  await quizTeacherAction(timed, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.ok(timed.data.has('quiz/quiz1/swept'));
 });
