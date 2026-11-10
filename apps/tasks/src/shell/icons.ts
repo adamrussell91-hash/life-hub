@@ -44,6 +44,7 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   templates: ['M9 4h10v16H9z', 'M5 8h4', 'M5 8v12h8'],
   search: ['M11 11a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z', 'M14.5 14.5 19 19'],
   properties: ['M5 7h14v3H5z', 'M7 11h10v8H7z', 'M9 14h2', 'M13 14h2'],
+  think: ['M5 17a2 2 0 1 0 0-4a2 2 0 0 0 0 4', 'M19 11a2 2 0 1 0 0-4a2 2 0 0 0 0 4', 'M7 14c4 0 3-4 5-4s1 3 5 0'],
   'problem-solver': ['M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18', 'M8 10l4 4l4-4'],
   'decision-maker': ['M8 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10', 'M16 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10', 'M5 12h13', 'M15 9l3 3l-3 3'],
   // The gear inside the two return arrows, in outline.

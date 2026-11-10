@@ -126,7 +126,7 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
           : kind === 'task' && row.reviewTaskId === id ? 'review'
           : kind === 'task' && (row.taskIds ?? []).includes(id) ? 'task'
             : (row.links ?? []).some((l) => l.kind === kind && l.id === id) ? 'link' : null;
-        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role }] : [];
+        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role, threadId: row.threadId ?? null }] : [];
       });
     },
 

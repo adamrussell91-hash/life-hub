@@ -2,6 +2,8 @@
 import '../../../../../packages/problem-solver/problem-solver.css';
 import './problem-solver-view.css';
 import { el } from '@/views/hub-kit';
+import '../thinking/thinking.css';
+import { mountSessionThread, type SessionThread } from '../thinking/session-hooks';
 import { hashQuery } from '@/shell/shell';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
@@ -29,6 +31,8 @@ import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
 
 let poll: AbortController | null = null;
+/** The open session's thinking-thread strip, landing block and joint watcher. */
+let threadNow: SessionThread | null = null;
 /** The open session's canvas, dropped (observers, frame loops) when the page changes. */
 let diagramNow: { destroy(): void } | null = null;
 /** The open session's Tasks listeners (live statuses), removed when the page changes. */
@@ -492,13 +496,15 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     dismissCaseFile: (key) => confirmed('dismiss_case_file', { key })
   }, { fallbackFocus: () => coach.el.querySelector('textarea') });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
+  const thread = mountSessionThread({ say: (text) => act('say', text) });
+  threadNow = thread;
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
   const entry = reviewEntry(session, hashQuery().get('step'));
   // A waiting Improve already shows Review now; one start button is enough.
   const banner = entry && !(entry.kind === 'start' && waitingForReview(session)) ? reviewBanner(entry, () => void reviews.startReview(), stepName(session.model!.id, entry.step)) : null;
-  page.append(back, title, track.el, ...(banner ? [banner] : []), board);
+  page.append(back, title, track.el, thread.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
   diagramNow = diagram;
@@ -521,6 +527,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     cards.update(session);
     review.update(session);
     reviews.onRender(session);
+    thread.update(session);
   };
 
   const sync = syncFor(session, render, () => page.isConnected);
@@ -641,6 +648,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
 export function unmountProblemSolverView(): void {
   poll?.abort();
   poll = null;
+  threadNow?.destroy();
+  threadNow = null;
   diagramNow?.destroy();
   diagramNow = null;
   for (const off of unsubscribeNow) off();

@@ -63,6 +63,7 @@ export type HubViewId =
   | 'programs'
   | 'properties'
   | 'term-dates'
+  | 'think'
   | 'problem-solver'
   | 'decision-maker'
   | 'gear-shifter'
@@ -127,6 +128,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tools',
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
+      { id: 'think', label: 'Think it through', href: '#/think' },
       { id: 'problem-solver', label: 'Problem Solver', href: '#/problem-solver' },
       { id: 'decision-maker', label: 'Decision Maker', href: '#/decision-maker' },
       { id: 'gear-shifter', label: 'Gear Shifter', href: '#/gear-shifter' },
