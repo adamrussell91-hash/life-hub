@@ -61,6 +61,8 @@ export type Triage =
   | { question: string }
   | { start: { optionId: string; reason: string }; likely: string[]; alternative: { optionId: string; reason: string }; fallback?: boolean };
 
-export type Verdict = { verdict: 'carry_on' | 'suggest' | 'hand_over'; optionId?: string; reason?: string; why?: string; fallback?: boolean };
+/** A snare the guide saw in the work (before_commit and returned only). Never blocks anything. */
+export type Caution = { snareId: string; title: string; line: string; check: string };
+export type Verdict = { verdict: 'carry_on' | 'suggest' | 'hand_over'; optionId?: string; reason?: string; why?: string; fallback?: boolean; caution?: Caution };
 export type LatestStep = { optionId?: string; title?: string; text?: string };
 export type CheckInRequest = { threadId: string; joint: Joint; sessionId: string; stepId?: string | null; latestStep?: LatestStep | null };
