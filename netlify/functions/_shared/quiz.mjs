@@ -65,6 +65,7 @@ import { readFeedbackCodes } from './feedback-codes.mjs';
 import { cleanStepPick } from './next-steps.mjs';
 import { exitUnlocked } from './tutorial-status.mjs';
 import { interleave, isGroupSet, liftGroupSets } from './group-sets.mjs';
+import { AGAIN, AGAIN_COMMENT_MAX, AGAIN_KINDS, againFieldOk, againFields, againOf, againResponse, againState, againWorkingKey, answerRowKey, askOnPiece, fieldLimit, sentOnPiece, sentResponse, unaskOnPiece } from './quiz-again.mjs';
 
 export { QuizError };
 
@@ -337,7 +338,7 @@ function entryFor(record, id) {
   return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
 }
 
-const INSIGHT_SCHEMA = 6;
+const INSIGHT_SCHEMA = 7;
 
 /** Closed by the teacher's Close now, or by the Closes date. */
 async function closedState(store, k, settings, now = Date.now()) {
@@ -441,8 +442,11 @@ function scoreAttempt(record, result, teacherMarks, aiMarks = null) {
   const hintCost = resolveQuizSettings(record.settings).hint_cost;
   const rows = record.order.map((id) => {
     const entry = record.questions[id];
-    const given = result.responses?.[id] ?? null;
-    let mark = result.marks?.[id] ?? markResponse(entry.key, given);
+    // Another go the student sent replaces their first answer, and is marked afresh.
+    const redo = againOf(teacherMarks, id);
+    const again = sentResponse(redo);
+    const given = again ?? result.responses?.[id] ?? null;
+    let mark = (again ? null : result.marks?.[id]) ?? markResponse(entry.key, given);
     const hinted = !!result.hints?.[id];
     // A teacher mark is a number, or { marks, codes?, comment? } once codes or a comment were added.
     const override = teacherMarks?.[id];
@@ -462,7 +466,8 @@ function scoreAttempt(record, result, teacherMarks, aiMarks = null) {
     }
     const codes = cleanCodes(override?.codes);
     const comment = typeof override?.comment === 'string' && override.comment.trim() ? override.comment : null;
-    return { id, mark, awarded, by, hinted, response: given, confidence: result.confidence?.[id] ?? null, codes, ...(ai ? { ai } : {}), ...(comment ? { comment } : {}) };
+    const asked = againState(redo);
+    return { id, mark, awarded, by, hinted, response: given, confidence: result.confidence?.[id] ?? null, codes, ...(ai ? { ai } : {}), ...(comment ? { comment } : {}), ...(asked ? { again: asked } : {}) };
   });
   const setOf = (id) => record.practice?.[id] ?? null;
   const shared = rows.filter((r) => !setOf(r.id));
@@ -567,6 +572,7 @@ export async function quizAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
   if (action.startsWith('live_')) return liveStudent(store, lessonId, body, action);
+  if (action.startsWith('again_')) return againStudent(store, lessonId, body, action);
   if (!['status', 'claim', 'start', 'hint', 'check', 'save', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const loaded = await loadQuiz(store, lessonId);
   const { draft, settings, k } = loaded;
@@ -916,6 +922,64 @@ async function handInStale(store, k, lessonId, record, closed, now = Date.now())
   return changed;
 }
 
+/**
+ * A student's another go at one answer, from their Returned work: load it, save
+ * words as they type, send it. Only an ask on their own latest row, still open.
+ */
+async function againStudent(store, lessonId, body, action) {
+  if (!['again_load', 'again_save', 'again_send'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  const { record, k } = await loadQuiz(store, lessonId);
+  const who = await identify(store, body, action);
+  needIdentity(who);
+  if (!who.student) reject(403, 'need_initials', 'Type your initials first.');
+  const questionId = String(body.question_id ?? '');
+  const changed = () => reject(409, 'not_asked', 'Your teacher has changed this. Reopen Returned work.');
+  const row = await read(store, answerRowKey(who.classId, who.student.id, lessonId, questionId));
+  const match = ATTEMPT_ID.exec(String(row?.redraft?.attempt_id ?? ''));
+  if (!match) changed();
+  const [device, n] = [match[1], Number(match[2])];
+  if (device !== ownerOf(who, null)) changed();
+  const [start, marks] = await Promise.all([read(store, k.attempt(device, n)), read(store, k.marks(device, n))]);
+  const redo = againOf(marks, questionId);
+  if (!start || start.deleted || !redo || sentResponse(redo)) changed();
+  const entry = entryFor(narrow(await recordFor(store, lessonId, start.version, record), start.student_id), questionId);
+  if (!entry || !AGAIN_KINDS.has(entry.key.kind)) reject(409, 'task_changed', 'This question has changed. Ask your teacher.');
+  const workingKey = againWorkingKey(lessonId, device, n, questionId);
+  const working = (await read(store, workingKey))?.fields ?? {};
+
+  if (action === 'again_load') {
+    const { text, prompts } = againFields(entry, redo.from);
+    return { scope: 'whole', text, prompts, working: Object.keys(working).length ? { answer: working } : {} };
+  }
+
+  if (action === 'again_save') {
+    if (typeof body.text !== 'string' || !againFieldOk(entry, body.part, body.field)) reject(400, 'out_of_scope', 'That isn’t part of this answer.');
+    if (body.text.length > fieldLimit(entry)) reject(400, 'too_long', 'That’s too long to save. Shorten it a little.');
+    const at = new Date().toISOString();
+    await store.setJSON(workingKey, { fields: { ...working, [body.field]: body.text }, at });
+    return { saved: true, at };
+  }
+
+  const response = againResponse(entry, redo.from, working);
+  if (!hasAnswer(response)) reject(400, 'empty', 'Write something before you send it.');
+  const now = new Date().toISOString();
+  // Read again just before writing, so a mark the teacher saved a moment ago isn't undone.
+  const latest = (await read(store, k.marks(device, n))) ?? {};
+  const next = { ...latest, [AGAIN]: { ...(latest[AGAIN] ?? {}), [questionId]: { ...(againOf(latest, questionId) ?? redo), response, sent_at: now } } };
+  // The old mark was for the old answer: the new one waits to be marked.
+  delete next[questionId];
+  await store.setJSON(k.marks(device, n), next);
+  const ai = await read(store, k.aiMarks(device, n));
+  if (ai && Object.hasOwn(ai, questionId)) {
+    const { [questionId]: _old, ...rest } = ai;
+    await store.setJSON(k.aiMarks(device, n), rest);
+  }
+  await store.delete(workingKey);
+  await sentOnPiece(store, { classId: who.classId, studentId: who.student.id, lessonId, questionId, now });
+  await markInsightChanged(store, lessonId);
+  return { sent: true, at: now };
+}
+
 function confidenceOf(value) {
   return [1, 2, 3].includes(value) ? value : null;
 }
@@ -956,7 +1020,7 @@ export async function quizTeacherAction(store, lessonId, body) {
   }
   if (action.startsWith('live_')) return liveTeacher(store, lessonId, body, action);
   if (action === 'classes') return { classes: await classesForLesson(store, lessonId) };
-  if (!['results', 'attempt', 'mark', 'release', 'reset', 'delete_attempt', 'clear_all', 'insight', 'close', 'reopen', 'dismiss_flag'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['results', 'attempt', 'mark', 'release', 'reset', 'delete_attempt', 'clear_all', 'insight', 'close', 'reopen', 'dismiss_flag', 'again_ask', 'again_cancel', 'again_blank'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
 
   let loaded;
   try {
@@ -1025,6 +1089,78 @@ export async function quizTeacherAction(store, lessonId, body) {
     return { device, n, start, result, rec: narrow(await recordFor(store, lessonId, start.version, record), start.student_id) };
   };
 
+  /**
+   * Asks for another go at one typed answer. The mark stands until the new answer
+   * comes back; an answer with no mark yet gets 0 so it leaves the marking queue.
+   * False when it was already asked and nothing changed.
+   */
+  const askAgain = async ({ device, n, start, result, rec }, questionId, comment, title, now) => {
+    const entry = entryFor(rec, questionId);
+    if (!entry) reject(404, 'not_found', 'Unknown question.');
+    if (!AGAIN_KINDS.has(entry.key.kind)) reject(400, 'not_typed', 'Only typed answers can have another go.');
+    if (!start.class_id || !start.student_id) reject(409, 'no_student', 'Only a student who typed their initials can have another go.');
+    const marks = (await read(store, k.marks(device, n))) ?? {};
+    const redo = againOf(marks, questionId);
+    if (redo && !sentResponse(redo)) return false;
+    const from = sentResponse(redo) ?? result.responses?.[questionId] ?? null;
+    const { prev: _older, ...was } = redo ?? {};
+    const ask = { asked_at: now, comment, from, class_id: start.class_id, student_id: start.student_id, ...(redo ? { prev: was } : {}) };
+    const next = { ...marks, [AGAIN]: { ...(marks[AGAIN] ?? {}), [questionId]: ask } };
+    const row = scoreAttempt(rec, result, marks, await read(store, k.aiMarks(device, n))).rows.find((r) => r.id === questionId);
+    if (row && row.awarded === null) next[questionId] = comment ? { marks: 0, comment } : 0;
+    await store.setJSON(k.marks(device, n), next);
+    await askOnPiece(store, { classId: start.class_id, studentId: start.student_id, lessonId, questionId, attemptId: attemptId(device, n), title: title(rec, questionId), comment, response: from, now });
+    return true;
+  };
+  const lessonName = async () => (await read(store, draftLessonKey(lessonId)))?.title || 'Quiz';
+  const titleFor = (name) => (rec, questionId) => `${name}: question ${rec.order.indexOf(questionId) + 1}`;
+  const askComment = () => (typeof body.comment === 'string' ? body.comment.trim().slice(0, AGAIN_COMMENT_MAX) : '');
+
+  if (action === 'again_ask') {
+    const attempt = await handedIn();
+    if (await askAgain(attempt, body.question_id, askComment(), titleFor(await lessonName()), new Date().toISOString())) await markInsightChanged(store, lessonId);
+  }
+
+  if (action === 'again_cancel') {
+    const { device, n, start } = await handedIn();
+    const marks = (await read(store, k.marks(device, n))) ?? {};
+    const redo = againOf(marks, body.question_id);
+    if (!redo) reject(404, 'not_found', 'Nothing was asked on that answer.');
+    if (sentResponse(redo)) reject(409, 'sent', 'Their new answer is already back. Mark it instead.');
+    const asks = { ...marks[AGAIN] };
+    if (redo.prev) asks[body.question_id] = redo.prev;
+    else delete asks[body.question_id];
+    const next = { ...marks, [AGAIN]: asks };
+    if (!Object.keys(asks).length) delete next[AGAIN];
+    await store.setJSON(k.marks(device, n), next);
+    await store.delete(againWorkingKey(lessonId, device, n, body.question_id));
+    if (start.class_id && start.student_id) await unaskOnPiece(store, { classId: start.class_id, studentId: start.student_id, lessonId, questionId: body.question_id });
+    await markInsightChanged(store, lessonId);
+  }
+
+  // Every student in the class who left this question blank, asked in one go.
+  if (action === 'again_blank') {
+    // No class named: every class that has this lesson.
+    const classIds = body.class_id ? [String(body.class_id)] : (await classesForLesson(store, lessonId)).map((c) => c.id);
+    const questionId = String(body.question_id ?? '');
+    const blank = [];
+    for (const classId of classIds) {
+      const insight = await classInsight(store, lessonId, classId, loaded, { family: false });
+      if (insight?.class_id) blank.push(...insight.attempts.filter((a) => a.rows.some((r) => r.id === questionId && r.unanswered) && !a.asked_again?.some((q) => q.id === questionId)));
+    }
+    const now = new Date().toISOString();
+    const title = titleFor(await lessonName());
+    let asked = 0;
+    for (const a of blank) {
+      const match = ATTEMPT_ID.exec(a.attempt_id);
+      if (!match) continue;
+      body.attempt_id = a.attempt_id;
+      if (await askAgain(await handedIn(), questionId, askComment(), title, now)) asked += 1;
+    }
+    if (asked) await markInsightChanged(store, lessonId);
+    return { asked };
+  }
+
   if (action === 'mark') {
     const { device, n, rec } = await handedIn();
     const entry = entryFor(rec, body.question_id);
@@ -1045,7 +1181,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     await markInsightChanged(store, lessonId);
   }
 
-  if (action === 'attempt' || action === 'mark') {
+  if (action === 'attempt' || action === 'mark' || action === 'again_ask' || action === 'again_cancel') {
     const { device, n, start, result, rec } = await handedIn();
     const [marks, aiMarks, logs] = await Promise.all([read(store, k.marks(device, n)), read(store, k.aiMarks(device, n)), read(store, k.writing(device, n))]);
     const scored = scoreAttempt(rec, result, marks, aiMarks);
@@ -1185,7 +1321,7 @@ export async function quizAnswersToMark(store, lessonId, classId, students) {
       }
       questions.get(row.id).answers.push({
         attempt_id: a.attempt_id, student_id: a.student, initials: who.get(a.student).initials, name: who.get(a.student).name, submitted_at: a.submitted_at,
-        response: row.response, awarded: row.awarded, by: row.by, ai_ready: waitsForAi(row) && hasAnswer(row.response), ...(row.ai ? { ai: row.ai } : {}), ...(row.comment ? { comment: row.comment } : {})
+        response: row.response, awarded: row.awarded, by: row.by, ai_ready: waitsForAi(row) && hasAnswer(row.response), ...(row.ai ? { ai: row.ai } : {}), ...(row.comment ? { comment: row.comment } : {}), ...(row.again ? { again: row.again } : {})
       });
     }
   });
@@ -1380,6 +1516,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
       max: scored.max,
       pending: scored.pending,
       ai_review: scored.rows.filter((r) => r.by === 'ai').length,
+      asked_again: scored.rows.filter((r) => r.again?.state === 'asked').map((r) => ({ id: r.id, asked_at: r.again.asked_at })),
       practice: scored.practice,
       writing_flags: flaggedAnswers(a.result),
       rows: scored.rows.map((r) => {
@@ -1568,7 +1705,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   let firstAt = null;
   for (const a of insight.attempts) {
     if (!wanted.has(a.student)) continue;
-    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, ai_review: a.ai_review ?? 0, practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
+    scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, ai_review: a.ai_review ?? 0, asked_again: a.asked_again ?? [], practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
   const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store, loaded.record);

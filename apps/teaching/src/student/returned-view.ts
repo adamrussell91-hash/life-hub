@@ -30,7 +30,7 @@ export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew:
     card.append(el('span', `pg-returned__tag is-${item.kind}`, TAG[item.kind]));
     const t = el('span', 'pg-returned__title', item.title);
     if (item.new) t.append(el('span', 'pg-returned__new', 'New'));
-    if (item.redraft) t.append(el('span', 'pg-returned__ask', item.redraft === 'asked' ? 'Redraft asked' : 'Sent to your teacher'));
+    if (item.redraft) t.append(el('span', 'pg-returned__ask', item.redraft === 'asked' ? (item.kind === 'answer' ? 'Have another go' : 'Redraft asked') : 'Sent to your teacher'));
     card.append(t, el('span', 'pg-returned__meta', `Returned ${item.date}`), el('span', 'pg-returned__chev', '›'));
     card.addEventListener('click', () => onOpen(item.id, Boolean(item.new)));
     box.append(card);
@@ -157,8 +157,10 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: 
     root.append(sideBoxes(p));
     return root;
   }
+  // A quiz answer sent back is one question, so it's "another go", not a redraft.
+  const answer = p.kind === 'answer';
   if (p.sent) root.append(el('p', 'pg-ask', 'Sent. Your teacher has it.'));
-  else if (p.redraft) root.append(el('p', 'pg-ask', p.redraft.scope === 'whole' ? 'Your teacher asked for a redraft of this piece.' : 'Your teacher asked for a redraft of one section.'));
+  else if (p.redraft) root.append(el('p', 'pg-ask', answer ? 'Your teacher asked you to have another go at this question. Read their comment, then write your new answer.' : p.redraft.scope === 'whole' ? 'Your teacher asked for a redraft of this piece.' : 'Your teacher asked for a redraft of one section.'));
   const canRewrite = Boolean(p.redraft && o.redraft);
   const cols = el('div', 'pg-piece__cols');
   const left = el('div');
@@ -167,12 +169,12 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: 
   let view: View = canRewrite ? 'write' : 'latest';
   const earlier = [...(p.drafts ?? [])].reverse();
   const tabs: Array<[View, string]> = [
-    ...(canRewrite ? [['write', 'Your redraft'] as [View, string]] : []),
-    ...(earlier.length || canRewrite ? [['latest', `Draft ${p.draft ?? 1}`] as [View, string]] : []),
+    ...(canRewrite ? [['write', answer ? 'Your new answer' : 'Your redraft'] as [View, string]] : []),
+    ...(earlier.length || canRewrite ? [['latest', answer ? 'Your first answer' : `Draft ${p.draft ?? 1}`] as [View, string]] : []),
     ...earlier.map((d) => [d.n, `Draft ${d.n}`] as [View, string])
   ];
   // The editor keeps its words when the student flips to read their feedback.
-  const editor = canRewrite ? redraftEditor(o.redraft!, () => o.onSent?.()) : null;
+  const editor = canRewrite ? redraftEditor(o.redraft!, () => o.onSent?.(), answer ? 'Send my new answer' : undefined) : null;
   const paint = (): void => {
     left.replaceChildren();
     if (tabs.length > 1) {

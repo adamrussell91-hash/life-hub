@@ -115,7 +115,7 @@ const quiz = () => ({
       ]),
       passage: [{ text: 'The road follows the ' }, { gap: 'g1', answers: ['river', 'creek'] }, { text: ' and cuts through ' }, { gap: 'g2', answers: ['the communities'] }, { text: ', and the past keeps rising to the ' }, { gap: 'g3', answers: ['surface'] }, { text: '.' }]
     },
-    { ...question('q_short2', 'short_answer', 1, 'Which word tells you the speaker is certain?', [answer(1, 'surely')]), accepted: ['clearly'], looking_for: 'The judging word in the critic’s claim.' },
+    { ...question('q_short2', 'short_answer', 1, 'Which word tells you the speaker is certain?', [answer(1, 'surely'), answer(2, 'the word clearly shows she is sure', { again: { state: 'sent', asked_at: '2026-11-03T00:00:00Z', sent_at: '2026-11-04T00:00:00Z', comment: 'Have a go: find the word in the claim.', first: { text: '' } } })]), accepted: ['clearly'], looking_for: 'The judging word in the critic’s claim.' },
     question('q_form', 'extended_response', 8, FORM_PROMPT, [answer(1, FORM_ANSWER, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 6, reason: 'Links the form to the idea, with two specific moments.' } } : {})]),
     question('q_written', 'extended_response', 4, 'Justify how the critic’s claims affirm or challenge a reader’s relationship with the past.', [
       answer(0, WRITTEN, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 3, reason: 'Uses a judging word and links to the poem. The link to the reader stays general.', feedback: 'You name a judging word and show what it does. Next, say what this asks of the reader.', tags: [{ code_id: 'comp_e', quote: 'Using “clearly” shows she is sure', why: 'Names the judging word and what it does' }, { code_id: 'comp_ar', quote: 'the past is still being dealt with now', why: 'Close to the question, but says no more about the reader' }] } } : {})
@@ -128,7 +128,7 @@ const queue = () => {
   return {
     tasks: [
       { ...base, kind: 'voice', what: 'Recordings to return', title: 'Viva Practice 1', lesson_id: 'lesson_viva', block_id: 'blk_viva', waiting: open.length, ai_ready: aiDone ? 0 : open.length, rows: open.map((t) => ({ id: t.id, student_id: t.student_id, initials: t.initials, has_transcript: true, ai_read: aiDone })) },
-      { ...base, kind: 'quiz', what: 'Quiz answers to mark', title: 'Week 3 Review', lesson_id: 'lesson_quiz', waiting: 4, rows: [] },
+      { ...base, kind: 'quiz', what: 'Quiz answers to mark', title: 'Week 3 Review', lesson_id: 'lesson_quiz', waiting: 4, rows: [], asked: [{ initials: 'JS', asked_at: '2026-11-03T00:00:00Z' }] },
       { ...base, kind: 'piece', what: 'Handed-in work', title: 'Your own road', lesson_id: 'lesson_road', column_id: 'col_road', waiting: 1, rows: [{ student_id: 'st_ev', initials: 'EV' }] },
       { ...base, kind: 'sprint', what: 'Sprint reflections to mark', title: 'Design sprint', lesson_id: 'lesson_sprint', column_id: 'col_sprint', waiting: 1, rows: [{ student_id: 'st_rk', initials: 'RK' }] },
       { ...base, kind: 'handup', what: 'Lecture hand-ups', title: 'Lecture 2', lesson_id: 'lesson_lecture', waiting: 1, rows: [{ id: `${'b'.repeat(24)}~abcdef`, source: 'lecture', initials: 'JS', text: 'Is correlation enough to say one thing causes another if the sample is really big?', scene_label: 'At 4:12' }] }
@@ -188,7 +188,20 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 };
 
 const mount = document.getElementById('mount')!;
-if (new URLSearchParams(location.search).has('student')) {
+if (new URLSearchParams(location.search).get('student') === 'again') {
+  // A quiz answer sent back for another go, as the student opens it from Returned work.
+  mount.replaceChildren(pieceView({
+    id: 'q:lesson_quiz:q_written', kind: 'answer', title: 'Week 3 Review: question 5', date: '3 November', comment: 'Have a go at this one: name the judging word, then say what it asks of the reader.',
+    text: { answer: { text: '' } }, tags: [], criteria: [], redraft: { scope: 'whole' }
+  }, () => undefined, {
+    redraft: {
+      load: async () => ({ scope: 'whole', text: { answer: { text: '' } }, prompts: { text: 'Justify how the critic’s claims affirm or challenge a reader’s relationship with the past.' }, working: {} }),
+      save: async (part, field, text) => { sent.push({ again_save: { part, field, text } }); return { saved: true }; },
+      send: async () => { sent.push({ again_send: true }); return { sent: true }; }
+    },
+    onSent: () => mount.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Sent. Your teacher has it.' }))
+  }));
+} else if (new URLSearchParams(location.search).has('student')) {
   mount.replaceChildren(pieceView({
     id: 'p1', kind: 'answer', title: 'Week 3 Review', date: '3 November', comment: 'Your reading of the repeated word is the best part of this.',
     text: { answer: { text: FORM_ANSWER } }, tags: [], criteria: [],

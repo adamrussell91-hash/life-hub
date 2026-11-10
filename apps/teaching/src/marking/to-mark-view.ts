@@ -21,7 +21,7 @@ export type ToMarkTask = {
   answers?: number;
   who?: string[];
   rows?: unknown[];
-  /** Students asked for a redraft, whose rewrite hasn't come back yet. */
+  /** Students asked for a redraft, or another go at a quiz answer, whose rewrite hasn't come back yet. */
   asked?: { initials: string; asked_at: string }[];
   /** Takes on a tagged viva question the AI could still read. */
   ai_ready?: number;
@@ -72,7 +72,7 @@ function row(t: ToMarkTask): HTMLElement {
   text.append(head, el('p', 'tm-task__where', where));
   const who = whoText(t);
   if (who) text.append(el('p', 'tm-task__who', who));
-  if (t.asked?.length) text.append(el('p', 'tm-task__asked', `Redraft asked: ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
+  if (t.asked?.length) text.append(el('p', 'tm-task__asked', `${t.kind === 'quiz' ? 'Asked again' : 'Redraft asked'}: ${t.asked.map((a) => `${a.initials} (${ageText(a.asked_at)})`).join(', ')}`));
   const age = el('span', 'tm-age', t.oldest_at ? ageText(t.oldest_at) : 'open');
   const count = el('span', 'tm-count', t.waiting ? `${t.waiting} waiting` : `${t.handed_in ?? 0} in`);
   item.append(text);
