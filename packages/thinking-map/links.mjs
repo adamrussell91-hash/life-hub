@@ -96,7 +96,9 @@ export const PROTOCOL_LINKS = Object.freeze([
   // Witness: a closed thread
   l('gt_project_evaluation', 'protocol:witness', 'A finished project can have its thinking audited.'),
   l('cb_postmortem', 'protocol:witness', 'A postmortem asks how far to trust the reasoning, not only the result.'),
-  l('dm_feedback_analysis', 'protocol:witness', 'Comparing what you expected with what happened invites an audit.')
+  l('dm_feedback_analysis', 'protocol:witness', 'Comparing what you expected with what happened invites an audit.'),
+  // Refinery: a view worth testing rather than defending
+  l('rb_scout', 'protocol:refinery', 'A view you have been defending can be built, broken and rebuilt to see what survives.')
 ]);
 
 /** Tool-level links, so every tool has a way in and out. */

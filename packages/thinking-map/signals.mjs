@@ -82,7 +82,8 @@ export const SECTION_SIGNALS = Object.freeze({
     workplace: ['group', 'stuck'],
     change: ['change_over_time'],
     people: ['self_knowledge', 'person'],
-    life: ['values', 'future']
+    life: ['values', 'future'],
+    models: ['argument']
   }),
   'change-book': Object.freeze({
     explaining_our_world: ['change_over_time', 'future'],
@@ -147,6 +148,12 @@ export const ID_SIGNALS = Object.freeze({
   rb_region_beta: ['stuck'],
   rb_one_step: ['getting_started'],
   rb_chesterton: ['choice'],
+  rb_first_principles: ['stuck'],
+  rb_second_order: ['future', 'change_over_time'],
+  rb_hanlon: ['person'],
+  rb_circle_competence: ['self_knowledge', 'choice'],
+  rb_probabilistic: ['future', 'choice'],
+  rb_scout: ['self_knowledge'],
   ch_decision: ['choice'],
   ch_climate_disaster: ['ethics', 'future'],
   ch_othering: ['person', 'ethics'],
