@@ -1,0 +1,626 @@
+/* Comparative judgement block. Panels, fields, chips and print lines come from peer-feedback.css. */
+
+.cj-run,
+.cj-student__body,
+.cj-teacher__body,
+.cj-teacher__run,
+.cj-step,
+.cj-judge,
+.cj-results,
+.cj-display {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.cj-controls,
+.cj-progress-panel,
+.cj-fold,
+.cj-fold__body,
+.cj-section,
+.cj-signal {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cj-run [hidden] {
+  display: none;
+}
+
+.cj-criterion {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.cj-progress,
+.cj-step__eyebrow {
+  margin: 0;
+}
+
+.cj-step__lead {
+  margin: 0;
+}
+
+.cj-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.cj-input:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: 1px;
+}
+
+.cj-input--num {
+  width: 6rem;
+}
+
+/* ── Pair of answers: stacked on a phone, side by side when there is room ── */
+
+.cj-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .cj-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cj-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.cj-card__label {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cj-card__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: var(--leading-normal);
+}
+
+.cj-chips {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+}
+
+.cj-chips__q {
+  margin: 0;
+}
+
+.cj-chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cj-chip {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.8rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.cj-chip[aria-pressed="true"] {
+  color: var(--pastel-sage-ink);
+  background: var(--pastel-sage);
+  border-color: var(--pastel-sage-ink);
+}
+
+.cj-chip[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.cj-chip:focus-visible,
+.cj-choose__btn:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: 2px;
+}
+
+.cj-choose {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.cj-choose .btn {
+  min-height: 2.75rem;
+}
+
+.cj-thirds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+@media (min-width: 560px) {
+  .cj-thirds {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cj-feedback {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--pastel-blue);
+  border-radius: var(--radius-md);
+}
+
+.cj-feedback[data-match="true"] {
+  background: var(--success-surface);
+}
+
+.cj-feedback p {
+  margin: 0;
+}
+
+.cj-reflect {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cj-claim {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.cj-claim__input {
+  max-width: 10rem;
+  text-transform: uppercase;
+}
+
+.cj-third {
+  margin: 0;
+}
+
+/* ── Teacher ─────────────────────────────────────────────────────── */
+
+.cj-class {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cj-class:empty {
+  display: none;
+}
+
+.cj-class__select {
+  max-width: 100%;
+}
+
+.cj-controls__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cj-controls__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.cj-fold {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.cj-fold__summary {
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.cj-fold__body,
+.cj-fold > .cj-table-scroll,
+.cj-fold > .pf-note {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.cj-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cj-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.cj-table th,
+.cj-table td {
+  padding: var(--space-2);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.cj-table th {
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.cj-table tr[data-match="true"] td:last-child {
+  color: var(--success);
+}
+
+.cj-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cj-who {
+  font-weight: var(--weight-medium);
+  margin-right: var(--space-2);
+}
+
+.cj-meter {
+  width: 5rem;
+  vertical-align: middle;
+}
+
+.cj-meter__text {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cj-tick {
+  color: var(--muted);
+}
+
+.cj-tick.is-yes {
+  color: var(--success);
+  font-weight: var(--weight-semibold);
+}
+
+.cj-results__top {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.cj-signal {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--warning-surface);
+}
+
+.cj-signal--feedback {
+  background: var(--pastel-blue);
+}
+
+.cj-signal--marks {
+  background: var(--success-surface);
+}
+
+.cj-signal p {
+  margin: 0;
+}
+
+.cj-signal__title {
+  font-weight: var(--weight-semibold);
+}
+
+.cj-section {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cj-section__title {
+  margin: 0;
+}
+
+.cj-rank {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cj-rank__row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.cj-rank__row.is-anchor {
+  background: var(--pastel-gold);
+  border-color: transparent;
+}
+
+.cj-rank__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cj-rank__n {
+  min-width: 1.5rem;
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cj-rank__name {
+  font-weight: var(--weight-medium);
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cj-rank__mark {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.cj-rank__wins {
+  font-size: var(--text-xs);
+}
+
+.cj-rank__bar {
+  position: relative;
+  display: block;
+  height: 0.375rem;
+  border-radius: var(--radius-full);
+  background: var(--line);
+}
+
+.cj-rank__bar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--cj-at, 50%);
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--marine);
+  transform: translate(-50%, -50%);
+}
+
+.cj-rank__text {
+  margin: 0;
+  padding: 0;
+}
+
+.cj-rank__text summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.cj-rank__text .cj-card__text {
+  padding-top: var(--space-2);
+}
+
+.cj-chipgap {
+  width: 30%;
+}
+
+.cj-chipgap__bar {
+  display: block;
+  width: var(--cj-w, 0%);
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--success);
+}
+
+.cj-chipgap__bar.is-neg {
+  background: var(--muted);
+}
+
+.cj-judges,
+.cj-reflections {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cj-marks {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cj-marks p {
+  margin: 0;
+}
+
+.cj-marks__push {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.cj-marks__push .pf-field {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+/* Display: big readable cards for whole-class talk. */
+.cj-display__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.cj-teacher--display .cj-card__text {
+  font-size: var(--text-lg);
+}
+
+.cj-exemplars {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* ── Editor ──────────────────────────────────────────────────────── */
+
+.cj-editor__group {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cj-editor__row {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cj-editor__row .bs-select {
+  max-width: 100%;
+}
+
+.cj-editor__chips {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cj-editor__chip,
+.cj-editor__anchorfoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cj-editor__chip .cj-input {
+  flex: 1 1 12rem;
+}
+
+.cj-editor__pair,
+.cj-editor__anchor {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  min-width: 0;
+  justify-items: start;
+}
+
+.cj-editor__pair > .cj-pair,
+.cj-editor__pair > .pf-field,
+.cj-editor__anchor > .pf-field {
+  width: 100%;
+}
+
+.cj-editor__pairtitle {
+  margin: 0;
+}
+
+.cj-editor__better {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cj-editor__radio,
+.cj-editor__togglerow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cj-editor__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cj-editor__settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.cj-editor__toggle {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.cj-editor__toggle .pf-field__hint {
+  margin: 0;
+}
+
+/* ── Print ───────────────────────────────────────────────────────── */
+
+.cj-print {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.cj-print__chips {
+  margin: 0;
+}
+
+.cj-print__pair {
+  display: grid;
+  gap: var(--space-2);
+  break-inside: avoid;
+}
+
+@media print {
+  .cj-print .cj-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

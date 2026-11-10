@@ -96,6 +96,13 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'brainstorm':
       push(parts, c.question);
       break;
+    case 'comparative_judgement': {
+      const cj = c as { title?: string; criterion?: string; chips?: string[] };
+      push(parts, cj.title);
+      push(parts, cj.criterion);
+      for (const chip of cj.chips ?? []) push(parts, chip);
+      break;
+    }
     case 'explainer': {
       const ex = c as { title?: string; text?: unknown; recording?: { events?: Array<{ kind?: string; html?: string; prompt?: string }> } };
       push(parts, ex.title);

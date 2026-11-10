@@ -1073,6 +1073,7 @@ var BlockTypeSchema = z12.enum([
   "brainstorm",
   "hinge_question",
   "explainer",
+  "comparative_judgement",
   "continuum_line",
   "curriculum_lines",
   "quiz_question",
@@ -2621,6 +2622,48 @@ var ExplainerBlockSchema = z12.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var CJ_DEFAULT_CRITERION = "Which answer is stronger overall?";
+var CJ_DEFAULT_CHIPS = ["Precise quote", "Clear argument", "Analyses effect"];
+var CjSourceSchema = z12.object({
+  /** '' = this lesson. */
+  lesson_id: z12.string().max(80).default(""),
+  block_id: z12.string().max(80).default(""),
+  question_id: z12.string().max(80).default("")
+});
+var CjCalibrationSchema = z12.object({
+  id: z12.string().min(1).max(60),
+  left: z12.string().max(4e3).default(""),
+  right: z12.string().max(4e3).default(""),
+  better: z12.enum(["left", "right"]).default("left"),
+  reason: z12.string().max(300).default("")
+});
+var CjAnchorSchema = z12.object({
+  id: z12.string().min(1).max(60),
+  text: z12.string().max(4e3).default(""),
+  mark: z12.number().min(0).max(100).nullable().default(null)
+});
+var ComparativeJudgementBlockSchema = z12.object({
+  id: z12.string().min(1),
+  type: z12.literal("block"),
+  block_type: z12.literal("comparative_judgement"),
+  variant: z12.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z12.object({
+    title: z12.string().max(200).optional(),
+    source: CjSourceSchema.default({ lesson_id: "", block_id: "", question_id: "" }),
+    criterion: z12.string().max(300).default(CJ_DEFAULT_CRITERION),
+    chips: z12.array(z12.string().max(40)).max(8).default(CJ_DEFAULT_CHIPS),
+    calibration: z12.array(CjCalibrationSchema).max(3).default([]),
+    anchors: z12.array(CjAnchorSchema).max(6).default([]),
+    per_student: z12.number().int().min(4).max(20).default(8),
+    show_third: z12.boolean().default(false),
+    teacher_weight: z12.union([z12.literal(1), z12.literal(2), z12.literal(3)]).default(2),
+    downweight_misfits: z12.boolean().default(true),
+    out_of: z12.number().min(1).max(100).default(20)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
 function refineExplainerRecording(block, ctx) {
   const rec = block.content.recording;
   if (!rec) return;
@@ -2730,6 +2773,7 @@ var leafBlockSchemas = [
   BrainstormBlockSchema,
   HingeQuestionBlockSchema,
   ExplainerBlockSchema,
+  ComparativeJudgementBlockSchema,
   ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
@@ -3010,6 +3054,8 @@ export {
   BlockSchema,
   BlockTypeSchema,
   BrainstormBlockSchema,
+  CJ_DEFAULT_CHIPS,
+  CJ_DEFAULT_CRITERION,
   CalloutBlockSchema,
   CalloutStyleSchema,
   CardStackBlockSchema,
@@ -3020,6 +3066,9 @@ export {
   ChartSeriesColorSchema,
   ChartSeriesSchema,
   ChartTypeSchema,
+  CjAnchorSchema,
+  CjCalibrationSchema,
+  CjSourceSchema,
   ClassroomToolIdSchema,
   ClassroomToolsBlockSchema,
   ClozeBlockSchema,
@@ -3029,6 +3078,7 @@ export {
   ColumnChildBlockSchema,
   ColumnPresetSchema,
   ColumnsBlockSchema,
+  ComparativeJudgementBlockSchema,
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
   ContinuumLineBlockSchema,
