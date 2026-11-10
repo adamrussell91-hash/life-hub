@@ -6,7 +6,7 @@
 import { isDeletedRecord } from './record-liveness.mjs';
 import { read } from './question-drop.mjs';
 import { subjectKey, SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
-import { listBlobKeys } from './blobs-list.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { filterBlocksForStudent } from './teaching-student.mjs';
 import { publicNetworkLines } from './teaching-network.mjs';
 
@@ -45,7 +45,7 @@ export async function unitMapPayload(store, roster, unit, lessons) {
   const keep = new Set(content.concept_lines ?? []);
   const lines = all.filter((l) => l.mode !== 'metro' || !keep.size || keep.has(l.id));
   const ids = new Set(lessons.map((l) => l.id));
-  const rows = (await Promise.all((await listBlobKeys(store, SCHEDULED_LESSON_PREFIX)).map((key) => read(store, key))))
+  const rows = (await mapBounded(await listBlobKeys(store, SCHEDULED_LESSON_PREFIX), 8, (key) => read(store, key)))
     .filter((r) => r && !isDeletedRecord(r) && r.class_id === roster.cls.id && ids.has(r.lesson_id) && r.delivery_status !== 'skipped' && typeof r.date === 'string');
   return {
     content,

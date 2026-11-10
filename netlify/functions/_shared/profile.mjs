@@ -13,7 +13,7 @@ import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
-import { markbookAction } from './markbook.mjs';
+import { classLessonIds, quizColumns, readBook, workColumns } from './markbook.mjs';
 import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, vivaHistoryFor, classSkillRungs } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
@@ -21,6 +21,8 @@ import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
 import { deleteTeacherNote, saveTeacherNote, teacherNotes } from './teacher-notes.mjs';
 import { teacherHabits } from './teacher-habits.mjs';
 import { todoFor } from './profile-todo.mjs';
+import { mapBounded } from './blobs-list.mjs';
+import { requestStore } from './request-store.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -37,9 +39,11 @@ async function unitLessons(store, cls) {
   const lessons = [];
   /** Each lesson's published copy, by id: the To do panel reads its countdowns and question sets. */
   const published = new Map();
-  for (const id of unit?.lesson_ids ?? []) {
-    if (!isSafeId(id)) continue;
-    const [lesson, copy] = await Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]);
+  // Read side by side, kept in unit order.
+  const ids = (unit?.lesson_ids ?? []).filter((id) => isSafeId(id));
+  const found = await mapBounded(ids, 8, (id) => Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]));
+  for (const [i, id] of ids.entries()) {
+    const [lesson, copy] = found[i];
     // Students only ever see lessons that are published and not trashed.
     if (!lesson || !copy || !lesson.title || isDeletedRecord(lesson)) continue;
     const role = routeRoleOf(unit, lesson);
@@ -116,19 +120,35 @@ export function mapRows(lessons, view, done, studentId) {
   });
 }
 
+/**
+ * The markbook load as one student's page needs it. Quizzes stay class-wide, since a lesson
+ * draws as a quiz once anyone in the class has a go; written work is read for this student only.
+ */
+async function studentView(store, roster, student) {
+  const [{ book }, lessonIds] = await Promise.all([readBook(store, roster.cls.id), classLessonIds(store, roster)]);
+  const self = { ...roster, students: roster.students.filter((s) => s.id === student.id) };
+  const [quizzes, work] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, self, lessonIds)]);
+  return { markbook: book, quizzes, work };
+}
+
 /** The student's own unit: their lessons, the map's rows, each lesson's published copy and the markbook load. */
 async function unitState(store, roster, student) {
   const classId = roster.cls.id;
-  const { unit, lessons: unitList, published } = await unitLessons(store, roster.cls);
-  const view = await markbookAction(store, classId, { action: 'load', skip_done: true });
-  const done = await listDone(store, classId, student.id);
+  // None of the three needs another, so they load side by side.
+  const [{ unit, lessons: unitList, published }, view, done] = await Promise.all([
+    unitLessons(store, roster.cls),
+    studentView(store, roster, student),
+    listDone(store, classId, student.id)
+  ]);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
   const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
   return { unit, lessons, published, view, done, rows: mapRows(lessons, view, done, student.id) };
 }
 
 /** The My progress payload: feedback, the map and the To do panel beside it. The teacher's read gets the same. */
-async function progressPage(store, roster, student, now) {
+async function progressPage(rawStore, roster, student, now) {
+  // The page's helpers share the class, markbook, schedule and pieces: each is read once.
+  const store = requestStore(rawStore);
   const state = await unitState(store, roster, student);
   const [progress, map, todo] = await Promise.all([
     progressFor(store, roster, student),
@@ -143,7 +163,8 @@ async function mapPayload(store, roster, { unit, lessons, rows }) {
   return { lessons: rows, next, unit: await unitMapPayload(store, roster, unit, lessons) };
 }
 
-async function profileFor(store, roster, student) {
+async function profileFor(rawStore, roster, student) {
+  const store = requestStore(rawStore);
   return { need: null, initials: student.initials, map: await mapPayload(store, roster, await unitState(store, roster, student)) };
 }
 
