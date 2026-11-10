@@ -95,6 +95,7 @@ import { renderWhatHowWhy } from '@/blocks/what-how-why';
 import { renderBrainstorm, createBrainstormEditor } from '@/blocks/brainstorm';
 import { renderHingeQuestion, createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { renderExplainer, createExplainerEditor } from '@/blocks/explainer';
+import { renderComparativeJudgement, createComparativeJudgementEditor } from '@/blocks/comparative-judgement';
 import { renderContinuumLine, createContinuumLineEditor } from '@/blocks/continuum-line';
 import { renderCurriculumLines, createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
@@ -210,6 +211,7 @@ export const blockRegistry: {
   brainstorm: { render: renderBrainstorm, createEditor: createBrainstormEditor },
   hinge_question: { render: renderHingeQuestion, createEditor: createHingeQuestionEditor },
   explainer: { render: renderExplainer, createEditor: createExplainerEditor },
+  comparative_judgement: { render: renderComparativeJudgement, createEditor: (block, onChange) => createComparativeJudgementEditor(block, onChange) },
   continuum_line: { render: renderContinuumLine, createEditor: createContinuumLineEditor },
   curriculum_lines: { render: renderCurriculumLines, createEditor: (block, onChange) => createCurriculumLinesEditor(block, onChange) },
   done: { render: renderDone, createEditor: (block, onChange) => createDoneEditor(block, onChange) },

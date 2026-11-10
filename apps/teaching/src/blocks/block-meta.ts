@@ -35,6 +35,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   brainstorm: 'Gather quick answers from the class and show them together on one board.',
   hinge_question: 'A quick check at the turning point of a lesson. Each wrong answer names a misconception, so you know whether to move on.',
   explainer: 'Record yourself talking through a text while you mark it up. Students replay your voice and marks together.',
+  comparative_judgement: 'Students pick the stronger of two anonymous answers from the class. Builds a fair ranking, shared standards and talk about quality.',
   continuum_line: 'Students place a statement on a line and defend it. Hidden until you reveal.',
   curriculum_lines: 'Map the unit as a transit map: strands of learning, lesson stations and the assessment.',
   done: 'Students tap to mark the lesson finished.',
@@ -87,7 +88,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:pdf': 'Embed a PDF document for inline viewing.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["classroom_tools", "countdown", "done", "analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "explainer", "comparative_judgement", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {

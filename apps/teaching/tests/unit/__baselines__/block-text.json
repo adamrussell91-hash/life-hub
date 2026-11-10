@@ -436,6 +436,16 @@
     "text",
     "text"
   ],
+  "every-block/every_comparative_judgement/student": [
+    "Comparative judgement",
+    "Comparative judgement title",
+    "Loading…"
+  ],
+  "every-block/every_comparative_judgement/teacher": [
+    "Comparative judgement",
+    "Comparative judgement title",
+    "Loading…"
+  ],
   "every-block/every_continuum_line/student": [
     "Continuum line",
     "Implied ↔ Not implied",

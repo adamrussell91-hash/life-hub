@@ -244,14 +244,15 @@ describe('createBlock learning activities', () => {
       'faded_example',
       'with_teacher',
       'annotation',
-      'explainer'
+      'explainer',
+      'comparative_judgement'
     ]);
   });
 
   it('excludes lesson-only learning activities from homepage block choices', () => {
     expect(HOMEPAGE_BLOCK_GROUPS.find((group) => group.label === 'Learning')?.types).toEqual(['question_set']);
     expect(HOMEPAGE_BLOCK_GROUPS.flatMap((group) => group.types)).not.toEqual(
-      expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', 'explainer'])
+      expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', 'explainer', 'comparative_judgement'])
     );
   });
 

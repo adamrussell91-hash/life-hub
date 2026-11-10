@@ -57,6 +57,33 @@ async function changeBook(store, classId, fn) {
   reject(409, 'changed', 'The markbook changed in another tab. Reload to see it.');
 }
 
+/**
+ * Adds a new column with marks for students on the class list, in one write.
+ * Each part is checked the way save_column and set_mark check it. Returns how many marks went in.
+ */
+export async function addColumnWithMarks(store, classId, column, marks) {
+  const roster = await loadRoster(store, classId);
+  if (!roster) reject(404, 'not_found', 'Class not found.');
+  const checked = checkColumn(column);
+  if ('problem' in checked) reject(400, 'bad_column', checked.problem);
+  const kept = {};
+  for (const [studentId, value] of Object.entries(marks ?? {})) {
+    if (!roster.students.some((s) => s.id === studentId)) continue;
+    const mark = checkMark(checked.column, value);
+    if ('problem' in mark) reject(400, 'bad_mark', mark.problem);
+    kept[studentId] = mark.mark;
+  }
+  await changeBook(store, classId, (book) => {
+    if (book.columns.some((c) => c.id === checked.column.id)) reject(409, 'exists', 'That column is already there.');
+    if (book.columns.length >= MARKBOOK_LIMITS.columns) reject(400, 'too_many', 'This markbook is full.');
+    book.columns.push(checked.column);
+    book.marks[checked.column.id] = kept;
+    return book;
+  });
+  await markWalkthruDirty(store);
+  return Object.keys(kept).length;
+}
+
 /** This class's live calendar rows. */
 async function scheduledRows(store, classId) {
   const rowKeys = (await listBlobKeys(store, SCHEDULED_LESSON_PREFIX)).filter((key) => !key.endsWith('/_index'));

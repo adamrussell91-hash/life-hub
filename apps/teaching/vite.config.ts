@@ -39,7 +39,15 @@ export default defineConfig({
   // the repo's packages/, and pdf.js comes from the root install.
   server: {
     port: 5173,
-    fs: { allow: [searchForWorkspaceRoot(__dirname), path.resolve(__dirname, '../../packages'), path.resolve(__dirname, '../../node_modules')] }
+    // The comparative judgement preview runs the server's pure maths module in the page.
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(__dirname),
+        path.resolve(__dirname, '../../packages'),
+        path.resolve(__dirname, '../../node_modules'),
+        path.resolve(__dirname, '../../netlify/functions/_shared/cj-maths.mjs')
+      ]
+    }
   },
   test: {
     include: ['tests/**/*.test.ts'],

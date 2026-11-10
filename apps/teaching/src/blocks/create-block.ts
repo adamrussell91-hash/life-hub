@@ -4,6 +4,7 @@ import { starterHingeOptions } from '@/blocks/hinge-question/shared';
 import { starterCurriculumLinesContent } from '@/blocks/curriculum-lines/starter';
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider, WhiteboardStarterId } from '@/schemas/block';
+import { CJ_DEFAULT_CHIPS, CJ_DEFAULT_CRITERION } from '@/schemas/block';
 import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
 import { analogyMoveContent } from '@/toolkit/analogy-moves';
 import {
@@ -47,6 +48,7 @@ export const NEW_BLOCK_TYPES = [
   'brainstorm',
   'hinge_question',
   'explainer',
+  'comparative_judgement',
   'continuum_line',
   'quiz_question',
   'question_set',
@@ -121,6 +123,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
   explainer: 'Explainer',
+  comparative_judgement: 'Comparative judgement',
   continuum_line: 'Continuum line',
   quiz_question: 'Question',
   question_set: 'Question',
@@ -249,7 +252,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'quiz_question', 'question_set', 'question_drop', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation', 'explainer']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'quiz_question', 'question_set', 'question_drop', 'flashcards', 'cloze', 'note_cue', 'faded_example', 'with_teacher', 'annotation', 'explainer', 'comparative_judgement']
   },
   {
     label: 'Visualisation',
@@ -318,6 +321,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   'outcomes',
   'annotation',
   'explainer',
+  'comparative_judgement',
   'anthology'
 ]);
 
@@ -332,7 +336,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', 'explainer', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'done', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', 'explainer', 'comparative_judgement', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -670,6 +674,19 @@ export function createBlock(type: NewBlockType, id: string): Block {
         layout: 'text',
         text: { kind: 'prose', stanzas: [{ id: `${id}_stanza_1`, lines: [{ id: `${id}_line_1`, text: '' }] }] },
         tray: []
+      } };
+    case 'comparative_judgement':
+      return { ...shared, block_type: 'comparative_judgement', variant: 'large', content: {
+        source: { lesson_id: '', block_id: '', question_id: '' },
+        criterion: CJ_DEFAULT_CRITERION,
+        chips: [...CJ_DEFAULT_CHIPS],
+        calibration: [],
+        anchors: [],
+        per_student: 8,
+        show_third: false,
+        teacher_weight: 2,
+        downweight_misfits: true,
+        out_of: 20
       } };
     case 'continuum_line':
       return { ...shared, block_type: 'continuum_line', variant: 'medium', content: {
