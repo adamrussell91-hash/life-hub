@@ -19,7 +19,7 @@
 
 **Size:** a bit smaller than the original Problem Solver build. That build also designed a whole engine and its renderers. This one adds a thin layer, adapters and about seven small views, over engines that already exist. No A$ figure is given.
 
-**Branch / worktree:** `claude/thinking-threads-spec` at `/Users/adamrussell/Projects/life-hub-thinking-threads`. Ships as one PR, with the phases as commits.
+**Branch / worktree:** `claude/thinking-threads-spec` in its own worktree. Ships as one PR, with the phases as commits.
 
 ## Rules for every chunk
 - **Public repo.** Fixtures, tests and comments use invented situations only, for example "choosing between two community garden plots" or "a flatmate who never does the dishes". Code names roles, never people.
