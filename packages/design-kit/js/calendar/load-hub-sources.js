@@ -76,7 +76,62 @@ async function readOkJson(apiFetch, path, init) {
  */
 export function createHubSourceLoader(opts) {
   if (typeof opts?.apiFetch !== 'function') throw new TypeError('apiFetch is required');
-  const apiFetch = opts.apiFetch;
+  const rawFetch = opts.apiFetch;
+
+  // Netlify Blobs reads are eventually consistent: a refetch straight after a tick or a
+  // drag can return the row as it was before the save, and the calendar would undo itself.
+  // Remember what each PATCH saved for a minute and keep it over an older server copy.
+  const WRITE_HOLD_MS = 60_000;
+  /** @type {Map<string, { record: Record<string, any>, at: number }>} */
+  const recentWrites = new Map();
+  const WRITE_PATH = /^\/api\/(tasks|work-blocks)\?id=([^&]+)/;
+
+  /** @param {string} path @param {RequestInit} [init] */
+  async function apiFetch(path, init) {
+    const response = await rawFetch(path, init);
+    const match = String(init?.method || 'GET').toUpperCase() === 'PATCH' ? WRITE_PATH.exec(String(path)) : null;
+    if (match && response.ok && typeof response.clone === 'function') {
+      try {
+        const payload = await response.clone().json();
+        const record = payload?.data;
+        if (payload?.ok !== false && record && typeof record === 'object' && typeof record.updated_at === 'string') {
+          recentWrites.set(`${match[1]}:${decodeURIComponent(match[2])}`, { record, at: Date.now() });
+          holdStatus(match[1] === 'tasks' ? 'task' : 'work_block', decodeURIComponent(match[2]), record);
+        }
+      } catch {
+        /* the caller still reads the original body */
+      }
+    }
+    return response;
+  }
+
+  /** The refetch repaints from the held events before new data lands: keep their status current. */
+  function holdStatus(type, id, record) {
+    if (typeof record.status !== 'string') return;
+    const status = type === 'task' && (record.status === 'done' || record.completed_at) ? 'done' : record.status;
+    buckets.tasks.events = buckets.tasks.events.map((event) =>
+      event?.record?.type === type && event.record.id === id
+        ? { ...event, record: { ...event.record, status } }
+        : event
+    );
+  }
+
+  /** Swap stale rows for the copy this page just saved; forget writes the server has caught up with. */
+  function withRecentWrites(kind, rows) {
+    if (!recentWrites.size || !Array.isArray(rows)) return rows;
+    const now = Date.now();
+    return rows.map((row) => {
+      const key = `${kind}:${row?.id}`;
+      const held = recentWrites.get(key);
+      if (!held) return row;
+      const serverAt = typeof row.updated_at === 'string' ? row.updated_at : '';
+      if (now - held.at > WRITE_HOLD_MS || serverAt >= held.record.updated_at) {
+        recentWrites.delete(key);
+        return row;
+      }
+      return { ...row, ...held.record };
+    });
+  }
   const onChange = typeof opts.onChange === 'function' ? opts.onChange : () => {};
   const loadLife = typeof opts.loadLife === 'function' ? opts.loadLife : null;
   const today = typeof opts.today === 'string' ? opts.today : null;
@@ -171,10 +226,11 @@ export function createHubSourceLoader(opts) {
           ghost: true,
           source: block.source || 'clare'
         }));
+        const tasks = withRecentWrites('tasks', tasksPayload.data?.tasks ?? []);
         const events = [
-          ...tasksEventsFromTasks(tasksPayload.data?.tasks ?? []),
-          ...tasksEventsFromProjects(projectsPayload.data?.projects ?? [], tasksPayload.data?.tasks ?? []),
-          ...tasksEventsFromWorkBlocks(blocksPayload.data?.work_blocks ?? []),
+          ...tasksEventsFromTasks(tasks),
+          ...tasksEventsFromProjects(projectsPayload.data?.projects ?? [], tasks),
+          ...tasksEventsFromWorkBlocks(withRecentWrites('work-blocks', blocksPayload.data?.work_blocks ?? [])),
           ...tasksEventsFromWorkBlocks(ghostBlocks),
           ...tasksEventsFromWorkSessions(
             sessionsPayload.data?.work_sessions ?? [],
@@ -340,6 +396,8 @@ export function createHubSourceLoader(opts) {
   };
 
   return {
+    /** The fetch the calendar writes through, so the loader sees what was just saved. */
+    apiFetch,
     loadAll() {
       return Promise.all([loadHubContext(), ...HUB_SOURCE_IDS.map((id) => loaders[id]())]);
     },

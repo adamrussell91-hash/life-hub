@@ -154,7 +154,7 @@ export function mountHubCalendar(host, adapter) {
     const key = `${range.from}:${range.to}`;
     if (key === ghostsKey) return;
     try {
-      const response = await adapter.apiFetch(
+      const response = await loader.apiFetch(
         `/api/calendar-ghosts?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
       );
       const payload = await response.json().catch(() => null);
@@ -203,7 +203,7 @@ export function mountHubCalendar(host, adapter) {
       fills: adapter.fills ?? {},
       defaultFilter: adapter.defaultFilter ?? defaultFilterForHub(hub),
       routeFor: adapter.routeFor,
-      apiFetch: adapter.apiFetch,
+      apiFetch: loader.apiFetch,
       onNavigate: adapter.onNavigate,
       onReschedule: adapter.onReschedule,
       onQuickAdd: adapter.onQuickAdd,
@@ -255,7 +255,7 @@ export function mountHubCalendar(host, adapter) {
       renderAlmanac(doc, calendarHost, {
         hub,
         now: input.now,
-        apiFetch: adapter.apiFetch,
+        apiFetch: loader.apiFetch,
         onSwitchView: input.onSwitchView,
         routeFor: adapter.routeFor,
         events: input.events,
