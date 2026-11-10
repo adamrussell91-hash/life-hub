@@ -41,13 +41,19 @@ Otherwise reply: {"start": {"optionId": "...", "reason": "one line"}, "likely": 
   return { system, user };
 }
 
+/** One line per snare, for the prompt. */
+export function snareLines(snares) {
+  return snares.map((s) => `- ${s.id} | ${s.title} | ${clip(s.when, 160)}`).join('\n');
+}
+
 /**
  * A check-in at a joint. Suggest only for a real reason to change course: a step that is really a
  * choice, a person or relationship at the centre, a values clash, going in circles, drift from the
  * situation, or answers getting thin. `canHandOver` lets a detour offer to become the home tool.
- * At `returned` the digest is rewritten in the same reply.
+ * At `returned` the digest is rewritten in the same reply. With `snares` (only sent at
+ * `before_commit` and `returned`), the reply may add one caution naming a snare the work shows.
  */
-export function checkInPrompt({ thread, joint, latestStep, options, declined, canSuggest, canHandOver, rewriteDigest }) {
+export function checkInPrompt({ thread, joint, latestStep, options, declined, canSuggest, canHandOver, rewriteDigest, snares = [] }) {
   const system = `${STANCE}
 Most check-ins should be {"verdict": "carry_on"}. Suggest a move only when there is a reason to change course: a step that is really a choice, a person or relationship at the centre, a values clash, going in circles, drift from the situation, or answers getting thin.
 Choose only from THE OPTIONS by id. Never suggest a DECLINED option.`;
@@ -56,6 +62,9 @@ Choose only from THE OPTIONS by id. Never suggest a DECLINED option.`;
     ...(canSuggest ? ['{"verdict": "suggest", "optionId": "...", "reason": "one line the person sees", "why": "two or three lines, folded"}'] : []),
     ...(canHandOver ? ['{"verdict": "hand_over", "reason": "one line", "why": "..."} (this detour has become the real work: offer to make it the home tool)'] : [])
   ];
+  const snareAsk = snares.length
+    ? `\n\nSNARES TO WATCH:\n${snareLines(snares)}\nAlongside any verdict you may add "caution": {"snareId": "...", "line": "one line naming what in the work looks like this"}. Only when something in the work actually shows it; most check-ins have no caution. Use only a snareId from SNARES TO WATCH.`
+    : '';
   const digestAsk = rewriteDigest
     ? `\nAlso rewrite what we know, folding in what came back, under about 150 words in all, as "digest": {"facts": [], "choices": [], "restsOn": [], "openQuestions": []}.`
     : '';
@@ -74,6 +83,6 @@ THE OPTIONS:
 ${optionLines(options)}
 
 Reply with one of:
-${verdicts.join('\n')}${digestAsk}`;
+${verdicts.join('\n')}${digestAsk}${snareAsk}`;
   return { system, user };
 }

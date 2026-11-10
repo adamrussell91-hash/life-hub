@@ -3,9 +3,11 @@
 // Haiku call each, with a 12 second timeout. Its output is checked against the shortlist; an id
 // outside it, or one already declined at this step, is dropped (carry on). If the call fails,
 // triage falls back to the map alone (top 3 for the detected signals, no reasons) and a check-in
-// says carry on quietly. Spend is logged per call.
+// says carry on quietly. Spend is logged per call. At `before_commit` and `returned` the check-in
+// also lists the snares worth watching (from the map, no extra call) and keeps one caution the
+// model names from that list; cautions are never written to the route.
 import { completeMessage } from '../anthropic-client.mjs';
-import { getOption, shortlist, signalsFromText, TOOLS } from '../../../../packages/thinking-map/index.mjs';
+import { getOption, getSnare, shortlist, signalsFromText, snaresFor, TOOLS } from '../../../../packages/thinking-map/index.mjs';
 import { recordRoute, sessionOf, setDigest, wasDeclined } from '../thinking-threads/thread.mjs';
 import { checkInPrompt, triagePrompt } from './prompt.mjs';
 import { recordSpend } from './spend.mjs';
@@ -49,6 +51,27 @@ export function parseJsonReply(text) {
 
 const line = (text, max = 300) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const toolOptions = () => TOOLS.map((t) => getOption(`tool:${t.id}`));
+
+/** The joints at which the guide watches for snares. */
+export const CAUTION_JOINTS = Object.freeze(['before_commit', 'returned']);
+const SNARE_LIMIT = 6;
+
+/** The text a snare is looked for in: the situation, what we know and the latest step. */
+function snareText(thread, latestStep) {
+  const d = thread.digest ?? {};
+  const digest = ['facts', 'choices', 'restsOn', 'openQuestions'].flatMap((k) => (Array.isArray(d[k]) ? d[k] : [])).join(' ');
+  const step = latestStep && typeof latestStep === 'object' ? `${latestStep.title ?? ''} ${latestStep.text ?? ''}` : String(latestStep ?? '');
+  return `${thread.situation ?? ''} ${digest} ${step}`;
+}
+
+/** The model's caution, kept only for a snare that was sent; title and check come from the data. */
+function readCaution(raw, sentIds) {
+  if (!raw || typeof raw !== 'object' || !sentIds.has(raw.snareId)) return null;
+  const said = line(raw.line);
+  const snare = getSnare(raw.snareId);
+  if (!said || !snare) return null;
+  return { snareId: snare.id, title: snare.title, line: said, check: snare.check };
+}
 
 /** The step's own option: what was sent (`latestStep.optionId`) or the session's tool. */
 function stepOption(entry, latestStep) {
@@ -136,9 +159,11 @@ export function createGuide({ model, threads, owner, now = () => new Date().toIS
     const options = shortlist({ signals, fromOptionId, exclude: [...inThread, ...declinedHere], limit: 8 });
     const ids = new Set(options.map((o) => o.id));
     const rewriteDigest = joint === 'returned';
+    const watchText = CAUTION_JOINTS.includes(joint) ? snareText(thread, latestStep) : '';
+    const snares = watchText ? snaresFor({ signals: signalsFromText(watchText), text: watchText, limit: SNARE_LIMIT }) : [];
     let reply;
     try {
-      reply = await call('check_in', checkInPrompt({ thread, joint, latestStep, options, declined: declinedHere, canSuggest: !isDetour, canHandOver: isDetour, rewriteDigest }));
+      reply = await call('check_in', checkInPrompt({ thread, joint, latestStep, options, declined: declinedHere, canSuggest: !isDetour, canHandOver: isDetour, rewriteDigest, snares }));
     } catch (error) {
       log(error);
       return carryOn({ fallback: true });
@@ -165,7 +190,9 @@ export function createGuide({ model, threads, owner, now = () => new Date().toIS
         });
       } catch (error) { log(error); }
     }
-    return verdict;
+    // The caution rides on the verdict; it is never recorded in the route.
+    const caution = snares.length ? readCaution(reply.caution, new Set(snares.map((sn) => sn.id))) : null;
+    return caution ? { ...verdict, caution } : verdict;
   }
 
   return { triage, checkIn };
