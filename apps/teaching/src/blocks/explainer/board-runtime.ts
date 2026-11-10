@@ -61,6 +61,8 @@ export type MountBoardOptions = {
   files?: Record<string, unknown>;
   background?: string;
   editable: boolean;
+  /** Frame the view round these instead of the first picture (playback: everything ever drawn). */
+  fitElements?: readonly ExplainerBoardElement[];
   onChange?: (change: BoardChange) => void;
 };
 
@@ -125,10 +127,17 @@ export function mountBoard(options: MountBoardOptions): BoardHandle {
   };
 
   const fit = () => {
-    if (!api) return;
-    if (api.getSceneElementsIncludingDeleted().some((e) => !e.isDeleted)) {
-      api.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.85, animate: false });
-      if (api.getAppState().zoom.value > 1) api.updateScene({ appState: { zoom: { value: 1 } } });
+    if (!api || !rt) return;
+    const frame = options.fitElements
+      ? (rt.excalidraw.restoreElements(options.fitElements.filter((e) => !e.isDeleted) as never, null) as unknown[])
+      : api.getSceneElementsIncludingDeleted().filter((e) => !e.isDeleted);
+    if (frame.length) {
+      api.scrollToContent(frame, { fitToViewport: true, viewportZoomFactor: 0.85, animate: false });
+      if (api.getAppState().zoom.value > 1) {
+        // Never blow a small drawing up; centre it at full size instead.
+        api.updateScene({ appState: { zoom: { value: 1 } } });
+        api.scrollToContent(frame, { fitToViewport: false, animate: false });
+      }
     }
     const s = api.getAppState();
     view = { scrollX: s.scrollX, scrollY: s.scrollY, zoom: { value: s.zoom.value } };

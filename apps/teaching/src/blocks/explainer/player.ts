@@ -52,6 +52,18 @@ export type Panes = {
   dispose: () => void;
 };
 
+/** Every board element seen at any point in the recording (latest shape of each), for framing playback. */
+export function everyBoardElement(content: ExplainerBlock['content']): ExplainerState['board'] {
+  const seen = new Map<string, ExplainerState['board'][number]>();
+  const times = [0, ...(content.recording?.events ?? []).map((e) => e.t), Number.POSITIVE_INFINITY];
+  for (const t of times) {
+    for (const element of stateAt(content, t).board) {
+      if (!element.isDeleted) seen.set(String(element.id), element);
+    }
+  }
+  return [...seen.values()];
+}
+
 /** The panes for the block's layout: text, board, or both side by side. */
 export function createPanes(
   block: Pick<ExplainerBlock, 'content'>,
@@ -70,8 +82,12 @@ export function createPanes(
   let board: BoardHandle | null = null;
   if (layout !== 'text') {
     const start = opts.boardElements ?? stateAt({ board_start: block.content.board_start }, 0).board;
+    // Playback frames everything drawn across the recording, so nothing lands off-screen later.
+    const fitElements =
+      opts.editableBoard === true ? undefined : everyBoardElement(block.content);
     board = mountBoard({
       elements: start,
+      fitElements,
       files: block.content.board_start?.files,
       background: block.content.board_start?.appState?.viewBackgroundColor,
       editable: opts.editableBoard === true,
