@@ -121,24 +121,68 @@ export function mapRows(lessons, view, done, studentId) {
 }
 
 /**
+ * Where a progress read spends its time. Only the teacher's `progress` with `timing: true` gets
+ * one; every other read runs `untimed`, which adds nothing.
+ */
+const untimed = { time: (_name, fn) => fn(), store: (store) => store };
+function phaseTimer() {
+  const started = Date.now();
+  const phases = {};
+  const blobs = { get: 0, get_ms: 0, get_slowest: 0, list: 0, list_ms: 0, list_slowest: 0 };
+  const count = (kind, ms) => {
+    blobs[kind] += 1;
+    blobs[`${kind}_ms`] += ms;
+    blobs[`${kind}_slowest`] = Math.max(blobs[`${kind}_slowest`], ms);
+  };
+  return {
+    async time(name, fn) {
+      const at = Date.now();
+      try {
+        return await fn();
+      } finally {
+        phases[name] = Date.now() - at;
+      }
+    },
+    /** Counts the reads that reach the real store, under the request cache. */
+    store: (store) => new Proxy(store, {
+      get(target, prop) {
+        if (prop !== 'get' && prop !== 'list') {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+        return async (...args) => {
+          const at = Date.now();
+          try {
+            return await target[prop](...args);
+          } finally {
+            count(prop, Date.now() - at);
+          }
+        };
+      }
+    }),
+    report: () => ({ total_ms: Date.now() - started, phases, blobs })
+  };
+}
+
+/**
  * The markbook load as one student's page needs it. Quizzes stay class-wide, since a lesson
  * draws as a quiz once anyone in the class has a go; written work is read for this student only.
  */
-async function studentView(store, roster, student) {
-  const [{ book }, lessonIds] = await Promise.all([readBook(store, roster.cls.id), classLessonIds(store, roster)]);
+async function studentView(store, roster, student, t = untimed) {
+  const [{ book }, lessonIds] = await Promise.all([t.time('markbook_book', () => readBook(store, roster.cls.id)), t.time('lesson_ids', () => classLessonIds(store, roster))]);
   const self = { ...roster, students: roster.students.filter((s) => s.id === student.id) };
-  const [quizzes, work] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, self, lessonIds)]);
+  const [quizzes, work] = await Promise.all([t.time('quizzes', () => quizColumns(store, roster, book, lessonIds)), t.time('work', () => workColumns(store, self, lessonIds))]);
   return { markbook: book, quizzes, work };
 }
 
 /** The student's own unit: their lessons, the map's rows, each lesson's published copy and the markbook load. */
-async function unitState(store, roster, student) {
+async function unitState(store, roster, student, t = untimed) {
   const classId = roster.cls.id;
   // None of the three needs another, so they load side by side.
   const [{ unit, lessons: unitList, published }, view, done] = await Promise.all([
-    unitLessons(store, roster.cls),
-    studentView(store, roster, student),
-    listDone(store, classId, student.id)
+    t.time('unit_lessons', () => unitLessons(store, roster.cls)),
+    t.time('markbook_view', () => studentView(store, roster, student, t)),
+    t.time('done', () => listDone(store, classId, student.id))
   ]);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
   const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
@@ -146,14 +190,14 @@ async function unitState(store, roster, student) {
 }
 
 /** The My progress payload: feedback, the map and the To do panel beside it. The teacher's read gets the same. */
-async function progressPage(rawStore, roster, student, now) {
+async function progressPage(rawStore, roster, student, now, t = untimed) {
   // The page's helpers share the class, markbook, schedule and pieces: each is read once.
-  const store = requestStore(rawStore);
-  const state = await unitState(store, roster, student);
+  const store = requestStore(t.store(rawStore));
+  const state = await t.time('state', () => unitState(store, roster, student, t));
   const [progress, map, todo] = await Promise.all([
-    progressFor(store, roster, student),
-    mapPayload(store, roster, state),
-    todoFor(store, roster, student, { ...state, now })
+    t.time('feedback', () => progressFor(store, roster, student)),
+    t.time('map', () => mapPayload(store, roster, state)),
+    t.time('todo', () => todoFor(store, roster, student, { ...state, now }))
   ]);
   return { need: null, initials: student.initials, ...progress, map, todo };
 }
@@ -175,7 +219,8 @@ async function profileFor(rawStore, roster, student) {
  * `note_save`, `note_delete`) and `habits`. None of these is in the student's profileAction.
  */
 export async function teacherProfileAction(store, classId, body, { now = new Date() } = {}) {
-  const roster = await loadRoster(store, classId);
+  const t = body?.action === 'progress' && body.timing === true ? phaseTimer() : null;
+  const roster = await (t ?? untimed).time('roster', () => loadRoster(store, classId));
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body?.action ?? 'list';
   if (!['list', 'remove', 'mark', 'progress', 'returned', 'piece', 'skill_rungs', 'notes', 'note_save', 'note_delete', 'habits'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
@@ -190,7 +235,10 @@ export async function teacherProfileAction(store, classId, body, { now = new Dat
       reject(400, 'bad_request', 'Unknown student.');
     }
     const student = roster.students.find((s) => s.id === body.student_id);
-    if (action === 'progress') return { name: student.name, ...(await progressPage(store, roster, student, now)) };
+    if (action === 'progress') {
+      const page = { name: student.name, ...(await progressPage(store, roster, student, now, t ?? untimed)) };
+      return t ? { ...page, timing: t.report() } : page;
+    }
     if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
     if (action === 'piece') return pieceFor(store, roster, student, body.item);
     if (action === 'skill_rungs') return { rungs: (await classSkillRungs(store, classId, [student.id]))[0]?.rungs ?? {} };
