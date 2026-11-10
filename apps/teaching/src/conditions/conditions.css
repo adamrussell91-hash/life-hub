@@ -1,0 +1,278 @@
+/* ── Learning conditions: chip in the lesson meta row, panel above the canvas ── */
+
+.lc-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.75rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lc-chip__mark {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+}
+
+.lc-chip.has-gaps {
+  color: var(--ink);
+}
+
+.lc-chip.has-gaps .lc-chip__mark {
+  border-color: var(--sand);
+  background: color-mix(in oklab, var(--sand) 45%, transparent);
+}
+
+.lc-chip:hover,
+.lc-chip.is-open {
+  border-color: color-mix(in oklab, var(--marine) 35%, var(--line));
+  color: var(--marine);
+}
+
+.lc-chip:focus-visible,
+.lc__btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wave) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.lc {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.lc[hidden] {
+  display: none;
+}
+
+.lc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lc__title,
+.lc__subtitle {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.lc__subtitle {
+  font-size: var(--text-sm);
+}
+
+.lc__intro,
+.lc__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.lc__section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lc__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc__row {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.lc__state {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.lc__row--present .lc__state {
+  color: color-mix(in oklab, var(--shore) 45%, var(--ink));
+}
+
+.lc__row--present .lc__state::before {
+  content: '✓';
+  margin-right: 0.3rem;
+}
+
+.lc__row--missing .lc__state,
+.lc__row--revisit .lc__state {
+  color: var(--ink);
+}
+
+.lc__row--missing .lc__state::before,
+.lc__row--revisit .lc__state::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--sand);
+}
+
+.lc__row--off,
+.lc__row--not_relevant {
+  opacity: 0.7;
+}
+
+.lc__body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.lc__detail,
+.lc__why {
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lc__why {
+  font-style: italic;
+}
+
+.lc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.lc__btn {
+  min-height: 2rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lc__btn:hover {
+  border-color: var(--marine);
+  color: var(--marine);
+}
+
+.lc__btn--primary {
+  border-color: var(--marine);
+  color: var(--marine);
+}
+
+.lc__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.lc__class {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.lc__groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.lc__groups > .lc__note {
+  grid-column: 1 / -1;
+}
+
+.lc__group {
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.lc__names {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Spacing on the unit map */
+.lc-spacing {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-family: var(--font-ui);
+}
+
+.lc-spacing__stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.lc-spacing__stop {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+a.lc-spacing__stop:hover {
+  border-color: var(--marine);
+  color: var(--marine);
+}
+
+/* Stack by the panel's own width: the canvas narrows when the chat is open. */
+@container (max-width: 640px) {
+  .lc__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lc__actions {
+    justify-content: flex-start;
+  }
+
+  .lc__groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .lc {
+    padding: var(--space-3);
+  }
+}

@@ -9,6 +9,7 @@ import { focusAreaFor } from '@/alignment/coverage';
 import { buildCoverageMap, type CoverageMapInput } from '@/network/coverage-map/model';
 import { mountCoverageMap } from '@/network/coverage-map/mount';
 import { unitLines } from '@/network/unit-concepts';
+import { mountSpacingPanel } from '@/conditions/spacing-panel';
 
 /** The map's input for this viewer. Version 1 blocks are converted in memory, never saved here. */
 export function unitNetworkInput(block: CurriculumLinesBlock, ctx: RenderContext): NetInput {
@@ -57,6 +58,8 @@ export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderM
       unitTitle: ctx.network.unitTitle,
       ...(isCurriculumLinesV2(block.content) && block.content.focus_area ? { focusArea: block.content.focus_area } : {})
     });
+    // Dot points taught in one burst, and the later lessons to bring each back in.
+    mountSpacingPanel(root, { lessons: ctx.network.lessons, ...(ctx.network.dates ? { dates: ctx.network.dates } : {}) });
   }
   return root;
 }

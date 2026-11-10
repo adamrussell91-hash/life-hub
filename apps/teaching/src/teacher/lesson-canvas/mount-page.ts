@@ -45,6 +45,7 @@ import { mountOutcomeStrip } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
+import { mountConditionsPanel, type ConditionsPanelOptions } from '@/conditions/conditions-panel';
 import { mountLessonSyllabus } from '@/alignment/lesson-syllabus';
 import { mountOrganiserCard } from '@/organiser/lesson-card';
 import { autoLineIds, syncAutoStops } from '@/alignment/auto-lines';
@@ -206,6 +207,8 @@ export type MountLessonPageOptions = {
   nextSteps?: NextStepJobs;
   /** A page tool started an Ann job: open the chat on it. */
   onAnnStarted?: () => void;
+  /** Learning conditions (src/conditions): the agent hook, the unit's spacing and each class's slot and markbook. */
+  conditions?: Omit<ConditionsPanelOptions, 'getLesson' | 'onOff'>;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
    * editor passes false and carries those items in its single header menu,
@@ -1790,6 +1793,21 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
   metaRow.append(pulseSummary.chip);
   canvasHost.before(pulseSummary.panel);
+
+  // Learning conditions: what the lesson does for attention, memory and readiness. Teacher-only.
+  const conditionsPanel = mountConditionsPanel({
+    ...options.conditions,
+    getLesson: () => lesson,
+    onOff: (ids) => emitLesson({ ...lesson, conditions_off: ids })
+  });
+  metaRow.append(conditionsPanel.chip);
+  canvasHost.before(conditionsPanel.panel);
+  conditionsPanel.refresh();
+  const syncBeforeConditions = afterEmit;
+  afterEmit = () => {
+    syncBeforeConditions();
+    conditionsPanel.refresh();
+  };
   const strip =
     options.subject && options.outcomesCatalog
       ? mountOutcomeStrip(stripHost, {
@@ -1897,6 +1915,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       });
       canvas.update(lesson.blocks, media);
       pulseSummary.refresh();
+      conditionsPanel.refresh();
       strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
       lineChips?.update(lesson.line_stops, lesson.line_off);
     },
