@@ -516,7 +516,9 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     const seat = v.you?.seat;
     const rank = v.you?.rank;
     const card = el('section', 'gm-finish gl-finish');
-    const top = v.teams?.length && seat?.team !== undefined ? v.teams.find((t) => t.team === seat.team)?.rank === 1 : rank === 1;
+    // First place only counts with points on the board: a game nobody scored in has no winner.
+    const mine = v.teams?.length && seat?.team !== undefined ? v.teams.find((t) => t.team === seat.team) : undefined;
+    const top = mine ? mine.rank === 1 && mine.score > 0 : !v.teams?.length && rank === 1 && (seat?.score ?? 0) > 0;
     const heading = el('h3', 'gm-finish__title', top ? 'You won!' : 'Game over');
     heading.tabIndex = -1;
     const big = el('p', 'gm-finish__score');

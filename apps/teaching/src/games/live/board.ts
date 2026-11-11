@@ -91,6 +91,10 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   const toastEl = el('div', 'gl-board__toast');
   toastEl.setAttribute('role', 'status');
   root.append(top, stage, ranks, pause, controls, toastEl);
+  // The controls float over the board's foot; when a kind's buttons wrap them to two rows the stage
+  // must stop above them, so the board's bottom padding follows their real height.
+  const footObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => root.style.setProperty('--gl-controls-h', `${controls.offsetHeight}px`)) : null;
+  footObserver?.observe(controls);
 
   let screen: Screen = 'connecting';
   let closed = false;
@@ -1170,6 +1174,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     for (const t of [endArmed, idleTimer, toastTimer]) if (t) clearTimeout(t);
     conn.close();
     document.removeEventListener('keydown', onKey);
+    footObserver?.disconnect();
     root.removeEventListener('mousemove', wake);
     if (document.fullscreenElement === root) void document.exitFullscreen?.();
     root.remove();

@@ -89,11 +89,18 @@ function startTurn(ctx, k) {
   const team = k.order[k.at] ?? 0;
   const describer = nextDescriber(ctx, k, team);
   if (!describer) return err("no_describer", "This team has nobody to describe.");
+  if (!k.deck.length) k.deck = refill(ctx, k);
   if (!k.deck.length) return err("deck_empty", "The deck is empty.");
   k.phase = "turn";
   k.turn = { team, describer, cards: [], passes: 0 };
   ctx.setTimer(ctx.now + articulateSettings(ctx.game.settings).seconds * 1e3);
   draw(ctx, k);
+}
+function refill(ctx, k) {
+  const all = cardsOf(ctx.keys).map((c) => c.id);
+  const got = new Set(k.log.filter((t) => t.round === k.round).flatMap((t) => t.cards.filter((c) => c.result === "got").map((c) => c.item)));
+  const left = all.filter((id) => !got.has(id));
+  return shuffle(left.length ? left : all, ctx.random);
 }
 function resolve(ctx, k, result, by) {
   if (!k.turn || !k.current) return;
@@ -275,8 +282,29 @@ var articulateRules = {
   },
   view(ctx, k, role, owner) {
     return articulateView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return articulateBot(ctx, k, owner);
   }
 };
+function articulateBot(ctx, k, owner) {
+  const r = ctx.random();
+  if (k.phase === "check" && k.check) {
+    const mine = k.check.answers[owner] ?? {};
+    const q = k.check.questions.find((_, n) => !mine[n]);
+    if (!q) return null;
+    const wrong = q.options.find((o) => o.id !== q.right)?.id ?? q.right;
+    return { move: { item: q.item, move: "answer", response: { option: r < 0.7 ? q.right : wrong }, time_ms: 2e3 + Math.round(ctx.random() * 6e3) } };
+  }
+  if (k.phase !== "turn" || !k.turn || !k.current) return null;
+  if (k.turn.describer === owner) {
+    if (ctx.now - k.card_at < 2500) return null;
+    const pass = k.turn.passes < articulateSettings(ctx.game.settings).passes && r < 0.2;
+    return { move: { item: k.current, move: pass ? "pass" : "describe", response: { result: pass ? "pass" : "got" } } };
+  }
+  if (isCaptainAgainst(ctx, k, owner) && ctx.now - k.card_at > 1500 && r < 0.06) return { control: { name: "buzz", data: { item: k.current } } };
+  return null;
+}
 function buzz(ctx, k, from, item) {
   const staff = from.role === "teacher" || from.role === "board";
   if (!staff && !isCaptainAgainst(ctx, k, from.owner)) return err("not_allowed", "Only the other teams\u2019 captains can buzz.");
@@ -884,8 +912,55 @@ var battlesRules = {
   },
   view(ctx, k, role, owner) {
     return role === "student" ? phoneView(ctx, k, owner) : boardView(ctx, k, role);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
   }
 };
+var BOT_ANSWERS = [
+  "The storm is described as howling at the shutters, so the weather mirrors Mira\u2019s fear and the house seems to attack her.",
+  "Short sentences slow the reader down before Mira climbs the stairs, which builds tension and makes every sound feel like a threat.",
+  "The house is personified as watching her from every window, so the reader feels she is never safe, even at home.",
+  "The candle guttering in the window suggests hope fading, and the dark seems to swallow the only light in the house.",
+  "It is scary because it is old and dark and there are noises at night.",
+  "Repeating that she counts the stairs shows Mira trying to control a fear she cannot name, which unsettles the reader.",
+  "The writer uses lots of adjectives like cold and empty to make the house feel frightening.",
+  "Sibilance in the silent, sighing stairs creates a hushed sound that makes the house feel like it is breathing.",
+  "The locked wing is never explained, so the reader imagines something worse than any description could give.",
+  "The house groans like an old man, which makes it seem alive and angry that Mira is there.",
+  "Darkness is everywhere in the chapter and that makes it frightening for the reader.",
+  "The frozen lake outside traps the house in silence, so Mira has no escape and the reader feels her isolation.",
+  "Rhetorical questions in Mira\u2019s head show her doubt, and the reader starts doubting what is real too.",
+  "The narrator calls the stairs a throat, a metaphor that makes climbing them feel like being swallowed.",
+  "Doctor Hask\u2019s calm voice is creepy because he speaks about fear like an illness he wants to cut out.",
+  "The writer makes it scary with spooky words."
+];
+function botMove(ctx, k, owner) {
+  if (k.phase === "write") {
+    const d = k.drafts[owner];
+    if (d?.in) return null;
+    const taken = new Set(Object.entries(k.drafts).filter(([o]) => o !== owner).map(([, x]) => BOT_ANSWERS.findIndex((a) => x.text && a.startsWith(x.text))));
+    const mine = d?.text ? BOT_ANSWERS.findIndex((a) => a.startsWith(d.text)) : -1;
+    const full = BOT_ANSWERS[mine >= 0 ? mine : BOT_ANSWERS.findIndex((_, i) => !taken.has(i))] ?? BOT_ANSWERS[0] ?? "";
+    const all = full.split(" ");
+    const have = d?.words ?? 0;
+    if (have >= all.length) return { move: { item: BATTLES_ITEM, move: "answer", response: { text: full, hand_in: true } } };
+    const next = all.slice(0, Math.min(all.length, have + 3 + Math.floor(ctx.random() * 5))).join(" ");
+    return { move: { item: BATTLES_ITEM, move: "answer", response: { text: next } } };
+  }
+  if (k.phase === "battle") {
+    const p = k.pairs[owner];
+    if (!p || !k.pool[p.left] || !k.pool[p.right]) return null;
+    const lw = words(k.pool[p.left].text);
+    const rw = words(k.pool[p.right].text);
+    const longer = lw >= rw ? p.left : p.right;
+    const winner = ctx.random() < 0.75 ? longer : longer === p.left ? p.right : p.left;
+    const n = battleContent(ctx.keys).chips.length;
+    const chips = n && ctx.random() < 0.6 ? [Math.floor(ctx.random() * n)] : [];
+    return { move: { item: BATTLES_ITEM, move: "judge", response: { left: p.left, right: p.right, winner, chips: { left: winner === p.left ? chips : [], right: winner === p.right ? chips : [] } } } };
+  }
+  return null;
+}
 var initialsOf2 = (ctx, owner) => ctx.seat(owner)?.initials ?? "";
 function judgeRows(ctx, k) {
   return Object.entries(k.final?.judges ?? {}).filter(([o]) => ctx.seat(o)).map(([o, j]) => ({ owner: o, initials: initialsOf2(ctx, o), points: j.points, agreed: j.agree.filter(Boolean).length, judged: j.agree.length })).sort((a, b) => b.points - a.points || b.agreed - a.agreed || (a.initials < b.initials ? -1 : 1));
@@ -2584,7 +2659,13 @@ function startRound(ctx, k) {
   const s = pictionarySettings(ctx.game.settings, 0);
   k.round = { n: (k.round?.n ?? 0) + 1, item, drawer, started_at: ctx.now, seconds: s.seconds, strokes: [], guessers: {}, order: [], guesses: 0, gains: {} };
   k.phase = "draw";
-  ctx.setTimer(ctx.now + s.seconds * 1e3);
+  arm(ctx, k.round);
+}
+function arm(ctx, r) {
+  const end = r.started_at + r.seconds * 1e3;
+  const hint = r.started_at + HINT_AFTER_MS;
+  r.alarm = ctx.now < hint && hint < end ? hint : end;
+  ctx.setTimer(r.alarm);
 }
 function gain(ctx, r, owner, points) {
   if (owner === "teacher" || !ctx.seat(owner)) return;
@@ -2708,7 +2789,7 @@ var pictionaryRules = {
       case "more_time":
         if (k.phase !== "draw" || !k.round) return err4("not_now", "No round is running.");
         k.round.seconds += 15;
-        ctx.setTimer(k.round.started_at + k.round.seconds * 1e3);
+        arm(ctx, k.round);
         return;
       case "standings":
         if (k.phase !== "reveal") return err4("not_now", "Finish the round first.");
@@ -2722,7 +2803,11 @@ var pictionaryRules = {
     }
   },
   tick(ctx, k) {
-    if (k.phase === "draw") closeRound(ctx, k, "time");
+    const r = k.round;
+    if (k.phase !== "draw" || !r) return;
+    if (r.alarm !== void 0 && ctx.now - r.alarm > 1e3) r.started_at += ctx.now - r.alarm;
+    if (ctx.now < r.started_at + r.seconds * 1e3 - 250) arm(ctx, r);
+    else closeRound(ctx, k, "time");
   },
   finish(ctx, k) {
     if (k.phase === "draw") closeRound(ctx, k, "ended");
@@ -2734,8 +2819,41 @@ var pictionaryRules = {
   },
   view(ctx, k, role, owner) {
     return pictionaryView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return botMove2(ctx, k, owner);
   }
 };
+function botMove2(ctx, k, owner) {
+  const r = k.round;
+  if (k.phase !== "draw" || !r) return null;
+  const p = promptsOf(ctx.keys).get(r.item);
+  if (!p) return null;
+  if (r.drawer === owner) {
+    if (r.strokes.length >= 14) return null;
+    const pts = [];
+    let x = 150 + ctx.random() * 700;
+    let y = 150 + ctx.random() * 700;
+    let dir = ctx.random() * Math.PI * 2;
+    for (let i = 0; i < 14; i++) {
+      pts.push(Math.round(x), Math.round(y));
+      dir += (ctx.random() - 0.5) * 0.9;
+      x = Math.min(960, Math.max(40, x + Math.cos(dir) * 45));
+      y = Math.min(960, Math.max(40, y + Math.sin(dir) * 45));
+    }
+    const id = (r.strokes.at(-1)?.id ?? 0) + 1;
+    return { move: { item: r.item, move: "draw", response: { s: id, c: Math.floor(ctx.random() * STROKE_LIMITS.colours), w: ctx.random() < 0.7 ? 0 : 1, p: pts, full: true } } };
+  }
+  if (r.guessers[owner]?.ms !== void 0 || ctx.random() < 0.45) return null;
+  const elapsed = ctx.now - r.started_at;
+  const roll = ctx.random();
+  const right = Math.min(0.75, 0.1 + elapsed / 5e4);
+  const answer3 = p.shape === "quote" ? p.blanks : p.answers[0] ?? p.answer;
+  const near = keyWords(p.answer)[0] ?? keyWords(p.blanks)[0];
+  const misses = ["metaphor", "a storm", "symbolism", "the house", "imagery", "contrast", "tone"];
+  const text = roll < right ? answer3 : roll < right + 0.2 && near ? `${near} thing` : misses[Math.floor(ctx.random() * misses.length)] ?? "imagery";
+  return { move: { item: r.item, move: "guess", response: { text } } };
+}
 function pictionaryView(ctx, k, role, owner) {
   const r = k.round;
   const p = r ? promptsOf(ctx.keys).get(r.item) : void 0;
@@ -2762,10 +2880,11 @@ function pictionaryView(ctx, k, role, owner) {
       ...r ? { seconds: r.seconds, started_at: r.started_at } : {},
       ...r?.closed ? { closed: r.closed } : {},
       ...revealed && p ? { answer: p.answer, drawer_points: r?.closed === "void" ? 0 : (r?.order.length ?? 0) * DRAWER_POINTS } : {},
-      ...r?.drawer === "teacher" && open ? { teacher_drawing: true, ...role === "teacher" && p ? { prompt: p.prompt } : {} } : {},
-      gallery: k.gallery,
+      // The laptop runs the board (board ticket), so it needs the prompt to draw; it stays hidden until held.
+      ...r?.drawer === "teacher" && open ? { teacher_drawing: true, ...p ? { prompt: p.prompt } : {} } : {},
+      gallery: k.gallery.map((g2) => ({ ...g2 })),
       deck_left: k.deck.length,
-      ...role === "teacher" ? { speed: k.speed } : {}
+      ...role === "teacher" ? { speed: k.speed.map((x) => ({ ...x, times: { ...x.times }, guesses: { ...x.guesses } })) } : {}
     };
     return v2;
   }
@@ -2784,7 +2903,8 @@ function pictionaryView(ctx, k, role, owner) {
     ...isDrawer && open && p ? { prompt: p.prompt } : {},
     got_count: r?.order.length ?? 0,
     guessers: r ? guesserOwners(ctx, r).length : 0,
-    ...r && !isDrawer ? { mine: { got: g?.ms !== void 0, ...g?.ms !== void 0 ? { s: Math.round(g.ms / 1e3), points: g.points } : {}, tries: g?.tries ?? [] } } : {},
+    // Copies, never the state's own arrays: the room diffs each view against the last one it sent.
+    ...r && !isDrawer ? { mine: { got: g?.ms !== void 0, ...g?.ms !== void 0 ? { s: Math.round(g.ms / 1e3), points: g.points } : {}, tries: (g?.tries ?? []).map((t) => ({ ...t })) } } : {},
     ...r?.closed ? { closed: r.closed } : {},
     ...revealed && p ? { answer: p.answer } : {},
     // Someone who got it may see the answer at once (their phone is green and hidden from others).
@@ -4362,10 +4482,10 @@ var wheelRules = {
     return view(ctx, k, role, owner);
   },
   bot(ctx, k, owner) {
-    return botMove(ctx, k, owner);
+    return botMove3(ctx, k, owner);
   }
 };
-function botMove(ctx, k, owner) {
+function botMove3(ctx, k, owner) {
   const pz = puzzle(ctx, k);
   if (!pz) return null;
   const r = ctx.random();
@@ -4946,7 +5066,7 @@ function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
   const rules = rulesOf(s);
   if (rules) {
     const part = safe(() => rules.view(rulesCtx(s, now, null), s.custom, role, owner));
-    if (!isRulesError(part) && part !== void 0) view2.kind_view = part;
+    if (!isRulesError(part) && part !== void 0) view2.kind_view = JSON.parse(JSON.stringify(part ?? null));
   }
   if (isStudent(role)) {
     const seat = s.seats[owner];

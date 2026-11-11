@@ -511,8 +511,10 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
   const rules = rulesOf(s);
   if (rules) {
     // The kind's own part: built fresh per viewer; a throw shows nothing rather than breaking the view.
+    // Copied, so a kind that hands out its own state arrays can't make the last sent view change with
+    // it (viewDelta compares against the kept view and would see nothing new).
     const part = safe(() => rules.view(rulesCtx(s, now, null), s.custom, role, owner));
-    if (!isRulesError(part) && part !== undefined) view.kind_view = part;
+    if (!isRulesError(part) && part !== undefined) view.kind_view = JSON.parse(JSON.stringify(part ?? null));
   }
   if (isStudent(role)) {
     const seat = s.seats[owner];

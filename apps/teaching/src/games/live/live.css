@@ -23,7 +23,9 @@ html.gl-board-open, html.gl-board-open body { overflow: hidden; }
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.6em;
-  padding: 1.1em 1.6em 4.6em;
+  /* Room for the floating controls: one row by default, more when a kind's buttons wrap (board.ts sets the height). */
+  --gl-foot: max(4.6em, calc(var(--gl-controls-h, 0px) + 1.5em));
+  padding: 1.1em 1.6em var(--gl-foot);
   background: var(--stage-bg) var(--depth, #0a1536);
   color: var(--stage-ink);
   font-family: var(--font-ui, Inter, ui-sans-serif, system-ui, sans-serif);
@@ -215,7 +217,7 @@ html.gl-board-open, html.gl-board-open body { overflow: hidden; }
 .gl-also { grid-column: 1; grid-row: 2; display: grid; gap: 0.45em; align-content: center; }
 
 /* ── Teacher ranks panel ─────────────────────────────────────────── */
-.gl-ranks { position: absolute; top: 3.2em; right: 1.2em; bottom: 4.6em; z-index: 6; width: min(19em, 46vw); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 0.6em; padding: 0.9em; border-radius: 1em; background: rgba(10, 21, 54, 0.94); box-shadow: var(--stage-glow); font-size: 0.8em; }
+.gl-ranks { position: absolute; top: 3.2em; right: 1.2em; bottom: var(--gl-foot, 4.6em); z-index: 6; width: min(19em, 46vw); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 0.6em; padding: 0.9em; border-radius: 1em; background: rgba(10, 21, 54, 0.94); box-shadow: var(--stage-glow); font-size: 0.8em; }
 .gl-ranks__note { margin: 0.2em 0 0; color: var(--stage-muted); font-size: 0.85em; }
 .gl-ranks__list { margin: 0; padding: 0; list-style: none; overflow: auto; display: grid; gap: 0.3em; align-content: start; }
 .gl-ranks__row { display: grid; grid-template-columns: 2.4em auto minmax(0, 1fr) auto auto; align-items: center; gap: 0.45em; padding: 0.25em 0.4em; border-radius: 0.5em; background: var(--stage-card); }
@@ -245,7 +247,7 @@ html.gl-board-open, html.gl-board-open body { overflow: hidden; }
 .gl-pause { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; align-content: center; text-align: center; background: rgba(10, 21, 54, 0.42); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; }
 .gl-pause b { font-size: 2.6em; font-weight: 700; }
 .gl-pause small { display: block; font-size: 1em; opacity: 0.85; max-width: 22em; }
-.gl-board__toast { position: absolute; left: 50%; bottom: 4.6em; z-index: 25; transform: translate(-50%, 1em); opacity: 0; padding: 0.5em 1em; border-radius: 0.8em; background: var(--depth, #0a1536); box-shadow: var(--stage-glow); font-size: 0.85em; font-weight: 600; pointer-events: none; transition: opacity 0.25s, transform 0.4s var(--gl-spring); }
+.gl-board__toast { position: absolute; left: 50%; bottom: var(--gl-foot, 4.6em); z-index: 25; transform: translate(-50%, 1em); opacity: 0; padding: 0.5em 1em; border-radius: 0.8em; background: var(--depth, #0a1536); box-shadow: var(--stage-glow); font-size: 0.85em; font-weight: 600; pointer-events: none; transition: opacity 0.25s, transform 0.4s var(--gl-spring); }
 .gl-board__toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
 .gl-board__toast[data-tone="bad"] { background: var(--danger, #9b2c2c); }
 
