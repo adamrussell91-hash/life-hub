@@ -104,7 +104,19 @@ export type WordGridKey = {
 };
 export type GridKey = CrosswordGridKey | WordGridKey;
 /** Everything that marks one game, kept on the server. Keyed by item id (and wall id for Connections). */
-export type GameKeys = { kind: Game['kind']; title: string; items: Record<string, ItemKey>; grid?: GridKey };
+export type GameKeys = { kind: Game['kind']; title: string; items: Record<string, ItemKey>; grid?: GridKey; live?: LiveContent };
+
+/**
+ * Live-only kinds: the content the room shows, item by item, when its rules
+ * choose (prompts, options, Jeopardy's board). Kept with the keys because a
+ * live-only game's public copy ships without items (the page never sees them);
+ * the room's rules put each piece into a view only when it's in play.
+ */
+export type LiveContent = {
+  items: PublicItem[];
+  /** Jeopardy: categories in order, each tile's value, Double flag and item id; the Final's item id. */
+  jeopardy?: { categories: Array<{ id: string; title: string; tiles: Array<{ id: string; item: string; value: number; double: boolean }> }>; final?: string };
+};
 
 /**
  * How many things a play is scored out of: every item, each Connections group
@@ -673,6 +685,15 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     count = pubItems.length;
   }
   if (game.kind === 'battles') count = 1;
+  if (!info.solo && pubItems.length) {
+    keys.live = { items: pubItems };
+    if (game.kind === 'jeopardy') {
+      keys.live.jeopardy = {
+        categories: game.categories.map((c) => ({ id: c.id, title: c.title.trim(), tiles: c.tiles.map((t) => ({ id: t.id, item: t.item.id, value: t.value, double: t.double })) })),
+        ...(game.final ? { final: game.final.id } : {})
+      };
+    }
+  }
 
   const pub: PublicGame = {
     id: game.id,
