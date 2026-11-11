@@ -118,6 +118,8 @@ import { createPublishedCaseHandler } from '../../../netlify/functions/published
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
 import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
+import { createGamesHandler } from '../../../netlify/functions/games.mjs';
+import { createPublishedGamesHandler } from '../../../netlify/functions/published-games.mjs';
 import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
 import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
 import { createOrganiserHandler } from '../../../netlify/functions/organiser.mjs';
@@ -156,6 +158,8 @@ import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/
 import { prepareRotationPublish, storeRotationConfig } from '../../../netlify/functions/_shared/rotation.mjs';
 import { mockWritingChecker } from './mock-rotation-writing';
 import { rotationLesson, ROTATION_ROSTER } from '../../../tests/unit/helpers/rotation-fixture.mjs';
+import { prepareGamePublish, storeGameKeys } from '../../../netlify/functions/_shared/games.mjs';
+import { gameLesson, GAME_ROSTER } from '../../../tests/unit/helpers/game-fixture.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -764,6 +768,56 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   /**
+   * A walkable Game lesson, dev walk, preview and browser test: an invented Year 9 class and the invented
+   * Harbour Lights games from the test fixture (crossword, Who said it?, Connections, Wager), published and
+   * scheduled, plus a small vocabulary organiser for Build from this unit when the unit has none. All invented.
+   * Walk: teacher `/lessons/lesson_game_harbour`, student `/s/classes/class_2026_09eng/lessons/lesson_game_harbour` (initials AB).
+   */
+  function seedGameLesson(): void {
+    if (process.env.VITEST) return;
+    const unit = options.seed.units[0] as { id: string; lesson_ids: string[] } | undefined;
+    const template = options.seed.classes[0] as Record<string, unknown> | undefined;
+    if (!unit || !template) return;
+    const classId = 'class_2026_09eng';
+    const lessonId = 'lesson_game_harbour';
+    const stamp = '2026-11-09T09:00:00.000Z';
+    store.setJSON(classKey(classId), {
+      ...template, id: classId, code: '9ENG', title: 'Year 9 English', slug: '9eng', display_name: '9ENG',
+      students: GAME_ROSTER.map((r) => ({ id: r.id, name: r.name, skip_picker: false })), current_scheduled_lesson_id: undefined
+    });
+    seedIds.classes.push(classId);
+    const base = gameLesson();
+    const lesson = { ...base, id: lessonId, slug: 'harbour_lights_games', unit_id: unit.id, sequence: unit.lesson_ids.length + 2, tags: [], syllabus_outcomes: [], outcome_ids: [], game: { ...base.game, homework_closes_at: '2026-12-18T08:00:00.000Z' } };
+    const pub = prepareGamePublish(lesson);
+    if (pub.problems.length || !pub.snapshot || !pub.record) { console.error('game seed', pub.problems); return; }
+    void storeGameKeys(functionBlobStore(), lessonId, pub.record);
+    store.setJSON(draftLessonKey(lessonId), { ...lesson, published_at: stamp });
+    store.setJSON(publishedLessonKey(lessonId), { lesson_id: lessonId, title: lesson.title, unit_id: unit.id, blocks: [], published_at: stamp, schema_version: 1, pedagogical_mode: 'game', game: pub.snapshot });
+    const unitNow = store.getJSON<{ lesson_ids?: string[] }>(unitKey(unit.id)) ?? unit;
+    store.setJSON(unitKey(unit.id), { ...unitNow, lesson_ids: [...(unitNow.lesson_ids ?? []), lessonId] });
+    seedIds.lessons.push(lessonId);
+    store.setJSON(scheduledLessonKey('sched_game_harbour'), {
+      id: 'sched_game_harbour', type: 'scheduled_lesson', class_id: classId, lesson_id: lessonId, unit_id: unit.id,
+      date: '2026-11-12', start_time: '11:00', end_time: '12:00', schedule_order: 1, delivery_status: 'planned', created_at: stamp, updated_at: stamp, schema_version: 1
+    });
+    seedIds.scheduled_lessons.push('sched_game_harbour');
+    const organiser = `unit_organisers/${unit.id}`;
+    if (store.getJSON(organiser) == null) {
+      store.setJSON(organiser, {
+        sections: [{
+          id: 'sec_vocab_demo', name: 'Vocabulary', role: 'vocab',
+          lines: [
+            ['Simile', 'A comparison using like or as', 'The fog sat like a cat on the pier.'],
+            ['Pathetic fallacy', 'Weather that mirrors a mood', 'The storm broke as the keeper wept.'],
+            ['Foreshadowing', 'A hint of what is to come', 'The lamp flickered twice before dawn.'],
+            ['Juxtaposition', 'Two things placed side by side to contrast', 'A bright lamp in a dead sea.']
+          ].map((cells, i) => ({ id: `line_demo_${i + 1}`, cells }))
+        }]
+      });
+    }
+  }
+
+  /**
    * A walkable student progress case, dev walk only: a second class of invented students with five
    * returned written pieces each, a sixth waiting for feedback from three of them, a linked Markbook
    * task per piece, and a small skills continuum. The real Functions read all of it from the mock store.
@@ -955,6 +1009,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
   seedStudentProgress();
   seedStationRotation();
+  seedGameLesson();
 
   /**
    * Over time walk, dev only: nine weekly quizzes for 12ENGADV2 across Term 3 and Term 4 (holiday gap
@@ -1763,13 +1818,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const caseStudy = parsed.data.pedagogical_mode === 'case_study' ? prepareCasePublish(parsed.data) : null;
     if (caseStudy?.problems.length) return errorResponse(400, 'validation_error', caseStudy.problems[0]);
     if (caseStudy) await storeCaseConfig(functionBlobStore(), id, caseStudy.config);
+    // A Game lesson's games go public without answers; the keys are stored apart, as the real publish does.
+    const games = parsed.data.pedagogical_mode === 'game' ? prepareGamePublish(parsed.data) : null;
+    if (games?.problems.length) return errorResponse(400, 'validation_error', games.problems[0]);
+    if (games?.record) await storeGameKeys(functionBlobStore(), id, games.record);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
       ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(parsed.data.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' as const } : {}) } : {}),
       ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
       ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {}),
-      ...(rotation ? { pedagogical_mode: 'station_rotation', rotation: rotation.snapshot.rotation } : {})
+      ...(rotation ? { pedagogical_mode: 'station_rotation', rotation: rotation.snapshot.rotation } : {}),
+      ...(games?.snapshot ? { pedagogical_mode: 'game', game: games.snapshot } : {})
     });
 
     try {
@@ -4265,6 +4325,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createRotationHandler(deps)
       : path.startsWith('/api/published/rotation/')
         ? createPublishedRotationHandler({ ...deps, checkWriting: mockWritingChecker })
+      : /^\/api\/lessons\/[^/]+\/game$/.test(path)
+        ? createGamesHandler(deps)
+      : path.startsWith('/api/published/game/')
+        ? createPublishedGamesHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
       : /^\/api\/units\/[^/]+\/organiser$/.test(path)
@@ -4438,6 +4502,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/rotation$/.test(path) ||
       /^\/api\/published\/rotation\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/game$/.test(path) ||
+      /^\/api\/published\/game\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/organiser$/.test(path) ||
       /^\/api\/published\/organiser\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path) ||

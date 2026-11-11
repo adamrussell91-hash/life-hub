@@ -106,6 +106,10 @@ import { rotationTeacherApi } from '@/rotation/api';
 import { findStationSection, isRotationFinale } from '@/rotation/model';
 import { seedRotation, withRotationSections } from '@/rotation/seed';
 import { inRotationTab, tabOfBlock, tabStation } from '@/rotation/editor-tabs';
+import { mountGameEditor, type GameEditorHandle } from '@/games/editor';
+import { canvasShowsOn } from '@/games/editor-tabs';
+import { gameTeacherApi } from '@/games/api';
+import { seedGame } from '@/games/seed';
 import { httpMarkbookApi } from '@/markbook/api';
 import { todayInSydney } from '@/markbook/calc';
 import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
@@ -1239,6 +1243,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncSprintPanel();
     syncCasePanel();
     syncRotationPanel();
+    syncGamePanel();
     syncFooterNote();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
@@ -1652,6 +1657,42 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     rotationHost.hidden = !isRotation;
   }
 
+  // A Game lesson gets its build tabs (Games · Before you play · Settings · Results). Its ordinary blocks are the
+  // optional "Before you play" page, so the canvas shows on that tab only.
+  const gameHost = document.createElement('div');
+  gameHost.className = 'lesson-page__game';
+  let gameEditor: GameEditorHandle | null = null;
+  function showGameCanvas(): void {
+    if (!gameEditor) return;
+    canvasHost.hidden = !canvasShowsOn(gameEditor.tabs.current());
+  }
+  function syncGamePanel(): void {
+    const isGame = resolvePedagogicalMode(lesson.pedagogical_mode) === 'game';
+    if (isGame && !lesson.game) emitLesson({ ...lesson, game: seedGame() });
+    if (isGame && !gameEditor) {
+      gameEditor = mountGameEditor({
+        getLesson: () => lesson,
+        emitLesson,
+        classes: options.flowClasses ?? [],
+        api: gameTeacherApi(lesson.id),
+        onTab: () => {
+          showGameCanvas();
+          canvas.clearSelection();
+        }
+      });
+      gameHost.append(gameEditor.root);
+    } else if (!isGame && gameEditor) {
+      gameEditor.dispose();
+      gameEditor = null;
+      gameHost.replaceChildren();
+      canvasHost.hidden = false;
+    } else if (gameEditor) {
+      gameEditor.sync();
+    }
+    showGameCanvas();
+    gameHost.hidden = !isGame;
+  }
+
   if (showPageMenu) root.append(chrome);
   // Students end every lesson on the footer (lesson-footer.ts), so no block is needed for it.
   const footerNote = document.createElement('p');
@@ -1663,7 +1704,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         : 'Students see Previous, a tick to finish, and Next under every lesson.';
   }
   syncFooterNote();
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, rotationHost, canvasHost, footerNote);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, rotationHost, gameHost, canvasHost, footerNote);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1763,6 +1804,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncSprintPanel();
   syncCasePanel();
   syncRotationPanel();
+  syncGamePanel();
   if (tutorialTabs || sprintTabs || caseEditor || rotationEditor) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
@@ -1905,6 +1947,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncSprintPanel();
       syncCasePanel();
       syncRotationPanel();
+      syncGamePanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1962,6 +2005,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       banner.dispose();
       optionsMenu.dispose();
       rotationLive?.dispose();
+      gameEditor?.dispose();
       root.remove();
     }
   };
