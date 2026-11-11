@@ -9,7 +9,12 @@ import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, TimelineItem, Unit } from '@/schemas';
 import {
-  academicYearBounds,
+  addDays,
+  scopeTermsFor,
+  scopeWeekOfDate,
+  scopeWindowStart,
+  scopeYearLabel,
+  startsInTermFour,
   diffDays,
   formatDateRange,
   formatYmd,
@@ -266,6 +271,34 @@ export function renderScopeTimelineEditor(
   canvas.replaceChildren();
   const optionsMenu = mountPageOptionsMenu(
     [
+      {
+        label: startsInTermFour(initial.terms) ? 'Start the year in Term 1' : 'Start the year in Term 4 (HSC)',
+        onSelect: () => {
+          void (async () => {
+            const hsc = !startsInTermFour(scope.terms);
+            const ok = await askConfirmCard({
+              eyebrow: 'Scope & sequence year',
+              title: hsc
+                ? `Run ${subject.title} from Term 4 ${scope.academic_year} to Term 3 ${scope.academic_year + 1}?`
+                : `Run ${subject.title} from Term 1 to Term 4 ${scope.academic_year}?`,
+              supporting: 'Units keep their dates and move to the weeks those dates fall in.',
+              confirmLabel: hsc ? 'Start in Term 4' : 'Start in Term 1'
+            });
+            if (!ok) return;
+            const terms = scopeTermsFor(scope.academic_year, hsc, scope.week_count);
+            const timeline_items = scope.timeline_items.map((item) => {
+              const unit = item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined;
+              const span = resolveItemSpan(item, scope.terms, scope.academic_year, unit);
+              const start_week = scopeWeekOfDate(terms, scope.academic_year, span.start);
+              const end_week = Math.max(start_week, scopeWeekOfDate(terms, scope.academic_year, span.end));
+              return { ...item, start_week, end_week, start_date: span.start, end_date: span.end };
+            });
+            await patchScopeSequence(scope.id, { terms, timeline_items });
+            invalidateCurriculum();
+            window.location.reload();
+          })();
+        }
+      },
       {
         label: 'Delete scope & sequence',
         danger: true,
@@ -726,20 +759,25 @@ export function renderScopeTimelineEditor(
     renderInspectorContent(item);
   };
 
-  /** Months on the axis: Jan of the academic year through the month the last item ends. */
+  /** Months on the axis: the month the first term starts through the month the last term or item ends. */
   const axisMonths = (): string[] => {
-    const yearEnd = academicYearBounds(scope.academic_year).end;
-    let lastEnd = yearEnd;
+    const windowStart = scopeWindowStart(scope.terms, scope.academic_year);
+    let lastEnd = windowStart;
+    for (const term of scope.terms) {
+      const span = resolveTermSpan(term, scope.academic_year);
+      if (span.end > lastEnd) lastEnd = span.end;
+    }
     for (const item of scope.timeline_items) {
       const unit = item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined;
       const span = resolveItemSpan(item, scope.terms, scope.academic_year, unit);
       if (span.end > lastEnd) lastEnd = span.end;
     }
+    const first = parseYmd(windowStart);
     const months: string[] = [];
     for (let month = 0; ; month += 1) {
-      const first = formatYmd(new Date(Date.UTC(scope.academic_year, month, 1)));
-      if (first > lastEnd) break;
-      months.push(first);
+      const ymd = formatYmd(new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + month, 1)));
+      if (ymd > lastEnd) break;
+      months.push(ymd);
     }
     return months;
   };
@@ -751,13 +789,13 @@ export function renderScopeTimelineEditor(
 
   const monthLabel = (first: string, style: 'short' | 'long'): string => {
     const label = parseYmd(first).toLocaleDateString('en-AU', { month: style, timeZone: 'UTC' });
-    // Months that spill into the next year carry the year so January isn't ambiguous.
-    return first.startsWith(String(scope.academic_year)) ? label : `${label} ${first.slice(2, 4)}`;
+    // Months in a later year than the axis start carry the year so January isn't ambiguous.
+    return first.startsWith(scopeWindowStart(scope.terms, scope.academic_year).slice(0, 4)) ? label : `${label} ${first.slice(2, 4)}`;
   };
 
   const yearBounds = (): { start: string; days: number; ppd: number; totalW: number } => {
     const months = axisMonths();
-    const yearStart = academicYearBounds(scope.academic_year).start;
+    const yearStart = scopeWindowStart(scope.terms, scope.academic_year);
     const bounds = {
       start: yearStart,
       days: diffDays(yearStart, monthEnd(months[months.length - 1]!))
@@ -910,7 +948,7 @@ export function renderScopeTimelineEditor(
     ticks.className = 'scope-gantt__ticks';
     if (zoom === 'month') {
       for (let d = 0; d < days; d += 7) {
-        const tickDate = new Date(Date.UTC(scope.academic_year, 0, 1 + d));
+        const tickDate = parseYmd(addDays(start, d));
         const tick = document.createElement('div');
         tick.className = 'scope-gantt__tick';
         tick.style.left = `${d * ppd}px`;
@@ -1257,7 +1295,7 @@ export function renderScopeTimelineEditor(
 
   const paintView = (): void => {
     const unitCount = scope.timeline_items.filter((entry) => entry.kind === 'unit').length;
-    meta.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.academic_year}`;
+    meta.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scopeYearLabel(scope.terms, scope.academic_year)}`;
     timelineTab.classList.toggle('scope-timeline__tab--active', tab === 'timeline');
     knowledgeTab.classList.toggle('scope-timeline__tab--active', tab === 'knowledge');
     knowledgeTab.classList.toggle('is-active', tab === 'knowledge');

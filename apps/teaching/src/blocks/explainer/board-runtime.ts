@@ -90,6 +90,31 @@ export type BoardHandle = {
   dispose: () => void;
 };
 
+/** Break sent words into lines of about 40 characters so a long quote stays on the board. */
+export function wrapForBoard(text: string, width = 40): string {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else line = line ? `${line} ${word}` : word;
+  }
+  if (line) lines.push(line);
+  return lines.join('\n');
+}
+
+/** Whether an element sits wholly inside the visible board. */
+export function inView(s: AppState, el: { x: number; y: number; width?: number; height?: number }): boolean {
+  if (!s.width || !s.height) return true;
+  const z = s.zoom.value || 1;
+  const left = -s.scrollX;
+  const top = -s.scrollY;
+  const right = left + s.width / z;
+  const bottom = top + s.height / z;
+  return el.x >= left && el.y >= top && el.x + (el.width ?? 0) <= right && el.y + (el.height ?? 0) <= bottom;
+}
+
 export function mountBoard(options: MountBoardOptions): BoardHandle {
   const wrap = document.createElement('div');
   wrap.className = 'block-explainer__board';
@@ -236,9 +261,11 @@ export function mountBoard(options: MountBoardOptions): BoardHandle {
         x = minX;
         y = maxY + 40;
       }
-      const [el] = rt.excalidraw.convertToExcalidrawElements([{ type: 'text', x, y, text, fontSize: 20 } as never]) as unknown as ExplainerBoardElement[];
+      const [el] = rt.excalidraw.convertToExcalidrawElements([{ type: 'text', x, y, text: wrapForBoard(text), fontSize: 20 } as never]) as unknown as ExplainerBoardElement[];
       if (!el) return null;
       api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), el] });
+      // It lands below the drawing, often out of view: bring it on screen.
+      if (!inView(api.getAppState(), el as unknown as { x: number; y: number; width: number; height: number }))api.scrollToContent([el], { fitToViewport: false, animate: true });
       return el;
     },
     dispose: () => {

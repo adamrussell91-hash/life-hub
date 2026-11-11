@@ -86,7 +86,9 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
     studentPick.hidden = true;
     bar.append(classPick, studentPick, tookBtn);
   }
-  root.append(bar, note, scroller, legend);
+  /** A "next" link that jumped past dated lessons: the map followed the dates instead. */
+  const jumpNote = el('p', 'cm__jump');
+  root.append(bar, jumpNote, note, scroller, legend);
   host.append(root);
 
   const allItems = () => map.groups.flatMap((g) => g.items);
@@ -174,6 +176,25 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
     tookBtn.hidden = !(route && row && isSideRow(row) && options.saveTook);
     if (!tookBtn.hidden) tookBtn.textContent = route!.took.has(row!.id) ? 'Mark as not taken' : 'Mark as taken';
     paintLegend();
+    paintJumps();
+  }
+
+  function paintJumps(): void {
+    const jumps = options.print ? [] : map.dateJumps ?? [];
+    jumpNote.hidden = !jumps.length;
+    jumpNote.replaceChildren();
+    const title = (id: string) => map.rows.find((r) => r.id === id)?.title ?? 'a lesson';
+    const list = (ids: string[]) => {
+      const names = ids.map(title);
+      return names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    };
+    jumps.forEach((j, i) => {
+      if (i) jumpNote.append(el('br'));
+      const row = map.rows.find((r) => r.id === j.lessonId);
+      const name = el(row?.href ? 'a' : 'strong', 'cm__jump-lesson', title(j.lessonId));
+      if (row?.href) (name as HTMLAnchorElement).href = row.href;
+      jumpNote.append(name, ` leads straight on to ${title(j.target)}, skipping ${list(j.skipped)}. The map follows the dates instead. Open the lesson and set its next lesson back to the unit order to clear this.`);
+    });
   }
 
   stage.addEventListener('click', (event) => {

@@ -19,7 +19,7 @@ import {
 } from '@/schemas/block';
 import type { ExplainerTake } from './clips';
 import { mergeTranscripts } from './clips';
-import { stateAt } from './fold';
+import { stateAt, type ShownPointer } from './fold';
 import { createPanes, formatClock } from './player';
 import { anchorFromWords } from './words';
 
@@ -218,13 +218,15 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   tools.setAttribute('role', 'toolbar');
   tools.setAttribute('aria-label', 'Recording tools');
   let tool: RecorderTool = 'highlight';
+  let lastTool: RecorderTool = 'highlight';
   let colour: AnnotationColour = 'sand';
   const TEXT_TOOLS: RecorderTool[] = ['highlight', 'underline', 'box', 'bracket', 'strike', 'note', 'erase'];
   const offered = (Object.keys(TOOL_LABEL) as RecorderTool[]).filter((key) =>
     content.layout === 'board' ? !TEXT_TOOLS.includes(key) && key !== 'send' : key !== 'send' || content.layout === 'both'
   );
   const toolBtns = offered.map((key) => {
-    const b = btn(TOOL_LABEL[key], 'btn--ghost block-explainer__tool', () => pickTool(key));
+    // Pressing the pointer again puts it down and goes back to the last tool.
+    const b = btn(TOOL_LABEL[key], 'btn--ghost block-explainer__tool', () => pickTool(key === 'pointer' && tool === 'pointer' ? lastTool : key));
     b.dataset.tool = key;
     tools.append(b);
     return b;
@@ -326,8 +328,23 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   root.append(head, tools, notePanel, stage, actions);
 
+  // A board needs room: the recorder fills the window, and the teacher can shrink it back.
+  const fullBtn = btn('', 'btn--ghost block-explainer__full', () => setFull(!root.classList.contains('is-full')));
+  head.append(fullBtn);
+  function setFull(on: boolean): void {
+    root.classList.toggle('is-full', on);
+    document.documentElement.classList.toggle('block-explainer-full-open', on);
+    fullBtn.textContent = on ? 'Shrink' : 'Fill the window';
+    fullBtn.setAttribute('aria-pressed', String(on));
+    // Excalidraw measures itself on window resize.
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+  setFull(layout !== 'text');
+
   function pickTool(next: RecorderTool): void {
-    if (tool === 'pointer' && next !== 'pointer') take.endPointer(recording ? now() : undefined);
+    const leavingPointer = tool === 'pointer' && next !== 'pointer';
+    if (leavingPointer) take.endPointer(recording ? now() : undefined);
+    if (next !== 'pointer') lastTool = next;
     tool = next;
     // The board's laser follows the pointer tool; board drawing uses Excalidraw's own tools.
     view.board?.setTool(next === 'pointer' ? 'laser' : 'selection');
@@ -335,6 +352,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     for (const b of swatchBtns) b.setAttribute('aria-pressed', String(tool === 'highlight' && b.dataset.colour === colour));
     notePanel.hidden = tool !== 'note';
     root.dataset.tool = tool;
+    // The dot goes the moment the pointer is put down.
+    if (leavingPointer) repaint();
   }
   pickTool('highlight');
 
@@ -365,7 +384,16 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   function repaint(selection: [number, number] | null = null): void {
     const t = now();
     const shifted = take.events.map((ev) => ({ ...ev, t: ev.t + startAt }));
-    view.paint(stateAt({ board_start: content.board_start, recording: { status: 'draft', clips: [], duration_s: EXPLAINER_MAX_SECONDS, events: [...before, ...shifted] } }, startAt + t), { selection });
+    const state = stateAt({ board_start: content.board_start, recording: { status: 'draft', clips: [], duration_s: EXPLAINER_MAX_SECONDS, events: [...before, ...shifted] } }, startAt + t);
+    view.paint({ ...state, pointer: shownPointer(state.pointer) }, { selection });
+  }
+
+  /**
+   * While recording, the text dot shows only with the pointer in hand; the
+   * board has Excalidraw's own laser, so its playback dot stays hidden.
+   */
+  function shownPointer(p: ShownPointer | null): ShownPointer | null {
+    return tool === 'pointer' && p?.pane === 'text' ? p : null;
   }
 
   function openClip(): void {
@@ -410,6 +438,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     if (disposed) return;
     const t = now();
     clock.textContent = `${formatClock(startAt + t)} / ${formatClock(EXPLAINER_MAX_SECONDS)}`;
+    // Let the text dot fade once the pointer stops moving or leaves the text.
+    if (recording && tool === 'pointer' && dragFrom == null) repaint();
     if (recording && t >= maxTake) {
       flash('That is the 10-minute limit. Saving…');
       void stop();
@@ -604,7 +634,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
         const copy = JSON.parse(JSON.stringify(added)) as ExplainerBoardElement;
         capture?.note(copy);
         take.push({ id: eventId('send'), t, kind: 'send', anchor, element: copy });
-      }
+        flash('Sent to the board.');
+      } else flash('The board is still loading. Try again in a moment.');
     } else if (tool !== 'pointer' && tool !== 'erase') {
       take.push({ id: eventId('mark'), t, kind: 'mark', style: tool, ...(tool === 'highlight' ? { colour } : {}), anchor });
     }
@@ -624,6 +655,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
       /* ignore */
     }
     for (const track of stream?.getTracks() ?? []) track.stop();
+    document.documentElement.classList.remove('block-explainer-full-open');
     view.dispose();
   }
 

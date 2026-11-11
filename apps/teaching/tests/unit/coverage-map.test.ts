@@ -51,6 +51,31 @@ describe('Coverage map: model', () => {
     expect(map.rows.map((r) => r.id).slice(0, 4)).toEqual(['a', 'x', 'b', 'c']);
   });
 
+  it('keeps dated core lessons in date order when one "next" link jumps weeks ahead', () => {
+    // Rotation (Wk 3) is linked straight on to Viva (Wk 6), past the Wk 3–5 lessons.
+    const lessons: MapLesson[] = [
+      { id: 'w1', title: 'Opening' }, { id: 'w2', title: 'Poem one' }, { id: 'rot', title: 'Rotation', after: ['viva'] },
+      { id: 'w3', title: 'Poem two' }, { id: 'w4', title: 'Poem three' }, { id: 'w5', title: 'Poem four' },
+      { id: 'viva', title: 'Viva' }, { id: 'w7', title: 'Review' }
+    ];
+    const dates = new Map([['w1', '2026-10-05T09:00'], ['w2', '2026-10-12T09:00'], ['rot', '2026-10-19T09:00'], ['w3', '2026-10-21T09:00'],
+      ['w4', '2026-10-26T09:00'], ['w5', '2026-11-02T09:00'], ['viva', '2026-11-09T09:00'], ['w7', '2026-11-16T09:00']]);
+    const bands = new Map([['w1', 'Wk 1'], ['w2', 'Wk 2'], ['rot', 'Wk 3'], ['w3', 'Wk 3'], ['w4', 'Wk 4'], ['w5', 'Wk 5'], ['viva', 'Wk 6'], ['w7', 'Wk 7']]);
+    const map = buildCoverageMap({ content: v2(), lines: LINES, lessons, points: POINTS, dates, bands });
+    expect(map.rows.filter((r) => r.kind !== 'goal').map((r) => r.band)).toEqual(['Wk 1', 'Wk 2', 'Wk 3', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6', 'Wk 7']);
+    expect(map.dateJumps).toEqual([{ lessonId: 'rot', target: 'viva', skipped: ['w3', 'w4', 'w5'] }]);
+  });
+
+  it('keeps a choice of next lessons even when one option is dated later', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Start', after: ['b', 'c'] }, { id: 'b', title: 'Path one', after: ['d'] }, { id: 'x', title: 'Between' },
+      { id: 'c', title: 'Path two', after: ['d'] }, { id: 'd', title: 'Join' }
+    ];
+    const dates = new Map([['a', '2026-10-05T09:00'], ['b', '2026-10-06T09:00'], ['x', '2026-10-07T09:00'], ['c', '2026-10-08T09:00'], ['d', '2026-10-09T09:00']]);
+    const map = buildCoverageMap({ content: v2(), lines: LINES, lessons, points: POINTS, dates });
+    expect(map.dateJumps).toEqual([]);
+  });
+
   it('shows a dated side lesson in its own week, under the lesson it branches off', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Poem' }, { id: 's', title: 'Later support', role: 'support', branchFrom: 'a' }, { id: 'u', title: 'Undated option', role: 'optional', branchFrom: 'a' },

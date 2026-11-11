@@ -1,8 +1,7 @@
 import type { Lesson } from '@/schemas/lesson';
 import { el } from '@/quiz/dom';
-import { ROTATION_FALLBACK_LABELS, ROTATION_KINDS, ROTATION_KIND_INFO, ROTATION_LEVELS, ROTATION_LEVEL_LABELS, RotationSettingsSchema, WRITTEN_CHECK_LABELS, type PublicStation } from './schema';
+import { ROTATION_FALLBACK_LABELS, ROTATION_KINDS, ROTATION_KIND_INFO, ROTATION_LEVELS, ROTATION_LEVEL_LABELS, RotationSettingsSchema, WRITTEN_CHECK_LABELS } from './schema';
 import { DEFAULT_LESSON_MINUTES, FINALE_MINUTES, MOVE_MINUTES, timeBudget } from './rules';
-import { mapPositions } from './player';
 import type { RotationBoard, RotationTeacherApi } from './api';
 import './rotation.css';
 
@@ -68,8 +67,11 @@ export function mountRotationLive(o: RotationLiveOptions): RotationLiveHandle {
     const row = el('div', 'rot-stat-row');
     const stat = (big: string, small: HTMLElement | string) => { const s = el('div', 'rot-stat'); s.append(el('b', '', big)); const sp = el('span'); sp.append(small); s.append(sp); return s; };
     const timeNote = el('span');
-    timeNote.append(document.createTextNode(b.started_at ? `left · plan needs ${needs}${needs > left ? ' · ' : ''}` : `planned ${plan.total} of ${minutes} min · not started`));
-    if (b.started_at && needs > left && b.behind_fallback !== 'none' && !b.fallback_on) {
+    const home = !!r.finish_at_home;
+    timeNote.append(document.createTextNode(b.started_at
+      ? `left in class · about ${needs} min of work still to do${home && needs > left ? ', the rest at home' : ''}${!home && needs > left ? ' · ' : ''}`
+      : `planned ${plan.total} min${home && plan.home ? `: ${minutes} in class, ${plan.home} at home` : ` of ${minutes} min`} · not started`));
+    if (b.started_at && !home && needs > left && b.behind_fallback !== 'none' && !b.fallback_on) {
       const fb = el('button', 'rot-link', ROTATION_FALLBACK_LABELS[b.behind_fallback].split(':')[0]!.toLowerCase());
       fb.type = 'button';
       fb.addEventListener('click', () => void run(() => o.api.fallback(true)));
@@ -91,29 +93,72 @@ export function mountRotationLive(o: RotationLiveOptions): RotationLiveHandle {
     return row;
   }
 
+  /** The room as tidy cards: learning stations in order, then the teacher station, each with a seat meter and who is there. */
   function roomMap(b: RotationBoard): HTMLElement {
-    const map = el('div', 'rot-map');
-    map.setAttribute('aria-label', 'Room map');
-    const pub: PublicStation[] = b.stations.map((s) => ({ ...s, x: s.x ?? undefined, y: s.y ?? undefined, kind: s.kind as PublicStation['kind'], outcomes: [], piece: '', strand: s.strand ?? undefined } as PublicStation));
-    const at = mapPositions(pub);
-    for (const s of b.stations) {
-      const n = el('div', `rot-node${s.kind === 'teacher' ? ' rot-node--teacher' : ''}`);
-      n.style.left = `${at[s.id]!.x}%`;
-      n.style.top = `${at[s.id]!.y}%`;
-      n.style.cursor = 'default';
+    const grid = el('div', 'rot-room');
+    grid.setAttribute('aria-label', 'Room');
+    const learningIds = b.stations.filter((s) => s.kind !== 'teacher').map((s) => s.id);
+    const ordered = [...b.stations.filter((s) => s.kind !== 'teacher'), ...b.stations.filter((s) => s.kind === 'teacher')];
+    for (const s of ordered) {
+      const teacher = s.kind === 'teacher';
+      const n = learningIds.indexOf(s.id);
+      const card = el('div', `rot-room__card${teacher ? ' rot-room__card--teacher' : ''}`);
+      if (!teacher) card.dataset.hue = String(n % 6);
       const here = b.students.filter((st) => st.at === s.id);
-      n.append(el('span', 'rot-node__title', s.title), el('span', 'rot-node__sub', `${here.length} of ${s.seats} seats${b.gate_misses[s.id] ? ` · ${b.gate_misses[s.id]} gate misses` : ''}`));
-      const dots = el('span', 'rot-chips');
-      dots.style.marginTop = '4px';
+      card.dataset.full = String(here.length >= s.seats);
+      const top = el('div', 'rot-room__top');
+      top.append(el('span', 'rot-room__badge', teacher ? 'T' : String(n + 1)));
+      const head = el('div', 'rot-room__head');
+      head.append(el('span', 'rot-room__kind', teacher ? 'Teacher station · you' : (ROTATION_KIND_INFO[s.kind as keyof typeof ROTATION_KIND_INFO]?.label ?? '')), el('b', 'rot-room__title', s.title));
+      top.append(head);
+      const count = el('span', 'rot-room__count');
+      count.append(el('b', '', String(here.length)), document.createTextNode(` / ${s.seats}`));
+      top.append(count);
+      const seats = el('div', 'rot-room__seats');
+      seats.setAttribute('aria-label', `${here.length} of ${s.seats} seats taken`);
+      for (let k = 0; k < s.seats; k++) seats.append(el('i', k < here.length ? 'on' : ''));
+      card.append(top, seats);
+      const misses = b.gate_misses[s.id];
+      if (misses) card.append(el('span', 'rot-room__flag', `${misses} gate miss${misses === 1 ? '' : 'es'}`));
+      const names = el('div', 'rot-room__names');
+      if (!here.length) names.append(el('span', 'rot-room__empty', teacher ? 'Nobody called yet' : 'Empty'));
       for (const st of here) {
-        const d = el('span', `rot-chip ${st.stuck ? 'rot-chip--warn' : ''}`, st.name);
+        const d = el('span', `rot-room__name${st.stuck ? ' rot-room__name--stuck' : ''}`, st.name);
         d.title = st.stuck ? `${st.name} is stuck` : st.name;
-        dots.append(d);
+        names.append(d);
       }
-      n.append(dots);
-      map.append(n);
+      card.append(names);
+      grid.append(card);
     }
-    return map;
+    return grid;
+  }
+
+  function coveragePanel(b: RotationBoard): HTMLElement {
+    const kinds = ROTATION_KINDS.filter((k) => k !== 'teacher' && b.stations.some((s) => s.kind === k));
+    const strands = [...new Set(b.stations.map((s) => s.strand).filter((s): s is string => !!s))];
+    const t = el('table', 'rot-cover');
+    const groups = el('tr', 'rot-cover__groups');
+    groups.append(el('th', '', ''));
+    if (kinds.length) { const th = el('th', 'rot-cover__group', 'What the station teaches'); th.colSpan = kinds.length; groups.append(th); }
+    if (strands.length) { const th = el('th', 'rot-cover__group', 'English skill'); th.colSpan = strands.length; groups.append(th); }
+    const head = el('tr');
+    const which = (k: string) => b.stations.filter((s) => s.kind === k || s.strand === k).map((s) => s.title).join(', ');
+    const th = (label: string, k: string) => { const c = el('th'); c.append(el('span', '', label), el('small', 'rot-cover__which', which(k))); return c; };
+    head.append(el('th', '', 'Student'), ...kinds.map((k) => th(ROTATION_KIND_INFO[k].label, k)), ...strands.map((s) => th(s.charAt(0).toUpperCase() + s.slice(1), s)));
+    const cols = el('colgroup');
+    cols.append(el('col', 'rot-cover__name'), ...[...kinds, ...strands].map(() => el('col')));
+    t.append(cols, groups, head);
+    for (const st of b.students) {
+      const tr = el('tr');
+      tr.append(el('td', '', st.name));
+      const doneKinds = new Set(st.done.map((id) => b.stations.find((s) => s.id === id)?.kind));
+      const doneStrands = new Set(st.done.map((id) => b.stations.find((s) => s.id === id)?.strand));
+      for (const k of kinds) { const td = el('td'); const tick = el('span', `rot-tick${doneKinds.has(k) ? ' on' : ''}`); tick.setAttribute('aria-label', doneKinds.has(k) ? 'covered' : 'not yet'); td.append(tick); tr.append(td); }
+      for (const s of strands) { const td = el('td'); const tick = el('span', `rot-tick${doneStrands.has(s) ? ' on' : ''}`); tick.setAttribute('aria-label', doneStrands.has(s) ? 'covered' : 'not yet'); td.append(tick); tr.append(td); }
+      t.append(tr);
+    }
+    const key = el('p', 'rot-note', 'A green tick means the student has finished a station of that kind. The station names sit under each heading.');
+    return panel('Coverage', key, t);
   }
 
   function groupsPanel(b: RotationBoard): HTMLElement {
@@ -186,27 +231,6 @@ export function mountRotationLive(o: RotationLiveOptions): RotationLiveHandle {
     return p;
   }
 
-  function coveragePanel(b: RotationBoard): HTMLElement {
-    const kinds = ROTATION_KINDS.filter((k) => k !== 'teacher' && b.stations.some((s) => s.kind === k));
-    const strands = [...new Set(b.stations.map((s) => s.strand).filter((s): s is string => !!s))];
-    const wrap = el('div', 'rot-scroll');
-    const t = el('table', 'rot-cover');
-    const head = el('tr');
-    head.append(el('th', '', 'Student'), ...kinds.map((k) => el('th', '', ROTATION_KIND_INFO[k].label.split(' ')[0]!)), ...strands.map((s) => el('th', '', s.charAt(0).toUpperCase() + s.slice(1))));
-    t.append(head);
-    for (const st of b.students) {
-      const tr = el('tr');
-      tr.append(el('td', '', st.name));
-      const doneKinds = new Set(st.done.map((id) => b.stations.find((s) => s.id === id)?.kind));
-      const doneStrands = new Set(st.done.map((id) => b.stations.find((s) => s.id === id)?.strand));
-      for (const k of kinds) { const td = el('td'); const tick = el('span', `rot-tick${doneKinds.has(k) ? ' on' : ''}`); tick.setAttribute('aria-label', doneKinds.has(k) ? 'covered' : 'not yet'); td.append(tick); tr.append(td); }
-      for (const s of strands) { const td = el('td'); const tick = el('span', `rot-tick${doneStrands.has(s) ? ' on' : ''}`); tick.setAttribute('aria-label', doneStrands.has(s) ? 'covered' : 'not yet'); td.append(tick); tr.append(td); }
-      t.append(tr);
-    }
-    wrap.append(t);
-    return panel('Coverage', wrap);
-  }
-
   function writingPanel(b: RotationBoard): HTMLElement | null {
     if (!b.writing.length) return null;
     const box = el('div', 'rot-grid');
@@ -262,9 +286,7 @@ export function mountRotationLive(o: RotationLiveOptions): RotationLiveHandle {
     const room = el('div', 'rot-grid');
     room.style.gap = '6px';
     room.append(el('h3', '', 'Room'), roomMap(b), el('p', 'rot-note', 'Red names are stuck: three hints and no exit check, a gate miss, or a hand up.'));
-    const pair = el('div', 'rot-grid rot-grid--2');
-    pair.append(heatPanel(b), coveragePanel(b));
-    main.append(room, pair);
+    main.append(room, heatPanel(b), coveragePanel(b));
     const writing = writingPanel(b);
     if (writing) main.append(writing);
     const side = el('aside', 'rot-grid');

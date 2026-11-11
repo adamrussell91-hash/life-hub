@@ -1900,6 +1900,9 @@ ul.block-faded__choices { display: block; padding-left: var(--space-4); }
   font-family: var(--font-ui);
   font-size: var(--text-md);
 }
+.block-cloze__sentence {
+  white-space: pre-line;
+}
 
 .block-cloze__blank {
   min-width: 3ch;

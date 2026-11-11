@@ -157,7 +157,7 @@ export function createExplainerEditor(
       el(
         'p',
         'block-explainer__hint',
-        locked ? 'Record again to change the starting picture: the recording draws on top of it.' : 'Draw what the board shows before you start talking.'
+        locked ? 'Delete the recording, or record again, to change the starting picture: the recording draws on top of it.' : 'Draw what the board shows before you start talking.'
       )
     );
     const scene = current.content.board_start;
@@ -225,6 +225,22 @@ export function createExplainerEditor(
     openRecorder(startAt);
   };
 
+  // A test take can go: the text, tray and starting picture stay, and the board can be drawn on again.
+  const askDelete = async () => {
+    const ok = await askConfirmCard({
+      title: 'Delete this recording?',
+      supporting: 'Your voice, marks and board drawing go. The text, notes tray and starting picture stay.',
+      confirmLabel: 'Delete recording',
+      discardLabel: 'Keep it'
+    });
+    if (!ok) return;
+    const { recording: _gone, ...rest } = current.content;
+    current = { ...current, content: rest };
+    onChange(current);
+    paintStartBoard();
+    paintRecording();
+  };
+
   function paintRecording(): void {
     setup.hidden = false;
     player?.dispose();
@@ -253,7 +269,8 @@ export function createExplainerEditor(
       return b;
     });
     const again = btn('Record again', 'btn--ghost block-explainer-editor__record-again', () => void askRecord(0));
-    statusRow.append(again);
+    const remove = btn('Delete recording', 'btn--ghost block-explainer-editor__delete-recording', () => void askDelete());
+    statusRow.append(again, remove);
     player = mountExplainerPlayer(current);
     const timeline = createTimeline(rec, {
       onChange: (next) => {
