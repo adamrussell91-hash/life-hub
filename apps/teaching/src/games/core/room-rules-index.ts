@@ -5,6 +5,7 @@
  */
 import '../kinds/articulate/rules';
 import '../kinds/jeopardy/rules';
+import '../kinds/pictionary/rules';
 import '../kinds/points-rush/rules';
 import '../kinds/team-match/rules';
 import '../kinds/wager/rules';
