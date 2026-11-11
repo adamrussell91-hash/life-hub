@@ -14,8 +14,14 @@ export const gameKeys = (lesson) => ({
   plays: (game) => `games/${lesson}/${game}/plays/`,
   play: (game, play) => `games/${lesson}/${game}/plays/${play}`,
   events: (game, play, owner) => `games/${lesson}/${game}/events/${play}/${owner}`,
-  summary: (game, cls) => `games/${lesson}/${game}/summary/${cls}`
+  summary: (game, cls) => `games/${lesson}/${game}/summary/${cls}`,
+  /** Live rooms opened for a game (game-rooms.mjs): { room, code, class_id, version, opened_at, folded }. */
+  rooms: (game) => `games/${lesson}/${game}/rooms/`,
+  room: (game, room) => `games/${lesson}/${game}/rooms/${room}`
 });
+
+/** A live room's join code → where it is. Freed when the room folds, or once it is 6 h old. */
+export const roomCodeKey = (code) => `game-rooms/codes/${code}`;
 
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
