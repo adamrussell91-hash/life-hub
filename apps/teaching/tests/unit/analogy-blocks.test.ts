@@ -213,10 +213,12 @@ describe('Fluid analogy block', () => {
     const tier = shownTier(view);
     const level2 = analogyType('analogy:reverse')!.tiers[1]!;
     expect(tier.querySelector('.tk-guide')?.textContent).toContain(level2.task);
-    expect([...tier.querySelectorAll('.an-step__title')].map((node) => node.textContent)).toEqual(
+    expect([...tier.querySelectorAll('.tk-flow__name')].map((node) => node.textContent)).toEqual(
       level2.steps.map((step) => step.title)
     );
-    expect(tier.querySelector('.an-step__frame')?.textContent).toBe(level2.steps[0]!.prompt);
+    // Steps open one at a time: only the first step's card shows.
+    expect(tier.querySelectorAll('.tk-flow__card')).toHaveLength(1);
+    expect(tier.querySelector('.tk-flow__card')?.textContent).toContain(level2.steps[0]!.prompt);
     expect(view.querySelectorAll('.an-tier:not([hidden])')).toHaveLength(1);
   });
 

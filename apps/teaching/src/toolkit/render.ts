@@ -19,6 +19,7 @@ import { renderWalkthruSection } from '@/blocks/walkthru-note/note';
 import { authoredPoint, mapLayer, mountClassQuestions, mountStudentQuestions, numberMarker } from '@/toolkit/quadrant-live';
 import {
   CONCEPT_CRITERIA,
+  GUIDE,
   QUADRANT_AXIS_DEFINITION,
   QUADRANT_DEFINITION,
   QUADRANT_LABEL,
@@ -186,21 +187,171 @@ function reveal(options: {
   return wrap;
 }
 
-function stepList(steps: Array<{ title: string; prompt: string }>): HTMLOListElement {
-  const list = el('ol', 'block-question-set__list');
-  for (const step of steps) {
-    const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt block-body');
-    if (step.title.trim()) {
-      prompt.append(el('strong', 'block-subtitle', step.title.trim()));
-      if (step.prompt.trim()) prompt.append(document.createTextNode(` ${step.prompt.trim()}`));
-    } else {
-      prompt.textContent = step.prompt;
-    }
-    li.append(prompt);
-    list.append(li);
+/** One step in a step-by-step flow. */
+type FlowStep = {
+  /** Short name on the step line ("Example", "Check"). */
+  name: string;
+  /** What to do in this step. */
+  task?: string;
+  /** Sentence starter students copy into their book. */
+  frame?: string;
+  /** Worked example behind a Show an example button. */
+  example?: { part: string; body: string };
+  /** Tick-box checks; the step finishes once every one is ticked. */
+  checks?: string[];
+};
+
+/**
+ * A block's own instruction, shown as a quiet line above a step flow. The
+ * stock instruction is dropped there: the flow itself says what to do.
+ */
+function flowGuide(text: string | undefined, stock: string): HTMLElement | null {
+  const own = text?.trim();
+  if (!own || own === stock) return null;
+  return el('p', 'tk-flow-guide block-body', own);
+}
+
+function flowCard(step: FlowStep, options: { ctx: TkRenderContext; mode: TkRenderMode; blockId: string }): HTMLElement {
+  const card = el('div', 'tk-flow__card');
+  if (step.task?.trim()) card.append(el('p', 'tk-flow__task block-body', step.task.trim()));
+  if (step.frame?.trim()) {
+    const book = el('div', 'tk-flow__book');
+    book.append(el('span', 'tk-flow__book-label block-eyebrow', 'Write in your book'), el('p', 'tk-flow__frame block-body', step.frame.trim()));
+    card.append(book);
   }
-  return list;
+  if (step.example?.body.trim()) {
+    appendIf(
+      card,
+      reveal({ ...options, part: step.example.part, label: 'An example', body: step.example.body, className: 'tk-flow__example' })
+    );
+  }
+  return card;
+}
+
+/**
+ * Steps shown one at a time, as a flow chart down the page. Students do the
+ * open step in their book, tick it, and the next one opens. Finished steps
+ * fold to one line. Where they are saves per device. Print lists every step.
+ */
+function stepFlow(options: {
+  ctx: TkRenderContext;
+  mode: TkRenderMode;
+  blockId: string;
+  part?: string;
+  steps: FlowStep[];
+}): HTMLElement | null {
+  const steps = options.steps.filter((step) => step.name.trim() || step.task?.trim() || step.checks?.length);
+  if (!steps.length) return null;
+  const { ctx, mode, blockId } = options;
+  const wrap = el('div', 'tk-flow');
+
+  if (mode === 'print') {
+    const list = el('ol', 'tk-flow__list');
+    steps.forEach((step, index) => {
+      const li = el('li', 'tk-flow__step is-now');
+      li.append(el('span', 'tk-flow__dot', String(index + 1)), el('p', 'tk-flow__name block-subtitle', step.name));
+      const card = flowCard(step, { ctx, mode, blockId });
+      if (step.checks?.length) {
+        const ul = el('ul', 'tk-checks block-body');
+        for (const check of step.checks) ul.append(el('li', undefined, check));
+        card.append(ul);
+      }
+      li.append(card);
+      list.append(li);
+    });
+    wrap.append(list);
+    return wrap;
+  }
+
+  const key = activityKey(ctx, blockId, options.part ?? 'flow');
+  const saved = loadActivityState<{ at?: unknown }>(key)?.at;
+  let at = typeof saved === 'number' && saved >= 0 ? Math.min(saved, steps.length) : 0;
+
+  const progress = el('div', 'tk-flow__progress');
+  const count = el('p', 'tk-flow__count');
+  count.setAttribute('aria-live', 'polite');
+  const bar = el('div', 'tk-flow__bar');
+  bar.setAttribute('aria-hidden', 'true');
+  const segments = steps.map(() => bar.appendChild(el('span', 'tk-flow__seg')));
+  progress.append(count, bar);
+  const list = el('ol', 'tk-flow__list');
+  const finish = el('p', 'tk-flow__finish', `All ${steps.length} steps done.`);
+
+  function go(next: number): void {
+    at = next;
+    saveActivityState(key, { at });
+    paint();
+  }
+
+  function paint(): void {
+    count.textContent = at >= steps.length ? 'All done' : `Step ${at + 1} of ${steps.length}`;
+    segments.forEach((seg, index) => {
+      seg.classList.toggle('is-done', index < at);
+      seg.classList.toggle('is-now', index === at);
+    });
+    finish.hidden = at < steps.length;
+    list.replaceChildren(
+      ...steps.map((step, index) => {
+        const state = index < at ? 'is-done' : index === at ? 'is-now' : 'is-locked';
+        const li = el('li', `tk-flow__step ${state}`);
+        li.append(el('span', 'tk-flow__dot', index < at ? '✓' : String(index + 1)));
+        const head = el('div', 'tk-flow__head');
+        head.append(el('span', 'tk-flow__name block-subtitle', step.name));
+        li.append(head);
+        if (index < at) {
+          head.append(el('span', 'tk-flow__done', 'done'));
+          const again = el('button', 'tk-flow__again', 'Open again');
+          again.type = 'button';
+          again.setAttribute('aria-label', `Open ${step.name} again`);
+          again.addEventListener('click', () => go(index));
+          head.append(again);
+          return li;
+        }
+        if (index > at) return li;
+        li.setAttribute('aria-current', 'step');
+        const card = flowCard(step, { ctx, mode, blockId });
+        const ticks: HTMLInputElement[] = [];
+        const tick = (text: string, className: string): HTMLLabelElement => {
+          const label = el('label', className);
+          const input = el('input', 'tk-flow__tick');
+          input.type = 'checkbox';
+          ticks.push(input);
+          label.append(input, el('span', undefined, text));
+          return label;
+        };
+        const foot = el('div', 'tk-flow__foot');
+        if (step.checks?.length) {
+          const ul = el('ul', 'tk-flow__checks');
+          for (const check of step.checks) {
+            const item = el('li');
+            item.append(tick(check, 'tk-flow__check'));
+            ul.append(item);
+          }
+          card.append(ul);
+        } else {
+          foot.append(tick(step.frame?.trim() ? "I've written this in my book" : "I've done this", 'tk-flow__confirm'));
+        }
+        const next = el('button', 'tk-flow__next', index === steps.length - 1 ? 'Finish' : 'Next step');
+        next.type = 'button';
+        next.disabled = true;
+        next.addEventListener('click', () => go(index + 1));
+        for (const input of ticks) {
+          input.addEventListener('change', () => {
+            next.disabled = !ticks.every((box) => box.checked);
+          });
+        }
+        foot.append(next);
+        card.append(foot);
+        li.append(card);
+        return li;
+      })
+    );
+  }
+
+  if (steps.length > 1) wrap.append(progress);
+  wrap.append(list, finish);
+  paint();
+  return wrap;
 }
 
 /**
@@ -414,23 +565,17 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
     question.append(el('span', 'tk-question__mark', '?'), text);
     wrap.append(question);
   }
-  appendIf(wrap, guideLine(c.guide));
-  const steps = c.steps.map((step) => ({ title: step.title, prompt: step.prompt }));
-  const list = stepList(steps);
-  if (c.show_test && c.checks.some((line) => line.trim())) {
-    const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt block-body');
-    prompt.append(el('strong', 'block-subtitle', 'Check'));
-    li.append(prompt);
-    const checks = c.checks.filter((line) => line.trim());
-    if (checks.length) {
-      const ul = el('ul', 'tk-checks block-body');
-      for (const check of checks) ul.append(el('li', undefined, check));
-      li.append(ul);
-    }
-    list.append(li);
+  appendIf(wrap, flowGuide(c.guide, GUIDE.skill));
+  const steps: FlowStep[] = c.steps.map((step, index) => ({
+    name: step.title.trim() || `Step ${index + 1}`,
+    task: step.prompt
+  }));
+  const checks = c.checks.filter((line) => line.trim());
+  if (c.show_test && checks.length) {
+    steps.push({ name: 'Check', task: 'Read your answer back. Tick each check.', checks });
   }
-  if (list.childElementCount) wrap.append(list);
+  const flow = stepFlow({ ctx, mode, blockId: block.id, steps });
+  if (flow) wrap.append(flow);
   else appendIf(wrap, teacherHint(mode, 'No steps yet. Select the block to add some.'));
   for (const item of c.reveals) {
     appendIf(wrap, reveal({ ctx, mode, blockId: block.id, part: item.id, label: item.label, body: item.body }));
@@ -611,27 +756,26 @@ function renderConverter(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRen
   return frag;
 }
 
-function renderToolSteps(block: ToolkitToolBlock): HTMLElement {
+function renderToolSteps(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement | null {
   const c = block.content;
-  const frag = el('div', 'tk-frame');
-  if (c.steps.length) frag.append(stepList(c.steps));
-  if (c.sentence.trim()) {
-    const sentence = el('p', 'tk-sentence block-body');
-    sentence.append(el('span', 'tk-sentence__label block-eyebrow', 'Frame'), document.createTextNode(c.sentence));
-    frag.append(sentence);
-  }
-  return frag;
+  const steps: FlowStep[] = c.steps.map((step, index) => ({
+    name: step.title.trim() || `Step ${index + 1}`,
+    task: step.prompt
+  }));
+  if (c.sentence.trim()) steps.push({ name: 'Write it', task: 'Use the frame to write your answer.', frame: c.sentence });
+  return stepFlow({ ctx, mode, blockId: block.id, steps });
 }
 
 function renderTool(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Tool'), itemCard('tool', c.label, c.definition));
-  appendIf(wrap, guideLine(c.guide));
+  if (c.frame === 'fork' || c.frame === 'stress' || c.frame === 'converter') appendIf(wrap, guideLine(c.guide));
+  else appendIf(wrap, flowGuide(c.guide, GUIDE.steps));
   if (c.frame === 'fork') wrap.append(renderFork(block, mode, ctx));
   else if (c.frame === 'stress') wrap.append(renderStress(block, mode, ctx));
   else if (c.frame === 'converter') wrap.append(renderConverter(block, mode, ctx));
-  else wrap.append(renderToolSteps(block));
+  else appendIf(wrap, renderToolSteps(block, mode, ctx));
   for (const item of c.reveals) {
     appendIf(wrap, reveal({ ctx, mode, blockId: block.id, part: item.id, label: item.label, body: item.body }));
   }
@@ -724,55 +868,28 @@ function renderValue(block: ToolkitValueBlock, mode: TkRenderMode, ctx: TkRender
 
 // ─── Thinking move ──────────────────────────────────────────────────────────
 
-function miniCard(id: string): HTMLElement | null {
-  const label = itemLabel(id);
-  const kind = itemKind(id);
-  if (!label || !kind) return null;
-  return el('li', `tk-mini tk-mini--${kind}`, label);
-}
-
 function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Thinking move'));
   wrap.append(el('p', 'tk-move__sentence block-title', moveSentence(c.skill, c.tools, c.value)));
-  const cards = el('ol', 'tk-minis');
-  cards.setAttribute('aria-label', 'Skill, tools and value in order');
-  for (const id of [c.skill, ...c.tools, c.value]) appendIf(cards, miniCard(id));
-  wrap.append(cards);
-  appendIf(wrap, guideLine(c.guide));
+  appendIf(wrap, flowGuide(c.guide, GUIDE.move));
   if (c.stimulus.trim()) {
-    const stimulus = el('p', 'tk-context');
-    stimulus.append(el('span', 'tk-context__label block-eyebrow', 'Working on'), document.createTextNode(c.stimulus));
+    const stimulus = el('div', 'tk-move__stimulus');
+    stimulus.append(el('span', 'block-eyebrow', 'Working on'), el('p', 'tk-move__stimulus-text block-body', c.stimulus.trim()));
     wrap.append(stimulus);
   }
-  const list = el('ol', 'block-question-set__list');
-  for (const step of c.steps) {
-    const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt block-body');
-    const tool = itemLabel(step.tool);
-    if (tool) prompt.append(el('span', `hub-list__chip tk-chip tk-chip--tool tk-step__chip`, tool));
-    prompt.append(document.createTextNode(` ${step.prompt}`));
-    li.append(prompt);
-    if (step.frame.trim()) li.append(el('p', 'tk-sentence tk-sentence--compact block-body', step.frame));
-    if (step.example.trim()) {
-      appendIf(li, reveal({ ctx, mode, blockId: block.id, part: step.id, label: 'An example', body: step.example }));
-    }
-    list.append(li);
-  }
+  const steps: FlowStep[] = c.steps.map((step, index) => ({
+    name: itemLabel(step.tool) || `Step ${index + 1}`,
+    task: step.prompt,
+    frame: step.frame,
+    example: step.example.trim() ? { part: step.id, body: step.example } : undefined
+  }));
   const checks = c.check.filter((line) => line.trim());
   if (checks.length) {
-    const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt block-body');
-    const value = itemLabel(c.value);
-    prompt.append(el('strong', 'block-subtitle', value ? `Check for ${value.toLowerCase()}` : 'Check'));
-    li.append(prompt);
-    const ul = el('ul', 'tk-checks block-body');
-    for (const check of checks) ul.append(el('li', undefined, check));
-    li.append(ul);
-    list.append(li);
+    steps.push({ name: itemLabel(c.value) || 'Check', task: 'Read your answer back. Tick each check.', checks });
   }
-  wrap.append(list);
+  appendIf(wrap, stepFlow({ ctx, mode, blockId: block.id, steps }));
   if (c.community.trim()) {
     const together = el('aside', 'callout callout--shore');
     together.setAttribute('role', 'note');
@@ -1306,16 +1423,20 @@ function tierPanel(
   panel.dataset.level = String(level);
   appendIf(panel, guideLine(tier.task));
   const steps = tier.steps.filter((step) => step.title.trim() || step.prompt.trim());
-  if (steps.length) {
-    const list = el('ol', 'an-steps');
-    for (const step of steps) {
-      const item = el('li', 'an-step');
-      if (step.title.trim()) item.append(el('span', 'an-step__title block-subtitle', step.title.trim()));
-      if (step.prompt.trim()) item.append(el('span', 'an-step__frame block-body', step.prompt.trim()));
-      list.append(item);
-    }
-    panel.append(list);
-  }
+  appendIf(
+    panel,
+    stepFlow({
+      ctx,
+      mode,
+      blockId: block.id,
+      part: `flow-${level}`,
+      // A prompt with [gaps] is a sentence frame; anything else is the task.
+      steps: steps.map((step, index) => ({
+        name: step.title.trim() || `Step ${index + 1}`,
+        ...(step.prompt.includes('[') ? { frame: step.prompt } : { task: step.prompt })
+      }))
+    })
+  );
   if (tier.example.trim()) {
     appendIf(panel, reveal({ ctx, mode, blockId: block.id, part: `example-${level}`, label: 'An example', body: tier.example }));
   }

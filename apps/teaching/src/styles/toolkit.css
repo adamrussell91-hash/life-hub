@@ -504,48 +504,21 @@ button.tk-chip:focus-visible {
   padding-left: 1.3rem;
 }
 
-/* Thinking move mini cards --------------------------------------------------- */
+/* Thinking move ----------------------------------------------------------- */
 
 .tk-move__sentence {
   margin: 0;
 }
 
-.tk-minis {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tk-mini {
-  padding: 6px 12px;
-  border: 1px solid var(--line);
+.tk-move__stimulus {
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  white-space: nowrap;
+  background: color-mix(in srgb, var(--wave) 8%, #fff);
 }
 
-.tk-mini--skill {
-  color: var(--navy);
-  background: #fff;
-}
-
-.tk-mini--tool {
-  color: #fff;
-  background: var(--depth);
-  border-color: var(--depth);
-}
-
-.tk-mini--value {
-  color: var(--depth);
-  background: var(--high-sea);
-  border-color: var(--high-sea);
+.tk-move__stimulus-text {
+  margin: 2px 0 0;
+  font-weight: var(--weight-semibold, 600);
 }
 
 /* Question Quadrant ---------------------------------------------------------- */
@@ -2828,3 +2801,281 @@ span.wts-tool__aux { cursor: default; }
 .think-aloud-edit__field { display: grid; gap: 0.3rem; }
 .think-aloud-edit__label { font-weight: 600; font-size: 0.9rem; }
 .think-aloud-edit__box { width: 100%; min-height: 3.5rem; resize: vertical; }
+
+/* Step flow: one step open at a time ------------------------------------------
+ * Toolkit orange marks the open step, green the finished ones. Three sizes
+ * only: step name, body, small label. */
+
+.tk-flow-guide {
+  margin: 0;
+  color: var(--muted);
+}
+
+.tk-flow {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tk-flow__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-flow__count {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tk-flow__bar {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.tk-flow__seg {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--navy) 12%, #fff);
+}
+
+.tk-flow__seg.is-done {
+  background: var(--success);
+}
+
+.tk-flow__seg.is-now {
+  background: var(--high-sea);
+}
+
+.tk-flow__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-flow__step {
+  position: relative;
+  padding: 0 0 var(--space-3) 40px;
+  min-width: 0;
+}
+
+/* The line that joins one step to the next. */
+.tk-flow__step::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--navy) 12%, #fff);
+}
+
+.tk-flow__step:last-child {
+  padding-bottom: 0;
+}
+
+.tk-flow__step:last-child::before {
+  display: none;
+}
+
+.tk-flow__step.is-done::before {
+  background: var(--success);
+}
+
+.tk-flow__dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid color-mix(in srgb, var(--navy) 18%, #fff);
+  border-radius: 50%;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--muted);
+}
+
+.tk-flow__step.is-done .tk-flow__dot {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+
+.tk-flow__step.is-now .tk-flow__dot {
+  border-color: var(--high-sea);
+  background: var(--high-sea);
+  color: var(--ink);
+}
+
+.tk-flow__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+}
+
+.tk-flow__name {
+  margin: 0;
+}
+
+.tk-flow__step.is-locked .tk-flow__name {
+  color: var(--shallow);
+}
+
+.tk-flow__done {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.tk-flow__again {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tk-flow__card {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--high-sea) 28%, #fff);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--high-sea) 8%, #fff);
+  min-width: 0;
+}
+
+.tk-flow__task {
+  margin: 0;
+  font-weight: 600;
+}
+
+.tk-flow__book {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--high-sea) 28%, #fff);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.tk-flow__book-label {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.tk-flow__frame {
+  margin: 0;
+}
+
+.tk-flow__example {
+  margin: 0;
+}
+
+.tk-flow__checks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-flow__check,
+.tk-flow__confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.tk-flow__check {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--high-sea) 28%, #fff);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.tk-flow__confirm {
+  align-items: center;
+  font-weight: 600;
+}
+
+.tk-flow__tick {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--success);
+}
+
+.tk-flow__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.tk-flow__next {
+  margin-left: auto;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--navy);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: #fff;
+  cursor: pointer;
+}
+
+.tk-flow__next:disabled {
+  background: var(--shallow);
+  cursor: not-allowed;
+}
+
+.tk-flow__finish {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--success-surface);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-bold);
+  color: var(--success);
+}
+
+.tk-flow__finish[hidden] {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .tk-flow__step {
+    padding-left: 36px;
+  }
+
+  .tk-flow__next {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media print {
+  .tk-flow__card {
+    background: #fff;
+  }
+}
