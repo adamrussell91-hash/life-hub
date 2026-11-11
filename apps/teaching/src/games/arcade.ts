@@ -10,7 +10,7 @@ import { gameGlyph, modeChips } from './glyphs';
 import { hasPlayer } from './solo/registry';
 import { openSoloPlayer } from './solo/shell';
 import { openLivePhone } from './live/phone';
-import { LIVE_STYLE } from './live/board-parts';
+import { liveStyle } from './live/board-parts';
 import './kinds';
 import './games.css';
 
@@ -141,7 +141,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     } else {
       foot.append(el('span', 'gm-card__wait', 'Waiting for your teacher'));
     }
-    if (g.live && LIVE_STYLE[g.kind] && client?.join) foot.append(liveButton(g));
+    if (g.live && liveStyle(g.kind) && client?.join) foot.append(liveButton(g));
     c.append(foot);
     return c;
   }

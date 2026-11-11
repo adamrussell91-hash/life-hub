@@ -147,7 +147,7 @@ export type GameTeacherApi = {
   pushToMarkbook(classId: string, gameId: string, title?: string): Promise<{ column_id: string; count: number }>;
   sources(): Promise<UnitSources>;
   /** Opens a live room for one game and class: the board's code and teacher ticket. */
-  open?(gameId: string, classId: string): Promise<LiveOpen>;
+  open?(gameId: string, classId: string, opts?: { teams?: number }): Promise<LiveOpen>;
   /** Rooms still open for this lesson (so a refreshed board can reconnect). */
   rooms?(): Promise<{ rooms: LiveRoomInfo[] }>;
 };
@@ -179,7 +179,7 @@ export function gameTeacherApi(lessonId: string): GameTeacherApi {
     results: (class_id, game_id) => call('results', { class_id, ...(game_id ? { game_id } : {}) }),
     pushToMarkbook: (class_id, game_id, title) => call('markbook_push', { class_id, game_id, ...(title ? { title } : {}) }),
     sources: () => call<UnitSources>('sources'),
-    open: (game_id, class_id) => call<LiveOpen>('open', { game_id, class_id }),
+    open: (game_id, class_id, opts) => call<LiveOpen>('open', { game_id, class_id, ...(opts?.teams ? { teams: opts.teams } : {}) }),
     rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms')
   };
 }

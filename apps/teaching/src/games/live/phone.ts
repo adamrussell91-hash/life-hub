@@ -11,6 +11,8 @@ import { connectRoom, type ConnectOptions, type RoomConnection, type RoomStatus 
 import { mountPacedPhone, type PacedPhone } from './paced-phone';
 import { earForText } from '../kinds/who-said-it/player';
 import { ordinal } from './format';
+import { liveKind, type KindView } from './kind-views';
+import { teamColour } from './board-parts';
 import '../kinds';
 import '../games.css';
 import './live.css';
@@ -107,6 +109,9 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
   let lastCode = options.code ?? '';
   let player: MountedPlayer | null = null;
   let paced: PacedPhone | null = null;
+  let kindView: KindView | null = null;
+  let kindEndTimer: ReturnType<typeof setTimeout> | null = null;
+  let lobbyTeam: number | undefined;
   let playerStatus = '';
   let playStarted = 0;
   let closed = false;
@@ -151,6 +156,14 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     player = null;
     paced?.dispose();
     paced = null;
+    try {
+      kindView?.dispose();
+    } catch {
+      // Same for a kind's phone view.
+    }
+    kindView = null;
+    if (kindEndTimer) clearTimeout(kindEndTimer);
+    kindEndTimer = null;
     playerStatus = '';
   }
   function state(text: string, opts: { error?: boolean } = {}): void {
@@ -281,11 +294,15 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     pause.hidden = v.phase !== 'paused';
     if (v.phase === 'paused' && screen === 'play') pause.querySelector('small')!.textContent = 'Your teacher paused the game. Hold tight.';
     if (v.phase === 'lobby') {
-      if (screen !== 'lobby') showLobby(v);
+      // Teams can change in the lobby (the teacher moves or shuffles): the badge follows.
+      if (screen !== 'lobby' || v.you?.seat?.team !== lobbyTeam) showLobby(v);
     } else if (v.phase === 'countdown') {
       if (screen !== 'countdown') showCountdown(v);
     } else if (v.phase === 'playing' || v.phase === 'paused') {
-      if (v.style === 'paced') {
+      if (v.style === 'custom') {
+        if (screen !== 'play') showCustom(v);
+        paintCustom(v);
+      } else if (v.style === 'paced') {
         if (screen !== 'play') showPaced();
         paced?.update(v);
       } else if (me()?.finished || finishedSeat) {
@@ -293,7 +310,14 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
         else paintDone(v);
       } else if (screen !== 'play') showRace();
     } else if (v.phase === 'ended' || v.phase === 'folded') {
-      if (screen !== 'ended') showEnded(v);
+      if (screen === 'play' && kindView) {
+        // The kind's last screen (its final reveal) stays a moment, then the finish card.
+        paintCustom(v);
+        kindEndTimer ??= setTimeout(() => {
+          const now = conn?.view();
+          if (!closed && now) showEnded(now);
+        }, calm() ? 1200 : 3200);
+      } else if (screen !== 'ended') showEnded(v);
     }
     paintStatus();
   }
@@ -304,21 +328,32 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     const seat = v.you?.seat;
     const initials = seat?.initials ?? ticket?.initials ?? '';
     const team = seat?.team ?? ticket?.team;
+    const first = screen !== 'lobby';
+    lobbyTeam = seat?.team;
     const box = el('div', 'gl-in');
     const badge = el('div', 'gl-in__badge', initials);
-    // Teams are numbered from 0 in the room (later phases); colours cycle through the four team tokens.
-    if (team !== undefined) badge.style.setProperty('--gl-team', `var(--game-team-${(team % 4) + 1})`);
+    // Teams are numbered from 0 in the room; six team colours, then they repeat.
+    if (team !== undefined) {
+      box.classList.add('is-team');
+      box.style.setProperty('--gl-team', teamColour(team));
+      box.style.setProperty('--gl-team-soft', teamColour(team, true));
+      badge.style.setProperty('--gl-team', teamColour(team));
+    }
     badge.setAttribute('aria-hidden', 'true');
     box.append(badge, el('p', 'gl-in__h', 'You’re in'));
-    const sub = el('p', 'gl-in__sub');
-    if (team !== undefined) sub.append('Team ', el('b', '', String(team + 1)), ' · waiting for your teacher to start');
-    else sub.textContent = 'Waiting for your teacher to start';
+    if (team !== undefined) {
+      const on = el('p', 'gl-in__team');
+      on.append('You’re on ', el('b', '', `Team ${team + 1}`));
+      box.append(on);
+    }
+    const sub = el('p', 'gl-in__sub', 'Waiting for your teacher to start');
     box.append(sub);
-    box.setAttribute('aria-label', `You’re in as ${initials}. Waiting for your teacher to start.`);
+    box.setAttribute('aria-label', `You’re in as ${initials}${team !== undefined ? `, on Team ${team + 1}` : ''}. Waiting for your teacher to start.`);
     stage.replaceChildren(box);
     setDock([]);
     void enter(box);
-    toast('Joined', 'good');
+    if (first) toast('Joined', 'good');
+    else if (team !== undefined) toast(`You’re on Team ${team + 1} now`);
   }
 
   function showCountdown(v: RoomView): void {
@@ -418,6 +453,43 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     });
   }
 
+  /** A kind with its own rules: its phone view gets the stage, the dock and every view. */
+  function showCustom(v: RoomView): void {
+    screen = 'play';
+    disposePlay();
+    stage.replaceChildren();
+    setDock([]);
+    const live = liveKind(v.kind);
+    const c = conn!;
+    if (!live) {
+      state('This game’s screens are coming. Watch the board for now.');
+      return;
+    }
+    playStarted = Date.now();
+    try {
+      kindView = live.phone(stage, {
+        move: (event) => c.move({ ...event, time_ms: event.time_ms ?? Date.now() - playStarted }),
+        control: (name, data) => c.request({ t: 'control', op: { op: 'kind', name, ...(data !== undefined ? { data } : {}) } }).then(() => undefined),
+        serverNow: () => c.serverNow(),
+        calm,
+        sfx,
+        toast,
+        setActions: setDock,
+        owner: ticket?.owner ?? v.you?.owner ?? ''
+      });
+    } catch (e) {
+      kindView = null;
+      state(message(e, 'This game couldn’t open.'), { error: true });
+    }
+  }
+  function paintCustom(v: RoomView): void {
+    try {
+      kindView?.update(v);
+    } catch {
+      // One bad paint must not stop the phone; the next view tries again.
+    }
+  }
+
   let doneNum: HTMLElement | null = null;
   function showDone(v: RoomView): void {
     screen = 'done';
@@ -444,7 +516,7 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     const seat = v.you?.seat;
     const rank = v.you?.rank;
     const card = el('section', 'gm-finish gl-finish');
-    const top = rank === 1;
+    const top = v.teams?.length && seat?.team !== undefined ? v.teams.find((t) => t.team === seat.team)?.rank === 1 : rank === 1;
     const heading = el('h3', 'gm-finish__title', top ? 'You won!' : 'Game over');
     heading.tabIndex = -1;
     const big = el('p', 'gm-finish__score');
@@ -458,6 +530,11 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
       d.append(el('dt', '', label), el('dd', '', value));
       stats.append(d);
     };
+    const myTeam = seat?.team !== undefined ? v.teams?.find((t) => t.team === seat.team) : undefined;
+    if (myTeam) {
+      stat('Team', `Team ${myTeam.team + 1} · ${ordinal(myTeam.rank)} of ${v.teams!.length}`);
+      stat('Team points', myTeam.score.toLocaleString('en-AU'));
+    }
     if (rank) stat('Place', placeText(v, rank));
     if (seat?.progress?.mistakes !== undefined) stat('Mistakes', String(seat.progress.mistakes));
     if (v.style === 'paced' && answers.length) {
@@ -480,12 +557,24 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
   /* ── Shell ────────────────────────────────────────────────────── */
 
   function onKey(e: KeyboardEvent): void {
+    const paused = conn?.view()?.phase === 'paused';
+    // A kind's phone view hears its keys first (not while paused).
+    let kindKey = false;
+    try {
+      kindKey = !paused && !!kindView?.onKey?.(e);
+    } catch {
+      kindKey = false;
+    }
+    if (kindKey) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
       return;
     }
-    if (conn?.view()?.phase === 'paused') return;
+    if (paused) return;
     if (player?.onKey?.(e) || paced?.onKey(e)) e.preventDefault();
   }
 

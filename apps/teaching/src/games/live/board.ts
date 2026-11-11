@@ -9,10 +9,12 @@ import { setSfxRole, sfx, soundOn, setSoundOn } from '../sound/sfx';
 import { primeSound } from '@/blocks/classroom-tools/sound';
 import { cameo, castLooks, type Look } from '../kinds/who-said-it/portraits';
 import { connectRoom, type ConnectOptions, type RoomConnection, type RoomStatus } from './transport';
-import { avatar, createLeaderboard, createRing, type Leaderboard, type Ring } from './board-parts';
+import { avatar, createLeaderboard, createRing, teamBadge, teamColour, type Leaderboard, type Ring } from './board-parts';
+import { liveKind, type KindView, type KindViewApi } from './kind-views';
 import { spacedCode } from './code-field';
 import { clock, ordinal } from './format';
 import { qrSvg } from './qr';
+import '../kinds';
 import '../games.css';
 import '../kinds/who-said-it/who-said-it.css';
 import './live.css';
@@ -45,7 +47,10 @@ export type LiveBoardOptions = {
 
 export type LiveBoard = { root: HTMLElement; close(): void; connection(): RoomConnection };
 
-type Screen = 'connecting' | 'lobby' | 'countdown' | 'race' | 'paced' | 'ended';
+type Screen = 'connecting' | 'lobby' | 'countdown' | 'race' | 'paced' | 'custom' | 'ended';
+type KindButton = ReturnType<NonNullable<KindView['controls']>>[number];
+/** How long a custom game's last screen stays up before the podium. */
+const KIND_END_MS = 3200;
 
 const KIND_TICKER: Record<string, string> = { connections: 'First to find it', who_said_it: 'First to lock in' };
 
@@ -126,6 +131,11 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     primeSound();
     void conn.request({ t: 'control', op }).catch((e: unknown) => toast(e instanceof Error && e.message ? e.message : 'The room didn’t take that. Try again.', 'bad'));
   }
+  /** A kind's own control (style 'custom'), from its view or the control bar. */
+  function kindControl(name: string, data?: unknown): Promise<void> {
+    primeSound();
+    return conn.request({ t: 'control', op: { op: 'kind', name, ...(data !== undefined ? { data } : {}) } }).then(() => undefined);
+  }
 
   function onStatus(s: RoomStatus, info: { slow: boolean }): void {
     slow.hidden = !info.slow || s === 'closed';
@@ -165,13 +175,22 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     } else if (v.phase === 'countdown') {
       if (screen !== 'countdown') buildCountdown(v);
     } else if (v.phase === 'playing' || v.phase === 'paused') {
-      if (v.style === 'paced') {
+      if (v.style === 'custom') {
+        if (screen !== 'custom') buildCustom(v);
+        paintCustom(v);
+      } else if (v.style === 'paced') {
         if (screen !== 'paced') buildPaced();
         paintPaced(v, prev);
       } else {
         if (screen !== 'race') buildRace(v);
         paintRace(v);
       }
+    } else if (screen === 'custom' && kindView) {
+      // The kind's last screen (its final reveal) stays up a moment, then the podium.
+      paintCustom(v);
+      endTimer ??= setTimeout(() => {
+        if (!closed && view) buildEnded(view);
+      }, calm() ? 1200 : KIND_END_MS);
     } else {
       if (screen !== 'ended') buildEnded(v);
     }
@@ -187,6 +206,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   function buildLobby(): void {
     screen = 'lobby';
     stopClock();
+    disposeKind();
     const wrap = el('div', 'gl-lobby');
     const hero = el('div', 'gl-lobby__hero');
     hero.append(el('span', 'gl-eyebrow', `Live game · ${kindLabel(view?.kind)}`), el('h2', 'gl-lobby__title', view?.title || game?.title || 'Live game'));
@@ -216,32 +236,120 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     seen.clear();
   }
 
+  function lobbyChip(s: Seat): HTMLElement {
+    const chip = el('span', 'gl-chip');
+    chip.dataset.owner = s.owner;
+    chip.append(avatar(s.initials), el('span', 'gl-chip__i', s.initials));
+    if (!seen.has(s.owner)) {
+      seen.add(s.owner);
+      sfx.ding();
+      void animate(
+        chip,
+        [
+          { transform: 'translate(-30vw, -12vh) scale(0.3) rotate(-25deg)', opacity: 0 },
+          { transform: 'scale(1.15)', opacity: 1, offset: 0.7 },
+          { transform: 'none', opacity: 1 }
+        ],
+        { duration: 750 }
+      );
+    }
+    return chip;
+  }
+
+  /* Team games: one column per team. Drag a chip to another team, or tap it, then tap the team. */
+  let picked: string | null = null;
+  let teamsSig = '';
+  function paintTeamLobby(v: RoomView, teams: NonNullable<RoomView['teams']>): void {
+    if (!lobbyChips) return;
+    lobbyChips.classList.add('gl-teams');
+    lobbyChips.style.setProperty('--n', String(teams.length));
+    const sig = `${picked ?? ''}|${teams.map((t) => t.team).join(',')}|${v.seats.map((s) => `${s.owner}:${s.team}:${s.connected ? 1 : 0}`).join(',')}`;
+    if (sig === teamsSig) return;
+    teamsSig = sig;
+    const move = (owner: string, team: number) => {
+      picked = null;
+      teamsSig = '';
+      const seat = v.seats.find((s) => s.owner === owner);
+      if (seat && seat.team !== team) control({ op: 'move_team', owner, team });
+      else if (view) paintLobby(view);
+    };
+    const cols = teams.map((t) => {
+      const col = el('section', 'gl-team');
+      col.dataset.team = String(t.team);
+      col.style.setProperty('--gl-team', teamColour(t.team));
+      col.style.setProperty('--gl-team-soft', teamColour(t.team, true));
+      const members = v.seats.filter((s) => s.team === t.team);
+      const head = el('button', 'gl-team__head');
+      head.type = 'button';
+      head.append(teamBadge(t.team), el('b', '', `Team ${t.team + 1}`), el('small', '', String(members.length)));
+      head.setAttribute('aria-label', picked ? `Move ${v.seats.find((s) => s.owner === picked)?.initials ?? ''} to Team ${t.team + 1}` : `Team ${t.team + 1}, ${members.length} players`);
+      head.addEventListener('click', () => picked && move(picked, t.team));
+      const list = el('div', 'gl-team__list');
+      for (const s of members) {
+        const chip = lobbyChip(s);
+        chip.classList.toggle('is-away', !s.connected);
+        chip.classList.toggle('is-picked', picked === s.owner);
+        chip.setAttribute('role', 'button');
+        chip.tabIndex = 0;
+        chip.draggable = true;
+        chip.setAttribute('aria-label', `${s.initials}, Team ${t.team + 1}. Press to move to another team.`);
+        const pick = () => {
+          picked = picked === s.owner ? null : s.owner;
+          teamsSig = '';
+          if (picked) toast(`Tap a team to move ${s.initials}`);
+          if (view) paintLobby(view);
+        };
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          pick();
+        });
+        chip.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            pick();
+          }
+        });
+        chip.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('text/plain', s.owner);
+          chip.classList.add('is-dragging');
+        });
+        chip.addEventListener('dragend', () => chip.classList.remove('is-dragging'));
+        list.append(chip);
+      }
+      col.append(head, list);
+      col.addEventListener('click', () => picked && move(picked, t.team));
+      col.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        col.classList.add('is-over');
+      });
+      col.addEventListener('dragleave', () => col.classList.remove('is-over'));
+      col.addEventListener('drop', (e) => {
+        e.preventDefault();
+        col.classList.remove('is-over');
+        const owner = e.dataTransfer?.getData('text/plain');
+        if (owner) move(owner, t.team);
+      });
+      return col;
+    });
+    lobbyChips.replaceChildren(...cols);
+  }
+
   function paintLobby(v: RoomView): void {
     if (!lobbyChips || !lobbyCount) return;
     const here = v.seats.filter((s) => s.connected);
     lobbyCount.replaceChildren(el('b', '', String(here.length)), ` ${here.length === 1 ? 'player' : 'players'} here`);
+    if (v.teams?.length) {
+      paintTeamLobby(v, v.teams);
+      return;
+    }
     const keep = new Set(v.seats.map((s) => s.owner));
     for (const chip of [...lobbyChips.children] as HTMLElement[]) if (!keep.has(chip.dataset.owner ?? '')) chip.remove();
     for (const s of v.seats) {
       let chip = lobbyChips.querySelector<HTMLElement>(`[data-owner="${CSS.escape(s.owner)}"]`);
       if (!chip) {
-        chip = el('span', 'gl-chip');
-        chip.dataset.owner = s.owner;
-        chip.append(avatar(s.initials), el('span', 'gl-chip__i', s.initials));
+        chip = lobbyChip(s);
         lobbyChips.append(chip);
-        if (!seen.has(s.owner)) {
-          seen.add(s.owner);
-          sfx.ding();
-          void animate(
-            chip,
-            [
-              { transform: 'translate(-30vw, -12vh) scale(0.3) rotate(-25deg)', opacity: 0 },
-              { transform: 'scale(1.15)', opacity: 1, offset: 0.7 },
-              { transform: 'none', opacity: 1 }
-            ],
-            { duration: 750 }
-          );
-        }
       }
       chip.classList.toggle('is-away', !s.connected);
     }
@@ -252,6 +360,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   function buildCountdown(v: RoomView): void {
     screen = 'countdown';
     stopClock();
+    disposeKind();
     const wrap = el('div', 'gl-countdown');
     const ring = createRing('gl-ring--xl');
     wrap.append(el('span', 'gl-eyebrow', 'Get ready'), ring.root);
@@ -651,6 +760,94 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     pacedLb?.update(v.leaderboard);
   }
 
+  /* ── Custom kinds (their own board view) ─────────────────────── */
+
+  let kindView: KindView | null = null;
+  let kindHost: HTMLElement | null = null;
+  let kindLbBox: HTMLElement | null = null;
+  let kindLb: Leaderboard | null = null;
+  let endTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const kindApi: KindViewApi = {
+    move: () => Promise.reject(new Error('The board doesn’t make moves.')),
+    control: (name, data) => kindControl(name, data),
+    serverNow: () => conn.serverNow(),
+    calm,
+    sfx,
+    toast: (text, tone) => toast(text, tone === 'bad' ? 'bad' : 'plain'),
+    owner: 'board'
+  };
+
+  function disposeKind(): void {
+    try {
+      kindView?.dispose();
+    } catch {
+      // A kind's own tidy-up must not stop the board.
+    }
+    kindView = null;
+    kindHost = null;
+    kindLbBox = null;
+    if (endTimer) clearTimeout(endTimer);
+    endTimer = null;
+  }
+
+  function buildCustom(v: RoomView): void {
+    screen = 'custom';
+    stopClock();
+    disposeKind();
+    showLb = false;
+    const wrap = el('div', 'gl-kind');
+    kindHost = el('div', 'gl-kind__stage');
+    kindLbBox = el('div', 'gl-kind__lb');
+    kindLbBox.hidden = true;
+    wrap.append(kindHost, kindLbBox);
+    stage.replaceChildren(wrap);
+    const live = liveKind(v.kind);
+    if (!live) {
+      const box = el('div', 'gl-interlude');
+      box.append(el('span', 'gl-eyebrow', kindLabel(v.kind)), el('h2', 'gl-lobby__title', 'This game’s screens are coming'), el('p', 'gl-race__sub', 'The room is running, but this board can’t show this game yet. You can end it from the controls.'));
+      kindHost.append(box);
+      return;
+    }
+    try {
+      kindView = live.board(kindHost, kindApi);
+    } catch {
+      kindView = null;
+      kindHost.replaceChildren(el('p', 'gl-race__sub', 'This game’s board couldn’t open. End the game and try again.'));
+    }
+  }
+
+  function paintCustom(v: RoomView): void {
+    try {
+      kindView?.update(v);
+    } catch {
+      // One bad paint must not take the board down; the next view tries again.
+    }
+    if (kindLbBox) {
+      kindLbBox.hidden = !showLb;
+      if (showLb) {
+        if (!kindLb || !kindLbBox.contains(kindLb.root)) {
+          kindLb = createLeaderboard({ title: v.teams?.length ? 'Teams' : 'Top five' });
+          kindLbBox.replaceChildren(el('h2', 'gl-lbscreen__h', v.teams?.length ? 'Teams' : 'Top five'), kindLb.root);
+        }
+        kindLb.update(v.leaderboard);
+      }
+    }
+  }
+
+  /** The kind's own buttons for the control bar, while it plays. */
+  function kindButtons(v: RoomView): KindButton[] {
+    if (v.style !== 'custom' || v.phase !== 'playing' || !kindView?.controls) return [];
+    try {
+      return kindView.controls(v) ?? [];
+    } catch {
+      return [];
+    }
+  }
+  function runKindButton(c: KindButton): void {
+    void kindControl(c.name, c.data).catch((e: unknown) => toast(e instanceof Error && e.message ? e.message : 'The room didn’t take that. Try again.', 'bad'));
+  }
+
   /* ── Ended: podium ────────────────────────────────────────────── */
 
   function summary(v: RoomView): string {
@@ -668,9 +865,13 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     return total ? `Class solved ${Math.round((done / total) * 100)}% · ${fin} of ${v.seats.length} finished` : '';
   }
 
+  /** Rows after the podium: places 4–5, or every other team. */
+  const r0 = (v: RoomView) => (v.teams?.length ? v.teams.length : 5);
+
   function buildEnded(v: RoomView): void {
     screen = 'ended';
     stopClock();
+    disposeKind();
     typing += 1;
     const wrap = el('div', 'gl-end');
     const head = el('div', 'gl-end__head');
@@ -688,17 +889,24 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     for (const [i, cls] of order) {
       const r = lb[i];
       const pod = el('div', `gl-pod gl-pod--${cls}`);
-      if (r) {
-        pod.append(avatar(r.initials, 'gl-av--xl'), el('span', 'gl-pod__name', r.initials), el('span', 'gl-pod__score', v.style === 'paced' ? `${r.score.toLocaleString('en-AU')} pts` : `${r.score}`));
+      if (r && r.team !== undefined) {
+        // Team games: the teams rise, with their members' initials.
+        pod.style.setProperty('--gl-team', teamColour(r.team));
+        pod.classList.add('is-team');
+        const members = v.teams?.find((t) => t.team === r.team)?.members ?? [];
+        pod.append(teamBadge(r.team, 'gl-av--xl'), el('span', 'gl-pod__name', r.initials), el('span', 'gl-pod__score', `${r.score.toLocaleString('en-AU')} pts`));
+        if (members.length) pod.append(el('span', 'gl-pod__members', members.join(' · ')));
+      } else if (r) {
+        pod.append(avatar(r.initials, 'gl-av--xl'), el('span', 'gl-pod__name', r.initials), el('span', 'gl-pod__score', v.style !== 'race' ? `${r.score.toLocaleString('en-AU')} pts` : `${r.score}`));
       }
       pod.append(el('div', 'gl-pod__block', String(i + 1)));
       podium.append(pod);
       pods.push(pod);
     }
     const also = el('div', 'gl-also');
-    lb.slice(3, 5).forEach((r) => {
+    lb.slice(3, r0(v)).forEach((r) => {
       const row = el('div', 'gl-lb__row');
-      row.append(el('span', 'gl-lb__rank', String(r.rank)), avatar(r.initials), el('span', 'gl-lb__name', r.initials), el('span', 'gl-lb__pts', String(r.score)));
+      row.append(el('span', 'gl-lb__rank', String(r.rank)), r.team !== undefined ? teamBadge(r.team) : avatar(r.initials), el('span', 'gl-lb__name', r.initials), el('span', 'gl-lb__pts', String(r.score)));
       also.append(row);
     });
     wrap.append(head, podium, also);
@@ -782,6 +990,10 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     if (!v) return null;
     if (v.phase === 'lobby') return () => control({ op: 'start' });
     if (v.phase === 'paused') return () => control({ op: 'resume' });
+    if (v.phase === 'playing' && v.style === 'custom') {
+      const main = kindButtons(v).find((c) => c.primary);
+      return main ? () => runKindButton(main) : null;
+    }
     if (v.phase !== 'playing' || v.style !== 'paced') return null;
     const item = v.item;
     if (item && !item.revealed) return () => control({ op: 'reveal' });
@@ -811,6 +1023,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     const v = view;
     const list: HTMLElement[] = [];
     if (v?.phase === 'lobby') {
+      if (v.teams?.length) list.push(btn('Shuffle teams', () => control({ op: 'shuffle_teams' }), { label: 'Deal everyone into teams again at random' }));
       list.push(btn('Start game', () => control({ op: 'start' }), { primary: true, key: 'Space' }));
     } else if (v?.phase === 'playing' || v?.phase === 'paused') {
       list.push(v.phase === 'paused' ? btn('Resume', () => control({ op: 'resume' }), { primary: true, key: 'P' }) : btn('Pause', () => control({ op: 'pause' }), { key: 'P' }));
@@ -826,6 +1039,15 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
         }
       }
       if (v.style === 'race' && v.kind === 'connections') list.push(btn(classWall ? 'Back to race' : 'Class wall', () => toggleClassWall(), { key: 'W', pressed: classWall }));
+      if (v.style === 'custom') {
+        // The kind's own buttons join the bar (sent as { op: 'kind', name, data }).
+        for (const c of kindButtons(v)) {
+          const b = btn(c.label, () => runKindButton(c), { ...(c.primary ? { primary: true } : {}), ...(c.key ? { key: c.key } : {}) });
+          b.dataset.kind = `${c.name}:${JSON.stringify(c.data ?? null)}`;
+          list.push(b);
+        }
+        list.push(btn(showLb ? 'Back to the game' : v.teams?.length ? 'Teams' : 'Leaderboard', () => toggleLb(), { key: 'L', pressed: showLb }));
+      }
       list.push(endButton());
     }
     const tools: HTMLElement[] = [];
@@ -844,7 +1066,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     tools.push(btn('Close board', () => close(), { label: 'Close the board (the game keeps running)' }));
     // Rebuild only when a button changes: every move sends a delta, and a rebuilt
     // button loses a click in progress and the keyboard focus.
-    const sig = [...tools, ...list].map((b) => `${b.textContent}|${b.getAttribute('aria-pressed') ?? ''}|${b.className}`).join('/');
+    const sig = [...tools, ...list].map((b) => `${b.textContent}|${b.getAttribute('aria-pressed') ?? ''}|${b.className}|${b.dataset.kind ?? ''}`).join('/');
     if (sig === controlsSig) return;
     controlsSig = sig;
     const toolRow = el('div', 'gl-controls__tools');
@@ -889,6 +1111,25 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     if (target && target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
     const k = e.key.toLowerCase();
     const v = view;
+    // A custom kind's board gets its keys first, then its control-bar shortcuts.
+    if (v?.style === 'custom' && kindView) {
+      let handled = false;
+      try {
+        handled = !!kindView.onKey?.(e);
+      } catch {
+        handled = false;
+      }
+      if (handled) {
+        e.preventDefault();
+        return;
+      }
+      const hit = kindButtons(v).find((c) => c.key && c.key !== 'Space' && c.key.toLowerCase() === k);
+      if (hit) {
+        e.preventDefault();
+        runKindButton(hit);
+        return;
+      }
+    }
     if (e.key === ' ' || e.key === 'Enter') {
       const act = primaryAction();
       if (act) {
@@ -897,7 +1138,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
       }
     } else if (k === 'p' && v && (v.phase === 'playing' || v.phase === 'paused')) control({ op: v.phase === 'paused' ? 'resume' : 'pause' });
     else if ((e.key === '+' || e.key === '=') && v?.item && !v.item.revealed) control({ op: 'add_time', seconds: 15 });
-    else if (k === 'l' && v?.style === 'paced' && v.item?.revealed) toggleLb();
+    else if (k === 'l' && ((v?.style === 'paced' && v.item?.revealed) || (v?.style === 'custom' && (v.phase === 'playing' || v.phase === 'paused')))) toggleLb();
     else if (k === 'w' && v?.kind === 'connections' && v.style === 'race') toggleClassWall();
     else if (k === 't') toggleRanks();
     else if (k === 'm') {
@@ -920,6 +1161,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     closed = true;
     typing += 1;
     stopClock();
+    disposeKind();
     pacedRing?.stop();
     for (const t of [endArmed, idleTimer, toastTimer]) if (t) clearTimeout(t);
     conn.close();

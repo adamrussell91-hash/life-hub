@@ -184,7 +184,7 @@ function shuffleTeams(s: RoomState): void {
  * The real RulesCtx (core/room-rules.ts) over the room's state. With `fx`
  * null (a view), every write is ignored: `view` only reads.
  */
-function rulesCtx(s: RoomState, now: number, fx: Fx | null): RulesCtx {
+function rulesCtx(s: RoomState, now: number, fx: Fx | null, random?: () => number): RulesCtx {
   const write = fx !== null;
   const keys = keysOf(s);
   const teamOf = (owner: string) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
@@ -201,7 +201,7 @@ function rulesCtx(s: RoomState, now: number, fx: Fx | null): RulesCtx {
     config: s.config,
     game: s.config.game,
     keys,
-    random: () => (write ? nextRandom(s) : nextRandom(view)),
+    random: random ?? (() => (write ? nextRandom(s) : nextRandom(view))),
     seats: () => Object.values(s.seats),
     seat: (owner) => s.seats[owner],
     teams: () => teamsInUse(s),
@@ -255,6 +255,17 @@ function rulesCtx(s: RoomState, now: number, fx: Fx | null): RulesCtx {
       if (write) endGame(s, now, fx, { finish: false });
     }
   };
+}
+
+/**
+ * DEV ONLY: what a simulated classmate does next (`RoomRules.bot`), for the
+ * dev preview's fake room. Read-only; `random` is the caller's own.
+ */
+export function botTurn(s: RoomState, owner: string, now: number, random: () => number): { move: SoloEvent } | { control: KindControl } | null {
+  const rules = rulesOf(s);
+  if (!rules?.bot) return null;
+  const out = safe(() => rules.bot!(rulesCtx(s, now, null, random), s.custom, owner));
+  return isRulesError(out) ? null : out;
 }
 
 /** Runs one of the kind's hooks with a writing ctx. False when the room has no rules (or no such hook). */

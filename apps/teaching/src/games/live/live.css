@@ -317,3 +317,43 @@ html.gl-board-open, html.gl-board-open body { overflow: hidden; }
 .gl-launch__text { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
 .gl-launch__rooms { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); align-items: center; }
 .gl-launch__rooms:empty { display: none; }
+
+/* ── Kinds with their own rules (style 'custom') and team games ───────── */
+/* Team colours 5 and 6 (games.css has 1–4): teams of up to six. */
+:root {
+  --game-team-5: #d1678f;
+  --game-team-5-soft: var(--pastel-rose, #f6dfe7);
+  --game-team-6: #3f9fae;
+  --game-team-6-soft: var(--pastel-teal, #d9eef0);
+}
+.gl-av--team { --gl-team: var(--game-team-1); background: var(--gl-team); color: #fff; }
+.gl-lb__row.is-team { box-shadow: inset 0.3em 0 0 var(--gl-team), var(--stage-glow); }
+
+/* Board lobby: one column per team; drag a chip, or tap it then tap a team. */
+.gl-lobby__chips.gl-teams { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 0.7em; align-items: stretch; }
+.gl-team { --gl-team: var(--game-team-1); display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0.5em; min-width: 0; min-height: 8em; padding: 0.55em; border-radius: 1em; background: var(--stage-card); box-shadow: inset 0 0.3em 0 var(--gl-team), var(--stage-glow); transition: background 0.2s; }
+.gl-team.is-over { background: var(--stage-card-hi); box-shadow: inset 0 0 0 3px var(--gl-team); }
+.gl-team__head { display: flex; align-items: center; gap: 0.45em; min-height: 44px; padding: 0 0.3em; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.gl-team__head b { flex: 1; min-width: 0; }
+.gl-team__head small { color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.gl-team__list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0.4em; min-height: 0; overflow: auto; }
+.gl-team .gl-chip { cursor: grab; font-size: 0.9em; }
+.gl-team .gl-chip.is-picked { box-shadow: 0 0 0 3px var(--game-gold); }
+.gl-team .gl-chip.is-dragging { opacity: 0.4; }
+.gl-team .gl-chip:focus-visible { outline: 3px solid var(--game-gold); outline-offset: 2px; }
+
+/* The kind's own board, with the shell's leaderboard laid over it on L. */
+.gl-kind { position: relative; display: grid; min-height: 0; min-width: 0; }
+.gl-kind__stage { display: grid; min-height: 0; min-width: 0; }
+.gl-kind__lb { position: absolute; inset: 0; z-index: 5; display: grid; justify-items: center; align-content: start; gap: 0.8em; padding-top: 1em; font-size: 1.15em; background: rgba(10, 21, 54, 0.72); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-radius: 1em; }
+.gl-kind__lb > .gl-lb { width: min(36em, 100%); }
+
+/* Team podium */
+.gl-pod.is-team .gl-pod__block { box-shadow: inset 0 0.35em 0 var(--gl-team); }
+.gl-pod__members { font-size: 0.75em; color: var(--stage-muted); text-align: center; overflow-wrap: anywhere; }
+
+/* Phone lobby: "You're on Team N" in the team colour. */
+.gl-in.is-team .gl-in__badge { box-shadow: 0 0 0 6px var(--gl-team-soft, rgba(0, 0, 0, 0.06)), 0 18px 40px rgba(20, 35, 70, 0.2); }
+.gl-in__team { margin: 0; display: inline-flex; align-items: center; gap: 0.5em; padding: 0.35em 0.9em; border-radius: 999px; background: var(--gl-team-soft, var(--surface, #f3f5f9)); color: var(--ink, #14213d); font-size: 17px; }
+/* The colour sits in a swatch, the words stay ink (contrast; never colour alone). */
+.gl-in__team::before { content: ''; width: 0.8em; height: 0.8em; border-radius: 50%; background: var(--gl-team); }

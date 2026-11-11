@@ -1,5 +1,8 @@
 import { el } from '@/quiz/dom';
 import type { GameKind } from '../core/schema';
+import type { RoomStyle } from '../core/room-protocol';
+import { roomStyle } from '../core/room-core';
+import '../core/room-rules-index';
 import { animate, calm, countUp, flip } from '../motion/motion';
 import { sfx } from '../sound/sfx';
 import { avatarTone } from './format';
@@ -10,13 +13,29 @@ import { avatarTone } from './format';
  * rolling counters and climb arrows, and the play style for each kind.
  */
 
-/** How each Phase 3 game runs live. Kinds without a style don't run live yet. */
+/** How a kind runs live (race, paced, or 'custom' with its own rules, core/room-rules-index.ts); null: not live yet. Same answer as the room's `roomStyle`. */
+export function liveStyle(kind: GameKind): RoomStyle | null {
+  return roomStyle(kind);
+}
+
+/** How each Phase 3 game runs live (built into room-core). Use `liveStyle` for every kind. */
 export const LIVE_STYLE: Partial<Record<GameKind, 'race' | 'paced'>> = {
   crossword: 'race',
   find_a_word: 'race',
   connections: 'race',
   who_said_it: 'paced'
 };
+
+/** A team's colour token (strong, or soft for surfaces). Teams are numbered from 0; six colours, then they repeat. */
+export const teamColour = (team: number, soft = false): string => `var(--game-team-${(team % 6) + 1}${soft ? '-soft' : ''})`;
+
+/** A team's round badge: its number on its colour (never colour alone, spec §5.4). */
+export function teamBadge(team: number, cls = ''): HTMLElement {
+  const a = el('span', `gl-av gl-av--team${cls ? ` ${cls}` : ''}`, String(team + 1));
+  a.style.setProperty('--gl-team', teamColour(team));
+  a.setAttribute('aria-hidden', 'true');
+  return a;
+}
 
 /** A round initials avatar (pastel by initials, as the mockups). */
 export function avatar(initials: string, cls = ''): HTMLElement {
@@ -92,7 +111,8 @@ export function createRing(cls = ''): Ring {
 
 /* ── Leaderboard ─────────────────────────────────────────────────── */
 
-export type LbRow = { initials: string; score: number; rank: number };
+/** One leaderboard row. Team games: `team` is set and `initials` is the team's name ("Team 2"). */
+export type LbRow = { initials: string; score: number; rank: number; team?: number };
 export type Leaderboard = { root: HTMLElement; update(rows: LbRow[]): void; rows(): LbRow[] };
 
 /**
@@ -115,7 +135,11 @@ export function createLeaderboard(options: { max?: number; title?: string } = {}
     const rank = el('span', 'gl-lb__rank', String(r.rank));
     const name = el('span', 'gl-lb__name', r.initials);
     const pts = el('span', 'gl-lb__pts', String(r.score));
-    row.append(rank, avatar(r.initials), name, pts);
+    if (r.team !== undefined) {
+      row.classList.add('is-team');
+      row.style.setProperty('--gl-team', teamColour(r.team));
+    }
+    row.append(rank, r.team !== undefined ? teamBadge(r.team) : avatar(r.initials), name, pts);
     return { row, rank, pts, score: r.score };
   }
 

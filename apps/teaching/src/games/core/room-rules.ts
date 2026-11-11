@@ -94,6 +94,13 @@ export type RoomRules<K = any> = {
    * slice; teacher/board get the class picture. Tests assert this.
    */
   view(ctx: RulesCtx, k: K, role: Role, owner: string): unknown;
+  /**
+   * DEV ONLY (optional): what one simulated classmate does next in the dev
+   * preview's "Simulate class" (live/fake-room.ts runs this reducer in the
+   * browser). Return a move or a phone kind control, or null to wait. The real
+   * room never calls it. `ctx.random()` here doesn't touch the room's sequence.
+   */
+  bot?(ctx: RulesCtx, k: K, owner: string): { move: SoloEvent } | { control: KindControl } | null;
 };
 
 /** The registry. Filled by `core/room-rules-index.ts` (bundled with room-core). */

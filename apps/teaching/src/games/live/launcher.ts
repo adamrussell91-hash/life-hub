@@ -3,7 +3,8 @@ import type { GameTeacherApi, LiveOpen } from '../api';
 import { GAME_KIND_INFO, type Game, type PublicGame } from '../core/schema';
 import { splitGame } from '../core/model';
 import { gameGlyph } from '../glyphs';
-import { LIVE_STYLE } from './board-parts';
+import { roomStyle, roomTeams } from '../core/room-core';
+import '../core/room-rules-index';
 import { openLiveBoard } from './board';
 import { spacedCode } from './code-field';
 
@@ -11,7 +12,9 @@ import { spacedCode } from './code-field';
  * "Play live" in the Game lesson's Results tab: one row per game that runs
  * live now, with Open live game (opens a room for the chosen class and the
  * full-screen board). Rooms still open for this lesson can be reopened, so a
- * refreshed laptop gets its board back. One call from the editor:
+ * refreshed laptop gets its board back. Every kind room-core can run is
+ * listed (race, paced, or its own rules); team games pick how many teams.
+ * One call from the editor:
  * `liveLauncher({...})`.
  */
 
@@ -43,7 +46,13 @@ export function liveLauncher(o: LiveLauncherOptions): HTMLElement {
   const status = el('p', 'gm-note');
   status.setAttribute('role', 'status');
   const list = el('div', 'gl-launch__list');
-  const live = o.games.filter((g) => LIVE_STYLE[g.kind]);
+  const live = o.games.filter((g) => roomStyle(g.kind));
+  const how = (g: Game) => {
+    const style = roomStyle(g.kind);
+    if (style === 'paced') return 'together, quote by quote';
+    if (style === 'race') return 'a race, everyone on their own copy';
+    return roomTeams(g.kind) ? 'in teams, on the board and phones' : 'together, on the board and phones';
+  };
   const open = o.api?.open;
   const launch = (reply: LiveOpen, gameId?: string) => {
     openLiveBoard({ open: reply, game: boardGame(reply, o.games, gameId) });
@@ -51,7 +60,23 @@ export function liveLauncher(o: LiveLauncherOptions): HTMLElement {
   for (const g of live) {
     const row = el('div', 'gl-launch__row');
     const text = el('div', 'gl-launch__text');
-    text.append(el('b', '', g.title || GAME_KIND_INFO[g.kind].label), el('span', 'gm-note', `${GAME_KIND_INFO[g.kind].label} · ${LIVE_STYLE[g.kind] === 'paced' ? 'together, quote by quote' : 'a race, everyone on their own copy'}`));
+    text.append(el('b', '', g.title || GAME_KIND_INFO[g.kind].label), el('span', 'gm-note', `${GAME_KIND_INFO[g.kind].label} · ${how(g)}`));
+    // Team games: how many teams (the rules' range, their default picked).
+    const teamRule = roomTeams(g.kind);
+    let teamPick: HTMLSelectElement | null = null;
+    if (teamRule) {
+      const label = el('label', 'gl-launch__teams');
+      teamPick = el('select', 'gm-select');
+      for (let n = teamRule.min; n <= teamRule.max; n += 1) {
+        const opt = el('option', '', `${n} teams`);
+        opt.value = String(n);
+        opt.selected = n === teamRule.default;
+        teamPick.append(opt);
+      }
+      teamPick.setAttribute('aria-label', `How many teams for ${g.title || GAME_KIND_INFO[g.kind].label}`);
+      label.append(teamPick);
+      text.append(label);
+    }
     const go = el('button', 'btn btn--primary', 'Open live game');
     go.type = 'button';
     go.disabled = !o.classId || !open;
@@ -61,7 +86,7 @@ export function liveLauncher(o: LiveLauncherOptions): HTMLElement {
       go.disabled = true;
       status.textContent = 'Opening a room…';
       try {
-        const reply = await o.api!.open!(g.id, o.classId);
+        const reply = await o.api!.open!(g.id, o.classId, teamPick ? { teams: Number(teamPick.value) } : undefined);
         status.textContent = `Room open: code ${spacedCode(reply.code)}.`;
         launch(reply, g.id);
       } catch (e) {
@@ -73,7 +98,7 @@ export function liveLauncher(o: LiveLauncherOptions): HTMLElement {
     row.append(gameGlyph(g.kind, 'sm'), text, go);
     list.append(row);
   }
-  if (!live.length) list.append(el('p', 'gm-note', 'Crossword, find-a-word, Connections and Who said it? play live so far.'));
+  if (!live.length) list.append(el('p', 'gm-note', 'None of these games plays live yet.'));
   const reopen = el('div', 'gl-launch__rooms');
   panel.append(head, note, list, reopen, status);
   if (o.api?.rooms) {

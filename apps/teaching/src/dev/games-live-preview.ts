@@ -1,5 +1,5 @@
 import { el } from '@/quiz/dom';
-import { GameLessonSchema, type Game } from '@/games/core/schema';
+import { GameSchema, type Game } from '@/games/core/schema';
 import { splitGame } from '@/games/core/model';
 import { seededRandom } from '@/games/generators/random';
 import { createFakeRoom, fakeTicket, FakeSocket, FAKE_WS_BASE } from '@/games/live/fake-room';
@@ -15,7 +15,11 @@ import { FIND_A_WORD } from '../../scripts/mock-grid-games';
  * Dev walk for live games, without the Worker (games/live/fake-room.ts).
  *   /games.html?view=live-board&game=g_who          the board (it hosts the fake room)
  *   /games.html?view=live-phone&game=g_who&seat=AB   a phone (open several tabs, one per seat)
- * Code 482913. Use "Simulate class" on the board for invented classmates.
+ * `game` is a game id below or a kind (`game=wager`). Every kind with its own
+ * rules (core/room-rules-index.ts) runs on the REAL reducer in the board's tab;
+ * team games take `&teams=3`. Kinds without rules yet say so on the board.
+ * Code 482913. Use "Simulate class" on the board for invented classmates
+ * (they play a custom kind when its rules have a `bot`).
  * Everything is invented (the novella "The Lantern House", as in the mockups).
  *
  * With `&real=1` both sides use the real path instead: the mock API's open / join (the Netlify
@@ -32,8 +36,37 @@ const CODE = '482913';
 const tagless = { pieces: [], outcomes: [], skills: [], tech: [] };
 const term = (id: string, word: string, text: string) => ({ id, shape: 'term', term: word, accept: [], clues: [{ kind: 'definition', text }], banned: [], decoys: [], ...tagless });
 const group = (id: string, label: string, tiles: string[], difficulty: number, why: string) => ({ id, shape: 'group', label, tiles, difficulty, why, ...tagless });
+const mcq = (id: string, prompt: string, options: string[], right = 0) => ({
+  id,
+  shape: 'question',
+  question: { id, kind: 'multiple_choice', prompt, marks: 1, options: options.map((text, i) => ({ id: `${id}o${i}`, text })), correct: [`${id}o${right}`] },
+  ...tagless
+});
+const banned = (t: ReturnType<typeof term>, words: string[], draw?: string) => ({ ...t, banned: words, ...(draw ? { draw_prompt: draw } : {}) });
+const TECHNIQUES = [
+  term('t1', 'Simile', 'A comparison using like or as'),
+  term('t2', 'Pathetic fallacy', 'Weather that mirrors a mood'),
+  term('t3', 'Alliteration', 'Repeated first sounds'),
+  term('t4', 'Sibilance', 'Repeated s sounds'),
+  term('t5', 'Hyperbole', 'Deliberate exaggeration'),
+  term('t6', 'Oxymoron', 'Two opposites side by side'),
+  term('t7', 'Personification', 'Human qualities given to a thing'),
+  term('t8', 'Foreshadowing', 'A hint of what is to come'),
+  term('t9', 'Juxtaposition', 'Two things placed side by side to contrast'),
+  term('t10', 'Motif', 'An image that returns through a text'),
+  term('t11', 'Metaphor', 'Saying one thing is another'),
+  term('t12', 'Irony', 'The opposite of what is expected')
+];
+const LANTERN_MCQ = [
+  mcq('m1', 'Why does Mira count the stairs each night?', ['To feel in control of her fear', 'To find a hidden room', 'Because Doctor Hask told her to']),
+  mcq('m2', 'What does the candle in the window stand for?', ['Hope that someone will return', 'A warning to strangers', 'The house catching fire']),
+  mcq('m3', 'How does Doctor Hask see fear?', ['As an illness to cure', 'As a gift', 'As something to share']),
+  mcq('m4', 'What does Old Tobin warn about?', ['The ice on the lake', 'The locked wing', 'The new teacher']),
+  mcq('m5', 'Where is the novella set?', ['An old house by a frozen lake', 'A city hospital', 'A ship at sea'])
+];
 
-const LESSON = GameLessonSchema.parse({
+// One of every kind: more than a real lesson holds (8), so each game is parsed on its own.
+const LESSON: { games: Game[] } = {
   games: [
     {
       id: 'g_cross', kind: 'crossword', title: 'Technique crossword',
@@ -60,6 +93,48 @@ const LESSON = GameLessonSchema.parse({
       }]
     },
     {
+      id: 'g_jeopardy', kind: 'jeopardy', title: 'Lantern House Jeopardy',
+      categories: [
+        { id: 'c1', title: 'Techniques', tiles: [100, 200, 300].map((value, i) => ({ id: `c1t${i}`, value, item: TECHNIQUES[i] })) },
+        { id: 'c2', title: 'The plot', tiles: [100, 200, 300].map((value, i) => ({ id: `c2t${i}`, value, double: i === 2, item: LANTERN_MCQ[i] })) },
+        { id: 'c3', title: 'People', tiles: [100, 200, 300].map((value, i) => ({ id: `c3t${i}`, value, item: [LANTERN_MCQ[3], TECHNIQUES[6], LANTERN_MCQ[4]][i] })) }
+      ],
+      final: mcq('fin', 'Final: what is the house most afraid of?', ['Being forgotten', 'Fire', 'Visitors'])
+    },
+    {
+      id: 'g_wheel', kind: 'wheel', title: 'Lantern House wheel',
+      puzzles: [
+        { id: 'p1', category: 'Quote: Chapter 1', text: 'I count the stairs each night', bank: [LANTERN_MCQ[0], TECHNIQUES[0]], explain: mcq('p1x', 'What does this line show about Mira?', ['She fights fear with routine', 'She is bored', 'She is lost']), ...tagless },
+        { id: 'p2', category: 'Quote: Chapter 6', text: 'Keep one candle in the window', bank: [LANTERN_MCQ[1], TECHNIQUES[9]], explain: mcq('p2x', 'Which technique does the candle become?', ['A motif', 'An oxymoron', 'Sibilance']), ...tagless },
+        { id: 'p3', category: 'Key line', text: 'That ice will not hold till spring', bank: [LANTERN_MCQ[3], TECHNIQUES[7]], explain: mcq('p3x', 'What does the line foreshadow?', ['Danger on the lake', 'A wedding', 'A journey']), ...tagless }
+      ]
+    },
+    { id: 'g_match', kind: 'team_match', title: 'Technique team match', items: TECHNIQUES },
+    { id: 'g_rush', kind: 'points_rush', title: 'Points rush: techniques', items: [...TECHNIQUES.slice(0, 6), ...LANTERN_MCQ] },
+    {
+      id: 'g_battles', kind: 'battles', title: 'Short-answer battle',
+      prompt: 'How does the writer make the Lantern House frightening in Chapter 1?',
+      criterion: 'Which answer explains the effect of a technique more precisely?',
+      chips: ['Names a technique', 'Quotes closely', 'Explains the effect'],
+      ...tagless
+    },
+    { id: 'g_wager', kind: 'wager', title: 'Wager on the Lantern House', items: LANTERN_MCQ },
+    {
+      id: 'g_artic', kind: 'articulate', title: 'Articulate: techniques',
+      items: [
+        banned(TECHNIQUES[0], ['like', 'as', 'compare']),
+        banned(TECHNIQUES[1], ['weather', 'mood', 'rain']),
+        banned(TECHNIQUES[2], ['letter', 'sound', 'start']),
+        banned(TECHNIQUES[4], ['exaggerate', 'big']),
+        banned(TECHNIQUES[5], ['opposite', 'contradiction']),
+        banned(TECHNIQUES[6], ['human', 'person'])
+      ]
+    },
+    {
+      id: 'g_pict', kind: 'pictionary', title: 'Pictionary: techniques',
+      items: [banned(TECHNIQUES[1], [], 'A storm over a sad face'), banned(TECHNIQUES[6], [], 'A tree waving goodbye'), banned(TECHNIQUES[9], [], 'The same candle in three windows'), banned(TECHNIQUES[8], [], 'A palace beside a shack')]
+    },
+    {
       id: 'g_who', kind: 'who_said_it', title: 'Who said it? The Lantern House',
       cast: [{ id: 'c_mira', name: 'Mira Vale' }, { id: 'c_hask', name: 'Doctor Hask' }, { id: 'c_tobin', name: 'Old Tobin' }, { id: 'c_agnes', name: 'Sister Agnes' }],
       items: [
@@ -70,8 +145,8 @@ const LESSON = GameLessonSchema.parse({
         { id: 'q5', shape: 'quote', text: 'Keep one candle in the window, child. He will look for it.', speaker: 'c_agnes', source: 'Chapter 6', ...tagless }
       ]
     }
-  ]
-});
+  ].map((g) => GameSchema.parse(g))
+};
 
 export function mountLivePreview(mount: HTMLElement, view: string): void {
   const params = new URLSearchParams(location.search);
@@ -80,7 +155,8 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
     return;
   }
   const gameId = params.get('game') ?? 'g_who';
-  const draft = LESSON.games.find((g: Game) => g.id === gameId) ?? LESSON.games[3];
+  const draft = LESSON.games.find((g: Game) => g.id === gameId) ?? LESSON.games.find((g: Game) => g.kind === gameId) ?? LESSON.games.find((g: Game) => g.kind === 'who_said_it')!;
+  const teams = Number(params.get('teams')) || undefined;
   // Seeded, so every tab gets the same tile ids and grids.
   const split = splitGame(draft, seededRandom(7));
   const room = `room_dev_${draft.id}`;
@@ -91,13 +167,14 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
   nav.append(el('b', '', 'Live dev:'));
   for (const g of LESSON.games) {
     const a = el('a', '', g.title);
-    a.href = `?view=${view}&game=${g.id}${view === 'live-phone' ? `&seat=${params.get('seat') ?? 'AB'}` : ''}`;
+    a.href = `?view=${view}&game=${g.id}${view === 'live-phone' ? `&seat=${params.get('seat') ?? 'AB'}` : ''}${teams ? `&teams=${teams}` : ''}`;
+    if (g.id === draft.id) a.style.fontWeight = '700';
     nav.append(a);
   }
   mount.append(nav);
 
   if (view === 'live-board') {
-    const fake = createFakeRoom({ room, code: CODE, game: split.public, keys: split.keys });
+    const fake = createFakeRoom({ room, code: CODE, game: split.public, keys: split.keys, ...(teams ? { teams } : {}) });
     const sim = el('button', 'gl-btn', 'Simulate class');
     sim.type = 'button';
     sim.addEventListener('click', () => fake.simulate(14));

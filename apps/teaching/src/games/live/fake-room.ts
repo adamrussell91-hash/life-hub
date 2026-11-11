@@ -6,15 +6,25 @@ import { checkAnswer, checkSelection, crosswordHint, gameTotal, wordHint, type G
 import { ROOM_LIMITS, type ClientMsg, type ControlOp, type PacedItem, type Phase, type Role, type RoomView, type Seat, type ServerMsg, type TicketPayload } from '../core/room-protocol';
 import { quotePoints } from '../kinds/who-said-it/player';
 import type { SocketLike } from './transport';
+import { botTurn, initialState, nextAlarm, publicView, reduce, roomStyle, viewDelta } from '../core/room-core';
+import type { RoomAction, RoomState } from '../core/room-protocol';
+import '../core/room-rules-index';
 
 /**
  * DEV ONLY: an in-browser stand-in for the game room, so the board and phones
  * can be walked in /games.html without the Worker. It speaks the protocol
  * (room-protocol.ts) over a BroadcastChannel, so phones in other tabs reach
- * the board's tab. It is NOT the real reducer (`core/room-core.ts`); it marks
- * race moves with the same model checks the solo endpoint uses and keeps just
- * enough state to drive the screens. "Simulate class" adds invented seats
- * that join and play.
+ * the board's tab.
+ *
+ * Kinds with their own rules (style 'custom') run the REAL reducer
+ * (`core/room-core.ts`, pure) right here, exactly as the Worker wraps it:
+ * every kind registered in core/room-rules-index.ts is playable without the
+ * Worker. "Simulate class" adds invented seats; they play when the kind's
+ * rules have a `bot`.
+ *
+ * The four Phase 3 kinds (race and paced) keep the older stand-in below: it
+ * marks race moves with the solo model checks and its simulated class fakes
+ * progress, which the walks of those boards rely on.
  */
 
 export const FAKE_WS_BASE = 'fake://game-rooms';
@@ -102,7 +112,7 @@ export class FakeSocket implements SocketLike {
 
 /* ── The fake room ──────────────────────────────────────────────── */
 
-export type FakeRoomOptions = { room: string; code: string; game: PublicGame; keys: GameKeys; title?: string; itemSeconds?: number };
+export type FakeRoomOptions = { room: string; code: string; game: PublicGame; keys: GameKeys; title?: string; itemSeconds?: number; /** Team games: how many teams (default from the rules). */ teams?: number };
 export type FakeRoom = { simulate(n?: number): void; stop(): void; seats(): Seat[] };
 
 const SIM_INITIALS = ['AK', 'BL', 'CM', 'DN', 'EO', 'FP', 'GR', 'HS', 'IT', 'JW', 'KY', 'LZ', 'MB', 'NC', 'OD', 'PE', 'QF', 'RG', 'SH', 'TJ', 'UK', 'VL', 'WM', 'XN'];
@@ -111,8 +121,151 @@ type Conn = { cid: string; owner: string; role: Role };
 type Past = { item: string; move: string; correct?: boolean; group?: string };
 
 export function createFakeRoom(o: FakeRoomOptions): FakeRoom {
+  const style = roomStyle(o.game.kind);
+  if (style !== 'race' && style !== 'paced') return createReducerRoom(o);
+  return createStandInRoom(o);
+}
+
+/**
+ * The real reducer in the browser, wrapped like the Worker's Durable Object:
+ * each connection gets its own view (a delta against its last one, or a
+ * snapshot), the room's alarm is a timer, and the fold is logged.
+ */
+function createReducerRoom(o: FakeRoomOptions): FakeRoom {
   const b = bus(channelFor(o.room));
-  const style: 'race' | 'paced' = o.game.kind === 'who_said_it' ? 'paced' : 'race';
+  const opened = Date.now();
+  const state: RoomState = initialState(
+    {
+      room: o.room,
+      code: o.code,
+      lesson_id: 'lesson_dev',
+      class_id: 'class_dev',
+      game: o.game,
+      keys: o.keys,
+      style: 'custom',
+      roster: {},
+      ...(o.teams ? { teams: { count: o.teams } } : {}),
+      ...(o.itemSeconds ? { item_seconds: o.itemSeconds } : {}),
+      fold_url: 'dev://fold',
+      opened_at: opened
+    },
+    opened
+  );
+  const conns = new Map<string, Conn>();
+  const views = new Map<string, RoomView>();
+  const sims = new Set<string>();
+  let alarm: ReturnType<typeof setTimeout> | null = null;
+  let sim: ReturnType<typeof setInterval> | null = null;
+  let timers: Array<ReturnType<typeof setTimeout>> = [];
+
+  const sendTo = (cid: string, msg: ServerMsg) => b.post({ k: 'msg', cid, data: msg, to: 'client' });
+  const cidsOf = (owner: string, conn?: string) => [...conns.values()].filter((c) => c.owner === owner && (!conn || c.cid === conn)).map((c) => c.cid);
+
+  function broadcast(now: number): void {
+    for (const c of conns.values()) {
+      const view = publicView(state, c.role, c.owner, now);
+      const prev = views.get(c.cid);
+      const patch = prev ? viewDelta(prev, view) : null;
+      views.set(c.cid, view);
+      if (patch && !Object.keys(patch).length) continue;
+      sendTo(c.cid, patch ? { t: 'delta', seq: view.seq, now, patch } : { t: 'snapshot', view });
+    }
+  }
+
+  function apply(action: RoomAction): void {
+    const now = Date.now();
+    const { effects } = reduce(state, action, now);
+    for (const fx of effects) {
+      if (fx.kind === 'send' || fx.kind === 'close') {
+        for (const cid of cidsOf(fx.owner, fx.conn)) {
+          if (fx.msg.t === 'snapshot') views.set(cid, fx.msg.view);
+          sendTo(cid, fx.msg);
+          if (fx.kind === 'close') {
+            b.post({ k: 'closed', cid, to: 'client' });
+            conns.delete(cid);
+            views.delete(cid);
+          }
+        }
+      } else if (fx.kind === 'broadcast') broadcast(now);
+      else if (fx.kind === 'fold') console.info('[fake room] fold', fx.payload);
+    }
+    schedule();
+  }
+
+  function schedule(): void {
+    if (alarm) clearTimeout(alarm);
+    alarm = null;
+    const at = nextAlarm(state);
+    if (at === null) return;
+    alarm = setTimeout(() => apply({ type: 'tick' }), Math.max(0, Math.min(at - Date.now(), 2 ** 31 - 1)));
+  }
+
+  b.on((w) => {
+    if (w.to !== 'room') return;
+    if (w.k === 'open') {
+      const t = readTicket(w.ticket ?? '');
+      if (!t || t.room !== o.room) return b.post({ k: 'closed', cid: w.cid, to: 'client' });
+      conns.set(w.cid, { cid: w.cid, owner: t.owner, role: t.role });
+      b.post({ k: 'opened', cid: w.cid, to: 'client' });
+      // Dev tickets carry no roster id: the seat's owner stands in for it, on the list as it joins.
+      const studentId = t.student_id ?? t.owner;
+      if (t.role === 'student') state.config.roster[studentId] = t.initials ?? '??';
+      apply({ type: 'connect', owner: t.owner, role: t.role, ...(t.initials ? { initials: t.initials } : {}), ...(t.role === 'student' ? { student_id: studentId } : {}), conn: w.cid });
+    } else if (w.k === 'close') {
+      const c = conns.get(w.cid);
+      conns.delete(w.cid);
+      views.delete(w.cid);
+      if (c) apply({ type: 'disconnect', owner: c.owner, conn: w.cid });
+    } else if (w.k === 'msg') {
+      const c = conns.get(w.cid);
+      if (c) apply({ type: 'msg', owner: c.owner, role: c.role, msg: w.data as ClientMsg, conn: w.cid });
+    }
+  });
+
+  function simTick(): void {
+    if (state.phase !== 'playing') return;
+    for (const owner of sims) {
+      if (Math.random() > 0.4) continue;
+      const turn = botTurn(state, owner, Date.now(), Math.random);
+      if (!turn) continue;
+      const msg: ClientMsg = 'move' in turn ? { t: 'move', event: turn.move } : { t: 'control', op: { op: 'kind', name: turn.control.name, ...(turn.control.data !== undefined ? { data: turn.control.data } : {}) } };
+      apply({ type: 'msg', owner, role: 'student', msg });
+    }
+  }
+
+  return {
+    simulate(n = 12) {
+      const taken = new Set(Object.values(state.seats).map((x) => x.initials));
+      SIM_INITIALS.filter((i) => !taken.has(i))
+        .slice(0, n)
+        .forEach((initials, k) =>
+          timers.push(
+            setTimeout(() => {
+              const owner = `sim_${initials}`;
+              sims.add(owner);
+              state.config.roster[owner] = initials;
+              apply({ type: 'connect', owner, role: 'student', initials, student_id: owner });
+            }, 250 + k * 450)
+          )
+        );
+      if (sim) clearInterval(sim);
+      sim = setInterval(simTick, 900);
+    },
+    seats: () => Object.values(state.seats),
+    stop() {
+      timers.forEach(clearTimeout);
+      timers = [];
+      if (alarm) clearTimeout(alarm);
+      if (sim) clearInterval(sim);
+      b.close();
+    }
+  };
+}
+
+/** The Phase 3 stand-in (race and paced kinds). */
+function createStandInRoom(o: FakeRoomOptions): FakeRoom {
+  const b = bus(channelFor(o.room));
+  const style: 'race' | 'paced' = roomStyle(o.game.kind) === 'paced' ? 'paced' : 'race';
   const seconds = o.itemSeconds ?? (Number(o.game.settings.seconds) || ROOM_LIMITS.pacedSeconds);
   const total = gameTotal(o.keys);
   const quoteIds = Object.keys(o.keys.items).filter((id) => o.keys.items[id].shape === 'quote');
