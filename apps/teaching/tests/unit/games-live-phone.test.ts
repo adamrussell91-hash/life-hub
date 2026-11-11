@@ -96,6 +96,23 @@ describe('live phone', () => {
     expect(root.querySelector('.gm-solo__body')?.textContent).toContain('Sound devices');
   });
 
+  it('race: a phone reopened mid-race hands the room’s restore to the player (own groups back, no move sent)', async () => {
+    const join = vi.fn(async () => joinReply(WALL));
+    const host = document.createElement('div');
+    document.body.append(host);
+    const phone = openLivePhone({ game: WALL, join, host, code: '482913', connect: { WebSocketImpl: FakeWS, fetchImpl: undefined } });
+    await settle();
+    const ws = FakeWS.last();
+    ws.open();
+    const restore = { walls: [{ wall: 'w1', groups: [{ id: 'grp1', label: 'Sound devices', why: 'Sound.', difficulty: 1, tiles: [0, 1, 2, 3].map((ti) => tileId(0, ti)), found: true }], guesses: [{ tiles: [0, 1, 2, 3].map((ti) => tileId(0, ti)), correct: true }], mistakes: 1, out: false }] };
+    ws.push({ t: 'snapshot', view: makeView({ kind: 'connections', style: 'race', title: WALL.title, phase: 'playing', seats: [], you: { owner: ME.owner, seat: { ...ME, score: 1 }, rank: 1, restore } }) });
+    await settle();
+    expect(phone.root.querySelector('.cx-row b')?.textContent).toBe('Sound devices');
+    expect(phone.root.querySelectorAll('.cx-wall .cx-tile')).toHaveLength(12);
+    expect(phone.root.querySelectorAll('.cx-left i.is-gone')).toHaveLength(1);
+    expect(ws.sentOf('move')).toHaveLength(0);
+  });
+
   it('frosts the screen while paused', async () => {
     const { root, patch } = await joined(WALL, 'race');
     patch({ phase: 'playing' });
