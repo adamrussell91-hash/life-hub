@@ -26,6 +26,9 @@ export function resetMandalaView(goalId?: string): void {
   else openPillar.clear();
 }
 
+/** One tone per pillar slot; no two neighbours share one. Actions inherit their pillar's tone. */
+const PILLAR_TONES = ['tone-sage', 'tone-lilac', 'tone-gold', 'tone-blue', 'tone-peach', 'tone-gold', 'tone-sage', 'tone-lilac'];
+
 /** Grid order: cells 0-3, then the centre, then cells 4-7. */
 function gridSlots(): Array<number | 'centre'> {
   return [0, 1, 2, 3, 'centre', 4, 5, 6, 7];
@@ -78,7 +81,7 @@ export function promotionState(
 }
 
 function cellInput(path: string, value: string, label: string, placeholder: string, onCommit: (v: string) => void) {
-  const node = el('textarea', 'goal-field mandala__input');
+  const node = el('textarea', 'mandala__input');
   node.value = value;
   node.rows = 2;
   node.placeholder = placeholder;
@@ -118,36 +121,41 @@ function overview(goal: Goal, pillars: GoalMandalaPillar[], onPatch: (p: Mandala
   for (const slot of gridSlots()) {
     if (slot === 'centre') {
       const centre = el('div', 'mandala__cell mandala__cell--centre');
-      centre.append(el('span', 'goal-frame__label', 'Goal'), el('span', 'mandala__centre-text', goal.title));
+      centre.append(el('span', 'mandala__kicker', 'Goal'), el('span', 'mandala__centre-text', goal.title));
       grid.append(centre);
       continue;
     }
     const pillar = pillars[slot]!;
-    const cell = el('div', 'mandala__cell mandala__cell--pillar');
+    const named = Boolean(pillar.label.trim());
+    const cell = el('div', `mandala__cell mandala__cell--pillar ${named ? PILLAR_TONES[slot] : 'is-empty'}`);
     cell.dataset.pillar = String(slot);
     cell.append(
-      cellInput(`mandala.p.${slot}`, pillar.label, `Pillar ${slot + 1}`, 'A pillar', (v) =>
+      cellInput(`mandala.p.${slot}`, pillar.label, `Pillar ${slot + 1}`, 'Name a pillar', (v) =>
         onPatch(framePatch(goal, withPillar(pillars, slot, { ...pillar, label: v })))
       )
     );
+    if (named) {
+      const linked = pillar.project_id ? projectTitle.get(pillar.project_id) : undefined;
+      if (linked) cell.append(chip(linked, 'mandala__chip--project'));
+      else if (ctx.projects) cell.append(chip('No project yet', 'mandala__chip--empty'));
+    }
     const foot = el('div', 'mandala__foot');
     const filled = pillar.actions.filter((a) => a.label.trim()).length;
-    if (pillar.label.trim()) {
-      const linked = pillar.project_id ? projectTitle.get(pillar.project_id) : undefined;
-      if (linked) foot.append(chip(linked, 'mandala__chip--project'));
-      else if (ctx.projects) foot.append(chip('No project yet', 'mandala__chip--empty'));
-    }
-    const open = el('button', 'btn btn--ghost mandala__open', `${filled}/${MANDALA_SIZE} actions →`);
+    const dots = el('span', 'mandala__dots');
+    dots.setAttribute('aria-hidden', 'true');
+    for (let j = 0; j < MANDALA_SIZE; j++) dots.append(el('span', `mandala__dot${j < filled ? ' is-on' : ''}`));
+    const open = el('button', 'mandala__open');
     open.type = 'button';
     open.dataset.action = 'open-pillar';
-    open.disabled = !pillar.label.trim();
-    open.title = open.disabled ? 'Name the pillar first' : `Open ${pillar.label}`;
-    open.setAttribute('aria-label', open.disabled ? `Pillar ${slot + 1}: name it first` : `Open ${pillar.label} actions`);
+    open.disabled = !named;
+    open.append(el('span', 'mandala__count', `${filled}/${MANDALA_SIZE}`), el('span', 'mandala__arrow', '→'));
+    open.title = named ? `Open ${pillar.label}` : 'Name the pillar first';
+    open.setAttribute('aria-label', named ? `Open ${pillar.label}: ${filled} of ${MANDALA_SIZE} actions` : `Pillar ${slot + 1}: name it first`);
     open.addEventListener('click', () => {
       openPillar.set(goal.id, slot);
       rerender();
     });
-    foot.append(open);
+    if (named) foot.append(dots, open);
     cell.append(foot);
     grid.append(cell);
   }
@@ -168,7 +176,7 @@ function promoteControl(
   const select = el('select', 'mandala__promote');
   select.dataset.action = 'promote';
   select.setAttribute('aria-label', `Use "${action.label}" as`);
-  const options: Array<[string, string]> = [['', 'Use as…'], ['lead', 'Lead measure']];
+  const options: Array<[string, string]> = [['', 'Use as… ▾'], ['lead', 'Lead measure']];
   if (ctx.onPromoteTask) options.push(['task', 'Task on this goal']);
   for (const [value, label] of options) {
     const opt = el('option', '', label);
@@ -202,7 +210,7 @@ function pillarView(goal: Goal, pillars: GoalMandalaPillar[], index: number, onP
   const pillar = pillars[index]!;
   const wrap = el('div', 'mandala mandala--pillar');
   const bar = el('div', 'mandala__bar');
-  const back = el('button', 'btn btn--ghost', '← All pillars');
+  const back = el('button', 'mandala__back', '← All pillars');
   back.type = 'button';
   back.dataset.action = 'close-pillar';
   back.addEventListener('click', () => {
@@ -233,16 +241,16 @@ function pillarView(goal: Goal, pillars: GoalMandalaPillar[], index: number, onP
   grid.setAttribute('aria-label', `${pillar.label} and its actions`);
   for (const slot of gridSlots()) {
     if (slot === 'centre') {
-      const centre = el('div', 'mandala__cell mandala__cell--centre');
-      centre.append(el('span', 'goal-frame__label', 'Pillar'), el('span', 'mandala__centre-text', pillar.label));
+      const centre = el('div', `mandala__cell mandala__cell--hub ${PILLAR_TONES[index]}`);
+      centre.append(el('span', 'mandala__kicker', goal.title), el('span', 'mandala__centre-text', pillar.label));
       grid.append(centre);
       continue;
     }
     const action = pillar.actions[slot]!;
-    const cell = el('div', 'mandala__cell mandala__cell--action');
+    const cell = el('div', `mandala__cell mandala__cell--action${action.label.trim() ? '' : ' is-empty'}`);
     cell.dataset.action = String(slot);
     cell.append(
-      cellInput(`mandala.a.${slot}`, action.label, `Action ${slot + 1}`, 'An action', (v) =>
+      cellInput(`mandala.a.${slot}`, action.label, `Action ${slot + 1}`, 'Add an action', (v) =>
         // Editing the text clears a promotion: the cell no longer says what it became.
         onPatch(framePatch(goal, withPillar(pillars, index, withAction(pillar, slot, { ...action, label: v, promoted: v === action.label ? action.promoted : null }))))
       )
