@@ -112,8 +112,25 @@ export class FakeSocket implements SocketLike {
 
 /* ── The fake room ──────────────────────────────────────────────── */
 
-export type FakeRoomOptions = { room: string; code: string; game: PublicGame; keys: GameKeys; title?: string; itemSeconds?: number; /** Team games: how many teams (default from the rules). */ teams?: number };
-export type FakeRoom = { simulate(n?: number): void; stop(): void; seats(): Seat[] };
+export type FakeRoomOptions = {
+  room: string;
+  code: string;
+  game: PublicGame;
+  keys: GameKeys;
+  title?: string;
+  itemSeconds?: number;
+  /** Team games: how many teams (default from the rules). */
+  teams?: number;
+  /**
+   * Custom kinds: the room keeps itself in this tab's sessionStorage and,
+   * unless this is false, picks up a saved game again after a reload. The dev
+   * server reloads the page whenever a rules file changes, and the room lives
+   * in the board's tab: without this a game in progress fell back to the
+   * lobby with no error. False starts a new room (and saves that one).
+   */
+  resume?: boolean;
+};
+export type FakeRoom = { simulate(n?: number): void; stop(): void; seats(): Seat[]; /** The room's phase (dev and tests). */ phase(): Phase };
 
 const SIM_INITIALS = ['AK', 'BL', 'CM', 'DN', 'EO', 'FP', 'GR', 'HS', 'IT', 'JW', 'KY', 'LZ', 'MB', 'NC', 'OD', 'PE', 'QF', 'RG', 'SH', 'TJ', 'UK', 'VL', 'WM', 'XN'];
 
@@ -131,10 +148,28 @@ export function createFakeRoom(o: FakeRoomOptions): FakeRoom {
  * each connection gets its own view (a delta against its last one, or a
  * snapshot), the room's alarm is a timer, and the fold is logged.
  */
+/** Where a reducer room keeps itself between reloads of the board's tab (sessionStorage). */
+export const fakeRoomStoreKey = (o: Pick<FakeRoomOptions, 'room' | 'teams'>) => `gl-fake-room:${o.room}:${o.teams ?? 'default'}`;
+type Saved = { v: 1; game: string; state: RoomState; sims: string[] };
+function loadSaved(key: string, gameId: string): Saved | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    const saved = raw ? (JSON.parse(raw) as Saved) : null;
+    if (!saved || saved.v !== 1 || saved.game !== gameId || !saved.state) return null;
+    // A finished game starts again from the lobby.
+    if (saved.state.phase === 'ended' || saved.state.phase === 'folded') return null;
+    return saved;
+  } catch {
+    return null;
+  }
+}
+
 function createReducerRoom(o: FakeRoomOptions): FakeRoom {
   const b = bus(channelFor(o.room));
   const opened = Date.now();
-  const state: RoomState = initialState(
+  const storeKey = fakeRoomStoreKey(o);
+  const saved = o.resume === false ? null : loadSaved(storeKey, o.game.id);
+  const state: RoomState = saved?.state ?? initialState(
     {
       room: o.room,
       code: o.code,
@@ -153,10 +188,19 @@ function createReducerRoom(o: FakeRoomOptions): FakeRoom {
   );
   const conns = new Map<string, Conn>();
   const views = new Map<string, RoomView>();
-  const sims = new Set<string>();
+  const sims = new Set<string>(saved?.sims ?? []);
   let alarm: ReturnType<typeof setTimeout> | null = null;
   let sim: ReturnType<typeof setInterval> | null = null;
   let timers: Array<ReturnType<typeof setTimeout>> = [];
+
+  function save(): void {
+    try {
+      if (state.phase === 'ended' || state.phase === 'folded') sessionStorage.removeItem(storeKey);
+      else sessionStorage.setItem(storeKey, JSON.stringify({ v: 1, game: o.game.id, state, sims: [...sims] } satisfies Saved));
+    } catch {
+      /* storage full or blocked: the room just won't survive a reload */
+    }
+  }
 
   const sendTo = (cid: string, msg: ServerMsg) => b.post({ k: 'msg', cid, data: msg, to: 'client' });
   const cidsOf = (owner: string, conn?: string) => [...conns.values()].filter((c) => c.owner === owner && (!conn || c.cid === conn)).map((c) => c.cid);
@@ -190,6 +234,7 @@ function createReducerRoom(o: FakeRoomOptions): FakeRoom {
       else if (fx.kind === 'fold') console.info('[fake room] fold', fx.payload);
     }
     schedule();
+    save();
   }
 
   function schedule(): void {
@@ -219,8 +264,18 @@ function createReducerRoom(o: FakeRoomOptions): FakeRoom {
     } else if (w.k === 'msg') {
       const c = conns.get(w.cid);
       if (c) apply({ type: 'msg', owner: c.owner, role: c.role, msg: w.data as ClientMsg, conn: w.cid });
+      // A phone still on the room from before the reload: close it, so it reconnects to this one.
+      else if (saved) b.post({ k: 'closed', cid: w.cid, to: 'client' });
     }
   });
+
+  if (saved) {
+    // Picked up after a reload: every socket from before is gone (the simulated class plays on).
+    for (const [owner, conn] of Object.entries(state.conns ?? {})) if (!sims.has(owner)) apply({ type: 'disconnect', owner, conn });
+    for (const seat of Object.values(state.seats)) if (seat.connected && !sims.has(seat.owner)) apply({ type: 'disconnect', owner: seat.owner });
+    if (sims.size) sim = setInterval(simTick, 900);
+    schedule();
+  }
 
   function simTick(): void {
     if (state.phase !== 'playing') return;
@@ -258,7 +313,8 @@ function createReducerRoom(o: FakeRoomOptions): FakeRoom {
       if (alarm) clearTimeout(alarm);
       if (sim) clearInterval(sim);
       b.close();
-    }
+    },
+    phase: () => state.phase
   };
 }
 
@@ -645,6 +701,7 @@ function createStandInRoom(o: FakeRoomOptions): FakeRoom {
 
   return {
     simulate,
+    phase: () => phase,
     seats: () => [...seats.values()],
     stop() {
       timers.forEach(clearTimeout);

@@ -176,7 +176,8 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
   mount.append(nav);
 
   if (view === 'live-board') {
-    const fake = createFakeRoom({ room, code: CODE, game: split.public, keys: split.keys, ...(teams ? { teams } : {}) });
+    // The room survives a reload of this tab (the dev server reloads on every rules edit); `&fresh=1` starts a new one.
+    const fake = createFakeRoom({ room, code: CODE, game: split.public, keys: split.keys, ...(teams ? { teams } : {}), resume: params.get('fresh') !== '1' });
     const sim = el('button', 'gl-btn', 'Simulate class');
     sim.type = 'button';
     sim.addEventListener('click', () => fake.simulate(14));
@@ -194,7 +195,10 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
     start.type = 'button';
     const go = () => openLiveBoard({ open, game: split.public, connect: { WebSocketImpl: FakeSocket, fetchImpl: () => Promise.reject(new Error('dev')) }, extraControls: [sim] });
     start.addEventListener('click', go);
-    const help = el('p', 'gm-note', 'The board hosts the fake room in this tab. Open phones in other tabs (links below), then Start. Closing the board keeps the room; reopen it here.');
+    const help = el('p', 'gm-note', 'The board hosts the fake room in this tab. Open phones in other tabs (links below), then Start. Closing the board or reloading the tab keeps the room; ');
+    const fresh = el('a', '', 'start a new room');
+    fresh.href = `?view=live-board&game=${draft.id}${teams ? `&teams=${teams}` : ''}&fresh=1`;
+    help.append(fresh, '.');
     const phones = el('p', 'gm-note');
     ['AB', 'CD', 'EF'].forEach((s) => {
       const a = el('a', '', `Phone ${s}`);
