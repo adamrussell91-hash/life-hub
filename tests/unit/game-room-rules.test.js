@@ -142,7 +142,8 @@ test('teams: round-robin in the lobby, move_team and shuffle in the lobby only, 
   // The board's lobby shows both teams with initials; a student sees only their own team's members.
   const board = publicView(d.state, 'board', 'board', d.now);
   assert.deepEqual(board.teams.map((t) => [t.team, t.members]), [[0, ['AB', 'EF']], [1, ['CD']]]);
-  assert.deepEqual(board.leaderboard.map((r) => r.initials), ['Team 1', 'Team 2']);
+  assert.deepEqual(board.leaderboard.map((r) => r.initials), ['Kestrels', 'Otters']);
+  assert.deepEqual(board.teams.map((t) => t.name), ['Kestrels', 'Otters']);
   const phone = publicView(d.state, 'student', 'own_2', d.now);
   assert.deepEqual(phone.teams.map((t) => t.members), [[], ['CD']]);
   assert.equal(phone.you.seat.team, 1);
@@ -228,7 +229,7 @@ test('every ctx method through the reducer: mark, record, scores, team scores, p
   const board = publicView(d.state, 'board', 'board', d.now);
   assert.deepEqual(board.kind_view, { round: 1, ticks: 0, finished: false, teams: [0, 1] });
   assert.deepEqual(publicView(d.state, 'student', 'own_2', d.now).kind_view, { round: 1, mine: 42 });
-  assert.deepEqual(board.leaderboard.map((r) => [r.initials, r.score, r.rank, r.team]), [['Team 1', 10, 1, 0], ['Team 2', 0, 2, 1]]);
+  assert.deepEqual(board.leaderboard.map((r) => [r.initials, r.score, r.rank, r.team]), [['Kestrels', 10, 1, 0], ['Otters', 0, 2, 1]]);
   assert.ok(board.ticker.length > 0);
 });
 

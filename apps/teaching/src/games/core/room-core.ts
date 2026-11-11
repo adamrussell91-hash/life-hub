@@ -5,6 +5,7 @@ import { gameTotal, wordHint, type GameKeys, type QuoteKey, type WallKey } from 
 import { FAKE_SPEAKER } from './schema';
 import {
   ROOM_LIMITS,
+  teamName,
   type ClientMsg,
   type ControlOp,
   type FoldPayload,
@@ -471,11 +472,11 @@ function sharedOf(s: RoomState): Shared {
   const count = teamCount(s);
   if (count) {
     // Team games: the leaderboard is the teams (spec §5.1), members by initials only.
-    const rows = Array.from({ length: count }, (_, team) => ({ team, score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
+    const rows = Array.from({ length: count }, (_, team) => ({ team, name: teamName(team), score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
     const sorted = rows.slice().sort((a, b) => b.score - a.score || a.team - b.team);
     sorted.forEach((r, i) => (r.rank = i > 0 && sorted[i - 1]!.score === r.score ? sorted[i - 1]!.rank : i + 1));
     shared.teams = rows;
-    shared.leaderboard = sorted.map((r) => ({ initials: `Team ${r.team + 1}`, score: r.score, rank: r.rank, team: r.team }));
+    shared.leaderboard = sorted.map((r) => ({ initials: r.name, score: r.score, rank: r.rank, team: r.team }));
   }
   sharedCache.set(s, shared);
   return shared;

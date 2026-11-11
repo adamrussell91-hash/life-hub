@@ -1,7 +1,7 @@
 import { el } from '@/quiz/dom';
 import type { EventResult, LiveJoin, SoloEvent } from '../api';
 import { GAME_KIND_INFO, type PublicGame } from '../core/schema';
-import type { RoomView, Seat, ServerMsg } from '../core/room-protocol';
+import { teamName, type RoomView, type Seat, type ServerMsg } from '../core/room-protocol';
 import { calm, calmToggleOn, countUp, enter, loadCalm, setCalm } from '../motion/motion';
 import { confetti } from '../motion/confetti';
 import { setSfxRole, sfx, soundToggle } from '../sound/sfx';
@@ -343,17 +343,17 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     box.append(badge, el('p', 'gl-in__h', 'You’re in'));
     if (team !== undefined) {
       const on = el('p', 'gl-in__team');
-      on.append('You’re on ', el('b', '', `Team ${team + 1}`));
+      on.append('You’re on the ', el('b', '', teamName(team)));
       box.append(on);
     }
     const sub = el('p', 'gl-in__sub', 'Waiting for your teacher to start');
     box.append(sub);
-    box.setAttribute('aria-label', `You’re in as ${initials}${team !== undefined ? `, on Team ${team + 1}` : ''}. Waiting for your teacher to start.`);
+    box.setAttribute('aria-label', `You’re in as ${initials}${team !== undefined ? `, on the ${teamName(team)}` : ''}. Waiting for your teacher to start.`);
     stage.replaceChildren(box);
     setDock([]);
     void enter(box);
     if (first) toast('Joined', 'good');
-    else if (team !== undefined) toast(`You’re on Team ${team + 1} now`);
+    else if (team !== undefined) toast(`You’re on the ${teamName(team)} now`);
   }
 
   function showCountdown(v: RoomView): void {
@@ -532,7 +532,7 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
     };
     const myTeam = seat?.team !== undefined ? v.teams?.find((t) => t.team === seat.team) : undefined;
     if (myTeam) {
-      stat('Team', `Team ${myTeam.team + 1} · ${ordinal(myTeam.rank)} of ${v.teams!.length}`);
+      stat('Team', `${myTeam.name} · ${ordinal(myTeam.rank)} of ${v.teams!.length}`);
       stat('Team points', myTeam.score.toLocaleString('en-AU'));
     }
     if (rank) stat('Place', placeText(v, rank));

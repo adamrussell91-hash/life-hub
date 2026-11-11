@@ -76,8 +76,12 @@ export type RoomConfig = {
 
 export type RoomStyle = 'race' | 'paced' | 'custom';
 
-/** A team as every viewer may see it: number (0-based), score, members' initials (students get only their own team's), rank. */
-export type TeamView = { team: number; score: number; members: string[]; rank: number };
+/** Team names, by team number (0-based): every screen calls a team by these. Up to six teams. */
+export const TEAM_NAMES = ['Kestrels', 'Otters', 'Foxes', 'Herons', 'Wrens', 'Magpies'] as const;
+export const teamName = (team: number): string => TEAM_NAMES[team] ?? `Team ${team + 1}`;
+
+/** A team as every viewer may see it: number (0-based), name, score, members' initials (students get only their own team's), rank. */
+export type TeamView = { team: number; name: string; score: number; members: string[]; rank: number };
 
 export type Phase = 'lobby' | 'countdown' | 'playing' | 'paused' | 'ended' | 'folded';
 
@@ -127,7 +131,7 @@ export type RoomView = {
   item?: PacedItem;
   /**
    * Top 5 for individual games; teams for team games (one row per team:
-   * `initials` is "Team 1", `team` is its number). Teacher and board get every rank in `seats`.
+   * `initials` is the team's name, "Kestrels", `team` its number). Teacher and board get every rank in `seats`.
    */
   leaderboard: Array<{ initials: string; score: number; rank: number; team?: number }>;
   /** Team games: every team with its score and rank (members as initials; students see only their own team's members). */

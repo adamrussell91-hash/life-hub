@@ -6,4 +6,4 @@ export { GROUP_COLOURS, classWall, foldPayload, initialState, nextAlarm, publicV
 export { registerRules, rulesFor } from './room-rules';
 export { markMove, quotePoints } from './mark';
 export { SIGNATURE_HEADER, SIGNATURE_SKEW_MS, TICKET_LIFE_MS, signBody, signTicket, ticketFromAuthorization, verifyBody, verifyTicket } from './room-ticket';
-export { ROOM_LIMITS } from './room-protocol';
+export { ROOM_LIMITS, TEAM_NAMES, teamName } from './room-protocol';

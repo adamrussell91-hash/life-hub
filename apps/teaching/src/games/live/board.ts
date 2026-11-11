@@ -281,8 +281,8 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
       const members = v.seats.filter((s) => s.team === t.team);
       const head = el('button', 'gl-team__head');
       head.type = 'button';
-      head.append(teamBadge(t.team), el('b', '', `Team ${t.team + 1}`), el('small', '', String(members.length)));
-      head.setAttribute('aria-label', picked ? `Move ${v.seats.find((s) => s.owner === picked)?.initials ?? ''} to Team ${t.team + 1}` : `Team ${t.team + 1}, ${members.length} players`);
+      head.append(teamBadge(t.team), el('b', '', t.name), el('small', '', String(members.length)));
+      head.setAttribute('aria-label', picked ? `Move ${v.seats.find((s) => s.owner === picked)?.initials ?? ''} to the ${t.name}` : `${t.name}, ${members.length} players`);
       head.addEventListener('click', () => picked && move(picked, t.team));
       const list = el('div', 'gl-team__list');
       for (const s of members) {
@@ -292,7 +292,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
         chip.setAttribute('role', 'button');
         chip.tabIndex = 0;
         chip.draggable = true;
-        chip.setAttribute('aria-label', `${s.initials}, Team ${t.team + 1}. Press to move to another team.`);
+        chip.setAttribute('aria-label', `${s.initials}, ${t.name}. Press to move to another team.`);
         const pick = () => {
           picked = picked === s.owner ? null : s.owner;
           teamsSig = '';

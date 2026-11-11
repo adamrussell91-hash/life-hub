@@ -1,10 +1,877 @@
 // Generated from apps/teaching/src/games/core/room-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.
 
-// apps/teaching/src/games/core/events.ts
-import { z as z4 } from "zod";
+// apps/teaching/src/games/core/room-rules.ts
+var registry = /* @__PURE__ */ new Map();
+function registerRules(rules) {
+  registry.set(rules.kind, rules);
+}
+function rulesFor(kind) {
+  return registry.get(kind);
+}
 
-// apps/teaching/src/games/core/schema.ts
-import { z as z3 } from "zod";
+// apps/teaching/src/games/kinds/articulate/rules.ts
+var ARTICULATE_KIND = "articulate";
+function articulateSettings(s) {
+  const num = (v, d, lo, hi) => typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(hi, Math.max(lo, v))) : d;
+  return { seconds: num(s?.seconds, 45, 30, 60), passes: num(s?.passes, 2, 0, 3), quick_check: s?.quick_check !== false, quick_check_items: num(s?.quick_check_items, 4, 3, 5) };
+}
+function cardsOf(keys) {
+  const live2 = keys.live?.cards ?? {};
+  const out = [];
+  for (const [id, key] of Object.entries(keys.items)) {
+    if (key.shape !== "term") continue;
+    const extra = live2?.[id];
+    const def = extra?.clues.find((c) => c.kind === "definition")?.text;
+    const ex = extra?.clues.find((c) => c.kind === "example")?.text;
+    out.push({ id, term: key.label || key.answers[0] || "", banned: extra?.banned ?? [], ...def ? { definition: def } : {}, ...ex ? { example: ex } : {} });
+  }
+  return out.filter((c) => c.term);
+}
+var cardMap = (keys) => new Map(cardsOf(keys).map((c) => [c.id, c]));
+function shuffle(list, random) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+function teamsOf(ctx) {
+  const t = ctx.teams();
+  return t.length ? t : [0];
+}
+function membersOf(ctx, team) {
+  if (ctx.teams().length) return ctx.members(team).filter((o) => ctx.seat(o));
+  return ctx.seats().map((s) => s.owner);
+}
+var teamOf = (ctx, owner) => ctx.teams().length ? ctx.seat(owner)?.team : 0;
+function captainOf(ctx, team) {
+  const list = membersOf(ctx, team);
+  return list.find((o) => ctx.seat(o)?.connected) ?? list[0];
+}
+function nextDescriber(ctx, k, team) {
+  const list = membersOf(ctx, team);
+  if (!list.length) return void 0;
+  const start = (k.rot[team] ?? 0) % list.length;
+  for (let i = 0; i < list.length; i++) {
+    const o = list[(start + i) % list.length];
+    if (ctx.seat(o)?.connected) return o;
+  }
+  return list[start];
+}
+var isCaptainAgainst = (ctx, k, owner) => {
+  if (!k.turn || k.phase !== "turn" || !ctx.teams().length) return false;
+  const team = teamOf(ctx, owner);
+  return team !== void 0 && team !== k.turn.team && captainOf(ctx, team) === owner;
+};
+var err = (code, message) => ({ error: { code, message } });
+function draw(ctx, k) {
+  const next = k.deck.shift() ?? null;
+  k.current = next;
+  k.card_at = ctx.now;
+  if (next && !k.seen.includes(next)) k.seen.push(next);
+  if (!next) endTurn(ctx, k, "deck");
+}
+function endTurn(ctx, k, why) {
+  if (k.phase !== "turn" || !k.turn) return;
+  if (k.current) k.deck.unshift(k.current);
+  k.current = null;
+  k.turn.why = why;
+  k.log.push({ ...k.turn, cards: [...k.turn.cards], round: k.round });
+  k.rot[k.turn.team] = (k.rot[k.turn.team] ?? 0) + 1;
+  k.phase = "end";
+  ctx.setTimer(void 0);
+  const got = k.turn.cards.filter((c) => c.result === "got").length;
+  ctx.ticker(got ? `+${got} card${got === 1 ? "" : "s"}` : "no cards this time");
+}
+function startTurn(ctx, k) {
+  if (k.phase !== "ready") return err("not_now", "Wait for the next turn.");
+  const team = k.order[k.at] ?? 0;
+  const describer = nextDescriber(ctx, k, team);
+  if (!describer) return err("no_describer", "This team has nobody to describe.");
+  if (!k.deck.length) return err("deck_empty", "The deck is empty.");
+  k.phase = "turn";
+  k.turn = { team, describer, cards: [], passes: 0 };
+  ctx.setTimer(ctx.now + articulateSettings(ctx.game.settings).seconds * 1e3);
+  draw(ctx, k);
+}
+function resolve(ctx, k, result, by) {
+  if (!k.turn || !k.current) return;
+  const item = k.current;
+  const ms = Math.max(0, ctx.now - k.card_at);
+  k.turn.cards.push({ item, result, ms });
+  const describer = k.turn.describer;
+  const team = k.turn.team;
+  if (result === "got") {
+    ctx.addTeamScore(team, 1);
+    ctx.addScore(describer, 1);
+    ctx.record(describer, { item, move: "describe", response: { result: "got" }, time_ms: ms, extra: { result: "got", team }, strength: "live_team" });
+  } else if (result === "pass") {
+    k.turn.passes += 1;
+    k.deck.push(item);
+    ctx.record(describer, { item, move: "pass", response: { result: "pass" }, time_ms: ms, extra: { result: "pass", team }, strength: "live_team" });
+  } else {
+    ctx.record(describer, { item, move: "buzz", response: { result: "buzz" }, time_ms: ms, extra: { result: "buzz", team, by: by ?? "teacher" }, strength: "live_team" });
+  }
+  draw(ctx, k);
+}
+var OPTION_IDS = ["a", "b", "c", "d"];
+function buildCheck(ctx, k) {
+  const s = articulateSettings(ctx.game.settings);
+  const cards = cardsOf(ctx.keys);
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const askable = (c) => !!c && (!!c.definition || !!c.example);
+  const picks = [];
+  for (const id of k.seen) {
+    const c = byId.get(id);
+    if (askable(c) && !picks.includes(c)) picks.push(c);
+  }
+  if (picks.length < 3) {
+    for (const c of shuffle(cards, ctx.random)) if (picks.length < 3 && askable(c) && !picks.includes(c)) picks.push(c);
+  }
+  const out = [];
+  for (const c of picks) {
+    if (out.length >= s.quick_check_items) break;
+    const kind = c.definition ? "definition" : "example";
+    const right = kind === "definition" ? c.definition : c.example;
+    const others = shuffle(
+      cards.filter((o) => o.id !== c.id && (kind === "definition" ? o.definition : o.example) && (kind === "definition" ? o.definition : o.example) !== right),
+      ctx.random
+    ).slice(0, 3);
+    if (others.length < 2) continue;
+    const pool = shuffle([{ card: c.id, text: right }, ...others.map((o) => ({ card: o.id, text: kind === "definition" ? o.definition : o.example }))], ctx.random);
+    const options = pool.map((p, i) => ({ id: OPTION_IDS[i], text: p.text }));
+    const from = Object.fromEntries(pool.map((p, i) => [OPTION_IDS[i], p.card]));
+    const why = kind === "definition" ? c.example : c.definition;
+    out.push({ item: c.id, term: c.term, kind, options, right: OPTION_IDS[pool.findIndex((p) => p.card === c.id)], from, ...why ? { why } : {} });
+  }
+  return out;
+}
+function startCheck(ctx, k) {
+  if (k.phase === "turn") endTurn(ctx, k, "ended");
+  const s = articulateSettings(ctx.game.settings);
+  const questions = s.quick_check ? buildCheck(ctx, k) : [];
+  k.check = { questions, answers: {}, revealed: !questions.length };
+  k.phase = questions.length ? "check" : "checked";
+  ctx.setTimer(void 0);
+}
+function checkStats(ctx, k) {
+  const qs = k.check?.questions ?? [];
+  const students = ctx.seats().map((s) => s.owner);
+  return qs.map((q, i) => {
+    const answered = students.filter((o) => k.check?.answers[o]?.[i]);
+    const right = answered.filter((o) => k.check?.answers[o]?.[i]?.correct).length;
+    return { answered: answered.length, right, pct: answered.length ? Math.round(right / answered.length * 100) : 0 };
+  });
+}
+var articulateRules = {
+  kind: ARTICULATE_KIND,
+  teams: { min: 2, max: 4, default: 4 },
+  init(ctx) {
+    return { phase: "ready", round: 0, order: [], at: 0, deck: [], current: null, card_at: 0, turn: null, log: [], seen: [], rot: {}, check: null };
+  },
+  start(ctx, k) {
+    k.order = teamsOf(ctx);
+    k.deck = shuffle(
+      cardsOf(ctx.keys).map((c) => c.id),
+      ctx.random
+    );
+    k.phase = "ready";
+  },
+  move(ctx, k, owner, e) {
+    if (e.move === "answer") {
+      if (k.phase !== "check" || !k.check) return err("not_now", "The quick check isn\u2019t open.");
+      const index = k.check.questions.findIndex((q2) => q2.item === e.item);
+      const q = k.check.questions[index];
+      if (!q) return err("bad_item", "That isn\u2019t in this quick check.");
+      const mine = k.check.answers[owner] ??= {};
+      if (mine[index]) return { item: e.item, correct: mine[index].correct };
+      const option = typeof e.response?.option === "string" ? e.response.option : "";
+      const picked = q.from[option];
+      if (!picked) return err("bad_option", "Pick one of the answers.");
+      const pickedTerm = cardMap(ctx.keys).get(picked)?.term ?? "";
+      const marked = ctx.mark(owner, { item: q.item, move: "answer", response: { text: pickedTerm }, ...e.time_ms !== void 0 ? { time_ms: e.time_ms } : {}, extra: { check: q.kind, option, ...picked !== q.item ? { picked } : {} } }, "live_solo");
+      if ("error" in marked) return marked;
+      const correct = marked.result.correct === true;
+      mine[index] = { option, correct };
+      if (correct) ctx.addScore(owner, 1);
+      const answeredAll = k.check.questions.every((_, i) => mine[i]);
+      ctx.setProgress(owner, { done: Object.keys(mine).length, total: k.check.questions.length });
+      if (answeredAll) ctx.ticker("finished the quick check", ctx.seat(owner)?.initials);
+      return { item: q.item, correct };
+    }
+    if (e.move === "describe" || e.move === "pass") {
+      if (k.phase !== "turn" || !k.turn) return err("not_now", "Wait for your turn.");
+      if (k.turn.describer !== owner) return err("not_describer", "Only the describer can do that.");
+      if (!k.current || e.item !== k.current) return err("stale", "That card has changed.");
+      const result = e.move === "pass" ? "pass" : e.response?.result === "pass" ? "pass" : "got";
+      if (result === "pass" && k.turn.passes >= articulateSettings(ctx.game.settings).passes) return err("no_passes", "No passes left this turn.");
+      resolve(ctx, k, result);
+      return { item: e.item };
+    }
+    if (e.move === "buzz") {
+      const out = buzz(ctx, k, { owner, role: "student" }, e.item);
+      return out ? out : { item: e.item };
+    }
+    return err("bad_move", "That move isn\u2019t part of Articulate.");
+  },
+  control(ctx, k, op, from) {
+    const staff = from.role === "teacher" || from.role === "board";
+    if (op.name === "buzz") {
+      const item = typeof op.data?.item === "string" ? op.data.item : void 0;
+      return buzz(ctx, k, from, item) ?? void 0;
+    }
+    if (!staff) return err("not_allowed", "Only your teacher can do that.");
+    switch (op.name) {
+      case "start_turn":
+        return startTurn(ctx, k);
+      case "end_turn":
+        if (k.phase !== "turn") return err("not_now", "No turn is running.");
+        endTurn(ctx, k, "ended");
+        return;
+      case "next":
+      case "next_turn": {
+        if (k.phase !== "end") return err("not_now", "Finish this turn first.");
+        if (k.at + 1 >= k.order.length) return startCheck(ctx, k);
+        k.at += 1;
+        k.turn = null;
+        k.phase = "ready";
+        return;
+      }
+      case "check":
+        if (k.phase !== "ready" && k.phase !== "end" && k.phase !== "turn") return err("not_now", "The quick check is already open.");
+        startCheck(ctx, k);
+        return;
+      case "reveal":
+      case "reveal_check":
+        if (k.phase !== "check" || !k.check) return err("not_now", "Open the quick check first.");
+        k.check.revealed = true;
+        k.phase = "checked";
+        return;
+      case "next_round": {
+        if (k.phase !== "checked") return err("not_now", "Finish the quick check first.");
+        k.round += 1;
+        k.at = 0;
+        k.turn = null;
+        k.seen = [];
+        k.check = null;
+        k.order = teamsOf(ctx);
+        if (!k.deck.length) k.deck = shuffle(cardsOf(ctx.keys).map((c) => c.id), ctx.random);
+        k.phase = "ready";
+        return;
+      }
+      case "final":
+        ctx.end();
+        return;
+      default:
+        return err("bad_control", "Unknown control.");
+    }
+  },
+  tick(ctx, k) {
+    if (k.phase === "turn") endTurn(ctx, k, "time");
+  },
+  finish(ctx, k) {
+    if (k.phase === "turn") endTurn(ctx, k, "ended");
+  },
+  view(ctx, k, role, owner) {
+    return articulateView(ctx, k, role, owner);
+  }
+};
+function buzz(ctx, k, from, item) {
+  const staff = from.role === "teacher" || from.role === "board";
+  if (!staff && !isCaptainAgainst(ctx, k, from.owner)) return err("not_allowed", "Only the other teams\u2019 captains can buzz.");
+  if (k.phase !== "turn" || !k.current) return err("not_now", "No card to buzz.");
+  if (item && item !== k.current) return err("stale", "That card has gone.");
+  resolve(ctx, k, "buzz", staff ? "teacher" : "captain");
+  return null;
+}
+var initialsOf = (ctx, owner) => owner ? ctx.seat(owner)?.initials ?? "" : "";
+function publicCards(ctx, cards) {
+  const map = cardMap(ctx.keys);
+  return cards.map((c) => ({ item: c.item, term: map.get(c.item)?.term ?? "", result: c.result }));
+}
+function articulateView(ctx, k, role, owner) {
+  const s = articulateSettings(ctx.game.settings);
+  const team = k.turn?.team ?? k.order[k.at] ?? 0;
+  const turnCards = k.turn?.cards ?? [];
+  if (role !== "student") {
+    const describer = k.turn?.describer ?? (k.phase === "ready" ? nextDescriber(ctx, k, team) : void 0);
+    const stats = k.check ? checkStats(ctx, k) : [];
+    const avg = stats.length ? Math.round(stats.reduce((a, x) => a + x.pct, 0) / stats.length) : void 0;
+    const hardest = stats.length ? stats.findIndex((x) => x.pct === Math.min(...stats.map((y) => y.pct))) : void 0;
+    const view3 = {
+      who: "board",
+      phase: k.phase,
+      round: k.round,
+      order: k.order,
+      at: k.at,
+      team,
+      ...describer ? { describer: initialsOf(ctx, describer) } : {},
+      guessers: membersOf(ctx, team).filter((o) => o !== describer).map((o) => initialsOf(ctx, o)),
+      cards: publicCards(ctx, turnCards),
+      dealt: turnCards.length + (k.current ? 1 : 0),
+      ...k.turn?.why ? { why: k.turn.why } : {},
+      ...k.at + 1 < k.order.length ? { next_team: k.order[k.at + 1] } : {},
+      last_turn: k.at + 1 >= k.order.length,
+      deck_left: k.deck.length + (k.current ? 1 : 0),
+      seconds: s.seconds,
+      ...k.check ? {
+        check: {
+          questions: k.check.questions.map((q, i) => ({ term: q.term, kind: q.kind, answered: stats[i]?.answered ?? 0, ...k.check?.revealed ? { pct: stats[i]?.pct ?? 0 } : {} })),
+          seats: ctx.seats().length,
+          revealed: k.check.revealed,
+          ...k.check.revealed && avg !== void 0 ? { avg, hardest } : {}
+        }
+      } : {}
+    };
+    if (role === "teacher" && (k.phase === "checked" || k.phase === "check")) {
+      view3.describers = k.log.map((t) => {
+        const n = (r) => t.cards.filter((c) => c.result === r).length;
+        return {
+          initials: initialsOf(ctx, t.describer),
+          team: t.team,
+          got: n("got"),
+          passed: n("pass"),
+          buzzed: n("buzz"),
+          avg_s: t.cards.length ? Math.round(t.cards.reduce((a, c) => a + c.ms, 0) / t.cards.length / 1e3) : 0,
+          terms: publicCards(ctx, t.cards)
+        };
+      });
+    }
+    return view3;
+  }
+  const myTeam = teamOf(ctx, owner);
+  const describing = k.phase === "turn" && k.turn?.describer === owner;
+  const captain = isCaptainAgainst(ctx, k, owner);
+  const myRole = describing ? "describer" : captain ? "captain" : myTeam === team ? "team" : "watch";
+  const cardMapNow = k.current && (describing || captain) ? cardMap(ctx.keys).get(k.current) : void 0;
+  const lastTurn = k.log[k.log.length - 1];
+  const upNext = k.phase === "ready" && nextDescriber(ctx, k, team) === owner;
+  const view2 = {
+    who: "phone",
+    phase: k.phase,
+    round: k.round,
+    ...myTeam !== void 0 ? { my_team: myTeam } : {},
+    team,
+    ...k.turn?.describer || k.phase === "ready" ? { describer: initialsOf(ctx, k.turn?.describer ?? nextDescriber(ctx, k, team)) } : {},
+    role: myRole,
+    ...cardMapNow ? { card: { item: cardMapNow.id, term: cardMapNow.term, banned: cardMapNow.banned } } : {},
+    got: turnCards.filter((c) => c.result === "got").length,
+    passes: s.passes,
+    passes_left: Math.max(0, s.passes - (k.turn?.passes ?? 0)),
+    up_next: upNext,
+    ...lastTurn && (k.phase === "end" || k.phase === "ready") ? { last: { team: lastTurn.team, describer: initialsOf(ctx, lastTurn.describer), mine: lastTurn.describer === owner, cards: publicCards(ctx, lastTurn.cards) } } : {}
+  };
+  if (k.check) {
+    const mine = k.check.answers[owner] ?? {};
+    view2.check = {
+      revealed: k.check.revealed,
+      questions: k.check.questions.map((q, i) => {
+        const a = mine[i];
+        return { item: q.item, term: q.term, kind: q.kind, options: q.options, ...a ? { answer: { ...a, right: q.right, ...q.why ? { why: q.why } : {} } } : {} };
+      })
+    };
+    if (k.phase === "checked") {
+      view2.mine = {
+        described: k.log.filter((t) => t.describer === owner).reduce((a, t) => a + t.cards.filter((c) => c.result === "got").length, 0),
+        check_right: Object.values(mine).filter((a) => a.correct).length,
+        check_of: k.check.questions.length
+      };
+    }
+  }
+  return view2;
+}
+registerRules(articulateRules);
+
+// apps/teaching/src/games/kinds/jeopardy/shared.ts
+var TEAM_NAMES = ["Kestrels", "Otters", "Foxes", "Herons", "Wrens", "Magpies"];
+var teamName = (team) => TEAM_NAMES[team % TEAM_NAMES.length] ?? `Team ${team + 1}`;
+var round10 = (n) => Math.round(n / 10) * 10 || 0;
+var choicesOf = (q) => {
+  const r = q;
+  for (const k of ["options", "segments", "items", "labels", "right"]) if (Array.isArray(r[k])) return r[k];
+  return [];
+};
+function answerText(item, key) {
+  if (!key) return "";
+  if (key.shape === "term") return key.label || key.answers[0] || "";
+  if (key.shape === "quote") return key.speaker_name || key.speaker;
+  if (key.shape === "wall") return key.label;
+  const q = item?.shape === "question" ? item.question : null;
+  const a = key.key.answer;
+  const opts = q ? choicesOf(q) : [];
+  const text = (id) => opts.find((o) => o.id === id)?.text ?? "";
+  switch (a.type) {
+    case "choice":
+      return a.ids.map(text).filter(Boolean).join(" \xB7 ");
+    case "boolean":
+      return a.value ? "True" : "False";
+    case "text":
+      return a.accepted[0] ?? "";
+    case "gaps":
+      return Object.values(a.gaps).map((g) => g[0] ?? "").join(" \xB7 ");
+    case "order":
+      return a.ids.map(text).filter(Boolean).join(" \u2192 ");
+    case "map": {
+      const all = q ? [...choicesOf(q), ...q.left ?? [], ...q.groups ?? []] : [];
+      const t = (id) => all.find((o) => o.id === id)?.text ?? id;
+      return Object.entries(a.map).map(([k, v]) => `${t(k)} \u2192 ${t(v)}`).join(" \xB7 ");
+    }
+    case "spots": {
+      const words2 = a.passage.split(/\s+/).filter(Boolean);
+      return a.targets.map((s) => words2.slice(s.from, s.to + 1).join(" ")).join(" \xB7 ");
+    }
+    default:
+      return "";
+  }
+}
+function singleChoice(item, key) {
+  if (!item || item.shape !== "question" || key?.shape !== "question" || key.key.answer.type !== "choice" || key.key.answer.ids.length !== 1) return null;
+  const opts = choicesOf(item.question);
+  const rightId = key.key.answer.ids[0];
+  const right = opts.find((o) => o.id === rightId)?.text;
+  if (!right) return null;
+  return { right, others: opts.filter((o) => o.id !== rightId).map((o) => o.text) };
+}
+
+// apps/teaching/src/games/kinds/jeopardy/rules.ts
+var WAGER_SECONDS = 30;
+var MIN_WAGER = 100;
+var err2 = (code, message) => ({ error: { code, message } });
+function content(ctx) {
+  return { items: ctx.keys.live?.items ?? [], jeopardy: ctx.keys.live?.jeopardy };
+}
+var itemOf = (ctx, id) => content(ctx).items.find((i) => i.id === id);
+var tiles = (ctx) => (content(ctx).jeopardy?.categories ?? []).flatMap((c) => c.tiles.map((t) => ({ ...t, cat: c.id, cat_title: c.title })));
+var tileOf = (ctx, id) => tiles(ctx).find((t) => t.id === id);
+var topValue = (ctx) => Math.max(500, ...tiles(ctx).map((t) => t.value));
+var seconds = (ctx) => Number(ctx.game.settings?.seconds) || 30;
+var bonus = (ctx) => Number(ctx.game.settings?.picker_bonus) || 1.5;
+var connected = (ctx, owner) => !!ctx.seat(owner)?.connected;
+function order(ctx, k) {
+  for (const t of ctx.teams()) if (!k.order.includes(t)) k.order.push(t);
+  return k.order.filter((t) => ctx.members(t).length > 0);
+}
+function pickingTeam(ctx, k) {
+  const o = order(ctx, k);
+  return o.length ? o[k.turn % o.length] : null;
+}
+function captainOf2(ctx, k, team) {
+  const live2 = ctx.members(team).filter((o) => connected(ctx, o));
+  if (!live2.length) return null;
+  return live2[(k.picks[team] ?? 0) % live2.length];
+}
+function tileGain(opts) {
+  const { value, n, r, answered, pick: pick2, wager } = opts;
+  if (!n || !answered) return 0;
+  if (pick2 && wager !== void 0) return round10(wager * (2 * r - n) / n);
+  return round10(value * (r / n) * (pick2 ? opts.bonus : 1));
+}
+function counted(ctx, team, answers) {
+  return ctx.members(team).filter((o) => connected(ctx, o) || answers[o]);
+}
+function results(ctx, k, answers, score) {
+  return order(ctx, k).map((team) => {
+    const who = counted(ctx, team, answers);
+    const r = who.filter((o) => answers[o]?.correct).length;
+    const answered = who.filter((o) => answers[o]).length;
+    return score(team, who.length, r, answered);
+  });
+}
+function everyoneIn(ctx, answers) {
+  const live2 = ctx.seats().filter((s) => s.connected && s.team !== void 0);
+  return live2.length > 0 && live2.every((s) => answers[s.owner]);
+}
+function openClue(ctx, k) {
+  const cur = k.cur;
+  if (!cur) return;
+  k.phase = "clue";
+  cur.opened_at = ctx.now;
+  cur.ends_at = ctx.now + seconds(ctx) * 1e3;
+  ctx.setTimer(cur.ends_at);
+}
+function close(ctx, k) {
+  if (k.phase === "clue") k.phase = "closed";
+  else if (k.phase === "final_clue") k.phase = "final_closed";
+  else return;
+  ctx.setTimer(void 0);
+}
+function reveal(ctx, k) {
+  const cur = k.cur;
+  if (!cur || k.phase !== "closed" && k.phase !== "clue") return;
+  close(ctx, k);
+  cur.results = results(ctx, k, cur.answers, (team, n, r, answered) => {
+    const pick2 = team === cur.team;
+    const wager = pick2 && cur.double ? cur.wager ?? 0 : void 0;
+    return { team, n, r, pick: pick2, gain: tileGain({ value: cur.value, n, r, answered, pick: pick2, bonus: bonus(ctx), ...wager !== void 0 ? { wager } : {} }), ...wager !== void 0 ? { wager } : {} };
+  });
+  for (const x of cur.results) if (x.gain) ctx.addTeamScore(x.team, x.gain);
+  const best = [...cur.results].sort((a, b) => b.gain - a.gain)[0];
+  k.used[cur.tile] = best && best.gain > 0 ? { team: best.team, gain: best.gain } : { team: null, gain: 0 };
+  const right = Object.values(cur.answers).filter((a) => a.correct).length;
+  k.tally[cur.tile] = { right, answered: Object.keys(cur.answers).length };
+  for (const [o, a] of Object.entries(cur.answers)) {
+    if (!a.correct) continue;
+    const row = k.ceil[o] ??= {};
+    row[cur.cat] = Math.max(row[cur.cat] ?? 0, cur.value);
+  }
+  if (best && best.gain > 0) ctx.ticker(`${teamName(best.team)} +${best.gain}`);
+  k.phase = "revealed";
+}
+function backToBoard(ctx, k) {
+  if (k.phase !== "revealed" || !k.cur) return;
+  k.picks[k.cur.team] = (k.picks[k.cur.team] ?? 0) + 1;
+  k.turn += 1;
+  k.cur = null;
+  k.aim = null;
+  k.phase = "pick";
+  if (tiles(ctx).every((t) => k.used[t.id])) {
+    if (content(ctx).jeopardy?.final && itemOf(ctx, content(ctx).jeopardy?.final)) startFinal(ctx, k);
+    else k.phase = "done";
+  }
+}
+function pick(ctx, k, tileId) {
+  if (k.phase !== "pick") return err2("not_now", "Pick when the board is showing.");
+  const t = tileOf(ctx, tileId);
+  if (!t) return err2("bad_tile", "That tile isn\u2019t on the board.");
+  if (k.used[t.id]) return err2("used", "That tile has been played.");
+  const team = pickingTeam(ctx, k);
+  if (team === null) return err2("no_team", "No team is ready to pick.");
+  k.aim = null;
+  k.cur = { tile: t.id, item: t.item, cat: t.cat, value: t.value, double: t.double, team, answers: {} };
+  if (t.double) {
+    k.phase = "wager";
+    k.cur.max_wager = Math.max(ctx.teamScore(team), topValue(ctx));
+    ctx.setTimer(ctx.now + WAGER_SECONDS * 1e3);
+  } else openClue(ctx, k);
+}
+function clampWager(n, max, min = MIN_WAGER) {
+  const v = Math.round(Number(n) / 10) * 10;
+  const lo = Math.min(min, max);
+  return Number.isFinite(v) ? Math.max(lo, Math.min(max, v)) : lo;
+}
+function startFinal(ctx, k) {
+  const id = content(ctx).jeopardy?.final;
+  if (!id) return;
+  k.cur = null;
+  k.final = { item: id, wagers: {}, answers: {}, shown: 0 };
+  k.phase = "final_wager";
+  ctx.setTimer(ctx.now + WAGER_SECONDS * 1e3);
+}
+var finalMax = (ctx, team) => Math.max(0, ctx.teamScore(team));
+function finalWagersIn(ctx, k) {
+  return order(ctx, k).every((t) => k.final?.wagers[t] !== void 0 || captainOf2(ctx, k, t) === null);
+}
+function openFinal(ctx, k) {
+  const f = k.final;
+  if (!f) return;
+  for (const t of order(ctx, k)) if (f.wagers[t] === void 0) f.wagers[t] = 0;
+  k.phase = "final_clue";
+  f.opened_at = ctx.now;
+  f.ends_at = ctx.now + seconds(ctx) * 1e3;
+  ctx.setTimer(f.ends_at);
+}
+function revealFinalNext(ctx, k) {
+  const f = k.final;
+  if (!f) return;
+  if (k.phase === "final_clue") close(ctx, k);
+  if (k.phase === "final_closed") {
+    f.results = results(ctx, k, f.answers, (team, n, r, answered) => {
+      const wager = f.wagers[team] ?? 0;
+      return { team, n, r, pick: true, wager, gain: tileGain({ value: 0, n, r, answered, pick: true, bonus: 1, wager }) };
+    });
+    f.results.sort((a, b) => ctx.teamScore(a.team) - ctx.teamScore(b.team));
+    k.phase = "final_reveal";
+    k.tally[f.item] = { right: Object.values(f.answers).filter((a) => a.correct).length, answered: Object.keys(f.answers).length };
+  }
+  if (k.phase !== "final_reveal" || !f.results) return;
+  const next = f.results[f.shown];
+  if (!next) {
+    k.phase = "done";
+    return;
+  }
+  if (next.gain) ctx.addTeamScore(next.team, next.gain);
+  ctx.ticker(`${teamName(next.team)} ${next.gain >= 0 ? "+" : "\u2212"}${Math.abs(next.gain)}`);
+  f.shown += 1;
+  if (f.shown >= f.results.length) k.phase = "done";
+}
+function answer(ctx, k, owner, e) {
+  const seat = ctx.seat(owner);
+  if (!seat || seat.team === void 0) return err2("no_seat", "Join a team first.");
+  const final = k.phase === "final_clue";
+  if (k.phase !== "clue" && !final) return err2("closed", "Answers are closed.");
+  const itemId = final ? k.final?.item : k.cur?.item;
+  const answers = final ? k.final?.answers : k.cur?.answers;
+  if (!itemId || !answers || e.item !== itemId) return err2("bad_item", "That clue isn\u2019t open.");
+  if (answers[owner]) return { item: itemId };
+  const opened = (final ? k.final?.opened_at : k.cur?.opened_at) ?? ctx.now;
+  const t = k.cur ? tileOf(ctx, k.cur.tile) : void 0;
+  const extra = final ? { final: true, wager: k.final?.wagers[seat.team] ?? 0 } : { tile: k.cur?.tile ?? "", cat: k.cur?.cat ?? "", value: k.cur?.value ?? 0, ...t?.double ? { double: true } : {}, ...k.cur?.team === seat.team ? { picked: true } : {} };
+  const marked = ctx.mark(owner, { item: itemId, move: "answer", response: e.response, time_ms: Math.max(0, ctx.now - opened), extra, ...e.cid ? { cid: e.cid } : {} }, "live_solo");
+  if ("error" in marked) return marked;
+  const r = e.response;
+  answers[owner] = {
+    correct: marked.result.correct === true,
+    at: ctx.now,
+    ...Array.isArray(r?.selected) ? { choice: r.selected.filter((x) => typeof x === "string").slice(0, 12) } : {},
+    ...typeof r?.text === "string" ? { text: r.text.slice(0, 80) } : {}
+  };
+  if (marked.result.correct) ctx.addScore(owner, final ? 0 : k.cur?.value ?? 0);
+  if (everyoneIn(ctx, answers)) close(ctx, k);
+  return { item: itemId };
+}
+var jeopardyRules = {
+  kind: "jeopardy",
+  teams: { min: 2, max: 6, default: 4 },
+  init: () => ({ phase: "pick", order: [], turn: 0, picks: {}, used: {}, aim: null, cur: null, final: null, tally: {}, ceil: {} }),
+  start(ctx, k) {
+    k.order = ctx.teams();
+    k.phase = tiles(ctx).length ? "pick" : content(ctx).jeopardy?.final ? "final_wager" : "done";
+    if (k.phase === "final_wager") startFinal(ctx, k);
+  },
+  move(ctx, k, owner, e) {
+    if (e.move !== "answer") return err2("bad_move", "Answer the clue on your phone.");
+    return answer(ctx, k, owner, e);
+  },
+  control(ctx, k, op, from) {
+    const data = op.data ?? {};
+    const staff = from.role === "teacher" || from.role === "board";
+    switch (op.name) {
+      case "aim":
+      case "pick": {
+        if (typeof data.tile !== "string") return err2("bad_tile", "Pick a tile.");
+        if (!staff) {
+          const team = pickingTeam(ctx, k);
+          if (team === null || captainOf2(ctx, k, team) !== from.owner) return err2("not_captain", "Your captain picks this turn.");
+        }
+        if (op.name === "aim") {
+          if (k.phase !== "pick" || !tileOf(ctx, data.tile) || k.used[data.tile]) return err2("bad_tile", "Pick a tile still on the board.");
+          k.aim = data.tile;
+          return;
+        }
+        return pick(ctx, k, data.tile);
+      }
+      case "wager": {
+        if (k.phase === "wager" && k.cur) {
+          if (!staff && captainOf2(ctx, k, k.cur.team) !== from.owner) return err2("not_captain", "Your captain wagers.");
+          k.cur.wager = clampWager(data.amount, k.cur.max_wager ?? MIN_WAGER);
+          openClue(ctx, k);
+          return;
+        }
+        if (k.phase === "final_wager" && k.final) {
+          const team = staff ? Number(data.team) : ctx.seat(from.owner)?.team;
+          if (team === void 0 || !Number.isInteger(team) || !order(ctx, k).includes(team)) return err2("bad_team", "No such team.");
+          if (!staff && captainOf2(ctx, k, team) !== from.owner) return err2("not_captain", "Your captain wagers.");
+          k.final.wagers[team] = clampWager(data.amount, finalMax(ctx, team), 0);
+          if (finalWagersIn(ctx, k)) openFinal(ctx, k);
+          return;
+        }
+        return err2("not_now", "No wager is open.");
+      }
+      case "close":
+        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (k.phase === "wager" && k.cur) {
+          k.cur.wager = clampWager(k.cur.wager ?? MIN_WAGER, k.cur.max_wager ?? MIN_WAGER);
+          openClue(ctx, k);
+        } else if (k.phase === "final_wager") openFinal(ctx, k);
+        else close(ctx, k);
+        return;
+      case "reveal":
+        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
+        else if (k.phase === "final_clue" || k.phase === "final_closed" || k.phase === "final_reveal") revealFinalNext(ctx, k);
+        return;
+      case "next":
+      case "back":
+        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (k.phase === "revealed") backToBoard(ctx, k);
+        else if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
+        else if (k.phase.startsWith("final_")) revealFinalNext(ctx, k);
+        else if (k.phase === "done") ctx.end();
+        return;
+      case "final":
+        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (k.phase !== "pick" && k.phase !== "done") return err2("not_now", "Finish this tile first.");
+        if (!content(ctx).jeopardy?.final) return err2("no_final", "This game has no Final.");
+        startFinal(ctx, k);
+        return;
+      default:
+        return err2("bad_control", "That isn\u2019t a Jeopardy control.");
+    }
+  },
+  tick(ctx, k) {
+    if (k.phase === "wager" && k.cur) {
+      k.cur.wager = clampWager(k.cur.wager ?? MIN_WAGER, k.cur.max_wager ?? MIN_WAGER);
+      openClue(ctx, k);
+    } else if (k.phase === "final_wager") openFinal(ctx, k);
+    else close(ctx, k);
+  },
+  finish(ctx, k) {
+    if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
+    while (k.phase === "final_clue" || k.phase === "final_closed" || k.phase === "final_reveal") {
+      const before = k.final?.shown ?? 0;
+      revealFinalNext(ctx, k);
+      if (k.phase === "final_reveal" && (k.final?.shown ?? 0) === before) break;
+    }
+  },
+  seatChanged(ctx, k) {
+    if (k.phase === "clue" && k.cur && everyoneIn(ctx, k.cur.answers)) close(ctx, k);
+    if (k.phase === "final_clue" && k.final && everyoneIn(ctx, k.final.answers)) close(ctx, k);
+    if (k.phase === "final_wager" && k.final && finalWagersIn(ctx, k)) openFinal(ctx, k);
+  },
+  view(ctx, k, role, owner) {
+    return jeopardyView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    const seat = ctx.seat(owner);
+    if (!seat || seat.team === void 0) return null;
+    const captain = captainOf2(ctx, k, seat.team) === owner;
+    if (k.phase === "pick" && captain && pickingTeam(ctx, k) === seat.team) {
+      const free = tiles(ctx).filter((t2) => !k.used[t2.id]);
+      const t = free[Math.floor(ctx.random() * free.length)];
+      if (!t) return null;
+      return { control: { name: k.aim === t.id || ctx.random() < 0.5 ? "pick" : "aim", data: { tile: k.aim && !k.used[k.aim] ? k.aim : t.id } } };
+    }
+    if (k.phase === "wager" && captain && k.cur?.team === seat.team) return { control: { name: "wager", data: { amount: Math.round((k.cur.max_wager ?? 100) * (0.3 + ctx.random() * 0.5) / 100) * 100 } } };
+    if (k.phase === "final_wager" && captain && k.final && k.final.wagers[seat.team] === void 0) return { control: { name: "wager", data: { amount: Math.round(finalMax(ctx, seat.team) * ctx.random() / 10) * 10 } } };
+    const open = k.phase === "clue" ? k.cur : k.phase === "final_clue" ? k.final : null;
+    if (!open || open.answers[owner]) return null;
+    return { move: { item: open.item, move: "answer", response: botResponse(ctx, open.item, ctx.random() < 0.65) } };
+  }
+};
+function botResponse(ctx, item, right) {
+  const key = ctx.keys.items[item];
+  if (key?.shape === "term") return { text: right ? key.answers[0] : key.decoys[0] ?? "not sure" };
+  if (key?.shape === "question") {
+    const a = key.key.answer;
+    const pub = itemOf(ctx, item);
+    const q = pub?.shape === "question" ? pub.question : {};
+    if (a.type === "choice") {
+      const wrong = (q.options ?? []).map((o) => o.id).filter((id) => !a.ids.includes(id));
+      return { selected: right || !wrong.length ? a.ids : [wrong[Math.floor(ctx.random() * wrong.length)]] };
+    }
+    if (a.type === "boolean") return { value: right ? a.value : !a.value };
+    if (a.type === "text") return { text: right ? a.accepted[0] ?? "" : "not sure" };
+  }
+  return { text: "" };
+}
+function answeredBy(ctx, k, answers, names, myTeam) {
+  const out = {};
+  for (const t of order(ctx, k)) {
+    const who = ctx.members(t).filter((o) => answers[o]);
+    out[t] = names ? who.map((o) => ctx.seat(o)?.initials ?? "") : t === myTeam ? who.length : who.length;
+  }
+  return out;
+}
+function jeopardyView(ctx, k, role, owner) {
+  const staff = role === "teacher" || role === "board";
+  const layout = content(ctx).jeopardy;
+  const me = role === "student" ? ctx.seat(owner) : void 0;
+  const turnTeam = k.phase === "pick" ? pickingTeam(ctx, k) : k.cur?.team ?? null;
+  const captains = {};
+  for (const t of order(ctx, k)) {
+    const c = captainOf2(ctx, k, t);
+    captains[t] = c ? ctx.seat(c)?.initials ?? null : null;
+  }
+  const v = {
+    phase: k.phase,
+    categories: (layout?.categories ?? []).map((c) => ({
+      id: c.id,
+      title: c.title,
+      tiles: c.tiles.map((t) => ({ id: t.id, value: t.value, ...k.used[t.id] ? { used: k.used[t.id] } : {}, ...k.used[t.id] && t.double ? { double: true } : {} }))
+    })),
+    has_final: !!layout?.final,
+    bonus: bonus(ctx),
+    turn: turnTeam === null ? null : { team: turnTeam, captain: captains[turnTeam] ?? null },
+    captains,
+    aim: k.aim,
+    cur: null,
+    final: null
+  };
+  const cur = k.cur;
+  if (cur) {
+    const open = k.phase !== "wager";
+    const revealed = k.phase === "revealed";
+    const item = open ? itemOf(ctx, cur.item) : void 0;
+    const live2 = {};
+    for (const t of order(ctx, k)) live2[t] = counted(ctx, t, cur.answers).length;
+    v.cur = {
+      tile: cur.tile,
+      cat: cur.cat,
+      value: cur.value,
+      double: cur.double,
+      team: cur.team,
+      ...cur.wager !== void 0 ? { wager: cur.wager } : {},
+      ...cur.max_wager !== void 0 ? { max_wager: cur.max_wager } : {},
+      ...k.phase === "clue" && cur.ends_at ? { ends_at: cur.ends_at } : {},
+      ...item ? { item } : {},
+      answered: answeredBy(ctx, k, cur.answers, staff, me?.team),
+      live: live2,
+      ...revealed && cur.results ? { results: cur.results } : {}
+    };
+    if (revealed) {
+      v.cur.answer = answerText(item, ctx.keys.items[cur.item]);
+      const all = Object.values(cur.answers);
+      v.cur.right = all.filter((a) => a.correct).length;
+      v.cur.total = all.length;
+      if (staff) {
+        const counts = {};
+        for (const a of all) for (const c of a.choice ?? []) counts[c] = (counts[c] ?? 0) + 1;
+        v.cur.counts = counts;
+        const misses = /* @__PURE__ */ new Map();
+        for (const a of all) if (!a.correct && a.text?.trim()) misses.set(a.text.trim().toLowerCase(), (misses.get(a.text.trim().toLowerCase()) ?? 0) + 1);
+        const top = [...misses.entries()].sort((a, b) => b[1] - a[1])[0];
+        if (top) v.cur.miss = top[0];
+      }
+    }
+  }
+  const f = k.final;
+  if (f) {
+    const open = k.phase !== "final_wager";
+    const item = open ? itemOf(ctx, f.item) : void 0;
+    const wagered = Object.keys(f.wagers).map(Number);
+    const wagersFor = {};
+    for (const [t, w] of Object.entries(f.wagers)) if (staff || Number(t) === me?.team || k.phase === "final_reveal" || k.phase === "done") wagersFor[Number(t)] = w;
+    const max = {};
+    for (const t of order(ctx, k)) max[t] = finalMax(ctx, t);
+    v.final = {
+      ...item ? { item } : {},
+      ...k.phase === "final_clue" && f.ends_at ? { ends_at: f.ends_at } : {},
+      wagered,
+      wagers: wagersFor,
+      max,
+      answered: answeredBy(ctx, k, f.answers, staff, me?.team),
+      shown: f.shown,
+      ...f.results ? { results: f.results.slice(0, f.shown) } : {},
+      ...(k.phase === "final_reveal" || k.phase === "done") && f.results ? { answer: answerText(itemOf(ctx, f.item), ctx.keys.items[f.item]) } : {}
+    };
+  }
+  if (me && me.team !== void 0) {
+    const answers = k.phase.startsWith("final") ? f?.answers : cur?.answers;
+    const mine = answers?.[owner];
+    const revealed = k.phase === "revealed" || (k.phase === "final_reveal" || k.phase === "done") && !!f?.results?.slice(0, f.shown).some((x) => x.team === me.team);
+    const captain = captainOf2(ctx, k, me.team) === owner;
+    v.me = {
+      team: me.team,
+      captain,
+      answered: !!mine,
+      ...mine?.choice ? { choice: mine.choice } : {},
+      ...mine?.text !== void 0 ? { text: mine.text } : {},
+      ...mine && revealed ? { correct: mine.correct } : {},
+      ...captain && k.phase === "final_wager" ? { max_wager: finalMax(ctx, me.team) } : {}
+    };
+  }
+  if (role === "teacher" || role === "board") {
+    const all = tiles(ctx);
+    v.insight = { cells: all.filter((t) => k.tally[t.id]).map((t) => ({ tile: t.id, cat: t.cat, value: t.value, ...k.tally[t.id] })) };
+    if (role === "teacher") v.insight.ceilings = ceilings(ctx, k);
+  }
+  return v;
+}
+function ceilings(ctx, k) {
+  return ctx.seats().map((s) => ({ initials: s.initials, ...s.team !== void 0 ? { team: s.team } : {}, by_cat: { ...k.ceil[s.owner] ?? {} } }));
+}
+registerRules(jeopardyRules);
 
 // apps/teaching/src/quiz/core.ts
 import { z as z2 } from "zod";
@@ -275,23 +1142,23 @@ function parseGapPassage(passage) {
   return parts;
 }
 function passageWords(passage) {
-  const words = [];
+  const words2 = [];
   const re = /\S+/g;
   let line = 0;
   let seen = 0;
   for (let m = re.exec(passage); m; m = re.exec(passage)) {
     line += (passage.slice(seen, m.index).match(/\n/g) ?? []).length;
     seen = m.index;
-    words.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
+    words2.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
   }
-  return words;
+  return words2;
 }
 function wordKey(word) {
   return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 function locateQuote(passage, quote) {
-  const words = passageWords(passage);
-  const keyed = words.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
+  const words2 = passageWords(passage);
+  const keyed = words2.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
   const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
   if (!wanted.length) return null;
   for (let s = 0; s + wanted.length <= keyed.length; s++) {
@@ -302,14 +1169,14 @@ function locateQuote(passage, quote) {
 var FILLER = new Set(
   "a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than".split(" ")
 );
-function spanFinds(words, spot, target) {
-  const content = (i) => {
-    const key = wordKey(words[i]?.text ?? "");
+function spanFinds(words2, spot, target) {
+  const content2 = (i) => {
+    const key = wordKey(words2[i]?.text ?? "");
     return !!key && !FILLER.has(key);
   };
   const targetWords = [];
   for (let i = target.from; i <= target.to; i++) targetWords.push(i);
-  const meaningful = targetWords.filter(content);
+  const meaningful = targetWords.filter(content2);
   const pool = meaningful.length ? meaningful : targetWords;
   const caught = pool.filter((i) => i >= spot.from && i <= spot.to).length;
   if (caught < Math.max(1, Math.ceil(pool.length / 3))) return false;
@@ -317,11 +1184,11 @@ function spanFinds(words, spot, target) {
   const spill = spot.to - spot.from + 1 - overlap;
   return spill <= Math.max(4, targetWords.length);
 }
-function matchSpots(words, spots, targets) {
+function matchSpots(words2, spots, targets) {
   const pairs = [];
   spots.forEach(
     (spot, s) => targets.forEach((target, t) => {
-      if (!spanFinds(words, spot, target)) return;
+      if (!spanFinds(words2, spot, target)) return;
       const overlap = Math.min(spot.to, target.to) - Math.max(spot.from, target.from) + 1;
       const union = Math.max(spot.to, target.to) - Math.min(spot.from, target.from) + 1;
       pairs.push({ s, t, fit: overlap / union });
@@ -472,9 +1339,9 @@ function markResponse(key, response) {
       return share(right, Object.keys(a.map).length, parts);
     }
     case "spots": {
-      const words = passageWords(a.passage);
+      const words2 = passageWords(a.passage);
       const spots = spotList(r.spots).slice(0, a.pick);
-      const found = matchSpots(words, spots, a.targets);
+      const found = matchSpots(words2, spots, a.targets);
       const parts = {};
       let credit = 0;
       spots.forEach((spot, i) => {
@@ -539,6 +1406,7 @@ function cleanResponse(kind, response) {
 }
 
 // apps/teaching/src/games/core/schema.ts
+import { z as z3 } from "zod";
 var GAME_KINDS = [
   "crossword",
   "find_a_word",
@@ -853,45 +1721,6 @@ var PublicGameLessonSchema = z3.object({
   version: z3.string()
 });
 
-// apps/teaching/src/games/core/events.ts
-var GAME_MOVES = ["answer", "solve", "guess", "bet", "hint", "judge", "describe", "draw", "pass", "buzz", "tap"];
-var MARKED_MOVES = /* @__PURE__ */ new Set(["answer", "solve", "guess", "tap"]);
-var STRENGTHS = ["live_solo", "live_team", "self_paced"];
-var Extra = z4.record(z4.string().max(40), z4.union([z4.number(), z4.string().max(200), z4.boolean()]));
-var GameEventSchema = z4.object({
-  seq: z4.number().int().min(0),
-  at: z4.number().int().min(0),
-  game: GameKindSchema,
-  play_id: z4.string().min(1).max(40),
-  owner: z4.string().min(1).max(64),
-  student_id: z4.string().max(64).optional(),
-  team: z4.string().max(40).optional(),
-  /** Item id within the game (a wall id for a Connections guess). */
-  item: z4.string().min(1).max(40),
-  move: z4.enum(GAME_MOVES),
-  /** The cleaned answer. */
-  response: z4.unknown().optional(),
-  correct: z4.boolean().nullable().optional(),
-  /** From the item shown to the move. */
-  time_ms: z4.number().int().min(0).max(36e5).optional(),
-  /** Per kind: hints, bet, letters_showing, confused_with, group, one_away… */
-  extra: Extra.optional(),
-  strength: z4.enum(STRENGTHS),
-  /** The phone's own id for the move: a batch sent twice never stores it twice. */
-  cid: z4.string().max(40).optional()
-});
-var SoloEventInputSchema = z4.object({
-  /** Made by the phone's queue, once per move, so a retried batch is recognised (games.mjs dedupes on it). */
-  cid: z4.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
-  item: z4.string().min(1).max(40),
-  move: z4.enum(GAME_MOVES),
-  response: z4.unknown().optional(),
-  time_ms: z4.number().int().min(0).max(36e5).optional(),
-  extra: Extra.optional()
-});
-var PLAY_EVENTS_MAX = 600;
-var REVEAL_HINTS = 3;
-
 // apps/teaching/src/games/generators/wordsearch.ts
 function lineBetween(from, to) {
   const dx = to[0] - from[0];
@@ -972,23 +1801,23 @@ function checkAnswer(key, response) {
   }
 }
 var cellKey = (x, y) => `${x},${y}`;
-function crosswordHint(grid, itemId, step, typed) {
+function crosswordHint(grid, itemId, step2, typed) {
   const e = grid.entries.find((x) => x.id === itemId);
   if (!e) return [];
   const cellsOf = (x) => Array.from(x.word, (ch, i) => ({ x: x.dir === "across" ? x.x + i : x.x, y: x.dir === "down" ? x.y + i : x.y, ch }));
   const mine = cellsOf(e);
-  if (step >= 3) return mine;
-  if (step === 2) {
+  if (step2 >= 3) return mine;
+  if (step2 === 2) {
     const at = new Set(mine.map((c) => cellKey(c.x, c.y)));
     return grid.entries.filter((x) => x.dir !== e.dir && cellsOf(x).some((c) => at.has(cellKey(c.x, c.y)))).map((x) => cellsOf(x)[0]);
   }
   const given = typed.toUpperCase();
   return [mine.find((c, i) => given[i] !== c.ch) ?? mine[0]];
 }
-function wordHint(grid, itemId, step) {
+function wordHint(grid, itemId, step2) {
   const p = grid.placements.find((x) => !x.decoy && x.id === itemId);
   if (!p) return {};
-  return { first: p.word[0], ...step >= 2 ? { length: p.word.length } : {}, ...step >= 3 ? { line: fullLine(grid.size, p) } : {} };
+  return { first: p.word[0], ...step2 >= 2 ? { length: p.word.length } : {}, ...step2 >= 3 ? { line: fullLine(grid.size, p) } : {} };
 }
 var point = (v, size) => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n < size) ? [v[0], v[1]] : null;
 function checkSelection(grid, clue, response) {
@@ -1018,6 +1847,1987 @@ var COUNT_OF = {
   who_said_it: GAME_COUNTS.who_said_it,
   wheel: GAME_COUNTS.wheel
 };
+
+// apps/teaching/src/games/kinds/pictionary/rules.ts
+var PICTIONARY_KIND = "pictionary";
+var CANVAS = 1e3;
+var STROKE_LIMITS = { strokes: 300, points: 9e3, perMove: 600, colours: 4, widths: 2 };
+var HINT_AFTER_MS = 4e4;
+function pictionarySettings(s, items) {
+  const sec = typeof s?.seconds === "number" && Number.isFinite(s.seconds) ? Math.round(Math.min(90, Math.max(60, s.seconds))) : 75;
+  return { seconds: sec, rounds: items };
+}
+var STOP = /* @__PURE__ */ new Set(["the", "and", "a", "an", "of", "to", "in", "on", "it", "is", "was", "i", "my", "me", "he", "she", "his", "her", "they", "we", "you", "that", "this", "with", "for", "as", "at", "by", "from", "out", "up", "be", "or", "but", "not", "so", "all", "only", "into"]);
+var words = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "").split(/[^\p{L}\p{N}']+/u).map((w) => w.replace(/'/g, "")).filter(Boolean);
+var keyWords = (s) => words(s).filter((w) => w.length >= 4 && !STOP.has(w));
+function promptsOf(keys) {
+  const out = /* @__PURE__ */ new Map();
+  const cards = keys.live?.cards ?? {};
+  for (const [id, key] of Object.entries(keys.items)) {
+    if (key.shape === "term") {
+      const term = key.label || key.answers[0] || "";
+      if (!term) continue;
+      out.set(id, { id, shape: "term", prompt: cards[id]?.draw || term, answer: term, answers: key.answers, blanks: term, key: [] });
+    } else if (key.shape === "quote") {
+      const text = key.label || key.answers[0] || "";
+      if (!text) continue;
+      const phrases = key.answers.slice(1);
+      const blanks = phrases[0] || keyWords(text).sort((a, b) => b.length - a.length).slice(0, 2).join(" ");
+      out.set(id, { id, shape: "quote", prompt: text, answer: text, answers: key.answers, blanks, key: keyWords(blanks) });
+    }
+  }
+  return out;
+}
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) {
+      const row = d[i];
+      const up = d[i - 1];
+      row[j] = Math.min(up[j] + 1, row[j - 1] + 1, up[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  return d[a.length][b.length];
+}
+function judgeGuess(p, raw) {
+  const g = normaliseAnswer(raw);
+  if (!g) return { right: null, close: false };
+  for (const a of p.answers) {
+    const n = normaliseAnswer(a);
+    if (!n) continue;
+    if (n === g) return { right: a, close: false };
+    if (p.shape === "term" && n.length >= 4 && lev(n, g) <= (n.length >= 8 ? 2 : 1)) return { right: a, close: false };
+  }
+  const gw = new Set(words(raw));
+  if (p.shape === "quote" && p.key.length && p.key.every((k) => gw.has(k) || [...gw].some((w) => w.length >= 5 && lev(w, k) <= 1))) return { right: p.answers[1] ?? p.answers[0] ?? "", close: false };
+  const pool = /* @__PURE__ */ new Set([...p.answers.flatMap(keyWords), ...p.key]);
+  const close2 = [...gw].some((w) => pool.has(w) || w.length >= 6 && [...pool].some((k) => k.startsWith(w.slice(0, 6))));
+  return { right: null, close: close2 };
+}
+var guessPoints = (ms) => Math.max(40, Math.round((200 - ms / 1e3 * 2.4) / 10) * 10);
+var DRAWER_POINTS = 20;
+function blanksOf(p, hinted) {
+  const ws = p.blanks.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^\p{L}\p{N}'’-]/gu, ""));
+  return { lengths: ws.map((w) => w.length), ...hinted ? { first: ws.map((w) => (w[0] ?? "").toUpperCase()) } : {} };
+}
+function shuffle2(list, random) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+var err3 = (code, message) => ({ error: { code, message } });
+var pointCount = (r) => r.strokes.reduce((a, s) => a + s.p.length / 2, 0);
+function applyStroke(r, data) {
+  const d = data ?? {};
+  if (d.clear === true) {
+    r.strokes = [];
+    return null;
+  }
+  if (d.undo === true) {
+    r.strokes.pop();
+    return null;
+  }
+  const id = Number(d.s);
+  const pts = Array.isArray(d.p) ? d.p : [];
+  if (!Number.isInteger(id) || id < 0 || id > 1e6) return "bad_stroke";
+  if (pts.length % 2 || pts.length > STROKE_LIMITS.perMove * 2 || pts.some((v) => typeof v !== "number" || !Number.isFinite(v))) return "bad_stroke";
+  const clean = pts.map((v) => Math.round(Math.min(CANVAS, Math.max(0, v))));
+  const c = Math.min(STROKE_LIMITS.colours - 1, Math.max(0, Math.round(Number(d.c) || 0)));
+  const w = Math.min(STROKE_LIMITS.widths - 1, Math.max(0, Math.round(Number(d.w) || 0)));
+  let s = r.strokes.find((x) => x.id === id);
+  if (!s) {
+    if (r.strokes.length >= STROKE_LIMITS.strokes) return "too_much";
+    s = { id, c, w, p: [] };
+    r.strokes.push(s);
+  }
+  const room = STROKE_LIMITS.points * 2 - (pointCount(r) * 2 - s.p.length);
+  if (d.full === true) s.p = clean.slice(0, Math.max(0, room));
+  else {
+    const from = Number(d.from) || 0;
+    const fresh = clean.slice(Math.max(0, (s.p.length / 2 - from) * 2));
+    s.p = [...s.p, ...fresh].slice(0, Math.max(0, room));
+  }
+  return null;
+}
+var guesserOwners = (ctx, r) => ctx.seats().map((s) => s.owner).filter((o) => o !== r.drawer);
+function nextDrawer(ctx, k) {
+  const seats = ctx.seats();
+  const online = seats.filter((s) => s.connected);
+  const pool = online.length ? online : seats;
+  const fresh = pool.find((s) => !k.drawn.includes(s.owner));
+  if (fresh) return fresh.owner;
+  k.drawn = [];
+  return pool[0]?.owner;
+}
+function startRound(ctx, k) {
+  if (k.phase === "draw") return err3("not_now", "A round is running.");
+  const prompts = promptsOf(ctx.keys);
+  const item = k.deck.shift();
+  if (!item || !prompts.has(item)) return err3("deck_empty", "Every prompt has been drawn.");
+  const drawer = k.teacher_next ? "teacher" : nextDrawer(ctx, k);
+  if (!drawer) return err3("no_drawer", "Nobody is here to draw.");
+  k.teacher_next = false;
+  if (drawer !== "teacher") k.drawn.push(drawer);
+  const s = pictionarySettings(ctx.game.settings, 0);
+  k.round = { n: (k.round?.n ?? 0) + 1, item, drawer, started_at: ctx.now, seconds: s.seconds, strokes: [], guessers: {}, order: [], guesses: 0, gains: {} };
+  k.phase = "draw";
+  ctx.setTimer(ctx.now + s.seconds * 1e3);
+}
+function gain(ctx, r, owner, points) {
+  if (owner === "teacher" || !ctx.seat(owner)) return;
+  ctx.addScore(owner, points);
+  r.gains[owner] = (r.gains[owner] ?? 0) + points;
+}
+function closeRound(ctx, k, why) {
+  const r = k.round;
+  if (!r || k.phase !== "draw") return;
+  r.closed = why;
+  k.phase = "reveal";
+  ctx.setTimer(void 0);
+  const p = promptsOf(ctx.keys).get(r.item);
+  const of = guesserOwners(ctx, r).length;
+  if (why === "void") {
+    for (const [owner, pts] of Object.entries(r.gains)) ctx.addScore(owner, -pts);
+    r.gains = {};
+  } else {
+    for (const [owner, g] of Object.entries(r.guessers)) {
+      if (!ctx.seat(owner)) continue;
+      const n = g.tries.length + (g.ms !== void 0 ? 1 : 0);
+      if (g.ms !== void 0) ctx.mark(owner, { item: r.item, move: "guess", response: { text: g.matched ?? p?.answer ?? "" }, time_ms: g.ms, extra: { guesses: n } }, "live_solo");
+      else if (g.tries.length) ctx.mark(owner, { item: r.item, move: "guess", response: { text: g.tries[g.tries.length - 1]?.text ?? "" }, extra: { guesses: n, close: g.tries.some((t) => t.close) } }, "live_solo");
+    }
+  }
+  if (r.drawer !== "teacher" && ctx.seat(r.drawer)) ctx.record(r.drawer, { item: r.item, move: "draw", extra: { got: r.order.length, of, void: why === "void", strokes: r.strokes.length } });
+  const first = r.order[0];
+  k.gallery.push({
+    n: r.n,
+    item: r.item,
+    answer: p?.answer ?? "",
+    drawer: r.drawer === "teacher" ? "Teacher" : ctx.seat(r.drawer)?.initials ?? "",
+    got: r.order.length,
+    of,
+    void: why === "void",
+    ...first && r.guessers[first]?.ms !== void 0 ? { fast: Math.round((r.guessers[first]?.ms ?? 0) / 1e3) } : {}
+  });
+  k.speed.push({
+    n: r.n,
+    item: r.item,
+    drawer: r.drawer === "teacher" ? "Teacher" : ctx.seat(r.drawer)?.initials ?? "",
+    void: why === "void",
+    times: Object.fromEntries(r.order.map((o) => [ctx.seat(o)?.initials ?? o, Math.round((r.guessers[o]?.ms ?? 0) / 1e3)])),
+    guesses: Object.fromEntries(Object.entries(r.guessers).map(([o, g]) => [ctx.seat(o)?.initials ?? o, g.tries.length + (g.ms !== void 0 ? 1 : 0)]))
+  });
+}
+var pictionaryRules = {
+  kind: PICTIONARY_KIND,
+  // Strokes arrive about ten times a second while someone draws, plus a stroke end each lift of the finger.
+  burst: 200,
+  init() {
+    return { phase: "ready", deck: [], round: null, drawn: [], gallery: [], speed: [], teacher_next: false };
+  },
+  start(ctx, k) {
+    k.deck = shuffle2([...promptsOf(ctx.keys).keys()], ctx.random);
+    k.phase = "ready";
+  },
+  move(ctx, k, owner, e) {
+    const r = k.round;
+    if (e.move === "draw") {
+      if (k.phase !== "draw" || !r) return err3("not_now", "The round is over.");
+      if (r.drawer !== owner) return err3("not_drawer", "Only the drawer can draw.");
+      if (e.item !== r.item) return err3("stale", "That round has finished.");
+      const bad = applyStroke(r, e.response);
+      return bad ? err3(bad, bad === "too_much" ? "That drawing is full." : "That stroke didn\u2019t go through.") : { item: e.item };
+    }
+    if (e.move === "guess" || e.move === "answer") {
+      if (k.phase !== "draw" || !r) return err3("not_now", "Wait for the next drawing.");
+      if (r.drawer === owner) return err3("not_guesser", "You\u2019re drawing this one.");
+      if (e.item !== r.item) return err3("stale", "That drawing has finished.");
+      const g = r.guessers[owner] ??= { tries: [] };
+      if (g.ms !== void 0) return { item: e.item, correct: true };
+      const raw = typeof e.response?.text === "string" ? e.response.text.slice(0, 120) : "";
+      if (!raw.trim()) return err3("empty", "Type a guess.");
+      if (g.tries.length >= 60) return err3("slow_down", "That\u2019s a lot of guesses. Watch the drawing.");
+      const p = promptsOf(ctx.keys).get(r.item);
+      if (!p) return err3("bad_item", "That isn\u2019t in this game.");
+      r.guesses += 1;
+      const verdict = judgeGuess(p, raw);
+      if (!verdict.right) {
+        g.tries.push({ text: raw.trim().slice(0, 40), close: verdict.close });
+        return { item: e.item, correct: false };
+      }
+      g.ms = Math.max(0, ctx.now - r.started_at);
+      g.matched = verdict.right;
+      g.points = guessPoints(g.ms);
+      r.order.push(owner);
+      gain(ctx, r, owner, g.points);
+      gain(ctx, r, r.drawer, DRAWER_POINTS);
+      ctx.ticker("got it", ctx.seat(owner)?.initials);
+      if (r.order.length >= guesserOwners(ctx, r).length) closeRound(ctx, k, "all");
+      return { item: e.item, correct: true };
+    }
+    return err3("bad_move", "That move isn\u2019t part of Pictionary.");
+  },
+  control(ctx, k, op, from) {
+    const staff = from.role === "teacher" || from.role === "board";
+    if (op.name === "stroke") {
+      if (!staff || k.round?.drawer !== "teacher" || k.phase !== "draw") return err3("not_drawer", "Only the drawer can draw.");
+      const bad = applyStroke(k.round, op.data);
+      return bad ? err3(bad, "That stroke didn\u2019t go through.") : void 0;
+    }
+    if (!staff) return err3("not_allowed", "Only your teacher can do that.");
+    switch (op.name) {
+      case "next":
+      case "next_round":
+        return startRound(ctx, k);
+      case "teacher_draws":
+        if (k.phase === "draw") return err3("not_now", "A round is running.");
+        k.teacher_next = true;
+        return startRound(ctx, k);
+      case "end_round":
+      case "reveal":
+        if (k.phase !== "draw") return err3("not_now", "No round is running.");
+        closeRound(ctx, k, "time");
+        return;
+      case "disqualify":
+        if (k.phase !== "draw") return err3("not_now", "No round is running.");
+        closeRound(ctx, k, "void");
+        return;
+      case "more_time":
+        if (k.phase !== "draw" || !k.round) return err3("not_now", "No round is running.");
+        k.round.seconds += 15;
+        ctx.setTimer(k.round.started_at + k.round.seconds * 1e3);
+        return;
+      case "standings":
+        if (k.phase !== "reveal") return err3("not_now", "Finish the round first.");
+        k.phase = "standings";
+        return;
+      case "final":
+        ctx.end();
+        return;
+      default:
+        return err3("bad_control", "Unknown control.");
+    }
+  },
+  tick(ctx, k) {
+    if (k.phase === "draw") closeRound(ctx, k, "time");
+  },
+  finish(ctx, k) {
+    if (k.phase === "draw") closeRound(ctx, k, "ended");
+  },
+  seatChanged(ctx, k, owner) {
+    const r = k.round;
+    if (k.phase === "draw" && r && r.order.length && r.order.length >= guesserOwners(ctx, r).length) closeRound(ctx, k, "all");
+    void owner;
+  },
+  view(ctx, k, role, owner) {
+    return pictionaryView(ctx, k, role, owner);
+  }
+};
+function pictionaryView(ctx, k, role, owner) {
+  const r = k.round;
+  const p = r ? promptsOf(ctx.keys).get(r.item) : void 0;
+  const open = k.phase === "draw";
+  const hinted = !!r && open && ctx.now - r.started_at >= HINT_AFTER_MS;
+  const revealed = !!r && !open && r.closed !== void 0;
+  const total = promptsOf(ctx.keys).size;
+  const drawerIni = r ? r.drawer === "teacher" ? "Teacher" : ctx.seat(r.drawer)?.initials ?? "" : void 0;
+  const blanks = p ? revealed ? { lengths: blanksOf(p, false).lengths } : blanksOf(p, hinted) : void 0;
+  const got = r ? r.order.map((o) => ({ initials: ctx.seat(o)?.initials ?? "", s: Math.round((r.guessers[o]?.ms ?? 0) / 1e3) })) : [];
+  if (role !== "student") {
+    const v2 = {
+      who: "board",
+      phase: k.phase,
+      n: r?.n ?? 0,
+      of: total,
+      ...drawerIni ? { drawer: drawerIni } : {},
+      ...p ? { shape: p.shape } : {},
+      ...blanks ? { blanks } : {},
+      ...r ? { strokes: r.strokes.map((s) => ({ c: s.c, w: s.w, p: s.p })) } : {},
+      got,
+      guessers: r ? guesserOwners(ctx, r).length : ctx.seats().length,
+      guesses: r?.guesses ?? 0,
+      ...r ? { seconds: r.seconds, started_at: r.started_at } : {},
+      ...r?.closed ? { closed: r.closed } : {},
+      ...revealed && p ? { answer: p.answer, drawer_points: r?.closed === "void" ? 0 : (r?.order.length ?? 0) * DRAWER_POINTS } : {},
+      ...r?.drawer === "teacher" && open ? { teacher_drawing: true, ...role === "teacher" && p ? { prompt: p.prompt } : {} } : {},
+      gallery: k.gallery,
+      deck_left: k.deck.length,
+      ...role === "teacher" ? { speed: k.speed } : {}
+    };
+    return v2;
+  }
+  const isDrawer = !!r && r.drawer === owner;
+  const g = r?.guessers[owner];
+  const v = {
+    who: "phone",
+    phase: k.phase,
+    n: r?.n ?? 0,
+    of: total,
+    ...drawerIni ? { drawer: drawerIni } : {},
+    role: !r ? "waiting" : isDrawer ? "drawer" : "guesser",
+    ...r ? { item: r.item, started_at: r.started_at, seconds: r.seconds } : {},
+    ...p ? { shape: p.shape } : {},
+    ...blanks && !isDrawer ? { blanks } : {},
+    ...isDrawer && open && p ? { prompt: p.prompt } : {},
+    got_count: r?.order.length ?? 0,
+    guessers: r ? guesserOwners(ctx, r).length : 0,
+    ...r && !isDrawer ? { mine: { got: g?.ms !== void 0, ...g?.ms !== void 0 ? { s: Math.round(g.ms / 1e3), points: g.points } : {}, tries: g?.tries ?? [] } } : {},
+    ...r?.closed ? { closed: r.closed } : {},
+    ...revealed && p ? { answer: p.answer } : {},
+    // Someone who got it may see the answer at once (their phone is green and hidden from others).
+    ...open && p && g?.ms !== void 0 ? { answer: p.answer } : {},
+    ...isDrawer && revealed && r ? { drew: { got: r.closed === "void" ? 0 : r.order.length, points: r.closed === "void" ? 0 : r.order.length * DRAWER_POINTS, ...got[0] ? { first: got[0] } : {} } } : {},
+    score: ctx.seat(owner)?.score ?? 0
+  };
+  return v;
+}
+registerRules(pictionaryRules);
+
+// apps/teaching/src/games/kinds/wager/content.ts
+var CHOICE_KINDS = /* @__PURE__ */ new Set(["multiple_choice", "odd_one_out", "quote_technique"]);
+function contentItems(game, keys) {
+  return keys?.live?.items?.length ? keys.live.items : game?.items ?? [];
+}
+function shownItem(item) {
+  if (!item) return null;
+  if (item.shape === "term") {
+    const clue = item.clues[0];
+    return { id: item.id, mode: "text", prompt: clue?.text ?? "", clue_kind: clue?.kind ?? "definition", lengths: item.lengths };
+  }
+  if (item.shape !== "question") return null;
+  const q = item.question;
+  const prompt = String(q.prompt ?? "");
+  if (CHOICE_KINDS.has(String(q.kind)) && Array.isArray(q.options) && q.options.length >= 2) {
+    return { id: item.id, mode: "choice", prompt, options: q.options.map((o) => ({ id: String(o.id), text: String(o.text) })), ...q.quote ? { quote: String(q.quote) } : {} };
+  }
+  if (q.kind === "true_false") return { id: item.id, mode: "truefalse", prompt };
+  if (q.kind === "short_answer") return { id: item.id, mode: "text", prompt };
+  return null;
+}
+function responseFor(item, pick2) {
+  if (item.mode === "choice") return { selected: [pick2] };
+  if (item.mode === "truefalse") return { value: pick2 === "true" };
+  return { text: pick2.slice(0, 200) };
+}
+function choiceOf(response) {
+  if (!response || typeof response !== "object") return null;
+  const r = response;
+  if (Array.isArray(r.selected) && typeof r.selected[0] === "string") return r.selected[0].slice(0, 40);
+  if (typeof r.value === "boolean") return r.value ? "true" : "false";
+  return null;
+}
+function optionsOf(item) {
+  if (!item) return [];
+  if (item.mode === "choice") return item.options ?? [];
+  if (item.mode === "truefalse") return [
+    { id: "true", text: "True" },
+    { id: "false", text: "False" }
+  ];
+  return [];
+}
+function botResponse2(item, key, rightRate, random) {
+  const right = random() < rightRate;
+  if (key?.shape === "term") return { text: right ? key.answers[0] ?? "" : key.decoys[0] ?? "not sure" };
+  if (key?.shape !== "question") return responseFor(item, item.options?.[0]?.id ?? "true");
+  const a = key.key.answer;
+  if (a.type === "boolean") return { value: right ? a.value : !a.value };
+  if (a.type === "text") return { text: right ? a.accepted[0] ?? "" : "not sure" };
+  if (a.type !== "choice") return responseFor(item, item.options?.[0]?.id ?? "true");
+  const opts = optionsOf(item).map((o) => o.id);
+  const wrong = opts.filter((id) => !a.ids.includes(id));
+  const pick2 = right || !wrong.length ? a.ids[0] : wrong[Math.floor(random() * wrong.length)];
+  return { selected: [pick2] };
+}
+
+// apps/teaching/src/games/kinds/points-rush/engine.ts
+var BASE_POINTS = 100;
+var STREAK_BONUS = [0, 100, 250, 500];
+var UPGRADES = ["mult", "streak", "ins"];
+var UPGRADE_INFO = {
+  mult: { name: "Multiplier", costs: [300, 800, 1800], max: 3 },
+  streak: { name: "Streak bonus", costs: [250, 700, 1500], max: 3 },
+  ins: { name: "Insurance", costs: [200], max: 1 }
+};
+function shuffle3(xs, random) {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function newRunner(items, random) {
+  return { queue: shuffle3(items, random), qi: 0, answered: 0, back: [], cur: null, points: 0, earned: 0, streak: 0, best: 0, up: { mult: 0, streak: 0, ins: 0 }, bought: 0, rec: {} };
+}
+var multiplier = (r) => r.up.mult + 1;
+function nextItem(r, items, random, now) {
+  if (!items.length) return r.cur = null;
+  let item;
+  let back = false;
+  const due = r.back.findIndex((b) => b.due <= r.answered);
+  if (due > -1) {
+    item = r.back.splice(due, 1)[0].item;
+    back = true;
+  } else if (r.qi < r.queue.length) item = r.queue[r.qi++];
+  else if (r.back.length) {
+    r.back.sort((a, b) => a.due - b.due);
+    item = r.back.shift().item;
+    back = true;
+  } else {
+    const prev = r.cur?.item;
+    r.queue = shuffle3(items, random);
+    if (r.queue.length > 1 && r.queue[0] === prev) r.queue.push(r.queue.shift());
+    r.qi = 0;
+    item = r.queue[r.qi++];
+  }
+  r.cur = { item, back, n: r.answered + 1, shown_at: now };
+  return r.cur;
+}
+function applyAnswer(r, correct, random, now) {
+  const cur = r.cur;
+  if (!cur) return null;
+  const rec = r.rec[cur.item] ??= { first: null, tries: 0, fixed: false, ms: 0 };
+  const solved = rec.first === true || rec.fixed;
+  if (!solved) {
+    rec.tries += 1;
+    rec.ms += Math.max(0, now - cur.shown_at);
+    if (rec.first === null) rec.first = correct;
+    else if (correct) rec.fixed = true;
+  }
+  r.answered += 1;
+  let gain2 = 0;
+  let bonus2 = 0;
+  let insurance = false;
+  if (correct) {
+    r.streak += 1;
+    r.best = Math.max(r.best, r.streak);
+    gain2 = BASE_POINTS * multiplier(r);
+    if (r.streak % 3 === 0) bonus2 = STREAK_BONUS[r.up.streak] ?? 0;
+    r.points += gain2 + bonus2;
+    r.earned += gain2 + bonus2;
+  } else {
+    if (r.up.ins > 0) {
+      r.up.ins = 0;
+      insurance = true;
+    } else r.streak = 0;
+    r.back.push({ item: cur.item, due: r.answered + 3 + Math.floor(random() * 4) });
+  }
+  r.last = { item: cur.item, correct, back: cur.back, gain: gain2, bonus: bonus2, insurance_used: insurance, streak: r.streak, n: cur.n };
+  return r.last;
+}
+function shopRows(r) {
+  return UPGRADES.map((key) => {
+    const info = UPGRADE_INFO[key];
+    const level = r.up[key];
+    const cost = level >= info.max ? null : info.costs[level];
+    return { key, name: info.name, level, max: info.max, cost, can: cost !== null && r.points >= cost };
+  });
+}
+function buy(r, key) {
+  const row = shopRows(r).find((x) => x.key === key);
+  if (!row?.can || row.cost === null) return false;
+  r.points -= row.cost;
+  r.up[key] += 1;
+  r.bought += 1;
+  return true;
+}
+function runnerSummary(r) {
+  const recs = Object.entries(r.rec);
+  const missed = recs.filter(([, x]) => x.first === false);
+  return {
+    first_right: recs.filter(([, x]) => x.first === true).length,
+    tried: recs.length,
+    missed: missed.length,
+    fixed: missed.filter(([, x]) => x.fixed).length,
+    still: missed.filter(([, x]) => !x.fixed).map(([id]) => id),
+    best: r.best
+  };
+}
+function autoGoal(seats, minutes) {
+  const raw = Math.max(1, seats) * minutes * 4 * BASE_POINTS * 0.66;
+  return Math.max(1e3, Math.round(raw / 1e3) * 1e3);
+}
+var MILESTONES = [25, 50, 75, 100];
+
+// apps/teaching/src/games/kinds/points-rush/rules.ts
+var err4 = (code, message) => ({ error: { code, message } });
+var classEarned = (k) => Object.values(k.runners).reduce((n, r) => n + r.earned, 0);
+function runner(ctx, k, owner) {
+  if (!k.runners[owner]) {
+    if (!ctx.seat(owner)) return null;
+    k.runners[owner] = newRunner(k.items, () => ctx.random());
+    if (k.started_at !== void 0 && !k.over) nextItem(k.runners[owner], k.items, () => ctx.random(), ctx.now);
+  }
+  return k.runners[owner];
+}
+function syncGoal(ctx, k) {
+  if (!k.goal_set) k.goal = autoGoal(ctx.seats().length, k.minutes);
+}
+function finishRush(ctx, k) {
+  if (k.over) return;
+  k.over = true;
+  k.ends_at = void 0;
+  ctx.setTimer(void 0);
+}
+var pointsRushRules = {
+  kind: "points_rush",
+  burst: 90,
+  init(ctx) {
+    const items = contentItems(ctx.game, ctx.keys).filter((i) => shownItem(i) && ctx.keys.items[i.id]).map((i) => i.id);
+    const minutes = Math.min(15, Math.max(5, Number(ctx.game.settings?.minutes) || 8));
+    const set = Number(ctx.game.settings?.class_goal) || 0;
+    const k = { items, minutes, goal: set || autoGoal(ctx.seats().length, minutes), goal_set: set > 0, over: false, runners: {}, recent: [], first: { n: 0, right: 0 }, back: { n: 0, right: 0 }, upgrades: 0, milestones: [], board: "race" };
+    return k;
+  },
+  start(ctx, k) {
+    if (!k.items.length) return ctx.end();
+    syncGoal(ctx, k);
+    k.started_at = ctx.now;
+    k.ends_at = ctx.now + k.minutes * 6e4;
+    ctx.setTimer(k.ends_at);
+    for (const seat of ctx.seats()) {
+      const r = runner(ctx, k, seat.owner);
+      if (r && !r.cur) nextItem(r, k.items, () => ctx.random(), ctx.now);
+    }
+  },
+  move(ctx, k, owner, event) {
+    if (k.over || k.started_at === void 0) return err4("closed", "Time\u2019s up.");
+    if (k.ends_at !== void 0 && ctx.now >= k.ends_at) {
+      finishRush(ctx, k);
+      ctx.end();
+      return err4("closed", "Time\u2019s up.");
+    }
+    const r = runner(ctx, k, owner);
+    if (!r) return err4("no_seat", "Join the game first.");
+    if (!r.cur) nextItem(r, k.items, () => ctx.random(), ctx.now);
+    if (event.move !== "answer" || !r.cur || event.item !== r.cur.item) return err4("stale", "That question has moved on.");
+    const back = r.cur.back;
+    const marked = ctx.mark(owner, { item: event.item, move: "answer", response: event.response, time_ms: Math.max(0, ctx.now - r.cur.shown_at), extra: { back, n: r.cur.n } });
+    if ("error" in marked) return marked;
+    const correct = marked.result.correct === true;
+    const v = applyAnswer(r, correct, () => ctx.random(), ctx.now);
+    if (back) {
+      k.back.n += 1;
+      if (correct) k.back.right += 1;
+    } else if (r.rec[event.item]?.tries === 1) {
+      k.first.n += 1;
+      if (correct) k.first.right += 1;
+    }
+    k.recent.push(ctx.now);
+    while (k.recent.length && k.recent[0] < ctx.now - 6e4) k.recent.shift();
+    if (k.recent.length > 3e3) k.recent.splice(0, k.recent.length - 3e3);
+    ctx.setScore(owner, r.points);
+    const pct = classEarned(k) / Math.max(1, k.goal) * 100;
+    for (const m of MILESTONES) {
+      if (pct >= m && !k.milestones.includes(m)) {
+        k.milestones.push(m);
+        ctx.ticker(m === 100 ? "Class goal reached" : `Class goal ${m}%`);
+      }
+    }
+    nextItem(r, k.items, () => ctx.random(), ctx.now);
+    return { item: event.item, correct: v?.correct ?? correct };
+  },
+  control(ctx, k, op, from) {
+    if (op.name === "buy") {
+      if (from.role !== "student") return err4("not_allowed", "Only players can buy upgrades.");
+      if (k.over) return err4("closed", "Time\u2019s up.");
+      const r = runner(ctx, k, from.owner);
+      const key = op.data?.up;
+      if (!r || typeof key !== "string" || !UPGRADES.includes(key)) return err4("bad_upgrade", "That isn\u2019t an upgrade.");
+      if (!buy(r, key)) return err4("cant_buy", "Not enough points for that yet.");
+      k.upgrades += 1;
+      ctx.setScore(from.owner, r.points);
+      return;
+    }
+    if (from.role === "student") return err4("not_allowed", "Only the teacher can do that.");
+    if (op.name === "goal") {
+      const goal = Math.round(Number(op.data?.goal));
+      if (!Number.isFinite(goal) || goal < 100 || goal > 1e6) return err4("bad_goal", "Pick a goal between 100 and 1,000,000.");
+      k.goal = goal;
+      k.goal_set = true;
+      k.milestones = MILESTONES.filter((m) => classEarned(k) / goal * 100 >= m);
+      return;
+    }
+    if (op.name === "show") {
+      const v = op.data?.view;
+      if (v !== "race" && v !== "insight" && v !== "anon") return err4("bad_view", "That view isn\u2019t part of Points rush.");
+      k.board = v;
+      return;
+    }
+    if (op.name === "add_time" && k.ends_at !== void 0 && !k.over) {
+      const secs = Number(op.data?.seconds) || 60;
+      k.ends_at += Math.min(300, Math.max(15, secs)) * 1e3;
+      ctx.setTimer(k.ends_at);
+      return;
+    }
+    if (op.name === "next" || op.name === "end_now") {
+      finishRush(ctx, k);
+      ctx.end();
+      return;
+    }
+    return err4("unknown", "That control isn\u2019t part of Points rush.");
+  },
+  tick(ctx, k) {
+    if (!k.over && k.ends_at !== void 0 && ctx.now >= k.ends_at) {
+      finishRush(ctx, k);
+      ctx.end();
+    }
+  },
+  finish(ctx, k) {
+    finishRush(ctx, k);
+  },
+  /** DEV ONLY: a simulated classmate answers its own stream (right about 7 in 10) and now and then buys an upgrade. */
+  bot(ctx, k, owner) {
+    const r = k.runners[owner];
+    if (k.over || !r?.cur) return null;
+    const can = shopRows(r).filter((x) => x.can);
+    if (can.length && ctx.random() < 0.2) return { control: { name: "buy", data: { up: can[Math.floor(ctx.random() * can.length)].key } } };
+    const it = shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === r.cur?.item));
+    if (!it) return null;
+    return { move: { item: r.cur.item, move: "answer", response: botResponse2(it, ctx.keys.items[r.cur.item], 0.7, () => ctx.random()) } };
+  },
+  seatChanged(ctx, k, owner) {
+    syncGoal(ctx, k);
+    const r = runner(ctx, k, owner);
+    if (r) ctx.setScore(owner, r.points);
+  },
+  view(ctx, k, role, owner) {
+    const earned = classEarned(k);
+    const base3 = {
+      minutes: k.minutes,
+      goal: k.goal,
+      class_earned: earned,
+      milestones: [...k.milestones],
+      over: k.over,
+      ...k.started_at !== void 0 ? { started_at: k.started_at } : {},
+      ...k.ends_at !== void 0 ? { ends_at: k.ends_at } : {}
+    };
+    if (role === "student") {
+      const r = k.runners[owner];
+      if (!r) return { ...base3, you: null };
+      const cur = r.cur && !k.over ? { item: r.cur.item, back: r.cur.back, n: r.cur.n, q: shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === r.cur?.item)) } : null;
+      const rank = 1 + Object.values(k.runners).filter((x) => x.points > r.points).length;
+      return {
+        ...base3,
+        you: {
+          points: r.points,
+          earned: r.earned,
+          streak: r.streak,
+          best: r.best,
+          mult: r.up.mult + 1,
+          up: { ...r.up },
+          answered: r.answered,
+          shop: shopRows(r),
+          cur,
+          ...r.last ? { last: r.last } : {},
+          ...k.over ? { summary: runnerSummary(r), rank, of: Object.keys(k.runners).length } : {}
+        }
+      };
+    }
+    return {
+      ...base3,
+      board: k.board,
+      stats: {
+        per_minute: k.recent.filter((t) => t >= ctx.now - 6e4).length,
+        first_pct: k.first.n ? Math.round(k.first.right / k.first.n * 100) : null,
+        back_pct: k.back.n ? Math.round(k.back.right / k.back.n * 100) : null,
+        upgrades: k.upgrades
+      },
+      top: Object.entries(k.runners).map(([o, r]) => ({ initials: ctx.seat(o)?.initials ?? "?", points: r.points })).sort((a, b) => b.points - a.points || a.initials.localeCompare(b.initials)).slice(0, 5),
+      insight: insightOf(ctx, k)
+    };
+  }
+};
+function insightOf(ctx, k) {
+  const per = /* @__PURE__ */ new Map();
+  for (const r of Object.values(k.runners)) {
+    for (const [id, rec] of Object.entries(r.rec)) {
+      const p = per.get(id) ?? { fn: 0, fr: 0, bn: 0, br: 0 };
+      if (rec.first !== null) {
+        p.fn += 1;
+        if (rec.first) p.fr += 1;
+        else {
+          if (rec.tries > 1 || rec.fixed) {
+            p.bn += 1;
+            if (rec.fixed) p.br += 1;
+          }
+        }
+      }
+      per.set(id, p);
+    }
+  }
+  const pct = (a, b) => b ? Math.round(a / b * 100) : null;
+  const content2 = contentItems(ctx.game, ctx.keys);
+  const label = (id) => (shownItem(content2.find((i) => i.id === id))?.prompt ?? id).slice(0, 90);
+  const items = [...per.entries()].map(([item, p]) => ({ item, label: label(item), first_pct: pct(p.fr, p.fn), back_pct: pct(p.br, p.bn), first_n: p.fn, back_n: p.bn })).sort((a, b) => (a.first_pct ?? 101) - (b.first_pct ?? 101));
+  const students = Object.entries(k.runners).map(([o, r]) => {
+    const s = runnerSummary(r);
+    return { initials: ctx.seat(o)?.initials ?? "?", first_pct: pct(s.first_right, s.tried), fixed_pct: pct(s.fixed, s.missed), still: s.still.length };
+  }).sort((a, b) => (b.first_pct ?? -1) - (a.first_pct ?? -1) || a.initials.localeCompare(b.initials));
+  return { items, students };
+}
+registerRules(pointsRushRules);
+
+// apps/teaching/src/games/live/format.ts
+function ordinal(n) {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+// apps/teaching/src/games/kinds/team-match/rules.ts
+var OPTIONS = 12;
+var err5 = (code, message) => ({ error: { code, message } });
+var promptOf = (item) => {
+  if (item.shape === "term") return item.clues[0]?.text ?? "";
+  if (item.shape === "quote") return item.text;
+  return String(item.question.prompt ?? "");
+};
+function cardsOf2(ctx) {
+  const out = [];
+  for (const item of ctx.keys.live?.items ?? []) {
+    const key = ctx.keys.items[item.id];
+    if (!key) continue;
+    if (item.shape === "question") {
+      const one = singleChoice(item, key);
+      if (one) out.push({ item: item.id, prompt: promptOf(item), eyebrow: "Pick the answer", answer: one.right, lures: one.others });
+      continue;
+    }
+    const answer3 = answerText(item, key);
+    if (!answer3.trim()) continue;
+    out.push({ item: item.id, prompt: promptOf(item), eyebrow: item.shape === "quote" ? "Who said it?" : "Name the term", answer: answer3.trim(), lures: key.shape === "term" ? key.decoys : [] });
+  }
+  return out;
+}
+function shuffle4(list, random) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function freshId(random, used) {
+  for (; ; ) {
+    const id = `o${Math.floor(random() * 36 ** 5).toString(36)}`;
+    if (!used.has(id)) {
+      used.add(id);
+      return id;
+    }
+  }
+}
+function buildOptions(card, all, random) {
+  const seen = /* @__PURE__ */ new Set([normaliseAnswer(card.answer)]);
+  const pick2 = [card.answer];
+  const add = (text) => {
+    const n = normaliseAnswer(text);
+    if (!n || seen.has(n) || pick2.length >= OPTIONS) return;
+    seen.add(n);
+    pick2.push(text.trim());
+  };
+  for (const l of card.lures) add(l);
+  for (const c of shuffle4(all, random)) add(c.answer);
+  const used = /* @__PURE__ */ new Set();
+  const opts = shuffle4(pick2, random).map((text) => ({ id: freshId(random, used), text }));
+  const right = opts.find((o) => o.text === card.answer.trim())?.id;
+  return { opts, right };
+}
+function dealHands(opts, right, lures, members, random) {
+  if (!members.length) return {};
+  const order2 = shuffle4(members, random);
+  const hands = Object.fromEntries(order2.map((m) => [m, []]));
+  const holder = order2[0];
+  hands[holder].push(right);
+  const others = order2.slice(1);
+  const rest = opts.filter((o) => o.id !== right);
+  const lureOpts = rest.filter((o) => lures.has(normaliseAnswer(o.text)));
+  const fill = rest.filter((o) => !lures.has(normaliseAnswer(o.text)));
+  lureOpts.forEach((o, i) => hands[others.length ? others[i % others.length] : holder].push(o.id));
+  for (const o of fill) {
+    const min = order2.reduce((best, m) => hands[m].length < hands[best].length ? m : best, order2[0]);
+    hands[min].push(o.id);
+  }
+  for (const m of order2) hands[m] = shuffle4(hands[m], random);
+  return hands;
+}
+var live = (ctx, team) => ctx.members(team).filter((o) => ctx.seat(o)?.connected);
+function nextCard(ctx, race, cards) {
+  if (!cards.length) return void 0;
+  const ids = new Set(cards.map((c) => c.item));
+  race.queue = race.queue.filter((id2) => ids.has(id2));
+  if (race.qi >= race.queue.length) {
+    const last = race.queue[race.queue.length - 1];
+    let q = shuffle4(cards.map((c) => c.item), ctx.random);
+    if (q.length > 1 && q[0] === last) q = [...q.slice(1), q[0]];
+    race.queue = q;
+    race.qi = 0;
+  }
+  const id = race.queue[race.qi++];
+  return cards.find((c) => c.item === id);
+}
+function deal(ctx, k, team) {
+  const race = k.teams[team];
+  if (!race) return;
+  const cards = cardsOf2(ctx);
+  const card = nextCard(ctx, race, cards);
+  if (!card) {
+    race.round = null;
+    return;
+  }
+  const { opts, right } = buildOptions(card, cards, ctx.random);
+  const lures = new Set(card.lures.map(normaliseAnswer));
+  const members = live(ctx, team);
+  race.rounds += 1;
+  k.rounds += 1;
+  race.round = { item: card.item, n: race.rounds, opts, right, hands: dealHands(opts, right, lures, members, ctx.random), opened_at: ctx.now };
+  for (const [owner, hand] of Object.entries(race.round.hands)) if (hand.includes(right)) stat(k, owner).held += 1;
+}
+function redeal(ctx, k, team) {
+  const round = k.teams[team]?.round;
+  if (!round) return;
+  const card = cardsOf2(ctx).find((c) => c.item === round.item);
+  const before = Object.entries(round.hands).find(([, h]) => h.includes(round.right))?.[0];
+  round.hands = dealHands(round.opts, round.right, new Set((card?.lures ?? []).map(normaliseAnswer)), live(ctx, team), ctx.random);
+  const after = Object.entries(round.hands).find(([, h]) => h.includes(round.right))?.[0];
+  if (before !== after) {
+    if (before) stat(k, before).held = Math.max(0, stat(k, before).held - 1);
+    if (after) stat(k, after).held += 1;
+  }
+}
+var stat = (k, owner) => k.taps[owner] ??= { held: 0, right: 0, false_taps: 0, wrong: [] };
+function feed(ctx, k, team, text, tone) {
+  k.feed.unshift({ team, text, tone, at: ctx.now });
+  k.feed.length = Math.min(k.feed.length, 6);
+}
+function tap(ctx, k, owner, e) {
+  const seat = ctx.seat(owner);
+  if (!seat || seat.team === void 0) return err5("no_seat", "Join a team first.");
+  if (k.phase !== "race") return err5("over", "The race is over.");
+  const team = seat.team;
+  const race = k.teams[team];
+  if (!race || race.place !== null) return err5("finished", "Your team has finished. Watch the board.");
+  const round = race.round;
+  if (!round || e.item !== round.item) return err5("stale", "That question has moved on.");
+  const option = e.response?.option;
+  const mine = round.hands[owner] ?? [];
+  if (typeof option !== "string" || !mine.includes(option)) return err5("stale", "That question has moved on.");
+  const opt = round.opts.find((o) => o.id === option);
+  const rightOpt = round.opts.find((o) => o.id === round.right);
+  const holderOwner = Object.entries(round.hands).find(([, h]) => h.includes(round.right))?.[0] ?? null;
+  const isHolder = holderOwner === owner;
+  const correct = option === round.right;
+  ctx.record(owner, {
+    item: round.item,
+    move: "tap",
+    response: { text: opt.text },
+    correct,
+    time_ms: Math.max(0, ctx.now - round.opened_at),
+    extra: { holder: isHolder, tapped: opt.text.slice(0, 200), round: round.n, ...isHolder ? {} : { false_tap: true, answer: rightOpt.text.slice(0, 200) } },
+    strength: "live_team"
+  });
+  const s = stat(k, owner);
+  const card = cardsOf2(ctx).find((c) => c.item === round.item);
+  const from = race.step;
+  if (correct) {
+    s.right += 1;
+    race.step = Math.min(k.track, race.step + 1);
+    ctx.addTeamScore(team, race.step - from);
+    ctx.addScore(owner, 1);
+  } else {
+    if (!isHolder) {
+      s.false_taps += 1;
+      const key = `${normaliseAnswer(opt.text)}\u2192${normaliseAnswer(rightOpt.text)}`;
+      const p = k.pairs[key] ??= { tapped: opt.text, answer: rightOpt.text, n: 0, owners: [] };
+      p.n += 1;
+      if (!p.owners.includes(owner)) p.owners.push(owner);
+    }
+    s.wrong.unshift({ tapped: opt.text, answer: rightOpt.text });
+    s.wrong.length = Math.min(s.wrong.length, 4);
+    race.step = k.mode === "back3" ? Math.max(0, race.step - 3) : 0;
+    race.crashes += 1;
+    if (race.step !== from) ctx.addTeamScore(team, race.step - from);
+    feed(ctx, k, team, `${teamName(team)} wrong tap \xB7 ${k.mode === "back3" ? "back 3" : "back to start"}`, "bad");
+  }
+  race.last = {
+    at: ctx.now,
+    owner,
+    by: seat.initials,
+    correct,
+    tapped: opt.text,
+    answer: rightOpt.text,
+    holder: holderOwner ? ctx.seat(holderOwner)?.initials ?? null : null,
+    from,
+    to: race.step,
+    item: round.item,
+    prompt: card?.prompt ?? ""
+  };
+  if (correct && race.step >= k.track) {
+    race.place = k.places.length + 1;
+    k.places.push(team);
+    race.round = null;
+    const bonus2 = Math.max(0, ctx.teams().length - race.place);
+    if (bonus2) ctx.addTeamScore(team, bonus2);
+    feed(ctx, k, team, `${teamName(team)} finish ${ordinal(race.place)}`, "win");
+    ctx.ticker(`${teamName(team)} finished ${ordinal(race.place)}`);
+    const racing = ctx.teams().filter((t) => k.teams[t] && k.teams[t]?.place === null && ctx.members(t).length);
+    if (!racing.length) {
+      k.phase = "done";
+      ctx.end();
+    }
+  } else deal(ctx, k, team);
+  return { item: round.item, correct };
+}
+function startTeam(ctx, k, team) {
+  if (k.teams[team]) return;
+  k.teams[team] = { step: 0, place: null, queue: [], qi: 0, round: null, last: null, crashes: 0, rounds: 0 };
+  deal(ctx, k, team);
+}
+var teamMatchRules = {
+  kind: "team_match",
+  teams: { min: 2, max: 6, default: 4 },
+  init: (ctx) => {
+    const mode = String(ctx.game.settings?.wrong_tap ?? "back3");
+    return {
+      phase: "race",
+      mode: WRONG_TAPS.includes(mode) ? mode : "back3",
+      track: Math.max(6, Math.min(20, Number(ctx.game.settings?.track) || 12)),
+      teams: {},
+      places: [],
+      feed: [],
+      taps: {},
+      pairs: {},
+      rounds: 0
+    };
+  },
+  start(ctx, k) {
+    for (const t of ctx.teams()) startTeam(ctx, k, t);
+  },
+  move(ctx, k, owner, e) {
+    if (e.move !== "tap") return err5("bad_move", "Tap one of your answers.");
+    return tap(ctx, k, owner, e);
+  },
+  control(ctx, k, op, from) {
+    if (from.role === "student") return err5("teacher_only", "Only the teacher can do that.");
+    if (op.name === "wrong_tap") {
+      const mode = op.data?.mode;
+      const next = typeof mode === "string" && WRONG_TAPS.includes(mode) ? mode : k.mode === "back3" ? "start" : "back3";
+      k.mode = next;
+      return;
+    }
+    if (op.name === "skip") {
+      const team = Number(op.data?.team);
+      if (!k.teams[team] || k.teams[team]?.place !== null) return err5("bad_team", "No such team racing.");
+      deal(ctx, k, team);
+      return;
+    }
+    if (op.name === "next" || op.name === "reveal") return;
+    return err5("bad_control", "That isn\u2019t a team match control.");
+  },
+  seatChanged(ctx, k, owner) {
+    if (k.phase !== "race") return;
+    const team = ctx.seat(owner)?.team ?? Object.keys(k.teams).map(Number).find((t) => k.teams[t]?.round?.hands[owner]);
+    if (team === void 0) return;
+    if (!k.teams[team]) startTeam(ctx, k, team);
+    else if (k.teams[team]?.round) redeal(ctx, k, team);
+    else if (k.teams[team]?.place === null) deal(ctx, k, team);
+  },
+  view(ctx, k, role, owner) {
+    return teamMatchView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    const team = ctx.seat(owner)?.team;
+    const round = team === void 0 ? null : k.teams[team]?.round ?? null;
+    const hand = round?.hands[owner];
+    if (!round || !hand?.length || k.phase !== "race") return null;
+    if (hand.includes(round.right)) return ctx.random() < 0.35 ? { move: { item: round.item, move: "tap", response: { option: round.right } } } : null;
+    return ctx.random() < 0.04 ? { move: { item: round.item, move: "tap", response: { option: hand[Math.floor(ctx.random() * hand.length)] } } } : null;
+  }
+};
+function teamMatchView(ctx, k, role, owner) {
+  const staff = role === "teacher" || role === "board";
+  const lanes = Object.keys(k.teams).map(Number).sort((a, b) => a - b).map((team) => {
+    const r = k.teams[team];
+    const lastOut = r.last ? (({ owner: _o, item: _i, ...rest }) => rest)(r.last) : null;
+    return {
+      team,
+      step: r.step,
+      place: r.place,
+      crashes: r.crashes,
+      members: ctx.members(team).map((o) => ({ initials: ctx.seat(o)?.initials ?? "", connected: !!ctx.seat(o)?.connected })),
+      // Students see only their own team's last tap (what was tapped, what it was).
+      last: staff || ctx.seat(owner)?.team === team ? lastOut : null
+    };
+  });
+  const v = { phase: k.phase, mode: k.mode, track: k.track, lanes, places: [...k.places], feed: k.feed.slice(0, 3) };
+  const seat = role === "student" ? ctx.seat(owner) : void 0;
+  if (seat && seat.team !== void 0) {
+    const race = k.teams[seat.team];
+    const round = race?.round ?? null;
+    const card = round ? cardsOf2(ctx).find((c) => c.item === round.item) : void 0;
+    const mineIds = round?.hands[owner] ?? [];
+    const st = stat(k, owner);
+    v.me = {
+      team: seat.team,
+      mates: ctx.members(seat.team).map((o) => ({ initials: ctx.seat(o)?.initials ?? "", connected: !!ctx.seat(o)?.connected, options: round?.hands[o]?.length ?? 0, me: o === owner })),
+      round: round && card ? { item: round.item, n: round.n, eyebrow: card.eyebrow, prompt: card.prompt, options: mineIds.map((id) => round.opts.find((o) => o.id === id)), total: round.opts.length } : null,
+      last: race?.last ? { ...(({ owner: _o, item: _i, ...rest }) => rest)(race.last), mine: race.last.owner === owner, held: race.last.holder === seat.initials } : null,
+      stats: { held: st.held, right: st.right, false_taps: st.false_taps, wrong: st.wrong.slice(0, 2) }
+    };
+  }
+  if (staff) {
+    const pairs = Object.values(k.pairs).sort((a, b) => b.n - a.n).slice(0, 5);
+    v.insight = {
+      pairs: pairs.map((p) => ({ tapped: p.tapped, answer: p.answer, n: p.n, students: p.owners.length, ...role === "teacher" ? { who: p.owners.map((o) => ctx.seat(o)?.initials ?? "") } : {} }))
+    };
+    if (role === "teacher") {
+      v.insight.students = ctx.seats().map((s) => ({ initials: s.initials, ...s.team !== void 0 ? { team: s.team } : {}, held: k.taps[s.owner]?.held ?? 0, right: k.taps[s.owner]?.right ?? 0, false_taps: k.taps[s.owner]?.false_taps ?? 0 })).sort((a, b) => b.false_taps - a.false_taps);
+    }
+  }
+  return v;
+}
+registerRules(teamMatchRules);
+
+// apps/teaching/src/games/kinds/wager/rules.ts
+function wagerSettings(s) {
+  const num = (v, d, lo, hi) => typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+  return {
+    start: Math.round(num(s?.start, 100, 10, 1e4)),
+    min_bet: Math.round(num(s?.min_bet, 10, 1, 1e3)),
+    seconds: Math.round(num(s?.seconds, 30, 10, 120)),
+    house_bonus: num(s?.house_bonus, 0.5, 0, 2),
+    rescue: s?.rescue !== false,
+    final_all_in: s?.final_all_in !== false
+  };
+}
+var finalBonus = (k) => k.s.house_bonus * 2;
+var isFinal = (k) => k.index === k.order.length - 1;
+var bonusRate = (k) => isFinal(k) && k.s.final_all_in ? finalBonus(k) : k.s.house_bonus;
+var err6 = (code, message) => ({ error: { code, message } });
+function shown(ctx, id) {
+  if (!id) return null;
+  return shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === id));
+}
+var minBetFor = (s, held) => Math.max(0, Math.min(s.min_bet, held));
+function clampBet(s, held, bet) {
+  const b = typeof bet === "number" && Number.isFinite(bet) ? Math.round(bet) : s.min_bet;
+  return Math.min(held, Math.max(minBetFor(s, held), b));
+}
+function splitPot(pot, bets) {
+  const total = bets.reduce((n, b) => n + b.bet, 0);
+  const out = {};
+  if (!bets.length || pot <= 0) {
+    for (const b of bets) out[b.owner] = 0;
+    return out;
+  }
+  const weight = (b) => total > 0 ? b.bet / total : 1 / bets.length;
+  const raw = bets.map((b, i) => ({ ...b, i, exact: pot * weight(b) }));
+  let given = 0;
+  for (const r of raw) {
+    out[r.owner] = Math.floor(r.exact);
+    given += out[r.owner];
+  }
+  const rest = raw.sort((a, b) => b.exact - Math.floor(b.exact) - (a.exact - Math.floor(a.exact)) || b.bet - a.bet || a.i - b.i);
+  for (let j = 0; j < pot - given; j++) out[rest[j % rest.length].owner] += 1;
+  return out;
+}
+function rightOptions(ctx, id) {
+  const key = ctx.keys.items[id];
+  if (key?.shape !== "question") return [];
+  const a = key.key.answer;
+  if (a.type === "choice") return [...a.ids];
+  if (a.type === "boolean") return [a.value ? "true" : "false"];
+  return [];
+}
+function ensure(ctx, k, owner) {
+  if (!(owner in k.points) && ctx.seat(owner)) k.points[owner] = k.s.start;
+}
+function openQuestion(ctx, k, index) {
+  k.index = index;
+  k.stage = "open";
+  k.carried = k.pot;
+  k.picks = {};
+  k.rescued_now = {};
+  delete k.riding;
+  delete k.counts;
+  delete k.payouts;
+  delete k.right;
+  delete k.pot_in;
+  delete k.winners;
+  for (const seat of ctx.seats()) ensure(ctx, k, seat.owner);
+  for (const owner of Object.keys(k.points)) {
+    if (k.s.rescue && k.points[owner] < k.s.min_bet) {
+      k.points[owner] = k.s.min_bet;
+      k.rescued_now[owner] = true;
+      k.calib_off[owner] = true;
+    } else if (k.calib_off[owner] && k.points[owner] > k.s.start / 2) delete k.calib_off[owner];
+    ctx.setScore(owner, k.points[owner]);
+  }
+  k.ends_at = ctx.now + k.s.seconds * 1e3;
+  ctx.setTimer(k.ends_at);
+}
+function closeAnswers(ctx, k) {
+  if (k.stage !== "open") return;
+  const item = k.order[k.index];
+  k.stage = "closed";
+  k.ends_at = void 0;
+  ctx.setTimer(void 0);
+  const riding = {};
+  const counts = {};
+  const payouts = {};
+  const winners = [];
+  let potIn = 0;
+  const owners = Object.keys(k.points).filter((o) => k.picks[o] || ctx.seat(o)?.connected);
+  for (const owner of owners) {
+    const held = k.points[owner];
+    const pick2 = k.picks[owner];
+    const rescued = !!k.calib_off[owner];
+    if (!pick2) {
+      const bet2 = minBetFor(k.s, held);
+      potIn += bet2;
+      payouts[owner] = { choice: null, bet: bet2, correct: null, bonus: 0, share: 0, change: -bet2, before: held, after: held - bet2, rescued };
+      ctx.record(owner, { item, move: "bet", extra: { bet: bet2, held, confidence: held ? round2(bet2 / held) : 0, rescued, no_answer: true } });
+      continue;
+    }
+    const marked = ctx.mark(owner, { item, move: "answer", response: pick2.response, ...pick2.time_ms !== void 0 ? { time_ms: pick2.time_ms } : {} });
+    const correct = "error" in marked ? false : marked.result.correct === true;
+    const bet = clampBet(k.s, held, pick2.bet);
+    if (pick2.choice) {
+      riding[pick2.choice] = (riding[pick2.choice] ?? 0) + bet;
+      counts[pick2.choice] = (counts[pick2.choice] ?? 0) + 1;
+    }
+    ctx.record(owner, {
+      item,
+      move: "bet",
+      ...pick2.choice ? { response: { choice: pick2.choice } } : {},
+      correct,
+      extra: { bet, held, confidence: held ? round2(bet / held) : 0, rescued, ...isFinal(k) ? { final: true } : {}, ...bet === held ? { all_in: true } : {} }
+    });
+    if (!rescued) (k.calibration[owner] ??= []).push({ item, bet, held, correct, rescued });
+    const t = k.tally[owner] ??= { right: 0, answered: 0 };
+    t.answered += 1;
+    if (correct) t.right += 1;
+    if (correct) winners.push({ owner, bet });
+    else potIn += bet;
+    payouts[owner] = { choice: pick2.choice, bet, correct, bonus: 0, share: 0, change: correct ? 0 : -bet, before: held, after: correct ? held : held - bet, rescued };
+  }
+  const pot = k.carried + potIn;
+  const shares = winners.length ? splitPot(pot, winners) : {};
+  for (const w of winners) {
+    const p = payouts[w.owner];
+    p.bonus = Math.round(w.bet * bonusRate(k));
+    p.share = shares[w.owner] ?? 0;
+    p.change = p.bonus + p.share;
+    p.after = p.before + p.change;
+  }
+  k.riding = riding;
+  k.counts = counts;
+  k.payouts = payouts;
+  k.right = rightOptions(ctx, item);
+  k.pot_in = potIn;
+  k.winners = winners.length;
+}
+function reveal2(ctx, k) {
+  if (k.stage === "open") closeAnswers(ctx, k);
+  if (k.stage !== "closed" || !k.payouts) return;
+  k.stage = "revealed";
+  k.before = { ...k.points };
+  for (const [owner, p] of Object.entries(k.payouts)) {
+    k.points[owner] = p.after;
+    ctx.setScore(owner, p.after);
+  }
+  const pot = k.carried + (k.pot_in ?? 0);
+  k.pot = k.winners ? 0 : pot;
+  const total = Object.values(k.riding ?? {}).reduce((n, v) => n + v, 0);
+  k.log.push({ item: k.order[k.index], riding: { ...k.riding ?? {} }, right: [...k.right ?? []], total, winners: k.winners ?? 0, answered: Object.keys(k.picks).length });
+  if (!k.winners && pot > 0) ctx.ticker(`Nobody right: jackpot ${pot}`);
+}
+var round2 = (n) => Math.round(n * 100) / 100;
+function step(ctx, k) {
+  if (k.stage === "idle") openQuestion(ctx, k, 0);
+  else if (k.stage === "open") closeAnswers(ctx, k);
+  else if (k.stage === "closed") reveal2(ctx, k);
+  else if (k.stage === "revealed") k.stage = "standings";
+  else if (k.stage === "standings" || k.stage === "calibration") {
+    if (k.index < k.order.length - 1) openQuestion(ctx, k, k.index + 1);
+    else ctx.end();
+  }
+}
+function calibrationOf(ctx, k) {
+  return Object.entries(k.calibration).filter(([, rows]) => rows.length).map(([owner, rows]) => ({
+    initials: ctx.seat(owner)?.initials ?? "?",
+    confidence: round2(rows.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows.length),
+    accuracy: round2(rows.filter((r) => r.correct).length / rows.length),
+    rounds: rows.length,
+    big_wrong: rows.filter((r) => !r.correct && r.held && r.bet / r.held >= 0.5).length
+  })).sort((a, b) => a.initials.localeCompare(b.initials));
+}
+function confidentMisconceptions(ctx, k) {
+  const out = [];
+  k.log.forEach((q, index) => {
+    if (!q.total) return;
+    const opts = optionsOf(shown(ctx, q.item));
+    for (const [option, pts] of Object.entries(q.riding)) {
+      if (q.right.includes(option) || pts / q.total < 0.3) continue;
+      out.push({ item: q.item, index, option, text: opts.find((o) => o.id === option)?.text ?? option, share: round2(pts / q.total) });
+    }
+  });
+  return out.sort((a, b) => b.share - a.share);
+}
+var wagerRules = {
+  kind: "wager",
+  init(ctx) {
+    const s = wagerSettings(ctx.game.settings);
+    const order2 = contentItems(ctx.game, ctx.keys).filter((i) => i.shape === "question" && shownItem(i) && ctx.keys.items[i.id]).map((i) => i.id);
+    const points = {};
+    for (const seat of ctx.seats()) points[seat.owner] = s.start;
+    return { s, order: order2, index: -1, stage: "idle", carried: 0, pot: 0, points, calib_off: {}, rescued_now: {}, picks: {}, calibration: {}, tally: {}, log: [] };
+  },
+  start(ctx, k) {
+    if (!k.order.length) return ctx.end();
+    openQuestion(ctx, k, 0);
+  },
+  move(ctx, k, owner, event) {
+    const item = k.order[k.index];
+    if (k.stage !== "open" || !item) return err6("closed", "Answers are closed for this question.");
+    if (event.item !== item || event.move !== "answer") return err6("bad_item", "That isn\u2019t the question on the board.");
+    if (k.ends_at !== void 0 && ctx.now > k.ends_at + 500) return err6("closed", "Time\u2019s up for this question.");
+    ensure(ctx, k, owner);
+    if (!(owner in k.points)) return err6("no_seat", "Join the game first.");
+    const it = shown(ctx, item);
+    const choice = choiceOf(event.response);
+    if (it && (it.mode === "choice" || it.mode === "truefalse") && !(choice && optionsOf(it).some((o) => o.id === choice))) return err6("bad_answer", "Pick one of the answers.");
+    const bet = clampBet(k.s, k.points[owner], event.extra?.bet);
+    k.picks[owner] = { response: event.response, choice, bet, ...event.time_ms !== void 0 ? { time_ms: Math.max(0, Math.round(event.time_ms)) } : {} };
+    return { item };
+  },
+  control(ctx, k, op, from) {
+    if (from.role === "student") return err6("not_allowed", "Only the teacher can do that.");
+    if (op.name === "next") return void step(ctx, k);
+    if (op.name === "close") return void closeAnswers(ctx, k);
+    if (op.name === "reveal") return void reveal2(ctx, k);
+    if (op.name === "standings" && k.stage === "revealed") return void (k.stage = "standings");
+    if (op.name === "calibration" && (k.stage === "standings" || k.stage === "revealed") && isFinal(k)) return void (k.stage = "calibration");
+    if (op.name === "add_time" && k.stage === "open" && k.ends_at !== void 0) {
+      const secs = Number(op.data?.seconds) || 15;
+      k.ends_at += Math.min(120, Math.max(5, secs)) * 1e3;
+      ctx.setTimer(k.ends_at);
+      return;
+    }
+    return err6("unknown", "That control isn\u2019t part of Wager.");
+  },
+  tick(ctx, k) {
+    if (k.stage === "open" && k.ends_at !== void 0 && ctx.now >= k.ends_at) closeAnswers(ctx, k);
+  },
+  finish(ctx, k) {
+    if (k.stage === "open" || k.stage === "closed") reveal2(ctx, k);
+  },
+  seatChanged(ctx, k, owner) {
+    ensure(ctx, k, owner);
+    if (owner in k.points) ctx.setScore(owner, k.points[owner]);
+  },
+  /** DEV ONLY: a simulated classmate answers once per question (right about 6 in 10) and bets a slice of what it holds. */
+  bot(ctx, k, owner) {
+    const item = k.order[k.index];
+    if (k.stage !== "open" || !item || owner in k.picks || !(owner in k.points)) return null;
+    const it = shown(ctx, item);
+    if (!it) return null;
+    const held = k.points[owner];
+    const bet = isFinal(k) && ctx.random() < 0.3 ? held : Math.max(k.s.min_bet, Math.round(held * (0.1 + ctx.random() * 0.5) / 10) * 10);
+    return { move: { item, move: "answer", response: botResponse2(it, ctx.keys.items[item], 0.6, () => ctx.random()), extra: { bet } } };
+  },
+  view(ctx, k, role, owner) {
+    const itemId = k.order[k.index];
+    const it = k.stage === "idle" ? null : shown(ctx, itemId);
+    const answered = Object.keys(k.picks).length;
+    const after = k.stage === "revealed" || k.stage === "standings" || k.stage === "calibration";
+    const base3 = {
+      stage: k.stage,
+      index: k.index,
+      of: k.order.length,
+      final: isFinal(k) && k.s.final_all_in,
+      bonus: bonusRate(k),
+      min_bet: k.s.min_bet,
+      start: k.s.start,
+      ...k.ends_at !== void 0 ? { ends_at: k.ends_at } : {},
+      ...it ? { item: it } : {},
+      carried: k.carried,
+      pot: k.pot
+    };
+    if (role === "student") {
+      const held = k.points[owner] ?? k.s.start;
+      const pick2 = k.picks[owner];
+      const p = after ? k.payouts?.[owner] : void 0;
+      const rank = after ? 1 + Object.values(k.points).filter((v) => v > held).length : void 0;
+      return {
+        ...base3,
+        you: {
+          points: held,
+          ...k.rescued_now[owner] ? { rescued: true } : {},
+          ...pick2 ? { locked: { choice: pick2.choice, bet: pick2.bet, ...pick2.choice ? {} : { text: textOf2(pick2.response) } } } : {},
+          ...p ? { result: p, ...rank ? { rank, of: Object.keys(k.points).length } : {} } : {},
+          ...k.stage !== "open" && !pick2 && k.payouts?.[owner] ? { missed: k.payouts[owner].bet } : {}
+        },
+        ...after ? { right: k.right ?? [] } : {},
+        ...after && isFinal(k) ? { summary: studentSummary(k, owner) } : {}
+      };
+    }
+    const seats = ctx.seats();
+    const locked = seats.filter((s) => k.picks[s.owner]).map((s) => s.initials);
+    const board = {
+      ...base3,
+      answered,
+      seats: Object.keys(k.points).length,
+      locked_initials: k.stage === "open" ? locked : [],
+      ...k.stage !== "open" && k.stage !== "idle" ? { riding: k.riding ?? {}, counts: k.counts ?? {}, pot_in: k.pot_in ?? 0 } : {},
+      ...after ? { right: k.right ?? [], winners: k.winners ?? 0, standings: standings(ctx, k) } : {},
+      ...isFinal(k) && after ? { misconceptions: confidentMisconceptions(ctx, k) } : {},
+      ...k.stage === "calibration" ? { calibration: calibrationOf(ctx, k) } : {}
+    };
+    return board;
+  }
+};
+var textOf2 = (r) => r && typeof r === "object" && typeof r.text === "string" ? r.text.slice(0, 80) : "";
+function standings(ctx, k) {
+  const before = k.before ?? k.points;
+  const rankBy = (m) => Object.keys(k.points).sort((a, b) => (m[b] ?? 0) - (m[a] ?? 0) || (ctx.seat(a)?.initials ?? "").localeCompare(ctx.seat(b)?.initials ?? ""));
+  const was = rankBy(before);
+  return rankBy(k.points).slice(0, 5).map((o, i) => ({ initials: ctx.seat(o)?.initials ?? "?", before: before[o] ?? 0, after: k.points[o], climbed: was.indexOf(o) > i }));
+}
+function studentSummary(k, owner) {
+  const rows = k.calibration[owner] ?? [];
+  const t = k.tally[owner] ?? { right: 0, answered: 0 };
+  return {
+    right: t.right,
+    of: k.order.length,
+    confidence: rows.length ? round2(rows.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows.length) : null,
+    accuracy: rows.length ? round2(rows.filter((r) => r.correct).length / rows.length) : null
+  };
+}
+registerRules(wagerRules);
+
+// apps/teaching/src/games/kinds/wheel/shared.ts
+var WHEEL_SEGMENTS = [300, 700, 400, "bankrupt", 500, 900, 200, 600, "lose", 350, 800, 250, 1e3, 450, 150, 550];
+var VOWELS = "AEIOU";
+var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+var WHEEL = {
+  /** Board spin animation budget: physics stops inside this, then the landing shows. */
+  spinMs: 5600,
+  /** A value showing before the letter question opens. */
+  valueMs: 1400,
+  /** Bankrupt / Lose a turn stamp. */
+  stampMs: 2400,
+  questionMs: 15e3,
+  qclosedMs: 1900,
+  /** The captain's time to call a letter before play passes on. */
+  letterMs: 3e4,
+  /** Letters turning over: a beat, then one per letter, then a pause. */
+  flipBaseMs: 1500,
+  flipEachMs: 380,
+  /** After the first solve, others may still solve for their record. */
+  solvedMs: 1e4,
+  explainMs: 2e4,
+  solveBonus: 500,
+  /** A solve this fast with nothing showing is an outlier (likely had the text open). */
+  outlierMs: 3e3
+};
+var stripMarks = (s) => s.normalize("NFD").replace(/\p{M}+/gu, "");
+function puzzleBoard(text) {
+  return stripMarks(String(text ?? "")).toUpperCase().replace(/_/g, "-").replace(/\s+/g, " ").trim();
+}
+var isLetter = (ch) => ch >= "A" && ch <= "Z" && ch.length === 1;
+var lettersOf = (board) => [...board].filter(isLetter);
+var solveForm = (s) => stripMarks(String(s ?? "")).toUpperCase().replace(/[^A-Z]/g, "");
+function maskBoard(board, shown2) {
+  const on = new Set(shown2);
+  return [...board].map((ch) => isLetter(ch) && !on.has(ch) ? "_" : ch).join("");
+}
+function shownCount(board, shown2) {
+  const on = new Set(shown2);
+  return lettersOf(board).filter((ch) => on.has(ch)).length;
+}
+function lettersNeededAt(shown2, total, ms) {
+  return { shown: shown2, total, pct: total ? shown2 / total : 0, outlier: shown2 === 0 && ms < WHEEL.outlierMs, ms };
+}
+
+// apps/teaching/src/games/kinds/wheel/rules.ts
+function puzzlesOf(keys) {
+  const live2 = keys.live?.wheel?.puzzles ?? [];
+  return live2.flatMap((p) => {
+    const key = keys.items[p.id];
+    const line = key && key.shape === "term" ? key.answers[0] ?? "" : "";
+    if (!line) return [];
+    return [{ ...p, line, board: puzzleBoard(line), tags: key && "tags" in key ? key.tags : [] }];
+  });
+}
+var publicItem = (keys, id) => keys.live?.items.find((i) => i.id === id);
+var err7 = (code, message) => ({ error: { code, message } });
+var tk = (t) => String(t);
+function vowelCost(ctx) {
+  const v = Number(ctx.game.settings?.vowel_cost);
+  return Number.isFinite(v) && v >= 0 ? v : 250;
+}
+function lockMs(ctx) {
+  const v = Number(ctx.game.settings?.lockout_seconds);
+  return (Number.isFinite(v) && v > 0 ? v : 20) * 1e3;
+}
+var puzzle = (ctx, k) => puzzlesOf(ctx.keys)[k.p];
+var teamNow = (k) => k.order[k.turn % Math.max(1, k.order.length)] ?? 0;
+var teamOf2 = (ctx, owner) => ctx.seat(owner)?.team;
+var studentSeats = (ctx) => ctx.seats().filter((s) => s.owner !== "teacher" && s.owner !== "board");
+function setTimer(ctx, k, ms) {
+  k.ends_at = ms === void 0 ? void 0 : ctx.now + ms;
+  ctx.setTimer(k.ends_at);
+}
+function captainOf3(ctx, k, team) {
+  const members = ctx.members(team);
+  const on = members.filter((m) => ctx.seat(m)?.connected);
+  const list = on.length ? on : members;
+  if (!list.length) return void 0;
+  return list[(k.cap[tk(team)] ?? 0) % list.length];
+}
+function openPuzzle(ctx, k, p) {
+  Object.assign(k, { p, used: [], solves: {}, wrong: 0, locks: {}, bankI: 0, opened_at: ctx.now });
+  delete k.first;
+  delete k.winner;
+  delete k.pending;
+  for (const t of k.order) k.round[tk(t)] = 0;
+  startTurn2(ctx, k);
+}
+function startTurn2(ctx, k) {
+  k.stage = "turn";
+  k.captain = captainOf3(ctx, k, teamNow(k));
+  delete k.q;
+  delete k.value;
+  delete k.landed;
+  delete k.last;
+  setTimer(ctx, k, void 0);
+}
+function nextTurn(ctx, k) {
+  const t = tk(teamNow(k));
+  k.cap[t] = (k.cap[t] ?? 0) + 1;
+  k.turn += 1;
+  startTurn2(ctx, k);
+}
+function spin(ctx, k, power) {
+  const seg = Math.min(WHEEL_SEGMENTS.length - 1, Math.floor(ctx.random() * WHEEL_SEGMENTS.length));
+  k.spins += 1;
+  k.spin = { n: k.spins, seg, power: Math.max(0, Math.min(1, Number.isFinite(power) ? power : 0.6)), at: ctx.now, ends_at: ctx.now + WHEEL.spinMs };
+  k.stage = "spinning";
+  delete k.landed;
+  delete k.value;
+  setTimer(ctx, k, WHEEL.spinMs);
+}
+function land(ctx, k) {
+  const seg = k.spin?.seg ?? 0;
+  const v = WHEEL_SEGMENTS[seg];
+  const t = tk(teamNow(k));
+  k.stage = "landed";
+  if (v === "bankrupt") {
+    k.landed = { seg, lost: k.round[t] ?? 0 };
+    k.round[t] = 0;
+    setTimer(ctx, k, WHEEL.stampMs);
+  } else if (v === "lose") {
+    k.landed = { seg };
+    setTimer(ctx, k, WHEEL.stampMs);
+  } else {
+    k.landed = { seg };
+    k.value = v;
+    setTimer(ctx, k, WHEEL.valueMs);
+  }
+}
+function askLetterQuestion(ctx, k) {
+  const pz = puzzle(ctx, k);
+  const bank = (pz?.bank ?? []).filter((id) => publicItem(ctx.keys, id) && ctx.keys.items[id]);
+  if (!bank.length) {
+    k.stage = "letter";
+    setTimer(ctx, k, WHEEL.letterMs);
+    return;
+  }
+  const team = teamNow(k);
+  const members = ctx.members(team);
+  const on = members.filter((m) => ctx.seat(m)?.connected);
+  const item = bank[k.bankI % bank.length];
+  k.bankI += 1;
+  k.q = { kind: "letter", item, team, asked: on.length ? on : members, answers: {}, opened_at: ctx.now };
+  k.stage = "question";
+  setTimer(ctx, k, WHEEL.questionMs);
+}
+function closeLetterQuestion(ctx, k) {
+  const q = k.q;
+  if (!q || q.kind !== "letter" || q.closed) return;
+  q.closed = true;
+  q.n = q.asked.length;
+  q.r = q.asked.filter((m) => q.answers[m]?.correct).length;
+  q.ok = q.n > 0 && q.r * 2 >= q.n;
+  k.stage = "qclosed";
+  setTimer(ctx, k, WHEEL.qclosedMs);
+}
+function callLetter(ctx, k, raw) {
+  const pz = puzzle(ctx, k);
+  if (!pz) return err7("no_puzzle", "No puzzle is open.");
+  const letter = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+  if (letter.length !== 1 || !ALPHABET.includes(letter)) return err7("bad_letter", "Pick a letter A to Z.");
+  if (k.used.includes(letter)) return err7("used", `${letter} has been called already.`);
+  const vowel = VOWELS.includes(letter);
+  const t = tk(teamNow(k));
+  if (vowel) {
+    if (k.stage !== "turn" && k.stage !== "letter") return err7("not_now", "Buy a vowel on your turn.");
+    const cost = vowelCost(ctx);
+    if ((k.round[t] ?? 0) < cost) return err7("short", `A vowel costs ${cost} round points.`);
+    k.round[t] = (k.round[t] ?? 0) - cost;
+  } else if (k.stage !== "letter") return err7("not_now", "Earn a letter first: spin and answer.");
+  const count = lettersOf(pz.board).filter((ch) => ch === letter).length;
+  const won = vowel ? 0 : count * (k.value ?? 0);
+  k.used = [...k.used, letter];
+  k.round[t] = (k.round[t] ?? 0) + won;
+  k.last = { letter, count, vowel, won };
+  k.stage = "revealing";
+  setTimer(ctx, k, WHEEL.flipBaseMs + count * WHEEL.flipEachMs);
+}
+function solvedMoment(ctx, k) {
+  delete k.pending;
+  const team = k.first ? teamOf2(ctx, k.first) : void 0;
+  const bank = team === void 0 ? 0 : Math.max(0, k.round[tk(team)] ?? 0) + WHEEL.solveBonus;
+  if (team !== void 0) {
+    k.bank[tk(team)] = (k.bank[tk(team)] ?? 0) + bank;
+    ctx.addTeamScore(team, bank);
+  }
+  k.winner = { team: team ?? -1, bank };
+  for (const t of k.order) k.round[tk(t)] = 0;
+  delete k.q;
+  k.stage = "solved";
+  setTimer(ctx, k, WHEEL.solvedMs);
+}
+function revealPuzzle(ctx, k) {
+  const pz = puzzle(ctx, k);
+  if (!pz) return;
+  if (!k.winner) for (const t of k.order) k.round[tk(t)] = 0;
+  delete k.pending;
+  delete k.q;
+  k.used = [.../* @__PURE__ */ new Set([...k.used, ...lettersOf(pz.board)])];
+  k.stage = "revealed";
+  k.played[k.p] = { puzzle: pz.id, category: pz.category, solves: { ...k.solves } };
+  setTimer(ctx, k, void 0);
+}
+function openExplain(ctx, k) {
+  const pz = puzzle(ctx, k);
+  if (!pz?.explain || !publicItem(ctx.keys, pz.explain)) return void totals(ctx, k);
+  const on = studentSeats(ctx).filter((s) => s.connected).map((s) => s.owner);
+  k.q = { kind: "explain", item: pz.explain, asked: on, answers: {}, opened_at: ctx.now };
+  k.stage = "explain";
+  setTimer(ctx, k, WHEEL.explainMs);
+}
+function closeExplain(ctx, k) {
+  if (!k.q || k.q.kind !== "explain") return;
+  k.q.closed = true;
+  k.stage = "ex_closed";
+  setTimer(ctx, k, void 0);
+}
+function revealExplain(ctx, k) {
+  if (!k.q || k.q.kind !== "explain") return;
+  const played = k.played[k.p];
+  if (played) played.explain = Object.fromEntries(Object.entries(k.q.answers).map(([o, a]) => [o, a.correct]));
+  k.stage = "ex_revealed";
+  setTimer(ctx, k, void 0);
+}
+function totals(ctx, k) {
+  delete k.q;
+  k.stage = "totals";
+  setTimer(ctx, k, void 0);
+}
+function nextPuzzle(ctx, k) {
+  if (k.p + 1 >= puzzlesOf(ctx.keys).length) return void ctx.end();
+  const t = tk(teamNow(k));
+  k.cap[t] = (k.cap[t] ?? 0) + 1;
+  k.turn += 1;
+  openPuzzle(ctx, k, k.p + 1);
+}
+function advance(ctx, k) {
+  switch (k.stage) {
+    case "turn":
+      return spin(ctx, k, 0.6);
+    case "question":
+      return closeLetterQuestion(ctx, k);
+    case "solved":
+      return revealPuzzle(ctx, k);
+    case "revealed":
+      return openExplain(ctx, k);
+    case "explain":
+      return closeExplain(ctx, k);
+    case "ex_closed":
+      return revealExplain(ctx, k);
+    case "ex_revealed":
+      return totals(ctx, k);
+    case "totals":
+      return nextPuzzle(ctx, k);
+    default:
+      return;
+  }
+}
+var SOLVING = /* @__PURE__ */ new Set(["turn", "spinning", "landed", "question", "qclosed", "letter", "revealing", "solved"]);
+var DEFER = /* @__PURE__ */ new Set(["spinning", "landed", "qclosed", "revealing"]);
+function solve(ctx, k, owner, e) {
+  const pz = puzzle(ctx, k);
+  if (!pz || e.item !== pz.id) return err7("bad_item", "That isn\u2019t the puzzle on the board.");
+  if (!SOLVING.has(k.stage)) return err7("closed", "Solving is closed for this quote.");
+  if (k.solves[owner]) return { item: pz.id, correct: true, again: true };
+  const until = k.locks[owner] ?? 0;
+  if (until > ctx.now) return err7("locked", `Solve is locked for ${Math.ceil((until - ctx.now) / 1e3)} s.`);
+  const r = e.response;
+  const text = typeof r?.text === "string" ? r.text.slice(0, 200) : "";
+  if (!solveForm(text)) return err7("empty", "Type the whole line.");
+  const shown2 = shownCount(pz.board, k.used);
+  const total = lettersOf(pz.board).length;
+  const ms = Math.max(0, ctx.now - k.opened_at);
+  const extra = { letters_showing: shown2, letters_total: total, letters_pct: Math.round((total ? shown2 / total : 0) * 100) };
+  if (solveForm(text) !== solveForm(pz.line)) {
+    k.locks[owner] = ctx.now + lockMs(ctx);
+    k.wrong += 1;
+    ctx.record(owner, { item: pz.id, move: "solve", response: { text }, correct: false, time_ms: ms, extra });
+    return { item: pz.id, correct: false };
+  }
+  const first = !k.first && k.stage !== "solved";
+  const need = lettersNeededAt(shown2, total, ms);
+  k.solves[owner] = { ...need, at: ctx.now, first };
+  ctx.record(owner, { item: pz.id, move: "solve", correct: true, time_ms: ms, extra: { ...extra, outlier: need.outlier, first } });
+  if (first) {
+    k.first = owner;
+    if (DEFER.has(k.stage)) k.pending = true;
+    else solvedMoment(ctx, k);
+  }
+  return { item: pz.id, correct: true };
+}
+function answer2(ctx, k, owner, e) {
+  const q = k.q;
+  if (!q || q.closed || e.item !== q.item) return err7("closed", "That question isn\u2019t open.");
+  if (q.kind === "letter" && !q.asked.includes(owner)) return err7("not_yours", "This one is for the spinning team.");
+  if (q.answers[owner]) return { item: q.item };
+  const solved = k.solves[owner];
+  const extra = q.kind === "explain" ? { solved: !!solved, ...solved ? { letters_pct: Math.round(solved.pct * 100), early: solved.pct < 0.5 && !solved.outlier } : {} } : { letter_question: true, ...k.value ? { value: k.value } : {} };
+  const out = ctx.mark(owner, { item: q.item, move: "answer", response: e.response, time_ms: Math.max(0, ctx.now - q.opened_at), extra, ...e.cid ? { cid: e.cid } : {} });
+  if ("error" in out) return out;
+  const stored = out.stored?.response;
+  const pick2 = Array.isArray(stored?.selected) ? stored.selected : typeof stored?.value === "boolean" ? [String(stored.value)] : void 0;
+  q.answers[owner] = { correct: out.result.correct === true, ...pick2 ? { pick: pick2 } : {} };
+  if (q.kind === "explain" && !q.asked.includes(owner)) q.asked.push(owner);
+  const everyone = q.asked.every((m) => q.answers[m] || !ctx.seat(m)?.connected);
+  if (everyone) {
+    if (q.kind === "letter") closeLetterQuestion(ctx, k);
+    else closeExplain(ctx, k);
+  }
+  return { item: q.item };
+}
+function splitFor(solves, answers) {
+  const early = { n: 0, right: 0 };
+  const late = { n: 0, right: 0 };
+  for (const [owner, right] of Object.entries(answers)) {
+    const s = solves[owner];
+    const bin = s && !s.outlier && s.pct < 0.5 ? early : late;
+    bin.n += 1;
+    if (right) bin.right += 1;
+  }
+  return { early, late };
+}
+function countsFor(q) {
+  const counts = {};
+  for (const a of Object.values(q.answers)) for (const id of a.pick ?? []) counts[id] = (counts[id] ?? 0) + 1;
+  return counts;
+}
+function heatOf(ctx, k) {
+  const pzs = puzzlesOf(ctx.keys);
+  const played = pzs.map((_, i) => i === k.p && k.stage !== "totals" && !k.played[i] ? { solves: k.solves, explain: void 0 } : k.played[i]);
+  return {
+    puzzles: pzs.map((p) => ({ id: p.id, category: p.category })),
+    rows: studentSeats(ctx).map((s) => ({
+      initials: s.initials,
+      cells: played.map((pl) => {
+        const v = pl?.solves[s.owner];
+        return v ? { shown: v.shown, total: v.total, pct: v.pct, outlier: v.outlier, first: v.first } : null;
+      })
+    })),
+    explain: played.map((pl) => pl?.explain ? splitFor(pl.solves, pl.explain) : null)
+  };
+}
+function view(ctx, k, role, owner) {
+  const pzs = puzzlesOf(ctx.keys);
+  const pz = pzs[k.p];
+  if (!pz) return null;
+  const revealed = !SOLVING.has(k.stage);
+  const letters = lettersOf(pz.board);
+  const q = k.q;
+  const showResult = !!q && (q.kind === "letter" && q.closed || q.kind === "explain" && k.stage === "ex_revealed");
+  const key = q ? ctx.keys.items[q.item] : void 0;
+  const item = q ? publicItem(ctx.keys, q.item) : void 0;
+  const now = ctx.now;
+  const out = {
+    stage: k.stage,
+    p: k.p,
+    of: pzs.length,
+    category: pz.category,
+    puzzle: pz.id,
+    board: maskBoard(pz.board, k.used),
+    total: letters.length,
+    shown: shownCount(pz.board, k.used),
+    used: [...k.used],
+    hits: k.used.filter((l) => letters.includes(l)),
+    vowel_cost: vowelCost(ctx),
+    lockout_seconds: lockMs(ctx) / 1e3,
+    turn_team: teamNow(k),
+    ...k.captain ? { captain: ctx.seat(k.captain)?.initials } : {},
+    teams: k.order.map((t) => {
+      const cap = captainOf3(ctx, k, t);
+      return { team: t, round: k.round[tk(t)] ?? 0, bank: k.bank[tk(t)] ?? 0, size: ctx.members(t).length, ...cap ? { captain: ctx.seat(cap)?.initials } : {} };
+    }),
+    ...k.spin ? { spin: { ...k.spin } } : {},
+    ...k.landed && k.stage !== "spinning" ? { landed: { seg: k.landed.seg, segment: WHEEL_SEGMENTS[k.landed.seg], ...k.landed.lost !== void 0 ? { lost: k.landed.lost } : {} } } : {},
+    ...k.value !== void 0 ? { value: k.value } : {},
+    ...k.last ? { last: { ...k.last } } : {},
+    solves: { solved: Object.keys(k.solves).length, wrong: k.wrong, locked: Object.values(k.locks).filter((u) => u > now).length },
+    ...k.winner ? { winner: { team: k.winner.team, bank: k.winner.bank, ...role !== "student" && role !== "board" && k.first ? { initials: ctx.seat(k.first)?.initials } : {} } } : {},
+    ...revealed ? { line: pz.line } : {},
+    ...k.stage === "ex_revealed" && q?.kind === "explain" ? { split: splitFor(k.solves, Object.fromEntries(Object.entries(q.answers).map(([o, a]) => [o, a.correct]))) } : {},
+    ...k.ends_at ? { ends_at: k.ends_at } : {}
+  };
+  if (q && item) {
+    out.q = {
+      kind: q.kind,
+      item,
+      ...q.team !== void 0 ? { team: q.team } : {},
+      asked: q.asked.length,
+      answered: q.asked.filter((m) => q.answers[m]).length,
+      dots: q.asked.map((m) => !!q.answers[m]),
+      closed: !!q.closed,
+      ...showResult ? {
+        result: {
+          counts: countsFor(q),
+          ...key?.shape === "question" ? { key: key.key } : {},
+          ...key?.shape === "term" ? { term: key.label } : {},
+          ...q.kind === "letter" ? { r: q.r, n: q.n, ok: q.ok } : {}
+        }
+      } : {}
+    };
+  }
+  if (role === "student") {
+    const mine = k.solves[owner];
+    const a = q?.answers[owner];
+    out.you = {
+      ...teamOf2(ctx, owner) !== void 0 ? { team: teamOf2(ctx, owner) } : {},
+      captain: k.captain === owner,
+      ...mine ? { solve: { shown: mine.shown, total: mine.total, pct: mine.pct, outlier: mine.outlier } } : {},
+      ...(k.locks[owner] ?? 0) > now ? { locked_until: k.locks[owner] } : {},
+      answered: !!a,
+      ...a?.pick ? { pick: a.pick } : {},
+      ...a && showResult ? { correct: a.correct } : {},
+      history: pzs.map((p, i) => {
+        const pl = i === k.p && !k.played[i] ? { solves: k.solves } : k.played[i];
+        const s = pl?.solves[owner];
+        return { category: p.category, played: !!pl, solve: s ? { shown: s.shown, total: s.total, pct: s.pct, outlier: s.outlier } : null };
+      })
+    };
+  } else {
+    out.heat = heatOf(ctx, k);
+  }
+  return out;
+}
+var wheelRules = {
+  kind: "wheel",
+  teams: { min: 2, max: 4, default: 4 },
+  init(ctx) {
+    return { p: 0, stage: "turn", order: [], turn: 0, cap: {}, round: {}, bank: {}, used: [], spins: 0, bankI: 0, solves: {}, wrong: 0, locks: {}, opened_at: ctx.now, played: [] };
+  },
+  start(ctx, k) {
+    k.order = ctx.teams().length ? ctx.teams() : [0];
+    for (const t of k.order) {
+      k.bank[tk(t)] = 0;
+      k.cap[tk(t)] = 0;
+    }
+    openPuzzle(ctx, k, 0);
+  },
+  move(ctx, k, owner, e) {
+    if (!ctx.seat(owner)) return err7("no_seat", "Join the room first.");
+    if (e.move === "solve") return solve(ctx, k, owner, e);
+    if (e.move === "answer") return answer2(ctx, k, owner, e);
+    return err7("bad_move", "That move isn\u2019t part of this game.");
+  },
+  control(ctx, k, op, from) {
+    const teacher = from.role === "teacher" || from.role === "board";
+    const captain = from.role === "student" && from.owner === k.captain;
+    const data = op.data ?? {};
+    switch (op.name) {
+      case "spin":
+        if (k.stage !== "turn") return err7("not_now", "Not time to spin.");
+        if (!teacher && !captain) return err7("not_captain", "Only the captain spins.");
+        return spin(ctx, k, Number(data.power ?? 0.6));
+      case "letter":
+        if (!teacher && !captain) return err7("not_captain", "Only the captain calls a letter.");
+        return callLetter(ctx, k, data.letter);
+      case "skip":
+        if (!teacher) return err7("teacher_only", "Only the teacher can skip a turn.");
+        if (k.stage === "turn" || k.stage === "letter") return nextTurn(ctx, k);
+        return;
+      default:
+        break;
+    }
+    if (!teacher) return err7("teacher_only", "That\u2019s a teacher control.");
+    switch (op.name) {
+      case "next":
+        return advance(ctx, k);
+      case "close":
+        if (k.stage === "question") return closeLetterQuestion(ctx, k);
+        if (k.stage === "explain") return closeExplain(ctx, k);
+        return;
+      case "reveal":
+        if (SOLVING.has(k.stage)) return revealPuzzle(ctx, k);
+        if (k.stage === "explain") closeExplain(ctx, k);
+        if (k.stage === "ex_closed") return revealExplain(ctx, k);
+        return;
+      case "explain":
+        if (k.stage === "revealed") return openExplain(ctx, k);
+        return;
+      case "totals":
+        if (k.stage === "ex_revealed" || k.stage === "revealed" || k.stage === "ex_closed") return totals(ctx, k);
+        return;
+      case "next_puzzle":
+        if (k.stage === "totals") return nextPuzzle(ctx, k);
+        return;
+      default:
+        return err7("bad_control", "Unknown control.");
+    }
+  },
+  tick(ctx, k) {
+    switch (k.stage) {
+      case "spinning":
+        return land(ctx, k);
+      case "landed":
+        if (k.pending) return solvedMoment(ctx, k);
+        if (k.value !== void 0) return askLetterQuestion(ctx, k);
+        return nextTurn(ctx, k);
+      case "question":
+        return closeLetterQuestion(ctx, k);
+      case "qclosed":
+        if (k.pending) return solvedMoment(ctx, k);
+        if (k.q?.ok) {
+          k.stage = "letter";
+          return setTimer(ctx, k, WHEEL.letterMs);
+        }
+        return nextTurn(ctx, k);
+      case "letter":
+        return nextTurn(ctx, k);
+      case "revealing": {
+        if (k.pending) return solvedMoment(ctx, k);
+        const pz = puzzle(ctx, k);
+        if (pz && shownCount(pz.board, k.used) === lettersOf(pz.board).length) return revealPuzzle(ctx, k);
+        if ((k.last?.count ?? 0) > 0) return startTurn2(ctx, k);
+        return nextTurn(ctx, k);
+      }
+      case "solved":
+        return revealPuzzle(ctx, k);
+      case "explain":
+        return closeExplain(ctx, k);
+      default:
+        return;
+    }
+  },
+  finish(ctx, k) {
+    if (k.q && !k.q.closed) k.q.closed = true;
+    setTimer(ctx, k, void 0);
+  },
+  seatChanged(ctx, k, owner) {
+    if (k.captain === owner && !ctx.seat(owner)?.connected && (k.stage === "turn" || k.stage === "letter")) {
+      const t = tk(teamNow(k));
+      k.cap[t] = (k.cap[t] ?? 0) + 1;
+      k.captain = captainOf3(ctx, k, teamNow(k));
+    }
+    const q = k.q;
+    if (q && !q.closed && q.asked.length && q.asked.every((m) => q.answers[m] || !ctx.seat(m)?.connected) && Object.keys(q.answers).length) {
+      if (q.kind === "letter") closeLetterQuestion(ctx, k);
+      else closeExplain(ctx, k);
+    }
+  },
+  view(ctx, k, role, owner) {
+    return view(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
+  }
+};
+function botMove(ctx, k, owner) {
+  const pz = puzzle(ctx, k);
+  if (!pz) return null;
+  const r = ctx.random();
+  const q = k.q;
+  if (q && !q.closed && !q.answers[owner] && (q.kind === "explain" || q.asked.includes(owner))) {
+    const key = ctx.keys.items[q.item];
+    const pub = publicItem(ctx.keys, q.item);
+    const right = r < 0.65;
+    let response = { text: "not sure" };
+    if (key?.shape === "term") response = { text: right ? key.answers[0] : "not sure" };
+    if (key?.shape === "question" && key.key.answer.type === "choice") {
+      const ok = key.key.answer.ids;
+      const opts = pub?.shape === "question" ? (pub.question.options ?? []).map((o) => o.id) : [];
+      response = { selected: [right ? ok[0] : opts.find((o) => !ok.includes(o)) ?? ok[0]] };
+    }
+    if (key?.shape === "question" && key.key.answer.type === "boolean") response = { value: right ? key.key.answer.value : !key.key.answer.value };
+    return { move: { item: q.item, move: "answer", response } };
+  }
+  if (k.captain === owner && k.stage === "turn") return { control: { name: "spin", data: { power: 0.3 + r * 0.7 } } };
+  if (k.captain === owner && k.stage === "letter") {
+    const unused = [...ALPHABET].filter((l) => !VOWELS.includes(l) && !k.used.includes(l));
+    const inLine = unused.filter((l) => pz.board.includes(l));
+    const pickFrom = inLine.length && r < 0.75 ? inLine : unused;
+    return pickFrom.length ? { control: { name: "letter", data: { letter: pickFrom[Math.floor(ctx.random() * pickFrom.length)] } } } : null;
+  }
+  if (SOLVING.has(k.stage) && !k.solves[owner] && (k.locks[owner] ?? 0) <= ctx.now) {
+    const share = shownCount(pz.board, k.used) / Math.max(1, lettersOf(pz.board).length);
+    if (share > 0.3 && r < share * 0.12) return { move: { item: pz.id, move: "solve", response: { text: ctx.random() < 0.3 + share * 0.6 ? pz.line : `${pz.line} again` } } };
+  }
+  return null;
+}
+registerRules(wheelRules);
+
+// apps/teaching/src/games/core/events.ts
+import { z as z4 } from "zod";
+var GAME_MOVES = ["answer", "solve", "guess", "bet", "hint", "judge", "describe", "draw", "pass", "buzz", "tap"];
+var MARKED_MOVES = /* @__PURE__ */ new Set(["answer", "solve", "guess", "tap"]);
+var STRENGTHS = ["live_solo", "live_team", "self_paced"];
+var Extra = z4.record(z4.string().max(40), z4.union([z4.number(), z4.string().max(200), z4.boolean()]));
+var GameEventSchema = z4.object({
+  seq: z4.number().int().min(0),
+  at: z4.number().int().min(0),
+  game: GameKindSchema,
+  play_id: z4.string().min(1).max(40),
+  owner: z4.string().min(1).max(64),
+  student_id: z4.string().max(64).optional(),
+  team: z4.string().max(40).optional(),
+  /** Item id within the game (a wall id for a Connections guess). */
+  item: z4.string().min(1).max(40),
+  move: z4.enum(GAME_MOVES),
+  /** The cleaned answer. */
+  response: z4.unknown().optional(),
+  correct: z4.boolean().nullable().optional(),
+  /** From the item shown to the move. */
+  time_ms: z4.number().int().min(0).max(36e5).optional(),
+  /** Per kind: hints, bet, letters_showing, confused_with, group, one_away… */
+  extra: Extra.optional(),
+  strength: z4.enum(STRENGTHS),
+  /** The phone's own id for the move: a batch sent twice never stores it twice. */
+  cid: z4.string().max(40).optional()
+});
+var SoloEventInputSchema = z4.object({
+  /** Made by the phone's queue, once per move, so a retried batch is recognised (games.mjs dedupes on it). */
+  cid: z4.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
+  item: z4.string().min(1).max(40),
+  move: z4.enum(GAME_MOVES),
+  response: z4.unknown().optional(),
+  time_ms: z4.number().int().min(0).max(36e5).optional(),
+  extra: Extra.optional()
+});
+var PLAY_EVENTS_MAX = 600;
+var REVEAL_HINTS = 3;
 
 // apps/teaching/src/games/core/mark.ts
 function revealFor(kind, key, check) {
@@ -1069,24 +3879,24 @@ function markMove(game, keys, history, e, now, who) {
     if (check.decoy) extra.confused_with = check.decoy;
     if (grid && key.shape === "term") extra.hints = hintsOn(e.item);
     Object.assign(out, { correct, ...check.one_away ? { one_away: true } : {}, ...check.decoy ? { decoy: true } : {} });
-    const reveal = revealFor(kind, key, check);
-    if (reveal) out.reveal = reveal;
+    const reveal3 = revealFor(kind, key, check);
+    if (reveal3) out.reveal = reveal3;
   } else if (e.move === "pass" && key?.shape === "wall") {
     const wrong = history.filter((x) => x.item === e.item && x.move === "guess" && x.correct === false).length;
     if (wrong >= wallMistakes(game)) {
       const got = new Set(history.filter((x) => x.item === e.item && x.correct === true && typeof x.extra?.group === "string").map((x) => x.extra?.group));
-      out.reveal = { groups: key.groups.filter((g) => !got.has(g.id)).map(({ id, label, why, difficulty, tiles }) => ({ id, label, why, difficulty, tiles })) };
+      out.reveal = { groups: key.groups.filter((g) => !got.has(g.id)).map(({ id, label, why, difficulty, tiles: tiles2 }) => ({ id, label, why, difficulty, tiles: tiles2 })) };
     }
   } else if (e.move === "hint" && grid && key?.shape === "term") {
-    const step = Math.min(REVEAL_HINTS, hintsOn(e.item) + 1);
-    extra.hints = step;
+    const step2 = Math.min(REVEAL_HINTS, hintsOn(e.item) + 1);
+    extra.hints = step2;
     if (grid.hints !== false) {
       if (grid.kind === "crossword") {
         const r = e.response;
         const typed = typeof r?.letters === "string" ? r.letters.slice(0, 15) : "";
         response = { letters: typed };
-        out.reveal = { step, cells: crosswordHint(grid, e.item, step, typed) };
-      } else out.reveal = { step, ...wordHint(grid, e.item, step) };
+        out.reveal = { step: step2, cells: crosswordHint(grid, e.item, step2, typed) };
+      } else out.reveal = { step: step2, ...wordHint(grid, e.item, step2) };
     }
   }
   if (correct === true && grid?.kind === "wordsearch" && grid.message) {
@@ -1111,13 +3921,15 @@ function markMove(game, keys, history, e, now, who) {
   };
   return { result: out, stored };
 }
-function quotePoints(correct, fake, ms, seconds) {
+function quotePoints(correct, fake, ms, seconds2) {
   if (!correct) return 0;
-  const share = Math.max(0, 1 - ms / Math.max(1, seconds * 1e3));
+  const share = Math.max(0, 1 - ms / Math.max(1, seconds2 * 1e3));
   return (100 + Math.round(share * 10) * 10) * (fake ? 2 : 1);
 }
 
 // apps/teaching/src/games/core/room-protocol.ts
+var TEAM_NAMES2 = ["Kestrels", "Otters", "Foxes", "Herons", "Wrens", "Magpies"];
+var teamName2 = (team) => TEAM_NAMES2[team] ?? `Team ${team + 1}`;
 var ROOM_LIMITS = {
   seats: 40,
   /** Messages per seat per 10 s before the room starts dropping them. */
@@ -1136,15 +3948,6 @@ var ROOM_LIMITS = {
   /** Show at most this many on the board's leaderboard for individual games. */
   leaderboardTop: 5
 };
-
-// apps/teaching/src/games/core/room-rules.ts
-var registry = /* @__PURE__ */ new Map();
-function registerRules(rules) {
-  registry.set(rules.kind, rules);
-}
-function rulesFor(kind) {
-  return registry.get(kind);
-}
 
 // apps/teaching/src/games/core/room-core.ts
 var RACE_KINDS = /* @__PURE__ */ new Set(["crossword", "find_a_word", "connections"]);
@@ -1255,24 +4058,24 @@ function shuffleTeams(s) {
   }
   seats.forEach((seat, i) => seat.team = i % count);
 }
-function rulesCtx(s, now, fx) {
+function rulesCtx(s, now, fx, random) {
   const write = fx !== null;
   const keys = keysOf(s);
-  const teamOf = (owner) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
+  const teamOf3 = (owner) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
   const store = (owner, event) => {
     const history = s.history[owner] ??= [];
     if (history.length >= PLAY_EVENTS_MAX) return false;
-    const team = teamOf(owner);
+    const team = teamOf3(owner);
     history.push({ ...event, ...team !== void 0 ? { team: String(team) } : {}, seq: history.length });
     return true;
   };
-  const view = { rng: s.rng };
+  const view2 = { rng: s.rng };
   return {
     now,
     config: s.config,
     game: s.config.game,
     keys,
-    random: () => write ? nextRandom(s) : nextRandom(view),
+    random: random ?? (() => write ? nextRandom(s) : nextRandom(view2)),
     seats: () => Object.values(s.seats),
     seat: (owner) => s.seats[owner],
     teams: () => teamsInUse(s),
@@ -1386,14 +4189,14 @@ function firstText(s, item, group) {
   }
   return null;
 }
-function studentSeats(s) {
+function studentSeats2(s) {
   return Object.values(s.seats).sort((a, b) => b.score - a.score || a.initials.localeCompare(b.initials) || a.owner.localeCompare(b.owner));
 }
 function ranks(s) {
   const out = /* @__PURE__ */ new Map();
   let rank = 0;
   let prev = null;
-  studentSeats(s).forEach((seat, i) => {
+  studentSeats2(s).forEach((seat, i) => {
     if (seat.score !== prev) rank = i + 1;
     prev = seat.score;
     out.set(seat.owner, rank);
@@ -1409,12 +4212,12 @@ function classWall(s) {
       if (e.move !== "guess" || e.correct !== false) continue;
       const wall = keys.items[e.item];
       if (wall?.shape !== "wall") continue;
-      const tiles = e.response?.tiles ?? [];
+      const tiles2 = e.response?.tiles ?? [];
       const groupOf = (t) => wall.groups.find((g) => g.tiles.includes(t))?.id;
-      for (let i = 0; i < tiles.length; i += 1) {
-        for (let j = i + 1; j < tiles.length; j += 1) {
-          const ti = tiles[i];
-          const tj = tiles[j];
+      for (let i = 0; i < tiles2.length; i += 1) {
+        for (let j = i + 1; j < tiles2.length; j += 1) {
+          const ti = tiles2[i];
+          const tj = tiles2[j];
           if (groupOf(ti) === groupOf(tj)) continue;
           const [a, b] = [wall.tiles[ti] ?? "", wall.tiles[tj] ?? ""].sort();
           const k = `${a}\0${b}`;
@@ -1441,8 +4244,8 @@ function seatRestore(s, owner) {
       const found = /* @__PURE__ */ new Set();
       const guesses = mine.map((e) => {
         if (e.correct === true && typeof e.extra?.group === "string") found.add(e.extra.group);
-        const tiles = e.response?.tiles ?? [];
-        return { tiles: tiles.filter((t) => typeof t === "string"), correct: e.correct === true };
+        const tiles2 = e.response?.tiles ?? [];
+        return { tiles: tiles2.filter((t) => typeof t === "string"), correct: e.correct === true };
       });
       const mistakes = guesses.filter((g) => !g.correct).length;
       const out2 = mistakes >= limit && found.size < w.groups.length;
@@ -1471,8 +4274,8 @@ function seatRestore(s, owner) {
   const hints = {};
   for (const [item, n] of hintCount) {
     if (done.has(item)) continue;
-    const step = Math.min(3, n);
-    hints[item] = { step, ...grid?.kind === "wordsearch" && grid.hints !== false ? wordHint(grid, item, step) : {} };
+    const step2 = Math.min(3, n);
+    hints[item] = { step: step2, ...grid?.kind === "wordsearch" && grid.hints !== false ? wordHint(grid, item, step2) : {} };
   }
   const out = {};
   if (solved.length) out.solved = solved;
@@ -1490,16 +4293,16 @@ var sharedCache = /* @__PURE__ */ new WeakMap();
 function sharedOf(s) {
   const held = sharedCache.get(s);
   if (held && held.seq === s.seq) return held;
-  const all = studentSeats(s);
+  const all = studentSeats2(s);
   const rank = ranks(s);
   const shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
   const count = teamCount(s);
   if (count) {
-    const rows = Array.from({ length: count }, (_, team) => ({ team, score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
+    const rows = Array.from({ length: count }, (_, team) => ({ team, name: teamName2(team), score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
     const sorted = rows.slice().sort((a, b) => b.score - a.score || a.team - b.team);
     sorted.forEach((r, i) => r.rank = i > 0 && sorted[i - 1].score === r.score ? sorted[i - 1].rank : i + 1);
     shared.teams = rows;
-    shared.leaderboard = sorted.map((r) => ({ initials: `Team ${r.team + 1}`, score: r.score, rank: r.rank, team: r.team }));
+    shared.leaderboard = sorted.map((r) => ({ initials: r.name, score: r.score, rank: r.rank, team: r.team }));
   }
   sharedCache.set(s, shared);
   return shared;
@@ -1508,7 +4311,7 @@ function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
   const s = state;
   const shared = sharedOf(s);
   const { all, rank } = shared;
-  const view = {
+  const view2 = {
     room: s.config.room,
     code: s.config.code,
     kind: s.config.game.kind,
@@ -1524,27 +4327,27 @@ function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
     seq: s.seq
   };
   const item = pacedItemView(s);
-  if (item) view.item = item;
-  if (s.phase === "paused" && s.paused_left_ms !== void 0) view.paused_left_ms = s.paused_left_ms;
+  if (item) view2.item = item;
+  if (s.phase === "paused" && s.paused_left_ms !== void 0) view2.paused_left_ms = s.paused_left_ms;
   if (shared.teams) {
     const mine = isStudent(role) ? s.seats[owner]?.team : void 0;
-    view.teams = shared.teams.map((t) => ({ ...t, members: !isStudent(role) || t.team === mine ? [...t.members] : [] }));
+    view2.teams = shared.teams.map((t) => ({ ...t, members: !isStudent(role) || t.team === mine ? [...t.members] : [] }));
   }
   const rules = rulesOf(s);
   if (rules) {
     const part = safe(() => rules.view(rulesCtx(s, now, null), s.custom, role, owner));
-    if (!isRulesError(part) && part !== void 0) view.kind_view = part;
+    if (!isRulesError(part) && part !== void 0) view2.kind_view = part;
   }
   if (isStudent(role)) {
     const seat = s.seats[owner];
     const last = s.last?.[owner];
     const restore = opts.restore && seat ? seatRestore(s, owner) : void 0;
-    view.you = { owner, ...seat ? { seat: { ...seat } } : {}, ...last ? { last } : {}, ...seat ? { rank: rank.get(owner) ?? 0 } : {}, ...restore ? { restore } : {} };
+    view2.you = { owner, ...seat ? { seat: { ...seat } } : {}, ...last ? { last } : {}, ...seat ? { rank: rank.get(owner) ?? 0 } : {}, ...restore ? { restore } : {} };
   } else {
-    view.you = { owner };
-    if (s.config.game.kind === "connections" && (role === "teacher" || s.board_view === "class_wall" || s.phase === "ended" || s.phase === "folded")) view.class_wall = shared.wall ??= classWall(s);
+    view2.you = { owner };
+    if (s.config.game.kind === "connections" && (role === "teacher" || s.board_view === "class_wall" || s.phase === "ended" || s.phase === "folded")) view2.class_wall = shared.wall ??= classWall(s);
   }
-  return view;
+  return view2;
 }
 function viewDelta(prev, next) {
   const patch = {};
@@ -1616,19 +4419,19 @@ function revealItem(s) {
   const key = keysOf(s).items[item.item];
   const counts = {};
   for (const c of Object.values(item.choices)) counts[c.choice] = (counts[c.choice] ?? 0) + 1;
-  const reveal = key ? revealFor(keysOf(s).kind, key, {}) : void 0;
-  item.revealed = { counts, reveal };
+  const reveal3 = key ? revealFor(keysOf(s).kind, key, {}) : void 0;
+  item.revealed = { counts, reveal: reveal3 };
   const fake = key?.shape === "quote" && key.speaker === FAKE_SPEAKER;
-  const seconds = itemSeconds(s);
+  const seconds2 = itemSeconds(s);
   for (const [owner, seat] of Object.entries(s.seats)) {
     const choice = item.choices[owner];
     const event = choice ? [...s.history[owner] ?? []].reverse().find((e) => e.item === item.item && e.move === "answer") : void 0;
     const correct = event?.correct === true;
     if (choice) {
-      seat.score += quotePoints(correct, fake, Math.max(0, choice.at - item.opened_at), seconds);
+      seat.score += quotePoints(correct, fake, Math.max(0, choice.at - item.opened_at), seconds2);
       if (correct && seat.progress) seat.progress = { ...seat.progress, done: seat.progress.done + 1 };
     }
-    (s.last ??= {})[owner] = { item: item.item, ...choice ? { correct } : {}, ...reveal ? { reveal } : {} };
+    (s.last ??= {})[owner] = { item: item.item, ...choice ? { correct } : {}, ...reveal3 ? { reveal: reveal3 } : {} };
   }
   s.ends_at = void 0;
 }
@@ -1647,18 +4450,18 @@ function endGame(s, now, fx, opts = {}) {
 }
 function onConnect(s, a, now, fx) {
   const { owner, role, conn } = a;
-  const close = (msg) => fx.push({ kind: "close", owner, ...conn ? { conn } : {}, msg });
+  const close2 = (msg) => fx.push({ kind: "close", owner, ...conn ? { conn } : {}, msg });
   let changed = false;
   if (isStudent(role)) {
-    if (s.kicked?.[owner]) return close({ t: "kicked" }), false;
+    if (s.kicked?.[owner]) return close2({ t: "kicked" }), false;
     const initials = a.student_id ? s.config.roster[a.student_id] : void 0;
-    if (!a.student_id || !initials) return close({ t: "error", code: "not_on_list", message: "You\u2019re not on this class list. Ask your teacher." }), false;
+    if (!a.student_id || !initials) return close2({ t: "error", code: "not_on_list", message: "You\u2019re not on this class list. Ask your teacher." }), false;
     const seat = s.seats[owner];
     if (seat) {
       if (!seat.connected) changed = true;
       seat.connected = true;
     } else if (s.phase !== "ended" && s.phase !== "folded") {
-      if (Object.keys(s.seats).length >= ROOM_LIMITS.seats) return close({ t: "error", code: "room_full", message: "This game is full." }), false;
+      if (Object.keys(s.seats).length >= ROOM_LIMITS.seats) return close2({ t: "error", code: "room_full", message: "This game is full." }), false;
       s.seats[owner] = newSeat(s, owner, initials);
       s.history[owner] ??= [];
       (s.students ??= {})[owner] = a.student_id;
@@ -1753,8 +4556,8 @@ function onMove(s, owner, conn, msg, now, fx) {
     const result2 = { item: item.item };
     remember(s, owner, msg.rid, result2);
     ack(fx, owner, conn, msg.rid, { result: result2 });
-    const live = Object.values(s.seats).filter((x) => x.connected);
-    if (live.length > 0 && live.every((x) => item.choices[x.owner])) revealItem(s);
+    const live2 = Object.values(s.seats).filter((x) => x.connected);
+    if (live2.length > 0 && live2.every((x) => item.choices[x.owner])) revealItem(s);
     return true;
   }
   const { result, stored, error } = markMove(s.config.game, keys, history, msg.event, now, who);
@@ -1807,8 +4610,8 @@ function onControl(s, owner, role, conn, rid, op, now, fx) {
   const no = (code, message) => (fail(fx, owner, conn, rid, code, message), false);
   const paced = s.config.style === "paced";
   if (s.config.style === "custom" && (op.op === "kind" || op.op === "next" || op.op === "reveal")) {
-    const err = kindControl(s, owner, role, op, now, fx);
-    return err ? no(err.error.code, err.error.message) : ok();
+    const err8 = kindControl(s, owner, role, op, now, fx);
+    return err8 ? no(err8.error.code, err8.error.message) : ok();
   }
   switch (op.op) {
     case "start":
@@ -2092,6 +4895,7 @@ export {
   ROOM_LIMITS,
   SIGNATURE_HEADER,
   SIGNATURE_SKEW_MS,
+  TEAM_NAMES2 as TEAM_NAMES,
   TICKET_LIFE_MS,
   classWall,
   foldPayload,
@@ -2109,6 +4913,7 @@ export {
   signBody,
   signTicket,
   teamCount,
+  teamName2 as teamName,
   ticketFromAuthorization,
   verifyBody,
   verifyTicket,
