@@ -328,7 +328,61 @@ describe('rendering', () => {
       'Justifying using reasons and example, judged for relevance.'
     );
     const el = renderBlock(createBlock('thinking_move', 'move_1'), 'student');
-    expect(el.querySelectorAll('.tk-mini')).toHaveLength(3);
+    expect(el.querySelector('.tk-move__sentence')?.textContent).toMatch(/judged for/);
+    expect(el.querySelectorAll('.tk-mini')).toHaveLength(0);
+  });
+
+  it('stepped blocks open one step at a time; ticking opens the next and it saves (flow)', () => {
+    const block = createBlock('thinking_move', 'flow_1') as Extract<Block, { block_type: 'thinking_move' }>;
+    const total = block.content.steps.length + (block.content.check.some((l) => l.trim()) ? 1 : 0);
+    expect(total).toBeGreaterThan(1);
+    const el = renderBlock(block, 'student', { lessonId: 'lflow' });
+    expect(el.querySelector('.tk-flow__count')?.textContent).toBe(`Step 1 of ${total}`);
+    expect(el.querySelectorAll('.tk-flow__step.is-now')).toHaveLength(1);
+    expect(el.querySelectorAll('.tk-flow__card')).toHaveLength(1);
+    const next = el.querySelector<HTMLButtonElement>('.tk-flow__next')!;
+    expect(next.disabled).toBe(true);
+    const tick = el.querySelector<HTMLInputElement>('.tk-flow__tick')!;
+    tick.checked = true;
+    tick.dispatchEvent(new Event('change'));
+    expect(next.disabled).toBe(false);
+    next.click();
+    expect(el.querySelector('.tk-flow__count')?.textContent).toBe(`Step 2 of ${total}`);
+    expect(el.querySelectorAll('.tk-flow__step.is-done')).toHaveLength(1);
+    const again = renderBlock(block, 'student', { lessonId: 'lflow' });
+    expect(again.querySelector('.tk-flow__count')?.textContent).toBe(`Step 2 of ${total}`);
+    again.querySelector<HTMLButtonElement>('.tk-flow__again')!.click();
+    expect(again.querySelector('.tk-flow__count')?.textContent).toBe(`Step 1 of ${total}`);
+  });
+
+  it('the last check step needs every check ticked before Finish', () => {
+    const block = createBlock('thinking_move', 'flow_2') as Extract<Block, { block_type: 'thinking_move' }>;
+    block.content.steps = block.content.steps.slice(0, 1);
+    block.content.check = ['First check', 'Second check'];
+    const el = renderBlock(block, 'student', { lessonId: 'lflow2' });
+    const first = el.querySelector<HTMLInputElement>('.tk-flow__tick')!;
+    first.checked = true;
+    first.dispatchEvent(new Event('change'));
+    el.querySelector<HTMLButtonElement>('.tk-flow__next')!.click();
+    const boxes = [...el.querySelectorAll<HTMLInputElement>('.tk-flow__check .tk-flow__tick')];
+    expect(boxes).toHaveLength(2);
+    const finish = el.querySelector<HTMLButtonElement>('.tk-flow__next')!;
+    expect(finish.textContent).toBe('Finish');
+    boxes[0]!.checked = true;
+    boxes[0]!.dispatchEvent(new Event('change'));
+    expect(finish.disabled).toBe(true);
+    boxes[1]!.checked = true;
+    boxes[1]!.dispatchEvent(new Event('change'));
+    finish.click();
+    expect(el.querySelector<HTMLElement>('.tk-flow__finish')!.hidden).toBe(false);
+    expect(el.querySelector('.tk-flow__count')?.textContent).toBe('All done');
+  });
+
+  it('print lists every step with no buttons', () => {
+    const el = renderBlock(createBlock('toolkit_skill', 'flow_3'), 'print');
+    const steps = el.querySelectorAll('.tk-flow__step');
+    expect(steps.length).toBeGreaterThan(1);
+    expect(el.querySelectorAll('.tk-flow__next, .tk-flow__tick')).toHaveLength(0);
   });
 });
 
@@ -447,21 +501,28 @@ describe('usable in a lesson', () => {
     expect(text).not.toContain('Thinking Toolkit');
   });
 
-  it('every student-facing block opens with a "What to do" line', () => {
+  it('every student-facing block opens with a "What to do" line, except stepped blocks, whose steps say it', () => {
+    const STEPPED = new Set<string>(['toolkit_skill', 'thinking_move']);
     for (const type of NOTE_TYPES) {
+      if (STEPPED.has(type)) {
+        const el = renderBlock(createBlock(type, `guide_${type}`), 'student');
+        expect(el.querySelector('.tk-guide'), type).toBeNull();
+        expect(el.querySelector('.tk-flow'), type).not.toBeNull();
+        continue;
+      }
       const el = renderBlock(createBlock(type, `guide_${type}`), 'student');
       expect(el.querySelector('.tk-guide')?.textContent, type).toMatch(/^What to do\S/);
     }
   });
 
-  it('a skill shows its question above "What to do"', () => {
+  it('a skill shows its question above the steps', () => {
     const block = createBlock('toolkit_skill', 'question_1');
     if (block.block_type !== 'toolkit_skill') throw new Error('expected a skill');
     block.content.context = 'Explain how the poem treats renewal.';
     const el = renderBlock(block, 'student');
     const question = el.querySelector('.tk-question')!;
     expect(question.querySelector('.tk-question__text')?.textContent).toBe('Explain how the poem treats renewal.');
-    expect(question.compareDocumentPosition(el.querySelector('.tk-guide')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(question.compareDocumentPosition(el.querySelector('.tk-flow')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('the teacher note starts closed and opens on click', () => {
