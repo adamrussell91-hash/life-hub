@@ -105,6 +105,16 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       const play = el('button', 'btn btn--primary gm-card__play', r ? 'Play again' : 'Play');
       play.type = 'button';
       play.addEventListener('click', () => {
+        if (client && arcade?.identity.need === 'initials') {
+          // Scores need a name first: send them to the initials box, not into a dead end.
+          const box = gate.querySelector<HTMLElement>('.gm-gate');
+          box?.classList.remove('gm-gate--nudge');
+          void box?.offsetWidth;
+          box?.classList.add('gm-gate--nudge');
+          box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          gate.querySelector<HTMLInputElement>('.gm-input')?.focus({ preventScroll: true });
+          return;
+        }
         if (client && hasPlayer(g.kind)) {
           soloShell = openSoloPlayer({
             game: g,

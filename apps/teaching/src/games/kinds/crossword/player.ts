@@ -522,6 +522,8 @@ export function mountCrossword(host: HTMLElement, ctx: PlayerContext): MountedPl
   paint();
   frame();
   void enter(root);
+  // Keyboards can type straight away; phones wait for a tap so the keyboard doesn't jump up unasked.
+  if (typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches) focusKey();
 
   return {
     onKey(ev: KeyboardEvent): boolean {

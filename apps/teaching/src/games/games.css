@@ -219,6 +219,9 @@ textarea.gm-input { resize: vertical; min-height: 2.4rem; }
 .gm-card__soon { margin: 0; font-size: var(--text-sm); color: var(--ink); outline: none; }
 .gm-gate { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md); background: var(--cotton); }
 .gm-gate p { margin: 0; }
+.gm-gate--nudge { animation: gm-gate-nudge 0.5s ease; box-shadow: 0 0 0 2px var(--game-gold); }
+@keyframes gm-gate-nudge { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .gm-gate--nudge { animation: none; } }
 .gm-gate__form { display: flex; gap: var(--space-2); }
 .gm-gate__form .gm-input { max-width: 9rem; text-transform: uppercase; }
 .gm-gate__form .btn { min-height: 44px; }
