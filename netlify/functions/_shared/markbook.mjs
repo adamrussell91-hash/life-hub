@@ -110,9 +110,9 @@ export async function classLessonIds(store, roster) {
 }
 
 /** Each lesson's written work, saved as students on the list typed it. */
-export async function workColumns(store, roster, lessonIds) {
+export async function workColumns(store, roster, lessonIds, { size = 8 } = {}) {
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 8, (lessonId) => classWork(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, size, (lessonId) => classWork(store, lessonId, roster.cls.id, ids));
   return found.filter(Boolean).map((w) => ({
     kind: 'work',
     id: `work:${w.lesson_id}`,
@@ -125,11 +125,11 @@ export async function workColumns(store, roster, lessonIds) {
 }
 
 /** Quiz lessons that someone on the list has handed in, or saved answers on. */
-export async function quizColumns(store, roster, book, lessonIds) {
+export async function quizColumns(store, roster, book, lessonIds, { size = 8 } = {}) {
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 8, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, size, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
   return found
     // A quiz shows once someone handed in, or has answers saved on a go they haven't handed in.
     .filter((q) => q && (Object.keys(q.scores).length || q.saved))
