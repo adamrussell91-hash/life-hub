@@ -1699,8 +1699,19 @@ function tutorialGroupNames(draft) {
  * scored as the Results tab scores it, with evidence items. Null when the
  * lesson isn't a published quiz. Goes before a teacher's clear are skipped.
  */
-export async function classQuizScores(store, lessonId, classId, studentIds) {
+/**
+ * One student’s page passes `onlyStudent`. Then a lesson whose draft runs no quiz is skipped
+ * before the quiz is read (loadQuiz would refuse it anyway). And once anyone has handed in,
+ * only that student's open go is looked up: `started` and `saved` cover them alone, which is
+ * all that page reads. With nobody handed in, the whole list is checked as before, since saved
+ * answers decide whether the quiz shows at all.
+ */
+export async function classQuizScores(store, lessonId, classId, studentIds, { onlyStudent = null } = {}) {
   if (!studentIds.length) return null;
+  if (onlyStudent) {
+    const draft = isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
+    if (!draft || isDeletedRecord(draft) || !runsQuiz(draft.pedagogical_mode)) return null;
+  }
   let loaded;
   try {
     loaded = await loadQuiz(store, lessonId);
@@ -1718,7 +1729,8 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, ai_review: a.ai_review ?? 0, asked_again: a.asked_again ?? [], practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
-  const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store, loaded.record);
+  const lookFor = onlyStudent && Object.keys(scores).length ? [onlyStudent] : studentIds;
+  const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, lookFor, scores, store, loaded.record);
   return {
     lesson_id: lessonId,
     title: insight.title,
