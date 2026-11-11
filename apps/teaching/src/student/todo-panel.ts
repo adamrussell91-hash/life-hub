@@ -215,7 +215,10 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
     if (prac.today > 0) {
       const minutes = minutesFor(prac.today);
       const note = `${prac.today} ${prac.today === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-      g.append(item('box', 'Practise your organiser', note, options.teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser')));
+      // Orange card so the daily practice stands out from the plain rows below it.
+      const row = item('box', 'Practise your organiser', note, options.teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
+      row.classList.add('td-item--practise');
+      g.append(row);
     } else g.append(item('tick', 'Practise your organiser', 'Done for today'));
     panel.append(g);
     any = true;

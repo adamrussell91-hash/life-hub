@@ -236,6 +236,32 @@
 .td-acts li::before { content: "○ "; color: rgba(23, 55, 94, 0.3); }
 .td-acts li.is-done::before { content: "● "; color: var(--pastel-sage-ink); }
 
+/* Daily organiser practice: an orange card so it stands out from the plain rows. */
+.td-item--practise {
+  align-items: center;
+  margin: 2px 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #f3b98a;
+  border-left: 4px solid #e8711f;
+  border-radius: var(--radius-sm);
+  background: #fdebdc;
+}
+
+.td-item--practise .td-mark--box { margin-top: 0; border-color: #e8711f; background: #fff; }
+.td-item--practise .td-item__title { color: #7a3510; }
+.td-item--practise .td-item__note { color: #8f4a1f; }
+
+.td-item--practise .td-go {
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  background: #b9530f;
+  color: #fff;
+}
+
+.td-item--practise .td-go:hover,
+.td-item--practise .td-go:focus-visible { background: #9a440c; text-decoration: none; }
+.td-item--practise .td-go:focus-visible { outline: 2px solid #7a3510; outline-offset: 2px; }
+
 /* Announcements */
 .td-ann {
   margin-bottom: 6px;
