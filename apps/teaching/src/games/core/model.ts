@@ -116,6 +116,8 @@ export type LiveContent = {
   items: PublicItem[];
   /** Jeopardy: categories in order, each tile's value, Double flag and item id; the Final's item id. */
   jeopardy?: { categories: Array<{ id: string; title: string; tiles: Array<{ id: string; item: string; value: number; double: boolean }> }>; final?: string };
+  /** Wheel: puzzles in order with their category, letter-question ids and explain id. The line itself stays in `items[puzzle id]` (a term key). */
+  wheel?: { puzzles: Array<{ id: string; category: string; bank: string[]; explain?: string }> };
 };
 
 /**
@@ -674,7 +676,10 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
   } else if (game.kind === 'wheel') {
     for (const p of game.puzzles) {
       keys.items[p.id] = { shape: 'term', answers: [p.text.trim()], decoys: [], tags: evidenceTags(p), label: p.text.trim() };
-      for (const item of [...p.bank, ...(p.explain ? [p.explain] : [])]) any(item);
+      for (const item of [...p.bank, ...(p.explain ? [p.explain] : [])]) {
+        const pub = any(item);
+        if (pub) pubItems.push(pub);
+      }
     }
     count = game.puzzles.length;
   } else {
@@ -691,6 +696,11 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
       keys.live.jeopardy = {
         categories: game.categories.map((c) => ({ id: c.id, title: c.title.trim(), tiles: c.tiles.map((t) => ({ id: t.id, item: t.item.id, value: t.value, double: t.double })) })),
         ...(game.final ? { final: game.final.id } : {})
+      };
+    }
+    if (game.kind === 'wheel') {
+      keys.live.wheel = {
+        puzzles: game.puzzles.map((p) => ({ id: p.id, category: p.category.trim(), bank: p.bank.map((i) => i.id), ...(p.explain ? { explain: p.explain.id } : {}) }))
       };
     }
   }
