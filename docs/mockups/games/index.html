@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game lessons — mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+body { background: var(--warm-white); }
+.ix { max-width: 1180px; margin: 0 auto; padding: 40px 16px 80px; }
+.ix-head { display: grid; gap: 10px; margin-bottom: 28px; }
+.ix-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--high-sea-ink); }
+.ix-head h1 { margin: 0; font-size: clamp(32px, 6vw, 48px); line-height: 1.05; letter-spacing: -.02em; color: var(--navy); }
+.ix-head p { margin: 0; max-width: 70ch; color: var(--muted); font-size: 16px; }
+.ix-arcade { border-radius: 28px; padding: 28px; background: radial-gradient(900px 400px at 20% -20%, #213f6e, var(--marine) 55%, var(--depth)); color: #f4f6fb; display: grid; gap: 18px; margin-bottom: 36px; box-shadow: 0 18px 50px rgba(10,21,54,.25); }
+.ix-arcade h2 { margin: 0; font-size: 24px; }
+.ix-arcade p { margin: 0; color: rgba(244,246,251,.7); font-size: 14px; }
+.ix-lobby { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 999px; background: var(--high-sea); color: var(--depth); font-weight: 700; text-decoration: none; justify-self: start; }
+.ix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.ix-card { position: relative; display: grid; gap: 10px; padding: 20px; border-radius: 22px; background: #fff; text-decoration: none; color: var(--ink); box-shadow: 0 1px 2px rgba(20,35,70,.06), 0 0 0 1px rgba(23,55,94,.08); transition: transform .25s var(--ease), box-shadow .25s; overflow: hidden; }
+.ix-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(20,35,70,.14), 0 0 0 1px rgba(23,55,94,.1); }
+.ix-card .glyph { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; }
+.ix-card .glyph svg { width: 32px; height: 32px; }
+.ix-card h3 { margin: 0; font-size: 19px; color: var(--navy); }
+.ix-card p { margin: 0; font-size: 14px; color: var(--muted); }
+.ix-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.ix-tags span { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cotton); color: var(--orca, #424860); }
+.ix-tags span.live { background: #ffe8d2; color: var(--high-sea-ink); }
+.ix-data { font-size: 13px; color: var(--ink); border-top: 1px solid rgba(23,55,94,.08); padding-top: 10px; }
+.ix-data b { color: var(--success); font-weight: 600; }
+.ix-card.pending { pointer-events: none; opacity: .55; }
+.ix-card.pending::after { content: "Being built"; position: absolute; top: 16px; right: 16px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ix-foot { margin-top: 32px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="ix">
+  <header class="ix-head">
+    <span class="ix-eyebrow">Phase 0 · mockups for sign-off</span>
+    <h1>Game lessons</h1>
+    <p>Twelve games inside the Game lesson type. Each mockup shows the projector board and a student's phone side by side, plays end to end with a simulated class, and includes the teacher-only view of the learning data that game produces. Everything here is invented: the novella “The Lantern House”, its quotes and the students.</p>
+  </header>
+
+  <section class="ix-arcade">
+    <h2>Start here: the lobby</h2>
+    <p>Every live game starts the same way: code and QR on the board, students join on their phones, teams balance themselves.</p>
+    <a class="ix-lobby" href="lobby.html">Open the lobby →</a>
+  </section>
+
+  <div class="ix-grid" id="grid"></div>
+  <p class="ix-foot">Toolbar on every mockup: switch Board / Phone views, try the light board for bright rooms, Calm (reduced motion), sound, restart.</p>
+</main>
+<script>
+const G = [
+  ['wager', 'Wager', 'Answer, then bet your points on it. Right answers split the pot of wrong bets.', ['Live'], 'Confidence against accuracy for every student', 'k3', '<path d="M8 22a8 3 0 0 0 16 0M8 22v-4a8 3 0 0 0 16 0v4M8 18a8 3 0 0 1 16 0M8 14a8 3 0 0 0 16 0v-4a8 3 0 0 0-16 0z" fill="none" stroke="#fff" stroke-width="2"/>'],
+  ['connections', 'Connections wall', 'Sixteen tiles, four hidden groups, four mistakes.', ['Solo', 'Live race'], 'Which ideas the class mixes up', 'k4', '<g fill="#fff"><rect x="5" y="5" width="9" height="9" rx="2"/><rect x="18" y="5" width="9" height="9" rx="2"/><rect x="5" y="18" width="9" height="9" rx="2"/><rect x="18" y="18" width="9" height="9" rx="2" opacity=".5"/></g>'],
+  ['crossword', 'Crossword', 'Definition and example clues, with a hint ladder.', ['Solo', 'Live race', 'Print'], 'Clues solved cleanly vs with hints', 'k1', '<g fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="5" width="22" height="22" rx="2"/><path d="M12 5v22M20 5v22M5 12h22M5 20h22"/></g>'],
+  ['find-a-word', 'Find-a-word', 'No word list: find the term each clue points to. Watch for decoys.', ['Solo', 'Live race', 'Print'], 'Decoy hits show confusions', 'k2', '<g fill="none" stroke="#fff" stroke-width="2.4"><circle cx="14" cy="14" r="7"/><path d="M19 19l7 7"/></g>'],
+  ['jeopardy', 'Jeopardy', 'Teams pick a tile; everyone answers on their own phone.', ['Live', 'Teams'], 'Each student’s level by category', 'k1', '<g fill="#fff"><rect x="4" y="6" width="7" height="5" rx="1"/><rect x="12.5" y="6" width="7" height="5" rx="1"/><rect x="21" y="6" width="7" height="5" rx="1"/><rect x="4" y="13.5" width="7" height="5" rx="1"/><rect x="12.5" y="13.5" width="7" height="5" rx="1" opacity=".5"/><rect x="21" y="13.5" width="7" height="5" rx="1"/><rect x="4" y="21" width="7" height="5" rx="1"/><rect x="12.5" y="21" width="7" height="5" rx="1"/><rect x="21" y="21" width="7" height="5" rx="1" opacity=".5"/></g>'],
+  ['wheel', 'Wheel of Fortune', 'Spin, earn letters by answering, solve the quote privately.', ['Live', 'Teams'], 'Letters needed to recognise each quote', 'k3', '<g fill="none" stroke="#fff" stroke-width="2"><circle cx="16" cy="16" r="11"/><path d="M16 5v22M5 16h22M8.2 8.2l15.6 15.6M23.8 8.2L8.2 23.8"/></g>'],
+  ['team-match', 'Team match', 'The answers are split across your team’s phones. Talk.', ['Live', 'Teams'], 'False taps reveal misconceptions', 'k2', '<g fill="#fff"><circle cx="10" cy="11" r="4"/><circle cx="22" cy="11" r="4"/><path d="M3 26c1-5 4-8 7-8s6 3 7 8zM15 26c1-5 4-8 7-8s6 3 7 8z"/></g>'],
+  ['points-rush', 'Points rush', 'Fast questions, misses come back, three simple upgrades.', ['Live', 'Solo'], 'First try vs second chance accuracy', 'k4', '<path d="M18 3L7 18h8l-2 11 12-16h-8z" fill="#fff"/>'],
+  ['battles', 'Short-answer battles', 'Write, then judge pairs of anonymous answers.', ['Live'], 'Quality scale + each student’s judging accuracy', 'k1', '<g fill="#fff"><rect x="4" y="7" width="10" height="16" rx="2"/><rect x="18" y="7" width="10" height="16" rx="2" opacity=".55"/></g>'],
+  ['articulate', 'Articulate', 'Describe the term without the banned words.', ['Live', 'Teams'], 'Who can explain which terms, plus a quick check', 'k3', '<path d="M5 7h22v13H13l-6 5v-5H5z" fill="#fff"/>'],
+  ['pictionary', 'Pictionary', 'Draw a term or a moment; the class guesses on their phones.', ['Live'], 'Guess speed, and a gallery of drawings', 'k2', '<path d="M6 26l3-8L22 5l5 5L14 23z" fill="#fff"/>'],
+  ['who-said-it', 'Who said it?', 'Pick the character, or call out a fake quote.', ['Solo', 'Live', 'Print'], 'Speaker mix-ups and an ear for fakes', 'k4', '<path d="M7 9h8v8c0 4-3 6-6 6M17 9h8v8c0 4-3 6-6 6" fill="none" stroke="#fff" stroke-width="2.4"/>']
+];
+const grid = document.getElementById('grid');
+grid.innerHTML = G.map(([f, t, d, tags, data, k, svg]) => `<a class="ix-card" data-f="${f}" href="${f}.html"><span class="glyph ${k}"><svg viewBox="0 0 32 32">${svg}</svg></span><h3>${t}</h3><p>${d}</p><span class="ix-tags">${tags.map((x) => `<span class="${/Live/.test(x) ? 'live' : ''}">${x}</span>`).join('')}</span><span class="ix-data"><b>Learning data:</b> ${data}</span></a>`).join('');
+// grey out mockups that don't exist yet
+grid.querySelectorAll('.ix-card').forEach((a) => fetch(a.getAttribute('href'), { method: 'HEAD' }).then((r) => { if (!r.ok) a.classList.add('pending'); }).catch(() => {}));
+</script>
+</body>
+</html>
