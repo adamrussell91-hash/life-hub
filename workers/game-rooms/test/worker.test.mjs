@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { unstable_dev } from 'wrangler';
 import { signBody, signTicket, verifyBody } from '../../../netlify/functions/_shared/game-room-core.mjs';
 import { prepareGamePublish } from '../../../netlify/functions/_shared/games.mjs';
-import { GAME_ROSTER, crossword, gameLesson } from '../../../tests/unit/helpers/game-fixture.mjs';
+import { GAME_ROSTER, crossword, gameLesson, wager } from '../../../tests/unit/helpers/game-fixture.mjs';
 
 const SECRET = 'worker-test-secret-0123456789abcdef';
 const ORIGIN = 'http://localhost:5173';
@@ -144,4 +144,69 @@ test('game-rooms Worker: sockets, reconnect, poll fallback and a signed fold', {
   for (const text of [folds[0].body, ...teacher.got.map((m) => JSON.stringify(m))]) assert.ok(!text.includes('"answers"'));
   teacher.ws.close();
   phone2.ws.close();
+});
+
+test('game-rooms Worker: a game with its own room rules (Wager) opens, takes a bet and folds', { timeout: 120_000 }, async (t) => {
+  const folds = [];
+  const receiver = createServer(async (req, res) => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    folds.push({ body, sig: req.headers['x-game-room-signature'] });
+    res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
+  });
+  await new Promise((r) => receiver.listen(0, '127.0.0.1', r));
+  t.after(() => receiver.close());
+
+  const worker = await unstable_dev('src/index.js', {
+    config: 'wrangler.jsonc',
+    vars: { GAME_ROOM_SECRET: SECRET, ALLOWED_ORIGINS: ORIGIN },
+    persist: false,
+    logLevel: 'error',
+    experimental: { disableExperimentalWarning: true }
+  });
+  t.after(() => worker.stop());
+  const base = `http://${worker.address}:${worker.port}`;
+  const wsBase = `ws://${worker.address}:${worker.port}`;
+
+  const pub = prepareGamePublish(gameLesson({}, [wager()]));
+  const room = 'room_worker_wager1';
+  const config = {
+    room, code: '135790', lesson_id: 'gl1', class_id: 'class1', game: pub.snapshot.games[0], keys: pub.record.games.g_wager, style: 'custom',
+    roster: Object.fromEntries(GAME_ROSTER.map((s) => [s.id, s.initials])), fold_url: `http://127.0.0.1:${receiver.address().port}/fold`, opened_at: Date.now()
+  };
+  const create = async (c) => {
+    const body = JSON.stringify(c);
+    return fetch(`${base}/g/rooms`, { method: 'POST', body, headers: { 'x-game-room-signature': await signBody(SECRET, body, Date.now()) } });
+  };
+  // A style the kind doesn't run with is refused; the kind's own style is accepted.
+  assert.equal((await create({ ...config, room: 'room_worker_wager0', style: 'race' })).status, 400);
+  assert.equal((await create({ ...config, room: 'room_worker_wager9', style: 'banana' })).status, 400);
+  const created = await create(config);
+  assert.equal(created.status, 201, await created.clone().text());
+
+  const now = Date.now();
+  const ticket = (role, owner, extra = {}) => signTicket(SECRET, { room, role, owner, ...extra }, now);
+  const teacher = await open(`${wsBase}/g/rooms/${room}/ws?ticket=${encodeURIComponent(await ticket('teacher', 'teacher'))}`);
+  await teacher.next((m) => m.t === 'snapshot');
+  const phone = await open(`${wsBase}/g/rooms/${room}/ws?ticket=${encodeURIComponent(await ticket('student', 'own_ann', { student_id: 'st_ann', initials: 'AB' }))}`);
+  await phone.next((m) => m.t === 'snapshot');
+
+  teacher.ws.send(JSON.stringify({ t: 'control', rid: 'c1', op: { op: 'start' } }));
+  await teacher.next((m) => m.t === 'ack' && m.rid === 'c1');
+  const open1 = await phone.next((m) => (m.t === 'delta' && m.patch.kind_view?.stage === 'open') || (m.t === 'snapshot' && m.view.kind_view?.stage === 'open'), 10_000);
+  const item = (open1.patch ?? open1.view).kind_view.item;
+  assert.equal(item.mode, 'choice');
+  assert.ok(!JSON.stringify(item).includes('correct'), 'no answer key on the phone');
+
+  phone.ws.send(JSON.stringify({ t: 'move', rid: 'm1', event: { item: item.id, move: 'answer', response: { selected: [item.options[0].id] }, extra: { bet: 20 } } }));
+  assert.deepEqual((await phone.next((m) => m.t === 'ack' && m.rid === 'm1')).result, { item: item.id });
+
+  teacher.ws.send(JSON.stringify({ t: 'control', rid: 'c2', op: { op: 'end' } }));
+  await phone.next((m) => (m.t === 'delta' && m.patch.phase === 'folded') || (m.t === 'snapshot' && m.view.phase === 'folded'), 15_000);
+  assert.equal(folds.length, 1);
+  assert.equal(await verifyBody(SECRET, folds[0].body, folds[0].sig, Date.now()), true);
+  const fold = JSON.parse(folds[0].body);
+  assert.ok(fold.events.some((e) => e.owner === 'own_ann' && e.item === item.id), 'the bet folds as evidence');
+  teacher.ws.close();
+  phone.ws.close();
 });

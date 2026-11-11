@@ -22,7 +22,7 @@
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
-  ROOM_LIMITS, SIGNATURE_HEADER, initialState, nextAlarm, publicView, reduce, signBody, ticketFromAuthorization, verifyBody, verifyTicket, viewDelta
+  ROOM_LIMITS, SIGNATURE_HEADER, initialState, nextAlarm, publicView, reduce, roomStyle, signBody, ticketFromAuthorization, verifyBody, verifyTicket, viewDelta
 } from '../../../netlify/functions/_shared/game-room-core.mjs';
 
 const ROOM_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -93,7 +93,7 @@ export default {
       } catch {
         return fail(request, env, 400, 'bad_request', 'Invalid config.');
       }
-      if (!config || !ROOM_ID.test(config.room ?? '') || !CODE.test(config.code ?? '') || !config.game || !config.keys || !['race', 'paced'].includes(config.style) || typeof config.fold_url !== 'string') {
+      if (!config || !ROOM_ID.test(config.room ?? '') || !CODE.test(config.code ?? '') || !config.game || !config.keys || !config.style || roomStyle(config.keys.kind) !== config.style || typeof config.fold_url !== 'string') {
         return fail(request, env, 400, 'bad_config', 'Invalid config.');
       }
       const result = await env.GAME_ROOM.getByName(config.room).create(config);
