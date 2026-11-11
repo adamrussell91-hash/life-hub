@@ -391,7 +391,7 @@ var StationSchema = z3.object({
   kind: z3.enum(ROTATION_KINDS).default("concepts"),
   strand: z3.string().max(40).optional(),
   outcomes: z3.array(z3.string().max(200)).max(6).default([]),
-  minutes: z3.number().int().min(1).max(90).default(10),
+  minutes: z3.number().int().min(1).max(90).default(20),
   seats: z3.number().int().min(1).max(40).default(6),
   /** "Back bench". A QR code links to the station. */
   location: z3.string().max(80).optional(),
@@ -448,7 +448,9 @@ var RotationSettingsSchema = z3.object({
   story: z3.object({ title: z3.string().max(120), intro: z3.string().max(800) }).optional(),
   behind_fallback: z3.enum(ROTATION_FALLBACKS).default("choose_n_minus_1"),
   /** Lesson length when it isn't scheduled; the timetable's wins when it is. */
-  minutes: z3.number().int().min(10).max(240).optional()
+  minutes: z3.number().int().min(10).max(240).optional(),
+  /** Students start in class and finish at home: time past the bell is homework, not over budget. */
+  finish_at_home: z3.boolean().optional()
 });
 var PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
 var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({

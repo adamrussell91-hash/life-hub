@@ -112,11 +112,17 @@ describe('path and recommendation', () => {
 });
 
 describe('time budget', () => {
-  it('adds pretest, stations, moves and finale; the teacher station adds nothing', () => {
+  it('adds pretest, stations, the teacher station, moves and finale', () => {
     const b = timeBudget(settings(), 60);
-    // 9 questions × 30 s = 5 min; 8 + 10 + 12 = 30; 3 moves; 10 finale.
-    expect(b).toMatchObject({ pretest: 5, stations: 30, moves: 3, finale: 10, total: 48, over: 0 });
-    expect(timeBudget(settings(), 40).over).toBe(8);
+    // 9 questions × 30 s = 5 min; 8 + 10 + 12 = 30; teacher 8; 4 moves; 10 finale.
+    expect(b).toMatchObject({ pretest: 5, stations: 30, teacher: 8, moves: 4, finale: 10, total: 57, over: 0, home: 0 });
+    expect(b.parts.map((p) => p.kind)).toEqual(['pretest', 'station', 'moving', 'station', 'moving', 'station', 'moving', 'teacher', 'moving', 'finale']);
+    expect(timeBudget(settings(), 40).over).toBe(17);
+  });
+
+  it('counts time past the bell as homework when students finish at home', () => {
+    const b = timeBudget(settings({ finish_at_home: true }), 40);
+    expect(b).toMatchObject({ total: 57, over: 0, home: 17, finishAtHome: true });
   });
 });
 

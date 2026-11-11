@@ -118,7 +118,7 @@ export const StationSchema = z.object({
   kind: z.enum(ROTATION_KINDS).default('concepts'),
   strand: z.string().max(40).optional(),
   outcomes: z.array(z.string().max(200)).max(6).default([]),
-  minutes: z.number().int().min(1).max(90).default(10),
+  minutes: z.number().int().min(1).max(90).default(20),
   seats: z.number().int().min(1).max(40).default(6),
   /** "Back bench". A QR code links to the station. */
   location: z.string().max(80).optional(),
@@ -183,7 +183,9 @@ export const RotationSettingsSchema = z.object({
   story: z.object({ title: z.string().max(120), intro: z.string().max(800) }).optional(),
   behind_fallback: z.enum(ROTATION_FALLBACKS).default('choose_n_minus_1'),
   /** Lesson length when it isn't scheduled; the timetable's wins when it is. */
-  minutes: z.number().int().min(10).max(240).optional()
+  minutes: z.number().int().min(10).max(240).optional(),
+  /** Students start in class and finish at home: time past the bell is homework, not over budget. */
+  finish_at_home: z.boolean().optional()
 });
 export type RotationSettings = z.infer<typeof RotationSettingsSchema>;
 

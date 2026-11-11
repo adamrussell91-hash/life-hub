@@ -20,7 +20,7 @@ export function newStation(r: RotationSettings, kind: Station['kind'] = 'concept
     title: kind === 'teacher' ? 'Teacher station' : `Station ${n}`,
     kind,
     outcomes: [],
-    minutes: kind === 'teacher' ? 8 : 10,
+    minutes: kind === 'teacher' ? 8 : 20,
     seats: kind === 'teacher' ? 5 : 6,
     piece: ''
   };

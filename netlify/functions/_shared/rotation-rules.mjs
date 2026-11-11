@@ -104,12 +104,27 @@ var DEFAULT_LESSON_MINUTES = 60;
 function timeBudget(settings, available = DEFAULT_LESSON_MINUTES) {
   const stations = learning(settings.stations);
   const n = stationsNeeded(settings);
-  const chosen = settings.path === "must_may" && stations.some((s) => s.must_do) ? stations.filter((s) => s.must_do) : stations.slice().sort((a, b) => b.minutes - a.minutes).slice(0, n);
+  const chosen = settings.path === "must_may" && stations.some((s) => s.must_do) ? stations.filter((s) => s.must_do) : stations.slice().sort((a, b) => b.minutes - a.minutes).slice(0, n).sort((a, b) => stations.indexOf(a) - stations.indexOf(b));
+  const teacherStation = settings.stations.find((s) => s.kind === "teacher");
   const pretest = Math.ceil((settings.pretest?.length ?? 0) * PRETEST_SECONDS / 60);
   const stationMinutes = chosen.reduce((sum, s) => sum + s.minutes, 0);
-  const moves = chosen.length * MOVE_MINUTES;
-  const total = pretest + stationMinutes + moves + FINALE_MINUTES;
-  return { pretest, stations: stationMinutes, moves, finale: FINALE_MINUTES, total, available, over: Math.max(0, total - available) };
+  const teacher = teacherStation?.minutes ?? 0;
+  const moves = (chosen.length + (teacherStation ? 1 : 0)) * MOVE_MINUTES;
+  const total = pretest + stationMinutes + teacher + moves + FINALE_MINUTES;
+  const parts = [];
+  if (pretest) parts.push({ kind: "pretest", label: "Pretest", minutes: pretest });
+  chosen.forEach((s, i) => {
+    parts.push({ kind: "station", label: chosen.length === stations.length ? s.title || `Station ${i + 1}` : `Station ${i + 1}`, minutes: s.minutes });
+    parts.push({ kind: "moving", label: "Moving", minutes: MOVE_MINUTES });
+  });
+  if (teacherStation) {
+    parts.push({ kind: "teacher", label: teacherStation.title || "Teacher station", minutes: teacher });
+    parts.push({ kind: "moving", label: "Moving", minutes: MOVE_MINUTES });
+  }
+  parts.push({ kind: "finale", label: "Finale", minutes: FINALE_MINUTES });
+  const finishAtHome = !!settings.finish_at_home;
+  const past = Math.max(0, total - available);
+  return { pretest, stations: stationMinutes, teacher, moves, finale: FINALE_MINUTES, total, available, over: finishAtHome ? 0 : past, home: finishAtHome ? past : 0, finishAtHome, parts };
 }
 var CURLY = /[‘’‚‛′]/g;
 var CURLY_DOUBLE = /[“”„‟″]/g;
