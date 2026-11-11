@@ -1277,10 +1277,20 @@ function pacedItemView(s) {
   const { choices: _choices, ...item } = s.item;
   return { ...item, answered: [...item.answered] };
 }
-function publicView(state, role, owner, now = state.at ?? 0) {
-  const s = state;
+var sharedCache = /* @__PURE__ */ new WeakMap();
+function sharedOf(s) {
+  const held = sharedCache.get(s);
+  if (held && held.seq === s.seq) return held;
   const all = studentSeats(s);
   const rank = ranks(s);
+  const shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
+  sharedCache.set(s, shared);
+  return shared;
+}
+function publicView(state, role, owner, now = state.at ?? 0) {
+  const s = state;
+  const shared = sharedOf(s);
+  const { all, rank } = shared;
   const view = {
     room: s.config.room,
     code: s.config.code,
@@ -1292,7 +1302,7 @@ function publicView(state, role, owner, now = state.at ?? 0) {
     ...s.ends_at !== void 0 && s.phase !== "paused" ? { ends_at: s.ends_at } : {},
     seats: isStudent(role) ? [] : all.map((x) => ({ ...x, ...x.progress ? { progress: { ...x.progress, ...x.progress.groups ? { groups: [...x.progress.groups] } : {} } } : {} })),
     ticker: s.config.style === "race" ? s.ticker.slice(0, TICKER_MAX) : [],
-    leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })),
+    leaderboard: shared.leaderboard.map((x) => ({ ...x })),
     board_view: s.board_view,
     seq: s.seq
   };
@@ -1305,7 +1315,7 @@ function publicView(state, role, owner, now = state.at ?? 0) {
     view.you = { owner, ...seat ? { seat: { ...seat } } : {}, ...last ? { last } : {}, ...seat ? { rank: rank.get(owner) ?? 0 } : {} };
   } else {
     view.you = { owner };
-    if (s.config.game.kind === "connections" && (role === "teacher" || s.board_view === "class_wall" || s.phase === "ended" || s.phase === "folded")) view.class_wall = classWall(s);
+    if (s.config.game.kind === "connections" && (role === "teacher" || s.board_view === "class_wall" || s.phase === "ended" || s.phase === "folded")) view.class_wall = shared.wall ??= classWall(s);
   }
   return view;
 }
@@ -1663,6 +1673,7 @@ var reduce = (state, action, now) => {
   const s = state;
   const fx = [];
   const alarmBefore = nextAlarm(s);
+  sharedCache.delete(s);
   s.at = now;
   let changed = false;
   switch (action.type) {

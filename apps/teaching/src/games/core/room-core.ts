@@ -205,10 +205,23 @@ function pacedItemView(s: RoomState): PacedItem | undefined {
  * plus the top-5 leaderboard, never other seats' detail; teacher and board get
  * every seat. Built only from public game fields and the room's own counts.
  */
-export function publicView(state: RoomState, role: Role, owner: string, now: number = state.at ?? 0): RoomView {
-  const s = state;
+type Shared = { seq: number; all: Seat[]; rank: Map<string, number>; leaderboard: RoomView['leaderboard']; wall?: RoomView['class_wall'] };
+/** The parts every viewer shares, worked out once per change (seq), not once per socket. */
+const sharedCache = new WeakMap<RoomState, Shared>();
+function sharedOf(s: RoomState): Shared {
+  const held = sharedCache.get(s);
+  if (held && held.seq === s.seq) return held;
   const all = studentSeats(s);
   const rank = ranks(s);
+  const shared: Shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
+  sharedCache.set(s, shared);
+  return shared;
+}
+
+export function publicView(state: RoomState, role: Role, owner: string, now: number = state.at ?? 0): RoomView {
+  const s = state;
+  const shared = sharedOf(s);
+  const { all, rank } = shared;
   const view: RoomView = {
     room: s.config.room,
     code: s.config.code,
@@ -220,7 +233,7 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
     ...(s.ends_at !== undefined && s.phase !== 'paused' ? { ends_at: s.ends_at } : {}),
     seats: isStudent(role) ? [] : all.map((x) => ({ ...x, ...(x.progress ? { progress: { ...x.progress, ...(x.progress.groups ? { groups: [...x.progress.groups] } : {}) } } : {}) })),
     ticker: s.config.style === 'race' ? s.ticker.slice(0, TICKER_MAX) : [],
-    leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })),
+    leaderboard: shared.leaderboard.map((x) => ({ ...x })),
     board_view: s.board_view,
     seq: s.seq
   };
@@ -233,7 +246,7 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
     view.you = { owner, ...(seat ? { seat: { ...seat } } : {}), ...(last ? { last } : {}), ...(seat ? { rank: rank.get(owner) ?? 0 } : {}) };
   } else {
     view.you = { owner };
-    if (s.config.game.kind === 'connections' && (role === 'teacher' || s.board_view === 'class_wall' || s.phase === 'ended' || s.phase === 'folded')) view.class_wall = classWall(s);
+    if (s.config.game.kind === 'connections' && (role === 'teacher' || s.board_view === 'class_wall' || s.phase === 'ended' || s.phase === 'folded')) view.class_wall = (shared.wall ??= classWall(s));
   }
   return view;
 }
@@ -632,6 +645,8 @@ export const reduce: RoomReducer = (state, action, now) => {
   const s = state;
   const fx: Fx = [];
   const alarmBefore = nextAlarm(s);
+  // Views built during this action (a joiner's snapshot) must see it: drop the per-change cache first.
+  sharedCache.delete(s);
   s.at = now;
   let changed = false;
   switch (action.type) {
