@@ -48,7 +48,7 @@ import {
   withSettings
 } from './model';
 import { newPretestItems, newStation, stationSection, withRotationSections } from './seed';
-import { CHECK_TOKENS, DEFAULT_LESSON_MINUTES, timeBudget } from './rules';
+import { CHECK_TOKENS, DEFAULT_LESSON_MINUTES, timeBudget, type TimeBudget } from './rules';
 import { createRotationTabs, stationTab, tabStation, type RotationTab } from './editor-tabs';
 import './rotation.css';
 
@@ -194,6 +194,52 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
 
   const lessonMinutes = (r: RotationSettings): number => o.classes?.find((c) => c.id === r.class_id)?.minutes ?? r.minutes ?? DEFAULT_LESSON_MINUTES;
 
+  /** One coloured segment per part, in the order students do them, with the bell marked. */
+  function budgetBar(b: TimeBudget): HTMLElement {
+    const wrap = el('div', 'rot-budget2');
+    const bar = el('div', 'rot-budget2__bar');
+    bar.setAttribute('aria-hidden', 'true');
+    const scale = Math.max(b.total, b.available);
+    for (const part of b.parts) {
+      const seg = el('span', `rot-budget2__seg rot-budget2__seg--${part.kind}`);
+      seg.style.flexGrow = String(part.minutes);
+      seg.title = `${part.label}: ${part.minutes} min`;
+      if (part.kind !== 'moving' && part.minutes / scale > 0.07) seg.append(el('span', 'rot-budget2__label', `${part.label} ${part.minutes}`));
+      bar.append(seg);
+    }
+    if (b.total > b.available) {
+      const bell = el('span', 'rot-budget2__bell');
+      bell.style.left = `${(b.available / scale) * 100}%`;
+      bell.append(el('span', '', b.finishAtHome ? 'Bell · home from here' : 'Bell'));
+      bar.append(bell);
+      if (b.finishAtHome) {
+        const home = el('span', 'rot-budget2__home');
+        home.style.left = `${(b.available / scale) * 100}%`;
+        bar.append(home);
+      }
+    }
+    wrap.append(bar);
+    return wrap;
+  }
+
+  function budgetSummary(b: TimeBudget, scheduled: boolean): HTMLElement {
+    const box = el('div', 'rot-budget2__sum');
+    const stat = (big: string, small: string, tone = '') => { const d = el('div', `rot-budget2__stat${tone ? ` rot-budget2__stat--${tone}` : ''}`); d.append(el('b', '', big), el('span', '', small)); return d; };
+    const row = el('div', 'rot-budget2__stats');
+    row.append(stat(`${b.total} min`, 'each student’s work'), stat(`${b.available} min`, scheduled ? 'in class, from the timetable' : 'in class'));
+    if (b.finishAtHome) row.append(stat(b.home ? `${b.home} min` : 'None', 'at home', 'home'));
+    else if (b.over) row.append(stat(`${b.over} min`, 'over the bell', 'over'));
+    else row.append(stat(`${b.available - b.total} min`, 'spare', 'ok'));
+    box.append(row);
+    const stationsText = b.stations ? `${b.parts.filter((p) => p.kind === 'station').length} stations (${b.stations} min)` : 'no stations yet';
+    const sentence = `Pretest ${b.pretest} min, ${stationsText}${b.teacher ? `, ${b.parts.find((p) => p.kind === 'teacher')!.label} ${b.teacher} min` : ''}, moving ${b.moves} min, finale ${b.finale} min.`;
+    const tail = b.finishAtHome
+      ? (b.home ? ` Students work until the bell and finish the last ${b.home} min at home.` : ' It all fits in class.')
+      : (b.over ? ` That runs ${b.over} min past the bell: tick “Students finish at home” if the rest is homework, or cut or shorten a station.` : '');
+    box.append(el('p', b.over ? 'rot-small rot-err' : 'rot-small rot-muted', sentence + tail));
+    return box;
+  }
+
   // ---- Build tab
 
   function stationChips(s: Station): HTMLElement {
@@ -222,7 +268,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     if (s.kind !== 'teacher') meta.append(pick(kinds, s.kind, 'Knowledge type', (v) => put((d) => { d.stations[i]!.kind = v; }, true)));
     meta.append(el('span', 'rot-suggest', suggestionFor(s.kind)));
     meta.append(pick(SKILL_STRANDS.map((x) => [x, STRAND_LABEL(x)] as const), (s.strand ?? '') as (typeof SKILL_STRANDS)[number] | '', 'Strand', (v) => put((d) => { d.stations[i]!.strand = v || undefined; }), 'No strand'));
-    const mins = num(s.minutes, 1, 90, 'Minutes', (v) => put((d) => { d.stations[i]!.minutes = v ?? 10; }, true));
+    const mins = num(s.minutes, 1, 90, 'Minutes', (v) => put((d) => { d.stations[i]!.minutes = v ?? 20; }, true));
     const seats = num(s.seats, 1, 40, 'Seats', (v) => put((d) => { d.stations[i]!.seats = v ?? 6; }));
     meta.append(mins, el('span', 'rot-note', 'min'), seats, el('span', 'rot-note', 'seats'));
     main.append(title, meta, stationChips(s));
@@ -323,28 +369,10 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
 
     const available = lessonMinutes(r);
     const b = timeBudget(r, available);
-    const bar = el('div', 'rot-budget');
-    bar.dataset.over = String(b.over > 0);
-    bar.setAttribute('aria-hidden', 'true');
-    const scale = Math.max(b.total, available);
-    for (const [mins, colour] of [[b.pretest, 'var(--pastel-lilac-ink)'], [b.stations, 'var(--wave)'], [b.moves, 'var(--muted)'], [b.finale, 'var(--marine)']] as const) {
-      const s = el('span');
-      s.style.width = `${(mins / scale) * 100}%`;
-      s.style.background = colour;
-      bar.append(s);
-    }
     const scheduled = o.classes?.find((c) => c.id === r.class_id)?.minutes;
-    const budgetText = el('p', b.over > 0 ? 'rot-small rot-err' : 'rot-small',
-      `Pretest ${b.pretest} min + stations ${b.stations} min + moving ${b.moves} min + finale ${b.finale} min = ${b.total} min, against ${available} min${scheduled ? ' (from the timetable)' : ''}.${b.over > 0 ? ` That is ${b.over} min over: cut a station, shorten one, or use “Choose some”.` : ''} The teacher station adds no time.`);
-    const legend = el('div', 'rot-legend');
-    for (const [label, colour] of [['Pretest', 'var(--pastel-lilac-ink)'], ['Stations', 'var(--wave)'], ['Moving', 'var(--muted)'], ['Finale', 'var(--marine)']] as const) {
-      const span = el('span');
-      const sw = el('b');
-      sw.style.background = colour;
-      span.append(sw, document.createTextNode(label));
-      legend.append(span);
-    }
-    const timePanel = panel('Time budget', bar, legend, budgetText, scheduled ? null : field('Lesson length (not scheduled yet)', num(r.minutes ?? DEFAULT_LESSON_MINUTES, 10, 240, 'Lesson length in minutes', (v) => put((d) => { d.minutes = v; }, true))));
+    const timePanel = panel('Time budget', budgetBar(b), budgetSummary(b, !!scheduled),
+      check('Students finish at home', b.finishAtHome, (v) => put((d) => { d.finish_at_home = v || undefined; }, true)),
+      scheduled ? null : field('Lesson length (not scheduled yet)', num(r.minutes ?? DEFAULT_LESSON_MINUTES, 10, 240, 'Lesson length in minutes', (v) => put((d) => { d.minutes = v; }, true))));
 
     const storyOn = !!r.story;
     const story = panel('Story (breakout)',
@@ -378,7 +406,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     }
     const grid = el('div', 'rot-fields');
     grid.append(
-      field('Minutes', num(s.minutes, 1, 90, 'Minutes', (v) => put((d) => { d.stations[i]!.minutes = v ?? 10; }))),
+      field('Minutes', num(s.minutes, 1, 90, 'Minutes', (v) => put((d) => { d.stations[i]!.minutes = v ?? 20; }))),
       field('Seats', num(s.seats, 1, 40, 'Seats', (v) => put((d) => { d.stations[i]!.seats = v ?? 6; }))),
       field('Where', input(s.location ?? '', 80, 'Where in the room', (v) => put((d) => { d.stations[i]!.location = v || undefined; }))),
       field('Strand', pick(SKILL_STRANDS.map((x) => [x, STRAND_LABEL(x)] as const), (s.strand ?? '') as (typeof SKILL_STRANDS)[number] | '', 'Strand', (v) => put((d) => { d.stations[i]!.strand = v || undefined; }), 'No strand'))
@@ -506,7 +534,8 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     blocks.forEach((b, bi) => {
       const row = el('div', 'rot-content__row');
       const role = roleOf(b);
-      const snippet = b.block_type === 'rich_text' ? plain(String(b.content.html ?? '')) : b.block_type === 'quiz_question' ? String((b.content.question as { prompt?: string }).prompt ?? '') : b.block_type === 'hinge_question' ? String(b.content.prompt ?? '') : '';
+      const c = b.content as Record<string, unknown>;
+      const snippet = b.block_type === 'rich_text' ? plain(String(c.html ?? '')) : b.block_type === 'quiz_question' ? String((c.question as { prompt?: string }).prompt ?? '') : String(c.title ?? c.prompt ?? c.question ?? '');
       row.append(el('span', 'rot-content__label', `${blockTypeLabel(b)}${snippet ? ` · ${snippet.slice(0, 80)}` : ''}`));
       const ctl = el('span', 'rot-content__ctl');
       const roles = ROTATION_ROLES.filter((x) => (x === 'gate' ? b.block_type === 'hinge_question' : x === 'recall' || x === 'exit' ? b.block_type === 'quiz_question' : true));
@@ -570,14 +599,14 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     const i = r.stations.findIndex((s) => s.id === id);
     const s = r.stations[i];
     if (!s) return [el('p', 'rot-note', 'That station is gone.')];
-    const grid = el('div', 'rot-grid rot-grid--side');
+    // One full-width column: a side column here held only the chips and squeezed the station card list.
     const main = el('div', 'rot-grid');
-    main.append(stationDetails(s, i, r));
+    const details = stationDetails(s, i, r);
+    details.insertBefore(stationChips(s), details.children[1] ?? null);
+    main.append(details);
     if (s.kind !== 'teacher') main.append(gatePanel(s, i), contentPanel(s, r));
-    const side = el('div', 'rot-grid');
-    side.append(panel('Chips', stationChips(s)), deletePanel(s));
-    grid.append(main, side);
-    return [grid];
+    main.append(deletePanel(s));
+    return [main];
   }
 
   // ---- Pretest tab
