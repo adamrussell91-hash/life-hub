@@ -1,0 +1,201 @@
+/* Jeopardy, live: board and phone (approved mockup docs/mockups/games/jeopardy.html).
+ * The board is fluid (em off the live board's root size, live.css): the grid
+ * and the team column share the stage, and on a 4:3 projector the team cards
+ * get narrower and drop their member row. Colours are the --game-* tokens. */
+
+:root {
+  /* Teams 5 and 6 (proposed in team-match.html for six teams of four). */
+  --game-team-5: #3fa9a3;
+  --game-team-5-soft: #d6efec;
+  --game-team-6: #d0678e;
+  --game-team-6-soft: #f6dde6;
+}
+
+/* ── Board ─────────────────────────────────────────────────────────── */
+.jp {
+  --jp-tile: linear-gradient(165deg, #2b5cb3 0%, #1b408a 58%, #142f6b 100%);
+  --jp-ink: #f4f6fb;
+  --jp-muted: rgba(244, 246, 251, 0.74);
+  --jp-val: var(--game-gold);
+  --jp-card: rgba(255, 255, 255, 0.1);
+  --jp-line: rgba(255, 255, 255, 0.2);
+  --jp-shadow: 0 0.45em 1.1em rgba(0, 0, 0, 0.35);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10em, 14.5em);
+  gap: 1.1em;
+  min-height: 0;
+  height: 100%;
+}
+.jp-main { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 0.7em; min-height: 0; min-width: 0; }
+.jp-grid { display: grid; grid-template-columns: repeat(var(--cats, 5), minmax(0, 1fr)); grid-template-rows: auto repeat(var(--rows, 5), minmax(0, 1fr)); gap: 0.5em; perspective: 1600px; min-height: 0; }
+.jp-cat { display: grid; place-items: center; text-align: center; padding: 0 0.3em 0.25em; font-size: 0.86em; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.1; color: var(--stage-ink); border-bottom: 0.14em solid var(--game-gold); text-wrap: balance; min-height: 2.6em; }
+.jp-tile { position: relative; border: 0; border-radius: 0.6em; background: var(--jp-tile); color: var(--jp-val); font-size: 2.1em; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; box-shadow: var(--jp-shadow); text-shadow: 0 0.05em 0 rgba(0, 0, 0, 0.28); display: grid; place-items: center; place-content: center; min-height: 0; cursor: pointer; transition: transform 0.3s var(--gl-ease), box-shadow 0.3s, opacity 0.4s; }
+.jp-tile:not(.used):not(:disabled):hover { transform: translateY(-0.12em); }
+.jp-tile:disabled { cursor: default; }
+.jp-tile:focus-visible { outline: 0.1em solid var(--game-gold); outline-offset: 0.08em; }
+.jp-tile.aim { transform: scale(1.05); box-shadow: 0 0 0 0.16em var(--game-gold), 0 0 1.6em rgba(242, 193, 78, 0.55); z-index: 2; }
+.jp-tile.used { background: color-mix(in srgb, var(--tc, transparent) 24%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tc, var(--stage-ink)) 50%, transparent); color: var(--stage-ink); text-shadow: none; font-size: 0.86em; line-height: 1.2; text-align: center; }
+.jp-tile.used small { display: block; font-size: 0.85em; font-weight: 600; color: var(--stage-muted); }
+.jp-tile.used.none { --tc: var(--stage-muted); opacity: 0.55; }
+
+.jp-turn { justify-self: start; display: flex; align-items: center; gap: 0.55em; padding: 0.4em 0.9em; border-radius: 999px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 0.9em; color: var(--stage-muted); max-width: 100%; }
+.jp-turn b { color: var(--stage-ink); }
+.jp-turn i { width: 0.75em; height: 0.75em; border-radius: 50%; background: var(--tc); flex: none; }
+
+.jp-side { display: grid; align-content: start; gap: 0.6em; min-width: 0; min-height: 0; overflow: hidden; }
+.jp-teams { display: grid; gap: 0.55em; }
+.jp-team { position: relative; padding: 0.6em 0.75em 0.6em 1em; border-radius: 0.85em; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.3em 0.4em; transition: box-shadow 0.4s; }
+.jp-team::before { content: ''; position: absolute; left: 0; top: 0.7em; bottom: 0.7em; width: 0.25em; border-radius: 0 0.25em 0.25em 0; background: var(--tc); }
+.jp-team .nm { font-size: 1em; font-weight: 700; display: flex; align-items: baseline; gap: 0.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jp-team .rk { font-size: 0.8em; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.jp-team .sc { font-size: 1.6em; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
+.jp-team .mem { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.25em; }
+.jp-team .mem .gl-av { width: 1.5em; height: 1.5em; font-size: 0.55em; }
+.jp-team .mem .cap { box-shadow: 0 0 0 0.18em var(--game-gold); }
+.jp-team .mem .off { opacity: 0.28; }
+.jp-team .tagp { position: absolute; top: -0.5em; right: 0.7em; font-style: normal; font-size: 0.65em; font-weight: 700; color: var(--depth, #0a1536); background: var(--game-gold); padding: 0.1em 0.5em; border-radius: 999px; opacity: 0; transform: scale(0.7); transition: 0.4s var(--gl-spring); }
+.jp-team.turn { box-shadow: 0 0 0 0.14em var(--tc), 0 0 1.5em color-mix(in srgb, var(--tc) 50%, transparent); }
+.jp-team.turn .tagp { opacity: 1; transform: none; }
+.jp-rule { margin: 0; padding: 0.65em 0.8em; border-radius: 0.85em; border: 2px dashed var(--stage-line); font-size: 0.75em; line-height: 1.35; color: var(--stage-muted); }
+.jp-rule b { color: var(--stage-ink); }
+.jp-insight-btn { justify-self: start; min-height: 2.2em; padding: 0 0.9em; border-radius: 999px; border: 2px dashed var(--stage-line); background: transparent; font-size: 0.75em; font-weight: 600; cursor: pointer; }
+.jp-insight-btn[aria-pressed='true'] { background: var(--stage-card); }
+
+/* Clue: zooms out of its tile to cover the stage. */
+.jp-clue { position: absolute; inset: 0; z-index: 10; transform-origin: 0 0; background: var(--jp-tile); color: var(--jp-ink); border-radius: 0.6em; overflow: hidden; display: grid; grid-template-rows: auto auto 1fr auto; align-content: start; gap: 0.8em; padding: 1.2em 2em 1.3em; }
+.jp-c-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7em; padding-right: 5em; font-size: 0.95em; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--jp-val); }
+.jp-c-pick { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.25em 0.7em; border-radius: 999px; background: var(--jp-card); color: var(--jp-ink); font-size: 0.8em; letter-spacing: 0; text-transform: none; font-weight: 600; }
+.jp-c-pick i { width: 0.7em; height: 0.7em; border-radius: 50%; background: var(--tc); }
+.jp-c-ring { position: absolute; right: 1.6em; top: 0.9em; transition: opacity 0.4s; }
+.jp-clue .gl-ring__track { stroke: var(--jp-line); }
+.jp-clue.closed .jp-c-ring { opacity: 0.25; }
+.jp-c-q { margin: 0.2em auto 0; max-width: 34em; text-align: center; font-size: 1.75em; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+.jp-c-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7em; align-content: start; max-width: 50em; width: 100%; margin: 0 auto; }
+.jp-c-opt { position: relative; min-height: 3.4em; border-radius: 0.85em; padding: 0.55em 0.8em; background: var(--jp-card); box-shadow: inset 0 0 0 1px var(--jp-line); display: grid; grid-template-columns: 2em minmax(0, 1fr) auto; gap: 0.6em; align-items: center; transition: transform 0.6s var(--gl-spring), opacity 0.5s, box-shadow 0.5s, background 0.5s; }
+.jp-c-opt .key { width: 2em; height: 2em; border-radius: 0.55em; display: grid; place-items: center; font-weight: 700; color: var(--game-key-ink, #fff); background: var(--game-key-1); }
+.jp-c-opt .key.k2 { background: var(--game-key-2); }
+.jp-c-opt .key.k3 { background: var(--game-key-3); }
+.jp-c-opt .key.k4 { background: var(--game-key-4); }
+.jp-c-opt .txt { font-size: 1.1em; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.jp-c-opt .n { font-size: 0.85em; font-weight: 700; color: var(--jp-muted); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+.jp-clue.revealed .jp-c-opt .n { opacity: 1; }
+.jp-c-opt.is-right { transform: scale(1.03); background: rgba(63, 174, 115, 0.3); box-shadow: 0 0 0 0.14em var(--game-right), 0 0 2em rgba(63, 174, 115, 0.45); }
+.jp-c-opt.is-wrong { opacity: 0.35; transform: scale(0.97); }
+.jp-c-term { justify-self: center; align-self: start; width: min(30em, 100%); min-height: 6em; border-radius: 1em; border: 0.1em dashed var(--jp-line); display: grid; place-content: center; justify-items: center; gap: 0.3em; text-align: center; padding: 0.8em; }
+.jp-c-term .big { font-size: 1.3em; font-weight: 700; }
+.jp-c-term .sub { font-size: 0.85em; color: var(--jp-muted); }
+.jp-c-term.done { border: 0; background: rgba(63, 174, 115, 0.26); box-shadow: 0 0 0 0.14em var(--game-right), 0 0 2em rgba(63, 174, 115, 0.4); }
+.jp-c-term.done .big { font-size: 2em; }
+.jp-c-prog { display: flex; flex-wrap: wrap; gap: 0.6em 1.5em; font-size: 0.85em; font-weight: 600; align-self: end; }
+.jp-c-prog .grp { display: grid; gap: 0.3em; }
+.jp-c-prog .grp span { display: flex; align-items: center; gap: 0.35em; }
+.jp-c-prog .grp span i { width: 0.65em; height: 0.65em; border-radius: 50%; background: var(--tc); }
+.jp-c-prog .dots { display: flex; gap: 0.3em; }
+.jp-c-prog .dots i { width: 0.85em; height: 0.85em; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--jp-line); transition: background 0.3s, box-shadow 0.3s; }
+.jp-c-prog .dots i.on { background: var(--tc); box-shadow: none; }
+.jp-c-prog .dots i.off { opacity: 0.3; }
+.jp-c-res { align-self: end; display: grid; grid-template-columns: repeat(min(var(--n, 4), 4), minmax(0, 1fr)); gap: 0.6em; }
+.jp-rc { position: relative; border-radius: 0.85em; padding: 0.55em 0.8em 0.55em 1em; background: var(--jp-card); box-shadow: inset 0 0 0 1px var(--jp-line); display: grid; gap: 0.1em; min-width: 0; }
+.jp-rc::before { content: ''; position: absolute; left: 0; top: 0.6em; bottom: 0.6em; width: 0.25em; border-radius: 0 0.25em 0.25em 0; background: var(--tc); }
+.jp-rc .t { font-size: 0.95em; font-weight: 700; display: flex; align-items: center; gap: 0.35em; flex-wrap: wrap; }
+.jp-rc .t em { font-style: normal; font-size: 0.7em; padding: 0.05em 0.4em; border-radius: 999px; background: var(--game-gold); color: var(--depth, #0a1536); }
+.jp-rc .f { font-size: 0.8em; color: var(--jp-muted); }
+.jp-rc .g { font-size: 1.6em; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.jp-rc.up .g { color: var(--game-right); }
+.jp-rc.down .g { color: var(--game-wrong); }
+
+/* Double and Final splash */
+.jp-dbl { grid-row: 1 / -1; align-self: center; display: grid; justify-items: center; gap: 0.6em; text-align: center; }
+.jp-dbl-word { display: flex; gap: 0.05em; font-size: 6.4em; font-weight: 700; line-height: 1; letter-spacing: -0.02em; color: var(--game-gold); text-shadow: 0 0.04em 0 rgba(0, 0, 0, 0.25), 0 0 0.4em rgba(242, 193, 78, 0.5); }
+.jp-dbl-word span { display: inline-block; }
+.jp-dbl p { margin: 0; font-size: 1.2em; font-weight: 600; color: var(--jp-muted); max-width: 30em; }
+.jp-dbl p b { color: var(--jp-ink); }
+.jp-dbl .num { font-size: 3.6em; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.jp-shine { position: absolute; top: 0; bottom: 0; width: 12em; left: -14em; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent); pointer-events: none; }
+.jp-fw { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5em; }
+.jp-fw-chip { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.35em 0.8em; border-radius: 999px; background: var(--jp-card); font-weight: 600; }
+.jp-fw-chip i { width: 0.7em; height: 0.7em; border-radius: 50%; background: var(--tc); }
+.jp-fw-chip b { font-size: 0.8em; color: var(--jp-muted); }
+.jp-fw-chip.in { box-shadow: 0 0 0 0.12em var(--tc); }
+.jp-fw-chip.in b { color: var(--jp-ink); }
+
+/* Teacher insight (category × value) */
+.jp-ins { position: absolute; inset: 0; z-index: 12; padding: 0.4em 0.2em; background: var(--stage-bg, #0a1536) var(--depth, #0a1536); overflow: auto; display: grid; align-content: start; gap: 0.5em; }
+.jp-ins h2 { margin: 0; font-size: 1.5em; }
+.jp-ins .lede { margin: 0; color: var(--stage-muted); }
+.jp-heat { display: grid; grid-template-columns: 3.4em repeat(var(--cats, 5), minmax(0, 6em)); gap: 0.3em; }
+.jp-heat .h { display: grid; place-items: end center; text-align: center; font-size: 0.7em; font-weight: 700; color: var(--stage-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.jp-heat .v { display: grid; place-items: center; font-weight: 700; color: var(--game-gold); }
+.jp-heat .c { --p: 0.5; min-height: 2.6em; border-radius: 0.5em; display: grid; place-items: center; font-weight: 700; color: var(--depth, #0a1536); font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--game-right) calc(var(--p) * 100%), var(--game-wrong)); }
+.jp-heat .c.none { background: var(--stage-line); color: var(--stage-muted); }
+.jp-ceil h3 { margin: 0.4em 0 0; font-size: 1em; }
+.jp-ceil .key { margin: 0 0 0.3em; font-size: 0.75em; color: var(--stage-muted); }
+.jp-ceil .row { display: grid; grid-template-columns: 2em repeat(var(--cats, 5), minmax(0, 3em)); gap: 0.25em; align-items: center; margin-bottom: 0.2em; }
+.jp-ceil .row i { height: 1.4em; border-radius: 0.35em; display: grid; place-items: center; font-style: normal; font-size: 0.7em; font-weight: 700; background: var(--game-gold); color: var(--depth, #0a1536); }
+.jp-ceil .row i.no { background: var(--stage-line); color: var(--stage-muted); }
+.jp-ceil .row.hd i { background: none; color: var(--stage-muted); }
+
+/* A 4:3 projector: narrower team column, no member rows. */
+@media (max-aspect-ratio: 3/2) {
+  .jp { grid-template-columns: minmax(0, 1fr) minmax(8em, 10.5em); gap: 0.8em; }
+  .jp-team .mem { display: none; }
+  .jp-tile { font-size: 1.7em; }
+  .jp-c-q { font-size: 1.45em; }
+  .jp-rule { display: none; }
+}
+
+.gm-calm .jp-tile, .gm-calm .jp-c-opt, .gm-calm .jp-team .tagp { transition-duration: 0.15s; }
+
+/* ── Phone ─────────────────────────────────────────────────────────── */
+.jpp { position: relative; display: grid; gap: var(--space-3, 12px); min-width: 0; }
+.jpp-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.jpp-me { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--navy); font-size: 14px; }
+.jpp-tp { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--shore, #f4efe6); font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.jpp-tp i { width: 10px; height: 10px; border-radius: 50%; background: var(--tc); flex: none; }
+.jpp-timer { height: 6px; border-radius: 6px; background: rgba(23, 55, 94, 0.1); overflow: hidden; }
+.jpp-timer i { display: block; height: 100%; background: var(--high-sea, #f68620); transform-origin: left; }
+.jpp-body { display: grid; gap: var(--space-3, 12px); min-width: 0; }
+.jpp-cap { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: var(--pastel-gold, #f1e2b6); color: var(--pastel-gold-ink, #6c581f); font-size: 15px; font-weight: 600; }
+.jpp-pcat { display: grid; gap: 6px; }
+.jpp-pcat b { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--navy); }
+.jpp-pvals { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
+.jpp-pvals button { min-height: 46px; border-radius: 12px; border: 0; background: linear-gradient(165deg, #2b5cb3, #1b408a); color: var(--game-gold); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; transition: transform 0.2s var(--game-ease-spring), box-shadow 0.2s; }
+.jpp-pvals button.sel { box-shadow: 0 0 0 3px var(--high-sea, #f68620); transform: scale(1.06); }
+.jpp-pvals button[disabled] { background: var(--shore, #f4efe6); color: var(--muted); }
+.jpp-pvals button[disabled] i { display: block; width: 10px; height: 10px; border-radius: 50%; margin: 0 auto; background: var(--tc, var(--muted)); }
+.jpp-wait { display: grid; place-items: center; text-align: center; gap: 10px; color: var(--muted); padding: 18px 0; }
+.jpp-wait .mid { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1.2; overflow-wrap: anywhere; }
+.jpp-wait.is-right .mid { color: var(--success, #2e7d4f); font-size: 44px; }
+.jpp-wait.is-wrong .mid { color: var(--danger, #b3261e); font-size: 44px; }
+.jpp-sub { margin: 0; font-size: 15px; color: var(--muted); }
+.jpp-small { font-size: 13px; }
+.jpp-more { margin-top: 10px; }
+.jpp-bob { width: 74px; height: 74px; border-radius: 22px; margin: 0 auto 6px; background: linear-gradient(165deg, #2b5cb3, #1b408a); color: var(--game-gold); display: grid; place-items: center; font-size: 22px; font-weight: 700; animation: jppBob 2.4s ease-in-out infinite; }
+@keyframes jppBob { 50% { transform: translateY(-8px) rotate(-4deg); } }
+.jpp-mini { display: grid; gap: 6px; }
+.jpp-mini div { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.08); font-size: 15px; font-weight: 600; }
+.jpp-mini div i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); }
+.jpp-mini div b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.jpp-mini div.me { box-shadow: 0 0 0 2px var(--navy); }
+.jpp-qmeta { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--high-sea-ink, #9a4d0b); }
+.jpp-qmeta .dbl { padding: 2px 8px; border-radius: 999px; background: var(--pastel-gold, #f1e2b6); color: var(--pastel-gold-ink, #6c581f); }
+.jpp-h { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.3; color: var(--navy); overflow-wrap: anywhere; }
+.jpp-input { width: 100%; min-height: 48px; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(23, 55, 94, 0.2); font: inherit; font-size: 16px; box-sizing: border-box; }
+.jpp-bet { display: grid; gap: 14px; padding: 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1), 0 8px 24px rgba(20, 35, 70, 0.08); }
+.jpp-bet .amt { text-align: center; font-size: 52px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--navy); }
+.jpp-range { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; }
+.jpp-range::-webkit-slider-runnable-track { height: 12px; border-radius: 12px; background: linear-gradient(90deg, var(--high-sea, #f68620) var(--p, 50%), rgba(23, 55, 94, 0.12) var(--p, 50%)); }
+.jpp-range::-webkit-slider-thumb { -webkit-appearance: none; width: 36px; height: 36px; margin-top: -12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea, #f68620), 0 4px 10px rgba(0, 0, 0, 0.2); }
+.jpp-range::-moz-range-track { height: 12px; border-radius: 12px; background: rgba(23, 55, 94, 0.12); }
+.jpp-range::-moz-range-progress { height: 12px; border-radius: 12px; background: var(--high-sea, #f68620); }
+.jpp-range::-moz-range-thumb { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea, #f68620); }
+.jpp-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.jpp-chip { min-height: 44px; border-radius: 12px; border: 1px solid rgba(23, 55, 94, 0.15); background: var(--shore, #f4efe6); font: inherit; font-weight: 700; color: var(--navy); }
+.jpp-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1); font-size: 15px; }
+.jpp-break div { display: flex; justify-content: space-between; gap: 12px; }
+.jpp-break .tot { border-top: 1px solid rgba(23, 55, 94, 0.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+.jpp-cta { width: 100%; min-height: 52px; }
+.jpp-dock { display: grid; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .jpp-bob { animation: none; } }
+.gm-calm .jpp-bob { animation: none; }

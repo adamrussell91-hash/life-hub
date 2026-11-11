@@ -10,6 +10,8 @@ import './articulate';
 import './connections';
 import './crossword';
 import './find-a-word';
+import './jeopardy';
+import './team-match';
 import './wheel';
 import './who-said-it';
 
