@@ -5194,7 +5194,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     for (const name of ['.dev.vars', '.dev.vars.example']) {
       if (secret) break;
       try {
-        const text = readFileSync(new URL(`../../../workers/game-rooms/${name}`, import.meta.url), 'utf-8');
+        // A plain path, not new URL(`…${name}`, import.meta.url): Vite turns that into a glob over the
+        // whole Worker folder, and its package-lock.json is outside fs.allow, so every API test fails to load.
+        const workerDir = new URL('../../../workers/game-rooms/', import.meta.url).pathname;
+        const text = readFileSync(workerDir + name, 'utf-8');
         secret = /^GAME_ROOM_SECRET=(.+)$/m.exec(text)?.[1]?.trim() ?? '';
       } catch {
         // No Worker checkout: live games say they aren't set up.
