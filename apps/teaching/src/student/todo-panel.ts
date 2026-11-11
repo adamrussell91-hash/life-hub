@@ -9,7 +9,8 @@ import { minutesFor } from '@/organiser/student-panel';
 import './todo-panel.css';
 
 export type TodoActivity = { id: string; title: string; done: boolean };
-export type TodoCountdown = { title: string; lesson_id: string; assessment: boolean; due_date: string; due_time: string; set_date: string };
+/** `published: false`: an assessment on the calendar whose task page is still closed, so there is nothing to open. */
+export type TodoCountdown = { title: string; lesson_id: string; assessment: boolean; due_date: string; due_time: string; set_date: string; published?: boolean };
 export type TodoPayload = {
   countdowns: TodoCountdown[];
   announcements: { id: string; text: string; at: string | null }[];
@@ -49,6 +50,7 @@ export function remaining(due: Date, now: Date): { days: number; hours: number; 
 const DAY_FORMAT = new Intl.DateTimeFormat('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 const SHORT_DAY = new Intl.DateTimeFormat('en-AU', { weekday: 'long' });
 const DATE_ONLY = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short' });
+const BIG_DAY = new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
 
 function clock(time: string): string {
   const [h = 0, m = 0] = time.split(':').map(Number);
@@ -82,14 +84,30 @@ function unit(n: number, label: string): HTMLElement {
   return cell;
 }
 
-function countdown(c: TodoCountdown, classId: string, now: () => Date): HTMLElement | null {
+export type CountdownOptions = {
+  classId: string;
+  now?: () => Date;
+  /** `big`: the card at the top of My progress, with the clock beside the name. */
+  size?: 'small' | 'big';
+};
+
+/**
+ * One countdown: a live days, hours and minutes clock, the due moment and how far along from the
+ * day it was set. Links to its lesson once that is published. Null once the time is up.
+ */
+export function countdownCard(c: TodoCountdown, options: CountdownOptions): HTMLElement | null {
+  const now = options.now ?? (() => new Date());
+  const big = options.size === 'big';
   const due = dueAt(c);
   if (Number.isNaN(due.getTime()) || remaining(due, now()).past) return null;
-  const box = studentAnchor(lessonHref(classId, c.lesson_id), 'td-count');
-  box.append(el('span', 'td-count__kicker', c.assessment ? 'Assessment task' : 'Due soon'), el('span', 'td-count__name', c.title));
+  const open = c.published !== false;
+  const box = open ? studentAnchor(lessonHref(options.classId, c.lesson_id), 'td-count') : el('div', 'td-count is-closed');
+  if (big) box.classList.add('td-count--big');
+  const head = big ? el('div', 'td-count__head') : box;
+  head.append(el('span', 'td-count__kicker', c.assessment ? 'Assessment task' : 'Due soon'), el('span', 'td-count__name', c.title));
   const cells = el('div', 'td-count__clock');
   cells.setAttribute('role', 'timer');
-  const when = el('span', 'td-count__due', `Due ${DAY_FORMAT.format(due)}${c.due_time ? `, ${clock(c.due_time)}` : ''}`);
+  const when = el('span', 'td-count__due', `Due ${big ? BIG_DAY.format(due).replace(',', '') : DAY_FORMAT.format(due)}${c.due_time ? `, ${clock(c.due_time)}` : ''}`);
   const track = el('span', 'td-count__track');
   const fill = el('i');
   track.append(fill);
@@ -105,8 +123,12 @@ function countdown(c: TodoCountdown, classId: string, now: () => Date): HTMLElem
     return !left.past;
   };
   draw();
-  box.append(cells, when);
+  if (big) {
+    head.append(when);
+    box.append(head, cells);
+  } else box.append(cells, when);
   if (set && set < due) box.append(track);
+  if (big && !open) box.append(el('p', 'td-count__foot', 'Your teacher opens the task page closer to the day.'));
   // Redraws twice a minute; stops once the panel has left the page or the time is up.
   const timer = window.setInterval(() => {
     if (!box.isConnected || !draw()) window.clearInterval(timer);
@@ -166,7 +188,7 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
   let any = false;
 
   // Two countdowns at once (an assessment and a sprint step, say) stack, soonest first.
-  const counts = todo.countdowns.map((c) => countdown(c, options.classId, now)).filter((c): c is HTMLElement => c !== null);
+  const counts = todo.countdowns.map((c) => countdownCard(c, { classId: options.classId, now })).filter((c): c is HTMLElement => c !== null);
   if (counts.length) {
     const stack = el('div', 'td-counts');
     stack.append(...counts);

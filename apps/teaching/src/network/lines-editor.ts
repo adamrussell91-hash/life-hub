@@ -193,6 +193,19 @@ export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions)
       r.append(link);
     }
     r.append(up, down, remove);
+    const meaning = textInput(line.meaning ?? '', 200, 'In a sentence, e.g. how a text shows people, places and ideas', `What ${line.name || 'this line'} means (students see this)`);
+    meaning.className = 'net-lines__meaning';
+    meaning.addEventListener('change', () => {
+      const text = meaning.value.trim();
+      void save(lines.map((l) => {
+        if (l.id !== line.id) return l;
+        const { meaning: _old, ...rest } = l;
+        return text ? { ...rest, meaning: text } : rest;
+      }));
+    });
+    const label = el('label', 'net-lines__meaning-label');
+    label.append(el('span', 'net-lines__meaning-text', 'What it means (students see this)'), meaning);
+    r.append(label);
     return r;
   }
 

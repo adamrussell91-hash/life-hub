@@ -93,7 +93,8 @@ const rich = {
   outcomes: [{ key: 'out:a', name: 'Analysis', sub: 'EN12-1', cells: ['starting', 'building'], now: 'building', story: { kind: 'moved_up', from: 'starting', to: 'building', piece_id: 'p2' }, looks: null }],
   concepts: [],
   skills: [{ strand: 'Composing', rows: [{ key: 'skill:x', name: 'Paragraph control', counts: { below: 0, capable: 1, skilled: 1, accomplished: 0, excellent: 0 }, now: 'skilled', story: { kind: 'now', step: 'skilled' }, i_can: 'I can build a paragraph.', next_move: 'Link back at the end.', next_rung: 'accomplished' }] }],
-  codes: [{ code_id: 'ts', code: 'TS', label: 'Topic sentence', colour: 'peach', positive: false, cells: [1, 1], hit: 2, of: 2, total: 2, dropped: false }]
+  codes: [{ code_id: 'ts', code: 'TS', label: 'Topic sentence', colour: 'peach', positive: false, cells: [1, 1], hit: 2, of: 2, total: 2, dropped: false }],
+  feedback: { pieces: [{ id: 'w:l1:b', label: 'Road imagery', date: '6 Oct', kind: 'written' }, { id: 'w:l4:b', label: 'Tension', date: '13 Oct', kind: 'written' }], rows: [{ code_id: 'ts', code: 'TS', label: 'Topic sentence', colour: 'peach', positive: false, cells: [1, 1], hit: 2, of: 2, total: 2, trend: 'steady', hits: [{ piece_id: 'w:l4:b', title: 'Tension', date: '13 Oct', words: 'The road waits.', note: null }], do: 'Open each paragraph with your argument.' }] }
 };
 
 describe('progress page', () => {
@@ -105,8 +106,8 @@ describe('progress page', () => {
   it('shows learning rows, a skills path and the code grid with counts', () => {
     expect(host.textContent).toContain('Where your learning is');
     expect(host.querySelectorAll('.pg-learning .pg-chart').length).toBe(1);
-    expect(host.querySelector('.pg-skills .pg-path')).toBeTruthy();
-    expect(host.querySelector('.pg-codes .pg-codes__n')!.textContent).toBe('1');
+    expect(host.querySelectorAll('.pg-skills .pg-sk__dot').length).toBe(4);
+    expect(host.querySelector('.pg-fb .pg-fb__count')!.textContent).toBe('2 of last 2 · steady');
   });
   it('badges Returned work with the unseen count', () => {
     expect(host.querySelector('[data-tab="returned"] .pg-tab__badge')!.textContent).toBe('2');
@@ -136,6 +137,39 @@ describe('progress page', () => {
     const gone = pieceView({ ...note, audio_url: null, audio_deleted: true }, () => {});
     expect(gone.querySelector('audio')).toBeNull();
     expect(gone.textContent).toContain('kept for 28 days');
+  });
+  it('opens a piece from a feedback row on the Returned work tab, for the teacher too', async () => {
+    for (const teacher of [undefined, { name: 'Sam Teacher' }]) {
+      const asked: string[] = [];
+      const lists: number[] = [];
+      const h = renderProfile({ ...rich, unseen: 0 } as never, { classId: 'class1', teacher, loadReturned: async () => (lists.push(1), []), loadPiece: async (id) => (asked.push(id), { id, kind: 'written', title: 'Tension', date: '13 Oct', comment: '', text: null, tags: [], codes: [], criteria: [] } as never) });
+      (h.querySelector('.pg-fb__head') as HTMLElement).click();
+      (h.querySelector('.pg-fb__open') as HTMLElement).click();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(h.querySelector('[data-tab="returned"]')!.getAttribute('aria-selected')).toBe('true');
+      expect(asked).toEqual(['w:l4:b']);
+      expect(lists).toEqual([], 'the list does not load over the piece');
+    }
+  });
+  it('puts the soonest assessment countdown at the top, and says when its page is still closed', () => {
+    const todo = { countdowns: [{ title: 'Sprint step', lesson_id: 'l2', assessment: false, due_date: '2099-01-01', due_time: '', set_date: '', published: true }, { title: 'Viva task', lesson_id: 'l5', assessment: true, due_date: '2099-02-01', due_time: '13:24', set_date: '', published: false }], announcements: [], practice: null, back: [], waiting: [], started: [], todo: [], more: 0 };
+    const h = renderProfile({ ...rich, unseen: 0, todo } as never, { classId: 'class1' });
+    const panel = h.querySelector('.pg-panel')!;
+    const top = panel.firstElementChild as HTMLElement;
+    expect(top.classList.contains('td-count--big')).toBe(true);
+    expect(top.tagName).toBe('DIV');
+    expect(top.querySelector('.td-count__name')!.textContent).toBe('Viva task');
+    expect(top.textContent).toContain('Your teacher opens the task page closer to the day.');
+    expect(top.querySelector('.td-count__due')!.textContent).toBe('Due Sun 1 Feb, 1:24 pm');
+    const open = renderProfile({ ...payload, todo: { ...todo, countdowns: [{ ...todo.countdowns[1]!, published: true }] } } as never, { classId: 'class1' });
+    const link = open.querySelector('.td-count--big')!;
+    expect(link.tagName).toBe('A');
+    expect(link.textContent).not.toContain('closer to the day');
+    expect(link.parentElement).toBe(open);
+    expect(link.nextElementSibling!.classList.contains('pm-empty')).toBe(true);
+    const none = renderProfile({ ...rich, todo: { ...todo, countdowns: [todo.countdowns[0]!] } } as never, { classId: 'class1' });
+    expect(none.querySelector('.td-count--big')).toBeNull();
   });
   it('loads the returned list when the tab is opened', async () => {
     const opened: string[] = [];

@@ -208,3 +208,33 @@ test('a redraft being marked keeps the step and rubric being worked on out of si
   const progress = await profileAction(store, 'class1', { action: 'progress', ...device });
   assert.equal(JSON.stringify(progress).includes('secure"'), false);
 });
+
+test('feedback covers the newest 6 pieces, with a trend, where each code was marked and what to do', async () => {
+  const { store, ava } = await setup();
+  const body = 'The road is long and the night is quiet.';
+  // Seven returned pieces: TS on the 2nd and 3rd, then on the 7th with a note; the 1st drops out of the window.
+  for (let n = 1; n <= 7; n += 1) {
+    const tags = [2, 3, 7].includes(n) ? [{ id: `t${n}`, code_id: 'ts', positive: false, part: 'answers', field: 'q1', start: 0, end: 17, quote: body.slice(0, 17), ...(n === 7 ? { note: 'Say what the road stands for.' } : {}) }] : [];
+    store.data.set(`piece_feedback/class1/${ava.id}/w:lesson${n}:b`, { kind: 'written', title: `Piece ${n}`, lesson_id: `lesson${n}`, block_id: 'b', column_id: null, tags, comment: '', status: 'returned', returned_at: `2026-10-${10 + n}T00:00:00Z`, updated_at: 'x' });
+  }
+  const out = await profileAction(store, 'class1', { action: 'progress', ...device });
+  assert.deepEqual(out.feedback.pieces.map((p) => p.label), ['Piece 2', 'Piece 3', 'Piece 4', 'Piece 5', 'Piece 6', 'Piece 7']);
+  const [row] = out.feedback.rows;
+  assert.deepEqual([row.code, row.cells, row.hit, row.trend, row.do], ['TS', [1, 1, 0, 0, 0, 1], 3, 'less', 'Open each paragraph with your argument.']);
+  assert.deepEqual(row.hits.map((h) => [h.piece_id, h.words, h.note]), [
+    ['w:lesson7:b', 'The road is long', 'Say what the road stands for.'],
+    ['w:lesson3:b', 'The road is long', null],
+    ['w:lesson2:b', 'The road is long', null]
+  ]);
+  assert.equal(out.codes[0].cells.length, out.pieces.length, 'the Over time grid keeps the chart’s pieces');
+});
+
+test('code trend compares the newest 3 pieces with the 3 before', async () => {
+  const { codeTrend } = await import('../../netlify/functions/_shared/profile-feedback.mjs');
+  assert.equal(codeTrend([0, 0, 0, 0, 1, 0]), 'new');
+  assert.equal(codeTrend([1, 0, 0, 1, 1, 0]), 'more');
+  assert.equal(codeTrend([1, 1, 0, 0, 0, 1]), 'less');
+  assert.equal(codeTrend([1, 0, 0, 0, 1, 0]), 'steady');
+  assert.equal(codeTrend([0, 1]), 'steady', 'nothing earlier to compare with');
+  assert.equal(codeTrend([null, null, null, 0, 1, 0]), 'steady');
+});

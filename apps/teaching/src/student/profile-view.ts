@@ -18,13 +18,13 @@ import { buildCoverageMap, type CoverageMapInput } from '@/network/coverage-map/
 import { mountProgressMap } from '@/network/coverage-map/progress';
 import { scheduleFromRows, type ScheduleRow } from '@/network/schedule';
 import { stepChart } from '@/progress/step-chart';
-import { skillPath } from '@/progress/skill-path';
-import { codeGrid, codeChip } from '@/progress/code-grid';
+import { skillRow } from '@/progress/skill-row';
+import { feedbackCard, codeChip } from '@/progress/code-grid';
 import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import type { RedraftApi } from '@/student/redraft-editor';
-import { renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
+import { countdownCard, renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -123,21 +123,35 @@ function renderSkills(p: ProfilePayload): HTMLElement | null {
   const skills = p.skills ?? [];
   if (!skills.length) return null;
   const sec = el('section', 'pg-skills');
-  sec.append(el('h2', 'pm-map__title', 'Your skills'), el('p', 'pm-key', 'Skills use the HSC skills continuum, a different scale from your outcomes. The dot shows where you are now. Under each rung is how many of your pieces landed there.'));
+  sec.append(el('h2', 'pm-map__title', 'Your skills'), el('p', 'pm-key', 'The filled dot is where you are. Tap any dot to see what that step looks like.'));
+  const card = el('div', 'pg-skills__card');
   for (const s of skills) {
-    const card = el('div', 'pg-skills__card');
-    card.append(el('p', 'pg-skills__strand', s.strand));
-    for (const r of s.rows) {
-      const row = el('div', `pg-skills__row${r.story.kind === 'holding' ? ' is-holding' : ''}`);
-      row.append(el('h4', 'pg-row__name', r.name), skillPath(r));
-      if (r.i_can) row.append(el('p', 'pg-skills__ican', `“${r.i_can}”`));
-      if (r.next_move && r.next_rung) row.append(el('p', 'pg-skills__next', `To reach ${placeName(r.next_rung)}: ${r.next_move}`));
-      if (r.story.kind === 'holding') row.append(el('p', 'pg-row__flag', storyText(r.story, null, true)));
-      card.append(row);
-    }
-    sec.append(card);
+    const strand = el('div', 'pg-skills__group');
+    strand.append(el('h3', 'pg-skills__strand', s.strand));
+    for (const r of s.rows) strand.append(skillRow(r));
+    card.append(strand);
   }
+  sec.append(card);
   return sec;
+}
+
+/** "What your feedback keeps saying": the newest pieces' codes, each row opening to where it was marked. */
+function renderFeedback(p: ProfilePayload, onOpen: (pieceId: string) => void): HTMLElement | null {
+  const feedback = p.feedback;
+  if (!feedback?.pieces.length || !feedback.rows.length) return null;
+  const sec = el('section', 'pg-codes-sec');
+  sec.append(
+    el('h2', 'pm-map__title', 'What your feedback keeps saying'),
+    el('p', 'pm-key', `Your last ${feedback.pieces.length} marked ${feedback.pieces.length === 1 ? 'piece' : 'pieces'}, newest on the right. Tap a row to see where your teacher marked it.`),
+    feedbackCard(feedback, { onOpen })
+  );
+  return sec;
+}
+
+/** The soonest assessment's countdown, big, at the top of My progress. Other countdowns stay in To do. */
+function topCountdown(payload: ProfilePayload, options: RenderProfileOptions): HTMLElement | null {
+  const first = payload.todo?.countdowns.find((c) => c.assessment);
+  return first ? countdownCard(first, { classId: options.classId, size: 'big' }) : null;
 }
 
 function renderLearning(p: ProfilePayload): HTMLElement {
@@ -150,7 +164,7 @@ function renderLearning(p: ProfilePayload): HTMLElement {
 }
 
 /** The unit map: the teacher's coverage map as the student's own, grey until done. */
-function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HTMLElement {
+function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string, payload: ProfilePayload): HTMLElement {
   const section = el('section', 'pm-map');
   section.append(el('h2', 'pm-map__title', 'Your unit'));
   const unit = map.unit;
@@ -173,7 +187,24 @@ function renderMap(map: NonNullable<ProfilePayload['map']>, classId: string): HT
     label: 'Your unit map',
     done: new Set(map.lessons.filter((l) => l.done).map((l) => l.id)),
     faded: new Set(),
-    next: map.next
+    next: map.next,
+    lineStatus: (columnId) => {
+      // Where the student is on a line, from their own marked work: skills by strand, concepts by name.
+      const item = built.groups.flatMap((g) => g.items).find((it) => it.id === columnId);
+      if (!item) return null;
+      const name = item.name.trim().toLowerCase();
+      if (item.kind === 'skill') {
+        const strand = (payload.skills ?? []).find((s) => s.strand.trim().toLowerCase() === name);
+        const rungs = (strand?.rows ?? []).filter((r) => r.now).map((r) => `${r.name} ${placeName(r.now)}`);
+        return rungs.length ? `Your ${item.name} skills: ${rungs.join(', ')}` : null;
+      }
+      if (item.kind === 'concept') {
+        const row = (payload.concepts ?? []).find((c) => c.name.trim().toLowerCase() === name && c.now);
+        return row ? `Now: ${placeName(row.now)}` : null;
+      }
+      // Syllabus lines reach students without their syllabus link, so there is no outcome to match.
+      return null;
+    }
   });
   return section;
 }
@@ -260,7 +291,7 @@ function dropBadge(root: Element | null): void {
   else badge.remove();
 }
 
-function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () => void {
+function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): { showList: () => void; open: (id: string) => void } {
   const showList = (): void => {
     panel.replaceChildren(el('p', 'pm-empty', 'Loading…'));
     void (options.loadReturned?.() ?? Promise.resolve([] as ReturnedItem[])).then(
@@ -279,7 +310,7 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): () =>
       (error: unknown) => panel.replaceChildren(el('p', 'pm-empty', errorText(error, 'Couldn’t open that piece. Try again.')))
     );
   };
-  return showList;
+  return { showList, open: (id) => open(id) };
 }
 
 function organizerPanelFor(organiser: OrganiserLoad, options: RenderProfileOptions): HTMLElement {
@@ -308,12 +339,15 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     root.append(el('h1', 'pm-title', 'Your progress'));
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
   }
-  const map = withTodo(renderMap(payload.map, options.classId), payload, options);
+  const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
   const organiserPanel = organiser ? organizerPanelFor(organiser, options) : null;
   const wantOrganiser = options.tab === 'organiser' && !!organiserPanel;
   const over = overTimeTab(options);
+  // The soonest assessment's countdown leads every view of the page that has the student's own data.
+  const countdown = topCountdown(payload, options);
   if (!hasReturned && !organiserPanel && !over) {
+    if (countdown) root.append(countdown);
     // The teacher knows nothing is returned yet; only the student needs telling.
     if (!options.teacher) root.append(el('p', 'pm-empty', 'Your progress appears here once your teacher returns your first piece of work.'));
     root.append(map);
@@ -321,6 +355,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   const progress = el('div', 'pg-panel');
   progress.setAttribute('role', 'tabpanel');
+  if (countdown) progress.append(countdown);
   if (!hasReturned) {
     if (over) {
       // Only a teacher gets here with nothing returned: the overview is the map, then Over time.
@@ -332,19 +367,24 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     root.append(tabs(0, wantOrganiser ? 'organiser' : 'progress', { progress, organiser: organiserPanel! }, () => undefined), progress, organiserPanel!);
     return root;
   }
-  progress.append(renderNext(payload), renderLearning(payload));
-  const skills = renderSkills(payload);
-  if (skills) progress.append(skills);
-  if (payload.pieces?.length) {
-    const codes = el('section', 'pg-codes-sec');
-    codes.append(el('h2', 'pm-map__title', 'What your feedback keeps saying'), codeGrid(payload.codes ?? [], payload.pieces));
-    progress.append(codes);
-  }
-  progress.append(map);
   const returned = el('div', 'pg-panel');
   returned.setAttribute('role', 'tabpanel');
   let loaded = false;
-  const load = returnedPanel(returned, options);
+  const returnedApi = returnedPanel(returned, options);
+  // "Open this piece" in the feedback rows: over to Returned work, straight to that piece.
+  const openPiece = (id: string): void => {
+    loaded = true;
+    const tab = root.querySelector<HTMLButtonElement>('.pg-tab[data-tab="returned"]');
+    tab?.click();
+    returnedApi.open(id);
+    tab?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  };
+  progress.append(renderNext(payload), renderLearning(payload));
+  const skills = renderSkills(payload);
+  if (skills) progress.append(skills);
+  const feedback = renderFeedback(payload, openPiece);
+  if (feedback) progress.append(feedback);
+  progress.append(map);
   root.append(
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
     tabs(
@@ -354,7 +394,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
       () => {
         if (loaded) return;
         loaded = true;
-        load();
+        returnedApi.showList();
       },
       over?.hooks
     ),

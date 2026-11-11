@@ -254,6 +254,20 @@ describe('Lesson flow', () => {
   });
 });
 
+describe('Network lines for students', () => {
+  it('passes a line’s meaning through, trimmed and capped, and leaves a blank one out', async () => {
+    const { publicNetworkLines } = await import('../../../../netlify/functions/_shared/teaching-network.mjs');
+    const lines = publicNetworkLines([
+      { id: 'rep', mode: 'metro', name: 'Representation', colour: 'lilac', meaning: '  How a text shows people and places.  ', alignment: { kind: 'concept', key: 'REP' } },
+      { id: 'read', mode: 'light_rail', name: 'Reading', colour: 'amber', meaning: '   ' },
+      { id: 'long', mode: 'train', name: 'Long', meaning: 'x'.repeat(260) }
+    ]);
+    expect(lines[0]).toEqual({ id: 'rep', mode: 'metro', name: 'Representation', colour: 'lilac', meaning: 'How a text shows people and places.' });
+    expect(lines[1]).not.toHaveProperty('meaning');
+    expect(lines[2].meaning).toHaveLength(200);
+  });
+});
+
 describe('Lesson flow for students', () => {
   it('passes links through lessons students cannot see, and leaves unset links unset', async () => {
     const { publicAfterLinks } = await import('../../../../netlify/functions/_shared/teaching-network.mjs');

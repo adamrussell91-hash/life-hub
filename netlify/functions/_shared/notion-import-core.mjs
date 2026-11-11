@@ -2767,7 +2767,9 @@ var NetworkLineSchema = z13.object({
   name: z13.string().max(60).default(""),
   short: z13.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default("wave"),
-  alignment: LineAlignmentSchema.optional()
+  alignment: LineAlignmentSchema.optional(),
+  /** What the line means, in a sentence: students read it when they press the line's tag on their unit map. */
+  meaning: z13.string().max(200).optional()
 });
 var AfterLessonIdsSchema = z13.array(z13.string().min(1).max(64)).max(6);
 var LessonRouteRoleSchema = z13.enum(["core", "support", "extension", "optional"]);
@@ -5391,6 +5393,8 @@ var LessonSchema = z19.object({
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
   feedback_off: z19.boolean().optional(),
+  /** Learning conditions the teacher set aside for this lesson (src/conditions). Teacher-only. */
+  conditions_off: z19.array(z19.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
   end_questions: z19.object({
     on: z19.boolean().optional(),

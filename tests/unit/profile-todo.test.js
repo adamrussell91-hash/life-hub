@@ -77,10 +77,42 @@ test('countdowns: every one still due, soonest first, so two at once stack; past
     ['y', { blocks: [countdown('c4', '2026-11-20', { title: 'Your own poem' })] }]
   ]);
   assert.deepEqual(countdownsFrom(lessons, published, '2026-11-09'), [
-    { title: 'Sprint step 2', lesson_id: 'x', assessment: false, due_date: '2026-11-13', due_time: '15:00', set_date: '2026-11-01' },
-    { title: 'Your own poem', lesson_id: 'y', assessment: true, due_date: '2026-11-20', due_time: '15:00', set_date: '2026-11-01' }
+    { title: 'Sprint step 2', lesson_id: 'x', assessment: false, due_date: '2026-11-13', due_time: '15:00', set_date: '2026-11-01', published: true },
+    { title: 'Your own poem', lesson_id: 'y', assessment: true, due_date: '2026-11-20', due_time: '15:00', set_date: '2026-11-01', published: true }
   ]);
   assert.deepEqual(countdownsFrom(lessons, published, '2026-12-01'), []);
+});
+
+test('countdowns: a planned assessment counts from its calendar day; a countdown block on the same lesson wins', () => {
+  const lessons = [{ id: 'y', title: 'Poem task', pedagogical_mode: 'assessment' }];
+  const published = new Map([['y', { blocks: [countdown('c4', '2026-11-20')] }]]);
+  const planned = [
+    { lesson_id: 'z', title: 'Viva task', published: false, date: '2026-11-24', start_time: '13:24' },
+    { lesson_id: 'z', title: 'Viva task', published: false, date: '2026-11-30', start_time: '09:00' },
+    { lesson_id: 'old', title: 'Last term', published: false, date: '2026-11-01', start_time: '' },
+    { lesson_id: 'y', title: 'Poem task', published: true, date: '2026-11-18', start_time: '10:00' }
+  ];
+  assert.deepEqual(countdownsFrom(lessons, published, '2026-11-09', planned).map((c) => [c.lesson_id, c.due_date, c.due_time, c.assessment, c.published]), [
+    ['y', '2026-11-20', '15:00', true, true],
+    ['z', '2026-11-24', '13:24', true, false]
+  ]);
+  const sprints = new Map([['s', { blocks: ['a', 'b', 'c'].map((n, i) => countdown(n, `2026-11-1${i}`)) }]]);
+  const kept = countdownsFrom([{ id: 's', title: 'Sprint' }], sprints, '2026-11-09', planned.slice(0, 1));
+  assert.equal(kept.length, 3);
+  assert.equal(kept.at(-1).lesson_id, 'z', 'the soonest assessment stays when sprint steps fill the list');
+});
+
+test('an unpublished assessment on the class calendar shows as a countdown, and nothing else of it goes out', async () => {
+  const { store, progress } = await setup();
+  store.data.set('units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1', 'l2', 'l3', 'l4', 'l5'] });
+  store.data.set('lessons/l5', { id: 'l5', title: 'Viva task', pedagogical_mode: 'assessment', blocks: [{ id: 'secret', block_type: 'rich_text', content: { html: 'DRAFT QUESTIONS' } }] });
+  store.data.set('scheduled_lessons/s1', { id: 's1', class_id: 'class1', lesson_id: 'l5', date: '2026-11-24', start_time: '13:24' });
+  store.data.set('scheduled_lessons/s2', { id: 's2', class_id: 'other', lesson_id: 'l5', date: '2026-11-12', start_time: '09:00' });
+  store.data.set('scheduled_lessons/s3', { id: 's3', class_id: 'class1', lesson_id: 'l5', date: '2026-11-13', start_time: '09:00', delivery_status: 'skipped' });
+  const out = await progress();
+  assert.deepEqual(out.todo.countdowns.find((c) => c.lesson_id === 'l5'), { title: 'Viva task', lesson_id: 'l5', assessment: true, due_date: '2026-11-24', due_time: '13:24', set_date: '', published: false });
+  assert.ok(!JSON.stringify(out).includes('DRAFT QUESTIONS'));
+  assert.ok(!out.map.lessons.some((l) => l.id === 'l5'), 'the unpublished lesson stays off the map');
 });
 
 test('activities: every question answered, or anything written in a format or lens, counts as done', () => {
