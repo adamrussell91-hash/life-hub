@@ -14,6 +14,14 @@ export const BANDS = {
 /** Mastery on the student profile: top-end results on this many separate checkpoints (quizzes or assessed pieces). */
 export const MASTERY = { checkpoints: 2 } as const;
 
+/**
+ * Evidence from a game (`game:{lesson}:{game}`). A right answer in a game is only
+ * ever "right once": games never count toward mastery or a full circle, whatever
+ * the strength (Adam, 11 Nov).
+ */
+export const GAME_SOURCE_PREFIX = 'game:';
+export const isGameSource = (source: string): boolean => source === 'game' || source.startsWith(GAME_SOURCE_PREFIX);
+
 /** Pre-tests usually ask two questions per technique, so two items are enough for a focus area or a secure tag. */
 export const FOCUS = { below: 0.6, minItems: 2, max: 3, secureMinItems: 2 } as const;
 

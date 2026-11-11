@@ -56,8 +56,8 @@ export function createPublishedLessonHandler(deps = {}) {
       if (publicOutcome) outcomes.push(publicOutcome);
     }
 
-    // A plain lesson link names no class. Lectures, tutorials and sprints need one, so the page gets the choices.
-    const needsClass = ['lecture', 'tutorial', 'design_sprint', 'case_study', 'station_rotation'].includes(snapshot.pedagogical_mode);
+    // A plain lesson link names no class. Lectures, tutorials, sprints, rotations and games need one, so the page gets the choices.
+    const needsClass = ['lecture', 'tutorial', 'design_sprint', 'case_study', 'station_rotation', 'game'].includes(snapshot.pedagogical_mode);
     let classes;
     if (needsClass) {
       classes = await classesForLesson(store, id);

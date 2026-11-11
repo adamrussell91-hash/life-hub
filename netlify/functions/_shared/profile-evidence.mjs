@@ -27,6 +27,8 @@ var BANDS = {
   groupMin: 2
 };
 var MASTERY = { checkpoints: 2 };
+var GAME_SOURCE_PREFIX = "game:";
+var isGameSource = (source) => source === "game" || source.startsWith(GAME_SOURCE_PREFIX);
 var NEXT = {
   /** Fewer students assessed than this, and a tag makes no move. */
   minStudents: 3,
@@ -105,6 +107,13 @@ function markbookEvidence(view, labels = []) {
       if (share !== null) evidence.push({ item: `${row.piece}#skill:${skill}`, tags: [`skill:${skill}`], share, why: [], student: row.student, source, date, confidence: null });
     }
   }
+  for (const game of view.games ?? []) {
+    const source = `${GAME_SOURCE_PREFIX}${game.lesson_id}:${game.game_id}`;
+    sources.push({ source, title: game.title || "Game" });
+    for (const [student, played] of Object.entries(game.students)) {
+      for (const { item, tags, share, why } of played.evidence) evidence.push({ item: `${game.game_id}:${item}`, tags: tags.map(norm), share, why, student, source, date: played.date, confidence: null });
+    }
+  }
   return { evidence, sources, timing };
 }
 
@@ -168,7 +177,7 @@ var MASTERY_GROUPS = ["understanding", "responding", "concepts", "skills"];
 function levelFor(group, tag, evidence) {
   const bySource = /* @__PURE__ */ new Map();
   for (const e of evidence) {
-    if (e.share === null || !e.tags.includes(tag)) continue;
+    if (e.share === null || !e.tags.includes(tag) || isGameSource(e.source)) continue;
     bySource.set(e.source, [...bySource.get(e.source) ?? [], e.share]);
   }
   let top = 0;

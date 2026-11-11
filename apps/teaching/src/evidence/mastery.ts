@@ -1,5 +1,5 @@
 import { rungForMark } from '../skills/model';
-import { BANDS, MASTERY } from './constants';
+import { BANDS, MASTERY, isGameSource } from './constants';
 import type { Evidence } from './types';
 
 export type MasteryGroup = 'understanding' | 'responding' | 'concepts' | 'skills';
@@ -16,12 +16,13 @@ export const MASTERY_GROUPS: MasteryGroup[] = ['understanding', 'responding', 'c
  * - Syllabus points and concepts: a checkpoint is top-end when it has at least BANDS.minQuestions
  *   tagged questions averaging BANDS.secure or more.
  * - Skills: a checkpoint is top-end at Accomplished or Excellent; any rung from Capable up is building.
+ * Games are never checkpoints: a right answer in a game is only ever "right once".
  */
 export function levelFor(group: MasteryGroup, tag: string, evidence: readonly Evidence[]): MasteryLevel {
   const bySource = new Map<string, number[]>();
   for (const e of evidence) {
     // A null share is an answer still waiting to be marked; it says nothing yet.
-    if (e.share === null || !e.tags.includes(tag)) continue;
+    if (e.share === null || !e.tags.includes(tag) || isGameSource(e.source)) continue;
     bySource.set(e.source, [...(bySource.get(e.source) ?? []), e.share]);
   }
   let top = 0;

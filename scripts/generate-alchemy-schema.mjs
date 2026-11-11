@@ -73,6 +73,18 @@ await build({
   banner: {js:'// Generated from apps/teaching/src/rotation/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
 await build({
+  entryPoints: ['apps/teaching/src/games/core/schema.ts'],
+  outfile: 'netlify/functions/_shared/game-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/games/core/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/games/core/server-entry.ts'],
+  outfile: 'netlify/functions/_shared/game-rules.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/games/core/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
   entryPoints: ['apps/teaching/src/sprint/schema.ts'],
   outfile: 'netlify/functions/_shared/sprint-schema.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],

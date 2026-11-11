@@ -24,6 +24,7 @@ import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
 import { prepareTutorialPublish, storeTutorialTabs } from './_shared/tutorial.mjs';
 import { prepareCasePublish, storeCaseConfig } from './_shared/case-study.mjs';
 import { prepareRotationPublish, storeRotationConfig } from './_shared/rotation.mjs';
+import { prepareGamePublish, storeGameKeys } from './_shared/games.mjs';
 import { prepareSprintPublish, sprintPublishProblems, storeSprintConfig } from './_shared/sprint.mjs';
 import { SprintSettingsSchema } from './_shared/sprint-schema.mjs';
 
@@ -261,6 +262,34 @@ export function createLessonPublishHandler(deps = {}) {
         ...(draft.feedback_off === true ? { feedback_off: true } : {}),
         pedagogical_mode: 'station_rotation',
         rotation: rotation.snapshot.rotation
+      });
+      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
+    }
+
+    // A Game lesson: its games go public without answers; every game's keys are stored apart (games.mjs).
+    // Its own blocks ("Before you play") publish as usual, but quiz questions there would never run.
+    if (draft.pedagogical_mode === 'game') {
+      const games = prepareGamePublish(draft);
+      if (games.problems.length > 0) return withCors(errorResponse(400, 'validation_error', games.problems[0], false), request, env);
+      const before = prepareQuizPublish(draft, publishBlocks);
+      if (before.dropped > 0) {
+        const n = before.dropped;
+        return withCors(errorResponse(400, 'validation_error', `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a Game plays through its own player. Put ${n === 1 ? 'it' : 'them'} in a game, or remove ${n === 1 ? 'it' : 'them'}.`, false), request, env);
+      }
+      await storeGameKeys(store, id, games.record);
+      await setJSON(store, publishedLessonKey(id), {
+        lesson_id: id,
+        title,
+        unit_id,
+        blocks: sanitizeBlocksDeep(before.blocks),
+        published_at: publishedAt,
+        schema_version: 1,
+        ...(draft.cover ? { cover: draft.cover } : {}),
+        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+        pedagogical_mode: 'game',
+        game: games.snapshot
       });
       await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
       return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);

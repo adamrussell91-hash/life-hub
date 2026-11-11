@@ -28,10 +28,10 @@ function makeBlock(blockType, id, content, now, variant) {
 var BlockIds = class {
   used = /* @__PURE__ */ new Map();
   from(notionId) {
-    const base2 = `blk_${notionId.replace(/-/g, "")}`;
-    const count = (this.used.get(base2) ?? 0) + 1;
-    this.used.set(base2, count);
-    return count === 1 ? base2 : `${base2}_${count}`;
+    const base3 = `blk_${notionId.replace(/-/g, "")}`;
+    const count = (this.used.get(base3) ?? 0) + 1;
+    this.used.set(base3, count);
+    return count === 1 ? base3 : `${base3}_${count}`;
   }
 };
 
@@ -926,7 +926,7 @@ function buildImportPlan(tree, ctx) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z19 } from "zod";
+import { z as z20 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z } from "zod";
@@ -1444,6 +1444,23 @@ var QUIZ_QUESTION_KINDS = [
   "explain_effect"
 ];
 var QuizQuestionKindSchema = z11.enum(QUIZ_QUESTION_KINDS);
+var QUIZ_KIND_INFO = {
+  multiple_choice: { label: "Multiple choice", blurb: "Pick the one right answer.", tier: 1, manual: false },
+  multi_select: { label: "Multi-select", blurb: "Pick every answer that applies.", tier: 1, manual: false },
+  true_false: { label: "True or false", blurb: "Is the statement true or false?", tier: 1, manual: false },
+  short_answer: { label: "Short answer", blurb: "Type a word or a short phrase.", tier: 1, manual: false },
+  fill_gap: { label: "Fill the gap", blurb: "Fill the missing words in a sentence or quote.", tier: 1, manual: false },
+  odd_one_out: { label: "Odd one out", blurb: "Spot the one that doesn\u2019t belong.", tier: 1, manual: false },
+  matching: { label: "Matching pairs", blurb: "Match each item to its partner.", tier: 2, manual: false },
+  ordering: { label: "Put in order", blurb: "Put the items in the right order.", tier: 2, manual: false },
+  categorise: { label: "Sort into groups", blurb: "Sort each item into its group.", tier: 2, manual: false },
+  quote_technique: { label: "Quote \u2192 technique", blurb: "Name the technique in a quote.", tier: 2, manual: false },
+  find_it: { label: "Find it in the text", blurb: "Tap the line that answers the question.", tier: 2, manual: false },
+  spot_technique: { label: "Spot the technique", blurb: "Select the words in a passage, then name the technique.", tier: 2, manual: false },
+  label_image: { label: "Label the image", blurb: "Match each label to its pin on the image.", tier: 2, manual: false },
+  extended_response: { label: "Extended response", blurb: "Write a paragraph. Your teacher marks it.", tier: 3, manual: true },
+  explain_effect: { label: "Explain the effect", blurb: "Explain the effect of a technique. Your teacher marks it.", tier: 3, manual: true }
+};
 var QUIZ_LIMITS = {
   prompt: 1e3,
   option: 300,
@@ -4611,22 +4628,522 @@ function rotationIssues(lesson) {
   return [...new Set(out)];
 }
 
-// apps/teaching/src/schemas/cover.ts
+// apps/teaching/src/games/core/schema.ts
 import { z as z17 } from "zod";
-var CoverSchema = z17.object({
-  url: z17.string().min(1).optional(),
-  media_id: z17.string().min(1).optional(),
-  alt_text: z17.string().optional()
+var GAME_KINDS = [
+  "crossword",
+  "find_a_word",
+  "jeopardy",
+  "wheel",
+  "team_match",
+  "points_rush",
+  "battles",
+  "wager",
+  "connections",
+  "articulate",
+  "pictionary",
+  "who_said_it"
+];
+var GameKindSchema = z17.enum(GAME_KINDS);
+var GAME_LIMITS = {
+  games: 8,
+  title: 80,
+  term: 60,
+  clue: 300,
+  clues: 4,
+  accept: 6,
+  banned: 5,
+  decoys: 3,
+  word: 60,
+  drawPrompt: 200,
+  quote: 600,
+  source: 120,
+  whyFake: 300,
+  label: 80,
+  tile: 60,
+  why: 300,
+  cast: 8,
+  castName: 60,
+  category: 40,
+  /** Letters in a Wheel puzzle (A–Z only). */
+  wheelLetters: 60,
+  wheelText: 120,
+  message: 40,
+  prompt: 1e3,
+  criterion: 200,
+  chips: 6,
+  chip: 60
+};
+var GAME_COUNTS = {
+  crossword: { min: 6, max: 30 },
+  find_a_word: { min: 6, max: 20 },
+  jeopardy_categories: { min: 3, max: 6 },
+  jeopardy_tiles: { min: 3, max: 5 },
+  wheel: { min: 3, max: 8 },
+  wheel_bank: { min: 1, max: 20 },
+  team_match: { min: 12, max: 40 },
+  points_rush: { min: 10, max: 60 },
+  wager: { min: 5, max: 15 },
+  connections_walls: { min: 1, max: 6 },
+  articulate: { min: 6, max: 60 },
+  pictionary: { min: 3, max: 40 },
+  who_said_it: { min: 8, max: 30 },
+  cast: { min: 2, max: 8 }
+};
+var ItemIdSchema = z17.string().regex(/^[a-z0-9_-]{1,40}$/);
+var Text2 = (max) => z17.string().max(max).default("");
+var OptText = (max) => z17.string().max(max).optional();
+var ItemTagsShape = {
+  /** Knowledge pieces (`kp_…`) this item checks. */
+  pieces: z17.array(z17.string().regex(/^kp_[a-z0-9]{4,16}$/)).max(6).default([]),
+  /** Syllabus outcome ids. */
+  outcomes: z17.array(z17.string().min(1).max(64)).max(8).default([]),
+  /** Skills-continuum sub-strands, `strand.sub`. */
+  skills: z17.array(z17.string().regex(SkillRefPattern)).max(8).default([]),
+  /** Technique catalogue ids. */
+  tech: z17.array(z17.string().min(1).max(64)).max(6).default([])
+};
+var CLUE_KINDS = ["definition", "example", "quote"];
+var ClueSchema = z17.object({ kind: z17.enum(CLUE_KINDS).default("definition"), text: Text2(GAME_LIMITS.clue) });
+var TermItemSchema = z17.object({
+  id: ItemIdSchema,
+  shape: z17.literal("term"),
+  term: Text2(GAME_LIMITS.term),
+  /** Other spellings that count as right ("colour", "color"). */
+  accept: z17.array(z17.string().max(GAME_LIMITS.term)).max(GAME_LIMITS.accept).default([]),
+  clues: z17.array(ClueSchema).max(GAME_LIMITS.clues).default([]),
+  /** Which clue this game uses (crossword, find-a-word). Absent: the first. */
+  use_clue: z17.number().int().min(0).max(GAME_LIMITS.clues - 1).optional(),
+  /** Articulate: words the describer can't say. */
+  banned: z17.array(z17.string().max(GAME_LIMITS.word)).max(GAME_LIMITS.banned).default([]),
+  /** Find-a-word: plausible wrong terms placed in the grid for this clue. */
+  decoys: z17.array(z17.string().max(GAME_LIMITS.word)).max(GAME_LIMITS.decoys).default([]),
+  /** Pictionary: what to draw, when it isn't the term itself. */
+  draw_prompt: OptText(GAME_LIMITS.drawPrompt),
+  ...ItemTagsShape
+});
+var GAME_QUESTION_KINDS = QUIZ_QUESTION_KINDS.filter((k) => !QUIZ_KIND_INFO[k].manual);
+var QuestionItemSchema2 = z17.object({
+  id: ItemIdSchema,
+  shape: z17.literal("question"),
+  question: QuizQuestionDraftSchema,
+  ...ItemTagsShape
+});
+var FAKE_SPEAKER = "fake";
+var QuoteItemSchema = z17.object({
+  id: ItemIdSchema,
+  shape: z17.literal("quote"),
+  text: Text2(GAME_LIMITS.quote),
+  /** A cast member's id, or 'fake'. Empty while being written. */
+  speaker: z17.string().max(40).default(""),
+  /** Act, scene, chapter. */
+  source: OptText(GAME_LIMITS.source),
+  why_fake: OptText(GAME_LIMITS.whyFake),
+  /** Pictionary and Wheel: other answers that count (key words of the line). */
+  accept: z17.array(z17.string().max(GAME_LIMITS.quote)).max(GAME_LIMITS.accept).default([]),
+  ...ItemTagsShape
+});
+var CastMemberSchema = z17.object({
+  id: ItemIdSchema,
+  name: Text2(GAME_LIMITS.castName),
+  /** A letter or emoji for the card. */
+  emblem: OptText(8),
+  image_url: OptText(2e3)
+});
+var GroupItemSchema = z17.object({
+  id: ItemIdSchema,
+  shape: z17.literal("group"),
+  label: Text2(GAME_LIMITS.label),
+  tiles: z17.array(z17.string().max(GAME_LIMITS.tile)).max(4).default([]),
+  difficulty: z17.number().int().min(1).max(4).default(1),
+  why: Text2(GAME_LIMITS.why),
+  ...ItemTagsShape
+});
+var ItemSchema = z17.discriminatedUnion("shape", [TermItemSchema, QuestionItemSchema2, QuoteItemSchema, GroupItemSchema]);
+var TermOrQuestion = z17.discriminatedUnion("shape", [TermItemSchema, QuestionItemSchema2]);
+var TermQuoteOrQuestion = z17.discriminatedUnion("shape", [TermItemSchema, QuoteItemSchema, QuestionItemSchema2]);
+var TermOrQuote = z17.discriminatedUnion("shape", [TermItemSchema, QuoteItemSchema]);
+var Seconds = (min, max, dflt) => z17.number().int().min(min).max(max).default(dflt);
+var Seed = z17.number().int().min(0).max(2 ** 31 - 1).default(1);
+var RESERVED_GAME_IDS = ["keys", "current"];
+var GameIdSchema = ItemIdSchema.refine((id) => !RESERVED_GAME_IDS.includes(id), "That game id is reserved.");
+var base2 = { id: GameIdSchema, title: Text2(GAME_LIMITS.title) };
+var CrosswordSchema = z17.object({
+  ...base2,
+  kind: z17.literal("crossword"),
+  items: z17.array(TermItemSchema).max(GAME_COUNTS.crossword.max).default([]),
+  settings: z17.object({ seed: Seed, locked: z17.boolean().default(false), hints: z17.boolean().default(true) }).prefault({})
+});
+var FindAWordSchema = z17.object({
+  ...base2,
+  kind: z17.literal("find_a_word"),
+  items: z17.array(TermItemSchema).max(GAME_COUNTS.find_a_word.max).default([]),
+  /** Optional hidden message spelled by the leftover letters, and the question asked about it. */
+  message: z17.object({ text: Text2(GAME_LIMITS.message), question: QuizQuestionDraftSchema.optional() }).optional(),
+  settings: z17.object({ seed: Seed, directions: z17.enum(["easy", "all"]).default("all"), hints: z17.boolean().default(true) }).prefault({})
+});
+var JEOPARDY_VALUES = [100, 200, 300, 400, 500];
+var JeopardyTileSchema = z17.object({
+  id: ItemIdSchema,
+  value: z17.number().int().refine((v) => JEOPARDY_VALUES.includes(v), "Pick 100 to 500."),
+  double: z17.boolean().default(false),
+  item: TermOrQuestion
+});
+var JeopardySchema = z17.object({
+  ...base2,
+  kind: z17.literal("jeopardy"),
+  categories: z17.array(z17.object({ id: ItemIdSchema, title: Text2(GAME_LIMITS.category), tiles: z17.array(JeopardyTileSchema).max(GAME_COUNTS.jeopardy_tiles.max).default([]) })).max(GAME_COUNTS.jeopardy_categories.max).default([]),
+  final: QuestionItemSchema2.optional(),
+  settings: z17.object({ seconds: Seconds(10, 120, 30), picker_bonus: z17.number().min(1).max(2).default(1.5) }).prefault({})
+});
+var WheelPuzzleSchema = z17.object({
+  id: ItemIdSchema,
+  category: Text2(GAME_LIMITS.category),
+  /** The line to solve: a quote or a short key line. */
+  text: Text2(GAME_LIMITS.wheelText),
+  /** Questions that earn letters. */
+  bank: z17.array(TermOrQuestion).max(GAME_COUNTS.wheel_bank.max).default([]),
+  /** Everyone answers this once the puzzle is solved. */
+  explain: QuestionItemSchema2.optional(),
+  ...ItemTagsShape
+});
+var WheelSchema = z17.object({
+  ...base2,
+  kind: z17.literal("wheel"),
+  puzzles: z17.array(WheelPuzzleSchema).max(GAME_COUNTS.wheel.max).default([]),
+  settings: z17.object({ vowel_cost: z17.number().int().min(0).max(1e3).default(250), lockout_seconds: Seconds(5, 60, 20) }).prefault({})
+});
+var WRONG_TAPS = ["back3", "start"];
+var TeamMatchSchema = z17.object({
+  ...base2,
+  kind: z17.literal("team_match"),
+  items: z17.array(TermQuoteOrQuestion).max(GAME_COUNTS.team_match.max).default([]),
+  settings: z17.object({
+    /** A wrong tap by any member: back 3 steps (default) or back to the start (Adam, 11 Nov). */
+    wrong_tap: z17.enum(WRONG_TAPS).default("back3"),
+    track: z17.number().int().min(6).max(20).default(12),
+    team_size: z17.number().int().min(3).max(4).default(4)
+  }).prefault({})
+});
+var PointsRushSchema = z17.object({
+  ...base2,
+  kind: z17.literal("points_rush"),
+  items: z17.array(TermOrQuestion).max(GAME_COUNTS.points_rush.max).default([]),
+  settings: z17.object({ minutes: z17.number().int().min(5).max(15).default(8), class_goal: z17.number().int().min(0).max(1e6).default(0) }).prefault({})
+});
+var BattlesSchema = z17.object({
+  ...base2,
+  kind: z17.literal("battles"),
+  prompt: Text2(GAME_LIMITS.prompt),
+  criterion: Text2(GAME_LIMITS.criterion),
+  chips: z17.array(z17.string().max(GAME_LIMITS.chip)).max(GAME_LIMITS.chips).default([]),
+  /** Or point at an existing question, as comparative judgement does. */
+  question_ref: z17.object({ lesson_id: z17.string().min(1).max(80), block_id: z17.string().min(1).max(80) }).optional(),
+  settings: z17.object({ write_minutes: z17.number().int().min(2).max(8).default(4) }).prefault({}),
+  ...ItemTagsShape
+});
+var WagerSchema = z17.object({
+  ...base2,
+  kind: z17.literal("wager"),
+  items: z17.array(QuestionItemSchema2).max(GAME_COUNTS.wager.max).default([]),
+  settings: z17.object({
+    start: z17.number().int().min(10).max(1e4).default(100),
+    min_bet: z17.number().int().min(1).max(1e3).default(10),
+    seconds: Seconds(10, 120, 30),
+    /** Right answers get this share of their bet on top. */
+    house_bonus: z17.number().min(0).max(2).default(0.5),
+    rescue: z17.boolean().default(true),
+    final_all_in: z17.boolean().default(true)
+  }).prefault({})
+});
+var ConnectionsWallSchema = z17.object({ id: ItemIdSchema, title: Text2(GAME_LIMITS.title), groups: z17.array(GroupItemSchema).max(4).default([]) });
+var ConnectionsSchema = z17.object({
+  ...base2,
+  kind: z17.literal("connections"),
+  walls: z17.array(ConnectionsWallSchema).max(GAME_COUNTS.connections_walls.max).default([]),
+  settings: z17.object({ mistakes: z17.number().int().min(1).max(8).default(4) }).prefault({})
+});
+var ArticulateSchema = z17.object({
+  ...base2,
+  kind: z17.literal("articulate"),
+  items: z17.array(TermItemSchema).max(GAME_COUNTS.articulate.max).default([]),
+  settings: z17.object({ seconds: Seconds(30, 60, 45), passes: z17.number().int().min(0).max(3).default(2), quick_check: z17.boolean().default(true), quick_check_items: z17.number().int().min(3).max(5).default(4) }).prefault({})
+});
+var PictionarySchema = z17.object({
+  ...base2,
+  kind: z17.literal("pictionary"),
+  items: z17.array(TermOrQuote).max(GAME_COUNTS.pictionary.max).default([]),
+  settings: z17.object({ seconds: Seconds(60, 90, 75), drawers: z17.enum(["team", "class"]).default("class") }).prefault({})
+});
+var WhoSaidItSchema = z17.object({
+  ...base2,
+  kind: z17.literal("who_said_it"),
+  cast: z17.array(CastMemberSchema).max(GAME_COUNTS.cast.max).default([]),
+  items: z17.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
+  settings: z17.object({ seconds: Seconds(10, 60, 20) }).prefault({})
+});
+var GameSchema = z17.discriminatedUnion("kind", [
+  CrosswordSchema,
+  FindAWordSchema,
+  JeopardySchema,
+  WheelSchema,
+  TeamMatchSchema,
+  PointsRushSchema,
+  BattlesSchema,
+  WagerSchema,
+  ConnectionsSchema,
+  ArticulateSchema,
+  PictionarySchema,
+  WhoSaidItSchema
+]);
+var GameLessonSchema = z17.object({
+  games: z17.array(GameSchema).max(GAME_LIMITS.games).default([]),
+  /** Solo play (homework) closes at this time. Absent: open. */
+  homework_closes_at: z17.string().datetime().optional()
+});
+var PublicTermSchema = z17.object({
+  id: z17.string(),
+  shape: z17.literal("term"),
+  clues: z17.array(ClueSchema),
+  lengths: z17.array(z17.number().int())
+});
+var PublicQuestionItemSchema = z17.object({ id: z17.string(), shape: z17.literal("question"), question: z17.record(z17.string(), z17.unknown()) });
+var PublicQuoteSchema = z17.object({ id: z17.string(), shape: z17.literal("quote"), text: z17.string() });
+var PublicItemSchema = z17.discriminatedUnion("shape", [PublicTermSchema, PublicQuestionItemSchema, PublicQuoteSchema]);
+var PublicWallSchema = z17.object({ id: z17.string(), title: z17.string(), tiles: z17.array(z17.object({ id: z17.string(), text: z17.string() })) });
+var PublicGameSchema = z17.object({
+  id: z17.string(),
+  title: z17.string(),
+  kind: GameKindSchema,
+  solo: z17.boolean(),
+  live: z17.boolean(),
+  /** Questions, clues or tiles in the game, for the card. */
+  count: z17.number().int(),
+  /** Settings students may see (timers, mistakes allowed, wrong tap rule…). */
+  settings: z17.record(z17.string(), z17.union([z17.string(), z17.number(), z17.boolean()])),
+  /** Solo kinds only. */
+  items: z17.array(PublicItemSchema).optional(),
+  walls: z17.array(PublicWallSchema).optional(),
+  cast: z17.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
+  message: z17.object({ length: z17.number().int(), question: z17.record(z17.string(), z17.unknown()).optional() }).optional()
+});
+var PublicGameLessonSchema = z17.object({
+  games: z17.array(PublicGameSchema).max(GAME_LIMITS.games),
+  homework_closes_at: z17.string().optional(),
+  /** The publish version the keys are stored under. */
+  version: z17.string()
+});
+
+// apps/teaching/src/games/core/model.ts
+function normaliseAnswer(value) {
+  return norm(String(value ?? "")).normalize("NFD").replace(/\p{M}+/gu, "").replace(/^(?:a|an|the)\s+/, "").replace(/[\s\-‐-―_]+/g, "");
+}
+var gridWord = (term) => normaliseAnswer(term).toUpperCase();
+function gameItems(game) {
+  switch (game.kind) {
+    case "crossword":
+    case "find_a_word":
+    case "team_match":
+    case "points_rush":
+    case "wager":
+    case "articulate":
+    case "pictionary":
+    case "who_said_it":
+      return [...game.items];
+    case "jeopardy":
+      return [...game.categories.flatMap((c) => c.tiles.map((t) => t.item)), ...game.final ? [game.final] : []];
+    case "wheel":
+      return game.puzzles.flatMap((p) => [...p.bank, ...p.explain ? [p.explain] : []]);
+    case "connections":
+      return game.walls.flatMap((w) => w.groups);
+    case "battles":
+      return [];
+  }
+}
+function clueOf(item) {
+  return item.clues[item.use_clue ?? 0] ?? item.clues[0];
+}
+var named = (game, i) => game.title.trim() ? `\u201C${game.title.trim()}\u201D` : `Game ${i + 1}`;
+var KIND_NOUN = {
+  crossword: "terms",
+  find_a_word: "terms",
+  team_match: "items",
+  points_rush: "questions",
+  wager: "questions",
+  articulate: "cards",
+  pictionary: "prompts",
+  who_said_it: "quotes",
+  wheel: "puzzles"
+};
+var COUNT_OF = {
+  crossword: GAME_COUNTS.crossword,
+  find_a_word: GAME_COUNTS.find_a_word,
+  team_match: GAME_COUNTS.team_match,
+  points_rush: GAME_COUNTS.points_rush,
+  wager: GAME_COUNTS.wager,
+  articulate: GAME_COUNTS.articulate,
+  pictionary: GAME_COUNTS.pictionary,
+  who_said_it: GAME_COUNTS.who_said_it,
+  wheel: GAME_COUNTS.wheel
+};
+var CLUED = /* @__PURE__ */ new Set(["crossword", "find_a_word", "jeopardy", "wheel", "team_match", "points_rush"]);
+var GRID = /* @__PURE__ */ new Set(["crossword", "find_a_word"]);
+var GRID_MAX = 15;
+function questionProblem(q) {
+  const kind = q.question.kind;
+  if (!GAME_QUESTION_KINDS.includes(kind)) return "a question a game can\u2019t mark (written answers need a person)";
+  const checked = checkQuestion({ ...q.question, id: q.id });
+  return checked.ok ? null : checked.message.replace(/\.$/, "").toLowerCase();
+}
+function itemProblems(game, item, where2, cast) {
+  const out = [];
+  switch (item.shape) {
+    case "term": {
+      if (!item.term.trim()) {
+        out.push(`${where2} has a card with no term.`);
+        break;
+      }
+      if (CLUED.has(game.kind) && !clueOf(item)?.text.trim()) out.push(`${where2}: \u201C${item.term.trim()}\u201D has an empty clue.`);
+      if (GRID.has(game.kind)) {
+        const word = gridWord(item.term);
+        if (!/^[A-Z]+$/.test(word)) out.push(`${where2}: \u201C${item.term.trim()}\u201D needs letters only for the grid.`);
+        else if (word.length > GRID_MAX) out.push(`${where2}: \u201C${item.term.trim()}\u201D is longer than ${GRID_MAX} letters, so it won\u2019t fit the grid.`);
+      }
+      break;
+    }
+    case "question": {
+      const problem = questionProblem(item);
+      if (problem) out.push(`${where2} has ${problem.startsWith("a question") ? problem : `a question to finish: ${problem}`}.`);
+      break;
+    }
+    case "quote": {
+      if (!item.text.trim()) out.push(`${where2} has an empty quote.`);
+      if (game.kind === "who_said_it") {
+        if (!item.speaker) out.push(`${where2}: pick who said \u201C${item.text.trim().slice(0, 40)}\u201D, or mark it fake.`);
+        else if (item.speaker !== FAKE_SPEAKER && !cast?.some((c) => c.id === item.speaker)) out.push(`${where2}: a quote\u2019s speaker isn\u2019t in the cast.`);
+        if (item.speaker === FAKE_SPEAKER && !item.why_fake?.trim()) out.push(`${where2}: say why \u201C${item.text.trim().slice(0, 40)}\u201D is fake.`);
+      }
+      break;
+    }
+    case "group":
+      break;
+  }
+  return out;
+}
+function matchAnswer(item) {
+  if (item.shape === "term") return normaliseAnswer(item.term);
+  if (item.shape === "quote") return normaliseAnswer(item.speaker);
+  if (item.shape === "question") {
+    const q = item.question;
+    const right = q.options?.find((o) => q.correct?.includes(o.id));
+    return right ? normaliseAnswer(right.text) : "";
+  }
+  return "";
+}
+function gameIssues(lesson) {
+  const g = lesson.game;
+  if (!g || !g.games.length) return ["Add at least one game."];
+  const out = [];
+  const gameIds = g.games.map((x) => x.id);
+  if (new Set(gameIds).size !== gameIds.length) out.push("Two games share an id. Delete one and add it again.");
+  g.games.forEach((game, i) => {
+    const where2 = named(game, i);
+    if (!game.title.trim()) out.push(`Give game ${i + 1} a title.`);
+    const items = gameItems(game);
+    const ids = items.map((x) => x.id);
+    if (new Set(ids).size !== ids.length) out.push(`${where2}: two items share an id.`);
+    const counts = COUNT_OF[game.kind];
+    const n = game.kind === "wheel" ? game.puzzles.length : "items" in game ? game.items.length : 0;
+    if (counts && n < counts.min) out.push(`${where2} needs at least ${counts.min} ${KIND_NOUN[game.kind]}.`);
+    const cast = game.kind === "who_said_it" ? game.cast : null;
+    for (const item of items) out.push(...itemProblems(game, item, where2, cast));
+    switch (game.kind) {
+      case "find_a_word": {
+        if (game.message?.text.trim()) {
+          const letters = gridWord(game.message.text);
+          if (!/^[A-Z]+$/.test(letters)) out.push(`${where2}: the hidden message needs letters only.`);
+          if (game.message.question) {
+            const problem = questionProblem({ id: "message", shape: "question", question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
+            if (problem) out.push(`${where2}: the hidden message question needs finishing: ${problem}.`);
+          }
+        }
+        break;
+      }
+      case "jeopardy": {
+        const { min } = GAME_COUNTS.jeopardy_categories;
+        if (game.categories.length < min) out.push(`${where2} needs at least ${min} categories.`);
+        if (game.categories.some((c) => !c.title.trim())) out.push(`${where2}: name every category.`);
+        const sizes = new Set(game.categories.map((c) => c.tiles.length));
+        if (game.categories.some((c) => c.tiles.length < GAME_COUNTS.jeopardy_tiles.min)) out.push(`${where2}: each category needs at least ${GAME_COUNTS.jeopardy_tiles.min} clues.`);
+        else if (sizes.size > 1) out.push(`${where2}: give every category the same number of clues.`);
+        if (game.categories.some((c) => new Set(c.tiles.map((t) => t.value)).size !== c.tiles.length)) out.push(`${where2}: each value once per category.`);
+        if (game.categories.flatMap((c) => c.tiles).filter((t) => t.double).length > 2) out.push(`${where2}: flag at most 2 Doubles.`);
+        break;
+      }
+      case "wheel": {
+        for (const p of game.puzzles) {
+          const letters = (p.text.toUpperCase().match(/[A-Z]/g) ?? []).length;
+          const label = p.text.trim() ? `\u201C${p.text.trim().slice(0, 30)}\u201D` : "a puzzle";
+          if (!letters) out.push(`${where2}: ${label} is empty.`);
+          if (letters > GAME_LIMITS.wheelLetters) out.push(`${where2}: ${label} is over ${GAME_LIMITS.wheelLetters} letters.`);
+          if (!p.category.trim()) out.push(`${where2}: give ${label} a category.`);
+          if (p.bank.length < GAME_COUNTS.wheel_bank.min) out.push(`${where2}: ${label} needs letter questions.`);
+          if (!p.explain) out.push(`${where2}: ${label} needs an explain question.`);
+        }
+        break;
+      }
+      case "team_match": {
+        const distinct = new Set(game.items.map(matchAnswer).filter(Boolean));
+        if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where2} needs at least 12 different answers.`);
+        break;
+      }
+      case "battles":
+        if (!game.prompt.trim() && !game.question_ref) out.push(`${where2}: write the prompt students answer.`);
+        if (!game.criterion.trim()) out.push(`${where2}: say what makes one answer better.`);
+        break;
+      case "connections": {
+        if (game.walls.length < GAME_COUNTS.connections_walls.min) out.push(`${where2} needs a wall.`);
+        game.walls.forEach((w, wi) => {
+          const wall = w.title.trim() ? `${where2}, wall \u201C${w.title.trim()}\u201D` : `${where2}, wall ${wi + 1}`;
+          if (w.groups.length !== 4) out.push(`${wall} needs 4 groups.`);
+          for (const grp of w.groups) {
+            if (!grp.label.trim()) out.push(`${wall}: name every group.`);
+            if (grp.tiles.filter((t) => t.trim()).length < 4) out.push(`${wall}: \u201C${grp.label.trim() || "a group"}\u201D has fewer than 4 tiles.`);
+          }
+          const tiles = w.groups.flatMap((grp) => grp.tiles.filter((t) => t.trim()).map(normaliseAnswer));
+          if (new Set(tiles).size !== tiles.length) out.push(`${wall}: two tiles say the same thing.`);
+        });
+        break;
+      }
+      case "who_said_it": {
+        const { min, max } = GAME_COUNTS.cast;
+        if (game.cast.length < min || game.cast.length > max) out.push(`${where2} needs ${min} to ${max} characters in the cast.`);
+        if (game.cast.some((c) => !c.name.trim())) out.push(`${where2}: name every character.`);
+        break;
+      }
+      default:
+        break;
+    }
+  });
+  return [...new Set(out)];
+}
+
+// apps/teaching/src/schemas/cover.ts
+import { z as z18 } from "zod";
+var CoverSchema = z18.object({
+  url: z18.string().min(1).optional(),
+  media_id: z18.string().min(1).optional(),
+  alt_text: z18.string().optional()
 }).superRefine((cover, ctx) => {
   if (!cover.url && !cover.media_id) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       message: "Cover needs a url and/or media_id"
     });
   }
   if (cover.url !== void 0 && !isHttpUrl(cover.url)) {
     ctx.addIssue({
-      code: z17.ZodIssueCode.custom,
+      code: z18.ZodIssueCode.custom,
       path: ["url"],
       message: "Cover url must be http(s)"
     });
@@ -4635,10 +5152,10 @@ var CoverSchema = z17.object({
 var CoverPatchSchema = CoverSchema.nullable();
 
 // apps/teaching/src/schemas/source.ts
-import { z as z18 } from "zod";
-var SourceSchema = z18.object({
-  system: z18.literal("notion"),
-  page_id: z18.string().min(1).max(64),
+import { z as z19 } from "zod";
+var SourceSchema = z19.object({
+  system: z19.literal("notion"),
+  page_id: z19.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -5353,22 +5870,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z19.object({
+var LessonSchema = z20.object({
   ...CommonFields,
   ...TrashFields,
-  type: z19.literal("lesson"),
-  unit_id: z19.string().min(1),
-  sequence: z19.number().int(),
-  blocks: z19.array(BlockSchema),
+  type: z20.literal("lesson"),
+  unit_id: z20.string().min(1),
+  sequence: z20.number().int(),
+  blocks: z20.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z19.array(z19.string().min(1).max(40)).max(24).optional(),
-  author_id: z19.string().min(1).optional(),
-  review_status: z19.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z19.array(z19.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z19.array(z19.string().min(1).max(64)).max(24).optional(),
+  tags: z20.array(z20.string().min(1).max(40)).max(24).optional(),
+  author_id: z20.string().min(1).optional(),
+  review_status: z20.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z20.array(z20.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z20.array(z20.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z19.array(LineStopSchema).max(16).optional(),
+  line_stops: z20.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -5380,28 +5897,28 @@ var LessonSchema = z19.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z19.string().min(1).max(64).nullable().optional(),
+  branch_from: z20.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z19.boolean().nullable().optional(),
+  pre_unit: z20.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z19.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z20.array(DotPointRefSchema).max(20).optional(),
   /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
-  focus_pieces: z19.array(PieceIdSchema).max(24).optional(),
+  focus_pieces: z20.array(PieceIdSchema).max(24).optional(),
   /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
-  focus_skills: z19.array(z19.string().regex(SkillRefPattern)).max(12).optional(),
+  focus_skills: z20.array(z20.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z19.array(z19.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z20.array(z20.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z19.boolean().optional(),
+  feedback_off: z20.boolean().optional(),
   /** Learning conditions the teacher set aside for this lesson (src/conditions). Teacher-only. */
-  conditions_off: z19.array(z19.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
+  conditions_off: z20.array(z20.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z19.object({
-    on: z19.boolean().optional(),
-    skip: z19.array(z19.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z19.boolean().optional()
+  end_questions: z20.object({
+    on: z20.boolean().optional(),
+    skip: z20.array(z20.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z20.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -5413,52 +5930,59 @@ var LessonSchema = z19.object({
   case: CaseSettingsSchema.optional(),
   /** Station Rotation lessons only: stations, pretest, path, dial, evidence board and finale. */
   rotation: RotationSettingsSchema.optional(),
+  /** Game lessons only: the games, in play order, and when homework closes. */
+  game: GameLessonSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z19.ZodIssueCode.custom,
+      code: z20.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
   }
-  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study") {
+  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study" || lesson.pedagogical_mode === "game") {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === "quiz_question") stray = true;
     });
     if (stray) {
       ctx.addIssue({
-        code: z19.ZodIssueCode.custom,
-        message: "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
+        code: z20.ZodIssueCode.custom,
+        message: lesson.pedagogical_mode === "game" ? "Quiz questions don\u2019t run in a Game lesson\u2019s blocks. Put them in a game, or remove them." : "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
     }
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["case"] });
     }
   }
   if (lesson.pedagogical_mode === "station_rotation") {
     for (const message of rotationIssues(lesson)) {
-      ctx.addIssue({ code: z19.ZodIssueCode.custom, message, path: ["rotation"] });
+      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["rotation"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "game") {
+    for (const message of gameIssues(lesson)) {
+      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["game"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z19.ZodIssueCode.custom,
+      code: z20.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -5466,37 +5990,37 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/schemas/unit.ts
-import { z as z20 } from "zod";
-var WalkthruTieSchema = z20.object({
-  technique: z20.string().min(1).max(120),
-  kind: z20.enum(["du", "organiser", "block"]),
-  ref: z20.string().min(1).max(240),
-  how: z20.string().max(200).optional()
+import { z as z21 } from "zod";
+var WalkthruTieSchema = z21.object({
+  technique: z21.string().min(1).max(120),
+  kind: z21.enum(["du", "organiser", "block"]),
+  ref: z21.string().min(1).max(240),
+  how: z21.string().max(200).optional()
 });
-var UnitSchema = z20.object({
+var UnitSchema = z21.object({
   ...CommonFields,
   ...TrashFields,
-  type: z20.literal("unit"),
-  year_id: z20.string().min(1),
-  subject_id: z20.string().min(1),
-  lesson_ids: z20.array(z20.string().min(1)),
-  primary_term: z20.number().int().positive().optional(),
-  start_date: z20.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z20.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  description: z20.string().optional(),
+  type: z21.literal("unit"),
+  year_id: z21.string().min(1),
+  subject_id: z21.string().min(1),
+  lesson_ids: z21.array(z21.string().min(1)),
+  primary_term: z21.number().int().positive().optional(),
+  start_date: z21.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z21.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z21.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z20.array(BlockSchema).optional(),
-  outcome_ids: z20.array(z20.string().min(1)).max(24).optional(),
+  blocks: z21.array(BlockSchema).optional(),
+  outcome_ids: z21.array(z21.string().min(1)).max(24).optional(),
   /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
-  deep_understandings: z20.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
-  walkthru_ties: z20.array(WalkthruTieSchema).max(120).optional(),
+  deep_understandings: z21.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
+  walkthru_ties: z21.array(WalkthruTieSchema).max(120).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
-  kind: z20.enum(["program"]).optional(),
+  kind: z21.enum(["program"]).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/class.ts
-import { z as z21 } from "zod";
+import { z as z22 } from "zod";
 
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
@@ -5541,74 +6065,74 @@ function validateTimetable(input) {
 }
 
 // apps/teaching/src/schemas/class.ts
-var ClassTimetableSchema = z21.unknown().transform((value, ctx) => {
+var ClassTimetableSchema = z22.unknown().transform((value, ctx) => {
   try {
     return validateTimetable(value);
   } catch (error) {
-    ctx.addIssue({ code: z21.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
-    return z21.NEVER;
+    ctx.addIssue({ code: z22.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
+    return z22.NEVER;
   }
 });
-var ClassHomepageSchema = z21.object({
-  announcements: z21.array(BlockSchema),
-  resources: z21.array(BlockSchema),
-  custom: z21.array(BlockSchema)
+var ClassHomepageSchema = z22.object({
+  announcements: z22.array(BlockSchema),
+  resources: z22.array(BlockSchema),
+  custom: z22.array(BlockSchema)
 });
-var ClassStudentSchema = z21.object({
-  name: z21.string().min(1).max(80),
-  skip_picker: z21.boolean().default(false),
+var ClassStudentSchema = z22.object({
+  name: z22.string().min(1).max(80),
+  skip_picker: z22.boolean().default(false),
   /** Never changes once saved, so renames keep a student's quiz results. */
-  id: z21.string().regex(STUDENT_ID_PATTERN).optional(),
+  id: z22.string().regex(STUDENT_ID_PATTERN).optional(),
   /** What the student types to take a quiz. Unique within the class. */
-  initials: z21.string().regex(INITIALS_PATTERN).optional()
+  initials: z22.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
-var ClassSchema = z21.object({
+var ClassSchema = z22.object({
   ...CommonFields,
   ...TrashFields,
-  type: z21.literal("class"),
-  code: z21.string().min(1),
-  display_name: z21.string().min(1).optional(),
-  academic_year: z21.number().int(),
-  year_id: z21.string().min(1),
-  subject_id: z21.string().min(1),
-  active_unit_ids: z21.array(z21.string().min(1)),
-  current_unit_id: z21.string().min(1).optional(),
-  current_scheduled_lesson_id: z21.string().min(1).optional(),
-  meeting_days: z21.array(z21.number().int().min(1).max(7)).optional(),
+  type: z22.literal("class"),
+  code: z22.string().min(1),
+  display_name: z22.string().min(1).optional(),
+  academic_year: z22.number().int(),
+  year_id: z22.string().min(1),
+  subject_id: z22.string().min(1),
+  active_unit_ids: z22.array(z22.string().min(1)),
+  current_unit_id: z22.string().min(1).optional(),
+  current_scheduled_lesson_id: z22.string().min(1).optional(),
+  meeting_days: z22.array(z22.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z21.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  students: z22.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/subject.ts
-import { z as z22 } from "zod";
-var SubjectSchema = z22.object({
+import { z as z23 } from "zod";
+var SubjectSchema = z23.object({
   ...CommonFields,
-  type: z22.literal("subject"),
-  display_title: z22.string().min(1),
-  scope_id: z22.string().min(1).optional(),
-  unit_ids: z22.array(z22.string().min(1)),
-  outcome_ids: z22.array(z22.string().min(1)),
-  class_ids: z22.array(z22.string().min(1)),
+  type: z23.literal("subject"),
+  display_title: z23.string().min(1),
+  scope_id: z23.string().min(1).optional(),
+  unit_ids: z23.array(z23.string().min(1)),
+  outcome_ids: z23.array(z23.string().min(1)),
+  class_ids: z23.array(z23.string().min(1)),
   /** Curriculum network lines, in map column order: trains, metro, light rail. */
-  network_lines: z22.array(NetworkLineSchema).max(24).optional(),
+  network_lines: z23.array(NetworkLineSchema).max(24).optional(),
   /** Drag offsets on the year network, keyed by unit id. */
   network_nudges: NetworkNudgesSchema.optional()
 });
 
 // apps/teaching/src/schemas/document.ts
-import { z as z23 } from "zod";
-var DocumentKindSchema = z23.enum(["syllabus"]);
-var DocumentSchema = z23.object({
+import { z as z24 } from "zod";
+var DocumentKindSchema = z24.enum(["syllabus"]);
+var DocumentSchema = z24.object({
   ...CommonFields,
   ...TrashFields,
-  type: z23.literal("document"),
+  type: z24.literal("document"),
   kind: DocumentKindSchema,
-  subject_id: z23.string().min(1),
-  blocks: z23.array(BlockSchema),
+  subject_id: z24.string().min(1),
+  blocks: z24.array(BlockSchema),
   cover: CoverSchema.optional(),
   source: SourceSchema.optional()
 });

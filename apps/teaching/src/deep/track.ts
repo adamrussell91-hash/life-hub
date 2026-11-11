@@ -1,3 +1,4 @@
+import { isGameSource } from '@/evidence/constants';
 import type { Evidence } from '@/evidence/types';
 import type { KnowledgePiece, PlacedStep, Step } from './schema';
 
@@ -5,6 +6,8 @@ import type { KnowledgePiece, PlacedStep, Step } from './schema';
  * One student's hold on one knowledge piece, from `kp:` quiz evidence and the
  * teacher's piece-use ticks on writing tasks. Pure; the monitor view feeds it.
  *   fill   none · half (right once) · full (right on two separate days)
+ *          A game answer is only ever "right once": it can make a circle half, never full,
+ *          and a game miss never turns a circle amber (games are low stakes).
  *   amber  the latest marked check was wrong (memory jog)
  *   faded  no check in FADE_DAYS
  *   ring   used (in writing) · missed (expected, not used; hidden while amber) · none
@@ -17,9 +20,11 @@ const daysBetween = (a: string, b: string): number => Math.round((Date.parse(`${
 
 export function circleFor(evidence: readonly Evidence[], student: string, pieceId: string, today: string, writing: WritingTicks = {}): Circle {
   const tag = `kp:${pieceId}`;
-  const mine = evidence.filter((e) => e.student === student && e.share !== null && e.tags.includes(tag)).sort((a, b) => a.date.localeCompare(b.date));
+  const tagged = evidence.filter((e) => e.student === student && e.share !== null && e.tags.includes(tag));
+  const mine = tagged.filter((e) => !isGameSource(e.source)).sort((a, b) => a.date.localeCompare(b.date));
   const rightDays = new Set(mine.filter((e) => (e.share ?? 0) >= 1).map((e) => e.date));
-  const fill = rightDays.size >= 2 ? 'full' : rightDays.size === 1 ? 'half' : 'none';
+  const rightInGame = tagged.some((e) => isGameSource(e.source) && (e.share ?? 0) >= 1);
+  const fill = rightDays.size >= 2 ? 'full' : rightDays.size === 1 || rightInGame ? 'half' : 'none';
   const last = mine[mine.length - 1];
   const amber = !!last && (last.share ?? 0) < 1;
   const faded = !!last && daysBetween(last.date, today) > FADE_DAYS;

@@ -6,7 +6,8 @@
  * Quiz columns are not stored. They are built on every load from the class's
  * quiz attempts, so a question marked later in Results shows at once. A go not
  * handed in shows as it stands from the answers its page saved. Work columns
- * are built the same way from what students typed (lesson-work.mjs).
+ * are built the same way from what students typed (lesson-work.mjs), and game
+ * evidence from finished game plays (game-store.mjs).
  */
 import { isSafeId } from './class-examples.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
@@ -15,6 +16,7 @@ import { SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { classQuizScores } from './quiz.mjs';
 import { classWork } from './lesson-work.mjs';
+import { classGameEvidence } from './game-store.mjs';
 import { listClassDone } from './profile-done.mjs';
 import { hasStarted } from './lesson-assign.mjs';
 import { read, reject } from './question-drop.mjs';
@@ -124,6 +126,16 @@ export async function workColumns(store, roster, lessonIds, { size = 8 } = {}) {
   }));
 }
 
+/**
+ * Game lessons' evidence, per game a student on the list has finished. Games never write marks;
+ * this is evidence only, and readers count it as "right once" at most (games/core/events.ts).
+ */
+export async function gameColumns(store, roster, lessonIds) {
+  const ids = roster.students.map((s) => s.id);
+  const found = await mapBounded(lessonIds, 8, (lessonId) => classGameEvidence(store, lessonId, roster.cls.id, ids));
+  return found.flat();
+}
+
 /** Quiz lessons that someone on the list has handed in, or saved answers on. */
 export async function quizColumns(store, roster, book, lessonIds) {
   // Quiz cells only cover students on the list. A removed student's attempts
@@ -218,7 +230,7 @@ async function markbookActionInner(store, classId, body) {
 
   if (action === 'load') {
     const [{ book }, lessonIds] = await Promise.all([readBook(store, classId), classLessonIds(store, roster)]);
-    const [quizzes, work, ledger] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds), readRubricLedger(store, classId)]);
+    const [quizzes, work, ledger, games] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds), readRubricLedger(store, classId), gameColumns(store, roster, lessonIds)]);
     const rubrics = ledgerRows(ledger, roster.students.map((s) => s.id));
     return {
       markbook: book,
@@ -226,6 +238,7 @@ async function markbookActionInner(store, classId, body) {
       quizzes,
       work,
       ...(rubrics.length ? { rubrics } : {}),
+      ...(games.length ? { games } : {}),
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
       ...(body.skip_done ? {} : { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) })
     };

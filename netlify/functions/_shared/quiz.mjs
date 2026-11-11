@@ -165,7 +165,7 @@ export function mapTree(blocks, fn) {
  * quiz questions. Every other type runs its quiz questions and group sets
  * inline, like a quiz does.
  */
-const PLAYER_MODES = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial']);
+const PLAYER_MODES = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial', 'game']);
 
 /** True when quiz questions in a lesson of this type reach students. */
 export function quizRunsIn(mode) {
