@@ -332,3 +332,43 @@ export async function organiserStudentAction(store, classId, body, { now = new D
   };
 }
 
+
+/**
+ * Missed in a game: each organiser line linked to one of these knowledge pieces goes back to box 1,
+ * due tomorrow (spec §4.3). Lines come from the class's units. A line already in box 1 keeps an earlier
+ * due day. Nothing moves up here, and the card's history is left alone: a game answer is not a review.
+ * Returns how many lines moved. Etag write with retries, as `review`.
+ */
+export async function sendPiecesToBoxOne(store, roster, student, pieceIds, { now = new Date() } = {}) {
+  const wanted = new Set((Array.isArray(pieceIds) ? pieceIds : []).filter((p) => typeof p === 'string'));
+  if (!wanted.size || !student) return 0;
+  const cls = roster.cls;
+  const unitIds = [...new Set([cls.current_unit_id, ...(cls.active_unit_ids ?? [])])].filter((id) => isSafeId(id));
+  const lineIds = new Set();
+  for (const unitId of unitIds) {
+    if (!(await liveUnit(store, unitId))) continue;
+    const organiser = await read(store, organiserKey(unitId));
+    for (const section of organiser?.sections ?? []) for (const line of section?.lines ?? []) if (line?.id && wanted.has(line.piece_id)) lineIds.add(line.id);
+  }
+  if (!lineIds.size) return 0;
+  const today = sydneyDay(now);
+  const tomorrow = addDays(today, 1);
+  const key = practiceKey(cls.id, workOwner(cls.id, student.id));
+  for (let attempt = 0; ; attempt += 1) {
+    const held = await readBoxes(store, cls.id, student);
+    const boxes = { ...held.boxes };
+    let moved = 0;
+    for (const id of lineIds) {
+      const entry = boxes[id] && typeof boxes[id] === 'object' ? boxes[id] : null;
+      const due = entry?.box === 1 && typeof entry.due === 'string' && entry.due < tomorrow ? entry.due : tomorrow;
+      if (entry?.box === 1 && entry.due === due) continue;
+      boxes[id] = { ...(entry ?? {}), box: 1, due };
+      moved += 1;
+    }
+    if (!moved) return 0;
+    const options = held.exists ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
+    const written = await store.setJSON(key, { boxes, at: now.toISOString() }, options);
+    if (written?.modified !== false) return moved;
+    if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
+  }
+}

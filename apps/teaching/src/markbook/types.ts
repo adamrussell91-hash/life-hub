@@ -89,6 +89,16 @@ export type MarkbookView = {
   done?: Record<string, Record<string, DoneRecord>>;
   /** Rungs tapped on rubrics of written work and viva takes; a quiz answer's reach its own items instead. Missing from an older server. */
   rubrics?: RubricEvidenceRow[];
+  /** Game lessons' evidence, per game: never marks, "right once" at most. Missing when no game has been played. */
+  games?: GameEvidenceColumn[];
+};
+/** One game's evidence for a class: each student's latest finished play. */
+export type GameEvidenceColumn = {
+  lesson_id: string;
+  game_id: string;
+  title: string;
+  kind: string | null;
+  students: Record<string, { date: string; evidence: Array<EvidenceItem & { strength?: string }> }>;
 };
 /** One marked piece's rungs, as the markbook reads them. `column_id` when the piece is a Markbook task. */
 export type RubricEvidenceRow = { student: string; piece: string; lesson_id: string; title: string; at: string; skills: Record<string, string>; column_id?: string };

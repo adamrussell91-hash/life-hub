@@ -1,0 +1,83 @@
+/* Who said it?, solo (approved mockup docs/mockups/games/who-said-it.html). */
+.ws { display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow: clip; overflow-clip-margin: 12px; }
+.ws-eyebrow { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--high-sea-ink); }
+
+/* Cameo portraits: drawn silhouettes on a pastel oval. */
+.ws-cameo {
+  --cb: var(--pastel-gold); --ci: var(--pastel-gold-ink);
+  position: relative; display: block; width: 100%; height: 100%; border-radius: 50% / 46%;
+  background: radial-gradient(120% 90% at 50% 18%, #fff 0%, var(--cb) 55%, color-mix(in srgb, var(--cb) 80%, var(--ci)) 100%);
+  color: var(--ci); overflow: hidden;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.7), inset 0 0 0 5px color-mix(in srgb, var(--cb) 70%, var(--ci));
+}
+.ws-cameo svg { display: block; width: 100%; height: 100%; }
+.ws-tone-1 { --cb: var(--pastel-gold); --ci: var(--pastel-gold-ink); }
+.ws-tone-2 { --cb: var(--pastel-blue); --ci: var(--pastel-blue-ink); }
+.ws-tone-3 { --cb: var(--pastel-sage); --ci: var(--pastel-sage-ink); }
+.ws-tone-4 { --cb: var(--pastel-lilac); --ci: var(--pastel-lilac-ink); }
+.ws-tone-5 { --cb: var(--pastel-peach); --ci: var(--pastel-peach-ink); }
+.ws-tone-6 { --cb: var(--shore, #eae7da); --ci: var(--orca, #424860); }
+.ws-cameo--fake { --cb: #e9e5dc; --ci: #4a4f5c; }
+.ws-emblem { position: absolute; right: 6%; top: 6%; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; display: grid; place-items: center; background: #fff; color: var(--ci); font-size: 12px; font-weight: 700; box-shadow: 0 1px 3px rgba(20, 35, 70, 0.2); }
+
+/* The quote slip */
+.ws-slip { padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1), 0 6px 18px rgba(20, 35, 70, 0.06); display: grid; gap: 4px; }
+.ws-quote { position: relative; margin: 0; font-family: 'Newsreader', Georgia, serif; font-style: italic; font-weight: 600; font-size: 18px; line-height: 1.3; color: var(--navy); cursor: default; text-wrap: pretty; }
+.ws-ghost { visibility: hidden; }
+.ws-typed { position: absolute; inset: 0; }
+.ws-caret { display: inline-block; width: 2px; height: 0.95em; margin-left: 2px; vertical-align: -0.1em; background: var(--high-sea, #f0802f); animation: wsBlink 0.9s steps(1) infinite; }
+@keyframes wsBlink { 50% { opacity: 0; } }
+.ws-ask { margin: 4px 0 0; text-align: center; font-size: 19px; font-weight: 700; color: var(--navy); }
+
+/* The hand of cards */
+.ws-hand { position: relative; height: 222px; flex: none; margin-top: auto; }
+.ws-pc {
+  position: absolute; left: calc(50% - 46px); bottom: 8px; width: 92px; height: 142px;
+  padding: 6px 6px 8px; border: 0; border-radius: 14px; background: #fff; font: inherit; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.12), 0 6px 14px rgba(20, 35, 70, 0.14);
+  display: grid; grid-template-rows: 88px 1fr; gap: 5px; text-align: left;
+  transform-origin: 50% 100%; transition: transform 0.38s var(--game-ease-spring), box-shadow 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ws-pc .ws-cameo { width: 80px; height: 88px; border-radius: 12px; }
+.ws-pc b { font-size: 13.5px; line-height: 1.15; color: var(--ink); padding-left: 2px; overflow-wrap: normal; word-break: keep-all; hyphens: none; overflow: hidden; }
+.ws-pc.is-sel { box-shadow: 0 0 0 3px var(--navy), 0 14px 26px rgba(20, 35, 70, 0.25); }
+.ws-pc:focus-visible { outline: 3px solid var(--high-sea, #f0802f); outline-offset: 2px; }
+.ws-pc:disabled { cursor: default; }
+.ws-pick { margin: 0; min-height: 24px; text-align: center; font-size: 15px; color: var(--muted); }
+.ws-pick b { color: var(--navy); }
+
+/* Dock: fake and lock in stack, as on the mockup phone */
+.gm-solo__dock:has(.ws-lock) { flex-direction: column; }
+.gm-solo__dock .ws-fakebtn, .gm-solo__dock .ws-lock { flex: none; width: 100%; min-height: 52px; border-radius: 18px; font-size: 16px; font-weight: 600; }
+.ws-fakebtn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.ws-fakebtn svg { flex: none; }
+.ws-fakebtn.is-sel { background: var(--ink); color: #fff; border-color: var(--ink); }
+.gm-solo__dock .ws-lock--go { background: var(--high-sea, #f0802f); border-color: var(--high-sea, #f0802f); color: var(--depth, #0a1536); }
+.gm-solo__dock .ws-lock--go:hover:not(:disabled) { background: color-mix(in srgb, var(--high-sea, #f0802f) 86%, #000); border-color: transparent; color: var(--depth, #0a1536); }
+.gm-solo__dock .ws-lock:disabled { opacity: 0.4; }
+
+/* Result and summary */
+.ws-result, .ws-summary { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 8px 0; }
+.ws-big { font-size: 56px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.ws-result.is-right .ws-big { color: var(--success); }
+.ws-result.is-wrong .ws-big { color: var(--danger); }
+.ws-mini { width: 96px; height: 112px; }
+.ws-who { margin: 0; font-size: 22px; font-weight: 700; color: var(--ink); }
+.ws-you { margin: 0; font-size: 15px; color: var(--muted); }
+.ws-note { justify-self: stretch; text-align: left; padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1); font-size: 15px; line-height: 1.45; color: var(--ink); }
+.ws-note > span { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.ws-note--fake { background: var(--pastel-gold); box-shadow: none; }
+.ws-note--fake > span { color: var(--pastel-gold-ink); }
+.ws-break { justify-self: stretch; display: grid; gap: 8px; margin: 0; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1); font-size: 15px; text-align: left; }
+.ws-break div { display: flex; justify-content: space-between; gap: 12px; }
+.ws-break dt { color: var(--ink); }
+.ws-break dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ws-break .ws-tot { border-top: 1px solid rgba(23, 55, 94, 0.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+.ws-explain { margin: 0; font-size: 13px; color: var(--muted); max-width: 26rem; }
+
+@container (min-width: 560px) {
+  .ws-quote { font-size: 22px; }
+  .ws-hand { height: 250px; }
+}
+.ws:focus { outline: none; }

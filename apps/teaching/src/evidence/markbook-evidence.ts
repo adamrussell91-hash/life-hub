@@ -2,7 +2,7 @@ import { assessments, sydneyDay } from '@/markbook/calc';
 import { outcomeIdOf } from '@/markbook/parse';
 import type { AssessmentMark } from '@/markbook/schema';
 import type { MarkbookView, OutcomeLabel } from '@/markbook/types';
-import { rungShare } from './constants';
+import { GAME_SOURCE_PREFIX, rungShare } from './constants';
 import type { Evidence } from './types';
 
 export type Source = { source: string; title: string };
@@ -17,8 +17,9 @@ const trailingBlanks = (rows: ReadonlyArray<{ unanswered?: true }>): number => {
 
 /**
  * Every piece of evidence the markbook holds: quiz items (latest attempts,
- * shown quizzes only), assessment criteria, and the skills rated on rubrics of
- * written work and viva takes. Old outcome codes become catalogue ids when
+ * shown quizzes only), assessment criteria, the skills rated on rubrics of
+ * written work and viva takes, and game answers (latest play; source
+ * `game:{lesson}:{game}`, which mastery and the circles count as "right once" at most). Old outcome codes become catalogue ids when
  * `labels` are given.
  */
 export function markbookEvidence(view: MarkbookView, labels: readonly OutcomeLabel[] = []): { evidence: Evidence[]; sources: Source[]; timing: Timing } {
@@ -65,6 +66,13 @@ export function markbookEvidence(view: MarkbookView, labels: readonly OutcomeLab
     for (const [skill, rung] of Object.entries(row.skills)) {
       const share = rungShare(rung);
       if (share !== null) evidence.push({ item: `${row.piece}#skill:${skill}`, tags: [`skill:${skill}`], share, why: [], student: row.student, source, date, confidence: null });
+    }
+  }
+  for (const game of view.games ?? []) {
+    const source = `${GAME_SOURCE_PREFIX}${game.lesson_id}:${game.game_id}`;
+    sources.push({ source, title: game.title || 'Game' });
+    for (const [student, played] of Object.entries(game.students)) {
+      for (const { item, tags, share, why } of played.evidence) evidence.push({ item: `${game.game_id}:${item}`, tags: tags.map(norm), share, why, student, source, date: played.date, confidence: null });
     }
   }
   return { evidence, sources, timing };

@@ -23,6 +23,8 @@ import { mountCasePlayer } from '@/case-study/player';
 import { caseClient } from '@/case-study/api';
 import { mountRotationPlayer } from '@/rotation/player';
 import { rotationClient } from '@/rotation/api';
+import { mountGameArcade } from '@/games/arcade';
+import { gameClient } from '@/games/api';
 import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
 import { isSidePath } from '@/lecture/scenes';
@@ -94,7 +96,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : lesson.pedagogical_mode === 'game' ? 'Game' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -170,6 +172,20 @@ function renderPublishedLesson(
       lesson,
       classId,
       client: classId ? rotationClient(lesson.lesson_id, classId) : null,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
+  if (lesson.pedagogical_mode === 'game' && lesson.game) {
+    // The games are in the snapshot without answers; scores and play come from the server after the initials claim.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountGameArcade(playerHost, {
+      lesson,
+      classId,
+      client: classId ? gameClient(lesson.lesson_id, classId) : null,
       renderHero: (hostEl) => {
         renderPublishedLessonHero(hostEl, lesson, extras?.cls);
       }

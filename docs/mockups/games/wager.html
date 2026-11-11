@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wager — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Board */
+.w-head { position: absolute; left: 120px; right: 420px; top: 150px; }
+.w-q { font-size: 54px; font-weight: 700; line-height: 1.18; letter-spacing: -.015em; text-wrap: balance; margin: 0; }
+.w-ring { position: absolute; right: 120px; top: 150px; }
+.w-opts { position: absolute; left: 120px; width: 1180px; top: 470px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.w-opt { position: relative; min-height: 200px; border-radius: 28px; padding: 28px 30px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: 64px 1fr; gap: 22px; align-items: start; transition: transform .6s var(--ease-spring), opacity .5s, box-shadow .5s, background .5s; }
+.w-opt .key { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-weight: 700; font-size: 30px; color: #fff; }
+.w-opt .txt { font-size: 36px; font-weight: 600; line-height: 1.2; }
+.w-opt .ride { grid-column: 2; display: flex; align-items: center; gap: 16px; font-size: 24px; color: var(--stage-muted); opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s var(--ease); }
+.w-opt .ride b { color: var(--stage-ink); font-size: 30px; font-variant-numeric: tabular-nums; }
+.w-opt .bar { flex: 1; height: 12px; border-radius: 12px; background: var(--stage-line); overflow: hidden; }
+.w-opt .bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--game-gold); transition: width 1s var(--ease); }
+.board.closed .w-opt .ride { opacity: 1; transform: none; }
+.board.closed .w-ring { opacity: .25; transition: opacity .4s; }
+.w-opt.is-right { transform: scale(1.04); background: rgba(63,174,115,.22); box-shadow: 0 0 0 4px var(--game-right), 0 0 60px rgba(63,174,115,.45); }
+.w-opt.is-wrong { opacity: .38; transform: scale(.97); }
+.w-opt .tag { position: absolute; top: -18px; right: 24px; padding: 6px 16px; border-radius: 999px; background: var(--game-right); color: #062; font-size: 22px; font-weight: 700; color: #04210f; opacity: 0; transform: scale(.6); transition: .5s var(--ease-spring); }
+.w-opt.is-right .tag { opacity: 1; transform: none; }
+
+.w-pot { position: absolute; right: 120px; top: 470px; width: 400px; height: 440px; border-radius: 32px; padding: 32px; background: linear-gradient(160deg, rgba(242,193,78,.22), rgba(242,193,78,.05)); box-shadow: 0 0 0 2px rgba(242,193,78,.45), 0 30px 80px rgba(0,0,0,.3); display: grid; align-content: start; justify-items: center; gap: 6px; text-align: center; }
+[data-board-theme="light"] .w-pot { background: linear-gradient(160deg, #fbecc4, #fff8e6); }
+.w-pot .lbl { font-size: 24px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--game-gold); }
+[data-board-theme="light"] .w-pot .lbl { color: var(--pastel-gold-ink); }
+.w-pot .num { font-size: 120px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.w-pot .sub { font-size: 24px; color: var(--stage-muted); }
+.w-pile { position: relative; width: 220px; height: 150px; margin-top: 14px; }
+.w-pile i { position: absolute; width: 74px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffe08a, #e0a92e 70%); box-shadow: 0 3px 0 #b07f16; }
+.w-jackpot { position: absolute; right: 120px; top: 410px; width: 400px; text-align: center; font-size: 24px; font-weight: 700; color: var(--depth); }
+.w-jackpot span { display: inline-block; padding: 8px 20px; border-radius: 999px; background: var(--game-gold); }
+.w-locked { position: absolute; left: 120px; bottom: 44px; display: flex; align-items: center; gap: 18px; font-size: 26px; color: var(--stage-muted); }
+.w-dots { display: flex; gap: 8px; flex-wrap: wrap; max-width: 900px; }
+.w-dots i { width: 22px; height: 22px; border-radius: 50%; background: var(--stage-line); transition: background .3s, transform .4s var(--ease-spring); }
+.w-dots i.on { background: var(--game-gold); transform: scale(1.15); }
+.coin { position: absolute; left: 0; top: 0; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffe9a6, #e0a92e 70%); box-shadow: 0 2px 0 #b07f16, 0 0 18px rgba(242,193,78,.6); z-index: 30; pointer-events: none; }
+
+.w-lb { position: absolute; left: 420px; right: 420px; top: 300px; }
+.w-lb h2 { text-align: center; font-size: 44px; margin: 0 0 28px; }
+.w-cal { position: absolute; left: 120px; right: 120px; top: 180px; display: none; }
+
+/* Phone */
+.w-opt-btn .key { width: 34px; height: 34px; }
+.w-bet { display: grid; gap: 14px; padding: 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1), 0 8px 24px rgba(20,35,70,.08); }
+.w-bet .amt { text-align: center; font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--navy); }
+.w-bet .of { text-align: center; font-size: 14px; color: var(--muted); margin-top: -8px; }
+.w-range { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; }
+.w-range::-webkit-slider-runnable-track { height: 12px; border-radius: 12px; background: linear-gradient(90deg, var(--high-sea) var(--p, 20%), rgba(23,55,94,.12) var(--p, 20%)); }
+.w-range::-webkit-slider-thumb { -webkit-appearance: none; width: 36px; height: 36px; margin-top: -12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea), 0 4px 10px rgba(0,0,0,.2); }
+.w-range::-moz-range-track { height: 12px; border-radius: 12px; background: rgba(23,55,94,.12); }
+.w-range::-moz-range-progress { height: 12px; border-radius: 12px; background: var(--high-sea); }
+.w-range::-moz-range-thumb { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea); }
+.w-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.w-chips button { min-height: 44px; border-radius: 14px; border: 0; background: var(--cotton); font-weight: 600; font-size: 15px; }
+.w-chips button.allin { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.w-mine { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--cotton); font-size: 15px; }
+.w-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 10px; color: var(--muted); }
+.w-wait .big { font-size: 64px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.w-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.w-break div { display: flex; justify-content: space-between; }
+.w-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const QS = [
+  { q: '“The house held its breath as the door gave way.” Which technique is doing the most work?', opts: ['Metaphor', 'Personification', 'Pathetic fallacy', 'Hyperbole'], right: 1, lure: 2 },
+  { q: 'Mira counts the stairs each night: twelve, then one night thirteen. What does the extra stair most create?', opts: ['Dramatic irony', 'A sense of the uncanny', 'Comic relief', 'A flashback'], right: 1, lure: 0 },
+  { q: 'Final question: which term names a narrator whose account the reader has reason to doubt?', opts: ['Omniscient narrator', 'Intrusive narrator', 'Unreliable narrator', 'Second-person narrator'], right: 2, lure: 1, final: true }
+];
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const MIN = 10;
+let S;
+function fresh() {
+  S = { i: 0, pot: 0, players: Object.fromEntries(GM.class.map((c) => [c, { pts: 100, prev: 100 }])), me: { ans: null, bet: 30, locked: false } };
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Wager</b> · The Lantern House',
+  note: '<b>How to use:</b> answer and bet on the phone (you are JW), then use the board buttons to close answers and reveal. The other 23 students are simulated. Right answers get their bet back + half again + a share of the pot in proportion to their bet. Nobody right: the pot rolls over.',
+  onRestart: () => { fresh(); showQuestion(); }
+});
+
+function boardQuestion() {
+  const q = QS[S.i];
+  board.classList.remove('closed');
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x w-head"><span class="b-eyebrow">${q.final ? 'Final question · all in allowed · bonus doubled' : `Question ${S.i + 1} of ${QS.length}`}</span><p class="w-q">${q.q}</p></div>
+    <div class="stage-x w-ring"></div>
+    <div class="stage-x w-opts">${q.opts.map((o, k) => `<div class="w-opt" data-k="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span><span class="txt">${o}</span><span class="ride"><span class="bar"><i></i></span><b>0</b> pts</span><span class="tag">Right</span></div>`).join('')}</div>
+    ${S.pot ? `<div class="stage-x w-jackpot"><span>Jackpot carried over</span></div>` : ''}
+    <div class="stage-x w-pot"><span class="lbl">The pot</span><span class="num">${S.pot}</span><span class="sub">${S.pot ? 'rolled over from last question' : 'fills with every wrong bet'}</span><div class="w-pile"></div></div>
+    <div class="stage-x w-locked"><span><b class="lockn">0</b> / ${GM.class.length} locked in</span><span class="w-dots">${GM.class.map(() => '<i></i>').join('')}</span></div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="time">+15 s</button><button class="bctl primary" data-a="close">Close answers</button></div>`);
+  board.querySelectorAll('.w-opt').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(30px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 600, delay: GM.calm() ? 0 : 120 * k, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  pile(S.pot);
+  S.timer = GM.ring(board.querySelector('.w-ring'), 30, { onEnd: closeAnswers, bar: () => phone.querySelector('.ph-timer i') });
+}
+function pile(n) {
+  const p = board.querySelector('.w-pile'); if (!p) return;
+  const count = Math.min(14, Math.ceil(n / 60));
+  p.innerHTML = Array.from({ length: count }, (_, j) => `<i style="left:${73 + ((j % 3) - 1) * 58 + (j % 2) * 8}px; bottom:${Math.floor(j / 3) * 18}px"></i>`).join('');
+}
+
+// Simulated class answering over time
+function simulate() {
+  const q = QS[S.i]; S.answers = {};
+  const others = GM.shuffle(GM.class.filter((c) => c !== GM.me));
+  others.forEach((c, n) => setTimeout(() => {
+    if (!S.answers || S.closed) return;
+    const r = GM.rand();
+    const ans = r < .52 ? q.right : r < .8 ? q.lure : GM.pick([0, 1, 2, 3]);
+    const held = S.players[c].pts;
+    const conf = ans === q.right ? .2 + GM.rand() * .5 : .15 + GM.rand() * .55;
+    const bet = Math.max(MIN, Math.min(held, Math.round((q.final && GM.rand() < .3 ? held : held * conf) / 10) * 10));
+    S.answers[c] = { ans, bet }; lockDot();
+  }, 900 + n * (GM.calm() ? 30 : 380)));
+}
+function lockDot() {
+  const n = Object.keys(S.answers).length;
+  const dots = board.querySelectorAll('.w-dots i'); if (dots[n - 1]) dots[n - 1].classList.add('on');
+  const el = board.querySelector('.lockn'); if (el) el.textContent = n;
+}
+
+function closeAnswers() {
+  if (S.closed) return; S.closed = true; S.timer && S.timer.stop();
+  if (!S.me.locked) { S.answers[GM.me] = { ans: S.me.ans ?? -1, bet: MIN }; S.me.locked = true; }
+  GM.class.forEach((c) => { if (!S.answers[c]) S.answers[c] = { ans: -1, bet: MIN }; });
+  board.classList.add('closed'); GM.sound.lock();
+  const riding = [0, 0, 0, 0]; Object.values(S.answers).forEach((a) => { if (a.ans >= 0) riding[a.ans] += a.bet; });
+  const max = Math.max(...riding, 1);
+  board.querySelectorAll('.w-opt').forEach((n, k) => { GM.countUp(n.querySelector('.ride b'), 0, riding[k], 900); n.querySelector('.bar i').style.width = `${(riding[k] / max) * 100}%`; });
+  setControls('<button class="bctl primary" data-a="reveal">Reveal</button>');
+  renderPhone('waiting');
+}
+
+async function reveal() {
+  const q = QS[S.i]; setControls('');
+  GM.sound.reveal();
+  const opts = board.querySelectorAll('.w-opt');
+  opts.forEach((n, k) => n.classList.add(k === q.right ? 'is-right' : 'is-wrong'));
+  await GM.sleep(900);
+  // wrong bets fly into the pot
+  let wrongTotal = 0, rightBets = 0; const winners = [];
+  Object.entries(S.answers).forEach(([c, a]) => { if (a.ans === q.right) { rightBets += a.bet; winners.push(c); } else wrongTotal += a.bet; });
+  const potEl = board.querySelector('.w-pot .num');
+  const potBox = { x: 1420 + 200 - 20, y: 470 + 260 };
+  const flights = [];
+  opts.forEach((n, k) => {
+    if (k === q.right) return;
+    const col = k % 2, row = Math.floor(k / 2);
+    const from = { x: 120 + col * 590 + 280, y: 470 + row * 224 + 120 };
+    for (let j = 0; j < 6; j++) {
+      const c = GM.h('<i class="coin"></i>'); board.appendChild(c);
+      flights.push(GM.sleep(j * 70 + k * 120).then(() => { GM.sound.coin(); return GM.flyTo(c, from, { x: potBox.x + (j - 3) * 10, y: potBox.y }, { duration: 750 }); }).then(() => c.remove()));
+    }
+  });
+  await Promise.all(flights);
+  const newPot = S.pot + wrongTotal;
+  GM.countUp(potEl, S.pot, newPot, 900); pile(newPot);
+  board.querySelector('.w-pot .sub').textContent = `${winners.length} got it right`;
+  await GM.sleep(1100);
+
+  // payouts
+  const bonusRate = q.final ? 1 : .5;
+  const potToSplit = winners.length ? newPot : 0;
+  GM.class.forEach((c) => {
+    const p = S.players[c], a = S.answers[c]; p.prev = p.pts;
+    if (a.ans === q.right) {
+      const bonus = Math.round(a.bet * bonusRate), share = Math.round(potToSplit * (a.bet / rightBets));
+      p.pts += bonus + share; p.last = { bet: a.bet, bonus, share };
+    } else { p.pts = Math.max(0, p.pts - a.bet); p.last = { bet: a.bet, lost: true }; }
+    if (p.pts < MIN) { p.pts = MIN; p.rescued = true; }
+  });
+  if (winners.length) {
+    const rk = q.right, from = { x: potBox.x, y: potBox.y }, to = { x: 120 + (rk % 2) * 590 + 280, y: 470 + Math.floor(rk / 2) * 224 + 100 };
+    const fl = [];
+    for (let j = 0; j < 10; j++) { const c = GM.h('<i class="coin"></i>'); board.appendChild(c); fl.push(GM.sleep(j * 60).then(() => GM.flyTo(c, from, { x: to.x + (j - 5) * 14, y: to.y }, { duration: 700 })).then(() => c.remove())); }
+    GM.countUp(potEl, newPot, 0, 800); pile(0); GM.sound.right();
+    await Promise.all(fl);
+    S.pot = 0;
+  } else { S.pot = newPot; board.querySelector('.w-pot .sub').textContent = 'Nobody right: the pot rolls over'; }
+  renderPhone('result');
+  setControls(`<button class="bctl primary" data-a="board">${S.i === QS.length - 1 ? 'Final scores' : 'Leaderboard'}</button>`);
+}
+
+function leaderboard() {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  const rows = GM.class.map((c) => ({ c, ...S.players[c] }));
+  const before = rows.slice().sort((a, b) => b.prev - a.prev).slice(0, 5);
+  const after = rows.slice().sort((a, b) => b.pts - a.pts);
+  const top = after.slice(0, 5);
+  if (S.i === QS.length - 1) return podium(after);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x w-lb"><h2>Top five</h2><div class="lb"></div></div>
+    <div class="stage-x board-controls"><button class="bctl primary" data-a="next">Next question</button></div>`);
+  const lb = board.querySelector('.lb');
+  const row = (r, i) => `<div class="lb-row ${i === 0 ? 'first' : ''}" data-c="${r.c}"><span class="rank">${i + 1}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}</span><span class="pts">${r.prev}</span></div>`;
+  lb.innerHTML = before.map(row).join('');
+  setTimeout(() => {
+    GM.flip(lb, () => {
+      lb.innerHTML = top.map((r, i) => row(r, i)).join('');
+    });
+    lb.querySelectorAll('.lb-row').forEach((n) => { const r = S.players[n.dataset.c]; GM.countUp(n.querySelector('.pts'), r.prev, r.pts, 900); const oldRank = before.findIndex((b) => b.c === n.dataset.c); const newRank = top.findIndex((b) => b.c === n.dataset.c); if (oldRank === -1 || newRank < oldRank) n.querySelector('.pts').insertAdjacentHTML('afterend', '<span class="move">▲</span>'); });
+    GM.sound.whoosh();
+  }, GM.calm() ? 50 : 700);
+}
+
+function podium(sorted) {
+  const [a, b, c] = sorted;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x" style="position:absolute;left:0;right:0;top:170px;text-align:center"><span class="b-eyebrow">Final scores</span><div style="font-size:30px;color:var(--stage-muted)">Class got 2 of 3 right on average · most backed wrong answer: <b style="color:var(--stage-ink)">Dramatic irony</b></div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${r.pts} pts</span><div class="block">${n}</div></div>`).join('')}</div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="calib">Teacher: calibration view</button></div>`);
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  renderPhone('final');
+}
+
+function calibration() {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  // teacher-only view: confidence vs accuracy per student (names visible to teacher only)
+  const pts = GM.class.map((c) => ({ c, conf: .15 + GM.rand() * .75, acc: GM.rand() }));
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x" style="position:absolute;left:120px;right:120px;top:140px">
+    <span class="b-eyebrow">Teacher only · not for the projector</span>
+    <div style="display:grid;grid-template-columns:1fr 520px;gap:48px">
+      <div style="position:relative;height:720px;border-left:2px solid var(--stage-line);border-bottom:2px solid var(--stage-line)">
+        <div style="position:absolute;left:0;bottom:0;width:100%;height:100%;background:linear-gradient(to top right, transparent calc(50% - 1px), rgba(255,255,255,.18) 50%, transparent calc(50% + 1px))"></div>
+        <span style="position:absolute;left:20px;top:10px;font-size:22px;color:var(--stage-muted)">Underconfident</span>
+        <span style="position:absolute;right:20px;bottom:20px;font-size:22px;color:var(--game-wrong)">Overconfident</span>
+        ${pts.map((p) => `<span class="b-avatar" style="position:absolute;width:52px;height:52px;font-size:18px;left:calc(${p.conf * 100}% - 26px);bottom:calc(${p.acc * 100}% - 26px);${GM.avatarStyle(p.c)}">${p.c}</span>`).join('')}
+        <span style="position:absolute;left:50%;bottom:-48px;transform:translateX(-50%);font-size:22px;color:var(--stage-muted)">Confidence (bet ÷ points held) →</span>
+        <span style="position:absolute;left:-60px;top:50%;transform:rotate(-90deg) translateX(50%);transform-origin:left;font-size:22px;color:var(--stage-muted)">Accuracy →</span>
+      </div>
+      <div style="display:grid;gap:20px;align-content:start;font-size:26px">
+        <div class="lb-row" style="grid-template-columns:1fr;font-size:26px"><b>Confident misconception</b><span style="color:var(--stage-muted)">Q2 · “Dramatic irony” drew 34% of all points bet. Worth reteaching: irony needs the reader to know more than a character.</span></div>
+        <div class="lb-row" style="grid-template-columns:1fr;font-size:26px"><b>Big bets, wrong (revisit)</b><span style="color:var(--stage-muted)">HS, OD, TJ backed a wrong answer with 80+ points. These are the answers they’re most likely to remember being corrected on.</span></div>
+        <div class="lb-row" style="grid-template-columns:1fr;font-size:26px"><b>Underselling themselves</b><span style="color:var(--stage-muted)">BL, MB right on every question but never bet more than a quarter.</span></div>
+      </div>
+    </div></div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="restart">Play again</button></div>`);
+}
+
+function setControls(html) {
+  board.querySelector('.board-controls')?.remove();
+  if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`);
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'close') closeAnswers();
+  if (a === 'reveal') reveal();
+  if (a === 'board') leaderboard();
+  if (a === 'next') { S.i++; showQuestion(); }
+  if (a === 'calib') calibration();
+  if (a === 'restart') { fresh(); showQuestion(); }
+  if (a === 'time') GM.toast(phone, '+15 seconds added');
+});
+
+// Phone
+function phoneShell(body, dock = '') {
+  const me = S.players[GM.me];
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score"><span class="mypts">${me.pts}</span> pts</span></div>
+    <div class="ph-timer"><i></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+function renderPhone(mode) {
+  const q = QS[S.i], me = S.players[GM.me];
+  if (mode === 'answer') {
+    phoneShell(`<p class="ph-sub">${q.final ? 'Final question' : `Question ${S.i + 1}`} · answer first, then bet</p>
+      <p class="ph-h" style="font-size:18px">${q.q}</p>
+      ${q.opts.map((o, k) => `<button class="pbtn w-opt-btn ${S.me.ans === k ? 'sel' : ''}" data-ans="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span>${o}</button>`).join('')}`,
+      `<button class="pbtn cta" data-p="tobet" ${S.me.ans == null ? 'disabled' : ''}>Next: place your bet</button>`);
+  }
+  if (mode === 'bet') {
+    const held = me.pts, v = Math.min(S.me.bet, held);
+    phoneShell(`<div class="w-mine"><span class="key ${KEYS[S.me.ans]}" style="width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px">${LET[S.me.ans]}</span><span>Your answer: <b>${q.opts[S.me.ans]}</b></span><button data-p="change" style="margin-left:auto;border:0;background:none;color:var(--wave);font-weight:600;min-height:44px">Change</button></div>
+      <div class="w-bet"><span class="ph-sub" style="text-align:center">How sure are you?</span><span class="amt">${v}</span><span class="of">of your ${held} points</span>
+      <input class="w-range" type="range" min="${MIN}" max="${held}" step="10" value="${v}" style="--p:${((v - MIN) / Math.max(1, held - MIN)) * 100}%" aria-label="Bet">
+      <div class="w-chips"><button data-chip="min">Min</button><button data-chip=".25">¼</button><button data-chip=".5">½</button><button data-chip="1" class="allin">All in</button></div></div>
+      <p class="ph-sub" style="font-size:13px">Right: your bet back, plus ${q.final ? 'the same again' : 'half again'}, plus a share of the pot. Wrong: you lose it.</p>`,
+      `<button class="pbtn cta orange" data-p="lock">Lock in ${v} points</button>`);
+    const r = phone.querySelector('.w-range');
+    r.addEventListener('input', () => { S.me.bet = +r.value; phone.querySelector('.amt').textContent = r.value; r.style.setProperty('--p', `${((r.value - MIN) / Math.max(1, held - MIN)) * 100}%`); phone.querySelector('[data-p="lock"]').textContent = `Lock in ${r.value} points`; });
+  }
+  if (mode === 'locked') {
+    phoneShell(`<div class="w-wait"><div><span class="ph-sub">Locked in</span><div class="big">${S.me.bet}</div><p class="ph-sub">on <b>${LET[S.me.ans]} · ${q.opts[S.me.ans]}</b></p><p class="ph-sub" style="margin-top:18px">Eyes on the board.</p></div></div>`);
+  }
+  if (mode === 'waiting') {
+    const a = S.answers[GM.me];
+    phoneShell(`<div class="w-wait"><div><span class="ph-sub">Answers closed</span><div class="big">${a.bet}</div><p class="ph-sub">${a.ans >= 0 ? `riding on <b>${LET[a.ans]}</b>` : 'No answer: minimum bet lost'}</p></div></div>`);
+  }
+  if (mode === 'result') {
+    const l = me.last;
+    if (l.lost) {
+      phoneShell(`<div class="w-wait"><div><span class="ph-sub">Not this time</span><div class="big" style="color:var(--danger)">−${l.bet}</div><p class="ph-sub">The answer was <b>${q.opts[q.right]}</b>.</p></div></div>
+        <div class="w-break"><div><span>Points now</span><b>${me.pts}</b></div>${me.rescued ? '<div><span>Rescue top-up</span><b>back to 10</b></div>' : ''}</div>`);
+      GM.toast(phone, `−${l.bet} points<small>Big bets that miss are the ones you remember.</small>`, 'bad');
+    } else {
+      phoneShell(`<div class="w-wait"><div><span class="ph-sub">You were right</span><div class="big" style="color:var(--success)">+${l.bonus + l.share}</div></div></div>
+        <div class="w-break"><div><span>Bet returned</span><b>${l.bet}</b></div><div><span>House bonus</span><b>+${l.bonus}</b></div><div><span>Your share of the pot</span><b>+${l.share}</b></div><div class="tot"><span>Points now</span><span>${me.pts}</span></div></div>`);
+      GM.toast(phone, `+${l.bonus + l.share} points`, 'good');
+    }
+  }
+  if (mode === 'final') {
+    const rank = GM.class.map((c) => S.players[c].pts).sort((a, b) => b - a).indexOf(me.pts) + 1;
+    phoneShell(`<div class="w-wait"><div><span class="ph-sub">Final points</span><div class="big">${me.pts}</div><p class="ph-sub">You finished <b>${rank}${['st', 'nd', 'rd'][rank - 1] || 'th'}</b> of ${GM.class.length}</p></div></div>
+      <div class="w-break"><div><span>Questions right</span><b>2 of 3</b></div><div><span>Your confidence matched your accuracy</span><b>Well</b></div></div>`);
+  }
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.ans != null) { S.me.ans = +t.dataset.ans; GM.sound.click(); renderPhone('answer'); }
+  if (t.dataset.p === 'tobet') renderPhone('bet');
+  if (t.dataset.p === 'change') renderPhone('answer');
+  if (t.dataset.chip) { const held = S.players[GM.me].pts; S.me.bet = t.dataset.chip === 'min' ? MIN : Math.max(MIN, Math.round(held * +t.dataset.chip / 10) * 10); renderPhone('bet'); }
+  if (t.dataset.p === 'lock') { S.me.locked = true; S.answers[GM.me] = { ans: S.me.ans, bet: S.me.bet }; lockDot(); GM.sound.lock(); renderPhone('locked'); }
+});
+
+function showQuestion() {
+  S.closed = false; S.me = { ans: null, bet: 30, locked: false };
+  renderPhone('answer'); boardQuestion(); simulate();
+}
+fresh(); showQuestion();
+</script>
+</body>
+</html>

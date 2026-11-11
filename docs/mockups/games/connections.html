@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connections wall — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+:root {
+  --cx-1: var(--pastel-gold); --cx-1-ink: var(--pastel-gold-ink);
+  --cx-2: var(--pastel-sage); --cx-2-ink: var(--pastel-sage-ink);
+  --cx-3: var(--pastel-blue); --cx-3-ink: var(--pastel-blue-ink);
+  --cx-4: var(--pastel-lilac); --cx-4-ink: var(--pastel-lilac-ink);
+}
+/* Phone wall */
+.cx-wall { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cx-tile { aspect-ratio: 1 / .92; border: 0; border-radius: 14px; background: var(--shore); color: var(--ink); font-size: var(--fs, 13px); font-weight: 700; letter-spacing: 0; text-transform: uppercase; display: grid; place-items: center; text-align: center; padding: 3px; line-height: 1.1; transition: transform .22s var(--ease-spring), background .2s, color .2s; overflow-wrap: normal; }
+.cx-tile.sel { background: var(--orca, #424860); color: #fff; transform: scale(.94); }
+.cx-row { grid-column: 1 / -1; border-radius: 14px; padding: 12px 10px; text-align: center; display: grid; gap: 2px; }
+.cx-row b { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; }
+.cx-row span { font-size: 12.5px; font-weight: 600; text-transform: uppercase; }
+.cx-row em { font-style: normal; font-size: 12px; opacity: .85; }
+.cx-left { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.cx-left i { width: 12px; height: 12px; border-radius: 50%; background: var(--orca, #424860); transition: transform .3s, opacity .3s; }
+.cx-left i.gone { opacity: .15; transform: scale(.6); }
+.cx-acts { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; }
+.cx-acts button { min-height: 52px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; font-weight: 600; font-size: 15px; }
+.cx-acts button.go { background: var(--ink); color: #fff; }
+.cx-acts button[disabled] { opacity: .35; }
+.cx-done { text-align: center; display: grid; gap: 6px; padding: 8px 0; }
+.cx-done .big { font-size: 44px; font-weight: 700; color: var(--navy); line-height: 1; }
+.cx-grid-mini { display: grid; grid-template-columns: repeat(4, 22px); gap: 4px; justify-content: center; margin: 6px 0; }
+.cx-grid-mini i { width: 22px; height: 22px; border-radius: 5px; }
+
+/* Board race wall */
+.cx-race { position: absolute; left: 100px; right: 100px; top: 210px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 24px; }
+.cx-head { position: absolute; left: 100px; right: 100px; top: 120px; display: flex; align-items: baseline; gap: 24px; font-size: 40px; font-weight: 700; }
+.cx-head span { font-size: 28px; font-weight: 500; color: var(--stage-muted); }
+.cx-card { min-height: 150px; align-content: space-between; border-radius: 24px; padding: 22px 22px 20px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 12px; transition: transform .5s var(--ease-spring), box-shadow .4s; }
+.cx-card.done { box-shadow: 0 0 0 3px var(--game-gold), 0 0 40px rgba(242,193,78,.35); }
+.cx-card .who { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 32px; }
+.cx-card .who .b-avatar { width: 58px; height: 58px; font-size: 21px; }
+.cx-card .who .miss { margin-left: auto; display: flex; gap: 5px; }
+.cx-card .who .miss i { width: 14px; height: 14px; border-radius: 50%; background: var(--stage-ink); opacity: .85; }
+.cx-card .who .miss i.gone { opacity: .15; }
+.cx-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.cx-slots i { height: 34px; border-radius: 9px; background: var(--stage-line); transition: background .4s; }
+.cx-slots i.g1 { background: var(--cx-1); } .cx-slots i.g2 { background: var(--cx-2); } .cx-slots i.g3 { background: var(--cx-3); } .cx-slots i.g4 { background: var(--cx-4); }
+.cx-ticker { position: absolute; left: 100px; right: 100px; bottom: 120px; display: flex; gap: 18px; align-items: center; font-size: 26px; color: var(--stage-muted); }
+.cx-ticker .b-pill { color: var(--stage-ink); }
+.cx-ticker .sw { width: 22px; height: 22px; border-radius: 6px; }
+.cx-legend { position: absolute; left: 100px; bottom: 48px; display: flex; gap: 22px; font-size: 22px; color: var(--stage-muted); }
+.cx-legend span { display: flex; align-items: center; gap: 10px; }
+.cx-legend i { width: 22px; height: 22px; border-radius: 6px; }
+
+/* Board class wall (after the game) */
+.cx-class { position: absolute; left: 100px; right: 100px; top: 210px; bottom: 110px; display: grid; grid-template-columns: 1fr 560px; gap: 48px; }
+.cx-net { position: relative; }
+.cx-net svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cx-node { position: absolute; transform: translate(-50%, -50%); padding: 12px 20px; border-radius: 16px; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
+.cx-side { display: grid; gap: 18px; align-content: start; }
+.cx-side .lb-row { grid-template-columns: 1fr auto; font-size: 26px; }
+.cx-side .pair { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cx-side .pair span { padding: 4px 12px; border-radius: 10px; font-size: 20px; text-transform: uppercase; font-weight: 700; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const GROUPS = [
+  { d: 1, label: 'Sound devices', tiles: ['Sibilance', 'Assonance', 'Onomatopoeia', 'Alliteration'], why: 'Each one works on how the words sound.' },
+  { d: 2, label: 'Gothic settings', tiles: ['Crypt', 'Turret', 'Moor', 'Labyrinth'], why: 'Enclosed or isolated places that trap a character.' },
+  { d: 3, label: 'Kinds of narrator', tiles: ['Intrusive', 'Unreliable', 'Omniscient', 'Naive'], why: 'Each describes who tells the story and how far to trust them.' },
+  { d: 4, label: '___ irony', tiles: ['Dramatic', 'Situational', 'Verbal', 'Cosmic'], why: 'Red herrings: Cosmic and Omniscient both sound god-like; Verbal and Unreliable both sound like speech.' }
+];
+const groupOf = Object.fromEntries(GROUPS.flatMap((g) => g.tiles.map((t) => [t, g.d])));
+let S;
+function fresh() {
+  GM.rand(); S = { tiles: GM.shuffle(GROUPS.flatMap((g) => g.tiles)), sel: [], solved: [], miss: 4, guesses: [], view: 'race', race: {} };
+  GM.class.forEach((c) => S.race[c] = { solved: [], miss: 4 });
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Connections wall</b> · Week 5 terms',
+  note: '<b>How to use:</b> solve the wall on the phone (pick four, Submit; four mistakes allowed). The board shows the class race: groups solved and mistakes left, never which tiles. Use “Class wall” on the board to see what the class mixed up most.',
+  onRestart: () => { fresh(); renderPhone(); renderRace(); }
+});
+
+// ── Phone ─────────────────────────────────────────
+function renderPhone(flash) {
+  const done = S.solved.length === 4 || S.miss === 0;
+  const rows = S.solved.map((d) => { const g = GROUPS[d - 1]; return `<div class="cx-row" style="background:var(--cx-${d});color:var(--cx-${d}-ink)" data-row="${d}"><b>${g.label}</b><span>${g.tiles.join(', ')}</span><em>${g.why}</em></div>`; }).join('');
+  const left = S.tiles.filter((t) => !S.solved.includes(groupOf[t]));
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${S.solved.length} / 4 groups</span></div>
+    <div class="ph-body">
+      ${done ? '' : '<p class="ph-sub" style="text-align:center">Make four groups of four</p>'}
+      <div class="cx-wall">${rows}${done ? '' : left.map((t) => `<button class="cx-tile ${S.sel.includes(t) ? 'sel' : ''}" data-t="${t}" style="--fs:${t.length > 11 ? 9.5 : t.length > 9 ? 10.5 : t.length > 7 ? 11.5 : 13}px">${t}</button>`).join('')}</div>
+      ${done ? endCard() : `<div class="cx-left">Mistakes left ${[0, 1, 2, 3].map((k) => `<i class="${k >= S.miss ? 'gone' : ''}"></i>`).join('')}</div>`}
+    </div>
+    ${done ? '' : `<div class="ph-dock"><div class="cx-acts"><button data-p="shuffle">Shuffle</button><button data-p="clear" ${S.sel.length ? '' : 'disabled'}>Deselect</button><button class="go" data-p="submit" ${S.sel.length === 4 ? '' : 'disabled'}>Submit</button></div></div>`}`;
+  if (flash === 'solved') {
+    const r = phone.querySelector(`[data-row="${S.solved[S.solved.length - 1]}"]`);
+    r && r.animate([{ transform: 'scale(.9)', opacity: .2 }, { transform: 'scale(1.03)', opacity: 1, offset: .6 }, { transform: 'none' }], { duration: GM.calm() ? 1 : 520, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+}
+function endCard() {
+  const won = S.solved.length === 4;
+  return `<div class="cx-done"><span class="ph-sub">${won ? 'Wall solved' : 'Out of mistakes'}</span><span class="big">${won ? (4 - S.miss) === 0 ? 'Perfect' : `${4 - S.miss} mistake${4 - S.miss === 1 ? '' : 's'}` : `${S.solved.length} of 4`}</span>
+    <div class="cx-grid-mini">${S.guesses.flatMap((g) => g.map((t) => `<i style="background:var(--cx-${groupOf[t]})"></i>`)).join('')}</div>
+    <p class="ph-sub" style="font-size:13px">Each row is one of your guesses, coloured by where those tiles really belonged.</p></div>`;
+}
+phone.addEventListener('click', async (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.t) {
+    const v = t.dataset.t;
+    if (S.sel.includes(v)) S.sel = S.sel.filter((x) => x !== v); else if (S.sel.length < 4) S.sel.push(v);
+    GM.sound.click(); renderPhone(); return;
+  }
+  if (t.dataset.p === 'shuffle') { S.tiles = GM.shuffle(S.tiles); renderPhone(); phone.querySelectorAll('.cx-tile').forEach((n, k) => n.animate([{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 300, delay: GM.calm() ? 0 : k * 15, fill: 'backwards' })); }
+  if (t.dataset.p === 'clear') { S.sel = []; renderPhone(); }
+  if (t.dataset.p === 'submit') await submit();
+});
+async function submit() {
+  const guess = S.sel.slice(); S.guesses.push(guess);
+  // lift the selection in sequence
+  const nodes = guess.map((v) => phone.querySelector(`[data-t="${v}"]`));
+  for (const n of nodes) { n.animate([{ transform: 'scale(.94)' }, { transform: 'translateY(-10px) scale(.94)' }, { transform: 'scale(.94)' }], { duration: GM.calm() ? 1 : 260 }); await GM.sleep(90); }
+  await GM.sleep(220);
+  const counts = {}; guess.forEach((v) => counts[groupOf[v]] = (counts[groupOf[v]] || 0) + 1);
+  const best = Math.max(...Object.values(counts));
+  if (best === 4) {
+    const d = groupOf[guess[0]]; S.solved.push(d); S.sel = [];
+    S.race[GM.me].solved.push(d);
+    GM.sound.right(); renderPhone('solved'); renderRace();
+    if (S.solved.length === 4) { GM.sound.fanfare(); GM.confetti(phone); }
+  } else {
+    S.miss--; S.race[GM.me].miss = S.miss;
+    nodes.forEach((n) => n.classList.add('fx-shake')); GM.sound.wrong();
+    await GM.sleep(450);
+    if (best === 3) GM.toast(phone, 'One away…');
+    if (S.miss === 0) { S.sel = []; S.solved = [...new Set([...S.solved, 1, 2, 3, 4])]; }
+    renderPhone(); renderRace();
+  }
+}
+
+// ── Board: race ───────────────────────────────────
+let raceTimer;
+function renderRace() {
+  if (S.view !== 'race') return;
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  const firsts = {}; Object.entries(S.race).forEach(([c, r]) => r.solved.forEach((d, k) => { if (!firsts[d]) firsts[d] = c; }));
+  const fin = GM.class.filter((c) => S.race[c].solved.length === 4).length;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x cx-head">The race <span>${fin} of ${GM.class.length} have solved the wall · tiles stay hidden</span></div><div class="stage-x cx-race">${GM.class.map((c) => { const r = S.race[c]; return `<div class="cx-card ${r.solved.length === 4 ? 'done' : ''}" data-c="${c}"><div class="who"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${c}<span class="miss">${[0, 1, 2, 3].map((k) => `<i class="${k >= r.miss ? 'gone' : ''}"></i>`).join('')}</span></div><div class="cx-slots">${[0, 1, 2, 3].map((k) => `<i class="${r.solved[k] ? 'g' + r.solved[k] : ''}"></i>`).join('')}</div></div>`; }).join('')}</div>
+    <div class="stage-x cx-ticker">${Object.entries(firsts).map(([d, c]) => `<span class="b-pill"><i class="sw" style="background:var(--cx-${d})"></i>First to find it: <b>${c}</b></span>`).join('') || '<span>Groups appear here as people find them. Tiles stay hidden.</span>'}</div>
+    <div class="stage-x cx-legend"><span><i style="background:var(--cx-1)"></i>Easiest</span><span><i style="background:var(--cx-2)"></i></span><span><i style="background:var(--cx-3)"></i></span><span><i style="background:var(--cx-4)"></i>Trickiest</span></div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="pause">Pause</button><button class="bctl primary" data-a="classwall">Class wall</button></div>`);
+}
+function tickRace() {
+  // simulated classmates solve groups and make mistakes over time
+  const busy = GM.class.filter((c) => c !== GM.me && S.race[c].solved.length < 4 && S.race[c].miss > 0);
+  if (!busy.length) return;
+  const c = GM.pick(busy), r = S.race[c];
+  if (GM.rand() < .62) {
+    const next = [1, 2, 3, 4].filter((d) => !r.solved.includes(d));
+    const d = GM.rand() < .6 ? next[0] : GM.pick(next); r.solved.push(d);
+  } else r.miss--;
+  renderRace();
+  const card = board.querySelector(`[data-c="${c}"]`);
+  if (card && !GM.calm()) card.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+
+// ── Board: class wall (confusion pairs) ───────────
+function renderClassWall() {
+  S.view = 'class';
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  const all = GROUPS.flatMap((g) => g.tiles.map((t) => ({ t, d: g.d })));
+  const W = 1200, H = 760, cx = W / 2, cy = H / 2;
+  const pos = {}; GROUPS.forEach((g, gi) => g.tiles.forEach((t, k) => { pos[t] = { x: 150 + gi * 300, y: 110 + k * 180 }; }));
+  const curve = (a, b) => { const p = pos[a], q = pos[b], mx = (p.x + q.x) / 2, my = Math.min(p.y, q.y) - 60 - Math.abs(p.x - q.x) * .12; return `M${p.x} ${p.y} Q${mx} ${my} ${q.x} ${q.y}`; };
+  const pairs = [['Cosmic', 'Omniscient', 14], ['Verbal', 'Unreliable', 11], ['Labyrinth', 'Naive', 4], ['Dramatic', 'Intrusive', 7], ['Assonance', 'Verbal', 5]];
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x cx-class">
+    <div class="cx-net">${GROUPS.map((g, gi) => `<span style="position:absolute;top:-6%;left:${((150 + gi * 300) / W) * 100}%;transform:translateX(-50%);font-size:20px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--stage-muted);white-space:nowrap">${g.label}</span>`).join('')}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${pairs.map(([a, b, n]) => `<path d="${curve(a, b)}" fill="none" stroke="var(--game-wrong)" stroke-opacity="${.25 + n / 20}" stroke-width="${2 + n * .8}" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"><animate attributeName="stroke-dashoffset" from="1" to="0" dur="${GM.calm() ? '0.01s' : '0.9s'}" fill="freeze"/></path>`).join('')}</svg>
+      ${all.map((n) => `<span class="cx-node" style="left:${(pos[n.t].x / W) * 100}%;top:${(pos[n.t].y / H) * 100}%;background:var(--cx-${n.d});color:var(--cx-${n.d}-ink)">${n.t}</span>`).join('')}</div>
+    <div class="cx-side"><span class="b-eyebrow">What we mixed up most</span>
+      ${pairs.slice(0, 3).map(([a, b, n]) => `<div class="lb-row"><span class="pair"><span style="background:var(--cx-${groupOf[a]});color:var(--cx-${groupOf[a]}-ink)">${a}</span>+<span style="background:var(--cx-${groupOf[b]});color:var(--cx-${groupOf[b]}-ink)">${b}</span></span><span class="pts">${n}×</span></div>`).join('')}
+      <div class="lb-row" style="grid-template-columns:1fr"><span style="color:var(--stage-muted);font-size:24px">Lines join tiles that people put in the same guess but which belonged to different groups. Thicker means more often. No names.</span></div>
+    </div></div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="race">Back to race</button></div>`);
+  GM.sound.reveal();
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return; GM.sound.click();
+  if (a === 'classwall') renderClassWall();
+  if (a === 'race') { S.view = 'race'; renderRace(); }
+  if (a === 'pause') { const p = e.target.closest('button'); const on = p.textContent === 'Pause'; p.textContent = on ? 'Resume' : 'Pause'; S.paused = on; }
+});
+fresh(); renderPhone(); renderRace();
+raceTimer = setInterval(() => { if (!S.paused) tickRace(); }, 1300);
+</script>
+</body>
+</html>

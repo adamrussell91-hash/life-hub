@@ -1,0 +1,27 @@
+{
+  // Live game rooms (spec §3). Not deployed yet: see the notes in netlify/functions/_shared/game-rooms.mjs
+  // and .env.example (GAME_ROOM_SECRET must be set on both sides first: `wrangler secret put GAME_ROOM_SECRET`).
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "game-rooms",
+  "main": "src/index.js",
+  "workers_dev": false,
+  "send_metrics": false,
+  "compatibility_date": "2026-10-23",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "traces": { "enabled": true }
+  },
+  // A zone route in front of the class-site Custom Domain (class.adam-russell.com): requests to /g/* run here,
+  // everything else still reaches class-site. Cloudflare runs route Workers before a Custom Domain Worker.
+  "routes": [
+    { "pattern": "class.adam-russell.com/g/*", "zone_name": "adam-russell.com" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://life-hub.adam-russell.com,https://class.adam-russell.com,https://teaching-hub.adam-russell.com"
+  }
+}

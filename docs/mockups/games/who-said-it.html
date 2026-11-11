@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who said it? — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Character colours (cameo backgrounds + silhouette ink) */
+.ch-mira { --cb: var(--pastel-gold); --ci: var(--pastel-gold-ink); }
+.ch-hask { --cb: var(--pastel-blue); --ci: var(--pastel-blue-ink); }
+.ch-tobin { --cb: var(--pastel-sage); --ci: var(--pastel-sage-ink); }
+.ch-agnes { --cb: var(--pastel-lilac); --ci: var(--pastel-lilac-ink); }
+.ch-ellis { --cb: var(--pastel-peach); --ci: var(--pastel-peach-ink); }
+.ch-fake { --cb: #e9e5dc; --ci: #4a4f5c; }
+.cameo { display: block; width: 100%; height: 100%; border-radius: 50% / 46%; background: radial-gradient(120% 90% at 50% 18%, #fff 0%, var(--cb) 55%, color-mix(in srgb, var(--cb) 80%, var(--ci)) 100%); color: var(--ci); overflow: hidden; box-shadow: inset 0 0 0 3px rgba(255,255,255,.7), inset 0 0 0 5px color-mix(in srgb, var(--cb) 70%, var(--ci)); }
+.cameo svg { display: block; width: 100%; height: 100%; }
+
+/* ── Board ───────────────────────────────────────── */
+.ws-head { position: absolute; left: 120px; right: 340px; top: 132px; }
+.ws-quote { position: relative; margin: 0; min-height: 214px; font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; font-size: 54px; line-height: 1.2; letter-spacing: -.005em; text-wrap: pretty; }
+.ws-quote .ghost { visibility: hidden; }
+.ws-quote .typed { position: absolute; left: 0; top: 0; right: 0; }
+.ws-quote .caret { display: inline-block; width: 4px; height: .95em; margin-left: 4px; vertical-align: -.1em; background: var(--high-sea); animation: wsBlink .9s steps(1) infinite; }
+@keyframes wsBlink { 50% { opacity: 0; } }
+.ws-src { margin-top: 18px; display: flex; align-items: center; gap: 16px; font-size: 30px; font-weight: 600; min-height: 48px; opacity: 0; }
+.ws-src .tag { flex: none; padding: 6px 18px; border-radius: 999px; font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--game-right); color: #04210f; }
+.ws-src.fake .tag { background: var(--game-gold); color: var(--depth); }
+.ws-src span:last-child { color: var(--stage-muted); font-weight: 500; }
+.ws-src span b { color: var(--stage-ink); }
+.ws-ring { position: absolute; right: 120px; top: 140px; transition: opacity .4s; }
+.board.closed .ws-ring { opacity: .25; }
+
+.ws-cast { position: absolute; left: 120px; right: 120px; top: 548px; height: 410px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 24px; }
+.ws-card { position: relative; perspective: 1400px; transition: opacity .5s, transform .6s var(--ease-spring); }
+.ws-flip { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .9s cubic-bezier(.3,1.3,.5,1); }
+.ws-face { position: absolute; inset: 0; border-radius: 28px; padding: 18px 18px 20px; background: var(--stage-card); box-shadow: var(--stage-glow); backface-visibility: hidden; -webkit-backface-visibility: hidden; display: grid; grid-template-rows: 196px auto auto 1fr; justify-items: center; text-align: center; }
+.ws-face .cameo { width: 168px; height: 196px; }
+.ws-face .nm { margin-top: 12px; font-size: 30px; font-weight: 700; line-height: 1.1; }
+.ws-face .rl { font-size: 26px; color: var(--stage-muted); line-height: 1.2; }
+.ws-dist { align-self: end; width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; opacity: 0; transform: translateY(10px); transition: opacity .4s, transform .4s var(--ease); }
+.ws-dist .bar { height: 14px; border-radius: 14px; background: var(--stage-line); overflow: hidden; }
+.ws-dist .bar i { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--game-gold); transform: scaleX(0); transform-origin: left; transition: transform 1s var(--ease); }
+.ws-dist b { font-size: 30px; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.board.closed .ws-dist { opacity: 1; transform: none; }
+.ws-card.fakecard .ws-face.front { background: repeating-linear-gradient(135deg, var(--stage-card) 0 16px, transparent 16px 32px); box-shadow: inset 0 0 0 3px var(--stage-line); }
+.ws-back { transform: rotateY(180deg); background: linear-gradient(170deg, rgba(63,174,115,.32), var(--stage-card)); box-shadow: 0 0 0 4px var(--game-right), 0 0 70px rgba(63,174,115,.45); grid-template-rows: auto 150px auto auto 1fr; gap: 6px; }
+.ws-back .said { font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--game-right); }
+[data-board-theme="light"] .ws-back .said { color: var(--success); }
+.ws-back .cameo { width: 128px; height: 150px; }
+.ws-back .src { font-size: 26px; line-height: 1.2; color: var(--stage-ink); }
+.ws-back .src small { display: block; font-size: 22px; color: var(--stage-muted); margin-top: 4px; }
+.ws-card.is-right { transform: translateY(-18px) scale(1.05); z-index: 2; }
+.ws-card.is-right .ws-flip { transform: rotateY(180deg); }
+.ws-card.is-dim { opacity: .34; transform: scale(.96); }
+body.calm .ws-flip { transition: none; }
+body.calm .ws-card.is-right .ws-flip, body.calm .ws-card.is-right .ws-back { transform: none; }
+body.calm .ws-card.is-right .front { opacity: 0; }
+body.calm .ws-back { transition: opacity .15s; }
+
+.ws-locked { position: absolute; left: 120px; bottom: 44px; display: flex; align-items: center; gap: 18px; font-size: 26px; color: var(--stage-muted); }
+.ws-dots { display: flex; gap: 8px; flex-wrap: wrap; max-width: 900px; }
+.ws-dots i { width: 22px; height: 22px; border-radius: 50%; background: var(--stage-line); transition: background .3s, transform .4s var(--ease-spring); }
+.ws-dots i.on { background: var(--game-gold); transform: scale(1.15); }
+
+.ws-lb { position: absolute; left: 420px; right: 420px; top: 260px; }
+.ws-lb h2 { text-align: center; font-size: 44px; margin: 0 0 28px; }
+
+/* Teacher insight */
+.ws-ins { position: absolute; left: 100px; right: 100px; top: 104px; }
+.ws-ins h2 { margin: 0; font-size: 44px; }
+.ws-ins .line { margin: 6px 0 20px; font-size: 26px; color: var(--stage-muted); }
+.ws-ins-grid { display: grid; grid-template-columns: 980px 1fr; gap: 48px; }
+.ws-mx { display: grid; grid-template-columns: 170px repeat(6, 1fr); gap: 6px; }
+.ws-mx > span { height: 74px; border-radius: 12px; display: grid; place-items: center; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ws-mx .hd { height: 64px; font-size: 22px; font-weight: 700; color: var(--stage-muted); text-align: center; line-height: 1.05; }
+.ws-mx .rh { justify-content: start; padding-left: 4px; font-size: 24px; display: flex; gap: 10px; align-items: center; }
+.ws-mx .rh .cameo { width: 40px; height: 46px; flex: none; }
+.ws-mx .ax { font-size: 20px; color: var(--stage-muted); font-weight: 600; }
+.ws-ear { display: grid; gap: 8px; align-content: start; }
+.ws-ear h3 { margin: 0; font-size: 30px; }
+.ws-ear p { margin: 0 0 6px; font-size: 22px; color: var(--stage-muted); }
+.ws-ear-row { display: grid; grid-template-columns: 52px 1fr 92px 92px 92px; align-items: center; gap: 10px; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ws-ear-row.hd { font-size: 20px; color: var(--stage-muted); font-weight: 700; }
+.ws-ear-row .b-avatar { width: 44px; height: 44px; font-size: 16px; }
+.ws-ear-row .sc { position: relative; height: 34px; border-radius: 10px; background: var(--stage-card); overflow: hidden; }
+.ws-ear-row .sc i { position: absolute; top: 0; bottom: 0; left: 50%; border-radius: 6px; }
+.ws-ear-row .sc::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--stage-line); }
+.ws-ear-row span:not(.sc):not(.b-avatar) { text-align: right; }
+.ws-display { margin-top: 18px; padding: 16px 22px; border-radius: 18px; background: var(--stage-card); box-shadow: inset 0 0 0 2px var(--stage-line); font-size: 24px; color: var(--stage-muted); }
+.ws-display b { color: var(--stage-ink); }
+
+/* ── Phone ───────────────────────────────────────── */
+.phone .ph-body { overflow-x: hidden; }
+.ws-slip { padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1), 0 6px 18px rgba(20,35,70,.06); display: grid; gap: 4px; }
+.ws-slip span { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--high-sea-ink); }
+.ws-slip q { quotes: none; font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; font-size: 18px; line-height: 1.3; color: var(--navy); }
+.ws-hand { position: relative; height: 222px; flex: none; margin-top: auto; }
+.ws-pc { position: absolute; left: calc(50% - 46px); bottom: 8px; width: 92px; height: 142px; padding: 6px 6px 8px; border: 0; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.12), 0 6px 14px rgba(20,35,70,.14); display: grid; grid-template-rows: 88px 1fr; gap: 5px; text-align: left; transform-origin: 50% 100%; transition: transform .38s var(--ease-spring), box-shadow .2s; }
+.ws-pc .cameo { width: 80px; height: 88px; border-radius: 12px; }
+.ws-pc b { font-size: 13.5px; line-height: 1.15; color: var(--ink); padding-left: 2px; overflow-wrap: normal; word-break: keep-all; hyphens: none; }
+.ws-pc.sel { box-shadow: 0 0 0 3px var(--navy), 0 14px 26px rgba(20,35,70,.25); }
+.ws-pick { min-height: 24px; text-align: center; font-size: 15px; color: var(--muted); }
+.ws-pick b { color: var(--navy); }
+.ws-fakebtn { justify-content: center; text-align: center; background: transparent; box-shadow: inset 0 0 0 2px rgba(23,55,94,.25); border: 0; }
+.ws-fakebtn svg { flex: none; }
+.ws-fakebtn.sel { background: var(--ink); color: #fff; box-shadow: none; }
+.ws-wait { flex: 1; display: grid; place-items: center; text-align: center; align-content: center; gap: 10px; color: var(--muted); }
+.ws-wait .big { font-size: 56px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.ws-wait .mini { width: 96px; height: 112px; margin: 0 auto; }
+.ws-wait .who { font-size: 22px; font-weight: 700; color: var(--ink); }
+.ws-note { padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; line-height: 1.45; color: var(--ink); }
+.ws-note > span { display: block; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.ws-note.fake { background: var(--pastel-gold); box-shadow: none; }
+.ws-note.fake > span { color: var(--pastel-gold-ink); }
+.ws-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.ws-break div { display: flex; justify-content: space-between; gap: 12px; }
+.ws-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content (invented: The Lantern House) ─────────────
+const CAST = [
+  { k: 'mira', name: 'Mira Vale', role: 'Narrator' },
+  { k: 'hask', name: 'Doctor Hask', role: 'The doctor' },
+  { k: 'tobin', name: 'Old Tobin', role: 'Groundskeeper' },
+  { k: 'agnes', name: 'Sister Agnes', role: 'The sister' },
+  { k: 'ellis', name: 'Ellis Crane', role: 'Her brother' }
+];
+const FAKE = { k: 'fake', name: 'Nobody', role: 'It’s fake' };
+const ALL = [...CAST, FAKE];
+const byK = Object.fromEntries(ALL.map((c) => [c.k, c]));
+const QS = [
+  { text: 'I count the stairs each night so that the dark cannot count me.', who: 'mira', src: 'Chapter 1', title: 'Lamp-oil', p: .7, lure: 'ellis' },
+  { text: 'Fear is a fever, Miss Vale. I have bled it out of stronger patients than you.', who: 'hask', src: 'Chapter 3', title: 'The Surgery', p: .66, lure: 'tobin' },
+  { text: 'Honestly, the house is just old. There’s a perfectly scientific reason for every noise.', who: 'fake', why: 'Wrong voice and wrong idea. “Honestly” and “perfectly scientific” are modern and breezy. Doctor Hask is cold and clinical, and the novella never explains the house away.', p: .42, lure: 'hask' },
+  { text: 'Light them all, Mira. Every one. He hates the light.', who: 'ellis', src: 'Chapter 7', title: 'The East Wing', p: .55, lure: 'mira' },
+  { text: 'The ground keeps what you give it, miss. And some things it gives back.', who: 'tobin', src: 'Chapter 5', title: 'Frost', p: .62, lure: 'agnes' },
+  { text: 'We pray with the shutters closed, child. God sees well enough in the dark.', who: 'agnes', src: 'Chapter 6', title: 'Vespers', p: .5, lure: 'tobin' },
+  { text: 'Mira, I forgive you for the fire. Let the lamps go out now.', who: 'fake', why: 'Wrong idea and wrong time. Ellis never learns Mira’s part in the fire, and the novella ends with the lamps still burning: nobody offers forgiveness.', p: .38, lure: 'ellis' }
+];
+const ROUND_S = 30;
+
+// ── Portraits: drawn silhouettes with one prop each ───
+function portrait(k) {
+  const body = '<path d="M10 124 C12 96 30 84 50 84 C70 84 88 96 90 124 Z"/><path d="M43 64 h14 v24 h-14 z"/>';
+  const head = '<ellipse cx="50" cy="50" rx="16" ry="19"/>';
+  const p = {
+    mira: `<circle cx="80" cy="96" r="20" fill="#f2c14e" opacity=".35"/><circle cx="80" cy="96" r="11" fill="#f2c14e" opacity=".5"/>
+      <g fill="currentColor">${body}${head}<circle cx="50" cy="28" r="8.5"/><path d="M34 46 C32 34 40 29 50 29 C60 29 68 34 66 46 C62 40 56 37 50 37 C44 37 38 40 34 46Z"/></g>
+      <g fill="none" stroke="currentColor" stroke-width="2"><path d="M80 78 v6"/><path d="M74 84 h12 l-1 18 h-10 z" fill="#f7d67a"/></g>`,
+    hask: `<g fill="currentColor">${body}${head}<rect x="34" y="12" width="32" height="22" rx="2"/><rect x="26" y="32" width="48" height="5" rx="2.5"/></g>
+      <g fill="none" stroke="#fff" stroke-width="2" opacity=".9"><circle cx="43" cy="50" r="5.5"/><circle cx="57" cy="50" r="5.5"/><path d="M48.5 50 h3"/></g>
+      <path d="M42 86 L50 100 L58 86" fill="none" stroke="#fff" stroke-width="2.5" opacity=".75"/>`,
+    tobin: `<g fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M80 124 L88 66"/></g><path d="M82 60 l12 2 l-4 -18 l-8 -1 z" fill="currentColor"/>
+      <g fill="currentColor">${body}${head}<path d="M31 42 C32 28 68 28 69 42 L79 44 C71 48 40 47 31 42Z"/></g>
+      <path d="M35 56 C37 76 63 76 65 56 C60 66 40 66 35 56Z" fill="#fff" opacity=".55"/>`,
+    agnes: `<g fill="currentColor"><path d="M28 54 C26 30 38 24 50 24 C62 24 74 30 72 54 L80 104 C66 96 34 96 20 104 Z"/>${body}</g>
+      <ellipse cx="50" cy="52" rx="13" ry="16" fill="#fff" opacity=".8"/><path d="M36 40 Q50 31 64 40" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+      <g transform="translate(76 92)"><path d="M-3 0 h6 v18 h-6z" fill="#fff"/><path d="M0 -9 C3 -5 3 -2 0 0 C-3 -2 -3 -5 0 -9Z" fill="#f2c14e"/></g>`,
+    ellis: `<g fill="currentColor">${body}${head}<path d="M33 46 C31 30 41 26 50 28 C55 23 67 27 67 40 C64 35 61 37 58 33 C55 37 48 34 45 37 C41 34 36 39 33 46Z"/></g>
+      <path d="M36 86 C44 94 56 94 64 86 L66 92 C56 100 44 100 34 92Z" fill="#e0894a"/><path d="M58 92 l5 22 l-8 -2z" fill="#e0894a"/>`,
+    fake: `<g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
+      <path d="M28 46 C28 34 72 34 72 46 C72 66 60 82 50 82 C40 82 28 66 28 46Z" stroke-dasharray="6 6"/>
+      <path d="M36 52 q6 -5 12 0 M52 52 q6 -5 12 0"/><path d="M42 68 q8 -4 16 0"/></g>
+      <text x="50" y="114" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="Fraunces, Georgia, serif" font-style="italic">?</text>`
+  }[k];
+  return `<span class="cameo ch-${k}"><svg viewBox="0 0 100 124" aria-hidden="true">${p}</svg></span>`;
+}
+
+// ── State ────────────────────────────────────────────
+let S;
+function fresh() {
+  seedSkills();
+  S = { i: 0, token: 0, log: [], players: Object.fromEntries(GM.class.map((c) => [c, { pts: 0, prev: 0 }])), me: { pick: null, locked: false } };
+}
+let SKILL;
+function seedSkills() { SKILL = Object.fromEntries(GM.class.map((c) => [c, .45 + GM.rand() * .55])); }
+
+const { board, phone } = GM.scaffold({
+  title: '<b>Who said it?</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW. Read the quote on the board, tap a character in your hand of cards (or <b>Nobody: it’s fake</b>), then lock in. Use the board buttons as the teacher: close answers to see how the class split, then reveal. Quotes 3 and 7 are fakes. The other 23 students are simulated. Points for speed; catching a fake scores double.',
+  onRestart: () => { fresh(); showQuote(); }
+});
+const Q = () => QS[S.i];
+const ord = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+const srcText = (q) => `${q.src}, <span style="white-space:nowrap">“${q.title}”</span>`;
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function clearStage() { board.querySelectorAll('.stage-x').forEach((n) => n.remove()); board.classList.remove('closed'); }
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+
+// ── Board: quote + cast ──────────────────────────────
+function boardQuote() {
+  clearStage();
+  const q = Q();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x ws-head"><span class="b-eyebrow">Quote ${S.i + 1} of ${QS.length} · who said it?</span>
+      <p class="ws-quote"><span class="ghost">“${esc(q.text)}”</span><span class="typed"></span></p>
+      <div class="ws-src"></div></div>
+    <div class="stage-x ws-ring"></div>
+    <div class="stage-x ws-cast">${ALL.map((c) => `<div class="ws-card ${c.k === 'fake' ? 'fakecard' : ''}" data-k="${c.k}"><div class="ws-flip">
+      <div class="ws-face front">${portrait(c.k)}<span class="nm">${c.name}</span><span class="rl">${c.role}</span><span class="ws-dist"><span class="bar"><i></i></span><b>0</b></span></div>
+      <div class="ws-face ws-back"></div></div></div>`).join('')}</div>
+    <div class="stage-x ws-locked"><span><b class="lockn">0</b> / ${GM.class.length} locked in</span><span class="ws-dots">${GM.class.map(() => '<i></i>').join('')}</span></div>`);
+  setControls('<button class="bctl" data-a="time">+15 s</button><button class="bctl primary" data-a="close">Close answers</button>');
+  board.querySelectorAll('.ws-card').forEach((n, k) => !GM.calm() && n.animate([{ opacity: 0, transform: 'translateY(60px) rotate(-3deg) scale(.92)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 + 90 * k, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  return typeQuote(S.token);
+}
+async function typeQuote(tok) {
+  const el = board.querySelector('.ws-quote .typed'), full = `“${Q().text}”`;
+  if (GM.calm()) { el.textContent = full; return; }
+  el.innerHTML = '<span></span><i class="caret"></i>';
+  const out = el.firstChild;
+  await new Promise((r) => setTimeout(r, 450));
+  for (let n = 1; n <= full.length; n++) {
+    if (tok !== S.token) return;
+    out.textContent = full.slice(0, n);
+    if (n % 3 === 0 && full[n - 1] !== ' ') GM.sound.click();
+    await new Promise((r) => setTimeout(r, /[,.:]/.test(full[n - 1]) ? 160 : 26));
+  }
+  setTimeout(() => { if (tok === S.token) el.querySelector('.caret')?.remove(); }, 900);
+}
+
+// Simulated class
+function simAnswer(c, q) {
+  const s = SKILL[c], r = GM.rand(), pRight = Math.min(.95, q.p * (.4 + s * .7));
+  if (r < pRight) return q.who;
+  if (r < pRight + (1 - pRight) * .6) return q.lure;
+  if (q.who !== 'fake' && GM.rand() < .45) return 'fake';
+  return GM.pick(ALL.filter((x) => x.k !== q.who).map((x) => x.k));
+}
+function simulate(tok) {
+  const q = Q();
+  GM.shuffle(GM.class.filter((c) => c !== GM.me)).forEach((c, n) => {
+    const t = 3 + n * (GM.calm() ? .1 : .55) + GM.rand() * 4;
+    setTimeout(() => { if (tok !== S.token || S.closed) return; S.answers[c] = { pick: simAnswer(c, q), t: Math.min(ROUND_S - 1, t) }; lockDot(); }, t * 1000);
+  });
+}
+function lockDot() {
+  const n = Object.keys(S.answers).length;
+  board.querySelectorAll('.ws-dots i').forEach((d, k) => d.classList.toggle('on', k < n));
+  const el = board.querySelector('.lockn'); if (el) el.textContent = n;
+  if (n === GM.class.length) setTimeout(closeAnswers, 600);
+}
+
+function closeAnswers() {
+  if (S.closed) return; S.closed = true; S.ring && S.ring.stop();
+  GM.class.forEach((c) => { if (!S.answers[c]) S.answers[c] = { pick: null, t: ROUND_S }; });
+  S.log[S.i] = S.answers;
+  board.classList.add('closed'); GM.sound.lock();
+  const counts = Object.fromEntries(ALL.map((c) => [c.k, 0])); Object.values(S.answers).forEach((a) => { if (a.pick) counts[a.pick]++; });
+  const max = Math.max(1, ...Object.values(counts));
+  board.querySelectorAll('.ws-card').forEach((n, k) => {
+    const v = counts[n.dataset.k];
+    setTimeout(() => { n.querySelector('.ws-dist i').style.transform = `scaleX(${v / max})`; GM.countUp(n.querySelector('.ws-dist b'), 0, v, 800); }, GM.calm() ? 0 : k * 90);
+  });
+  setControls('<button class="bctl primary" data-a="reveal">Reveal</button>');
+  renderPhone('closed');
+}
+
+async function reveal() {
+  const q = Q(); setControls('');
+  GM.sound.reveal();
+  const card = board.querySelector(`.ws-card[data-k="${q.who}"]`);
+  const back = card.querySelector('.ws-back');
+  back.innerHTML = q.who === 'fake'
+    ? `<span class="said">Nobody said it</span>${portrait('fake')}<span class="nm">It’s fake</span><span class="src">Caught by<small>${Object.values(S.answers).filter((a) => a.pick === 'fake').length} of ${GM.class.length}</small></span>`
+    : `<span class="said">Said it</span>${portrait(q.who)}<span class="nm">${byK[q.who].name}</span><span class="src">${q.src}<small style="white-space:nowrap">“${q.title}”</small><small>${Object.values(S.answers).filter((a) => a.pick === q.who).length} of ${GM.class.length} got it</small></span>`;
+  board.querySelectorAll('.ws-card').forEach((n) => n.classList.add(n === card ? 'is-right' : 'is-dim'));
+  const src = board.querySelector('.ws-src');
+  src.className = `ws-src ${q.who === 'fake' ? 'fake' : ''}`;
+  src.innerHTML = q.who === 'fake' ? `<span class="tag">Fake</span><span>${q.why.split('.')[0]}.</span>` : `<span class="tag">Real</span><span><b>${byK[q.who].name}</b> · ${srcText(q)}</span>`;
+  src.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 150 : 600, delay: GM.calm() ? 0 : 500, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'both' });
+  // score everyone
+  GM.class.forEach((c) => {
+    const p = S.players[c], a = S.answers[c]; p.prev = p.pts;
+    if (a.pick === q.who) { const gain = (100 + Math.max(0, Math.round((1 - a.t / ROUND_S) * 10)) * 10) * (q.who === 'fake' ? 2 : 1); p.pts += gain; p.last = gain; } else p.last = 0;
+  });
+  await GM.sleep(700);
+  S.answers[GM.me].pick === q.who ? GM.sound.right() : GM.sound.wrong();
+  renderPhone('result');
+  await GM.sleep(600);
+  if (q.who === 'fake') { // the why matters more than the tag: give it room
+    src.innerHTML = `<span class="tag">Fake</span><span>${q.why}</span>`;
+    src.style.alignItems = 'start'; src.style.fontSize = '27px'; src.style.lineHeight = '1.3';
+  }
+  const last = S.i === QS.length - 1;
+  setControls(last ? '<button class="bctl primary" data-a="final">Final scores</button>' : '<button class="bctl" data-a="lb">Leaderboard</button><button class="bctl primary" data-a="next">Next quote</button>');
+}
+
+function leaderboard() {
+  clearStage();
+  const rows = GM.class.map((c) => ({ c, ...S.players[c] }));
+  const before = rows.slice().sort((a, b) => b.prev - a.prev || a.c.localeCompare(b.c)).slice(0, 5);
+  const top = rows.slice().sort((a, b) => b.pts - a.pts || a.c.localeCompare(b.c)).slice(0, 5);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ws-lb"><h2>Top five</h2><div class="lb"></div></div>`);
+  setControls('<button class="bctl primary" data-a="next">Next quote</button>');
+  const lb = board.querySelector('.lb');
+  const row = (r, i) => `<div class="lb-row ${i === 0 ? 'first' : ''}" data-c="${r.c}"><span class="rank">${i + 1}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}</span><span class="pts">${r.prev}</span></div>`;
+  lb.innerHTML = before.map(row).join('');
+  setTimeout(() => {
+    GM.flip(lb, () => { lb.innerHTML = top.map(row).join(''); });
+    lb.querySelectorAll('.lb-row').forEach((n) => { const p = S.players[n.dataset.c]; GM.countUp(n.querySelector('.pts'), p.prev, p.pts, 900); const o = before.findIndex((b) => b.c === n.dataset.c), nw = top.findIndex((b) => b.c === n.dataset.c); if (S.i > 0 && (o === -1 || nw < o)) n.querySelector('.pts').insertAdjacentHTML('afterend', '<span class="move">▲</span>'); });
+    GM.sound.whoosh();
+  }, GM.calm() ? 50 : 700);
+  renderPhone('board');
+}
+
+// Learning data the insight reads
+function stats() {
+  const played = S.log.map((ans, i) => ({ ans, q: QS[i] })).filter((x) => x.ans);
+  const mx = {}; ALL.forEach((t) => { mx[t.k] = Object.fromEntries(ALL.map((c) => [c.k, 0])); mx[t.k].none = 0; mx[t.k].n = 0; });
+  played.forEach(({ ans, q }) => Object.values(ans).forEach((a) => { mx[q.who].n++; a.pick ? mx[q.who][a.pick]++ : mx[q.who].none++; }));
+  const ear = GM.class.map((c) => {
+    let fk = 0, fkN = 0, fa = 0, realN = 0;
+    played.forEach(({ ans, q }) => { const p = ans[c].pick; if (q.who === 'fake') { fkN++; if (p === 'fake') fk++; } else { realN++; if (p === 'fake') fa++; } });
+    const catchR = fkN ? fk / fkN : 0, faR = realN ? fa / realN : 0;
+    return { c, fk, fkN, fa, realN, catchR, faR, ear: catchR - faR };
+  });
+  // most mixed-up real pair
+  let pair = null, best = 0;
+  CAST.forEach((a) => CAST.forEach((b) => { if (a.k < b.k) { const v = mx[a.k][b.k] + mx[b.k][a.k]; if (v > best) { best = v; pair = [a, b]; } } }));
+  const fakeN = mx.fake.n, realTot = ALL.filter((x) => x.k !== 'fake').reduce((s, x) => s + mx[x.k].n, 0);
+  const realFake = ALL.filter((x) => x.k !== 'fake').reduce((s, x) => s + mx[x.k].fake, 0);
+  return { played, mx, ear, pair, catchAll: fakeN ? mx.fake.fake / fakeN : 0, faAll: realTot ? realFake / realTot : 0 };
+}
+
+function podium() {
+  clearStage();
+  const sorted = GM.class.map((c) => ({ c, ...S.players[c] })).sort((a, b) => b.pts - a.pts || a.c.localeCompare(b.c));
+  const st = stats(), right = st.played.reduce((s, { ans, q }) => s + Object.values(ans).filter((a) => a.pick === q.who).length, 0);
+  const [a, b, c] = sorted;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x" style="position:absolute;left:0;right:0;top:150px;text-align:center"><span class="b-eyebrow">Final scores</span><div style="font-size:30px;color:var(--stage-muted)">Class got ${Math.round(right / (st.played.length * GM.class.length) * 100)}% · fakes caught ${Math.round(st.catchAll * 100)}%${st.pair ? ` · most mixed up: <b style="color:var(--stage-ink)">${st.pair[0].name} and ${st.pair[1].name}</b>` : ''}</div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${r.pts} pts</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="insight">Teacher: ear for the text</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  renderPhone('final');
+}
+
+function insight() {
+  clearStage();
+  const st = stats();
+  const short = { mira: 'Mira', hask: 'Hask', tobin: 'Tobin', agnes: 'Agnes', ellis: 'Ellis', fake: 'Fake' };
+  const cell = (t, c) => {
+    const row = st.mx[t.k], v = row[c.k], share = row.n ? v / row.n : 0;
+    if (!row.n) return '<span class="ax">·</span>';
+    const diag = t.k === c.k, a = .1 + share * .85;
+    return `<span style="background:${diag ? `rgba(63,174,115,${a})` : v ? `rgba(212,84,79,${Math.min(.85, a * 1.5)})` : 'var(--stage-card)'};${v ? '' : 'color:var(--stage-muted);font-weight:500'}">${v}</span>`;
+  };
+  const mxHtml = `<span class="hd" style="text-align:left;place-items:end start">Said by ↓ · chosen →</span>${ALL.map((c) => `<span class="hd">${short[c.k]}</span>`).join('')}
+    ${ALL.map((t) => `<span class="rh">${portrait(t.k)}${short[t.k]}</span>${ALL.map((c) => cell(t, c)).join('')}`).join('')}`;
+  const ear = st.ear.slice().sort((x, y) => y.ear - x.ear || x.c.localeCompare(y.c));
+  const shown = [...ear.slice(0, 5), ...ear.slice(-4)];
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const earRow = (e) => { const w = Math.abs(e.ear) * 50; return `<div class="ws-ear-row"><span class="b-avatar" style="${GM.avatarStyle(e.c)}">${e.c}</span><span class="sc"><i style="${e.ear >= 0 ? `left:50%;width:${w}%;background:var(--game-right)` : `left:${50 - w}%;width:${w}%;background:var(--game-wrong)`}"></i></span><span>${e.fk}/${e.fkN}</span><span>${e.fa}/${e.realN}</span><span>${e.ear >= 0 ? '+' : '−'}${Math.abs(Math.round(e.ear * 100))}</span></div>`; };
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ws-ins"><span class="b-eyebrow">Teacher only · not for the projector</span><h2>Speaker confusion and fake detection</h2>
+    <p class="line">Fakes caught <b style="color:var(--stage-ink)">${pct(st.catchAll)}</b> · real quotes called fake (false alarms) <b style="color:var(--stage-ink)">${pct(st.faAll)}</b>${st.pair ? ` · most mixed up: <b style="color:var(--stage-ink)">${st.pair[0].name} ↔ ${st.pair[1].name}</b>` : ''}</p>
+    <div class="ws-ins-grid"><div><div class="ws-mx">${mxHtml}</div>
+      <div class="ws-display">Display version, no names: <b>Most mixed up: ${st.pair ? `${short[st.pair[0].k]} and ${short[st.pair[1].k]}` : 'nobody'}</b> · fakes caught ${pct(st.catchAll)}</div></div>
+      <div class="ws-ear"><h3>Ear for the text</h3><p>Fake catch rate minus false-alarm rate. Top five and bottom four; full list in Results.</p>
+        <div class="ws-ear-row hd"><span></span><span>Score</span><span>Fakes</span><span>Alarms</span><span>Ear</span></div>
+        ${shown.slice(0, 5).map(earRow).join('')}<div style="text-align:center;color:var(--stage-muted);font-size:22px;line-height:1">···</div>${shown.slice(5).map(earRow).join('')}</div></div></div>`);
+  setControls('<button class="bctl" data-a="podium">Podium</button><button class="bctl primary" data-a="restart">Play again</button>');
+}
+
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'close') closeAnswers();
+  if (a === 'reveal') reveal();
+  if (a === 'lb') leaderboard();
+  if (a === 'next') { S.i++; showQuote(); }
+  if (a === 'final') podium();
+  if (a === 'podium') podium();
+  if (a === 'insight') insight();
+  if (a === 'restart') { fresh(); showQuote(); }
+  if (a === 'time') { const left = Math.max(0, (S.endAt - performance.now()) / 1000); startRing(Math.round(left) + 15); GM.toast(phone, '+15 seconds added'); }
+});
+function startRing(sec) {
+  S.ring && S.ring.stop();
+  S.endAt = performance.now() + sec * 1000;
+  S.ring = GM.ring(board.querySelector('.ws-ring'), sec, { onEnd: closeAnswers, bar: () => phone.querySelector('.ph-timer i') });
+}
+
+// ── Phone ────────────────────────────────────────────
+const FAN = [-2, -1, 0, 1, 2].map((d) => ({ x: d * 60, y: d * d * 5, r: d * 6 }));
+const fanT = (k, sel) => `translate(${FAN[k].x}px, ${FAN[k].y - (sel ? 30 : 0)}px) rotate(${sel ? FAN[k].r * .5 : FAN[k].r}deg) scale(${sel ? 1.08 : 1})`;
+function phoneShell(body, dock = '') {
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av" style="${GM.avatarStyle(GM.me)}">${GM.me}</span>JW</span><span class="ph-score"><span class="mypts">${S.players[GM.me].pts}</span> pts</span></div>
+    <div class="ph-timer"><i></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+function pickLine() {
+  const p = S.me.pick;
+  return p ? `Your pick: <b>${p === 'fake' ? 'Nobody: it’s fake' : byK[p].name}</b>` : 'Tap a card, or call it a fake';
+}
+const maskIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8c0-2 16-2 16 0 0 6-4 11-8 11S4 14 4 8z" stroke-dasharray="3 3"/><path d="M8 11q2-1.6 4 0M12 11q2-1.6 4 0"/></svg>';
+function renderPhone(mode) {
+  const q = Q(), me = S.players[GM.me];
+  if (mode === 'answer') {
+    phoneShell(`<div class="ws-slip"><span>Quote ${S.i + 1} of ${QS.length}</span><q>“${esc(q.text)}”</q></div>
+      <p class="ph-h" style="font-size:19px;text-align:center;margin-top:4px">Who said it?</p>
+      <div class="ws-hand" role="group" aria-label="The cast">${CAST.map((c, k) => `<button class="ws-pc ${S.me.pick === c.k ? 'sel' : ''}" data-pick="${c.k}" aria-label="${c.name}" aria-pressed="${S.me.pick === c.k}" style="transform:${fanT(k, S.me.pick === c.k)};z-index:${S.me.pick === c.k ? 9 : k}">${portrait(c.k)}<b>${c.name.replace(' ', '<br>')}</b></button>`).join('')}</div>
+      <p class="ws-pick">${pickLine()}</p>`,
+      `<button class="pbtn ws-fakebtn ${S.me.pick === 'fake' ? 'sel' : ''}" data-pick="fake" aria-pressed="${S.me.pick === 'fake'}">${maskIcon}Nobody: it’s fake</button>
+       <button class="pbtn cta orange" data-p="lock" ${S.me.pick ? '' : 'disabled'}>Lock in</button>`);
+  }
+  if (mode === 'locked') {
+    const p = S.me.pick;
+    phoneShell(`<div class="ws-wait"><div><span class="ph-sub">Locked in</span><div class="mini" style="margin-top:12px">${portrait(p)}</div><p class="who">${p === 'fake' ? 'Nobody: it’s fake' : byK[p].name}</p><p class="ph-sub">Eyes on the board.</p></div></div>`);
+  }
+  if (mode === 'closed') {
+    const a = S.answers[GM.me];
+    phoneShell(`<div class="ws-wait"><div><span class="ph-sub">Answers closed</span>${a.pick ? `<div class="mini" style="margin-top:12px">${portrait(a.pick)}</div><p class="who">${a.pick === 'fake' ? 'You called it fake' : `You said ${byK[a.pick].name}`}</p>` : '<div class="big">–</div><p class="ph-sub">No answer this time.</p>'}<p class="ph-sub">See how the class split on the board.</p></div></div>`);
+  }
+  if (mode === 'result') {
+    const a = S.answers[GM.me], ok = a.pick === q.who, fake = q.who === 'fake';
+    const head = ok ? (fake ? 'Fake caught' : 'Right') : !a.pick ? 'No answer' : (a.pick === 'fake' ? 'False alarm: it’s real' : fake ? 'It’s a fake' : 'Not this time');
+    phoneShell(`<div class="ws-wait"><div><span class="ph-sub">${head}</span><div class="big" style="color:${ok ? 'var(--success)' : 'var(--danger)'}">${ok ? `+${me.last}` : '+0'}</div><div class="mini" style="margin-top:14px">${portrait(q.who)}</div><p class="who">${fake ? 'Nobody said it' : byK[q.who].name}</p></div></div>
+      ${fake ? `<div class="ws-note fake"><span>Why it’s fake</span>${q.why}</div>` : `<div class="ws-note"><span>Source</span>${byK[q.who].name} · ${srcText(q)}</div>`}`);
+    if (ok) GM.toast(phone, `+${me.last} points${fake ? '<small>Double for catching a fake</small>' : ''}`, 'good');
+    else if (a.pick) GM.toast(phone, fake ? 'You trusted a fake<small>Read why on your screen.</small>' : `It was ${byK[q.who].name}`, 'bad');
+  }
+  if (mode === 'board') {
+    const rank = GM.class.map((c) => S.players[c].pts).sort((x, y) => y - x).indexOf(me.pts) + 1;
+    phoneShell(`<div class="ws-wait"><div><span class="ph-sub">Leaderboard on the board</span><div class="big">${ord(rank)}</div><p class="ph-sub">${me.pts} points · next: quote ${S.i + 2}</p></div></div>`);
+  }
+  if (mode === 'final') {
+    const rank = GM.class.map((c) => S.players[c].pts).sort((x, y) => y - x).indexOf(me.pts) + 1;
+    const e = stats().ear.find((x) => x.c === GM.me), right = S.log.filter((ans, i) => ans && ans[GM.me].pick === QS[i].who).length;
+    phoneShell(`<div class="ws-wait"><div><span class="ph-sub">Final points</span><div class="big">${me.pts}</div><p class="ph-sub">You finished <b>${ord(rank)}</b> of ${GM.class.length}</p></div></div>
+      <div class="ws-break"><div><span>Quotes right</span><b>${right} of ${QS.length}</b></div><div><span>Fakes caught</span><b>${e.fk} of ${e.fkN}</b></div><div><span>Real quotes called fake</span><b>${e.fa} of ${e.realN}</b></div><div class="tot"><span>Ear for the text</span><span>${e.ear >= 0 ? '+' : '−'}${Math.abs(Math.round(e.ear * 100))}</span></div></div>`);
+  }
+}
+function fanIn() {
+  if (GM.calm()) return;
+  phone.querySelectorAll('.ws-pc').forEach((n, k) => n.animate([{ transform: 'translate(0, 90px) rotate(0deg) scale(.8)', opacity: 0 }, { transform: n.style.transform, opacity: 1 }], { duration: 620, delay: 80 + k * 70, easing: 'cubic-bezier(.34,1.4,.64,1)', fill: 'backwards' }));
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.pick && !S.me.locked && !S.closed) {
+    S.me.pick = S.me.pick === t.dataset.pick ? null : t.dataset.pick; GM.sound.click();
+    phone.querySelectorAll('[data-pick]').forEach((b) => {
+      const on = b.dataset.pick === S.me.pick; b.classList.toggle('sel', on); b.setAttribute('aria-pressed', String(on));
+      if (b.classList.contains('ws-pc')) { const k = CAST.findIndex((c) => c.k === b.dataset.pick); b.style.transform = fanT(k, on); b.style.zIndex = on ? 9 : k; }
+    });
+    phone.querySelector('.ws-pick').innerHTML = pickLine();
+    phone.querySelector('[data-p="lock"]').disabled = !S.me.pick;
+  }
+  if (t.dataset.p === 'lock' && S.me.pick && !S.closed) {
+    S.me.locked = true; S.answers[GM.me] = { pick: S.me.pick, t: Math.max(1, (performance.now() - S.t0) / 1000) }; lockDot(); GM.sound.lock(); renderPhone('locked');
+  }
+});
+
+async function showQuote() {
+  S.token++; S.closed = false; S.t0 = performance.now(); S.answers = {}; S.me = { pick: null, locked: false }; S.ring && S.ring.stop();
+  const tok = S.token;
+  renderPhone('answer'); fanIn();
+  await boardQuote();
+  if (tok !== S.token || S.closed) return;
+  S.t0 = performance.now();
+  startRing(ROUND_S); simulate(tok);
+}
+fresh(); showQuote();
+</script>
+</body>
+</html>

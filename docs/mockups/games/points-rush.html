@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Points rush — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* ── Board: lobby ─────────────────────────────── */
+.pr-title { position: absolute; left: 120px; right: 120px; top: 140px; text-align: center; }
+.pr-title h2 { margin: 0; font-size: 104px; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+.pr-title p { margin: 22px auto 0; max-width: 1200px; font-size: 32px; color: var(--stage-muted); text-wrap: balance; }
+.pr-rules { position: absolute; left: 160px; right: 160px; top: 430px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.pr-rule { border-radius: 28px; padding: 28px 30px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 12px; align-content: start; }
+.pr-rule .ic { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; color: #fff; }
+.pr-rule b { font-size: 34px; }
+.pr-rule span { font-size: 26px; color: var(--stage-muted); line-height: 1.3; }
+.pr-joined { position: absolute; left: 160px; right: 160px; top: 790px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.pr-joined .b-avatar { width: 58px; height: 58px; font-size: 21px; }
+.pr-set { position: absolute; left: 120px; bottom: 40px; z-index: 20; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 0 26px; border-radius: 999px; border: 2px dashed var(--stage-line); background: transparent; color: var(--stage-ink); font-size: 24px; font-weight: 600; }
+.pr-set span { font-size: 20px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--stage-muted); }
+.pr-set b { color: var(--high-sea); }
+.pr-set:hover { background: var(--stage-card); }
+
+/* ── Board: live ──────────────────────────────── */
+.pr-goal { position: absolute; left: 120px; right: 120px; top: 128px; height: 262px; border-radius: 32px; padding: 26px 36px 0; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.pr-goal-row { display: flex; align-items: flex-end; gap: 22px; }
+.pr-goal-row .b-eyebrow { margin: 0 0 8px; }
+.pr-total { font-size: 76px; font-weight: 800; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.pr-of { font-size: 30px; color: var(--stage-muted); padding-bottom: 8px; }
+.pr-pct { font-size: 30px; font-weight: 700; color: var(--game-gold); padding-bottom: 8px; font-variant-numeric: tabular-nums; }
+[data-board-theme="light"] .pr-pct { color: var(--pastel-gold-ink); }
+.pr-clock { margin-left: auto; display: grid; justify-items: end; }
+.pr-clock small { font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.pr-clock b { font-size: 76px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pr-clock.low b { color: var(--game-wrong); }
+.pr-bar { position: relative; margin-top: 22px; height: 56px; border-radius: 28px; background: var(--stage-line); overflow: hidden; }
+.pr-bar-fill { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, var(--game-gold), var(--high-sea)); transform-origin: left; transform: scaleX(0); transition: transform .9s var(--ease-spring); }
+.pr-bar-glint { position: absolute; top: 0; bottom: 0; left: 0; width: 160px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: prGlint 2.6s linear infinite; }
+@keyframes prGlint { from { transform: translateX(-200px); } to { transform: translateX(1900px); } }
+body.calm .pr-bar-glint { display: none; }
+.pr-ticks { position: relative; height: 44px; }
+.pr-tick { position: absolute; top: 0; transform: translateX(-50%); display: grid; justify-items: center; font-size: 22px; font-weight: 700; color: var(--stage-muted); white-space: nowrap; transition: color .4s; }
+.pr-tick::before { content: ""; display: block; width: 4px; height: 66px; margin-top: -66px; border-radius: 4px; background: var(--stage-ink); opacity: .35; }
+.pr-tick.hit { color: var(--stage-ink); }
+.pr-tick.hit::before { opacity: .9; }
+.pr-tick:last-child { transform: translateX(-100%); justify-items: end; }
+.pr-tick:last-child::before { display: none; }
+
+.pr-race-h { position: absolute; left: 120px; top: 426px; font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.pr-race { position: absolute; left: 120px; width: 1140px; top: 466px; display: grid; gap: 14px; }
+.pr-lane { height: 92px; display: grid; grid-template-columns: 52px 1fr 170px; align-items: center; gap: 18px; padding: 0 24px 0 18px; border-radius: 24px; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.pr-lane .rk { font-size: 30px; font-weight: 800; color: var(--stage-muted); text-align: center; }
+.pr-lane.first .rk { color: var(--game-gold); }
+[data-board-theme="light"] .pr-lane.first .rk { color: var(--pastel-gold-ink); }
+.pr-track { position: relative; height: 64px; }
+.pr-track-fill { position: absolute; left: 0; right: 0; top: 26px; height: 12px; border-radius: 12px; background: var(--stage-line); overflow: hidden; }
+.pr-track-fill i { position: absolute; inset: 0; border-radius: inherit; background: var(--game-gold); opacity: .8; transform-origin: left; transform: scaleX(0); transition: transform .9s var(--ease); }
+.pr-track .b-avatar { position: absolute; left: 0; top: 0; width: 64px; height: 64px; box-shadow: 0 0 0 4px var(--stage-card-hi), 0 8px 20px rgba(0,0,0,.25); transition: transform .9s var(--ease); }
+.pr-lane .pts { text-align: right; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pr-plus { position: absolute; top: -10px; font-size: 26px; font-weight: 800; color: var(--game-gold); pointer-events: none; white-space: nowrap; }
+[data-board-theme="light"] .pr-plus { color: var(--high-sea-ink); }
+
+.pr-side { position: absolute; left: 1320px; right: 120px; top: 466px; display: grid; gap: 14px; }
+.pr-card { height: 112px; border-radius: 24px; padding: 16px 26px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; align-content: center; gap: 2px; }
+.pr-card small { font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-muted); }
+.pr-card b { font-size: 48px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.pr-card b em { font-style: normal; font-size: 26px; font-weight: 600; color: var(--stage-muted); margin-left: 8px; }
+
+.pr-mile { position: absolute; inset: 0; z-index: 16; display: grid; place-items: center; pointer-events: none; }
+.pr-mile-in { display: grid; justify-items: center; gap: 10px; padding: 48px 90px; border-radius: 48px; background: linear-gradient(160deg, rgba(242,193,78,.95), rgba(246,134,32,.95)); color: var(--depth); box-shadow: 0 40px 120px rgba(0,0,0,.4); text-align: center; }
+.pr-mile-in small { font-size: 28px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.pr-mile-in b { font-size: 120px; font-weight: 800; line-height: 1; letter-spacing: -.04em; }
+.pr-mile-in span { font-size: 32px; font-weight: 600; }
+.pr-cover { position: absolute; inset: 0; z-index: 16; display: grid; place-items: center; }
+.pr-cover.paused { background: rgba(10,21,54,.42); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+[data-board-theme="light"] .pr-cover.paused { background: rgba(251,248,242,.55); }
+.pr-cover b { font-size: 96px; font-weight: 800; letter-spacing: -.03em; }
+.pr-count { font-size: 300px; font-weight: 800; line-height: 1; letter-spacing: -.04em; text-shadow: 0 20px 60px rgba(0,0,0,.3); }
+
+/* Teacher insight */
+.pr-ins { position: absolute; left: 120px; right: 120px; top: 120px; }
+.pr-ins h2 { margin: 0 0 14px; font-size: 48px; letter-spacing: -.01em; }
+.pr-legend { display: flex; gap: 30px; font-size: 24px; color: var(--stage-muted); margin-bottom: 18px; }
+.pr-legend span { display: inline-flex; align-items: center; gap: 10px; }
+.pr-legend i { width: 22px; height: 22px; border-radius: 50%; }
+.dot-first { background: var(--stage-muted); }
+.dot-back { background: var(--game-right); }
+.pr-ins-grid { display: grid; grid-template-columns: 1fr 620px; gap: 48px; }
+.pr-db { display: grid; gap: 8px; }
+.pr-db-row { display: grid; grid-template-columns: 250px 1fr 120px; align-items: center; gap: 18px; height: 64px; padding: 0 20px; border-radius: 18px; background: var(--stage-card); font-size: 27px; font-weight: 700; }
+.pr-db-row .tr { position: relative; height: 30px; }
+.pr-db-row .tr::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 2px; background: var(--stage-line); }
+.pr-db-row .gap { position: absolute; top: 11px; height: 8px; border-radius: 8px; background: linear-gradient(90deg, var(--stage-muted), var(--game-right)); opacity: .6; transform-origin: left; }
+.pr-db-row .d { position: absolute; top: 2px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; box-shadow: 0 0 0 3px var(--stage-card-hi); }
+.pr-db-row .nums { font-size: 22px; color: var(--stage-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pr-db-row .nums b { color: var(--stage-ink); }
+.pr-db-row .re { display: inline-block; margin-left: 10px; padding: 2px 10px; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; vertical-align: middle; }
+.pr-axis { display: grid; grid-template-columns: 250px 1fr 120px; gap: 18px; padding: 0 20px; font-size: 20px; color: var(--stage-muted); }
+.pr-axis div { display: flex; justify-content: space-between; }
+.pr-tbl { display: grid; gap: 6px; font-size: 26px; align-content: start; }
+.pr-tbl div { display: grid; grid-template-columns: 140px 1fr 1.2fr 1fr; align-items: center; gap: 10px; padding: 7px 18px; border-radius: 14px; font-variant-numeric: tabular-nums; }
+.pr-tbl div:not(.th):nth-child(even) { background: var(--stage-card); }
+.pr-tbl .th { font-size: 20px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-muted); line-height: 1.2; }
+.pr-tbl .who { font-weight: 700; }
+.pr-tbl .hot { color: var(--game-wrong); font-weight: 700; }
+.pr-tbl .me { box-shadow: inset 0 0 0 2px var(--stage-line); }
+.pr-foot { margin: 18px 0 0; font-size: 26px; color: var(--stage-muted); max-width: 1020px; line-height: 1.3; }
+.pr-anon { position: absolute; left: 160px; right: 160px; top: 160px; text-align: center; }
+.pr-anon h2 { margin: 0 0 40px; font-size: 56px; }
+.pr-anon .row { display: flex; justify-content: center; align-items: center; gap: 26px; margin: 0 0 24px; font-size: 44px; font-weight: 700; }
+.pr-anon .row span { padding: 14px 30px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.pr-anon .row em { font-style: normal; font-size: 32px; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.pr-anon .row em b { color: var(--game-right); }
+
+/* ── Phone ────────────────────────────────────── */
+.pr-status { display: flex; align-items: center; gap: 8px; }
+.pr-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+.pr-chip.mult { background: var(--pastel-gold); color: var(--pastel-gold-ink); box-shadow: none; }
+.pr-streak { display: inline-flex; gap: 4px; align-items: center; }
+.pr-streak i { width: 12px; height: 12px; border-radius: 50%; background: rgba(23,55,94,.14); transition: background .3s, transform .35s var(--ease-spring); }
+.pr-streak i.on { background: var(--high-sea); transform: scale(1.2); }
+.pr-shield { color: var(--success); display: inline-grid; }
+.pr-shop-btn { margin-left: auto; position: relative; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--navy); color: #fff; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.pr-shop-btn .n { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--high-sea); color: var(--depth); font-size: 13px; display: grid; place-items: center; }
+.pr-q { padding: 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.08), 0 8px 24px rgba(20,35,70,.06); }
+.pr-q .eb { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--high-sea-ink); }
+.pr-q .eb.back { padding: 4px 10px; border-radius: 999px; background: var(--pastel-peach); color: var(--pastel-peach-ink); letter-spacing: .06em; }
+.pr-q p { margin: 10px 0 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: var(--navy); }
+.pr-note { margin: 0; font-size: 14px; color: var(--muted); text-align: center; min-height: 20px; }
+.pr-opt .key { width: 32px; height: 32px; }
+.pr-burst { position: absolute; left: 0; top: 0; z-index: 26; pointer-events: none; padding: 6px 12px; border-radius: 999px; background: var(--high-sea); color: var(--depth); font-weight: 800; font-size: 18px; white-space: nowrap; box-shadow: 0 6px 16px rgba(246,134,32,.4); }
+.pr-burst.bonus { background: var(--success); color: #fff; }
+.pr-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 12px; }
+.pr-big { font-size: 56px; font-weight: 800; color: var(--navy); line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.pr-you { display: grid; justify-items: center; gap: 12px; padding: 28px 22px; border-radius: 28px; background: var(--pastel-gold); text-align: center; }
+.pr-you .bolt { width: 84px; height: 84px; border-radius: 24px; display: grid; place-items: center; background: var(--high-sea); color: var(--depth); }
+.pr-bob { animation: prBob 2.8s ease-in-out infinite; }
+@keyframes prBob { 50% { transform: translateY(-8px); } }
+.pr-list { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.pr-list div { display: flex; justify-content: space-between; gap: 12px; }
+.pr-list div span:last-child { font-weight: 700; text-align: right; }
+.pr-list .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; }
+.pr-paused { position: absolute; inset: 0; z-index: 28; display: grid; place-items: center; background: rgba(251,248,242,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 24px; font-weight: 700; color: var(--navy); }
+
+/* Shop sheet */
+.pr-sheet-bg { position: absolute; inset: 0; z-index: 27; background: rgba(10,21,54,.35); opacity: 0; transition: opacity .3s; }
+.pr-sheet-bg.show { opacity: 1; }
+.pr-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 28; padding: 14px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: 30px 30px 0 0; background: var(--warm-white); box-shadow: 0 -12px 40px rgba(10,21,54,.25); display: grid; gap: 10px; transform: translateY(105%); transition: transform .45s var(--ease-spring); }
+.pr-sheet.show { transform: none; }
+.pr-sheet::before { content: ""; justify-self: center; width: 44px; height: 5px; border-radius: 5px; background: rgba(23,55,94,.2); }
+.pr-sheet-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pr-sheet-h b { font-size: 21px; color: var(--navy); }
+.pr-sheet-h span { font-size: 15px; color: var(--muted); }
+.pr-up { width: 100%; min-height: 84px; border: 0; border-radius: 20px; padding: 12px 14px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; text-align: left; transition: transform .15s var(--ease), box-shadow .2s; }
+.pr-up:active { transform: scale(.98); }
+.pr-up .ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
+.pr-up .nm { display: block; font-size: 16px; font-weight: 700; color: var(--ink); }
+.pr-up .ds { display: block; font-size: 13px; color: var(--muted); line-height: 1.35; }
+.pr-up .lv { display: flex; gap: 3px; margin-top: 5px; }
+.pr-up .lv i { width: 16px; height: 5px; border-radius: 5px; background: rgba(23,55,94,.14); }
+.pr-up .lv i.on { background: var(--high-sea); }
+.pr-up .cost { min-width: 74px; min-height: 44px; padding: 0 10px; border-radius: 14px; background: var(--high-sea); color: var(--depth); font-weight: 800; font-size: 15px; display: grid; place-items: center; text-align: center; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pr-up[disabled] { cursor: default; }
+.pr-up[disabled] .cost { background: var(--cotton); color: var(--muted); font-weight: 700; font-size: 13px; }
+.pr-up.maxed .cost { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.pr-up.bought { box-shadow: 0 0 0 3px var(--success); }
+.pr-sheet-note { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const ITEMS = [
+  { id: 'i1', term: 'Personification', q: '“The fog pressed its face to the window and waited.” Which technique?', opts: ['Pathetic fallacy', 'Personification', 'Metaphor', 'Imagery'], right: 1 },
+  { id: 'i2', term: 'Metaphor', q: '“Doctor Hask’s voice was a cold spoon against the teeth.” Which technique?', opts: ['Simile', 'Personification', 'Metaphor', 'Hyperbole'], right: 2 },
+  { id: 'i3', term: 'Simile', q: '“Sister Agnes smiled the way a locked door smiles.” Which technique?', opts: ['Metaphor', 'Simile', 'Personification', 'Irony'], right: 1 },
+  { id: 'i4', term: 'Dramatic irony', q: 'Mira tells Sister Agnes that Ellis is “perfectly well”. We have already read his farewell note. What is this?', opts: ['Situational irony', 'Unreliable narrator', 'Dramatic irony', 'Foreshadowing'], right: 2 },
+  { id: 'i5', term: 'Cyclical structure', q: 'The novella opens and closes with Mira lighting the same lamp at dusk. What structure is this?', opts: ['Frame narrative', 'Cyclical structure', 'Motif', 'In medias res'], right: 1 },
+  { id: 'i6', term: 'In medias res', q: 'Chapter 1 begins with Mira already running through the dark corridors. Which term fits?', opts: ['In medias res', 'Analepsis', 'Prolepsis', 'Foreshadowing'], right: 0 },
+  { id: 'i7', term: 'Understatement', q: '“The house was a little unwell,” Mira says, as the roof falls in. Which technique?', opts: ['Hyperbole', 'Euphemism', 'Understatement', 'Bathos'], right: 2 },
+  { id: 'i8', term: 'Onomatopoeia', q: '“Crack. Hiss. The lamp glass split.” What are “crack” and “hiss” doing?', opts: ['Sibilance', 'Onomatopoeia', 'Alliteration', 'Imagery'], right: 1 },
+  { id: 'i9', term: 'Motif', q: 'A lantern appears every time Mira is about to learn the truth. What is the lantern working as?', opts: ['Symbol', 'Allegory', 'Foreshadowing', 'Motif'], right: 3 },
+  { id: 'i10', term: 'Pathetic fallacy', q: 'A storm rages outside the night Doctor Hask finally confesses. Which technique?', opts: ['Personification', 'Pathetic fallacy', 'Imagery', 'Symbolism'], right: 1 },
+  { id: 'i11', term: 'Alliteration', q: '“Hollow halls and hungry hours.” Which sound device leads?', opts: ['Assonance', 'Sibilance', 'Alliteration', 'Consonance'], right: 2 },
+  { id: 'i12', term: 'Analepsis', q: 'Old Tobin starts a story, and the chapter drops back twenty years to the night of the fire. Which term?', opts: ['Prolepsis', 'Analepsis', 'Frame narrative', 'In medias res'], right: 1 },
+  { id: 'i13', term: 'Prolepsis', q: 'Chapter 2 leaps ahead to Mira as an old woman, then returns to the house. Which term?', opts: ['Analepsis', 'Foreshadowing', 'Prolepsis', 'Epilogue'], right: 2 },
+  { id: 'i14', term: 'Sibilance', q: '“Silent, sullen, the stone stairs slept.” Which sound device leads?', opts: ['Sibilance', 'Assonance', 'Onomatopoeia', 'Alliteration'], right: 0 }
+];
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const BASE = 100, GAME_S = 180, GOALS = [40000, 60000, 90000];
+const UP = {
+  mult: { name: 'Multiplier', desc: (l) => `Every right answer ×${l + 2}`, costs: [300, 800, 1800], max: 3, colour: 'var(--high-sea)',
+    icon: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
+  streak: { name: 'Streak bonus', desc: (l) => `+${[100, 250, 500][l]} on every 3 in a row`, costs: [250, 700, 1500], max: 3, colour: 'var(--wave)',
+    icon: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-4-1-6 1-9z" fill="currentColor"/></svg>' },
+  ins: { name: 'Insurance', desc: () => 'Your next wrong answer keeps your streak', costs: [200], max: 1, colour: 'var(--success)',
+    icon: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" fill="currentColor"/></svg>' }
+};
+const STREAK_BONUS = [0, 100, 250, 500];
+const SHIELD = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" fill="currentColor"/></svg>';
+const BOLT = '<svg viewBox="0 0 32 32" width="44" height="44" aria-hidden="true"><path d="M18 3L7 18h8l-2 11 12-16h-8z" fill="currentColor"/></svg>';
+const ORD = (n) => n + ((n % 100 > 10 && n % 100 < 14) ? 'th' : (['st', 'nd', 'rd'][n % 10 - 1] || 'th'));
+const fmt = (n) => Math.round(n).toLocaleString('en-AU');
+const mmss = (s) => { const t = Math.max(0, Math.ceil(s)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+
+let S;
+function fresh() {
+  if (S) { S.timers.forEach(clearTimeout); clearInterval(S.loop); }
+  S = {
+    gen: (S ? S.gen : 0) + 1, phase: 'lobby', paused: false, view: 'live', goalIx: S ? S.goalIx : 1, left: GAME_S, timers: [], hit: [], answers: [],
+    others: Object.fromEntries(GM.class.filter((c) => c !== GM.me).map((c, i) => [c, { pts: 0, earned: 0, mult: 1, streak: 0, skill: .55 + ((i * 37) % 36) / 100, shownPts: 0 }])),
+    my: { pts: 0, earned: 0, streak: 0, best: 0, bought: 0, up: { mult: 0, streak: 0, ins: 0 }, queue: GM.shuffle(ITEMS), qi: 0, answered: 0, back: [], rec: {}, cur: null, lock: false, shop: false }
+  };
+}
+const goal = () => GOALS[S.goalIx];
+function later(fn, ms) {
+  const g = S.gen;
+  const run = () => { if (g !== S.gen) return; if (S.paused) { S.timers.push(setTimeout(run, 300)); return; } fn(); };
+  S.timers.push(setTimeout(run, ms));
+}
+
+const { board, phone } = GM.scaffold({
+  title: '<b>Points rush</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW. Answer on the phone as fast as you can: right answers score 100 × your multiplier, misses come back a few questions later. Tap <b>Upgrades</b> for the 2-tap shop (Multiplier, Streak bonus, Insurance). The board shows the class goal and the top five; the other 23 students are simulated. Teacher view and End now are on the board.',
+  onRestart: () => { fresh(); renderLobby(true); renderPhone('lobby'); }
+});
+
+// ── Board helpers ─────────────────────────────────
+const clear = () => board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+function setControls(html) {
+  board.querySelector('.board-controls')?.remove();
+  if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`);
+}
+function cover(html, cls = '') {
+  board.querySelector('.pr-cover')?.remove();
+  if (html != null) board.insertAdjacentHTML('beforeend', `<div class="stage-x pr-cover ${cls}">${html}</div>`);
+  return board.querySelector('.pr-cover');
+}
+const chipHTML = () => `<button class="stage-x pr-set" data-a="goal" title="Teacher setting"><span>Teacher setting</span>Class goal <b>${fmt(goal())}</b> · 3 min</button>`;
+const ease = 'cubic-bezier(.22,1,.36,1)';
+const enter = (nodes, from, step = 80, delay = 0) => { if (GM.calm()) return; nodes.forEach((n, k) => n.animate([{ opacity: 0, transform: from }, { opacity: 1, transform: 'none' }], { duration: 620, delay: delay + k * step, easing: ease, fill: 'backwards' })); };
+
+// ── Lobby ─────────────────────────────────────────
+function renderLobby(anim) {
+  clear(); cover(null);
+  const rule = (ic, col, b, s) => `<div class="pr-rule"><span class="ic" style="background:${col}">${ic}</span><b>${b}</b><span>${s}</span></div>`;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pr-title"><span class="b-eyebrow">Everyone at their own pace · 3 minutes</span><h2>Points rush</h2><p>Answer as many as you can. Every point you score fills the class goal.</p></div>
+    <div class="stage-x pr-rules">
+      ${rule(BOLT.replace('44', '34').replace('44', '34'), 'var(--high-sea)', 'Right: 100 × multiplier', 'Fast and right adds up quickly.')}
+      ${rule('<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>', 'var(--wave)', 'Missed? It comes back', 'A few questions later. Fix it then.')}
+      ${rule(UP.ins.icon.replace(/26/g, '34'), 'var(--success)', 'Three upgrades', 'Multiplier, Streak bonus and Insurance. Nothing else.')}
+    </div>
+    <div class="stage-x pr-joined">${GM.class.map((c) => `<span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>`).join('')}</div>
+    ${chipHTML()}`);
+  setControls('<button class="bctl primary" data-a="start">Start</button>');
+  if (anim) {
+    enter([board.querySelector('.pr-title')], 'translateY(30px) scale(.96)');
+    enter([...board.querySelectorAll('.pr-rule')], 'translateY(40px)', 90, 150);
+    if (!GM.calm()) board.querySelectorAll('.pr-joined .b-avatar').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(-70px) scale(.4)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 450 + k * 40, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' }));
+  }
+}
+
+async function start() {
+  S.phase = 'count'; setControls(''); renderPhone('count');
+  const g = S.gen;
+  for (const n of ['3', '2', '1', 'Go']) {
+    if (g !== S.gen) return;
+    const c = cover(`<span class="pr-count">${n}</span>`);
+    if (!GM.calm()) c.firstElementChild.animate([{ opacity: 0, transform: 'scale(1.6)' }, { opacity: 1, transform: 'scale(1)', offset: .35 }, { opacity: 0, transform: 'scale(.85)' }], { duration: 760, easing: ease, fill: 'forwards' });
+    n === 'Go' ? GM.sound.ding() : GM.sound.tick();
+    await GM.sleep(780);
+  }
+  if (g !== S.gen) return;
+  cover(null);
+  S.phase = 'live'; renderLive(true);
+  nextQ(true);
+  let last = performance.now(), acc = 0;
+  S.loop = setInterval(() => {
+    const now = performance.now(), dt = (now - last) / 1000; last = now;
+    if (S.paused || S.phase !== 'live') return;
+    const before = Math.ceil(S.left);
+    S.left = Math.max(0, S.left - dt);
+    acc += dt;
+    while (acc >= .45) { acc -= .45; simAnswers(); }
+    const s = Math.ceil(S.left);
+    if (s !== before) { if (s <= 5 && s > 0) GM.sound.tick(); updateBoard(); }
+    const bar = phone.querySelector('.ph-timer i'); if (bar) bar.style.transform = `scaleX(${S.left / GAME_S})`;
+    if (S.left <= 0) timeUp();
+  }, 100);
+}
+
+// ── Simulated class ───────────────────────────────
+function simAnswers() {
+  const names = Object.keys(S.others);
+  for (let j = 0; j < 3; j++) {
+    const c = GM.pick(names), o = S.others[c];
+    const right = GM.rand() < o.skill;
+    S.answers.push({ t: performance.now(), right, back: GM.rand() < .2 });
+    if (right) {
+      o.streak++;
+      const gain = BASE * o.mult + (o.streak % 3 === 0 && o.mult > 1 ? 100 : 0);
+      o.pts += gain; o.earned += gain;
+      if (o.mult < 4 && o.pts > [0, 300, 800, 1800][o.mult] * 1.6 && GM.rand() < .25) { o.pts -= [0, 300, 800, 1800][o.mult]; o.mult++; S.upgrades = (S.upgrades || 0) + 1; }
+    } else o.streak = 0;
+  }
+}
+const classEarned = () => Object.values(S.others).reduce((a, o) => a + o.earned, 0) + S.my.earned;
+function ranking() {
+  return [...Object.entries(S.others).map(([c, o]) => ({ c, pts: o.pts })), { c: GM.me, pts: S.my.pts }].sort((a, b) => b.pts - a.pts);
+}
+
+// ── Board: live ───────────────────────────────────
+function renderLive(anim) {
+  S.view = 'live'; clear();
+  const marks = [[25, '25%'], [50, 'Halfway'], [75, '75%'], [100, 'Goal']];
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pr-goal">
+      <div class="pr-goal-row"><div><span class="b-eyebrow">Class goal</span><span class="pr-total">0</span></div><span class="pr-of">of ${fmt(goal())}</span><span class="pr-pct">0%</span>
+        <div class="pr-clock"><small>Time left</small><b>${mmss(S.left)}</b></div></div>
+      <div class="pr-bar"><div class="pr-bar-fill"></div><div class="pr-bar-glint"></div></div>
+      <div class="pr-ticks">${marks.map(([p, l]) => `<span class="pr-tick ${S.hit.includes(p) ? 'hit' : ''}" style="left:${p}%">${l}</span>`).join('')}</div>
+    </div>
+    <div class="stage-x pr-race-h">Top five</div>
+    <div class="stage-x pr-race"></div>
+    <div class="stage-x pr-side">
+      <div class="pr-card"><small>Answers this minute</small><b class="s-apm">0</b></div>
+      <div class="pr-card"><small>Right first time</small><b class="s-first">0%</b></div>
+      <div class="pr-card"><small>Fixed when it came back</small><b class="s-back">0%</b></div>
+      <div class="pr-card"><small>Upgrades bought</small><b class="s-up">0</b></div>
+    </div>`);
+  liveControls();
+  S.shownTotal = S.shownTotal || 0; S.top = [];
+  updateBoard(true);
+  if (anim) {
+    enter([board.querySelector('.pr-goal')], 'translateY(-30px)');
+    enter([...board.querySelectorAll('.pr-card')], 'translateX(50px)', 80, 200);
+  }
+}
+function liveControls() {
+  setControls(`<button class="bctl" data-a="pause">${S.paused ? 'Resume' : 'Pause'}</button><button class="bctl" data-a="insight">Teacher view</button><button class="bctl primary" data-a="end">End now</button>`);
+}
+function updateBoard(instant) {
+  if (S.view !== 'live' || !board.querySelector('.pr-goal')) return;
+  const total = classEarned(), g = goal(), pct = total / g;
+  const totEl = board.querySelector('.pr-total');
+  if (instant) totEl.textContent = fmt(total); else GM.countUp(totEl, S.shownTotal, total, 800);
+  S.shownTotal = total;
+  board.querySelector('.pr-pct').textContent = pct >= 1 ? `Goal smashed · ${Math.round(pct * 100)}%` : `${Math.floor(pct * 100)}%`;
+  board.querySelector('.pr-bar-fill').style.transform = `scaleX(${Math.min(1, pct)})`;
+  const clock = board.querySelector('.pr-clock'); clock.querySelector('b').textContent = mmss(S.left); clock.classList.toggle('low', S.left <= 15);
+  // milestones
+  [25, 50, 75, 100].forEach((p) => { if (pct * 100 >= p && !S.hit.includes(p)) { S.hit.push(p); if (!instant) milestone(p); board.querySelector(`.pr-tick[style="left:${p}%"]`)?.classList.add('hit'); } });
+  // stats
+  const now = performance.now(), recent = S.answers.filter((a) => now - a.t < 60000);
+  const firsts = S.answers.filter((a) => !a.back), backs = S.answers.filter((a) => a.back);
+  board.querySelector('.s-apm').textContent = recent.length;
+  board.querySelector('.s-first').textContent = `${firsts.length ? Math.round(firsts.filter((a) => a.right).length / firsts.length * 100) : 0}%`;
+  board.querySelector('.s-back').textContent = `${backs.length ? Math.round(Math.min(.95, backs.filter((a) => a.right).length / backs.length + .12) * 100) : 0}%`;
+  board.querySelector('.s-up').textContent = (S.upgrades || 0) + S.my.bought;
+  race();
+}
+function race() {
+  const box = board.querySelector('.pr-race'); if (!box) return;
+  const top = ranking().slice(0, 5), max = Math.max(1, top[0].pts);
+  const prevPts = Object.fromEntries((S.top || []).map((r) => [r.c, r.pts]));
+  const W = box.querySelector('.pr-track')?.clientWidth || 840;
+  // build/reuse lane nodes keyed by student
+  const nodes = top.map((r, i) => {
+    let n = box.querySelector(`[data-c="${r.c}"]`);
+    if (!n) {
+      n = GM.h(`<div class="pr-lane" data-c="${r.c}"><span class="rk"></span><div class="pr-track"><div class="pr-track-fill"><i></i></div><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span></div><span class="pts">0</span></div>`);
+      n._new = true;
+    }
+    n.querySelector('.rk').textContent = i + 1;
+    n.classList.toggle('first', i === 0);
+    return n;
+  });
+  const s = (board.getBoundingClientRect().width / 1920) || 1;
+  const firstTop = new Map([...box.children].map((n) => [n, n.getBoundingClientRect().top]));
+  [...box.children].forEach((n) => { if (!nodes.includes(n)) n.remove(); });
+  nodes.forEach((n) => box.appendChild(n));
+  nodes.forEach((n, i) => {
+    const r = top[i], k = r.pts / max, av = n.querySelector('.b-avatar');
+    const tw = n.querySelector('.pr-track').clientWidth || W;
+    av.style.transform = `translateX(${k * (tw - 64)}px)`;
+    n.querySelector('.pr-track-fill i').style.transform = `scaleX(${k})`;
+    const ptsEl = n.querySelector('.pts'), was = prevPts[r.c] ?? 0;
+    if (r.pts !== was) GM.countUp(ptsEl, was, r.pts, 700); else ptsEl.textContent = fmt(r.pts);
+    if (n._new) { n._new = false; if (!GM.calm()) n.animate([{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 500, easing: ease }); }
+    else if (!GM.calm() && firstTop.has(n)) { const dy = (firstTop.get(n) - n.getBoundingClientRect().top) / s; if (Math.abs(dy) > 1) n.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 650, easing: ease }); }
+    if (!GM.calm() && r.pts - was >= 300 && was) {
+      const p = GM.h(`<span class="pr-plus">+${fmt(r.pts - was)}</span>`); n.querySelector('.pr-track').appendChild(p);
+      p.style.left = `${k * (tw - 64) + 70}px`;
+      p.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'translateY(-6px)', offset: .3 }, { opacity: 0, transform: 'translateY(-26px)' }], { duration: 1200, easing: 'ease-out' }).finished.then(() => p.remove());
+    }
+  });
+  S.top = top;
+}
+async function milestone(p) {
+  const words = { 25: ['Quarter way', 'A great start'], 50: ['Halfway', 'Keep it going'], 75: ['75%', 'Nearly there'], 100: ['Goal!', 'The whole class did that'] }[p];
+  board.querySelector('.pr-mile')?.remove();
+  const m = GM.h(`<div class="stage-x pr-mile"><div class="pr-mile-in"><small>Class goal</small><b>${words[0]}</b><span>${fmt(goal() * p / 100)} points · ${words[1]}</span></div></div>`);
+  board.appendChild(m);
+  GM.sound.fanfare();
+  if (p === 100) GM.confetti(board);
+  const inner = m.firstElementChild;
+  if (!GM.calm()) inner.animate([{ opacity: 0, transform: 'scale(.6) rotate(-4deg)' }, { opacity: 1, transform: 'scale(1.05) rotate(1deg)', offset: .5 }, { opacity: 1, transform: 'none' }], { duration: 650, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  later(() => {
+    const done = () => m.remove();
+    if (GM.calm()) done(); else inner.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(.92) translateY(-30px)' }], { duration: 400, easing: ease, fill: 'forwards' }).finished.then(done);
+  }, 2000);
+}
+
+function timeUp() {
+  if (S.phase !== 'live') return;
+  S.phase = 'end'; clearInterval(S.loop); closeShop();
+  if (S.paused) { S.paused = false; phone.querySelector('.pr-paused')?.remove(); }
+  GM.sound.buzz();
+  if (S.view === 'live') updateBoard();
+  const c = cover('<b>Time!</b>', 'paused');
+  if (!GM.calm()) c.firstElementChild.animate([{ opacity: 0, transform: 'scale(1.5)' }, { opacity: 1, transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  renderPhone('final');
+  later(podium, GM.calm() ? 300 : 1400);
+}
+
+// ── Phone: question stream ────────────────────────
+function nextQ(anim) {
+  if (S.phase !== 'live') return;
+  const m = S.my;
+  // a missed item comes back once it is due; otherwise a fresh one
+  let ix = m.back.findIndex((b) => b.due <= m.answered), item, back = false;
+  if (ix > -1) { item = m.back.splice(ix, 1)[0].item; back = true; }
+  else if (m.qi < m.queue.length) item = m.queue[m.qi++];
+  else if (m.back.length) { item = m.back.shift().item; back = true; }
+  else { m.queue = GM.shuffle(ITEMS); m.qi = 0; item = m.queue[m.qi++]; }
+  m.cur = { item, back, n: m.answered + 1 };
+  m.lock = false;
+  renderPhone('play', anim !== false);
+}
+function answer(k) {
+  const m = S.my, cur = m.cur;
+  if (!cur || m.lock || S.phase !== 'live' || S.paused) return;
+  m.lock = true;
+  const it = cur.item, right = k === it.right;
+  const rec = m.rec[it.id] ||= { first: null, backTries: 0, backRight: 0, fixed: false };
+  if (cur.back) { rec.backTries++; if (right) { rec.backRight++; rec.fixed = true; } } else if (rec.first === null) rec.first = right;
+  S.answers.push({ t: performance.now(), right, back: cur.back });
+  m.answered++;
+  const btns = [...phone.querySelectorAll('.pr-opt')];
+  btns.forEach((b, j) => { b.disabled = true; if (j === it.right) b.classList.add('right'); else if (j === k) b.classList.add('wrong'); else b.classList.add('dim'); });
+  const note = phone.querySelector('.pr-note');
+  if (right) {
+    m.streak++; m.best = Math.max(m.best, m.streak);
+    const gain = BASE * (m.up.mult + 1), bonus = m.streak % 3 === 0 ? STREAK_BONUS[m.up.streak] : 0;
+    const from = m.pts; m.pts += gain + bonus; m.earned += gain + bonus;
+    GM.sound.right();
+    burst(btns[k], `+${gain}${m.up.mult ? ` <small style="font-weight:600">(100 × ${m.up.mult + 1})</small>` : ''}`, '', from, m.pts - bonus);
+    if (bonus) later(() => { burst(btns[k], `Streak +${bonus}`, 'bonus', m.pts - bonus, m.pts); GM.sound.coin(); }, 260);
+    if (note) note.textContent = cur.back ? 'Fixed it. That one won’t come back.' : (m.streak >= 3 ? `${m.streak} in a row` : '');
+    statusRefresh();
+    later(() => nextQ(), bonus ? 1050 : 800);
+  } else {
+    const kept = m.up.ins > 0;
+    if (kept) { m.up.ins = 0; } else m.streak = 0;
+    m.back.push({ item: it, due: m.answered + 3 + Math.floor(GM.rand() * 4) });
+    GM.sound.wrong();
+    phone.querySelector('.pr-q')?.classList.add('fx-shake');
+    if (note) note.textContent = 'No points lost. This one comes back in a few questions.';
+    GM.toast(phone, `<span>${kept ? 'Insurance used: streak kept' : 'Not this time'}<small>It was ${it.opts[it.right]}. You’ll see it again soon.</small></span>`, 'bad');
+    statusRefresh();
+    later(() => nextQ(), 1700);
+  }
+}
+function burst(btn, html, cls, from, to) {
+  const scoreEl = phone.querySelector('.mypts');
+  const pr = phone.getBoundingClientRect(), k = pr.width / 390 || 1;
+  const b = btn.getBoundingClientRect(), sc = phone.querySelector('.ph-score').getBoundingClientRect();
+  const el = GM.h(`<span class="pr-burst ${cls}">${html}</span>`); phone.appendChild(el);
+  const a = { x: (b.left - pr.left) / k + 40, y: (b.top - pr.top) / k + 8 }, z = { x: (sc.left - pr.left) / k - 10, y: (sc.top - pr.top) / k };
+  const done = () => { el.remove(); if (scoreEl.isConnected) GM.countUp(scoreEl, from, to, 450); bump(); };
+  if (GM.calm()) { el.style.transform = `translate(${z.x - 60}px, ${z.y + 40}px)`; setTimeout(done, 300); return; }
+  el.animate([
+    { transform: `translate(${a.x}px, ${a.y}px) scale(.6)`, opacity: 0 },
+    { transform: `translate(${a.x}px, ${a.y - 34}px) scale(1.15)`, opacity: 1, offset: .25 },
+    { transform: `translate(${z.x}px, ${z.y}px) scale(.7)`, opacity: .9 }
+  ], { duration: 720, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' }).finished.then(done);
+}
+function bump() {
+  const sc = phone.querySelector('.ph-score'); if (!sc || GM.calm()) return;
+  sc.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 380, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+}
+
+// ── Phone: shop ───────────────────────────────────
+function upState(key) {
+  const u = UP[key], lvl = S.my.up[key], maxed = lvl >= u.max, cost = maxed ? 0 : u.costs[key === 'ins' ? 0 : lvl];
+  return { u, lvl, maxed, cost, can: !maxed && S.my.pts >= cost };
+}
+const affordable = () => Object.keys(UP).filter((k) => upState(k).can).length;
+function shopHTML(boughtKey) {
+  return `<div class="pr-sheet-bg" data-p="closeshop"></div><div class="pr-sheet" role="dialog" aria-label="Upgrades">
+    <div class="pr-sheet-h"><b>Upgrades</b><span>You have <b class="shop-pts">${fmt(S.my.pts)}</b> pts</span></div>
+    ${Object.keys(UP).map((key) => {
+      const { u, lvl, maxed, cost, can } = upState(key);
+      const desc = key === 'ins' ? (maxed ? 'Ready: your next wrong answer keeps your streak' : u.desc()) : (maxed ? `Top level reached` : u.desc(lvl));
+      return `<button class="pr-up ${maxed ? 'maxed' : ''} ${boughtKey === key ? 'bought' : ''}" data-up="${key}" ${can ? '' : 'disabled'}>
+        <span class="ic" style="background:${u.colour}">${u.icon}</span>
+        <span><span class="nm">${u.name}${key === 'mult' ? ` · now ×${lvl + 1}` : ''}</span><span class="ds">${desc}</span>${u.max > 1 ? `<span class="lv">${Array.from({ length: u.max }, (_, j) => `<i class="${j < lvl ? 'on' : ''}"></i>`).join('')}</span>` : ''}</span>
+        <span class="cost">${maxed ? (key === 'ins' ? 'Held' : 'Max') : can ? fmt(cost) : `Need ${fmt(cost - S.my.pts)} more`}</span>
+      </button>`;
+    }).join('')}
+    <p class="pr-sheet-note">Tap an upgrade to buy it. Spending points never lowers the class goal.</p>
+    <button class="pbtn cta" data-p="closeshop">Back to questions</button>
+  </div>`;
+}
+function openShop() {
+  if (S.phase !== 'live' || S.paused) return;
+  S.my.shop = true;
+  phone.querySelector('.pr-sheet-bg')?.remove(); phone.querySelector('.pr-sheet')?.remove();
+  phone.insertAdjacentHTML('beforeend', shopHTML());
+  requestAnimationFrame(() => requestAnimationFrame(() => phone.querySelectorAll('.pr-sheet, .pr-sheet-bg').forEach((n) => n.classList.add('show'))));
+}
+function closeShop() {
+  if (!S.my.shop) return;
+  S.my.shop = false;
+  const sh = phone.querySelectorAll('.pr-sheet, .pr-sheet-bg');
+  sh.forEach((n) => n.classList.remove('show'));
+  setTimeout(() => sh.forEach((n) => n.remove()), GM.calm() ? 160 : 420);
+}
+function buy(key) {
+  const st = upState(key); if (!st.can) return;
+  const from = S.my.pts;
+  S.my.pts -= st.cost; S.my.up[key]++; S.my.bought++;
+  GM.sound.coin();
+  const old = phone.querySelector('.pr-sheet');
+  const fresh = GM.h(shopHTML(key).replace(/^<div class="pr-sheet-bg"[^>]*><\/div>/, ''));
+  fresh.classList.add('show'); old.replaceWith(fresh);
+  const sp = phone.querySelector('.shop-pts'); if (sp) GM.countUp(sp, from, S.my.pts, 400);
+  const mp = phone.querySelector('.mypts'); if (mp) GM.countUp(mp, from, S.my.pts, 400);
+  statusRefresh();
+  GM.toast(phone, `${UP[key].name} ${key === 'mult' ? `now ×${S.my.up.mult + 1}` : key === 'ins' ? 'ready' : `level ${S.my.up.streak}`}`, 'good');
+  later(closeShop, 650);
+}
+
+// ── Phone render ──────────────────────────────────
+function phoneShell(body, dock = '') {
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av" style="${GM.avatarStyle(GM.me)}">${GM.me}</span>JW</span><span class="ph-score"><span class="mypts">${fmt(S.my.pts)}</span> pts</span></div>
+    <div class="ph-timer"><i style="transform:scaleX(${S.left / GAME_S})"></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}${S.paused ? '<div class="pr-paused">Paused · eyes on the board</div>' : ''}`;
+}
+function statusHTML() {
+  const m = S.my, fill = m.streak && m.streak % 3 === 0 ? 3 : m.streak % 3, n = affordable();
+  return `<div class="pr-status"><span class="pr-chip mult">×${m.up.mult + 1}</span>
+    <span class="pr-chip" title="Streak"><span class="pr-streak">${[0, 1, 2].map((j) => `<i class="${j < fill ? 'on' : ''}"></i>`).join('')}</span>${m.streak}</span>
+    ${m.up.ins ? `<span class="pr-chip pr-shield" title="Insurance ready">${SHIELD}</span>` : ''}
+    <button class="pr-shop-btn" data-p="shop">Upgrades${n ? `<span class="n">${n}</span>` : ''}</button></div>`;
+}
+function statusRefresh() {
+  const s = phone.querySelector('.pr-status'); if (s) s.outerHTML = statusHTML();
+}
+function renderPhone(mode, anim) {
+  const m = S.my;
+  if (mode === 'lobby' || mode === 'count') {
+    phoneShell(`<div class="pr-wait"><div class="pr-you ${mode === 'lobby' ? 'pr-bob' : ''}"><span class="bolt">${BOLT}</span><span class="ph-sub">${mode === 'lobby' ? 'You’re in' : 'Get ready…'}</span><span class="pr-big" style="font-size:40px">Points rush</span><span class="ph-sub">Your own questions, as fast as you like.</span></div></div>
+      <div class="pr-list"><div><span>Right answer</span><span>100 × multiplier</span></div><div><span>Wrong answer</span><span>No loss · comes back</span></div><div><span>Upgrades</span><span>Multiplier · Streak · Insurance</span></div></div>`);
+  }
+  if (mode === 'play') {
+    const cur = m.cur, it = cur.item;
+    phoneShell(`${statusHTML()}
+      <div class="pr-q"><span class="eb ${cur.back ? 'back' : ''}">${cur.back ? '↻ Back again · you missed this one' : `Question ${cur.n}`}</span><p>${it.q}</p></div>
+      <p class="pr-note"></p>`,
+      `${it.opts.map((o, k) => `<button class="pbtn pr-opt" data-k="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span>${o}</button>`).join('')}`);
+    if (anim && !GM.calm()) {
+      phone.querySelector('.pr-q').animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: ease });
+      phone.querySelectorAll('.pr-opt').forEach((b, k) => b.animate([{ opacity: 0, transform: 'translateY(20px)' }, { opacity: 1, transform: 'none' }], { duration: 380, delay: 60 + k * 45, easing: ease, fill: 'backwards' }));
+    }
+    if (m.shop) { m.shop = false; openShop(); }
+  }
+  if (mode === 'final') {
+    const rank = ranking().findIndex((r) => r.c === GM.me) + 1;
+    const recs = Object.entries(m.rec), first = recs.filter(([, r]) => r.first).length;
+    const missed = recs.filter(([, r]) => r.first === false), fixed = missed.filter(([, r]) => r.fixed);
+    const still = missed.filter(([, r]) => !r.fixed).map(([id]) => ITEMS.find((i) => i.id === id).term);
+    phoneShell(`<div class="pr-wait"><div><span class="ph-sub">Time! Your points</span><div class="pr-big">${fmt(m.pts)}</div><p class="ph-sub">You came <b>${ORD(rank)}</b> of ${GM.class.length} · you added ${fmt(m.earned)} to the class goal</p></div></div>
+      <div class="pr-list"><div><span>Right first try</span><span>${first} of ${recs.length}</span></div>
+      <div><span>Fixed when it came back</span><span>${fixed.length} of ${missed.length}</span></div>
+      <div><span>Best streak</span><span>${m.best}</span></div>
+      ${still.length ? `<div class="tot"><span>Still to fix</span><span>${still.slice(0, 3).join(', ')}</span></div>` : ''}</div>`);
+  }
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button, [data-p]'); if (!t) return;
+  if (t.dataset.k != null) answer(+t.dataset.k);
+  if (t.dataset.p === 'shop') { GM.sound.click(); openShop(); }
+  if (t.dataset.p === 'closeshop') closeShop();
+  if (t.dataset.up) buy(t.dataset.up);
+});
+
+// ── End: podium, teacher view ─────────────────────
+function podium() {
+  S.phase = 'end'; S.view = 'podium'; clearInterval(S.loop); S.paused = false; cover(null); clear();
+  const r = ranking(), [a, b, c] = r, pct = Math.round(classEarned() / goal() * 100);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x" style="position:absolute;left:0;right:0;top:150px;text-align:center"><span class="b-eyebrow">Final points</span><div style="font-size:30px;color:var(--stage-muted)">Class reached <b style="color:var(--stage-ink)">${pct}%</b> of the goal · hardest first time: <b style="color:var(--stage-ink)">Prolepsis</b></div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([x, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(x.c)}">${x.c}</span><span class="name">${x.c}</span><span class="score">${fmt(x.pts)} pts</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="insight">Teacher: first try vs came back</button><button class="bctl primary" data-a="again">Play again</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [500, 1200, 0][k], easing: ease, fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1400);
+  if (!phone.querySelector('.pr-big')) renderPhone('final');
+}
+function insightData() {
+  // invented class data per item, with JW's real answers folded in
+  const base = { i13: [38, 71], i12: [46, 84], i9: [49, 62], i7: [55, 88], i10: [58, 90], i4: [61, 79], i5: [64, 92], i11: [70, 93], i1: [74, 95], i3: [81, 97] };
+  const items = Object.entries(base).map(([id, [f, b]]) => ({ id, term: ITEMS.find((i) => i.id === id).term, f, b }));
+  const studs = GM.class.filter((c) => c !== GM.me).slice(0, 8).map((c, i) => ({ c, first: [92, 85, 78, 74, 70, 66, 58, 51][i], back: [100, 90, 100, 67, 80, 50, 75, 40][i], still: [0, 1, 0, 2, 1, 3, 2, 4][i] }));
+  const recs = Object.values(S.my.rec), missed = recs.filter((r) => r.first === false);
+  studs.push({ c: GM.me, me: true, first: recs.length ? Math.round(recs.filter((r) => r.first).length / recs.length * 100) : 0, back: missed.length ? Math.round(missed.filter((r) => r.fixed).length / missed.length * 100) : null, still: missed.filter((r) => !r.fixed).length });
+  studs.sort((x, y) => y.first - x.first);
+  return { items: items.slice(0, 8), studs };
+}
+function insight() {
+  const prev = S.view; S.view = 'insight'; S.ret = prev === 'insight' || prev === 'anon' ? S.ret : prev;
+  clear(); cover(null);
+  const { items, studs } = insightData();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pr-ins">
+    <span class="b-eyebrow">Teacher only · not for the projector</span>
+    <h2>First try vs when it came back</h2>
+    <div class="pr-legend"><span><i class="dot-first"></i>Right first try</span><span><i class="dot-back"></i>Right when it came back</span></div>
+    <div class="pr-ins-grid">
+      <div class="pr-db">${items.map((x) => `<div class="pr-db-row"><span>${x.term}${x.b < 75 ? '<span class="re">Reteach</span>' : ''}</span><div class="tr"><span class="gap" style="left:${x.f}%;width:${x.b - x.f}%"></span><span class="d dot-first" style="left:${x.f}%"></span><span class="d dot-back" style="left:${x.b}%"></span></div><span class="nums">${x.f}% → <b>${x.b}%</b></span></div>`).join('')}
+        <div class="pr-axis"><span></span><div><span>0%</span><span>50%</span><span>100%</span></div><span></span></div></div>
+      <div class="pr-tbl"><div class="th"><span>Student</span><span>First try</span><span>Fixed on come-back</span><span>Still to fix</span></div>
+        ${studs.map((s) => `<div class="${s.me ? 'me' : ''}"><span class="who">${s.c}</span><span>${s.first}%</span><span class="${s.back != null && s.back < 60 ? 'hot' : ''}">${s.back == null ? '–' : `${s.back}%`}</span><span class="${s.still >= 3 ? 'hot' : ''}">${s.still}</span></div>`).join('')}</div>
+    </div>
+    <p class="pr-foot">Every item records first try, tries until right, and time. A big jump means the come-back worked; a small one (Motif) means the class is guessing, not learning it.</p></div>`);
+  setControls(`<button class="bctl" data-a="anon">Class version (no names)</button><button class="bctl primary" data-a="back">${S.ret === 'podium' ? 'Back to podium' : 'Back to the rush'}</button>`);
+  if (!GM.calm()) {
+    board.querySelectorAll('.pr-db-row').forEach((n, k) => {
+      n.querySelector('.gap').animate([{ transform: 'scaleX(0)' }, { transform: 'none' }], { duration: 800, delay: 200 + k * 70, easing: ease, fill: 'backwards' });
+      n.querySelector('.dot-back').animate([{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 700 + k * 70, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' });
+    });
+  }
+}
+function anon() {
+  S.view = 'anon'; clear();
+  const { items } = insightData();
+  const jumps = items.slice().sort((x, y) => (y.b - y.f) - (x.b - x.f)).slice(0, 3);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pr-anon"><span class="b-eyebrow">Safe for the projector · no names</span><h2>Fixed on the second go</h2>
+    ${jumps.map((p) => `<div class="row"><span>${p.term}</span><em>${p.f}% first try → <b>${p.b}%</b> when it came back</em></div>`).join('')}
+    <div class="row" style="margin-top:48px"><em>Still tricky:</em><span>Motif</span><em>and</em><span>Symbol</span></div></div>`);
+  setControls(`<button class="bctl primary" data-a="insight">Back to teacher view</button>`);
+  if (!GM.calm()) board.querySelectorAll('.pr-anon .row').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: k * 150, easing: ease, fill: 'backwards' }));
+  GM.sound.reveal();
+}
+
+function togglePause() {
+  S.paused = !S.paused;
+  if (S.paused) { closeShop(); cover('<b>Paused</b>', 'paused'); } else cover(null);
+  liveControls();
+  const p = phone.querySelector('.pr-paused');
+  if (S.paused && !p) phone.insertAdjacentHTML('beforeend', '<div class="pr-paused">Paused · eyes on the board</div>');
+  if (!S.paused && p) p.remove();
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'goal') { S.goalIx = (S.goalIx + 1) % GOALS.length; board.querySelector('.pr-set').outerHTML = chipHTML(); }
+  if (a === 'start') start();
+  if (a === 'pause') togglePause();
+  if (a === 'end') timeUp();
+  if (a === 'insight') insight();
+  if (a === 'anon') anon();
+  if (a === 'back') { if (S.ret === 'podium' || S.phase === 'end') podium(); else { renderLive(false); if (S.paused) cover('<b>Paused</b>', 'paused'); } }
+  if (a === 'again') { fresh(); renderLobby(true); renderPhone('lobby'); }
+});
+
+fresh(); renderLobby(true); renderPhone('lobby');
+</script>
+</body>
+</html>

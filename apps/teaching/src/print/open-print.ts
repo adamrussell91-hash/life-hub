@@ -61,6 +61,9 @@ const PRINT_CSS = `
   .block-self-check__controls,
   .block-gallery__controls,
   .block-gallery__nav { display: none !important; }
+  .gm-print__game { break-inside: avoid-page; margin-bottom: 1rem; }
+  .gm-print__title { font-size: 1.2rem; margin: 0 0 0.5rem; }
+  .gm-print-key { break-before: page; }
   .block-flashcards__print,
   .block-cloze__print,
   .block-self-check__print { display: block !important; }

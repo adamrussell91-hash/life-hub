@@ -73,6 +73,18 @@ await build({
   banner: {js:'// Generated from apps/teaching/src/rotation/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
 await build({
+  entryPoints: ['apps/teaching/src/games/core/schema.ts'],
+  outfile: 'netlify/functions/_shared/game-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/games/core/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/games/core/server-entry.ts'],
+  outfile: 'netlify/functions/_shared/game-rules.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/games/core/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
   entryPoints: ['apps/teaching/src/sprint/schema.ts'],
   outfile: 'netlify/functions/_shared/sprint-schema.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
@@ -97,4 +109,10 @@ await build({
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   alias: { '@': './apps/teaching/src' },
   banner: {js:'// Generated from apps/teaching/src/marking/rubric-model.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/games/core/room-entry.ts'],
+  outfile: 'netlify/functions/_shared/game-room-core.mjs',
+  bundle: true, platform: 'neutral', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/games/core/room-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });

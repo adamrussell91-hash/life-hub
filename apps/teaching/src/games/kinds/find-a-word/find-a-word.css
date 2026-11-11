@@ -1,0 +1,76 @@
+/* Find-a-word, solo (docs/mockups/games/find-a-word.html, approved).
+ * The grid is a square as wide as the stage allows (343 px on a 375 px phone,
+ * up to 520 px on a laptop), so cells are as large as the grid allows: a 10 × 10
+ * grid gives 34 px cells at 375 px, 12 × 12 gives 28 px, 15 × 15 gives 22 px. */
+.gm-fw { position: relative; display: grid; gap: var(--space-3); min-width: 0; overflow-wrap: normal; word-break: normal; hyphens: manual;
+  --fw-ink-0: var(--game-key-1); --fw-ink-1: var(--game-key-2); --fw-ink-2: var(--game-key-3); --fw-ink-3: var(--game-key-4); --fw-ink-4: var(--game-wrong);
+  --fw-ink-5: var(--game-team-2); --fw-ink-6: var(--high-sea-ink); --fw-ink-7: var(--game-team-1); --fw-ink-8: var(--game-team-4); }
+.gm-fw .fw-card { padding: 12px 14px; border-radius: 18px; background: var(--navy); color: #fff; display: grid; gap: 4px; min-height: 84px; align-content: center; }
+.gm-fw .fw-card b { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.78; }
+.gm-fw .fw-card .q { font-size: 16px; line-height: 1.35; font-weight: 500; }
+.gm-fw .fw-card .hints { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.gm-fw .fw-card .hints span { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); }
+.gm-fw .fw-card.all { background: var(--cotton); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(23, 55, 94, 0.1); }
+.gm-fw .fw-card.all b { color: var(--muted); opacity: 1; }
+.gm-fw .fw-wrap { position: relative; width: min(100%, 520px); aspect-ratio: 1; justify-self: center; border-radius: 18px; background: var(--paper); box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1), 0 8px 24px rgba(20, 35, 70, 0.07); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair; container-type: inline-size; }
+.gm-fw .fw-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--fw-n), 1fr); grid-template-rows: repeat(var(--fw-n), 1fr); }
+.gm-fw .fw-c { display: grid; place-items: center; font-size: calc(100cqw / var(--fw-n) * 0.54); font-weight: 700; color: var(--ink); transition: opacity 0.4s, color 0.3s, background 0.3s; border-radius: 8px; }
+.gm-fw .fw-c.line { background: rgba(246, 134, 32, 0.16); }
+.gm-fw .fw-c.anchor { background: var(--pastel-gold); box-shadow: inset 0 0 0 2px var(--high-sea); }
+.gm-fw .fw-c.cursor { box-shadow: inset 0 0 0 2px var(--navy); }
+.gm-fw .fw-wrap.reveal .fw-c { opacity: 0.18; }
+.gm-fw .fw-wrap.reveal .fw-c.left { opacity: 1; }
+.gm-fw .fw-c.glow { color: var(--high-sea-ink); background: var(--pastel-gold); }
+.gm-fw .fw-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.gm-fw .fw-svg .fill { fill: currentColor; fill-opacity: 0.16; stroke: none; }
+.gm-fw .fw-svg .pen { fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+.gm-fw .fw-wrap.reveal .fw-svg { opacity: 0.15; transition: opacity 0.5s; }
+.gm-fw .fw-band { position: absolute; left: 0; top: 0; background: rgba(55, 111, 183, 0.22); box-shadow: inset 0 0 0 2.5px var(--wave); pointer-events: none; opacity: 0; transition: width 0.08s linear, opacity 0.15s; }
+.gm-fw .fw-band.on { opacity: 1; }
+.gm-fw .fw-band.bad { background: rgba(212, 84, 79, 0.18); box-shadow: inset 0 0 0 2.5px var(--game-wrong); }
+.gm-fw .fw-band.miss { background: rgba(107, 119, 136, 0.18); box-shadow: inset 0 0 0 2px var(--muted); }
+.gm-fw .fw-list { display: grid; gap: 2px; }
+.gm-fw .fw-clue { width: 100%; min-height: 48px; display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: start; text-align: left; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; font: inherit; font-size: 15px; line-height: 1.38; color: var(--ink); cursor: pointer; }
+.gm-fw .fw-clue:disabled { cursor: default; }
+.gm-fw .fw-clue .num { font-weight: 700; color: var(--navy); }
+.gm-fw .fw-clue.act { background: var(--pastel-blue); }
+.gm-fw .fw-clue.done { color: var(--muted); }
+.gm-fw .fw-clue .word { display: inline-block; margin-top: 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; padding: 2px 10px; border-radius: 999px; color: #fff; background: currentColor; }
+.gm-fw .fw-clue .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: #fff; background: var(--game-right); margin-top: 1px; }
+.gm-fw .fw-type { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); margin-right: 4px; vertical-align: 1px; }
+.gm-fw .fw-type.def { background: var(--shore); color: var(--muted); }
+.gm-fw .ink-0 { color: var(--fw-ink-0); } .gm-fw .ink-1 { color: var(--fw-ink-1); } .gm-fw .ink-2 { color: var(--fw-ink-2); }
+.gm-fw .ink-3 { color: var(--fw-ink-3); } .gm-fw .ink-4 { color: var(--fw-ink-4); } .gm-fw .ink-5 { color: var(--fw-ink-5); }
+.gm-fw .ink-6 { color: var(--fw-ink-6); } .gm-fw .ink-7 { color: var(--fw-ink-7); } .gm-fw .ink-8 { color: var(--fw-ink-8); }
+/* The found-word chip keeps white text on its ink. */
+.gm-fw .fw-clue .word[class*="ink-"] { color: #fff; }
+.gm-fw .fw-clue .word.ink-0 { background: var(--fw-ink-0); } .gm-fw .fw-clue .word.ink-1 { background: var(--fw-ink-1); } .gm-fw .fw-clue .word.ink-2 { background: var(--fw-ink-2); }
+.gm-fw .fw-clue .word.ink-3 { background: var(--fw-ink-3); } .gm-fw .fw-clue .word.ink-4 { background: var(--fw-ink-4); } .gm-fw .fw-clue .word.ink-5 { background: var(--fw-ink-5); }
+.gm-fw .fw-clue .word.ink-6 { background: var(--fw-ink-6); } .gm-fw .fw-clue .word.ink-7 { background: var(--fw-ink-7); } .gm-fw .fw-clue .word.ink-8 { background: var(--fw-ink-8); }
+.gm-fw .fw-fly { position: absolute; left: 0; top: 0; display: grid; place-items: center; border-radius: 9px; background: var(--pastel-gold); color: var(--high-sea-ink); font-weight: 700; font-size: 19px; z-index: 30; pointer-events: none; box-shadow: 0 6px 16px rgba(108, 88, 31, 0.25); }
+.gm-fw .fw-msg-panel { display: grid; gap: 8px; }
+.gm-fw .fw-msg-lbl { text-align: center; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.gm-fw .fw-msg { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; padding: 18px 8px; border-radius: 22px; background: var(--depth); }
+.gm-fw .fw-msg .ln { display: flex; gap: 3px; }
+.gm-fw .fw-msg .t { width: 30px; height: 38px; display: grid; place-items: center; border-radius: 9px; background: var(--pastel-gold); color: var(--high-sea-ink); font-weight: 700; font-size: 19px; }
+.gm-fw .fw-msg .p { color: var(--pastel-gold); font-weight: 700; font-size: 19px; align-self: end; }
+.gm-fw .fw-msg .t.wait { opacity: 0; }
+.gm-fw .fw-q { display: grid; gap: 10px; }
+.gm-fw .fw-q.wait { opacity: 0; }
+.gm-fw .fw-q__prompt { margin: 0; font-size: 19px; font-weight: 700; color: var(--navy); }
+.gm-fw .fw-q__input { min-height: 44px; font-size: 16px; }
+.gm-fw .fw-opt { min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.16); font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; }
+.gm-fw .fw-opt[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--navy); }
+.gm-fw .fw-opt .key { width: 32px; height: 32px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--game-key-ink); font-weight: 700; }
+.gm-fw .fw-opt .key.k1 { background: var(--game-key-1); } .gm-fw .fw-opt .key.k2 { background: var(--game-key-2); }
+.gm-fw .fw-opt .key.k3 { background: var(--game-key-3); } .gm-fw .fw-opt .key.k4 { background: var(--game-key-4); }
+.gm-fw .fw-opt.right { background: var(--game-right-surface); box-shadow: 0 0 0 3px var(--game-right); }
+.gm-fw .fw-opt.wrong { background: var(--game-wrong-surface); box-shadow: 0 0 0 3px var(--game-wrong); }
+.gm-fw .fw-opt.dim { opacity: 0.5; }
+.gm-fw .fw-why { margin: 0; font-size: 14px; color: var(--muted); padding: 12px 14px; border-radius: 14px; background: var(--cotton); }
+.gm-solo__dock .fw-hint { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 10px; line-height: 1.2; }
+.gm-solo__dock .fw-hint small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.gm-solo__dock .fw-any[aria-pressed="true"] { background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.cw-dots { display: inline-flex; gap: 5px; vertical-align: middle; }
+.cw-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(23, 55, 94, 0.18); }
+.cw-dots i.on { background: var(--high-sea); }

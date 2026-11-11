@@ -1,0 +1,46 @@
+/* Crossword, solo (docs/mockups/games/crossword.html, approved). */
+.gm-cw { display: grid; gap: var(--space-3); min-width: 0; overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.gm-cw .cw-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.gm-cw .cw-sub { flex: 1; margin: 0; font-size: 14px; color: var(--muted); }
+.gm-cw .cw-zoom { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--paper); box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.14); font: inherit; font-size: 14px; font-weight: 600; color: var(--navy); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.gm-cw .cw-zoom[hidden] { display: none; }
+.gm-cw .cw-view { position: relative; height: clamp(300px, 46dvh, 520px); border-radius: 20px; background: var(--cotton); box-shadow: inset 0 0 0 1px rgba(23, 55, 94, 0.08); overflow: hidden; touch-action: manipulation; }
+.gm-cw .cw-grid { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: transform 0.5s var(--game-ease); }
+.gm-cw .cw-cell { position: absolute; width: 42px; height: 42px; border: 0; padding: 0; border-radius: 9px; background: var(--paper); box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.2); display: grid; place-items: center; font: inherit; font-size: 22px; font-weight: 700; color: var(--ink); cursor: pointer; transition: background 0.2s, box-shadow 0.2s, color 0.2s; }
+.gm-cw .cw-cell .n { position: absolute; left: 4px; top: 3px; font-size: 10px; font-weight: 700; color: var(--muted); line-height: 1; }
+.gm-cw .cw-cell .l { display: block; line-height: 1; }
+.gm-cw .cw-cell .sw { position: absolute; inset: 0; border-radius: inherit; background: var(--game-right); opacity: 0; pointer-events: none; }
+.gm-cw .cw-cell .sh { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.9) 50%, transparent 70%); opacity: 0; pointer-events: none; }
+.gm-cw .cw-cell.in { background: var(--pastel-blue); }
+.gm-cw .cw-cell.ok { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.gm-cw .cw-cell.shown { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.gm-cw .cw-cell.ok.in, .gm-cw .cw-cell.shown.in { box-shadow: 0 0 0 2px var(--wave); }
+.gm-cw .cw-cell.cur { background: var(--pastel-gold); box-shadow: 0 0 0 3px var(--navy); z-index: 2; }
+.gm-cw .cw-cell.given::after { content: ""; position: absolute; right: 3px; top: 3px; width: 0; height: 0; border-left: 8px solid transparent; border-top: 8px solid var(--high-sea); border-radius: 0 4px 0 0; }
+.gm-cw .cw-bar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 18px; background: var(--navy); color: #fff; }
+.gm-cw .cw-bar button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 22px; font-weight: 600; cursor: pointer; }
+.gm-cw .cw-bar .t { font-size: 15px; line-height: 1.35; min-height: 44px; display: grid; align-content: center; min-width: 0; }
+.gm-cw .cw-bar .t b { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.78; font-weight: 700; }
+.gm-cw .cw-list { display: grid; gap: 2px; }
+.gm-cw .cw-list h3 { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 8px 0 2px 4px; }
+.gm-cw .cw-clue { width: 100%; min-height: 48px; display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: start; text-align: left; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; font: inherit; font-size: 15px; line-height: 1.38; color: var(--ink); cursor: pointer; }
+.gm-cw .cw-clue .num { font-weight: 700; color: var(--navy); }
+.gm-cw .cw-clue.act { background: var(--pastel-blue); }
+.gm-cw .cw-clue.done { color: var(--muted); }
+.gm-cw .cw-clue.done .num { color: var(--success); }
+.gm-cw .cw-clue .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: #fff; background: var(--game-right); margin-top: 1px; }
+.gm-cw .cw-clue .tick.shown { background: var(--high-sea); }
+.gm-cw .cw-type { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--shore); color: var(--muted); margin-right: 4px; vertical-align: 1px; }
+.gm-cw .cw-type.ex { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.gm-cw .cw-key { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
+.gm-cw .cw-foot { display: grid; justify-items: center; gap: 2px; padding: var(--space-2) 0 var(--space-4); }
+.gm-cw .cw-finish { min-height: 44px; padding: 0 16px; border: 0; background: none; color: var(--navy); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.gm-cw .cw-finish-note { margin: 0; font-size: 13px; color: var(--muted); }
+.gm-solo__dock .cw-hint { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 10px; line-height: 1.2; flex: 1 1 0; }
+.gm-solo__dock .cw-hint small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.gm-solo__dock .cw-check { flex: 1.2 1 0; }
+.cw-dots { display: inline-flex; gap: 5px; vertical-align: middle; }
+.cw-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(23, 55, 94, 0.18); }
+.cw-dots i.on { background: var(--high-sea); }
+.gm-calm .gm-cw .cw-grid { transition: none; }
+@media (prefers-reduced-motion: reduce) { .gm-cw .cw-grid { transition: none; } }

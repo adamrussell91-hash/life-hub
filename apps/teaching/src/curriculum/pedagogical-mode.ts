@@ -48,7 +48,7 @@ export function resolvePedagogicalMode(value: unknown): PedagogicalMode {
 }
 
 /** Lesson types that play through their own player, which has no place for quiz questions. */
-const PLAYER_MODES: ReadonlySet<PedagogicalMode> = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial']);
+const PLAYER_MODES: ReadonlySet<PedagogicalMode> = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial', 'game']);
 
 /** True when quiz questions and group sets in a lesson of this type reach students. */
 export function quizRunsIn(value: unknown): boolean {

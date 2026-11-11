@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jeopardy — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Board tokens for this game (follow the stage theme) */
+.board { --jp-tile: linear-gradient(165deg, #2b5cb3 0%, #1b408a 58%, #142f6b 100%); --jp-ink: #f4f6fb; --jp-muted: rgba(244,246,251,.74); --jp-val: var(--game-gold); --jp-card: rgba(255,255,255,.1); --jp-line: rgba(255,255,255,.2); --jp-shadow: 0 12px 30px rgba(0,0,0,.35); --jp-tshadow: 0 3px 0 rgba(0,0,0,.28); }
+.board[data-board-theme="light"] { --jp-tile: linear-gradient(165deg, #ffffff 0%, #eef3fb 60%, #e1eaf8 100%); --jp-ink: var(--ink); --jp-muted: var(--muted); --jp-val: var(--navy); --jp-card: rgba(23,55,94,.06); --jp-line: rgba(23,55,94,.16); --jp-shadow: 0 8px 22px rgba(20,35,70,.14), 0 0 0 1px rgba(23,55,94,.08); --jp-tshadow: none; }
+
+/* Board: grid */
+.jp-grid { position: absolute; left: 80px; top: 150px; display: grid; grid-template-columns: repeat(5, 248px); grid-template-rows: 100px repeat(5, 124px); gap: 16px; perspective: 1600px; }
+.jp-cat { display: grid; place-items: center; text-align: center; padding: 0 10px 6px; font-size: 28px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; line-height: 1.1; color: var(--stage-ink); border-bottom: 4px solid var(--game-gold); text-wrap: balance; }
+.jp-tile { position: relative; border: 0; border-radius: 18px; background: var(--jp-tile); color: var(--jp-val); font-size: 64px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; box-shadow: var(--jp-shadow); text-shadow: var(--jp-tshadow); display: grid; place-items: center; transition: transform .3s var(--ease), box-shadow .3s, opacity .4s; }
+.jp-tile:not(.used):hover { transform: translateY(-4px); }
+.jp-tile.aim { transform: scale(1.05); box-shadow: 0 0 0 5px var(--game-gold), 0 0 50px rgba(242,193,78,.55); z-index: 2; }
+.jp-tile.used { background: color-mix(in srgb, var(--tc, transparent) 24%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tc, var(--stage-ink)) 50%, transparent); color: var(--stage-ink); text-shadow: none; cursor: default; font-size: 26px; font-weight: 700; place-content: center; gap: 0; text-align: center; line-height: 1.2; }
+.jp-tile.used small { display: block; font-size: 22px; font-weight: 600; color: var(--stage-muted); }
+.jp-tile.used.none { --tc: var(--stage-muted); opacity: .55; }
+
+/* Board: teams */
+.jp-teams { position: absolute; left: 1440px; width: 400px; top: 150px; display: grid; gap: 16px; }
+.jp-team { position: relative; padding: 18px 22px 18px 30px; border-radius: 24px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 12px; transition: box-shadow .4s; }
+.jp-team::before { content: ""; position: absolute; left: 0; top: 20px; bottom: 20px; width: 7px; border-radius: 0 7px 7px 0; background: var(--tc); }
+.jp-team .nm { font-size: 30px; font-weight: 700; display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
+.jp-team .rk { font-size: 24px; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.jp-team .sc { font-size: 50px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
+.jp-team .mem { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.jp-team .mem span { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; }
+.jp-team .mem span.cap { box-shadow: 0 0 0 3px var(--game-gold); }
+.jp-team .mem span.off { opacity: .28; }
+.jp-team .tagp { position: absolute; top: -14px; right: 20px; font-style: normal; font-size: 20px; font-weight: 700; color: var(--depth); background: var(--game-gold); padding: 4px 14px; border-radius: 999px; opacity: 0; transform: scale(.7); transition: .4s var(--ease-spring); }
+.jp-team.turn { box-shadow: 0 0 0 4px var(--tc), 0 0 44px color-mix(in srgb, var(--tc) 50%, transparent); }
+.jp-team.turn .tagp { opacity: 1; transform: none; }
+.jp-turn { position: absolute; left: 80px; top: 974px; display: flex; align-items: center; gap: 16px; padding: 12px 26px; border-radius: 999px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 28px; color: var(--stage-muted); }
+.jp-turn b { color: var(--stage-ink); }
+.jp-turn i { width: 22px; height: 22px; border-radius: 50%; background: var(--tc); }
+
+/* Board: clue (zooms out of its tile) */
+.jp-clue { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; background: var(--jp-tile); color: var(--jp-ink); z-index: 10; overflow: hidden; }
+.jp-clue-in { position: absolute; inset: 0; }
+.jp-c-head { position: absolute; left: 100px; top: 64px; display: flex; align-items: center; gap: 22px; font-size: 30px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--jp-val); }
+.jp-c-pick { display: inline-flex; align-items: center; gap: 12px; padding: 8px 20px; border-radius: 999px; background: var(--jp-card); color: var(--jp-ink); font-size: 24px; letter-spacing: 0; text-transform: none; font-weight: 600; }
+.jp-c-pick i { width: 20px; height: 20px; border-radius: 50%; background: var(--tc); }
+.jp-c-ring { position: absolute; right: 100px; top: 44px; }
+.jp-clue .ring .track { stroke: var(--jp-line); }
+.jp-c-ring { transition: opacity .4s; }
+.jp-clue.closed .jp-c-ring { opacity: .25; }
+.jp-rule { position: absolute; left: 1440px; width: 400px; top: 740px; padding: 20px 24px; border-radius: 24px; border: 2px dashed var(--stage-line); font-size: 24px; line-height: 1.35; color: var(--stage-muted); }
+.jp-rule b { color: var(--stage-ink); }
+.jp-c-q { position: absolute; left: 180px; right: 180px; top: 210px; margin: 0; text-align: center; font-size: 56px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
+.jp-c-opts { position: absolute; left: 180px; right: 180px; top: 500px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.jp-c-opt { position: relative; min-height: 130px; border-radius: 24px; padding: 20px 26px; background: var(--jp-card); box-shadow: inset 0 0 0 1px var(--jp-line); display: grid; grid-template-columns: 60px 1fr auto; gap: 20px; align-items: center; transition: transform .6s var(--ease-spring), opacity .5s, box-shadow .5s, background .5s; }
+.jp-c-opt .key { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; font-weight: 700; color: #fff; }
+.jp-c-opt .txt { font-size: 34px; font-weight: 600; line-height: 1.2; }
+.jp-c-opt .n { font-size: 26px; font-weight: 700; color: var(--jp-muted); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .4s; white-space: nowrap; }
+.jp-clue.revealed .jp-c-opt .n { opacity: 1; }
+.jp-c-opt.is-right { transform: scale(1.03); background: rgba(63,174,115,.3); box-shadow: 0 0 0 4px var(--game-right), 0 0 60px rgba(63,174,115,.45); }
+.jp-c-opt.is-wrong { opacity: .35; transform: scale(.97); }
+.jp-c-term { position: absolute; left: 380px; right: 380px; top: 500px; min-height: 240px; border-radius: 28px; border: 3px dashed var(--jp-line); display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; padding: 24px; }
+.jp-c-term .big { font-size: 40px; font-weight: 700; }
+.jp-c-term .sub { font-size: 26px; color: var(--jp-muted); }
+.jp-c-term.done { border: 0; background: rgba(63,174,115,.26); box-shadow: 0 0 0 4px var(--game-right), 0 0 60px rgba(63,174,115,.4); }
+.jp-c-term.done .big { font-size: 64px; }
+.jp-c-prog { position: absolute; left: 100px; top: 860px; display: flex; gap: 44px; font-size: 26px; font-weight: 600; }
+.jp-c-prog .grp { display: grid; gap: 10px; }
+.jp-c-prog .grp span { display: flex; align-items: center; gap: 10px; }
+.jp-c-prog .grp span i { width: 18px; height: 18px; border-radius: 50%; background: var(--tc); }
+.jp-c-prog .dots { display: flex; gap: 8px; }
+.jp-c-prog .dots i { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--jp-line); transition: background .3s, transform .4s var(--ease-spring), box-shadow .3s; }
+.jp-c-prog .dots i.on { background: var(--tc); box-shadow: none; transform: scale(1.15); }
+.jp-c-prog .dots i.off { opacity: .3; box-shadow: inset 0 0 0 2px var(--jp-line); }
+.jp-c-res { position: absolute; left: 100px; right: 100px; top: 820px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.jp-rc { position: relative; border-radius: 24px; padding: 18px 24px; background: var(--jp-card); box-shadow: inset 0 0 0 1px var(--jp-line); display: grid; gap: 2px; }
+.jp-rc::before { content: ""; position: absolute; left: 0; top: 18px; bottom: 18px; width: 7px; border-radius: 0 7px 7px 0; background: var(--tc); }
+.jp-rc .t { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.jp-rc .t em { font-style: normal; font-size: 20px; padding: 2px 10px; border-radius: 999px; background: var(--game-gold); color: var(--depth); }
+.jp-rc .f { font-size: 26px; color: var(--jp-muted); }
+.jp-rc .g { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 52px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jp-rc.up .g { color: var(--game-right); }
+.jp-rc.down .g { color: var(--game-wrong); }
+[data-board-theme="light"] .jp-rc.up .g { color: var(--success); }
+
+/* Double */
+.jp-dbl { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 18px; text-align: center; }
+.jp-dbl-word { display: flex; gap: 6px; font-size: 220px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--game-gold); text-shadow: 0 8px 0 rgba(0,0,0,.25), 0 0 80px rgba(242,193,78,.5); }
+[data-board-theme="light"] .jp-dbl-word { color: var(--high-sea-ink); text-shadow: none; }
+.jp-dbl-word span { display: inline-block; }
+.jp-dbl p { margin: 0; font-size: 38px; font-weight: 600; color: var(--jp-muted); }
+.jp-dbl .num { font-size: 120px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.jp-shine { position: absolute; top: 0; bottom: 0; width: 360px; left: -400px; background: linear-gradient(100deg, transparent, rgba(255,255,255,.28), transparent); pointer-events: none; }
+
+/* End */
+.jp-sum { position: absolute; left: 0; right: 0; top: 150px; text-align: center; }
+.jp-sum div { font-size: 30px; color: var(--stage-muted); }
+.jp-sum div b { color: var(--stage-ink); }
+.pod .b-avatar.tm { color: #fff; font-size: 48px; }
+.jp-fourth { position: absolute; left: 0; right: 0; top: 300px; text-align: center; font-size: 26px; color: var(--stage-muted); }
+
+/* Teacher insight */
+.jp-ins { position: absolute; left: 100px; right: 100px; top: 120px; }
+.jp-ins h2 { margin: 0 0 4px; font-size: 44px; letter-spacing: -.01em; }
+.jp-ins .lede { font-size: 26px; color: var(--stage-muted); margin: 0; }
+.jp-heat { position: absolute; left: 0; top: 150px; display: grid; grid-template-columns: 110px repeat(5, 150px); grid-template-rows: 70px; grid-auto-rows: 92px; gap: 8px; }
+.jp-heat .h { display: grid; place-items: end center; padding-bottom: 8px; text-align: center; font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--stage-muted); text-transform: uppercase; letter-spacing: .04em; height: 70px; align-self: end; }
+.jp-heat .v { display: grid; place-items: center; font-size: 30px; font-weight: 700; color: var(--jp-val); }
+.jp-heat .c { border-radius: 14px; display: grid; place-items: center; font-size: 32px; font-weight: 700; color: var(--depth); font-variant-numeric: tabular-nums; position: relative; }
+.jp-heat .c.sample::after { content: ""; position: absolute; right: 10px; top: 10px; width: 10px; height: 10px; border-radius: 50%; background: rgba(10,21,54,.45); }
+.jp-heat .hdr { grid-row: auto; }
+.jp-call { position: absolute; left: 0; width: 902px; top: 740px; padding: 18px 24px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 26px; color: var(--stage-muted); }
+.jp-call b { color: var(--stage-ink); }
+.jp-ceil { position: absolute; left: 990px; right: 0; top: 150px; }
+.jp-ceil h3 { margin: 0 0 6px; font-size: 28px; }
+.jp-ceil .key { font-size: 20px; color: var(--stage-muted); margin: 0 0 14px; }
+.jp-ceil .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+.jp-ceil .row { display: grid; grid-template-columns: 40px repeat(5, 1fr); gap: 6px; align-items: center; height: 44px; }
+.jp-ceil .row .b-avatar { width: 36px; height: 36px; font-size: 14px; }
+.jp-ceil .row i { height: 34px; border-radius: 9px; display: grid; place-items: center; font-style: normal; font-size: 19px; font-weight: 700; color: var(--depth); font-variant-numeric: tabular-nums; }
+.jp-ceil .row i.no { background: var(--stage-line); color: var(--stage-muted); }
+.jp-ceil .row.hd i { background: none; color: var(--stage-muted); font-size: 18px; height: 26px; }
+
+/* Phone */
+.jp-tp { display: inline-flex; align-items: center; gap: 8px; }
+.jp-tp i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); }
+.jp-pcat { display: grid; gap: 6px; }
+.jp-pcat b { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--navy); }
+.jp-pvals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.jp-pvals button { min-height: 46px; border-radius: 12px; border: 0; background: linear-gradient(165deg, #2b5cb3, #1b408a); color: var(--game-gold); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; transition: transform .2s var(--ease-spring), box-shadow .2s; }
+.jp-pvals button.sel { box-shadow: 0 0 0 3px var(--high-sea); transform: scale(1.06); }
+.jp-pvals button[disabled] { background: var(--shore); color: var(--muted); font-weight: 600; font-size: 13px; }
+.jp-pvals button[disabled] i { display: block; width: 10px; height: 10px; border-radius: 50%; margin: 0 auto; background: var(--tc, var(--muted)); }
+.jp-cap { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: 15px; font-weight: 600; }
+.jp-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 10px; color: var(--muted); }
+.jp-wait .big { font-size: 56px; font-weight: 700; color: var(--navy); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.jp-wait .mid { font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1.2; }
+.jp-bob { width: 74px; height: 74px; border-radius: 22px; margin: 0 auto 6px; background: linear-gradient(165deg, #2b5cb3, #1b408a); color: var(--game-gold); display: grid; place-items: center; font-size: 22px; font-weight: 700; animation: jpBob 2.4s ease-in-out infinite; }
+@keyframes jpBob { 50% { transform: translateY(-8px) rotate(-4deg); } }
+.jp-mini { display: grid; gap: 6px; }
+.jp-mini div { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.08); font-size: 15px; font-weight: 600; }
+.jp-mini div i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); }
+.jp-mini div b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.jp-mini div.me { box-shadow: 0 0 0 2px var(--navy); }
+.jp-qmeta { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--high-sea-ink); }
+.jp-qmeta .dbl { padding: 2px 8px; border-radius: 999px; background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.jp-bet { display: grid; gap: 14px; padding: 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1), 0 8px 24px rgba(20,35,70,.08); }
+.jp-bet .amt { text-align: center; font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--navy); }
+.jp-range { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; }
+.jp-range::-webkit-slider-runnable-track { height: 12px; border-radius: 12px; background: linear-gradient(90deg, var(--high-sea) var(--p, 20%), rgba(23,55,94,.12) var(--p, 20%)); }
+.jp-range::-webkit-slider-thumb { -webkit-appearance: none; width: 36px; height: 36px; margin-top: -12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea), 0 4px 10px rgba(0,0,0,.2); }
+.jp-range::-moz-range-track { height: 12px; border-radius: 12px; background: rgba(23,55,94,.12); }
+.jp-range::-moz-range-progress { height: 12px; border-radius: 12px; background: var(--high-sea); }
+.jp-range::-moz-range-thumb { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--high-sea); }
+.jp-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.jp-break div { display: flex; justify-content: space-between; gap: 12px; }
+.jp-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const VALUES = [100, 200, 300, 400, 500];
+const CATS = [
+  { name: 'Narrators', tiles: [
+    { q: 'Mira tells the whole story as “I”. Which point of view is this?', opts: ['First person', 'Second person', 'Third person limited', 'Third person omniscient'], right: 0, lure: 2 },
+    { q: 'Mira swears the lamps “never once failed”. Two pages later, one gutters out. What kind of narrator does this suggest?', opts: ['Omniscient', 'Unreliable', 'Intrusive', 'Naive'], right: 1, lure: 3 },
+    { q: 'Type the term: the narrator steps out of the story to speak to us. “You will think me foolish, reader.”', ans: ['intrusive narrator', 'intrusive', 'intrusive narration', 'direct address'], miss: ['unreliable narrator', 'second person', 'omniscient narrator', 'aside'] },
+    { q: 'The novella opens with Mira, now old, looking back on one winter. What is this way of telling called?', opts: ['In medias res', 'Retrospective narration', 'Stream of consciousness', 'Epistolary form'], right: 1, lure: 0 },
+    { q: 'Ellis’s letter in chapter 9 tells the same night differently. Why does it matter for how we read Mira?', opts: ['It reveals Ellis is the real narrator', 'It confirms everything she told us', 'It gives a second account that unsettles hers', 'It moves the story into present tense'], right: 2, lure: 1 }
+  ] },
+  { name: 'Gothic devices', tiles: [
+    { q: 'Sister Agnes’s candle dies the moment Doctor Hask walks in. What is the writer doing?', opts: ['Pathetic fallacy', 'Foreshadowing', 'Red herring', 'Flashback'], right: 1, lure: 0 },
+    { q: 'The storm breaks just as Mira learns where Ellis is kept. Which device?', opts: ['Personification', 'Foreshadowing', 'Pathetic fallacy', 'Symbolism'], right: 2, lure: 1 },
+    { q: 'The east wing is locked, and nobody will say why. Which Gothic convention is this?', opts: ['The forbidden room', 'The double', 'The sublime', 'Dramatic irony'], right: 0, lure: 3 },
+    { dbl: true, q: 'In the cellar glass Mira sees her own face, older and smiling. Which Gothic convention is this?', opts: ['The double', 'Foreshadowing', 'The forbidden room', 'Pathetic fallacy'], right: 0, lure: 1 },
+    { q: 'Type the term: the familiar made strange, like the thirteenth stair that was not there yesterday.', ans: ['uncanny', 'the uncanny'], miss: ['sublime', 'foreshadowing', 'supernatural', 'surreal'] }
+  ] },
+  { name: 'Who’s who', tiles: [
+    { q: 'Who keeps the grounds and warns Mira away from the east wing?', opts: ['Doctor Hask', 'Old Tobin', 'Ellis Crane', 'Sister Agnes'], right: 1, lure: 3 },
+    { q: 'Whose care is Ellis in when the novella opens?', opts: ['Sister Agnes', 'Old Tobin', 'Doctor Hask', 'Mira Vale'], right: 2, lure: 0 },
+    { q: '“Light is a kindness we ration here.” Who says it?', opts: ['Sister Agnes', 'Doctor Hask', 'Old Tobin', 'Mira Vale'], right: 1, lure: 0 },
+    { q: 'Sister Agnes hides the ledger from Doctor Hask. What does this most suggest?', opts: ['She is working with Hask', 'She wants the ledger for herself', 'Her loyalty is to the patients', 'She is afraid of Mira'], right: 2, lure: 0 },
+    { q: 'Which character works best as a foil to Doctor Hask?', opts: ['Old Tobin', 'Ellis Crane', 'Mira Vale', 'Sister Agnes'], right: 3, lure: 0 }
+  ] },
+  { name: 'Sound and image', tiles: [
+    { q: '“The wind whispered at the shutters.” Which technique?', opts: ['Sibilance', 'Personification', 'Simile', 'Metaphor'], right: 1, lure: 0 },
+    { q: '“Slow, soft, the snow settled on the sill.” Which sound device?', opts: ['Assonance', 'Onomatopoeia', 'Sibilance', 'Caesura'], right: 2, lure: 0 },
+    { q: 'Type the term: “The lamp hissed and spat.”', ans: ['onomatopoeia', 'onomatopeia', 'onomatopoea'], miss: ['personification', 'sibilance', 'alliteration', 'imagery'] },
+    { q: 'Lanterns appear in every chapter, a little dimmer each time. What are they?', opts: ['An allegory', 'A red herring', 'A motif', 'A simile'], right: 2, lure: 0 },
+    { q: '“Her kindness was a locked door.” Why is this metaphor unsettling?', opts: ['It gives the door human feelings', 'It joins care with confinement', 'It exaggerates for comic effect', 'It compares using “like”'], right: 1, lure: 0 }
+  ] },
+  { name: 'Structure', tiles: [
+    { q: 'The novella begins mid-storm, with Mira already lost. Where does the story start?', opts: ['Exposition', 'Flashback', 'In medias res', 'Prologue'], right: 2, lure: 1 },
+    { q: 'Chapter 6 goes back to Mira’s first night as a lamplighter. What is this?', opts: ['Flashback', 'Foreshadowing', 'Flash-forward', 'Frame narrative'], right: 0, lure: 3 },
+    { q: 'We know Ellis is in the east wing. Mira does not. What is this?', opts: ['Situational irony', 'Dramatic irony', 'Verbal irony', 'Suspense'], right: 1, lure: 0 },
+    { q: 'Type the term: Mira’s winter story sits inside the story of her old age.', ans: ['frame narrative', 'frame story', 'frame', 'framed narrative', 'frame narration'], miss: ['flashback', 'retrospective', 'in medias res', 'embedded'] },
+    { q: 'The last line repeats the first, word for word, but Mira now reads it differently. What does this circular ending do?', opts: ['Shows nothing has changed', 'Marks how far Mira has changed', 'Resolves every mystery', 'Brings in a new narrator'], right: 1, lure: 0 }
+  ] }
+];
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const OFFLINE = ['XN'];
+const ORDER = [1, 2, 3, 0]; // Otters pick first
+const GX = 80, GY = 150, HH = 100, TW = 248, TH = 124, G = 16;
+const tileX = (c) => GX + c * (TW + G), tileY = (v) => GY + HH + G + v * (TH + G);
+const r10 = (n) => Math.round(n / 10) * 10;
+const fmt = (n) => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString();
+const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/^the /, '').replace(/\s+/g, ' ').trim();
+const skill = Object.fromEntries(GM.class.map((c) => [c, .55 + GM.rand() * .38]));
+let S;
+
+function fresh() {
+  S?.cur?.timer?.stop();
+  S = {
+    gen: (S?.gen || 0) + 1, turn: 0, used: {}, phase: 'pick', aim: null, log: {}, cur: null, me: {},
+    teams: GM.teams.map((t, i) => ({ ...t, members: GM.class.filter((_, k) => k % 4 === i), score: 0, prev: 0, capN: 0 }))
+  };
+  GM.class.forEach((c) => S.log[c] = {});
+}
+const teamOf = (c) => S.teams.find((t) => t.members.includes(c));
+const myTeam = () => teamOf(GM.me);
+const pickTeam = () => S.teams[ORDER[S.turn % 4]];
+const live = (t) => t.members.filter((m) => !OFFLINE.includes(m));
+// Mockup: JW captains the Otters every turn so you can try picking; other teams rotate.
+const captainOf = (t) => t.id === 't2' ? GM.me : live(t)[t.capN % live(t).length];
+const iAmCaptain = () => captainOf(pickTeam()) === GM.me;
+const isRight = (tile, a) => !a ? false : tile.opts ? a.ans === tile.right : tile.ans.map(norm).includes(norm(a.text));
+
+const { board, phone } = GM.scaffold({
+  title: '<b>Jeopardy</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW, captain of the Otters. Pick a tile on the phone, then answer it like everyone else. Other teams’ captains pick on their own, or tap any tile on the board as the teacher. Team score = tile value × the share of the team who got it right (×1.5 for the team that picked). The Double sits under <b>Gothic devices 400</b>. XN is offline, so Herons count 5 players.',
+  onRestart: () => { fresh(); renderBoard(true); renderPhone(); enterPick(); }
+});
+
+// ── Board: grid + teams ───────────────────────────
+const teamNodes = {};
+function renderBoard(intro) {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  Object.keys(teamNodes).forEach((k) => delete teamNodes[k]);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x jp-grid">
+      ${CATS.map((c) => `<div class="jp-cat">${c.name}</div>`).join('')}
+      ${VALUES.map((val, v) => CATS.map((_, c) => tileHtml(c, v)).join('')).join('')}
+    </div>
+    <div class="stage-x jp-teams"></div>
+    <div class="stage-x jp-turn"></div>
+    <div class="stage-x jp-rule"><b>Scoring</b><br>Tile value × share of the team who got it right. The picking team gets ×1.5.</div>`);
+  renderTeams(true);
+  renderTurn();
+  if (intro) {
+    const calm = GM.calm();
+    board.querySelectorAll('.jp-cat').forEach((n, c) => n.animate([{ opacity: 0, transform: 'translateY(-30px) rotateX(-80deg)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 650, delay: calm ? 0 : c * 90, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    board.querySelectorAll('.jp-tile').forEach((n) => {
+      const c = +n.dataset.c, v = +n.dataset.v;
+      n.animate([{ opacity: 0, transform: 'rotateY(-95deg) scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 620, delay: calm ? 0 : 450 + (c + v) * 75, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+    });
+    board.querySelectorAll('.jp-team').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateX(60px)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 600, delay: calm ? 0 : 300 + k * 110, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    if (!calm) { GM.sound.whoosh(); setTimeout(() => GM.sound.reveal(), 1100); }
+  }
+}
+function tileHtml(c, v) {
+  const key = `${c}-${v}`, u = S.used[key];
+  if (u) return `<button class="jp-tile used ${u.team ? '' : 'none'}" data-c="${c}" data-v="${v}" data-tile="${key}" style="${u.team ? `--tc:${u.team.colour}` : ''}" aria-label="${CATS[c].name} ${VALUES[v]}, played">${u.team ? `${u.team.name}<small>+${u.gain}</small>` : `<small>No points</small>`}</button>`;
+  return `<button class="jp-tile ${S.aim === key ? 'aim' : ''}" data-c="${c}" data-v="${v}" data-tile="${key}" aria-label="${CATS[c].name} for ${VALUES[v]}">${VALUES[v]}</button>`;
+}
+function teamCard(t, rank) {
+  const cap = captainOf(t);
+  return `<div class="nm"><span class="rk">${rank}</span>${t.name}</div><div class="sc">${fmt(t.prev)}</div>
+    <div class="mem">${t.members.map((m) => `<span class="${m === cap ? 'cap' : ''} ${OFFLINE.includes(m) ? 'off' : ''}" style="${GM.avatarStyle(m)}" title="${m}${OFFLINE.includes(m) ? ' (offline)' : ''}">${m}</span>`).join('')}</div><em class="tagp">Picking</em>`;
+}
+function renderTeams(first) {
+  const box = board.querySelector('.jp-teams'); if (!box) return;
+  const sorted = S.teams.slice().sort((a, b) => b.score - a.score || ORDER.indexOf(S.teams.indexOf(a)) - ORDER.indexOf(S.teams.indexOf(b)));
+  sorted.forEach((t) => { if (!teamNodes[t.id]) { teamNodes[t.id] = GM.h(`<div class="jp-team" data-t="${t.id}" style="--tc:${t.colour}"></div>`); box.appendChild(teamNodes[t.id]); } });
+  const oldRank = Object.fromEntries([...box.children].map((n, i) => [n.dataset.t, i]));
+  sorted.forEach((t, i) => { const n = teamNodes[t.id]; n.innerHTML = teamCard(t, i + 1); n.classList.toggle('turn', S.phase === 'pick' && t === pickTeam()); });
+  if (first) { sorted.forEach((t) => box.appendChild(teamNodes[t.id])); return; }
+  GM.flip(box, () => sorted.forEach((t) => box.appendChild(teamNodes[t.id])));
+  sorted.forEach((t, i) => {
+    const sc = teamNodes[t.id].querySelector('.sc');
+    if (t.prev !== t.score) { GM.countUp(sc, t.prev, t.score, 1000); setTimeout(() => sc.textContent = fmt(t.score), GM.calm() ? 0 : 1050); }
+    if (i < oldRank[t.id]) teamNodes[t.id].querySelector('.rk').insertAdjacentHTML('afterend', '<span class="move" style="font-size:22px;color:var(--game-right)">▲</span>');
+    t.prev = t.score;
+  });
+}
+function renderTurn() {
+  const el = board.querySelector('.jp-turn'); if (!el) return;
+  const t = pickTeam();
+  el.style.setProperty('--tc', t.colour);
+  el.innerHTML = `<i></i><span><b>${t.name}</b> to pick · captain <b>${captainOf(t)}</b> chooses on their phone</span>`;
+  setControls(`<button class="bctl" data-a="end">Final scores</button>`);
+}
+
+// ── Picking ───────────────────────────────────────
+function enterPick() {
+  S.phase = 'pick'; S.aim = null; S.cur = null; S.me = {};
+  if (Object.keys(S.used).length === 25) return endGame();
+  renderTeams(); renderTurn(); renderPhone();
+  if (!iAmCaptain()) simCaptainPick();
+}
+async function simCaptainPick() {
+  const gen = S.gen, turn = S.turn;
+  const ok = () => gen === S.gen && turn === S.turn && S.phase === 'pick';
+  await GM.sleep(1600); if (!ok()) return;
+  const free = VALUES.flatMap((_, v) => CATS.map((_, c) => `${c}-${v}`)).filter((k) => !S.used[k]);
+  for (let h = 0; h < 3; h++) { setAim(GM.pick(free)); GM.sound.click(); await GM.sleep(480); if (!ok()) return; }
+  const pref = free.filter((k) => +k.split('-')[1] >= 1 && +k.split('-')[1] <= 3);
+  const pick = GM.pick(pref.length ? pref : free);
+  setAim(pick); await GM.sleep(650); if (!ok()) return;
+  openTile(pick);
+}
+function setAim(key) {
+  S.aim = key;
+  board.querySelectorAll('.jp-tile').forEach((n) => n.classList.toggle('aim', n.dataset.tile === key && !n.classList.contains('used')));
+}
+
+// ── Clue ──────────────────────────────────────────
+async function openTile(key) {
+  if (S.phase !== 'pick' || S.used[key]) return;
+  const [c, v] = key.split('-').map(Number);
+  const tile = CATS[c].tiles[v], team = pickTeam();
+  S.cur = { c, v, key, tile, team, value: VALUES[v], answers: {} };
+  S.phase = 'zoom'; S.me = {}; setAim(null); setControls('');
+  renderTeams(); renderPhone();
+  GM.sound.whoosh();
+  const el = GM.h(`<div class="stage-x jp-clue"><div class="jp-clue-in"></div></div>`);
+  board.appendChild(el);
+  if (GM.calm()) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150 });
+  else await el.animate([{ transform: `translate(${tileX(c)}px, ${tileY(v)}px) scale(${TW / 1920}, ${TH / 1080})`, borderRadius: '18px' }, { transform: 'none', borderRadius: '0px' }], { duration: 650, easing: 'cubic-bezier(.65,0,.25,1)' }).finished;
+  if (tile.dbl) doubleSplash(); else showClue();
+}
+const clueIn = () => board.querySelector('.jp-clue-in');
+function fadeIn(nodes, step = 70) {
+  nodes.forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 520, delay: GM.calm() ? 0 : k * step, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+
+async function doubleSplash() {
+  const cur = S.cur, t = cur.team, gen = S.gen;
+  cur.maxWager = Math.max(t.score, 500);
+  S.phase = 'wager';
+  clueIn().innerHTML = `<div class="jp-dbl"><div class="jp-dbl-word">${[...'DOUBLE'].map((ch) => `<span>${ch}</span>`).join('')}</div>
+    <p><b style="color:var(--jp-ink)">${t.name}</b> found the Double. Captain ${captainOf(t)} wagers up to ${cur.maxWager.toLocaleString()}.</p>
+    <div class="num">…</div></div><div class="jp-shine"></div>`;
+  const calm = GM.calm();
+  clueIn().querySelectorAll('.jp-dbl-word span').forEach((s, k) => s.animate([{ opacity: 0, transform: 'translateY(80px) scale(.4) rotate(-12deg)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 700, delay: calm ? 0 : k * 80, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' }));
+  if (!calm) clueIn().querySelector('.jp-shine').animate([{ transform: 'translateX(0)' }, { transform: 'translateX(2700px)' }], { duration: 1400, delay: 500, easing: 'cubic-bezier(.5,0,.3,1)' });
+  GM.sound.fanfare();
+  renderPhone();
+  if (captainOf(t) !== GM.me) {
+    await GM.sleep(2600); if (gen !== S.gen || S.phase !== 'wager') return;
+    setWager(Math.max(100, Math.round(cur.maxWager * (.35 + GM.rand() * .45) / 100) * 100));
+  }
+}
+async function setWager(n) {
+  const gen = S.gen;
+  S.cur.wager = n; S.phase = 'wagered';
+  const num = clueIn().querySelector('.jp-dbl .num');
+  GM.countUp(num, 0, n, 900); GM.sound.coin();
+  num.animate([{ transform: 'scale(.6)' }, { transform: 'scale(1.1)', offset: .6 }, { transform: 'none' }], { duration: GM.calm() ? 1 : 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+  renderPhone();
+  await GM.sleep(1700); if (gen !== S.gen) return;
+  showClue();
+}
+
+function showClue() {
+  const cur = S.cur, tile = cur.tile, t = cur.team;
+  S.phase = 'answer'; S.me = { ans: null, text: '', locked: false };
+  clueIn().innerHTML = `
+    <div class="jp-c-head">${CATS[cur.c].name} · ${cur.value}${tile.dbl ? ' · Double' : ''}<span class="jp-c-pick" style="--tc:${t.colour}"><i></i>${t.name} picked · ${tile.dbl ? `wagered ${cur.wager.toLocaleString()}` : '×1.5'}</span></div>
+    <div class="jp-c-ring"></div>
+    <p class="jp-c-q">${tile.q}</p>
+    ${tile.opts ? `<div class="jp-c-opts">${tile.opts.map((o, k) => `<div class="jp-c-opt" data-k="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span><span class="txt">${o}</span><span class="n"></span></div>`).join('')}</div>`
+      : `<div class="jp-c-term"><span class="big">Type your answer on your phone</span><span class="sub"><b class="typed">0</b> of ${GM.class.length - OFFLINE.length} typed</span></div>`}
+    <div class="jp-c-prog">${S.teams.map((tm) => `<div class="grp" style="--tc:${tm.colour}"><span><i></i>${tm.name}</span><div class="dots">${tm.members.map((m) => `<i data-c="${m}" class="${OFFLINE.includes(m) ? 'off' : ''}"></i>`).join('')}</div></div>`).join('')}</div>`;
+  fadeIn([clueIn().querySelector('.jp-c-head'), clueIn().querySelector('.jp-c-q'), ...clueIn().querySelectorAll('.jp-c-opt, .jp-c-term'), clueIn().querySelector('.jp-c-prog')], 90);
+  GM.sound.reveal();
+  setControls(`<button class="bctl primary" data-a="close">Close answers</button>`);
+  renderPhone();
+  cur.timer = GM.ring(clueIn().querySelector('.jp-c-ring'), 20, { onEnd: closeAnswers, bar: () => phone.querySelector('.ph-timer i') });
+  simulateAnswers();
+}
+function simulateAnswers() {
+  const cur = S.cur, tile = cur.tile, gen = S.gen;
+  GM.class.filter((c) => c !== GM.me && !OFFLINE.includes(c)).forEach((c) => {
+    const at = GM.calm() ? 150 + GM.rand() * 900 : 1400 + GM.rand() * 9000;
+    setTimeout(() => {
+      if (gen !== S.gen || S.cur !== cur || S.phase !== 'answer') return;
+      const p = skill[c] - cur.v * .09 - (tile.opts ? 0 : .08);
+      const right = GM.rand() < p;
+      let a;
+      if (tile.opts) a = { ans: right ? tile.right : GM.rand() < .65 ? tile.lure : GM.pick([0, 1, 2, 3].filter((k) => k !== tile.right)) };
+      else a = { text: right ? tile.ans[0] : (GM.rand() < .6 ? tile.miss[0] : GM.pick(tile.miss)) };
+      answered(c, a);
+    }, at);
+  });
+}
+function answered(c, a) {
+  const cur = S.cur; cur.answers[c] = a;
+  const dot = board.querySelector(`.jp-c-prog i[data-c="${c}"]`); if (dot) dot.classList.add('on');
+  const typed = board.querySelector('.jp-c-term .typed'); if (typed) typed.textContent = Object.keys(cur.answers).length;
+  const mine = phone.querySelector('.jp-teamdone'); if (mine) mine.textContent = live(myTeam()).filter((m) => cur.answers[m]).length;
+  if (Object.keys(cur.answers).length === GM.class.length - OFFLINE.length) setTimeout(() => { if (S.cur === cur) closeAnswers(); }, 700);
+}
+function closeAnswers() {
+  const cur = S.cur; if (!cur || S.phase !== 'answer') return;
+  S.phase = 'closed'; cur.timer && cur.timer.stop(); GM.sound.lock();
+  board.querySelector('.jp-clue')?.classList.add('closed');
+  if (!S.me.locked) S.me.locked = true;
+  setControls(`<button class="bctl primary" data-a="reveal">Reveal</button>`);
+  const term = board.querySelector('.jp-c-term .big'); if (term) term.textContent = 'Answers closed';
+  renderPhone();
+}
+
+async function reveal() {
+  const cur = S.cur, tile = cur.tile, gen = S.gen; if (S.phase !== 'closed') return;
+  S.phase = 'revealing'; setControls('');
+  const clue = board.querySelector('.jp-clue');
+  GM.sound.reveal();
+  // per student, per tile (connected members only)
+  GM.class.filter((c) => !OFFLINE.includes(c)).forEach((c) => S.log[c][cur.key] = { right: isRight(tile, cur.answers[c]), a: cur.answers[c], live: true });
+  if (tile.opts) {
+    const counts = [0, 0, 0, 0]; Object.values(cur.answers).forEach((a) => { if (a.ans >= 0) counts[a.ans]++; });
+    clue.classList.add('revealed');
+    clue.querySelectorAll('.jp-c-opt').forEach((n, k) => { n.classList.add(k === tile.right ? 'is-right' : 'is-wrong'); n.querySelector('.n').textContent = `${counts[k]} chose`; });
+  } else {
+    const wrong = {}; Object.values(cur.answers).forEach((a) => { if (!tile.ans.map(norm).includes(norm(a.text)) && a.text) wrong[norm(a.text)] = (wrong[norm(a.text)] || 0) + 1; });
+    const top = Object.entries(wrong).sort((a, b) => b[1] - a[1])[0];
+    const box = clue.querySelector('.jp-c-term'); box.classList.add('done');
+    const nRight = Object.values(cur.answers).filter((a) => isRight(tile, a)).length;
+    box.innerHTML = `<span class="sub">Accepted</span><span class="big">${tile.ans[0][0].toUpperCase() + tile.ans[0].slice(1)}</span><span class="sub">${nRight} of ${Object.keys(cur.answers).length} typed it${top ? ` · most common miss: “${top[0]}”` : ''}</span>`;
+    box.animate([{ transform: 'scale(.9)' }, { transform: 'scale(1.04)', offset: .6 }, { transform: 'none' }], { duration: GM.calm() ? 1 : 600, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+  setTimeout(() => (isRight(tile, cur.answers[GM.me]) ? GM.sound.right : GM.sound.wrong)(), 250);
+  await GM.sleep(1300); if (gen !== S.gen) return;
+
+  // team results
+  cur.results = S.teams.map((t) => {
+    const con = live(t), n = con.length, r = con.filter((m) => isRight(tile, cur.answers[m])).length, pick = t === cur.team;
+    const gain = pick && tile.dbl ? r10(cur.wager * (2 * r - n) / n) : r10(cur.value * (r / n) * (pick ? 1.5 : 1));
+    return { t, n, r, pick, gain };
+  });
+  clue.querySelector('.jp-c-prog').remove();
+  clue.querySelector('.jp-clue-in').insertAdjacentHTML('beforeend', `<div class="jp-c-res">${cur.results.map((x) => `<div class="jp-rc ${x.gain > 0 ? 'up' : x.gain < 0 ? 'down' : ''}" style="--tc:${x.t.colour}"><span class="t">${x.t.name}${x.pick ? `<em>${tile.dbl ? 'wager' : '×1.5'}</em>` : ''}</span><span class="f">${x.r} of ${x.n} right</span><span class="g">${x.gain >= 0 ? '+' : '−'}<span class="gv">0</span></span></div>`).join('')}</div>`);
+  const cards = [...clue.querySelectorAll('.jp-rc')];
+  cards.forEach((n, k) => {
+    n.animate([{ opacity: 0, transform: 'translateY(40px) scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 600, delay: GM.calm() ? 0 : k * 160, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' });
+    setTimeout(() => { GM.countUp(n.querySelector('.gv'), 0, Math.abs(cur.results[k].gain), 800); if (cur.results[k].gain > 0) GM.sound.coin(); }, GM.calm() ? 0 : 200 + k * 160);
+  });
+  cur.results.forEach((x) => { x.t.score += x.gain; });
+  S.phase = 'revealed';
+  renderPhone();
+  setControls(`<button class="bctl primary" data-a="back">Back to the board</button>`);
+}
+
+async function backToBoard() {
+  const cur = S.cur, gen = S.gen; if (S.phase !== 'revealed') return;
+  S.phase = 'zoomout'; setControls('');
+  const best = cur.results.slice().sort((a, b) => b.gain - a.gain)[0];
+  S.used[cur.key] = best.gain > 0 ? { team: best.t, gain: best.gain } : { team: null, gain: 0 };
+  const el = board.querySelector('.jp-clue');
+  board.querySelector(`[data-tile="${cur.key}"]`).outerHTML = tileHtml(cur.c, cur.v);
+  if (GM.calm()) el.remove();
+  else {
+    el.querySelector('.jp-clue-in').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' });
+    await el.animate([{ transform: 'none', borderRadius: '0px' }, { transform: `translate(${tileX(cur.c)}px, ${tileY(cur.v)}px) scale(${TW / 1920}, ${TH / 1080})`, borderRadius: '18px', opacity: .2 }], { duration: 560, easing: 'cubic-bezier(.65,0,.25,1)', fill: 'forwards' }).finished;
+    el.remove();
+    const nt = board.querySelector(`[data-tile="${cur.key}"]`);
+    nt && nt.animate([{ transform: 'rotateY(90deg)' }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+  if (gen !== S.gen) return;
+  GM.sound.whoosh();
+  cur.team.capN++; S.turn++;
+  enterPick();
+}
+
+// ── End: podium + teacher view ────────────────────
+function endGame() {
+  S.phase = 'end'; S.gen++;
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  const sorted = S.teams.slice().sort((a, b) => b.score - a.score);
+  const [a, b, c, d] = sorted;
+  const played = Object.keys(S.used);
+  let tot = 0, right = 0; const per = {};
+  GM.class.forEach((s) => Object.entries(S.log[s]).forEach(([k, x]) => { tot++; if (x.right) right++; per[k] = per[k] || [0, 0]; per[k][1]++; if (x.right) per[k][0]++; }));
+  const hardest = Object.entries(per).sort((x, y) => x[1][0] / x[1][1] - y[1][0] / y[1][1])[0];
+  const hardName = hardest ? (() => { const [cc, vv] = hardest[0].split('-').map(Number); return `${CATS[cc].name} ${VALUES[vv]}`; })() : '—';
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x jp-sum"><span class="b-eyebrow">Final scores</span><div>${played.length} tile${played.length === 1 ? '' : 's'} played · class got <b>${tot ? Math.round(right / tot * 100) : 0}%</b> · hardest: <b>${hardName}</b></div></div>
+    <div class="stage-x jp-fourth">4th · ${d.name} · ${fmt(d.score)}</div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([t, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar tm" style="background:${t.colour}">${t.name[0]}</span><span class="name">${t.name}</span><span class="score">${fmt(t.score)}</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls(`<button class="bctl" data-a="insight">Teacher: category × value view</button><button class="bctl primary" data-a="restart">Play again</button>`);
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  board.querySelector('.jp-fourth').animate([{ opacity: 0 }, { opacity: 1 }], { duration: GM.calm() ? 1 : 500, delay: GM.calm() ? 0 : 1600, fill: 'backwards' });
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  renderPhone();
+}
+
+function insight() {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  // Played tiles use the game's answers; unplayed tiles get sample data so the view reads full.
+  const res = (s, c, v) => { const k = `${c}-${v}`; if (S.log[s][k]) return S.log[s][k].right; if (OFFLINE.includes(s)) return null; return GM.rand() < skill[s] - v * .11 - (CATS[c].tiles[v].opts ? 0 : .08); };
+  const grid = {}; const students = GM.class.filter((s) => !OFFLINE.includes(s));
+  students.forEach((s) => { grid[s] = CATS.map((_, c) => VALUES.map((_, v) => res(s, c, v))); });
+  const acc = (c, v) => { const xs = students.map((s) => grid[s][c][v]); return xs.filter(Boolean).length / xs.length; };
+  const col = (p) => p < .5 ? `color-mix(in srgb, var(--game-gold) ${Math.round(p * 200)}%, var(--game-wrong))` : `color-mix(in srgb, var(--game-right) ${Math.round((p - .5) * 200)}%, var(--game-gold))`;
+  const ceiling = (s, c) => { let best = 0; VALUES.forEach((val, v) => { if (grid[s][c][v]) best = val; }); return best; };
+  const half = Math.ceil(GM.class.length / 2);
+  const rowHtml = (s) => OFFLINE.includes(s)
+    ? `<div class="row"><span class="b-avatar" style="${GM.avatarStyle(s)};opacity:.4">${s}</span><i class="no" style="grid-column:span 5">Offline</i></div>`
+    : `<div class="row"><span class="b-avatar" style="${GM.avatarStyle(s)}">${s}</span>${CATS.map((_, c) => { const v = ceiling(s, c); return v ? `<i style="background:${col(.25 + v / 500 * .75)}">${v}</i>` : '<i class="no">–</i>'; }).join('')}</div>`;
+  const hdr = `<div class="row hd"><span></span>${['N', 'G', 'W', 'S', 'T'].map((x) => `<i>${x}</i>`).join('')}</div>`;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x jp-ins">
+    <span class="b-eyebrow">Teacher only · not for the projector</span>
+    <h2>Accuracy by category × value</h2>
+    <p class="lede">Where the class, and each student, tops out. Dotted cells were not played this game (sample data in the mockup).</p>
+    <div class="jp-heat">
+      <span></span>${CATS.map((c) => `<span class="h">${c.name}</span>`).join('')}
+      ${VALUES.map((val, v) => `<span class="v">${val}</span>${CATS.map((_, c) => { const p = acc(c, v); return `<span class="c ${S.used[`${c}-${v}`] ? '' : 'sample'}" style="background:${col(p)}">${Math.round(p * 100)}%</span>`; }).join('')}`).join('')}
+    </div>
+    <div class="jp-call"><b>Ceiling for most of the class: 300.</b> Typed terms drop about 10 points below choice questions at the same value. Most common typed miss: “unreliable narrator” for intrusive narrator.</div>
+    <div class="jp-ceil"><h3>Each student’s ceiling</h3><p class="key">Highest value right · N Narrators · G Gothic · W Who’s who · S Sound · T Structure</p>
+      <div class="cols"><div>${hdr}${GM.class.slice(0, half).map(rowHtml).join('')}</div><div>${hdr}${GM.class.slice(half).map(rowHtml).join('')}</div></div></div>
+  </div>`);
+  const cells = [...board.querySelectorAll('.jp-heat .c')];
+  cells.forEach((n, k) => n.animate([{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 420, delay: GM.calm() ? 0 : (k % 5 + Math.floor(k / 5)) * 50, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' }));
+  setControls(`<button class="bctl" data-a="podium">Back to podium</button><button class="bctl primary" data-a="restart">Play again</button>`);
+}
+
+function setControls(html) {
+  board.querySelector('.board-controls')?.remove();
+  if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`);
+}
+board.addEventListener('click', (e) => {
+  const tile = e.target.closest('.jp-tile');
+  if (tile && !tile.classList.contains('used') && S.phase === 'pick') { GM.sound.click(); openTile(tile.dataset.tile); return; }
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'close') closeAnswers();
+  if (a === 'reveal') reveal();
+  if (a === 'back') backToBoard();
+  if (a === 'end') endGame();
+  if (a === 'insight') insight();
+  if (a === 'podium') endGame();
+  if (a === 'restart') { fresh(); renderBoard(true); enterPick(); }
+});
+
+// ── Phone ─────────────────────────────────────────
+function phoneShell(body, dock = '', timer = false) {
+  const t = myTeam();
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score jp-tp" style="--tc:${t.colour}"><i></i>${t.name} · ${fmt(t.score)}</span></div>
+    ${timer ? '<div class="ph-timer"><i></i></div>' : ''}<div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+function standings() {
+  return `<div class="jp-mini">${S.teams.slice().sort((a, b) => b.score - a.score).map((t) => `<div class="${t === myTeam() ? 'me' : ''}" style="--tc:${t.colour}"><i></i>${t.name}<b>${fmt(t.score)}</b></div>`).join('')}</div>`;
+}
+function renderPhone() {
+  const cur = S.cur, ph = S.phase;
+  if (ph === 'pick' && iAmCaptain()) {
+    const sel = S.aim && !S.used[S.aim] ? S.aim.split('-').map(Number) : null;
+    phoneShell(`<div class="jp-cap">★ You’re the Otters’ captain. Pick a tile for the team.</div>
+      ${CATS.map((c, ci) => `<div class="jp-pcat"><b>${c.name}</b><div class="jp-pvals">${VALUES.map((val, v) => { const k = `${ci}-${v}`, u = S.used[k]; return u ? `<button disabled aria-label="${c.name} ${val}, played" style="${u.team ? `--tc:${u.team.colour}` : ''}"><i></i></button>` : `<button data-pick="${k}" class="${S.aim === k ? 'sel' : ''}" aria-label="${c.name} for ${val}">${val}</button>`; }).join('')}</div></div>`).join('')}`,
+      `<button class="pbtn cta orange" data-p="go" ${sel ? '' : 'disabled'}>${sel ? `Pick ${CATS[sel[0]].name} · ${VALUES[sel[1]]}` : 'Choose a tile'}</button>`);
+    return;
+  }
+  if (ph === 'pick') {
+    const t = pickTeam();
+    phoneShell(`<div class="jp-wait"><div><div class="jp-bob">?</div><p class="ph-sub">${t.name} are picking</p><div class="mid">Captain ${captainOf(t)} is choosing a tile</div><p class="ph-sub" style="margin-top:10px">Everyone answers every tile, so stay ready.</p></div></div>${standings()}`);
+    return;
+  }
+  if (ph === 'zoom') { phoneShell(`<div class="jp-wait"><div><div class="jp-bob">${cur.value}</div><p class="ph-sub">${cur.team.name} picked</p><div class="mid">${CATS[cur.c].name} for ${cur.value}</div></div></div>`); return; }
+  if (ph === 'wager' && captainOf(cur.team) === GM.me) {
+    const max = cur.maxWager, v = Math.min(S.me.wager ?? Math.round(max / 2 / 100) * 100, max);
+    S.me.wager = v;
+    phoneShell(`<div class="jp-cap">★ Double! You wager for the Otters.</div>
+      <p class="ph-h">${CATS[cur.c].name} · ${cur.value}</p>
+      <div class="jp-bet"><span class="ph-sub" style="text-align:center">How sure is your team?</span><span class="amt">${v.toLocaleString()}</span>
+        <input class="jp-range" type="range" min="100" max="${max}" step="100" value="${v}" style="--p:${((v - 100) / (max - 100)) * 100}%" aria-label="Wager"></div>
+      <p class="ph-sub" style="font-size:13px">Every Otter answers. Each right answer wins a share of the wager; each wrong one loses a share. Up to ${max.toLocaleString()}.</p>`,
+      `<button class="pbtn cta orange" data-p="wager">Wager ${v.toLocaleString()}</button>`);
+    const r = phone.querySelector('.jp-range');
+    r.addEventListener('input', () => { S.me.wager = +r.value; phone.querySelector('.amt').textContent = (+r.value).toLocaleString(); r.style.setProperty('--p', `${((r.value - 100) / (max - 100)) * 100}%`); phone.querySelector('[data-p="wager"]').textContent = `Wager ${(+r.value).toLocaleString()}`; });
+    return;
+  }
+  if (ph === 'wager' || ph === 'wagered') {
+    phoneShell(`<div class="jp-wait"><div><div class="jp-bob">×2</div><p class="ph-sub">Double</p><div class="mid">${ph === 'wagered' ? `${cur.team.name} wagered ${cur.wager.toLocaleString()}` : `${cur.team.name}’ captain is wagering`}</div><p class="ph-sub" style="margin-top:10px">The clue comes next. Everyone answers.</p></div></div>`);
+    return;
+  }
+  if (ph === 'answer' && !S.me.locked) {
+    const tile = cur.tile;
+    phoneShell(`<span class="jp-qmeta">${CATS[cur.c].name} · ${cur.value}${tile.dbl ? '<span class="dbl">Double</span>' : ''}</span>
+      <p class="ph-h" style="font-size:18px">${tile.q}</p>
+      ${tile.opts ? tile.opts.map((o, k) => `<button class="pbtn ${S.me.ans === k ? 'sel' : ''}" data-ans="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span>${o}</button>`).join('')
+        : `<input class="pinput" id="jp-term" placeholder="Type the term" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" value="${S.me.text || ''}" aria-label="Your answer">`}`,
+      `<button class="pbtn cta orange" data-p="lock" ${tile.opts && S.me.ans == null ? 'disabled' : ''}>Lock in</button>`, true);
+    const inp = phone.querySelector('#jp-term');
+    if (inp) { inp.addEventListener('input', () => { S.me.text = inp.value; }); inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') lockIn(); }); }
+    return;
+  }
+  if (ph === 'answer' || ph === 'closed' || ph === 'revealing') {
+    const a = cur.answers[GM.me], t = myTeam();
+    phoneShell(`<div class="jp-wait"><div><p class="ph-sub">${ph === 'answer' ? 'Locked in' : 'Answers closed'}</p>
+      <div class="mid" style="margin:6px 0 10px">${a ? (cur.tile.opts ? `${LET[a.ans]} · ${cur.tile.opts[a.ans]}` : `“${a.text || '…'}”`) : 'No answer'}</div>
+      <p class="ph-sub"><b class="jp-teamdone">${live(t).filter((m) => cur.answers[m]).length}</b> of ${live(t).length} Otters answered</p>
+      <p class="ph-sub" style="margin-top:14px">Eyes on the board.</p></div></div>`, '', ph === 'answer');
+    return;
+  }
+  if (ph === 'revealed' || ph === 'zoomout') {
+    const me = cur.results.find((x) => x.t === myTeam()), ok = isRight(cur.tile, cur.answers[GM.me]);
+    const rightTxt = cur.tile.opts ? cur.tile.opts[cur.tile.right] : cur.tile.ans[0];
+    phoneShell(`<div class="jp-wait"><div><p class="ph-sub">${ok ? 'You got it' : 'Not this time'}</p><div class="big" style="color:${ok ? 'var(--success)' : 'var(--danger)'}">${ok ? 'Right' : 'Missed'}</div>
+      ${ok ? '' : `<p class="ph-sub">The answer: <b>${rightTxt}</b></p>`}</div></div>
+      <div class="jp-break"><div><span>Otters right</span><b>${me.r} of ${me.n}</b></div>
+        ${me.pick ? (cur.tile.dbl ? `<div><span>Wager</span><b>${cur.wager.toLocaleString()}</b></div>` : `<div><span>Picking bonus</span><b>×1.5</b></div>`) : ''}
+        <div class="tot"><span>Otters this tile</span><span>${me.gain >= 0 ? '+' : '−'}${Math.abs(me.gain).toLocaleString()}</span></div></div>`);
+    GM.toast(phone, ok ? `Right · Otters ${me.gain >= 0 ? '+' : '−'}${Math.abs(me.gain)}<small>${me.r} of ${me.n} of your team got it.</small>` : `Missed · Otters ${me.gain >= 0 ? '+' : '−'}${Math.abs(me.gain)}<small>Your team still scored from those who got it.</small>`, ok ? 'good' : 'bad');
+    return;
+  }
+  if (ph === 'end') {
+    const sorted = S.teams.slice().sort((a, b) => b.score - a.score), place = sorted.indexOf(myTeam()) + 1;
+    const mine = Object.values(S.log[GM.me]), r = mine.filter((x) => x.right).length;
+    let best = 0; Object.entries(S.log[GM.me]).forEach(([k, x]) => { if (x.right) best = Math.max(best, VALUES[+k.split('-')[1]]); });
+    phoneShell(`<div class="jp-wait"><div><span class="ph-sub">Otters finished</span><div class="big">${place}${['st', 'nd', 'rd'][place - 1] || 'th'}</div><p class="ph-sub">with ${fmt(myTeam().score)} points</p></div></div>
+      <div class="jp-break"><div><span>Your answers right</span><b>${r} of ${mine.length}</b></div><div><span>Highest tile you got right</span><b>${best || '–'}</b></div></div>${standings()}`);
+  }
+}
+function lockIn() {
+  const cur = S.cur; if (!cur || S.phase !== 'answer' || S.me.locked) return;
+  if (cur.tile.opts && S.me.ans == null) return;
+  if (!cur.tile.opts) S.me.text = phone.querySelector('#jp-term')?.value || S.me.text;
+  S.me.locked = true; GM.sound.lock();
+  answered(GM.me, cur.tile.opts ? { ans: S.me.ans } : { text: S.me.text });
+  renderPhone();
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t || t.disabled) return;
+  if (t.dataset.pick && S.phase === 'pick') { setAim(t.dataset.pick); GM.sound.click(); renderPhone(); }
+  if (t.dataset.p === 'go' && S.aim) openTile(S.aim);
+  if (t.dataset.ans != null) { S.me.ans = +t.dataset.ans; GM.sound.click(); renderPhone(); }
+  if (t.dataset.p === 'lock') lockIn();
+  if (t.dataset.p === 'wager' && S.phase === 'wager') setWager(S.me.wager);
+});
+
+fresh(); renderBoard(true); renderPhone(); enterPick();
+</script>
+</body>
+</html>

@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pictionary — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* ── Board ─────────────────────────────────────────── */
+.pc-eyebrow { position: absolute; left: 120px; top: 118px; display: flex; align-items: center; gap: 16px; font-size: 26px; font-weight: 600; color: var(--stage-muted); }
+.pc-eyebrow b { color: var(--high-sea); font-size: 24px; letter-spacing: .14em; text-transform: uppercase; }
+.pc-paper { position: absolute; left: 120px; top: 176px; width: 800px; height: 800px; border-radius: 28px; overflow: hidden; background-color: #fbf8f2; background-image: radial-gradient(rgba(19,35,58,.09) 1.6px, transparent 1.8px); background-size: 40px 40px; background-position: 20px 20px; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 30px 80px rgba(0,0,0,.38); }
+[data-board-theme="light"] .pc-paper { background-color: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.14), 0 20px 50px rgba(20,35,70,.14); }
+.pc-paper canvas { position: absolute; inset: 0; width: 800px; height: 800px; }
+.pc-live { position: absolute; left: 22px; top: 22px; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 7px 20px 7px 8px; border-radius: 999px; background: rgba(19,35,58,.07); color: #13233a; font-size: 24px; font-weight: 600; }
+.pc-live .b-avatar { width: 44px; height: 44px; font-size: 17px; }
+.pc-live .dot { width: 14px; height: 14px; border-radius: 50%; background: #d4544f; animation: pcPulse 1.4s ease-in-out infinite; }
+@keyframes pcPulse { 50% { opacity: .25; transform: scale(.7); } }
+.pc-answer { position: absolute; left: 22px; right: 22px; bottom: 22px; z-index: 3; padding: 20px 30px 24px; border-radius: 22px; background: rgba(10,21,54,.92); color: #fff; display: grid; gap: 4px; box-shadow: 0 20px 50px rgba(10,21,54,.4); }
+.pc-answer span { font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--game-gold); }
+.pc-answer b { font-size: 54px; line-height: 1.08; letter-spacing: -.01em; }
+.pc-answer.quote b { font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; font-size: 42px; line-height: 1.15; }
+.pc-void { position: absolute; left: 50%; top: 42%; z-index: 4; padding: 18px 36px; border: 8px solid #c0403b; border-radius: 18px; color: #c0403b; background: rgba(251,248,242,.9); font-size: 64px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; transform: translate(-50%, -50%) rotate(-9deg); white-space: nowrap; }
+.pc-void small { display: block; font-size: 24px; letter-spacing: .02em; text-transform: none; font-weight: 600; text-align: center; }
+
+.pc-side { position: absolute; left: 990px; right: 120px; top: 176px; bottom: 120px; }
+.pc-hint { display: grid; gap: 16px; padding-right: 160px; min-height: 132px; align-content: start; }
+.pc-hint .kind { font-size: 24px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.pc-blanks { display: flex; flex-wrap: wrap; gap: 6px; font-size: 44px; font-weight: 700; }
+.pc-blanks i { font-style: normal; width: 34px; height: 58px; display: grid; place-items: end center; padding-bottom: 2px; line-height: 1; border-bottom: 5px solid var(--stage-ink); }
+.pc-blanks i.gap { width: 22px; border: 0; }
+.pc-blanks i.shown { color: var(--game-gold); border-color: var(--game-gold); }
+[data-board-theme="light"] .pc-blanks i.shown { color: var(--high-sea-ink); border-color: var(--high-sea); }
+.pc-hint .why { font-size: 24px; color: var(--stage-muted); }
+.pc-ring { position: absolute; right: 0; top: 0; }
+
+.pc-got { position: absolute; left: 0; right: 0; top: 168px; bottom: 0; border-radius: 28px; padding: 22px 24px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-rows: auto 1fr; gap: 16px; }
+.pc-got-head { display: flex; align-items: center; gap: 16px; }
+.pc-got-head h3 { margin: 0; font-size: 34px; }
+.pc-got-head .g { font-size: 24px; color: var(--stage-muted); }
+.pc-got-head .n { margin-left: auto; font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.pc-got-head .n small { font-size: 28px; font-weight: 600; color: var(--stage-muted); }
+.pc-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-content: start; }
+.pc-chip { display: flex; align-items: center; gap: 12px; height: 62px; padding: 0 16px 0 9px; border-radius: 18px; background: var(--stage-card-hi); font-size: 26px; font-weight: 700; }
+.pc-chip .b-avatar { width: 44px; height: 44px; font-size: 17px; }
+.pc-chip .t { white-space: nowrap; margin-left: auto; font-size: 22px; font-weight: 600; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.pc-chip.m1 { box-shadow: 0 0 0 3px var(--game-gold); }
+.pc-chip.me { background: rgba(63,174,115,.3); }
+.pc-empty { grid-column: 1 / -1; padding-top: 140px; align-self: center; text-align: center; font-size: 28px; color: var(--stage-muted); max-width: 520px; margin: 0 auto; }
+
+.pc-sum { display: grid; gap: 18px; align-content: start; }
+.pc-sum .drew { display: flex; align-items: center; gap: 20px; padding: 18px 22px; border-radius: 22px; background: var(--stage-card-hi); font-size: 30px; font-weight: 700; }
+.pc-sum .drew .b-avatar { width: 72px; height: 72px; font-size: 26px; }
+.pc-sum .drew .pts { margin-left: auto; color: var(--game-right); font-size: 40px; font-variant-numeric: tabular-nums; }
+.pc-sum .drew small { display: block; font-size: 24px; font-weight: 500; color: var(--stage-muted); }
+.pc-sum h4 { margin: 6px 0 0; font-size: 24px; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.pc-fast { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pc-fast div { display: grid; justify-items: center; gap: 8px; padding: 18px 10px; border-radius: 22px; background: var(--stage-card-hi); font-size: 28px; font-weight: 700; }
+.pc-fast div .b-avatar { width: 64px; height: 64px; }
+.pc-fast div span:last-child { font-size: 24px; color: var(--stage-muted); font-weight: 600; }
+.pc-fast div:first-child { box-shadow: 0 0 0 3px var(--game-gold); }
+
+.pc-galbadge { display: flex; align-items: center; gap: 12px; padding: 10px 22px 10px 14px; border-radius: 999px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 24px; font-weight: 600; color: var(--stage-muted); }
+.pc-galbadge .ic { width: 40px; height: 40px; border-radius: 10px; background: #fbf8f2; display: grid; place-items: center; }
+.pc-galbadge b { color: var(--stage-ink); font-variant-numeric: tabular-nums; }
+.pc-fly { position: absolute; left: 0; top: 0; width: 800px; height: 800px; border-radius: 28px; transform-origin: 0 0; z-index: 30; pointer-events: none; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+
+.pc-podhead { position: absolute; left: 0; right: 480px; top: 150px; text-align: center; }
+.board .podium.pc-pod { right: 480px; }
+.pc-lb { position: absolute; left: 420px; right: 420px; top: 260px; }
+.pc-lb h2 { text-align: center; font-size: 44px; margin: 0 0 28px; }
+
+.pc-gallery { position: absolute; left: 120px; right: 120px; top: 130px; }
+.pc-gallery h2 { margin: 0; font-size: 52px; letter-spacing: -.01em; }
+.pc-gallery p { margin: 6px 0 0; font-size: 28px; color: var(--stage-muted); }
+.pc-frames { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; }
+.pc-frame { display: grid; gap: 16px; }
+.pc-frame .pic { position: relative; aspect-ratio: 1; border-radius: 22px; overflow: hidden; background: #fbf8f2; box-shadow: var(--stage-glow); transform: rotate(var(--tilt, 0deg)); }
+.pc-frame .pic img { width: 100%; height: 100%; display: block; }
+.pc-frame .pic .tape { position: absolute; top: -10px; left: 50%; width: 130px; height: 34px; margin-left: -65px; background: rgba(242,193,78,.55); transform: rotate(-3deg); }
+.pc-frame .cap { display: flex; align-items: center; gap: 14px; font-size: 26px; }
+.pc-frame .cap .b-avatar { width: 52px; height: 52px; font-size: 19px; }
+.pc-frame .cap b { display: block; font-size: 30px; }
+.pc-frame .cap .q { font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; }
+.pc-frame .cap span { color: var(--stage-muted); }
+.pc-frame.void .pic { display: grid; place-items: center; color: #8a6a5a; font-size: 30px; font-weight: 600; background: repeating-linear-gradient(45deg, #f2ebe0 0 18px, #fbf8f2 18px 36px); }
+.pc-btoast { position: absolute; left: 1395px; bottom: 130px; z-index: 25; padding: 14px 28px; border-radius: 999px; background: var(--game-right); color: #04210f; font-size: 26px; font-weight: 700; transform: translateX(-50%); }
+
+/* Teacher insight */
+.pc-ins { position: absolute; left: 120px; right: 120px; top: 104px; }
+.pc-ins .b-eyebrow { margin-bottom: 6px; }
+.pc-ins h2 { margin: 0; font-size: 44px; }
+.pc-ins .line { margin: 8px 0 22px; font-size: 26px; color: var(--stage-muted); }
+.pc-ins .line b { color: var(--stage-ink); }
+.pc-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.pc-tab { display: grid; grid-template-columns: 130px repeat(3, 1fr) 120px; gap: 4px 6px; font-size: 26px; }
+.pc-tab > span { height: 42px; display: grid; place-items: center; border-radius: 10px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pc-tab .hd { height: 56px; font-size: 22px; color: var(--stage-muted); font-weight: 700; text-align: center; line-height: 1.05; }
+.pc-tab .who { justify-content: start; padding-left: 8px; font-weight: 700; }
+.pc-tab .miss { background: rgba(212,84,79,.22); color: var(--stage-ink); }
+.pc-tab .drew { background: var(--stage-card-hi); color: var(--stage-muted); font-size: 22px; }
+.pc-tab .n { color: var(--stage-muted); }
+.pc-key { display: flex; gap: 24px; margin-top: 18px; font-size: 22px; color: var(--stage-muted); align-items: center; }
+.pc-key i { display: inline-block; width: 28px; height: 20px; border-radius: 6px; vertical-align: -3px; margin-right: 8px; }
+
+/* ── Phone ─────────────────────────────────────────── */
+.phone { transition: background .45s; }
+.pc-role { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: var(--cotton); font-size: 15px; }
+.pc-role .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.pc-prompt { padding: 14px 16px; border-radius: 18px; background: var(--navy); color: #fff; display: grid; gap: 2px; }
+.pc-prompt span { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--game-gold); }
+.pc-prompt b { font-size: 24px; line-height: 1.15; }
+.pc-prompt b.q { font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; font-size: 19px; line-height: 1.25; }
+.pc-prompt small { font-size: 13px; opacity: .75; }
+.pc-pad { position: relative; width: 350px; height: 350px; flex: none; border-radius: 20px; overflow: hidden; background-color: #fff; background-image: radial-gradient(rgba(19,35,58,.1) 1px, transparent 1.2px); background-size: 17.5px 17.5px; background-position: 8.75px 8.75px; box-shadow: 0 0 0 1px rgba(23,55,94,.14), 0 6px 18px rgba(20,35,70,.08); }
+.pc-pad canvas { position: absolute; inset: 0; width: 350px; height: 350px; touch-action: none; cursor: crosshair; }
+.pc-pad .hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; pointer-events: none; transition: opacity .3s; }
+.pc-pad.locked::after { content: ""; position: absolute; inset: 0; background: rgba(251,248,242,.35); }
+.pc-tools { display: flex; align-items: center; gap: 8px; }
+.pc-tools .sw { width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; display: grid; place-items: center; background: transparent; box-shadow: inset 0 0 0 2px rgba(23,55,94,.12); }
+.pc-tools .sw i { width: 28px; height: 28px; border-radius: 50%; transition: transform .2s var(--ease-spring); }
+.pc-tools .sw[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--navy); }
+.pc-tools .sw[aria-pressed="true"] i { transform: scale(1.1); }
+.pc-tools .sep { width: 1px; height: 28px; background: rgba(23,55,94,.15); margin: 0 2px; }
+.pc-tools .wd { width: 44px; height: 44px; border-radius: 14px; border: 0; background: var(--cotton); display: grid; place-items: center; }
+.pc-tools .wd i { border-radius: 50%; background: var(--ink); }
+.pc-tools .wd[aria-pressed="true"] { background: var(--navy); }
+.pc-tools .wd[aria-pressed="true"] i { background: #fff; }
+.pc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pc-two .pbtn { justify-content: center; text-align: center; }
+.pc-count { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.pc-count b { color: var(--navy); font-size: 17px; font-variant-numeric: tabular-nums; }
+.pc-guessrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.pc-guessrow .pbtn { width: auto; padding: 0 22px; justify-content: center; }
+.pc-hist { display: grid; gap: 8px; }
+.pc-hist div { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.08); font-size: 16px; }
+.pc-hist div em { font-style: normal; margin-left: auto; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--cotton); color: var(--muted); }
+.pc-hist div.close em { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.pc-hist div.no span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(107,119,136,.5); }
+.pc-pblanks { display: flex; flex-wrap: wrap; gap: 4px; font-size: 22px; font-weight: 700; color: var(--navy); }
+.pc-pblanks i { font-style: normal; width: 17px; height: 30px; display: grid; place-items: end center; border-bottom: 3px solid var(--navy); line-height: 1; }
+.pc-pblanks i.gap { width: 10px; border: 0; }
+.pc-pblanks i.shown { color: var(--high-sea-ink); border-color: var(--high-sea); }
+.pc-mini { width: 120px; height: 120px; border-radius: 16px; overflow: hidden; background: #fbf8f2; box-shadow: 0 0 0 1px rgba(23,55,94,.1); }
+.pc-mini canvas, .pc-mini img { width: 100%; height: 100%; display: block; }
+
+.phone.pc-green { background: linear-gradient(170deg, #45b77b, #2c8a57); color: #fff; }
+.phone.pc-green .ph-me { color: #fff; }
+.phone.pc-green .ph-score { color: var(--success); }
+.phone.pc-green .ph-timer { background: rgba(255,255,255,.25); }
+.phone.pc-green .ph-timer i { background: #fff; }
+.pc-gotit { flex: 1; display: grid; place-items: center; text-align: center; align-content: center; gap: 6px; }
+.pc-gotit svg { width: 120px; height: 120px; }
+.pc-gotit .big { font-size: 40px; font-weight: 700; line-height: 1.05; }
+.pc-gotit .pts { font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.pc-gotit .ans { font-size: 20px; font-weight: 600; opacity: .95; }
+.pc-gotit .sub { font-size: 15px; opacity: .8; }
+.pc-watch { padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,.16); text-align: center; font-size: 15px; }
+.pc-watch b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.pc-wait { flex: 1; display: grid; place-items: center; text-align: center; align-content: center; gap: 10px; color: var(--muted); }
+.pc-wait .big { font-size: 56px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.pc-wait .ans { font-size: 22px; font-weight: 700; color: var(--ink); }
+.pc-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.pc-break div { display: flex; justify-content: space-between; gap: 12px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content (invented: The Lantern House) ─────────────
+const PI = Math.PI;
+const COLS = { ink: '#13233a', red: '#d4544f', blue: '#3a6fc4', gold: '#e0a92e' };
+const WID = { thin: .009, thick: .024 };
+const ROUND_S = 75;
+const norm = (s) => s.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+function lev(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+const ROUNDS = [
+  { kind: 'Term', answer: 'pathetic fallacy', blanks: 'pathetic fallacy', reveal: [0, 9], role: 'guess', simDrawer: 'CM', sketch: sketchStorm,
+    right: (g) => /pathetic fallac/.test(g) || lev(g, 'pathetic fallacy') <= 2,
+    close: (g) => /pathetic|fallac|weather|storm mood/.test(g) },
+  { kind: 'Term', answer: 'foreshadowing', blanks: 'foreshadowing', reveal: [0, 4], role: 'draw', simDrawer: 'OD', sketch: sketchShadow,
+    right: (g) => /foreshadow/.test(g) || lev(g, 'foreshadowing') <= 2,
+    close: (g) => /shadow|forebod|foretell|fore/.test(g) },
+  { kind: 'Quote', answer: '“The lantern went out on the thirteenth stair.”', blanks: 'lantern stair', reveal: [0, 8], role: 'guess', simDrawer: 'HS', sketch: sketchStair, quote: true,
+    right: (g) => /lantern/.test(g) && /stair|step/.test(g),
+    close: (g) => /lantern|lamp|stair|step|thirteen/.test(g) }
+];
+
+// Hand-drawn stroke helpers (normalised 0..1 coords)
+const jit = () => (GM.rand() - .5) * .006;
+const seg = (a, b, n = 10) => Array.from({ length: n + 1 }, (_, i) => [a[0] + (b[0] - a[0]) * i / n + jit(), a[1] + (b[1] - a[1]) * i / n + jit()]);
+const poly = (pts, n = 6) => pts.slice(1).reduce((out, p, i) => out.concat(seg(pts[i], p, n).slice(i ? 1 : 0)), []);
+const arc = (cx, cy, rx, ry, a0, a1, n = 24) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * rx + jit(), cy + Math.sin(a) * ry + jit()]; });
+const st = (c, w, pts) => ({ c, w: WID[w], pts });
+function sketchStorm() {
+  const rain = Array.from({ length: 8 }, (_, i) => { const x = .27 + i * .065, y = .48 + (i % 2) * .035; return st('blue', 'thin', seg([x, y], [x - .03, y + .08], 4)); });
+  return [
+    st('ink', 'thick', [...arc(.30, .36, .085, .085, PI * .85, PI * 1.9, 14), ...arc(.45, .29, .12, .11, PI * 1.12, PI * 1.9, 16).slice(1), ...arc(.61, .31, .1, .1, PI * 1.15, PI * 1.95, 14).slice(1), ...arc(.71, .38, .07, .065, PI * 1.35, PI * 2.45, 12).slice(1)]),
+    st('ink', 'thick', seg([.74, .44], [.22, .43], 14)),
+    ...rain,
+    st('gold', 'thick', poly([[.55, .45], [.49, .56], [.555, .56], [.49, .69]], 4)),
+    st('ink', 'thin', arc(.29, .73, .045, .05, 0, PI * 2, 28)),
+    st('ink', 'thick', [[.275, .72]]), st('ink', 'thick', [[.305, .72]]),
+    st('ink', 'thin', arc(.29, .77, .02, .013, PI * 1.1, PI * 1.9, 8)),
+    st('blue', 'thin', seg([.272, .735], [.268, .752], 2)),
+    st('ink', 'thin', seg([.29, .78], [.29, .88], 6)),
+    st('ink', 'thin', poly([[.245, .86], [.29, .81], [.335, .86]], 5)),
+    st('ink', 'thin', poly([[.26, .95], [.29, .88], [.32, .95]], 5)),
+    st('ink', 'thin', poly([[.58, .95], [.58, .75], [.68, .65], [.78, .75], [.78, .95]], 6)),
+    st('gold', 'thick', poly([[.645, .79], [.715, .79], [.715, .85], [.645, .85], [.645, .79]], 3)),
+    st('ink', 'thin', seg([.1, .955], [.9, .955], 18))
+  ];
+}
+function sketchShadow() {
+  return [
+    st('ink', 'thin', seg([.06, .84], [.94, .84], 18)),
+    st('ink', 'thin', arc(.18, .55, .035, .04, 0, PI * 2, 22)),
+    st('ink', 'thin', seg([.18, .59], [.18, .72], 6)),
+    st('ink', 'thin', poly([[.15, .83], [.18, .72], [.22, .83]], 5)),
+    st('ink', 'thin', poly([[.14, .67], [.18, .63], [.245, .66]], 4)),
+    st('gold', 'thick', poly([[.235, .665], [.27, .665], [.27, .72], [.235, .72], [.235, .665]], 3)),
+    st('gold', 'thin', arc(.2525, .69, .06, .06, 0, PI * 2, 20)),
+    st('ink', 'thick', poly([[.24, .85], [.45, .88], [.62, .86]], 8)),
+    st('ink', 'thick', [...arc(.70, .30, .075, .085, PI * .55, PI * 2.45, 22)]),
+    st('ink', 'thick', poly([[.67, .38], [.63, .62], [.62, .86]], 8)),
+    st('ink', 'thick', poly([[.73, .38], [.77, .62], [.78, .86]], 8)),
+    st('ink', 'thick', poly([[.65, .44], [.52, .52], [.47, .49]], 6)),
+    st('ink', 'thin', poly([[.47, .49], [.44, .46], [.47, .49], [.44, .5], [.47, .49], [.455, .53]], 2)),
+    st('red', 'thick', seg([.3, .16], [.62, .16], 12)),
+    st('red', 'thick', poly([[.57, .11], [.62, .16], [.57, .21]], 4))
+  ];
+}
+function sketchStair() {
+  const pts = [[.1, .92]]; for (let i = 0; i < 8; i++) { const [x, y] = pts[pts.length - 1]; pts.push([x, y - .075], [x + .085, y - .075]); }
+  const smoke = Array.from({ length: 22 }, (_, i) => [.82 + Math.sin(i * .7) * .02 + jit(), .19 - i * .007]);
+  return [
+    st('ink', 'thick', poly(pts, 3)),
+    st('ink', 'thin', seg([.1, .92], [.9, .92], 16)),
+    st('gold', 'thick', poly([[.785, .24], [.855, .24], [.855, .33], [.785, .33], [.785, .24]], 3)),
+    st('gold', 'thin', arc(.82, .24, .025, .03, PI, PI * 2, 10)),
+    st('ink', 'thin', smoke),
+    st('gold', 'thin', [...arc(.2, .2, .065, .065, -PI * .55, PI * .55, 14), ...arc(.24, .2, .05, .055, PI * .5, -PI * .5, 12).slice(1)]),
+    st('ink', 'thin', arc(.06, .78, .03, .034, 0, PI * 2, 18)),
+    st('ink', 'thin', seg([.06, .815], [.06, .87], 4)),
+    st('ink', 'thin', poly([[.04, .91], [.06, .87], [.08, .91]], 3)),
+    st('red', 'thin', poly([[.075, .76], [.11, .72]], 2))
+  ];
+}
+
+// ── Canvas painting (smoothed through midpoints) ─────
+function paint(g, strokes, size) {
+  g.clearRect(0, 0, size, size); g.lineCap = 'round'; g.lineJoin = 'round';
+  strokes.forEach((s) => {
+    const p = s.pts; if (!p.length) return;
+    g.strokeStyle = g.fillStyle = COLS[s.c]; g.lineWidth = s.w * size;
+    if (p.length === 1) { g.beginPath(); g.arc(p[0][0] * size, p[0][1] * size, s.w * size * .6, 0, PI * 2); g.fill(); return; }
+    g.beginPath(); g.moveTo(p[0][0] * size, p[0][1] * size);
+    for (let i = 1; i < p.length - 1; i++) { const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2; g.quadraticCurveTo(p[i][0] * size, p[i][1] * size, mx * size, my * size); }
+    const l = p[p.length - 1]; g.lineTo(l[0] * size, l[1] * size); g.stroke();
+  });
+}
+// Ramer–Douglas–Peucker, as the room would before sending
+function rdp(pts, eps) {
+  if (pts.length < 3) return pts;
+  const [a, b] = [pts[0], pts[pts.length - 1]], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1e-9;
+  let max = 0, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) { const d = Math.abs(dy * pts[i][0] - dx * pts[i][1] + b[0] * a[1] - b[1] * a[0]) / L; if (d > max) { max = d; idx = i; } }
+  return max > eps ? rdp(pts.slice(0, idx + 1), eps).slice(0, -1).concat(rdp(pts.slice(idx), eps)) : [a, b];
+}
+
+// ── State ────────────────────────────────────────────
+let S;
+function fresh() {
+  S = { i: 0, token: 0, phase: 'idle', roleOver: {}, gallery: [], players: Object.fromEntries(GM.class.map((c) => [c, { pts: 0, prev: 0 }])), times: [], drawers: [], guessN: [], voided: [] };
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Pictionary</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW. Round 1 you guess (try a near miss like “fallacy” first), round 2 you draw on the phone and the class guesses from your drawing, round 3 you guess a quote. Switch with <b>Phone guesses / Phone draws</b> at any time (it restarts the round). Use the board buttons as the teacher. The other 23 students are simulated.',
+  onRestart: () => { fresh(); startRound(); }
+});
+const roleSeg = GM.h('<span class="mk-seg" data-seg="role"><button data-r="guess" aria-pressed="true">Phone guesses</button><button data-r="draw">Phone draws</button></span>');
+GM.$('.mk-bar [data-seg="view"]').after(roleSeg);
+roleSeg.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (S.phase === 'end') { GM.toast(phone, 'Game over: press Restart to play again'); return; }
+  S.roleOver[S.i] = b.dataset.r; startRound();
+});
+const boardTop = GM.$('.board-top', board);
+boardTop.insertAdjacentHTML('beforeend', '<span class="pc-galbadge"><span class="ic"><svg width="26" height="26" viewBox="0 0 26 26"><path d="M4 19c3-6 6-9 9-5s5 2 9-4" fill="none" stroke="#13233a" stroke-width="2.4" stroke-linecap="round"/></svg></span>Gallery <b class="galn">0</b></span>');
+
+const R = () => ROUNDS[S.i];
+const ord = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const role = () => S.roleOver[S.i] || R().role;
+const drawer = () => (role() === 'draw' ? GM.me : R().simDrawer);
+const guessers = () => GM.class.filter((c) => c !== drawer());
+const elapsed = () => Math.max(0, (performance.now() - S.t0) / 1000);
+
+// ── Board ────────────────────────────────────────────
+const B = { strokes: [], map: new Map(), raf: 0, g: null };
+function clearStage() { board.querySelectorAll('.stage-x').forEach((n) => n.remove()); }
+function blanksHtml(word, shown, tag = 'i') { let k = -1; return [...word].map((ch) => { if (ch === ' ') return `<${tag} class="gap"></${tag}>`; k++; return shown.includes(k) || S.phase === 'reveal' ? `<${tag} class="shown">${ch.toUpperCase()}</${tag}>` : `<${tag}></${tag}>`; }).join(''); }
+function hintBlanks() { return blanksHtml(R().blanks, S.hinted ? R().reveal.map((ix) => ix - (R().blanks.slice(0, ix).split(' ').length - 1)) : []); }
+function boardRound() {
+  clearStage();
+  const d = drawer(), r = R();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x pc-eyebrow"><b>Round ${S.i + 1} of ${ROUNDS.length}</b>${d === GM.me ? 'JW is drawing (that’s you)' : `${d} is drawing`} · guesses stay secret</div>
+    <div class="stage-x pc-paper"><span class="pc-live"><span class="b-avatar" style="${GM.avatarStyle(d)}">${d}</span>${d} drawing<span class="dot"></span></span><canvas width="800" height="800"></canvas></div>
+    <div class="stage-x pc-side">
+      <div class="pc-hint"><span class="kind">${r.quote ? 'Quote · guess the two key words' : `${r.kind} · ${r.blanks.split(' ').length} word${r.blanks.includes(' ') ? 's' : ''}`}</span><div class="pc-blanks">${hintBlanks()}</div><span class="why">${r.quote ? 'A line from The Lantern House' : 'First letters appear at 40 s'}</span></div>
+      <div class="pc-ring"></div>
+      <div class="pc-got"><div class="pc-got-head"><h3>Got it</h3><span class="g"><span class="gn">0</span> guesses so far</span><span class="n"><span class="gotn">0</span><small> / ${guessers().length}</small></span></div>
+        <div class="pc-chips"><p class="pc-empty">Nobody yet. Only right answers appear here, never the guesses.</p></div></div>
+    </div>`);
+  setControls('<button class="bctl" data-a="dq">Disqualify drawing</button><button class="bctl" data-a="time">+15 s</button><button class="bctl primary" data-a="end">End round</button>');
+  B.g = board.querySelector('.pc-paper canvas').getContext('2d'); B.strokes = []; B.map = new Map(); paintBoard();
+  const paper = board.querySelector('.pc-paper'), side = board.querySelector('.pc-side');
+  if (!GM.calm()) {
+    paper.animate([{ opacity: 0, transform: 'translateY(40px) rotate(-1.5deg) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+    side.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+  }
+  startRing(ROUND_S);
+}
+function startRing(sec) {
+  S.ring && S.ring.stop();
+  S.endAt = performance.now() + sec * 1000;
+  S.ring = GM.ring(board.querySelector('.pc-ring'), sec, { onEnd: () => endRound('time'), bar: () => phone.querySelector('.ph-timer i') });
+}
+function paintBoard() { if (B.raf) return; B.raf = requestAnimationFrame(() => { B.raf = 0; B.g && paint(B.g, B.strokes, 800); }); }
+
+// The room: phone → board messages, with a little network latency
+const room = { send(msg) { const tok = S.token; setTimeout(() => { if (tok === S.token) onBoardMsg(msg); }, 60); } };
+function onBoardMsg(m) {
+  if (m.t === 'stroke') { let s = B.map.get(m.id); if (!s) { s = { c: m.c, w: m.w, pts: [] }; B.map.set(m.id, s); B.strokes.push(s); } s.pts = m.pts; }
+  if (m.t === 'undo') { const s = B.strokes.pop(); for (const [k, v] of B.map) if (v === s) B.map.delete(k); }
+  if (m.t === 'clear') { B.strokes = []; B.map.clear(); const cv = board.querySelector('.pc-paper canvas'); cv && !GM.calm() && cv.animate([{ opacity: .2 }, { opacity: 1 }], { duration: 300 }); }
+  paintBoard();
+}
+
+// Simulated drawer: strokes appear point by point, like a real hand
+async function playSketch(tok) {
+  const strokes = R().sketch();
+  await GM.sleep(900);
+  for (const s of strokes) {
+    if (tok !== S.token || S.phase !== 'play') return;
+    const live = { c: s.c, w: s.w, pts: [] }; B.strokes.push(live);
+    if (GM.calm()) { live.pts = s.pts; paintBoard(); S.drawStrokes++; await new Promise((r) => setTimeout(r, 650)); continue; }
+    for (let k = 0; k < s.pts.length; k += 2) {
+      if (tok !== S.token || S.phase !== 'play') return;
+      live.pts = s.pts.slice(0, k + 2); paintBoard();
+      await new Promise((r) => setTimeout(r, 34));
+    }
+    live.pts = s.pts; paintBoard(); S.drawStrokes++;
+    await new Promise((r) => setTimeout(r, 380 + GM.rand() * 500));
+  }
+}
+
+// Simulated guessers
+function planGuessers() {
+  S.plan = {};
+  const pool = guessers().filter((c) => c !== GM.me);
+  const hard = S.i === 1 ? 1.25 : S.i === 2 ? 1.1 : 1;
+  pool.forEach((c) => { S.plan[c] = GM.rand() < (S.i === 1 ? .72 : .84) ? (6 + Math.pow(GM.rand(), 1.5) * 52) * hard : null; S.guessN[S.i][c] = 1 + Math.floor(GM.rand() * 4); });
+}
+function simTick() {
+  if (S.phase !== 'play') return;
+  const t = elapsed();
+  if (GM.rand() < (role() === "guess" ? .22 : .7)) bumpGuesses(1);
+  if (role() === 'guess') {
+    Object.entries(S.plan).forEach(([c, at]) => { if (at != null && at <= t && S.times[S.i][c] == null) gotIt(c, Math.round(at)); });
+  } else {
+    // the class can only get it from what you have drawn
+    const left = guessers().filter((c) => S.times[S.i][c] == null && S.plan[c] != null);
+    if (left.length && GM.rand() < Math.min(.8, B.strokes.length * .09)) gotIt(GM.pick(left), Math.round(t));
+  }
+}
+function bumpGuesses(n) { S.guessTotal += n; const el = board.querySelector('.gn'); if (el) el.textContent = S.guessTotal; }
+function gotIt(c, sec) {
+  if (S.times[S.i][c] != null || S.phase !== 'play') return;
+  S.times[S.i][c] = sec; S.order.push(c); bumpGuesses(1);
+  const p = S.players[c], gain = Math.max(40, Math.round((200 - sec * 2.4) / 10) * 10); p.pts += gain; p.lastGain = gain;
+  const box = board.querySelector('.pc-chips'); box.querySelector('.pc-empty')?.remove();
+  const chip = GM.h(`<div class="pc-chip ${S.order.length <= 3 ? 'm1' : ''} ${c === GM.me ? 'me' : ''}"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${c}<span class="t">${sec} s</span></div>`);
+  box.appendChild(chip);
+  if (!GM.calm()) chip.animate([{ opacity: 0, transform: 'translateY(26px) scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  const n = S.order.length, el = board.querySelector('.gotn');
+  if (el) { GM.countUp(el, n - 1, n, 300); el.animate?.([{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 360 }); }
+  c === GM.me ? GM.sound.ding() : GM.sound.coin();
+  // drawer earns for every guesser who gets it
+  S.players[drawer()].pts += 20;
+  phone.querySelectorAll('.gotn-ph').forEach((x) => x.textContent = n);
+  if (role() === 'draw' && n % 4 === 1) GM.toast(phone, `${c} got it from your drawing<small>+20 for you</small>`, 'good');
+  if (n === guessers().length) setTimeout(() => endRound('all'), 700);
+}
+
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+function btoast(text) { board.querySelector('.pc-btoast')?.remove(); const t = GM.h(`<div class="stage-x pc-btoast">${text}</div>`); board.appendChild(t); if (!GM.calm()) t.animate([{ opacity: 0, transform: 'translate(-50%, 30px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: 400, easing: 'cubic-bezier(.22,1,.36,1)' }); setTimeout(() => t.remove(), 2400); }
+
+// ── Round flow ───────────────────────────────────────
+function startRound() {
+  S.token++; clearInterval(S.sim); clearTimeout(S.hintT); clearInterval(S.flushT); S.ring && S.ring.stop();
+  GM.$$('button', roleSeg).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.r === role())));
+  GM.class.forEach((c) => { const p = S.players[c]; if (p.roundStart != null && S.roundIdx === S.i) p.pts = p.roundStart; p.roundStart = p.pts; p.prev = p.pts; });
+  S.roundIdx = S.i;
+  S.phase = 'play'; S.t0 = performance.now(); S.hinted = false; S.order = []; S.guessTotal = 0; S.drawStrokes = 0;
+  S.times[S.i] = {}; S.guessN[S.i] = {}; S.drawers[S.i] = drawer(); S.voided[S.i] = false;
+  S.me = { guesses: [], got: false };
+  S.gallery = S.gallery.filter((x) => x.r !== S.i); const gn = board.querySelector('.galn'); if (gn) gn.textContent = S.gallery.filter((x) => !x.void).length;
+  P.strokes = []; P.cur = null;
+  boardRound(); planGuessers();
+  S.sim = setInterval(simTick, role() === 'guess' ? 250 : 1100);
+  S.hintT = setTimeout(() => { S.hinted = true; const b = board.querySelector('.pc-blanks'); if (b) { b.innerHTML = hintBlanks(); b.querySelectorAll('.shown').forEach((n) => !GM.calm() && n.animate([{ transform: 'translateY(-20px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.34,1.56,.64,1)' })); } GM.sound.ding(); updatePhoneBlanks(); }, 40000);
+  renderPhone(role() === 'draw' ? 'draw' : 'guess');
+  if (role() === 'guess') playSketch(S.token);
+  else S.flushT = setInterval(flush, 50);
+}
+
+async function endRound(why) {
+  if (S.phase !== 'play') return;
+  S.phase = 'reveal'; clearInterval(S.sim); clearTimeout(S.hintT); clearInterval(S.flushT); S.ring && S.ring.stop();
+  if (P.cur) { P.cur = null; }
+  const r = R(), paper = board.querySelector('.pc-paper'), d = drawer();
+  board.querySelector('.pc-live .dot')?.remove(); const rg = board.querySelector('.pc-ring'); if (rg) rg.style.cssText = 'opacity:.3;transition:opacity .4s';
+  setControls('');
+  if (why === 'void') {
+    S.voided[S.i] = true;
+    GM.class.forEach((c) => S.players[c].pts = S.players[c].roundStart);
+    const stamp = GM.h('<div class="pc-void">Disqualified<small>Letters in the drawing · round void, no points</small></div>');
+    paper.appendChild(stamp); GM.sound.buzz();
+    const gp = board.querySelector('.pc-got'); if (gp) { gp.style.transition = 'opacity .4s'; gp.style.opacity = '.35'; }
+    const wy = board.querySelector('.pc-hint .why'); if (wy) wy.textContent = 'No points this round';
+    if (!GM.calm()) stamp.animate([{ transform: 'translate(-50%, -50%) rotate(-9deg) scale(2.2)', opacity: 0 }, { transform: 'translate(-50%, -50%) rotate(-9deg) scale(1)', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.5,0,.75,0)' });
+    S.gallery.push({ void: true, r: S.i, d });
+    renderPhone('void');
+    setControls(`<button class="bctl primary" data-a="${S.i === ROUNDS.length - 1 ? 'final' : 'next'}">${S.i === ROUNDS.length - 1 ? 'Final scores' : 'Next round'}</button>`);
+    return;
+  }
+  // reveal the answer
+  const ans = GM.h(`<div class="pc-answer ${r.quote ? 'quote' : ''}"><span>${why === 'all' ? 'Everyone got it · it was' : 'It was'}</span><b>${r.quote ? r.answer : r.answer[0].toUpperCase() + r.answer.slice(1)}</b></div>`);
+  paper.appendChild(ans); GM.sound.reveal();
+  if (!GM.calm()) ans.animate([{ transform: 'translateY(60px) scale(.9)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 650, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  const b = board.querySelector('.pc-blanks'); if (b) b.innerHTML = blanksHtml(r.blanks, []);
+  const wy = board.querySelector('.pc-hint .why'); if (wy) wy.textContent = r.quote ? 'Key words of the quote' : 'Answer revealed';
+  // summary panel
+  const got = S.order.length, of = guessers().length, drewPts = got * 20;
+  const fast = S.order.slice(0, 3);
+  const panel = board.querySelector('.pc-got');
+  panel.style.gridTemplateRows = 'auto';
+  panel.innerHTML = `<div class="pc-sum">
+    <div class="drew"><span class="b-avatar" style="${GM.avatarStyle(d)}">${d}</span><span>${d === GM.me ? 'You drew it' : `${d} drew it`}<small>${got} of ${of} got it from the drawing</small></span><span class="pts">+<span class="dp">0</span></span></div>
+    <h4>Fastest</h4>
+    <div class="pc-fast">${fast.length ? fast.map((c) => `<div><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span><span>${c}</span><span>${S.times[S.i][c]} s</span></div>`).join('') : '<p class="pc-empty" style="padding-top:20px">Nobody got this one. A hard prompt: worth a second look in class.</p>'}</div>
+  </div>`;
+  GM.countUp(panel.querySelector('.dp'), 0, drewPts, 900);
+  panel.querySelectorAll('.pc-fast > div').forEach((n, k) => !GM.calm() && n.animate([{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 300 + k * 150, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  renderPhone(role() === 'draw' ? 'drawdone' : 'reveal');
+  await GM.sleep(1300);
+  await saveToGallery(d, got, of);
+  setControls(`<button class="bctl primary" data-a="lb">${S.i === ROUNDS.length - 1 ? 'Final scores' : 'Leaderboard'}</button>`);
+}
+
+async function saveToGallery(d, got, of) {
+  const off = document.createElement('canvas'); off.width = off.height = 800;
+  const g = off.getContext('2d'); g.fillStyle = '#fbf8f2'; g.fillRect(0, 0, 800, 800);
+  const tmp = document.createElement('canvas'); tmp.width = tmp.height = 800; paint(tmp.getContext('2d'), B.strokes, 800); g.drawImage(tmp, 0, 0);
+  const src = off.toDataURL('image/png');
+  const fast = S.order[0];
+  S.gallery.push({ src, r: S.i, d, got, of, fast: fast ? S.times[S.i][fast] : null });
+  const badge = board.querySelector('.pc-galbadge'), bs = board.getBoundingClientRect(), k = bs.width / 1920, br = badge.getBoundingClientRect();
+  const to = { x: (br.left - bs.left) / k + 14, y: (br.top - bs.top) / k + 10 };
+  const fly = GM.h(`<img class="pc-fly" alt="" src="${src}">`); board.appendChild(fly);
+  GM.sound.whoosh();
+  await GM.flyTo(fly, { x: 120, y: 176 }, to, { duration: 900, scale: 40 / 800 });
+  fly.remove();
+  const n = board.querySelector('.galn'); n.textContent = S.gallery.filter((x) => !x.void).length;
+  if (!GM.calm()) badge.animate([{ transform: 'scale(1.15)' }, { transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  btoast('Saved to the gallery');
+}
+
+function leaderboard() {
+  clearStage();
+  const rows = GM.class.map((c) => ({ c, ...S.players[c] }));
+  const before = rows.slice().sort((a, b) => b.prev - a.prev || a.c.localeCompare(b.c)).slice(0, 5);
+  const after = rows.slice().sort((a, b) => b.pts - a.pts || a.c.localeCompare(b.c));
+  if (S.i === ROUNDS.length - 1) return podium(after);
+  const topFive = after.slice(0, 5);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pc-lb"><h2>Top five</h2><div class="lb"></div></div>`);
+  setControls('<button class="bctl primary" data-a="next">Next round</button>');
+  const lb = board.querySelector('.lb');
+  const row = (r, i) => `<div class="lb-row ${i === 0 ? 'first' : ''}" data-c="${r.c}"><span class="rank">${i + 1}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}${r.c === drawer() ? ' <span style="font-size:22px;color:var(--stage-muted);font-weight:500">· drew</span>' : ''}</span><span class="pts">${r.prev}</span></div>`;
+  lb.innerHTML = before.map(row).join('');
+  setTimeout(() => {
+    GM.flip(lb, () => { lb.innerHTML = topFive.map(row).join(''); });
+    lb.querySelectorAll('.lb-row').forEach((n) => { const p = S.players[n.dataset.c]; GM.countUp(n.querySelector('.pts'), p.prev, p.pts, 900); const o = before.findIndex((b) => b.c === n.dataset.c), nw = topFive.findIndex((b) => b.c === n.dataset.c); if (S.i > 0 && (o === -1 || nw < o)) n.querySelector('.pts').insertAdjacentHTML('afterend', '<span class="move">▲</span>'); });
+    GM.sound.whoosh();
+  }, GM.calm() ? 50 : 700);
+  renderPhone('board');
+}
+
+function classLine() {
+  const played = ROUNDS.map((r, i) => ({ r, i, got: Object.keys(S.times[i] || {}).length, of: GM.class.length - 1 })).filter((x) => S.times[x.i] && !S.voided[x.i]);
+  const hard = played.slice().sort((a, b) => a.got - b.got)[0];
+  return hard ? `Class guessed ${Math.round(played.reduce((a, x) => a + x.got / x.of, 0) / played.length * 100)}% of drawings · hardest: <b style="color:var(--stage-ink)">${hard.r.quote ? 'the thirteenth-stair quote' : hard.r.answer}</b> (${hard.got} of ${hard.of})` : 'Every round was void';
+}
+function podium(sorted) {
+  S.phase = 'end';
+  const [a, b, c] = sorted;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pc-podhead"><span class="b-eyebrow">Final scores</span><div style="font-size:30px;color:var(--stage-muted)">${classLine()}</div></div>
+    <div class="stage-x podium pc-pod">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${r.pts} pts</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="insight">Teacher: guess speed</button><button class="bctl primary" data-a="gallery">Our drawings</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  renderPhone('final');
+}
+
+function gallery() {
+  clearStage();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pc-gallery"><h2>Our drawings</h2><p>Saved with their prompts. Add one to a lesson, or bring them back next week.</p>
+    <div class="pc-frames">${S.gallery.map((x, k) => { const r = ROUNDS[x.r]; return x.void ? `<div class="pc-frame void"><div class="pic">Round void</div><div class="cap"><span class="b-avatar" style="${GM.avatarStyle(x.d)}">${x.d}</span><span><b>${r.quote ? 'The thirteenth stair' : cap(r.answer)}</b><span>Disqualified: not saved</span></span></div></div>` : `<div class="pc-frame" style="--tilt:${[-1.6, 1.2, -.8][k % 3]}deg"><div class="pic"><img alt="Drawing of ${r.answer.replace(/[“”]/g, '')}" src="${x.src}"><span class="tape"></span></div><div class="cap"><span class="b-avatar" style="${GM.avatarStyle(x.d)}">${x.d}</span><span><b class="${r.quote ? 'q' : ''}">${r.quote ? 'The thirteenth stair' : r.answer[0].toUpperCase() + r.answer.slice(1)}</b><span>${x.got} of ${x.of} got it${x.fast != null ? ` · fastest ${x.fast} s` : ''}</span></span></div></div>`; }).join('')}</div></div>`);
+  board.querySelectorAll('.pc-frame').forEach((f, k) => !GM.calm() && f.animate([{ opacity: 0, transform: 'translateY(60px) rotate(4deg) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 750, delay: k * 160, easing: 'cubic-bezier(.34,1.3,.64,1)', fill: 'backwards' }));
+  GM.sound.whoosh();
+  setControls('<button class="bctl" data-a="podium">Podium</button><button class="bctl" data-a="insight">Teacher: guess speed</button><button class="bctl primary" data-a="addlesson">Add one to a lesson</button>');
+}
+
+function insight() {
+  clearStage();
+  const played = ROUNDS.map((r, i) => i).filter((i) => S.times[i]);
+  const all = GM.class.map((c) => {
+    const cells = ROUNDS.map((_, i) => { if (!S.times[i]) return { k: 'na' }; if (S.voided[i]) return { k: 'void' }; if (S.drawers[i] === c) return { k: 'drew', n: Object.keys(S.times[i]).length }; const t = S.times[i][c]; return t == null ? { k: 'miss' } : { k: 'got', t }; });
+    const ts = cells.filter((x) => x.k === 'got').map((x) => x.t);
+    const guessesN = played.reduce((a, i) => a + (S.guessN[i][c] || 0), 0);
+    return { c, cells, avg: ts.length ? ts.reduce((a, b) => a + b, 0) / ts.length : 999, got: ts.length, guessesN };
+  }).sort((a, b) => b.got - a.got || a.avg - b.avg);
+  const heat = (t) => { const k = Math.max(0, Math.min(1, 1 - (t - 5) / 50)); return `background:rgba(63,174,115,${.16 + k * .62})`; };
+  const head = `<span class="hd">Student</span>${['Pathetic fallacy', 'Foreshadowing', 'Stair quote'].map((l) => `<span class="hd">${l}</span>`).join('')}<span class="hd">Guesses</span>`;
+  const rowHtml = (s) => `<span class="who"><span style="display:flex;align-items:center;gap:10px"><span class="b-avatar" style="width:38px;height:38px;font-size:15px;${GM.avatarStyle(s.c)}">${s.c}</span>${s.c}</span></span>${s.cells.map((x) => x.k === 'got' ? `<span style="${heat(x.t)}">${x.t} s</span>` : x.k === 'miss' ? '<span class="miss">—</span>' : x.k === 'drew' ? `<span class="drew">drew · ${x.n}</span>` : x.k === 'void' ? '<span class="drew">void</span>' : '<span class="n">·</span>').join('')}<span class="n">${s.guessesN}</span>`;
+  const meds = played.filter((i) => !S.voided[i]).map((i) => { const v = Object.values(S.times[i]).sort((a, b) => a - b); return { i, med: v.length ? v[Math.floor(v.length / 2)] : null, n: v.length }; });
+  const slow = meds.filter((m) => m.med != null).sort((a, b) => b.med - a.med)[0];
+  const neverGot = all.filter((s) => s.cells.some((x) => x.k === 'miss')).length;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x pc-ins"><span class="b-eyebrow">Teacher only · not for the projector</span><h2>Guess speed per student per prompt</h2>
+    <p class="line">${slow ? `Slowest prompt: <b>${ROUNDS[slow.i].quote ? 'the stair quote' : ROUNDS[slow.i].answer}</b> (median ${slow.med} s)` : ''} · drawers: ${played.map((i) => `<b>${S.drawers[i]}</b> ${S.voided[i] ? 'void' : `${Object.keys(S.times[i]).length}/${GM.class.length - 1}`}`).join(', ')} · ${neverGot} students missed at least one</p>
+    <div class="pc-tabs"><div class="pc-tab">${head}${all.slice(0, 12).map(rowHtml).join('')}</div><div class="pc-tab">${head}${all.slice(12).map(rowHtml).join('')}</div></div>
+    <div class="pc-key"><span><i style="background:rgba(63,174,115,.78)"></i>Fast</span><span><i style="background:rgba(63,174,115,.2)"></i>Slow</span><span><i style="background:rgba(212,84,79,.3)"></i>Missed</span><span>Board view for the class shows the drawings, never this table.</span></div></div>`);
+  setControls('<button class="bctl" data-a="gallery">Our drawings</button><button class="bctl primary" data-a="restart">Play again</button>');
+}
+
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'end') endRound('time');
+  if (a === 'dq') endRound('void');
+  if (a === 'time') { const left = Math.max(0, (S.endAt - performance.now()) / 1000); startRing(Math.round(left) + 15); btoast('+15 seconds'); }
+  if (a === 'lb') leaderboard();
+  if (a === 'final') { GM.class.forEach((c) => S.players[c].prev = S.players[c].pts); leaderboard(); }
+  if (a === 'next') { S.i++; startRound(); }
+  if (a === 'gallery') gallery();
+  if (a === 'insight') insight();
+  if (a === 'podium') { clearStage(); podium(GM.class.map((c) => ({ c, ...S.players[c] })).sort((x, y) => y.pts - x.pts || x.c.localeCompare(y.c))); }
+  if (a === 'addlesson') btoast('Pick a drawing, then a lesson (in the real build)');
+  if (a === 'restart') { fresh(); board.querySelector('.galn').textContent = '0'; startRound(); }
+});
+
+// ── Phone ────────────────────────────────────────────
+const P = { strokes: [], cur: null, c: 'ink', w: 'thin', id: 0, dirty: false, g: null };
+function phoneShell(body, dock = '', green = false) {
+  phone.classList.toggle('pc-green', green);
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av" style="${GM.avatarStyle(GM.me)}">${GM.me}</span>JW</span><span class="ph-score"><span class="mypts">${S.players[GM.me].pts}</span> pts</span></div>
+    <div class="ph-timer"><i></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock" ${green ? 'style="background:none"' : ''}>${dock}</div>` : ''}`;
+}
+function phoneBlanks() { const r = R(); return blanksHtml(r.blanks, S.hinted ? r.reveal.map((ix) => ix - (r.blanks.slice(0, ix).split(' ').length - 1)) : []); }
+function updatePhoneBlanks() { const b = phone.querySelector('.pc-pblanks'); if (b) b.innerHTML = phoneBlanks(); }
+function histHtml() {
+  return S.me.guesses.slice().reverse().map((g) => `<div class="${g.v === 'close' ? 'close' : 'no'}"><span>${g.text.replace(/</g, '&lt;')}</span><em>${g.v === 'close' ? 'Close!' : 'Not it'}</em></div>`).join('');
+}
+function renderPhone(mode) {
+  const r = R(), d = drawer();
+  if (mode === 'guess') {
+    phoneShell(`<div class="pc-role"><span class="av" style="${GM.avatarStyle(d)}">${d}</span><span><b>${d}</b> is drawing. Watch the board.</span></div>
+      <p class="ph-h">${r.quote ? 'Which line from the novella is it?' : 'What term is being drawn?'}</p>
+      <div class="pc-pblanks" aria-label="Letter blanks">${phoneBlanks()}</div>
+      <p class="ph-sub" style="font-size:14px">${r.quote ? 'Type the key words of the quote.' : 'Type as many guesses as you like. Only you see them.'}</p>
+      <div class="pc-hist"></div>`,
+      `<form class="pc-guessrow" autocomplete="off"><input class="pinput" name="g" placeholder="Your guess" aria-label="Your guess" enterkeyhint="send"><button class="pbtn cta orange" type="submit">Guess</button></form>`);
+    phone.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); const inp = e.target.g; myGuess(inp.value); inp.value = ''; inp.focus({ preventScroll: true }); });
+  }
+  if (mode === 'got') {
+    const t = S.times[S.i][GM.me];
+    phoneShell(`<div class="pc-gotit"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="rgba(255,255,255,.18)"/><path class="tk" d="M36 62l16 16 32-36" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${GM.calm() ? 0 : 1}"/></svg>
+      <span class="big">Got it!</span><span class="pts">+${S.players[GM.me].lastGain}</span><span class="ans">${cap(r.answer)}</span><span class="sub">${t} s · ${S.me.guesses.length + 1} guess${S.me.guesses.length ? 'es' : ''} · hidden from everyone else</span></div>
+      <div class="pc-watch">Keep watching: <b class="gotn-ph">${S.order.length}</b> of ${guessers().length} got it</div>`, '', true);
+    const tk = phone.querySelector('.tk'); if (tk && !GM.calm()) tk.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 500, delay: 150, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+    const sv = phone.querySelector('.pc-gotit svg'); if (sv && !GM.calm()) sv.animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  }
+  if (mode === 'draw') {
+    phoneShell(`<div class="pc-prompt"><span>Draw this · only you can see it</span><b class="${r.quote ? 'q' : ''}">${r.quote ? r.answer : r.answer[0].toUpperCase() + r.answer.slice(1)}</b><small>Pictures only: no letters or numbers.</small></div>
+      <div class="pc-pad"><canvas aria-label="Drawing pad"></canvas><span class="hint">Draw with your finger</span></div>
+      <div class="pc-tools" role="toolbar" aria-label="Pen">${Object.entries(COLS).map(([k, v]) => `<button class="sw" data-col="${k}" aria-label="${k === 'ink' ? 'Black' : k[0].toUpperCase() + k.slice(1)} pen" aria-pressed="${P.c === k}"><i style="background:${v}"></i></button>`).join('')}<span class="sep"></span><button class="wd" data-w="thin" aria-label="Thin pen" aria-pressed="${P.w === 'thin'}"><i style="width:6px;height:6px"></i></button><button class="wd" data-w="thick" aria-label="Thick pen" aria-pressed="${P.w === 'thick'}"><i style="width:16px;height:16px"></i></button></div>
+      <div class="pc-count"><b class="gotn-ph">${S.order.length}</b> of ${guessers().length} got it so far</div>`,
+      `<div class="pc-two"><button class="pbtn" data-p="undo">Undo</button><button class="pbtn" data-p="clear">Clear</button></div>`);
+    bindPad(phone.querySelector('.pc-pad canvas'));
+  }
+  if (mode === 'drawdone') {
+    const got = S.order.length;
+    phoneShell(`<div class="pc-wait"><span>Round over</span><div class="big" style="color:var(--success)">+${got * 20}</div><span class="ans">${got} of ${guessers().length} got it from your drawing</span><div class="pc-mini" style="margin:8px auto 0"><canvas width="240" height="240"></canvas></div></div>
+      <div class="pc-break"><div><span>Points per guesser</span><b>20</b></div><div><span>First to get it</span><b>${S.order[0] ? `${S.order[0]} · ${S.times[S.i][S.order[0]]} s` : 'nobody'}</b></div><div><span>Saved to the class gallery</span><b>Yes</b></div></div>`);
+    paint(phone.querySelector('.pc-mini canvas').getContext('2d'), P.strokes, 240);
+  }
+  if (mode === 'reveal') {
+    if (S.me.got) { GM.$('.pc-watch', phone) && (GM.$('.pc-watch', phone).innerHTML = `Round over: <b>${S.order.length}</b> of ${guessers().length} got it`); return; }
+    phoneShell(`<div class="pc-wait"><span>Round over · it was</span><span class="ans" style="font-size:26px;${r.quote ? 'font-family:Fraunces,Georgia,serif;font-style:italic' : ''}">${cap(r.answer)}</span><p class="ph-sub">${S.me.guesses.some((g) => g.v === 'close') ? 'You were close. Next one.' : 'No points this round.'}</p></div>
+      ${S.me.guesses.length ? `<div class="pc-break"><div><span>Your guesses</span><b>${S.me.guesses.length}</b></div><div><span>Closest</span><b>${(S.me.guesses.find((g) => g.v === 'close') || S.me.guesses[S.me.guesses.length - 1]).text.replace(/</g, '&lt;')}</b></div></div>` : ''}`);
+  }
+  if (mode === 'void') {
+    phoneShell(`<div class="pc-wait"><span>Round void</span><div class="big" style="color:var(--danger);font-size:40px">Disqualified</div><p class="ph-sub">${d === GM.me ? 'The teacher saw letters in your drawing. Pictures only next time.' : 'The drawing had letters in it. No points this round.'}</p></div>`);
+  }
+  if (mode === 'board') {
+    const me = S.players[GM.me], rank = GM.class.map((c) => S.players[c].pts).sort((a, b) => b - a).indexOf(me.pts) + 1;
+    phoneShell(`<div class="pc-wait"><span>Leaderboard on the board</span><div class="big">${ord(rank)}</div><p class="ph-sub">${me.pts} points · ${S.i + 1 < ROUNDS.length ? `next: round ${S.i + 2}` : ''}</p></div>`);
+  }
+  if (mode === 'final') {
+    const me = S.players[GM.me], rank = GM.class.map((c) => S.players[c].pts).sort((a, b) => b - a).indexOf(me.pts) + 1;
+    const mine = ROUNDS.map((_, i) => i).filter((i) => S.times[i] && S.drawers[i] !== GM.me && !S.voided[i]);
+    const gotN = mine.filter((i) => S.times[i][GM.me] != null).length;
+    const ts = mine.map((i) => S.times[i][GM.me]).filter((x) => x != null);
+    const drew = ROUNDS.map((_, i) => i).find((i) => S.drawers[i] === GM.me);
+    phoneShell(`<div class="pc-wait"><span>Final points</span><div class="big">${me.pts}</div><p class="ph-sub">You finished <b>${ord(rank)}</b> of ${GM.class.length}</p></div>
+      <div class="pc-break"><div><span>Drawings you guessed</span><b>${gotN} of ${mine.length}</b></div>${ts.length ? `<div><span>Your fastest</span><b>${Math.min(...ts)} s</b></div>` : ''}${drew != null ? `<div><span>Your drawing</span><b>${S.voided[drew] ? 'void' : `${Object.keys(S.times[drew]).length} got it`}</b></div>` : ''}</div>`);
+  }
+}
+function myGuess(raw) {
+  if (S.phase !== 'play' || S.me.got) return;
+  const g = norm(raw); if (!g) return;
+  const r = R();
+  if (r.right(g)) {
+    S.me.got = true; gotIt(GM.me, Math.max(1, Math.round(elapsed())));
+    S.guessN[S.i][GM.me] = S.me.guesses.length + 1; renderPhone('got');
+    return;
+  }
+  const v = r.close(g) ? 'close' : 'no';
+  S.me.guesses.push({ text: raw.trim().slice(0, 40), v }); S.guessN[S.i][GM.me] = S.me.guesses.length; bumpGuesses(1);
+  const h = phone.querySelector('.pc-hist'); h.innerHTML = histHtml();
+  const first = h.firstElementChild; if (first && !GM.calm()) first.animate([{ opacity: 0, transform: 'translateY(-10px)' }, { opacity: 1, transform: 'none' }], { duration: 300 });
+  if (v === 'close') GM.toast(phone, 'Close!<small>Part of it is right. Keep going.</small>');
+  else phone.querySelector('.pinput')?.classList.add('fx-shake'), setTimeout(() => phone.querySelector('.pinput')?.classList.remove('fx-shake'), 450);
+}
+
+// Drawing pad: pointer events, strokes sent every 50 ms
+function bindPad(cv) {
+  const dpr = Math.min(3, window.devicePixelRatio || 1); cv.width = cv.height = 350 * dpr;
+  P.g = cv.getContext('2d'); P.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))]; };
+  const hint = cv.parentElement.querySelector('.hint');
+  cv.addEventListener('pointerdown', (e) => {
+    if (S.phase !== 'play') return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    P.cur = { id: ++P.id, c: P.c, w: WID[P.w], pts: [pos(e)] }; P.strokes.push(P.cur); P.dirty = true;
+    if (hint) hint.style.opacity = 0;
+    paintPad();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!P.cur) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach((ev) => { const p = pos(ev), l = P.cur.pts[P.cur.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > .003) P.cur.pts.push(p); });
+    P.dirty = true; paintPad();
+  });
+  const up = () => {
+    if (!P.cur) return;
+    P.cur.pts = rdp(P.cur.pts, .0018);
+    room.send({ t: 'stroke', id: P.cur.id, c: P.cur.c, w: P.cur.w, pts: P.cur.pts.slice() });
+    P.cur = null; P.dirty = false; S.drawStrokes++; paintPad();
+  };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('lostpointercapture', up);
+  paintPad();
+}
+function paintPad() { P.g && paint(P.g, P.strokes, 350); }
+function flush() { if (P.cur && P.dirty) { room.send({ t: 'stroke', id: P.cur.id, c: P.cur.c, w: P.cur.w, pts: P.cur.pts.slice() }); P.dirty = false; } }
+
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.col) { P.c = t.dataset.col; phone.querySelectorAll('.sw').forEach((b) => b.setAttribute('aria-pressed', String(b === t))); GM.sound.click(); }
+  if (t.dataset.w) { P.w = t.dataset.w; phone.querySelectorAll('.wd').forEach((b) => b.setAttribute('aria-pressed', String(b === t))); GM.sound.click(); }
+  if (S.phase !== 'play') return;
+  if (t.dataset.p === 'undo' && P.strokes.length) { P.strokes.pop(); paintPad(); room.send({ t: 'undo' }); }
+  if (t.dataset.p === 'clear' && P.strokes.length) { P.strokes = []; paintPad(); room.send({ t: 'clear' }); const h = phone.querySelector('.pc-pad .hint'); if (h) h.style.opacity = 1; }
+});
+// keep the phone score pill in step
+setInterval(() => { const m = phone.querySelector('.mypts'); if (m && S) m.textContent = S.players[GM.me].pts; }, 300);
+
+fresh(); startRound();
+</script>
+</body>
+</html>

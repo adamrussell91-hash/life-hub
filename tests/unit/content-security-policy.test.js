@@ -65,3 +65,11 @@ for (const shell of SHELLS) {
     }
   });
 }
+
+test('Teaching can reach the live game rooms (class.adam-russell.com/g: sockets and the poll fallback)', async () => {
+  const html = await readFile(new URL('apps/teaching/index.html', root), 'utf8');
+  const policy = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)[1];
+  const connect = directives(policy).get('connect-src') ?? [];
+  assert.ok(connect.includes('wss://class.adam-russell.com'), 'live game sockets');
+  assert.ok(connect.includes('https://class.adam-russell.com'), 'live game poll fallback');
+});

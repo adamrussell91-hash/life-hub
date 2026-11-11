@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game lobby — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+.lo-hero { position: absolute; left: 100px; top: 140px; width: 760px; display: grid; gap: 22px; }
+.lo-kind { font-size: 26px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--high-sea); }
+.lo-title { font-size: 92px; font-weight: 700; line-height: 1; letter-spacing: -.03em; margin: 0; }
+.lo-sub { font-size: 30px; color: var(--stage-muted); margin: 0; }
+.lo-join { margin-top: 26px; display: flex; gap: 36px; align-items: center; padding: 30px 34px; border-radius: 32px; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.lo-qr { width: 220px; height: 220px; border-radius: 18px; background: #fff; padding: 14px; display: grid; grid-template-columns: repeat(25, 1fr); }
+.lo-qr i { background: #0a1536; border-radius: 1px; }
+.lo-qr i.o { background: transparent; }
+.lo-code small { display: block; font-size: 24px; color: var(--stage-muted); }
+.lo-code b { display: block; font-size: 92px; line-height: 1.05; letter-spacing: .04em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lo-code span { font-size: 26px; color: var(--stage-ink); font-weight: 600; }
+.lo-count { margin-top: 18px; font-size: 30px; color: var(--stage-muted); }
+.lo-count b { color: var(--stage-ink); font-size: 44px; font-variant-numeric: tabular-nums; }
+
+.lo-teams { position: absolute; left: 920px; right: 64px; top: 130px; bottom: 140px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.lo-team { border-radius: 28px; padding: 22px 18px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; align-content: start; gap: 14px; position: relative; overflow: hidden; }
+.lo-team::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--c); }
+.lo-team h3 { margin: 6px 0 4px; font-size: 23px; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+.lo-team h3 i { width: 18px; height: 18px; border-radius: 50%; background: var(--c); }
+.lo-team h3 small { margin-left: auto; font-size: 22px; color: var(--stage-muted); font-weight: 600; }
+.lo-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lo-chip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 16px; background: var(--stage-card-hi); font-size: 24px; font-weight: 700; cursor: grab; }
+.lo-chip .b-avatar { width: 40px; height: 40px; font-size: 15px; }
+.lo-chip.me { box-shadow: 0 0 0 3px var(--high-sea); }
+.lo-solo { position: absolute; left: 940px; right: 80px; top: 130px; bottom: 140px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 16px; }
+.lo-solo .lo-chip { font-size: 28px; padding: 10px 18px 10px 10px; }
+.lo-solo .lo-chip .b-avatar { width: 52px; height: 52px; font-size: 19px; }
+.lo-mode { position: absolute; left: 100px; bottom: 40px; display: flex; gap: 12px; }
+
+/* phone */
+.lo-codebox { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.lo-codebox input { width: 100%; height: 64px; border: 0; border-radius: 16px; text-align: center; font-size: 28px; font-weight: 700; background: #fff; box-shadow: 0 0 0 1.5px rgba(23,55,94,.18); }
+.lo-codebox input:focus { outline: none; box-shadow: 0 0 0 3px var(--wave); }
+.lo-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.lo-pick button { min-height: 56px; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.12); font-weight: 700; font-size: 17px; }
+.lo-pick button.taken { opacity: .35; text-decoration: line-through; }
+.lo-pick button.sel { box-shadow: 0 0 0 3px var(--navy); }
+.lo-in { flex: 1; display: grid; place-items: center; text-align: center; gap: 14px; }
+.lo-badge { width: 150px; height: 150px; border-radius: 44px; display: grid; place-items: center; font-size: 52px; font-weight: 700; color: #fff; animation: bob 3s ease-in-out infinite; box-shadow: 0 18px 40px rgba(20,35,70,.2); }
+@keyframes bob { 50% { transform: translateY(-10px) rotate(-3deg); } }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+let S;
+const { board, phone } = GM.scaffold({
+  title: '<b>Lobby</b> · shared by every live game',
+  note: '<b>How to use:</b> join on the phone (type 482913, then pick your initials). Classmates arrive on the board as they join. Switch between team and individual games, and press Balance teams to reshuffle. Drag a chip onto another team to move someone.',
+  onRestart: start
+});
+function start() {
+  S = { joined: [], mode: 'teams', teamOf: {}, code: '', me: null };
+  renderBoard(); renderPhone('code'); simulate();
+}
+function qr() {
+  // deterministic pattern with three finder squares: looks like a QR, isn't one
+  let h = ''; for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
+    const f = (a, b) => x >= a && x < a + 7 && y >= b && y < b + 7;
+    let on;
+    if (f(0, 0) || f(18, 0) || f(0, 18)) { const lx = x % 18 === x ? x : x - 18, ly = y % 18 === y ? y : y - 18; const cx = Math.min(lx, 6 - lx), cy = Math.min(ly, 6 - ly); on = Math.min(cx, cy) !== 1; }
+    else on = ((x * 7 + y * 13 + x * y) % 5) < 2;
+    h += `<i class="${on ? '' : 'o'}"></i>`;
+  } return h;
+}
+function renderBoard() {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x lo-hero"><span class="lo-kind">Live game · Jeopardy</span><h2 class="lo-title">Gothic gauntlet</h2><p class="lo-sub">The Lantern House · Week 5</p>
+    <div class="lo-join"><div class="lo-qr">${qr()}</div><div class="lo-code"><small>Go to <span>class.adam-russell.com</span> and enter</small><b>482 913</b></div></div>
+    <div class="lo-count"><b class="n">${S.joined.length}</b> of ${GM.class.length} here</div></div>
+    ${S.mode === 'teams' ? `<div class="stage-x lo-teams">${GM.teams.map((t) => `<div class="lo-team" style="--c:${t.colour}" data-team="${t.id}"><h3><i></i>${t.name}<small>${S.joined.filter((c) => S.teamOf[c] === t.id).length}</small></h3><div class="lo-chips">${S.joined.filter((c) => S.teamOf[c] === t.id).map(chip).join('')}</div></div>`).join('')}</div>`
+      : `<div class="stage-x lo-solo">${S.joined.map(chip).join('')}</div>`}
+    <div class="stage-x lo-mode"><button class="bctl" data-a="mode">${S.mode === 'teams' ? 'Team game ▾' : 'Individual game ▾'}</button>${S.mode === 'teams' ? '<button class="bctl" data-a="balance">Balance teams</button>' : ''}</div>
+    <div class="stage-x board-controls"><button class="bctl" data-a="mute">Sound</button><button class="bctl primary" data-a="start">Start game</button></div>`);
+  wireDrag();
+}
+const chip = (c) => `<span class="lo-chip ${c === GM.me ? 'me' : ''}" draggable="true" data-c="${c}"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${c}</span>`;
+function teamFor() { const n = GM.teams.map((t) => S.joined.filter((c) => S.teamOf[c] === t.id).length); return GM.teams[n.indexOf(Math.min(...n))].id; }
+function arrive(c) {
+  if (S.joined.includes(c)) return;
+  S.joined.push(c); S.teamOf[c] = teamFor();
+  renderBoard();
+  const n = board.querySelector(`[data-c="${c}"]`);
+  if (n && !GM.calm()) n.animate([{ transform: 'translate(-420px, -160px) scale(.3) rotate(-25deg)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1, offset: .7 }, { transform: 'none' }], { duration: 750, easing: 'cubic-bezier(.22,1,.36,1)' });
+  GM.sound.ding();
+}
+function simulate() {
+  clearTimeout(S.t);
+  const rest = GM.class.filter((c) => c !== GM.me && !S.joined.includes(c));
+  if (!rest.length) return;
+  S.t = setTimeout(() => { arrive(GM.pick(rest)); simulate(); }, GM.calm() ? 200 : 700 + GM.rand() * 900);
+}
+function wireDrag() {
+  board.querySelectorAll('.lo-chip').forEach((n) => n.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', n.dataset.c)));
+  board.querySelectorAll('.lo-team').forEach((t) => { t.addEventListener('dragover', (e) => e.preventDefault()); t.addEventListener('drop', (e) => { e.preventDefault(); const c = e.dataTransfer.getData('text/plain'); S.teamOf[c] = t.dataset.team; renderBoard(); GM.sound.click(); }); });
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return; GM.sound.click();
+  if (a === 'mode') { S.mode = S.mode === 'teams' ? 'solo' : 'teams'; renderBoard(); }
+  if (a === 'balance') {
+    const host = board.querySelector('.lo-teams');
+    const order = GM.shuffle(S.joined); order.forEach((c, i) => S.teamOf[c] = GM.teams[i % 4].id);
+    renderBoard(); GM.sound.whoosh();
+    board.querySelectorAll('.lo-chip').forEach((n, k) => n.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 420, delay: GM.calm() ? 0 : k * 25, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  }
+  if (a === 'start') { GM.sound.fanfare(); board.querySelector('.lo-title').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 600 }); GM.toast(phone, 'Game starting…'); }
+});
+
+function renderPhone(mode) {
+  const top = `<div class="ph-top"><span class="ph-me" style="font-size:17px">Join a game</span></div>`;
+  if (mode === 'code') {
+    phone.innerHTML = `${top}<div class="ph-body"><p class="ph-h">Enter the code on the board</p><div class="lo-codebox">${[0, 1, 2, 3, 4, 5].map((i) => `<input inputmode="numeric" maxlength="1" aria-label="Digit ${i + 1}" data-i="${i}">`).join('')}</div><p class="ph-sub">Six numbers. It's on the big screen.</p></div>
+      <div class="ph-dock"><button class="pbtn cta" data-p="join" disabled>Join</button></div>`;
+    const ins = [...phone.querySelectorAll('.lo-codebox input')];
+    ins.forEach((inp, i) => inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(-1); if (inp.value && ins[i + 1]) ins[i + 1].focus(); phone.querySelector('[data-p="join"]').disabled = ins.some((x) => !x.value); }));
+    ins.forEach((inp, i) => inp.addEventListener('keydown', (e) => { if (e.key === 'Backspace' && !inp.value && ins[i - 1]) ins[i - 1].focus(); }));
+  }
+  if (mode === 'pick') {
+    phone.innerHTML = `${top}<div class="ph-body"><p class="ph-h">Which one is you?</p><p class="ph-sub">Tap your initials. Taken ones are already in.</p><div class="lo-pick">${GM.class.map((c) => `<button data-c="${c}" class="${S.joined.includes(c) ? 'taken' : ''} ${S.me === c ? 'sel' : ''}" ${S.joined.includes(c) ? 'disabled' : ''}>${c}</button>`).join('')}</div></div>
+      <div class="ph-dock"><button class="pbtn cta" data-p="claim" ${S.me ? '' : 'disabled'}>That's me</button></div>`;
+  }
+  if (mode === 'in') {
+    const t = GM.teams.find((x) => x.id === S.teamOf[S.me]);
+    phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${S.me}</span>${S.me}</span></div><div class="ph-body"><div class="lo-in"><div><div class="lo-badge" style="background:${S.mode === 'teams' ? t.colour : 'var(--navy)'}">${S.me}</div><p class="ph-h" style="margin-top:22px">You're in</p><p class="ph-sub">${S.mode === 'teams' ? `Team <b style="color:var(--ink)">${t.name}</b>` : 'Individual game'} · waiting for your teacher to start</p></div></div></div>`;
+  }
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.p === 'join') { const code = [...phone.querySelectorAll('.lo-codebox input')].map((x) => x.value).join(''); if (code !== '482913') { phone.querySelector('.lo-codebox').classList.remove('fx-shake'); void phone.offsetWidth; phone.querySelector('.lo-codebox').classList.add('fx-shake'); GM.toast(phone, 'That code isn’t running. Check the board.', 'bad'); return; } renderPhone('pick'); }
+  if (t.dataset.c) { S.me = t.dataset.c; renderPhone('pick'); }
+  if (t.dataset.p === 'claim') { GM.me = S.me; arrive(S.me); renderPhone('in'); GM.toast(phone, 'Joined', 'good'); }
+});
+start();
+</script>
+</body>
+</html>
