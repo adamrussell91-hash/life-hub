@@ -62,16 +62,19 @@ describe('Mandala structure', () => {
 
   it('an unnamed pillar cannot be opened', () => {
     const node = renderGoalFrame(mandalaGoal(), vi.fn());
-    const buttons = node.querySelectorAll<HTMLButtonElement>('[data-action="open-pillar"]');
-    expect(buttons[0]!.disabled).toBe(false);
-    expect(buttons[2]!.disabled).toBe(true);
+    const cells = node.querySelectorAll('.mandala__cell--pillar');
+    expect(cells[0]!.querySelector('[data-action="open-pillar"]')).not.toBeNull();
+    expect(cells[2]!.querySelector('[data-action="open-pillar"]')).toBeNull();
+    expect(cells[2]!.classList.contains('is-empty')).toBe(true);
   });
 
   it('opens a pillar with its actions and keeps it open after a repaint (V7)', () => {
     const g = mandalaGoal();
     const node = renderGoalFrame(g, vi.fn());
     node.querySelector<HTMLButtonElement>('[data-action="open-pillar"]')!.click();
-    expect(node.querySelector('.mandala__cell--centre')!.textContent).toContain('Base mileage');
+    const hub = node.querySelector('.mandala__cell--hub')!;
+    expect(hub.textContent).toContain('Base mileage');
+    expect(hub.classList.contains('tone-sage')).toBe(true);
     expect(node.querySelector<HTMLTextAreaElement>('[data-field="mandala.a.0"]')!.value).toBe('Three easy runs a week');
     // A save repaints the whole card; the pillar stays open.
     const again = renderGoalFrame(g, vi.fn());
