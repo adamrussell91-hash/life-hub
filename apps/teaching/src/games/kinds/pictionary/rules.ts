@@ -49,6 +49,8 @@ export type PicRound = {
   guesses: number;
   /** Points given this round, so a disqualified round can take them back. */
   gains: Record<string, number>;
+  /** When the room's alarm was last set for (the hint at 40 s, then the end), so a pause can be taken off the clock. */
+  alarm?: number;
   closed?: 'time' | 'all' | 'ended' | 'void';
 };
 
@@ -246,7 +248,19 @@ function startRound(ctx: RulesCtx, k: PictionaryState): void | RulesError {
   const s = pictionarySettings(ctx.game.settings, 0);
   k.round = { n: (k.round?.n ?? 0) + 1, item, drawer, started_at: ctx.now, seconds: s.seconds, strokes: [], guessers: {}, order: [], guesses: 0, gains: {} };
   k.phase = 'draw';
-  ctx.setTimer(ctx.now + s.seconds * 1000);
+  arm(ctx, k.round);
+}
+
+/**
+ * The room's one alarm: first at the hint (40 s), so the first letters reach
+ * every screen even when nobody is moving, then at the round's end. The ring
+ * and bars run off `started_at + seconds`, never the alarm.
+ */
+function arm(ctx: RulesCtx, r: PicRound): void {
+  const end = r.started_at + r.seconds * 1000;
+  const hint = r.started_at + HINT_AFTER_MS;
+  r.alarm = ctx.now < hint && hint < end ? hint : end;
+  ctx.setTimer(r.alarm);
 }
 
 function gain(ctx: RulesCtx, r: PicRound, owner: string, points: number) {
@@ -377,7 +391,7 @@ export const pictionaryRules: RoomRules<PictionaryState> = {
       case 'more_time':
         if (k.phase !== 'draw' || !k.round) return err('not_now', 'No round is running.');
         k.round.seconds += 15;
-        ctx.setTimer(k.round.started_at + k.round.seconds * 1000);
+        arm(ctx, k.round);
         return;
       case 'standings':
         if (k.phase !== 'reveal') return err('not_now', 'Finish the round first.');
@@ -391,7 +405,12 @@ export const pictionaryRules: RoomRules<PictionaryState> = {
     }
   },
   tick(ctx, k) {
-    if (k.phase === 'draw') closeRound(ctx, k, 'time');
+    const r = k.round;
+    if (k.phase !== 'draw' || !r) return;
+    // A pause moves the room's alarm on: take the paused time off this round's clock (and everyone's speed).
+    if (r.alarm !== undefined && ctx.now - r.alarm > 1000) r.started_at += ctx.now - r.alarm;
+    if (ctx.now < r.started_at + r.seconds * 1000 - 250) arm(ctx, r);
+    else closeRound(ctx, k, 'time');
   },
   finish(ctx, k) {
     if (k.phase === 'draw') closeRound(ctx, k, 'ended');
@@ -404,8 +423,43 @@ export const pictionaryRules: RoomRules<PictionaryState> = {
   },
   view(ctx, k, role, owner) {
     return pictionaryView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
   }
 };
+
+/** Dev preview only: a simulated classmate. The drawer scribbles a few strokes; guessers miss, get close, and get it more often as time passes. */
+export function botMove(ctx: RulesCtx, k: PictionaryState, owner: string): { move: SoloEvent } | null {
+  const r = k.round;
+  if (k.phase !== 'draw' || !r) return null;
+  const p = promptsOf(ctx.keys).get(r.item);
+  if (!p) return null;
+  if (r.drawer === owner) {
+    if (r.strokes.length >= 14) return null;
+    const pts: number[] = [];
+    let x = 150 + ctx.random() * 700;
+    let y = 150 + ctx.random() * 700;
+    let dir = ctx.random() * Math.PI * 2;
+    for (let i = 0; i < 14; i++) {
+      pts.push(Math.round(x), Math.round(y));
+      dir += (ctx.random() - 0.5) * 0.9;
+      x = Math.min(960, Math.max(40, x + Math.cos(dir) * 45));
+      y = Math.min(960, Math.max(40, y + Math.sin(dir) * 45));
+    }
+    const id = (r.strokes.at(-1)?.id ?? 0) + 1;
+    return { move: { item: r.item, move: 'draw', response: { s: id, c: Math.floor(ctx.random() * STROKE_LIMITS.colours), w: ctx.random() < 0.7 ? 0 : 1, p: pts, full: true } } };
+  }
+  if (r.guessers[owner]?.ms !== undefined || ctx.random() < 0.45) return null;
+  const elapsed = ctx.now - r.started_at;
+  const roll = ctx.random();
+  const right = Math.min(0.75, 0.1 + elapsed / 50_000);
+  const answer = p.shape === 'quote' ? p.blanks : p.answers[0] ?? p.answer;
+  const near = keyWords(p.answer)[0] ?? keyWords(p.blanks)[0];
+  const misses = ['metaphor', 'a storm', 'symbolism', 'the house', 'imagery', 'contrast', 'tone'];
+  const text = roll < right ? answer : roll < right + 0.2 && near ? `${near} thing` : misses[Math.floor(ctx.random() * misses.length)] ?? 'imagery';
+  return { move: { item: r.item, move: 'guess', response: { text } } };
+}
 
 /* ── Views ───────────────────────────────────────────────────────── */
 
@@ -429,7 +483,7 @@ export type PictionaryBoardView = {
   /** After the round only. */
   answer?: string;
   drawer_points?: number;
-  /** Teacher draws: the prompt (teacher view only, only then). */
+  /** Teacher draws from the laptop: the prompt, only then, for the teacher's screen (the board hides it behind a hold-to-peek button). */
   prompt?: string;
   teacher_drawing?: boolean;
   gallery: GalleryEntry[];
@@ -489,10 +543,11 @@ export function pictionaryView(ctx: RulesCtx, k: PictionaryState, role: Role, ow
       ...(r ? { seconds: r.seconds, started_at: r.started_at } : {}),
       ...(r?.closed ? { closed: r.closed } : {}),
       ...(revealed && p ? { answer: p.answer, drawer_points: r?.closed === 'void' ? 0 : (r?.order.length ?? 0) * DRAWER_POINTS } : {}),
-      ...(r?.drawer === 'teacher' && open ? { teacher_drawing: true, ...(role === 'teacher' && p ? { prompt: p.prompt } : {}) } : {}),
-      gallery: k.gallery,
+      // The laptop runs the board (board ticket), so it needs the prompt to draw; it stays hidden until held.
+      ...(r?.drawer === 'teacher' && open ? { teacher_drawing: true, ...(p ? { prompt: p.prompt } : {}) } : {}),
+      gallery: k.gallery.map((g) => ({ ...g })),
       deck_left: k.deck.length,
-      ...(role === 'teacher' ? { speed: k.speed } : {})
+      ...(role === 'teacher' ? { speed: k.speed.map((x) => ({ ...x, times: { ...x.times }, guesses: { ...x.guesses } })) } : {})
     };
     return v;
   }
@@ -511,7 +566,8 @@ export function pictionaryView(ctx: RulesCtx, k: PictionaryState, role: Role, ow
     ...(isDrawer && open && p ? { prompt: p.prompt } : {}),
     got_count: r?.order.length ?? 0,
     guessers: r ? guesserOwners(ctx, r).length : 0,
-    ...(r && !isDrawer ? { mine: { got: g?.ms !== undefined, ...(g?.ms !== undefined ? { s: Math.round(g.ms / 1000), points: g.points } : {}), tries: g?.tries ?? [] } } : {}),
+    // Copies, never the state's own arrays: the room diffs each view against the last one it sent.
+    ...(r && !isDrawer ? { mine: { got: g?.ms !== undefined, ...(g?.ms !== undefined ? { s: Math.round(g.ms / 1000), points: g.points } : {}), tries: (g?.tries ?? []).map((t) => ({ ...t })) } } : {}),
     ...(r?.closed ? { closed: r.closed } : {}),
     ...(revealed && p ? { answer: p.answer } : {}),
     // Someone who got it may see the answer at once (their phone is green and hidden from others).

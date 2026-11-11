@@ -133,12 +133,32 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     strokes = v.strokes ?? [];
     schedule();
 
-    // The teacher drawing from the laptop: a pad over the paper, and the prompt for the teacher only.
-    if (drawing && v.teacher_drawing && v.prompt && !pad) {
+    // The teacher drawing from the laptop: a pad over the paper. The laptop is
+    // usually on the projector, so the prompt stays hidden until held down.
+    if (drawing && v.teacher_drawing && !pad) {
       pad = createPad({ send: (b: StrokeBatch) => void api.control('stroke', b).catch(() => undefined), hint: 'Draw with the mouse' });
       root.querySelector('.pc-paper')!.append(pad.root);
       const tip = el('div', 'pc-tprompt');
-      tip.innerHTML = `<span>Draw this · only on your screen</span><b>${esc(v.prompt)}</b>`;
+      const peek = el('button', 'btn btn--secondary pc-peek', 'Hold to see your prompt');
+      peek.type = 'button';
+      peek.setAttribute('aria-describedby', 'pc-tprompt-word');
+      const word = el('b', 'pc-tword');
+      word.id = 'pc-tprompt-word';
+      word.hidden = true;
+      const show = (on: boolean) => {
+        word.textContent = on ? cap(k?.prompt ?? '') : '';
+        word.hidden = !on;
+      };
+      peek.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        show(true);
+      });
+      for (const ev of ['pointerup', 'pointerleave', 'pointercancel', 'blur'] as const) peek.addEventListener(ev, () => show(false));
+      peek.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') show(true);
+      });
+      peek.addEventListener('keyup', () => show(false));
+      tip.append(el('span', '', 'You’re drawing · the class can see this screen'), peek, word);
       root.querySelector('.pc-side')!.prepend(tip);
     }
     if (!drawing && pad) {
@@ -146,7 +166,8 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       root.querySelector('.pc-tprompt')?.remove();
     }
 
-    if (drawing && view.ends_at) ring.run(view.ends_at, (v.seconds ?? 75) * 1000, api.serverNow);
+    // The round's own clock (the room's alarm also wakes it for the 40 s hint).
+    if (drawing && v.started_at && v.seconds) ring.run(v.started_at + v.seconds * 1000, v.seconds * 1000, api.serverNow);
     else {
       ring.stop();
       ring.root.style.opacity = '0.3';
@@ -296,7 +317,8 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
             { label: 'End round', name: 'end_round', primary: true }
           ];
         case 'reveal':
-          return [{ label: more ? 'Leaderboard' : 'Leaderboard and gallery', name: 'standings', primary: !more }, ...(more ? [{ label: 'Next round', name: 'next_round', primary: true, key: ' ' }] : [])];
+          // The bar already has the room's own Leaderboard toggle: this one is the top five with the gallery.
+          return [{ label: 'Scores and gallery', name: 'standings', primary: !more }, ...(more ? [{ label: 'Next round', name: 'next_round', primary: true, key: ' ' }] : [])];
         case 'standings':
           return more
             ? [
@@ -327,6 +349,18 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
   let bar: HTMLElement | null = null;
   let raf = 0;
   let sending = false;
+  /** A wrong guess waiting for its view, so "Close!" reads the verdict for this guess, not the one before. */
+  let awaiting: number | null = null;
+  const verdict = () => {
+    const tries = v?.mine?.tries ?? [];
+    if (awaiting === null || tries.length <= awaiting) return;
+    awaiting = null;
+    if (tries[tries.length - 1]?.close) api.toast('Close! Part of it is right. Keep going.');
+    else {
+      const input = root.ownerDocument.querySelector<HTMLInputElement>('.pc-input');
+      if (input && !api.calm()) void animate(input, [{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], { duration: 300 });
+    }
+  };
 
   const tickBar = () => {
     raf = 0;
@@ -442,6 +476,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       sending = true;
       input.value = '';
       input.focus({ preventScroll: true });
+      const before = v.mine?.tries.length ?? 0;
       void api
         .move({ item: v.item, move: 'guess', response: { text } })
         .then((r) => {
@@ -449,9 +484,9 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
             api.sfx.ding();
             return;
           }
-          const near = v?.mine?.tries.at(-1);
-          if (near?.close) api.toast('Close! Part of it is right. Keep going.');
-          else if (!api.calm()) void animate(input, [{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], { duration: 300 });
+          // The reply can beat the view that carries the verdict: wait for it if so.
+          awaiting = before;
+          verdict();
         })
         .catch((e: unknown) => api.toast(e instanceof Error ? e.message : 'That didn’t go through.', 'bad'))
         .finally(() => {
@@ -540,6 +575,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       if (!p || p.who !== 'phone') return;
       v = p;
       render(p);
+      verdict();
       if (p.phase === 'draw' && !raf) tickBar();
     },
     dispose() {

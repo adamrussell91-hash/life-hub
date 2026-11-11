@@ -47,7 +47,7 @@
 .pc-g { font-size: 0.86em; color: var(--stage-muted); }
 .pc-n { margin-left: auto; font-size: 2em; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .pc-n small { font-size: 0.5em; font-weight: 600; color: var(--stage-muted); }
-.pc-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.4em, 1fr)); gap: 0.36em; align-content: start; min-height: 0; overflow: hidden; }
+.pc-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.4em, 1fr)); gap: 0.36em; align-content: start; min-height: 0; overflow: hidden; padding: 0.15em; /* the gold ring on the fastest three isn't clipped */ }
 .pc-chip { display: flex; align-items: center; gap: 0.43em; height: 2.21em; padding: 0 0.57em 0 0.32em; border-radius: 0.64em; background: var(--stage-card-hi); font-size: 0.93em; font-weight: 700; min-width: 0; }
 .pc-chip .gl-av { width: 1.7em; height: 1.7em; font-size: 0.65em; flex: none; }
 .pc-t { white-space: nowrap; margin-left: auto; font-size: 0.85em; font-weight: 600; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
@@ -179,3 +179,6 @@
   .pc-sw i, .pc-phone, .pc-pad__hint, .pc-side .pc-ring { transition: none; }
 }
 .gm-calm .pc-dot { animation: none; }
+.pc-tprompt { justify-items: start; }
+.pc-peek { min-height: 44px; font-size: 0.75em; }
+.pc-tword { font-size: 1.2em; }

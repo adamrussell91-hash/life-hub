@@ -332,8 +332,60 @@ export const battlesRules: RoomRules<BattlesState> = {
   },
   view(ctx, k, role, owner) {
     return role === 'student' ? phoneView(ctx, k, owner) : boardView(ctx, k, role);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
   }
 };
+
+/** Invented answers for the dev preview's simulated class (no real student writing). */
+const BOT_ANSWERS = [
+  'The storm is described as howling at the shutters, so the weather mirrors Mira’s fear and the house seems to attack her.',
+  'Short sentences slow the reader down before Mira climbs the stairs, which builds tension and makes every sound feel like a threat.',
+  'The house is personified as watching her from every window, so the reader feels she is never safe, even at home.',
+  'The candle guttering in the window suggests hope fading, and the dark seems to swallow the only light in the house.',
+  'It is scary because it is old and dark and there are noises at night.',
+  'Repeating that she counts the stairs shows Mira trying to control a fear she cannot name, which unsettles the reader.',
+  'The writer uses lots of adjectives like cold and empty to make the house feel frightening.',
+  'Sibilance in the silent, sighing stairs creates a hushed sound that makes the house feel like it is breathing.',
+  'The locked wing is never explained, so the reader imagines something worse than any description could give.',
+  'The house groans like an old man, which makes it seem alive and angry that Mira is there.',
+  'Darkness is everywhere in the chapter and that makes it frightening for the reader.',
+  'The frozen lake outside traps the house in silence, so Mira has no escape and the reader feels her isolation.',
+  'Rhetorical questions in Mira’s head show her doubt, and the reader starts doubting what is real too.',
+  'The narrator calls the stairs a throat, a metaphor that makes climbing them feel like being swallowed.',
+  'Doctor Hask’s calm voice is creepy because he speaks about fear like an illness he wants to cut out.',
+  'The writer makes it scary with spooky words.'
+];
+
+/** Dev preview only: a simulated classmate writes an invented answer a few words at a time, hands in, then judges each pair (longer answers win more often). */
+export function botMove(ctx: RulesCtx, k: BattlesState, owner: string): { move: SoloEvent } | null {
+  if (k.phase === 'write') {
+    const d = k.drafts[owner];
+    if (d?.in) return null;
+    // Each simulated writer takes the next unused answer, so no two match.
+    const taken = new Set(Object.entries(k.drafts).filter(([o]) => o !== owner).map(([, x]) => BOT_ANSWERS.findIndex((a) => x.text && a.startsWith(x.text))));
+    const mine = d?.text ? BOT_ANSWERS.findIndex((a) => a.startsWith(d.text)) : -1;
+    const full = BOT_ANSWERS[mine >= 0 ? mine : BOT_ANSWERS.findIndex((_, i) => !taken.has(i))] ?? BOT_ANSWERS[0] ?? '';
+    const all = full.split(' ');
+    const have = d?.words ?? 0;
+    if (have >= all.length) return { move: { item: BATTLES_ITEM, move: 'answer', response: { text: full, hand_in: true } } };
+    const next = all.slice(0, Math.min(all.length, have + 3 + Math.floor(ctx.random() * 5))).join(' ');
+    return { move: { item: BATTLES_ITEM, move: 'answer', response: { text: next } } };
+  }
+  if (k.phase === 'battle') {
+    const p = k.pairs[owner];
+    if (!p || !k.pool[p.left] || !k.pool[p.right]) return null;
+    const lw = words(k.pool[p.left]!.text);
+    const rw = words(k.pool[p.right]!.text);
+    const longer = lw >= rw ? p.left : p.right;
+    const winner = ctx.random() < 0.75 ? longer : longer === p.left ? p.right : p.left;
+    const n = battleContent(ctx.keys).chips.length;
+    const chips = n && ctx.random() < 0.6 ? [Math.floor(ctx.random() * n)] : [];
+    return { move: { item: BATTLES_ITEM, move: 'judge', response: { left: p.left, right: p.right, winner, chips: { left: winner === p.left ? chips : [], right: winner === p.right ? chips : [] } } } };
+  }
+  return null;
+}
 
 /* ── Views ───────────────────────────────────────────────────────── */
 

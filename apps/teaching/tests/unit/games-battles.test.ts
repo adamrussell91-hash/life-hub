@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameSchema, type Game } from '@/games/core/schema';
-import { battlesRules, judgingPoints, type BattlesBoardView, type BattlesPhoneView, type BattlesState } from '@/games/kinds/battles/rules';
+import { battlesRules, botMove, judgingPoints, type BattlesBoardView, type BattlesPhoneView, type BattlesState } from '@/games/kinds/battles/rules';
 import { leaks, rulesHarness } from './games-rules-harness';
 import { fakeApi, kindRoomView, textOf } from './games-kind-api';
 
@@ -197,5 +197,49 @@ describe('Short-answer battles board and phone', () => {
     expect(textOf(gh)).toContain('Your judging score');
     b.dispose();
     p.dispose();
+  });
+});
+
+describe('Short-answer battles dev bot (Simulate class)', () => {
+  it('writes distinct invented answers, hands in, judges every pair dealt, and the game reaches results', () => {
+    const h = setup();
+    const turn = () => {
+      let moved = false;
+      for (const s of SEATS) {
+        const t = botMove(h.ctx, k(h), `o_${s}`);
+        if (!t) continue;
+        expect('error' in h.move(s, t.move)).toBe(false);
+        moved = true;
+      }
+      return moved;
+    };
+    for (let i = 0; i < 60 && turn(); i++) h.advance(1000);
+    expect(Object.values(k(h).drafts).every((d) => d.in)).toBe(true);
+    expect(new Set(Object.values(k(h).drafts).map((d) => d.text)).size).toBe(SEATS.length);
+    h.control('battle');
+    expect(k(h).phase).toBe('battle');
+    for (let i = 0; i < 60 && turn(); i++) h.advance(1000);
+    expect(Object.values(k(h).judgements).every((l) => l.length === k(h).rounds)).toBe(true);
+    h.control('results');
+    expect(k(h).phase).toBe('results');
+  });
+});
+
+describe('Short-answer battles board buttons', () => {
+  it('the board offers Teacher view only when its view carries the teacher data (no dead end on the projector)', async () => {
+    await import('@/games/kinds/battles/live');
+    const { liveKind } = await import('@/games/live/kind-views');
+    const h = setup();
+    writeAll(h);
+    h.control('battle');
+    judgeAll(h);
+    h.control('results');
+    h.control('judges');
+    const host = document.createElement('div');
+    document.body.append(host);
+    const b = liveKind('battles')!.board(host, fakeApi('board'));
+    expect(b.controls?.(kindRoomView('battles', board(h, 'board'))).map((c) => c.name)).toEqual(['back', 'final']);
+    expect(b.controls?.(kindRoomView('battles', board(h, 'teacher'))).map((c) => c.name)).toEqual(['back', 'teacher', 'final']);
+    b.dispose();
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GameSchema, type Game } from '@/games/core/schema';
 import { ROOM_LIMITS } from '@/games/core/room-protocol';
 import { simplify, StrokeStream, type StrokeBatch } from '@/games/kinds/pictionary/canvas';
-import { applyStroke, guessPoints, judgeGuess, pictionaryRules, promptsOf, type PicRound, type PictionaryBoardView, type PictionaryPhoneView, type PictionaryState } from '@/games/kinds/pictionary/rules';
+import { applyStroke, botMove, guessPoints, judgeGuess, pictionaryRules, promptsOf, type PicRound, type PictionaryBoardView, type PictionaryPhoneView, type PictionaryState } from '@/games/kinds/pictionary/rules';
 import { splitGame } from '@/games/core/model';
 import { leaks, rulesHarness } from './games-rules-harness';
 import { fakeApi, kindRoomView, textOf } from './games-kind-api';
@@ -65,7 +65,9 @@ describe('Pictionary rules', () => {
     h.control('next_round');
     const r = k(h).round!;
     expect(r.drawer).toBe('o_AA');
-    expect(h.timer).toBe(h.now + 60_000);
+    // The alarm wakes first for the 40 s hint; the round itself runs 60 s.
+    expect(h.timer).toBe(h.now + 40_000);
+    expect(k(h).round?.seconds).toBe(60);
     const answer = ANSWERS[r.item]!;
     const prompt = promptsOf(h.keys).get(r.item)!;
     expect(phone(h, 'AA').role).toBe('drawer');
@@ -88,6 +90,10 @@ describe('Pictionary rules', () => {
     // Nothing marked while the round runs.
     expect(h.events.filter((e) => e.move === 'guess')).toHaveLength(0);
     h.move('CC', { item: r.item, move: 'guess', response: { text: 'thunder' } });
+    // The alarms ring as the room sets them: the 40 s hint, then time runs out.
+    h.advance(r.started_at + 40_000 - h.now);
+    h.tick();
+    h.advance(r.started_at + r.seconds * 1000 - h.now);
     h.tick();
     expect(board(h).phase).toBe('reveal');
     expect(board(h).answer).toBe(prompt.answer);
@@ -109,6 +115,59 @@ describe('Pictionary rules', () => {
     expect(board(h).closed).toBe('all');
     h.control('next_round');
     expect(k(h).round!.drawer).toBe('o_BB');
+  });
+
+  it('the room’s alarm wakes at 40 s for the hint (nobody needs to move), then at the end', () => {
+    const h = setup();
+    h.control('next_round');
+    const r = k(h).round!;
+    expect(h.timer).toBe(r.started_at + 40_000);
+    h.advance(40_000);
+    h.tick();
+    expect(k(h).phase).toBe('draw');
+    expect(board(h).blanks?.first?.length).toBeGreaterThan(0);
+    expect(h.timer).toBe(r.started_at + r.seconds * 1000);
+    h.advance(r.seconds * 1000 - 40_000);
+    h.tick();
+    expect(k(h).phase).toBe('reveal');
+  });
+
+  it('a pause (the alarm firing late) comes off the round’s clock', () => {
+    const h = setup();
+    h.control('next_round');
+    const r = k(h).round!;
+    const started = r.started_at;
+    h.advance(40_000 + 30_000);
+    h.tick();
+    expect(k(h).phase).toBe('draw');
+    expect(r.started_at).toBe(started + 30_000);
+    expect(h.timer).toBe(r.started_at + r.seconds * 1000);
+  });
+
+  it('+15 s keeps the hint alarm when it hasn’t rung yet', () => {
+    const h = setup();
+    h.control('next_round');
+    h.control('more_time');
+    const r = k(h).round!;
+    expect(r.seconds).toBe(90);
+    expect(h.timer).toBe(r.started_at + 40_000);
+  });
+
+  it('views are copies: a second guess changes the view the room last sent (no shared arrays)', () => {
+    const h = setup();
+    h.control('next_round');
+    const r = k(h).round!;
+    const guesser = SEATS.find((s) => `o_${s}` !== r.drawer)!;
+    h.move(guesser, { item: r.item, move: 'guess', response: { text: 'metaphor' } });
+    const before = phone(h, guesser);
+    const sentBoard = board(h);
+    const sent = JSON.stringify(before);
+    h.move(guesser, { item: r.item, move: 'guess', response: { text: 'tone' } });
+    expect(JSON.stringify(before)).toBe(sent);
+    expect(phone(h, guesser).mine?.tries).toHaveLength(2);
+    h.control('end_round');
+    expect(sentBoard.gallery).toHaveLength(0);
+    expect(board(h).gallery).toHaveLength(1);
   });
 
   it('first letters appear after 40 s, never before', () => {
@@ -165,14 +224,17 @@ describe('Pictionary rules', () => {
     expect(applyStroke(r, { s: 999, p: [1, 1], from: 0 })).toBe('too_much');
   });
 
-  it('the teacher can draw from the laptop; the board never gets the prompt, the teacher view does', () => {
+  it('the teacher can draw from the laptop: the laptop’s board gets the prompt (held to peek), students never do', () => {
     const h = setup();
+    expect(board(h).prompt).toBeUndefined();
     h.control('teacher_draws');
     const r = k(h).round!;
     expect(r.drawer).toBe('teacher');
     const prompt = promptsOf(h.keys).get(r.item)!.prompt;
     expect((h.view('teacher', 'teacher') as PictionaryBoardView).prompt).toBe(prompt);
-    expect(leaks(board(h), [prompt])).toEqual([]);
+    // The laptop runs the board ticket, so the board view must carry it or nobody can draw.
+    expect(board(h).prompt).toBe(prompt);
+    for (const s of SEATS) expect(leaks(phone(h, s), [prompt])).toEqual([]);
     expect(h.control('stroke', { s: 1, p: [5, 5], from: 0 })).toBeUndefined();
     expect(board(h).strokes).toHaveLength(1);
     expect(h.control('stroke', { s: 1, p: [5, 5] }, { owner: 'o_BB', role: 'student' })).toMatchObject({ error: { code: 'not_drawer' } });
@@ -271,5 +333,23 @@ describe('Pictionary board and phone', () => {
     b.dispose();
     p.dispose();
     d.dispose();
+  });
+});
+
+describe('Pictionary dev bot (Simulate class)', () => {
+  it('the drawer draws and guessers guess until the round closes', () => {
+    const h = setup();
+    h.control('next_round');
+    const r = k(h).round!;
+    for (let i = 0; i < 400 && k(h).phase === 'draw'; i++) {
+      for (const s of SEATS) {
+        const turn = botMove(h.ctx, k(h), `o_${s}`);
+        if (turn) expect('error' in h.move(s, turn.move)).toBe(false);
+      }
+      h.advance(1000);
+    }
+    expect(r.strokes.length).toBeGreaterThan(0);
+    expect(k(h).phase).toBe('reveal');
+    expect(r.closed).toBe('all');
   });
 });

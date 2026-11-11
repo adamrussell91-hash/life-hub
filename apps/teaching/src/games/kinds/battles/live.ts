@@ -254,7 +254,8 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       if (v.phase === 'too_few') return [{ label: 'Spotlight', name: 'spotlight', primary: true }, { label: 'Finish', name: 'final' }];
       if (v.phase === 'battle') return [{ label: 'Spotlight', name: 'spotlight' }, { label: 'Show results', name: 'results', primary: true }];
       if (v.phase === 'results') {
-        if (v.screen === 'judges') return [{ label: 'Top answers', name: 'back' }, { label: 'Teacher view', name: 'teacher' }, { label: 'Final scores', name: 'final', primary: true }];
+        // Teacher view only where the view carries it (the teacher's own screen), never as a dead end on the board.
+        if (v.screen === 'judges') return [{ label: 'Top answers', name: 'back' }, ...(v.teacher ? [{ label: 'Teacher view', name: 'teacher' }] : []), { label: 'Final scores', name: 'final', primary: true }];
         if (v.screen === 'teacher') return [{ label: 'Top answers', name: 'back' }, { label: 'Final scores', name: 'final', primary: true }];
         return [{ label: 'Spotlight', name: 'spotlight' }, { label: 'Sharpest judges', name: 'judges', primary: true }];
       }
