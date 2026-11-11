@@ -280,6 +280,39 @@ export function linkProblem(lessons: readonly FlowLesson[], lessonId: string, af
   return next.find((p) => (p.kind === 'cross_link' || p.kind === 'too_deep' || p.kind === 'loop') && !had.has(key(p)));
 }
 
+export type DateJump = { lessonId: string; target: string; skipped: string[] };
+
+/**
+ * A single "comes next" link from a dated lesson to a lesson dated later, past
+ * other dated lessons, would drag those later weeks ahead of the ones it skips.
+ * The calendar wins: the link is set aside, so the lesson follows the date
+ * order, and the jump is reported. A choice (two or more next lessons) stays,
+ * and lessons `skip` names (hidden or side lessons) don't count as skipped.
+ */
+export function dropDateJumps<T extends FlowLesson>(
+  lessons: readonly T[],
+  dates: ReadonlyMap<string, string> | undefined,
+  skip: (id: string) => boolean = () => false
+): { lessons: T[]; jumps: DateJump[] } {
+  const jumps: DateJump[] = [];
+  if (!dates?.size) return { lessons: [...lessons], jumps };
+  const dated = lessons.filter((l) => dates.has(l.id) && !skip(l.id));
+  // An option's link is where its branch rejoins: that stays too.
+  const options = new Set(lessons.flatMap((l) => (l.after && l.after.length > 1 ? l.after : [])));
+  const out = lessons.map((lesson) => {
+    const target = lesson.after?.length === 1 && !options.has(lesson.id) ? lesson.after[0]! : undefined;
+    const from = dates.get(lesson.id);
+    const to = target === undefined ? undefined : dates.get(target);
+    if (target === undefined || from === undefined || to === undefined || to <= from) return lesson;
+    const skipped = dated.filter((l) => l.id !== lesson.id && l.id !== target && dates.get(l.id)! > from && dates.get(l.id)! < to).map((l) => l.id);
+    if (!skipped.length) return lesson;
+    jumps.push({ lessonId: lesson.id, target, skipped });
+    const { after: _dropped, ...rest } = lesson;
+    return rest as T;
+  });
+  return { lessons: out, jumps };
+}
+
 /** The lessons that come before `id`, as drawn. */
 export function lessonsBefore(flow: Flow, id: string): string[] {
   return [...flow.next.entries()].filter(([, v]) => v.includes(id)).map(([k]) => k);
