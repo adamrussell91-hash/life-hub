@@ -32,7 +32,8 @@ import { eventsToEvidence, gameTotal, missedPieces, playScore } from './game-rul
 import { ROOM_LIMITS, SIGNATURE_HEADER, roomStyle, roomTeams, signBody, signTicket } from './game-room-core.mjs';
 
 export const DEFAULT_GAME_ROOMS_URL = 'https://class.adam-russell.com/g';
-const DEFAULT_SITE_URL = 'https://life-hub.adam-russell.com';
+// Netlify sets URL to the site's main address (api.adam-russell.com); the umbrella host is GitHub Pages and refuses POSTs.
+const DEFAULT_SITE_URL = 'https://api.adam-russell.com';
 const CODE = /^\d{6}$/;
 const ROOM = /^gr[a-f0-9]{20}$/;
 const list = (v) => (Array.isArray(v) ? v : []);
