@@ -281,7 +281,7 @@ html.gm-solo-open, html.gm-solo-open body { overflow: hidden; }
 .gm-icon-btn[aria-pressed="true"] { background: var(--navy); color: var(--paper); border-color: var(--navy); }
 .gm-solo__back { flex: none; }
 .gm-solo__body { overflow: auto; overscroll-behavior: contain; min-height: 0; }
-.gm-solo__stage { display: grid; gap: var(--space-4); padding: var(--space-4) var(--space-5); min-width: 0; }
+.gm-solo__stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4) var(--space-5); min-width: 0; }
 .gm-solo__dock {
   display: flex; gap: var(--space-2);
   padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
@@ -305,7 +305,7 @@ html.gm-solo-open, html.gm-solo-open body { overflow: hidden; }
 .gm-confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
 
 /* Finish card */
-.gm-finish { display: grid; gap: var(--space-3); justify-items: center; text-align: center; padding: var(--space-5) 0; }
+.gm-finish { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); justify-items: center; text-align: center; padding: var(--space-5) 0; }
 .gm-finish__title { margin: 0; font-size: var(--text-xl); color: var(--navy); outline: none; }
 .gm-finish__score { margin: 0; font-size: 3.5rem; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; line-height: 1; }
 .gm-finish__of { font-size: 1.75rem; color: var(--muted); font-weight: 700; }

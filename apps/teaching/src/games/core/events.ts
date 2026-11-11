@@ -39,12 +39,16 @@ export const GameEventSchema = z.object({
   time_ms: z.number().int().min(0).max(3_600_000).optional(),
   /** Per kind: hints, bet, letters_showing, confused_with, group, one_away… */
   extra: Extra.optional(),
-  strength: z.enum(STRENGTHS)
+  strength: z.enum(STRENGTHS),
+  /** The phone's own id for the move: a batch sent twice never stores it twice. */
+  cid: z.string().max(40).optional()
 });
 export type GameEvent = z.infer<typeof GameEventSchema>;
 
 /** What a phone sends in a solo batch. The server adds seq, time, owner and `correct`; a phone never says it was right. */
 export const SoloEventInputSchema = z.object({
+  /** Made by the phone's queue, once per move, so a retried batch is recognised (games.mjs dedupes on it). */
+  cid: z.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
   item: z.string().min(1).max(40),
   move: z.enum(GAME_MOVES),
   response: z.unknown().optional(),

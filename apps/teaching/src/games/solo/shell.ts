@@ -1,5 +1,5 @@
 import { el } from '@/quiz/dom';
-import type { EventResult, FinishReply, GameClient, PlayScore, SoloEvent } from '../api';
+import { scoreText, type EventResult, type FinishReply, type GameClient, type PlayScore, type SoloEvent } from '../api';
 import { GAME_KIND_INFO, type PublicGame } from '../core/schema';
 import { calm, calmToggleOn, countUp, enter, loadCalm, pulse, setCalm } from '../motion/motion';
 import { confetti } from '../motion/confetti';
@@ -299,8 +299,9 @@ export function openSoloPlayer(options: SoloShellOptions): SoloShell {
     stat('With hints', String(split.hinted));
     const best = reply.best ?? options.best ?? null;
     const latest = reply.latest ?? options.latest ?? null;
-    if (best) stat('Best', `${best.right}/${best.answered}`);
-    if (latest) stat('Latest', `${latest.right}/${latest.answered}`);
+    // Best and Latest are out of the same total as the big score above.
+    if (best) stat('Best', scoreText(best));
+    if (latest) stat('Latest', scoreText(latest));
     card.append(heading, big, stats);
     if (reply.boxed > 0) card.append(el('p', 'gm-note', `${reply.boxed} ${reply.boxed === 1 ? 'card goes' : 'cards go'} back to box 1 in your organiser for another look.`));
     stage.replaceChildren(card);

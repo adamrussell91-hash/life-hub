@@ -12,6 +12,7 @@ import { addItems, isListGame, listShapes, newGame, newGameId, seedGame } from '
 import { gameContent, settingsRow } from './content-editor';
 import { pills, textInput } from './item-editors';
 import { canvasShowsOn, createGameTabs, type GameTab } from './editor-tabs';
+import { gridPanel, isGridGame, keepGridFields, type GridPanel } from './grid-editor';
 import './games.css';
 
 export type GameEditorOptions = {
@@ -35,7 +36,7 @@ export type GameEditorHandle = {
 
 const pct = (n: number | null) => (n === null ? '—' : `${Math.round(n * 100)}%`);
 const secs = (ms: number | null) => (ms === null ? '—' : `${(ms / 1000).toFixed(1)} s`);
-const score = (s: { right: number; answered: number } | null) => (s ? `${s.right}/${s.answered}` : '—');
+const score = (s: { right: number; answered: number; total?: number } | null) => (s ? `${s.right}/${s.total ?? s.answered}` : '—');
 const errText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
 
 /**
@@ -85,6 +86,8 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
   let gamesList: HubListHandle<Game> | null = null;
   const main = el('div', 'gm-main');
   let issuesHost: HTMLElement | null = null;
+  /** Crossword and find-a-word: the Layout panel (preview, regenerate, lock). */
+  let gridHost: GridPanel | null = null;
 
   function gameRow(game: Game): HTMLElement {
     const row = el('button', 'gm-game-row');
@@ -142,6 +145,7 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
   function paintIssues(): void {
     if (!issuesHost) return;
     const game = current().games.find((g) => g.id === selectedId);
+    if (gridHost && game && isGridGame(game)) gridHost.update(game);
     issuesHost.replaceChildren();
     if (!game) return;
     // Checked across the whole lesson so names match ("Game 3"), then kept to this game's lines.
@@ -298,6 +302,8 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
 
   function paintMain(): void {
     issuesHost = null;
+    gridHost?.dispose();
+    gridHost = null;
     main.replaceChildren();
     const flashNode = el('p', 'gm-flash', flashText);
     flashNode.setAttribute('role', 'status');
@@ -327,11 +333,16 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     titleWrap.append(title, kindLine);
     head.append(gameGlyph(game.kind, 'lg'), titleWrap);
     const ctx = {
-      onChange: (next: Game) => putGame(game.id, next),
+      // The Layout panel owns the seed, the lock and the hidden message: an older copy from another editor keeps them.
+      onChange: (next: Game) => putGame(game.id, keepGridFields(next, current().games.find((g) => g.id === game.id))),
       ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {})
     };
     issuesHost = el('div', 'gm-issues-host');
     main.append(head, flashNode, settingsRow(game, ctx), issuesHost);
+    if (isGridGame(game)) {
+      gridHost = gridPanel(game, (next) => putGame(game.id, next));
+      main.append(gridHost.root);
+    }
     if (buildOpen && isListGame(game)) main.append(buildPanel(game));
     main.append(gameContent(game, ctx));
     paintIssues();

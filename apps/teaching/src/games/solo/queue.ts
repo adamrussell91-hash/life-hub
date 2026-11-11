@@ -5,8 +5,8 @@ import type { EventResult, SoloEvent } from '../api';
  * when 5 are waiting, 10 s after the first one waited, when a player asks for
  * an answer now (a crossword word check), and on finish. One batch is in
  * flight at a time. A failed batch goes back to the front of the queue and is
- * retried with backoff; nothing is dropped and nothing is sent twice by this
- * queue. Each move's promise resolves with the server's verdict for it.
+ * retried with backoff; nothing is dropped. Every move carries a client id
+ * (`cid`), so a retried batch the server already stored isn't stored twice. Each move's promise resolves with the server's verdict for it.
  */
 
 export type QueueState = 'idle' | 'waiting' | 'sending' | 'retrying' | 'offline';
@@ -46,6 +46,18 @@ type Entry = { event: SoloEvent; resolve(r: EventResult): void; reject(e: unknow
 type Waiter = { resolve(): void; reject(e: unknown): void };
 
 const RETRYABLE_CODES = new Set(['network_error', 'invalid_response', 'retry', 'timeout']);
+
+/**
+ * A move's own id, made once when it's queued. A batch that reached the
+ * server but whose reply was lost is sent again with the same ids, and the
+ * server (games.mjs) stores each id once and answers it the same way.
+ */
+export function newClientId(): string {
+  const bytes = new Uint8Array(9);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return Array.from(bytes, (b) => 'abcdefghijklmnopqrstuvwxyz0123456789-_ABCDEFGHIJKLMNOPQRSTUVWXYZ'[b % 64]).join('');
+}
 
 /** Network failures and the server's own "send it again" are retried; anything else is a refusal. */
 export function defaultIsRetryable(error: unknown): boolean {
@@ -168,7 +180,7 @@ export function createEventQueue(options: QueueOptions): EventQueue {
   return {
     push(event, opts = {}) {
       return new Promise<EventResult>((resolve, reject) => {
-        pending.push({ event, resolve, reject });
+        pending.push({ event: event.cid ? event : { ...event, cid: newClientId() }, resolve, reject });
         if (opts.now) forced = true;
         pump();
       });

@@ -7,7 +7,11 @@ import type { GameMove, Strength } from './core/events';
 // ---------------------------------------------------------------- student
 // POST /api/published/game/:lessonId  (netlify/functions/published-games.mjs → _shared/games.mjs, gameStudentAction)
 
-export type PlayScore = { play_id: string; right: number; answered: number; at: string };
+/** A finished play: right out of `total`, every item in the game (the finish card's main score). `answered` is what was tried. */
+export type PlayScore = { play_id: string; right: number; answered: number; total?: number; at: string };
+
+/** "7/12": right out of the game's total (older plays without a total fall back to answered). */
+export const scoreText = (s: Pick<PlayScore, 'right' | 'answered' | 'total'>): string => `${s.right}/${s.total ?? s.answered}`;
 
 export type Arcade = {
   identity: { need: 'class' | 'initials' | null; initials: string | null };
@@ -20,7 +24,15 @@ export type Arcade = {
 };
 
 /** One move a phone sends. The server marks it; a phone never says it was right. */
-export type SoloEvent = { item: string; move: GameMove; response?: unknown; time_ms?: number; extra?: Record<string, number | string | boolean> };
+export type SoloEvent = {
+  /** Set by the queue: the move's own id, so a resent batch isn't stored twice. */
+  cid?: string;
+  item: string;
+  move: GameMove;
+  response?: unknown;
+  time_ms?: number;
+  extra?: Record<string, number | string | boolean>;
+};
 
 export type EventResult = {
   item: string;
@@ -30,13 +42,27 @@ export type EventResult = {
   one_away?: true;
   /** Find-a-word: a real word in the grid, but not this clue's. */
   decoy?: true;
+  /** Find-a-word: that word was already found. */
+  again?: true;
   /** After answering: who said it (and its source or why it's fake), the group found, or a question's key (never in points rush). */
   reveal?: {
     speaker?: string;
     source?: string;
     why_fake?: string;
     group?: { id: string; label: string; why: string; difficulty: number; tiles: string[] };
+    /** Connections, a `pass` once out of mistakes: every group not yet found. */
+    groups?: Array<{ id: string; label: string; why: string; difficulty: number; tiles: string[] }>;
     key?: QuestionKey;
+    /** Hint ladder: which rung this was (1–3). */
+    step?: number;
+    /** Crossword hint: letters to fill. */
+    cells?: Array<{ x: number; y: number; ch: string }>;
+    /** Find-a-word hints: first letter, length, and the line (first cell and a direction) the word sits in. */
+    first?: string;
+    length?: number;
+    line?: { x: number; y: number; dx: number; dy: number };
+    /** Find-a-word: the last word found, so the hidden message's cells (reading order) and text. */
+    message?: { text: string; display: string; cells: Array<[number, number]> };
   };
 };
 

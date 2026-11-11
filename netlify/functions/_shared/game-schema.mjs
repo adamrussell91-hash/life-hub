@@ -497,7 +497,7 @@ var FindAWordSchema = z3.object({
   items: z3.array(TermItemSchema).max(GAME_COUNTS.find_a_word.max).default([]),
   /** Optional hidden message spelled by the leftover letters, and the question asked about it. */
   message: z3.object({ text: Text2(GAME_LIMITS.message), question: QuizQuestionDraftSchema.optional() }).optional(),
-  settings: z3.object({ seed: Seed, directions: z3.enum(["easy", "all"]).default("all"), hints: z3.boolean().default(true) }).prefault({})
+  settings: z3.object({ seed: Seed, locked: z3.boolean().default(false), directions: z3.enum(["easy", "all"]).default("all"), hints: z3.boolean().default(true) }).prefault({})
 });
 var JEOPARDY_VALUES = [100, 200, 300, 400, 500];
 var JeopardyTileSchema = z3.object({
@@ -629,6 +629,14 @@ var PublicQuestionItemSchema = z3.object({ id: z3.string(), shape: z3.literal("q
 var PublicQuoteSchema = z3.object({ id: z3.string(), shape: z3.literal("quote"), text: z3.string() });
 var PublicItemSchema = z3.discriminatedUnion("shape", [PublicTermSchema, PublicQuestionItemSchema, PublicQuoteSchema]);
 var PublicWallSchema = z3.object({ id: z3.string(), title: z3.string(), tiles: z3.array(z3.object({ id: z3.string(), text: z3.string() })) });
+var PublicCrosswordGridSchema = z3.object({
+  kind: z3.literal("crossword"),
+  width: z3.number().int(),
+  height: z3.number().int(),
+  entries: z3.array(z3.object({ item: z3.string(), number: z3.number().int(), dir: z3.enum(["across", "down"]), x: z3.number().int(), y: z3.number().int(), length: z3.number().int() }))
+});
+var PublicWordGridSchema = z3.object({ kind: z3.literal("wordsearch"), size: z3.number().int(), rows: z3.array(z3.string()) });
+var PublicGridSchema = z3.discriminatedUnion("kind", [PublicCrosswordGridSchema, PublicWordGridSchema]);
 var PublicGameSchema = z3.object({
   id: z3.string(),
   title: z3.string(),
@@ -643,7 +651,9 @@ var PublicGameSchema = z3.object({
   items: z3.array(PublicItemSchema).optional(),
   walls: z3.array(PublicWallSchema).optional(),
   cast: z3.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
-  message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional()
+  message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional(),
+  /** Crossword and find-a-word: the grid, built at publish. */
+  grid: PublicGridSchema.optional()
 });
 var PublicGameLessonSchema = z3.object({
   games: z3.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -680,13 +690,16 @@ export {
   JeopardyTileSchema,
   PictionarySchema,
   PointsRushSchema,
+  PublicCrosswordGridSchema,
   PublicGameLessonSchema,
   PublicGameSchema,
+  PublicGridSchema,
   PublicItemSchema,
   PublicQuestionItemSchema,
   PublicQuoteSchema,
   PublicTermSchema,
   PublicWallSchema,
+  PublicWordGridSchema,
   QuestionItemSchema,
   QuoteItemSchema,
   RESERVED_GAME_IDS,

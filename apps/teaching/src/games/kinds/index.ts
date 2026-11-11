@@ -7,6 +7,8 @@
  * registered here is playable and printable everywhere.
  */
 import './connections';
+import './crossword';
+import './find-a-word';
 import './who-said-it';
 
 export {};

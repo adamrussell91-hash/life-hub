@@ -3,6 +3,7 @@ import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Arcade, GameClient } from '@/games/api';
 import { mountGameArcade } from '@/games/arcade';
 import { canvasShowsOn } from '@/games/editor-tabs';
+import { unregisterForTests } from '@/games/solo/registry';
 
 // Invented content only.
 const pub = (over: Record<string, unknown> = {}) => ({ id: 'g', title: '', kind: 'crossword', solo: true, live: true, count: 6, settings: {}, items: [], ...over });
@@ -63,6 +64,8 @@ describe('game arcade', () => {
     expect(wager.textContent).toContain('Waiting for your teacher');
     const play = host.querySelector<HTMLButtonElement>('[data-game-id="g_cross"] .gm-card__play')!;
     expect(play.textContent).toBe('Play');
+    // Crossword has a player now (Phase 3): take it away to see the Coming next path.
+    unregisterForTests('crossword');
     play.click();
     expect(host.querySelector('[data-game-id="g_cross"] .gm-card__soon')?.textContent).toContain('Coming next');
   });

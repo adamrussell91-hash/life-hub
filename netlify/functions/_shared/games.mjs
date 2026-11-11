@@ -35,7 +35,8 @@ import { gameKeys } from './game-store.mjs';
 import { QUIZ_KIND_INFO } from './quiz-core.mjs';
 import { GAME_KIND_INFO, GameLessonSchema } from './game-schema.mjs';
 import {
-  MARKED_MOVES, PLAY_EVENTS_MAX, SOLO_BATCH_MAX, SoloEventInputSchema, checkAnswer, eventsToEvidence, gameIssues, missedPieces, playScore, splitGame
+  MARKED_MOVES, PLAY_EVENTS_MAX, REVEAL_HINTS, SOLO_BATCH_MAX, SoloEventInputSchema, checkAnswer, checkSelection, crosswordHint, eventsToEvidence, gameIssues, gameTotal,
+  missedPieces, playScore, splitGame, wordHint
 } from './game-rules.mjs';
 
 export { QuizError as GameError };
@@ -123,14 +124,21 @@ async function readEvents(store, k, gameId, playId, owner) {
   return list(await read(store, k.events(gameId, playId, owner)));
 }
 
-/** Appends to a play's event log: read, add, write only if nobody wrote in between. */
+/**
+ * Appends to a play's event log: read, add, write only if nobody wrote in
+ * between. A move whose client id (`cid`) is already in the log is a retried
+ * batch's move and isn't added again.
+ */
 async function appendEvents(store, key, add) {
   for (let attempt = 0; ; attempt += 1) {
     const held = await readWithEtag(store, key);
     const events = list(held.data);
-    if (events.length + add.length > PLAY_EVENTS_MAX) reject(409, 'too_many', 'This game has had enough answers. Finish and start again.');
+    const have = new Set(events.map((e) => e.cid).filter(Boolean));
+    const fresh = add.filter((e) => !e.cid || !have.has(e.cid));
+    if (!fresh.length) return events;
+    if (events.length + fresh.length > PLAY_EVENTS_MAX) reject(409, 'too_many', 'This game has had enough answers. Finish and start again.');
     const seq0 = events.length ? Math.max(...events.map((e) => e.seq)) + 1 : 0;
-    const next = [...events, ...add.map((e, i) => ({ ...e, seq: seq0 + i }))];
+    const next = [...events, ...fresh.map((e, i) => ({ ...e, seq: seq0 + i }))];
     const options = held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
     const written = await store.setJSON(key, next, options);
     if (written?.modified !== false) return next;
@@ -170,9 +178,10 @@ export async function rebuildSummary(store, lessonId, gameId, classId, current) 
   for (const [id, mine] of byStudent) {
     mine.sort((a, b) => a.ended_at.localeCompare(b.ended_at));
     const latest = mine[mine.length - 1];
-    const best = mine.reduce((top, p) => (!top || p.score.right > top.score.right ? p : top), null);
     const record = await recordFor(store, k, latest.version, current);
     const keys = record.games?.[gameId];
+    const share = (p) => p.score.right / Math.max(1, p.score.total ?? p.score.answered);
+    const best = mine.reduce((top, p) => (!top || share(p) > share(top) ? p : top), null);
     const events = await readEvents(store, k, gameId, latest.play_id, latest.owner);
     const evidence = keys ? eventsToEvidence(keys, events) : [];
     const seen = new Set();
@@ -187,7 +196,8 @@ export async function rebuildSummary(store, lessonId, gameId, classId, current) 
       if (said) stat.wrong[said] = (stat.wrong[said] ?? 0) + 1;
       items[e.item] = stat;
     }
-    const score = (p) => ({ play_id: p.play_id, right: p.score.right, answered: p.score.answered, at: p.ended_at });
+    // Out of the same total as the finish card: every item in the game, not just those answered.
+    const score = (p) => ({ play_id: p.play_id, right: p.score.right, answered: p.score.answered, total: p.score.total ?? (keys ? gameTotal(keys) : p.score.answered), at: p.ended_at });
     students[id] = {
       owner: latest.owner,
       ...(latest.student_id ? { student_id: latest.student_id } : {}),
@@ -315,48 +325,112 @@ export async function gameStudentAction(store, lessonId, body, { now = Date.now(
     const raw = list(body.events);
     if (!raw.length) reject(400, 'bad_request', 'Nothing to send.');
     if (raw.length > SOLO_BATCH_MAX) reject(400, 'too_many', `Send up to ${SOLO_BATCH_MAX} moves at a time.`);
-    const results = [];
-    const add = [];
-    for (const input of raw) {
+    const inputs = raw.map((input) => {
       const parsed = SoloEventInputSchema.safeParse(input);
       if (!parsed.success) reject(400, 'bad_event', 'A move couldn’t be read.');
-      const e = parsed.data;
+      return parsed.data;
+    });
+    const eventsKey = k.events(body.game_id, play.play_id, owner);
+    // What this play holds so far: retried moves, hint ladders and words found are read from it.
+    const log = await readEvents(store, k, body.game_id, play.play_id, owner);
+    const byCid = new Map(log.filter((e) => e.cid).map((e) => [e.cid, e]));
+    const grid = playKeys.grid ?? null;
+    const results = [];
+    const add = [];
+    const seen = () => [...log, ...add];
+    const hintsOn = (item) => seen().filter((e) => e.move === 'hint' && e.item === item).length;
+    const solved = (item) => seen().some((e) => e.item === item && e.correct === true);
+    for (const e of inputs) {
+      const repeat = e.cid ? byCid.get(e.cid) ?? add.find((x) => x.cid === e.cid) : null;
+      if (repeat) {
+        // Sent before (the reply was lost): the same verdict, nothing stored twice.
+        results.push(repeat.reply ?? { item: repeat.item });
+        continue;
+      }
+      const selection = kind === 'find_a_word' && grid?.kind === 'wordsearch' && e.move === 'answer' && (e.item === 'any' || playKeys.items[e.item]?.shape === 'term');
       const key = playKeys.items[e.item];
-      if (!key) reject(400, 'bad_item', 'That isn’t in this game.');
+      if (!key && !selection) reject(400, 'bad_item', 'That isn’t in this game.');
       const extra = { ...(e.extra ?? {}) };
-      // Only the server says what was right: a phone's own say is dropped.
-      for (const k2 of ['group', 'one_away', 'confused_with']) delete extra[k2];
+      // Only the server says what was right or how many hints were used: a phone's own say is dropped.
+      for (const k2 of ['group', 'one_away', 'confused_with', 'hints']) delete extra[k2];
+      let item = e.item;
       let correct = null;
       let response;
+      let store1 = true;
       const out = { item: e.item };
-      if (MARKED_MOVES.has(e.move)) {
+      if (selection) {
+        const check = checkSelection(grid, e.item === 'any' ? null : e.item, e.response);
+        if (!check.item || !check.response) {
+          // A stray drag: nothing to learn from, nothing stored.
+          results.push({ item: e.item, correct: false });
+          continue;
+        }
+        item = check.item;
+        response = check.response;
+        if (check.correct === true && solved(item)) {
+          results.push({ item, correct: true, again: true });
+          continue;
+        }
+        if (check.correct !== null) correct = check.correct;
+        if (check.decoy) extra.confused_with = check.decoy;
+        if (check.correct === null && !check.decoy) store1 = false;
+        extra.hints = hintsOn(item);
+        Object.assign(out, { item, correct: check.correct === true, ...(check.decoy ? { decoy: true } : {}) });
+      } else if (MARKED_MOVES.has(e.move)) {
         const check = checkAnswer(key, e.response);
         correct = check.correct;
         response = check.response;
         if (check.group) extra.group = check.group;
         if (check.one_away) extra.one_away = true;
         if (check.decoy) extra.confused_with = check.decoy;
+        if (grid && key.shape === 'term') extra.hints = hintsOn(e.item);
         Object.assign(out, { correct, ...(check.one_away ? { one_away: true } : {}), ...(check.decoy ? { decoy: true } : {}) });
         const reveal = revealFor(kind, key, check);
         if (reveal) out.reveal = reveal;
+      } else if (e.move === 'pass' && key?.shape === 'wall') {
+        // Out of mistakes on a Connections wall: the groups still hidden come back to be shown. Before that, nothing (no peeking).
+        const limit = Number(list(lesson.game?.games).find((g) => g.id === body.game_id)?.settings?.mistakes) || 4;
+        const wrong = seen().filter((x) => x.item === e.item && x.move === 'guess' && x.correct === false).length;
+        if (wrong >= limit) {
+          const got = new Set(seen().filter((x) => x.item === e.item && x.correct === true && typeof x.extra?.group === 'string').map((x) => x.extra.group));
+          out.reveal = { groups: key.groups.filter((g) => !got.has(g.id)).map(({ id, label, why, difficulty, tiles }) => ({ id, label, why, difficulty, tiles })) };
+        }
+      } else if (e.move === 'hint' && grid && key.shape === 'term') {
+        // The hint ladder climbs on the server: the step is how many hints this word has had.
+        const step = Math.min(REVEAL_HINTS, hintsOn(e.item) + 1);
+        extra.hints = step;
+        if (grid.hints !== false) {
+          if (grid.kind === 'crossword') {
+            const typed = typeof e.response?.letters === 'string' ? e.response.letters.slice(0, 15) : '';
+            response = { letters: typed };
+            out.reveal = { step, cells: crosswordHint(grid, e.item, step, typed) };
+          } else out.reveal = { step, ...wordHint(grid, e.item, step) };
+        }
+      }
+      // The last word of a find-a-word found: the hidden message's cells come back with it.
+      if (correct === true && grid?.kind === 'wordsearch' && grid.message) {
+        const terms = Object.entries(playKeys.items).filter(([, x]) => x.shape === 'term').map(([id]) => id);
+        if (terms.every((id) => id === item || solved(id))) out.reveal = { ...(out.reveal ?? {}), message: grid.message };
       }
       results.push(out);
+      if (!store1) continue;
       add.push({
         at: now,
         game: kind,
         play_id: play.play_id,
         owner,
         ...(play.student_id ? { student_id: play.student_id } : {}),
-        item: e.item,
+        item,
         move: e.move,
         ...(response !== undefined ? { response } : {}),
         ...(correct !== null ? { correct } : {}),
         ...(e.time_ms !== undefined ? { time_ms: e.time_ms } : {}),
         ...(Object.keys(extra).length ? { extra } : {}),
-        strength: 'self_paced'
+        strength: 'self_paced',
+        ...(e.cid ? { cid: e.cid, reply: out } : {})
       });
     }
-    await appendEvents(store, k.events(body.game_id, play.play_id, owner), add);
+    if (add.length) await appendEvents(store, eventsKey, add);
     return { results };
   }
 
@@ -367,7 +441,7 @@ export async function gameStudentAction(store, lessonId, body, { now = Date.now(
   }
   const events = await readEvents(store, k, body.game_id, play.play_id, owner);
   const evidence = eventsToEvidence(playKeys, events);
-  const score = { ...playScore(evidence), total: Object.values(playKeys.items).reduce((n, key) => n + (key.shape === 'wall' ? key.groups.length : 1), 0) };
+  const score = { ...playScore(evidence), total: gameTotal(playKeys) };
   let boxed = 0;
   if (whoIs.student) {
     const roster = await loadRoster(store, whoIs.classId);

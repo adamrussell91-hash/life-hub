@@ -6,8 +6,8 @@ import type { PublishedLesson } from '@/schemas/published-lesson';
 import { mountGameEditor } from '@/games/editor';
 import { mountGameArcade } from '@/games/arcade';
 import { gameClient, gameTeacherApi, type GameClient } from '@/games/api';
-import { registerPlayer, type PlayerContext } from '@/games/solo/registry';
-import { pop, shake } from '@/games/motion/motion';
+import '@/games/kinds';
+import { FIND_A_WORD } from '../../scripts/mock-grid-games';
 import { splitGame } from '@/games/core/model';
 import { GameLessonSchema } from '@/games/core/schema';
 import '../styles/app.css';
@@ -20,10 +20,9 @@ import '../styles/app.css';
  * scores go through the real Functions. Open /games.html; `?view=arcade` or
  * `?view=editor` shows one side only.
  *
- * The solo shell (Phase 2) is exercised with a preview-only stub player for
- * crossword: one clue at a time, type the term, Hint and Check in the docked
- * row. "Drop the network" makes every send fail, to watch the queue keep the
- * answers and retry. Real players arrive in Phase 3 (games/kinds/).
+ * The arcade plays the real players (games/kinds/): crossword, find-a-word,
+ * Connections and Who said it?. "Drop the network" makes every send fail, to
+ * watch the queue keep the answers and retry.
  */
 
 const LESSON_ID = 'lesson_game_harbour';
@@ -54,6 +53,7 @@ const draftGame = GameLessonSchema.parse({
         term('t6', 'Oxymoron', 'Two opposites side by side')
       ]
     },
+    FIND_A_WORD,
     {
       id: 'g_who', kind: 'who_said_it', title: 'Who said it in Harbour Lights',
       cast: [{ id: 'c_keeper', name: 'The Keeper' }, { id: 'c_gull', name: 'Mara Gull' }],
@@ -73,89 +73,6 @@ const draftGame = GameLessonSchema.parse({
 
 let lesson = { id: LESSON_ID, type: 'lesson', title: 'Harbour Lights games', unit_id: 'unit_demo', pedagogical_mode: 'game', blocks: [], game: draftGame } as unknown as Lesson;
 
-/** Preview stub: one clue at a time, typed answers checked by the server. Not a real crossword. */
-function mountStubTermPlayer(host: HTMLElement, ctx: PlayerContext) {
-  const items = (ctx.game.items ?? []).filter((i) => i.shape === 'term');
-  let at = 0;
-  const card = el('div', 'gm-panel');
-  const clue = el('p', 'gm-h3');
-  const lengths = el('p', 'gm-note');
-  const input = el('input', 'gm-input');
-  input.autocomplete = 'off';
-  input.setAttribute('aria-label', 'Your answer');
-  const verdict = el('p', 'gm-note');
-  verdict.setAttribute('aria-live', 'polite');
-  card.append(clue, lengths, input, verdict);
-  host.append(card);
-  const shown = () => ctx.elapsedMs();
-  let shownAt = 0;
-  const hint = el('button', 'btn btn--secondary', 'Hint');
-  const check = el('button', 'btn btn--primary', 'Check');
-  hint.type = check.type = 'button';
-  function paint() {
-    const item = items[at];
-    if (!item || item.shape !== 'term') return ctx.finish();
-    clue.textContent = item.clues[0]?.text ?? 'No clue';
-    lengths.textContent = `(${item.lengths.join(', ')})`;
-    input.value = '';
-    verdict.textContent = '';
-    ctx.setStatus(`${at + 1} of ${items.length}`);
-    shownAt = shown();
-    void pop(card);
-    input.focus();
-  }
-  hint.addEventListener('click', () => {
-    const item = items[at];
-    if (!item) return;
-    void ctx.emit({ item: item.id, move: 'hint' });
-    ctx.toast('Hint used: it starts with the letter in the clue’s first word (preview stub).');
-  });
-  check.addEventListener('click', () => {
-    const item = items[at];
-    if (!item || !input.value.trim()) return;
-    check.disabled = true;
-    verdict.textContent = 'Checking…';
-    ctx
-      .emit({ item: item.id, move: 'answer', response: { text: input.value }, time_ms: shown() - shownAt }, { now: true })
-      .then((r) => {
-        if (r.correct) {
-          ctx.sfx.right();
-          ctx.toast('Right', 'good');
-          at += 1;
-          paint();
-        } else {
-          ctx.sfx.wrong();
-          verdict.textContent = 'Not that one. Try again or skip.';
-          void shake(card);
-        }
-      })
-      .catch((e) => {
-        verdict.textContent = e instanceof Error ? e.message : 'That didn’t send.';
-      })
-      .finally(() => {
-        check.disabled = false;
-      });
-  });
-  const skip = el('button', 'btn btn--secondary', 'Skip');
-  skip.type = 'button';
-  skip.addEventListener('click', () => {
-    at += 1;
-    paint();
-  });
-  ctx.setActions([hint, skip, check]);
-  paint();
-  return {
-    onKey(e: KeyboardEvent) {
-      if (e.key !== 'Enter') return false;
-      check.click();
-      return true;
-    },
-    dispose() {
-      card.remove();
-    }
-  };
-}
-registerPlayer('crossword', { mount: mountStubTermPlayer });
 
 /** Wraps the real client so the preview can drop the network on purpose. */
 let networkDown = false;

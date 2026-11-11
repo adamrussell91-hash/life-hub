@@ -294,7 +294,7 @@ function locateQuote(passage, quote) {
   const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
   if (!wanted.length) return null;
   for (let s = 0; s + wanted.length <= keyed.length; s++) {
-    if (wanted.every((key, j) => keyed[s + j].key === key)) return { from: keyed[s].i, to: keyed[s + wanted.length - 1].i };
+    if (wanted.every((key2, j) => keyed[s + j].key === key2)) return { from: keyed[s].i, to: keyed[s + wanted.length - 1].i };
   }
   return null;
 }
@@ -303,8 +303,8 @@ var FILLER = new Set(
 );
 function spanFinds(words, spot, target) {
   const content = (i) => {
-    const key = wordKey(words[i]?.text ?? "");
-    return !!key && !FILLER.has(key);
+    const key2 = wordKey(words[i]?.text ?? "");
+    return !!key2 && !FILLER.has(key2);
   };
   const targetWords = [];
   for (let i = target.from; i <= target.to; i++) targetWords.push(i);
@@ -593,32 +593,32 @@ function hasAnswer(response) {
   }
   return false;
 }
-function markResponse(key, response) {
-  const max = key.marks;
+function markResponse(key2, response) {
+  const max = key2.marks;
   const r = isRecord(response) ? response : {};
   const full = (ok, parts) => ({ score: ok ? max : 0, max, correct: ok, ...parts ? { parts } : {} });
   const share = (right, total, parts) => {
     const score = total ? roundMarks(Math.max(0, right) / total * max) : 0;
     return { score, max, correct: score === max, parts };
   };
-  const a = key.answer;
+  const a = key2.answer;
   switch (a.type) {
     case "boolean":
       return full(typeof r.value === "boolean" && r.value === a.value);
     case "text": {
       const match = matchText(typeof r.text === "string" ? r.text : "", a.accepted, a.case_sensitive);
       if (match === "exact") return full(true);
-      if (key.ai && hasAnswer(r)) return { score: null, max, correct: null, pending: "ai" };
+      if (key2.ai && hasAnswer(r)) return { score: null, max, correct: null, pending: "ai" };
       if (match === "near") return { score: null, max, correct: null, pending: "near_miss" };
       return full(false);
     }
     case "manual":
-      return hasAnswer(r) ? { score: null, max, correct: null, pending: key.ai ? "ai" : "manual" } : full(false);
+      return hasAnswer(r) ? { score: null, max, correct: null, pending: key2.ai ? "ai" : "manual" } : full(false);
     case "choice": {
       const picked = new Set(strings(r.selected));
       const right = new Set(a.ids);
       const parts = Object.fromEntries([...picked].map((id) => [id, right.has(id)]));
-      const single = key.kind === "multiple_choice" || key.kind === "odd_one_out" || key.kind === "quote_technique";
+      const single = key2.kind === "multiple_choice" || key2.kind === "odd_one_out" || key2.kind === "quote_technique";
       if (single) return full(picked.size === 1 && right.has([...picked][0]), parts);
       let hits = 0;
       let misses = 0;
@@ -635,7 +635,7 @@ function markResponse(key, response) {
       let waiting = false;
       for (const [id, accepted] of Object.entries(a.gaps)) {
         const exact = matchText(given[id] ?? "", accepted) === "exact";
-        if (!exact && key.ai && (given[id] ?? "").trim()) {
+        if (!exact && key2.ai && (given[id] ?? "").trim()) {
           waiting = true;
           continue;
         }
@@ -919,7 +919,7 @@ var FindAWordSchema = z3.object({
   items: z3.array(TermItemSchema).max(GAME_COUNTS.find_a_word.max).default([]),
   /** Optional hidden message spelled by the leftover letters, and the question asked about it. */
   message: z3.object({ text: Text2(GAME_LIMITS.message), question: QuizQuestionDraftSchema.optional() }).optional(),
-  settings: z3.object({ seed: Seed, directions: z3.enum(["easy", "all"]).default("all"), hints: z3.boolean().default(true) }).prefault({})
+  settings: z3.object({ seed: Seed, locked: z3.boolean().default(false), directions: z3.enum(["easy", "all"]).default("all"), hints: z3.boolean().default(true) }).prefault({})
 });
 var JEOPARDY_VALUES = [100, 200, 300, 400, 500];
 var JeopardyTileSchema = z3.object({
@@ -1050,6 +1050,14 @@ var PublicQuestionItemSchema = z3.object({ id: z3.string(), shape: z3.literal("q
 var PublicQuoteSchema = z3.object({ id: z3.string(), shape: z3.literal("quote"), text: z3.string() });
 var PublicItemSchema = z3.discriminatedUnion("shape", [PublicTermSchema, PublicQuestionItemSchema, PublicQuoteSchema]);
 var PublicWallSchema = z3.object({ id: z3.string(), title: z3.string(), tiles: z3.array(z3.object({ id: z3.string(), text: z3.string() })) });
+var PublicCrosswordGridSchema = z3.object({
+  kind: z3.literal("crossword"),
+  width: z3.number().int(),
+  height: z3.number().int(),
+  entries: z3.array(z3.object({ item: z3.string(), number: z3.number().int(), dir: z3.enum(["across", "down"]), x: z3.number().int(), y: z3.number().int(), length: z3.number().int() }))
+});
+var PublicWordGridSchema = z3.object({ kind: z3.literal("wordsearch"), size: z3.number().int(), rows: z3.array(z3.string()) });
+var PublicGridSchema = z3.discriminatedUnion("kind", [PublicCrosswordGridSchema, PublicWordGridSchema]);
 var PublicGameSchema = z3.object({
   id: z3.string(),
   title: z3.string(),
@@ -1064,7 +1072,9 @@ var PublicGameSchema = z3.object({
   items: z3.array(PublicItemSchema).optional(),
   walls: z3.array(PublicWallSchema).optional(),
   cast: z3.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
-  message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional()
+  message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional(),
+  /** Crossword and find-a-word: the grid, built at publish. */
+  grid: PublicGridSchema.optional()
 });
 var PublicGameLessonSchema = z3.object({
   games: z3.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -1072,6 +1082,433 @@ var PublicGameLessonSchema = z3.object({
   /** The publish version the keys are stored under. */
   version: z3.string()
 });
+
+// apps/teaching/src/games/generators/random.ts
+function seededRandom(seed) {
+  let a = Math.floor(seed) >>> 0 || 2654435769;
+  return () => {
+    a = a + 1831565813 >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffleWith(list, rng) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+// apps/teaching/src/games/generators/crossword.ts
+var CROSSWORD_MAX = 15;
+var key = (x, y) => `${x},${y}`;
+var Board = class {
+  constructor(max) {
+    this.max = max;
+  }
+  max;
+  cells = /* @__PURE__ */ new Map();
+  placed = [];
+  minX = 0;
+  maxX = -1;
+  minY = 0;
+  maxY = -1;
+  crossings = 0;
+  get empty() {
+    return this.placed.length === 0;
+  }
+  /** Crossings made, or -1 when the word can't go there. */
+  fits(word, x, y, dir) {
+    const dx = dir === "across" ? 1 : 0;
+    const dy = dir === "down" ? 1 : 0;
+    const n = word.length;
+    const minX = this.empty ? x : Math.min(this.minX, x);
+    const minY = this.empty ? y : Math.min(this.minY, y);
+    const maxX = this.empty ? x + dx * (n - 1) : Math.max(this.maxX, x + dx * (n - 1));
+    const maxY = this.empty ? y + dy * (n - 1) : Math.max(this.maxY, y + dy * (n - 1));
+    if (maxX - minX + 1 > this.max || maxY - minY + 1 > this.max) return -1;
+    if (this.cells.has(key(x - dx, y - dy)) || this.cells.has(key(x + dx * n, y + dy * n))) return -1;
+    let crossings = 0;
+    for (let i = 0; i < n; i++) {
+      const cx = x + dx * i;
+      const cy = y + dy * i;
+      const held = this.cells.get(key(cx, cy));
+      if (held) {
+        if (held.ch !== word[i] || held[dir]) return -1;
+        crossings += 1;
+      } else if (this.cells.has(key(cx + dy, cy + dx)) || this.cells.has(key(cx - dy, cy - dx))) {
+        return -1;
+      }
+    }
+    return crossings;
+  }
+  place(p) {
+    const dx = p.dir === "across" ? 1 : 0;
+    const dy = p.dir === "down" ? 1 : 0;
+    const fresh = [];
+    for (let i = 0; i < p.word.length; i++) {
+      const k = key(p.x + dx * i, p.y + dy * i);
+      const held = this.cells.get(k);
+      if (held) {
+        held[p.dir] = true;
+        this.crossings += 1;
+      } else {
+        this.cells.set(k, { ch: p.word[i], across: p.dir === "across", down: p.dir === "down" });
+        fresh.push(k);
+      }
+    }
+    this.placed.push(p);
+    this.bounds();
+    return fresh;
+  }
+  unplace(p, fresh) {
+    const dx = p.dir === "across" ? 1 : 0;
+    const dy = p.dir === "down" ? 1 : 0;
+    const made = new Set(fresh);
+    for (let i = 0; i < p.word.length; i++) {
+      const k = key(p.x + dx * i, p.y + dy * i);
+      if (made.has(k)) this.cells.delete(k);
+      else {
+        const held = this.cells.get(k);
+        if (held) held[p.dir] = false;
+        this.crossings -= 1;
+      }
+    }
+    this.placed.pop();
+    this.bounds();
+  }
+  bounds() {
+    if (!this.placed.length) {
+      this.minX = this.minY = 0;
+      this.maxX = this.maxY = -1;
+      return;
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const k of this.cells.keys()) {
+      const [x, y] = k.split(",").map(Number);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    Object.assign(this, { minX, minY, maxX, maxY });
+  }
+  candidates(id, word, rng) {
+    if (this.empty) return [{ id, word, x: 0, y: 0, dir: "across", crossings: 0, area: word.length, tie: rng() }];
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const [k, cell] of this.cells) {
+      if (cell.across && cell.down) continue;
+      const dir = cell.across ? "down" : "across";
+      const [cx, cy] = k.split(",").map(Number);
+      for (let i = 0; i < word.length; i++) {
+        if (word[i] !== cell.ch) continue;
+        const x = dir === "across" ? cx - i : cx;
+        const y = dir === "down" ? cy - i : cy;
+        const tag = `${x},${y},${dir}`;
+        if (seen.has(tag)) continue;
+        seen.add(tag);
+        const crossings = this.fits(word, x, y, dir);
+        if (crossings < 1) continue;
+        const ex = dir === "across" ? x + word.length - 1 : x;
+        const ey = dir === "down" ? y + word.length - 1 : y;
+        const area = (Math.max(this.maxX, ex) - Math.min(this.minX, x) + 1) * (Math.max(this.maxY, ey) - Math.min(this.minY, y) + 1);
+        out.push({ id, word, x, y, dir, crossings, area, tie: rng() });
+      }
+    }
+    return out.sort((a, b) => b.crossings - a.crossings || a.area - b.area || a.tie - b.tie);
+  }
+};
+function better(a, b) {
+  if (!b) return true;
+  if (a.count !== b.count) return a.count > b.count;
+  if (a.crossings !== b.crossings) return a.crossings > b.crossings;
+  return a.area < b.area;
+}
+function generateCrossword(words, seed, options = {}) {
+  const max = Math.max(3, Math.min(CROSSWORD_MAX, options.max ?? CROSSWORD_MAX));
+  const attempts = options.attempts ?? 10;
+  const budget = options.budget ?? 1500;
+  const branch = options.branch ?? 3;
+  const rng = seededRandom(seed);
+  const usable = words.filter((w) => /^[A-Z]{2,}$/.test(w.word) && w.word.length <= max);
+  let best = null;
+  for (let attempt2 = 0; attempt2 < attempts; attempt2++) {
+    const order = shuffleWith(usable, rng).map((w) => ({ w, k: w.word.length + (attempt2 ? (rng() - 0.5) * Math.min(attempt2, 4) : 0) })).sort((a, b) => b.k - a.k).map((x) => x.w);
+    const board = new Board(max);
+    let nodes = 0;
+    const record = () => {
+      const area = board.placed.length ? (board.maxX - board.minX + 1) * (board.maxY - board.minY + 1) : 0;
+      const now = { placed: [...board.placed], crossings: board.crossings, area, count: board.placed.length };
+      if (better(now, best)) best = now;
+    };
+    const search = (queue) => {
+      if (nodes++ > budget) return true;
+      if (!queue.length) {
+        record();
+        return board.placed.length === usable.length;
+      }
+      const [next, ...rest] = queue;
+      const options2 = board.candidates(next.id, next.word, rng).slice(0, branch);
+      if (!options2.length && !next.deferred && rest.length) return search([...rest, { ...next, deferred: true }]);
+      for (const c of options2) {
+        const fresh = board.place(c);
+        const done = search(rest);
+        board.unplace(c, fresh);
+        if (done) return true;
+      }
+      return search(rest);
+    };
+    search(order);
+    if (best && best.count === usable.length && attempt2 >= 2) break;
+  }
+  const chosen = best ?? { placed: [], crossings: 0, area: 0, count: 0 };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of chosen.placed) {
+    const ex = p.dir === "across" ? p.x + p.word.length - 1 : p.x;
+    const ey = p.dir === "down" ? p.y + p.word.length - 1 : p.y;
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, ex);
+    maxY = Math.max(maxY, ey);
+  }
+  const shifted = chosen.placed.map((p) => ({ ...p, x: p.x - (Number.isFinite(minX) ? minX : 0), y: p.y - (Number.isFinite(minY) ? minY : 0) }));
+  const starts = [...new Set(shifted.map((p) => p.y * 100 + p.x))].sort((a, b) => a - b);
+  const entries = shifted.map((p) => ({ id: p.id, word: p.word, x: p.x, y: p.y, dir: p.dir, number: starts.indexOf(p.y * 100 + p.x) + 1 })).sort((a, b) => a.number - b.number || (a.dir === "across" ? -1 : 1));
+  const placedIds = new Set(entries.map((e) => e.id));
+  return {
+    width: Number.isFinite(maxX) ? maxX - minX + 1 : 0,
+    height: Number.isFinite(maxY) ? maxY - minY + 1 : 0,
+    entries,
+    unplaced: words.filter((w) => !placedIds.has(w.id)).map((w) => w.id),
+    crossings: chosen.crossings
+  };
+}
+
+// apps/teaching/src/games/generators/wordsearch.ts
+var WORDSEARCH_MAX = 15;
+var WORDSEARCH_MIN = 6;
+var DIRECTIONS_ALL = [
+  [1, 0],
+  [0, 1],
+  [1, 1],
+  [1, -1],
+  [-1, 0],
+  [0, -1],
+  [-1, -1],
+  [-1, 1]
+];
+var DIRECTIONS_EASY = [[1, 0], [0, 1]];
+function lineBetween(from, to) {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  if (dx && dy && Math.abs(dx) !== Math.abs(dy)) return null;
+  const n = Math.max(Math.abs(dx), Math.abs(dy));
+  const sx = Math.sign(dx);
+  const sy = Math.sign(dy);
+  return Array.from({ length: n + 1 }, (_, i) => [from[0] + sx * i, from[1] + sy * i]);
+}
+function readSelection(rows, from, to) {
+  const size = rows.length;
+  const cells = lineBetween(from, to);
+  if (!cells) return null;
+  let out = "";
+  for (const [x, y] of cells) {
+    if (x < 0 || y < 0 || x >= size || y >= size) return null;
+    out += rows[y]?.[x] ?? "";
+  }
+  return out;
+}
+function fullLine(size, p) {
+  let { dx, dy } = p;
+  if (dx < 0 || dx === 0 && dy < 0) {
+    dx = -dx;
+    dy = -dy;
+  }
+  let x = p.x;
+  let y = p.y;
+  while (x - dx >= 0 && x - dx < size && y - dy >= 0 && y - dy < size) {
+    x -= dx;
+    y -= dy;
+  }
+  return { x, y, dx, dy };
+}
+function placementCells(p) {
+  return Array.from({ length: p.word.length }, (_, i) => [p.x + p.dx * i, p.y + p.dy * i]);
+}
+function occurrences(rows, word) {
+  const size = rows.length;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (rows[y]?.[x] !== word[0]) continue;
+      for (const [dx, dy] of DIRECTIONS_ALL) {
+        const ex = x + dx * (word.length - 1);
+        const ey = y + dy * (word.length - 1);
+        if (ex < 0 || ey < 0 || ex >= size || ey >= size) continue;
+        let ok = true;
+        for (let i = 1; i < word.length && ok; i++) ok = rows[y + dy * i]?.[x + dx * i] === word[i];
+        if (!ok) continue;
+        const cells = Array.from({ length: word.length }, (_, i) => `${x + dx * i},${y + dy * i}`);
+        const tag = [...cells].sort().join("|");
+        if (seen.has(tag)) continue;
+        seen.add(tag);
+        out.push({ word, cells });
+      }
+    }
+  }
+  return out;
+}
+function strayCopies(rows, placements) {
+  const own = placements.map((p) => new Set(placementCells(p).map(([x, y]) => `${x},${y}`)));
+  const out = [];
+  for (const word of new Set(placements.map((p) => p.word))) {
+    for (const occ of occurrences(rows, word)) {
+      const inside = own.some((cells) => occ.cells.every((c) => cells.has(c)));
+      if (!inside) out.push(occ);
+    }
+  }
+  return out;
+}
+function fillerPicker(words, rng) {
+  const weight = /* @__PURE__ */ new Map();
+  for (const ch of "ABCDEFGHIJKLMNOPRSTUVWY") weight.set(ch, 1);
+  for (const w of words) for (const ch of w) weight.set(ch, (weight.get(ch) ?? 0) + 3);
+  const letters = [...weight.entries()];
+  const total = letters.reduce((n, [, v]) => n + v, 0);
+  return () => {
+    let r = rng() * total;
+    for (const [ch, v] of letters) {
+      r -= v;
+      if (r < 0) return ch;
+    }
+    return "E";
+  };
+}
+function attempt(size, input, rng) {
+  const dirs = input.directions === "easy" ? DIRECTIONS_EASY : DIRECTIONS_ALL;
+  const grid = Array(size * size).fill(null);
+  const placements = [];
+  const unplaced = [];
+  const decoysUnplaced = [];
+  const answerWords = new Set(input.words.map((w) => w.word));
+  const tryPlace = (word, make) => {
+    const spots = [];
+    for (const [dx, dy] of dirs) {
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const ex = x + dx * (word.length - 1);
+          const ey = y + dy * (word.length - 1);
+          if (ex < 0 || ey < 0 || ex >= size || ey >= size) continue;
+          let overlap = 0;
+          let ok = true;
+          for (let i = 0; i < word.length && ok; i++) {
+            const held = grid[(y + dy * i) * size + x + dx * i];
+            if (held === null || held === void 0) continue;
+            if (held === word[i]) overlap += 1;
+            else ok = false;
+          }
+          if (ok && overlap < word.length) spots.push({ x, y, dx, dy, overlap, tie: rng() });
+        }
+      }
+    }
+    if (!spots.length) return false;
+    const sharing = spots.filter((s) => s.overlap > 0);
+    const pool = sharing.length && rng() < 0.5 ? sharing : spots;
+    const pick = pool.reduce((a, b) => b.tie < a.tie ? b : a);
+    const p = make(pick.x, pick.y, pick.dx, pick.dy);
+    for (let i = 0; i < word.length; i++) grid[(p.y + p.dy * i) * size + p.x + p.dx * i] = word[i];
+    placements.push(p);
+    return true;
+  };
+  const words = shuffleWith(input.words, rng).sort((a, b) => b.word.length - a.word.length);
+  for (const w of words) {
+    if (w.word.length > size || !tryPlace(w.word, (x, y, dx, dy) => ({ id: w.id, owner: w.id, word: w.word, x, y, dx, dy, decoy: false }))) unplaced.push(w.id);
+  }
+  const placedWords = new Set(placements.map((p) => p.word));
+  for (const d of shuffleWith(input.decoys ?? [], rng)) {
+    if (answerWords.has(d.word) || placedWords.has(d.word)) continue;
+    if (d.word.length > size || !tryPlace(d.word, (x, y, dx, dy) => ({ id: null, owner: d.owner, word: d.word, x, y, dx, dy, decoy: true }))) decoysUnplaced.push(d.word);
+    else placedWords.add(d.word);
+  }
+  const message = input.message ?? "";
+  const free = [];
+  for (let i = 0; i < grid.length; i++) if (grid[i] === null) free.push(i);
+  const fits = !message || free.length >= message.length;
+  const msgCells = fits ? free.slice(0, message.length) : [];
+  msgCells.forEach((cell, i) => {
+    grid[cell] = message[i];
+  });
+  const fillerCells = free.slice(msgCells.length);
+  const filler = fillerPicker([...placements.map((p) => p.word)], rng);
+  for (const cell of fillerCells) grid[cell] = filler();
+  const rowsOf = () => Array.from({ length: size }, (_, y) => grid.slice(y * size, y * size + size).join(""));
+  let rows = rowsOf();
+  let stray = strayCopies(rows, placements);
+  const fillerSet = new Set(fillerCells.map((c) => `${c % size},${Math.floor(c / size)}`));
+  for (let round = 0; stray.length && round < 60; round++) {
+    let changed = false;
+    for (const occ of stray) {
+      const loose = occ.cells.filter((c2) => fillerSet.has(c2));
+      if (!loose.length) continue;
+      const c = loose[Math.floor(rng() * loose.length)];
+      const [x, y] = c.split(",").map(Number);
+      grid[y * size + x] = filler();
+      changed = true;
+    }
+    if (!changed) break;
+    rows = rowsOf();
+    stray = strayCopies(rows, placements);
+  }
+  const decoysWanted = (input.decoys ?? []).filter((d) => !answerWords.has(d.word)).length;
+  const decoysPlaced = placements.filter((p) => p.decoy).length;
+  const score = (input.words.length - unplaced.length) * 1e3 + (stray.length ? 0 : 500) + (fits ? 200 : 0) + Math.min(decoysPlaced, decoysWanted) * 10;
+  return {
+    score,
+    layout: {
+      size,
+      rows,
+      placements,
+      unplaced: input.words.filter((w) => unplaced.includes(w.id)).map((w) => w.id),
+      decoys_unplaced: decoysUnplaced,
+      message: message && fits ? { text: message, cells: msgCells.map((c) => [c % size, Math.floor(c / size)]) } : null,
+      message_fits: fits
+    }
+  };
+}
+function generateWordSearch(input) {
+  const rng = seededRandom(input.seed);
+  const words = input.words.filter((w) => /^[A-Z]+$/.test(w.word));
+  const decoys = (input.decoys ?? []).filter((d) => /^[A-Z]{2,}$/.test(d.word));
+  const clean = { ...input, words, decoys, message: (input.message ?? "").replace(/[^A-Z]/g, "") };
+  const letters = [...words, ...decoys].reduce((n, w) => n + w.word.length, 0);
+  const longest = Math.max(0, ...words.map((w) => w.word.length), ...decoys.map((d) => d.word.length));
+  const start = Math.min(WORDSEARCH_MAX, Math.max(WORDSEARCH_MIN, longest, Math.ceil(Math.sqrt(letters * 0.8 + clean.message.length))));
+  const perSize = input.attempts ?? 24;
+  const decoysWanted = decoys.filter((d) => !words.some((w) => w.word === d.word)).length;
+  const perfect = words.length * 1e3 + 500 + 200 + decoysWanted * 10;
+  let best = null;
+  for (let size = start; size <= WORDSEARCH_MAX; size++) {
+    for (let i = 0; i < perSize; i++) {
+      const a = attempt(size, clean, rng);
+      if (!best || a.score > best.score) best = a;
+      if (a.score >= perfect) return { ...a.layout, unplaced: input.words.filter((w) => !words.includes(w) || a.layout.unplaced.includes(w.id)).map((w) => w.id) };
+    }
+  }
+  const layout = best.layout;
+  return { ...layout, unplaced: input.words.filter((w) => !words.includes(w) || layout.unplaced.includes(w.id)).map((w) => w.id) };
+}
 
 // apps/teaching/src/games/core/model.ts
 function normaliseAnswer(value) {
@@ -1081,6 +1518,7 @@ function wordLengths(term) {
   return norm(term).split(/[\s\-‐-―]+/).map((w) => w.normalize("NFD").replace(/\p{M}+/gu, "").length).filter((n) => n > 0);
 }
 var gridWord = (term) => normaliseAnswer(term).toUpperCase();
+var messageLetters = (text) => String(text ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toUpperCase().replace(/[^A-Z]/g, "");
 function evidenceTags(tags, extra) {
   const out = [
     ...[...tags.outcomes ?? [], ...extra?.outcomes ?? []].map((o) => `out:${o}`),
@@ -1090,38 +1528,41 @@ function evidenceTags(tags, extra) {
   ];
   return [...new Set(out)];
 }
+function gameTotal(keys) {
+  return Object.values(keys.items).reduce((n, key2) => n + (key2.shape === "wall" ? key2.groups.length : 1), 0);
+}
 var isRecord2 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 var textOf = (r) => isRecord2(r) && typeof r.text === "string" ? r.text.slice(0, 400) : "";
-function checkAnswer(key, response) {
-  switch (key.shape) {
+function checkAnswer(key2, response) {
+  switch (key2.shape) {
     case "term": {
       const given = normaliseAnswer(textOf(response));
       const kept = { text: textOf(response) };
       if (!given) return { correct: false, response: kept };
-      if (key.answers.some((a) => normaliseAnswer(a) === given)) return { correct: true, response: kept };
-      const decoy = key.decoys.find((d) => normaliseAnswer(d) === given);
+      if (key2.answers.some((a) => normaliseAnswer(a) === given)) return { correct: true, response: kept };
+      const decoy = key2.decoys.find((d) => normaliseAnswer(d) === given);
       return { correct: false, response: kept, ...decoy ? { decoy } : {} };
     }
     case "question": {
-      const cleaned = cleanResponse(key.key.kind, response);
-      const mark = markResponse(key.key, cleaned);
+      const cleaned = cleanResponse(key2.key.kind, response);
+      const mark = markResponse(key2.key, cleaned);
       return { correct: mark.correct === true, mark, response: cleaned };
     }
     case "quote": {
       if (isRecord2(response) && typeof response.speaker === "string") {
         const speaker = response.speaker.slice(0, 40);
-        return { correct: speaker === key.speaker, response: { speaker } };
+        return { correct: speaker === key2.speaker, response: { speaker } };
       }
       const given = normaliseAnswer(textOf(response));
-      return { correct: !!given && key.answers.some((a) => normaliseAnswer(a) === given), response: { text: textOf(response) } };
+      return { correct: !!given && key2.answers.some((a) => normaliseAnswer(a) === given), response: { text: textOf(response) } };
     }
     case "wall": {
-      const picked = isRecord2(response) && Array.isArray(response.tiles) ? [...new Set(response.tiles.filter((t) => typeof t === "string" && t in key.tiles))].slice(0, 4) : [];
+      const picked = isRecord2(response) && Array.isArray(response.tiles) ? [...new Set(response.tiles.filter((t) => typeof t === "string" && t in key2.tiles))].slice(0, 4) : [];
       const kept = { tiles: picked };
       if (picked.length !== 4) return { correct: false, response: kept };
-      const hit = key.groups.find((g) => picked.every((t) => g.tiles.includes(t)));
+      const hit = key2.groups.find((g) => picked.every((t) => g.tiles.includes(t)));
       if (hit) return { correct: true, group: hit.id, response: kept };
-      const oneAway = key.groups.some((g) => picked.filter((t) => g.tiles.includes(t)).length === 3);
+      const oneAway = key2.groups.some((g) => picked.filter((t) => g.tiles.includes(t)).length === 3);
       return { correct: false, one_away: oneAway, response: kept };
     }
   }
@@ -1162,6 +1603,54 @@ function itemLabel(item) {
 var hasTags = (t, q) => !!(t.pieces?.length || t.outcomes?.length || t.skills?.length || t.tech?.length || q?.pieces?.length || q?.outcomes?.length || q?.skills?.length);
 function clueOf(item) {
   return item.clues[item.use_clue ?? 0] ?? item.clues[0];
+}
+function crosswordLayoutOf(game) {
+  return generateCrossword(game.items.map((t) => ({ id: t.id, word: gridWord(t.term) })), game.settings.seed);
+}
+function wordSearchOf(game) {
+  return generateWordSearch({
+    words: game.items.map((t) => ({ id: t.id, word: gridWord(t.term) })),
+    decoys: game.items.flatMap((t) => t.decoys.map((d) => ({ owner: t.id, word: gridWord(d) })).filter((d) => d.word.length > 1)),
+    message: game.message?.text.trim() ? messageLetters(game.message.text) : "",
+    seed: game.settings.seed,
+    directions: game.settings.directions
+  });
+}
+var cellKey = (x, y) => `${x},${y}`;
+function crosswordHint(grid, itemId, step, typed) {
+  const e = grid.entries.find((x) => x.id === itemId);
+  if (!e) return [];
+  const cellsOf = (x) => Array.from(x.word, (ch, i) => ({ x: x.dir === "across" ? x.x + i : x.x, y: x.dir === "down" ? x.y + i : x.y, ch }));
+  const mine = cellsOf(e);
+  if (step >= 3) return mine;
+  if (step === 2) {
+    const at = new Set(mine.map((c) => cellKey(c.x, c.y)));
+    return grid.entries.filter((x) => x.dir !== e.dir && cellsOf(x).some((c) => at.has(cellKey(c.x, c.y)))).map((x) => cellsOf(x)[0]);
+  }
+  const given = typed.toUpperCase();
+  return [mine.find((c, i) => given[i] !== c.ch) ?? mine[0]];
+}
+function wordHint(grid, itemId, step) {
+  const p = grid.placements.find((x) => !x.decoy && x.id === itemId);
+  if (!p) return {};
+  return { first: p.word[0], ...step >= 2 ? { length: p.word.length } : {}, ...step >= 3 ? { line: fullLine(grid.size, p) } : {} };
+}
+var point = (v, size) => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n < size) ? [v[0], v[1]] : null;
+function checkSelection(grid, clue, response) {
+  const r = isRecord2(response) ? response : {};
+  const from = point(r.from, grid.size);
+  const to = point(r.to, grid.size);
+  const text = from && to ? readSelection(grid.rows, from, to) : null;
+  if (!from || !to || !text || text.length < 2) return { item: null, correct: null, response: null };
+  const kept = { from, to, text };
+  const reversed = [...text].reverse().join("");
+  const hit = grid.placements.filter((p) => p.word === text || p.word === reversed);
+  const own = clue ? hit.find((p) => !p.decoy && p.id === clue) : hit.find((p) => !p.decoy);
+  if (own) return { item: own.id, correct: true, response: kept };
+  const other = hit[0];
+  if (!other) return { item: clue, correct: null, response: kept };
+  if (clue) return { item: clue, correct: false, decoy: other.label, response: kept };
+  return { item: other.owner, correct: null, decoy: other.label, response: kept };
 }
 var named = (game, i) => game.title.trim() ? `\u201C${game.title.trim()}\u201D` : `Game ${i + 1}`;
 var KIND_NOUN = {
@@ -1260,8 +1749,7 @@ function gameIssues(lesson) {
     switch (game.kind) {
       case "find_a_word": {
         if (game.message?.text.trim()) {
-          const letters = gridWord(game.message.text);
-          if (!/^[A-Z]+$/.test(letters)) out.push(`${where}: the hidden message needs letters only.`);
+          if (!messageLetters(game.message.text)) out.push(`${where}: the hidden message needs some letters A to Z.`);
           if (game.message.question) {
             const problem = questionProblem({ id: "message", shape: "question", question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
             if (problem) out.push(`${where}: the hidden message question needs finishing: ${problem}.`);
@@ -1388,11 +1876,11 @@ function quoteKey(item, cast) {
 function splitQuestionItem(item, random) {
   const checked = checkQuestion({ ...item.question, id: item.id });
   if (!checked.ok) return null;
-  const { question, key } = splitQuestion(checked.question, random);
+  const { question, key: key2 } = splitQuestion(checked.question, random);
   const q = checked.question;
   return {
     pub: { id: item.id, shape: "question", question },
-    key: { shape: "question", key, tags: evidenceTags(item, { pieces: q.pieces, outcomes: q.outcomes, skills: q.skills }), label: q.prompt.trim().slice(0, 200) }
+    key: { shape: "question", key: key2, tags: evidenceTags(item, { pieces: q.pieces, outcomes: q.outcomes, skills: q.skills }), label: q.prompt.trim().slice(0, 200) }
   };
 }
 function publicSettings(settings) {
@@ -1427,8 +1915,45 @@ function splitGame(game, random = Math.random) {
   };
   let walls;
   let message;
+  let grid;
   let count = 0;
-  if (game.kind === "connections") {
+  if (game.kind === "crossword") {
+    const layout = crosswordLayoutOf(game);
+    const placed = new Set(layout.entries.map((e) => e.id));
+    for (const item of game.items) {
+      if (!placed.has(item.id)) continue;
+      const pub2 = any(item);
+      if (pub2) pubItems.push(pub2);
+    }
+    count = pubItems.length;
+    keys.grid = { kind: "crossword", width: layout.width, height: layout.height, hints: game.settings.hints, entries: layout.entries.map((e) => ({ ...e })) };
+    grid = { kind: "crossword", width: layout.width, height: layout.height, entries: layout.entries.map((e) => ({ item: e.id, number: e.number, dir: e.dir, x: e.x, y: e.y, length: e.word.length })) };
+  } else if (game.kind === "find_a_word") {
+    const layout = wordSearchOf(game);
+    const placed = new Set(layout.placements.filter((p) => !p.decoy).map((p) => p.id));
+    for (const item of game.items) {
+      if (!placed.has(item.id)) continue;
+      const pub2 = any(item);
+      if (pub2) pubItems.push(pub2);
+    }
+    const labels = /* @__PURE__ */ new Map();
+    for (const t of game.items) for (const d of [t.term, ...t.decoys]) if (d.trim()) labels.set(gridWord(d), d.trim());
+    keys.grid = {
+      kind: "wordsearch",
+      size: layout.size,
+      rows: layout.rows,
+      hints: game.settings.hints,
+      placements: layout.placements.map((p) => ({ ...p, label: labels.get(p.word) ?? p.word })),
+      message: layout.message ? { ...layout.message, display: game.message?.text.trim() ?? layout.message.text } : null
+    };
+    grid = { kind: "wordsearch", size: layout.size, rows: layout.rows };
+    if (layout.message) {
+      let q;
+      if (game.message?.question) q = question({ id: "message_q", shape: "question", question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
+      message = { length: layout.message.text.length, ...q && q.shape === "question" ? { question: q.question } : {} };
+    }
+    count = pubItems.length + (message?.question ? 1 : 0);
+  } else if (game.kind === "connections") {
     const fresh = freshIds(random);
     walls = game.walls.map((w) => {
       const tiles = {};
@@ -1456,13 +1981,6 @@ function splitGame(game, random = Math.random) {
       if (pub2) pubItems.push(pub2);
     }
     count = pubItems.length;
-    if (game.kind === "find_a_word" && game.message?.text.trim()) {
-      const text = game.message.text.trim();
-      keys.items.message = { shape: "term", answers: [text], decoys: [], tags: [], label: text };
-      let q;
-      if (game.message.question) q = question({ id: "message_q", shape: "question", question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
-      message = { length: gridWord(text).length, ...q && q.shape === "question" ? { question: q.question } : {} };
-    }
   }
   if (game.kind === "battles") count = 1;
   const pub = {
@@ -1477,7 +1995,8 @@ function splitGame(game, random = Math.random) {
     ...info.solo && game.kind !== "connections" ? { items: pubItems } : {},
     ...info.solo && walls ? { walls } : {},
     ...info.solo && game.kind === "who_said_it" ? { cast: game.cast.map(({ id, name, emblem, image_url }) => ({ id, name: name.trim(), ...emblem ? { emblem } : {}, ...image_url ? { image_url } : {} })) } : {},
-    ...info.solo && message ? { message } : {}
+    ...info.solo && message ? { message } : {},
+    ...info.solo && grid ? { grid } : {}
   };
   return { public: pub, keys };
 }
@@ -1507,9 +2026,13 @@ var GameEventSchema = z4.object({
   time_ms: z4.number().int().min(0).max(36e5).optional(),
   /** Per kind: hints, bet, letters_showing, confused_with, group, one_away… */
   extra: Extra.optional(),
-  strength: z4.enum(STRENGTHS)
+  strength: z4.enum(STRENGTHS),
+  /** The phone's own id for the move: a batch sent twice never stores it twice. */
+  cid: z4.string().max(40).optional()
 });
 var SoloEventInputSchema = z4.object({
+  /** Made by the phone's queue, once per move, so a retried batch is recognised (games.mjs dedupes on it). */
+  cid: z4.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
   item: z4.string().min(1).max(40),
   move: z4.enum(GAME_MOVES),
   response: z4.unknown().optional(),
@@ -1527,9 +2050,9 @@ function eventsToEvidence(keys, events) {
   const walls = /* @__PURE__ */ new Map();
   for (const e of sorted) {
     if (!MARKED_MOVES.has(e.move) || typeof e.correct !== "boolean") continue;
-    const key = keys.items[e.item];
-    if (!key) continue;
-    if (key.shape === "wall") {
+    const key2 = keys.items[e.item];
+    if (!key2) continue;
+    if (key2.shape === "wall") {
       const w = walls.get(e.item) ?? { guessed: false, found: /* @__PURE__ */ new Set(), strength: e.strength };
       w.guessed = true;
       w.strength = stronger(w.strength, e.strength);
@@ -1545,12 +2068,12 @@ function eventsToEvidence(keys, events) {
     }
     const revealed = typeof e.extra?.hints === "number" && e.extra.hints >= REVEAL_HINTS;
     const right = e.correct && !revealed;
-    out.set(e.item, { item: e.item, tags: [...key.tags], share: right ? 1 : 0, why: [], source: "game", strength: e.strength });
+    out.set(e.item, { item: e.item, tags: [...key2.tags], share: right ? 1 : 0, why: [], source: "game", strength: e.strength });
   }
   for (const [wallId, w] of walls) {
-    const key = keys.items[wallId];
-    if (key?.shape !== "wall" || !w.guessed) continue;
-    for (const g of key.groups) out.set(g.id, { item: g.id, tags: [...g.tags], share: w.found.has(g.id) ? 1 : 0, why: [], source: "game", strength: w.strength });
+    const key2 = keys.items[wallId];
+    if (key2?.shape !== "wall" || !w.guessed) continue;
+    for (const g of key2.groups) out.set(g.id, { item: g.id, tags: [...g.tags], share: w.found.has(g.id) ? 1 : 0, why: [], source: "game", strength: w.strength });
   }
   return [...out.values()];
 }
@@ -1574,11 +2097,14 @@ export {
   STRENGTH_LABELS,
   SoloEventInputSchema,
   checkAnswer,
+  checkSelection,
   clueOf,
+  crosswordHint,
   eventsToEvidence,
   evidenceTags,
   gameIssues,
   gameItems,
+  gameTotal,
   gameWarnings,
   gridWord,
   itemLabel,
@@ -1586,5 +2112,6 @@ export {
   normaliseAnswer,
   playScore,
   splitGame,
+  wordHint,
   wordLengths
 };

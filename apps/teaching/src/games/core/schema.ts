@@ -234,7 +234,7 @@ export const FindAWordSchema = z.object({
   items: z.array(TermItemSchema).max(GAME_COUNTS.find_a_word.max).default([]),
   /** Optional hidden message spelled by the leftover letters, and the question asked about it. */
   message: z.object({ text: Text(GAME_LIMITS.message), question: QuizQuestionDraftSchema.optional() }).optional(),
-  settings: z.object({ seed: Seed, directions: z.enum(['easy', 'all']).default('all'), hints: z.boolean().default(true) }).prefault({})
+  settings: z.object({ seed: Seed, locked: z.boolean().default(false), directions: z.enum(['easy', 'all']).default('all'), hints: z.boolean().default(true) }).prefault({})
 });
 
 export const JEOPARDY_VALUES = [100, 200, 300, 400, 500] as const;
@@ -406,6 +406,23 @@ export type PublicItem = z.infer<typeof PublicItemSchema>;
 export const PublicWallSchema = z.object({ id: z.string(), title: z.string(), tiles: z.array(z.object({ id: z.string(), text: z.string() })) });
 
 /**
+ * A crossword's grid as students see it: where each word goes and its clue
+ * number, never a letter. Built at publish from the seed (generators/crossword.ts).
+ */
+export const PublicCrosswordGridSchema = z.object({
+  kind: z.literal('crossword'),
+  width: z.number().int(),
+  height: z.number().int(),
+  entries: z.array(z.object({ item: z.string(), number: z.number().int(), dir: z.enum(['across', 'down']), x: z.number().int(), y: z.number().int(), length: z.number().int() }))
+});
+/** A find-a-word's letters, one string per row. Which cells hold an answer stays on the server. */
+export const PublicWordGridSchema = z.object({ kind: z.literal('wordsearch'), size: z.number().int(), rows: z.array(z.string()) });
+export const PublicGridSchema = z.discriminatedUnion('kind', [PublicCrosswordGridSchema, PublicWordGridSchema]);
+export type PublicCrosswordGrid = z.infer<typeof PublicCrosswordGridSchema>;
+export type PublicWordGrid = z.infer<typeof PublicWordGridSchema>;
+export type PublicGrid = z.infer<typeof PublicGridSchema>;
+
+/**
  * One game as students see it. Live-only kinds ship their title and counts
  * only: their content goes to the game room, never to the page.
  */
@@ -423,7 +440,9 @@ export const PublicGameSchema = z.object({
   items: z.array(PublicItemSchema).optional(),
   walls: z.array(PublicWallSchema).optional(),
   cast: z.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
-  message: z.object({ length: z.number().int(), question: z.record(z.string(), z.unknown()).optional() }).optional()
+  message: z.object({ length: z.number().int(), question: z.record(z.string(), z.unknown()).optional() }).optional(),
+  /** Crossword and find-a-word: the grid, built at publish. */
+  grid: PublicGridSchema.optional()
 });
 export type PublicGame = z.infer<typeof PublicGameSchema>;
 

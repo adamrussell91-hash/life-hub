@@ -26,6 +26,8 @@ import {
   type QuoteItem,
   type TermItem
 } from './schema';
+import { generateCrossword, type CrosswordLayout } from '../generators/crossword';
+import { fullLine, generateWordSearch, readSelection, type WordSearchLayout } from '../generators/wordsearch';
 
 /**
  * Game lessons, pure: publish checks, the split into a public game and its
@@ -58,6 +60,14 @@ export function wordLengths(term: string): number[] {
 /** Letters A–Z only, for crossword and find-a-word grids. */
 export const gridWord = (term: string): string => normaliseAnswer(term).toUpperCase();
 
+/** A hidden message's letters: every letter kept (a leading "The" too), spaces and punctuation dropped. */
+export const messageLetters = (text: string): string =>
+  String(text ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '');
+
 /** Item tags in the evidence form (`kp:…`, `out:…`, `skill:…`, `tech:…`), as quiz evidence writes them. */
 export function evidenceTags(tags: Partial<ItemTags>, extra?: { pieces?: string[]; outcomes?: string[]; skills?: string[] }): string[] {
   const out = [
@@ -80,8 +90,31 @@ export type WallKey = {
   groups: Array<{ id: string; label: string; why: string; difficulty: number; tiles: string[]; tags: string[] }>;
 };
 export type ItemKey = TermKey | QuestionItemKey | QuoteKey | WallKey;
+/** A crossword's layout with its letters: server only. */
+export type CrosswordGridKey = { kind: 'crossword'; width: number; height: number; hints: boolean; entries: Array<{ id: string; word: string; x: number; y: number; dir: 'across' | 'down'; number: number }> };
+/** A find-a-word's letters, where every answer and decoy sits, and the hidden message's cells: server only. */
+export type WordGridKey = {
+  kind: 'wordsearch';
+  size: number;
+  rows: string[];
+  hints: boolean;
+  placements: Array<{ id: string | null; owner: string; word: string; label: string; x: number; y: number; dx: number; dy: number; decoy: boolean }>;
+  /** `text` is the letters the cells spell; `display` is the teacher's message as written (spaces, punctuation). */
+  message: { text: string; display: string; cells: Array<[number, number]> } | null;
+};
+export type GridKey = CrosswordGridKey | WordGridKey;
 /** Everything that marks one game, kept on the server. Keyed by item id (and wall id for Connections). */
-export type GameKeys = { kind: Game['kind']; title: string; items: Record<string, ItemKey> };
+export type GameKeys = { kind: Game['kind']; title: string; items: Record<string, ItemKey>; grid?: GridKey };
+
+/**
+ * How many things a play is scored out of: every item, each Connections group
+ * (not the wall), and nothing that isn't answered (a find-a-word message is
+ * shown, its question is answered). The finish card's main score and Best and
+ * Latest all use it, so they always share a denominator.
+ */
+export function gameTotal(keys: Pick<GameKeys, 'items'>): number {
+  return Object.values(keys.items).reduce((n, key) => n + (key.shape === 'wall' ? key.groups.length : 1), 0);
+}
 
 export type CheckResult = {
   correct: boolean;
@@ -184,6 +217,91 @@ const hasTags = (t: Partial<ItemTags>, q?: { pieces?: string[]; outcomes?: strin
 /** The clue a term uses in this game. */
 export function clueOf(item: TermItem): { kind: string; text: string } | undefined {
   return item.clues[item.use_clue ?? 0] ?? item.clues[0];
+}
+
+/* ── Grids ─────────────────────────────────────────────────────────── */
+
+/** The crossword layout a game publishes with: its terms as A–Z words and its seed. */
+export function crosswordLayoutOf(game: Extract<Game, { kind: 'crossword' }>): CrosswordLayout {
+  return generateCrossword(game.items.map((t) => ({ id: t.id, word: gridWord(t.term) })), game.settings.seed);
+}
+
+/** The find-a-word grid a game publishes with: answers, each clue's decoys, the hidden message and the seed. */
+export function wordSearchOf(game: Extract<Game, { kind: 'find_a_word' }>): WordSearchLayout {
+  return generateWordSearch({
+    words: game.items.map((t) => ({ id: t.id, word: gridWord(t.term) })),
+    decoys: game.items.flatMap((t) => t.decoys.map((d) => ({ owner: t.id, word: gridWord(d) })).filter((d) => d.word.length > 1)),
+    message: game.message?.text.trim() ? messageLetters(game.message.text) : '',
+    seed: game.settings.seed,
+    directions: game.settings.directions
+  });
+}
+
+/** Cells as "x,y" strings. */
+const cellKey = (x: number, y: number) => `${x},${y}`;
+
+/**
+ * A crossword hint (spec §6.1), climbing a ladder: 1 a letter (the first one
+ * that isn't right yet, from what the student has typed), 2 the first letter
+ * of every crossing word, 3 the whole word. Returns the cells to fill.
+ */
+export function crosswordHint(grid: CrosswordGridKey, itemId: string, step: number, typed: string): Array<{ x: number; y: number; ch: string }> {
+  const e = grid.entries.find((x) => x.id === itemId);
+  if (!e) return [];
+  const cellsOf = (x: (typeof grid.entries)[number]) => Array.from(x.word, (ch, i) => ({ x: x.dir === 'across' ? x.x + i : x.x, y: x.dir === 'down' ? x.y + i : x.y, ch }));
+  const mine = cellsOf(e);
+  if (step >= 3) return mine;
+  if (step === 2) {
+    const at = new Set(mine.map((c) => cellKey(c.x, c.y)));
+    return grid.entries.filter((x) => x.dir !== e.dir && cellsOf(x).some((c) => at.has(cellKey(c.x, c.y)))).map((x) => cellsOf(x)[0] as { x: number; y: number; ch: string });
+  }
+  const given = typed.toUpperCase();
+  return [mine.find((c, i) => given[i] !== c.ch) ?? (mine[0] as { x: number; y: number; ch: string })];
+}
+
+/** A find-a-word hint: 1 the first letter, 2 the length, 3 the line the word sits in (without which way it reads). */
+export function wordHint(grid: WordGridKey, itemId: string, step: number): { first?: string; length?: number; line?: { x: number; y: number; dx: number; dy: number } } {
+  const p = grid.placements.find((x) => !x.decoy && x.id === itemId);
+  if (!p) return {};
+  return { first: p.word[0], ...(step >= 2 ? { length: p.word.length } : {}), ...(step >= 3 ? { line: fullLine(grid.size, p) } : {}) };
+}
+
+export type SelectionCheck = {
+  /** The item the move belongs to: the active clue, or the clue found in "Any clue". Null: nothing to record. */
+  item: string | null;
+  /** Null: not a marked answer (a stray drag, or a decoy found with no clue picked). */
+  correct: boolean | null;
+  /** A real word in the grid, but not this clue's: what the student found instead. */
+  decoy?: string;
+  response: { from: [number, number]; to: [number, number]; text: string } | null;
+};
+
+const point = (v: unknown, size: number): [number, number] | null =>
+  Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n < size) ? [v[0] as number, v[1] as number] : null;
+
+/**
+ * Checks a find-a-word selection (a start cell and an end cell) against the
+ * grid. Read either way: a word dragged backwards still counts. For a picked
+ * clue: its own word is right; any other placed word (another clue's answer or
+ * a decoy) is a decoy hit; anything else is a stray drag, not recorded. With
+ * "Any clue" (`clue` null): a clue's word is found for that clue; a decoy is
+ * noted against the clue it was set for, unmarked.
+ */
+export function checkSelection(grid: WordGridKey, clue: string | null, response: unknown): SelectionCheck {
+  const r = isRecord(response) ? response : {};
+  const from = point(r.from, grid.size);
+  const to = point(r.to, grid.size);
+  const text = from && to ? readSelection(grid.rows, from, to) : null;
+  if (!from || !to || !text || text.length < 2) return { item: null, correct: null, response: null };
+  const kept = { from, to, text };
+  const reversed = [...text].reverse().join('');
+  const hit = grid.placements.filter((p) => p.word === text || p.word === reversed);
+  const own = clue ? hit.find((p) => !p.decoy && p.id === clue) : hit.find((p) => !p.decoy);
+  if (own) return { item: own.id, correct: true, response: kept };
+  const other = hit[0];
+  if (!other) return { item: clue, correct: null, response: kept };
+  if (clue) return { item: clue, correct: false, decoy: other.label, response: kept };
+  return { item: other.owner, correct: null, decoy: other.label, response: kept };
 }
 
 /* ── Publish checks ────────────────────────────────────────────────── */
@@ -297,8 +415,7 @@ export function gameIssues(lesson: { game?: GameLesson | undefined }): string[] 
     switch (game.kind) {
       case 'find_a_word': {
         if (game.message?.text.trim()) {
-          const letters = gridWord(game.message.text);
-          if (!/^[A-Z]+$/.test(letters)) out.push(`${where}: the hidden message needs letters only.`);
+          if (!messageLetters(game.message.text)) out.push(`${where}: the hidden message needs some letters A to Z.`);
           if (game.message.question) {
             const problem = questionProblem({ id: 'message', shape: 'question', question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
             if (problem) out.push(`${where}: the hidden message question needs finishing: ${problem}.`);
@@ -483,8 +600,46 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
 
   let walls: PublicGame['walls'];
   let message: PublicGame['message'];
+  let grid: PublicGame['grid'];
   let count = 0;
-  if (game.kind === 'connections') {
+  if (game.kind === 'crossword') {
+    // Laid out here, at publish: only placed words play; letters stay in the keys.
+    const layout = crosswordLayoutOf(game);
+    const placed = new Set(layout.entries.map((e) => e.id));
+    for (const item of game.items) {
+      if (!placed.has(item.id)) continue;
+      const pub = any(item);
+      if (pub) pubItems.push(pub);
+    }
+    count = pubItems.length;
+    keys.grid = { kind: 'crossword', width: layout.width, height: layout.height, hints: game.settings.hints, entries: layout.entries.map((e) => ({ ...e })) };
+    grid = { kind: 'crossword', width: layout.width, height: layout.height, entries: layout.entries.map((e) => ({ item: e.id, number: e.number, dir: e.dir, x: e.x, y: e.y, length: e.word.length })) };
+  } else if (game.kind === 'find_a_word') {
+    const layout = wordSearchOf(game);
+    const placed = new Set(layout.placements.filter((p) => !p.decoy).map((p) => p.id));
+    for (const item of game.items) {
+      if (!placed.has(item.id)) continue;
+      const pub = any(item);
+      if (pub) pubItems.push(pub);
+    }
+    const labels = new Map<string, string>();
+    for (const t of game.items) for (const d of [t.term, ...t.decoys]) if (d.trim()) labels.set(gridWord(d), d.trim());
+    keys.grid = {
+      kind: 'wordsearch',
+      size: layout.size,
+      rows: layout.rows,
+      hints: game.settings.hints,
+      placements: layout.placements.map((p) => ({ ...p, label: labels.get(p.word) ?? p.word })),
+      message: layout.message ? { ...layout.message, display: game.message?.text.trim() ?? layout.message.text } : null
+    };
+    grid = { kind: 'wordsearch', size: layout.size, rows: layout.rows };
+    if (layout.message) {
+      let q: PublicItem | undefined;
+      if (game.message?.question) q = question({ id: 'message_q', shape: 'question', question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
+      message = { length: layout.message.text.length, ...(q && q.shape === 'question' ? { question: q.question } : {}) };
+    }
+    count = pubItems.length + (message?.question ? 1 : 0);
+  } else if (game.kind === 'connections') {
     const fresh = freshIds(random);
     walls = game.walls.map((w) => {
       const tiles: Record<string, string> = {};
@@ -512,13 +667,6 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
       if (pub) pubItems.push(pub);
     }
     count = pubItems.length;
-    if (game.kind === 'find_a_word' && game.message?.text.trim()) {
-      const text = game.message.text.trim();
-      keys.items.message = { shape: 'term', answers: [text], decoys: [], tags: [], label: text };
-      let q: PublicItem | undefined;
-      if (game.message.question) q = question({ id: 'message_q', shape: 'question', question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
-      message = { length: gridWord(text).length, ...(q && q.shape === 'question' ? { question: q.question } : {}) };
-    }
   }
   if (game.kind === 'battles') count = 1;
 
@@ -534,7 +682,8 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     ...(info.solo && game.kind !== 'connections' ? { items: pubItems } : {}),
     ...(info.solo && walls ? { walls } : {}),
     ...(info.solo && game.kind === 'who_said_it' ? { cast: game.cast.map(({ id, name, emblem, image_url }) => ({ id, name: name.trim(), ...(emblem ? { emblem } : {}), ...(image_url ? { image_url } : {}) })) } : {}),
-    ...(info.solo && message ? { message } : {})
+    ...(info.solo && message ? { message } : {}),
+    ...(info.solo && grid ? { grid } : {})
   };
   return { public: pub, keys };
 }

@@ -5,7 +5,7 @@ import { renderBlock } from '@/blocks/render';
 import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { GAME_KIND_INFO, type PublicGame, type PublicGameLesson } from './core/schema';
-import type { Arcade, GameClient, PlayScore } from './api';
+import { scoreText, type Arcade, type GameClient } from './api';
 import { gameGlyph, modeChips } from './glyphs';
 import { hasPlayer } from './solo/registry';
 import { openSoloPlayer } from './solo/shell';
@@ -35,7 +35,6 @@ const NOUNS: Record<PublicGame['kind'], [string, string]> = {
   who_said_it: ['quote', 'quotes']
 };
 const countText = (g: PublicGame) => (g.count ? `${g.count} ${NOUNS[g.kind][g.count === 1 ? 0 : 1]}` : '');
-const scoreText = (s: PlayScore) => `${s.right}/${s.answered}`;
 
 /**
  * The student's arcade for a Game lesson: the optional "Before you play"

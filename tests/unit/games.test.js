@@ -106,7 +106,11 @@ test('solo crossword: the server marks each batch, finish scores, box 1 and summ
     { item: 't2', move: 'answer', response: { text: 'the  pathetic-fallacy' }, time_ms: 9000 },
     { item: 't3', move: 'hint', extra: { level: 1 } }
   ] });
-  assert.deepEqual(batch.results, [{ item: 't1', correct: false, decoy: true }, { item: 't2', correct: true }, { item: 't3' }]);
+  assert.deepEqual(batch.results.slice(0, 2), [{ item: 't1', correct: false, decoy: true }, { item: 't2', correct: true }]);
+  // A crossword hint comes back from the server: the first letter that isn't right yet.
+  assert.equal(batch.results[2].item, 't3');
+  assert.equal(batch.results[2].reveal.step, 1);
+  assert.equal(batch.results[2].reveal.cells.length, 1);
   const owner = workOwner('class1', 'st_ann');
   const events = store.data.get(gameKeys('gl1').events('g_cross', play_id, owner));
   assert.deepEqual(events.map((e) => [e.seq, e.item, e.correct ?? null, e.strength]), [[0, 't1', false, 'self_paced'], [1, 't2', true, 'self_paced'], [2, 't3', null, 'self_paced']]);
@@ -122,7 +126,7 @@ test('solo crossword: the server marks each batch, finish scores, box 1 and summ
   const done = await act(store, 1, 'solo_finish', { game_id: 'g_cross', play_id });
   assert.deepEqual(done.score, { right: 1, answered: 2, total: 6 });
   assert.equal(done.boxed, 1);
-  assert.deepEqual(done.best, { play_id, right: 1, answered: 2, at: new Date(NOW).toISOString() });
+  assert.deepEqual(done.best, { play_id, right: 1, answered: 2, total: 6, at: new Date(NOW).toISOString() });
   // Missed simile → its organiser line back to box 1, due tomorrow; nothing else moves.
   const boxes = store.data.get(`organiser_practice/class1/${owner}`).boxes;
   assert.deepEqual(boxes, { ol_simile: { box: 1, due: '2026-11-12' } });
