@@ -394,7 +394,7 @@
 
 .ot-code {
   display: grid;
-  grid-template-columns: minmax(0, 140px) minmax(0, 1fr) 52px;
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr) 7.5rem;
   gap: var(--space-2);
   align-items: center;
   font-size: var(--text-sm);
@@ -569,7 +569,7 @@
   .ot-du__row { grid-template-columns: 1fr; gap: var(--space-1); }
   .ot-evlist li { grid-template-columns: 56px minmax(0, 1fr) auto; }
   .ot-nlist li { grid-template-columns: 1fr; gap: 2px; }
-  .ot-code { grid-template-columns: minmax(0, 1fr) 44px; }
+  .ot-code { grid-template-columns: minmax(0, 1fr) auto; }
   .ot-code .ot-dots { grid-column: 1 / -1; grid-row: 2; }
 }
 
