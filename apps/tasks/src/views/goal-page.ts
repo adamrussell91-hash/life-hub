@@ -8,6 +8,7 @@ import { errorMessage, showViewLoading } from '@/views/feedback';
 import { createHubPills, el } from '@/views/hub-kit';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { renderGoalFrame, type GoalPatch } from '@/views/goal-frame';
+import { mandalaHasContent, type MandalaContext } from '@/views/goal-mandala';
 import { startFocusStrip } from '@/views/focus-strip';
 import { directTasks, hostedProjects, hostedTasks, isOpenTask, projectProgress, SPHERE_DOMAIN, SPHERE_LABEL } from '@/domain/goal-hosting';
 import { cellState, currentTerm, flattenTerms, sydneyToday, termWeeks, weekCount } from '@/domain/goal-runway';
@@ -35,7 +36,8 @@ const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
   { id: 'smarter', label: 'SMARTER' },
   { id: 'okr', label: 'OKR' },
   { id: 'lead_lag', label: 'Lead / lag' },
-  { id: 'floor_target_stretch', label: 'Floor · target · stretch' }
+  { id: 'floor_target_stretch', label: 'Floor · target · stretch' },
+  { id: 'mandala', label: 'Mandala' }
 ];
 const STATUSES: Array<{ id: Goal['status']; label: string }> = [
   { id: 'active', label: 'Active' },
@@ -405,11 +407,22 @@ function paint(
   // G-23 Structure card with morph + Details disclosure for other structures
   const structure = card('Structure');
   const frameHost = el('div', 'goal-frame-host');
-  frameHost.append(renderGoalFrame(goal, (patch) => void save(patch)));
+  const mandalaCtx: MandalaContext = {
+    projects: hostedProjects(goal, projects).map((p) => ({ id: p.id, title: p.title })),
+    tasks: tasks.map((t) => ({ id: t.id, status: t.status })),
+    onPromoteTask: (label, patchFor) =>
+      void tasksApi
+        .createTask({ title: label, domain: SPHERE_DOMAIN[goal.sphere], parent_goal_id: goal.id })
+        .then((created) => tasksApi.updateGoal(goal.id, patchFor(created.id)))
+        .then(reload)
+        .catch((err) => window.alert(errorMessage(err))),
+    onPromoteIfThen: (label) => void prefillIfThen(canvas, goal, label)
+  };
+  frameHost.append(renderGoalFrame(goal, (patch) => void save(patch), mandalaCtx));
   if (goal.structure === 'okr' || goal.structure === 'floor_target_stretch') {
     frameHost.append(currentSourcePicker(goal, hosted, save));
   }
-  const details = otherStructureDetails(goal, save);
+  const details = otherStructureDetails(goal, save, mandalaCtx);
   structure.root.append(
     createHubPills({
       label: 'Structure',
@@ -511,7 +524,7 @@ function currentSourcePicker(goal: Goal, hosted: Task[], save: (p: Partial<Goal>
   return wrap;
 }
 
-function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
+function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void, mandalaCtx: MandalaContext = {}): HTMLElement {
   const others = STRUCTURES.filter((s) => s.id !== goal.structure);
   const filled = others.filter((s) => structureHasContent(goal, s.id));
   if (!filled.length) {
@@ -528,7 +541,7 @@ function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void): HTMLEl
     const block = el('div', 'goal-details__block');
     block.append(el('p', 'goal-frame__label', s.label));
     const preview = el('div', 'goal-details__preview');
-    preview.append(renderGoalFrame({ ...goal, structure: s.id }, save));
+    preview.append(renderGoalFrame({ ...goal, structure: s.id }, save, mandalaCtx));
     block.append(preview);
     disc.body.append(block);
   }
@@ -550,6 +563,8 @@ function structureHasContent(goal: Goal, structure: Goal['structure']): boolean 
       const x = f.floor_target_stretch;
       return Boolean(x && (x.unit?.trim() || x.floor != null || x.target != null || x.stretch != null || x.current != null));
     }
+    case 'mandala':
+      return mandalaHasContent(goal);
   }
 }
 
@@ -603,15 +618,26 @@ function ifThen(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
   const root = el('section', 'goal-ifthen');
   const head = el('p', 'goal-card__eyebrow', 'If–then trigger · shows where you act');
   const current = goal.if_then ?? { cue: '', action: '', obstacle: '' };
+  const fields: Partial<Record<'cue' | 'action' | 'obstacle', HTMLInputElement>> = {};
   const input = (key: 'cue' | 'action' | 'obstacle', label: string) => {
     const node = el('input', 'goal-field');
     node.value = current[key];
     node.placeholder = label;
+    node.dataset.field = `if_then.${key}`;
     node.setAttribute('aria-label', label);
+    // Read every field live, so a value filled in from elsewhere (the Mandala) is kept.
     node.addEventListener('change', () => {
-      const next = { ...current, [key]: node.value.trim() };
-      save({ if_then: next.cue && next.action ? next : null });
+      const next = {
+        cue: fields.cue?.value.trim() ?? '',
+        action: fields.action?.value.trim() ?? '',
+        obstacle: fields.obstacle?.value.trim() ?? ''
+      };
+      const complete = Boolean(next.cue && next.action);
+      // Nothing stored and still incomplete (e.g. a Mandala action waiting for its cue): nothing to save.
+      if (!complete && !goal.if_then) return;
+      save({ if_then: complete ? next : null });
     });
+    fields[key] = node;
     return node;
   };
   const row1 = el('p', 'row');
@@ -622,6 +648,30 @@ function ifThen(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
   row3.append(el('span', 'meta', 'Answers the obstacle:'), input('obstacle', "e.g. it's boring admin, so email wins"));
   root.append(head, row1, row2, row3);
   return root;
+}
+
+/**
+ * Mandala "Use as if-then": fill the trigger's action and ask for the cue. Nothing is saved
+ * until the cue is typed, because a trigger without a cue is not a trigger.
+ */
+export function prefillIfThen(canvas: HTMLElement, goal: Goal, action: string, ask: (m: string) => boolean = (m) => window.confirm(m)): boolean {
+  const root = canvas.querySelector<HTMLElement>('.goal-ifthen');
+  const cue = root?.querySelector<HTMLInputElement>('[data-field="if_then.cue"]');
+  const then = root?.querySelector<HTMLInputElement>('[data-field="if_then.action"]');
+  const obstacle = root?.querySelector<HTMLInputElement>('[data-field="if_then.obstacle"]');
+  if (!root || !cue || !then) return false;
+  const existing = goal.if_then;
+  if (existing && existing.action !== action && !ask(`Replace the trigger "If ${existing.cue}, then ${existing.action}"?`)) return false;
+  then.value = action;
+  if (existing && existing.action !== action) {
+    cue.value = '';
+    if (obstacle) obstacle.value = '';
+  }
+  root.classList.add('is-prefilled');
+  if (typeof root.scrollIntoView === 'function') root.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  cue.placeholder = 'If… when will you do it?';
+  cue.focus({ preventScroll: true });
+  return true;
 }
 
 function nextStart(goal: Goal, canvas: HTMLElement, save: (p: GoalPatch) => void, reload: () => void): HTMLElement {

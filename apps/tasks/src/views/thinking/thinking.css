@@ -44,10 +44,12 @@
 .tt-session[hidden], .tt-landing[hidden] { display: none; }
 .tt-strip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .tt-strip__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--glass); min-width: 0; }
-.tt-strip--quiet .tt-strip__bar { border-style: dashed; }
+.tt-strip--quiet .tt-strip__bar { justify-content: flex-end; gap: 4px 18px; padding: 0; border: 0; background: none; }
+/* Before a thread has a second session the strip is two quiet links, not a boxed toolbar. */
+.tt-strip--quiet .tt-strip__bar :is(.btn, summary.btn) { padding-inline: 2px; border: 0; background: none; box-shadow: none; color: var(--accent, var(--navy)); font-size: var(--text-sm, 0.8125rem); font-weight: 600; }
+.tt-strip--quiet .tt-strip__bar :is(.btn, summary.btn):hover { text-decoration: underline; text-underline-offset: 3px; }
 .tt-strip__title { flex: 1 1 8rem; min-width: 0; font-size: var(--text-sm, 0.8125rem); font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
 .tt-strip__title[hidden], .tt-strip__back[hidden], .tt-strip__menu[hidden], .tt-strip__tick[hidden] { display: none; }
-.tt-strip--quiet .tt-strip__where { margin-left: auto; }
 .tt-strip__tick { color: var(--success, #2f7a4f); font-weight: 700; }
 .tt-strip__back { color: var(--ink); font-size: var(--text-sm, 0.8125rem); min-height: 44px; display: inline-flex; align-items: center; }
 .tt-strip__menu { position: relative; min-width: 0; }

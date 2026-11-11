@@ -128,6 +128,10 @@
 .ps-back { width: fit-content; color: var(--muted); text-decoration: none; font-size: var(--text-sm); }
 .ps-back:hover { color: var(--ink); }
 .ps-session__title { margin: 0; max-width: 40ch; font: var(--weight-bold) var(--text-xl) / var(--leading-tight) var(--font-display); letter-spacing: var(--tracking-tight); color: var(--ink); text-wrap: balance; overflow-wrap: anywhere; }
+/* The title is what the person first typed, up to 120 characters: three lines at most,
+   and a headline size that does not swallow a phone screen. */
+.ps-session__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+@media (max-width: 720px) { .ps-session__title { font-size: var(--text-lg); } }
 
 /* Process track */
 .ps-track { overflow-x: auto; padding-block: var(--space-2); }
@@ -244,9 +248,13 @@
 .ps-suggestion__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 @keyframes ps-spin-in { from { transform: rotate(-270deg) scale(0); } }
 
-.ps-scope .ps-composer { display: grid; gap: var(--space-2); }
+/* The coach composer has one tool (Send), so it sits beside the text box rather
+   than on its own row underneath: a whole button-high row of dead space on a phone. */
+.ps-scope .ps-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-2); }
+.ps-scope .ps-composer > .ps-composer__now { grid-column: 1 / -1; }
+.ps-scope .ps-composer .hub-ai-bar__aside { width: auto; }
 .ps-composer__now { display: flex; align-items: center; gap: var(--space-2); min-height: 1.25rem; margin: 0; color: var(--muted); font-size: var(--text-xs); }
-.ps-composer__now:empty { visibility: hidden; }
+.ps-composer__now:empty { display: none; }
 .ps-composer__now::before { content: ""; flex: none; width: 1rem; height: 0.5rem; border-radius: 1rem 1rem 0 0; background: var(--ps-blue); }
 .ps-composer__now[data-q='1']::before { height: 0.375rem; border-radius: 1rem; background: var(--ps-yellow); }
 .ps-composer__now[data-q='2']::before { border-radius: 0 0 1rem 1rem; background: var(--ps-red); }
@@ -288,7 +296,8 @@
     box-sizing: border-box;
     height: var(--vv-height, 100dvh);
     min-height: 0;
-    padding: var(--space-3) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom, 0px));
+    /* The keyboard covers the home indicator, so no safe-area floor under Send. */
+    padding: var(--space-3) var(--space-4) var(--space-2);
     background: var(--paper);
   }
 
@@ -306,7 +315,7 @@
     overflow-y: auto;
   }
 
-  html.vv-keyboard-open .ps-scope .ps-composer { position: static; }
+  html.vv-keyboard-open .ps-scope .ps-composer { position: static; padding-bottom: 0; }
   html.vv-keyboard-open:has(.ps-coach) .hub-mobile-nav { display: none; }
 }
 

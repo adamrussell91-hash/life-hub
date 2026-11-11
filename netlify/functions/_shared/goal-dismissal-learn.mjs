@@ -36,6 +36,7 @@ export function cooledKindsFromDecisions(decisions, nowMs = Date.now()) {
 export function quietLinesForCooled(cooled) {
   const labels = {
     goal_rest_weeks: "I've stopped suggesting rest weeks. You kept declining them.",
+    goal_mandala: "I've stopped suggesting cells for your grids. You kept declining them.",
     protect_block: "I've stopped suggesting calendar blocks. You kept declining them.",
     split_task: "I've stopped suggesting splits. You kept declining them.",
     create_task: "I've stopped suggesting new starts. You kept declining them.",

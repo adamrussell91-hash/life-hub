@@ -49,3 +49,19 @@ test('validateGhost rejects malformed goal ghosts', () => {
   assert.throws(() => validateGhost({ id: 'x', agent: 'hammond', kind: 'goal_rest_weeks', goalId: 'g', weeks: ['bad'], rest_weeks: [] }), /weeks/);
   assert.throws(() => validateGhost({ id: 'x', agent: 'hammond', kind: 'goal_rest_weeks', goalId: 'g', weeks: ['2026-11-16'], rest_weeks: [] }), /rest_weeks/);
 });
+
+test('goal_mandala patches the goal frame and counts the cells', () => {
+  const frame = { mandala: { pillars: [{ id: 'p1', label: 'Fitness', project_id: 'pr1', actions: [] }] } };
+  const plan = acceptPlan({
+    id: 'goal-g1-mandala-abc', agent: 'hammond', kind: 'goal_mandala', goalId: 'g1', title: 'Half marathon',
+    frame, applied: 2
+  }, { today: TODAY });
+  assert.deepEqual(plan.steps[0], { target: 'tasks', collection: 'goals', method: 'PATCH', id: 'g1', body: { frame } });
+  assert.match(plan.receipt, /added 2 cells to the grid for “Half marathon”/);
+});
+
+test('goal_mandala refuses when nothing is left to add', () => {
+  const base = { id: 'x', agent: 'hammond', kind: 'goal_mandala', goalId: 'g', frame: { mandala: { pillars: [] } } };
+  assert.throws(() => validateGhost({ ...base, applied: 0 }), /nothing left to add/);
+  assert.throws(() => validateGhost({ ...base, frame: {}, applied: 1 }), /frame\.mandala\.pillars/);
+});

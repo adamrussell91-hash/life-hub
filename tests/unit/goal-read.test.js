@@ -74,3 +74,52 @@ test('basis includes hosted project and task stamps', () => {
   const projects = [{ id: 'p1', parent_goal_id: 'g1', status: 'active', updated_at: '2026-11-03T00:00:00.000Z' }];
   assert.equal(basisUpdatedAt(GOAL, projects, TASKS), '2026-11-03T00:00:00.000Z');
 });
+
+test('Mandala: hosted work not on the grid is proposed as pillars and actions', async () => {
+  const { mandalaAdditions, applyMandalaAdditions } = await import('../../netlify/functions/_shared/goal-read.mjs');
+  const goal = {
+    ...GOAL, structure: 'mandala',
+    frame: { mandala: { pillars: [
+      { id: 'p1', label: 'Fitness', project_id: 'pr1', actions: [{ id: 'a1', label: 'Easy runs', promoted: { kind: 'task', task_id: 'tk1' } }] }
+    ] } }
+  };
+  const projects = [
+    { id: 'pr1', title: 'Training block', parent_goal_id: 'g1', status: 'active' },
+    { id: 'pr2', title: 'Kit', parent_goal_id: 'g1', status: 'active' }
+  ];
+  const hosted = [
+    task({ id: 'tk1', title: 'Easy runs', parent_project_id: 'pr1' }),
+    task({ id: 'tk2', title: 'Long run Sunday', parent_project_id: 'pr1' }),
+    task({ id: 'tk3', title: 'Buy shoes', parent_project_id: 'pr2' }),
+    task({ id: 'tk4', title: 'Done thing', parent_project_id: 'pr1', status: 'done', completed_at: '2026-11-01T00:00:00Z' }),
+    task({ id: 'tk5', title: 'Loose task', parent_goal_id: 'g1' })
+  ];
+  const additions = mandalaAdditions({ goal, hostedProjects: projects, hostedTasks: hosted });
+  assert.deepEqual(additions, [
+    { type: 'pillar', slot: 1, label: 'Kit', project_id: 'pr2' },
+    { type: 'action', pillar: 0, pillar_label: 'Fitness', project_id: 'pr1', slot: 1, label: 'Long run Sunday', task_id: 'tk2' },
+    { type: 'action', pillar: 1, pillar_label: 'Kit', project_id: 'pr2', slot: 0, label: 'Buy shoes', task_id: 'tk3' }
+  ]);
+  assert.deepEqual(mandalaAdditions({ goal: { ...goal, structure: 'woop' }, hostedProjects: projects, hostedTasks: hosted }), []);
+
+  // A pillar typed into Kit's slot since the read is kept, and Kit's task does not land under it.
+  const edited = { ...goal, frame: { mandala: { pillars: [goal.frame.mandala.pillars[0], { id: 'p2', label: 'Sleep', project_id: null, actions: [] }] } } };
+  const { frame, applied } = applyMandalaAdditions(edited, additions);
+  assert.equal(applied, 1);
+  assert.equal(frame.mandala.pillars[1].label, 'Sleep');
+  assert.deepEqual(frame.mandala.pillars[0].actions[1], { id: 'p1a2', label: 'Long run Sunday', promoted: { kind: 'task', task_id: 'tk2' } });
+  assert.equal(frame.mandala.pillars[1].actions.every(a => !a.label), true);
+  assert.equal(frame.mandala.pillars.length, 8);
+});
+
+test('Mandala proposal leads the read, and its id maps back to the goal', () => {
+  const goal = { ...GOAL, structure: 'mandala', frame: {} };
+  const projects = [{ id: 'pr1', title: 'Training block', parent_goal_id: 'g1', status: 'active' }];
+  const read = buildGoalRead({ goal, projects, tasks: TASKS, terms: TERMS, today: TODAY });
+  const ghost = read.ghosts[0];
+  assert.equal(ghost.kind, 'goal_mandala');
+  assert.match(ghost.id, /^goal-g1-mandala-[0-9a-z]+$/);
+  assert.equal(goalIdFromGhostId(ghost.id), 'g1');
+  const again = buildGoalRead({ goal, projects, tasks: TASKS, terms: TERMS, today: TODAY, dismissed: [ghost.id] });
+  assert.equal(again.ghosts.some(g => g.kind === 'goal_mandala'), false);
+});

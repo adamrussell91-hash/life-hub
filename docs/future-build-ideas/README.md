@@ -93,6 +93,7 @@ This split is an **Open question** for the next round, not a decision.
 | Classroom tools: timers, name picker and more on a divider or block | Concept and mockup | [classroom-tools.md](classroom-tools.md) |
 | Lesson builder on a phone: one thing at a time | Concept | [lesson-builder-mobile.md](lesson-builder-mobile.md) |
 | Focus view: one step of the lesson at a time on the board | Built | [focus-view.md](focus-view.md) |
+| Goal mandala: a 9×9 grid for thinking through a goal | Built (first slice) | [goal-mandala.md](goal-mandala.md) |
 
 | WalkThrus text and SVG collection | Collected reference material | [walkthrus.md](walkthrus.md) |
 

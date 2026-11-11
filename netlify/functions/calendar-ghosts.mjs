@@ -45,7 +45,7 @@ import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
 import { normalizeGoalRecord } from './_shared/goal-record.mjs';
-import { buildGoalRead, goalIdFromGhostId } from './_shared/goal-read.mjs';
+import { applyMandalaAdditions, buildGoalRead, goalIdFromGhostId } from './_shared/goal-read.mjs';
 import { goalReadKey, loadGoalInputs } from './goal-reads.mjs';
 import {
   defaultGetTasksStore,
@@ -1076,7 +1076,9 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
   const store = await tasksStore();
   const { appendDecision } = await import('./_shared/goal-dismissal-learn.mjs');
 
-  const kindGuess = decision.id.includes('-block-')
+  const kindGuess = decision.id.includes('-mandala-')
+    ? 'goal_mandala'
+    : decision.id.includes('-block-')
     ? 'protect_block'
     : decision.id.includes('-rest-')
       ? 'goal_rest_weeks'
@@ -1112,7 +1114,9 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
 
   let plan;
   try {
-    plan = acceptPlan(ghost, { today });
+    // Mandala additions merge into the grid as it is now, so cells edited since the read are kept.
+    const accepted = ghost.kind === 'goal_mandala' ? { ...ghost, ...applyMandalaAdditions(goal, ghost.additions) } : ghost;
+    plan = acceptPlan(accepted, { today });
   } catch (error) {
     return fail(400, 'invalid_ghost', error instanceof TypeError ? error.message : 'This ghost could not be validated.');
   }
