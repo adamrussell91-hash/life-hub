@@ -1,37 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { GameSchema, type Game } from '@/games/core/schema';
 import { applyAnswer, autoGoal, buy, newRunner, nextItem, shopRows, type Runner } from '@/games/kinds/points-rush/engine';
 import { pointsRushRules, type RushState } from '@/games/kinds/points-rush/rules';
 import { leaks, rulesHarness, type Harness } from './games-rules-harness';
-
-// Invented content only ("The Lantern House"). Wrong options are real misreadings.
-const mc = (id: string, prompt: string, options: string[], right: number) => ({
-  id,
-  shape: 'question',
-  question: { id, kind: 'multiple_choice', prompt, marks: 1, options: options.map((text, k) => ({ id: `${id}o${k}`, text })), correct: [`${id}o${right}`] },
-  pieces: [],
-  outcomes: [],
-  skills: [],
-  tech: []
-});
-const term = (id: string, word: string, clue: string) => ({ id, shape: 'term', term: word, clues: [{ kind: 'definition', text: clue }], pieces: [], outcomes: [], skills: [], tech: [] });
-
-export const RUSH: Game = GameSchema.parse({
-  id: 'g_rush',
-  title: 'Lantern House rush',
-  kind: 'points_rush',
-  items: [
-    mc('i1', 'The fog pressed its face to the window and waited. Which technique?', ['Pathetic fallacy', 'Personification', 'Metaphor', 'Imagery'], 1),
-    mc('i2', 'Sister Agnes smiled the way a locked door smiles. Which technique?', ['Metaphor', 'Simile', 'Personification', 'Irony'], 1),
-    mc('i3', 'The novella opens and closes with Mira lighting the same lamp. What structure is this?', ['Frame narrative', 'Cyclical structure', 'Motif', 'In medias res'], 1),
-    mc('i4', 'A storm rages the night Doctor Hask confesses. Which technique?', ['Personification', 'Pathetic fallacy', 'Imagery', 'Symbolism'], 1),
-    term('t1', 'Analepsis', 'A move back in time to an earlier event in the story.'),
-    term('t2', 'Sibilance', 'Repeated s sounds close together.')
-  ],
-  settings: { minutes: 5, class_goal: 2000 }
-});
-const ANSWERS: Record<string, string> = { i1: 'Personification', i2: 'Simile', i3: 'Cyclical structure', i4: 'Pathetic fallacy', t1: 'Analepsis', t2: 'Sibilance' };
-const WRONG: Record<string, string> = { i1: 'Pathetic fallacy', i2: 'Metaphor', i3: 'Frame narrative', i4: 'Personification', t1: 'Prolepsis', t2: 'Assonance' };
+import { ANSWERS, RUSH, WRONG } from './games-wager-rush-fixtures';
 
 type View = Record<string, any>;
 

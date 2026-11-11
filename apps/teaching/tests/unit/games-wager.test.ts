@@ -1,30 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { GameSchema, type Game } from '@/games/core/schema';
 import { clampBet, splitPot, wagerRules, wagerSettings, type WagerState } from '@/games/kinds/wager/rules';
 import { leaks, rulesHarness, type Harness } from './games-rules-harness';
-
-// Invented content only: an invented novella, "The Lantern House". Wrong options are real misreadings.
-const mc = (id: string, prompt: string, options: string[], right: number) => ({
-  id,
-  shape: 'question',
-  question: { id, kind: 'multiple_choice', prompt, marks: 1, options: options.map((text, k) => ({ id: `${id}o${k}`, text })), correct: [`${id}o${right}`] },
-  pieces: ['kp_wg01'],
-  outcomes: [],
-  skills: [],
-  tech: []
-});
-
-export const WAGER: Game = GameSchema.parse({
-  id: 'g_wager',
-  title: 'Lantern House wager',
-  kind: 'wager',
-  items: [
-    mc('q1', 'The house held its breath as the door gave way. Which technique is doing the most work?', ['Metaphor', 'Personification', 'Pathetic fallacy', 'Hyperbole'], 1),
-    mc('q2', 'Mira counts twelve stairs each night, then one night thirteen. What does the extra stair most create?', ['Dramatic irony', 'A sense of the uncanny', 'Comic relief', 'A flashback'], 1),
-    mc('q3', 'Which term names a narrator whose account the reader has reason to doubt?', ['Omniscient narrator', 'Intrusive narrator', 'Unreliable narrator', 'Second-person narrator'], 2)
-  ],
-  settings: {}
-});
+import { WAGER } from './games-wager-rush-fixtures';
 
 type View = Record<string, any>;
 const SEATS = ['AB', 'CD', 'EF', 'GH'];

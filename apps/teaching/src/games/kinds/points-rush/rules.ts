@@ -33,6 +33,8 @@ export type RushState = {
   back: { n: number; right: number };
   upgrades: number;
   milestones: number[];
+  /** What the board shows: the rush, the teacher's first-try-vs-come-back view, or its no-names class version. */
+  board: 'race' | 'insight' | 'anon';
 };
 
 const err = (code: string, message: string): RulesError => ({ error: { code, message } });
@@ -67,7 +69,7 @@ export const pointsRushRules: RoomRules<RushState> = {
       .map((i) => i.id);
     const minutes = Math.min(15, Math.max(5, Number(ctx.game.settings?.minutes) || 8));
     const set = Number(ctx.game.settings?.class_goal) || 0;
-    const k: RushState = { items, minutes, goal: set || autoGoal(ctx.seats().length, minutes), goal_set: set > 0, over: false, runners: {}, recent: [], first: { n: 0, right: 0 }, back: { n: 0, right: 0 }, upgrades: 0, milestones: [] };
+    const k: RushState = { items, minutes, goal: set || autoGoal(ctx.seats().length, minutes), goal_set: set > 0, over: false, runners: {}, recent: [], first: { n: 0, right: 0 }, back: { n: 0, right: 0 }, upgrades: 0, milestones: [], board: 'race' };
     return k;
   },
   start(ctx, k) {
@@ -140,6 +142,12 @@ export const pointsRushRules: RoomRules<RushState> = {
       k.milestones = MILESTONES.filter((m) => (classEarned(k) / goal) * 100 >= m);
       return;
     }
+    if (op.name === 'show') {
+      const v = (op.data as { view?: unknown } | undefined)?.view;
+      if (v !== 'race' && v !== 'insight' && v !== 'anon') return err('bad_view', 'That view isn’t part of Points rush.');
+      k.board = v;
+      return;
+    }
     if (op.name === 'add_time' && k.ends_at !== undefined && !k.over) {
       const secs = Number((op.data as { seconds?: unknown } | undefined)?.seconds) || 60;
       k.ends_at += Math.min(300, Math.max(15, secs)) * 1000;
@@ -202,6 +210,7 @@ export const pointsRushRules: RoomRules<RushState> = {
     }
     return {
       ...base,
+      board: k.board,
       stats: {
         per_minute: k.recent.filter((t) => t >= ctx.now - 60_000).length,
         first_pct: k.first.n ? Math.round((k.first.right / k.first.n) * 100) : null,

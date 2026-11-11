@@ -12,7 +12,9 @@ import './crossword';
 import './find-a-word';
 import './jeopardy';
 import './pictionary';
+import './points-rush';
 import './team-match';
+import './wager';
 import './wheel';
 import './who-said-it';
 
