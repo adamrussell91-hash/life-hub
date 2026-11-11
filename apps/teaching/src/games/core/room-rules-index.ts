@@ -3,6 +3,7 @@
  * kind; each module calls `registerRules`. Bundled with room-core for the
  * Worker and Netlify (core/room-entry.ts imports this file).
  */
+import '../kinds/articulate/rules';
 import '../kinds/jeopardy/rules';
 import '../kinds/points-rush/rules';
 import '../kinds/team-match/rules';
