@@ -340,18 +340,25 @@
   gap: var(--space-1);
 }
 
-.block-explainer__swatch {
-  width: 1.5rem;
-  height: 1.5rem;
+/* Highlighter pens: neat squares of ink. The .btn base sets a min height, so undo it. */
+.block-explainer__swatch.btn {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  background: var(--ink-band);
+  border: 0;
+  border-radius: 6px;
+  /* The band twice over white, so the pen reads stronger than the faint mark. */
+  background: linear-gradient(var(--ink-band), var(--ink-band)), linear-gradient(var(--ink-band), var(--ink-band)), #fff;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent);
   cursor: pointer;
 }
 
-.block-explainer__swatch[aria-pressed='true'] {
-  border-color: var(--ink);
+.block-explainer__swatch.btn[aria-pressed='true'] {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .block-explainer__note-panel {
@@ -547,4 +554,50 @@
 .block-explainer__player [hidden],
 .block-explainer-editor [hidden] {
   display: none !important;
+}
+
+/* Recording with a board: the recorder fills the window so the board can be as big as it gets. */
+html.block-explainer-full-open {
+  overflow: hidden;
+}
+
+.block-explainer__recorder.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  overflow: auto;
+}
+
+/* The stage takes whatever height the head, tools and buttons leave. */
+.block-explainer__recorder.is-full .block-explainer__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.block-explainer__recorder.is-full .block-explainer__panes {
+  height: 100%;
+}
+
+.block-explainer__recorder.is-full .block-explainer__panes[data-layout='both'] {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: stretch;
+}
+
+.block-explainer__recorder.is-full .block-explainer__panes > .block-explainer__text {
+  overflow: auto;
+}
+
+.block-explainer__recorder.is-full .block-explainer__board {
+  height: 100%;
+  min-height: 420px;
+}
+
+@media (max-width: 900px) {
+  .block-explainer__recorder.is-full .block-explainer__panes[data-layout='both'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(420px, 1fr);
+  }
 }
