@@ -23,9 +23,9 @@ import { handinKey, workOwner } from './lesson-work.mjs';
 import { addColumnWithMarks, sydneyDay } from './markbook.mjs';
 import { newMarkbookId } from './markbook-schema.mjs';
 import {
-  chipStats, choosePair, contestedPair, fitBradleyTerry, fitMarks, flagMisfits, judgeFit, markFor, pairKey,
-  reliabilitySignal, splitHalf, ssr, thirdOf
+  chipStats, choosePair, contestedPair, fitMarks, markFor, pairKey, thirdOf
 } from './cj-maths.mjs';
+import { computeScale } from './cj-scale.mjs';
 
 export const BLOCK_TYPE = 'comparative_judgement';
 export const CJ_LIMITS = { chips: 8, chip: 40, calibration: 3, anchors: 6, text: 4000, reason: 300, reflection: 500, title: 120 };
@@ -136,40 +136,8 @@ async function readJudges(store, lesson, block, classId) {
   return new Map(rows);
 }
 
-/**
- * The scale from every judgement on items still in the pool. Students count 1,
- * the teacher `teacher_weight` (D16); flagged misfits count 0.5 after one refit (D15).
- */
-export function computeScale(round, config, judges, rng = Math.random) {
-  const ids = Object.keys(round.pool);
-  const inPool = (id) => id in round.pool;
-  const weightOf = (key) => (key === 'teacher' ? config.teacher_weight : 1);
-  const judgements = [];
-  const comparisons = [];
-  for (const [key, judge] of judges) {
-    for (const j of judge.judgements) {
-      if (!inPool(j.left) || !inPool(j.right) || (j.winner !== j.left && j.winner !== j.right)) continue;
-      judgements.push(j);
-      comparisons.push({ winner: j.winner, loser: j.winner === j.left ? j.right : j.left, judge: key, weight: weightOf(key) });
-    }
-  }
-  let fit = fitBradleyTerry(ids, comparisons);
-  let infit = judgeFit(comparisons, fit.theta);
-  const flagged = flagMisfits(infit);
-  let used = comparisons;
-  if (config.downweight_misfits && flagged.size) {
-    used = comparisons.map((c) => (flagged.has(c.judge) ? { ...c, weight: c.weight * 0.5 } : c));
-    fit = fitBradleyTerry(ids, used);
-    infit = judgeFit(comparisons, fit.theta);
-  }
-  const s = ssr(fit.theta, fit.se);
-  const half = splitHalf(ids, used, { rng });
-  const reliability = { ...reliabilitySignal({ ssr: s, splitHalf: half, comparisons: comparisons.length, items: ids.length }), ssr: s, split_half: half };
-  const order = [...ids].sort((a, b) => fit.theta[b] - fit.theta[a] || (a < b ? -1 : 1));
-  const studentOrder = order.filter((id) => round.pool[id].kind === 'student');
-  const weights = Object.fromEntries([...judges.keys()].map((key) => [key, weightOf(key) * (config.downweight_misfits && flagged.has(key) ? 0.5 : 1)]));
-  return { ids, fit, comparisons, judgements, infit, flagged, reliability, order, studentOrder, weights };
-}
+// computeScale lives in cj-scale.mjs (pure, so the Battles room bundles the same code); re-exported here.
+export { computeScale };
 
 /** Fitted marks for students from anchors with known marks (D20). Null without a usable line. */
 function marksFrom(round, config, scale, roster) {

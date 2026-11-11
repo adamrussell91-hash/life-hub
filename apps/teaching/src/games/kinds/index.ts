@@ -7,6 +7,7 @@
  * registered here is playable and printable everywhere.
  */
 import './articulate';
+import './battles';
 import './connections';
 import './crossword';
 import './find-a-word';

@@ -4,6 +4,7 @@
  * Worker and Netlify (core/room-entry.ts imports this file).
  */
 import '../kinds/articulate/rules';
+import '../kinds/battles/rules';
 import '../kinds/jeopardy/rules';
 import '../kinds/pictionary/rules';
 import '../kinds/points-rush/rules';
