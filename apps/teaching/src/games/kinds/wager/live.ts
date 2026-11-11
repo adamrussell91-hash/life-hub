@@ -21,7 +21,8 @@ import './wager.css';
  *
  * Phone: answer buttons, then a bet slider snapping to 10s with Min / ¼ / ½ /
  * All in chips; "Lock in 80 points"; after the reveal, the change with its
- * parts: "+184 (bet 80, bonus 40, pot share 64)".
+ * parts: "+104", then "184 back (bet 80, bonus 40, pot share 64)" (the bet
+ * was never taken, so the change is bonus + share).
  */
 
 type BoardKV = {
@@ -584,7 +585,8 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       breakdown.append(d);
     };
     if (p.correct) {
-      root.append(waitCard('You were right', `+${fmt(p.change)}`, [`+${fmt(p.change)} (bet ${fmt(p.bet)}, bonus ${fmt(p.bonus)}, pot share ${fmt(p.share)})`], 'is-good'));
+      // The headline is the change in points; the line under it adds up to what came back (the bet was never taken).
+      root.append(waitCard('You were right', `+${fmt(p.change)}`, [`${fmt(p.bet + p.bonus + p.share)} back (bet ${fmt(p.bet)}, bonus ${fmt(p.bonus)}, pot share ${fmt(p.share)})`], 'is-good'));
       row('Bet returned', fmt(p.bet));
       row('House bonus', `+${fmt(p.bonus)}`);
       row('Your share of the pot', `+${fmt(p.share)}`);

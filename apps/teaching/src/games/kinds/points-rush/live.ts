@@ -258,7 +258,11 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const rows = el('div', 'pr-db');
     for (const x of k.insight.items.slice(0, 8)) {
       const r = el('div', 'pr-db__row');
-      const name = el('span', 'pr-db__name', x.label);
+      // Labels are whole prompts, not short terms: two lines at most, with the Reteach tag outside the clamp so it always shows.
+      const name = el('span', 'pr-db__name');
+      const lbl = el('span', 'pr-db__lbl', x.label);
+      lbl.title = x.label;
+      name.append(lbl);
       if (x.back_pct !== null && x.back_pct < 75) name.append(el('span', 'pr-db__re', 'Reteach'));
       const tr = el('div', 'pr-db__tr');
       const f = x.first_pct ?? 0;

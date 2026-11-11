@@ -87,7 +87,7 @@ describe('wager live views', () => {
     phone.dispose();
   });
 
-  it('phone: after the reveal shows "+N (bet, bonus, pot share)"', () => {
+  it('phone: after the reveal shows the change, then a line that adds up: "184 back (bet, bonus, pot share)"', () => {
     const h = rulesHarness(wagerRules, WAGER, { seats: ['AB', 'CD'] });
     h.start();
     const kv = h.view('board', 'board') as { item: { options: Array<{ id: string; text: string }> } };
@@ -99,7 +99,10 @@ describe('wager live views', () => {
     document.body.append(host);
     const phone = liveKind('wager')!.phone(host, api());
     phone.update(view('wager', h.view('student', 'o_AB')));
-    expect(host.textContent).toContain('+104 (bet 80, bonus 40, pot share 64)');
+    expect(host.querySelector('.wg-big')?.textContent).toBe('+104');
+    expect(host.textContent).toContain('184 back (bet 80, bonus 40, pot share 64)');
+    // Never a sum that doesn't add up: "+104 (bet 80, …)" read as 80 + 40 + 64.
+    expect(host.textContent).not.toContain('+104 (bet');
     const lost = document.createElement('div');
     document.body.append(lost);
     const p2 = liveKind('wager')!.phone(lost, api({ owner: 'o_CD' }));
@@ -237,6 +240,11 @@ describe('points rush live views', () => {
     h.control('show', { view: 'insight' });
     board.update(view('points_rush', h.view('board', 'board')));
     expect(host.textContent).toContain('First try vs when it came back');
+    // Labels are whole prompts: the full text is in the (two-line) label and its title, and Reteach sits outside the clamp.
+    const lbls = [...host.querySelectorAll<HTMLElement>('.pr-db__name .pr-db__lbl')];
+    expect(lbls.length).toBeGreaterThan(0);
+    for (const l of lbls) expect(l.title).toBe(l.textContent);
+    expect(host.querySelector('.pr-db__lbl .pr-db__re')).toBeNull();
     h.control('show', { view: 'anon' });
     board.update(view('points_rush', h.view('board', 'board')));
     expect(host.textContent).toContain('no names');

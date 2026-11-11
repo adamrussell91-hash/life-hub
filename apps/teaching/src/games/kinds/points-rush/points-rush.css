@@ -65,9 +65,10 @@
 .pr-dot--back { background: var(--game-right); }
 .pr-ins__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12em, 20em); gap: 1.4em; min-height: 0; }
 .pr-db { display: grid; gap: 0.3em; align-content: start; }
-.pr-db__row { display: grid; grid-template-columns: minmax(0, 9em) minmax(0, 1fr) 5em; align-items: center; gap: 0.6em; min-height: 2.2em; padding: 0.2em 0.7em; border-radius: 0.65em; background: var(--stage-card); font-size: 0.9em; font-weight: 700; }
-.pr-db__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-db__re { margin-left: 0.4em; padding: 0.05em 0.4em; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 0.65em; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: middle; }
+.pr-db__row { display: grid; grid-template-columns: minmax(0, 13em) minmax(0, 1fr) 5em; align-items: center; gap: 0.6em; min-height: 2.2em; padding: 0.2em 0.7em; border-radius: 0.65em; background: var(--stage-card); font-size: 0.9em; font-weight: 700; }
+.pr-db__name { display: flex; align-items: center; gap: 0.4em; min-width: 0; }
+.pr-db__lbl { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.15; overflow-wrap: anywhere; }
+.pr-db__re { flex: none; padding: 0.05em 0.4em; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 0.65em; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: middle; }
 .pr-db__tr { position: relative; height: 1em; }
 .pr-db__tr::before { content: ""; position: absolute; left: 0; right: 0; top: 0.45em; height: 2px; background: var(--stage-line); }
 .pr-db__gap { position: absolute; top: 0.35em; height: 0.3em; border-radius: 0.3em; background: linear-gradient(90deg, var(--stage-muted), var(--game-right)); opacity: 0.6; transform-origin: left; }
