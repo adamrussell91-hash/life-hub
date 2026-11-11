@@ -2090,6 +2090,104 @@ function missedPieces(evidence) {
   }
   return [...out];
 }
+
+// apps/teaching/src/games/core/mark.ts
+function revealFor(kind, key2, check) {
+  if (key2.shape === "quote" && kind === "who_said_it") return { speaker: key2.speaker, ...key2.source ? { source: key2.source } : {}, ...key2.why_fake ? { why_fake: key2.why_fake } : {} };
+  if (key2.shape === "wall" && check.group) {
+    const g = key2.groups.find((x) => x.id === check.group);
+    return g ? { group: { id: g.id, label: g.label, why: g.why, difficulty: g.difficulty, tiles: g.tiles } } : void 0;
+  }
+  if (key2.shape === "question" && kind !== "points_rush") return { key: key2.key };
+  return void 0;
+}
+var wallMistakes = (game) => Number(game?.settings?.mistakes) || 4;
+function markMove(game, keys, history, e, now, who) {
+  const kind = keys.kind;
+  if (e.cid) {
+    const repeat = history.find((x) => x.cid === e.cid);
+    if (repeat) return { result: repeat.reply ?? { item: repeat.item }, stored: null };
+  }
+  const grid = keys.grid ?? null;
+  const hintsOn = (item2) => history.filter((x) => x.move === "hint" && x.item === item2).length;
+  const solved = (item2) => history.some((x) => x.item === item2 && x.correct === true);
+  const selection = kind === "find_a_word" && grid?.kind === "wordsearch" && e.move === "answer" && (e.item === "any" || keys.items[e.item]?.shape === "term");
+  const key2 = keys.items[e.item];
+  if (!key2 && !selection) return { result: { item: e.item }, stored: null, error: "bad_item" };
+  const extra = { ...e.extra ?? {} };
+  for (const k of ["group", "one_away", "confused_with", "hints"]) delete extra[k];
+  let item = e.item;
+  let correct = null;
+  let response;
+  let keep = true;
+  const out = { item: e.item };
+  if (selection && grid?.kind === "wordsearch") {
+    const check = checkSelection(grid, e.item === "any" ? null : e.item, e.response);
+    if (!check.item || !check.response) return { result: { item: e.item, correct: false }, stored: null };
+    item = check.item;
+    response = check.response;
+    if (check.correct === true && solved(item)) return { result: { item, correct: true, again: true }, stored: null };
+    if (check.correct !== null) correct = check.correct;
+    if (check.decoy) extra.confused_with = check.decoy;
+    if (check.correct === null && !check.decoy) keep = false;
+    extra.hints = hintsOn(item);
+    Object.assign(out, { item, correct: check.correct === true, ...check.decoy ? { decoy: true } : {} });
+  } else if (key2 && MARKED_MOVES.has(e.move)) {
+    const check = checkAnswer(key2, e.response);
+    correct = check.correct;
+    response = check.response;
+    if (check.group) extra.group = check.group;
+    if (check.one_away) extra.one_away = true;
+    if (check.decoy) extra.confused_with = check.decoy;
+    if (grid && key2.shape === "term") extra.hints = hintsOn(e.item);
+    Object.assign(out, { correct, ...check.one_away ? { one_away: true } : {}, ...check.decoy ? { decoy: true } : {} });
+    const reveal = revealFor(kind, key2, check);
+    if (reveal) out.reveal = reveal;
+  } else if (e.move === "pass" && key2?.shape === "wall") {
+    const wrong = history.filter((x) => x.item === e.item && x.move === "guess" && x.correct === false).length;
+    if (wrong >= wallMistakes(game)) {
+      const got = new Set(history.filter((x) => x.item === e.item && x.correct === true && typeof x.extra?.group === "string").map((x) => x.extra?.group));
+      out.reveal = { groups: key2.groups.filter((g) => !got.has(g.id)).map(({ id, label, why, difficulty, tiles }) => ({ id, label, why, difficulty, tiles })) };
+    }
+  } else if (e.move === "hint" && grid && key2?.shape === "term") {
+    const step = Math.min(REVEAL_HINTS, hintsOn(e.item) + 1);
+    extra.hints = step;
+    if (grid.hints !== false) {
+      if (grid.kind === "crossword") {
+        const r = e.response;
+        const typed = typeof r?.letters === "string" ? r.letters.slice(0, 15) : "";
+        response = { letters: typed };
+        out.reveal = { step, cells: crosswordHint(grid, e.item, step, typed) };
+      } else out.reveal = { step, ...wordHint(grid, e.item, step) };
+    }
+  }
+  if (correct === true && grid?.kind === "wordsearch" && grid.message) {
+    const terms = Object.entries(keys.items).filter(([, x]) => x.shape === "term").map(([id]) => id);
+    if (terms.every((id) => id === item || solved(id))) out.reveal = { ...out.reveal ?? {}, message: grid.message };
+  }
+  if (!keep) return { result: out, stored: null };
+  const stored = {
+    at: now,
+    game: kind,
+    play_id: who.play_id,
+    owner: who.owner,
+    ...who.student_id ? { student_id: who.student_id } : {},
+    item,
+    move: e.move,
+    ...response !== void 0 ? { response } : {},
+    ...correct !== null ? { correct } : {},
+    ...e.time_ms !== void 0 ? { time_ms: e.time_ms } : {},
+    ...Object.keys(extra).length ? { extra } : {},
+    strength: who.strength,
+    ...e.cid ? { cid: e.cid, reply: out } : {}
+  };
+  return { result: out, stored };
+}
+function quotePoints(correct, fake, ms, seconds) {
+  if (!correct) return 0;
+  const share = Math.max(0, 1 - ms / Math.max(1, seconds * 1e3));
+  return (100 + Math.round(share * 10) * 10) * (fake ? 2 : 1);
+}
 export {
   GAME_MOVES,
   GameEventSchema,
@@ -2111,10 +2209,14 @@ export {
   gameWarnings,
   gridWord,
   itemLabel,
+  markMove,
   missedPieces,
   normaliseAnswer,
   playScore,
+  quotePoints,
+  revealFor,
   splitGame,
+  wallMistakes,
   wordHint,
   wordLengths
 };
