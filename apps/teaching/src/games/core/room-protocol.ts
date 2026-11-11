@@ -125,6 +125,10 @@ export type RoomView = {
   you?: { owner: string; seat?: Seat; last?: EventResult; rank?: number };
   /** Board's Class wall for Connections: anonymous confusion pairs (tile text pair → count). */
   class_wall?: Array<{ a: string; b: string; count: number }>;
+  /** What the teacher has put on the board (race games): the race wall or the Class wall. */
+  board_view?: 'race' | 'class_wall';
+  /** While paused: time that was left on the countdown or item (ends_at is left out while paused). */
+  paused_left_ms?: number;
   seq: number;
 };
 
@@ -186,12 +190,34 @@ export type RoomState = {
   folded?: boolean;
   /** Request ids already handled per seat, so a resent move is answered from here, not stored twice. */
   seen: Record<string, Record<string, EventResult | null>>;
+  /** Room-internal bookkeeping (room-core.ts). Never sent. */
+  /** The connection that holds each owner (teacher, board and seats): newest wins. */
+  conns?: Record<string, string>;
+  /** Seat owner → roster student id (for the fold; not shown on any screen). */
+  students?: Record<string, string>;
+  /** Seats the teacher removed: they can't rejoin this room; their moves still fold. */
+  kicked?: Record<string, Seat>;
+  /** Per-owner message counts in the current 10 s window. */
+  rate?: Record<string, { at: number; n: number }>;
+  /** Each seat's latest verdict (race: last move; paced: the last reveal), for `you.last`. */
+  last?: Record<string, EventResult>;
+  /** Items and groups someone has already solved first (the ticker names only the first). */
+  first?: Record<string, true>;
+  /** Time of the last action (ms), for views built outside a reduce. */
+  at?: number;
+  /** When play began (countdown ended). */
+  started_at?: number;
 };
 
+/**
+ * `conn` (optional): the wrapper's id for one socket or poller. With it the
+ * room knows which of an owner's connections is newest (the older one gets
+ * `replaced`), and a late close of a replaced socket doesn't take the seat offline.
+ */
 export type RoomAction =
-  | { type: 'connect'; owner: string; role: Role; initials?: string; student_id?: string }
-  | { type: 'disconnect'; owner: string }
-  | { type: 'msg'; owner: string; role: Role; msg: ClientMsg }
+  | { type: 'connect'; owner: string; role: Role; initials?: string; student_id?: string; conn?: string }
+  | { type: 'disconnect'; owner: string; conn?: string }
+  | { type: 'msg'; owner: string; role: Role; msg: ClientMsg; conn?: string }
   /** Alarm tick: countdown end, paced item end, auto-end after 6 h. */
   | { type: 'tick' }
   | { type: 'folded' };
@@ -199,8 +225,9 @@ export type RoomAction =
 export type RoomEffect =
   /** Broadcast to everyone; the wrapper builds each viewer's own view with `publicView`. */
   | { kind: 'broadcast' }
-  | { kind: 'send'; owner: string; msg: ServerMsg }
-  | { kind: 'close'; owner: string; msg: ServerMsg }
+  /** With `conn`: only that connection; without: every connection the owner holds. */
+  | { kind: 'send'; owner: string; conn?: string; msg: ServerMsg }
+  | { kind: 'close'; owner: string; conn?: string; msg: ServerMsg }
   /** Next alarm, server ms. */
   | { kind: 'alarm'; at: number }
   /** Post the fold (after `end` or the 6 h limit). */
