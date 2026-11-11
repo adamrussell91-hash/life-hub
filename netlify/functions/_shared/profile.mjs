@@ -196,7 +196,7 @@ async function studentView(store, roster, student, lessonIds, t = untimed) {
   const [{ book }, quizzes, work] = await Promise.all([
     t.time('markbook_book', () => readBook(store, roster.cls.id)),
     // Quiz scores never read the book's columns, so they start at once.
-    t.time('quizzes', async () => quizColumns(store, roster, await readBook(store, roster.cls.id).then((r) => r.book), lessonIds, { size: PAGE_READS })),
+    t.time('quizzes', async () => quizColumns(store, roster, await readBook(store, roster.cls.id).then((r) => r.book), lessonIds, { size: PAGE_READS, onlyStudent: student.id })),
     t.time('work', () => workColumns(store, self, lessonIds, { size: PAGE_READS }))
   ]);
   return { markbook: book, quizzes, work };

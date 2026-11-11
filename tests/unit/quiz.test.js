@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { questionDropAction, listSubmissions, reviewSubmission } from '../../netlify/functions/_shared/question-drop.mjs';
-import { prepareQuizPublish, storeQuizKey, quizAction as rawQuizAction, quizTeacherAction } from '../../netlify/functions/_shared/quiz.mjs';
+import { prepareQuizPublish, storeQuizKey, quizAction as rawQuizAction, quizTeacherAction, classQuizScores } from '../../netlify/functions/_shared/quiz.mjs';
 import { BlockSchema } from '../../netlify/functions/_shared/teaching-block-schema.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
 import { createPublishedQuizHandler } from '../../netlify/functions/published-quiz.mjs';
@@ -1234,4 +1234,39 @@ test('insight: an open quiz with no timer skips the hand-in sweep; a timed one s
   await publishQuiz(timed);
   await quizTeacherAction(timed, 'quiz1', { action: 'insight', class_id: 'class1' });
   assert.ok(timed.data.has('quiz/quiz1/swept'));
+});
+
+test('one student’s page: same score and open go for that student, no quiz read for a plain lesson', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const roster = await loadRoster(store, 'class1');
+  const [bob, tom] = roster.students;
+  const ids = [bob.id, tom.id];
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'save', responses: { qb: { text: 'Juliet' } } });
+
+  // Nobody has handed in: the whole list is checked, so the answer is the same as the markbook's.
+  const full = await classQuizScores(store, 'quiz1', 'class1', ids);
+  assert.deepEqual(await classQuizScores(store, 'quiz1', 'class1', ids, { onlyStudent: bob.id }), full);
+  assert.deepEqual(full.started, [tom.id]);
+
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' } } });
+  const after = await classQuizScores(store, 'quiz1', 'class1', ids);
+  for (const who of [bob, tom]) {
+    const one = await classQuizScores(store, 'quiz1', 'class1', ids, { onlyStudent: who.id });
+    assert.deepEqual(one.scores, after.scores);
+    assert.equal(one.started?.includes(who.id) ?? false, after.started?.includes(who.id) ?? false, who.initials);
+  }
+
+  // A lecture's player shows no quiz questions, so it can't hold a quiz.
+  store.data.set('lessons/lesson1', { ...store.data.get('lessons/lesson1'), pedagogical_mode: 'lecture' });
+  let currentReads = 0;
+  const get = store.get.bind(store);
+  store.get = async (key) => { if (key === 'quiz/lesson1/current') currentReads += 1; return get(key); };
+  assert.equal(await classQuizScores(store, 'lesson1', 'class1', ids, { onlyStudent: bob.id }), null);
+  assert.equal(currentReads, 0, 'a lesson type that runs no quiz is not read as one');
 });
