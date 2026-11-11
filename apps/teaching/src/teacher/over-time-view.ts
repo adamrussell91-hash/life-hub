@@ -58,7 +58,8 @@ export type Habits = {
   steps: { set: number; acted: number | null };
 };
 /** What the tab needs from the class's curriculum, already picked out. */
-export type ClassFrame = { terms: TermSpan[]; unit: Unit | null; unitStart: string | null; deep: DeepUnderstanding[] };
+/** `named` is every unit's deep understandings: tags from past units still show the piece's words, not its id. */
+export type ClassFrame = { terms: TermSpan[]; unit: Unit | null; unitStart: string | null; deep: DeepUnderstanding[]; named?: DeepUnderstanding[] };
 
 export type OverTimeApi = {
   markbook: (classId: string) => Promise<MarkbookView>;
@@ -99,7 +100,8 @@ async function classFrame(classId: string, today: string): Promise<ClassFrame> {
   const unit = unitId ? (curriculum.units.find((u) => u.id === unitId) ?? null) : null;
   const dates = curriculum.scheduled_lessons.filter((r) => r.class_id === classId && r.unit_id === unitId).map((r) => r.date).sort();
   const deep = (unit?.deep_understandings ?? []) as DeepUnderstanding[];
-  return { terms, unit, unitStart: dates[0] ?? null, deep };
+  const named = curriculum.units.flatMap((u) => (u.deep_understandings ?? []) as DeepUnderstanding[]);
+  return { terms, unit, unitStart: dates[0] ?? null, deep, named };
 }
 
 function defaultApi(classId: string, studentId: string): OverTimeApi {
@@ -115,6 +117,14 @@ function defaultApi(classId: string, studentId: string): OverTimeApi {
     saveGroup: (id, group, today) => httpMarkbookApi.saveGroup(id, group, today)
   };
 }
+
+/** How often a marking code shows up on their recent returned pieces, against their earlier ones. */
+const TREND_TEXT = { more: 'More often lately', fewer: 'Less often lately', same: 'No change' } as const;
+const TREND_TITLE = {
+  more: 'This code is on more of their recent pieces than their earlier ones',
+  fewer: 'This code is on fewer of their recent pieces than their earlier ones',
+  same: 'This code shows up as often on recent pieces as on earlier ones'
+} as const;
 
 // ── Small drawing helpers ────────────────────────────────────────────
 
@@ -282,7 +292,13 @@ export function mountOverTime(options: OverTimeViewOptions): HTMLElement {
   let notes: TeacherNote[] = [];
   let notesError = '';
   let taught: Map<string, number> | null = null;
-  const label = (tag: string): string => (tag === VOCAB_TAG ? 'Unit vocabulary' : loaded ? tagLabel(tag, { ...loaded.ctx, deep: loaded.frame.deep }) : tag);
+  const label = (tag: string): string => {
+    if (tag === VOCAB_TAG) return 'Unit vocabulary';
+    if (!loaded) return tag;
+    const text = tagLabel(tag, { ...loaded.ctx, deep: [...loaded.frame.deep, ...(loaded.frame.named ?? [])] });
+    // A piece no unit holds any more (merged or dropped): say so rather than show its id.
+    return kindOf(tag) === 'kp' && text === tag.slice(tag.indexOf(':') + 1) ? 'Knowledge piece since removed' : text;
+  };
 
   // ── Range ──
   function paintRange(): void {
@@ -598,7 +614,9 @@ export function mountOverTime(options: OverTimeViewOptions): HTMLElement {
       const tr = codeTrend(c.cells);
       // Fewer of a next-step code is good news; more of a strength is too.
       const good = tr === null || tr === 'same' ? null : c.positive ? tr === 'more' : tr === 'fewer';
-      row.append(lab, dots, el('div', `ot-code__tr ${good === null ? 'ot-flat' : good ? 'ot-pos' : 'ot-neg'}`, tr ?? ''));
+      const trCell = el('div', `ot-code__tr ${good === null ? 'ot-flat' : good ? 'ot-pos' : 'ot-neg'}`, tr ? TREND_TEXT[tr] : '');
+      if (tr) trCell.title = TREND_TITLE[tr];
+      row.append(lab, dots, trCell);
       codePanel.append(row);
     }
     const piecePanel = el('div', 'ot-panel');
@@ -622,7 +640,7 @@ export function mountOverTime(options: OverTimeViewOptions): HTMLElement {
     }
     piecePanel.append(items.length ? list : el('p', 'pm-empty', returned === null && options.loadReturned ? 'Loading returned pieces…' : 'No returned pieces yet.'));
     two.append(codePanel, piecePanel);
-    writingHost.replaceChildren(el('h2', 'ot-h2', 'Writing and speaking'), el('p', 'ot-sub', 'Your marking codes on each returned piece, oldest on the left. Green is a strength, orange a next step.'), two);
+    writingHost.replaceChildren(el('h2', 'ot-h2', 'Writing and speaking'), el('p', 'ot-sub', 'Your marking codes on each returned piece, oldest on the left. Green is a strength, orange a next step. The right column compares their recent pieces with earlier ones.'), two);
   }
 
   // ── Habits ──

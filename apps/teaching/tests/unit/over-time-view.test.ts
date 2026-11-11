@@ -143,3 +143,28 @@ describe('Over time view', () => {
     host.remove();
   });
 });
+
+describe('Over time view says what tags and trends mean', () => {
+  it('names knowledge pieces from any unit, and calls a removed one removed', async () => {
+    const quizzes = [quiz('l1', 'Week 1 quiz', '2026-10-13', 'kp:kp_zz01', 0.5, 1), quiz('l2', 'Week 2 quiz', '2026-10-20', 'kp:kp_zz09', 1, 1)];
+    const past = { id: 'du_past', claim: 'An invented claim', pieces: [{ id: 'kp_zz01', text: 'Form can act out what a text describes', tier: 'essential' }], shared_piece_ids: [] };
+    const api = { ...fakeApi(quizzes), frame: async () => ({ terms: [{ number: 4, start: '2026-10-12', end: '2026-12-18' }], unit: null, unitStart: null, deep: [], named: [past as never] }) };
+    const host = mountOverTime({ classId: 'c1', studentId: 's1', name: 'Jo Pell', api, today: '2026-11-04' });
+    await vi.waitFor(() => expect(host.querySelectorAll('.ot-row[data-tag]').length).toBe(2));
+    const text = host.querySelector('.ot-main')!.textContent!;
+    expect(text).toContain('Form can act out what a text describes');
+    expect(text).toContain('Knowledge piece since removed');
+    expect(text).not.toContain('kp_zz');
+  });
+
+  it('spells out what a marking code trend means', async () => {
+    const code = (id: string, positive: boolean, cells: number[]) => ({ code_id: id, code: id.toUpperCase(), label: `Code ${id}`, colour: '#888', positive, cells, hit: 1, of: cells.length, total: 1, dropped: false });
+    const codes = [code('a', true, [0, 0, 1, 1]), code('b', false, [1, 1, 0, 0]), code('c', false, [1, 0, 1, 0])];
+    const pieces = [1, 2, 3, 4].map((n) => ({ id: `p${n}`, label: `Essay ${n}`, date: '13 Oct', kind: 'written' }));
+    const host = mountOverTime({ classId: 'c1', studentId: 's1', name: 'Jo Pell', api: fakeApi([]), today: '2026-11-04', codes: codes as never, pieces: pieces as never });
+    await vi.waitFor(() => expect(host.querySelectorAll('.ot-code__tr').length).toBe(3));
+    const trs = [...host.querySelectorAll<HTMLElement>('.ot-code__tr')];
+    expect(trs.map((t) => t.textContent)).toEqual(['More often lately', 'Less often lately', 'No change']);
+    expect(trs[0]!.title).toBe('This code is on more of their recent pieces than their earlier ones');
+  });
+});
