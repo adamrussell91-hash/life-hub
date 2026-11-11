@@ -60,6 +60,19 @@ function historyRow(history: NonNullable<PracticeCard['history']>): HTMLElement 
   return row;
 }
 
+/** How often each box comes round, as the server's GAPS. */
+const BOX_GAPS = ['every day', 'every 3 days', 'every week', 'every 2 weeks', 'every 4 weeks'];
+
+/** A chip for the card's Leitner box, deeper each box up; "New" for a card never answered. */
+export function boxChip(c: Pick<PracticeCard, 'box' | 'history'>): HTMLElement | null {
+  if (!c.box) return null;
+  const box = Math.min(Math.max(Math.round(c.box), 1), BOX_GAPS.length);
+  const fresh = box === 1 && !c.history?.length;
+  const chip = el('span', `kos-boxchip ${fresh ? 'is-new' : `is-b${box}`}`, fresh ? 'New' : `Box ${box}`);
+  chip.title = fresh ? 'A new card' : `Box ${box} comes round ${BOX_GAPS[box - 1]}`;
+  return chip;
+}
+
 export function mountPractice(host: HTMLElement, options: PracticeOptions): PracticeHandle {
   const { classId, load } = options;
   const api = options.api ?? studentOrganiserApi;
@@ -123,7 +136,10 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
     const c = queue[i]!;
     const card = el('div', 'kos-card');
     const top = el('div', 'kos-card__top');
-    top.append(el('p', 'kos-card__from', `${c.section}${c.box ? ` · Box ${c.box}` : ''}`));
+    const from = el('p', 'kos-card__from', c.section);
+    const chip = boxChip(c);
+    if (chip) from.append(chip);
+    top.append(from);
     if (c.history?.length) top.append(historyRow(c.history));
     card.append(top, el('p', 'kos-card__cue', c.cue));
     if (!shown) {

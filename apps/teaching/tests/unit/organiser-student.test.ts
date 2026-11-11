@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderOrganiserPanel } from '@/organiser/student-panel';
 import { mountTestMyself } from '@/organiser/test-myself';
-import { mountPractice, readPending } from '@/organiser/practice';
+import { boxChip, mountPractice, readPending } from '@/organiser/practice';
 import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import type { OrganiserLoad, PracticeCard, Sheet, SheetSection } from '@/organiser/types';
 
@@ -175,9 +175,22 @@ describe('practice boxes and history', () => {
   it('shows green and red circles with dates on a card', () => {
     const host = document.createElement('div');
     mountPractice(host, { classId: 'c1', load: { today: 1, cards: [{ ...cards[0]!, box: 2, history: [{ d: '2026-11-03', ok: false }, { d: '2026-11-04', ok: true }] }], next: null }, api: { review: vi.fn() } });
-    expect(host.querySelector('.kos-card__from')!.textContent).toBe('Key ideas · Box 2');
+    expect(host.querySelector('.kos-card__from')!.textContent).toBe('Key ideasBox 2');
+    expect(host.querySelector('.kos-boxchip')!.className).toContain('is-b2');
     expect([...host.querySelectorAll('.kos-hist__item')].map((n) => n.className.includes('is-got'))).toEqual([false, true]);
     expect(host.querySelector('.kos-hist__day')!.textContent).toBe('3 Nov');
+  });
+});
+
+describe('box chip', () => {
+  it('says New for a card never answered, Box N otherwise, and nothing without a box', () => {
+    expect(boxChip({ box: 1, history: [] })!.textContent).toBe('New');
+    expect(boxChip({ box: 1, history: [{ d: '2026-11-03', ok: false }] })!.textContent).toBe('Box 1');
+    const four = boxChip({ box: 4, history: [{ d: '2026-11-03', ok: true }] })!;
+    expect(four.textContent).toBe('Box 4');
+    expect(four.className).toContain('is-b4');
+    expect(four.title).toBe('Box 4 comes round every 2 weeks');
+    expect(boxChip({})).toBeNull();
   });
 });
 
