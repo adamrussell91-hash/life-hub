@@ -1,6 +1,7 @@
 import { renderBlock } from '@/blocks/render';
 import { filterBlocksForStudent } from '@/blocks/visibility';
 import type { Lesson } from '@/schemas/lesson';
+import { renderGamesForPrint } from '@/games/print';
 
 export function renderPrintLesson(lesson: Lesson): HTMLElement {
   const root = document.createElement('article');
@@ -18,6 +19,12 @@ export function renderPrintLesson(lesson: Lesson): HTMLElement {
   const studentBlocks = filterBlocksForStudent(lesson.blocks);
   for (const block of studentBlocks) {
     body.append(renderBlock(block, 'print', { lessonId: lesson.id, pageBlocks: studentBlocks }));
+  }
+
+  // A Game lesson prints its games after the "Before you play" blocks (each kind's own print renderer).
+  if (lesson.pedagogical_mode === 'game') {
+    const games = renderGamesForPrint(lesson.game);
+    if (games) body.append(games);
   }
 
   root.append(body);

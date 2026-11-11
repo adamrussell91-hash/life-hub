@@ -38,6 +38,12 @@ export function primeSound(): void {
   }
 }
 
+/** The shared audio context, woken (game sound effects use it too). Null where audio is unavailable. */
+export function audioContext(): AudioContext | null {
+  primeSound();
+  return audio;
+}
+
 /** One soft tone per beat; the last beat is higher. */
 export function chime(beats = 1): void {
   if (isMuted()) return;

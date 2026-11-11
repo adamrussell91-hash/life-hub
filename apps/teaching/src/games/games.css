@@ -1,14 +1,56 @@
-/* Game lessons: teacher build and student arcade. Design-kit tokens, plus the
- * named game tokens below (spec §5.2; glyph tile colours from the approved
- * mockups, docs/mockups/games/games.css). */
+/* Game lessons: teacher build, student arcade and the solo player shell.
+ * Design-kit tokens, plus the named game tokens below (spec §5.2), taken from
+ * the approved mockups (docs/mockups/games/games.css). They live here, not in
+ * packages/design-kit, so the game build stays inside the Teaching app. */
+:root {
+  /* Team colours: a strong colour for marks and a soft one for surfaces. Teams also carry names and patterns (never colour alone, §5.4). */
+  --game-team-1: #5b8fd6;
+  --game-team-1-soft: var(--pastel-blue, #dceafa);
+  --game-team-2: #4f9a72;
+  --game-team-2-soft: var(--pastel-sage, #dfe9e1);
+  --game-team-3: #e0894a;
+  --game-team-3-soft: var(--pastel-peach, #f2dfd0);
+  --game-team-4: #a585cf;
+  --game-team-4-soft: var(--pastel-lilac, #e8e0f1);
+  /* Right, wrong and gold (first place, values, the countdown ring). */
+  --game-right: #3fae73;
+  --game-right-surface: #e3f4ea;
+  --game-wrong: #d4544f;
+  --game-wrong-surface: #fbe7e6;
+  --game-gold: #f2c14e;
+  --game-confetti-light: #ffffff;
+  /* Connections difficulty, easiest (1) to trickiest (4): fill and ink. Groups also show their label. */
+  --game-cx-1: var(--pastel-gold, #f1e2b6);
+  --game-cx-1-ink: var(--pastel-gold-ink, #6c581f);
+  --game-cx-2: var(--pastel-sage, #dfe9e1);
+  --game-cx-2-ink: var(--pastel-sage-ink, #3c5949);
+  --game-cx-3: var(--pastel-blue, #dceafa);
+  --game-cx-3-ink: var(--pastel-blue-ink, #294c71);
+  --game-cx-4: var(--pastel-lilac, #e8e0f1);
+  --game-cx-4-ink: var(--pastel-lilac-ink, #5d4e70);
+  /* Answer keys shared by board and phone (and the glyph tiles), each with a letter or shape too. */
+  --game-key-1: #3a6fc4;
+  --game-key-2: #3d9a6a;
+  --game-key-3: #d27a36;
+  --game-key-4: #8c6bc0;
+  --game-key-ink: #ffffff;
+  /* Motion: the plain ease-out and the spring (linear() with a cubic-bezier fallback below). */
+  --game-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --game-ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --game-ease-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 20.5%, 1.043 24.5%, 1.035 28.4%, 1.007 36%, 0.997 41.3%, 1.003 53.4%, 1);
+  }
+}
 .gm {
-  --gm-k1: #3a6fc4;
-  --gm-k2: #3d9a6a;
-  --gm-k3: #d27a36;
-  --gm-k4: #8c6bc0;
+  --gm-k1: var(--game-key-1);
+  --gm-k2: var(--game-key-2);
+  --gm-k3: var(--game-key-3);
+  --gm-k4: var(--game-key-4);
   --gm-live-surface: #ffe8d2;
   --gm-line-2: rgba(23, 55, 94, 0.22);
-  --gm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --gm-ease: var(--game-ease);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
@@ -204,4 +246,86 @@ textarea.gm-input { resize: vertical; min-height: 2.4rem; }
   .gm-sources .gm-actions .btn { flex: 1 1 0; }
   .gm-card { padding: var(--space-4); }
   .gm-arcade__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Solo player shell ─────────────────────────────────────────────
+ * A centred panel on a laptop; full screen on a phone with the action row
+ * docked at the bottom (R4: 44px buttons sharing the row, safe-area padding). */
+html.gm-solo-open, html.gm-solo-open body { overflow: hidden; }
+.gm.gm-solo {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center;
+  padding: var(--space-5);
+  background: rgba(10, 21, 54, 0.5);
+  max-width: none;
+}
+.gm-solo__panel {
+  position: relative;
+  width: min(46rem, 100%);
+  height: min(52rem, calc(100dvh - 2 * var(--space-5)));
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--warm-white, var(--paper)); color: var(--ink);
+  border-radius: 24px; box-shadow: var(--elev-4, 0 24px 60px rgba(10, 21, 54, 0.35));
+  overflow: hidden; outline: none;
+  container-type: inline-size;
+}
+.gm-solo__head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); min-width: 0; }
+.gm-solo__titles { display: grid; min-width: 0; flex: 1 1 auto; }
+.gm-solo__title { margin: 0; font-size: var(--text-md); color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-solo__status { margin: 0; font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.gm-solo__status:empty { display: none; }
+.gm-solo__tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.gm-solo__sync { font-size: var(--text-xs); color: var(--muted); white-space: nowrap; }
+.gm-solo__sync[data-state="offline"], .gm-solo__sync[data-state="retrying"] { color: var(--high-sea-ink); font-weight: 600; white-space: normal; max-width: 14rem; }
+.gm-icon-btn { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: var(--radius-full); border: 1px solid var(--gm-line-2); background: var(--paper); color: var(--navy); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.gm-icon-btn[aria-pressed="true"] { background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.gm-solo__back { flex: none; }
+.gm-solo__body { overflow: auto; overscroll-behavior: contain; min-height: 0; }
+.gm-solo__stage { display: grid; gap: var(--space-4); padding: var(--space-4) var(--space-5); min-width: 0; }
+.gm-solo__dock {
+  display: flex; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line); background: var(--warm-white, var(--paper));
+}
+.gm-solo__dock .btn { flex: 1 1 0; min-height: 44px; }
+.gm-solo__state { display: grid; place-items: center; min-height: 12rem; text-align: center; color: var(--muted); }
+.gm-solo__state p { margin: 0; max-width: 28rem; }
+.gm-solo__state--error { color: var(--danger); }
+.gm-solo__saving { margin: 0; text-align: center; color: var(--muted); font-size: var(--text-sm); }
+.gm-solo__toast {
+  position: absolute; left: var(--space-4); right: var(--space-4); bottom: calc(5rem + env(safe-area-inset-bottom));
+  padding: var(--space-3) var(--space-4); border-radius: 18px; background: var(--depth, var(--navy)); color: #fff; font-weight: 600;
+  box-shadow: 0 12px 30px rgba(10, 21, 54, 0.3); transform: translateY(160%); opacity: 0; pointer-events: none;
+  transition: transform 0.45s var(--game-ease-spring), opacity 0.2s;
+}
+.gm-solo__toast.is-shown { transform: none; opacity: 1; }
+.gm-solo__toast[data-tone="good"] { background: var(--success); }
+.gm-solo__toast[data-tone="bad"] { background: var(--danger); }
+.gm-solo--sending .gm-solo__sync { color: var(--navy); }
+.gm-confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+
+/* Finish card */
+.gm-finish { display: grid; gap: var(--space-3); justify-items: center; text-align: center; padding: var(--space-5) 0; }
+.gm-finish__title { margin: 0; font-size: var(--text-xl); color: var(--navy); outline: none; }
+.gm-finish__score { margin: 0; font-size: 3.5rem; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; line-height: 1; }
+.gm-finish__of { font-size: 1.75rem; color: var(--muted); font-weight: 700; }
+.gm-finish__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: var(--space-2); width: 100%; max-width: 40rem; margin: 0; }
+.gm-finish__stat { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--paper); box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.08); }
+.gm-finish__stat dt { font-size: var(--text-xs); color: var(--muted); font-weight: 600; }
+.gm-finish__stat dd { margin: 0; font-size: var(--text-lg); font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; }
+
+/* Calm: reduced motion or the game's Calm toggle. Moves become short fades. */
+.gm-calm *, .gm-calm *::before, .gm-calm *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.15s !important; }
+@media (prefers-reduced-motion: reduce) {
+  .gm-solo__toast { transition: opacity 0.15s; transform: none; }
+}
+
+@media (max-width: 720px) {
+  .gm.gm-solo { padding: 0; place-items: stretch; }
+  .gm-solo__panel { width: 100%; height: 100dvh; border-radius: 0; }
+  .gm-solo__head { padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2); gap: var(--space-2); flex-wrap: wrap; }
+  .gm-solo__titles { order: 3; flex-basis: 100%; }
+  .gm-solo__tools { margin-left: auto; }
+  .gm-solo__sync { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+  .gm-solo__stage { padding: var(--space-3) var(--space-4); }
 }

@@ -7,6 +7,9 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { GAME_KIND_INFO, type PublicGame, type PublicGameLesson } from './core/schema';
 import type { Arcade, GameClient, PlayScore } from './api';
 import { gameGlyph, modeChips } from './glyphs';
+import { hasPlayer } from './solo/registry';
+import { openSoloPlayer } from './solo/shell';
+import './kinds';
 import './games.css';
 
 export type ArcadeOptions = {
@@ -36,9 +39,10 @@ const scoreText = (s: PlayScore) => `${s.right}/${s.answered}`;
 
 /**
  * The student's arcade for a Game lesson: the optional "Before you play"
- * blocks, then one card per game. Solo games say Play (the players arrive in
- * the next phase, so for now Play says so); live-only games wait for the
- * teacher. Best and latest results come from the server after the initials claim.
+ * blocks, then one card per game. Solo games say Play; live-only games wait
+ * for the teacher. Play opens the kind's solo player (games/solo/registry.ts); a kind
+ * with no player yet says "Coming next". Best and latest results come from the
+ * server after the initials claim, and again after each finished play.
  */
 export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { dispose(): void } {
   const { lesson, client } = options;
@@ -47,6 +51,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   let arcade: Arcade | null = null;
   let disposed = false;
   let comingNext: string | null = null;
+  let soloShell: { close(): Promise<void> } | null = null;
 
   const shell = el('div', 'gm gm-arcade');
   const hero = el('div', 'gm-hero-host');
@@ -101,6 +106,19 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       const play = el('button', 'btn btn--primary gm-card__play', r ? 'Play again' : 'Play');
       play.type = 'button';
       play.addEventListener('click', () => {
+        if (client && hasPlayer(g.kind)) {
+          soloShell = openSoloPlayer({
+            game: g,
+            client,
+            best: r?.best ?? null,
+            latest: r?.latest ?? null,
+            onClose: ({ finished }) => {
+              soloShell = null;
+              if (finished && !disposed) client.load().then(apply, () => undefined);
+            }
+          });
+          return;
+        }
         comingNext = g.id;
         paint();
         shell.querySelector<HTMLElement>(`[data-game-id="${g.id}"] .gm-card__soon`)?.focus();
@@ -181,6 +199,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   return {
     dispose() {
       disposed = true;
+      void soloShell?.close();
       host.replaceChildren();
     }
   };
