@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialState, publicView, reduce, botTurn } from '@/games/core/room-core';
+import { initialState, nextAlarm, publicView, reduce, botTurn } from '@/games/core/room-core';
 import type { RoomState, Role, ControlOp, SoloEvent } from '@/games/core/room-protocol';
 import { splitGame } from '@/games/core/model';
 import { seededRandom } from '@/games/generators/random';
@@ -8,6 +8,7 @@ import '@/games/core/room-rules-index';
 import type { JeopardyView } from '@/games/kinds/jeopardy/rules';
 import { jeopardyGame, responseFor } from './games-jeopardy-fixture';
 import { teamMatchGame } from './games-team-match-fixture';
+import { RUSH } from './games-wager-rush-fixtures';
 import { leaks } from './games-rules-harness';
 
 // Jeopardy and Team match played through the real room reducer (style 'custom'), not the rules harness.
@@ -151,6 +152,20 @@ describe('Team match through room-core', () => {
       }
       r.advance(2000);
     }
+    expect(r.state.phase).toBe('ended');
+  });
+});
+
+describe('Points rush through room-core', () => {
+  it('ends on its own when its clock runs out: the alarm is the rush end, and the tick there brings the podium', () => {
+    const r = room(RUSH);
+    r.start();
+    const endsAt = r.state.ends_at!;
+    expect(endsAt).toBeGreaterThan(r.now());
+    expect(nextAlarm(r.state)).toBe(endsAt);
+    r.advance(endsAt - r.now() - 1);
+    expect(r.state.phase).toBe('playing');
+    r.advance(1);
     expect(r.state.phase).toBe('ended');
   });
 });

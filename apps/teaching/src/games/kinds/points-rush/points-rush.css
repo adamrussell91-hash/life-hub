@@ -31,8 +31,9 @@
 .pr-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9em, 14em); gap: 1.2em; min-height: 0; }
 .pr-race { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0.5em; min-height: 0; min-width: 0; }
 .pr-race__h { margin: 0; font-size: 0.8em; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stage-muted); }
-.pr-lanes { display: grid; gap: 0.45em; align-content: start; min-height: 0; }
-.pr-lane { height: 3.2em; display: grid; grid-template-columns: 1.6em minmax(0, 1fr) 5em; align-items: center; gap: 0.6em; padding: 0 0.8em 0 0.6em; border-radius: 0.85em; background: var(--stage-card); box-shadow: var(--stage-glow); min-width: 0; }
+/* Lanes shrink a little on a short board (two rows of teacher buttons) rather than spill under the controls. */
+.pr-lanes { display: grid; grid-auto-rows: minmax(2.5em, 3.2em); gap: 0.45em; align-content: start; min-height: 0; }
+.pr-lane { min-height: 0; display: grid; grid-template-columns: 1.6em minmax(0, 1fr) 5em; align-items: center; gap: 0.6em; padding: 0 0.8em 0 0.6em; border-radius: 0.85em; background: var(--stage-card); box-shadow: var(--stage-glow); min-width: 0; }
 .pr-lane__rk { font-size: 1.05em; font-weight: 800; color: var(--stage-muted); text-align: center; }
 .pr-lane.is-first .pr-lane__rk { color: var(--game-gold); }
 .pr-track { position: relative; height: 2.4em; min-width: 0; }
@@ -92,7 +93,8 @@
 @media (max-width: 1100px), (max-aspect-ratio: 4/3) {
   .pr-body { grid-template-columns: minmax(0, 1fr) minmax(8em, 10em); gap: 0.8em; }
   .pr-total, .pr-clock b { font-size: 2.2em; }
-  .pr-lane { height: 2.8em; grid-template-columns: 1.4em minmax(0, 1fr) 4.4em; }
+  .pr-lanes { grid-auto-rows: minmax(2.3em, 2.8em); }
+  .pr-lane { grid-template-columns: 1.4em minmax(0, 1fr) 4.4em; }
   .pr-card b { font-size: 1.4em; }
   .pr-ins__grid { grid-template-columns: minmax(0, 1fr) minmax(10em, 15em); }
 }
