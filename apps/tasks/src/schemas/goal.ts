@@ -5,7 +5,7 @@ import { schemaVersion } from './task';
 
 export const GoalStatusSchema = z.enum(['active', 'parked', 'achieved', 'dropped', 'archived']);
 export const GoalSphereSchema = z.enum(['life', 'work', 'professional']);
-export const GoalStructureSchema = z.enum(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch']);
+export const GoalStructureSchema = z.enum(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch', 'mandala']);
 export const GoalTermOutcomeSchema = z.enum(['carried', 'parked', 'achieved', 'dropped']);
 export const GoalLifeAreaSchema = z.enum([
   'career', 'health', 'love', 'money', 'create', 'explore', 'learn', 'friends'
@@ -33,6 +33,24 @@ export const GoalTermHistoryEntrySchema = z.object({
   at: z.string()
 });
 
+/** Mandala (9×9) action cell. `promoted` records what the cell became, if anything. */
+export const GoalMandalaActionSchema = z.object({
+  id: z.string(),
+  label: Text,
+  promoted: z
+    .object({ kind: z.enum(['lead', 'task']), task_id: z.string().nullable().default(null) })
+    .nullable()
+    .default(null)
+});
+
+/** Mandala pillar: one of the eight around the goal, with up to eight actions. */
+export const GoalMandalaPillarSchema = z.object({
+  id: z.string(),
+  label: Text,
+  project_id: z.string().nullable().default(null),
+  actions: z.array(GoalMandalaActionSchema).default([])
+});
+
 export const GoalFrameSchema = z.object({
   woop: z.object({ wish: Text, outcome: Text, obstacle: Text, plan: Text }).optional(),
   smarter: z
@@ -50,7 +68,8 @@ export const GoalFrameSchema = z.object({
   lead_lag: z.object({ lag: Text }).optional(),
   floor_target_stretch: z
     .object({ unit: Text, floor: Num, target: Num, stretch: Num, current: Num })
-    .optional()
+    .optional(),
+  mandala: z.object({ pillars: z.array(GoalMandalaPillarSchema).default([]) }).optional()
 });
 
 export const GoalMilestoneSchema = z.object({
@@ -100,6 +119,8 @@ export type Goal = z.infer<typeof GoalSchema>;
 export type GoalSphere = z.infer<typeof GoalSphereSchema>;
 export type GoalStructure = z.infer<typeof GoalStructureSchema>;
 export type GoalFrame = z.infer<typeof GoalFrameSchema>;
+export type GoalMandalaPillar = z.infer<typeof GoalMandalaPillarSchema>;
+export type GoalMandalaAction = z.infer<typeof GoalMandalaActionSchema>;
 export type GoalTerm = z.infer<typeof GoalTermSchema>;
 export type GoalLifeArea = z.infer<typeof GoalLifeAreaSchema>;
 export type GoalCurrentSource = z.infer<typeof GoalCurrentSourceSchema>;

@@ -8,7 +8,9 @@ import { normalizeWalkthru } from '../../../packages/walkthrus/goal.mjs';
  */
 const SPHERES = new Set(['life', 'work', 'professional']);
 const STATUSES = new Set(['active', 'parked', 'achieved', 'dropped', 'archived']);
-const STRUCTURES = new Set(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch']);
+const STRUCTURES = new Set(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch', 'mandala']);
+const MANDALA_SIZE = 8;
+const PROMOTE_KINDS = new Set(['lead', 'task']);
 const TERM_OUTCOMES = new Set(['carried', 'parked', 'achieved', 'dropped']);
 const LIFE_AREAS = new Set(['career', 'health', 'love', 'money', 'create', 'explore', 'learn', 'friends']);
 const CURRENT_SOURCES = new Set(['typed', 'tasks', 'signal']);
@@ -68,7 +70,46 @@ export function normalizeFrame(value) {
       current: num(f.current)
     };
   }
+  if (isObject(src.mandala)) out.mandala = normalizeMandala(src.mandala);
   return out;
+}
+
+function shortId(value, fallback) {
+  const id = text(value);
+  return id && id.length <= 64 ? id : fallback;
+}
+
+function normalizePromoted(value) {
+  if (!isObject(value) || !PROMOTE_KINDS.has(value.kind)) return null;
+  return { kind: value.kind, task_id: value.kind === 'task' ? text(value.task_id) || null : null };
+}
+
+/**
+ * Mandala: up to eight pillars, each with up to eight actions. Blank cells are kept
+ * because a cell's index is its place on the grid.
+ */
+export function normalizeMandala(value) {
+  const pillars = Array.isArray(value?.pillars) ? value.pillars : [];
+  return {
+    pillars: pillars.slice(0, MANDALA_SIZE).map((pillar, i) => {
+      const p = isObject(pillar) ? pillar : {};
+      const pid = shortId(p.id, `p${i + 1}`);
+      const actions = Array.isArray(p.actions) ? p.actions : [];
+      return {
+        id: pid,
+        label: text(p.label).slice(0, 120),
+        project_id: text(p.project_id) || null,
+        actions: actions.slice(0, MANDALA_SIZE).map((action, j) => {
+          const a = isObject(action) ? action : {};
+          return {
+            id: shortId(a.id, `${pid}a${j + 1}`),
+            label: text(a.label).slice(0, 160),
+            promoted: normalizePromoted(a.promoted)
+          };
+        })
+      };
+    })
+  };
 }
 
 function normalizeLeadMeasure(value) {

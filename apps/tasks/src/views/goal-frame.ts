@@ -1,6 +1,7 @@
 // apps/tasks/src/views/goal-frame.ts
 import type { Goal, GoalFrame } from '@/schemas/goal';
 import { el } from '@/views/hub-kit';
+import { renderMandala, type MandalaContext } from '@/views/goal-mandala';
 
 export type GoalPatch = Partial<Pick<Goal,
   'frame' | 'structure' | 'lead_measure' | 'week_log' | 'if_then' | 'next_start' | 'milestones' | 'status' | 'sphere'>>;
@@ -125,12 +126,13 @@ function floorTargetStretch(goal: Goal, onPatch: (p: GoalPatch) => void): HTMLEl
 }
 
 /** The main card body for the goal's chosen structure. */
-export function renderGoalFrame(goal: Goal, onPatch: (patch: GoalPatch) => void): HTMLElement {
+export function renderGoalFrame(goal: Goal, onPatch: (patch: GoalPatch) => void, ctx: MandalaContext = {}): HTMLElement {
   switch (goal.structure) {
     case 'woop': return woop(goal, onPatch);
     case 'smarter': return smarter(goal, onPatch);
     case 'okr': return okr(goal, onPatch);
     case 'lead_lag': return leadLag(goal, onPatch);
     case 'floor_target_stretch': return floorTargetStretch(goal, onPatch);
+    case 'mandala': return renderMandala(goal, onPatch, ctx);
   }
 }

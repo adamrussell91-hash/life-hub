@@ -34,7 +34,8 @@ const STRUCTURE_CHIP: Record<Goal['structure'], string> = {
   smarter: 'SMARTER',
   okr: 'OKR',
   lead_lag: 'LEAD/LAG',
-  floor_target_stretch: 'FLOOR·TARGET'
+  floor_target_stretch: 'FLOOR·TARGET',
+  mandala: 'MANDALA'
 };
 
 const ZOOM_MS = 500;
