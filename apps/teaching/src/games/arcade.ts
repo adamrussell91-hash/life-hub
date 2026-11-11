@@ -9,6 +9,8 @@ import { scoreText, type Arcade, type GameClient } from './api';
 import { gameGlyph, modeChips } from './glyphs';
 import { hasPlayer } from './solo/registry';
 import { openSoloPlayer } from './solo/shell';
+import { openLivePhone } from './live/phone';
+import { LIVE_STYLE } from './live/board-parts';
 import './kinds';
 import './games.css';
 
@@ -51,6 +53,16 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   let disposed = false;
   let comingNext: string | null = null;
   let soloShell: { close(): Promise<void> } | null = null;
+  let livePhone: { close(): void } | null = null;
+  /** A code from a QR link (`?join=482913`), offered when the student taps Join live game. */
+  const joinCode = (() => {
+    try {
+      const c = new URLSearchParams(location.search).get('join') ?? '';
+      return /^\d{6}$/.test(c) ? c : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
 
   const shell = el('div', 'gm gm-arcade');
   const hero = el('div', 'gm-hero-host');
@@ -105,16 +117,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       const play = el('button', 'btn btn--primary gm-card__play', r ? 'Play again' : 'Play');
       play.type = 'button';
       play.addEventListener('click', () => {
-        if (client && arcade?.identity.need === 'initials') {
-          // Scores need a name first: send them to the initials box, not into a dead end.
-          const box = gate.querySelector<HTMLElement>('.gm-gate');
-          box?.classList.remove('gm-gate--nudge');
-          void box?.offsetWidth;
-          box?.classList.add('gm-gate--nudge');
-          box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          gate.querySelector<HTMLInputElement>('.gm-input')?.focus({ preventScroll: true });
-          return;
-        }
+        if (nudgeInitials()) return;
         if (client && hasPlayer(g.kind)) {
           soloShell = openSoloPlayer({
             game: g,
@@ -138,8 +141,39 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     } else {
       foot.append(el('span', 'gm-card__wait', 'Waiting for your teacher'));
     }
+    if (g.live && LIVE_STYLE[g.kind] && client?.join) foot.append(liveButton(g));
     c.append(foot);
     return c;
+  }
+
+  function nudgeInitials(): boolean {
+    if (!(client && arcade?.identity.need === 'initials')) return false;
+    // Scores need a name first: send them to the initials box, not into a dead end.
+    const box = gate.querySelector<HTMLElement>('.gm-gate');
+    box?.classList.remove('gm-gate--nudge');
+    void box?.offsetWidth;
+    box?.classList.add('gm-gate--nudge');
+    box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    gate.querySelector<HTMLInputElement>('.gm-input')?.focus({ preventScroll: true });
+    return true;
+  }
+
+  /** Join live game: the six-box code, then the live phone (games/live/phone.ts). */
+  function liveButton(g: PublicGame): HTMLButtonElement {
+    const b = el('button', `btn ${g.solo ? 'btn--secondary' : 'btn--primary'} gm-card__live`, 'Join live game');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (nudgeInitials() || !client?.join) return;
+      livePhone = openLivePhone({
+        game: g,
+        join: (gameId, code) => client.join!(gameId, code),
+        code: joinCode,
+        onClose: () => {
+          livePhone = null;
+        }
+      });
+    });
+    return b;
   }
 
   function paint(): void {
@@ -209,6 +243,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     dispose() {
       disposed = true;
       void soloShell?.close();
+      livePhone?.close();
       host.replaceChildren();
     }
   };

@@ -85,8 +85,11 @@ function droppable(client: GameClient): GameClient {
 
 const mount = document.getElementById('mount')!;
 const view = new URLSearchParams(location.search).get('view');
+/** `?view=live-board` and `?view=live-phone&seat=AB`: live games on the dev fake room (games-live-preview.ts). */
+const live = view === 'live-board' || view === 'live-phone';
+if (live) (await import('./games-live-preview')).mountLivePreview(mount, view);
 
-if (view !== 'arcade') {
+if (!live && view !== 'arcade') {
   const section = el('section', 'gm-preview');
   section.append(el('h1', '', 'Teacher: Game lesson build'));
   const editor = mountGameEditor({
@@ -101,7 +104,7 @@ if (view !== 'arcade') {
   mount.append(section);
 }
 
-if (view !== 'editor') {
+if (!live && view !== 'editor') {
   const section = el('section', 'gm-preview');
   section.style.marginTop = '48px';
   section.append(el('h1', '', 'Student: the arcade'));

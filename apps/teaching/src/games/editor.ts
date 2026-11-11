@@ -13,6 +13,7 @@ import { gameContent, settingsRow } from './content-editor';
 import { pills, textInput } from './item-editors';
 import { canvasShowsOn, createGameTabs, type GameTab } from './editor-tabs';
 import { gridPanel, isGridGame, keepGridFields, type GridPanel } from './grid-editor';
+import { liveLauncher } from './live/launcher';
 import './games.css';
 
 export type GameEditorOptions = {
@@ -552,6 +553,7 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     refresh.addEventListener('click', () => void loadResults());
     bar.append(refresh);
     resultsHost.append(bar);
+    resultsHost.append(liveLauncher({ games: current().games, classId: resultsClass, className: classes.find((c) => c.id === resultsClass)?.name, api: o.api }));
     if (!o.api) {
       resultsHost.append(el('p', 'gm-note', 'Results show here once students play.'));
       return;

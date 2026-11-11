@@ -74,6 +74,29 @@ export type GameClient = {
   start(gameId: string): Promise<{ play_id: string; game: PublicGame | null }>;
   send(gameId: string, playId: string, events: SoloEvent[]): Promise<{ results: EventResult[] }>;
   finish(gameId: string, playId: string): Promise<FinishReply>;
+  /** Live: swaps the room code for a signed student ticket (initials claim first). */
+  join?(gameId: string, code: string): Promise<LiveJoin>;
+};
+
+/**
+ * What a phone needs to open its seat in a live room (`join`). The ticket is
+ * HMAC-signed by Netlify (room-protocol.ts `TicketPayload`); the room never
+ * sees the device token.
+ */
+export type LiveJoin = {
+  room: string;
+  ticket: string;
+  /** The game room Worker's socket base, e.g. `wss://class.adam-russell.com/g`. */
+  ws_base: string;
+  /** HTTPS base for the polling fallback (same Worker). */
+  http_base?: string;
+  initials: string;
+  game_id?: string;
+  /** The seat id; the room also sends it as `view.you.owner`. */
+  owner?: string;
+  team?: number;
+  /** The game as students see it, when the page's copy may be stale. */
+  game?: PublicGame;
 };
 
 export function gameClient(lessonId: string, classId: string): GameClient {
@@ -86,7 +109,8 @@ export function gameClient(lessonId: string, classId: string): GameClient {
     claim: (initials) => call<Arcade>('claim', { initials }),
     start: (game_id) => call('solo_start', { game_id }),
     send: (game_id, play_id, events) => call('solo_event', { game_id, play_id, events }),
-    finish: (game_id, play_id) => call<FinishReply>('solo_finish', { game_id, play_id })
+    finish: (game_id, play_id) => call<FinishReply>('solo_finish', { game_id, play_id }),
+    join: (game_id, code) => call<LiveJoin>('join', { game_id, code })
   };
 }
 
@@ -122,7 +146,31 @@ export type GameTeacherApi = {
   results(classId: string | null, gameId?: string): Promise<{ version: string; class_id: string | null; games: GameResults[] }>;
   pushToMarkbook(classId: string, gameId: string, title?: string): Promise<{ column_id: string; count: number }>;
   sources(): Promise<UnitSources>;
+  /** Opens a live room for one game and class: the board's code and teacher ticket. */
+  open?(gameId: string, classId: string): Promise<LiveOpen>;
+  /** Rooms still open for this lesson (so a refreshed board can reconnect). */
+  rooms?(): Promise<{ rooms: LiveRoomInfo[] }>;
 };
+
+/**
+ * A live room the teacher opened (`open`), or one still open (`rooms`, with
+ * fresh tickets). The board connects with `board_ticket`; `teacher_ticket` is
+ * the teacher's own seat (controls from another device).
+ */
+export type LiveOpen = {
+  room: string;
+  code: string;
+  teacher_ticket: string;
+  board_ticket: string;
+  ws_base: string;
+  http_base?: string;
+  game_id?: string;
+  /** Where the board's QR code points (defaults to the class site with the code). */
+  join_url?: string;
+  /** The game as students see it (no answers), for the board's quotes and cast. */
+  game?: PublicGame;
+};
+export type LiveRoomInfo = LiveOpen & { opened_at?: number; phase?: string };
 
 export function gameTeacherApi(lessonId: string): GameTeacherApi {
   const path = `/api/lessons/${encodeURIComponent(lessonId)}/game`;
@@ -130,6 +178,8 @@ export function gameTeacherApi(lessonId: string): GameTeacherApi {
   return {
     results: (class_id, game_id) => call('results', { class_id, ...(game_id ? { game_id } : {}) }),
     pushToMarkbook: (class_id, game_id, title) => call('markbook_push', { class_id, game_id, ...(title ? { title } : {}) }),
-    sources: () => call<UnitSources>('sources')
+    sources: () => call<UnitSources>('sources'),
+    open: (game_id, class_id) => call<LiveOpen>('open', { game_id, class_id }),
+    rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms')
   };
 }
