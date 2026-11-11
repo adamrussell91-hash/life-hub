@@ -63,6 +63,29 @@ function parseTimelineItems(items, weekCount) {
   return { timeline_items };
 }
 
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Terms in week order, contiguous from week 1 to the scope's last week, each with real dates. */
+export function parseTerms(terms, weekCount) {
+  if (!Array.isArray(terms) || terms.length < 1 || terms.length > 6) return { error: 'terms are invalid' };
+  const out = [];
+  let nextWeek = 1;
+  for (const raw of terms) {
+    const ok = raw && typeof raw.id === 'string' && raw.id && typeof raw.title === 'string' && raw.title.trim()
+      && Number.isInteger(raw.term_number) && raw.term_number >= 1 && raw.term_number <= 4
+      && raw.start_week === nextWeek && Number.isInteger(raw.end_week) && raw.end_week >= raw.start_week
+      && YMD.test(raw.start_date ?? '') && YMD.test(raw.end_date ?? '') && raw.end_date >= raw.start_date;
+    if (!ok) return { error: 'terms are invalid' };
+    out.push({
+      id: raw.id, title: raw.title.trim(), term_number: raw.term_number,
+      start_week: raw.start_week, end_week: raw.end_week, start_date: raw.start_date, end_date: raw.end_date
+    });
+    nextWeek = raw.end_week + 1;
+  }
+  if (nextWeek - 1 !== weekCount) return { error: `terms must cover weeks 1 to ${weekCount}` };
+  return { terms: out };
+}
+
 export function createScopeSequenceHandler(deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -96,12 +119,21 @@ export function createScopeSequenceHandler(deps = {}) {
     const hasOutcomes = parsed.value.outcome_ids !== undefined;
     const hasClimb = parsed.value.outcome_climb !== undefined;
     const hasKnowledge = parsed.value.knowledge_plan !== undefined;
-    if (!hasTimeline && !hasOutcomes && !hasClimb && !hasKnowledge) {
+    const hasTerms = parsed.value.terms !== undefined;
+    if (!hasTimeline && !hasOutcomes && !hasClimb && !hasKnowledge && !hasTerms) {
       return withCors(
-        errorResponse(400, 'validation_error', 'Provide timeline_items, outcome_ids, outcome_climb and/or knowledge_plan', false),
+        errorResponse(400, 'validation_error', 'Provide terms, timeline_items, outcome_ids, outcome_climb and/or knowledge_plan', false),
         request,
         env
       );
+    }
+    let terms = existing.terms;
+    if (hasTerms) {
+      const parsedTerms = parseTerms(parsed.value.terms, existing.week_count ?? 40);
+      if (parsedTerms.error) {
+        return withCors(errorResponse(400, 'validation_error', parsedTerms.error, false), request, env);
+      }
+      terms = parsedTerms.terms;
     }
     let timeline_items = existing.timeline_items;
     if (hasTimeline) {
@@ -154,6 +186,7 @@ export function createScopeSequenceHandler(deps = {}) {
     }
     const next = {
       ...existing,
+      terms,
       timeline_items,
       ...(outcome_ids !== undefined ? { outcome_ids } : {}),
       ...(outcome_climb !== undefined ? { outcome_climb } : {}),
