@@ -2,7 +2,7 @@
 
 Date: 11 November 2026
 Branch: `claude/game-lessons`
-Status: spec for Adam's review. Nothing built. All examples (students, quotes, texts) are invented.
+Status: reviewed by Adam 11 Nov (answers in §11); Phase 0 mockups next. Nothing built. All examples (students, quotes, texts) are invented.
 
 ## Purpose
 
@@ -64,18 +64,27 @@ Phase 0 (§9) is a clickable mockup of every board and controller for Adam's sig
 
 ---
 
-## 2. Structure: games are blocks, the Game lesson is the arcade
+## 2. Structure: games live inside the Game lesson type
 
-### 2.1 One block type, twelve kinds
+### 2.1 Not a block (Adam, 11 Nov)
 
-A new block type `game` with `content.kind` as a discriminated union:
+Games are **not** a block type. They belong to the existing **Game** lesson type, the same way stations belong to Station Rotation. A Game lesson holds one or more games and runs them with its own player.
+
+It plugs in by the Station Rotation pattern (commit 836957f57):
+
+- `LessonSchema` gets `game: GameLessonSchema.optional()` (`schemas/lesson.ts`), holding `games: Game[]` (1–8, in play order). Each `Game` has `id`, `title`, `kind` and that kind's content, as a discriminated union on `kind`:
 
 ```
 crossword | find_a_word | jeopardy | wheel | team_match | points_rush |
 battles | wager | connections | articulate | pictionary | who_said_it
 ```
 
-A game block can sit in **any** lesson (a quick Connections wall at the end of an ordinary lesson). Blocks plug in by the comparative-judgement checklist (commit 17f1af6fc): schema in `schemas/block.ts`, registry, render, editors, palette (`create-block.ts`, a new **Games** group), `block-meta.ts` + icon, `visibility.ts` (student-copy stripping), `publish-block-issues.ts`, `teaching-student.mjs`, `fixtures/every-block.ts`, dev preview, baselines, and regenerated files (`generate-alchemy-schema.mjs`, `generate-block-css.mjs`).
+- A publish-issues hook in `PublishableLessonSchema.superRefine`; a public schema in `PublishedLessonSchema` (`game` added to its `pedagogical_mode` list, answer keys stripped at publish and kept server-side as quiz keys are).
+- `game` added to `PLAYER_MODES` (`pedagogical-mode.ts` and the server copy in `_shared/quiz.mjs`), so the lesson renders through the game player, not the block page.
+- Schema and rules added to `scripts/generate-alchemy-schema.mjs` (→ `_shared/game-schema.mjs`, `_shared/game-rules.mjs`).
+- Server: `_shared/games.mjs`, `netlify/functions/games.mjs` (teacher, `/api/lessons/:lesson/game`), `published-games.mjs` (student, `/api/published/game/:lesson`), route added to `public-student-routes.mjs`. Every action names the `game_id`.
+- Editor: the lesson canvas for a Game lesson shows editor tabs (Games · Settings · Results), like Rotation's `editor-tabs.ts`.
+- The lesson's ordinary blocks, if any, show as a short "Before you play" page above the games (instructions, a model answer); they are optional.
 
 Code lives in `apps/teaching/src/games/`:
 
@@ -97,7 +106,6 @@ When `pedagogical_mode === 'game'`:
 - `game` is added to `PublishedLessonSchema.pedagogical_mode` so it reaches the student copy.
 - The **student** sees an arcade page: the lesson's games as large cards (title, kind, "Play" or "Waiting for your teacher" for live-only games, best result so far).
 - The **teacher's Display** opens on a "Tonight's games" board: the games in order, each with **Play live** / **Set as homework**, and the room code once a room is open.
-- Ordinary blocks still render (instructions, a model answer), so a Game lesson can mix games with teaching.
 
 ### 2.3 Where game content comes from
 
@@ -134,8 +142,8 @@ A Cloudflare Worker `workers/game-rooms` with one **Durable Object per room** (`
 
 ### 3.3 Flow
 
-1. **Teacher opens a room.** `POST /api/lessons/:lesson/game/:block { action: 'open', class_id }` (operator gate). Netlify reads the draft block, builds the **room config** (public items + answer keys + roster with initials), and creates the room by a server-to-server call to the Worker signed with `GAME_ROOM_SECRET` (HMAC, shared env var on both sides). Returns `{ room_id, code (6 digits), teacher_ticket }`.
-2. **Student joins.** Phone types the code (or scans the board's QR), then `POST /api/published/game/:lesson/:block { action: 'join', code, class_id, class_token }`. Netlify runs the existing `identify()` / initials claim (`class-claims.mjs`) and returns a **student ticket**: `{ room, owner, student_id, initials, exp }` HMAC-signed. The phone opens `wss://…/rooms/:room?ticket=…`. The DO verifies the ticket; it never sees device tokens.
+1. **Teacher opens a room.** `POST /api/lessons/:lesson/game { action: 'open', game_id, class_id }` (operator gate). Netlify reads that game from the draft lesson, builds the **room config** (public items + answer keys + roster with initials), and creates the room by a server-to-server call to the Worker signed with `GAME_ROOM_SECRET` (HMAC, shared env var on both sides). Returns `{ room_id, code (6 digits), teacher_ticket }`.
+2. **Student joins.** Phone types the code (or scans the board's QR), then `POST /api/published/game/:lesson { action: 'join', game_id, code, class_id, class_token }`. Netlify runs the existing `identify()` / initials claim (`class-claims.mjs`) and returns a **student ticket**: `{ room, owner, student_id, initials, exp }` HMAC-signed. The phone opens `wss://…/rooms/:room?ticket=…`. The DO verifies the ticket; it never sees device tokens.
 3. **Play.** Clients send actions; the DO reduces and broadcasts. Answer keys never leave the DO until the reveal for that item.
 4. **Fold.** When the teacher ends the game (or the DO's 6 h alarm fires), the DO posts the event log to `POST /api/games/fold` (signed). Netlify writes the plays and evidence (§4) and marks the room folded. Folding is idempotent by `room_id`.
 
@@ -156,7 +164,7 @@ A Cloudflare Worker `workers/game-rooms` with one **Durable Object per room** (`
 
 ### 3.6 Solo play (no room)
 
-Solo games (homework, or "play on your own" in class) don't open a room. The phone runs the same rules module locally and sends events to `POST /api/published/game/:lesson/:block { action: 'solo_event' | 'solo_finish' }` in small batches (every 5 events or 10 s, and on finish). Keys for solo play: Term/Quote answers are checked server-side on each batch, so keys still never ship to the phone; the client gets right/wrong back within the batch round-trip and animates optimistically only for "submitted". Crossword and find-a-word checks are per word on submit (server round-trip, ~150 ms, hidden behind the word-lock animation).
+Solo games (homework, or "play on your own" in class) don't open a room. The phone runs the same rules module locally and sends events to `POST /api/published/game/:lesson { action: 'solo_event' | 'solo_finish', game_id }` in small batches (every 5 events or 10 s, and on finish). Keys for solo play: Term/Quote answers are checked server-side on each batch, so keys still never ship to the phone; the client gets right/wrong back within the batch round-trip and animates optimistically only for "submitted". Crossword and find-a-word checks are per word on submit (server round-trip, ~150 ms, hidden behind the word-lock animation).
 
 ---
 
@@ -168,7 +176,7 @@ Solo games (homework, or "play on your own" in class) don't open a room. The pho
 GameEvent {
   seq: number; at: number; game: GameKind; play_id: string
   owner: string; student_id?: string; team?: string
-  item: string            // item id within the block
+  item: string            // item id within the game
   move: string            // 'answer' | 'solve' | 'guess' | 'bet' | 'hint' | 'judge' | 'describe' | 'draw' | 'decoy' | …
   response?: unknown      // cleaned (cleanResponse) answer
   correct?: boolean | null
@@ -181,10 +189,10 @@ GameEvent {
 Blobs (store `teaching-hub-content`):
 
 ```
-games/{lesson}/{block}/plays/{play_id}            { kind, mode: 'live'|'solo', class_id, room_id?, started_at, ended_at, folded }
-games/{lesson}/{block}/events/{play_id}/{owner}   GameEvent[] for that player in that play   (create-only per fold; solo appends with etag)
-games/{lesson}/{block}/summary/{class_id}         cached per-item and per-student summary (rebuilt on fold)
-games/{lesson}/{block}/media/{play_id}/{item}     Pictionary drawings (PNG), Battles answers
+games/{lesson}/{game_id}/plays/{play_id}            { kind, mode: 'live'|'solo', class_id, room_id?, started_at, ended_at, folded }
+games/{lesson}/{game_id}/events/{play_id}/{owner}   GameEvent[] for that player in that play   (create-only per fold; solo appends with etag)
+games/{lesson}/{game_id}/summary/{class_id}         cached per-item and per-student summary (rebuilt on fold)
+games/{lesson}/{game_id}/media/{play_id}/{item}     Pictionary drawings (PNG), Battles answers
 ```
 
 ### 4.2 Evidence
@@ -192,7 +200,7 @@ games/{lesson}/{block}/media/{play_id}/{item}     Pictionary drawings (PNG), Bat
 `games/core/events.ts` turns events into the same `EvidenceItem { item, tags, share, why }` shape `quiz/evidence.ts` produces, so the class evidence views, the student profile and the DU monitor read games with one added source.
 
 - A right answer in a game counts as **"right once"** for a knowledge piece (half-green circle).
-- **Mastery (full green) still needs a non-game check** on a second day (quiz, written work or organiser), because self-paced games can be looked up and team moves are shared. *Open question 2.*
+- Games **never** count toward mastery (full green), whatever the strength (Adam, 11 Nov). Mastery comes only from quizzes, written work and the organiser, as today.
 - `strength` shows in every teacher view as a small tag (Live / Team / Homework).
 
 ### 4.3 Organiser boxes
@@ -205,7 +213,7 @@ Off by default. The game's Results panel has **Add to markbook**: one column ("C
 
 ### 4.5 What each game shows the teacher
 
-Every game's Results panel (in the block's teacher view and on the class Results page) has three parts: **per item** (accuracy, median time, common wrong answers), **per student** (accuracy, items missed, strength), and the game's own insight:
+Every game's Results panel (in the Game lesson's Results tab and on the class Results page) has three parts: **per item** (accuracy, median time, common wrong answers), **per student** (accuracy, items missed, strength), and the game's own insight:
 
 | Game | Its own insight |
 |---|---|
@@ -234,7 +242,7 @@ Every insight view has the reduced, anonymous version for Display ("Most mixed u
 - **Lobby (phone):** code entry with a 6-box numeric field, then initials claim (existing flow), then "You're in" with your team colour and a gentle idle animation.
 - **Countdown ring:** server-clock ring that drains, turns warm at 10 s, pulses at 5 s; phones show a thin bar.
 - **Reveal:** answer distribution bars grow from zero, the right answer lifts and glows, wrong answers dim; per-phone personal result ("Right · +120") slides up.
-- **Leaderboard:** top 5 (or teams) with FLIP reordering, score counters that roll up, and arrows for climbers. Full ranks only on the teacher's view; the board shows top 5 and "everyone else" never named below that. Students see their own rank only.
+- **Leaderboard:** follows the game's play style. **Team games** (Jeopardy, Wheel, team match, Articulate, team Pictionary) show **teams**. **Individual games** show the **top 5 students**; nobody below 5 is named on the board. FLIP reordering, rolling score counters, arrows for climbers. Full ranks only on the teacher's view; students see their own rank on their phone.
 - **Podium (end):** top three rise in sequence, confetti burst, then the class summary ("Class got 78% · hardest: *zeugma*").
 - **Pause:** frosted overlay on board and phones.
 
@@ -319,7 +327,7 @@ Each entry: **content**, **solo**, **live**, **motion highlights**, **data**, **
 - **Content:** 12–40 items whose answers are short (Term ↔ definition/example, Quote ↔ speaker, Question MC). Needs at least 12 distinct answers.
 - **Live only.** Teams of 3–4. Each round, every team gets the **same question on all members' phones**; the team's answer options (12 per team) are **split across members' phones**, so only one member holds the right answer. Talk is the game.
   - The holder taps it: the team advances one step on the board's race track.
-  - **Any wrong tap by any member sends that team back to 0** (as in the original genre) — configurable to "back 3" for kinder play.
+  - **A wrong tap by any member sends the team back.** Setting on the game: **Back 3** (default) or **Back to start**.
   - First team to the end (12 by default) wins; play continues for places.
 - **Data:** each tap is an individual event: holder right/wrong, and **false taps** by non-holders with what they tapped (they believed their option was the answer: a misconception). All taps are `live_team` (the team talks before anyone taps), so the insight centres on false taps rather than accuracy.
 - **Motion:** board race track with team tokens sliding forward on springs, a crash-and-rewind animation on a reset; phones flash green/red for the whole team at once.
@@ -337,7 +345,7 @@ Each entry: **content**, **solo**, **live**, **motion highlights**, **data**, **
 
 ### 6.7 Short-answer battles (own ShortAnswer)
 
-Built **on the existing comparative judgement block** (`blocks/comparative-judgement/`, `_shared/cj-maths.mjs`): same pool snapshot, same anonymity rules (D3, D4, D19 of that spec), same Bradley–Terry fit. Battles is a live game skin over it, not a second engine.
+Built **on the existing comparative judgement engine** (`_shared/cj-maths.mjs` and the pairing, pool and anonymity logic in `_shared/comparative-judgement.mjs`): same pool snapshot, same anonymity rules (D3, D4, D19 of that spec), same Bradley–Terry fit. The pool comes from answers written inside the game rather than a `question_set` block, so the CJ server module gains a pool source; there is no second engine.
 
 - **Content:** one short-answer prompt (or point at an existing question, as CJ does), a criterion, optional chips, optional calibration pair.
 - **Live.**
@@ -413,15 +421,15 @@ Built **on the existing comparative judgement block** (`blocks/comparative-judge
 
 ## 7. Teacher experience
 
-- **Editor:** each kind has a focused editor in the block (items table with inline edit, drag to reorder, tags column, "Build from this unit", "Ann drafts", live preview of the board at 16:9 and the phone at 390). Publish issues list empty clues, groups with fewer than 4 tiles, Wheel puzzles over 60 letters, fakes without `why_fake`, untagged items (warning, not blocking).
-- **Run live:** from Display (Game lesson board or the block in any lesson): **Open room** → lobby → Start. Controls are docked bottom-right, auto-hide after 3 s of no mouse movement, return on movement or keypress. Keyboard: Space next/reveal, P pause, + add 15 s, M mute, Esc controls.
+- **Editor:** each kind has a focused editor in the Games tab (items table with inline edit, drag to reorder, tags column, "Build from this unit", "Ann drafts", live preview of the board at 16:9 and the phone at 390). Publish issues list empty clues, groups with fewer than 4 tiles, Wheel puzzles over 60 letters, fakes without `why_fake`, untagged items (warning, not blocking).
+- **Run live:** from Display (the Game lesson's "Tonight's games" board): **Open room** → lobby → Start. Controls are docked bottom-right, auto-hide after 3 s of no mouse movement, return on movement or keypress. Keyboard: Space next/reveal, P pause, + add 15 s, M mute, Esc controls.
 - **Set as homework:** opens the game for solo play until a close date (same pattern as quiz `closes_at`), with "best try" and "latest try" both kept.
-- **Results:** per §4.5, in the block's teacher view and as a section on the class Results page.
+- **Results:** per §4.5, in the Game lesson's Results tab and as a section on the class Results page.
 
 ## 8. Edge cases (cross-game)
 
 - **No class list:** solo games still play (device owner, as quizzes do); live games require a list (seats need identity for per-student data and reconnects).
-- **Two rooms for the same block:** allowed (two classes at once); each has its own code and play id.
+- **Two rooms for the same game:** allowed (two classes at once); each has its own code and play id.
 - **Teacher closes the laptop:** the room keeps running for 6 h; the teacher can resume from any device with the operator gate.
 - **Room dies unexpectedly (DO restart):** state is restored from DO SQLite on the next connection; events already logged are not lost.
 - **Fold fails (Netlify down):** the DO retries with backoff from its alarm for 24 h and the teacher's Results panel shows "Results still arriving".
@@ -431,22 +439,17 @@ Built **on the existing comparative judgement block** (`blocks/comparative-judge
 
 ## 9. Build phases
 
-One branch per phase group, phases as commits (Adam: minimise PRs). Proposed three PRs:
+One long-running branch, `claude/game-lessons`, phases as commits, one PR at the end (Adam, 11 Nov).
 
-**PR A: foundations and solo games**
-- Phase 0: clickable mockups of all twelve boards and phone controllers (`docs/mockups/games/`), one design language. **Adam signs off before Phase 1.**
-- Phase 1: `game` block type and plumbing, item shapes, Build from this unit, Game lesson arcade, events, solo endpoint, evidence fold, organiser box-1 path, Results panel shell.
-- Phase 2: motion and sound systems, design tokens for game colours.
-- Phase 3: crossword, find-a-word, Connections, Who said it (solo + print).
-
-**PR B: game rooms and live games**
-- Phase 4: `workers/game-rooms` (DO, tickets, fold), `room-core` reducer, client with fallback, shell (lobby, teams, countdown, reveal, leaderboard, podium). Live race modes for the PR A games.
-- Phase 5: Wager, Jeopardy, team match, points rush.
-- Phase 6: Wheel of Fortune.
-
-**PR C: talk, draw, write**
-- Phase 7: Articulate (+ quick check), Pictionary (canvas, stroke streaming, gallery), Battles (live skin over comparative judgement).
-- Phase 8: Ann drafts for game content (priced, confirmed per run).
+- **Phase 0:** clickable mockups of all twelve boards and phone controllers (`docs/mockups/games/`), one design language. **Adam signs off before Phase 1.**
+- **Phase 1:** Game lesson settings and plumbing (Station Rotation pattern), Games editor tabs, item shapes, Build from this unit, the arcade page, events, solo endpoint, evidence fold, organiser box-1 path, Results tab shell.
+- **Phase 2:** motion and sound systems, design tokens for game colours.
+- **Phase 3:** crossword, find-a-word, Connections, Who said it (solo + print).
+- **Phase 4:** `workers/game-rooms` (Durable Object, tickets, fold), `room-core` reducer, client with fallback, shell (lobby, teams, countdown, reveal, leaderboard, podium). Live race modes for the Phase 3 games. The live target is proved by building it and running it with a class.
+- **Phase 5:** Wager, Jeopardy, team match, points rush.
+- **Phase 6:** Wheel of Fortune.
+- **Phase 7:** Articulate (+ quick check), Pictionary (canvas, stroke streaming, gallery), Battles (in-game pool for the comparative judgement engine).
+- **Phase 8:** Ann drafts for game content (priced, confirmed per run).
 
 ## 10. Testing
 
@@ -457,13 +460,13 @@ One branch per phase group, phases as commits (Adam: minimise PRs). Proposed thr
 - **Load:** 35 simulated sockets in one room for 10 minutes; broadcast p95 < 250 ms locally.
 - **Walk:** each game walked on the live site at desktop and 390, and on a real phone and a projector-sized board before it's called done. Safari walk listed as a separate check.
 
-## 11. Open questions for Adam
+## 11. Adam's answers (11 Nov)
 
-1. **Hosting the rooms:** OK to add a Cloudflare Durable Object Worker on `class.adam-russell.com/g/*` (free plan expected to cover it; checked on your account before Phase 4)?
-2. **Mastery from games:** games count as "right once" for a knowledge piece but not for full mastery. Agree?
-3. **Team match reset:** back to 0 on any wrong tap (genre default) or back 3 (kinder)? Default proposed: back to 0.
-4. **Leaderboards on the board:** top 5 shown, everyone else unnamed. Or teams only, never individuals?
-5. **PR split:** three PRs (A, B, C) as above, or one long-running branch?
+1. **Cloudflare game rooms:** yes. Build it, test it with a class, see how it runs. Account plan still checked before Phase 4.
+2. **Mastery:** a right answer in a game is only ever "right once". Games never count toward mastery.
+3. **Team match on a wrong tap:** a setting on the game, **Back 3** (default) or **Back to start**.
+4. **Board leaderboard:** follows the game. Team games show teams; individual games show the top 5 students (nobody named below 5).
+5. **Branches:** one long-running branch.
 
 ## 12. Not in this build
 
