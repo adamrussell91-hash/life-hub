@@ -28,7 +28,7 @@ const resultLabel = (r: PublicTurnCard['result']) => (r === 'got' ? '✓ Got it'
 
 function teamsFrom(view: RoomView): TeamView[] {
   if (view.teams?.length) return view.teams;
-  return view.leaderboard.filter((r) => r.team !== undefined).map((r) => ({ team: r.team as number, score: r.score, members: [], rank: r.rank }));
+  return view.leaderboard.filter((r) => r.team !== undefined).map((r) => ({ team: r.team as number, name: teamName(r.team as number), score: r.score, members: [], rank: r.rank }));
 }
 
 /* ── Board ───────────────────────────────────────────────────────── */

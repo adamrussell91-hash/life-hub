@@ -80,6 +80,8 @@ function mountArcade(c: GameClient) {
 
 describe('registry in the arcade', () => {
   it('a kind with no player still says Coming next', async () => {
+    // Every kind now has a player somewhere in the bundle; take points rush's away for this test.
+    unregisterForTests('points_rush');
     const c = fakeClient();
     const host = mountArcade(c);
     await flush();

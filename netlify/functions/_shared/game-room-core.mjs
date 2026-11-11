@@ -383,6 +383,615 @@ function articulateView(ctx, k, role, owner) {
 }
 registerRules(articulateRules);
 
+// netlify/functions/_shared/cj-maths.mjs
+var PRIOR = 0.5;
+var MAX_ITERATIONS = 2e3;
+var TOLERANCE = 1e-9;
+var mean = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+var variance = (xs) => {
+  if (xs.length < 2) return 0;
+  const m = mean(xs);
+  return xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1);
+};
+var logistic = (x) => 1 / (1 + Math.exp(-x));
+var pairKey = (a, b) => a < b ? `${a}|${b}` : `${b}|${a}`;
+function usable(itemIds, comparisons) {
+  const known = new Set(itemIds);
+  const out = [];
+  for (const c of Array.isArray(comparisons) ? comparisons : []) {
+    if (!c || !known.has(c.winner) || !known.has(c.loser) || c.winner === c.loser) continue;
+    const weight = c.weight === void 0 ? 1 : Number(c.weight);
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    out.push({ ...c, weight });
+  }
+  return out;
+}
+function shuffled(list, rng) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+function fitBradleyTerry(itemIds, comparisons, opts = {}) {
+  const ids = [...new Set(Array.isArray(itemIds) ? itemIds : [])];
+  const maxIterations = opts.maxIterations ?? MAX_ITERATIONS;
+  const tolerance = opts.tolerance ?? TOLERANCE;
+  const index = new Map(ids.map((id, i) => [id, i]));
+  const n = ids.length;
+  const wins = new Array(n).fill(PRIOR);
+  const pairs = [];
+  for (const c of usable(ids, comparisons)) {
+    const w = index.get(c.winner);
+    const l = index.get(c.loser);
+    wins[w] += c.weight;
+    pairs.push([w, l, c.weight]);
+  }
+  let strength = new Array(n).fill(1);
+  let iterations = 0;
+  for (; iterations < maxIterations; iterations += 1) {
+    const denom = strength.map((p) => 2 * PRIOR / (p + 1));
+    for (const [a, b, weight] of pairs) {
+      const share = weight / (strength[a] + strength[b]);
+      denom[a] += share;
+      denom[b] += share;
+    }
+    const next = strength.map((_, i) => wins[i] / denom[i]);
+    let change = 0;
+    for (let i = 0; i < n; i += 1) change = Math.max(change, Math.abs(Math.log(next[i]) - Math.log(strength[i])));
+    strength = next;
+    if (change < tolerance) {
+      iterations += 1;
+      break;
+    }
+  }
+  const logs = strength.map((p) => Math.log(p));
+  const info = logs.map((t) => {
+    const p = logistic(t);
+    return 2 * PRIOR * p * (1 - p);
+  });
+  for (const [a, b, weight] of pairs) {
+    const p = logistic(logs[a] - logs[b]);
+    info[a] += weight * p * (1 - p);
+    info[b] += weight * p * (1 - p);
+  }
+  const centre = mean(logs);
+  const theta = {};
+  const se = {};
+  ids.forEach((id, i) => {
+    theta[id] = logs[i] - centre;
+    se[id] = 1 / Math.sqrt(info[i]);
+  });
+  return { theta, se, iterations };
+}
+function ssr(theta, se) {
+  const ids = Object.keys(theta ?? {});
+  const v = variance(ids.map((id) => theta[id]));
+  if (!(v > 0)) return 0;
+  const noise = mean(ids.map((id) => (se?.[id] ?? 0) ** 2));
+  return Math.min(1, Math.max(0, (v - noise) / v));
+}
+function pearson(xs, ys) {
+  const mx = mean(xs);
+  const my = mean(ys);
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < xs.length; i += 1) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) ** 2;
+    syy += (ys[i] - my) ** 2;
+  }
+  return sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
+}
+function splitHalf(itemIds, comparisons, { splits = 20, rng = Math.random } = {}) {
+  const list = usable(itemIds, comparisons).filter((c) => c.judge !== void 0 && c.judge !== null);
+  const judges = [...new Set(list.map((c) => String(c.judge)))].sort();
+  if (judges.length < 4) return null;
+  const ids = [...new Set(itemIds)];
+  let total = 0;
+  for (let s = 0; s < splits; s += 1) {
+    const order2 = shuffled(judges, rng);
+    const half = new Set(order2.slice(0, Math.floor(order2.length / 2)));
+    const a = fitBradleyTerry(ids, list.filter((c) => half.has(String(c.judge))));
+    const b = fitBradleyTerry(ids, list.filter((c) => !half.has(String(c.judge))));
+    const r = pearson(ids.map((id) => a.theta[id]), ids.map((id) => b.theta[id]));
+    total += 1 + r > 0 ? 2 * r / (1 + r) : -1;
+  }
+  return total / splits;
+}
+function reliabilitySignal({ ssr: s, splitHalf: half, comparisons, items }) {
+  const value = half === null || half === void 0 ? s : Math.min(s, half);
+  const level = value >= 0.8 ? "marks" : value >= 0.7 ? "feedback" : "keep";
+  const count = Math.max(0, Number(comparisons) || 0);
+  const n = Math.max(0, Number(items) || 0);
+  const per_item = n ? Math.round(2 * count / n * 10) / 10 : 0;
+  const more_to_12 = Math.max(0, Math.ceil(12 * n / 2 - count));
+  return { value, level, per_item, more_to_12 };
+}
+function choosePair({ items, theta = {}, counts: counts2 = {}, seen = /* @__PURE__ */ new Set(), exclude = /* @__PURE__ */ new Set(), rng = Math.random, warmup = 3 }) {
+  const eligible = [...new Set(items ?? [])].filter((id) => !exclude.has(id));
+  const count = (id) => counts2[id] ?? 0;
+  const partners = (a) => eligible.filter((b) => b !== a && !seen.has(pairKey(a, b)));
+  const open = eligible.filter((a) => partners(a).length);
+  if (!open.length) return null;
+  const least = (list) => {
+    const low = Math.min(...list.map(count));
+    const tied = list.filter((id) => count(id) === low);
+    return tied[Math.floor(rng() * tied.length)];
+  };
+  const first = least(open);
+  const choices = partners(first);
+  let second;
+  if (eligible.some((id) => count(id) < warmup)) {
+    second = least(choices);
+  } else {
+    const weights = choices.map((b) => Math.exp(-(((theta[first] ?? 0) - (theta[b] ?? 0)) ** 2) / 0.5));
+    const sum = weights.reduce((a, b) => a + b, 0);
+    if (!(sum > 0)) second = choices[Math.floor(rng() * choices.length)];
+    else {
+      let pick2 = rng() * sum;
+      second = choices[choices.length - 1];
+      for (let i = 0; i < choices.length; i += 1) {
+        pick2 -= weights[i];
+        if (pick2 < 0) {
+          second = choices[i];
+          break;
+        }
+      }
+    }
+  }
+  return rng() < 0.5 ? [first, second] : [second, first];
+}
+function judgeFit(comparisons, theta) {
+  const sums = {};
+  for (const c of Array.isArray(comparisons) ? comparisons : []) {
+    if (!c || c.judge === void 0 || !(c.winner in theta) || !(c.loser in theta) || c.winner === c.loser) continue;
+    const p = logistic(theta[c.winner] - theta[c.loser]);
+    const row = sums[c.judge] ??= { res: 0, info: 0, n: 0 };
+    row.res += (1 - p) ** 2;
+    row.info += p * (1 - p);
+    row.n += 1;
+  }
+  return Object.fromEntries(Object.entries(sums).map(([judge, r]) => [judge, { infit: r.info > 0 ? r.res / r.info : 0, n: r.n }]));
+}
+function flagMisfits(fit, { minN = 3 } = {}) {
+  const rows = Object.entries(fit ?? {}).filter(([, r]) => r.n >= minN);
+  if (rows.length < 3) return /* @__PURE__ */ new Set();
+  const values = rows.map(([, r]) => r.infit);
+  const m = mean(values);
+  const sd = Math.sqrt(values.reduce((a, x) => a + (x - m) ** 2, 0) / values.length);
+  return new Set(rows.filter(([, r]) => r.infit > m + 2 * sd).map(([judge]) => judge));
+}
+function contestedPair(comparisons, theta) {
+  const known = theta ?? {};
+  const pairs = /* @__PURE__ */ new Map();
+  for (const c of Array.isArray(comparisons) ? comparisons : []) {
+    if (!c || !(c.winner in known) || !(c.loser in known) || c.winner === c.loser) continue;
+    const [a, b] = c.winner < c.loser ? [c.winner, c.loser] : [c.loser, c.winner];
+    const row = pairs.get(`${a}|${b}`) ?? { a, b, aWins: 0, n: 0 };
+    row.n += 1;
+    if (c.winner === a) row.aWins += 1;
+    pairs.set(`${a}|${b}`, row);
+  }
+  let best = null;
+  for (const row of pairs.values()) {
+    if (row.n < 2) continue;
+    const split = row.aWins / row.n;
+    const score = [Math.abs(split - 0.5), Math.abs(known[row.a] - known[row.b]), -row.n];
+    if (!best || score[0] < best.score[0] - 1e-12 || Math.abs(score[0] - best.score[0]) <= 1e-12 && (score[1] < best.score[1] || score[1] === best.score[1] && score[2] < best.score[2])) {
+      best = { a: row.a, b: row.b, split, score };
+    }
+  }
+  if (best) return { a: best.a, b: best.b, split: best.split };
+  const ordered = Object.keys(known).sort((x, y) => known[y] - known[x] || (x < y ? -1 : 1));
+  if (ordered.length < 2) return null;
+  let at = 0;
+  for (let i = 1; i < ordered.length - 1; i += 1) {
+    if (known[ordered[i]] - known[ordered[i + 1]] < known[ordered[at]] - known[ordered[at + 1]]) at = i;
+  }
+  return { a: ordered[at], b: ordered[at + 1], split: null };
+}
+function thirdOf(rankIndex, n) {
+  if (!(n > 0)) return "middle";
+  const part = Math.min(2, Math.max(0, Math.floor(rankIndex * 3 / n)));
+  return part === 0 ? "top" : part === 1 ? "middle" : "bottom";
+}
+
+// netlify/functions/_shared/cj-scale.mjs
+var POOL_TEXT_MAX = 4e3;
+function computeScale(round, config, judges, rng = Math.random) {
+  const ids = Object.keys(round.pool);
+  const inPool = (id) => id in round.pool;
+  const weightOf = (key) => key === "teacher" ? config.teacher_weight : 1;
+  const judgements = [];
+  const comparisons = [];
+  for (const [key, judge] of judges) {
+    for (const j of judge.judgements) {
+      if (!inPool(j.left) || !inPool(j.right) || j.winner !== j.left && j.winner !== j.right) continue;
+      judgements.push(j);
+      comparisons.push({ winner: j.winner, loser: j.winner === j.left ? j.right : j.left, judge: key, weight: weightOf(key) });
+    }
+  }
+  let fit = fitBradleyTerry(ids, comparisons);
+  let infit = judgeFit(comparisons, fit.theta);
+  const flagged = flagMisfits(infit);
+  let used = comparisons;
+  if (config.downweight_misfits && flagged.size) {
+    used = comparisons.map((c) => flagged.has(c.judge) ? { ...c, weight: c.weight * 0.5 } : c);
+    fit = fitBradleyTerry(ids, used);
+    infit = judgeFit(comparisons, fit.theta);
+  }
+  const s = ssr(fit.theta, fit.se);
+  const half = splitHalf(ids, used, { rng });
+  const reliability = { ...reliabilitySignal({ ssr: s, splitHalf: half, comparisons: comparisons.length, items: ids.length }), ssr: s, split_half: half };
+  const order2 = [...ids].sort((a, b) => fit.theta[b] - fit.theta[a] || (a < b ? -1 : 1));
+  const studentOrder = order2.filter((id) => round.pool[id].kind === "student");
+  const weights = Object.fromEntries([...judges.keys()].map((key) => [key, weightOf(key) * (config.downweight_misfits && flagged.has(key) ? 0.5 : 1)]));
+  return { ids, fit, comparisons, judgements, infit, flagged, reliability, order: order2, studentOrder, weights };
+}
+function gamePool(answers) {
+  const pool = {};
+  for (const a of Array.isArray(answers) ? answers : []) {
+    if (!a || typeof a.id !== "string" || !a.id || typeof a.text !== "string") continue;
+    const text = a.text.trim().slice(0, POOL_TEXT_MAX);
+    if (text && !(a.id in pool)) pool[a.id] = { text, kind: "student", ref: String(a.ref ?? "") };
+  }
+  return pool;
+}
+
+// apps/teaching/src/games/kinds/battles/rules.ts
+var BATTLES_ITEM = "battle";
+var MIN_ANSWERS = 6;
+var ROUNDS = 5;
+var RELIABLE = 0.7;
+var DRAFT_MAX = POOL_TEXT_MAX;
+var err2 = (code, message) => ({ error: { code, message } });
+var words = (s) => (s.trim().match(/\S+/g) ?? []).length;
+var judgingPoints = (gap) => Math.round(60 + 40 * Math.max(0, 1 - Math.abs(gap) / 3));
+function battleContent(keys) {
+  const b = keys.live?.battle;
+  return { prompt: b?.prompt ?? "", criterion: b?.criterion ?? "", chips: b?.chips ?? [] };
+}
+function battlesSettings(settings) {
+  const s = settings ?? {};
+  const m = typeof s.write_minutes === "number" && Number.isFinite(s.write_minutes) ? Math.round(Math.min(8, Math.max(2, s.write_minutes))) : 4;
+  return { write_minutes: m };
+}
+var anonId = (ctx, taken) => {
+  for (; ; ) {
+    const id = `x${Math.floor(ctx.random() * 36 ** 6).toString(36).padStart(6, "0")}`;
+    if (!(id in taken)) return id;
+  }
+};
+function judgeMap(k) {
+  return new Map(Object.entries(k.judgements).map(([owner, list]) => [owner, { judgements: list }]));
+}
+function refit(ctx, k, force = false) {
+  const n = Object.values(k.judgements).reduce((a, l) => a + l.length, 0);
+  if (!force && k.scale && (k.scale.n === n || ctx.now - k.scale.at < 1e3)) return;
+  const s = computeScale({ pool: Object.fromEntries(Object.entries(k.pool).map(([id, a]) => [id, { text: a.text, kind: "student", ref: a.owner }])) }, { teacher_weight: 1, downweight_misfits: true }, judgeMap(k), ctx.random);
+  k.scale = { at: ctx.now, n, order: s.studentOrder, theta: s.fit.theta, reliability: Math.round(s.reliability.value * 100) / 100, level: s.reliability.level };
+}
+function counts(k) {
+  const out = {};
+  for (const list of Object.values(k.judgements))
+    for (const j of list) {
+      out[j.left] = (out[j.left] ?? 0) + 1;
+      out[j.right] = (out[j.right] ?? 0) + 1;
+    }
+  return out;
+}
+function deal(ctx, k, owner) {
+  const done = k.judgements[owner]?.length ?? 0;
+  if (done >= k.rounds) {
+    k.pairs[owner] = null;
+    return;
+  }
+  const own = k.own[owner];
+  const pair = choosePair({
+    items: Object.keys(k.pool),
+    theta: k.scale?.theta ?? {},
+    counts: counts(k),
+    seen: new Set((k.judgements[owner] ?? []).map((j) => pairKey(j.left, j.right))),
+    exclude: new Set(own ? [own] : []),
+    rng: () => ctx.random()
+  });
+  k.pairs[owner] = pair ? { left: pair[0], right: pair[1] } : null;
+}
+function startBattles(ctx, k) {
+  const answers = [];
+  for (const [owner, d] of Object.entries(k.drafts)) {
+    if (!d.text.trim() || !ctx.seat(owner)) continue;
+    const id = anonId(ctx, k.pool);
+    k.pool[id] = { text: "", owner };
+    answers.push({ id, text: d.text, ref: owner });
+    ctx.record(owner, { item: BATTLES_ITEM, move: "answer", response: { text: d.text.trim().slice(0, DRAFT_MAX) }, correct: null, extra: { words: d.words, handed_in: d.in } });
+  }
+  const pool = gamePool(answers);
+  k.pool = Object.fromEntries(Object.entries(pool).map(([id, a]) => [id, { text: a.text, owner: a.ref }]));
+  k.own = Object.fromEntries(Object.entries(k.pool).map(([id, a]) => [a.owner, id]));
+  ctx.setTimer(void 0);
+  const n = Object.keys(k.pool).length;
+  if (n < MIN_ANSWERS) {
+    k.phase = "too_few";
+    k.screen = "main";
+    return;
+  }
+  k.phase = "battle";
+  k.screen = "main";
+  k.rounds = Math.min(ROUNDS, (n - 1) * (n - 2) / 2);
+  for (const s of ctx.seats()) deal(ctx, k, s.owner);
+}
+function randomPair(ctx, k, not) {
+  const ids = Object.keys(k.pool);
+  if (ids.length < 2) return null;
+  for (let tries = 0; tries < 20; tries++) {
+    const a = ids[Math.floor(ctx.random() * ids.length)];
+    const rest = ids.filter((x) => x !== a);
+    const b = rest[Math.floor(ctx.random() * rest.length)];
+    if (!not || pairKey(a, b) !== pairKey(not.a, not.b) || ids.length === 2) return { a, b, split: null };
+  }
+  return { a: ids[0], b: ids[1], split: null };
+}
+function spotlight(ctx, k) {
+  if (k.phase === "battle" || k.phase === "results") {
+    refit(ctx, k, true);
+    const comparisons = Object.values(k.judgements).flatMap((l) => l.map((j) => ({ winner: j.winner, loser: j.winner === j.left ? j.right : j.left })));
+    k.spot = contestedPair(comparisons, k.scale?.theta ?? {}) ?? randomPair(ctx, k);
+  } else k.spot = randomPair(ctx, k, k.spot);
+  k.screen = "spotlight";
+  k.split = false;
+}
+function results(ctx, k) {
+  if (k.phase !== "battle") return;
+  refit(ctx, k, true);
+  const s = k.scale;
+  const judges = {};
+  for (const [owner, list] of Object.entries(k.judgements)) {
+    let points = 0;
+    const agree = list.map((j) => {
+      const loser = j.winner === j.left ? j.right : j.left;
+      const gap = (s.theta[j.winner] ?? 0) - (s.theta[loser] ?? 0);
+      const ok = gap > 0;
+      if (ok) points += judgingPoints(gap);
+      return ok;
+    });
+    judges[owner] = { agree, points };
+    if (points) ctx.addScore(owner, points);
+    ctx.record(owner, {
+      item: BATTLES_ITEM,
+      move: "judge",
+      response: { agreed: agree.filter(Boolean).length, judged: agree.length },
+      correct: null,
+      extra: { summary: true, agreed: agree.filter(Boolean).length, judged: agree.length, accuracy: agree.length ? Math.round(agree.filter(Boolean).length / agree.length * 100) : 0, points }
+    });
+  }
+  const all = Object.values(k.judgements).flat();
+  const { chips } = battleContent(ctx.keys);
+  const won = {};
+  for (const id of s.order.slice(0, 3)) {
+    const tally = /* @__PURE__ */ new Map();
+    for (const j of all) {
+      if (j.winner !== id) continue;
+      for (const c of j.chips[j.winner === j.left ? "left" : "right"]) tally.set(c, (tally.get(c) ?? 0) + 1);
+    }
+    won[id] = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 2).map(([c, n]) => [chips[c] ?? "", n]).filter(([label]) => label);
+  }
+  k.final = { order: s.order, theta: s.theta, reliability: s.reliability, reliable: s.reliability >= RELIABLE, judges, chips: won };
+  k.phase = "results";
+  k.screen = "main";
+  for (const o of Object.keys(k.pairs)) k.pairs[o] = null;
+}
+var battlesRules = {
+  kind: "battles",
+  init() {
+    return { phase: "write", screen: "main", split: false, ends: 0, drafts: {}, pool: {}, own: {}, rounds: ROUNDS, judgements: {}, pairs: {}, scale: null, spot: null, final: null };
+  },
+  start(ctx, k) {
+    if (!Object.keys(ctx.config.roster ?? {}).length) {
+      k.phase = "no_list";
+      return;
+    }
+    k.phase = "write";
+    k.ends = ctx.now + battlesSettings(ctx.game.settings).write_minutes * 6e4;
+    ctx.setTimer(k.ends);
+  },
+  move(ctx, k, owner, e) {
+    if (k.phase === "no_list") return err2("no_list", "Battles needs a class list.");
+    if (e.move === "answer") {
+      if (k.phase !== "write") return err2("not_now", "Writing has closed.");
+      const r = e.response ?? {};
+      if (typeof r.text !== "string") return err2("bad_answer", "Write your answer first.");
+      if (r.text.length > DRAFT_MAX) return err2("too_long", `Keep it under ${DRAFT_MAX} characters.`);
+      const was = k.drafts[owner];
+      const handIn = r.hand_in === true ? true : r.hand_in === false ? false : was?.in ?? false;
+      if (handIn && !r.text.trim()) return err2("empty", "Write your answer first.");
+      k.drafts[owner] = { text: r.text, words: words(r.text), in: handIn, at: ctx.now };
+      if (handIn && !was?.in) ctx.ticker("handed in", ctx.seat(owner)?.initials);
+      return { item: BATTLES_ITEM };
+    }
+    if (e.move === "judge") {
+      if (k.phase !== "battle") return err2("not_now", "The battles aren\u2019t running.");
+      const pair = k.pairs[owner];
+      const r = e.response ?? {};
+      if (!pair || r.left !== pair.left || r.right !== pair.right) return err2("bad_pair", "That pair has changed.");
+      if (r.winner !== pair.left && r.winner !== pair.right) return err2("bad_winner", "Pick one of the two answers.");
+      const n = battleContent(ctx.keys).chips.length;
+      const clean = (v) => Array.isArray(v) ? [...new Set(v.filter((i) => Number.isInteger(i) && i >= 0 && i < n))].sort((a, b) => a - b) : [];
+      const j = { left: pair.left, right: pair.right, winner: r.winner, chips: { left: clean(r.chips?.left), right: clean(r.chips?.right) }, at: ctx.now };
+      (k.judgements[owner] ??= []).push(j);
+      ctx.record(owner, { item: BATTLES_ITEM, move: "judge", response: { winner: j.winner === j.left ? "left" : "right" }, correct: null, extra: { left: j.left, right: j.right, winner: j.winner, chips: [...j.chips.left.map((c) => `L${c}`), ...j.chips.right.map((c) => `R${c}`)].join(" ") } });
+      const done = k.judgements[owner].length;
+      ctx.setProgress(owner, { done, total: k.rounds });
+      if (done >= k.rounds) ctx.ticker("judged every pair", ctx.seat(owner)?.initials);
+      refit(ctx, k);
+      deal(ctx, k, owner);
+      return { item: BATTLES_ITEM };
+    }
+    return err2("bad_move", "That move isn\u2019t part of Short-answer battles.");
+  },
+  control(ctx, k, op, from) {
+    if (from.role !== "teacher" && from.role !== "board") return err2("not_allowed", "Only the teacher can do that.");
+    switch (op.name) {
+      case "more_time":
+        if (k.phase !== "write") return err2("not_now", "Writing has closed.");
+        k.ends = Math.max(ctx.now, k.ends) + 6e4;
+        ctx.setTimer(k.ends);
+        return;
+      case "battle":
+      case "next":
+        if (k.phase === "write") startBattles(ctx, k);
+        else if (k.phase === "battle" && op.name === "next") results(ctx, k);
+        return;
+      case "spotlight":
+      case "next_pair":
+        if (k.phase === "write" || k.phase === "no_list") return err2("not_now", "Spotlight opens once the writing closes.");
+        spotlight(ctx, k);
+        return;
+      case "show_split":
+        if (k.screen === "spotlight") k.split = true;
+        return;
+      case "back":
+        k.screen = "main";
+        return;
+      case "results":
+      case "reveal":
+        results(ctx, k);
+        return;
+      case "judges":
+      case "teacher":
+        if (k.phase !== "results") return err2("not_now", "Results first.");
+        k.screen = op.name;
+        return;
+      case "final":
+        ctx.end();
+        return;
+      default:
+        return err2("bad_control", "Unknown control.");
+    }
+  },
+  tick(ctx, k) {
+    if (k.phase === "write") startBattles(ctx, k);
+  },
+  finish(ctx, k) {
+    if (k.phase === "write") startBattles(ctx, k);
+    if (k.phase === "battle") results(ctx, k);
+  },
+  seatChanged(ctx, k, owner) {
+    if (k.phase === "battle" && ctx.seat(owner) && k.pairs[owner] === void 0) deal(ctx, k, owner);
+  },
+  view(ctx, k, role, owner) {
+    return role === "student" ? phoneView(ctx, k, owner) : boardView(ctx, k, role);
+  }
+};
+var initialsOf2 = (ctx, owner) => ctx.seat(owner)?.initials ?? "";
+function judgeRows(ctx, k) {
+  return Object.entries(k.final?.judges ?? {}).filter(([o]) => ctx.seat(o)).map(([o, j]) => ({ owner: o, initials: initialsOf2(ctx, o), points: j.points, agreed: j.agree.filter(Boolean).length, judged: j.agree.length })).sort((a, b) => b.points - a.points || b.agreed - a.agreed || (a.initials < b.initials ? -1 : 1));
+}
+function boardView(ctx, k, role) {
+  const c = battleContent(ctx.keys);
+  const base3 = { who: "board", phase: k.phase, screen: k.screen, prompt: c.prompt, criterion: c.criterion, minutes: battlesSettings(ctx.game.settings).write_minutes };
+  if (k.phase === "no_list") return base3;
+  if (k.phase === "write") {
+    const writers = ctx.seats().map((s) => {
+      const d = k.drafts[s.owner];
+      return { initials: s.initials, words: d?.words ?? 0, in: !!d?.in, typing: !!d && !d.in && ctx.now - d.at < 3e3 };
+    });
+    return { ...base3, writers, total_words: writers.reduce((a, w) => a + w.words, 0), handed_in: writers.filter((w) => w.in).length };
+  }
+  const out = { ...base3, answers: Object.keys(k.pool).length };
+  if (k.screen === "spotlight" && k.spot && k.pool[k.spot.a] && k.pool[k.spot.b]) {
+    const all = Object.values(k.judgements).flat().filter((j) => pairKey(j.left, j.right) === pairKey(k.spot.a, k.spot.b));
+    const sideChips = (id) => {
+      const tally = /* @__PURE__ */ new Map();
+      for (const j of all) if (j.winner === id) for (const ch of j.chips[j.left === id ? "left" : "right"]) tally.set(ch, (tally.get(ch) ?? 0) + 1);
+      return [...tally.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([i]) => c.chips[i] ?? "").filter(Boolean);
+    };
+    out.spot = {
+      a: k.pool[k.spot.a].text,
+      b: k.pool[k.spot.b].text,
+      split: k.split,
+      ...k.split ? { a_n: all.filter((j) => j.winner === k.spot.a).length, b_n: all.filter((j) => j.winner === k.spot.b).length, a_chips: sideChips(k.spot.a), b_chips: sideChips(k.spot.b) } : {}
+    };
+  }
+  if (k.phase === "battle") {
+    const seats = ctx.seats();
+    const done = seats.map((s) => k.judgements[s.owner]?.length ?? 0);
+    const fin = seats.filter((s, i) => (done[i] ?? 0) >= k.rounds || k.pairs[s.owner] === null).length;
+    const avg = done.length ? done.reduce((a, b) => a + b, 0) / done.length : 0;
+    Object.assign(out, {
+      round: Math.min(k.rounds, Math.floor(avg) + 1),
+      rounds: k.rounds,
+      judgements: Object.values(k.judgements).reduce((a, l) => a + l.length, 0),
+      finished: fin,
+      judging: seats.length - fin,
+      reliability: k.scale?.reliability ?? 0,
+      reliable: (k.scale?.reliability ?? 0) >= RELIABLE,
+      // Positions only, sorted, so a dot can't be traced to a seat or an answer.
+      dots: k.scale ? k.scale.order.map((id) => Math.round((k.scale.theta[id] ?? 0) * 100) / 100).sort((a, b) => a - b) : []
+    });
+  }
+  if (k.phase === "results" && k.final) {
+    const f = k.final;
+    out.reliability = f.reliability;
+    out.reliable = f.reliable;
+    out.judgements = Object.values(k.judgements).reduce((a, l) => a + l.length, 0);
+    out.top = f.order.slice(0, 3).map((id) => ({ text: k.pool[id]?.text ?? "", chips: f.chips[id] ?? [] }));
+    if (k.screen === "judges" || k.screen === "teacher") out.judges = judgeRows(ctx, k).map(({ owner: _o, ...r }) => r);
+    if (role === "teacher") {
+      const rows = judgeRows(ctx, k);
+      const bins = Array.from({ length: k.rounds + 1 }, (_, n) => rows.filter((r) => r.agreed === n).length);
+      out.teacher = {
+        scale: f.order.map((id) => ({ text: (k.pool[id]?.text ?? "").slice(0, 140), theta: Math.round((f.theta[id] ?? 0) * 100) / 100 })),
+        bins,
+        low: rows.filter((r) => r.judged && r.agreed / r.judged <= 0.4).map((r) => r.initials),
+        perfect: rows.filter((r) => r.judged && r.agreed === r.judged).map((r) => r.initials)
+      };
+    }
+  }
+  return out;
+}
+function phoneView(ctx, k, owner) {
+  const c = battleContent(ctx.keys);
+  const base3 = { who: "phone", phase: k.phase, prompt: c.prompt, criterion: c.criterion, minutes: battlesSettings(ctx.game.settings).write_minutes, chips: c.chips };
+  if (k.phase === "write") {
+    const d = k.drafts[owner];
+    return { ...base3, draft: { text: d?.text ?? "", words: d?.words ?? 0, in: !!d?.in } };
+  }
+  if (k.phase === "too_few") return { ...base3, spotlight: k.screen === "spotlight" };
+  if (k.phase === "battle") {
+    const p = k.pairs[owner];
+    return {
+      ...base3,
+      spotlight: k.screen === "spotlight",
+      done: k.judgements[owner]?.length ?? 0,
+      rounds: k.rounds,
+      pair: p && k.pool[p.left] && k.pool[p.right] ? { left: { id: p.left, text: k.pool[p.left].text }, right: { id: p.right, text: k.pool[p.right].text } } : null
+    };
+  }
+  if (k.phase === "results" && k.final) {
+    const rows = judgeRows(ctx, k);
+    const mine = k.final.judges[owner];
+    const own = k.own[owner];
+    const at = own ? k.final.order.indexOf(own) : -1;
+    return {
+      ...base3,
+      result: {
+        agree: mine?.agree ?? [],
+        points: mine?.points ?? 0,
+        place: Math.max(1, rows.findIndex((r) => r.owner === owner) + 1),
+        of: Math.max(rows.length, 1),
+        wrote: !!own,
+        ...k.final.reliable && at >= 0 ? { third: thirdOf(at, k.final.order.length) } : {}
+      }
+    };
+  }
+  return base3;
+}
+registerRules(battlesRules);
+
 // apps/teaching/src/games/kinds/jeopardy/shared.ts
 var TEAM_NAMES = ["Kestrels", "Otters", "Foxes", "Herons", "Wrens", "Magpies"];
 var teamName = (team) => TEAM_NAMES[team % TEAM_NAMES.length] ?? `Team ${team + 1}`;
@@ -418,8 +1027,8 @@ function answerText(item, key) {
       return Object.entries(a.map).map(([k, v]) => `${t(k)} \u2192 ${t(v)}`).join(" \xB7 ");
     }
     case "spots": {
-      const words2 = a.passage.split(/\s+/).filter(Boolean);
-      return a.targets.map((s) => words2.slice(s.from, s.to + 1).join(" ")).join(" \xB7 ");
+      const words3 = a.passage.split(/\s+/).filter(Boolean);
+      return a.targets.map((s) => words3.slice(s.from, s.to + 1).join(" ")).join(" \xB7 ");
     }
     default:
       return "";
@@ -437,7 +1046,7 @@ function singleChoice(item, key) {
 // apps/teaching/src/games/kinds/jeopardy/rules.ts
 var WAGER_SECONDS = 30;
 var MIN_WAGER = 100;
-var err2 = (code, message) => ({ error: { code, message } });
+var err3 = (code, message) => ({ error: { code, message } });
 function content(ctx) {
   return { items: ctx.keys.live?.items ?? [], jeopardy: ctx.keys.live?.jeopardy };
 }
@@ -470,7 +1079,7 @@ function tileGain(opts) {
 function counted(ctx, team, answers) {
   return ctx.members(team).filter((o) => connected(ctx, o) || answers[o]);
 }
-function results(ctx, k, answers, score) {
+function results2(ctx, k, answers, score) {
   return order(ctx, k).map((team) => {
     const who = counted(ctx, team, answers);
     const r = who.filter((o) => answers[o]?.correct).length;
@@ -500,7 +1109,7 @@ function reveal(ctx, k) {
   const cur = k.cur;
   if (!cur || k.phase !== "closed" && k.phase !== "clue") return;
   close(ctx, k);
-  cur.results = results(ctx, k, cur.answers, (team, n, r, answered) => {
+  cur.results = results2(ctx, k, cur.answers, (team, n, r, answered) => {
     const pick2 = team === cur.team;
     const wager = pick2 && cur.double ? cur.wager ?? 0 : void 0;
     return { team, n, r, pick: pick2, gain: tileGain({ value: cur.value, n, r, answered, pick: pick2, bonus: bonus(ctx), ...wager !== void 0 ? { wager } : {} }), ...wager !== void 0 ? { wager } : {} };
@@ -531,12 +1140,12 @@ function backToBoard(ctx, k) {
   }
 }
 function pick(ctx, k, tileId) {
-  if (k.phase !== "pick") return err2("not_now", "Pick when the board is showing.");
+  if (k.phase !== "pick") return err3("not_now", "Pick when the board is showing.");
   const t = tileOf(ctx, tileId);
-  if (!t) return err2("bad_tile", "That tile isn\u2019t on the board.");
-  if (k.used[t.id]) return err2("used", "That tile has been played.");
+  if (!t) return err3("bad_tile", "That tile isn\u2019t on the board.");
+  if (k.used[t.id]) return err3("used", "That tile has been played.");
   const team = pickingTeam(ctx, k);
-  if (team === null) return err2("no_team", "No team is ready to pick.");
+  if (team === null) return err3("no_team", "No team is ready to pick.");
   k.aim = null;
   k.cur = { tile: t.id, item: t.item, cat: t.cat, value: t.value, double: t.double, team, answers: {} };
   if (t.double) {
@@ -576,7 +1185,7 @@ function revealFinalNext(ctx, k) {
   if (!f) return;
   if (k.phase === "final_clue") close(ctx, k);
   if (k.phase === "final_closed") {
-    f.results = results(ctx, k, f.answers, (team, n, r, answered) => {
+    f.results = results2(ctx, k, f.answers, (team, n, r, answered) => {
       const wager = f.wagers[team] ?? 0;
       return { team, n, r, pick: true, wager, gain: tileGain({ value: 0, n, r, answered, pick: true, bonus: 1, wager }) };
     });
@@ -597,12 +1206,12 @@ function revealFinalNext(ctx, k) {
 }
 function answer(ctx, k, owner, e) {
   const seat = ctx.seat(owner);
-  if (!seat || seat.team === void 0) return err2("no_seat", "Join a team first.");
+  if (!seat || seat.team === void 0) return err3("no_seat", "Join a team first.");
   const final = k.phase === "final_clue";
-  if (k.phase !== "clue" && !final) return err2("closed", "Answers are closed.");
+  if (k.phase !== "clue" && !final) return err3("closed", "Answers are closed.");
   const itemId = final ? k.final?.item : k.cur?.item;
   const answers = final ? k.final?.answers : k.cur?.answers;
-  if (!itemId || !answers || e.item !== itemId) return err2("bad_item", "That clue isn\u2019t open.");
+  if (!itemId || !answers || e.item !== itemId) return err3("bad_item", "That clue isn\u2019t open.");
   if (answers[owner]) return { item: itemId };
   const opened = (final ? k.final?.opened_at : k.cur?.opened_at) ?? ctx.now;
   const t = k.cur ? tileOf(ctx, k.cur.tile) : void 0;
@@ -630,7 +1239,7 @@ var jeopardyRules = {
     if (k.phase === "final_wager") startFinal(ctx, k);
   },
   move(ctx, k, owner, e) {
-    if (e.move !== "answer") return err2("bad_move", "Answer the clue on your phone.");
+    if (e.move !== "answer") return err3("bad_move", "Answer the clue on your phone.");
     return answer(ctx, k, owner, e);
   },
   control(ctx, k, op, from) {
@@ -639,13 +1248,13 @@ var jeopardyRules = {
     switch (op.name) {
       case "aim":
       case "pick": {
-        if (typeof data.tile !== "string") return err2("bad_tile", "Pick a tile.");
+        if (typeof data.tile !== "string") return err3("bad_tile", "Pick a tile.");
         if (!staff) {
           const team = pickingTeam(ctx, k);
-          if (team === null || captainOf2(ctx, k, team) !== from.owner) return err2("not_captain", "Your captain picks this turn.");
+          if (team === null || captainOf2(ctx, k, team) !== from.owner) return err3("not_captain", "Your captain picks this turn.");
         }
         if (op.name === "aim") {
-          if (k.phase !== "pick" || !tileOf(ctx, data.tile) || k.used[data.tile]) return err2("bad_tile", "Pick a tile still on the board.");
+          if (k.phase !== "pick" || !tileOf(ctx, data.tile) || k.used[data.tile]) return err3("bad_tile", "Pick a tile still on the board.");
           k.aim = data.tile;
           return;
         }
@@ -653,23 +1262,23 @@ var jeopardyRules = {
       }
       case "wager": {
         if (k.phase === "wager" && k.cur) {
-          if (!staff && captainOf2(ctx, k, k.cur.team) !== from.owner) return err2("not_captain", "Your captain wagers.");
+          if (!staff && captainOf2(ctx, k, k.cur.team) !== from.owner) return err3("not_captain", "Your captain wagers.");
           k.cur.wager = clampWager(data.amount, k.cur.max_wager ?? MIN_WAGER);
           openClue(ctx, k);
           return;
         }
         if (k.phase === "final_wager" && k.final) {
           const team = staff ? Number(data.team) : ctx.seat(from.owner)?.team;
-          if (team === void 0 || !Number.isInteger(team) || !order(ctx, k).includes(team)) return err2("bad_team", "No such team.");
-          if (!staff && captainOf2(ctx, k, team) !== from.owner) return err2("not_captain", "Your captain wagers.");
+          if (team === void 0 || !Number.isInteger(team) || !order(ctx, k).includes(team)) return err3("bad_team", "No such team.");
+          if (!staff && captainOf2(ctx, k, team) !== from.owner) return err3("not_captain", "Your captain wagers.");
           k.final.wagers[team] = clampWager(data.amount, finalMax(ctx, team), 0);
           if (finalWagersIn(ctx, k)) openFinal(ctx, k);
           return;
         }
-        return err2("not_now", "No wager is open.");
+        return err3("not_now", "No wager is open.");
       }
       case "close":
-        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
         if (k.phase === "wager" && k.cur) {
           k.cur.wager = clampWager(k.cur.wager ?? MIN_WAGER, k.cur.max_wager ?? MIN_WAGER);
           openClue(ctx, k);
@@ -677,26 +1286,26 @@ var jeopardyRules = {
         else close(ctx, k);
         return;
       case "reveal":
-        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
         if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
         else if (k.phase === "final_clue" || k.phase === "final_closed" || k.phase === "final_reveal") revealFinalNext(ctx, k);
         return;
       case "next":
       case "back":
-        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
         if (k.phase === "revealed") backToBoard(ctx, k);
         else if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
         else if (k.phase.startsWith("final_")) revealFinalNext(ctx, k);
         else if (k.phase === "done") ctx.end();
         return;
       case "final":
-        if (!staff) return err2("teacher_only", "Only the teacher can do that.");
-        if (k.phase !== "pick" && k.phase !== "done") return err2("not_now", "Finish this tile first.");
-        if (!content(ctx).jeopardy?.final) return err2("no_final", "This game has no Final.");
+        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
+        if (k.phase !== "pick" && k.phase !== "done") return err3("not_now", "Finish this tile first.");
+        if (!content(ctx).jeopardy?.final) return err3("no_final", "This game has no Final.");
         startFinal(ctx, k);
         return;
       default:
-        return err2("bad_control", "That isn\u2019t a Jeopardy control.");
+        return err3("bad_control", "That isn\u2019t a Jeopardy control.");
     }
   },
   tick(ctx, k) {
@@ -815,9 +1424,9 @@ function jeopardyView(ctx, k, role, owner) {
       v.cur.right = all.filter((a) => a.correct).length;
       v.cur.total = all.length;
       if (staff) {
-        const counts = {};
-        for (const a of all) for (const c of a.choice ?? []) counts[c] = (counts[c] ?? 0) + 1;
-        v.cur.counts = counts;
+        const counts2 = {};
+        for (const a of all) for (const c of a.choice ?? []) counts2[c] = (counts2[c] ?? 0) + 1;
+        v.cur.counts = counts2;
         const misses = /* @__PURE__ */ new Map();
         for (const a of all) if (!a.correct && a.text?.trim()) misses.set(a.text.trim().toLowerCase(), (misses.get(a.text.trim().toLowerCase()) ?? 0) + 1);
         const top = [...misses.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -1142,23 +1751,23 @@ function parseGapPassage(passage) {
   return parts;
 }
 function passageWords(passage) {
-  const words2 = [];
+  const words3 = [];
   const re = /\S+/g;
   let line = 0;
   let seen = 0;
   for (let m = re.exec(passage); m; m = re.exec(passage)) {
     line += (passage.slice(seen, m.index).match(/\n/g) ?? []).length;
     seen = m.index;
-    words2.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
+    words3.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
   }
-  return words2;
+  return words3;
 }
 function wordKey(word) {
   return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 function locateQuote(passage, quote) {
-  const words2 = passageWords(passage);
-  const keyed = words2.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
+  const words3 = passageWords(passage);
+  const keyed = words3.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
   const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
   if (!wanted.length) return null;
   for (let s = 0; s + wanted.length <= keyed.length; s++) {
@@ -1169,9 +1778,9 @@ function locateQuote(passage, quote) {
 var FILLER = new Set(
   "a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than".split(" ")
 );
-function spanFinds(words2, spot, target) {
+function spanFinds(words3, spot, target) {
   const content2 = (i) => {
-    const key = wordKey(words2[i]?.text ?? "");
+    const key = wordKey(words3[i]?.text ?? "");
     return !!key && !FILLER.has(key);
   };
   const targetWords = [];
@@ -1184,11 +1793,11 @@ function spanFinds(words2, spot, target) {
   const spill = spot.to - spot.from + 1 - overlap;
   return spill <= Math.max(4, targetWords.length);
 }
-function matchSpots(words2, spots, targets) {
+function matchSpots(words3, spots, targets) {
   const pairs = [];
   spots.forEach(
     (spot, s) => targets.forEach((target, t) => {
-      if (!spanFinds(words2, spot, target)) return;
+      if (!spanFinds(words3, spot, target)) return;
       const overlap = Math.min(spot.to, target.to) - Math.max(spot.from, target.from) + 1;
       const union = Math.max(spot.to, target.to) - Math.min(spot.from, target.from) + 1;
       pairs.push({ s, t, fit: overlap / union });
@@ -1339,9 +1948,9 @@ function markResponse(key, response) {
       return share(right, Object.keys(a.map).length, parts);
     }
     case "spots": {
-      const words2 = passageWords(a.passage);
+      const words3 = passageWords(a.passage);
       const spots = spotList(r.spots).slice(0, a.pick);
-      const found = matchSpots(words2, spots, a.targets);
+      const found = matchSpots(words3, spots, a.targets);
       const parts = {};
       let credit = 0;
       spots.forEach((spot, i) => {
@@ -1858,8 +2467,8 @@ function pictionarySettings(s, items) {
   return { seconds: sec, rounds: items };
 }
 var STOP = /* @__PURE__ */ new Set(["the", "and", "a", "an", "of", "to", "in", "on", "it", "is", "was", "i", "my", "me", "he", "she", "his", "her", "they", "we", "you", "that", "this", "with", "for", "as", "at", "by", "from", "out", "up", "be", "or", "but", "not", "so", "all", "only", "into"]);
-var words = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "").split(/[^\p{L}\p{N}']+/u).map((w) => w.replace(/'/g, "")).filter(Boolean);
-var keyWords = (s) => words(s).filter((w) => w.length >= 4 && !STOP.has(w));
+var words2 = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "").split(/[^\p{L}\p{N}']+/u).map((w) => w.replace(/'/g, "")).filter(Boolean);
+var keyWords = (s) => words2(s).filter((w) => w.length >= 4 && !STOP.has(w));
 function promptsOf(keys) {
   const out = /* @__PURE__ */ new Map();
   const cards = keys.live?.cards ?? {};
@@ -1899,7 +2508,7 @@ function judgeGuess(p, raw) {
     if (n === g) return { right: a, close: false };
     if (p.shape === "term" && n.length >= 4 && lev(n, g) <= (n.length >= 8 ? 2 : 1)) return { right: a, close: false };
   }
-  const gw = new Set(words(raw));
+  const gw = new Set(words2(raw));
   if (p.shape === "quote" && p.key.length && p.key.every((k) => gw.has(k) || [...gw].some((w) => w.length >= 5 && lev(w, k) <= 1))) return { right: p.answers[1] ?? p.answers[0] ?? "", close: false };
   const pool = /* @__PURE__ */ new Set([...p.answers.flatMap(keyWords), ...p.key]);
   const close2 = [...gw].some((w) => pool.has(w) || w.length >= 6 && [...pool].some((k) => k.startsWith(w.slice(0, 6))));
@@ -1919,7 +2528,7 @@ function shuffle2(list, random) {
   }
   return out;
 }
-var err3 = (code, message) => ({ error: { code, message } });
+var err4 = (code, message) => ({ error: { code, message } });
 var pointCount = (r) => r.strokes.reduce((a, s) => a + s.p.length / 2, 0);
 function applyStroke(r, data) {
   const d = data ?? {};
@@ -1964,12 +2573,12 @@ function nextDrawer(ctx, k) {
   return pool[0]?.owner;
 }
 function startRound(ctx, k) {
-  if (k.phase === "draw") return err3("not_now", "A round is running.");
+  if (k.phase === "draw") return err4("not_now", "A round is running.");
   const prompts = promptsOf(ctx.keys);
   const item = k.deck.shift();
-  if (!item || !prompts.has(item)) return err3("deck_empty", "Every prompt has been drawn.");
+  if (!item || !prompts.has(item)) return err4("deck_empty", "Every prompt has been drawn.");
   const drawer = k.teacher_next ? "teacher" : nextDrawer(ctx, k);
-  if (!drawer) return err3("no_drawer", "Nobody is here to draw.");
+  if (!drawer) return err4("no_drawer", "Nobody is here to draw.");
   k.teacher_next = false;
   if (drawer !== "teacher") k.drawn.push(drawer);
   const s = pictionarySettings(ctx.game.settings, 0);
@@ -2036,23 +2645,23 @@ var pictionaryRules = {
   move(ctx, k, owner, e) {
     const r = k.round;
     if (e.move === "draw") {
-      if (k.phase !== "draw" || !r) return err3("not_now", "The round is over.");
-      if (r.drawer !== owner) return err3("not_drawer", "Only the drawer can draw.");
-      if (e.item !== r.item) return err3("stale", "That round has finished.");
+      if (k.phase !== "draw" || !r) return err4("not_now", "The round is over.");
+      if (r.drawer !== owner) return err4("not_drawer", "Only the drawer can draw.");
+      if (e.item !== r.item) return err4("stale", "That round has finished.");
       const bad = applyStroke(r, e.response);
-      return bad ? err3(bad, bad === "too_much" ? "That drawing is full." : "That stroke didn\u2019t go through.") : { item: e.item };
+      return bad ? err4(bad, bad === "too_much" ? "That drawing is full." : "That stroke didn\u2019t go through.") : { item: e.item };
     }
     if (e.move === "guess" || e.move === "answer") {
-      if (k.phase !== "draw" || !r) return err3("not_now", "Wait for the next drawing.");
-      if (r.drawer === owner) return err3("not_guesser", "You\u2019re drawing this one.");
-      if (e.item !== r.item) return err3("stale", "That drawing has finished.");
+      if (k.phase !== "draw" || !r) return err4("not_now", "Wait for the next drawing.");
+      if (r.drawer === owner) return err4("not_guesser", "You\u2019re drawing this one.");
+      if (e.item !== r.item) return err4("stale", "That drawing has finished.");
       const g = r.guessers[owner] ??= { tries: [] };
       if (g.ms !== void 0) return { item: e.item, correct: true };
       const raw = typeof e.response?.text === "string" ? e.response.text.slice(0, 120) : "";
-      if (!raw.trim()) return err3("empty", "Type a guess.");
-      if (g.tries.length >= 60) return err3("slow_down", "That\u2019s a lot of guesses. Watch the drawing.");
+      if (!raw.trim()) return err4("empty", "Type a guess.");
+      if (g.tries.length >= 60) return err4("slow_down", "That\u2019s a lot of guesses. Watch the drawing.");
       const p = promptsOf(ctx.keys).get(r.item);
-      if (!p) return err3("bad_item", "That isn\u2019t in this game.");
+      if (!p) return err4("bad_item", "That isn\u2019t in this game.");
       r.guesses += 1;
       const verdict = judgeGuess(p, raw);
       if (!verdict.right) {
@@ -2069,47 +2678,47 @@ var pictionaryRules = {
       if (r.order.length >= guesserOwners(ctx, r).length) closeRound(ctx, k, "all");
       return { item: e.item, correct: true };
     }
-    return err3("bad_move", "That move isn\u2019t part of Pictionary.");
+    return err4("bad_move", "That move isn\u2019t part of Pictionary.");
   },
   control(ctx, k, op, from) {
     const staff = from.role === "teacher" || from.role === "board";
     if (op.name === "stroke") {
-      if (!staff || k.round?.drawer !== "teacher" || k.phase !== "draw") return err3("not_drawer", "Only the drawer can draw.");
+      if (!staff || k.round?.drawer !== "teacher" || k.phase !== "draw") return err4("not_drawer", "Only the drawer can draw.");
       const bad = applyStroke(k.round, op.data);
-      return bad ? err3(bad, "That stroke didn\u2019t go through.") : void 0;
+      return bad ? err4(bad, "That stroke didn\u2019t go through.") : void 0;
     }
-    if (!staff) return err3("not_allowed", "Only your teacher can do that.");
+    if (!staff) return err4("not_allowed", "Only your teacher can do that.");
     switch (op.name) {
       case "next":
       case "next_round":
         return startRound(ctx, k);
       case "teacher_draws":
-        if (k.phase === "draw") return err3("not_now", "A round is running.");
+        if (k.phase === "draw") return err4("not_now", "A round is running.");
         k.teacher_next = true;
         return startRound(ctx, k);
       case "end_round":
       case "reveal":
-        if (k.phase !== "draw") return err3("not_now", "No round is running.");
+        if (k.phase !== "draw") return err4("not_now", "No round is running.");
         closeRound(ctx, k, "time");
         return;
       case "disqualify":
-        if (k.phase !== "draw") return err3("not_now", "No round is running.");
+        if (k.phase !== "draw") return err4("not_now", "No round is running.");
         closeRound(ctx, k, "void");
         return;
       case "more_time":
-        if (k.phase !== "draw" || !k.round) return err3("not_now", "No round is running.");
+        if (k.phase !== "draw" || !k.round) return err4("not_now", "No round is running.");
         k.round.seconds += 15;
         ctx.setTimer(k.round.started_at + k.round.seconds * 1e3);
         return;
       case "standings":
-        if (k.phase !== "reveal") return err3("not_now", "Finish the round first.");
+        if (k.phase !== "reveal") return err4("not_now", "Finish the round first.");
         k.phase = "standings";
         return;
       case "final":
         ctx.end();
         return;
       default:
-        return err3("bad_control", "Unknown control.");
+        return err4("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -2354,7 +2963,7 @@ function autoGoal(seats, minutes) {
 var MILESTONES = [25, 50, 75, 100];
 
 // apps/teaching/src/games/kinds/points-rush/rules.ts
-var err4 = (code, message) => ({ error: { code, message } });
+var err5 = (code, message) => ({ error: { code, message } });
 var classEarned = (k) => Object.values(k.runners).reduce((n, r) => n + r.earned, 0);
 function runner(ctx, k, owner) {
   if (!k.runners[owner]) {
@@ -2395,16 +3004,16 @@ var pointsRushRules = {
     }
   },
   move(ctx, k, owner, event) {
-    if (k.over || k.started_at === void 0) return err4("closed", "Time\u2019s up.");
+    if (k.over || k.started_at === void 0) return err5("closed", "Time\u2019s up.");
     if (k.ends_at !== void 0 && ctx.now >= k.ends_at) {
       finishRush(ctx, k);
       ctx.end();
-      return err4("closed", "Time\u2019s up.");
+      return err5("closed", "Time\u2019s up.");
     }
     const r = runner(ctx, k, owner);
-    if (!r) return err4("no_seat", "Join the game first.");
+    if (!r) return err5("no_seat", "Join the game first.");
     if (!r.cur) nextItem(r, k.items, () => ctx.random(), ctx.now);
-    if (event.move !== "answer" || !r.cur || event.item !== r.cur.item) return err4("stale", "That question has moved on.");
+    if (event.move !== "answer" || !r.cur || event.item !== r.cur.item) return err5("stale", "That question has moved on.");
     const back = r.cur.back;
     const marked = ctx.mark(owner, { item: event.item, move: "answer", response: event.response, time_ms: Math.max(0, ctx.now - r.cur.shown_at), extra: { back, n: r.cur.n } });
     if ("error" in marked) return marked;
@@ -2433,20 +3042,20 @@ var pointsRushRules = {
   },
   control(ctx, k, op, from) {
     if (op.name === "buy") {
-      if (from.role !== "student") return err4("not_allowed", "Only players can buy upgrades.");
-      if (k.over) return err4("closed", "Time\u2019s up.");
+      if (from.role !== "student") return err5("not_allowed", "Only players can buy upgrades.");
+      if (k.over) return err5("closed", "Time\u2019s up.");
       const r = runner(ctx, k, from.owner);
       const key = op.data?.up;
-      if (!r || typeof key !== "string" || !UPGRADES.includes(key)) return err4("bad_upgrade", "That isn\u2019t an upgrade.");
-      if (!buy(r, key)) return err4("cant_buy", "Not enough points for that yet.");
+      if (!r || typeof key !== "string" || !UPGRADES.includes(key)) return err5("bad_upgrade", "That isn\u2019t an upgrade.");
+      if (!buy(r, key)) return err5("cant_buy", "Not enough points for that yet.");
       k.upgrades += 1;
       ctx.setScore(from.owner, r.points);
       return;
     }
-    if (from.role === "student") return err4("not_allowed", "Only the teacher can do that.");
+    if (from.role === "student") return err5("not_allowed", "Only the teacher can do that.");
     if (op.name === "goal") {
       const goal = Math.round(Number(op.data?.goal));
-      if (!Number.isFinite(goal) || goal < 100 || goal > 1e6) return err4("bad_goal", "Pick a goal between 100 and 1,000,000.");
+      if (!Number.isFinite(goal) || goal < 100 || goal > 1e6) return err5("bad_goal", "Pick a goal between 100 and 1,000,000.");
       k.goal = goal;
       k.goal_set = true;
       k.milestones = MILESTONES.filter((m) => classEarned(k) / goal * 100 >= m);
@@ -2454,7 +3063,7 @@ var pointsRushRules = {
     }
     if (op.name === "show") {
       const v = op.data?.view;
-      if (v !== "race" && v !== "insight" && v !== "anon") return err4("bad_view", "That view isn\u2019t part of Points rush.");
+      if (v !== "race" && v !== "insight" && v !== "anon") return err5("bad_view", "That view isn\u2019t part of Points rush.");
       k.board = v;
       return;
     }
@@ -2469,7 +3078,7 @@ var pointsRushRules = {
       ctx.end();
       return;
     }
-    return err4("unknown", "That control isn\u2019t part of Points rush.");
+    return err5("unknown", "That control isn\u2019t part of Points rush.");
   },
   tick(ctx, k) {
     if (!k.over && k.ends_at !== void 0 && ctx.now >= k.ends_at) {
@@ -2581,7 +3190,7 @@ function ordinal(n) {
 
 // apps/teaching/src/games/kinds/team-match/rules.ts
 var OPTIONS = 12;
-var err5 = (code, message) => ({ error: { code, message } });
+var err6 = (code, message) => ({ error: { code, message } });
 var promptOf = (item) => {
   if (item.shape === "term") return item.clues[0]?.text ?? "";
   if (item.shape === "quote") return item.text;
@@ -2669,7 +3278,7 @@ function nextCard(ctx, race, cards) {
   const id = race.queue[race.qi++];
   return cards.find((c) => c.item === id);
 }
-function deal(ctx, k, team) {
+function deal2(ctx, k, team) {
   const race = k.teams[team];
   if (!race) return;
   const cards = cardsOf2(ctx);
@@ -2705,16 +3314,16 @@ function feed(ctx, k, team, text, tone) {
 }
 function tap(ctx, k, owner, e) {
   const seat = ctx.seat(owner);
-  if (!seat || seat.team === void 0) return err5("no_seat", "Join a team first.");
-  if (k.phase !== "race") return err5("over", "The race is over.");
+  if (!seat || seat.team === void 0) return err6("no_seat", "Join a team first.");
+  if (k.phase !== "race") return err6("over", "The race is over.");
   const team = seat.team;
   const race = k.teams[team];
-  if (!race || race.place !== null) return err5("finished", "Your team has finished. Watch the board.");
+  if (!race || race.place !== null) return err6("finished", "Your team has finished. Watch the board.");
   const round = race.round;
-  if (!round || e.item !== round.item) return err5("stale", "That question has moved on.");
+  if (!round || e.item !== round.item) return err6("stale", "That question has moved on.");
   const option = e.response?.option;
   const mine = round.hands[owner] ?? [];
-  if (typeof option !== "string" || !mine.includes(option)) return err5("stale", "That question has moved on.");
+  if (typeof option !== "string" || !mine.includes(option)) return err6("stale", "That question has moved on.");
   const opt = round.opts.find((o) => o.id === option);
   const rightOpt = round.opts.find((o) => o.id === round.right);
   const holderOwner = Object.entries(round.hands).find(([, h]) => h.includes(round.right))?.[0] ?? null;
@@ -2778,13 +3387,13 @@ function tap(ctx, k, owner, e) {
       k.phase = "done";
       ctx.end();
     }
-  } else deal(ctx, k, team);
+  } else deal2(ctx, k, team);
   return { item: round.item, correct };
 }
 function startTeam(ctx, k, team) {
   if (k.teams[team]) return;
   k.teams[team] = { step: 0, place: null, queue: [], qi: 0, round: null, last: null, crashes: 0, rounds: 0 };
-  deal(ctx, k, team);
+  deal2(ctx, k, team);
 }
 var teamMatchRules = {
   kind: "team_match",
@@ -2807,11 +3416,11 @@ var teamMatchRules = {
     for (const t of ctx.teams()) startTeam(ctx, k, t);
   },
   move(ctx, k, owner, e) {
-    if (e.move !== "tap") return err5("bad_move", "Tap one of your answers.");
+    if (e.move !== "tap") return err6("bad_move", "Tap one of your answers.");
     return tap(ctx, k, owner, e);
   },
   control(ctx, k, op, from) {
-    if (from.role === "student") return err5("teacher_only", "Only the teacher can do that.");
+    if (from.role === "student") return err6("teacher_only", "Only the teacher can do that.");
     if (op.name === "wrong_tap") {
       const mode = op.data?.mode;
       const next = typeof mode === "string" && WRONG_TAPS.includes(mode) ? mode : k.mode === "back3" ? "start" : "back3";
@@ -2820,12 +3429,12 @@ var teamMatchRules = {
     }
     if (op.name === "skip") {
       const team = Number(op.data?.team);
-      if (!k.teams[team] || k.teams[team]?.place !== null) return err5("bad_team", "No such team racing.");
-      deal(ctx, k, team);
+      if (!k.teams[team] || k.teams[team]?.place !== null) return err6("bad_team", "No such team racing.");
+      deal2(ctx, k, team);
       return;
     }
     if (op.name === "next" || op.name === "reveal") return;
-    return err5("bad_control", "That isn\u2019t a team match control.");
+    return err6("bad_control", "That isn\u2019t a team match control.");
   },
   seatChanged(ctx, k, owner) {
     if (k.phase !== "race") return;
@@ -2833,7 +3442,7 @@ var teamMatchRules = {
     if (team === void 0) return;
     if (!k.teams[team]) startTeam(ctx, k, team);
     else if (k.teams[team]?.round) redeal(ctx, k, team);
-    else if (k.teams[team]?.place === null) deal(ctx, k, team);
+    else if (k.teams[team]?.place === null) deal2(ctx, k, team);
   },
   view(ctx, k, role, owner) {
     return teamMatchView(ctx, k, role, owner);
@@ -2844,7 +3453,8 @@ var teamMatchRules = {
     const hand = round?.hands[owner];
     if (!round || !hand?.length || k.phase !== "race") return null;
     if (hand.includes(round.right)) return ctx.random() < 0.35 ? { move: { item: round.item, move: "tap", response: { option: round.right } } } : null;
-    return ctx.random() < 0.04 ? { move: { item: round.item, move: "tap", response: { option: hand[Math.floor(ctx.random() * hand.length)] } } } : null;
+    const others = Math.max(1, Object.keys(round.hands).length - 1);
+    return ctx.random() < 0.05 / others ? { move: { item: round.item, move: "tap", response: { option: hand[Math.floor(ctx.random() * hand.length)] } } } : null;
   }
 };
 function teamMatchView(ctx, k, role, owner) {
@@ -2906,7 +3516,7 @@ function wagerSettings(s) {
 var finalBonus = (k) => k.s.house_bonus * 2;
 var isFinal = (k) => k.index === k.order.length - 1;
 var bonusRate = (k) => isFinal(k) && k.s.final_all_in ? finalBonus(k) : k.s.house_bonus;
-var err6 = (code, message) => ({ error: { code, message } });
+var err7 = (code, message) => ({ error: { code, message } });
 function shown(ctx, id) {
   if (!id) return null;
   return shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === id));
@@ -2976,7 +3586,7 @@ function closeAnswers(ctx, k) {
   k.ends_at = void 0;
   ctx.setTimer(void 0);
   const riding = {};
-  const counts = {};
+  const counts2 = {};
   const payouts = {};
   const winners = [];
   let potIn = 0;
@@ -2997,7 +3607,7 @@ function closeAnswers(ctx, k) {
     const bet = clampBet(k.s, held, pick2.bet);
     if (pick2.choice) {
       riding[pick2.choice] = (riding[pick2.choice] ?? 0) + bet;
-      counts[pick2.choice] = (counts[pick2.choice] ?? 0) + 1;
+      counts2[pick2.choice] = (counts2[pick2.choice] ?? 0) + 1;
     }
     ctx.record(owner, {
       item,
@@ -3024,7 +3634,7 @@ function closeAnswers(ctx, k) {
     p.after = p.before + p.change;
   }
   k.riding = riding;
-  k.counts = counts;
+  k.counts = counts2;
   k.payouts = payouts;
   k.right = rightOptions(ctx, item);
   k.pot_in = potIn;
@@ -3092,20 +3702,20 @@ var wagerRules = {
   },
   move(ctx, k, owner, event) {
     const item = k.order[k.index];
-    if (k.stage !== "open" || !item) return err6("closed", "Answers are closed for this question.");
-    if (event.item !== item || event.move !== "answer") return err6("bad_item", "That isn\u2019t the question on the board.");
-    if (k.ends_at !== void 0 && ctx.now > k.ends_at + 500) return err6("closed", "Time\u2019s up for this question.");
+    if (k.stage !== "open" || !item) return err7("closed", "Answers are closed for this question.");
+    if (event.item !== item || event.move !== "answer") return err7("bad_item", "That isn\u2019t the question on the board.");
+    if (k.ends_at !== void 0 && ctx.now > k.ends_at + 500) return err7("closed", "Time\u2019s up for this question.");
     ensure(ctx, k, owner);
-    if (!(owner in k.points)) return err6("no_seat", "Join the game first.");
+    if (!(owner in k.points)) return err7("no_seat", "Join the game first.");
     const it = shown(ctx, item);
     const choice = choiceOf(event.response);
-    if (it && (it.mode === "choice" || it.mode === "truefalse") && !(choice && optionsOf(it).some((o) => o.id === choice))) return err6("bad_answer", "Pick one of the answers.");
+    if (it && (it.mode === "choice" || it.mode === "truefalse") && !(choice && optionsOf(it).some((o) => o.id === choice))) return err7("bad_answer", "Pick one of the answers.");
     const bet = clampBet(k.s, k.points[owner], event.extra?.bet);
     k.picks[owner] = { response: event.response, choice, bet, ...event.time_ms !== void 0 ? { time_ms: Math.max(0, Math.round(event.time_ms)) } : {} };
     return { item };
   },
   control(ctx, k, op, from) {
-    if (from.role === "student") return err6("not_allowed", "Only the teacher can do that.");
+    if (from.role === "student") return err7("not_allowed", "Only the teacher can do that.");
     if (op.name === "next") return void step(ctx, k);
     if (op.name === "close") return void closeAnswers(ctx, k);
     if (op.name === "reveal") return void reveal2(ctx, k);
@@ -3117,7 +3727,7 @@ var wagerRules = {
       ctx.setTimer(k.ends_at);
       return;
     }
-    return err6("unknown", "That control isn\u2019t part of Wager.");
+    return err7("unknown", "That control isn\u2019t part of Wager.");
   },
   tick(ctx, k) {
     if (k.stage === "open" && k.ends_at !== void 0 && ctx.now >= k.ends_at) closeAnswers(ctx, k);
@@ -3264,7 +3874,7 @@ function puzzlesOf(keys) {
   });
 }
 var publicItem = (keys, id) => keys.live?.items.find((i) => i.id === id);
-var err7 = (code, message) => ({ error: { code, message } });
+var err8 = (code, message) => ({ error: { code, message } });
 var tk = (t) => String(t);
 function vowelCost(ctx) {
   const v = Number(ctx.game.settings?.vowel_cost);
@@ -3368,18 +3978,18 @@ function closeLetterQuestion(ctx, k) {
 }
 function callLetter(ctx, k, raw) {
   const pz = puzzle(ctx, k);
-  if (!pz) return err7("no_puzzle", "No puzzle is open.");
+  if (!pz) return err8("no_puzzle", "No puzzle is open.");
   const letter = typeof raw === "string" ? raw.trim().toUpperCase() : "";
-  if (letter.length !== 1 || !ALPHABET.includes(letter)) return err7("bad_letter", "Pick a letter A to Z.");
-  if (k.used.includes(letter)) return err7("used", `${letter} has been called already.`);
+  if (letter.length !== 1 || !ALPHABET.includes(letter)) return err8("bad_letter", "Pick a letter A to Z.");
+  if (k.used.includes(letter)) return err8("used", `${letter} has been called already.`);
   const vowel = VOWELS.includes(letter);
   const t = tk(teamNow(k));
   if (vowel) {
-    if (k.stage !== "turn" && k.stage !== "letter") return err7("not_now", "Buy a vowel on your turn.");
+    if (k.stage !== "turn" && k.stage !== "letter") return err8("not_now", "Buy a vowel on your turn.");
     const cost = vowelCost(ctx);
-    if ((k.round[t] ?? 0) < cost) return err7("short", `A vowel costs ${cost} round points.`);
+    if ((k.round[t] ?? 0) < cost) return err8("short", `A vowel costs ${cost} round points.`);
     k.round[t] = (k.round[t] ?? 0) - cost;
-  } else if (k.stage !== "letter") return err7("not_now", "Earn a letter first: spin and answer.");
+  } else if (k.stage !== "letter") return err8("not_now", "Earn a letter first: spin and answer.");
   const count = lettersOf(pz.board).filter((ch) => ch === letter).length;
   const won = vowel ? 0 : count * (k.value ?? 0);
   k.used = [...k.used, letter];
@@ -3472,14 +4082,14 @@ var SOLVING = /* @__PURE__ */ new Set(["turn", "spinning", "landed", "question",
 var DEFER = /* @__PURE__ */ new Set(["spinning", "landed", "qclosed", "revealing"]);
 function solve(ctx, k, owner, e) {
   const pz = puzzle(ctx, k);
-  if (!pz || e.item !== pz.id) return err7("bad_item", "That isn\u2019t the puzzle on the board.");
-  if (!SOLVING.has(k.stage)) return err7("closed", "Solving is closed for this quote.");
+  if (!pz || e.item !== pz.id) return err8("bad_item", "That isn\u2019t the puzzle on the board.");
+  if (!SOLVING.has(k.stage)) return err8("closed", "Solving is closed for this quote.");
   if (k.solves[owner]) return { item: pz.id, correct: true, again: true };
   const until = k.locks[owner] ?? 0;
-  if (until > ctx.now) return err7("locked", `Solve is locked for ${Math.ceil((until - ctx.now) / 1e3)} s.`);
+  if (until > ctx.now) return err8("locked", `Solve is locked for ${Math.ceil((until - ctx.now) / 1e3)} s.`);
   const r = e.response;
   const text = typeof r?.text === "string" ? r.text.slice(0, 200) : "";
-  if (!solveForm(text)) return err7("empty", "Type the whole line.");
+  if (!solveForm(text)) return err8("empty", "Type the whole line.");
   const shown2 = shownCount(pz.board, k.used);
   const total = lettersOf(pz.board).length;
   const ms = Math.max(0, ctx.now - k.opened_at);
@@ -3503,8 +4113,8 @@ function solve(ctx, k, owner, e) {
 }
 function answer2(ctx, k, owner, e) {
   const q = k.q;
-  if (!q || q.closed || e.item !== q.item) return err7("closed", "That question isn\u2019t open.");
-  if (q.kind === "letter" && !q.asked.includes(owner)) return err7("not_yours", "This one is for the spinning team.");
+  if (!q || q.closed || e.item !== q.item) return err8("closed", "That question isn\u2019t open.");
+  if (q.kind === "letter" && !q.asked.includes(owner)) return err8("not_yours", "This one is for the spinning team.");
   if (q.answers[owner]) return { item: q.item };
   const solved = k.solves[owner];
   const extra = q.kind === "explain" ? { solved: !!solved, ...solved ? { letters_pct: Math.round(solved.pct * 100), early: solved.pct < 0.5 && !solved.outlier } : {} } : { letter_question: true, ...k.value ? { value: k.value } : {} };
@@ -3533,9 +4143,9 @@ function splitFor(solves, answers) {
   return { early, late };
 }
 function countsFor(q) {
-  const counts = {};
-  for (const a of Object.values(q.answers)) for (const id of a.pick ?? []) counts[id] = (counts[id] ?? 0) + 1;
-  return counts;
+  const counts2 = {};
+  for (const a of Object.values(q.answers)) for (const id of a.pick ?? []) counts2[id] = (counts2[id] ?? 0) + 1;
+  return counts2;
 }
 function heatOf(ctx, k) {
   const pzs = puzzlesOf(ctx.keys);
@@ -3648,10 +4258,10 @@ var wheelRules = {
     openPuzzle(ctx, k, 0);
   },
   move(ctx, k, owner, e) {
-    if (!ctx.seat(owner)) return err7("no_seat", "Join the room first.");
+    if (!ctx.seat(owner)) return err8("no_seat", "Join the room first.");
     if (e.move === "solve") return solve(ctx, k, owner, e);
     if (e.move === "answer") return answer2(ctx, k, owner, e);
-    return err7("bad_move", "That move isn\u2019t part of this game.");
+    return err8("bad_move", "That move isn\u2019t part of this game.");
   },
   control(ctx, k, op, from) {
     const teacher = from.role === "teacher" || from.role === "board";
@@ -3659,20 +4269,20 @@ var wheelRules = {
     const data = op.data ?? {};
     switch (op.name) {
       case "spin":
-        if (k.stage !== "turn") return err7("not_now", "Not time to spin.");
-        if (!teacher && !captain) return err7("not_captain", "Only the captain spins.");
+        if (k.stage !== "turn") return err8("not_now", "Not time to spin.");
+        if (!teacher && !captain) return err8("not_captain", "Only the captain spins.");
         return spin(ctx, k, Number(data.power ?? 0.6));
       case "letter":
-        if (!teacher && !captain) return err7("not_captain", "Only the captain calls a letter.");
+        if (!teacher && !captain) return err8("not_captain", "Only the captain calls a letter.");
         return callLetter(ctx, k, data.letter);
       case "skip":
-        if (!teacher) return err7("teacher_only", "Only the teacher can skip a turn.");
+        if (!teacher) return err8("teacher_only", "Only the teacher can skip a turn.");
         if (k.stage === "turn" || k.stage === "letter") return nextTurn(ctx, k);
         return;
       default:
         break;
     }
-    if (!teacher) return err7("teacher_only", "That\u2019s a teacher control.");
+    if (!teacher) return err8("teacher_only", "That\u2019s a teacher control.");
     switch (op.name) {
       case "next":
         return advance(ctx, k);
@@ -3695,7 +4305,7 @@ var wheelRules = {
         if (k.stage === "totals") return nextPuzzle(ctx, k);
         return;
       default:
-        return err7("bad_control", "Unknown control.");
+        return err8("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -4206,7 +4816,7 @@ function ranks(s) {
 function classWall(s) {
   const keys = keysOf(s);
   if (keys.kind !== "connections") return [];
-  const counts = /* @__PURE__ */ new Map();
+  const counts2 = /* @__PURE__ */ new Map();
   for (const events of Object.values(s.history)) {
     for (const e of events) {
       if (e.move !== "guess" || e.correct !== false) continue;
@@ -4221,14 +4831,14 @@ function classWall(s) {
           if (groupOf(ti) === groupOf(tj)) continue;
           const [a, b] = [wall.tiles[ti] ?? "", wall.tiles[tj] ?? ""].sort();
           const k = `${a}\0${b}`;
-          const row = counts.get(k) ?? { a, b, count: 0 };
+          const row = counts2.get(k) ?? { a, b, count: 0 };
           row.count += 1;
-          counts.set(k, row);
+          counts2.set(k, row);
         }
       }
     }
   }
-  return [...counts.values()].sort((x, y) => y.count - x.count || x.a.localeCompare(y.a)).slice(0, CLASS_WALL_MAX);
+  return [...counts2.values()].sort((x, y) => y.count - x.count || x.a.localeCompare(y.a)).slice(0, CLASS_WALL_MAX);
 }
 function seatRestore(s, owner) {
   if (s.config.style !== "race") return void 0;
@@ -4417,10 +5027,10 @@ function revealItem(s) {
   const item = s.item;
   if (!item || item.revealed) return;
   const key = keysOf(s).items[item.item];
-  const counts = {};
-  for (const c of Object.values(item.choices)) counts[c.choice] = (counts[c.choice] ?? 0) + 1;
+  const counts2 = {};
+  for (const c of Object.values(item.choices)) counts2[c.choice] = (counts2[c.choice] ?? 0) + 1;
   const reveal3 = key ? revealFor(keysOf(s).kind, key, {}) : void 0;
-  item.revealed = { counts, reveal: reveal3 };
+  item.revealed = { counts: counts2, reveal: reveal3 };
   const fake = key?.shape === "quote" && key.speaker === FAKE_SPEAKER;
   const seconds2 = itemSeconds(s);
   for (const [owner, seat] of Object.entries(s.seats)) {
@@ -4610,8 +5220,8 @@ function onControl(s, owner, role, conn, rid, op, now, fx) {
   const no = (code, message) => (fail(fx, owner, conn, rid, code, message), false);
   const paced = s.config.style === "paced";
   if (s.config.style === "custom" && (op.op === "kind" || op.op === "next" || op.op === "reveal")) {
-    const err8 = kindControl(s, owner, role, op, now, fx);
-    return err8 ? no(err8.error.code, err8.error.message) : ok();
+    const err9 = kindControl(s, owner, role, op, now, fx);
+    return err9 ? no(err9.error.code, err9.error.message) : ok();
   }
   switch (op.op) {
     case "start":

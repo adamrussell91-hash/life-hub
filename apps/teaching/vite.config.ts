@@ -57,7 +57,8 @@ export default defineConfig({
         searchForWorkspaceRoot(__dirname),
         path.resolve(__dirname, '../../packages'),
         path.resolve(__dirname, '../../node_modules'),
-        path.resolve(__dirname, '../../netlify/functions/_shared/cj-maths.mjs')
+        path.resolve(__dirname, '../../netlify/functions/_shared/cj-maths.mjs'),
+        path.resolve(__dirname, '../../netlify/functions/_shared/cj-scale.mjs')
       ]
     }
   },

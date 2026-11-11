@@ -1975,7 +1975,10 @@ function splitGame(game, random = Math.random) {
   } else if (game.kind === "wheel") {
     for (const p of game.puzzles) {
       keys.items[p.id] = { shape: "term", answers: [p.text.trim()], decoys: [], tags: evidenceTags(p), label: p.text.trim() };
-      for (const item of [...p.bank, ...p.explain ? [p.explain] : []]) any(item);
+      for (const item of [...p.bank, ...p.explain ? [p.explain] : []]) {
+        const pub2 = any(item);
+        if (pub2) pubItems.push(pub2);
+      }
     }
     count = game.puzzles.length;
   } else {
@@ -1986,6 +1989,38 @@ function splitGame(game, random = Math.random) {
     count = pubItems.length;
   }
   if (game.kind === "battles") count = 1;
+  if (!info.solo && pubItems.length) {
+    keys.live = { items: pubItems };
+    if (game.kind === "jeopardy") {
+      keys.live.jeopardy = {
+        categories: game.categories.map((c) => ({ id: c.id, title: c.title.trim(), tiles: c.tiles.map((t) => ({ id: t.id, item: t.item.id, value: t.value, double: t.double })) })),
+        ...game.final ? { final: game.final.id } : {}
+      };
+    }
+    if (game.kind === "wheel") {
+      keys.live.wheel = {
+        puzzles: game.puzzles.map((p) => ({ id: p.id, category: p.category.trim(), bank: p.bank.map((i) => i.id), ...p.explain ? { explain: p.explain.id } : {} }))
+      };
+    }
+  }
+  if (game.kind === "articulate" || game.kind === "pictionary") {
+    const cards = {};
+    for (const item of game.items) {
+      const terms = item.shape === "term" ? item : null;
+      cards[item.id] = {
+        banned: (terms?.banned ?? []).map((w) => w.trim()).filter(Boolean),
+        clues: (terms?.clues ?? []).filter((c) => c.text.trim()).map((c) => ({ kind: c.kind, text: c.text.trim() })),
+        ...terms?.draw_prompt?.trim() ? { draw: terms.draw_prompt.trim() } : {}
+      };
+    }
+    keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
+  }
+  if (game.kind === "battles") {
+    keys.live = {
+      items: [],
+      battle: { prompt: game.prompt.trim(), criterion: game.criterion.trim(), chips: game.chips.map((c) => c.trim()).filter(Boolean), tags: evidenceTags(game) }
+    };
+  }
   const pub = {
     id: game.id,
     title: game.title.trim(),
