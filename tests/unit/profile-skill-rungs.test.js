@@ -67,3 +67,28 @@ test('a student with no claim gets nothing, and a bad strand is refused', async 
   assert.deepEqual(await profileAction(store, 'class1', { action: 'skills', class_token: 'c'.repeat(48) }), { need: 'initials' });
   await assert.rejects(() => profileAction(store, 'class1', { action: 'skills', strand: 'NOT OK', ...device }));
 });
+
+/** A made-up continuum strand, just enough to pass the schema. */
+function strandFixture(strand, subId, name) {
+  const rung = (r) => ({ i_can: `I can ${r} at ${subId}.`, indicators: [], build: { formula: [], parts: [{ id: 'p', name: 'Part', job: 'Job', language: [] }], example: [['Example', null]], why_here: 'Why', checks: [], next_move: r === 'excellent' ? 'Keep refining: vary your pace for effect.' : `Move to ${r}.` } });
+  return {
+    schema: 'skills_strand_v1', strand, name, summary: 'Summary',
+    rungs: ['capable', 'skilled', 'accomplished', 'excellent'].map((id) => ({ id, name: id, marks: '1', marker_words: 'w', meaning: 'm' })),
+    sub_strands: [{ id: subId, name: `${name} skill`, in_hsc: 'x', draws_on: 'y', outcomes: [], focus_areas: [], points: [], rungs: { capable: rung('capable'), skilled: rung('skilled'), accomplished: rung('accomplished'), excellent: rung('excellent') } }]
+  };
+}
+
+test('each skill row carries every rung’s I can line, and a top-rung row its refine line', async () => {
+  const { store, ava } = await setup();
+  store.data.set('skills_continuum/v1', { strands: [strandFixture('speaking', 'delivery', 'Speaking'), strandFixture('reading', 'technique', 'Reading')] });
+  store.data.set('voice_submissions/lessonC/blk/s_lessonC', { status: 'returned', class_id: 'class1', student_id: ava.id, tags: [], rubric: { skills: { 'reading.technique': 'excellent' }, pieces: {}, steps: {} }, submitted_at: '2026-10-15T00:00:00Z', returned_at: '2026-10-15T00:00:00Z' });
+  store.data.set(`piece_feedback/class1/${ava.id}/v:lessonC`, { kind: 'viva', title: 'Viva lessonC', lesson_id: 'lessonC', column_id: null, tags: [], comment: '', status: 'returned', returned_at: '2026-10-15T00:00:00Z', updated_at: 'x' });
+  const out = await profileAction(store, 'class1', { action: 'progress', ...device });
+  const rows = out.skills.flatMap((s) => s.rows);
+  const speaking = rows.find((r) => r.key === 'skill:speaking.delivery');
+  assert.deepEqual(speaking.rungs, { capable: 'I can capable at delivery.', skilled: 'I can skilled at delivery.', accomplished: 'I can accomplished at delivery.', excellent: 'I can excellent at delivery.' });
+  assert.equal(speaking.next_move, 'Move to accomplished.');
+  assert.equal(speaking.refine, undefined);
+  const reading = rows.find((r) => r.key === 'skill:reading.technique');
+  assert.deepEqual([reading.now, reading.next_move, reading.refine], ['excellent', null, 'Vary your pace for effect.']);
+});

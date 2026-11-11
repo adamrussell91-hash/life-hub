@@ -208,3 +208,80 @@
 .cm--progress .cm-group { font-size: 13px; }
 .cm--progress .cm-item { font-size: 12px; }
 .cm--progress .cm__legend { margin-top: var(--space-2, 0.5rem); }
+
+/* Line tags on the student's map: each opens a card saying what the line means. */
+.cm--progress { position: relative; }
+.cm--progress .cm__stage { position: relative; }
+.cm--progress .cm-item--tag { text-decoration: underline dotted; text-underline-offset: 2px; }
+.cm-tags { position: absolute; inset: 0 auto auto 0; height: 0; }
+.cm-tagbtn {
+  position: absolute;
+  top: 44px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.cm-tagbtn:hover,
+.cm-tagbtn[aria-expanded='true'] {
+  background: rgba(23, 55, 94, 0.08);
+  border-color: rgba(23, 55, 94, 0.18);
+}
+.cm-tagbtn:focus-visible {
+  outline: 2px solid var(--navy, #17375e);
+  outline-offset: 1px;
+}
+.cm-card {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line, rgba(23, 55, 94, 0.18));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper, #fbf8f2);
+  color: var(--ink, #13233a);
+  box-shadow: 0 6px 20px rgba(10, 21, 54, 0.14);
+  display: grid;
+  gap: 6px;
+}
+.cm-card p { margin: 0; }
+.cm-card__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #6b7788);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cm-card__close:hover { background: rgba(23, 55, 94, 0.08); }
+.cm-card__kind {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #6b7788);
+  padding-right: 32px;
+}
+.cm-card__title {
+  margin: 0;
+  padding-right: 32px;
+  font-size: 1rem;
+  border-left: 4px solid var(--cm-card-colour, currentColor);
+  padding-left: 8px;
+}
+.cm-card__meaning { font-size: var(--text-sm, 0.875rem); line-height: 1.45; }
+.cm-card__meaning.is-empty { color: var(--muted, #6b7788); font-style: italic; }
+.cm-card__count,
+.cm-card__status { font-size: var(--text-sm, 0.875rem); color: var(--muted, #6b7788); }
+.cm-card__status { color: var(--ink, #13233a); }
+.cm-card__next { font-size: var(--text-sm, 0.875rem); font-weight: 600; color: var(--wave, #376fb7); }

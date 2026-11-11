@@ -159,14 +159,16 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
   for (const lane of lanes) {
     const colour = lane.items[0]!.colour;
     if (lane.collapsed) push(`<text class="cm-count" x="${lane.x}" y="104" text-anchor="middle" style="fill:${colour}">${lane.items.length}</text>`);
-    else {
+    else if (pr) {
+      // The student's map: the label only, its foot right over its dot. A button laid over it (progress.ts) says what the line means.
+      const item = lane.items[0]!;
+      push(`<text class="cm-item cm-item--tag" aria-hidden="true" transform="translate(${lane.x - 2},100) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text>`);
+    } else {
       const item = lane.items[0]!;
       push(`<g class="cm-hit" data-item="${esc(item.id)}" role="button" tabindex="0" aria-label="Follow ${esc(item.label)}: ${esc(item.title)}">`);
       push(`<title>${esc(item.label)}: ${esc(item.title)}</title>`);
       push(`<rect x="${lane.x - 10}" y="30" width="20" height="74" fill="transparent"/>`);
-      // On the student's map the label's foot sits right over its dot.
-      const [lx, ly] = pr ? [lane.x - 2, 100] : [lane.x + 3, 92];
-      push(`<text class="cm-item${state.focus === item.id ? ' cm-item--on' : ''}" transform="translate(${lx},${ly}) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text></g>`);
+      push(`<text class="cm-item${state.focus === item.id ? ' cm-item--on' : ''}" transform="translate(${lane.x + 3},92) rotate(-60)" style="fill:${colour}">${esc(fit(item.label, 9))}</text></g>`);
     }
     if (pr) {
       const any = rows.some((r) => lane.items.some((it) => r.teaches.has(it.id)) && lit(r.id));

@@ -2,7 +2,8 @@
  * The To do panel beside the unit map on a student's own progress page. Everything here is read
  * from records that already exist; nothing is stored, and nothing is ticked by hand.
  *
- *   countdowns     every countdown block still due in the unit's published lessons, soonest first
+ *   countdowns     every countdown block still due in the unit's published lessons, and the unit's
+ *                  assessment lessons planned on the calendar for this class (published or not), soonest first
  *   announcements  the newest text announcements on the class page
  *   practice       organiser cards left today and cards answered today
  *   back           returned pieces not opened yet, pieces opened today (ticked), redrafts asked for
@@ -18,6 +19,9 @@ import { handinKey, pieceId } from './lesson-work.mjs';
 import { returnedRows } from './profile-feedback.mjs';
 import { practiceToday } from './organiser.mjs';
 import { sydneyDay } from './organiser-model.mjs';
+import { isDeletedRecord } from './record-liveness.mjs';
+import { SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 
 export const TODO_LIMITS = { countdowns: 3, announcements: 3, text: 280, back: 6, waiting: 6, started: 3, activities: 12, todo: 6 };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -67,12 +71,16 @@ export function announcementsFrom(cls) {
 }
 
 /**
- * Every countdown still due in the unit's published lessons, soonest first: an assessment, a
- * design sprint step, anything the teacher put a countdown on. `today` is a YYYY-MM-DD day; a
- * countdown due today still counts.
+ * Every countdown still due, soonest first: an assessment, a design sprint step, anything the
+ * teacher put a countdown on in a published lesson. `planned` adds the unit's assessment lessons
+ * that sit on the class calendar, published or not ({ lesson_id, title, published, date, start_time }):
+ * the date shows before the task page is ready. A lesson with its own countdown block keeps only
+ * the block's. `today` is a YYYY-MM-DD day; a countdown due today still counts. The soonest
+ * assessment always stays in the list, so the progress page can show it at the top.
  */
-export function countdownsFrom(lessons, published, today) {
+export function countdownsFrom(lessons, published, today, planned = []) {
   const found = [];
+  const withBlock = new Set();
   for (const lesson of lessons) {
     for (const b of visibleBlocks(published.get(lesson.id)?.blocks)) {
       if (b.block_type !== 'countdown') continue;
@@ -80,13 +88,41 @@ export function countdownsFrom(lessons, published, today) {
       if (!DAY.test(c.due_date ?? '') || c.due_date < today) continue;
       const due_time = TIME.test(c.due_time ?? '') ? c.due_time : '';
       const title = typeof c.title === 'string' && c.title.trim() ? c.title.trim() : lesson.title;
+      withBlock.add(lesson.id);
       found.push({
         when: `${c.due_date}T${due_time || '23:59'}`,
-        item: { title: clip(title, 120), lesson_id: lesson.id, assessment: lesson.pedagogical_mode === 'assessment', due_date: c.due_date, due_time, set_date: DAY.test(c.set_date ?? '') ? c.set_date : '' }
+        item: { title: clip(title, 120), lesson_id: lesson.id, assessment: lesson.pedagogical_mode === 'assessment', due_date: c.due_date, due_time, set_date: DAY.test(c.set_date ?? '') ? c.set_date : '', published: true }
       });
     }
   }
-  return found.sort((a, b) => a.when.localeCompare(b.when)).slice(0, TODO_LIMITS.countdowns).map((f) => f.item);
+  // One entry per planned lesson: its soonest calendar day from today on.
+  const soonest = new Map();
+  for (const p of planned) {
+    if (withBlock.has(p.lesson_id) || !DAY.test(p.date ?? '') || p.date < today) continue;
+    const due_time = TIME.test(p.start_time ?? '') ? p.start_time : '';
+    const when = `${p.date}T${due_time || '23:59'}`;
+    const was = soonest.get(p.lesson_id);
+    if (was && was.when <= when) continue;
+    soonest.set(p.lesson_id, { when, item: { title: clip(String(p.title ?? 'Assessment task'), 120), lesson_id: p.lesson_id, assessment: true, due_date: p.date, due_time, set_date: '', published: p.published === true } });
+  }
+  const all = [...found, ...soonest.values()].sort((a, b) => a.when.localeCompare(b.when));
+  const kept = all.slice(0, TODO_LIMITS.countdowns);
+  const firstAssessment = all.find((f) => f.item.assessment);
+  if (firstAssessment && !kept.includes(firstAssessment)) kept[kept.length - 1] = firstAssessment;
+  return kept.map((f) => f.item);
+}
+
+/**
+ * The calendar days of the unit's assessment lessons for this class: not deleted, not skipped.
+ * `assessments` are { id, title, published } only; nothing else of an unpublished lesson is read.
+ */
+export async function plannedAssessments(store, classId, assessments) {
+  if (!assessments?.length) return [];
+  const byId = new Map(assessments.map((a) => [a.id, a]));
+  const rows = await mapBounded(await listBlobKeys(store, SCHEDULED_LESSON_PREFIX), 8, (key) => read(store, key));
+  return rows
+    .filter((r) => r && !isDeletedRecord(r) && r.class_id === classId && byId.has(r.lesson_id) && r.delivery_status !== 'skipped' && typeof r.date === 'string')
+    .map((r) => ({ lesson_id: r.lesson_id, title: byId.get(r.lesson_id).title, published: byId.get(r.lesson_id).published, date: r.date, start_time: typeof r.start_time === 'string' ? r.start_time : '' }));
 }
 
 const answered = (v) => typeof v === 'string' && v.trim() !== '';
@@ -148,9 +184,10 @@ function doneAt(lessonId, done, view, studentId) {
 /**
  * The panel for one student. `lessons`, `rows` and `done` are the student's own map and records
  * (lessonsForStudent, mapRows, listDone); `published` maps lesson id to its published copy; `view`
- * is the class's markbook load; `now` the moment of the read.
+ * is the class's markbook load; `assessments` the unit's assessment lessons, published or not
+ * ({ id, title, published }); `now` the moment of the read.
  */
-export async function todoFor(store, roster, student, { lessons, rows, done, published, view, now = new Date() }) {
+export async function todoFor(store, roster, student, { lessons, rows, done, published, view, assessments = [], now = new Date() }) {
   const today = sydneyDay(now);
   const titles = new Map(lessons.map((l) => [l.id, l.title]));
   const finished = new Set(rows.filter((r) => r.done).map((r) => r.id));
@@ -183,13 +220,14 @@ export async function todoFor(store, roster, student, { lessons, rows, done, pub
     if (left <= TODO_LIMITS.todo) todo.push({ id: r.id, title: r.title, kind: r.kind, done: false });
   }
 
-  const [back, waiting, practice] = await Promise.all([
+  const [back, waiting, practice, planned] = await Promise.all([
     backFor(store, roster, student, today),
     waitingFor(store, roster.cls.id, student, view.markbook?.columns ?? []),
-    practiceToday(store, roster, student, { now })
+    practiceToday(store, roster, student, { now }),
+    plannedAssessments(store, roster.cls.id, assessments)
   ]);
   return {
-    countdowns: countdownsFrom(lessons, published, today),
+    countdowns: countdownsFrom(lessons, published, today, planned),
     announcements: announcementsFrom(roster.cls),
     practice: practice && (practice.today > 0 || practice.answered > 0) ? practice : null,
     back,

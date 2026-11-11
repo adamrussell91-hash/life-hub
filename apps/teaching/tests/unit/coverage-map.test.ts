@@ -147,6 +147,18 @@ describe('Coverage map: model', () => {
     ]);
   });
 
+  it('carries each column’s kind, full name and meaning, a dot point’s text as its meaning', () => {
+    const lines: NetworkLine[] = [...LINES.slice(0, 2), { ...LINES[2]!, meaning: '  Reading closely for how a text works.  ' }];
+    const map = buildCoverageMap({ content: v2(), lines, lessons: LESSONS, points: POINTS });
+    const items = map.groups.flatMap((g) => g.items).map((i) => [i.id, i.kind, i.name, i.meaning]);
+    expect(items).toEqual([
+      ['human:U1', 'point', 'Understanding', 'One'], ['human:U2', 'point', 'Understanding', 'Two'], ['human:R1', 'point', 'Responding', 'Three'],
+      ['rep', 'concept', 'Representation', undefined], ['read', 'skill', 'Reading', 'Reading closely for how a text works.']
+    ]);
+    const plain = buildCoverageMap({ content: v2(), lines: LINES, lessons: LESSONS });
+    expect(plain.groups[0]!.items[0]).toMatchObject({ id: 'und', kind: 'syllabus', name: 'Understanding' });
+  });
+
   it('gives dot points the depth of the lesson’s stop on their line, else first-then-again', () => {
     const map = build();
     const at = (row: string, item: string) => map.rows.find((r) => r.id === row)?.teaches.get(item);

@@ -46,6 +46,24 @@ async function vivaTakes(store, lessonId, studentId) {
 /** The confirmed tags on returned viva takes. */
 const vivaTags = (takes) => takes.flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive) })));
 
+const WORDS_MAX = 160;
+const clipWords = (text) => (text.length > WORDS_MAX ? `${text.slice(0, WORDS_MAX - 1).trimEnd()}…` : text);
+const noteOf = (t) => (typeof t.note === 'string' && t.note.trim() ? t.note.trim() : null);
+
+/**
+ * Where each code sits on a returned piece: the student's own words it covers (written work only)
+ * and the teacher's note on it. A viva's tags point at moments in a recording, so they carry no words.
+ */
+function marksOf(row, takes) {
+  if (row.kind === 'viva') return takes.flatMap((r) => (r.tags ?? []).filter((t) => t.confirmed !== false).map((t) => ({ code_id: t.code_id, positive: Boolean(t.positive), words: null, note: noteOf(t) })));
+  return (row.tags ?? []).map((t) => {
+    const body = row.text?.[t.part]?.[t.field];
+    const quote = typeof t.quote === 'string' && t.quote.trim() ? t.quote : typeof body === 'string' && t.end > t.start ? body.slice(t.start, t.end) : '';
+    const words = quote.replace(/\s+/g, ' ').trim();
+    return { code_id: t.code_id, positive: Boolean(t.positive), words: words ? clipWords(words) : null, note: noteOf(t) };
+  });
+}
+
 /** The rungs on returned viva takes: a later take on a skill replaces an earlier one. */
 const vivaPlaces = (takes) => Object.assign({}, ...[...takes].sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at))).map((t) => rubricPlaces(t.rubric)));
 
@@ -84,13 +102,13 @@ export async function studentPieces(store, classId, studentId) {
     const tags = row.kind === 'viva' ? vivaTags(takes) : unionTags(stored);
     // A rung tapped on a rubric says where the student sits on that skill.
     const places = { ...(column ? placesFor(column, shownMark(book.marks?.[column.id]?.[studentId], row)) : {}), ...rubricPlaces(row.rubric), ...vivaPlaces(takes) };
-    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places, tags, seen_at: row.seen_at ?? null, comment: row.comment ?? '', redraft: stored.redraft ? 'asked' : row.sent ? 'sent' : null });
+    pieces.push({ id, kind: row.kind, title: row.title, short: row.short ?? column?.piece?.short ?? null, at: row.returned_at, places, tags, marks: marksOf(row, takes), seen_at: row.seen_at ?? null, comment: row.comment ?? '', redraft: stored.redraft ? 'asked' : row.sent ? 'sent' : null });
   }
   for (const column of book.columns.filter((c) => c.kind === 'assessment' && !c.piece)) {
     const mark = book.marks?.[column.id]?.[studentId];
     if (!mark || mark.exempt) continue;
     const tags = Object.values(mark.codes ?? {}).flat().map((code_id) => ({ code_id, positive: false }));
-    pieces.push({ id: `a:${column.id}`, kind: 'assessment', title: column.title, short: null, at: `${column.date}T00:00:00Z`, places: placesFor(column, mark), tags, seen_at: null, comment: '' });
+    pieces.push({ id: `a:${column.id}`, kind: 'assessment', title: column.title, short: null, at: `${column.date}T00:00:00Z`, places: placesFor(column, mark), tags, marks: [], seen_at: null, comment: '' });
   }
   return pieces.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 }
@@ -118,9 +136,12 @@ export async function unseenFor(store, roster, student) {
   return rows.filter((r) => r?.status === 'returned' && r.kind !== 'assessment' && !r.seen_at).length + notes.filter((d) => !d.seen_at).length;
 }
 
+const SHOWN_RUNGS = ['capable', 'skilled', 'accomplished', 'excellent'];
+
 /**
  * Skill rows grouped by strand, each with the student's rung now, the rung after
- * it and that rung's next move. Only the lines each row needs leave the continuum.
+ * it and that rung's next move, and each rung's "I can" line so the student can look along the
+ * ladder. Only those lines leave the continuum.
  */
 async function skillGroups(store, skillRows) {
   if (!skillRows.length) return [];
@@ -133,7 +154,12 @@ async function skillGroups(store, skillRows) {
     const sub = strand?.sub_strands.find((s) => s.id === subId);
     const counts = Object.fromEntries(RUNGS.map((r) => [r, row.cells.filter((c) => c === r).length]));
     const nextRung = RUNGS[Math.max(1, RUNGS.indexOf(row.now) + 1)];
-    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null };
+    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null, rungs: Object.fromEntries(SHOWN_RUNGS.map((r) => [r, sub?.rungs?.[r]?.i_can ?? null])) };
+    // At the top rung there is no next one: the top rung's own move keeps the skill sharp.
+    if (row.now === 'excellent') {
+      const move = sub?.rungs?.excellent?.build?.next_move;
+      entry.refine = typeof move === 'string' && move.trim() ? move.trim().replace(/^keep refining:\s*/i, '').replace(/^./, (c) => c.toUpperCase()) : null;
+    }
     const group = skills.find((s) => s.strand === (strand?.name ?? strandId)) ?? (skills.push({ strand: strand?.name ?? strandId, strand_id: strandId, rows: [] }), skills.at(-1));
     group.rows.push(entry);
   }
@@ -149,6 +175,50 @@ export async function skillsFor(store, classId, studentId, strand = null) {
   const pieces = (await studentPieces(store, classId, studentId)).slice(-CHART_MAX);
   const rows = targetKeys(pieces).filter((k) => k.startsWith('skill:') && (!strand || k.startsWith(`skill:${strand}.`))).map((k) => targetRow(pieces, k));
   return { need: null, skills: await skillGroups(store, rows) };
+}
+
+/** How many of the newest pieces "What your feedback keeps saying" looks across. */
+export const FEEDBACK_MAX = 6;
+const FEEDBACK_HITS = 3;
+
+/** The action line a code gives: its strength line for a strength, else its descriptor. */
+export const actionFor = (code, positive) => (positive ? code?.strength_descriptor || code?.descriptor : code?.descriptor) ?? code?.label ?? null;
+
+/**
+ * Hits in the newest 3 pieces against the 3 before. `new`: on the newest 3 and none before.
+ * With no earlier piece the code could be on, there is nothing to compare: `steady`.
+ */
+export function codeTrend(cells) {
+  const hits = (list) => list.filter((c) => c > 0).length;
+  const newest = cells.slice(-3);
+  const before = cells.slice(-6, -3);
+  if (!before.some((c) => c !== null)) return 'steady';
+  const [now, then] = [hits(newest), hits(before)];
+  if (now > 0 && then === 0) return 'new';
+  return now > then ? 'more' : now < then ? 'less' : 'steady';
+}
+
+/**
+ * The code rows over the newest pieces only, each with its trend, where it was marked most
+ * recently (the student's own words and the teacher's note, when there are any) and what to do.
+ */
+export function feedbackRows(pieces, library) {
+  const recent = pieces.slice(-FEEDBACK_MAX);
+  const codes = new Map(library.map((c) => [c.id, c]));
+  const rows = codeGrid(recent, library).map(({ dropped: _dropped, ...r }) => {
+    const c = codes.get(r.code_id);
+    const hits = [];
+    for (const p of [...recent].reverse()) {
+      if (hits.length >= FEEDBACK_HITS) break;
+      if (!p.tags.some((t) => t.code_id === r.code_id && Boolean(t.positive) === r.positive)) continue;
+      const base = { piece_id: p.id, title: p.short || p.title, date: day(p.at) };
+      const marks = (p.marks ?? []).filter((m) => m.code_id === r.code_id && m.positive === r.positive && (m.words || m.note));
+      if (!marks.length) hits.push({ ...base, words: null, note: null });
+      for (const m of marks.slice(0, FEEDBACK_HITS - hits.length)) hits.push({ ...base, words: m.words, note: m.note });
+    }
+    return { ...r, code: c?.code, label: c?.label, colour: c?.colour, trend: codeTrend(r.cells), hits, do: actionFor(c, r.positive) };
+  });
+  return { pieces: recent.map((p) => ({ id: p.id, label: p.short || p.title, date: day(p.at), kind: p.kind })), rows };
 }
 
 /** How many returned vivas the pattern looks across. */
@@ -234,12 +304,13 @@ export async function progressFor(store, roster, student) {
   const grid = codeGrid(pieces, library).map((r) => ({ ...r, code: codes.get(r.code_id)?.code, label: codes.get(r.code_id)?.label, colour: codes.get(r.code_id)?.colour }));
   const next = nextSteps(pieces, library).map((n) => {
     const c = codes.get(n.code_id);
-    const action = n.positive ? c?.strength_descriptor || c?.descriptor : c?.descriptor;
-    return { ...n, code: c?.code, colour: c?.colour, action: action ?? c?.label, ...(c?.resource ? { resource: c.resource } : {}) };
+    return { ...n, code: c?.code, colour: c?.colour, action: actionFor(c, n.positive), ...(c?.resource ? { resource: c.resource } : {}) };
   });
   return {
     pieces: pieces.map((p) => ({ id: p.id, label: p.short || p.title, date: day(p.at), kind: p.kind })),
     outcomes, concepts, skills, codes: grid, next,
+    // `codes` stays across the chart's pieces for the teacher's Over time tab; this is the newest few.
+    feedback: feedbackRows(all, library),
     unseen: backToRead.filter((p) => !p.seen_at).length + notes.filter((d) => !d.seen_at).length,
     // A note isn't a piece, so a student with only notes has no pieces but still has something to open.
     has_returned: backToRead.length + notes.length > 0

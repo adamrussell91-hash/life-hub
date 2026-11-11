@@ -38,7 +38,21 @@ export type MapRow = {
   teaches: Map<string, Depth>;
 };
 
-export type MapItem = { id: string; label: string; title: string; colour: string; group: string; strand?: string };
+/** What a column is: a syllabus, concept or skill line, or one syllabus dot point. */
+export type MapItemKind = 'syllabus' | 'concept' | 'skill' | 'point';
+export type MapItem = {
+  id: string;
+  label: string;
+  title: string;
+  colour: string;
+  group: string;
+  strand?: string;
+  kind: MapItemKind;
+  /** The full name: the line's name, or a dot point's group (Understanding, Responding). */
+  name: string;
+  /** What it means, for students: the line's own words, or a dot point's text. */
+  meaning?: string;
+};
 export type MapGroup = { id: string; name: string; items: MapItem[] };
 export type ItemCoverage = { core: number; optional: number; thin: boolean; first: number };
 
@@ -158,8 +172,11 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     for (const kind of ['U', 'R'] as const) {
       const line = pointLine(kind);
       const colour = line ? lineColour(line.colour) : lineColour(kind === 'U' ? 'wave' : 'navy');
-      const items = points.points.filter((p) => p.kind === kind).map((p) => ({ id: `${points.area}:${p.id}`, label: p.id, title: p.short, colour, group: kind }));
-      if (items.length) groups.push({ id: kind, name: kind === 'U' ? 'Understanding' : 'Responding', items });
+      const name = kind === 'U' ? 'Understanding' : 'Responding';
+      const items = points.points.filter((p) => p.kind === kind).map((p): MapItem => ({
+        id: `${points.area}:${p.id}`, label: p.id, title: p.short, colour, group: kind, kind: 'point', name, ...(p.short.trim() ? { meaning: p.short.trim() } : {})
+      }));
+      if (items.length) groups.push({ id: kind, name, items });
     }
   }
   const lineItem = (l: NetworkLine, group: string): MapItem => ({
@@ -168,7 +185,10 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     title: l.name.trim() || 'Untitled line',
     colour: lineColour(l.colour),
     group,
-    ...(l.alignment?.kind === 'strand' ? { strand: l.alignment.strand } : {})
+    ...(l.alignment?.kind === 'strand' ? { strand: l.alignment.strand } : {}),
+    kind: l.mode === 'train' ? 'syllabus' : l.mode === 'metro' ? 'concept' : 'skill',
+    name: l.name.trim() || 'Untitled line',
+    ...(l.meaning?.trim() ? { meaning: l.meaning.trim() } : {})
   });
   const trains = lines.filter((l) => l.mode === 'train' && !(points?.points.length && l.alignment?.kind === 'points'));
   if (trains.length) groups.push({ id: 'train', name: points?.points.length ? 'Syllabus lines' : 'Syllabus', items: trains.map((l) => lineItem(l, 'train')) });

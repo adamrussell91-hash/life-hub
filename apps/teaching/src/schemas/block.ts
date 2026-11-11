@@ -849,7 +849,9 @@ export const NetworkLineSchema = z.object({
   name: z.string().max(60).default(''),
   short: z.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default('wave'),
-  alignment: LineAlignmentSchema.optional()
+  alignment: LineAlignmentSchema.optional(),
+  /** What the line means, in a sentence: students read it when they press the line's tag on their unit map. */
+  meaning: z.string().max(200).optional()
 });
 /** What kind of session a lesson is, for the student's next-step choices. */
 /** The lessons that can come after this one; more than one is a choice, and the map splits. */

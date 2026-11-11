@@ -1,6 +1,6 @@
 /**
  * Curriculum network data for student endpoints. Only the fields a map needs
- * leave the server: line ids, modes, names and colours; stop line ids and depth.
+ * leave the server: line ids, modes, names, colours and what each means; stop line ids and depth.
  */
 
 const MODES = new Set(['train', 'metro', 'light_rail']);
@@ -43,7 +43,8 @@ export function publicNetworkLines(lines) {
       mode: line.mode,
       name: typeof line.name === 'string' ? line.name.slice(0, 60) : '',
       ...(typeof line.short === 'string' && line.short ? { short: line.short.slice(0, 4) } : {}),
-      colour: typeof line.colour === 'string' ? line.colour : 'wave'
+      colour: typeof line.colour === 'string' ? line.colour : 'wave',
+      ...(typeof line.meaning === 'string' && line.meaning.trim() ? { meaning: line.meaning.trim().slice(0, 200) } : {})
     }));
 }
 

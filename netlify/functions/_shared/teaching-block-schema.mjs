@@ -1784,7 +1784,9 @@ var NetworkLineSchema = z12.object({
   name: z12.string().max(60).default(""),
   short: z12.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default("wave"),
-  alignment: LineAlignmentSchema.optional()
+  alignment: LineAlignmentSchema.optional(),
+  /** What the line means, in a sentence: students read it when they press the line's tag on their unit map. */
+  meaning: z12.string().max(200).optional()
 });
 var AfterLessonIdsSchema = z12.array(z12.string().min(1).max(64)).max(6);
 var LessonRouteRoleSchema = z12.enum(["core", "support", "extension", "optional"]);

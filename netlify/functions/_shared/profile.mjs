@@ -42,15 +42,18 @@ async function unitLessons(store, cls) {
   // Read side by side, kept in unit order.
   const ids = (unit?.lesson_ids ?? []).filter((id) => isSafeId(id));
   const found = await mapBounded(ids, 8, (id) => Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]));
+  /** The unit's assessment lessons, published or not: only id, title and whether published, for the countdown. */
+  const assessments = [];
   for (const [i, id] of ids.entries()) {
     const [lesson, copy] = found[i];
+    if (lesson && lesson.title && !isDeletedRecord(lesson) && lesson.pedagogical_mode === 'assessment') assessments.push({ id, title: String(lesson.title), published: Boolean(copy) });
     // Students only ever see lessons that are published and not trashed.
     if (!lesson || !copy || !lesson.title || isDeletedRecord(lesson)) continue;
     const role = routeRoleOf(unit, lesson);
     lessons.push(role ? { ...lesson, route_role: role } : lesson);
     published.set(id, copy);
   }
-  return { unit, lessons, published };
+  return { unit, lessons, published, assessments };
 }
 
 export async function profileAction(store, classId, body, { now = new Date() } = {}) {
@@ -179,14 +182,14 @@ async function studentView(store, roster, student, t = untimed) {
 async function unitState(store, roster, student, t = untimed) {
   const classId = roster.cls.id;
   // None of the three needs another, so they load side by side.
-  const [{ unit, lessons: unitList, published }, view, done] = await Promise.all([
+  const [{ unit, lessons: unitList, published, assessments }, view, done] = await Promise.all([
     t.time('unit_lessons', () => unitLessons(store, roster.cls)),
     t.time('markbook_view', () => studentView(store, roster, student, t)),
     t.time('done', () => listDone(store, classId, student.id))
   ]);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
   const lessons = lessonsForStudent(unitList, view, done, student.id, classId);
-  return { unit, lessons, published, view, done, rows: mapRows(lessons, view, done, student.id) };
+  return { unit, lessons, published, assessments, view, done, rows: mapRows(lessons, view, done, student.id) };
 }
 
 /** The My progress payload: feedback, the map and the To do panel beside it. The teacher's read gets the same. */
