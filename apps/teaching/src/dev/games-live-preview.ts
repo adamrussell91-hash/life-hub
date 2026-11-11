@@ -178,6 +178,12 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
   if (view === 'live-board') {
     // The room survives a reload of this tab (the dev server reloads on every rules edit); `&fresh=1` starts a new one.
     const fake = createFakeRoom({ room, code: CODE, game: split.public, keys: split.keys, ...(teams ? { teams } : {}), resume: params.get('fresh') !== '1' });
+    if (params.has('fresh')) {
+      // Fresh once: the next reload picks this new room up again.
+      const url = new URL(location.href);
+      url.searchParams.delete('fresh');
+      history.replaceState(history.state, '', url);
+    }
     const sim = el('button', 'gl-btn', 'Simulate class');
     sim.type = 'button';
     sim.addEventListener('click', () => fake.simulate(14));

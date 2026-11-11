@@ -81,6 +81,27 @@ describe('live board', () => {
     expect(pause.hidden).toBe(true);
   });
 
+  it('podium: two teams stand on two steps, winner in the middle, no empty third step', () => {
+    const { root, snap } = board();
+    snap({
+      phase: 'ended',
+      kind: 'jeopardy',
+      style: 'custom',
+      leaderboard: [
+        { initials: 'Otters', score: 1370, rank: 1, team: 1 },
+        { initials: 'Kestrels', score: 420, rank: 2, team: 0 }
+      ],
+      teams: [
+        { team: 0, score: 420, rank: 2, members: ['AB', 'CD'] },
+        { team: 1, score: 1370, rank: 1, members: ['EF', 'GH'] }
+      ]
+    } as Partial<RoomView>);
+    const pods = [...root.querySelectorAll<HTMLElement>('.gl-pod')];
+    expect(pods.map((p) => p.querySelector('.gl-pod__block')?.textContent)).toEqual(['2', '1']);
+    expect(root.querySelector('.gl-pod--p1 .gl-pod__name')?.textContent).toBe('Otters');
+    expect(root.querySelector('.gl-pod--p3')).toBeNull();
+  });
+
   it('Start sends a control with a request id', () => {
     const { root, ws, snap } = board();
     snap({ seats: seats(2) });

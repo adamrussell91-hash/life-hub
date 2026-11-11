@@ -888,6 +888,8 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     const pods: HTMLElement[] = [];
     for (const [i, cls] of order) {
       const r = lb[i];
+      // Two teams (or two players) stand on two steps: no empty third step.
+      if (!r && i > 0) continue;
       const pod = el('div', `gl-pod gl-pod--${cls}`);
       if (r && r.team !== undefined) {
         // Team games: the teams rise, with their members' initials.
