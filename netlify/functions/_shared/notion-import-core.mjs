@@ -4780,7 +4780,7 @@ var FindAWordSchema = z17.object({
   items: z17.array(TermItemSchema).max(GAME_COUNTS.find_a_word.max).default([]),
   /** Optional hidden message spelled by the leftover letters, and the question asked about it. */
   message: z17.object({ text: Text2(GAME_LIMITS.message), question: QuizQuestionDraftSchema.optional() }).optional(),
-  settings: z17.object({ seed: Seed, directions: z17.enum(["easy", "all"]).default("all"), hints: z17.boolean().default(true) }).prefault({})
+  settings: z17.object({ seed: Seed, locked: z17.boolean().default(false), directions: z17.enum(["easy", "all"]).default("all"), hints: z17.boolean().default(true) }).prefault({})
 });
 var JEOPARDY_VALUES = [100, 200, 300, 400, 500];
 var JeopardyTileSchema = z17.object({
@@ -4911,6 +4911,14 @@ var PublicQuestionItemSchema = z17.object({ id: z17.string(), shape: z17.literal
 var PublicQuoteSchema = z17.object({ id: z17.string(), shape: z17.literal("quote"), text: z17.string() });
 var PublicItemSchema = z17.discriminatedUnion("shape", [PublicTermSchema, PublicQuestionItemSchema, PublicQuoteSchema]);
 var PublicWallSchema = z17.object({ id: z17.string(), title: z17.string(), tiles: z17.array(z17.object({ id: z17.string(), text: z17.string() })) });
+var PublicCrosswordGridSchema = z17.object({
+  kind: z17.literal("crossword"),
+  width: z17.number().int(),
+  height: z17.number().int(),
+  entries: z17.array(z17.object({ item: z17.string(), number: z17.number().int(), dir: z17.enum(["across", "down"]), x: z17.number().int(), y: z17.number().int(), length: z17.number().int() }))
+});
+var PublicWordGridSchema = z17.object({ kind: z17.literal("wordsearch"), size: z17.number().int(), rows: z17.array(z17.string()) });
+var PublicGridSchema = z17.discriminatedUnion("kind", [PublicCrosswordGridSchema, PublicWordGridSchema]);
 var PublicGameSchema = z17.object({
   id: z17.string(),
   title: z17.string(),
@@ -4925,7 +4933,9 @@ var PublicGameSchema = z17.object({
   items: z17.array(PublicItemSchema).optional(),
   walls: z17.array(PublicWallSchema).optional(),
   cast: z17.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
-  message: z17.object({ length: z17.number().int(), question: z17.record(z17.string(), z17.unknown()).optional() }).optional()
+  message: z17.object({ length: z17.number().int(), question: z17.record(z17.string(), z17.unknown()).optional() }).optional(),
+  /** Crossword and find-a-word: the grid, built at publish. */
+  grid: PublicGridSchema.optional()
 });
 var PublicGameLessonSchema = z17.object({
   games: z17.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -4939,6 +4949,7 @@ function normaliseAnswer(value) {
   return norm(String(value ?? "")).normalize("NFD").replace(/\p{M}+/gu, "").replace(/^(?:a|an|the)\s+/, "").replace(/[\s\-‐-―_]+/g, "");
 }
 var gridWord = (term) => normaliseAnswer(term).toUpperCase();
+var messageLetters = (text2) => String(text2 ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toUpperCase().replace(/[^A-Z]/g, "");
 function gameItems(game) {
   switch (game.kind) {
     case "crossword":
@@ -5060,8 +5071,7 @@ function gameIssues(lesson) {
     switch (game.kind) {
       case "find_a_word": {
         if (game.message?.text.trim()) {
-          const letters = gridWord(game.message.text);
-          if (!/^[A-Z]+$/.test(letters)) out.push(`${where2}: the hidden message needs letters only.`);
+          if (!messageLetters(game.message.text)) out.push(`${where2}: the hidden message needs some letters A to Z.`);
           if (game.message.question) {
             const problem = questionProblem({ id: "message", shape: "question", question: game.message.question, pieces: [], outcomes: [], skills: [], tech: [] });
             if (problem) out.push(`${where2}: the hidden message question needs finishing: ${problem}.`);

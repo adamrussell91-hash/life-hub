@@ -514,13 +514,17 @@ function shuffled<T>(list: readonly T[], random: Random): T[] {
 function freshIds(random: Random): () => string {
   const used = new Set<string>();
   return () => {
-    for (;;) {
+    for (let attempt = 0; attempt < 20; attempt++) {
       const id = Array.from({ length: 8 }, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(random() * 31)]).join('');
       if (!used.has(id)) {
         used.add(id);
         return id;
       }
     }
+    // A stuck random source (a test constant): fall back to a counter so this never loops forever.
+    const id = `t${used.size.toString(36).padStart(7, '0')}`;
+    used.add(id);
+    return id;
   };
 }
 

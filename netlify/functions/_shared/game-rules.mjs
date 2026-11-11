@@ -1842,13 +1842,16 @@ function shuffled2(list, random) {
 function freshIds(random) {
   const used = /* @__PURE__ */ new Set();
   return () => {
-    for (; ; ) {
-      const id = Array.from({ length: 8 }, () => "abcdefghjkmnpqrstuvwxyz23456789"[Math.floor(random() * 31)]).join("");
-      if (!used.has(id)) {
-        used.add(id);
-        return id;
+    for (let attempt2 = 0; attempt2 < 20; attempt2++) {
+      const id2 = Array.from({ length: 8 }, () => "abcdefghjkmnpqrstuvwxyz23456789"[Math.floor(random() * 31)]).join("");
+      if (!used.has(id2)) {
+        used.add(id2);
+        return id2;
       }
     }
+    const id = `t${used.size.toString(36).padStart(7, "0")}`;
+    used.add(id);
+    return id;
   };
 }
 function termKey(item) {
