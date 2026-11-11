@@ -6657,6 +6657,11 @@ ul.block-faded__choices { display: block; padding-left: var(--space-4); }
   font-size: var(--text-md);
 }
 
+/* A new line in the text starts a new line on the page, so a numbered list stays a list. */
+.block-cloze__sentence {
+  white-space: pre-line;
+}
+
 .block-cloze__blank {
   min-width: 3ch;
   max-width: 100%;
