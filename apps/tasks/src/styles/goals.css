@@ -289,3 +289,36 @@ textarea.goal-field { resize: vertical; min-height: 3.5rem; }
 .goals-empty { padding: var(--space-5); margin: var(--space-4) 0; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
 .runway__empty-lane { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
 .goals-plan-sheet .btn, .goals-checkin-sheet .btn, .runway__row { min-height: 2.75rem; }
+
+/* Six structure pills no longer fit one row at 390: let them wrap inside the card (R2, R5). */
+.goal-card > .hub-pills { max-width: 100%; flex-wrap: wrap; }
+
+/* Mandala structure: goal centre, eight pillars, eight actions per pillar.
+ * Always a 3×3 grid, phone included: the shape is the point. */
+.mandala { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.mandala__summary { margin: 0; }
+.mandala__bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.mandala__project { font: inherit; font-size: var(--text-sm); max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-xs); padding: var(--space-1) var(--space-2); background: var(--glass); color: inherit; }
+.mandala__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.mandala__cell { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--glass); min-width: 0; }
+.mandala__cell--centre { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); border-color: transparent; justify-content: center; align-items: center; text-align: center; }
+.mandala__cell--pillar { background: var(--pastel-sage); color: var(--pastel-sage-ink); border-color: transparent; }
+.mandala__centre-text { font-weight: var(--weight-bold); overflow-wrap: anywhere; }
+textarea.mandala__input { min-height: 0; resize: none; overflow: hidden; field-sizing: content; hyphens: auto; overflow-wrap: break-word; font-size: var(--text-sm); background: rgba(255, 255, 255, 0.6); }
+.mandala__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: auto; }
+.mandala__open { font-size: var(--text-2xs); padding: var(--space-1) var(--space-2); margin-left: auto; }
+.mandala__open:disabled { opacity: 0.5; cursor: default; }
+.mandala__promote { font: inherit; font-size: var(--text-2xs); max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-xs); background: transparent; color: var(--muted); padding: 0 var(--space-1); }
+.mandala__chip { font-size: var(--text-2xs); font-weight: var(--weight-bold); padding: 0 var(--space-2); border-radius: var(--radius-full); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mandala__chip--project { background: rgba(255, 255, 255, 0.7); }
+.mandala__chip--empty { color: var(--muted); font-weight: normal; }
+.mandala__chip--lead { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.mandala__chip--task { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+
+@media (max-width: 719px) {
+  .mandala__grid { gap: var(--space-1); }
+  .mandala__cell { padding: var(--space-1); }
+  /* 16px stops iOS zooming into the field (R4). */
+  textarea.mandala__input, .mandala__project, .mandala__promote { font-size: 16px; }
+  .mandala__open { margin-left: 0; width: 100%; min-height: 2.75rem; }
+}

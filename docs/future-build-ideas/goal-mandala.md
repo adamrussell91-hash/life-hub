@@ -51,6 +51,16 @@ mandala: {
 - Should the Sunday check-in or weekly review ever surface an empty pillar, or is that nagging?
 - Is a 3×3 of eight pillars too many for small goals? Allow fewer, or keep eight as the prompt to stretch?
 
+## Built (11 November 2026, first slice)
+
+- **Mandala** is a sixth structure on the goal page. The card shows a 3×3 of the goal and its eight pillars; "n/8 actions →" opens a pillar as its own 3×3. The open pillar survives saves.
+- Each named pillar shows the project behind it, or "No project yet". The pillar view has a project picker listing the goal's hosted projects. The summary line counts named pillars and pillars with a project.
+- An action can be used as the **lead measure** (asks before replacing an existing one; only one cell holds it) or as a **task on this goal** (creates the task, then records its id). A chip shows what the cell became, and only while that still holds: a changed lead measure or a deleted task frees the cell again.
+- Data: `frame.mandala.pillars[]` (`id`, `label`, `project_id`, `actions[]` with `promoted: { kind: 'lead' | 'task', task_id } | null`), normalised on the server to at most eight of each with blank cells kept in place.
+- Not built: promotion to the if-then (it needs a cue the grid does not hold), Hammond suggestions, and an answer to the open question on structure vs step.
+- Files: `apps/tasks/src/views/goal-mandala.ts`, `goal-frame.ts`, `goal-page.ts`, `schemas/goal.ts`, `styles/goals.css`, `netlify/functions/_shared/goal-record.mjs`; tests in `apps/tasks/tests/unit/goal-mandala.test.ts` and `tests/unit/goal-record.test.js`.
+
 ## History
 
 - 11 November 2026: concept doc created from a discussion of the Harada 9×9 chart and how it fits the Goals design.
+- 11 November 2026: first slice built (see Built).

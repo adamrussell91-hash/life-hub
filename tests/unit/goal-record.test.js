@@ -115,3 +115,35 @@ test('invalid enums fall back and a half-filled lead measure is null', () => {
   assert.equal(goal.structure, 'woop');
   assert.equal(goal.lead_measure, null);
 });
+
+test('mandala frame keeps grid positions, caps at eight and cleans promotions', () => {
+  const nine = Array.from({ length: 9 }, (_, i) => ({ label: `P${i + 1}` }));
+  nine[1] = { label: '  ', actions: [] };
+  nine[0] = {
+    id: 'base',
+    label: ' Base mileage ',
+    project_id: 'proj1',
+    actions: [
+      { label: 'Easy runs', promoted: { kind: 'task', task_id: 't1' } },
+      { label: '' },
+      { label: 'Long run', promoted: { kind: 'lead', task_id: 'ignored' } },
+      { label: 'x', promoted: { kind: 'habit' } },
+      ...Array.from({ length: 6 }, () => ({ label: 'extra' }))
+    ]
+  };
+  const goal = normalizeGoalRecord({ id: 'g', title: 'g', structure: 'mandala', frame: { mandala: { pillars: nine } } });
+  assert.equal(goal.structure, 'mandala');
+  const pillars = goal.frame.mandala.pillars;
+  assert.equal(pillars.length, 8);
+  assert.equal(pillars[1].label, '');
+  assert.equal(pillars[2].id, 'p3');
+  const base = pillars[0];
+  assert.equal(base.id, 'base');
+  assert.equal(base.label, 'Base mileage');
+  assert.equal(base.project_id, 'proj1');
+  assert.equal(base.actions.length, 8);
+  assert.deepEqual(base.actions[0], { id: 'basea1', label: 'Easy runs', promoted: { kind: 'task', task_id: 't1' } });
+  assert.equal(base.actions[1].label, '');
+  assert.deepEqual(base.actions[2].promoted, { kind: 'lead', task_id: null });
+  assert.equal(base.actions[3].promoted, null);
+});

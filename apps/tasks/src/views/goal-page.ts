@@ -8,6 +8,7 @@ import { errorMessage, showViewLoading } from '@/views/feedback';
 import { createHubPills, el } from '@/views/hub-kit';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { renderGoalFrame, type GoalPatch } from '@/views/goal-frame';
+import { mandalaHasContent, type MandalaContext } from '@/views/goal-mandala';
 import { startFocusStrip } from '@/views/focus-strip';
 import { directTasks, hostedProjects, hostedTasks, isOpenTask, projectProgress, SPHERE_DOMAIN, SPHERE_LABEL } from '@/domain/goal-hosting';
 import { cellState, currentTerm, flattenTerms, sydneyToday, termWeeks, weekCount } from '@/domain/goal-runway';
@@ -35,7 +36,8 @@ const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
   { id: 'smarter', label: 'SMARTER' },
   { id: 'okr', label: 'OKR' },
   { id: 'lead_lag', label: 'Lead / lag' },
-  { id: 'floor_target_stretch', label: 'Floor · target · stretch' }
+  { id: 'floor_target_stretch', label: 'Floor · target · stretch' },
+  { id: 'mandala', label: 'Mandala' }
 ];
 const STATUSES: Array<{ id: Goal['status']; label: string }> = [
   { id: 'active', label: 'Active' },
@@ -405,11 +407,21 @@ function paint(
   // G-23 Structure card with morph + Details disclosure for other structures
   const structure = card('Structure');
   const frameHost = el('div', 'goal-frame-host');
-  frameHost.append(renderGoalFrame(goal, (patch) => void save(patch)));
+  const mandalaCtx: MandalaContext = {
+    projects: hostedProjects(goal, projects).map((p) => ({ id: p.id, title: p.title })),
+    tasks: tasks.map((t) => ({ id: t.id, status: t.status })),
+    onPromoteTask: (label, patchFor) =>
+      void tasksApi
+        .createTask({ title: label, domain: SPHERE_DOMAIN[goal.sphere], parent_goal_id: goal.id })
+        .then((created) => tasksApi.updateGoal(goal.id, patchFor(created.id)))
+        .then(reload)
+        .catch((err) => window.alert(errorMessage(err)))
+  };
+  frameHost.append(renderGoalFrame(goal, (patch) => void save(patch), mandalaCtx));
   if (goal.structure === 'okr' || goal.structure === 'floor_target_stretch') {
     frameHost.append(currentSourcePicker(goal, hosted, save));
   }
-  const details = otherStructureDetails(goal, save);
+  const details = otherStructureDetails(goal, save, mandalaCtx);
   structure.root.append(
     createHubPills({
       label: 'Structure',
@@ -511,7 +523,7 @@ function currentSourcePicker(goal: Goal, hosted: Task[], save: (p: Partial<Goal>
   return wrap;
 }
 
-function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
+function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void, mandalaCtx: MandalaContext = {}): HTMLElement {
   const others = STRUCTURES.filter((s) => s.id !== goal.structure);
   const filled = others.filter((s) => structureHasContent(goal, s.id));
   if (!filled.length) {
@@ -528,7 +540,7 @@ function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void): HTMLEl
     const block = el('div', 'goal-details__block');
     block.append(el('p', 'goal-frame__label', s.label));
     const preview = el('div', 'goal-details__preview');
-    preview.append(renderGoalFrame({ ...goal, structure: s.id }, save));
+    preview.append(renderGoalFrame({ ...goal, structure: s.id }, save, mandalaCtx));
     block.append(preview);
     disc.body.append(block);
   }
@@ -550,6 +562,8 @@ function structureHasContent(goal: Goal, structure: Goal['structure']): boolean 
       const x = f.floor_target_stretch;
       return Boolean(x && (x.unit?.trim() || x.floor != null || x.target != null || x.stretch != null || x.current != null));
     }
+    case 'mandala':
+      return mandalaHasContent(goal);
   }
 }
 
