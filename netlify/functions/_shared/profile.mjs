@@ -141,7 +141,17 @@ function phaseTimer() {
   const started = Date.now();
   const phases = {};
   const blobs = { get: 0, get_ms: 0, get_slowest: 0, list: 0, list_ms: 0, list_slowest: 0 };
-  const count = (kind, ms) => {
+  /** Reads and listings by the kind of thing they fetch: `quiz/attempts`, `lessons`, `piece_feedback`. */
+  const kinds = {};
+  const kindOf = (key) => {
+    const parts = String(key ?? '').split('/');
+    if (parts[0] === 'quiz' && parts[2]) return `quiz/${parts[2]}`;
+    if (parts[0] === 'published' && parts[1]) return `published/${parts[1]}`;
+    return parts[0] || '?';
+  };
+  const count = (kind, ms, key) => {
+    const name = `${kind} ${kindOf(key)}`;
+    kinds[name] = (kinds[name] ?? 0) + 1;
     blobs[kind] += 1;
     blobs[`${kind}_ms`] += ms;
     blobs[`${kind}_slowest`] = Math.max(blobs[`${kind}_slowest`], ms);
@@ -167,12 +177,12 @@ function phaseTimer() {
           try {
             return await target[prop](...args);
           } finally {
-            count(prop, Date.now() - at);
+            count(prop, Date.now() - at, prop === 'get' ? args[0] : args[0]?.prefix);
           }
         };
       }
     }),
-    report: () => ({ total_ms: Date.now() - started, phases, blobs })
+    report: () => ({ total_ms: Date.now() - started, phases, blobs, kinds: Object.fromEntries(Object.entries(kinds).sort((a, b) => b[1] - a[1])) })
   };
 }
 
