@@ -339,6 +339,17 @@ export const teamMatchRules: RoomRules<TeamMatchState> = {
   },
   view(ctx, k, role, owner) {
     return teamMatchView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    // DEV ONLY: the holder taps after some talk; now and then a teammate taps a near miss.
+    const team = ctx.seat(owner)?.team;
+    const round = team === undefined ? null : (k.teams[team]?.round ?? null);
+    const hand = round?.hands[owner];
+    if (!round || !hand?.length || k.phase !== 'race') return null;
+    if (hand.includes(round.right)) return ctx.random() < 0.35 ? { move: { item: round.item, move: 'tap', response: { option: round.right } } } : null;
+    // About one near miss a team for every few right taps, however big the team.
+    const others = Math.max(1, Object.keys(round.hands).length - 1);
+    return ctx.random() < 0.05 / others ? { move: { item: round.item, move: 'tap', response: { option: hand[Math.floor(ctx.random() * hand.length)] } } } : null;
   }
 };
 

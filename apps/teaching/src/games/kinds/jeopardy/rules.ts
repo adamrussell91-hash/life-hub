@@ -393,8 +393,42 @@ export const jeopardyRules: RoomRules<JeopardyState> = {
   },
   view(ctx, k, role, owner) {
     return jeopardyView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    const seat = ctx.seat(owner);
+    if (!seat || seat.team === undefined) return null;
+    const captain = captainOf(ctx, k, seat.team) === owner;
+    if (k.phase === 'pick' && captain && pickingTeam(ctx, k) === seat.team) {
+      const free = tiles(ctx).filter((t) => !k.used[t.id]);
+      const t = free[Math.floor(ctx.random() * free.length)];
+      if (!t) return null;
+      return { control: { name: k.aim === t.id || ctx.random() < 0.5 ? 'pick' : 'aim', data: { tile: k.aim && !k.used[k.aim] ? k.aim : t.id } } };
+    }
+    if (k.phase === 'wager' && captain && k.cur?.team === seat.team) return { control: { name: 'wager', data: { amount: Math.round(((k.cur.max_wager ?? 100) * (0.3 + ctx.random() * 0.5)) / 100) * 100 } } };
+    if (k.phase === 'final_wager' && captain && k.final && k.final.wagers[seat.team] === undefined) return { control: { name: 'wager', data: { amount: Math.round((finalMax(ctx, seat.team) * ctx.random()) / 10) * 10 } } };
+    const open = k.phase === 'clue' ? k.cur : k.phase === 'final_clue' ? k.final : null;
+    if (!open || open.answers[owner]) return null;
+    return { move: { item: open.item, move: 'answer', response: botResponse(ctx, open.item, ctx.random() < 0.65) } };
   }
 };
+
+/** DEV ONLY: a simulated classmate's answer, right or a plausible miss. */
+function botResponse(ctx: RulesCtx, item: string, right: boolean): unknown {
+  const key = ctx.keys.items[item];
+  if (key?.shape === 'term') return { text: right ? key.answers[0] : (key.decoys[0] ?? 'not sure') };
+  if (key?.shape === 'question') {
+    const a = key.key.answer;
+    const pub = itemOf(ctx, item);
+    const q = (pub?.shape === 'question' ? pub.question : {}) as { options?: Array<{ id: string }> };
+    if (a.type === 'choice') {
+      const wrong = (q.options ?? []).map((o) => o.id).filter((id) => !a.ids.includes(id));
+      return { selected: right || !wrong.length ? a.ids : [wrong[Math.floor(ctx.random() * wrong.length)]] };
+    }
+    if (a.type === 'boolean') return { value: right ? a.value : !a.value };
+    if (a.type === 'text') return { text: right ? (a.accepted[0] ?? '') : 'not sure' };
+  }
+  return { text: '' };
+}
 
 /* ── Views ───────────────────────────────────────────────────────── */
 

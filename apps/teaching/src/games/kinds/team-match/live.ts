@@ -377,12 +377,17 @@ export function teamMatchPhone(host: HTMLElement, api: KindViewApi): KindView {
   }
 
   function strip(k: TeamMatchView): HTMLElement {
-    const s = el('div', 'tmp-strip');
-    s.style.setProperty('--n', String(Math.max(1, k.me?.mates.length ?? 1)));
+    const n = Math.max(1, k.me?.mates.length ?? 1);
+    // Big teams (a small class split two ways): number only, and the strip scrolls sideways.
+    const s = el('div', `tmp-strip${n > 5 ? ' tight' : ''}`);
+    s.style.setProperty('--n', String(n));
     for (const m of k.me?.mates ?? []) {
       const c = el('div', `tmp-mate ${m.me ? 'me' : ''} ${m.connected ? '' : 'off'}`.trim());
       c.dataset.ini = m.initials;
-      c.append(avatar(m.initials), el('b', '', m.me ? 'You' : m.initials), el('span', '', m.connected ? `${m.options} answer${m.options === 1 ? '' : 's'}` : 'Away'));
+      const count = el('span', '', m.connected ? String(m.options) : 'Away');
+      if (m.connected) count.append(el('i', '', ` answer${m.options === 1 ? '' : 's'}`));
+      c.title = m.connected ? `${m.initials}: ${m.options} answer${m.options === 1 ? '' : 's'}` : `${m.initials}: away`;
+      c.append(avatar(m.initials), el('b', '', m.me ? 'You' : m.initials), count);
       s.append(c);
     }
     return s;

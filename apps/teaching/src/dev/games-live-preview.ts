@@ -10,6 +10,7 @@ import { apiPost } from '@/api/client';
 import { deviceToken } from '@/quiz/dom';
 import '@/games/kinds';
 import { FIND_A_WORD } from '../../scripts/mock-grid-games';
+import { TEAM_GAMES } from '../../scripts/mock-team-games';
 
 /**
  * Dev walk for live games, without the Worker (games/live/fake-room.ts).
@@ -147,6 +148,7 @@ const LESSON: { games: Game[] } = {
     }
   ].map((g) => GameSchema.parse(g))
 };
+LESSON.games.push(...TEAM_GAMES.map((g) => GameSchema.parse(g)));
 
 export function mountLivePreview(mount: HTMLElement, view: string): void {
   const params = new URLSearchParams(location.search);
