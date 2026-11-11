@@ -86,6 +86,14 @@
 /* Practice */
 .kos-card { background: var(--ko-card); border: 1px solid var(--ko-line); border-radius: var(--ko-r); padding: 20px; display: grid; gap: 12px; max-width: 560px; width: 100%; margin: 0 auto; }
 .kos-card__from { margin: 0; font-size: 12px; font-weight: 600; color: var(--ko-muted); }
+.kos-card__from { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.kos-boxchip { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; line-height: 1.5; border: 1px solid transparent; }
+.kos-boxchip.is-new { background: var(--ko-card); border-color: var(--ko-line); color: var(--ko-muted); }
+.kos-boxchip.is-b1 { background: #eaf1fa; color: #2c5a94; }
+.kos-boxchip.is-b2 { background: #d6e4f5; color: #24508a; }
+.kos-boxchip.is-b3 { background: #9fbde3; color: #13233a; }
+.kos-boxchip.is-b4 { background: #376fb7; color: #fff; }
+.kos-boxchip.is-b5 { background: #17375e; color: #fff; }
 .kos-card__top { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-start; justify-content: space-between; }
 .kos-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .kos-hist__item { display: grid; justify-items: center; gap: 2px; }
