@@ -82,7 +82,11 @@ export type RoomRules<K = any> = {
   tick?(ctx: RulesCtx, k: K): void;
   /** Called when the teacher ends the game (before fold): reveal anything open, award final points. */
   finish?(ctx: RulesCtx, k: K): void;
-  /** A seat joined late or reconnected (e.g. redeal team match options). */
+  /**
+   * A seat joined late, reconnected, dropped (`seat.connected` false) or was
+   * removed by the teacher (`ctx.seat(owner)` undefined), while the game is
+   * playing or paused (e.g. redeal team match options).
+   */
   seatChanged?(ctx: RulesCtx, k: K, owner: string): void;
   /**
    * The kind's part of each viewer's view (RoomView.kind_view). Must never

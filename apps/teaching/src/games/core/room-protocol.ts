@@ -59,10 +59,11 @@ export type RoomConfig = {
   game: PublicGame;
   /** The game's server-only keys, as stored by `storeGameKeys` (record.games[game_id]). */
   keys: unknown;
-  style: 'race' | 'paced';
+  /** 'custom': the kind's own rules (core/room-rules.ts) run the game; room-core keeps seats, teams, timers and fold. */
+  style: RoomStyle;
   /** Roster seats allowed in: student id → initials. Only these may hold a student ticket. */
   roster: Record<string, string>;
-  /** Team games only (later phases). */
+  /** Team games only (kinds whose rules set `teams`): how many teams. Default from the rules. */
   teams?: { count: number };
   /** Seconds per item for paced games (default 20). */
   item_seconds?: number;
@@ -72,6 +73,11 @@ export type RoomConfig = {
 };
 
 // ─────────────────────────────────────────────────────────────── state
+
+export type RoomStyle = 'race' | 'paced' | 'custom';
+
+/** A team as every viewer may see it: number (0-based), score, members' initials (students get only their own team's), rank. */
+export type TeamView = { team: number; score: number; members: string[]; rank: number };
 
 export type Phase = 'lobby' | 'countdown' | 'playing' | 'paused' | 'ended' | 'folded';
 
@@ -108,7 +114,7 @@ export type RoomView = {
   room: string;
   code: string;
   kind: GameKind;
-  style: 'race' | 'paced';
+  style: RoomStyle;
   title: string;
   phase: Phase;
   /** Server time this view was made (ms), for the client's clock offset. */
@@ -119,8 +125,15 @@ export type RoomView = {
   /** Race: "first to solve" ticker, newest first, max 8. Never names an answer before the reveal. */
   ticker: Array<{ initials: string; text: string; at: number }>;
   item?: PacedItem;
-  /** Top 5 for individual games; teams for team games. Teacher and board get every rank in `seats`. */
-  leaderboard: Array<{ initials: string; score: number; rank: number }>;
+  /**
+   * Top 5 for individual games; teams for team games (one row per team:
+   * `initials` is "Team 1", `team` is its number). Teacher and board get every rank in `seats`.
+   */
+  leaderboard: Array<{ initials: string; score: number; rank: number; team?: number }>;
+  /** Team games: every team with its score and rank (members as initials; students see only their own team's members). */
+  teams?: TeamView[];
+  /** Style 'custom': the kind's own part of this viewer's view (`RoomRules.view`). Never keys; students get only their own slice. */
+  kind_view?: unknown;
   /** Only in the viewer's own copy. `restore` comes only in the snapshot a seat gets when it connects (race games). */
   you?: { owner: string; seat?: Seat; last?: EventResult; rank?: number; restore?: SeatRestore };
   /** Board's Class wall for Connections: anonymous confusion pairs (tile text pair → count). */
@@ -162,7 +175,7 @@ export type ClientMsg =
   | { t: 'move'; rid?: string; event: SoloEvent }
   /** Race: the student's player said it's finished. */
   | { t: 'finish'; rid?: string }
-  /** Teacher / board only. */
+  /** Teacher / board; students only `{ op: 'kind' }` (the kind's rules decide what a student may do). */
   | { t: 'control'; rid?: string; op: ControlOp };
 
 export type ControlOp =
@@ -174,7 +187,13 @@ export type ControlOp =
   | { op: 'add_time'; seconds: number }
   | { op: 'kick'; owner: string }
   | { op: 'board_view'; view: 'race' | 'class_wall' }
-  | { op: 'end' };
+  | { op: 'end' }
+  /** Style 'custom': a kind control (teacher/board button, or a phone action such as a captain's pick), handed to `RoomRules.control`. */
+  | { op: 'kind'; name: string; data?: unknown }
+  /** Team games, in the lobby: move one seat to another team (0-based). */
+  | { op: 'move_team'; owner: string; team: number }
+  /** Team games, in the lobby: deal everyone into teams again at random (seeded). */
+  | { op: 'shuffle_teams' };
 
 /** Room → client. */
 export type ServerMsg =
@@ -227,6 +246,12 @@ export type RoomState = {
   at?: number;
   /** When play began (countdown ended). */
   started_at?: number;
+  /** Style 'custom': the kind's own state (`RoomRules.init`), persisted with the room. Plain JSON. */
+  custom?: unknown;
+  /** Team games: each team's score (team number → points). */
+  team_scores?: Record<number, number>;
+  /** Seeded random state for `RulesCtx.random` (mulberry32), so replays are deterministic. */
+  rng?: number;
 };
 
 /**
@@ -267,6 +292,8 @@ export type FoldPayload = {
   ended_at: number;
   strength: Extract<Strength, 'live_solo' | 'live_team'>;
   seats: Array<{ owner: string; student_id?: string; initials: string; team?: number; score: number }>;
+  /** Team games: final team scores (team number → points). */
+  team_scores?: Record<number, number>;
   events: GameEvent[];
 };
 

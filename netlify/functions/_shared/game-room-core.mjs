@@ -1137,6 +1137,15 @@ var ROOM_LIMITS = {
   leaderboardTop: 5
 };
 
+// apps/teaching/src/games/core/room-rules.ts
+var registry = /* @__PURE__ */ new Map();
+function registerRules(rules) {
+  registry.set(rules.kind, rules);
+}
+function rulesFor(kind) {
+  return registry.get(kind);
+}
+
 // apps/teaching/src/games/core/room-core.ts
 var RACE_KINDS = /* @__PURE__ */ new Set(["crossword", "find_a_word", "connections"]);
 var PACED_KINDS = /* @__PURE__ */ new Set(["who_said_it"]);
@@ -1148,7 +1157,20 @@ var CLASS_WALL_MAX = 8;
 function roomStyle(kind) {
   if (RACE_KINDS.has(kind)) return "race";
   if (PACED_KINDS.has(kind)) return "paced";
+  if (rulesFor(kind)) return "custom";
   return null;
+}
+function roomTeams(kind) {
+  if (RACE_KINDS.has(kind) || PACED_KINDS.has(kind)) return null;
+  const t = rulesFor(kind)?.teams;
+  return t ? { ...t } : null;
+}
+var rulesOf = (s) => s.config.style === "custom" ? rulesFor(s.config.game.kind) : void 0;
+function teamCount(s) {
+  const t = rulesOf(s)?.teams;
+  if (!t) return 0;
+  const raw = Math.round(Number(s.config.teams?.count ?? t.default));
+  return Math.max(t.min, Math.min(t.max, Number.isFinite(raw) ? raw : t.default));
 }
 var keysOf = (s) => s.config.keys;
 var isStudent = (role) => role === "student";
@@ -1157,8 +1179,24 @@ function itemSeconds(s) {
   const raw = Number(s.config.item_seconds ?? s.config.game.settings?.seconds);
   return Number.isFinite(raw) && raw > 0 ? Math.max(5, Math.min(300, Math.round(raw))) : ROOM_LIMITS.pacedSeconds;
 }
+function seedOf(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+function nextRandom(s) {
+  const a = (s.rng ?? 0) + 1831565813 >>> 0;
+  s.rng = a;
+  let t = a;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
 function initialState(config, now) {
-  return {
+  const s = {
     config,
     phase: "lobby",
     seq: 0,
@@ -1174,8 +1212,125 @@ function initialState(config, now) {
     rate: {},
     last: {},
     first: {},
-    at: now
+    at: now,
+    rng: seedOf(config.room)
   };
+  const rules = rulesOf(s);
+  if (rules) {
+    if (rules.teams) s.team_scores = {};
+    const k = safe(() => rules.init(rulesCtx(s, now, null)));
+    s.custom = isRulesError(k) ? {} : k;
+  }
+  return s;
+}
+var isRulesError = (x) => !!x && typeof x === "object" && "error" in x && !!x.error && typeof x.error.code === "string";
+var SNAG = { error: { code: "rules_failed", message: "The game hit a snag. Try that again." } };
+function safe(fn) {
+  try {
+    return fn();
+  } catch {
+    return SNAG;
+  }
+}
+var teamsInUse = (s) => [...new Set(Object.values(s.seats).map((x) => x.team).filter((t) => t !== void 0))].sort((a, b) => a - b);
+function smallestTeam(s, count) {
+  const size = new Array(count).fill(0);
+  for (const seat of Object.values(s.seats)) if (seat.team !== void 0 && seat.team < count) size[seat.team] += 1;
+  let best = 0;
+  for (let t = 1; t < count; t += 1) if (size[t] < size[best]) best = t;
+  return best;
+}
+function fillTeams(s) {
+  const count = teamCount(s);
+  if (!count) return;
+  for (const seat of Object.values(s.seats)) if (seat.team === void 0 || seat.team >= count) seat.team = smallestTeam(s, count);
+}
+function shuffleTeams(s) {
+  const count = teamCount(s);
+  if (!count) return;
+  const seats = Object.values(s.seats);
+  for (let i = seats.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(nextRandom(s) * (i + 1));
+    [seats[i], seats[j]] = [seats[j], seats[i]];
+  }
+  seats.forEach((seat, i) => seat.team = i % count);
+}
+function rulesCtx(s, now, fx) {
+  const write = fx !== null;
+  const keys = keysOf(s);
+  const teamOf = (owner) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
+  const store = (owner, event) => {
+    const history = s.history[owner] ??= [];
+    if (history.length >= PLAY_EVENTS_MAX) return false;
+    const team = teamOf(owner);
+    history.push({ ...event, ...team !== void 0 ? { team: String(team) } : {}, seq: history.length });
+    return true;
+  };
+  const view = { rng: s.rng };
+  return {
+    now,
+    config: s.config,
+    game: s.config.game,
+    keys,
+    random: () => write ? nextRandom(s) : nextRandom(view),
+    seats: () => Object.values(s.seats),
+    seat: (owner) => s.seats[owner],
+    teams: () => teamsInUse(s),
+    members: (team) => Object.values(s.seats).filter((x) => x.team === team).map((x) => x.owner),
+    mark(owner, event, strength = "live_solo") {
+      const history = s.history[owner] ?? [];
+      if (write && history.length >= PLAY_EVENTS_MAX) return { error: { code: "too_many", message: "This game has had enough answers." } };
+      const who = { play_id: s.config.room, owner, ...s.students?.[owner] ? { student_id: s.students[owner] } : {}, strength };
+      const out = markMove(s.config.game, keys, history, event, now, who);
+      if (out.error) return { error: { code: "bad_item", message: "That isn\u2019t in this game." } };
+      if (write && out.stored) store(owner, out.stored);
+      return { result: out.result, stored: out.stored ? { ...out.stored } : null };
+    },
+    record(owner, event) {
+      if (!write) return;
+      const { strength, ...rest } = event;
+      store(owner, { ...rest, at: now, game: keys.kind, play_id: s.config.room, owner, ...s.students?.[owner] ? { student_id: s.students[owner] } : {}, strength: strength ?? "live_solo" });
+    },
+    addScore(owner, points) {
+      const seat = s.seats[owner];
+      if (write && seat && Number.isFinite(points)) seat.score += points;
+    },
+    setScore(owner, points) {
+      const seat = s.seats[owner];
+      if (write && seat && Number.isFinite(points)) seat.score = points;
+    },
+    addTeamScore(team, points) {
+      if (!write || !Number.isFinite(points)) return;
+      const scores = s.team_scores ??= {};
+      scores[team] = (scores[team] ?? 0) + points;
+    },
+    teamScore: (team) => s.team_scores?.[team] ?? 0,
+    setProgress(owner, progress) {
+      const seat = s.seats[owner];
+      if (!write || !seat) return;
+      if (progress) seat.progress = progress;
+      else delete seat.progress;
+    },
+    ticker(text, initials) {
+      if (!write) return;
+      s.ticker.unshift({ initials: initials ?? "", text: String(text).slice(0, 120), at: now });
+      s.ticker.length = Math.min(s.ticker.length, TICKER_MAX);
+    },
+    send(owner, msg) {
+      if (write) fx.push({ kind: "send", owner, msg });
+    },
+    setTimer(endsAt) {
+      if (write) s.ends_at = endsAt !== void 0 && Number.isFinite(endsAt) ? endsAt : void 0;
+    },
+    end() {
+      if (write) endGame(s, now, fx, { finish: false });
+    }
+  };
+}
+function runRules(s, now, fx, hook) {
+  const rules = rulesOf(s);
+  if (!rules) return SNAG;
+  return safe(() => hook(rules, rulesCtx(s, now, fx), s.custom));
 }
 function wallsOf(keys) {
   return Object.entries(keys.items).filter((e) => e[1].shape === "wall");
@@ -1338,6 +1493,14 @@ function sharedOf(s) {
   const all = studentSeats(s);
   const rank = ranks(s);
   const shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
+  const count = teamCount(s);
+  if (count) {
+    const rows = Array.from({ length: count }, (_, team) => ({ team, score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
+    const sorted = rows.slice().sort((a, b) => b.score - a.score || a.team - b.team);
+    sorted.forEach((r, i) => r.rank = i > 0 && sorted[i - 1].score === r.score ? sorted[i - 1].rank : i + 1);
+    shared.teams = rows;
+    shared.leaderboard = sorted.map((r) => ({ initials: `Team ${r.team + 1}`, score: r.score, rank: r.rank, team: r.team }));
+  }
   sharedCache.set(s, shared);
   return shared;
 }
@@ -1355,7 +1518,7 @@ function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
     now,
     ...s.ends_at !== void 0 && s.phase !== "paused" ? { ends_at: s.ends_at } : {},
     seats: isStudent(role) ? [] : all.map((x) => ({ ...x, ...x.progress ? { progress: { ...x.progress, ...x.progress.groups ? { groups: [...x.progress.groups] } : {} } } : {} })),
-    ticker: s.config.style === "race" ? s.ticker.slice(0, TICKER_MAX) : [],
+    ticker: s.config.style !== "paced" ? s.ticker.slice(0, TICKER_MAX) : [],
     leaderboard: shared.leaderboard.map((x) => ({ ...x })),
     board_view: s.board_view,
     seq: s.seq
@@ -1363,6 +1526,15 @@ function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
   const item = pacedItemView(s);
   if (item) view.item = item;
   if (s.phase === "paused" && s.paused_left_ms !== void 0) view.paused_left_ms = s.paused_left_ms;
+  if (shared.teams) {
+    const mine = isStudent(role) ? s.seats[owner]?.team : void 0;
+    view.teams = shared.teams.map((t) => ({ ...t, members: !isStudent(role) || t.team === mine ? [...t.members] : [] }));
+  }
+  const rules = rulesOf(s);
+  if (rules) {
+    const part = safe(() => rules.view(rulesCtx(s, now, null), s.custom, role, owner));
+    if (!isRulesError(part) && part !== void 0) view.kind_view = part;
+  }
   if (isStudent(role)) {
     const seat = s.seats[owner];
     const last = s.last?.[owner];
@@ -1408,6 +1580,7 @@ function foldPayload(s) {
     ended_at: s.ended_at ?? s.at ?? s.config.opened_at,
     strength: "live_solo",
     seats: seats.map((x) => ({ owner: x.owner, ...s.students?.[x.owner] ? { student_id: s.students[x.owner] } : {}, initials: x.initials, ...x.team !== void 0 ? { team: x.team } : {}, score: x.score })),
+    ...s.team_scores ? { team_scores: { ...s.team_scores } } : {},
     events
   };
 }
@@ -1423,7 +1596,9 @@ function remember(s, owner, rid, result) {
 function newSeat(s, owner, initials) {
   const seat = { owner, initials, connected: true, score: 0 };
   if (s.config.style === "race") seat.progress = raceProgress(s, owner).progress;
-  else seat.progress = { done: 0, total: pacedItems(s).length };
+  else if (s.config.style === "paced") seat.progress = { done: 0, total: pacedItems(s).length };
+  const count = teamCount(s);
+  if (count) seat.team = smallestTeam(s, count);
   return seat;
 }
 function openItem(s, index, now) {
@@ -1457,9 +1632,13 @@ function revealItem(s) {
   }
   s.ends_at = void 0;
 }
-function endGame(s, now, fx) {
+function endGame(s, now, fx, opts = {}) {
   if (s.phase === "ended" || s.phase === "folded") return;
   if (s.config.style === "paced") revealItem(s);
+  if (s.config.style === "custom" && opts.finish !== false && rulesOf(s)?.finish) {
+    runRules(s, now, fx, (r, ctx, k) => r.finish?.(ctx, k));
+    if (s.phase === "ended") return;
+  }
   s.phase = "ended";
   s.ended_at = now;
   s.ends_at = void 0;
@@ -1485,6 +1664,7 @@ function onConnect(s, a, now, fx) {
       (s.students ??= {})[owner] = a.student_id;
       changed = true;
     }
+    if (changed) seatChanged(s, owner, now, fx);
   }
   const conns = s.conns ??= {};
   const old = conns[owner];
@@ -1493,16 +1673,20 @@ function onConnect(s, a, now, fx) {
   fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "snapshot", view: publicView(s, role, owner, now, { restore: true }) } });
   return changed;
 }
-function onDisconnect(s, a) {
+function seatChanged(s, owner, now, fx) {
+  if (s.config.style === "custom" && (s.phase === "playing" || s.phase === "paused") && rulesOf(s)?.seatChanged) runRules(s, now, fx, (r, ctx, k) => r.seatChanged?.(ctx, k, owner));
+}
+function onDisconnect(s, a, now, fx) {
   const conns = s.conns ??= {};
   if (a.conn && conns[a.owner] && conns[a.owner] !== a.conn) return false;
   delete conns[a.owner];
   const seat = s.seats[a.owner];
   if (!seat || !seat.connected) return false;
   seat.connected = false;
+  seatChanged(s, a.owner, now, fx);
   return true;
 }
-function rateLimited(s, owner, now) {
+function rateLimited(s, owner, now, burst = ROOM_LIMITS.burst) {
   const rate = s.rate ??= {};
   const r = rate[owner];
   if (!r || now - r.at >= RATE_WINDOW_MS) {
@@ -1510,7 +1694,7 @@ function rateLimited(s, owner, now) {
     return false;
   }
   r.n += 1;
-  return r.n > ROOM_LIMITS.burst;
+  return r.n > burst;
 }
 function validMove(ev) {
   if (!ev || typeof ev !== "object" || Array.isArray(ev)) return false;
@@ -1544,6 +1728,15 @@ function onMove(s, owner, conn, msg, now, fx) {
   if (history.length >= PLAY_EVENTS_MAX) return fail(fx, owner, conn, msg.rid, "too_many", "This game has had enough answers."), false;
   const keys = keysOf(s);
   const who = { play_id: s.config.room, owner, ...s.students?.[owner] ? { student_id: s.students[owner] } : {}, strength: "live_solo" };
+  if (s.config.style === "custom") {
+    const out = runRules(s, now, fx, (r, ctx, k) => r.move(ctx, k, owner, msg.event));
+    if (isRulesError(out)) return fail(fx, owner, conn, msg.rid, out.error.code, out.error.message), false;
+    const result2 = out && typeof out === "object" ? out : { item: msg.event.item };
+    remember(s, owner, msg.rid, result2);
+    (s.last ??= {})[owner] = result2;
+    ack(fx, owner, conn, msg.rid, { result: result2 });
+    return true;
+  }
   if (s.config.style === "paced") {
     const item = s.item;
     if (!item || item.revealed || msg.event.item !== item.item) return fail(fx, owner, conn, msg.rid, "not_open", "That quote has closed."), false;
@@ -1585,7 +1778,27 @@ function onMove(s, owner, conn, msg, now, fx) {
   }
   return true;
 }
-function onControl(s, owner, conn, rid, op, now, fx) {
+var CONTROL_NAME = /^[A-Za-z0-9_-]{1,40}$/;
+function kindControl(s, owner, role, op, now, fx) {
+  const rules = rulesOf(s);
+  if (!rules?.control) return { error: { code: "bad_control", message: "This game has no such control." } };
+  const name = op.op === "kind" ? op.name : op.op;
+  if (typeof name !== "string" || !CONTROL_NAME.test(name)) return { error: { code: "bad_control", message: "Unknown control." } };
+  const data = op.op === "kind" ? op.data : void 0;
+  try {
+    if (data !== void 0 && JSON.stringify(data).length > 4e3) return { error: { code: "bad_control", message: "That was too much to send at once." } };
+  } catch {
+    return { error: { code: "bad_control", message: "That couldn\u2019t be read." } };
+  }
+  if (s.phase === "ended" || s.phase === "folded") return { error: { code: "ended", message: "This game has finished." } };
+  if (s.phase === "paused") return { error: { code: "paused", message: "The game is paused." } };
+  if (s.phase === "countdown") return { error: { code: "not_started", message: "Nearly: the game is about to start." } };
+  if (s.phase === "lobby" && (isStudent(role) || op.op !== "kind")) return { error: { code: "not_started", message: "The game hasn\u2019t started yet." } };
+  const control = { name, ...data !== void 0 ? { data } : {} };
+  const out = runRules(s, now, fx, (r, ctx, k) => r.control?.(ctx, k, control, { owner, role }));
+  return isRulesError(out) ? out : null;
+}
+function onControl(s, owner, role, conn, rid, op, now, fx) {
   const ok = () => {
     remember(s, owner, rid, null);
     ack(fx, owner, conn, rid, {});
@@ -1593,6 +1806,10 @@ function onControl(s, owner, conn, rid, op, now, fx) {
   };
   const no = (code, message) => (fail(fx, owner, conn, rid, code, message), false);
   const paced = s.config.style === "paced";
+  if (s.config.style === "custom" && (op.op === "kind" || op.op === "next" || op.op === "reveal")) {
+    const err = kindControl(s, owner, role, op, now, fx);
+    return err ? no(err.error.code, err.error.message) : ok();
+  }
   switch (op.op) {
     case "start":
       if (s.phase !== "lobby") return no("started", "The game has already started.");
@@ -1651,8 +1868,25 @@ function onControl(s, owner, conn, rid, op, now, fx) {
       if (s.conns) delete s.conns[op.owner];
       if (s.item) s.item.answered = s.item.answered.filter((x) => x !== op.owner);
       fx.push({ kind: "close", owner: op.owner, msg: { t: "kicked" } });
+      seatChanged(s, op.owner, now, fx);
       return ok();
     }
+    case "move_team": {
+      const count = teamCount(s);
+      if (!count) return no("no_teams", "This game isn\u2019t played in teams.");
+      if (s.phase !== "lobby") return no("started", "Teams are set once the game starts.");
+      const seat = s.seats[op.owner];
+      if (!seat) return no("no_seat", "That player isn\u2019t here.");
+      const team = Number(op.team);
+      if (!Number.isInteger(team) || team < 0 || team >= count) return no("bad_team", "There\u2019s no such team.");
+      seat.team = team;
+      return ok();
+    }
+    case "shuffle_teams":
+      if (!teamCount(s)) return no("no_teams", "This game isn\u2019t played in teams.");
+      if (s.phase !== "lobby") return no("started", "Teams are set once the game starts.");
+      shuffleTeams(s);
+      return ok();
     case "board_view":
       if (op.view !== "race" && op.view !== "class_wall") return no("bad_view", "Unknown view.");
       s.board_view = op.view;
@@ -1676,7 +1910,7 @@ function onMsg(s, a, now, fx) {
     fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "pong", ...rid ? { rid } : {}, sent: Number(msg.sent) || 0, now } });
     return false;
   }
-  if (rateLimited(s, owner, now)) return fail(fx, owner, conn, rid, "slow_down", "Too many moves at once. Wait a moment."), false;
+  if (rateLimited(s, owner, now, rulesOf(s)?.burst ?? ROOM_LIMITS.burst)) return fail(fx, owner, conn, rid, "slow_down", "Too many moves at once. Wait a moment."), false;
   if (rid && s.seen[owner] && rid in s.seen[owner]) {
     const result = s.seen[owner][rid];
     ack(fx, owner, conn, rid, result ? { result } : {});
@@ -1698,9 +1932,14 @@ function onMsg(s, a, now, fx) {
       seat.finished = true;
       return true;
     }
-    case "control":
-      if (isStudent(role)) return fail(fx, owner, conn, rid, "not_allowed", "Only your teacher can do that."), false;
-      return onControl(s, owner, conn, rid, msg.op ?? {}, now, fx);
+    case "control": {
+      const op = msg.op ?? {};
+      if (isStudent(role)) {
+        if (s.config.style !== "custom" || op.op !== "kind") return fail(fx, owner, conn, rid, "not_allowed", "Only your teacher can do that."), false;
+        if (!s.seats[owner]) return fail(fx, owner, conn, rid, "no_seat", "Join the game first."), false;
+      }
+      return onControl(s, owner, role, conn, rid, op, now, fx);
+    }
     default:
       return fail(fx, owner, conn, rid, "bad_message", "That message couldn\u2019t be read."), false;
   }
@@ -1716,6 +1955,15 @@ function onTick(s, now, fx) {
     s.started_at = now;
     s.ends_at = void 0;
     if (s.config.style === "paced") openItem(s, 0, now);
+    if (s.config.style === "custom") {
+      fillTeams(s);
+      runRules(s, now, fx, (r, ctx, k) => r.start(ctx, k));
+    }
+    return true;
+  }
+  if (s.config.style === "custom" && s.phase === "playing" && s.ends_at !== void 0 && now >= s.ends_at) {
+    s.ends_at = void 0;
+    runRules(s, now, fx, (r, ctx, k) => r.tick?.(ctx, k));
     return true;
   }
   if (s.phase === "playing" && s.item && !s.item.revealed && now >= s.item.ends_at) {
@@ -1736,7 +1984,7 @@ var reduce = (state, action, now) => {
       changed = onConnect(s, action, now, fx);
       break;
     case "disconnect":
-      changed = onDisconnect(s, action);
+      changed = onDisconnect(s, action, now, fx);
       break;
     case "msg":
       changed = onMsg(s, action, now, fx);
@@ -1853,10 +2101,14 @@ export {
   publicView,
   quotePoints,
   reduce,
+  registerRules,
   roomStyle,
+  roomTeams,
+  rulesFor,
   seatRestore,
   signBody,
   signTicket,
+  teamCount,
   ticketFromAuthorization,
   verifyBody,
   verifyTicket,

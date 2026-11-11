@@ -357,6 +357,8 @@ export function createFakeRoom(o: FakeRoomOptions): FakeRoom {
       case 'end':
         end();
         return null;
+      default:
+        return 'Unknown control.';
     }
   }
 

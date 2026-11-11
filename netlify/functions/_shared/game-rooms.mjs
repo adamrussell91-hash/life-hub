@@ -5,7 +5,8 @@
  * results back (the fold) into the same plays, events and summaries solo
  * play writes, with strength `live_solo`.
  *
- *   open    teacher (operator gate)  { game_id, class_id } → { room, code, teacher_ticket, board_ticket, ws_base, http_base }
+ *   open    teacher (operator gate)  { game_id, class_id, teams? } → { room, code, teacher_ticket, board_ticket, ws_base, http_base, style, teams? }
+ *           (every kind room-core can run: race, paced, or 'custom' with its own rules; `teams` only for team games, kept to the rules' range)
  *   rooms   teacher (operator gate)  {} → { rooms: [ … with fresh teacher and board tickets ] }  (resume from any device)
  *   join    student (public)         { game_id?, code, class_id, class_token } → { room, ticket, game_id, initials, ws_base, http_base }
  *   fold    Worker → POST /api/games/fold, signed (x-game-room-signature), idempotent by room
@@ -28,7 +29,7 @@ import { publishedLessonKey } from './teaching-blobs.mjs';
 import { gameKeys, roomCodeKey } from './game-store.mjs';
 import { rebuildSummary } from './games.mjs';
 import { eventsToEvidence, gameTotal, missedPieces, playScore } from './game-rules.mjs';
-import { ROOM_LIMITS, SIGNATURE_HEADER, roomStyle, signBody, signTicket } from './game-room-core.mjs';
+import { ROOM_LIMITS, SIGNATURE_HEADER, roomStyle, roomTeams, signBody, signTicket } from './game-room-core.mjs';
 
 export const DEFAULT_GAME_ROOMS_URL = 'https://class.adam-russell.com/g';
 const DEFAULT_SITE_URL = 'https://life-hub.adam-russell.com';
@@ -100,11 +101,16 @@ export async function openRoom(store, lessonId, body, { env = process.env, fetch
   const seats = Object.fromEntries(roster.students.filter((s) => isSafeId(s.id) && s.initials).map((s) => [s.id, s.initials]));
   if (!Object.keys(seats).length) reject(409, 'no_list', 'Live games need a class list. Add the class first.');
   const classId = roster.cls.id;
+  // Team games: the teacher's pick of how many teams, else the rules' default, kept to the rules' range.
+  const teamRule = roomTeams(keys.kind);
+  const asked = Math.round(Number(body?.teams));
+  const teams = teamRule ? { count: Math.max(teamRule.min, Math.min(teamRule.max, Number.isFinite(asked) && asked > 0 ? asked : teamRule.default)) } : null;
   const room = `gr${randomBytes(10).toString('hex')}`;
   const code = await reserveCode(store, { room, lesson_id: lessonId, game_id: gameId, class_id: classId, opened_at: now, folded: false }, now);
   const config = {
     room, code, lesson_id: lessonId, class_id: classId, game, keys, style, roster: seats,
-    ...(style === 'paced' && Number(game.settings?.seconds) > 0 ? { item_seconds: Number(game.settings.seconds) } : {}),
+    ...(style !== 'race' && Number(game.settings?.seconds) > 0 ? { item_seconds: Number(game.settings.seconds) } : {}),
+    ...(teams ? { teams } : {}),
     fold_url: foldUrl(env),
     opened_at: now
   };
@@ -122,7 +128,7 @@ export async function openRoom(store, lessonId, body, { env = process.env, fetch
   }
   await store.setJSON(k.room(gameId, room), { room, code, game_id: gameId, class_id: classId, version: record.version, opened_at: now, folded: false });
   // The published game (no answers) goes back with the room, so the board shows what the room plays, not the editor's draft.
-  return { room, code, game_id: gameId, class_id: classId, kind: keys.kind, style, opened_at: now, game, ...(await teacherTickets(secret, room, now)), ...urls };
+  return { room, code, game_id: gameId, class_id: classId, kind: keys.kind, style, ...(teams ? { teams: teams.count } : {}), opened_at: now, game, ...(await teacherTickets(secret, room, now)), ...urls };
 }
 
 /** Teacher: this lesson's rooms still open (not folded, under 6 h), each with fresh tickets so any device can resume. */
@@ -208,7 +214,8 @@ export async function foldRoom(store, payload, { now = Date.now() } = {}) {
     const playId = playIdFor(p.room, owner);
     const events = raw
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
-      .map(({ reply: _reply, ...e }, i) => ({ ...e, seq: i, play_id: playId, owner, student_id: student.id, game: keys.kind, strength: p.strength }));
+      // Each move keeps its own strength when the room set one (a team game's talk-first taps are live_team).
+      .map(({ reply: _reply, ...e }, i) => ({ ...e, seq: i, play_id: playId, owner, student_id: student.id, game: keys.kind, strength: e.strength === 'live_team' || e.strength === 'live_solo' ? e.strength : p.strength }));
     await store.setJSON(k.events(p.game_id, playId, owner), events);
     const evidence = eventsToEvidence(keys, events);
     const score = { ...playScore(evidence), total: gameTotal(keys) };

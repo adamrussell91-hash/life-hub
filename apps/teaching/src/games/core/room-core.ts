@@ -16,11 +16,14 @@ import {
   type RoomReducer,
   type RoomState,
   type RestoreGroup,
+  type RoomStyle,
   type RoomView,
   type Seat,
   type SeatRestore,
-  type ServerMsg
+  type ServerMsg,
+  type TeamView
 } from './room-protocol';
+import { rulesFor, type KindControl, type RoomRules, type RulesCtx, type RulesError } from './room-rules';
 
 /**
  * The live game room's rules (spec §3.2): a pure reducer the Durable Object
@@ -50,10 +53,29 @@ const SEEN_MAX = 200;
 const RATE_WINDOW_MS = 10_000;
 const CLASS_WALL_MAX = 8;
 
-export function roomStyle(kind: string): 'race' | 'paced' | null {
+/** How a kind runs live: race and paced are built in; 'custom' when the kind registered its own rules (room-rules-index.ts). Null: not live yet. */
+export function roomStyle(kind: string): RoomStyle | null {
   if (RACE_KINDS.has(kind)) return 'race';
   if (PACED_KINDS.has(kind)) return 'paced';
+  if (rulesFor(kind)) return 'custom';
   return null;
+}
+
+/** A custom kind's team settings (min, max, default), or null for individual games. Netlify's `open` uses it for the team count. */
+export function roomTeams(kind: string): { min: number; max: number; default: number } | null {
+  if (RACE_KINDS.has(kind) || PACED_KINDS.has(kind)) return null;
+  const t = rulesFor(kind)?.teams;
+  return t ? { ...t } : null;
+}
+
+const rulesOf = (s: RoomState): RoomRules | undefined => (s.config.style === 'custom' ? rulesFor(s.config.game.kind) : undefined);
+
+/** Team games: how many teams this room plays with (the room config, else the rules' default, kept to the rules' range). 0: not a team game. */
+export function teamCount(s: RoomState): number {
+  const t = rulesOf(s)?.teams;
+  if (!t) return 0;
+  const raw = Math.round(Number(s.config.teams?.count ?? t.default));
+  return Math.max(t.min, Math.min(t.max, Number.isFinite(raw) ? raw : t.default));
 }
 
 const keysOf = (s: RoomState): GameKeys => s.config.keys as GameKeys;
@@ -65,8 +87,28 @@ function itemSeconds(s: RoomState): number {
   return Number.isFinite(raw) && raw > 0 ? Math.max(5, Math.min(300, Math.round(raw))) : ROOM_LIMITS.pacedSeconds;
 }
 
+/** FNV-1a of the room id: the room's random seed. */
+function seedOf(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/** mulberry32 over `s.rng`: the same sequence every time the room replays. */
+function nextRandom(s: { rng?: number }): number {
+  const a = ((s.rng ?? 0) + 0x6d2b79f5) >>> 0;
+  s.rng = a;
+  let t = a;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 export function initialState(config: RoomConfig, now: number): RoomState {
-  return {
+  const s: RoomState = {
     config,
     phase: 'lobby',
     seq: 0,
@@ -82,8 +124,144 @@ export function initialState(config: RoomConfig, now: number): RoomState {
     rate: {},
     last: {},
     first: {},
-    at: now
+    at: now,
+    rng: seedOf(config.room)
   };
+  const rules = rulesOf(s);
+  if (rules) {
+    if (rules.teams) s.team_scores = {};
+    const k = safe(() => rules.init(rulesCtx(s, now, null)));
+    s.custom = isRulesError(k) ? {} : k;
+  }
+  return s;
+}
+
+// ─────────────────────────────────────────────────────────────── custom rules
+
+const isRulesError = (x: unknown): x is RulesError => !!x && typeof x === 'object' && 'error' in x && !!(x as RulesError).error && typeof (x as RulesError).error.code === 'string';
+const SNAG: RulesError = { error: { code: 'rules_failed', message: 'The game hit a snag. Try that again.' } };
+/** A kind's rules must never take the room down: a throw becomes an error the caller can answer with. */
+function safe<T>(fn: () => T): T | RulesError {
+  try {
+    return fn();
+  } catch {
+    return SNAG;
+  }
+}
+
+/** Team numbers in use (0-based), from the seats. */
+const teamsInUse = (s: RoomState): number[] => [...new Set(Object.values(s.seats).map((x) => x.team).filter((t): t is number => t !== undefined))].sort((a, b) => a - b);
+
+/** The smallest team (fewest seats; the lowest number on a tie). */
+function smallestTeam(s: RoomState, count: number): number {
+  const size = new Array<number>(count).fill(0);
+  for (const seat of Object.values(s.seats)) if (seat.team !== undefined && seat.team < count) size[seat.team] += 1;
+  let best = 0;
+  for (let t = 1; t < count; t += 1) if (size[t] < size[best]) best = t;
+  return best;
+}
+
+/** Puts every seat without a team (or on a team past the count) on the smallest team, in join order. */
+function fillTeams(s: RoomState): void {
+  const count = teamCount(s);
+  if (!count) return;
+  for (const seat of Object.values(s.seats)) if (seat.team === undefined || seat.team >= count) seat.team = smallestTeam(s, count);
+}
+
+/** Deals every seat into teams again: a seeded shuffle, then round-robin. */
+function shuffleTeams(s: RoomState): void {
+  const count = teamCount(s);
+  if (!count) return;
+  const seats = Object.values(s.seats);
+  for (let i = seats.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(nextRandom(s) * (i + 1));
+    [seats[i], seats[j]] = [seats[j] as Seat, seats[i] as Seat];
+  }
+  seats.forEach((seat, i) => (seat.team = i % count));
+}
+
+/**
+ * The real RulesCtx (core/room-rules.ts) over the room's state. With `fx`
+ * null (a view), every write is ignored: `view` only reads.
+ */
+function rulesCtx(s: RoomState, now: number, fx: Fx | null): RulesCtx {
+  const write = fx !== null;
+  const keys = keysOf(s);
+  const teamOf = (owner: string) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
+  const store = (owner: string, event: GameEvent) => {
+    const history = (s.history[owner] ??= []);
+    if (history.length >= PLAY_EVENTS_MAX) return false;
+    const team = teamOf(owner);
+    history.push({ ...event, ...(team !== undefined ? { team: String(team) } : {}), seq: history.length } as GameEvent);
+    return true;
+  };
+  const view = { rng: s.rng };
+  return {
+    now,
+    config: s.config,
+    game: s.config.game,
+    keys,
+    random: () => (write ? nextRandom(s) : nextRandom(view)),
+    seats: () => Object.values(s.seats),
+    seat: (owner) => s.seats[owner],
+    teams: () => teamsInUse(s),
+    members: (team) => Object.values(s.seats).filter((x) => x.team === team).map((x) => x.owner),
+    mark(owner, event, strength = 'live_solo') {
+      const history = s.history[owner] ?? [];
+      if (write && history.length >= PLAY_EVENTS_MAX) return { error: { code: 'too_many', message: 'This game has had enough answers.' } };
+      const who = { play_id: s.config.room, owner, ...(s.students?.[owner] ? { student_id: s.students[owner] } : {}), strength };
+      const out = markMove(s.config.game, keys, history, event, now, who);
+      if (out.error) return { error: { code: 'bad_item', message: 'That isn’t in this game.' } };
+      if (write && out.stored) store(owner, out.stored as GameEvent);
+      return { result: out.result, stored: out.stored ? ({ ...out.stored } as GameEvent) : null };
+    },
+    record(owner, event) {
+      if (!write) return;
+      const { strength, ...rest } = event;
+      store(owner, { ...rest, at: now, game: keys.kind, play_id: s.config.room, owner, ...(s.students?.[owner] ? { student_id: s.students[owner] } : {}), strength: strength ?? 'live_solo' } as GameEvent);
+    },
+    addScore(owner, points) {
+      const seat = s.seats[owner];
+      if (write && seat && Number.isFinite(points)) seat.score += points;
+    },
+    setScore(owner, points) {
+      const seat = s.seats[owner];
+      if (write && seat && Number.isFinite(points)) seat.score = points;
+    },
+    addTeamScore(team, points) {
+      if (!write || !Number.isFinite(points)) return;
+      const scores = (s.team_scores ??= {});
+      scores[team] = (scores[team] ?? 0) + points;
+    },
+    teamScore: (team) => s.team_scores?.[team] ?? 0,
+    setProgress(owner, progress) {
+      const seat = s.seats[owner];
+      if (!write || !seat) return;
+      if (progress) seat.progress = progress;
+      else delete seat.progress;
+    },
+    ticker(text, initials) {
+      if (!write) return;
+      s.ticker.unshift({ initials: initials ?? '', text: String(text).slice(0, 120), at: now });
+      s.ticker.length = Math.min(s.ticker.length, TICKER_MAX);
+    },
+    send(owner, msg) {
+      if (write) fx.push({ kind: 'send', owner, msg });
+    },
+    setTimer(endsAt) {
+      if (write) s.ends_at = endsAt !== undefined && Number.isFinite(endsAt) ? endsAt : undefined;
+    },
+    end() {
+      if (write) endGame(s, now, fx, { finish: false });
+    }
+  };
+}
+
+/** Runs one of the kind's hooks with a writing ctx. False when the room has no rules (or no such hook). */
+function runRules(s: RoomState, now: number, fx: Fx, hook: (r: RoomRules, ctx: RulesCtx, k: unknown) => unknown): unknown {
+  const rules = rulesOf(s);
+  if (!rules) return SNAG;
+  return safe(() => hook(rules, rulesCtx(s, now, fx), s.custom));
 }
 
 // ─────────────────────────────────────────────────────────────── progress
@@ -270,7 +448,7 @@ function pacedItemView(s: RoomState): PacedItem | undefined {
  * plus the top-5 leaderboard, never other seats' detail; teacher and board get
  * every seat. Built only from public game fields and the room's own counts.
  */
-type Shared = { seq: number; all: Seat[]; rank: Map<string, number>; leaderboard: RoomView['leaderboard']; wall?: RoomView['class_wall'] };
+type Shared = { seq: number; all: Seat[]; rank: Map<string, number>; leaderboard: RoomView['leaderboard']; teams?: TeamView[]; wall?: RoomView['class_wall'] };
 /** The parts every viewer shares, worked out once per change (seq), not once per socket. */
 const sharedCache = new WeakMap<RoomState, Shared>();
 function sharedOf(s: RoomState): Shared {
@@ -279,6 +457,15 @@ function sharedOf(s: RoomState): Shared {
   const all = studentSeats(s);
   const rank = ranks(s);
   const shared: Shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
+  const count = teamCount(s);
+  if (count) {
+    // Team games: the leaderboard is the teams (spec §5.1), members by initials only.
+    const rows = Array.from({ length: count }, (_, team) => ({ team, score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
+    const sorted = rows.slice().sort((a, b) => b.score - a.score || a.team - b.team);
+    sorted.forEach((r, i) => (r.rank = i > 0 && sorted[i - 1]!.score === r.score ? sorted[i - 1]!.rank : i + 1));
+    shared.teams = rows;
+    shared.leaderboard = sorted.map((r) => ({ initials: `Team ${r.team + 1}`, score: r.score, rank: r.rank, team: r.team }));
+  }
   sharedCache.set(s, shared);
   return shared;
 }
@@ -297,7 +484,7 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
     now,
     ...(s.ends_at !== undefined && s.phase !== 'paused' ? { ends_at: s.ends_at } : {}),
     seats: isStudent(role) ? [] : all.map((x) => ({ ...x, ...(x.progress ? { progress: { ...x.progress, ...(x.progress.groups ? { groups: [...x.progress.groups] } : {}) } } : {}) })),
-    ticker: s.config.style === 'race' ? s.ticker.slice(0, TICKER_MAX) : [],
+    ticker: s.config.style !== 'paced' ? s.ticker.slice(0, TICKER_MAX) : [],
     leaderboard: shared.leaderboard.map((x) => ({ ...x })),
     board_view: s.board_view,
     seq: s.seq
@@ -305,6 +492,16 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
   const item = pacedItemView(s);
   if (item) view.item = item;
   if (s.phase === 'paused' && s.paused_left_ms !== undefined) view.paused_left_ms = s.paused_left_ms;
+  if (shared.teams) {
+    const mine = isStudent(role) ? s.seats[owner]?.team : undefined;
+    view.teams = shared.teams.map((t) => ({ ...t, members: !isStudent(role) || t.team === mine ? [...t.members] : [] }));
+  }
+  const rules = rulesOf(s);
+  if (rules) {
+    // The kind's own part: built fresh per viewer; a throw shows nothing rather than breaking the view.
+    const part = safe(() => rules.view(rulesCtx(s, now, null), s.custom, role, owner));
+    if (!isRulesError(part) && part !== undefined) view.kind_view = part;
+  }
   if (isStudent(role)) {
     const seat = s.seats[owner];
     const last = s.last?.[owner];
@@ -360,6 +557,7 @@ export function foldPayload(s: RoomState): FoldPayload {
     ended_at: s.ended_at ?? s.at ?? s.config.opened_at,
     strength: 'live_solo',
     seats: seats.map((x) => ({ owner: x.owner, ...(s.students?.[x.owner] ? { student_id: s.students[x.owner] } : {}), initials: x.initials, ...(x.team !== undefined ? { team: x.team } : {}), score: x.score })),
+    ...(s.team_scores ? { team_scores: { ...s.team_scores } } : {}),
     events
   };
 }
@@ -382,7 +580,10 @@ function remember(s: RoomState, owner: string, rid: string | undefined, result: 
 function newSeat(s: RoomState, owner: string, initials: string): Seat {
   const seat: Seat = { owner, initials, connected: true, score: 0 };
   if (s.config.style === 'race') seat.progress = raceProgress(s, owner).progress;
-  else seat.progress = { done: 0, total: pacedItems(s).length };
+  else if (s.config.style === 'paced') seat.progress = { done: 0, total: pacedItems(s).length };
+  // Team games: everyone joins the smallest team (round-robin by join order); late joiners too.
+  const count = teamCount(s);
+  if (count) seat.team = smallestTeam(s, count);
   return seat;
 }
 
@@ -420,9 +621,15 @@ function revealItem(s: RoomState) {
   s.ends_at = undefined;
 }
 
-function endGame(s: RoomState, now: number, fx: Fx) {
+function endGame(s: RoomState, now: number, fx: Fx, opts: { finish?: boolean } = {}) {
   if (s.phase === 'ended' || s.phase === 'folded') return;
   if (s.config.style === 'paced') revealItem(s);
+  // The teacher (or the 6 h limit) ends a custom game: the kind reveals anything open and awards final points first.
+  if (s.config.style === 'custom' && opts.finish !== false && rulesOf(s)?.finish) {
+    runRules(s, now, fx, (r, ctx, k) => r.finish?.(ctx, k));
+    // The rules may have ended it themselves (ctx.end): that already folded.
+    if ((s.phase as RoomState['phase']) === 'ended') return;
+  }
   s.phase = 'ended';
   s.ended_at = now;
   s.ends_at = undefined;
@@ -450,6 +657,8 @@ function onConnect(s: RoomState, a: Extract<RoomAction, { type: 'connect' }>, no
       (s.students ??= {})[owner] = a.student_id;
       changed = true;
     }
+    // A custom game under way hears about a late joiner or a reconnect (e.g. to deal them in).
+    if (changed) seatChanged(s, owner, now, fx);
   }
   const conns = (s.conns ??= {});
   const old = conns[owner];
@@ -461,7 +670,12 @@ function onConnect(s: RoomState, a: Extract<RoomAction, { type: 'connect' }>, no
   return changed;
 }
 
-function onDisconnect(s: RoomState, a: Extract<RoomAction, { type: 'disconnect' }>): boolean {
+/** A custom game under way hears that a seat joined late, came back, dropped or was removed. */
+function seatChanged(s: RoomState, owner: string, now: number, fx: Fx): void {
+  if (s.config.style === 'custom' && (s.phase === 'playing' || s.phase === 'paused') && rulesOf(s)?.seatChanged) runRules(s, now, fx, (r, ctx, k) => r.seatChanged?.(ctx, k, owner));
+}
+
+function onDisconnect(s: RoomState, a: Extract<RoomAction, { type: 'disconnect' }>, now: number, fx: Fx): boolean {
   const conns = (s.conns ??= {});
   // A replaced socket closing late doesn't take the seat offline.
   if (a.conn && conns[a.owner] && conns[a.owner] !== a.conn) return false;
@@ -469,10 +683,11 @@ function onDisconnect(s: RoomState, a: Extract<RoomAction, { type: 'disconnect' 
   const seat = s.seats[a.owner];
   if (!seat || !seat.connected) return false;
   seat.connected = false;
+  seatChanged(s, a.owner, now, fx);
   return true;
 }
 
-function rateLimited(s: RoomState, owner: string, now: number): boolean {
+function rateLimited(s: RoomState, owner: string, now: number, burst: number = ROOM_LIMITS.burst): boolean {
   const rate = (s.rate ??= {});
   const r = rate[owner];
   if (!r || now - r.at >= RATE_WINDOW_MS) {
@@ -480,7 +695,7 @@ function rateLimited(s: RoomState, owner: string, now: number): boolean {
     return false;
   }
   r.n += 1;
-  return r.n > ROOM_LIMITS.burst;
+  return r.n > burst;
 }
 
 function validMove(ev: unknown): ev is SoloEvent {
@@ -518,6 +733,16 @@ function onMove(s: RoomState, owner: string, conn: string | undefined, msg: Extr
   if (history.length >= PLAY_EVENTS_MAX) return fail(fx, owner, conn, msg.rid, 'too_many', 'This game has had enough answers.'), false;
   const keys = keysOf(s);
   const who = { play_id: s.config.room, owner, ...(s.students?.[owner] ? { student_id: s.students[owner] } : {}), strength: 'live_solo' as const };
+
+  if (s.config.style === 'custom') {
+    const out = runRules(s, now, fx, (r, ctx, k) => r.move(ctx, k, owner, msg.event));
+    if (isRulesError(out)) return fail(fx, owner, conn, msg.rid, out.error.code, out.error.message), false;
+    const result = (out && typeof out === 'object' ? out : { item: msg.event.item }) as EventResult;
+    remember(s, owner, msg.rid, result);
+    (s.last ??= {})[owner] = result;
+    ack(fx, owner, conn, msg.rid, { result });
+    return true;
+  }
 
   if (s.config.style === 'paced') {
     const item = s.item;
@@ -564,7 +789,31 @@ function onMove(s: RoomState, owner: string, conn: string | undefined, msg: Extr
   return true;
 }
 
-function onControl(s: RoomState, owner: string, conn: string | undefined, rid: string | undefined, op: ControlOp, now: number, fx: Fx): boolean {
+const CONTROL_NAME = /^[A-Za-z0-9_-]{1,40}$/;
+
+/** A control the kind's rules handle ('next', 'reveal', or `{ op: 'kind' }`). Returns an error, or null when it went through. */
+function kindControl(s: RoomState, owner: string, role: Role, op: ControlOp, now: number, fx: Fx): RulesError | null {
+  const rules = rulesOf(s);
+  if (!rules?.control) return { error: { code: 'bad_control', message: 'This game has no such control.' } };
+  const name = op.op === 'kind' ? op.name : op.op;
+  if (typeof name !== 'string' || !CONTROL_NAME.test(name)) return { error: { code: 'bad_control', message: 'Unknown control.' } };
+  const data = op.op === 'kind' ? op.data : undefined;
+  try {
+    if (data !== undefined && JSON.stringify(data).length > 4000) return { error: { code: 'bad_control', message: 'That was too much to send at once.' } };
+  } catch {
+    return { error: { code: 'bad_control', message: 'That couldn’t be read.' } };
+  }
+  if (s.phase === 'ended' || s.phase === 'folded') return { error: { code: 'ended', message: 'This game has finished.' } };
+  if (s.phase === 'paused') return { error: { code: 'paused', message: 'The game is paused.' } };
+  if (s.phase === 'countdown') return { error: { code: 'not_started', message: 'Nearly: the game is about to start.' } };
+  // In the lobby only the teacher's own kind buttons (setting up), never a phone's or 'next'.
+  if (s.phase === 'lobby' && (isStudent(role) || op.op !== 'kind')) return { error: { code: 'not_started', message: 'The game hasn’t started yet.' } };
+  const control: KindControl = { name, ...(data !== undefined ? { data } : {}) };
+  const out = runRules(s, now, fx, (r, ctx, k) => r.control?.(ctx, k, control, { owner, role }));
+  return isRulesError(out) ? out : null;
+}
+
+function onControl(s: RoomState, owner: string, role: Role, conn: string | undefined, rid: string | undefined, op: ControlOp, now: number, fx: Fx): boolean {
   const ok = () => {
     remember(s, owner, rid, null);
     ack(fx, owner, conn, rid, {});
@@ -572,6 +821,10 @@ function onControl(s: RoomState, owner: string, conn: string | undefined, rid: s
   };
   const no = (code: string, message: string) => (fail(fx, owner, conn, rid, code, message), false);
   const paced = s.config.style === 'paced';
+  if (s.config.style === 'custom' && (op.op === 'kind' || op.op === 'next' || op.op === 'reveal')) {
+    const err = kindControl(s, owner, role, op, now, fx);
+    return err ? no(err.error.code, err.error.message) : ok();
+  }
   switch (op.op) {
     case 'start':
       if (s.phase !== 'lobby') return no('started', 'The game has already started.');
@@ -631,8 +884,25 @@ function onControl(s: RoomState, owner: string, conn: string | undefined, rid: s
       if (s.conns) delete s.conns[op.owner];
       if (s.item) s.item.answered = s.item.answered.filter((x) => x !== op.owner);
       fx.push({ kind: 'close', owner: op.owner, msg: { t: 'kicked' } });
+      seatChanged(s, op.owner, now, fx);
       return ok();
     }
+    case 'move_team': {
+      const count = teamCount(s);
+      if (!count) return no('no_teams', 'This game isn’t played in teams.');
+      if (s.phase !== 'lobby') return no('started', 'Teams are set once the game starts.');
+      const seat = s.seats[op.owner];
+      if (!seat) return no('no_seat', 'That player isn’t here.');
+      const team = Number(op.team);
+      if (!Number.isInteger(team) || team < 0 || team >= count) return no('bad_team', 'There’s no such team.');
+      seat.team = team;
+      return ok();
+    }
+    case 'shuffle_teams':
+      if (!teamCount(s)) return no('no_teams', 'This game isn’t played in teams.');
+      if (s.phase !== 'lobby') return no('started', 'Teams are set once the game starts.');
+      shuffleTeams(s);
+      return ok();
     case 'board_view':
       if (op.view !== 'race' && op.view !== 'class_wall') return no('bad_view', 'Unknown view.');
       s.board_view = op.view;
@@ -657,7 +927,7 @@ function onMsg(s: RoomState, a: Extract<RoomAction, { type: 'msg' }>, now: numbe
     fx.push({ kind: 'send', owner, ...(conn ? { conn } : {}), msg: { t: 'pong', ...(rid ? { rid } : {}), sent: Number(msg.sent) || 0, now } });
     return false;
   }
-  if (rateLimited(s, owner, now)) return fail(fx, owner, conn, rid, 'slow_down', 'Too many moves at once. Wait a moment.'), false;
+  if (rateLimited(s, owner, now, rulesOf(s)?.burst ?? ROOM_LIMITS.burst)) return fail(fx, owner, conn, rid, 'slow_down', 'Too many moves at once. Wait a moment.'), false;
   if (rid && s.seen[owner] && rid in s.seen[owner]) {
     // A resent message: answered from what the room already decided, never applied twice.
     const result = s.seen[owner][rid];
@@ -680,9 +950,15 @@ function onMsg(s: RoomState, a: Extract<RoomAction, { type: 'msg' }>, now: numbe
       seat.finished = true;
       return true;
     }
-    case 'control':
-      if (isStudent(role)) return fail(fx, owner, conn, rid, 'not_allowed', 'Only your teacher can do that.'), false;
-      return onControl(s, owner, conn, rid, msg.op ?? ({} as ControlOp), now, fx);
+    case 'control': {
+      const op = msg.op ?? ({} as ControlOp);
+      if (isStudent(role)) {
+        // A phone may send the kind's own actions (a captain's pick); the rules decide what a student may do.
+        if (s.config.style !== 'custom' || op.op !== 'kind') return fail(fx, owner, conn, rid, 'not_allowed', 'Only your teacher can do that.'), false;
+        if (!s.seats[owner]) return fail(fx, owner, conn, rid, 'no_seat', 'Join the game first.'), false;
+      }
+      return onControl(s, owner, role, conn, rid, op, now, fx);
+    }
     default:
       return fail(fx, owner, conn, rid, 'bad_message', 'That message couldn’t be read.'), false;
   }
@@ -699,6 +975,16 @@ function onTick(s: RoomState, now: number, fx: Fx): boolean {
     s.started_at = now;
     s.ends_at = undefined;
     if (s.config.style === 'paced') openItem(s, 0, now);
+    if (s.config.style === 'custom') {
+      fillTeams(s);
+      runRules(s, now, fx, (r, ctx, k) => r.start(ctx, k));
+    }
+    return true;
+  }
+  // A custom game's timer (set with ctx.setTimer) has passed: the kind's tick.
+  if (s.config.style === 'custom' && s.phase === 'playing' && s.ends_at !== undefined && now >= s.ends_at) {
+    s.ends_at = undefined;
+    runRules(s, now, fx, (r, ctx, k) => r.tick?.(ctx, k));
     return true;
   }
   if (s.phase === 'playing' && s.item && !s.item.revealed && now >= s.item.ends_at) {
@@ -721,7 +1007,7 @@ export const reduce: RoomReducer = (state, action, now) => {
       changed = onConnect(s, action, now, fx);
       break;
     case 'disconnect':
-      changed = onDisconnect(s, action);
+      changed = onDisconnect(s, action, now, fx);
       break;
     case 'msg':
       changed = onMsg(s, action, now, fx);
