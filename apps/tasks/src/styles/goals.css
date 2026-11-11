@@ -341,6 +341,9 @@ textarea.mandala__input:focus { outline: none; background: rgba(255, 255, 255, 0
 .mandala__chip--empty { padding-left: 0; font-weight: var(--weight-medium); opacity: 0.7; }
 .mandala__chip--lead { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .mandala__chip--task { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.mandala__chip--ifthen { background: var(--depth); color: var(--on-dark); }
+/* The trigger card after "Use as if-then": the cue is the one thing left to type. */
+.goal-ifthen.is-prefilled [data-field="if_then.cue"] { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 @media (max-width: 719px) {
   .mandala__grid { gap: var(--space-1); }

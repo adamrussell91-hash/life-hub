@@ -1,7 +1,7 @@
 // apps/tasks/tests/unit/goal-page.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tasksApi } from '@/services/client-api';
-import { renderGoalPage } from '@/views/goal-page';
+import { prefillIfThen, renderGoalPage } from '@/views/goal-page';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { goal, project, task } from './goal-fixtures';
 
@@ -282,3 +282,35 @@ function heading(text: string): HTMLHeadingElement {
   title.textContent = text;
   return title;
 }
+
+describe('Mandala if-then hand-over', () => {
+  it('fills the action, asks for the cue, saves only once the cue is typed', async () => {
+    const canvas = document.createElement('div');
+    const bare = { ...G, if_then: null };
+    vi.mocked(tasksApi.getGoal).mockResolvedValue(bare);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', () => undefined);
+    expect(prefillIfThen(canvas, bare, 'Long run Sunday')).toBe(true);
+    const cue = canvas.querySelector<HTMLInputElement>('[data-field="if_then.cue"]')!;
+    const then = canvas.querySelector<HTMLInputElement>('[data-field="if_then.action"]')!;
+    expect(then.value).toBe('Long run Sunday');
+    expect(canvas.querySelector('.goal-ifthen')!.classList.contains('is-prefilled')).toBe(true);
+    // Touching another field first saves nothing: there is no cue yet.
+    then.dispatchEvent(new Event('change'));
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+    cue.value = 'Sunday after breakfast';
+    cue.dispatchEvent(new Event('change'));
+    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', {
+      if_then: { cue: 'Sunday after breakfast', action: 'Long run Sunday', obstacle: '' }
+    });
+  });
+
+  it('asks before replacing an existing trigger and clears its cue', async () => {
+    const canvas = document.createElement('div');
+    await renderGoalPage(canvas, 'g1', '2026-11-04', () => undefined);
+    expect(prefillIfThen(canvas, G, 'Long run Sunday', () => false)).toBe(false);
+    expect(canvas.querySelector<HTMLInputElement>('[data-field="if_then.action"]')!.value).toBe('open the doc');
+    expect(prefillIfThen(canvas, G, 'Long run Sunday', () => true)).toBe(true);
+    expect(canvas.querySelector<HTMLInputElement>('[data-field="if_then.cue"]')!.value).toBe('');
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+  });
+});
