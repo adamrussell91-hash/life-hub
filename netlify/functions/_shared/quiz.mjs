@@ -1699,19 +1699,8 @@ function tutorialGroupNames(draft) {
  * scored as the Results tab scores it, with evidence items. Null when the
  * lesson isn't a published quiz. Goes before a teacher's clear are skipped.
  */
-/**
- * One student’s page passes `onlyStudent`. Then a lesson whose draft runs no quiz is skipped
- * before the quiz is read (loadQuiz would refuse it anyway). And once anyone has handed in,
- * only that student's open go is looked up: `started` and `saved` cover them alone, which is
- * all that page reads. With nobody handed in, the whole list is checked as before, since saved
- * answers decide whether the quiz shows at all.
- */
-export async function classQuizScores(store, lessonId, classId, studentIds, { onlyStudent = null } = {}) {
+export async function classQuizScores(store, lessonId, classId, studentIds) {
   if (!studentIds.length) return null;
-  if (onlyStudent) {
-    const draft = isSafeId(lessonId) ? await read(store, draftLessonKey(lessonId)) : null;
-    if (!draft || isDeletedRecord(draft) || !runsQuiz(draft.pedagogical_mode)) return null;
-  }
   let loaded;
   try {
     loaded = await loadQuiz(store, lessonId);
@@ -1729,8 +1718,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds, { on
     scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, ai_review: a.ai_review ?? 0, asked_again: a.asked_again ?? [], practice: a.practice ?? {}, writing_flags: a.writing_flags ?? 0, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
-  const lookFor = onlyStudent && Object.keys(scores).length ? [onlyStudent] : studentIds;
-  const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, lookFor, scores, store, loaded.record);
+  const { started, saved } = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store, loaded.record);
   return {
     lesson_id: lessonId,
     title: insight.title,
@@ -1747,6 +1735,48 @@ export async function classQuizScores(store, lessonId, classId, studentIds, { on
     ...(insight.sets.length ? { sets: insight.sets } : {}),
     ...(insight.tutorial_groups ? { groups: Object.fromEntries(Object.entries(insight.tutorial_groups).filter(([id]) => wanted.has(id))) } : {})
   };
+}
+
+/**
+ * One student's own standing on one quiz, for their progress page, read from their records
+ * alone: no class insight, no other student. Null when the lesson holds no published quiz.
+ *   submitted_at  their latest counted hand-in, as the class insight counts it (latest go since
+ *                 a teacher's clear with both a start and a result), else null
+ *   started       a go since the clear, not deleted, with nothing handed in yet
+ * A timed go past its deadline stays started until the quiz's sweep hands it in, and a finished
+ * live round counts once it is folded; both run whenever the quiz's results are read.
+ */
+export async function studentQuizFacts(store, lessonId, classId, studentId) {
+  if (!isSafeId(lessonId)) return null;
+  const k = keys(lessonId);
+  const draft = await read(store, draftLessonKey(lessonId));
+  // loadQuiz's own test, without reading the quiz for a lesson type that can't hold one.
+  if (!draft || isDeletedRecord(draft) || !runsQuiz(draft.pedagogical_mode)) return null;
+  const owner = deviceHash(`student:${classId}:${studentId}`);
+  const numbers = (list) => list.map((key) => Number(key.slice(key.lastIndexOf('/') + 1))).filter(Number.isInteger);
+  const [published, current, cleared, resultKeys, attemptKeys] = await Promise.all([
+    read(store, publishedLessonKey(lessonId)),
+    read(store, k.current),
+    read(store, k.cleared(owner)),
+    listBlobKeys(store, `quiz/${lessonId}/results/${owner}/`),
+    listBlobKeys(store, k.attempts(owner))
+  ]);
+  if (!published || !current?.version) return null;
+  const from = cleared?.from ?? 0;
+  const handed = numbers(resultKeys).filter((n) => n >= from).sort((a, b) => b - a);
+  const handedSet = new Set(handed);
+  const open = numbers(attemptKeys).filter((n) => n >= from && !handedSet.has(n));
+  const [counted, starts] = await Promise.all([
+    (async () => {
+      for (const n of handed) {
+        const [start, result] = await Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n))]);
+        if (start && result) return result.submitted_at ?? null;
+      }
+      return null;
+    })(),
+    Promise.all(open.map((n) => read(store, k.attempt(owner, n))))
+  ]);
+  return { lesson_id: lessonId, submitted_at: counted, started: starts.some((start) => start && !start.deleted) };
 }
 
 /* ── Live ──────────────────────────────────────────────────────────── */

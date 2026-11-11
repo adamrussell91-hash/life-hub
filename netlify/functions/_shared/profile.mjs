@@ -13,7 +13,8 @@ import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
-import { quizColumns, readBook, workColumns } from './markbook.mjs';
+import { readBook, workColumns } from './markbook.mjs';
+import { studentQuizFacts } from './quiz.mjs';
 import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, vivaHistoryFor, classSkillRungs } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
@@ -187,18 +188,23 @@ function phaseTimer() {
 }
 
 /**
- * The markbook load as one student's page needs it, for the lessons of their unit only: the
- * page never looks up a quiz or written work outside it. Quiz scores stay class-wide, since a
- * lesson draws as a quiz once anyone in the class has a go; written work is this student's.
+ * The markbook load as one student's page needs it, for the lessons of their unit only.
+ * Quizzes come from the student's own records (studentQuizFacts), never the class's results:
+ * a lesson is a quiz once it has a published quiz, and `scores`/`started` hold this student
+ * alone, in the shape the map and To do already read. Written work is this student's too.
  */
 async function studentView(store, roster, student, lessonIds, t = untimed) {
   const self = { ...roster, students: roster.students.filter((s) => s.id === student.id) };
-  const [{ book }, quizzes, work] = await Promise.all([
+  const [{ book }, facts, work] = await Promise.all([
     t.time('markbook_book', () => readBook(store, roster.cls.id)),
-    // Quiz scores never read the book's columns, so they start at once.
-    t.time('quizzes', async () => quizColumns(store, roster, await readBook(store, roster.cls.id).then((r) => r.book), lessonIds, { size: PAGE_READS, onlyStudent: student.id })),
+    t.time('quizzes', () => mapBounded(lessonIds, PAGE_READS, (id) => studentQuizFacts(store, id, roster.cls.id, student.id))),
     t.time('work', () => workColumns(store, self, lessonIds, { size: PAGE_READS }))
   ]);
+  const quizzes = facts.filter(Boolean).map((f) => ({
+    lesson_id: f.lesson_id,
+    scores: f.submitted_at ? { [student.id]: { submitted_at: f.submitted_at } } : {},
+    started: f.started ? [student.id] : []
+  }));
   return { markbook: book, quizzes, work };
 }
 

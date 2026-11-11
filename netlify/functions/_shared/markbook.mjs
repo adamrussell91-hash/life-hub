@@ -125,11 +125,11 @@ export async function workColumns(store, roster, lessonIds, { size = 8 } = {}) {
 }
 
 /** Quiz lessons that someone on the list has handed in, or saved answers on. */
-export async function quizColumns(store, roster, book, lessonIds, { size = 8, onlyStudent = null } = {}) {
+export async function quizColumns(store, roster, book, lessonIds) {
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, size, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids, { onlyStudent }));
+  const found = await mapBounded(lessonIds, 8, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
   return found
     // A quiz shows once someone handed in, or has answers saved on a go they haven't handed in.
     .filter((q) => q && (Object.keys(q.scores).length || q.saved))
