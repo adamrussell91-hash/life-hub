@@ -859,6 +859,8 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
       const hardest = rows.filter((r) => r.answered).sort((a, b) => a.right / a.answered - b.right / b.answered)[0];
       return `Class got ${Math.round((right / answered) * 100)}%${hardest ? ` · hardest: quote ${hardest.index + 1}` : ''}`;
     }
+    // Race wording only: custom kinds use seat progress for their own things (quick checks, steps).
+    if (v.style !== 'race') return '';
     const total = v.seats.reduce((a, s) => a + (s.progress?.total ?? 0), 0);
     const done = v.seats.reduce((a, s) => a + (s.progress?.done ?? 0), 0);
     const fin = v.seats.filter((s) => s.finished).length;

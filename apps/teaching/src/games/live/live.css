@@ -256,8 +256,9 @@ html.gl-board-open, html.gl-board-open body { overflow: hidden; }
   .gl-join-card__code b { font-size: 2.6em; }
   /* One row of controls, so they never sit on the ticker. */
   .gl-controls { flex-wrap: nowrap; }
-  .gl-controls__tools, .gl-controls__main { flex-wrap: nowrap; }
-  .gl-controls__tools { min-width: 0; overflow: hidden; }
+  .gl-controls__tools { flex-wrap: nowrap; flex-shrink: 0; }
+  /* A kind with many teacher buttons wraps them upward rather than covering Close board. */
+  .gl-controls__main { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
   .gl-controls .gl-btn { padding: 0 0.7em; }
 }
 @media (max-width: 760px) {

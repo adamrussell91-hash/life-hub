@@ -136,7 +136,7 @@ describe('live board: kinds with their own rules', () => {
     expect(probes[0]!.disposed).toBe(true);
     expect(root.querySelector('.dummy-board')).toBeNull();
     const pods = [...root.querySelectorAll('.gl-pod')];
-    expect(pods.map((p) => p.querySelector('.gl-pod__name')?.textContent)).toEqual(['Otters', 'Kestrels', undefined]);
+    expect(pods.map((p) => p.querySelector('.gl-pod__name')?.textContent)).toEqual(['Otters', 'Kestrels']);
     expect(root.querySelector('.gl-pod--p1 .gl-av--team')?.textContent).toBe('1');
     expect(root.querySelector('.gl-pod--p1 .gl-pod__members')?.textContent).toBe('AB · EF');
   });
