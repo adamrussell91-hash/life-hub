@@ -11,9 +11,9 @@ import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
-import { draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, publishedLessonKey, SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
-import { classLessonIds, quizColumns, readBook, workColumns } from './markbook.mjs';
+import { quizColumns, readBook, workColumns } from './markbook.mjs';
 import { progressFor, returnedFor, pieceFor, markSeen, stepsFor, unseenFor, skillsFor, vivaHistoryFor, classSkillRungs } from './profile-feedback.mjs';
 import { listClassDone, listDone, markDone, recordDone, removeDone, undoTick } from './profile-done.mjs';
 import { STUDENT_ID_PATTERN } from './student-initials.mjs';
@@ -21,7 +21,7 @@ import { lessonsForStudent, routeRoleOf } from './lesson-assign.mjs';
 import { deleteTeacherNote, saveTeacherNote, teacherNotes } from './teacher-notes.mjs';
 import { teacherHabits } from './teacher-habits.mjs';
 import { todoFor } from './profile-todo.mjs';
-import { mapBounded } from './blobs-list.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { requestStore } from './request-store.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
@@ -30,18 +30,27 @@ const ROLES = new Set(['core', 'support', 'extension', 'optional']);
  * The class's current unit, lessons in unit order with their route role. A trashed unit is
  * skipped for the next one the class has, even while the class still names it.
  */
-async function unitLessons(store, cls) {
-  let unit = null;
+async function classUnit(store, cls) {
   for (const unitId of [cls.current_unit_id, ...(cls.active_unit_ids ?? [])]) {
     const found = isSafeId(unitId) ? await read(store, unitKey(unitId)) : null;
-    if (found && !isDeletedRecord(found)) { unit = found; break; }
+    if (found && !isDeletedRecord(found)) return found;
   }
+  return null;
+}
+
+/** The unit's safe lesson ids, in unit order. */
+const unitLessonIds = (unit) => (unit?.lesson_ids ?? []).filter((id) => isSafeId(id));
+
+/** Reads per step on a progress page: its reads are many and small, and none waits on another. */
+const PAGE_READS = 16;
+
+async function unitLessons(store, unit) {
   const lessons = [];
   /** Each lesson's published copy, by id: the To do panel reads its countdowns and question sets. */
   const published = new Map();
   // Read side by side, kept in unit order.
-  const ids = (unit?.lesson_ids ?? []).filter((id) => isSafeId(id));
-  const found = await mapBounded(ids, 8, (id) => Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]));
+  const ids = unitLessonIds(unit);
+  const found = await mapBounded(ids, PAGE_READS, (id) => Promise.all([read(store, draftLessonKey(id)), read(store, publishedLessonKey(id))]));
   for (const [i, id] of ids.entries()) {
     const [lesson, copy] = found[i];
     // Students only ever see lessons that are published and not trashed.
@@ -165,23 +174,34 @@ function phaseTimer() {
 }
 
 /**
- * The markbook load as one student's page needs it. Quizzes stay class-wide, since a lesson
- * draws as a quiz once anyone in the class has a go; written work is read for this student only.
+ * The markbook load as one student's page needs it, for the lessons of their unit only: the
+ * page never looks up a quiz or written work outside it. Quiz scores stay class-wide, since a
+ * lesson draws as a quiz once anyone in the class has a go; written work is this student's.
  */
-async function studentView(store, roster, student, t = untimed) {
-  const [{ book }, lessonIds] = await Promise.all([t.time('markbook_book', () => readBook(store, roster.cls.id)), t.time('lesson_ids', () => classLessonIds(store, roster))]);
+async function studentView(store, roster, student, lessonIds, t = untimed) {
   const self = { ...roster, students: roster.students.filter((s) => s.id === student.id) };
-  const [quizzes, work] = await Promise.all([t.time('quizzes', () => quizColumns(store, roster, book, lessonIds)), t.time('work', () => workColumns(store, self, lessonIds))]);
+  const [{ book }, quizzes, work] = await Promise.all([
+    t.time('markbook_book', () => readBook(store, roster.cls.id)),
+    // Quiz scores never read the book's columns, so they start at once.
+    t.time('quizzes', async () => quizColumns(store, roster, await readBook(store, roster.cls.id).then((r) => r.book), lessonIds, { size: PAGE_READS })),
+    t.time('work', () => workColumns(store, self, lessonIds, { size: PAGE_READS }))
+  ]);
   return { markbook: book, quizzes, work };
+}
+
+/** Starts reading the class calendar, which the map needs later; the request cache hands it on. */
+function warmSchedule(store) {
+  listBlobKeys(store, SCHEDULED_LESSON_PREFIX).then((keys) => mapBounded(keys, PAGE_READS, (key) => read(store, key))).catch(() => undefined);
 }
 
 /** The student's own unit: their lessons, the map's rows, each lesson's published copy and the markbook load. */
 async function unitState(store, roster, student, t = untimed) {
   const classId = roster.cls.id;
   // None of the three needs another, so they load side by side.
-  const [{ unit, lessons: unitList, published }, view, done] = await Promise.all([
-    t.time('unit_lessons', () => unitLessons(store, roster.cls)),
-    t.time('markbook_view', () => studentView(store, roster, student, t)),
+  const unit = await t.time('unit', () => classUnit(store, roster.cls));
+  const [{ lessons: unitList, published }, view, done] = await Promise.all([
+    t.time('unit_lessons', () => unitLessons(store, unit)),
+    t.time('markbook_view', () => studentView(store, roster, student, unitLessonIds(unit), t)),
     t.time('done', () => listDone(store, classId, student.id))
   ]);
   // Side lessons only reach the students they are set for; the map never carries the others' titles.
@@ -193,6 +213,7 @@ async function unitState(store, roster, student, t = untimed) {
 async function progressPage(rawStore, roster, student, now, t = untimed) {
   // The page's helpers share the class, markbook, schedule and pieces: each is read once.
   const store = requestStore(t.store(rawStore));
+  warmSchedule(store);
   const state = await t.time('state', () => unitState(store, roster, student, t));
   const [progress, map, todo] = await Promise.all([
     t.time('feedback', () => progressFor(store, roster, student)),
@@ -209,6 +230,7 @@ async function mapPayload(store, roster, { unit, lessons, rows }) {
 
 async function profileFor(rawStore, roster, student) {
   const store = requestStore(rawStore);
+  warmSchedule(store);
   return { need: null, initials: student.initials, map: await mapPayload(store, roster, await unitState(store, roster, student)) };
 }
 

@@ -89,11 +89,27 @@ test('the teacher can ask a progress read where its time went; without asking, n
   const plain = await teacherProfileAction(raw, 'class1', { action: 'progress', student_id: id });
   assert.equal('timing' in plain, false);
   const timed = await teacherProfileAction(raw, 'class1', { action: 'progress', student_id: id, timing: true });
-  for (const phase of ['roster', 'state', 'unit_lessons', 'markbook_view', 'markbook_book', 'lesson_ids', 'quizzes', 'work', 'done', 'feedback', 'map', 'todo']) {
+  for (const phase of ['roster', 'state', 'unit_lessons', 'markbook_view', 'markbook_book', 'unit', 'quizzes', 'work', 'done', 'feedback', 'map', 'todo']) {
     assert.equal(typeof timed.timing.phases[phase], 'number', phase);
   }
   assert.ok(timed.timing.blobs.get > 0);
   assert.equal(typeof timed.timing.total_ms, 'number');
   const { timing, ...rest } = timed;
   assert.deepEqual(rest, plain, 'the page itself is the same');
+});
+
+test('the progress page looks up quizzes and writing only for its unit, not other lessons on the calendar', async () => {
+  const raw = countingStore([
+    ['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', current_unit_id: 'unit1', active_unit_ids: ['unit2'], students: [{ name: 'Ana Ames' }], homepage: { announcements: [] } }],
+    ['units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1'] }],
+    ['units/unit2', { id: 'unit2', title: 'Drama', lesson_ids: ['d1'] }],
+    ['markbook/class1', { columns: [], marks: {}, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] }],
+    ['scheduled_lessons/r1', { id: 'r1', class_id: 'class1', lesson_id: 'x1', date: '2026-11-02' }],
+    ['lessons/l1', { id: 'l1', title: 'Lesson one' }],
+    ['published/lessons/l1', { id: 'l1', title: 'Lesson one', blocks: [] }]
+  ]);
+  const roster = await loadRoster(raw, 'class1');
+  const out = await teacherProfileAction(raw, 'class1', { action: 'progress', student_id: roster.students[0].id });
+  assert.deepEqual(out.map.lessons.map((l) => l.id), ['l1']);
+  for (const other of ['d1', 'x1']) assert.equal(raw.gets.has(`quiz/${other}/current`), false, `${other} is not on this page`);
 });
