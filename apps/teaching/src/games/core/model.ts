@@ -118,6 +118,10 @@ export type LiveContent = {
   jeopardy?: { categories: Array<{ id: string; title: string; tiles: Array<{ id: string; item: string; value: number; double: boolean }> }>; final?: string };
   /** Wheel: puzzles in order with their category, letter-question ids and explain id. The line itself stays in `items[puzzle id]` (a term key). */
   wheel?: { puzzles: Array<{ id: string; category: string; bank: string[]; explain?: string }> };
+  /** Articulate and Pictionary: each card's banned words, every clue (the quick check's options come from them) and what to draw. Term and quote text stay in the item keys. */
+  cards?: Record<string, { banned: string[]; clues: Array<{ kind: string; text: string }>; draw?: string }>;
+  /** Battles: the prompt students write to, what makes one answer better, the chips judges can tick and the prompt's tags. */
+  battle?: { prompt: string; criterion: string; chips: string[]; tags: string[] };
 };
 
 /**
@@ -703,6 +707,24 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
         puzzles: game.puzzles.map((p) => ({ id: p.id, category: p.category.trim(), bank: p.bank.map((i) => i.id), ...(p.explain ? { explain: p.explain.id } : {}) }))
       };
     }
+  }
+  if (game.kind === 'articulate' || game.kind === 'pictionary') {
+    const cards: NonNullable<LiveContent['cards']> = {};
+    for (const item of game.items) {
+      const terms = item.shape === 'term' ? item : null;
+      cards[item.id] = {
+        banned: (terms?.banned ?? []).map((w) => w.trim()).filter(Boolean),
+        clues: (terms?.clues ?? []).filter((c) => c.text.trim()).map((c) => ({ kind: c.kind, text: c.text.trim() })),
+        ...(terms?.draw_prompt?.trim() ? { draw: terms.draw_prompt.trim() } : {})
+      };
+    }
+    keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
+  }
+  if (game.kind === 'battles') {
+    keys.live = {
+      items: [],
+      battle: { prompt: game.prompt.trim(), criterion: game.criterion.trim(), chips: game.chips.map((c) => c.trim()).filter(Boolean), tags: evidenceTags(game) }
+    };
   }
 
   const pub: PublicGame = {
