@@ -713,7 +713,45 @@ export const wheelRules: RoomRules<WheelState> = {
   },
   view(ctx, k, role, owner) {
     return view(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
   }
 };
+
+/** Dev preview only: a simulated classmate (answers, spins, calls letters, solves now and then). */
+function botMove(ctx: RulesCtx, k: WheelState, owner: string): { move: SoloEvent } | { control: KindControl } | null {
+  const pz = puzzle(ctx, k);
+  if (!pz) return null;
+  const r = ctx.random();
+  const q = k.q;
+  if (q && !q.closed && !q.answers[owner] && (q.kind === 'explain' || q.asked.includes(owner))) {
+    const key = ctx.keys.items[q.item];
+    const pub = publicItem(ctx.keys, q.item);
+    const right = r < 0.65;
+    let response: unknown = { text: 'not sure' };
+    if (key?.shape === 'term') response = { text: right ? key.answers[0] : 'not sure' };
+    if (key?.shape === 'question' && key.key.answer.type === 'choice') {
+      const ok = key.key.answer.ids;
+      const opts = pub?.shape === 'question' ? ((pub.question as { options?: Array<{ id: string }> }).options ?? []).map((o) => o.id) : [];
+      response = { selected: [right ? ok[0] : opts.find((o) => !ok.includes(o)) ?? ok[0]] };
+    }
+    if (key?.shape === 'question' && key.key.answer.type === 'boolean') response = { value: right ? key.key.answer.value : !key.key.answer.value };
+    return { move: { item: q.item, move: 'answer', response } };
+  }
+  if (k.captain === owner && k.stage === 'turn') return { control: { name: 'spin', data: { power: 0.3 + r * 0.7 } } };
+  if (k.captain === owner && k.stage === 'letter') {
+    const unused = [...ALPHABET].filter((l) => !VOWELS.includes(l) && !k.used.includes(l));
+    const inLine = unused.filter((l) => pz.board.includes(l));
+    const pickFrom = inLine.length && r < 0.75 ? inLine : unused;
+    return pickFrom.length ? { control: { name: 'letter', data: { letter: pickFrom[Math.floor(ctx.random() * pickFrom.length)] } } } : null;
+  }
+  // Private solving: likelier the more letters show; some guesses are wrong.
+  if (SOLVING.has(k.stage) && !k.solves[owner] && (k.locks[owner] ?? 0) <= ctx.now) {
+    const share = shownCount(pz.board, k.used) / Math.max(1, lettersOf(pz.board).length);
+    if (share > 0.3 && r < share * 0.12) return { move: { item: pz.id, move: 'solve', response: { text: ctx.random() < 0.3 + share * 0.6 ? pz.line : `${pz.line} again` } } };
+  }
+  return null;
+}
 
 registerRules(wheelRules);

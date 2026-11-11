@@ -1082,6 +1082,8 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       }
       parts.push(keys);
     }
+    // On a turn the vowel row shows only when the team can afford one.
+    if (!earned && !canVowel) return void root.replaceChildren(...parts);
     parts.push(el('span', 'wf-lbl', `${earned ? 'Or buy' : 'Buy'} a vowel · ${w.vowel_cost}${canVowel ? '' : ' (not enough round points)'}`));
     const vkeys = el('div', 'wf-keys wf-keys--v');
     for (const L of VOWELS) {
