@@ -77,3 +77,22 @@ export const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 /** "1,240" (en-AU). */
 export const fmt = (n: number): string => Math.round(n).toLocaleString('en-AU');
+
+/**
+ * DEV ONLY ("Simulate class"): a classmate's answer to an item, right about
+ * `rightRate` of the time. Reads the item's key, so it only ever runs in the
+ * room's own reducer (the dev fake room), never on a page that shows answers.
+ */
+export function botResponse(item: ShownItem, key: GameKeys['items'][string] | undefined, rightRate: number, random: () => number): unknown {
+  const right = random() < rightRate;
+  if (key?.shape === 'term') return { text: right ? key.answers[0] ?? '' : key.decoys[0] ?? 'not sure' };
+  if (key?.shape !== 'question') return responseFor(item, item.options?.[0]?.id ?? 'true');
+  const a = key.key.answer;
+  if (a.type === 'boolean') return { value: right ? a.value : !a.value };
+  if (a.type === 'text') return { text: right ? a.accepted[0] ?? '' : 'not sure' };
+  if (a.type !== 'choice') return responseFor(item, item.options?.[0]?.id ?? 'true');
+  const opts = optionsOf(item).map((o) => o.id);
+  const wrong = opts.filter((id) => !a.ids.includes(id));
+  const pick = right || !wrong.length ? a.ids[0] : wrong[Math.floor(random() * wrong.length)];
+  return { selected: [pick] };
+}

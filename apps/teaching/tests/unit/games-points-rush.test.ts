@@ -183,3 +183,21 @@ describe('points rush rules', () => {
     expect(leaks(h.view('board', 'board'), ['Analepsis', 'Sibilance', 'o_AB'])).toEqual([]);
   });
 });
+
+describe('points rush dev bot', () => {
+  it('answers its own current item or buys an upgrade, and the room accepts it', () => {
+    const h = rulesHarness(pointsRushRules, RUSH, { seats: ['AB'] });
+    h.start();
+    let moves = 0;
+    for (let n = 0; n < 30; n++) {
+      const turn = pointsRushRules.bot!(h.ctx, h.k, 'o_AB');
+      expect(turn).not.toBeNull();
+      if (turn && 'move' in turn) {
+        moves++;
+        expect(h.move('AB', turn.move)).not.toHaveProperty('error');
+      } else if (turn) expect(h.control(turn.control.name, turn.control.data, { owner: 'o_AB', role: 'student' })).toBeUndefined();
+    }
+    expect(moves).toBeGreaterThan(10);
+    expect(h.seats.o_AB.score).toBeGreaterThan(0);
+  });
+});

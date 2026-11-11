@@ -1,7 +1,7 @@
 import type { EventResult, SoloEvent } from '../../api';
 import type { Role } from '../../core/room-protocol';
 import { registerRules, type KindControl, type RoomRules, type RulesCtx, type RulesError } from '../../core/room-rules';
-import { choiceOf, contentItems, optionsOf, shownItem, type ShownItem } from './content';
+import { botResponse, choiceOf, contentItems, optionsOf, shownItem, type ShownItem } from './content';
 
 /**
  * Wager (spec §6.8): everyone starts with 100 points; each question, answer
@@ -337,6 +337,16 @@ export const wagerRules: RoomRules<WagerState> = {
   seatChanged(ctx, k, owner) {
     ensure(ctx, k, owner);
     if (owner in k.points) ctx.setScore(owner, k.points[owner]);
+  },
+  /** DEV ONLY: a simulated classmate answers once per question (right about 6 in 10) and bets a slice of what it holds. */
+  bot(ctx, k, owner) {
+    const item = k.order[k.index];
+    if (k.stage !== 'open' || !item || owner in k.picks || !(owner in k.points)) return null;
+    const it = shown(ctx, item);
+    if (!it) return null;
+    const held = k.points[owner];
+    const bet = isFinal(k) && ctx.random() < 0.3 ? held : Math.max(k.s.min_bet, Math.round((held * (0.1 + ctx.random() * 0.5)) / 10) * 10);
+    return { move: { item, move: 'answer', response: botResponse(it, ctx.keys.items[item], 0.6, () => ctx.random()), extra: { bet } } };
   },
   view(ctx, k, role: Role, owner: string) {
     const itemId = k.order[k.index];

@@ -212,3 +212,18 @@ describe('wager views', () => {
     expect(leaks(after, ['o_CD', '"CD"'])).toEqual([]);
   });
 });
+
+describe('wager dev bot', () => {
+  it('answers each open question once with a bet the room accepts', () => {
+    const h = game();
+    if ((h.view('board', 'board') as View).stage !== 'open') h.control('next');
+    for (const ini of SEATS) {
+      const turn = wagerRules.bot!(h.ctx, h.k, `o_${ini}`);
+      expect(turn && 'move' in turn).toBe(true);
+      if (turn && 'move' in turn) expect(h.move(ini, turn.move)).not.toHaveProperty('error');
+      expect(wagerRules.bot!(h.ctx, h.k, `o_${ini}`)).toBeNull();
+    }
+    h.control('close');
+    expect(wagerRules.bot!(h.ctx, h.k, `o_${SEATS[0]}`)).toBeNull();
+  });
+});

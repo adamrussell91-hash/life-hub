@@ -1,7 +1,7 @@
 import type { EventResult, SoloEvent } from '../../api';
 import type { Role } from '../../core/room-protocol';
 import { registerRules, type KindControl, type RoomRules, type RulesCtx, type RulesError } from '../../core/room-rules';
-import { contentItems, shownItem } from '../wager/content';
+import { botResponse, contentItems, shownItem } from '../wager/content';
 import { applyAnswer, autoGoal, buy, MILESTONES, newRunner, nextItem, runnerSummary, shopRows, UPGRADES, type Runner, type Upgrade } from './engine';
 
 /**
@@ -169,6 +169,16 @@ export const pointsRushRules: RoomRules<RushState> = {
   },
   finish(ctx, k) {
     finishRush(ctx, k);
+  },
+  /** DEV ONLY: a simulated classmate answers its own stream (right about 7 in 10) and now and then buys an upgrade. */
+  bot(ctx, k, owner) {
+    const r = k.runners[owner];
+    if (k.over || !r?.cur) return null;
+    const can = shopRows(r).filter((x) => x.can);
+    if (can.length && ctx.random() < 0.2) return { control: { name: 'buy', data: { up: can[Math.floor(ctx.random() * can.length)].key } } };
+    const it = shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === r.cur?.item));
+    if (!it) return null;
+    return { move: { item: r.cur.item, move: 'answer', response: botResponse(it, ctx.keys.items[r.cur.item], 0.7, () => ctx.random()) } };
   },
   seatChanged(ctx, k, owner) {
     syncGoal(ctx, k);
